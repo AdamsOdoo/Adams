@@ -1,5 +1,7 @@
 # Task Tracking
 
+> Updated to reflect the consolidated 7-agent system. See docs/system/AGENT_SYSTEM.md.
+
 ## Status Legend
 - TODO: Not started
 - IN_PROGRESS: Being worked on
@@ -7,6 +9,16 @@
 - DONE: Completed and validated
 - BLOCKED: Cannot proceed
 - BUG: Defect found
+
+## Phase 0: System Design (COMPLETE)
+
+| Task ID | Description | Status |
+|---------|-------------|--------|
+| TASK-000A | Multi-agent architecture design (7-agent consolidated) | DONE |
+| TASK-000B | Competitive analysis & feature matrix | DONE |
+| TASK-000C | Odoo v19 technical reference | DONE |
+| TASK-000D | Shopify API technical reference | DONE |
+| TASK-000E | UX & configuration design | DONE |
 
 ---
 
