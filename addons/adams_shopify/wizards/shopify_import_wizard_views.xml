@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Import Data Wizard -->
+    <record id="shopify_import_wizard_view_form" model="ir.ui.view">
+        <field name="name">shopify.import.wizard.form</field>
+        <field name="model">shopify.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import from Shopify">
+                <group>
+                    <field name="backend_id"/>
+                </group>
+                <group string="What to Import">
+                    <field name="import_products"/>
+                    <field name="import_customers"/>
+                    <field name="import_orders"/>
+                    <field name="order_days"
+                           invisible="not import_orders"/>
+                </group>
+                <div class="alert alert-info" role="alert">
+                    Initial import may take several minutes for large stores.
+                    Products and customers are imported in batches.
+                    You can continue working while the import runs.
+                </div>
+                <footer>
+                    <button name="action_import" type="object"
+                            string="Start Import" class="oe_highlight"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_import_wizard_action" model="ir.actions.act_window">
+        <field name="name">Import Data</field>
+        <field name="res_model">shopify.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

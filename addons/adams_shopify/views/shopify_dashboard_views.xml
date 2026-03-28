@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Dashboard Action using Kanban of backends -->
+    <record id="shopify_dashboard_action" model="ir.actions.act_window">
+        <field name="name">Shopify Dashboard</field>
+        <field name="res_model">shopify.backend</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Connect your first Shopify store
+            </p>
+            <p>
+                Set up your Shopify store connection to start syncing
+                products, orders, customers, and inventory.
+            </p>
+        </field>
+    </record>
+
+    <!-- Dashboard Kanban View -->
+    <record id="shopify_backend_view_kanban" model="ir.ui.view">
+        <field name="name">shopify.backend.kanban.dashboard</field>
+        <field name="model">shopify.backend</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_dashboard" create="true">
+                <field name="name"/>
+                <field name="shop_url"/>
+                <field name="shop_name"/>
+                <field name="state"/>
+                <field name="last_sync_date"/>
+                <field name="product_bind_count"/>
+                <field name="customer_bind_count"/>
+                <field name="order_bind_count"/>
+                <field name="product_error_count"/>
+                <templates>
+                    <t t-name="card" class="flex-row">
+                        <aside>
+                            <field name="state" widget="badge"
+                                   decoration-success="state == 'connected'"
+                                   decoration-danger="state == 'error'"
+                                   decoration-info="state == 'draft'"/>
+                        </aside>
+                        <main>
+                            <field name="name" class="fw-bold fs-4"/>
+                            <field name="shop_url" class="text-muted"/>
+                            <div class="d-flex gap-4 mt-2">
+                                <div>
+                                    <span class="fw-bold"><field name="product_bind_count"/></span>
+                                    <span class="text-muted ms-1">Products</span>
+                                </div>
+                                <div>
+                                    <span class="fw-bold"><field name="customer_bind_count"/></span>
+                                    <span class="text-muted ms-1">Customers</span>
+                                </div>
+                                <div>
+                                    <span class="fw-bold"><field name="order_bind_count"/></span>
+                                    <span class="text-muted ms-1">Orders</span>
+                                </div>
+                            </div>
+                            <div t-if="record.product_error_count.raw_value > 0" class="mt-1">
+                                <span class="text-danger fw-bold">
+                                    <field name="product_error_count"/> errors
+                                </span>
+                            </div>
+                            <div class="text-muted mt-1" t-if="record.last_sync_date.raw_value">
+                                Last sync: <field name="last_sync_date"/>
+                            </div>
+                        </main>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+</odoo>

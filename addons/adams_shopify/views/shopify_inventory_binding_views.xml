@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_inventory_binding_view_tree" model="ir.ui.view">
+        <field name="name">shopify.inventory.binding.tree</field>
+        <field name="model">shopify.inventory.binding</field>
+        <field name="arch" type="xml">
+            <tree string="Shopify Inventory Bindings">
+                <field name="backend_id"/>
+                <field name="variant_binding_id"/>
+                <field name="shopify_inventory_item_id"/>
+                <field name="shopify_location_id"/>
+                <field name="last_pushed_qty"/>
+                <field name="sync_status" widget="badge"
+                       decoration-success="sync_status == 'synced'"
+                       decoration-danger="sync_status == 'error'"/>
+                <field name="last_sync_date"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="shopify_inventory_binding_action" model="ir.actions.act_window">
+        <field name="name">Shopify Inventory</field>
+        <field name="res_model">shopify.inventory.binding</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,166 @@
+import logging
+
+from .base_importer import BaseImporter
+from .checksum import customer_checksum, shopify_customer_checksum
+from ..shopify_api.queries.customer import FETCH_CUSTOMERS
+
+_logger = logging.getLogger(__name__)
+
+
+class CustomerImporter(BaseImporter):
+    entity_name = 'customer'
+    binding_model = 'shopify.customer.binding'
+
+    def _compute_shopify_checksum(self, node):
+        return shopify_customer_checksum(node)
+
+    def _import_one(self, node, existing_binding=None):
+        shopify_id = node.get('id')
+        vals = self._map_to_odoo(node)
+        checksum = self._compute_shopify_checksum(node)
+
+        if existing_binding:
+            existing_binding.odoo_id.write(vals)
+            existing_binding._mark_synced(checksum=checksum)
+        else:
+            partner = self._find_odoo_partner(node)
+            if not partner:
+                vals['is_shopify_customer'] = True
+                partner = self.env['res.partner'].create(vals)
+            else:
+                partner.write(vals)
+
+            self.env['shopify.customer.binding'].create({
+                'backend_id': self.backend.id,
+                'odoo_id': partner.id,
+                'shopify_id': shopify_id,
+                'shopify_email': node.get('email', ''),
+                'shopify_tags': ', '.join(node.get('tags', [])) if isinstance(node.get('tags'), list) else node.get('tags', ''),
+                'sync_status': 'synced',
+                'sync_checksum': checksum,
+                'last_sync_date': self.env.cr.now(),
+            })
+
+            # Import addresses
+            self._import_addresses(partner, node)
+
+    def _map_to_odoo(self, node):
+        first_name = node.get('firstName', '') or ''
+        last_name = node.get('lastName', '') or ''
+        name = f"{first_name} {last_name}".strip() or node.get('email', 'Unknown')
+
+        vals = {
+            'name': name,
+            'email': node.get('email') or False,
+            'phone': node.get('phone') or False,
+            'customer_rank': 1,
+        }
+
+        default_addr = node.get('defaultAddress') or {}
+        if default_addr:
+            country = self._resolve_country(default_addr.get('countryCodeV2'))
+            state = self._resolve_state(
+                default_addr.get('provinceCode'),
+                country,
+            )
+            vals.update({
+                'street': default_addr.get('address1') or False,
+                'street2': default_addr.get('address2') or False,
+                'city': default_addr.get('city') or False,
+                'zip': default_addr.get('zip') or False,
+                'country_id': country.id if country else False,
+                'state_id': state.id if state else False,
+            })
+
+        return vals
+
+    def _find_odoo_partner(self, node):
+        """Deduplicate by email (default strategy)."""
+        email = node.get('email')
+        if email:
+            return self.env['res.partner'].search([
+                ('email', '=ilike', email),
+                ('parent_id', '=', False),
+            ], limit=1)
+        return None
+
+    def _import_addresses(self, partner, node):
+        """Import additional Shopify addresses as child contacts."""
+        addresses = node.get('addresses', [])
+        # Skip first address (already set on main partner from defaultAddress)
+        for addr in addresses[1:]:
+            country = self._resolve_country(addr.get('countryCodeV2'))
+            state = self._resolve_state(addr.get('provinceCode'), country)
+            self.env['res.partner'].create({
+                'parent_id': partner.id,
+                'type': 'other',
+                'name': partner.name,
+                'street': addr.get('address1') or False,
+                'street2': addr.get('address2') or False,
+                'city': addr.get('city') or False,
+                'zip': addr.get('zip') or False,
+                'country_id': country.id if country else False,
+                'state_id': state.id if state else False,
+                'phone': addr.get('phone') or False,
+            })
+
+    def _resolve_country(self, country_code):
+        if not country_code:
+            return None
+        return self.env['res.country'].search([
+            ('code', '=', country_code),
+        ], limit=1)
+
+    def _resolve_state(self, state_code, country):
+        if not state_code or not country:
+            return None
+        return self.env['res.country.state'].search([
+            ('code', '=', state_code),
+            ('country_id', '=', country.id),
+        ], limit=1)
+
+
+class CustomerSync:
+    """Orchestrates customer sync."""
+
+    def __init__(self, env, backend):
+        self.env = env
+        self.backend = backend
+        self.importer = CustomerImporter(env, backend)
+
+    def import_customers(self):
+        nodes = self.importer.client.fetch_paginated(
+            FETCH_CUSTOMERS, 'customers',
+            page_size=self.backend.batch_size,
+            estimated_cost_per_page=12,
+        )
+        return self.importer.import_batch(nodes)
+
+    def import_single_customer(self, webhook_data):
+        """Import from webhook (REST payload)."""
+        shopify_id = f"gid://shopify/Customer/{webhook_data.get('id', '')}"
+        try:
+            from ..shopify_api.client import ShopifyClient
+            client = ShopifyClient(self.backend)
+            query = """
+            query GetCustomer($id: ID!) {
+              customer(id: $id) {
+                id firstName lastName email phone tags state
+                defaultAddress {
+                  address1 address2 city province provinceCode
+                  country countryCodeV2 zip phone
+                }
+                addresses {
+                  address1 address2 city province provinceCode
+                  country countryCodeV2 zip phone
+                }
+              }
+            }
+            """
+            body = client.execute(query, {'id': shopify_id}, estimated_cost=5)
+            node = body.get('data', {}).get('customer')
+            if node:
+                binding = self.importer._find_binding(shopify_id)
+                self.importer._import_one(node, binding)
+        except Exception:
+            _logger.exception("Failed to import customer from webhook: %s", shopify_id)

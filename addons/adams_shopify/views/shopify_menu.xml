@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Top-level App Menu -->
+    <menuitem id="menu_shopify_root"
+              name="Shopify"
+              web_icon="adams_shopify,static/description/icon.png"
+              sequence="50"/>
+
+    <!-- Dashboard -->
+    <menuitem id="menu_shopify_dashboard"
+              name="Dashboard"
+              parent="menu_shopify_root"
+              action="shopify_dashboard_action"
+              sequence="10"/>
+
+    <!-- Configuration -->
+    <menuitem id="menu_shopify_configuration"
+              name="Configuration"
+              parent="menu_shopify_root"
+              groups="adams_shopify.group_shopify_manager"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_stores"
+              name="Shopify Stores"
+              parent="menu_shopify_configuration"
+              action="shopify_backend_action"
+              sequence="10"/>
+
+    <!-- Operations -->
+    <menuitem id="menu_shopify_operations"
+              name="Operations"
+              parent="menu_shopify_root"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_sync_now"
+              name="Sync Now"
+              parent="menu_shopify_operations"
+              action="shopify_sync_wizard_action"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_import_data"
+              name="Import Data"
+              parent="menu_shopify_operations"
+              action="shopify_import_wizard_action"
+              sequence="20"/>
+
+    <!-- Sync Status -->
+    <menuitem id="menu_shopify_sync_status"
+              name="Sync Status"
+              parent="menu_shopify_root"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_products"
+              name="Products"
+              parent="menu_shopify_sync_status"
+              action="shopify_product_binding_action"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_customers"
+              name="Customers"
+              parent="menu_shopify_sync_status"
+              action="shopify_customer_binding_action"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_orders"
+              name="Orders"
+              parent="menu_shopify_sync_status"
+              action="shopify_order_binding_action"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_inventory"
+              name="Inventory"
+              parent="menu_shopify_sync_status"
+              action="shopify_inventory_binding_action"
+              sequence="40"/>
+
+    <!-- Logs -->
+    <menuitem id="menu_shopify_logs"
+              name="Logs"
+              parent="menu_shopify_root"
+              sequence="50"/>
+
+    <menuitem id="menu_shopify_sync_log"
+              name="Sync Log"
+              parent="menu_shopify_logs"
+              action="shopify_sync_log_action"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_webhook_log"
+              name="Webhook Log"
+              parent="menu_shopify_logs"
+              action="shopify_webhook_log_action"
+              sequence="20"/>
+
+</odoo>
