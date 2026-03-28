@@ -135,7 +135,29 @@
                             </group>
                         </page>
 
-                        <!-- Tab 3: Logs & Status -->
+                        <!-- Tab 3: Field Mapping -->
+                        <page string="Field Mapping" name="field_mapping"
+                              groups="adams_shopify.group_shopify_manager">
+                            <div class="mb-3">
+                                <button name="action_init_field_mappings" type="object"
+                                        string="Load Default Mappings"
+                                        class="btn-secondary"
+                                        invisible="field_mapping_ids"/>
+                            </div>
+                            <field name="field_mapping_ids" nolabel="1"
+                                   context="{'default_backend_id': active_id}">
+                                <tree editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="entity"/>
+                                    <field name="odoo_field"/>
+                                    <field name="shopify_field"/>
+                                    <field name="direction"/>
+                                    <field name="active"/>
+                                </tree>
+                            </field>
+                        </page>
+
+                        <!-- Tab 4: Logs & Status -->
                         <page string="Logs &amp; Status" name="logs_status">
                             <group>
                                 <field name="last_sync_date"/>

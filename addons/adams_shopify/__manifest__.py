@@ -1,17 +1,18 @@
 {
     'name': 'Adams Shopify Connector',
-    'version': '19.0.0.3.0',
+    'version': '19.0.1.0.0',
     'category': 'Sales/Sales',
     'summary': 'Sync products, orders, customers and inventory with Shopify',
     'author': 'Adams',
     'website': 'https://github.com/adamsodoo/adams',
-    'license': 'LGPL-3',
+    'license': 'OPL-1',
     'depends': [
         'adams_base',
         'product',
         'sale_management',
         'stock',
         'contacts',
+        'mail',
     ],
     'external_dependencies': {
         'python': ['requests'],
@@ -33,6 +34,7 @@
         'views/sale_order_views.xml',
         'wizards/shopify_sync_wizard_views.xml',
         'wizards/shopify_import_wizard_views.xml',
+        'views/shopify_field_mapping_views.xml',
         'views/shopify_menu.xml',
     ],
     'demo': [],
@@ -40,5 +42,5 @@
     'installable': True,
     'application': True,
     'auto_install': False,
-    'images': ['static/description/banner.png'],
+    'images': ['static/description/icon.png'],
 }

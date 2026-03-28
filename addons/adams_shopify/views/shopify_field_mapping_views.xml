@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_field_mapping_view_tree" model="ir.ui.view">
+        <field name="name">shopify.field.mapping.tree</field>
+        <field name="model">shopify.field.mapping</field>
+        <field name="arch" type="xml">
+            <tree string="Field Mappings" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="entity"/>
+                <field name="odoo_field"/>
+                <field name="shopify_field"/>
+                <field name="direction"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+</odoo>

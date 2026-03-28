@@ -119,7 +119,7 @@ class InventorySync:
                     inv_binding.write({'last_pushed_qty': item['quantity']})
                 else:
                     self.env['shopify.inventory.binding'].create({
-                        'backend_id': self.env.context.get('active_backend_id', batch[0]['variant_binding'].backend_id.id),
+                        'backend_id': self.backend.id,
                         'variant_binding_id': item['variant_binding'].id,
                         'shopify_inventory_item_id': item['inventory_item_id'],
                         'shopify_location_id': location_id,

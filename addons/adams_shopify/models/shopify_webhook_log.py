@@ -75,6 +75,10 @@ class ShopifyWebhookLog(models.Model):
             'inventory_levels/update': '_handle_inventory_webhook',
             'fulfillments/create': '_handle_fulfillment_webhook',
             'app/uninstalled': '_handle_app_uninstalled',
+            # GDPR mandatory compliance webhooks
+            'customers/data_request': '_handle_gdpr_data_request',
+            'customers/redact': '_handle_gdpr_customer_redact',
+            'shop/redact': '_handle_gdpr_shop_redact',
         }
 
         method_name = handler_map.get(topic)
@@ -127,3 +131,92 @@ class ShopifyWebhookLog(models.Model):
     def _handle_app_uninstalled(self, data):
         _logger.warning("App uninstalled webhook for backend %s", self.backend_id.id)
         self.backend_id.write({'state': 'error'})
+
+    # ── GDPR Compliance Handlers ────────────────────────────
+
+    def _handle_gdpr_data_request(self, data):
+        """Handle customers/data_request webhook.
+
+        Shopify sends this when a customer requests their data.
+        We log the request — the merchant must fulfill it manually
+        through Odoo's data export tools (GDPR module or similar).
+        """
+        customer_email = data.get('customer', {}).get('email', 'unknown')
+        shop_domain = data.get('shop_domain', '')
+        _logger.info(
+            "GDPR data request received for customer %s from shop %s (backend %s). "
+            "Merchant must fulfill via Odoo privacy tools.",
+            customer_email, shop_domain, self.backend_id.id,
+        )
+        # Create an activity on the backend so the admin is notified
+        self.backend_id.activity_schedule(
+            'mail.mail_activity_data_todo',
+            summary=f"GDPR Data Request: {customer_email}",
+            note=f"Shopify customer {customer_email} has requested their personal data. "
+                 f"Please export their data using Odoo's privacy tools and provide it "
+                 f"to the customer through the Shopify admin.",
+        )
+
+    def _handle_gdpr_customer_redact(self, data):
+        """Handle customers/redact webhook.
+
+        Shopify sends this when a customer requests deletion.
+        We must remove/anonymize their personal data from our systems.
+        """
+        customer_email = data.get('customer', {}).get('email', '')
+        shopify_customer_id = data.get('customer', {}).get('id')
+        orders_to_redact = data.get('orders_to_redact', [])
+
+        _logger.warning(
+            "GDPR customer redact for %s (Shopify ID: %s, backend %s). "
+            "Anonymizing customer data.",
+            customer_email, shopify_customer_id, self.backend_id.id,
+        )
+
+        if shopify_customer_id:
+            shopify_gid = f"gid://shopify/Customer/{shopify_customer_id}"
+            binding = self.env['shopify.customer.binding'].search([
+                ('backend_id', '=', self.backend_id.id),
+                ('shopify_id', '=', shopify_gid),
+            ], limit=1)
+            if binding and binding.odoo_id:
+                partner = binding.odoo_id
+                # Anonymize personal data while preserving record for accounting
+                partner.write({
+                    'name': f"Redacted Customer #{partner.id}",
+                    'email': False,
+                    'phone': False,
+                    'mobile': False,
+                    'street': False,
+                    'street2': False,
+                    'comment': "Personal data redacted per GDPR request.",
+                })
+                binding.write({
+                    'shopify_email': False,
+                    'shopify_tags': False,
+                    'sync_status': 'permanent_error',
+                    'sync_error': 'Customer data redacted (GDPR)',
+                })
+                _logger.info("Customer %s anonymized successfully", partner.id)
+
+    def _handle_gdpr_shop_redact(self, data):
+        """Handle shop/redact webhook.
+
+        Shopify sends this 48 hours after a merchant uninstalls the app.
+        We must delete all shop data from our systems.
+        """
+        shop_domain = data.get('shop_domain', '')
+        _logger.warning(
+            "GDPR shop redact received for %s (backend %s). "
+            "Scheduling data cleanup.",
+            shop_domain, self.backend_id.id,
+        )
+        # Notify admin — actual deletion requires human decision due to accounting data
+        self.backend_id.activity_schedule(
+            'mail.mail_activity_data_todo',
+            summary=f"GDPR Shop Redact: {shop_domain}",
+            note=f"Shopify shop {shop_domain} has been uninstalled and requests "
+                 f"data deletion. Review and delete all Shopify-related data for "
+                 f"this store. Note: order and invoice data may need to be retained "
+                 f"per local accounting regulations.",
+        )

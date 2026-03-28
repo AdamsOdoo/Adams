@@ -19,12 +19,15 @@ class BaseExporter:
 
     def _get_bindings_to_export(self):
         """Get bindings that need to be exported (pending or error with retry < 5)."""
-        return self.env[self.binding_model].search([
+        domain = [
             ('backend_id', '=', self.backend.id),
             ('sync_status', 'in', ['pending', 'error']),
             ('retry_count', '<', 5),
-            ('no_sync', '=', False) if 'no_sync' in self.env[self.binding_model]._fields else ('id', '!=', 0),
-        ], limit=self.backend.batch_size)
+        ]
+        model = self.env[self.binding_model]
+        if 'no_sync' in model._fields:
+            domain.append(('no_sync', '=', False))
+        return model.search(domain, limit=self.backend.batch_size)
 
     def _create_log(self, operation='export'):
         return self.env['shopify.sync.log'].create({
@@ -57,9 +60,11 @@ class BaseExporter:
                     "Export failed for %s binding %s: %s",
                     self.entity_name, binding.id, e,
                 )
-                binding._mark_error(str(e))
+                is_permanent = self._is_permanent_error(e)
+                binding._mark_error(str(e), permanent=is_permanent)
                 errors += 1
-                error_details.append(f"{binding.odoo_id.display_name}: {e}")
+                display = binding.odoo_id.display_name if binding.odoo_id else f'binding#{binding.id}'
+                error_details.append(f"{display}: {e}")
 
         log._finalize(success, errors, skipped, '\n'.join(error_details) or None)
         return success, errors, skipped
@@ -71,3 +76,16 @@ class BaseExporter:
     def _export_one(self, binding):
         """Override: export a single binding to Shopify."""
         raise NotImplementedError
+
+    @staticmethod
+    def _is_permanent_error(exc):
+        """Determine if an error should not be retried."""
+        from ..shopify_api.client import ShopifyAPIError
+        if isinstance(exc, ShopifyAPIError):
+            # 401/403/404 are not retryable
+            if exc.status_code in (401, 402, 403, 404):
+                return True
+            # Validation errors from Shopify are typically permanent
+            if exc.user_errors:
+                return True
+        return False

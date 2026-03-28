@@ -10,6 +10,7 @@ DEFAULT_API_VERSION = '2026-01'
 
 class ShopifyBackend(models.Model):
     _name = 'shopify.backend'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _description = 'Shopify Backend'
     _check_company_auto = True
 
@@ -97,6 +98,12 @@ class ShopifyBackend(models.Model):
 
     batch_size = fields.Integer(default=50)
 
+    # ── Field Mapping ───────────────────────────────────────
+    field_mapping_ids = fields.One2many(
+        'shopify.field.mapping', 'backend_id',
+        string='Field Mappings',
+    )
+
     # ── Status ──────────────────────────────────────────────
     state = fields.Selection([
         ('draft', 'Not Connected'),
@@ -181,6 +188,34 @@ class ShopifyBackend(models.Model):
                 'sticky': False,
             },
         }
+
+    def action_init_field_mappings(self):
+        """Initialize default field mappings if none exist."""
+        self.ensure_one()
+        if self.field_mapping_ids:
+            return
+        FieldMapping = self.env['shopify.field.mapping']
+        seq = 10
+        for m in FieldMapping._get_default_product_mappings():
+            FieldMapping.create({
+                'backend_id': self.id,
+                'entity': 'product',
+                'odoo_field': m['odoo_field'],
+                'shopify_field': m['shopify_field'],
+                'direction': m['direction'],
+                'sequence': seq,
+            })
+            seq += 10
+        for m in FieldMapping._get_default_customer_mappings():
+            FieldMapping.create({
+                'backend_id': self.id,
+                'entity': 'customer',
+                'odoo_field': m['odoo_field'],
+                'shopify_field': m['shopify_field'],
+                'direction': m['direction'],
+                'sequence': seq,
+            })
+            seq += 10
 
     def action_open_product_bindings(self):
         self.ensure_one()

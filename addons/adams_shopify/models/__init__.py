@@ -11,3 +11,5 @@ from . import product_template
 from . import product_product
 from . import res_partner
 from . import sale_order
+from . import shopify_field_mapping
+from . import shopify_reconciliation

@@ -1,7 +1,5 @@
 import logging
 
-from psycopg2 import IntegrityError
-
 from odoo import fields
 
 _logger = logging.getLogger(__name__)
@@ -56,19 +54,22 @@ class BaseImporter:
                     skipped += 1
                     continue
 
-                self._import_one(node, binding)
+                # Use savepoint so IntegrityError doesn't kill the whole batch
+                with self.env.cr.savepoint():
+                    self._import_one(node, binding)
                 success += 1
-            except IntegrityError:
-                self.env.cr.rollback()
-                _logger.info("Duplicate binding for %s %s — skipping", self.entity_name, shopify_id)
-                skipped += 1
             except Exception as e:
-                _logger.warning(
-                    "Import failed for %s %s: %s",
-                    self.entity_name, shopify_id, e,
-                )
-                errors += 1
-                error_details.append(f"{shopify_id}: {e}")
+                error_name = type(e).__name__
+                if 'IntegrityError' in error_name or 'UniqueViolation' in error_name:
+                    _logger.info("Duplicate binding for %s %s — skipping", self.entity_name, shopify_id)
+                    skipped += 1
+                else:
+                    _logger.warning(
+                        "Import failed for %s %s: %s",
+                        self.entity_name, shopify_id, e,
+                    )
+                    errors += 1
+                    error_details.append(f"{shopify_id}: {e}")
 
         log._finalize(success, errors, skipped, '\n'.join(error_details) or None)
         return success, errors, skipped
