@@ -5,7 +5,7 @@
         <field name="name">shopify.order.binding.tree</field>
         <field name="model">shopify.order.binding</field>
         <field name="arch" type="xml">
-            <tree string="Shopify Order Bindings"
+            <list string="Shopify Order Bindings"
                   decoration-danger="sync_status == 'error'"
                   decoration-warning="sync_status == 'pending'">
                 <field name="backend_id"/>
@@ -19,7 +19,7 @@
                        decoration-warning="sync_status == 'pending'"/>
                 <field name="shopify_created_at"/>
                 <field name="last_sync_date"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -83,7 +83,7 @@
     <record id="shopify_order_binding_action" model="ir.actions.act_window">
         <field name="name">Shopify Orders</field>
         <field name="res_model">shopify.order.binding</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
 </odoo>

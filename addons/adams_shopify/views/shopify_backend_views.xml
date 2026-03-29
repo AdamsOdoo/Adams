@@ -6,7 +6,7 @@
         <field name="name">shopify.backend.tree</field>
         <field name="model">shopify.backend</field>
         <field name="arch" type="xml">
-            <tree string="Shopify Stores">
+            <list string="Shopify Stores">
                 <field name="name"/>
                 <field name="shop_url"/>
                 <field name="shop_name"/>
@@ -16,7 +16,7 @@
                        decoration-info="state == 'draft'"/>
                 <field name="last_sync_date"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -148,14 +148,14 @@
                             </div>
                             <field name="field_mapping_ids" nolabel="1"
                                    context="{'default_backend_id': active_id}">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
                                     <field name="entity"/>
                                     <field name="odoo_field"/>
                                     <field name="shopify_field"/>
                                     <field name="direction"/>
                                     <field name="active"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
 
@@ -177,7 +177,7 @@
     <record id="shopify_backend_action" model="ir.actions.act_window">
         <field name="name">Shopify Stores</field>
         <field name="res_model">shopify.backend</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Connect your first Shopify store

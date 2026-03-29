@@ -233,7 +233,7 @@ class ShopifyBackend(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Product Bindings'),
             'res_model': 'shopify.product.binding',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': [('backend_id', '=', self.id)],
         }
 
@@ -243,7 +243,7 @@ class ShopifyBackend(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Customer Bindings'),
             'res_model': 'shopify.customer.binding',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': [('backend_id', '=', self.id)],
         }
 
@@ -253,7 +253,7 @@ class ShopifyBackend(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Order Bindings'),
             'res_model': 'shopify.order.binding',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': [('backend_id', '=', self.id)],
         }
 
@@ -263,7 +263,7 @@ class ShopifyBackend(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Sync Logs'),
             'res_model': 'shopify.sync.log',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': [('backend_id', '=', self.id)],
         }
 
@@ -359,6 +359,6 @@ class ShopifyBackend(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Promoters'),
             'res_model': 'shopify.promoter',
-            'view_mode': 'tree,form',
+            'view_mode': 'list,form',
             'domain': [('company_id', '=', self.company_id.id)],
         }

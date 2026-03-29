@@ -6,7 +6,7 @@
         <field name="name">shopify.promoter.tree</field>
         <field name="model">shopify.promoter</field>
         <field name="arch" type="xml">
-            <tree string="Promoters">
+            <list string="Promoters">
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="commission_type"/>
@@ -18,7 +18,7 @@
                        decoration-success="status == 'active'"
                        decoration-muted="status == 'inactive'"/>
                 <field name="company_id" groups="base.group_multi_company"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -80,7 +80,7 @@
                         <page string="Discount Codes" name="discount_codes">
                             <field name="discount_code_ids" nolabel="1"
                                    context="{'default_promoter_id': active_id}">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="backend_id"/>
                                     <field name="code"/>
                                     <field name="discount_type"/>
@@ -90,7 +90,7 @@
                                            decoration-success="sync_status == 'synced'"
                                            decoration-warning="sync_status == 'pending'"
                                            decoration-danger="sync_status == 'error'"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                         <page string="Performance" name="performance">
@@ -135,7 +135,7 @@
     <record id="shopify_promoter_action" model="ir.actions.act_window">
         <field name="name">Promoters</field>
         <field name="res_model">shopify.promoter</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="context">{'search_default_active_promoters': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

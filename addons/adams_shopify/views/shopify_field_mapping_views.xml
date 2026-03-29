@@ -5,14 +5,14 @@
         <field name="name">shopify.field.mapping.tree</field>
         <field name="model">shopify.field.mapping</field>
         <field name="arch" type="xml">
-            <tree string="Field Mappings" editable="bottom">
+            <list string="Field Mappings" editable="bottom">
                 <field name="sequence" widget="handle"/>
                 <field name="entity"/>
                 <field name="odoo_field"/>
                 <field name="shopify_field"/>
                 <field name="direction"/>
                 <field name="active"/>
-            </tree>
+            </list>
         </field>
     </record>
 

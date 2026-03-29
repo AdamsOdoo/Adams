@@ -5,7 +5,7 @@
         <field name="name">shopify.inventory.binding.tree</field>
         <field name="model">shopify.inventory.binding</field>
         <field name="arch" type="xml">
-            <tree string="Shopify Inventory Bindings">
+            <list string="Shopify Inventory Bindings">
                 <field name="backend_id"/>
                 <field name="variant_binding_id"/>
                 <field name="shopify_inventory_item_id"/>
@@ -15,14 +15,14 @@
                        decoration-success="sync_status == 'synced'"
                        decoration-danger="sync_status == 'error'"/>
                 <field name="last_sync_date"/>
-            </tree>
+            </list>
         </field>
     </record>
 
     <record id="shopify_inventory_binding_action" model="ir.actions.act_window">
         <field name="name">Shopify Inventory</field>
         <field name="res_model">shopify.inventory.binding</field>
-        <field name="view_mode">tree</field>
+        <field name="view_mode">list</field>
     </record>
 
 </odoo>

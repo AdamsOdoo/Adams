@@ -5,7 +5,7 @@
         <field name="name">shopify.webhook.log.tree</field>
         <field name="model">shopify.webhook.log</field>
         <field name="arch" type="xml">
-            <tree string="Webhook Logs"
+            <list string="Webhook Logs"
                   decoration-danger="state == 'error'"
                   decoration-muted="state == 'skipped'"
                   decoration-info="state == 'pending'">
@@ -20,7 +20,7 @@
                        decoration-muted="state == 'skipped'"/>
                 <field name="processed_at"/>
                 <field name="error_message" optional="hide"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -81,7 +81,7 @@
     <record id="shopify_webhook_log_action" model="ir.actions.act_window">
         <field name="name">Webhook Log</field>
         <field name="res_model">shopify.webhook.log</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
 </odoo>

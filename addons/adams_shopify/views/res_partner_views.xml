@@ -14,7 +14,7 @@
                         <field name="is_shopify_customer"/>
                     </group>
                     <field name="shopify_bind_ids" nolabel="1" readonly="1">
-                        <tree string="Shopify Bindings" create="false" delete="false">
+                        <list string="Shopify Bindings" create="false" delete="false">
                             <field name="backend_id" string="Store"/>
                             <field name="shopify_id"/>
                             <field name="shopify_email"/>
@@ -28,7 +28,7 @@
                                     invisible="sync_status != 'error'"/>
                             <button name="action_view_on_shopify" type="object"
                                     string="View on Shopify" icon="fa-external-link"/>
-                        </tree>
+                        </list>
                     </field>
                 </page>
             </xpath>

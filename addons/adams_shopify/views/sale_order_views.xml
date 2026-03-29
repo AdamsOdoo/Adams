@@ -18,7 +18,7 @@
                         </group>
                     </group>
                     <field name="shopify_bind_ids" nolabel="1" readonly="1">
-                        <tree string="Shopify Bindings" create="false" delete="false">
+                        <list string="Shopify Bindings" create="false" delete="false">
                             <field name="backend_id" string="Store"/>
                             <field name="shopify_id"/>
                             <field name="shopify_order_name"/>
@@ -34,7 +34,7 @@
                             <button name="action_retry_sync" type="object"
                                     string="Retry" icon="fa-refresh"
                                     invisible="sync_status not in ('error', 'permanent_error')"/>
-                        </tree>
+                        </list>
                     </field>
                 </page>
             </xpath>

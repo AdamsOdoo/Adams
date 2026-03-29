@@ -6,7 +6,7 @@
         <field name="name">shopify.discount.code.tree</field>
         <field name="model">shopify.discount.code</field>
         <field name="arch" type="xml">
-            <tree string="Discount Codes">
+            <list string="Discount Codes">
                 <field name="code"/>
                 <field name="promoter_id"/>
                 <field name="backend_id"/>
@@ -18,7 +18,7 @@
                        decoration-success="sync_status == 'synced'"
                        decoration-warning="sync_status == 'pending'"
                        decoration-danger="sync_status == 'error'"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -76,13 +76,13 @@
                     <notebook>
                         <page string="Usage History" name="usage_history">
                             <field name="usage_ids" nolabel="1" readonly="1">
-                                <tree>
+                                <list>
                                     <field name="date"/>
                                     <field name="sale_order_id"/>
                                     <field name="discount_amount" widget="monetary"/>
                                     <field name="order_total" widget="monetary"/>
                                     <field name="commission_amount" widget="monetary"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                     </notebook>
@@ -127,7 +127,7 @@
     <record id="shopify_discount_code_action" model="ir.actions.act_window">
         <field name="name">Discount Codes</field>
         <field name="res_model">shopify.discount.code</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a discount code
