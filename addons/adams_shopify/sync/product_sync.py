@@ -2,6 +2,8 @@ import base64
 import logging
 import requests
 
+from odoo import fields
+
 from .base_exporter import BaseExporter
 from .base_importer import BaseImporter
 from .checksum import product_checksum, shopify_product_checksum
@@ -139,7 +141,7 @@ class ProductExporter(BaseExporter):
                 'shopify_inventory_item_id': inv_item.get('id', ''),
                 'shopify_sku': sv.get('sku', ''),
                 'sync_status': 'synced',
-                'last_sync_date': self.env.cr.now(),
+                'last_sync_date': fields.Datetime.now(),
             })
 
 
@@ -188,7 +190,7 @@ class ProductImporter(BaseImporter):
                 'shopify_tags': shopify_tags,
                 'sync_status': 'synced',
                 'sync_checksum': checksum,
-                'last_sync_date': self.env.cr.now(),
+                'last_sync_date': fields.Datetime.now(),
             })
             self._import_variants(binding, node)
             self._import_images(product, node)
@@ -271,7 +273,7 @@ class ProductImporter(BaseImporter):
                     'shopify_inventory_item_id': inv_item.get('id', ''),
                     'shopify_sku': sv.get('sku', ''),
                     'sync_status': 'synced',
-                    'last_sync_date': self.env.cr.now(),
+                    'last_sync_date': fields.Datetime.now(),
                 })
 
 

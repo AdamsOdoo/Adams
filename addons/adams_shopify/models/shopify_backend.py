@@ -159,6 +159,9 @@ class ShopifyBackend(models.Model):
         self.ensure_one()
         if self.state != 'connected':
             raise UserError(_("Please test your connection first."))
+        if not self.webhook_secret:
+            raise UserError(_("Please set a Webhook Secret before registering webhooks. "
+                              "This secret is used to verify incoming webhook signatures."))
         from ..shopify_api.client import ShopifyClient
         client = ShopifyClient(self)
         topics = [

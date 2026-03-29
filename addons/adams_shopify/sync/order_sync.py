@@ -1,5 +1,7 @@
 import logging
 
+from odoo import fields
+
 from .base_importer import BaseImporter
 from .checksum import compute_checksum
 from ..shopify_api.queries.order import FETCH_ORDERS
@@ -53,7 +55,7 @@ class OrderImporter(BaseImporter):
                     'shopify_created_at': node.get('createdAt'),
                     'sync_status': 'synced',
                     'sync_checksum': checksum,
-                    'last_sync_date': self.env.cr.now(),
+                    'last_sync_date': fields.Datetime.now(),
                 })
 
     def _create_sale_order(self, node):

@@ -73,6 +73,9 @@ class ShopifyClient:
             'X-Shopify-Access-Token': self.access_token,
         })
 
+    def __repr__(self):
+        return f"<ShopifyClient shop={self.shop_url}>"
+
     @property
     def endpoint(self):
         return f"{self.shop_url}/admin/api/{self.api_version}/graphql.json"

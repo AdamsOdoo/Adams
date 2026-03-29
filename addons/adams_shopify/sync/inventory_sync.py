@@ -1,5 +1,7 @@
 import logging
 
+from odoo import fields
+
 from ..shopify_api.queries.inventory import INVENTORY_SET_QUANTITIES
 
 _logger = logging.getLogger(__name__)
@@ -126,7 +128,7 @@ class InventorySync:
                         'last_pushed_qty': item['quantity'],
                         'shopify_id': f"{item['inventory_item_id']}:{location_id}",
                         'sync_status': 'synced',
-                        'last_sync_date': self.env.cr.now(),
+                        'last_sync_date': fields.Datetime.now(),
                     })
             success = len(batch)
 

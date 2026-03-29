@@ -1,5 +1,7 @@
 import logging
 
+from odoo import fields
+
 from .base_importer import BaseImporter
 from .checksum import customer_checksum, shopify_customer_checksum
 from ..shopify_api.queries.customer import FETCH_CUSTOMERS
@@ -38,7 +40,7 @@ class CustomerImporter(BaseImporter):
                 'shopify_tags': ', '.join(node.get('tags', [])) if isinstance(node.get('tags'), list) else node.get('tags', ''),
                 'sync_status': 'synced',
                 'sync_checksum': checksum,
-                'last_sync_date': self.env.cr.now(),
+                'last_sync_date': fields.Datetime.now(),
             })
 
             # Import addresses
