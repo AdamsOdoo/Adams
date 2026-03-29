@@ -338,3 +338,27 @@ class ShopifyBackend(models.Model):
             except Exception as e:
                 _logger.exception("Customer sync failed for backend %s", backend.id)
                 backend._notify_sync_error('customers', 1, str(e))
+
+    @api.model
+    def _cron_sync_discounts(self):
+        backends = self.search([('state', '=', 'connected')])
+        for backend in backends:
+            try:
+                from ..sync.discount_sync import DiscountSync
+                syncer = DiscountSync(
+                    self.env.with_company(backend.company_id), backend,
+                )
+                syncer.export_discounts()
+            except Exception as e:
+                _logger.exception("Discount sync failed for backend %s", backend.id)
+                backend._notify_sync_error('discounts', 1, str(e))
+
+    def action_open_promoters(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Promoters'),
+            'res_model': 'shopify.promoter',
+            'view_mode': 'tree,form',
+            'domain': [('company_id', '=', self.company_id.id)],
+        }

@@ -29,3 +29,12 @@ access_shopify_field_mapping_user,shopify.field.mapping.user,model_shopify_field
 access_shopify_field_mapping_manager,shopify.field.mapping.manager,model_shopify_field_mapping,group_shopify_manager,1,1,1,1
 access_shopify_reconciliation,shopify.reconciliation,model_shopify_reconciliation,group_shopify_manager,1,1,1,1
 access_shopify_bulk_retry_wizard,shopify.bulk.retry.wizard,model_shopify_bulk_retry_wizard,group_shopify_manager,1,1,1,1
+access_shopify_promoter_user,shopify.promoter.user,model_shopify_promoter,group_shopify_user,1,0,0,0
+access_shopify_promoter_manager,shopify.promoter.manager,model_shopify_promoter,group_shopify_manager,1,1,1,0
+access_shopify_promoter_admin,shopify.promoter.admin,model_shopify_promoter,base.group_system,1,1,1,1
+access_shopify_discount_code_user,shopify.discount.code.user,model_shopify_discount_code,group_shopify_user,1,0,0,0
+access_shopify_discount_code_manager,shopify.discount.code.manager,model_shopify_discount_code,group_shopify_manager,1,1,1,0
+access_shopify_discount_code_admin,shopify.discount.code.admin,model_shopify_discount_code,base.group_system,1,1,1,1
+access_shopify_discount_usage_user,shopify.discount.usage.user,model_shopify_discount_usage,group_shopify_user,1,0,0,0
+access_shopify_discount_usage_manager,shopify.discount.usage.manager,model_shopify_discount_usage,group_shopify_manager,1,1,1,0
+access_shopify_discount_usage_admin,shopify.discount.usage.admin,model_shopify_discount_usage,base.group_system,1,1,1,1

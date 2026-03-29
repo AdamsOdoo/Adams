@@ -81,6 +81,30 @@
               action="shopify_inventory_binding_action"
               sequence="40"/>
 
+    <!-- Promoters -->
+    <menuitem id="menu_shopify_promoters_section"
+              name="Promoters"
+              parent="menu_shopify_root"
+              sequence="45"/>
+
+    <menuitem id="menu_shopify_promoters"
+              name="Promoters"
+              parent="menu_shopify_promoters_section"
+              action="shopify_promoter_action"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_discount_codes"
+              name="Discount Codes"
+              parent="menu_shopify_promoters_section"
+              action="shopify_discount_code_action"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_discount_usage"
+              name="Discount Usage"
+              parent="menu_shopify_promoters_section"
+              action="shopify_discount_usage_action"
+              sequence="30"/>
+
     <!-- Logs -->
     <menuitem id="menu_shopify_logs"
               name="Logs"

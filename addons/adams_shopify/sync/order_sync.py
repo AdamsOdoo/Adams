@@ -79,7 +79,7 @@ class OrderImporter(BaseImporter):
         else:
             order = self._create_sale_order(node)
             if order:
-                self.env['shopify.order.binding'].create({
+                order_binding = self.env['shopify.order.binding'].create({
                     'backend_id': self.backend.id,
                     'odoo_id': order.id,
                     'shopify_id': shopify_id,
@@ -91,6 +91,7 @@ class OrderImporter(BaseImporter):
                     'sync_checksum': checksum,
                     'last_sync_date': fields.Datetime.now(),
                 })
+                self._track_discount_usage(order_binding, node)
 
     def _create_sale_order(self, node):
         """Create an Odoo sale.order from Shopify order data."""
@@ -189,6 +190,44 @@ class OrderImporter(BaseImporter):
                     _logger.warning("Auto-invoice failed for order %s: %s", order.name, e)
 
         return order
+
+    def _track_discount_usage(self, order_binding, node):
+        """Check for promoter discount codes and record usage."""
+        discount_codes = node.get('discountCodes') or []
+        if not discount_codes:
+            return
+
+        # Get order total from Shopify data
+        total_price = float(
+            node.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0)
+        )
+        total_discounts = float(
+            node.get('totalDiscountsSet', {}).get('shopMoney', {}).get('amount', 0)
+        )
+
+        for code_str in discount_codes:
+            discount_binding = self.env['shopify.discount.code'].search([
+                ('backend_id', '=', self.backend.id),
+                ('code', '=ilike', code_str),
+            ], limit=1)
+            if not discount_binding:
+                continue
+
+            # Compute commission
+            promoter = discount_binding.promoter_id
+            if promoter.commission_type == 'percentage':
+                commission = total_price * (promoter.commission_rate / 100.0)
+            else:
+                commission = promoter.commission_rate
+
+            self.env['shopify.discount.usage'].create({
+                'discount_code_id': discount_binding.id,
+                'order_binding_id': order_binding.id,
+                'discount_amount': total_discounts,
+                'order_total': total_price,
+                'commission_amount': commission,
+                'date': fields.Datetime.now(),
+            })
 
     def _resolve_customer(self, node):
         """Find or create the customer for this order."""
@@ -393,6 +432,8 @@ class OrderSync:
                 displayFinancialStatus displayFulfillmentStatus
                 cancelledAt closed note tags
                 totalPriceSet { shopMoney { amount currencyCode } }
+                totalDiscountsSet { shopMoney { amount currencyCode } }
+                discountCodes
                 customer { id email firstName lastName }
                 shippingAddress {
                   address1 address2 city province provinceCode
