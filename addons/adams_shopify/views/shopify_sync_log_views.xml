@@ -71,7 +71,7 @@
                         domain="[('state', 'in', ['error', 'partial'])]"/>
                 <filter name="today" string="Today"
                         domain="[('create_date', '&gt;=', (context_today()).strftime('%Y-%m-%d'))]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_entity" string="Entity"
                             context="{'group_by': 'entity'}"/>
                     <filter name="group_backend" string="Store"

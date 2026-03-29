@@ -68,7 +68,7 @@
                         domain="[('sync_status', '=', 'synced')]"/>
                 <filter name="errors" string="Errors"
                         domain="[('sync_status', 'in', ['error', 'permanent_error'])]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_backend" string="Store"
                             context="{'group_by': 'backend_id'}"/>
                     <filter name="group_status" string="Status"

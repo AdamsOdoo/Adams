@@ -68,7 +68,7 @@
                         domain="[('state', '=', 'error')]"/>
                 <filter name="today" string="Today"
                         domain="[('received_at', '&gt;=', (context_today()).strftime('%Y-%m-%d'))]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_topic" string="Topic"
                             context="{'group_by': 'topic'}"/>
                     <filter name="group_state" string="Status"

@@ -34,7 +34,7 @@
                         domain="[('date', '&gt;=', (context_today() - relativedelta(months=1, day=1)).strftime('%%Y-%%m-%%d')),
                                  ('date', '&lt;', (context_today() - relativedelta(day=1)).strftime('%%Y-%%m-%%d'))]"/>
                 <separator/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_promoter" string="Promoter"
                             context="{'group_by': 'promoter_id'}"/>
                     <filter name="group_code" string="Discount Code"
