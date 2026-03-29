@@ -52,3 +52,7 @@ class ShopifyPromoter(models.Model):
             rec.total_revenue = sum(usages.mapped('order_total'))
             rec.total_discount_given = sum(usages.mapped('discount_amount'))
             rec.total_commission = sum(usages.mapped('commission_amount'))
+
+    def action_dummy(self):
+        """Placeholder for stat button clicks."""
+        pass

@@ -13,7 +13,7 @@
                 <field name="discount_type"/>
                 <field name="discount_value"/>
                 <field name="usage_count"/>
-                <field name="total_order_revenue" widget="monetary"/>
+                <field name="total_order_revenue"/>
                 <field name="sync_status" widget="badge"
                        decoration-success="sync_status == 'synced'"
                        decoration-warning="sync_status == 'pending'"
@@ -70,8 +70,8 @@
                     </group>
                     <group string="Usage Statistics">
                         <field name="usage_count"/>
-                        <field name="total_discount_amount" widget="monetary"/>
-                        <field name="total_order_revenue" widget="monetary"/>
+                        <field name="total_discount_amount"/>
+                        <field name="total_order_revenue"/>
                     </group>
                     <notebook>
                         <page string="Usage History" name="usage_history">
@@ -79,9 +79,9 @@
                                 <list>
                                     <field name="date"/>
                                     <field name="sale_order_id"/>
-                                    <field name="discount_amount" widget="monetary"/>
-                                    <field name="order_total" widget="monetary"/>
-                                    <field name="commission_amount" widget="monetary"/>
+                                    <field name="discount_amount"/>
+                                    <field name="order_total"/>
+                                    <field name="commission_amount"/>
                                 </list>
                             </field>
                         </page>
