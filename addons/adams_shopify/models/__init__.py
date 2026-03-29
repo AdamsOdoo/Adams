@@ -15,3 +15,6 @@ from . import shopify_field_mapping
 from . import shopify_reconciliation
 from . import stock_picking
 from . import stock_move
+from . import shopify_promoter
+from . import shopify_discount_code
+from . import shopify_discount_usage

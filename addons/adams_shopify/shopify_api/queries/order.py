@@ -32,6 +32,7 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
         totalDiscountsSet {
           shopMoney { amount currencyCode }
         }
+        discountCodes
         customer {
           id
           email
