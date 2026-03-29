@@ -2,11 +2,45 @@ import logging
 
 from odoo import fields
 
+from .base_exporter import BaseExporter
 from .base_importer import BaseImporter
 from .checksum import compute_checksum
-from ..shopify_api.queries.order import FETCH_ORDERS
+from ..shopify_api.queries.order import FETCH_ORDERS, ORDER_UPDATE_MUTATION
 
 _logger = logging.getLogger(__name__)
+
+
+class OrderExporter(BaseExporter):
+    entity_name = 'order'
+    binding_model = 'shopify.order.binding'
+
+    def _compute_checksum(self, binding):
+        order = binding.odoo_id
+        return compute_checksum({
+            'note': order.note or '',
+            'shopify_tags': order.shopify_tags or '',
+        })
+
+    def _export_one(self, binding):
+        order = binding.odoo_id
+        if not binding.shopify_id:
+            _logger.warning(
+                "Cannot export order %s: no Shopify ID on binding",
+                order.name,
+            )
+            return
+
+        order_input = {
+            'id': binding.shopify_id,
+            'note': order.note or '',
+            'tags': [t.strip() for t in (order.shopify_tags or '').split(',') if t.strip()],
+        }
+        self.client.execute_mutation(
+            ORDER_UPDATE_MUTATION,
+            {'input': order_input},
+            result_key='orderUpdate',
+            estimated_cost=10,
+        )
 
 
 class OrderImporter(BaseImporter):
@@ -327,12 +361,16 @@ class OrderImporter(BaseImporter):
 
 
 class OrderSync:
-    """Orchestrates order import."""
+    """Orchestrates order sync."""
 
     def __init__(self, env, backend):
         self.env = env
         self.backend = backend
         self.importer = OrderImporter(env, backend)
+        self.exporter = OrderExporter(env, backend)
+
+    def export_orders(self):
+        return self.exporter.export_batch()
 
     def import_orders(self):
         nodes = self.importer.client.fetch_paginated(
