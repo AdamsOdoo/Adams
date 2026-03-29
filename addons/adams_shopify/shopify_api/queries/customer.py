@@ -58,3 +58,20 @@ mutation CustomerCreate($input: CustomerInput!) {
   }
 }
 """
+
+CUSTOMER_UPDATE_MUTATION = """
+mutation customerUpdate($input: CustomerInput!) {
+  customerUpdate(input: $input) {
+    customer {
+      id
+      email
+      firstName
+      lastName
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""

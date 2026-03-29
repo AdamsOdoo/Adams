@@ -39,17 +39,19 @@ class ProductExporter(BaseExporter):
             self._create_product(binding, product)
 
     def _create_product(self, binding, product):
-        variables = {
-            'input': {
-                'title': product.name,
-                'bodyHtml': product.description_sale or '',
-                'productType': product.categ_id.name or '',
-                'vendor': product.seller_ids[:1].partner_id.name if product.seller_ids else '',
-                'status': 'ACTIVE',
-                'tags': binding.shopify_tags.split(', ') if binding.shopify_tags else [],
-                'variants': self._build_variant_inputs(product),
-            },
+        product_input = {
+            'title': product.name,
+            'bodyHtml': product.description_sale or '',
+            'productType': product.categ_id.name or '',
+            'vendor': product.seller_ids[:1].partner_id.name if product.seller_ids else '',
+            'status': 'ACTIVE',
+            'tags': binding.shopify_tags.split(', ') if binding.shopify_tags else [],
+            'variants': self._build_variant_inputs(product),
         }
+        options = self._build_options(product)
+        if options:
+            product_input['options'] = options
+        variables = {'input': product_input}
         result = self.client.execute_mutation(
             PRODUCT_CREATE_MUTATION,
             variables,
@@ -106,16 +108,36 @@ class ProductExporter(BaseExporter):
                 estimated_cost=10,
             )
 
+    def _build_options(self, product):
+        """Build Shopify options list from product attribute lines."""
+        options = []
+        for line in product.attribute_line_ids:
+            options.append({
+                'name': line.attribute_id.name,
+                'values': [{'name': v.name} for v in line.value_ids],
+            })
+        return options
+
     def _build_variant_inputs(self, product):
         variants = []
         for v in product.product_variant_ids:
-            variants.append({
+            variant_input = {
                 'sku': v.default_code or '',
                 'price': str(self._get_variant_price(v)),
                 'barcode': v.barcode or None,
                 'weight': v.weight,
                 'weightUnit': 'KILOGRAMS',
-            })
+            }
+            # Add option values from variant attributes
+            option_values = []
+            for ptav in v.product_template_attribute_value_ids:
+                option_values.append({
+                    'optionName': ptav.attribute_id.name,
+                    'name': ptav.name,
+                })
+            if option_values:
+                variant_input['optionValues'] = option_values
+            variants.append(variant_input)
         if not variants:
             pricelist = self.backend.pricelist_id
             price = pricelist._get_product_price(
@@ -168,6 +190,7 @@ class ProductImporter(BaseImporter):
             existing_binding.odoo_id.with_context(shopify_no_auto_export=True).write(vals)
             existing_binding.write({'shopify_tags': shopify_tags})
             existing_binding._mark_synced(checksum=checksum)
+            self._import_attributes(existing_binding.odoo_id, node)
             self._import_variants(existing_binding, node)
             self._import_images(existing_binding.odoo_id, node)
         else:
@@ -179,6 +202,8 @@ class ProductImporter(BaseImporter):
                 ).create(vals)
             else:
                 product.with_context(shopify_no_auto_export=True).write(vals)
+
+            self._import_attributes(product, node)
 
             binding = self.env['shopify.product.binding'].create({
                 'backend_id': self.backend.id,
@@ -242,6 +267,78 @@ class ProductImporter(BaseImporter):
                     return variant.product_tmpl_id
         return None
 
+    def _import_attributes(self, product, node):
+        """Create product attribute lines from Shopify options data."""
+        options = node.get('options', [])
+        if not options:
+            return
+
+        ProductAttribute = self.env['product.attribute']
+        ProductAttributeValue = self.env['product.attribute.value']
+
+        for option in options:
+            option_name = option.get('name', '')
+            option_values = option.get('values', [])
+            if not option_name or not option_values:
+                continue
+
+            # Find or create the attribute
+            attribute = ProductAttribute.search([('name', '=ilike', option_name)], limit=1)
+            if not attribute:
+                attribute = ProductAttribute.create({'name': option_name})
+
+            # Find or create attribute values
+            value_ids = []
+            for val_name in option_values:
+                attr_value = ProductAttributeValue.search([
+                    ('attribute_id', '=', attribute.id),
+                    ('name', '=ilike', val_name),
+                ], limit=1)
+                if not attr_value:
+                    attr_value = ProductAttributeValue.create({
+                        'attribute_id': attribute.id,
+                        'name': val_name,
+                    })
+                value_ids.append(attr_value.id)
+
+            # Check if attribute line already exists on this product
+            existing_line = product.attribute_line_ids.filtered(
+                lambda l: l.attribute_id.id == attribute.id
+            )
+            if existing_line:
+                # Add any new values to the existing line
+                existing_value_ids = set(existing_line.value_ids.ids)
+                new_value_ids = set(value_ids)
+                if not new_value_ids.issubset(existing_value_ids):
+                    existing_line.write({'value_ids': [(4, vid) for vid in new_value_ids - existing_value_ids]})
+            else:
+                self.env['product.template.attribute.line'].with_context(
+                    shopify_no_auto_export=True,
+                ).create({
+                    'product_tmpl_id': product.id,
+                    'attribute_id': attribute.id,
+                    'value_ids': [(6, 0, value_ids)],
+                })
+
+    def _match_variant_by_options(self, odoo_variants, selected_options):
+        """Match an Odoo variant by its attribute values against Shopify selectedOptions."""
+        if not selected_options:
+            return False
+        for variant in odoo_variants:
+            ptav_map = {
+                ptav.attribute_id.name.lower(): ptav.name.lower()
+                for ptav in variant.product_template_attribute_value_ids
+            }
+            if not ptav_map:
+                continue
+            match = all(
+                ptav_map.get(opt.get('name', '').lower()) == opt.get('value', '').lower()
+                for opt in selected_options
+            )
+            if match:
+                return variant
+        return False
+
     def _import_variants(self, product_binding, node):
         """Create/update variant bindings from Shopify data."""
         variant_edges = node.get('variants', {}).get('edges', [])
@@ -256,7 +353,11 @@ class ProductImporter(BaseImporter):
                 ('shopify_id', '=', shopify_vid),
             ], limit=1)
 
-            odoo_variant = odoo_variants[i] if i < len(odoo_variants) else False
+            # Try matching by selectedOptions first, fall back to index
+            selected_options = sv.get('selectedOptions', [])
+            odoo_variant = self._match_variant_by_options(odoo_variants, selected_options)
+            if not odoo_variant:
+                odoo_variant = odoo_variants[i] if i < len(odoo_variants) else False
             if not odoo_variant:
                 continue
 
@@ -336,12 +437,14 @@ class ProductSync:
               product(id: $id) {
                 id title bodyHtml vendor productType tags status handle
                 createdAt updatedAt
+                options { name values }
                 variants(first: 100) {
                   edges {
                     node {
                       id title sku barcode price compareAtPrice
                       weight weightUnit inventoryQuantity
                       inventoryItem { id }
+                      selectedOptions { name value }
                     }
                   }
                 }

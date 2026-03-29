@@ -75,6 +75,48 @@ class OrderImporter(BaseImporter):
             'warehouse_id': self.backend.warehouse_id.id,
         }
 
+        # Multi-currency support
+        if self.backend.import_currency_mode == 'shopify':
+            currency_code = (
+                node.get('totalPriceSet', {}).get('shopMoney', {}).get('currencyCode', '')
+            )
+            if currency_code:
+                currency = self.env['res.currency'].search([
+                    ('name', '=', currency_code),
+                    ('active', '=', True),
+                ], limit=1)
+                if not currency:
+                    # Try inactive currencies
+                    currency = self.env['res.currency'].search([
+                        ('name', '=', currency_code),
+                    ], limit=1)
+                    if currency:
+                        _logger.warning(
+                            "Currency %s is inactive; activate it to import "
+                            "order %s with correct currency.",
+                            currency_code, node.get('name'),
+                        )
+                        currency = False
+                    else:
+                        _logger.warning(
+                            "Currency %s not found for order %s, "
+                            "falling back to company currency.",
+                            currency_code, node.get('name'),
+                        )
+                if currency:
+                    company_currency = self.backend.company_id.currency_id
+                    if currency != company_currency:
+                        order_vals['currency_id'] = currency.id
+                        # Find a pricelist with this currency
+                        pricelist = self.env['product.pricelist'].search([
+                            ('currency_id', '=', currency.id),
+                            '|',
+                            ('company_id', '=', self.backend.company_id.id),
+                            ('company_id', '=', False),
+                        ], limit=1)
+                        if pricelist:
+                            order_vals['pricelist_id'] = pricelist.id
+
         # Resolve shipping address
         shipping = node.get('shippingAddress')
         if shipping:

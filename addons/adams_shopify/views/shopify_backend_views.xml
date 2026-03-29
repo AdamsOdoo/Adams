@@ -119,6 +119,8 @@
                                            invisible="not auto_sync_orders"/>
                                     <field name="auto_create_invoice"
                                            invisible="not auto_sync_orders"/>
+                                    <field name="import_currency_mode"
+                                           invisible="not auto_sync_orders"/>
                                 </group>
                                 <group string="Inventory">
                                     <field name="auto_sync_inventory"/>

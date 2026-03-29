@@ -17,6 +17,10 @@ query FetchProducts($first: Int!, $after: String) {
         handle
         createdAt
         updatedAt
+        options {
+          name
+          values
+        }
         images(first: 10) {
           edges {
             node {

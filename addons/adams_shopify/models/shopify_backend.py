@@ -86,6 +86,13 @@ class ShopifyBackend(models.Model):
     auto_create_invoice = fields.Boolean(
         'Auto-create Invoice', default=True,
     )
+    import_currency_mode = fields.Selection([
+        ('company', 'Always Use Company Currency'),
+        ('shopify', 'Use Shopify Order Currency'),
+    ], string='Order Currency Mode', default='company',
+        help="Controls how currency is set on imported orders. "
+             "'Shopify' will use the currency from the Shopify order.",
+    )
 
     auto_sync_inventory = fields.Boolean('Push Inventory', default=True)
     inventory_sync_interval = fields.Integer(
@@ -316,9 +323,17 @@ class ShopifyBackend(models.Model):
         backends = self.search([('state', '=', 'connected'), ('auto_sync_customers', '=', True)])
         for backend in backends:
             try:
-                self.env['shopify.customer.binding'].with_company(
-                    backend.company_id
-                ).run_import(backend)
+                direction = backend.customer_sync_direction or 'import'
+                if direction in ('import', 'both'):
+                    self.env['shopify.customer.binding'].with_company(
+                        backend.company_id
+                    ).run_import(backend)
+                if direction in ('export', 'both'):
+                    from ..sync.customer_sync import CustomerSync
+                    syncer = CustomerSync(
+                        self.env.with_company(backend.company_id), backend,
+                    )
+                    syncer.export_customers()
                 backend.last_sync_date = fields.Datetime.now()
             except Exception as e:
                 _logger.exception("Customer sync failed for backend %s", backend.id)

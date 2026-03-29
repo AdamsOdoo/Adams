@@ -107,3 +107,19 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
   }
 }
 """
+
+ORDER_UPDATE_MUTATION = """
+mutation orderUpdate($input: OrderInput!) {
+  orderUpdate(input: $input) {
+    order {
+      id
+      tags
+      note
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
