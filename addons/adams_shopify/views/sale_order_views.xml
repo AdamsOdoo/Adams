@@ -28,6 +28,12 @@
                                    decoration-success="sync_status == 'synced'"
                                    decoration-danger="sync_status == 'error'"/>
                             <field name="last_sync_date"/>
+                            <button name="action_view_on_shopify" type="object"
+                                    string="View on Shopify" icon="fa-external-link"
+                                    class="btn-link"/>
+                            <button name="action_retry_sync" type="object"
+                                    string="Retry" icon="fa-refresh"
+                                    attrs="{'invisible': [('sync_status', 'not in', ['error', 'permanent_error'])]}"/>
                         </tree>
                     </field>
                 </page>

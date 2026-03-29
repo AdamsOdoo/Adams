@@ -74,6 +74,7 @@ class ShopifyWebhookLog(models.Model):
             'customers/update': '_handle_customer_webhook',
             'inventory_levels/update': '_handle_inventory_webhook',
             'fulfillments/create': '_handle_fulfillment_webhook',
+            'refunds/create': '_handle_refund_webhook',
             'app/uninstalled': '_handle_app_uninstalled',
             # GDPR mandatory compliance webhooks
             'customers/data_request': '_handle_gdpr_data_request',
@@ -127,6 +128,42 @@ class ShopifyWebhookLog(models.Model):
 
     def _handle_fulfillment_webhook(self, data):
         _logger.info("Fulfillment webhook received for backend %s", self.backend_id.id)
+
+    def _handle_refund_webhook(self, data):
+        """Create credit note from Shopify refund."""
+        order_id = data.get('order_id')
+        if not order_id:
+            return
+        shopify_gid = f"gid://shopify/Order/{order_id}"
+        binding = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend_id.id),
+            ('shopify_id', '=', shopify_gid),
+        ], limit=1)
+        if not binding or not binding.odoo_id:
+            _logger.warning("No order found for refund, order_id=%s", order_id)
+            return
+        order = binding.odoo_id
+        # Find posted invoices to create credit notes from
+        invoices = order.invoice_ids.filtered(lambda i: i.move_type == 'out_invoice' and i.state == 'posted')
+        if not invoices:
+            _logger.info("No posted invoice found for refund on order %s", order.name)
+            return
+        try:
+            refund_amount = sum(
+                float(li.get('subtotal', 0)) for li in data.get('refund_line_items', [])
+            )
+            # Create credit note using the reversal wizard
+            move_reversal = self.env['account.move.reversal'].with_context(
+                active_model='account.move',
+                active_ids=invoices[0].ids,
+            ).create({
+                'reason': f"Shopify Refund #{data.get('id', '')}",
+                'journal_id': invoices[0].journal_id.id,
+            })
+            reversal = move_reversal.reverse_moves()
+            _logger.info("Credit note created for Shopify refund on order %s", order.name)
+        except Exception as e:
+            _logger.warning("Failed to create credit note for order %s: %s", order.name, e)
 
     def _handle_app_uninstalled(self, data):
         _logger.warning("App uninstalled webhook for backend %s", self.backend_id.id)

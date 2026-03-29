@@ -1,4 +1,6 @@
+import base64
 import logging
+import requests
 
 from .base_exporter import BaseExporter
 from .base_importer import BaseImporter
@@ -20,6 +22,13 @@ class ProductExporter(BaseExporter):
     def _compute_checksum(self, binding):
         return product_checksum(binding.odoo_id)
 
+    def _get_variant_price(self, variant):
+        """Get variant price using backend pricelist if configured, else lst_price."""
+        pricelist = self.backend.pricelist_id
+        if pricelist:
+            return pricelist._get_product_price(variant, 1.0)
+        return variant.lst_price
+
     def _export_one(self, binding):
         product = binding.odoo_id
         if binding.shopify_id:
@@ -35,6 +44,7 @@ class ProductExporter(BaseExporter):
                 'productType': product.categ_id.name or '',
                 'vendor': product.seller_ids[:1].partner_id.name if product.seller_ids else '',
                 'status': 'ACTIVE',
+                'tags': binding.shopify_tags.split(', ') if binding.shopify_tags else [],
                 'variants': self._build_variant_inputs(product),
             },
         }
@@ -61,6 +71,7 @@ class ProductExporter(BaseExporter):
                 'title': product.name,
                 'bodyHtml': product.description_sale or '',
                 'productType': product.categ_id.name or '',
+                'tags': binding.shopify_tags.split(', ') if binding.shopify_tags else [],
             },
         }
         self.client.execute_mutation(
@@ -81,7 +92,7 @@ class ProductExporter(BaseExporter):
                 variant_inputs.append({
                     'id': vbinding.shopify_id,
                     'sku': variant.default_code or '',
-                    'price': str(variant.lst_price),
+                    'price': str(self._get_variant_price(variant)),
                     'barcode': variant.barcode or None,
                 })
 
@@ -98,12 +109,18 @@ class ProductExporter(BaseExporter):
         for v in product.product_variant_ids:
             variants.append({
                 'sku': v.default_code or '',
-                'price': str(v.lst_price),
+                'price': str(self._get_variant_price(v)),
                 'barcode': v.barcode or None,
                 'weight': v.weight,
                 'weightUnit': 'KILOGRAMS',
             })
-        return variants or [{'price': str(product.list_price)}]
+        if not variants:
+            pricelist = self.backend.pricelist_id
+            price = pricelist._get_product_price(
+                product.product_variant_ids[:1], 1.0,
+            ) if pricelist and product.product_variant_ids else product.list_price
+            return [{'price': str(price)}]
+        return variants
 
     def _sync_variant_bindings(self, product_binding, product, shopify_variants):
         """Create variant bindings from Shopify response after product create."""
@@ -138,17 +155,28 @@ class ProductImporter(BaseImporter):
         vals = self._map_to_odoo(node)
         checksum = self._compute_shopify_checksum(node)
 
+        # Build tags string
+        tags = node.get('tags', [])
+        if isinstance(tags, list):
+            shopify_tags = ', '.join(tags)
+        else:
+            shopify_tags = tags or ''
+
         if existing_binding:
-            existing_binding.odoo_id.write(vals)
+            existing_binding.odoo_id.with_context(shopify_no_auto_export=True).write(vals)
+            existing_binding.write({'shopify_tags': shopify_tags})
             existing_binding._mark_synced(checksum=checksum)
             self._import_variants(existing_binding, node)
+            self._import_images(existing_binding.odoo_id, node)
         else:
             # Try to match by SKU first
             product = self._find_odoo_product(node)
             if not product:
-                product = self.env['product.template'].create(vals)
+                product = self.env['product.template'].with_context(
+                    shopify_no_auto_export=True,
+                ).create(vals)
             else:
-                product.write(vals)
+                product.with_context(shopify_no_auto_export=True).write(vals)
 
             binding = self.env['shopify.product.binding'].create({
                 'backend_id': self.backend.id,
@@ -157,11 +185,13 @@ class ProductImporter(BaseImporter):
                 'shopify_handle': node.get('handle', ''),
                 'shopify_status': (node.get('status', 'ACTIVE')).lower(),
                 'shopify_product_type': node.get('productType', ''),
+                'shopify_tags': shopify_tags,
                 'sync_status': 'synced',
                 'sync_checksum': checksum,
                 'last_sync_date': self.env.cr.now(),
             })
             self._import_variants(binding, node)
+            self._import_images(product, node)
 
     def _map_to_odoo(self, node):
         tags = node.get('tags', [])
@@ -173,7 +203,7 @@ class ProductImporter(BaseImporter):
         if variant_edges:
             first_variant = variant_edges[0].get('node', {})
 
-        return {
+        vals = {
             'name': node.get('title', 'Untitled'),
             'description_sale': node.get('bodyHtml', ''),
             'list_price': float(first_variant.get('price', 0)),
@@ -181,6 +211,21 @@ class ProductImporter(BaseImporter):
             'barcode': first_variant.get('barcode') or False,
             'weight': first_variant.get('weight', 0),
         }
+
+        # Download main image from first image node
+        image_edges = node.get('images', {}).get('edges', [])
+        if image_edges:
+            image_url = image_edges[0].get('node', {}).get('url') or \
+                        image_edges[0].get('node', {}).get('originalSrc')
+            if image_url:
+                try:
+                    resp = requests.get(image_url, timeout=15)
+                    if resp.status_code == 200:
+                        vals['image_1920'] = base64.b64encode(resp.content).decode('utf-8')
+                except Exception:
+                    _logger.warning("Failed to download product image from %s", image_url)
+
+        return vals
 
     def _find_odoo_product(self, node):
         """Try to match an existing Odoo product by SKU."""
@@ -228,6 +273,32 @@ class ProductImporter(BaseImporter):
                     'sync_status': 'synced',
                     'last_sync_date': self.env.cr.now(),
                 })
+
+
+    def _import_images(self, product, node):
+        """Import additional product images (beyond the first) as product.image records."""
+        image_edges = node.get('images', {}).get('edges', [])
+        if len(image_edges) <= 1:
+            return  # First image already set as image_1920 via _map_to_odoo
+
+        for edge in image_edges[1:]:
+            image_node = edge.get('node', {})
+            image_url = image_node.get('url') or image_node.get('originalSrc')
+            if not image_url:
+                continue
+            try:
+                resp = requests.get(image_url, timeout=15)
+                if resp.status_code == 200:
+                    image_data = base64.b64encode(resp.content).decode('utf-8')
+                    # Check if product.image model exists (requires product_images module)
+                    if 'product.image' in self.env:
+                        self.env['product.image'].create({
+                            'product_tmpl_id': product.id,
+                            'name': image_node.get('altText') or product.name,
+                            'image_1920': image_data,
+                        })
+            except Exception:
+                _logger.warning("Failed to download additional product image from %s", image_url)
 
 
 class ProductSync:

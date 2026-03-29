@@ -102,6 +102,13 @@ class OrderImporter(BaseImporter):
         # Confirm order if paid
         if order_vals['shopify_financial_status'] in ('paid', 'partially_paid', 'authorized'):
             order.action_confirm()
+            # Auto-create invoice if configured
+            if self.backend.auto_create_invoice and order_vals['shopify_financial_status'] == 'paid':
+                try:
+                    invoice = order._create_invoices()
+                    invoice.action_post()
+                except Exception as e:
+                    _logger.warning("Auto-invoice failed for order %s: %s", order.name, e)
 
         return order
 

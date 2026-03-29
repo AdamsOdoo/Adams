@@ -26,6 +26,8 @@
                             <button name="action_retry_sync" type="object"
                                     string="Retry" icon="fa-refresh"
                                     invisible="sync_status != 'error'"/>
+                            <button name="action_view_on_shopify" type="object"
+                                    string="View on Shopify" icon="fa-external-link"/>
                         </tree>
                     </field>
                 </page>

@@ -16,6 +16,27 @@ class ShopifyCustomerBinding(models.Model):
     )
     shopify_email = fields.Char('Shopify Email')
     shopify_tags = fields.Char('Shopify Tags')
+    shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
+
+    def _compute_shopify_url(self):
+        for rec in self:
+            if rec.shopify_id and rec.backend_id.shop_url:
+                numeric_id = rec.shopify_id.split('/')[-1] if rec.shopify_id else ''
+                base = rec.backend_id.shop_url.rstrip('/')
+                if not base.startswith('https://'):
+                    base = f"https://{base}"
+                rec.shopify_url = f"{base}/admin/customers/{numeric_id}"
+            else:
+                rec.shopify_url = False
+
+    def action_view_on_shopify(self):
+        self.ensure_one()
+        if self.shopify_url:
+            return {
+                'type': 'ir.actions.act_url',
+                'url': self.shopify_url,
+                'target': 'new',
+            }
 
     _sql_constraints = [
         ('unique_backend_shopify',

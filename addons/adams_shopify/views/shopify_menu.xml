@@ -45,6 +45,12 @@
               action="shopify_import_wizard_action"
               sequence="20"/>
 
+    <menuitem id="menu_shopify_bulk_retry"
+              name="Retry Failed Records"
+              parent="menu_shopify_operations"
+              action="shopify_bulk_retry_wizard_action"
+              sequence="30"/>
+
     <!-- Sync Status -->
     <menuitem id="menu_shopify_sync_status"
               name="Sync Status"

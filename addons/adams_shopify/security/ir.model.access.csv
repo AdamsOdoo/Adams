@@ -28,3 +28,4 @@ access_shopify_import_wizard,shopify.import.wizard,model_shopify_import_wizard,g
 access_shopify_field_mapping_user,shopify.field.mapping.user,model_shopify_field_mapping,group_shopify_user,1,0,0,0
 access_shopify_field_mapping_manager,shopify.field.mapping.manager,model_shopify_field_mapping,group_shopify_manager,1,1,1,1
 access_shopify_reconciliation,shopify.reconciliation,model_shopify_reconciliation,group_shopify_manager,1,1,1,1
+access_shopify_bulk_retry_wizard,shopify.bulk.retry.wizard,model_shopify_bulk_retry_wizard,group_shopify_manager,1,1,1,1

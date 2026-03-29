@@ -34,6 +34,7 @@
         'views/sale_order_views.xml',
         'wizards/shopify_sync_wizard_views.xml',
         'wizards/shopify_import_wizard_views.xml',
+        'wizards/shopify_bulk_retry_wizard_views.xml',
         'views/shopify_field_mapping_views.xml',
         'views/shopify_menu.xml',
     ],

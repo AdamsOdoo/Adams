@@ -13,3 +13,5 @@ from . import res_partner
 from . import sale_order
 from . import shopify_field_mapping
 from . import shopify_reconciliation
+from . import stock_picking
+from . import stock_move

@@ -24,6 +24,38 @@ class ShopifyAPIError(Exception):
         self.user_errors = user_errors or []
 
 
+class CircuitBreaker:
+    """Simple circuit breaker to prevent hammering a failing API."""
+
+    def __init__(self, failure_threshold=5, recovery_timeout=300):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout  # seconds
+        self.failure_count = 0
+        self.last_failure_time = 0
+        self.state = 'closed'  # closed=normal, open=blocking, half_open=testing
+
+    def record_success(self):
+        self.failure_count = 0
+        self.state = 'closed'
+
+    def record_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        if self.failure_count >= self.failure_threshold:
+            self.state = 'open'
+
+    def can_execute(self):
+        if self.state == 'closed':
+            return True
+        if self.state == 'open':
+            if time.time() - self.last_failure_time >= self.recovery_timeout:
+                self.state = 'half_open'
+                return True
+            return False
+        # half_open: allow one request to test
+        return True
+
+
 class ShopifyClient:
     """GraphQL Admin API client with rate limiting and retry logic."""
 
@@ -34,6 +66,7 @@ class ShopifyClient:
         self.access_token = backend.access_token
         self.api_version = backend.api_version or '2026-01'
         self.rate_limiter = ShopifyRateLimiter()
+        self.circuit_breaker = CircuitBreaker()
         self._session = requests.Session()
         self._session.headers.update({
             'Content-Type': 'application/json',
@@ -50,6 +83,9 @@ class ShopifyClient:
         Returns the full parsed JSON response body.
         Raises ShopifyAPIError on failure.
         """
+        if not self.circuit_breaker.can_execute():
+            raise ShopifyAPIError("Circuit breaker open — API appears down. Will retry in %d seconds." % self.circuit_breaker.recovery_timeout)
+
         self.rate_limiter.wait_if_needed(estimated_cost)
 
         payload = {'query': query}
@@ -69,6 +105,7 @@ class ShopifyClient:
                 if attempt < MAX_RETRIES:
                     self._backoff(attempt)
                     continue
+                self.circuit_breaker.record_failure()
                 raise ShopifyAPIError(f"Network error: {e}")
 
             if resp.status_code in RETRY_CODES:
@@ -82,6 +119,7 @@ class ShopifyClient:
                     else:
                         self._backoff(attempt)
                     continue
+                self.circuit_breaker.record_failure()
                 raise last_exc
 
             if resp.status_code != 200:
@@ -103,8 +141,10 @@ class ShopifyClient:
                 )
                 raise ShopifyAPIError(f"GraphQL errors: {error_messages}")
 
+            self.circuit_breaker.record_success()
             return body
 
+        self.circuit_breaker.record_failure()
         raise ShopifyAPIError(f"Max retries exceeded: {last_exc}")
 
     def execute_mutation(self, query, variables=None, result_key=None, estimated_cost=10):

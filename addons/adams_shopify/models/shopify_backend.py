@@ -257,6 +257,16 @@ class ShopifyBackend(models.Model):
             'domain': [('backend_id', '=', self.id)],
         }
 
+    def _notify_sync_error(self, entity, error_count, error_details=''):
+        """Post a notification to the backend's chatter about sync errors."""
+        if error_count == 0:
+            return
+        body = (
+            f"<p><strong>Sync Alert: {error_count} {entity} error(s)</strong></p>"
+            f"<p>{error_details[:500] if error_details else 'Check the sync log for details.'}</p>"
+        )
+        self.message_post(body=body, message_type='notification', subtype_xmlid='mail.mt_note')
+
     # ── Cron entry points ───────────────────────────────────
 
     @api.model
@@ -268,8 +278,9 @@ class ShopifyBackend(models.Model):
                     backend.company_id
                 ).run_sync(backend)
                 backend.last_sync_date = fields.Datetime.now()
-            except Exception:
+            except Exception as e:
                 _logger.exception("Product sync failed for backend %s", backend.id)
+                backend._notify_sync_error('products', 1, str(e))
 
     @api.model
     def _cron_import_orders(self):
@@ -280,8 +291,9 @@ class ShopifyBackend(models.Model):
                     backend.company_id
                 ).run_import(backend)
                 backend.last_sync_date = fields.Datetime.now()
-            except Exception:
+            except Exception as e:
                 _logger.exception("Order import failed for backend %s", backend.id)
+                backend._notify_sync_error('orders', 1, str(e))
 
     @api.model
     def _cron_sync_inventory(self):
@@ -292,8 +304,9 @@ class ShopifyBackend(models.Model):
                     backend.company_id
                 ).run_export(backend)
                 backend.last_sync_date = fields.Datetime.now()
-            except Exception:
+            except Exception as e:
                 _logger.exception("Inventory sync failed for backend %s", backend.id)
+                backend._notify_sync_error('inventory', 1, str(e))
 
     @api.model
     def _cron_sync_customers(self):
@@ -304,5 +317,6 @@ class ShopifyBackend(models.Model):
                     backend.company_id
                 ).run_import(backend)
                 backend.last_sync_date = fields.Datetime.now()
-            except Exception:
+            except Exception as e:
                 _logger.exception("Customer sync failed for backend %s", backend.id)
+                backend._notify_sync_error('customers', 1, str(e))
