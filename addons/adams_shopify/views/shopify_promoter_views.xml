@@ -79,7 +79,7 @@
                     <notebook>
                         <page string="Discount Codes" name="discount_codes">
                             <field name="discount_code_ids" nolabel="1"
-                                   context="{'default_promoter_id': active_id}">
+                                   context="{'default_promoter_id': id}">
                                 <list editable="bottom">
                                     <field name="backend_id"/>
                                     <field name="code"/>

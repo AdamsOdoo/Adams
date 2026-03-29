@@ -147,7 +147,7 @@
                                         invisible="field_mapping_ids"/>
                             </div>
                             <field name="field_mapping_ids" nolabel="1"
-                                   context="{'default_backend_id': active_id}">
+                                   context="{'default_backend_id': id}">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
                                     <field name="entity"/>
