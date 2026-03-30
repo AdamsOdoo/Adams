@@ -11,3 +11,7 @@ from . import collection_sync
 from . import refund_sync
 from . import metafield_sync
 from . import location_sync
+from . import collection_export
+from . import customer_tag_sync
+from . import discount_import_sync
+from . import gift_card_sync
