@@ -142,9 +142,15 @@ class ShopifyBackend(models.Model):
     customer_bind_count = fields.Integer(compute='_compute_bind_counts')
     order_bind_count = fields.Integer(compute='_compute_bind_counts')
     product_error_count = fields.Integer(compute='_compute_bind_counts')
+    total_error_count = fields.Integer(compute='_compute_bind_counts')
+    collection_bind_count = fields.Integer(compute='_compute_bind_counts')
+    refund_bind_count = fields.Integer(compute='_compute_bind_counts')
+    sync_log_today_count = fields.Integer(compute='_compute_bind_counts')
+    promoter_count = fields.Integer(compute='_compute_bind_counts')
 
     @api.depends_context('uid')
     def _compute_bind_counts(self):
+        today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0)
         for rec in self:
             rec.product_bind_count = self.env['shopify.product.binding'].search_count(
                 [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
@@ -157,6 +163,25 @@ class ShopifyBackend(models.Model):
             )
             rec.product_error_count = self.env['shopify.product.binding'].search_count(
                 [('backend_id', '=', rec.id), ('sync_status', '=', 'error')],
+            )
+            rec.total_error_count = (
+                rec.product_error_count
+                + self.env['shopify.customer.binding'].search_count(
+                    [('backend_id', '=', rec.id), ('sync_status', '=', 'error')])
+                + self.env['shopify.order.binding'].search_count(
+                    [('backend_id', '=', rec.id), ('sync_status', '=', 'error')])
+            )
+            rec.collection_bind_count = self.env['shopify.collection.binding'].search_count(
+                [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
+            )
+            rec.refund_bind_count = self.env['shopify.refund.binding'].search_count(
+                [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
+            )
+            rec.sync_log_today_count = self.env['shopify.sync.log'].search_count(
+                [('backend_id', '=', rec.id), ('create_date', '>=', today_start)],
+            )
+            rec.promoter_count = self.env['shopify.promoter'].search_count(
+                [('company_id', '=', rec.company_id.id), ('status', '=', 'active')],
             )
 
     # ── Actions ─────────────────────────────────────────────

@@ -8,7 +8,13 @@ _logger = logging.getLogger(__name__)
 
 
 class InventorySync:
-    """Exports Odoo stock levels to Shopify."""
+    """Exports Odoo stock levels to Shopify.
+
+    Supports multi-location: if shopify.location records with mapped
+    warehouses exist, each location/warehouse pair is synced independently.
+    Falls back to the legacy single-location mode using
+    backend.shopify_location_id / backend.warehouse_id.
+    """
 
     def __init__(self, env, backend):
         self.env = env
@@ -18,8 +24,8 @@ class InventorySync:
 
     def export_inventory(self, backend):
         """Push current stock levels for all variant bindings."""
-        location_id = backend.shopify_location_id
-        if not location_id:
+        location_mappings = self._get_location_mappings(backend)
+        if not location_mappings:
             _logger.warning("No Shopify location configured for backend %s", backend.id)
             return 0, 0, 0
 
@@ -35,27 +41,63 @@ class InventorySync:
             ('sync_status', 'in', ['synced', 'pending']),
         ])
 
-        success = errors = skipped = 0
-        error_details = []
+        total_success = total_errors = total_skipped = 0
+        all_error_details = []
         qty_field = backend.inventory_quantity_field or 'free_qty'
 
-        # Batch inventory updates (max 100 per API call)
+        for shopify_loc_id, warehouse in location_mappings:
+            success, errors, skipped, error_details = self._sync_location(
+                backend, variant_bindings, shopify_loc_id, warehouse, qty_field,
+            )
+            total_success += success
+            total_errors += errors
+            total_skipped += skipped
+            all_error_details.extend(error_details)
+
+        log._finalize(
+            total_success, total_errors, total_skipped,
+            '\n'.join(all_error_details) or None,
+        )
+        return total_success, total_errors, total_skipped
+
+    def _get_location_mappings(self, backend):
+        """Return list of (shopify_location_id, warehouse) tuples.
+
+        Prefers multi-location records. Falls back to legacy single-location.
+        """
+        locations = self.env['shopify.location'].search([
+            ('backend_id', '=', backend.id),
+            ('is_active', '=', True),
+            ('warehouse_id', '!=', False),
+        ])
+        if locations:
+            return [
+                (loc.shopify_location_id, loc.warehouse_id)
+                for loc in locations
+            ]
+        # Fallback: legacy single-location
+        if backend.shopify_location_id and backend.warehouse_id:
+            return [(backend.shopify_location_id, backend.warehouse_id)]
+        return []
+
+    def _sync_location(self, backend, variant_bindings, shopify_loc_id, warehouse, qty_field):
+        """Sync inventory for a single Shopify location / Odoo warehouse pair."""
+        success = errors = skipped = 0
+        error_details = []
         batch = []
+
         for vb in variant_bindings:
             product = vb.odoo_id
-            warehouse = backend.warehouse_id
-
             if qty_field == 'free_qty':
                 qty = product.with_context(warehouse=warehouse.id).free_qty
             else:
                 qty = product.with_context(warehouse=warehouse.id).qty_available
-
             qty = int(qty)
 
-            # Check if inventory binding exists; create if needed
             inv_binding = self.env['shopify.inventory.binding'].search([
                 ('backend_id', '=', backend.id),
                 ('variant_binding_id', '=', vb.id),
+                ('shopify_location_id', '=', shopify_loc_id),
             ], limit=1)
 
             if inv_binding and inv_binding.last_pushed_qty == qty:
@@ -70,20 +112,19 @@ class InventorySync:
             })
 
             if len(batch) >= 100:
-                s, e, details = self._push_batch(batch, location_id)
+                s, e, details = self._push_batch(batch, shopify_loc_id)
                 success += s
                 errors += e
                 error_details.extend(details)
                 batch = []
 
         if batch:
-            s, e, details = self._push_batch(batch, location_id)
+            s, e, details = self._push_batch(batch, shopify_loc_id)
             success += s
             errors += e
             error_details.extend(details)
 
-        log._finalize(success, errors, skipped, '\n'.join(error_details) or None)
-        return success, errors, skipped
+        return success, errors, skipped, error_details
 
     def _push_batch(self, batch, location_id):
         """Push a batch of inventory quantities to Shopify."""
@@ -114,7 +155,6 @@ class InventorySync:
                 estimated_cost=10,
             )
 
-            # Update bindings
             for item in batch:
                 inv_binding = item['inv_binding']
                 if inv_binding:

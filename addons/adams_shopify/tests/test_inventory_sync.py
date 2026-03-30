@@ -128,6 +128,39 @@ class TestInventorySync(TransactionCase):
         self.assertTrue(inv_binding)
         self.assertEqual(inv_binding.shopify_location_id, 'gid://shopify/Location/1')
 
+    def test_multi_location_sync(self):
+        """Should sync to multiple locations when shopify.location records exist."""
+        from ..sync.inventory_sync import InventorySync
+
+        warehouse2 = self.env['stock.warehouse'].search(
+            [('company_id', '=', self.env.company.id)], limit=1,
+        )
+        # Create two shopify.location records mapped to warehouses
+        self.env['shopify.location'].create({
+            'backend_id': self.backend.id,
+            'shopify_location_id': 'gid://shopify/Location/10',
+            'name': 'Main Warehouse',
+            'is_active': True,
+            'warehouse_id': warehouse2.id,
+        })
+        self.env['shopify.location'].create({
+            'backend_id': self.backend.id,
+            'shopify_location_id': 'gid://shopify/Location/20',
+            'name': 'Secondary Warehouse',
+            'is_active': True,
+            'warehouse_id': warehouse2.id,
+        })
+
+        syncer = InventorySync.__new__(InventorySync)
+        syncer.env = self.env
+        syncer.backend = self.backend
+        syncer.client = MagicMock()
+
+        success, errors, skipped = syncer.export_inventory(self.backend)
+        # Should push to both locations (2 calls, one per location)
+        self.assertEqual(syncer.client.execute_mutation.call_count, 2)
+        self.assertEqual(success, 2)  # 1 variant x 2 locations
+
     def test_export_handles_api_error(self):
         """Should count errors when Shopify API call fails."""
         from ..sync.inventory_sync import InventorySync

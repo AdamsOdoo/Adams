@@ -195,4 +195,10 @@
               action="shopify_webhook_log_action"
               sequence="20"/>
 
+    <menuitem id="menu_shopify_sync_analytics"
+              name="Sync Analytics"
+              parent="menu_shopify_logs"
+              action="shopify_sync_analytics_action"
+              sequence="30"/>
+
 </odoo>

@@ -51,6 +51,9 @@ class ProductExporter(BaseExporter):
         options = self._build_options(product)
         if options:
             product_input['options'] = options
+        images = self._build_image_inputs(product)
+        if images:
+            product_input['images'] = images
         variables = {'input': product_input}
         result = self.client.execute_mutation(
             PRODUCT_CREATE_MUTATION,
@@ -145,6 +148,32 @@ class ProductExporter(BaseExporter):
             ) if pricelist and product.product_variant_ids else product.list_price
             return [{'price': str(price)}]
         return variants
+
+    def _build_image_inputs(self, product):
+        """Build Shopify image inputs from Odoo product images.
+
+        Uses Odoo's web/image controller URL so Shopify can fetch the image.
+        Only works if the Odoo instance is publicly accessible (which it
+        must be for webhooks anyway).
+        """
+        images = []
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        if not base_url:
+            return images
+
+        # Main product image
+        if product.image_1920:
+            url = f"{base_url}/web/image/product.template/{product.id}/image_1920"
+            images.append({'src': url, 'altText': product.name})
+
+        # Extra product images (product.image model)
+        if 'product.image' in self.env:
+            for img in product.product_template_image_ids:
+                if img.image_1920:
+                    url = f"{base_url}/web/image/product.image/{img.id}/image_1920"
+                    images.append({'src': url, 'altText': img.name or product.name})
+
+        return images
 
     def _sync_variant_bindings(self, product_binding, product, shopify_variants):
         """Create variant bindings from Shopify response after product create."""
