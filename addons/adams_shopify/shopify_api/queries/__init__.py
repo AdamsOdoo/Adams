@@ -6,3 +6,7 @@ from . import webhook
 from . import shop
 from . import discount
 from . import collection
+from . import refund
+from . import metafield
+from . import location
+from . import discount_import

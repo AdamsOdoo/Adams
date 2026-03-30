@@ -37,6 +37,10 @@
                             string="Register Webhooks"
                             invisible="state != 'connected'"
                             groups="adams_shopify.group_shopify_manager"/>
+                    <button name="action_import_locations" type="object"
+                            string="Import Locations"
+                            invisible="state != 'connected'"
+                            groups="adams_shopify.group_shopify_manager"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,connected"/>
                 </header>
@@ -163,7 +167,39 @@
                             </field>
                         </page>
 
-                        <!-- Tab 4: Logs & Status -->
+                        <!-- Tab 4: Tax Mapping -->
+                        <page string="Tax Mapping" name="tax_mapping"
+                              groups="adams_shopify.group_shopify_manager">
+                            <field name="tax_mapping_ids" nolabel="1"
+                                   context="{'default_backend_id': id}">
+                                <list editable="bottom">
+                                    <field name="shopify_tax_name"/>
+                                    <field name="shopify_tax_rate"/>
+                                    <field name="odoo_tax_id"/>
+                                    <field name="fiscal_position_id"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 5: Metafield Mapping -->
+                        <page string="Metafield Mapping" name="metafield_mapping"
+                              groups="adams_shopify.group_shopify_manager">
+                            <field name="metafield_mapping_ids" nolabel="1"
+                                   context="{'default_backend_id': id}">
+                                <list editable="bottom">
+                                    <field name="owner_type"/>
+                                    <field name="shopify_namespace"/>
+                                    <field name="shopify_key"/>
+                                    <field name="shopify_type"/>
+                                    <field name="odoo_field"/>
+                                    <field name="direction"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 6: Logs &amp; Status -->
                         <page string="Logs &amp; Status" name="logs_status">
                             <group>
                                 <field name="last_sync_date"/>

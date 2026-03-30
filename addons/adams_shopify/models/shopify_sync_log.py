@@ -15,6 +15,11 @@ class ShopifySyncLog(models.Model):
         ('order', 'Orders'),
         ('inventory', 'Inventory'),
         ('fulfillment', 'Fulfillments'),
+        ('collection', 'Collections'),
+        ('discount', 'Discounts'),
+        ('refund', 'Refunds'),
+        ('metafield', 'Metafields'),
+        ('location', 'Locations'),
     ], required=True)
     operation = fields.Selection([
         ('export', 'Export'),

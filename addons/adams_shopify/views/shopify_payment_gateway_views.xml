@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_payment_gateway_view_list" model="ir.ui.view">
+        <field name="name">shopify.payment.gateway.list</field>
+        <field name="model">shopify.payment.gateway</field>
+        <field name="arch" type="xml">
+            <list string="Payment Gateways" editable="bottom">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="journal_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="shopify_payment_gateway_view_form" model="ir.ui.view">
+        <field name="name">shopify.payment.gateway.form</field>
+        <field name="model">shopify.payment.gateway</field>
+        <field name="arch" type="xml">
+            <form string="Payment Gateway">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                        </group>
+                        <group>
+                            <field name="journal_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_payment_gateway_action" model="ir.actions.act_window">
+        <field name="name">Payment Gateways</field>
+        <field name="res_model">shopify.payment.gateway</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Transaction Views -->
+    <record id="shopify_order_transaction_view_list" model="ir.ui.view">
+        <field name="name">shopify.order.transaction.list</field>
+        <field name="model">shopify.order.transaction</field>
+        <field name="arch" type="xml">
+            <list string="Transactions">
+                <field name="order_binding_id"/>
+                <field name="gateway"/>
+                <field name="kind"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'success'"
+                       decoration-danger="status in ('failure', 'error')"
+                       decoration-warning="status == 'pending'"/>
+                <field name="amount"/>
+                <field name="currency_code"/>
+                <field name="processed_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="shopify_order_transaction_view_search" model="ir.ui.view">
+        <field name="name">shopify.order.transaction.search</field>
+        <field name="model">shopify.order.transaction</field>
+        <field name="arch" type="xml">
+            <search string="Transactions">
+                <field name="gateway"/>
+                <field name="order_binding_id"/>
+                <filter name="success" string="Successful"
+                        domain="[('status', '=', 'success')]"/>
+                <filter name="failed" string="Failed"
+                        domain="[('status', 'in', ['failure', 'error'])]"/>
+                <group>
+                    <filter name="group_gateway" string="Gateway"
+                            context="{'group_by': 'gateway'}"/>
+                    <filter name="group_kind" string="Kind"
+                            context="{'group_by': 'kind'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="shopify_order_transaction_action" model="ir.actions.act_window">
+        <field name="name">Transactions</field>
+        <field name="res_model">shopify.order.transaction</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

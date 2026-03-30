@@ -33,6 +33,24 @@
               action="shopify_onboarding_wizard_action"
               sequence="20"/>
 
+    <menuitem id="menu_shopify_payment_gateways"
+              name="Payment Gateways"
+              parent="menu_shopify_configuration"
+              action="shopify_payment_gateway_action"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_tax_mappings"
+              name="Tax Mappings"
+              parent="menu_shopify_configuration"
+              action="shopify_tax_mapping_action"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_metafield_mappings"
+              name="Metafield Mappings"
+              parent="menu_shopify_configuration"
+              action="shopify_metafield_mapping_action"
+              sequence="50"/>
+
     <!-- Operations -->
     <menuitem id="menu_shopify_operations"
               name="Operations"
@@ -56,6 +74,12 @@
               parent="menu_shopify_operations"
               action="shopify_bulk_retry_wizard_action"
               sequence="30"/>
+
+    <menuitem id="menu_shopify_bulk_export"
+              name="Bulk Export"
+              parent="menu_shopify_operations"
+              action="shopify_bulk_export_wizard_action"
+              sequence="40"/>
 
     <!-- Sync Status -->
     <menuitem id="menu_shopify_sync_status"
@@ -92,6 +116,42 @@
               parent="menu_shopify_sync_status"
               action="shopify_collection_binding_action"
               sequence="50"/>
+
+    <menuitem id="menu_shopify_refunds"
+              name="Refunds"
+              parent="menu_shopify_sync_status"
+              action="shopify_refund_binding_action"
+              sequence="55"/>
+
+    <menuitem id="menu_shopify_locations"
+              name="Locations"
+              parent="menu_shopify_sync_status"
+              action="shopify_location_action"
+              sequence="60"/>
+
+    <menuitem id="menu_shopify_transactions"
+              name="Transactions"
+              parent="menu_shopify_sync_status"
+              action="shopify_order_transaction_action"
+              sequence="65"/>
+
+    <menuitem id="menu_shopify_gift_cards"
+              name="Gift Cards"
+              parent="menu_shopify_sync_status"
+              action="shopify_gift_card_action"
+              sequence="70"/>
+
+    <menuitem id="menu_shopify_customer_tags"
+              name="Customer Tags"
+              parent="menu_shopify_sync_status"
+              action="shopify_customer_tag_action"
+              sequence="75"/>
+
+    <menuitem id="menu_shopify_metafields"
+              name="Metafields"
+              parent="menu_shopify_sync_status"
+              action="shopify_metafield_action"
+              sequence="80"/>
 
     <!-- Promoters -->
     <menuitem id="menu_shopify_promoters_section"

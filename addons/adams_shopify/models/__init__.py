@@ -19,3 +19,14 @@ from . import shopify_promoter
 from . import shopify_discount_code
 from . import shopify_discount_usage
 from . import shopify_collection_binding
+from . import shopify_refund_binding
+from . import shopify_refund_line
+from . import shopify_order_cancel
+from . import shopify_payment_gateway
+from . import shopify_order_transaction
+from . import shopify_tax_mapping
+from . import shopify_metafield
+from . import shopify_metafield_mapping
+from . import shopify_location
+from . import shopify_customer_tag
+from . import shopify_gift_card

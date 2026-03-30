@@ -118,6 +118,14 @@ class ShopifyBackend(models.Model):
         'shopify.field.mapping', 'backend_id',
         string='Field Mappings',
     )
+    tax_mapping_ids = fields.One2many(
+        'shopify.tax.mapping', 'backend_id',
+        string='Tax Mappings',
+    )
+    metafield_mapping_ids = fields.One2many(
+        'shopify.metafield.mapping', 'backend_id',
+        string='Metafield Mappings',
+    )
 
     # ── Status ──────────────────────────────────────────────
     state = fields.Selection([
@@ -375,6 +383,37 @@ class ShopifyBackend(models.Model):
             except Exception as e:
                 _logger.exception("Collection sync failed for backend %s", backend.id)
                 backend._notify_sync_error('collections', 1, str(e))
+
+    @api.model
+    def _cron_import_refunds(self):
+        backends = self.search([('state', '=', 'connected'), ('auto_sync_orders', '=', True)])
+        for backend in backends:
+            try:
+                from ..sync.refund_sync import RefundSync
+                syncer = RefundSync(
+                    self.env.with_company(backend.company_id), backend,
+                )
+                syncer.import_refunds()
+            except Exception as e:
+                _logger.exception("Refund import failed for backend %s", backend.id)
+                backend._notify_sync_error('refunds', 1, str(e))
+
+    def action_import_locations(self):
+        """Import locations from Shopify."""
+        self.ensure_one()
+        from ..sync.location_sync import LocationSync
+        syncer = LocationSync(self.env, self)
+        success, errors = syncer.import_locations()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Locations Imported"),
+                'message': _("%d locations imported, %d errors.") % (success, errors),
+                'type': 'success' if not errors else 'warning',
+                'sticky': False,
+            },
+        }
 
     def action_open_promoters(self):
         self.ensure_one()
