@@ -339,10 +339,8 @@ class OrderImporter(BaseImporter):
         if not price:
             return
 
-        # Find or create a shipping product
-        shipping_product = self.env.ref(
-            'adams_shopify.product_shopify_shipping', raise_if_not_found=False,
-        )
+        # Use configured shipping product or find/create default
+        shipping_product = self.backend.shipping_product_id
         if not shipping_product:
             shipping_product = self.env['product.product'].search([
                 ('default_code', '=', 'SHOPIFY-SHIPPING'),

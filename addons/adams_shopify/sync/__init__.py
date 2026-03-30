@@ -7,3 +7,4 @@ from . import order_sync
 from . import inventory_sync
 from . import fulfillment_sync
 from . import discount_sync
+from . import collection_sync

@@ -103,6 +103,14 @@ class ShopifyBackend(models.Model):
         ('qty_available', 'On Hand Quantity'),
     ], string='Quantity Type', default='free_qty')
 
+    auto_sync_collections = fields.Boolean('Sync Collections', default=True)
+
+    shipping_product_id = fields.Many2one(
+        'product.product', string='Shipping Product',
+        help="Product used for shipping lines on imported orders. "
+             "If not set, a default 'Shopify Shipping' product is used.",
+    )
+
     batch_size = fields.Integer(default=50)
 
     # ── Field Mapping ───────────────────────────────────────
@@ -352,6 +360,21 @@ class ShopifyBackend(models.Model):
             except Exception as e:
                 _logger.exception("Discount sync failed for backend %s", backend.id)
                 backend._notify_sync_error('discounts', 1, str(e))
+
+    @api.model
+    def _cron_sync_collections(self):
+        backends = self.search([('state', '=', 'connected'), ('auto_sync_collections', '=', True)])
+        for backend in backends:
+            try:
+                from ..sync.collection_sync import CollectionSync
+                syncer = CollectionSync(
+                    self.env.with_company(backend.company_id), backend,
+                )
+                syncer.import_collections()
+                backend.last_sync_date = fields.Datetime.now()
+            except Exception as e:
+                _logger.exception("Collection sync failed for backend %s", backend.id)
+                backend._notify_sync_error('collections', 1, str(e))
 
     def action_open_promoters(self):
         self.ensure_one()

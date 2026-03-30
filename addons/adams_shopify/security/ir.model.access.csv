@@ -38,3 +38,7 @@ access_shopify_discount_code_admin,shopify.discount.code.admin,model_shopify_dis
 access_shopify_discount_usage_user,shopify.discount.usage.user,model_shopify_discount_usage,group_shopify_user,1,0,0,0
 access_shopify_discount_usage_manager,shopify.discount.usage.manager,model_shopify_discount_usage,group_shopify_manager,1,1,1,0
 access_shopify_discount_usage_admin,shopify.discount.usage.admin,model_shopify_discount_usage,base.group_system,1,1,1,1
+access_shopify_collection_binding_user,shopify.collection.binding.user,model_shopify_collection_binding,group_shopify_user,1,0,0,0
+access_shopify_collection_binding_manager,shopify.collection.binding.manager,model_shopify_collection_binding,group_shopify_manager,1,1,1,0
+access_shopify_collection_binding_admin,shopify.collection.binding.admin,model_shopify_collection_binding,base.group_system,1,1,1,1
+access_shopify_onboarding_wizard,shopify.onboarding.wizard,model_shopify_onboarding_wizard,group_shopify_manager,1,1,1,1

@@ -131,8 +131,12 @@
                                 </group>
                             </group>
                             <group>
+                                <group string="Collections">
+                                    <field name="auto_sync_collections"/>
+                                </group>
                                 <group string="General">
                                     <field name="batch_size"/>
+                                    <field name="shipping_product_id"/>
                                 </group>
                             </group>
                         </page>

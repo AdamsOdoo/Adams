@@ -39,6 +39,8 @@
         'views/shopify_promoter_views.xml',
         'views/shopify_discount_code_views.xml',
         'views/shopify_discount_usage_views.xml',
+        'views/shopify_collection_binding_views.xml',
+        'wizards/shopify_onboarding_wizard_views.xml',
         'views/shopify_menu.xml',
     ],
     'demo': [],

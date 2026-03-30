@@ -18,3 +18,4 @@ from . import stock_move
 from . import shopify_promoter
 from . import shopify_discount_code
 from . import shopify_discount_usage
+from . import shopify_collection_binding

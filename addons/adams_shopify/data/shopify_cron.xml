@@ -55,6 +55,15 @@
         <field name="active" eval="True"/>
     </record>
 
+    <record id="ir_cron_shopify_sync_collections" model="ir.cron">
+        <field name="name">Shopify: Sync Collections</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_sync_collections()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
     <record id="ir_cron_shopify_reconcile" model="ir.cron">
         <field name="name">Shopify: Reconciliation Check</field>
         <field name="model_id" ref="model_shopify_reconciliation"/>
