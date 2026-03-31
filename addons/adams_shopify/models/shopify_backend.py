@@ -105,6 +105,35 @@ class ShopifyBackend(models.Model):
 
     auto_sync_collections = fields.Boolean('Sync Collections', default=True)
 
+    # ── Status Sync Settings ───────────────────────────────
+    external_fulfillment_handling = fields.Selection([
+        ('activity', 'Create Activity (manual review)'),
+        ('auto_validate', 'Auto-validate Delivery'),
+        ('ignore', 'Update Status Only'),
+    ], string='External Fulfillment Handling', default='activity',
+        help="How to handle fulfillments created on Shopify "
+             "(e.g. by 3PL, dropship, or direct Shopify admin).",
+    )
+    auto_handle_payment_transitions = fields.Boolean(
+        'Auto-handle Payment Transitions', default=True,
+        help="Automatically post/cancel invoices when payment status "
+             "changes on Shopify (e.g. authorized→paid, pending→voided).",
+    )
+    reverse_sync_payment = fields.Boolean(
+        'Reverse Sync: Payment', default=False,
+        help="When an invoice is posted in Odoo for a Shopify order, "
+             "mark the order as paid on Shopify via orderMarkAsPaid.",
+    )
+    reverse_sync_refund = fields.Boolean(
+        'Reverse Sync: Refund', default=False,
+        help="When a credit note is posted in Odoo for a Shopify order, "
+             "create a refund on Shopify.",
+    )
+    reconciliation_order_days = fields.Integer(
+        'Reconciliation Lookback (days)', default=30,
+        help="How many days back to check for status mismatches.",
+    )
+
     shipping_product_id = fields.Many2one(
         'product.product', string='Shipping Product',
         help="Product used for shipping lines on imported orders. "

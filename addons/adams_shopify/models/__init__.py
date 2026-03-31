@@ -32,3 +32,4 @@ from . import shopify_customer_tag
 from . import shopify_gift_card
 from . import shopify_import_job
 from . import shopify_payout
+from . import account_move

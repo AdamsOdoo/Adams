@@ -12,6 +12,7 @@
                       groups="adams_shopify.group_shopify_user">
                     <group>
                         <group>
+                            <field name="sales_channel"/>
                             <field name="shopify_order_name"/>
                             <field name="shopify_financial_status"/>
                             <field name="shopify_fulfillment_status"/>

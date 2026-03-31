@@ -145,7 +145,28 @@
                             </group>
                         </page>
 
-                        <!-- Tab 3: Field Mapping -->
+                        <!-- Tab 3: Status Sync -->
+                        <page string="Status Sync" name="status_sync">
+                            <group>
+                                <group string="Fulfillment (Shopify → Odoo)">
+                                    <field name="external_fulfillment_handling"/>
+                                </group>
+                                <group string="Payment Transitions">
+                                    <field name="auto_handle_payment_transitions"/>
+                                </group>
+                            </group>
+                            <group>
+                                <group string="Reverse Sync (Odoo → Shopify)">
+                                    <field name="reverse_sync_payment"/>
+                                    <field name="reverse_sync_refund"/>
+                                </group>
+                                <group string="Reconciliation">
+                                    <field name="reconciliation_order_days"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 4: Field Mapping -->
                         <page string="Field Mapping" name="field_mapping"
                               groups="adams_shopify.group_shopify_manager">
                             <div class="mb-3">

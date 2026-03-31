@@ -134,6 +134,36 @@ class ShopifyWebhookLog(models.Model):
             binding.write({'sync_status': 'permanent_error', 'sync_error': 'Deleted on Shopify'})
 
     def _handle_order_webhook(self, data):
+        """Handle order create/update — includes payment status transition detection."""
+        # First, check if this is a status change on an existing order
+        order_id = data.get('id')
+        if order_id and self.topic == 'orders/updated':
+            shopify_gid = f"gid://shopify/Order/{order_id}"
+            binding = self.env['shopify.order.binding'].search([
+                ('backend_id', '=', self.backend_id.id),
+                ('shopify_id', '=', shopify_gid),
+            ], limit=1)
+
+            if binding:
+                # Detect financial status change
+                new_financial = (data.get('financial_status', '') or '').lower()
+                old_financial = binding.shopify_financial_status or ''
+                if new_financial and new_financial != old_financial:
+                    from ..sync.payment_status_sync import PaymentStatusHandler
+                    handler = PaymentStatusHandler(self.env, self.backend_id)
+                    handler.handle_status_change(binding, old_financial, new_financial)
+
+                # Detect fulfillment status change
+                new_fulfillment = (data.get('fulfillment_status') or 'unfulfilled').lower()
+                old_fulfillment = binding.shopify_fulfillment_status or 'unfulfilled'
+                if new_fulfillment != old_fulfillment:
+                    binding.write({'shopify_fulfillment_status': new_fulfillment})
+                    if binding.odoo_id:
+                        binding.odoo_id.with_context(
+                            shopify_no_auto_export=True,
+                        ).write({'shopify_fulfillment_status': new_fulfillment})
+
+        # Still run the standard order import/update logic
         self.env['shopify.order.binding'].process_webhook_event(
             self.backend_id, data, self.topic,
         )
@@ -157,7 +187,34 @@ class ShopifyWebhookLog(models.Model):
         self.state = 'skipped'
 
     def _handle_fulfillment_webhook(self, data):
-        _logger.info("Fulfillment webhook received for backend %s", self.backend_id.id)
+        """Handle inbound fulfillment from Shopify (3PL, dropship, admin)."""
+        order_id = data.get('order_id')
+        if not order_id:
+            _logger.warning("Fulfillment webhook without order_id")
+            return
+        shopify_gid = f"gid://shopify/Order/{order_id}"
+        binding = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend_id.id),
+            ('shopify_id', '=', shopify_gid),
+        ], limit=1)
+        if not binding:
+            _logger.info("No order binding for fulfillment, order_id=%s", order_id)
+            return
+
+        # Check if this fulfillment was pushed FROM Odoo (avoid loop)
+        # If the order's picking was just validated, the fulfillment push
+        # would have originated from us — skip inbound processing
+        if self.env.context.get('shopify_no_auto_export'):
+            return
+
+        from ..sync.fulfillment_sync import FulfillmentSync
+        syncer = FulfillmentSync(self.env, self.backend_id)
+
+        status = (data.get('status', '') or '').lower()
+        if status == 'cancelled':
+            syncer.handle_fulfillment_cancellation(binding, webhook_data=data)
+        else:
+            syncer.handle_inbound_fulfillment(binding, webhook_data=data)
 
     def _handle_refund_webhook(self, data):
         """Create credit note from Shopify refund."""

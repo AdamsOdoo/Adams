@@ -8,6 +8,13 @@ class SaleOrder(models.Model):
         'shopify.order.binding', 'odoo_id',
         string='Shopify Bindings',
     )
+    sales_channel = fields.Selection([
+        ('direct', 'Direct / B2B'),
+        ('shopify', 'Shopify'),
+    ], default='direct', readonly=True, index=True,
+        help="Sales channel that created this order. "
+             "Only 'Shopify' orders are synced with Shopify.",
+    )
     shopify_order_name = fields.Char(
         'Shopify Order #', readonly=True,
     )

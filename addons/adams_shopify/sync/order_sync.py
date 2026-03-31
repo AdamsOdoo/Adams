@@ -62,19 +62,32 @@ class OrderImporter(BaseImporter):
         fulfillment_status = (node.get('displayFulfillmentStatus', '') or '').lower()
 
         if existing_binding:
-            # Update financial/fulfillment status on existing order
+            # Detect financial status change → trigger transition handler
+            old_financial = existing_binding.shopify_financial_status or ''
+            if financial_status and financial_status != old_financial:
+                try:
+                    from .payment_status_sync import PaymentStatusHandler
+                    handler = PaymentStatusHandler(self.env, self.backend)
+                    handler.handle_status_change(
+                        existing_binding, old_financial, financial_status,
+                    )
+                except Exception as e:
+                    _logger.warning(
+                        "Payment transition failed for order %s: %s",
+                        existing_binding.shopify_order_name, e,
+                    )
+
+            # Update fulfillment status
+            old_fulfillment = existing_binding.shopify_fulfillment_status or ''
             update_vals = {}
-            if existing_binding.shopify_financial_status != financial_status:
-                update_vals['shopify_financial_status'] = financial_status
-            if existing_binding.shopify_fulfillment_status != fulfillment_status:
+            if fulfillment_status != old_fulfillment:
                 update_vals['shopify_fulfillment_status'] = fulfillment_status
             if update_vals:
                 existing_binding.write(update_vals)
                 if existing_binding.odoo_id:
-                    existing_binding.odoo_id.write({
-                        'shopify_financial_status': financial_status,
-                        'shopify_fulfillment_status': fulfillment_status,
-                    })
+                    existing_binding.odoo_id.with_context(
+                        shopify_no_auto_export=True,
+                    ).write(update_vals)
             existing_binding._mark_synced(checksum=checksum)
         else:
             order = self._create_sale_order(node)
@@ -102,6 +115,7 @@ class OrderImporter(BaseImporter):
 
         order_vals = {
             'partner_id': partner.id,
+            'sales_channel': 'shopify',
             'shopify_order_name': node.get('name', ''),
             'shopify_financial_status': (node.get('displayFinancialStatus', '') or '').lower(),
             'shopify_fulfillment_status': (node.get('displayFulfillmentStatus', '') or '').lower(),

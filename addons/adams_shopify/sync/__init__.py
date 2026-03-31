@@ -16,3 +16,4 @@ from . import customer_tag_sync
 from . import discount_import_sync
 from . import gift_card_sync
 from . import payout_sync
+from . import payment_status_sync
