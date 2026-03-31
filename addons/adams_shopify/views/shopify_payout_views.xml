@@ -119,6 +119,49 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <!-- Payout Transaction List View -->
+    <record id="shopify_payout_transaction_view_list" model="ir.ui.view">
+        <field name="name">shopify.payout.transaction.list</field>
+        <field name="model">shopify.payout.transaction</field>
+        <field name="arch" type="xml">
+            <list string="Payout Transactions">
+                <field name="processed_at"/>
+                <field name="payout_id"/>
+                <field name="transaction_type"/>
+                <field name="source_type"/>
+                <field name="source_order_id"/>
+                <field name="amount"/>
+                <field name="fee"/>
+                <field name="net" sum="Total Net"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Payout Transaction Search View -->
+    <record id="shopify_payout_transaction_view_search" model="ir.ui.view">
+        <field name="name">shopify.payout.transaction.search</field>
+        <field name="model">shopify.payout.transaction</field>
+        <field name="arch" type="xml">
+            <search string="Payout Transactions">
+                <field name="payout_id"/>
+                <field name="source_order_id"/>
+                <filter name="charges" string="Charges"
+                        domain="[('transaction_type', '=', 'charge')]"/>
+                <filter name="refunds" string="Refunds"
+                        domain="[('transaction_type', '=', 'refund')]"/>
+                <filter name="disputes" string="Disputes"
+                        domain="[('transaction_type', '=', 'dispute')]"/>
+                <group>
+                    <filter name="group_type" string="Type"
+                            context="{'group_by': 'transaction_type'}"/>
+                    <filter name="group_payout" string="Payout"
+                            context="{'group_by': 'payout_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <!-- Payout Transaction Action -->
     <record id="shopify_payout_transaction_action" model="ir.actions.act_window">
         <field name="name">Payout Transactions</field>
