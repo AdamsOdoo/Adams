@@ -159,29 +159,88 @@ class CustomerImporter(BaseImporter):
         return vals
 
     def _find_odoo_partner(self, node):
-        """Deduplicate by email (default strategy)."""
+        """Deduplicate partner based on backend's configured dedup strategy."""
+        dedup = self.backend.customer_dedup_field or 'email'
         email = node.get('email')
-        if email:
+        phone = node.get('phone')
+
+        # Strategy 1: first check if a binding already exists for this Shopify GID
+        shopify_id = node.get('id', '')
+        if shopify_id:
+            existing_binding = self.env['shopify.customer.binding'].search([
+                ('backend_id', '=', self.backend.id),
+                ('shopify_id', '=', shopify_id),
+            ], limit=1)
+            if existing_binding:
+                return existing_binding.odoo_id
+
+        # Strategy 2: dedup by configured field
+        if dedup == 'email' and email:
             return self.env['res.partner'].search([
                 ('email', '=ilike', email),
                 ('parent_id', '=', False),
             ], limit=1)
+
+        if dedup == 'phone' and phone:
+            # Normalize phone for matching
+            return self.env['res.partner'].search([
+                ('phone', '=', phone),
+                ('parent_id', '=', False),
+            ], limit=1) or self.env['res.partner'].search([
+                ('mobile', '=', phone),
+                ('parent_id', '=', False),
+            ], limit=1)
+
+        if dedup == 'email_phone':
+            # Try email first (more reliable), then phone
+            if email:
+                partner = self.env['res.partner'].search([
+                    ('email', '=ilike', email),
+                    ('parent_id', '=', False),
+                ], limit=1)
+                if partner:
+                    return partner
+            if phone:
+                partner = self.env['res.partner'].search([
+                    ('phone', '=', phone),
+                    ('parent_id', '=', False),
+                ], limit=1) or self.env['res.partner'].search([
+                    ('mobile', '=', phone),
+                    ('parent_id', '=', False),
+                ], limit=1)
+                if partner:
+                    return partner
+
         return None
 
     def _import_addresses(self, partner, node):
-        """Import additional Shopify addresses as child contacts."""
+        """Import additional Shopify addresses as child contacts (with dedup)."""
         addresses = node.get('addresses', [])
         # Skip first address (already set on main partner from defaultAddress)
         for addr in addresses[1:]:
+            street = addr.get('address1') or ''
+            city = addr.get('city') or ''
+            if not street and not city:
+                continue
+
+            # Check for existing child address to avoid duplicates
+            existing = self.env['res.partner'].search([
+                ('parent_id', '=', partner.id),
+                ('street', '=', street),
+                ('city', '=', city),
+            ], limit=1)
+            if existing:
+                continue
+
             country = self._resolve_country(addr.get('countryCodeV2'))
             state = self._resolve_state(addr.get('provinceCode'), country)
             self.env['res.partner'].create({
                 'parent_id': partner.id,
                 'type': 'other',
                 'name': partner.name,
-                'street': addr.get('address1') or False,
+                'street': street or False,
                 'street2': addr.get('address2') or False,
-                'city': addr.get('city') or False,
+                'city': city or False,
                 'zip': addr.get('zip') or False,
                 'country_id': country.id if country else False,
                 'state_id': state.id if state else False,

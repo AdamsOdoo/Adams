@@ -244,21 +244,19 @@ class OrderImporter(BaseImporter):
             })
 
     def _resolve_customer(self, node):
-        """Find or create the customer for this order."""
+        """Find or create the customer for this order.
+
+        Uses the backend's dedup strategy and ensures a binding is created
+        when a new partner is linked to a Shopify customer.
+        """
         customer_data = node.get('customer')
         if not customer_data:
-            # Use shipping address to create a partner
-            shipping = node.get('shippingAddress', {})
-            if shipping:
-                name = f"{shipping.get('firstName', '')} {shipping.get('lastName', '')}".strip()
-                return self.env['res.partner'].create({
-                    'name': name or 'Shopify Customer',
-                    'customer_rank': 1,
-                    'is_shopify_customer': True,
-                })
-            return None
+            # Guest order — dedup by shipping address email/phone
+            return self._resolve_guest_customer(node)
 
         shopify_customer_id = customer_data.get('id', '')
+
+        # Step 1: Check existing binding (fastest, most reliable)
         if shopify_customer_id:
             binding = self.env['shopify.customer.binding'].search([
                 ('backend_id', '=', self.backend.id),
@@ -267,26 +265,115 @@ class OrderImporter(BaseImporter):
             if binding:
                 return binding.odoo_id
 
-        # Try by email
+        # Step 2: Dedup by configured strategy
         email = customer_data.get('email')
-        if email:
-            partner = self.env['res.partner'].search([
+        phone = customer_data.get('phone')
+        partner = self._dedup_partner(email, phone)
+
+        # Step 3: Create new partner if no match
+        if not partner:
+            first_name = customer_data.get('firstName', '') or ''
+            last_name = customer_data.get('lastName', '') or ''
+            name = f"{first_name} {last_name}".strip() or email or 'Shopify Customer'
+            partner = self.env['res.partner'].create({
+                'name': name,
+                'email': email or False,
+                'phone': phone or False,
+                'customer_rank': 1,
+                'is_shopify_customer': True,
+            })
+
+        # Step 4: Create binding so future lookups use Step 1 (fast path)
+        if shopify_customer_id:
+            existing_binding = self.env['shopify.customer.binding'].search([
+                ('backend_id', '=', self.backend.id),
+                ('shopify_id', '=', shopify_customer_id),
+            ], limit=1)
+            if not existing_binding:
+                self.env['shopify.customer.binding'].create({
+                    'backend_id': self.backend.id,
+                    'odoo_id': partner.id,
+                    'shopify_id': shopify_customer_id,
+                    'shopify_email': email or '',
+                    'sync_status': 'synced',
+                    'sync_checksum': shopify_customer_id,
+                    'last_sync_date': fields.Datetime.now(),
+                })
+
+        return partner
+
+    def _resolve_guest_customer(self, node):
+        """Resolve customer for guest orders (no Shopify customer object).
+
+        Dedup by email from shipping/billing address to avoid creating
+        a new partner for every guest order from the same person.
+        """
+        shipping = node.get('shippingAddress', {})
+        billing = node.get('billingAddress', {})
+
+        # Try to find an identifier
+        email = node.get('email') or shipping.get('email') or billing.get('email')
+        phone = shipping.get('phone') or billing.get('phone')
+
+        partner = self._dedup_partner(email, phone)
+        if partner:
+            return partner
+
+        # Create new from shipping address
+        if shipping:
+            name = f"{shipping.get('firstName', '')} {shipping.get('lastName', '')}".strip()
+            return self.env['res.partner'].create({
+                'name': name or 'Shopify Guest',
+                'email': email or False,
+                'phone': phone or False,
+                'customer_rank': 1,
+                'is_shopify_customer': True,
+            })
+        return None
+
+    def _dedup_partner(self, email, phone):
+        """Find existing partner using the backend's dedup strategy."""
+        dedup = self.backend.customer_dedup_field or 'email'
+
+        if dedup == 'email' and email:
+            return self.env['res.partner'].search([
                 ('email', '=ilike', email),
                 ('parent_id', '=', False),
             ], limit=1)
-            if partner:
-                return partner
 
-        # Create new
-        first_name = customer_data.get('firstName', '') or ''
-        last_name = customer_data.get('lastName', '') or ''
-        name = f"{first_name} {last_name}".strip() or email or 'Shopify Customer'
-        return self.env['res.partner'].create({
-            'name': name,
-            'email': email or False,
-            'customer_rank': 1,
-            'is_shopify_customer': True,
-        })
+        if dedup == 'phone' and phone:
+            return (
+                self.env['res.partner'].search([
+                    ('phone', '=', phone),
+                    ('parent_id', '=', False),
+                ], limit=1)
+                or self.env['res.partner'].search([
+                    ('mobile', '=', phone),
+                    ('parent_id', '=', False),
+                ], limit=1)
+            )
+
+        if dedup == 'email_phone':
+            if email:
+                partner = self.env['res.partner'].search([
+                    ('email', '=ilike', email),
+                    ('parent_id', '=', False),
+                ], limit=1)
+                if partner:
+                    return partner
+            if phone:
+                return (
+                    self.env['res.partner'].search([
+                        ('phone', '=', phone),
+                        ('parent_id', '=', False),
+                    ], limit=1)
+                    or self.env['res.partner'].search([
+                        ('mobile', '=', phone),
+                        ('parent_id', '=', False),
+                    ], limit=1)
+                )
+
+        return None
 
     def _get_or_create_address(self, parent, addr_data, addr_type):
         """Get or create an address partner."""
