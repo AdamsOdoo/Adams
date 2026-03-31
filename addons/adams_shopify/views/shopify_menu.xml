@@ -81,6 +81,12 @@
               action="shopify_bulk_export_wizard_action"
               sequence="40"/>
 
+    <menuitem id="menu_shopify_import_jobs"
+              name="Import Jobs"
+              parent="menu_shopify_operations"
+              action="shopify_import_job_action"
+              sequence="50"/>
+
     <!-- Sync Status -->
     <menuitem id="menu_shopify_sync_status"
               name="Sync Status"
@@ -134,6 +140,12 @@
               parent="menu_shopify_sync_status"
               action="shopify_order_transaction_action"
               sequence="65"/>
+
+    <menuitem id="menu_shopify_payouts"
+              name="Payouts"
+              parent="menu_shopify_sync_status"
+              action="shopify_payout_action"
+              sequence="67"/>
 
     <menuitem id="menu_shopify_gift_cards"
               name="Gift Cards"

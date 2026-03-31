@@ -22,9 +22,12 @@ class ShopifyWebhookLog(models.Model):
         ('processing', 'Processing'),
         ('done', 'Done'),
         ('error', 'Error'),
+        ('dead_letter', 'Dead Letter'),
         ('skipped', 'Skipped'),
     ], default='pending', index=True)
     error_message = fields.Text()
+    retry_count = fields.Integer(default=0)
+    max_retries = fields.Integer(default=5)
     received_at = fields.Datetime(default=fields.Datetime.now)
     processed_at = fields.Datetime()
 
@@ -35,8 +38,11 @@ class ShopifyWebhookLog(models.Model):
 
     @api.model
     def _cron_process_pending(self):
-        """Process pending webhook events in batches."""
-        pending = self.search([('state', '=', 'pending')], limit=100, order='received_at asc')
+        """Process pending and retryable webhook events in batches."""
+        pending = self.search([
+            ('state', 'in', ['pending', 'error']),
+            ('retry_count', '<', 5),
+        ], limit=100, order='received_at asc')
         for log in pending:
             try:
                 log.state = 'processing'
@@ -48,13 +54,37 @@ class ShopifyWebhookLog(models.Model):
                 })
             except Exception as e:
                 _logger.exception("Webhook processing failed for %s", log.id)
-                log.write({
-                    'state': 'error',
-                    'error_message': str(e),
-                    'processed_at': fields.Datetime.now(),
-                })
+                new_retry = log.retry_count + 1
+                if new_retry >= log.max_retries:
+                    log.write({
+                        'state': 'dead_letter',
+                        'error_message': str(e),
+                        'retry_count': new_retry,
+                        'processed_at': fields.Datetime.now(),
+                    })
+                    _logger.warning(
+                        "Webhook %s moved to dead letter after %d retries",
+                        log.id, new_retry,
+                    )
+                else:
+                    log.write({
+                        'state': 'error',
+                        'error_message': str(e),
+                        'retry_count': new_retry,
+                        'processed_at': fields.Datetime.now(),
+                    })
             # Commit after each event to release locks and ensure progress
             self.env.cr.commit()  # noqa: E501
+
+    def action_retry_webhook(self):
+        """Manually retry a dead-letter or error webhook."""
+        for log in self:
+            if log.state in ('error', 'dead_letter'):
+                log.write({
+                    'state': 'pending',
+                    'retry_count': 0,
+                    'error_message': False,
+                })
 
     def _process_event(self):
         """Dispatch webhook event to the appropriate handler."""

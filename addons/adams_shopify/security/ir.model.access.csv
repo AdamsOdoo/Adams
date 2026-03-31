@@ -70,3 +70,12 @@ access_shopify_gift_card_user,shopify.gift.card.user,model_shopify_gift_card,gro
 access_shopify_gift_card_manager,shopify.gift.card.manager,model_shopify_gift_card,group_shopify_manager,1,1,1,0
 access_shopify_gift_card_admin,shopify.gift.card.admin,model_shopify_gift_card,base.group_system,1,1,1,1
 access_shopify_bulk_export_wizard,shopify.bulk.export.wizard,model_shopify_bulk_export_wizard,group_shopify_manager,1,1,1,1
+access_shopify_import_job_user,shopify.import.job.user,model_shopify_import_job,group_shopify_user,1,0,0,0
+access_shopify_import_job_manager,shopify.import.job.manager,model_shopify_import_job,group_shopify_manager,1,1,1,0
+access_shopify_import_job_admin,shopify.import.job.admin,model_shopify_import_job,base.group_system,1,1,1,1
+access_shopify_payout_user,shopify.payout.user,model_shopify_payout,group_shopify_user,1,0,0,0
+access_shopify_payout_manager,shopify.payout.manager,model_shopify_payout,group_shopify_manager,1,1,1,0
+access_shopify_payout_admin,shopify.payout.admin,model_shopify_payout,base.group_system,1,1,1,1
+access_shopify_payout_transaction_user,shopify.payout.transaction.user,model_shopify_payout_transaction,group_shopify_user,1,0,0,0
+access_shopify_payout_transaction_manager,shopify.payout.transaction.manager,model_shopify_payout_transaction,group_shopify_manager,1,1,1,0
+access_shopify_payout_transaction_admin,shopify.payout.transaction.admin,model_shopify_payout_transaction,base.group_system,1,1,1,1

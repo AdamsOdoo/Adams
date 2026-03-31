@@ -6,7 +6,7 @@
         <field name="model">shopify.webhook.log</field>
         <field name="arch" type="xml">
             <list string="Webhook Logs"
-                  decoration-danger="state == 'error'"
+                  decoration-danger="state in ('error', 'dead_letter')"
                   decoration-muted="state == 'skipped'"
                   decoration-info="state == 'pending'">
                 <field name="received_at"/>
@@ -15,9 +15,10 @@
                 <field name="shopify_id" string="Resource ID"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'done'"
-                       decoration-danger="state == 'error'"
+                       decoration-danger="state in ('error', 'dead_letter')"
                        decoration-info="state in ('pending', 'processing')"
                        decoration-muted="state == 'skipped'"/>
+                <field name="retry_count"/>
                 <field name="processed_at"/>
                 <field name="error_message" optional="hide"/>
             </list>
@@ -29,6 +30,11 @@
         <field name="model">shopify.webhook.log</field>
         <field name="arch" type="xml">
             <form string="Webhook Log">
+                <header>
+                    <button name="action_retry_webhook" type="object"
+                            string="Retry" class="oe_highlight"
+                            invisible="state not in ('error', 'dead_letter')"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
@@ -41,6 +47,8 @@
                         <group>
                             <field name="received_at"/>
                             <field name="processed_at"/>
+                            <field name="retry_count"/>
+                            <field name="max_retries"/>
                         </group>
                     </group>
                     <group string="Error" invisible="not error_message">
@@ -66,6 +74,8 @@
                         domain="[('state', '=', 'pending')]"/>
                 <filter name="errors" string="Errors"
                         domain="[('state', '=', 'error')]"/>
+                <filter name="dead_letter" string="Dead Letter"
+                        domain="[('state', '=', 'dead_letter')]"/>
                 <filter name="today" string="Today"
                         domain="[('received_at', '&gt;=', (context_today()).strftime('%Y-%m-%d'))]"/>
                 <group>

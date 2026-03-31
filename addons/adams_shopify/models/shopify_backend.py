@@ -410,6 +410,20 @@ class ShopifyBackend(models.Model):
                 backend._notify_sync_error('collections', 1, str(e))
 
     @api.model
+    def _cron_import_payouts(self):
+        backends = self.search([('state', '=', 'connected')])
+        for backend in backends:
+            try:
+                from ..sync.payout_sync import PayoutSync
+                syncer = PayoutSync(
+                    self.env.with_company(backend.company_id), backend,
+                )
+                syncer.import_payouts()
+            except Exception as e:
+                _logger.exception("Payout import failed for backend %s", backend.id)
+                backend._notify_sync_error('payouts', 1, str(e))
+
+    @api.model
     def _cron_import_refunds(self):
         backends = self.search([('state', '=', 'connected'), ('auto_sync_orders', '=', True)])
         for backend in backends:

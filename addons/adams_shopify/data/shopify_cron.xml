@@ -73,6 +73,24 @@
         <field name="active" eval="True"/>
     </record>
 
+    <record id="ir_cron_shopify_import_payouts" model="ir.cron">
+        <field name="name">Shopify: Import Payouts</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_import_payouts()</field>
+        <field name="interval_number">6</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_process_import_jobs" model="ir.cron">
+        <field name="name">Shopify: Process Import Jobs</field>
+        <field name="model_id" ref="model_shopify_import_job"/>
+        <field name="code">model._cron_process_import_jobs()</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
     <record id="ir_cron_shopify_reconcile" model="ir.cron">
         <field name="name">Shopify: Reconciliation Check</field>
         <field name="model_id" ref="model_shopify_reconciliation"/>

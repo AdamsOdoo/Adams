@@ -48,6 +48,8 @@
         'views/shopify_location_views.xml',
         'views/shopify_customer_tag_views.xml',
         'views/shopify_gift_card_views.xml',
+        'views/shopify_import_job_views.xml',
+        'views/shopify_payout_views.xml',
         'wizards/shopify_onboarding_wizard_views.xml',
         'wizards/shopify_bulk_export_wizard_views.xml',
         'views/shopify_menu.xml',

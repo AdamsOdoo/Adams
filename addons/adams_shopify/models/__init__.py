@@ -30,3 +30,5 @@ from . import shopify_metafield_mapping
 from . import shopify_location
 from . import shopify_customer_tag
 from . import shopify_gift_card
+from . import shopify_import_job
+from . import shopify_payout
