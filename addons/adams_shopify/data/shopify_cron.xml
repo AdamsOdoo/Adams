@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="ir_cron_shopify_sync_products" model="ir.cron">
+        <field name="name">Shopify: Sync Products</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_sync_products()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_sync_customers" model="ir.cron">
+        <field name="name">Shopify: Sync Customers</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_sync_customers()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_import_orders" model="ir.cron">
+        <field name="name">Shopify: Import Orders</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_import_orders()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_sync_inventory" model="ir.cron">
+        <field name="name">Shopify: Push Inventory</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_sync_inventory()</field>
+        <field name="interval_number">10</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_process_webhooks" model="ir.cron">
+        <field name="name">Shopify: Process Pending Webhooks</field>
+        <field name="model_id" ref="model_shopify_webhook_log"/>
+        <field name="code">model._cron_process_pending()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_sync_discounts" model="ir.cron">
+        <field name="name">Shopify: Sync Discount Codes</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_sync_discounts()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_sync_collections" model="ir.cron">
+        <field name="name">Shopify: Sync Collections</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_sync_collections()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_import_refunds" model="ir.cron">
+        <field name="name">Shopify: Import Refunds</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_import_refunds()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_import_payouts" model="ir.cron">
+        <field name="name">Shopify: Import Payouts</field>
+        <field name="model_id" ref="model_shopify_backend"/>
+        <field name="code">model._cron_import_payouts()</field>
+        <field name="interval_number">6</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_process_import_jobs" model="ir.cron">
+        <field name="name">Shopify: Process Import Jobs</field>
+        <field name="model_id" ref="model_shopify_import_job"/>
+        <field name="code">model._cron_process_import_jobs()</field>
+        <field name="interval_number">2</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_reconcile" model="ir.cron">
+        <field name="name">Shopify: Reconciliation Check</field>
+        <field name="model_id" ref="model_shopify_reconciliation"/>
+        <field name="code">model._cron_reconcile()</field>
+        <field name="interval_number">6</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_shopify_cleanup_webhook_logs" model="ir.cron">
+        <field name="name">Shopify: Cleanup Old Webhook Logs</field>
+        <field name="model_id" ref="model_shopify_webhook_log"/>
+        <field name="code">model._cron_cleanup_old_logs(days=90)</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+</odoo>

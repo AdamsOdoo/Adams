@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Backend Tree View -->
+    <record id="shopify_backend_view_tree" model="ir.ui.view">
+        <field name="name">shopify.backend.tree</field>
+        <field name="model">shopify.backend</field>
+        <field name="arch" type="xml">
+            <list string="Shopify Stores">
+                <field name="name"/>
+                <field name="shop_url"/>
+                <field name="shop_name"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'connected'"
+                       decoration-danger="state == 'error'"
+                       decoration-info="state == 'draft'"/>
+                <field name="last_sync_date"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Backend Form View -->
+    <record id="shopify_backend_view_form" model="ir.ui.view">
+        <field name="name">shopify.backend.form</field>
+        <field name="model">shopify.backend</field>
+        <field name="arch" type="xml">
+            <form string="Shopify Store">
+                <header>
+                    <button name="action_test_connection" type="object"
+                            string="Test Connection" class="oe_highlight"
+                            invisible="state == 'connected'"/>
+                    <button name="action_test_connection" type="object"
+                            string="Re-test Connection"
+                            invisible="state != 'connected'"/>
+                    <button name="action_register_webhooks" type="object"
+                            string="Register Webhooks"
+                            invisible="state != 'connected'"
+                            groups="adams_shopify.group_shopify_manager"/>
+                    <button name="action_import_locations" type="object"
+                            string="Import Locations"
+                            invisible="state != 'connected'"
+                            groups="adams_shopify.group_shopify_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,connected"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_product_bindings" type="object"
+                                class="oe_stat_button" icon="fa-cubes">
+                            <field name="product_bind_count" widget="statinfo"
+                                   string="Products"/>
+                        </button>
+                        <button name="action_open_customer_bindings" type="object"
+                                class="oe_stat_button" icon="fa-users">
+                            <field name="customer_bind_count" widget="statinfo"
+                                   string="Customers"/>
+                        </button>
+                        <button name="action_open_order_bindings" type="object"
+                                class="oe_stat_button" icon="fa-shopping-cart">
+                            <field name="order_bind_count" widget="statinfo"
+                                   string="Orders"/>
+                        </button>
+                        <button name="action_open_sync_logs" type="object"
+                                class="oe_stat_button" icon="fa-history">
+                            <span class="o_stat_text">Sync Logs</span>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Store Name"/>
+                        </h1>
+                    </div>
+                    <notebook>
+                        <!-- Tab 1: Connection -->
+                        <page string="Connection" name="connection">
+                            <group>
+                                <group string="Shopify Credentials">
+                                    <field name="shop_url" placeholder="my-store.myshopify.com"/>
+                                    <field name="access_token" password="True"/>
+                                    <field name="api_version"/>
+                                    <field name="webhook_secret" password="True"/>
+                                </group>
+                                <group string="Odoo Settings">
+                                    <field name="company_id" groups="base.group_multi_company"/>
+                                    <field name="warehouse_id"/>
+                                    <field name="pricelist_id"/>
+                                    <field name="shopify_location_id"/>
+                                </group>
+                            </group>
+                            <group string="Shop Info" invisible="state != 'connected'">
+                                <field name="shop_name"/>
+                                <field name="shop_plan"/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 2: Sync Settings -->
+                        <page string="Sync Settings" name="sync_settings">
+                            <group>
+                                <group string="Products">
+                                    <field name="auto_sync_products"/>
+                                    <field name="product_sync_direction"
+                                           invisible="not auto_sync_products"/>
+                                    <field name="product_sync_interval"
+                                           invisible="not auto_sync_products"/>
+                                    <field name="auto_export_on_change"
+                                           invisible="not auto_sync_products"/>
+                                </group>
+                                <group string="Customers">
+                                    <field name="auto_sync_customers"/>
+                                    <field name="customer_sync_direction"
+                                           invisible="not auto_sync_customers"/>
+                                    <field name="customer_sync_interval"
+                                           invisible="not auto_sync_customers"/>
+                                    <field name="customer_dedup_field"
+                                           invisible="not auto_sync_customers"/>
+                                </group>
+                            </group>
+                            <group>
+                                <group string="Orders">
+                                    <field name="auto_sync_orders"/>
+                                    <field name="order_sync_interval"
+                                           invisible="not auto_sync_orders"/>
+                                    <field name="auto_create_invoice"
+                                           invisible="not auto_sync_orders"/>
+                                    <field name="import_currency_mode"
+                                           invisible="not auto_sync_orders"/>
+                                </group>
+                                <group string="Inventory">
+                                    <field name="auto_sync_inventory"/>
+                                    <field name="inventory_sync_interval"
+                                           invisible="not auto_sync_inventory"/>
+                                    <field name="inventory_quantity_field"
+                                           invisible="not auto_sync_inventory"/>
+                                </group>
+                            </group>
+                            <group>
+                                <group string="Collections">
+                                    <field name="auto_sync_collections"/>
+                                </group>
+                                <group string="General">
+                                    <field name="batch_size"/>
+                                    <field name="shipping_product_id"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 3: Status Sync -->
+                        <page string="Status Sync" name="status_sync">
+                            <group>
+                                <group string="Fulfillment (Shopify → Odoo)">
+                                    <field name="external_fulfillment_handling"/>
+                                </group>
+                                <group string="Payment Transitions">
+                                    <field name="auto_handle_payment_transitions"/>
+                                </group>
+                            </group>
+                            <group>
+                                <group string="Reverse Sync (Odoo → Shopify)">
+                                    <field name="reverse_sync_payment"/>
+                                    <field name="reverse_sync_refund"/>
+                                </group>
+                                <group string="Reconciliation">
+                                    <field name="reconciliation_order_days"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 4: Field Mapping -->
+                        <page string="Field Mapping" name="field_mapping"
+                              groups="adams_shopify.group_shopify_manager">
+                            <div class="mb-3">
+                                <button name="action_init_field_mappings" type="object"
+                                        string="Load Default Mappings"
+                                        class="btn-secondary"
+                                        invisible="field_mapping_ids"/>
+                            </div>
+                            <field name="field_mapping_ids" nolabel="1"
+                                   context="{'default_backend_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="entity"/>
+                                    <field name="odoo_field"/>
+                                    <field name="shopify_field"/>
+                                    <field name="direction"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 4: Tax Mapping -->
+                        <page string="Tax Mapping" name="tax_mapping"
+                              groups="adams_shopify.group_shopify_manager">
+                            <field name="tax_mapping_ids" nolabel="1"
+                                   context="{'default_backend_id': id}">
+                                <list editable="bottom">
+                                    <field name="shopify_tax_name"/>
+                                    <field name="shopify_tax_rate"/>
+                                    <field name="odoo_tax_id"/>
+                                    <field name="fiscal_position_id"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 5: Metafield Mapping -->
+                        <page string="Metafield Mapping" name="metafield_mapping"
+                              groups="adams_shopify.group_shopify_manager">
+                            <field name="metafield_mapping_ids" nolabel="1"
+                                   context="{'default_backend_id': id}">
+                                <list editable="bottom">
+                                    <field name="owner_type"/>
+                                    <field name="shopify_namespace"/>
+                                    <field name="shopify_key"/>
+                                    <field name="shopify_type"/>
+                                    <field name="odoo_field"/>
+                                    <field name="direction"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 6: Logs &amp; Status -->
+                        <page string="Logs &amp; Status" name="logs_status">
+                            <group>
+                                <field name="last_sync_date"/>
+                                <field name="product_error_count" string="Product Errors"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Backend Action -->
+    <record id="shopify_backend_action" model="ir.actions.act_window">
+        <field name="name">Shopify Stores</field>
+        <field name="res_model">shopify.backend</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Connect your first Shopify store
+            </p>
+            <p>
+                Add your Shopify store credentials to start syncing
+                products, orders, customers, and inventory.
+            </p>
+        </field>
+    </record>
+
+</odoo>

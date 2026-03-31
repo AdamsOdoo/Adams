@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Dashboard Action using Kanban of backends -->
+    <record id="shopify_dashboard_action" model="ir.actions.act_window">
+        <field name="name">Shopify Dashboard</field>
+        <field name="res_model">shopify.backend</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Connect your first Shopify store
+            </p>
+            <p>
+                Set up your Shopify store connection to start syncing
+                products, orders, customers, and inventory.
+            </p>
+        </field>
+    </record>
+
+    <!-- Dashboard Kanban View -->
+    <record id="shopify_backend_view_kanban" model="ir.ui.view">
+        <field name="name">shopify.backend.kanban.dashboard</field>
+        <field name="model">shopify.backend</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_dashboard" create="true">
+                <field name="name"/>
+                <field name="shop_url"/>
+                <field name="shop_name"/>
+                <field name="state"/>
+                <field name="last_sync_date"/>
+                <field name="product_bind_count"/>
+                <field name="customer_bind_count"/>
+                <field name="order_bind_count"/>
+                <field name="product_error_count"/>
+                <field name="total_error_count"/>
+                <field name="collection_bind_count"/>
+                <field name="refund_bind_count"/>
+                <field name="sync_log_today_count"/>
+                <field name="promoter_count"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_card_content">
+                            <!-- Header -->
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h3 class="mb-0"><field name="name"/></h3>
+                                    <span class="text-muted"><field name="shop_url"/></span>
+                                </div>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'connected'"
+                                       decoration-danger="state == 'error'"
+                                       decoration-info="state == 'draft'"/>
+                            </div>
+
+                            <!-- Primary stats row -->
+                            <div class="d-flex gap-3 mb-3">
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold fs-4 text-primary">
+                                        <field name="product_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Products</div>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold fs-4 text-primary">
+                                        <field name="order_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Orders</div>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold fs-4 text-primary">
+                                        <field name="customer_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Customers</div>
+                                </div>
+                            </div>
+
+                            <!-- Secondary stats row -->
+                            <div class="d-flex gap-3 mb-3">
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold">
+                                        <field name="collection_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Collections</div>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold">
+                                        <field name="refund_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Refunds</div>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold">
+                                        <field name="promoter_count"/>
+                                    </div>
+                                    <div class="text-muted small">Promoters</div>
+                                </div>
+                            </div>
+
+                            <!-- Health indicators -->
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <t t-if="record.total_error_count.raw_value > 0">
+                                        <span class="badge text-bg-danger">
+                                            <field name="total_error_count"/> errors
+                                        </span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="badge text-bg-success">No errors</span>
+                                    </t>
+                                </div>
+                                <div>
+                                    <span class="badge text-bg-info">
+                                        <field name="sync_log_today_count"/> syncs today
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Last sync info -->
+                            <div class="text-muted small mt-2"
+                                 t-if="record.last_sync_date.raw_value">
+                                Last sync: <field name="last_sync_date"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Sync Log Pivot View for analysis -->
+    <record id="shopify_sync_log_view_pivot" model="ir.ui.view">
+        <field name="name">shopify.sync.log.pivot</field>
+        <field name="model">shopify.sync.log</field>
+        <field name="arch" type="xml">
+            <pivot string="Sync Statistics">
+                <field name="entity" type="col"/>
+                <field name="create_date" interval="day" type="row"/>
+                <field name="success_count" type="measure"/>
+                <field name="error_count" type="measure"/>
+                <field name="skipped_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Sync Log Graph View -->
+    <record id="shopify_sync_log_view_graph" model="ir.ui.view">
+        <field name="name">shopify.sync.log.graph</field>
+        <field name="model">shopify.sync.log</field>
+        <field name="arch" type="xml">
+            <graph string="Sync Activity" type="bar" stacked="1">
+                <field name="create_date" interval="day" type="row"/>
+                <field name="success_count" type="measure"/>
+                <field name="error_count" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Sync Analytics Action -->
+    <record id="shopify_sync_analytics_action" model="ir.actions.act_window">
+        <field name="name">Sync Analytics</field>
+        <field name="res_model">shopify.sync.log</field>
+        <field name="view_mode">graph,pivot,list</field>
+    </record>
+
+</odoo>

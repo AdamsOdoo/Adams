@@ -1,0 +1,459 @@
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan" style="font-size:36px;">Adams Shopify Connector</h2>
+        <h3 class="oe_slogan" style="font-size:18px; color:#555;">
+            The most complete, production-grade Shopify integration for Odoo 19
+        </h3>
+        <div class="oe_span12">
+            <p class="oe_mt32" style="text-align:center; font-size:15px; line-height:1.7; max-width:800px; margin:0 auto;">
+                Bidirectional sync for products, orders, customers, inventory, fulfillments, collections,
+                refunds, gift cards, metafields, and more. Built from the ground up with GraphQL,
+                real-time webhooks, circuit-breaker resilience, and GDPR compliance.
+                Connect multiple Shopify stores to a single Odoo instance with full multi-company support.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- CORE DATA SYNC -->
+<!-- ============================================================ -->
+
+<section class="oe_container oe_dark">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Core Data Synchronization</h2>
+
+        <div class="oe_span6">
+            <h3>Product Sync</h3>
+            <ul>
+                <li>Bidirectional product synchronization (Odoo to Shopify and back)</li>
+                <li>Full variant mapping with SKU matching</li>
+                <li>Attribute and attribute-value sync</li>
+                <li>Product image sync (multiple images per product)</li>
+                <li>Pricelist-based pricing export to Shopify</li>
+                <li>Checksum-based change detection -- only syncs what changed</li>
+                <li>Bulk import mode for initial setup</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Order Import</h3>
+            <ul>
+                <li>Automatic order import from Shopify into Odoo sale orders</li>
+                <li>Auto-confirm orders based on payment and fulfillment status</li>
+                <li>Auto-create invoices for paid orders</li>
+                <li>Multi-currency support with automatic rate handling</li>
+                <li>Shipping lines imported as service products</li>
+                <li>Discount tracking per line item and at order level</li>
+                <li>Full tax and financial status mapping</li>
+            </ul>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Customer Sync</h3>
+            <ul>
+                <li>Bidirectional customer synchronization</li>
+                <li>Intelligent deduplication by email address</li>
+                <li>Shipping and billing address handling</li>
+                <li>Customer tag sync (Shopify tags mapped to Odoo categories)</li>
+                <li>Multiple address support per customer</li>
+                <li>GDPR-compliant data handling and redaction</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Inventory Push</h3>
+            <ul>
+                <li>Push stock levels from Odoo to Shopify in real time</li>
+                <li>Multi-location inventory support</li>
+                <li>Batch updates for high-volume catalogs</li>
+                <li>Choose between free quantity or on-hand quantity</li>
+                <li>Warehouse-to-Shopify-location mapping</li>
+                <li>Automatic inventory adjustment on stock moves</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FULFILLMENT, COLLECTIONS, REFUNDS -->
+<!-- ============================================================ -->
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Fulfillment, Collections, and Refunds</h2>
+
+        <div class="oe_span6">
+            <h3>Fulfillment Push</h3>
+            <ul>
+                <li>Push fulfillment status from Odoo deliveries to Shopify</li>
+                <li>Tracking number and carrier information sync</li>
+                <li>Support for Shopify fulfillment orders workflow</li>
+                <li>Partial fulfillment support</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Collection Sync</h3>
+            <ul>
+                <li>Sync Shopify collections to Odoo product categories</li>
+                <li>Bidirectional collection/category mapping</li>
+                <li>Automatic product-collection membership sync</li>
+            </ul>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Refund Handling</h3>
+            <ul>
+                <li>Import Shopify refunds as Odoo credit notes</li>
+                <li>Refund line item detail preservation</li>
+                <li>Automatic credit note creation and reconciliation</li>
+                <li>Partial refund support</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Gift Card Support</h3>
+            <ul>
+                <li>Import and track Shopify gift cards in Odoo</li>
+                <li>Gift card payment line handling on orders</li>
+                <li>Balance tracking and reconciliation</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FINANCIAL MAPPING -->
+<!-- ============================================================ -->
+
+<section class="oe_container oe_dark">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Financial Mapping and Configuration</h2>
+
+        <div class="oe_span6">
+            <h3>Tax Mapping</h3>
+            <ul>
+                <li>Map Shopify tax lines to Odoo fiscal positions and taxes</li>
+                <li>Configurable tax-matching rules per store</li>
+                <li>Handles tax-inclusive and tax-exclusive pricing</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Payment Gateway Mapping</h3>
+            <ul>
+                <li>Map Shopify payment gateways to Odoo payment journals</li>
+                <li>Automatic payment registration on confirmed orders</li>
+                <li>Support for multiple gateways per store</li>
+            </ul>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Metafield Sync</h3>
+            <ul>
+                <li>Bidirectional Shopify metafield synchronization</li>
+                <li>Map custom Shopify metafields to Odoo fields</li>
+                <li>Support for product, variant, customer, and order metafields</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Configurable Field Mappings</h3>
+            <ul>
+                <li>Flexible field-mapping engine for all synced entities</li>
+                <li>Override default mappings without code changes</li>
+                <li>Per-store mapping configuration</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROMOTER / COUPON SYSTEM -->
+<!-- ============================================================ -->
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Promoter and Coupon System</h2>
+        <div class="oe_span12">
+            <p style="text-align:center; font-size:15px; max-width:800px; margin:0 auto 24px auto; line-height:1.7;">
+                A built-in promoter management system that goes beyond basic Shopify discount codes.
+                Create promoters, assign unique coupon codes, track usage, and calculate commissions --
+                all from within Odoo.
+            </p>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Promoter Management</h3>
+            <ul>
+                <li>Create and manage promoters linked to Odoo contacts</li>
+                <li>Assign one or more unique discount codes per promoter</li>
+                <li>Automatic Shopify price rule and discount code creation</li>
+                <li>Promoter status tracking (active, paused, archived)</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Commission and Usage Tracking</h3>
+            <ul>
+                <li>Track coupon usage per order automatically</li>
+                <li>Configurable commission rates per promoter</li>
+                <li>Commission calculation based on order totals</li>
+                <li>Reporting and analytics on promoter performance</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- REAL-TIME WEBHOOKS AND INFRASTRUCTURE -->
+<!-- ============================================================ -->
+
+<section class="oe_container oe_dark">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Real-Time Webhooks and Infrastructure</h2>
+
+        <div class="oe_span6">
+            <h3>Webhook Processing</h3>
+            <ul>
+                <li>HMAC-verified webhook endpoints for security</li>
+                <li>Asynchronous processing via background cron jobs</li>
+                <li>Automatic deduplication of duplicate webhook deliveries</li>
+                <li>Full audit trail of every webhook event</li>
+                <li>Handles all Shopify webhook topics (products, orders, customers, inventory, etc.)</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Location Sync</h3>
+            <ul>
+                <li>Import Shopify locations into Odoo</li>
+                <li>Map Shopify locations to Odoo warehouses</li>
+                <li>Multi-location inventory routing</li>
+                <li>Automatic location discovery on connection</li>
+            </ul>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Circuit Breaker and Rate Limiting</h3>
+            <ul>
+                <li>Built-in circuit breaker prevents cascading failures</li>
+                <li>Adaptive rate limiter reads Shopify throttle status from every API response</li>
+                <li>Automatic back-off and retry with exponential delay</li>
+                <li>Protects both your Odoo server and your Shopify API quota</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Checksum-Based Change Detection</h3>
+            <ul>
+                <li>Computes checksums on synced records to detect real changes</li>
+                <li>Eliminates unnecessary API calls and write operations</li>
+                <li>Dramatically reduces sync time for large catalogs</li>
+                <li>Works across all entity types (products, customers, orders)</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- OPERATIONS AND MONITORING -->
+<!-- ============================================================ -->
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Operations and Monitoring</h2>
+
+        <div class="oe_span6">
+            <h3>Dashboard and Store Health</h3>
+            <ul>
+                <li>At-a-glance sync health overview per store</li>
+                <li>Counts of synced products, orders, customers, and inventory records</li>
+                <li>Error visibility with one-click retry</li>
+                <li>Last sync timestamps and next scheduled run</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>Reconciliation and Drift Detection</h3>
+            <ul>
+                <li>Automated reconciliation checks between Odoo and Shopify</li>
+                <li>Detect and report data drift before it causes issues</li>
+                <li>One-click resolution for common discrepancies</li>
+                <li>Scheduled reconciliation via cron</li>
+            </ul>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Onboarding Wizard</h3>
+            <ul>
+                <li>Step-by-step guided setup for new stores</li>
+                <li>Connection testing, webhook registration, and initial import</li>
+                <li>Progress tracking across configuration steps</li>
+                <li>Get up and running in under five minutes</li>
+            </ul>
+        </div>
+        <div class="oe_span6">
+            <h3>GDPR-Compliant Data Handling</h3>
+            <ul>
+                <li>Handles mandatory Shopify privacy webhooks</li>
+                <li>Customer data request endpoint</li>
+                <li>Customer and shop data redaction endpoints</li>
+                <li>Audit-ready logging of all data operations</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MULTI-COMPANY AND MULTI-STORE -->
+<!-- ============================================================ -->
+
+<section class="oe_container oe_dark">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Multi-Company and Multi-Store</h2>
+        <div class="oe_span12">
+            <ul>
+                <li><strong>Multi-Company Support</strong> -- Full company-scoped backends with record rules ensuring data isolation between companies</li>
+                <li><strong>Multi-Store Management</strong> -- Connect and manage multiple Shopify stores from a single Odoo instance</li>
+                <li><strong>Per-Store Configuration</strong> -- Independent sync settings, field mappings, tax rules, and payment gateway mappings for each store</li>
+                <li><strong>Shared or Separate Catalogs</strong> -- Flexible product sharing across stores or complete catalog isolation</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- WHY CHOOSE US -->
+<!-- ============================================================ -->
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Why Choose Adams Shopify Connector?</h2>
+        <div class="oe_span12">
+            <p style="text-align:center; font-size:15px; max-width:800px; margin:0 auto 24px auto; line-height:1.7;">
+                This is not another thin wrapper around the Shopify REST API.
+                Adams Shopify Connector is an enterprise-grade integration built for real-world
+                e-commerce operations at scale.
+            </p>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Built-In Promoter System</h3>
+            <p>
+                Most Shopify connectors stop at syncing orders and products. Adams includes a full
+                promoter and coupon management system -- create promoters, generate discount codes,
+                track usage per order, and calculate commissions. No extra module required.
+            </p>
+        </div>
+        <div class="oe_span6">
+            <h3>Circuit Breaker Resilience</h3>
+            <p>
+                Network failures and API outages happen. The built-in circuit breaker pattern
+                automatically detects failures, stops sending requests to a failing endpoint,
+                and recovers gracefully -- preventing cascading errors across your sync jobs.
+            </p>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Reconciliation and Drift Detection</h3>
+            <p>
+                Data drifts silently over time. Adams periodically compares Odoo and Shopify
+                records, flags discrepancies, and lets you resolve them before they affect
+                your operations. No more discovering stock mismatches weeks later.
+            </p>
+        </div>
+        <div class="oe_span6">
+            <h3>Modern GraphQL API</h3>
+            <p>
+                Uses Shopify's modern GraphQL Admin API (version 2026-01) for optimal performance.
+                Fetch exactly the data you need in a single request instead of paginating through
+                REST endpoints. Faster syncs, lower API cost.
+            </p>
+        </div>
+
+        <div class="oe_span6">
+            <h3>Checksum-Based Efficiency</h3>
+            <p>
+                Every synced record carries a checksum. On each sync cycle, only records with
+                actual changes are processed. For a catalog of 10,000 products where 50 changed,
+                only 50 API calls are made -- not 10,000.
+            </p>
+        </div>
+        <div class="oe_span6">
+            <h3>Complete Feature Coverage</h3>
+            <p>
+                Products, orders, customers, inventory, fulfillments, collections, refunds,
+                gift cards, metafields, tax mapping, payment gateways, locations, and webhooks.
+                One module covers the entire Shopify integration surface.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ARCHITECTURE HIGHLIGHTS -->
+<!-- ============================================================ -->
+
+<section class="oe_container oe_dark">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Architecture Highlights</h2>
+        <div class="oe_span12">
+            <ul>
+                <li><strong>GraphQL Admin API</strong> -- Shopify API version 2026-01 for maximum efficiency</li>
+                <li><strong>Adaptive Rate Limiting</strong> -- Reads throttle cost from every GraphQL response and adjusts request pacing automatically</li>
+                <li><strong>Binding Pattern</strong> -- Clean separation between Odoo records and Shopify mappings via dedicated binding models</li>
+                <li><strong>Idempotent Operations</strong> -- Safe to retry any operation; duplicate protection enforced at the database level</li>
+                <li><strong>Async Webhook Processing</strong> -- Webhooks are received instantly and processed asynchronously to avoid blocking Shopify</li>
+                <li><strong>Comprehensive Logging</strong> -- Detailed sync logs, webhook logs, and error logs with full traceability</li>
+                <li><strong>No External Dependencies</strong> -- Uses only the Python <code>requests</code> library included in standard Odoo deployments</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SETUP -->
+<!-- ============================================================ -->
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Setup in 5 Minutes</h2>
+        <div class="oe_span12">
+            <ol>
+                <li>Install the module</li>
+                <li>Go to <strong>Shopify &gt; Configuration &gt; Shopify Stores</strong></li>
+                <li>Enter your shop URL and access token</li>
+                <li>Click <strong>Test Connection</strong> to verify API access</li>
+                <li>Follow the <strong>Onboarding Wizard</strong> to configure sync settings, register webhooks, and run your initial import</li>
+                <li>Scheduled sync takes over automatically -- you are done</li>
+            </ol>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- REQUIREMENTS -->
+<!-- ============================================================ -->
+
+<section class="oe_container oe_dark">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Requirements</h2>
+        <div class="oe_span12">
+            <ul>
+                <li>Odoo 19.0 (Community or Enterprise)</li>
+                <li>Shopify store with a <a href="https://shopify.dev/docs/apps/build/authentication/access-tokens">Custom App access token</a></li>
+                <li>Required Shopify API scopes: read/write products, customers, orders, inventory, fulfillments, locations, gift cards</li>
+                <li>Python <code>requests</code> library (included in standard Odoo deployments)</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SUPPORT -->
+<!-- ============================================================ -->
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Support</h2>
+        <div class="oe_span12">
+            <p style="text-align:center; font-size:15px; max-width:700px; margin:0 auto; line-height:1.7;">
+                For support, feature requests, and bug reports, please contact us through the Odoo Apps Store
+                or visit our <a href="https://github.com/adamsodoo/adams">GitHub repository</a>.
+                We actively maintain this module and respond to all inquiries.
+            </p>
+        </div>
+    </div>
+</section>
