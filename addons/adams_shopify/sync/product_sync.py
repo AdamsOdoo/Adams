@@ -1,6 +1,7 @@
 import base64
 import logging
 import requests
+from urllib.parse import urlparse
 
 from odoo import fields
 
@@ -14,7 +15,34 @@ from ..shopify_api.queries.product import (
     VARIANT_BULK_UPDATE_MUTATION,
 )
 
+# Allowed domains for image downloads (SSRF prevention)
+_ALLOWED_IMAGE_DOMAINS = {
+    'cdn.shopify.com',
+    'cdn.shopifycdn.net',
+    'burst.shopifycdn.com',
+}
+
 _logger = logging.getLogger(__name__)
+
+
+def _validate_image_url(url):
+    """Validate that an image URL points to an allowed Shopify CDN domain.
+
+    Returns True if the URL is safe to download, False otherwise.
+    Prevents SSRF by restricting downloads to known Shopify domains.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('https', 'http'):
+            return False
+        hostname = parsed.hostname or ''
+        # Allow exact matches and subdomains
+        for allowed in _ALLOWED_IMAGE_DOMAINS:
+            if hostname == allowed or hostname.endswith('.' + allowed):
+                return True
+        return False
+    except Exception:
+        return False
 
 
 class ProductExporter(BaseExporter):
@@ -274,12 +302,16 @@ class ProductImporter(BaseImporter):
             image_url = image_edges[0].get('node', {}).get('url') or \
                         image_edges[0].get('node', {}).get('originalSrc')
             if image_url:
-                try:
-                    resp = requests.get(image_url, timeout=15)
-                    if resp.status_code == 200:
-                        vals['image_1920'] = base64.b64encode(resp.content).decode('utf-8')
-                except Exception:
-                    _logger.warning("Failed to download product image from %s", image_url)
+                if not _validate_image_url(image_url):
+                    _logger.warning("Blocked image download from untrusted domain: %s",
+                                    urlparse(image_url).hostname)
+                else:
+                    try:
+                        resp = requests.get(image_url, timeout=15)
+                        if resp.status_code == 200:
+                            vals['image_1920'] = base64.b64encode(resp.content).decode('utf-8')
+                    except Exception:
+                        _logger.warning("Failed to download product image from %s", image_url)
 
         return vals
 
@@ -417,6 +449,10 @@ class ProductImporter(BaseImporter):
             image_node = edge.get('node', {})
             image_url = image_node.get('url') or image_node.get('originalSrc')
             if not image_url:
+                continue
+            if not _validate_image_url(image_url):
+                _logger.warning("Blocked image download from untrusted domain: %s",
+                                urlparse(image_url).hostname)
                 continue
             try:
                 resp = requests.get(image_url, timeout=15)

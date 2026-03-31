@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from odoo import api, fields, models
 
@@ -16,7 +17,7 @@ class ShopifyWebhookLog(models.Model):
     webhook_id = fields.Char('Shopify Webhook ID', index=True)
     topic = fields.Char(required=True, index=True)
     shopify_id = fields.Char('Resource Shopify ID')
-    payload = fields.Text()
+    payload = fields.Text(groups='adams_shopify.group_shopify_manager')
     state = fields.Selection([
         ('pending', 'Pending'),
         ('processing', 'Processing'),
@@ -35,6 +36,27 @@ class ShopifyWebhookLog(models.Model):
         ('unique_webhook_id', 'UNIQUE(webhook_id)',
          'This webhook event has already been received.'),
     ]
+
+    @api.model
+    def _cron_cleanup_old_logs(self, days=90):
+        """Purge webhook logs older than the retention period.
+
+        Removes processed/skipped logs to limit PII exposure.
+        Dead-letter logs are kept longer for debugging (2x retention).
+        """
+        cutoff = fields.Datetime.now() - timedelta(days=days)
+        dead_cutoff = fields.Datetime.now() - timedelta(days=days * 2)
+        old_logs = self.search([
+            '|',
+            '&', ('state', 'in', ['done', 'skipped']),
+                 ('received_at', '<', cutoff),
+            '&', ('state', '=', 'dead_letter'),
+                 ('received_at', '<', dead_cutoff),
+        ])
+        count = len(old_logs)
+        if count:
+            old_logs.unlink()
+            _logger.info("Purged %d old webhook logs (retention: %d days)", count, days)
 
     @api.model
     def _cron_process_pending(self):

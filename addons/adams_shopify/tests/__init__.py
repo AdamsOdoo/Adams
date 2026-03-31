@@ -8,3 +8,9 @@ from . import test_order_import
 from . import test_inventory_sync
 from . import test_promoter
 from . import test_fulfillment_sync
+from . import test_payment_status_sync
+from . import test_fulfillment_inbound
+from . import test_b2b_isolation
+from . import test_payout_import
+from . import test_customer_dedup
+from . import test_reverse_payment_sync

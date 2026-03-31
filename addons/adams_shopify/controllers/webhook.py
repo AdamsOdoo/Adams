@@ -3,11 +3,36 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 
 from odoo import http
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
+
+# ── Rate limiter for webhook endpoint ──────────────────────
+# Per-backend rate limiting: max requests within a time window
+_webhook_rate_buckets = {}  # {backend_id: [timestamps]}
+WEBHOOK_RATE_LIMIT = 200  # max requests per window
+WEBHOOK_RATE_WINDOW = 60  # seconds
+
+# Maximum webhook payload size (10 MB)
+MAX_PAYLOAD_SIZE = 10 * 1024 * 1024
+
+
+def _check_rate_limit(backend_id):
+    """Return True if the request is allowed, False if rate-limited."""
+    now = time.time()
+    bucket = _webhook_rate_buckets.get(backend_id, [])
+    # Prune old entries
+    cutoff = now - WEBHOOK_RATE_WINDOW
+    bucket = [t for t in bucket if t > cutoff]
+    if len(bucket) >= WEBHOOK_RATE_LIMIT:
+        _webhook_rate_buckets[backend_id] = bucket
+        return False
+    bucket.append(now)
+    _webhook_rate_buckets[backend_id] = bucket
+    return True
 
 
 class ShopifyWebhookController(http.Controller):
@@ -23,25 +48,39 @@ class ShopifyWebhookController(http.Controller):
     def handle_webhook(self, backend_id, **kwargs):
         """Receive Shopify webhook, verify HMAC, enqueue for processing."""
         raw_body = request.httprequest.get_data()
-        headers = request.httprequest.headers
 
+        # ── Payload size check ──────────────────────────────
+        if len(raw_body) > MAX_PAYLOAD_SIZE:
+            _logger.warning(
+                "Webhook payload too large (%d bytes) for backend %s",
+                len(raw_body), backend_id,
+            )
+            return request.make_json_response(
+                {'status': 'error', 'message': 'Payload too large'}, status=413,
+            )
+
+        # ── Rate limiting ───────────────────────────────────
+        if not _check_rate_limit(backend_id):
+            _logger.warning(
+                "Webhook rate limit exceeded for backend %s", backend_id,
+            )
+            return request.make_json_response(
+                {'status': 'error', 'message': 'Rate limit exceeded'}, status=429,
+            )
+
+        headers = request.httprequest.headers
         hmac_header = headers.get('X-Shopify-Hmac-Sha256', '')
         topic = headers.get('X-Shopify-Topic', '')
         webhook_id = headers.get('X-Shopify-Webhook-Id', '')
-        shop_domain = headers.get('X-Shopify-Shop-Domain', '')
 
         # Lookup backend
         backend = request.env['shopify.backend'].sudo().browse(backend_id)
         if not backend.exists() or backend.state != 'connected':
-            _logger.warning(
-                "Webhook received for unknown/disconnected backend %s from %s",
-                backend_id, shop_domain,
-            )
             return request.make_json_response(
                 {'status': 'error'}, status=404,
             )
 
-        # Verify HMAC
+        # ── HMAC verification ───────────────────────────────
         if not self._verify_hmac(raw_body, hmac_header, backend.webhook_secret):
             _logger.warning(
                 "HMAC verification failed for backend %s, topic %s",
@@ -51,25 +90,23 @@ class ShopifyWebhookController(http.Controller):
                 {'status': 'unauthorized'}, status=401,
             )
 
-        # Deduplicate by webhook_id
+        # ── Deduplicate by webhook_id ───────────────────────
         if webhook_id:
             existing = request.env['shopify.webhook.log'].sudo().search([
                 ('webhook_id', '=', webhook_id),
             ], limit=1)
             if existing:
-                _logger.debug("Duplicate webhook %s — skipping", webhook_id)
                 return request.make_json_response({'status': 'ok'})
 
-        # Parse payload
+        # ── Parse payload ───────────────────────────────────
         try:
             payload = json.loads(raw_body) if raw_body else {}
         except (json.JSONDecodeError, ValueError):
             payload = {}
 
-        # Extract the resource Shopify ID from the payload
         shopify_resource_id = str(payload.get('id', '')) if payload else ''
 
-        # Enqueue
+        # ── Enqueue ─────────────────────────────────────────
         try:
             request.env['shopify.webhook.log'].sudo().create({
                 'backend_id': backend_id,

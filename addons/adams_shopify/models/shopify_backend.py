@@ -1,7 +1,8 @@
 import logging
+import re
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -176,6 +177,38 @@ class ShopifyBackend(models.Model):
     refund_bind_count = fields.Integer(compute='_compute_bind_counts')
     sync_log_today_count = fields.Integer(compute='_compute_bind_counts')
     promoter_count = fields.Integer(compute='_compute_bind_counts')
+
+    # ── Constraints ─────────────────────────────────────────
+    @api.constrains('shop_url')
+    def _check_shop_url(self):
+        """Validate shop_url is a legitimate myshopify.com domain."""
+        pattern = re.compile(
+            r'^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$'
+        )
+        for rec in self:
+            url = (rec.shop_url or '').strip().rstrip('/')
+            # Strip protocol if user pasted full URL
+            if '://' in url:
+                url = url.split('://', 1)[1]
+            # Strip trailing path
+            url = url.split('/')[0]
+            if not pattern.match(url):
+                raise ValidationError(_(
+                    "Shop URL must be a valid myshopify.com domain "
+                    "(e.g. my-store.myshopify.com). Got: %s",
+                    rec.shop_url,
+                ))
+
+    @api.constrains('access_token')
+    def _check_access_token(self):
+        """Validate access token format (Shopify custom app tokens start with shpat_)."""
+        for rec in self:
+            token = rec.access_token or ''
+            if token and not token.startswith('shpat_'):
+                raise ValidationError(_(
+                    "Access token should start with 'shpat_'. "
+                    "Please use a valid Shopify Admin API access token.",
+                ))
 
     @api.depends_context('uid')
     def _compute_bind_counts(self):
