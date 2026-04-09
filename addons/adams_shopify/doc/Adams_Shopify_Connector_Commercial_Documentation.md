@@ -1,4 +1,4 @@
-# Adams Shopify Connector for Odoo 19
+# Qamah Solutions Shopify Connector Pro for Odoo 19
 
 ### Seamless, Real-Time Integration Between Your Odoo ERP and Shopify Store
 
@@ -6,9 +6,9 @@
 
 ## Executive Summary
 
-The **Adams Shopify Connector** is a purpose-built, enterprise-grade integration that connects your Odoo 19 ERP system with one or more Shopify stores. It eliminates manual data entry, keeps your inventory accurate across all channels, and gives your team a single source of truth for products, orders, customers, finances, and fulfillment.
+The **Qamah Solutions Shopify Connector Pro** is a purpose-built, enterprise-grade integration that connects your Odoo 19 ERP system with one or more Shopify stores. It eliminates manual data entry, keeps your inventory accurate across all channels, and gives your team a single source of truth for products, orders, customers, finances, and fulfillment.
 
-Unlike off-the-shelf connectors that bolt onto Odoo with limited features and outdated technology, the Adams Shopify Connector was designed from the ground up using **Shopify's latest GraphQL Admin API (2026-01)** — the only API Shopify actively supports and develops going forward. This means your integration is future-proof, faster, and more reliable than competitors still relying on Shopify's deprecated REST API.
+Unlike off-the-shelf connectors that bolt onto Odoo with limited features and outdated technology, the Qamah Solutions Shopify Connector Pro was designed from the ground up using **Shopify's latest GraphQL Admin API (2026-01)** — the only API Shopify actively supports and develops going forward. This means your integration is future-proof, faster, and more reliable than competitors still relying on Shopify's deprecated REST API.
 
 Whether you operate a single Shopify storefront or manage multiple stores across different companies, this connector handles the complexity so your team can focus on growing the business.
 
@@ -217,11 +217,11 @@ Designed with security as a foundational requirement — not an afterthought.
 
 ## Competitive Comparison
 
-The Odoo Apps Store currently offers two established Shopify connectors from third-party vendors. Here is how the Adams Shopify Connector compares against both.
+The Odoo Apps Store currently offers two established Shopify Connector Pros from third-party vendors. Here is how the Qamah Solutions Shopify Connector Pro compares against both.
 
 ### The Competitors
 
-| | **Adams Shopify Connector** | **Emipro Technologies** | **VentorTech PRO** |
+| | **Qamah Solutions Shopify Connector Pro** | **Emipro Technologies** | **VentorTech PRO** |
 |---|---|---|---|
 | **Pricing model** | Included with your project | ~$444 per Odoo version | ~$460 per Odoo version |
 | **Upgrade cost** | Included | Must repurchase for each new Odoo version | Free with ecosystem subscription |
@@ -229,7 +229,7 @@ The Odoo Apps Store currently offers two established Shopify connectors from thi
 
 ### Technology Foundation
 
-| | **Adams** | **Emipro** | **VentorTech** |
+| | **Qamah Solutions** | **Emipro** | **VentorTech** |
 |---|---|---|---|
 | **Shopify API** | GraphQL Admin API (2026-01) | REST Admin API (legacy) | Partial GraphQL + REST |
 | **Future-proof** | Yes — uses Shopify's only actively developed API | At risk — REST API deprecated Oct 2024, mandatory migration required | Partially — mixed approach |
@@ -240,7 +240,7 @@ The Odoo Apps Store currently offers two established Shopify connectors from thi
 
 ### Feature Comparison
 
-| Feature | **Adams** | **Emipro** | **VentorTech** |
+| Feature | **Qamah Solutions** | **Emipro** | **VentorTech** |
 |---|---|---|---|
 | **Bidirectional product sync** | Yes | Yes | Yes |
 | **Bidirectional customer sync** | Yes | Yes | Yes |
@@ -274,31 +274,31 @@ The Odoo Apps Store currently offers two established Shopify connectors from thi
 | **Multi-company support** | Yes, with database-level isolation rules | Claimed, limited documentation | Not prominently documented |
 | **Bulk retry wizard** | Yes | No | No |
 
-### Where Adams Stands Apart
+### Where Qamah Solutions Stands Apart
 
 **1. Built on Modern Technology**
-The Adams connector is built entirely on Shopify's GraphQL Admin API — the only API Shopify is actively developing and supporting. Competitors relying on the deprecated REST API face growing compatibility risks and already cannot handle products with more than 100 variants.
+The Qamah Solutions connector is built entirely on Shopify's GraphQL Admin API — the only API Shopify is actively developing and supporting. Competitors relying on the deprecated REST API face growing compatibility risks and already cannot handle products with more than 100 variants.
 
 **2. B2B and Wholesale Coexistence**
-No competing connector offers sales channel isolation. If your business sells both B2B (directly through Odoo) and direct-to-consumer (through Shopify), competing connectors will attempt to sync your B2B orders to Shopify or interfere with your wholesale workflows. The Adams connector keeps both channels completely separate.
+No competing connector offers sales channel isolation. If your business sells both B2B (directly through Odoo) and direct-to-consumer (through Shopify), competing connectors will attempt to sync your B2B orders to Shopify or interfere with your wholesale workflows. The Qamah Solutions connector keeps both channels completely separate.
 
 **3. Built-in Promoter and Affiliate Management**
-Competing connectors require separate apps or manual processes to manage promoter codes, commissions, and performance tracking. The Adams connector includes a complete promoter system out of the box.
+Competing connectors require separate apps or manual processes to manage promoter codes, commissions, and performance tracking. The Qamah Solutions connector includes a complete promoter system out of the box.
 
 **4. Financial Depth**
-No competing connector imports Shopify Payments payouts with transaction-level detail, tracks gift card balances, or provides reverse payment sync (marking Shopify orders as paid when invoices are posted in Odoo). The Adams connector gives your finance team complete visibility without switching between systems.
+No competing connector imports Shopify Payments payouts with transaction-level detail, tracks gift card balances, or provides reverse payment sync (marking Shopify orders as paid when invoices are posted in Odoo). The Qamah Solutions connector gives your finance team complete visibility without switching between systems.
 
 **5. Self-Healing and Resilience**
-Automated reconciliation, drift detection, dead-letter queues, smart retry logic, and circuit breaker patterns mean the Adams connector recovers from problems on its own. Competing connectors require manual intervention when things go wrong — and often don't tell you something went wrong in the first place.
+Automated reconciliation, drift detection, dead-letter queues, smart retry logic, and circuit breaker patterns mean the Qamah Solutions connector recovers from problems on its own. Competing connectors require manual intervention when things go wrong — and often don't tell you something went wrong in the first place.
 
 **6. Efficiency at Scale**
-Checksum-based change detection and delta inventory sync mean the Adams connector only processes records that have actually changed. For a catalog of 10,000 products where 50 changed, the Adams connector makes 50 API calls. Competitors process all 10,000 every cycle — wasting time, bandwidth, and Shopify API quota.
+Checksum-based change detection and delta inventory sync mean the Qamah Solutions connector only processes records that have actually changed. For a catalog of 10,000 products where 50 changed, the Qamah Solutions connector makes 50 API calls. Competitors process all 10,000 every cycle — wasting time, bandwidth, and Shopify API quota.
 
 **7. Enterprise Security**
 Layered webhook security (HMAC verification, timestamp validation, replay protection, rate limiting, payload size limits), role-based access control, and encrypted credential storage provide a level of security that no competing connector matches.
 
 **8. No Recurring Per-Version Cost**
-Competing connectors charge $400–$460 for each Odoo version. When you upgrade from Odoo 19 to Odoo 20, you pay again. The Adams connector is included as part of your project — no surprise relicensing fees.
+Competing connectors charge $400–$460 for each Odoo version. When you upgrade from Odoo 19 to Odoo 20, you pay again. The Qamah Solutions connector is included as part of your project — no surprise relicensing fees.
 
 ---
 
@@ -337,4 +337,4 @@ Competing connectors charge $400–$460 for each Odoo version. When you upgrade 
 
 ---
 
-*Adams Shopify Connector — Built for businesses that demand reliability, completeness, and scalability from their Shopify-Odoo integration.*
+*Qamah Solutions Shopify Connector Pro — Built for businesses that demand reliability, completeness, and scalability from their Shopify-Odoo integration.*
