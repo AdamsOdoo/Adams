@@ -32,19 +32,25 @@
                 <field name="customer_bind_count"/>
                 <field name="order_bind_count"/>
                 <field name="product_error_count"/>
+                <field name="customer_error_count"/>
+                <field name="order_error_count"/>
                 <field name="total_error_count"/>
+                <field name="total_synced_count"/>
+                <field name="total_pending_count"/>
                 <field name="collection_bind_count"/>
                 <field name="refund_bind_count"/>
                 <field name="sync_log_today_count"/>
                 <field name="promoter_count"/>
+                <field name="abandoned_cart_count"/>
+                <field name="sync_health_pct"/>
                 <templates>
                     <t t-name="card">
                         <div class="o_kanban_card_content">
-                            <!-- Header -->
-                            <div class="d-flex justify-content-between align-items-start mb-3">
+                            <!-- Header with connection status -->
+                            <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
                                     <h3 class="mb-0"><field name="name"/></h3>
-                                    <span class="text-muted"><field name="shop_url"/></span>
+                                    <small class="text-muted"><field name="shop_url"/></small>
                                 </div>
                                 <field name="state" widget="badge"
                                        decoration-success="state == 'connected'"
@@ -52,30 +58,75 @@
                                        decoration-info="state == 'draft'"/>
                             </div>
 
+                            <!-- Sync Health Progress Bar -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small class="fw-bold">Sync Health</small>
+                                    <small class="fw-bold">
+                                        <field name="sync_health_pct"/>%
+                                    </small>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <t t-if="record.sync_health_pct.raw_value >= 90">
+                                        <div class="progress-bar bg-success"
+                                             role="progressbar"
+                                             t-attf-style="width: #{record.sync_health_pct.raw_value}%"/>
+                                    </t>
+                                    <t t-elif="record.sync_health_pct.raw_value >= 70">
+                                        <div class="progress-bar bg-warning"
+                                             role="progressbar"
+                                             t-attf-style="width: #{record.sync_health_pct.raw_value}%"/>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="progress-bar bg-danger"
+                                             role="progressbar"
+                                             t-attf-style="width: #{record.sync_health_pct.raw_value}%"/>
+                                    </t>
+                                </div>
+                            </div>
+
                             <!-- Primary stats row -->
-                            <div class="d-flex gap-3 mb-3">
-                                <div class="text-center border rounded p-2 flex-fill">
-                                    <div class="fw-bold fs-4 text-primary">
+                            <div class="d-flex gap-2 mb-2">
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.product_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold fs-4">
                                         <field name="product_bind_count"/>
                                     </div>
                                     <div class="text-muted small">Products</div>
+                                    <t t-if="record.product_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="product_error_count"/> errors
+                                        </small>
+                                    </t>
                                 </div>
-                                <div class="text-center border rounded p-2 flex-fill">
-                                    <div class="fw-bold fs-4 text-primary">
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.order_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold fs-4">
                                         <field name="order_bind_count"/>
                                     </div>
                                     <div class="text-muted small">Orders</div>
+                                    <t t-if="record.order_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="order_error_count"/> errors
+                                        </small>
+                                    </t>
                                 </div>
-                                <div class="text-center border rounded p-2 flex-fill">
-                                    <div class="fw-bold fs-4 text-primary">
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.customer_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold fs-4">
                                         <field name="customer_bind_count"/>
                                     </div>
                                     <div class="text-muted small">Customers</div>
+                                    <t t-if="record.customer_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="customer_error_count"/> errors
+                                        </small>
+                                    </t>
                                 </div>
                             </div>
 
                             <!-- Secondary stats row -->
-                            <div class="d-flex gap-3 mb-3">
+                            <div class="d-flex gap-2 mb-2">
                                 <div class="text-center border rounded p-2 flex-fill">
                                     <div class="fw-bold">
                                         <field name="collection_bind_count"/>
@@ -94,29 +145,42 @@
                                     </div>
                                     <div class="text-muted small">Promoters</div>
                                 </div>
+                                <t t-if="record.abandoned_cart_count.raw_value > 0">
+                                    <div class="text-center border rounded p-2 flex-fill"
+                                         style="border-left: 3px solid #fd7e14 !important;">
+                                        <div class="fw-bold text-warning">
+                                            <field name="abandoned_cart_count"/>
+                                        </div>
+                                        <div class="text-muted small">Abandoned</div>
+                                    </div>
+                                </t>
                             </div>
 
-                            <!-- Health indicators -->
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
+                            <!-- Health footer -->
+                            <div class="d-flex justify-content-between align-items-center pt-2"
+                                 style="border-top: 1px solid #dee2e6;">
+                                <div class="d-flex gap-1">
                                     <t t-if="record.total_error_count.raw_value > 0">
                                         <span class="badge text-bg-danger">
                                             <field name="total_error_count"/> errors
                                         </span>
                                     </t>
-                                    <t t-else="">
-                                        <span class="badge text-bg-success">No errors</span>
+                                    <t t-if="record.total_pending_count.raw_value > 0">
+                                        <span class="badge text-bg-warning">
+                                            <field name="total_pending_count"/> pending
+                                        </span>
+                                    </t>
+                                    <t t-if="record.total_error_count.raw_value == 0 and record.total_pending_count.raw_value == 0">
+                                        <span class="badge text-bg-success">All synced</span>
                                     </t>
                                 </div>
-                                <div>
-                                    <span class="badge text-bg-info">
-                                        <field name="sync_log_today_count"/> syncs today
-                                    </span>
-                                </div>
+                                <span class="badge text-bg-info">
+                                    <field name="sync_log_today_count"/> syncs today
+                                </span>
                             </div>
 
                             <!-- Last sync info -->
-                            <div class="text-muted small mt-2"
+                            <div class="text-muted small mt-1"
                                  t-if="record.last_sync_date.raw_value">
                                 Last sync: <field name="last_sync_date"/>
                             </div>

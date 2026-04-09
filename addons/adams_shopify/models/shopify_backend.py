@@ -175,11 +175,21 @@ class ShopifyBackend(models.Model):
     customer_bind_count = fields.Integer(compute='_compute_bind_counts')
     order_bind_count = fields.Integer(compute='_compute_bind_counts')
     product_error_count = fields.Integer(compute='_compute_bind_counts')
+    customer_error_count = fields.Integer(compute='_compute_bind_counts')
+    order_error_count = fields.Integer(compute='_compute_bind_counts')
     total_error_count = fields.Integer(compute='_compute_bind_counts')
+    total_synced_count = fields.Integer(compute='_compute_bind_counts')
+    total_pending_count = fields.Integer(compute='_compute_bind_counts')
     collection_bind_count = fields.Integer(compute='_compute_bind_counts')
     refund_bind_count = fields.Integer(compute='_compute_bind_counts')
     sync_log_today_count = fields.Integer(compute='_compute_bind_counts')
     promoter_count = fields.Integer(compute='_compute_bind_counts')
+    abandoned_cart_count = fields.Integer(compute='_compute_bind_counts')
+    sync_health_pct = fields.Integer(
+        compute='_compute_bind_counts',
+        string='Sync Health %',
+        help='Percentage of bindings in synced state (vs error/pending).',
+    )
 
     # ── Constraints ─────────────────────────────────────────
     @api.constrains('shop_url')
@@ -216,26 +226,37 @@ class ShopifyBackend(models.Model):
     @api.depends_context('uid')
     def _compute_bind_counts(self):
         today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0)
+        binding_models = {
+            'product': 'shopify.product.binding',
+            'customer': 'shopify.customer.binding',
+            'order': 'shopify.order.binding',
+        }
         for rec in self:
-            rec.product_bind_count = self.env['shopify.product.binding'].search_count(
-                [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
-            )
-            rec.customer_bind_count = self.env['shopify.customer.binding'].search_count(
-                [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
-            )
-            rec.order_bind_count = self.env['shopify.order.binding'].search_count(
-                [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
-            )
-            rec.product_error_count = self.env['shopify.product.binding'].search_count(
-                [('backend_id', '=', rec.id), ('sync_status', '=', 'error')],
-            )
-            rec.total_error_count = (
-                rec.product_error_count
-                + self.env['shopify.customer.binding'].search_count(
+            synced_total = error_total = pending_total = 0
+            for key, model_name in binding_models.items():
+                Model = self.env[model_name]
+                synced = Model.search_count(
+                    [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')])
+                errors = Model.search_count(
                     [('backend_id', '=', rec.id), ('sync_status', '=', 'error')])
-                + self.env['shopify.order.binding'].search_count(
-                    [('backend_id', '=', rec.id), ('sync_status', '=', 'error')])
+                pending = Model.search_count(
+                    [('backend_id', '=', rec.id), ('sync_status', '=', 'pending')])
+                setattr(rec, f'{key}_bind_count', synced)
+                setattr(rec, f'{key}_error_count', errors)
+                synced_total += synced
+                error_total += errors
+                pending_total += pending
+
+            rec.total_error_count = error_total
+            rec.total_synced_count = synced_total
+            rec.total_pending_count = pending_total
+
+            # Sync health percentage
+            grand_total = synced_total + error_total + pending_total
+            rec.sync_health_pct = int(
+                (synced_total / grand_total * 100) if grand_total else 100
             )
+
             rec.collection_bind_count = self.env['shopify.collection.binding'].search_count(
                 [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
             )
@@ -248,6 +269,12 @@ class ShopifyBackend(models.Model):
             rec.promoter_count = self.env['shopify.promoter'].search_count(
                 [('company_id', '=', rec.company_id.id), ('status', '=', 'active')],
             )
+            # Abandoned carts
+            if 'shopify.abandoned.cart' in self.env:
+                rec.abandoned_cart_count = self.env['shopify.abandoned.cart'].search_count(
+                    [('backend_id', '=', rec.id), ('recovered', '=', False)])
+            else:
+                rec.abandoned_cart_count = 0
 
     # ── Actions ─────────────────────────────────────────────
 
