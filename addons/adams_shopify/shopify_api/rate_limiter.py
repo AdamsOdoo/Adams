@@ -15,14 +15,28 @@ class ShopifyRateLimiter:
         self.restore_rate = float(restore_rate)
         self.last_update = time.monotonic()
         self._lock = threading.Lock()
+        # Metrics
+        self.total_requests = 0
+        self.total_cost = 0.0
+        self.total_wait_time = 0.0
+        self.throttle_count = 0
 
     def wait_if_needed(self, estimated_cost):
         """Block until enough budget is available."""
         with self._lock:
             self._restore()
+            self.total_requests += 1
+            self.total_cost += estimated_cost
             if self.available < estimated_cost:
                 wait = (estimated_cost - self.available) / self.restore_rate
-                time.sleep(wait + 0.1)
+                wait += 0.1  # buffer
+                self.total_wait_time += wait
+                self.throttle_count += 1
+                self._lock.release()
+                try:
+                    time.sleep(wait)
+                finally:
+                    self._lock.acquire()
                 self._restore()
             self.available -= estimated_cost
 
@@ -36,6 +50,20 @@ class ShopifyRateLimiter:
                 self.bucket_size = float(throttle.get('maximumAvailable', self.bucket_size))
                 self.restore_rate = float(throttle.get('restoreRate', self.restore_rate))
                 self.last_update = time.monotonic()
+
+    def get_metrics(self):
+        """Return rate limiter metrics for monitoring."""
+        with self._lock:
+            self._restore()
+            return {
+                'available_budget': round(self.available, 1),
+                'bucket_size': round(self.bucket_size, 1),
+                'restore_rate': round(self.restore_rate, 1),
+                'total_requests': self.total_requests,
+                'total_cost': round(self.total_cost, 1),
+                'total_wait_seconds': round(self.total_wait_time, 2),
+                'throttle_count': self.throttle_count,
+            }
 
     def _restore(self):
         now = time.monotonic()

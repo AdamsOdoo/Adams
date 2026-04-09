@@ -181,6 +181,11 @@ class TestPromoter(TransactionCase):
         importer.env = self.env
         importer.backend = self.backend
         importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
 
         importer._track_discount_usage(order_binding, node)
 
@@ -230,6 +235,11 @@ class TestPromoter(TransactionCase):
         importer.env = self.env
         importer.backend = self.backend
         importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
 
         importer._track_discount_usage(order_binding, node)
 

@@ -1,6 +1,6 @@
 FETCH_LOCATIONS = """
 query FetchLocations {
-  locations(first: 50) {
+  locations(first: 250) {
     edges {
       node {
         id

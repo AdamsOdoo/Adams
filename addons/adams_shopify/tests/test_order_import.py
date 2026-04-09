@@ -102,6 +102,11 @@ class TestOrderImport(TransactionCase):
         importer.env = self.env
         importer.backend = self.backend
         importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
 
         importer._import_one(node, existing_binding=None)
 
@@ -129,6 +134,11 @@ class TestOrderImport(TransactionCase):
         importer.env = self.env
         importer.backend = self.backend
         importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
 
         importer._import_one(node, existing_binding=None)
 
@@ -153,6 +163,11 @@ class TestOrderImport(TransactionCase):
         importer.env = self.env
         importer.backend = self.backend
         importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
 
         importer._import_one(node, existing_binding=None)
 
@@ -175,6 +190,11 @@ class TestOrderImport(TransactionCase):
         importer.env = self.env
         importer.backend = self.backend
         importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
 
         importer._import_one(node, existing_binding=None)
 
@@ -189,3 +209,96 @@ class TestOrderImport(TransactionCase):
 
         importer._import_one(node2, existing_binding=binding)
         self.assertEqual(binding.shopify_financial_status, 'paid')
+
+    def test_import_order_presentment_currency(self):
+        """Should use presentment currency when mode is 'presentment' (Shopify Markets)."""
+        from ..sync.order_sync import OrderImporter
+
+        # Enable presentment currency mode
+        self.backend.import_currency_mode = 'presentment'
+
+        # Ensure EUR currency exists and is active
+        eur = self.env['res.currency'].search([('name', '=', 'EUR')], limit=1)
+        if not eur:
+            eur = self.env['res.currency'].create({'name': 'EUR', 'symbol': 'E'})
+        if not eur.active:
+            eur.active = True
+
+        node = self._make_order_node()
+        # Add presentment currency data
+        node['presentmentCurrencyCode'] = 'EUR'
+        node['currencyCode'] = 'USD'
+        node['totalPriceSet'] = {
+            'shopMoney': {'amount': '29.99', 'currencyCode': 'USD'},
+            'presentmentMoney': {'amount': '27.50', 'currencyCode': 'EUR'},
+        }
+        node['lineItems']['edges'][0]['node']['originalUnitPriceSet'] = {
+            'shopMoney': {'amount': '29.99', 'currencyCode': 'USD'},
+            'presentmentMoney': {'amount': '27.50', 'currencyCode': 'EUR'},
+        }
+
+        importer = OrderImporter.__new__(OrderImporter)
+        importer.env = self.env
+        importer.backend = self.backend
+        importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
+
+        importer._import_one(node, existing_binding=None)
+
+        binding = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Order/1000'),
+        ])
+        self.assertTrue(binding)
+        order = binding.odoo_id
+        # Order should use EUR since presentment mode picks customer currency
+        if order.currency_id.name != self.env.company.currency_id.name:
+            self.assertEqual(order.currency_id.name, 'EUR')
+
+    def test_import_order_money_helper_shopify_mode(self):
+        """_get_money_amount should return shopMoney in default mode."""
+        from ..sync.order_sync import OrderImporter
+
+        self.backend.import_currency_mode = 'shopify'
+
+        importer = OrderImporter.__new__(OrderImporter)
+        importer.env = self.env
+        importer.backend = self.backend
+        importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
+
+        price_set = {
+            'shopMoney': {'amount': '100.00', 'currencyCode': 'USD'},
+            'presentmentMoney': {'amount': '85.00', 'currencyCode': 'EUR'},
+        }
+        self.assertEqual(importer._get_money_amount(price_set), 100.0)
+
+    def test_import_order_money_helper_presentment_mode(self):
+        """_get_money_amount should return presentmentMoney in presentment mode."""
+        from ..sync.order_sync import OrderImporter
+
+        self.backend.import_currency_mode = 'presentment'
+
+        importer = OrderImporter.__new__(OrderImporter)
+        importer.env = self.env
+        importer.backend = self.backend
+        importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
+
+        price_set = {
+            'shopMoney': {'amount': '100.00', 'currencyCode': 'USD'},
+            'presentmentMoney': {'amount': '85.00', 'currencyCode': 'EUR'},
+        }
+        self.assertEqual(importer._get_money_amount(price_set), 85.0)

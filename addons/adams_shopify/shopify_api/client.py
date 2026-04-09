@@ -72,6 +72,13 @@ class ShopifyClient:
             'Content-Type': 'application/json',
             'X-Shopify-Access-Token': self.access_token,
         })
+        # Connection pooling — keep connections alive across requests
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=4,
+            pool_maxsize=10,
+            max_retries=0,  # We handle retries ourselves
+        )
+        self._session.mount('https://', adapter)
 
     def __repr__(self):
         return f"<ShopifyClient shop={self.shop_url}>"

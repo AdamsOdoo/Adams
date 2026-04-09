@@ -21,7 +21,7 @@ query FetchProducts($first: Int!, $after: String) {
           name
           values
         }
-        images(first: 10) {
+        images(first: 20) {
           edges {
             node {
               id
@@ -30,7 +30,7 @@ query FetchProducts($first: Int!, $after: String) {
             }
           }
         }
-        variants(first: 100) {
+        variants(first: 250) {
           edges {
             node {
               id

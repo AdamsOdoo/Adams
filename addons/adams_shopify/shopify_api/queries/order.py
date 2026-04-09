@@ -17,20 +17,27 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
         closed
         note
         tags
+        currencyCode
+        presentmentCurrencyCode
         totalPriceSet {
           shopMoney { amount currencyCode }
+          presentmentMoney { amount currencyCode }
         }
         subtotalPriceSet {
           shopMoney { amount currencyCode }
+          presentmentMoney { amount currencyCode }
         }
         totalShippingPriceSet {
           shopMoney { amount currencyCode }
+          presentmentMoney { amount currencyCode }
         }
         totalTaxSet {
           shopMoney { amount currencyCode }
+          presentmentMoney { amount currencyCode }
         }
         totalDiscountsSet {
           shopMoney { amount currencyCode }
+          presentmentMoney { amount currencyCode }
         }
         discountCodes
         customer {
@@ -61,7 +68,7 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
           countryCodeV2
           zip
         }
-        lineItems(first: 50) {
+        lineItems(first: 150) {
           edges {
             node {
               id
@@ -76,10 +83,12 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
               }
               originalUnitPriceSet {
                 shopMoney { amount currencyCode }
+                presentmentMoney { amount currencyCode }
               }
               discountAllocations {
                 allocatedAmountSet {
                   shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
                 }
               }
               taxLines {
@@ -87,18 +96,20 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
                 rate
                 priceSet {
                   shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
                 }
               }
             }
           }
         }
-        shippingLines(first: 5) {
+        shippingLines(first: 10) {
           edges {
             node {
               title
               code
               originalPriceSet {
                 shopMoney { amount currencyCode }
+                presentmentMoney { amount currencyCode }
               }
             }
           }

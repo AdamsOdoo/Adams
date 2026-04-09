@@ -85,20 +85,27 @@ class InventorySync:
         success = errors = skipped = 0
         error_details = []
         batch = []
+        batch_limit = min(backend.batch_size or 50, 100)  # Shopify max is 100
+
+        # Pre-fetch all inventory bindings for this location in one query
+        inv_bindings = self.env['shopify.inventory.binding'].search([
+            ('backend_id', '=', backend.id),
+            ('shopify_location_id', '=', shopify_loc_id),
+        ])
+        inv_binding_map = {vb.variant_binding_id.id: vb for vb in inv_bindings}
+
+        # Pre-fetch quantities for all variants in a single context
+        ctx_env = self.env['product.product'].with_context(warehouse=warehouse.id)
 
         for vb in variant_bindings:
             product = vb.odoo_id
             if qty_field == 'free_qty':
-                qty = product.with_context(warehouse=warehouse.id).free_qty
+                qty = ctx_env.browse(product.id).free_qty
             else:
-                qty = product.with_context(warehouse=warehouse.id).qty_available
+                qty = ctx_env.browse(product.id).qty_available
             qty = int(qty)
 
-            inv_binding = self.env['shopify.inventory.binding'].search([
-                ('backend_id', '=', backend.id),
-                ('variant_binding_id', '=', vb.id),
-                ('shopify_location_id', '=', shopify_loc_id),
-            ], limit=1)
+            inv_binding = inv_binding_map.get(vb.id)
 
             if inv_binding and inv_binding.last_pushed_qty == qty:
                 skipped += 1
@@ -111,7 +118,7 @@ class InventorySync:
                 'inventory_item_id': vb.shopify_inventory_item_id,
             })
 
-            if len(batch) >= 100:
+            if len(batch) >= batch_limit:
                 s, e, details = self._push_batch(batch, shopify_loc_id)
                 success += s
                 errors += e

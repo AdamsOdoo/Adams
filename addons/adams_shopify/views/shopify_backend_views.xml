@@ -220,11 +220,54 @@
                             </field>
                         </page>
 
-                        <!-- Tab 6: Logs &amp; Status -->
+                        <!-- Tab 6: Webhooks -->
+                        <page string="Webhooks" name="webhooks"
+                              invisible="state != 'connected'"
+                              groups="adams_shopify.group_shopify_manager">
+                            <div class="mb-3">
+                                <button name="action_register_webhooks" type="object"
+                                        string="Register All Webhooks"
+                                        class="btn-primary me-2"
+                                        groups="adams_shopify.group_shopify_manager"/>
+                                <button name="action_check_webhook_status" type="object"
+                                        string="Check Status"
+                                        class="btn-secondary me-2"
+                                        groups="adams_shopify.group_shopify_manager"/>
+                                <button name="action_unregister_webhooks" type="object"
+                                        string="Unregister All"
+                                        class="btn-outline-danger me-2"
+                                        groups="adams_shopify.group_shopify_manager"
+                                        confirm="This will remove all webhook registrations from Shopify. Are you sure?"/>
+                                <button name="action_open_webhook_logs" type="object"
+                                        string="View Webhook Logs"
+                                        class="btn-secondary"/>
+                            </div>
+                            <group string="Webhook Configuration">
+                                <field name="webhook_secret" password="True"
+                                       groups="base.group_system"/>
+                            </group>
+                            <div class="alert alert-info" role="alert">
+                                <strong>Registered webhook topics:</strong>
+                                PRODUCTS_CREATE, PRODUCTS_UPDATE, PRODUCTS_DELETE,
+                                ORDERS_CREATE, ORDERS_UPDATED, ORDERS_CANCELLED,
+                                CUSTOMERS_CREATE, CUSTOMERS_UPDATE,
+                                INVENTORY_LEVELS_UPDATE, FULFILLMENTS_CREATE,
+                                APP_UNINSTALLED
+                            </div>
+                            <div class="alert alert-warning" role="alert">
+                                <strong>Requirements:</strong> Your Odoo instance must be publicly
+                                accessible via HTTPS for webhooks to work. Set the
+                                <code>web.base.url</code> system parameter correctly.
+                                For development, use a tunnel service like ngrok.
+                            </div>
+                        </page>
+
+                        <!-- Tab 7: Logs &amp; Status -->
                         <page string="Logs &amp; Status" name="logs_status">
                             <group>
                                 <field name="last_sync_date"/>
                                 <field name="product_error_count" string="Product Errors"/>
+                                <field name="total_error_count" string="Total Errors"/>
                             </group>
                         </page>
                     </notebook>

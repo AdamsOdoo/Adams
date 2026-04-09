@@ -89,10 +89,13 @@ class ShopifyBackend(models.Model):
     )
     import_currency_mode = fields.Selection([
         ('company', 'Always Use Company Currency'),
-        ('shopify', 'Use Shopify Order Currency'),
+        ('shopify', 'Use Shopify Store Currency'),
+        ('presentment', 'Use Customer Currency (Shopify Markets)'),
     ], string='Order Currency Mode', default='company',
-        help="Controls how currency is set on imported orders. "
-             "'Shopify' will use the currency from the Shopify order.",
+        help="Controls how currency is set on imported orders.\n"
+             "'Store Currency' uses the shop's base currency.\n"
+             "'Customer Currency' uses the currency the customer paid in "
+             "(required for Shopify Markets / multi-currency storefronts).",
     )
 
     auto_sync_inventory = fields.Boolean('Push Inventory', default=True)
@@ -525,3 +528,110 @@ class ShopifyBackend(models.Model):
             'view_mode': 'list,form',
             'domain': [('company_id', '=', self.company_id.id)],
         }
+
+    def action_open_webhook_logs(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Webhook Logs'),
+            'res_model': 'shopify.webhook.log',
+            'view_mode': 'list,form',
+            'domain': [('backend_id', '=', self.id)],
+            'context': {'default_backend_id': self.id},
+        }
+
+    def action_unregister_webhooks(self):
+        """Unregister all webhooks from Shopify."""
+        self.ensure_one()
+        if self.state != 'connected':
+            raise UserError(_("Please test your connection first."))
+        from ..shopify_api.client import ShopifyClient
+        client = ShopifyClient(self)
+        # Fetch existing webhook subscriptions and delete them
+        query = """
+        query {
+          webhookSubscriptions(first: 50) {
+            edges {
+              node { id topic }
+            }
+          }
+        }
+        """
+        try:
+            body = client.execute(query, estimated_cost=5)
+            subscriptions = body.get('data', {}).get('webhookSubscriptions', {}).get('edges', [])
+            delete_mutation = """
+            mutation deleteWebhook($id: ID!) {
+              webhookSubscriptionDelete(id: $id) {
+                deletedWebhookSubscriptionId
+                userErrors { field message }
+              }
+            }
+            """
+            deleted = 0
+            for edge in subscriptions:
+                sub_id = edge.get('node', {}).get('id')
+                if sub_id:
+                    try:
+                        client.execute_mutation(
+                            delete_mutation,
+                            {'id': sub_id},
+                            result_key='webhookSubscriptionDelete',
+                            estimated_cost=5,
+                        )
+                        deleted += 1
+                    except Exception as e:
+                        _logger.warning("Failed to delete webhook %s: %s", sub_id, e)
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("Webhooks Removed"),
+                    'message': _("%d webhooks removed.") % deleted,
+                    'type': 'success',
+                    'sticky': False,
+                },
+            }
+        except Exception as e:
+            raise UserError(_("Failed to unregister webhooks: %s") % str(e))
+
+    def action_check_webhook_status(self):
+        """Check and display current webhook subscription status from Shopify."""
+        self.ensure_one()
+        if self.state != 'connected':
+            raise UserError(_("Please test your connection first."))
+        from ..shopify_api.client import ShopifyClient
+        client = ShopifyClient(self)
+        query = """
+        query {
+          webhookSubscriptions(first: 50) {
+            edges {
+              node {
+                id
+                topic
+                endpoint {
+                  ... on WebhookHttpEndpoint { callbackUrl }
+                }
+                createdAt
+              }
+            }
+          }
+        }
+        """
+        try:
+            body = client.execute(query, estimated_cost=5)
+            subscriptions = body.get('data', {}).get('webhookSubscriptions', {}).get('edges', [])
+            topics = [e.get('node', {}).get('topic', '') for e in subscriptions]
+            topic_list = '\n'.join(f"  - {t}" for t in sorted(topics)) if topics else "None"
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("Webhook Status"),
+                    'message': _("%d active webhooks:\n%s") % (len(topics), topic_list),
+                    'type': 'info',
+                    'sticky': True,
+                },
+            }
+        except Exception as e:
+            raise UserError(_("Failed to check webhook status: %s") % str(e))

@@ -47,6 +47,15 @@ class OrderImporter(BaseImporter):
     entity_name = 'order'
     binding_model = 'shopify.order.binding'
 
+    def __init__(self, env, backend):
+        super().__init__(env, backend)
+        # Caches to avoid repeated DB lookups during batch import
+        self._currency_cache = {}  # currency_code → res.currency
+        self._pricelist_cache = {}  # currency_id → product.pricelist
+        self._shipping_product = None  # cached shipping product
+        self._country_cache = {}  # country_code → res.country
+        self._state_cache = {}  # (state_code, country_id) → res.country.state
+
     def _compute_shopify_checksum(self, node):
         return compute_checksum({
             'name': node.get('name', ''),
@@ -125,44 +134,28 @@ class OrderImporter(BaseImporter):
         }
 
         # Multi-currency support
-        if self.backend.import_currency_mode == 'shopify':
-            currency_code = (
-                node.get('totalPriceSet', {}).get('shopMoney', {}).get('currencyCode', '')
-            )
+        currency_mode = self.backend.import_currency_mode
+        if currency_mode in ('shopify', 'presentment'):
+            if currency_mode == 'presentment':
+                # Use customer-facing currency (Shopify Markets)
+                currency_code = node.get('presentmentCurrencyCode', '')
+                if not currency_code:
+                    currency_code = (
+                        node.get('totalPriceSet', {}).get('presentmentMoney', {}).get('currencyCode', '')
+                    )
+            else:
+                # Use shop base currency
+                currency_code = (
+                    node.get('currencyCode', '')
+                    or node.get('totalPriceSet', {}).get('shopMoney', {}).get('currencyCode', '')
+                )
             if currency_code:
-                currency = self.env['res.currency'].search([
-                    ('name', '=', currency_code),
-                    ('active', '=', True),
-                ], limit=1)
-                if not currency:
-                    # Try inactive currencies
-                    currency = self.env['res.currency'].search([
-                        ('name', '=', currency_code),
-                    ], limit=1)
-                    if currency:
-                        _logger.warning(
-                            "Currency %s is inactive; activate it to import "
-                            "order %s with correct currency.",
-                            currency_code, node.get('name'),
-                        )
-                        currency = False
-                    else:
-                        _logger.warning(
-                            "Currency %s not found for order %s, "
-                            "falling back to company currency.",
-                            currency_code, node.get('name'),
-                        )
+                currency = self._resolve_currency(currency_code, node.get('name', ''))
                 if currency:
                     company_currency = self.backend.company_id.currency_id
                     if currency != company_currency:
                         order_vals['currency_id'] = currency.id
-                        # Find a pricelist with this currency
-                        pricelist = self.env['product.pricelist'].search([
-                            ('currency_id', '=', currency.id),
-                            '|',
-                            ('company_id', '=', self.backend.company_id.id),
-                            ('company_id', '=', False),
-                        ], limit=1)
+                        pricelist = self._resolve_pricelist(currency)
                         if pricelist:
                             order_vals['pricelist_id'] = pricelist.id
 
@@ -211,7 +204,7 @@ class OrderImporter(BaseImporter):
         if not discount_codes:
             return
 
-        # Get order total from Shopify data
+        # Get order total from Shopify data (always use shopMoney for commissions)
         total_price = float(
             node.get('totalPriceSet', {}).get('shopMoney', {}).get('amount', 0)
         )
@@ -242,6 +235,74 @@ class OrderImporter(BaseImporter):
                 'commission_amount': commission,
                 'date': fields.Datetime.now(),
             })
+
+    def _get_money_amount(self, price_set):
+        """Extract the correct amount from a priceSet based on currency mode.
+
+        For 'presentment' mode, use presentmentMoney (customer-facing currency).
+        Otherwise, use shopMoney (store base currency).
+        """
+        if not price_set:
+            return 0.0
+        if self.backend.import_currency_mode == 'presentment':
+            money = price_set.get('presentmentMoney') or price_set.get('shopMoney', {})
+        else:
+            money = price_set.get('shopMoney', {})
+        return float(money.get('amount', 0))
+
+    def _resolve_currency(self, currency_code, order_name=''):
+        """Resolve a currency code to a res.currency record, with caching."""
+        if currency_code in self._currency_cache:
+            return self._currency_cache[currency_code]
+
+        currency = self.env['res.currency'].search([
+            ('name', '=', currency_code),
+            ('active', '=', True),
+        ], limit=1)
+        if not currency:
+            currency = self.env['res.currency'].search([
+                ('name', '=', currency_code),
+            ], limit=1)
+            if currency:
+                _logger.warning(
+                    "Currency %s is inactive; activate it to import "
+                    "order %s with correct currency.",
+                    currency_code, order_name,
+                )
+                currency = False
+            else:
+                _logger.warning(
+                    "Currency %s not found for order %s, "
+                    "falling back to company currency.",
+                    currency_code, order_name,
+                )
+        self._currency_cache[currency_code] = currency or False
+        return self._currency_cache[currency_code]
+
+    def _resolve_pricelist(self, currency):
+        """Find or create a pricelist for the given currency, with caching."""
+        if currency.id in self._pricelist_cache:
+            return self._pricelist_cache[currency.id]
+
+        pricelist = self.env['product.pricelist'].search([
+            ('currency_id', '=', currency.id),
+            '|',
+            ('company_id', '=', self.backend.company_id.id),
+            ('company_id', '=', False),
+        ], limit=1)
+        if not pricelist:
+            # Auto-create a pricelist for this currency
+            pricelist = self.env['product.pricelist'].create({
+                'name': f'Shopify {currency.name}',
+                'currency_id': currency.id,
+                'company_id': self.backend.company_id.id,
+            })
+            _logger.info(
+                "Auto-created pricelist '%s' for currency %s",
+                pricelist.name, currency.name,
+            )
+        self._pricelist_cache[currency.id] = pricelist
+        return pricelist
 
     def _resolve_customer(self, node):
         """Find or create the customer for this order.
@@ -410,15 +471,12 @@ class OrderImporter(BaseImporter):
     def _create_order_line(self, order, line_item):
         """Create a sale.order.line from a Shopify line item."""
         product = self._resolve_product(line_item)
-        price_data = line_item.get('originalUnitPriceSet', {}).get('shopMoney', {})
-        price_unit = float(price_data.get('amount', 0))
+        price_unit = self._get_money_amount(line_item.get('originalUnitPriceSet'))
 
-        # Calculate discount
+        # Calculate discount using correct currency amounts
         discount_total = 0
         for alloc in line_item.get('discountAllocations', []):
-            discount_total += float(
-                alloc.get('allocatedAmountSet', {}).get('shopMoney', {}).get('amount', 0)
-            )
+            discount_total += self._get_money_amount(alloc.get('allocatedAmountSet'))
         quantity = line_item.get('quantity', 1)
         discount_pct = 0
         if price_unit and quantity:
@@ -435,24 +493,26 @@ class OrderImporter(BaseImporter):
 
     def _create_shipping_line(self, order, shipping_line):
         """Create a shipping line on the order."""
-        price_data = shipping_line.get('originalPriceSet', {}).get('shopMoney', {})
-        price = float(price_data.get('amount', 0))
+        price = self._get_money_amount(shipping_line.get('originalPriceSet'))
         if not price:
             return
 
-        # Use configured shipping product or find/create default
-        shipping_product = self.backend.shipping_product_id
+        # Use cached shipping product to avoid repeated lookups
+        shipping_product = self._shipping_product
         if not shipping_product:
-            shipping_product = self.env['product.product'].search([
-                ('default_code', '=', 'SHOPIFY-SHIPPING'),
-            ], limit=1)
-        if not shipping_product:
-            shipping_product = self.env['product.product'].create({
-                'name': 'Shopify Shipping',
-                'default_code': 'SHOPIFY-SHIPPING',
-                'detailed_type': 'service',
-                'list_price': 0,
-            })
+            shipping_product = self.backend.shipping_product_id
+            if not shipping_product:
+                shipping_product = self.env['product.product'].search([
+                    ('default_code', '=', 'SHOPIFY-SHIPPING'),
+                ], limit=1)
+            if not shipping_product:
+                shipping_product = self.env['product.product'].create({
+                    'name': 'Shopify Shipping',
+                    'default_code': 'SHOPIFY-SHIPPING',
+                    'detailed_type': 'service',
+                    'list_price': 0,
+                })
+            self._shipping_product = shipping_product
 
         self.env['sale.order.line'].create({
             'order_id': order.id,
@@ -487,15 +547,24 @@ class OrderImporter(BaseImporter):
     def _resolve_country(self, code):
         if not code:
             return None
-        return self.env['res.country'].search([('code', '=', code)], limit=1)
+        if code in self._country_cache:
+            return self._country_cache[code]
+        country = self.env['res.country'].search([('code', '=', code)], limit=1)
+        self._country_cache[code] = country or None
+        return self._country_cache[code]
 
     def _resolve_state(self, state_code, country):
         if not state_code or not country:
             return None
-        return self.env['res.country.state'].search([
+        cache_key = (state_code, country.id)
+        if cache_key in self._state_cache:
+            return self._state_cache[cache_key]
+        state = self.env['res.country.state'].search([
             ('code', '=', state_code),
             ('country_id', '=', country.id),
         ], limit=1)
+        self._state_cache[cache_key] = state or None
+        return self._state_cache[cache_key]
 
 
 class OrderSync:

@@ -68,3 +68,23 @@ class TestRateLimiter(unittest.TestCase):
         time.sleep(0.1)
         rl._restore()
         self.assertLessEqual(rl.available, 100.0)
+
+    def test_metrics_initial(self):
+        """Metrics should start at zero."""
+        rl = ShopifyRateLimiter(bucket_size=1000, restore_rate=50)
+        metrics = rl.get_metrics()
+        self.assertEqual(metrics['total_requests'], 0)
+        self.assertEqual(metrics['total_cost'], 0.0)
+        self.assertEqual(metrics['throttle_count'], 0)
+        self.assertGreater(metrics['available_budget'], 990)
+
+    def test_metrics_after_requests(self):
+        """Metrics should track requests and cost."""
+        rl = ShopifyRateLimiter(bucket_size=1000, restore_rate=50)
+        rl.wait_if_needed(10)
+        rl.wait_if_needed(20)
+        rl.wait_if_needed(30)
+        metrics = rl.get_metrics()
+        self.assertEqual(metrics['total_requests'], 3)
+        self.assertEqual(metrics['total_cost'], 60.0)
+        self.assertEqual(metrics['throttle_count'], 0)  # No throttling expected
