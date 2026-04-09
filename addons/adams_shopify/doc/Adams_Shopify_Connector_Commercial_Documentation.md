@@ -223,9 +223,9 @@ The Odoo Apps Store currently offers two established Shopify Connector Pros from
 
 | | **Qamah Solutions Shopify Connector Pro** | **Emipro Technologies** | **VentorTech PRO** |
 |---|---|---|---|
-| **Pricing model** | Included with your project | ~$444 per Odoo version | ~$460 per Odoo version |
+| **Pricing model** | Included with your project | ~$575 per Odoo version | ~$460 per Odoo version |
 | **Upgrade cost** | Included | Must repurchase for each new Odoo version | Free with ecosystem subscription |
-| **Support** | Dedicated, ongoing | 90 days free, then paid | Unlimited with subscription |
+| **Support** | Dedicated, ongoing | 90 days free, then paid | With a subscription |
 
 ### Technology Foundation
 
