@@ -20,6 +20,7 @@ class ShopifySyncLog(models.Model):
         ('refund', 'Refunds'),
         ('metafield', 'Metafields'),
         ('location', 'Locations'),
+        ('abandoned_cart', 'Abandoned Carts'),
     ], required=True)
     operation = fields.Selection([
         ('export', 'Export'),

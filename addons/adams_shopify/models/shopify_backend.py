@@ -109,6 +109,16 @@ class ShopifyBackend(models.Model):
 
     auto_sync_collections = fields.Boolean('Sync Collections', default=True)
 
+    # ── Abandoned Cart Settings ────────────────────────────
+    auto_sync_abandoned_carts = fields.Boolean(
+        'Sync Abandoned Carts', default=False,
+        help="Import abandoned checkouts from Shopify.",
+    )
+    auto_create_abandoned_quotation = fields.Boolean(
+        'Auto-create Quotations', default=False,
+        help="Automatically create draft quotations for abandoned carts.",
+    )
+
     # ── Status Sync Settings ───────────────────────────────
     external_fulfillment_handling = fields.Selection([
         ('activity', 'Create Activity (manual review)'),
@@ -528,6 +538,23 @@ class ShopifyBackend(models.Model):
             except Exception as e:
                 _logger.exception("Refund import failed for backend %s", backend.id)
                 backend._notify_sync_error('refunds', 1, str(e))
+
+    @api.model
+    def _cron_import_abandoned_carts(self):
+        backends = self.search([
+            ('state', '=', 'connected'),
+            ('auto_sync_abandoned_carts', '=', True),
+        ])
+        for backend in backends:
+            try:
+                from ..sync.abandoned_cart_sync import AbandonedCartSync
+                syncer = AbandonedCartSync(
+                    self.env.with_company(backend.company_id), backend,
+                )
+                syncer.import_abandoned_carts()
+            except Exception as e:
+                _logger.exception("Abandoned cart import failed for backend %s", backend.id)
+                backend._notify_sync_error('abandoned_carts', 1, str(e))
 
     def action_import_locations(self):
         """Import locations from Shopify."""

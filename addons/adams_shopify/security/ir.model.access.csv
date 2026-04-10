@@ -79,3 +79,7 @@ access_shopify_payout_admin,shopify.payout.admin,model_shopify_payout,base.group
 access_shopify_payout_transaction_user,shopify.payout.transaction.user,model_shopify_payout_transaction,group_shopify_user,1,0,0,0
 access_shopify_payout_transaction_manager,shopify.payout.transaction.manager,model_shopify_payout_transaction,group_shopify_manager,1,1,1,0
 access_shopify_payout_transaction_admin,shopify.payout.transaction.admin,model_shopify_payout_transaction,base.group_system,1,1,1,1
+access_shopify_abandoned_cart_user,shopify.abandoned.cart.user,model_shopify_abandoned_cart,group_shopify_user,1,0,0,0
+access_shopify_abandoned_cart_manager,shopify.abandoned.cart.manager,model_shopify_abandoned_cart,group_shopify_manager,1,1,1,0
+access_shopify_abandoned_cart_admin,shopify.abandoned.cart.admin,model_shopify_abandoned_cart,base.group_system,1,1,1,1
+access_shopify_demo_data_wizard,shopify.demo.data.wizard,model_shopify_demo_data_wizard,group_shopify_manager,1,1,1,1

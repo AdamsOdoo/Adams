@@ -87,6 +87,13 @@
               action="shopify_import_job_action"
               sequence="50"/>
 
+    <menuitem id="menu_shopify_demo_data"
+              name="Generate Demo Data"
+              parent="menu_shopify_operations"
+              action="shopify_demo_data_wizard_action"
+              groups="base.group_system"
+              sequence="90"/>
+
     <!-- Sync Status -->
     <menuitem id="menu_shopify_sync_status"
               name="Sync Status"
@@ -128,6 +135,12 @@
               parent="menu_shopify_sync_status"
               action="shopify_refund_binding_action"
               sequence="55"/>
+
+    <menuitem id="menu_shopify_abandoned_carts"
+              name="Abandoned Carts"
+              parent="menu_shopify_sync_status"
+              action="shopify_abandoned_cart_action"
+              sequence="57"/>
 
     <menuitem id="menu_shopify_locations"
               name="Locations"

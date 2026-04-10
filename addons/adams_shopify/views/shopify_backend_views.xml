@@ -143,6 +143,13 @@
                                     <field name="shipping_product_id"/>
                                 </group>
                             </group>
+                            <group>
+                                <group string="Abandoned Carts">
+                                    <field name="auto_sync_abandoned_carts"/>
+                                    <field name="auto_create_abandoned_quotation"
+                                           invisible="not auto_sync_abandoned_carts"/>
+                                </group>
+                            </group>
                         </page>
 
                         <!-- Tab 3: Status Sync -->
