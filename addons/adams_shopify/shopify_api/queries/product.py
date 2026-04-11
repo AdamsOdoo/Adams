@@ -9,7 +9,7 @@ query FetchProducts($first: Int!, $after: String) {
       node {
         id
         title
-        bodyHtml
+        descriptionHtml
         vendor
         productType
         tags
@@ -39,11 +39,15 @@ query FetchProducts($first: Int!, $after: String) {
               barcode
               price
               compareAtPrice
-              weight
-              weightUnit
               inventoryQuantity
               inventoryItem {
                 id
+                measurement {
+                  weight {
+                    value
+                    unit
+                  }
+                }
               }
               selectedOptions {
                 name

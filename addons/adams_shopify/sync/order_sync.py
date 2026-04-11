@@ -122,6 +122,10 @@ class OrderImporter(BaseImporter):
             _logger.warning("Could not resolve customer for order %s", node.get('name'))
             return None
 
+        # Skip cancelled orders — they should not create an Odoo draft/SO.
+        cancelled_at = node.get('cancelledAt')
+        is_cancelled = bool(cancelled_at) or node.get('displayFinancialStatus', '').lower() == 'voided'
+
         order_vals = {
             'partner_id': partner.id,
             'sales_channel': 'shopify',
@@ -171,7 +175,13 @@ class OrderImporter(BaseImporter):
             bill_partner = self._get_or_create_address(partner, billing, 'invoice')
             order_vals['partner_invoice_id'] = bill_partner.id
 
-        order = self.env['sale.order'].create(order_vals)
+        # All sale.order operations must run in the backend's company
+        # context and suppress the reverse-export trigger that fires on
+        # sale.order writes/creates.
+        SaleOrder = self.env['sale.order'].with_company(
+            self.backend.company_id,
+        ).with_context(shopify_no_auto_export=True)
+        order = SaleOrder.create(order_vals)
 
         # Create order lines
         line_items = node.get('lineItems', {}).get('edges', [])
@@ -185,14 +195,37 @@ class OrderImporter(BaseImporter):
             sl = edge.get('node', {})
             self._create_shipping_line(order, sl)
 
+        if is_cancelled:
+            # Record as cancelled in Odoo — do NOT confirm or invoice.
+            try:
+                order.with_context(
+                    shopify_no_auto_export=True,
+                    disable_cancel_warning=True,
+                ).action_cancel()
+            except Exception as e:
+                _logger.warning(
+                    "Failed to auto-cancel Shopify-cancelled order %s: %s",
+                    node.get('name'), e,
+                )
+            return order
+
         # Confirm order if paid
         if order_vals['shopify_financial_status'] in ('paid', 'partially_paid', 'authorized'):
-            order.action_confirm()
+            order.with_context(
+                shopify_no_auto_export=True,
+            ).action_confirm()
             # Auto-create invoice if configured
             if self.backend.auto_create_invoice and order_vals['shopify_financial_status'] == 'paid':
                 try:
-                    invoice = order._create_invoices()
-                    invoice.action_post()
+                    invoice = order.with_company(
+                        self.backend.company_id,
+                    ).with_context(
+                        shopify_no_auto_export=True,
+                    )._create_invoices()
+                    if invoice:
+                        invoice.with_context(
+                            shopify_no_auto_export=True,
+                        ).action_post()
                 except Exception as e:
                     _logger.warning("Auto-invoice failed for order %s: %s", order.name, e)
 

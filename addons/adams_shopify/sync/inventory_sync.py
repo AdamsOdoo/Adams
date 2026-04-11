@@ -134,17 +134,28 @@ class InventorySync:
         return success, errors, skipped, error_details
 
     def _push_batch(self, batch, location_id):
-        """Push a batch of inventory quantities to Shopify."""
+        """Push a batch of inventory quantities to Shopify.
+
+        Uses inventorySetQuantities with compareQuantity (required as of
+        Shopify 2026-01 — ignoreCompareQuantity was removed). compareQuantity
+        is taken from last_pushed_qty which represents our last known
+        Shopify state; if Shopify drifted (manual edit), the call will fail
+        with compareQuantityStale and we'll retry on the next cron pass.
+        """
         success = 0
         errors = 0
         error_details = []
 
         quantities = []
         for item in batch:
+            compare_qty = 0
+            if item['inv_binding']:
+                compare_qty = int(item['inv_binding'].last_pushed_qty or 0)
             quantities.append({
                 'inventoryItemId': item['inventory_item_id'],
                 'locationId': location_id,
                 'quantity': item['quantity'],
+                'compareQuantity': compare_qty,
             })
 
         try:
@@ -153,8 +164,7 @@ class InventorySync:
                 variables={
                     'input': {
                         'reason': 'correction',
-                        'name': 'Odoo inventory sync',
-                        'ignoreCompareQuantity': True,
+                        'name': 'available',
                         'quantities': quantities,
                     },
                 },

@@ -22,7 +22,12 @@ class ShopifyRateLimiter:
         self.throttle_count = 0
 
     def wait_if_needed(self, estimated_cost):
-        """Block until enough budget is available."""
+        """Block until enough budget is available.
+
+        Reserves the cost up-front under the lock, then releases the lock
+        before sleeping so other threads can be served in parallel.
+        """
+        wait = 0.0
         with self._lock:
             self._restore()
             self.total_requests += 1
@@ -32,13 +37,12 @@ class ShopifyRateLimiter:
                 wait += 0.1  # buffer
                 self.total_wait_time += wait
                 self.throttle_count += 1
-                self._lock.release()
-                try:
-                    time.sleep(wait)
-                finally:
-                    self._lock.acquire()
-                self._restore()
+            # Reserve the budget NOW (may go negative briefly; _restore() will
+            # catch up). Doing this inside the lock prevents other threads
+            # from double-spending the same capacity while we sleep.
             self.available -= estimated_cost
+        if wait > 0:
+            time.sleep(wait)
 
     def update_from_response(self, extensions):
         """Update state from actual Shopify throttle response."""

@@ -1,7 +1,7 @@
 import json
 import logging
 
-from odoo import fields
+from odoo import fields, tools
 
 from .base_importer import BaseImporter
 from .checksum import compute_checksum
@@ -129,25 +129,25 @@ class AbandonedCartSync:
             ('backend_id', '=', self.backend.id),
             ('recovered', '=', False),
             ('customer_email', '!=', False),
+            ('abandoned_at', '!=', False),
         ])
         if not open_carts:
             return
 
+        OrderBinding = self.env['shopify.order.binding']
         for cart in open_carts:
-            # Check if an order exists with the same customer email
-            # created after the cart was abandoned
-            if not cart.customer_email:
+            normalized = tools.email_normalize(cart.customer_email)
+            if not normalized:
                 continue
-            order_binding = self.env['shopify.order.binding'].search([
+            # Scope search to orders for this backend after the cart was
+            # abandoned, matched by normalized customer email.
+            matches = OrderBinding.search([
                 ('backend_id', '=', self.backend.id),
-                ('shopify_created_at', '>', cart.abandoned_at),
-            ], limit=20)
-            for ob in order_binding:
-                if ob.odoo_id and ob.odoo_id.partner_id:
-                    partner_email = (ob.odoo_id.partner_id.email or '').lower()
-                    if partner_email == cart.customer_email.lower():
-                        cart.write({
-                            'recovered': True,
-                            'recovered_order_binding_id': ob.id,
-                        })
-                        break
+                ('shopify_created_at', '>=', cart.abandoned_at),
+                ('odoo_id.partner_id.email_normalized', '=', normalized),
+            ], limit=1)
+            if matches:
+                cart.write({
+                    'recovered': True,
+                    'recovered_order_binding_id': matches.id,
+                })

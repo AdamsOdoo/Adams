@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+import threading
 import time
 
 import requests
@@ -14,6 +16,29 @@ RETRY_CODES = {429, 500, 502, 503}
 MAX_RETRIES = 3
 BACKOFF_BASE = 2  # seconds
 
+# (connect_timeout_seconds, read_timeout_seconds)
+REQUEST_TIMEOUT = (10, 30)
+
+# Allowed shop URL pattern — must be an exact .myshopify.com subdomain.
+# This guards against SSRF if an attacker somehow writes a malicious
+# shop_url into the DB (e.g. via a compromised admin or misconfig).
+_SHOPIFY_HOST_RE = re.compile(
+    r'^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$'
+)
+
+# Patterns that may contain an access token echoed back in an error body.
+_TOKEN_LEAK_RE = re.compile(
+    r'(shpat_[A-Za-z0-9]+|X-Shopify-Access-Token[^\s,;]*)',
+    re.IGNORECASE,
+)
+
+
+def _sanitize_error_body(text):
+    """Remove any access-token-like substrings from an error body."""
+    if not text:
+        return ''
+    return _TOKEN_LEAK_RE.sub('[REDACTED]', text)
+
 
 class ShopifyAPIError(Exception):
     """Raised when a Shopify API call fails."""
@@ -25,7 +50,7 @@ class ShopifyAPIError(Exception):
 
 
 class CircuitBreaker:
-    """Simple circuit breaker to prevent hammering a failing API."""
+    """Thread-safe circuit breaker to prevent hammering a failing API."""
 
     def __init__(self, failure_threshold=5, recovery_timeout=300):
         self.failure_threshold = failure_threshold
@@ -33,36 +58,50 @@ class CircuitBreaker:
         self.failure_count = 0
         self.last_failure_time = 0
         self.state = 'closed'  # closed=normal, open=blocking, half_open=testing
+        self._lock = threading.Lock()
 
     def record_success(self):
-        self.failure_count = 0
-        self.state = 'closed'
+        with self._lock:
+            self.failure_count = 0
+            self.state = 'closed'
 
     def record_failure(self):
-        self.failure_count += 1
-        self.last_failure_time = time.time()
-        if self.failure_count >= self.failure_threshold:
-            self.state = 'open'
+        with self._lock:
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+            if self.failure_count >= self.failure_threshold:
+                self.state = 'open'
 
     def can_execute(self):
-        if self.state == 'closed':
-            return True
-        if self.state == 'open':
-            if time.time() - self.last_failure_time >= self.recovery_timeout:
-                self.state = 'half_open'
+        with self._lock:
+            if self.state == 'closed':
                 return True
-            return False
-        # half_open: allow one request to test
-        return True
+            if self.state == 'open':
+                if time.time() - self.last_failure_time >= self.recovery_timeout:
+                    self.state = 'half_open'
+                    return True
+                return False
+            # half_open: allow one request to test
+            return True
 
 
 class ShopifyClient:
     """GraphQL Admin API client with rate limiting and retry logic."""
 
     def __init__(self, backend):
-        self.shop_url = backend.shop_url.rstrip('/')
-        if not self.shop_url.startswith('https://'):
-            self.shop_url = f"https://{self.shop_url}"
+        # Normalise and re-validate the shop URL at call time. The model-level
+        # constraint should already enforce this, but we re-check here as a
+        # defence-in-depth measure: if this ever doesn't match a canonical
+        # *.myshopify.com host, refuse to send the access token anywhere.
+        raw = (backend.shop_url or '').strip().rstrip('/')
+        if '://' in raw:
+            raw = raw.split('://', 1)[1]
+        host = raw.split('/')[0]
+        if not _SHOPIFY_HOST_RE.match(host):
+            raise ShopifyAPIError(
+                "Invalid Shopify shop URL configured on backend."
+            )
+        self.shop_url = f"https://{host}"
         self.access_token = backend.access_token
         self.api_version = backend.api_version or '2026-01'
         self.rate_limiter = ShopifyRateLimiter()
@@ -108,15 +147,25 @@ class ShopifyClient:
                 resp = self._session.post(
                     self.endpoint,
                     data=json.dumps(payload),
-                    timeout=30,
+                    timeout=REQUEST_TIMEOUT,
                 )
             except requests.RequestException as e:
-                last_exc = e
+                # Sanitise: never include the raw exception — it may embed
+                # the request URL or headers (which contain the access
+                # token). Log the full trace server-side and surface only a
+                # generic message to the caller.
+                _logger.warning(
+                    "Shopify network error for %s: %s",
+                    type(e).__name__, e,
+                )
+                last_exc = type(e).__name__
                 if attempt < MAX_RETRIES:
                     self._backoff(attempt)
                     continue
                 self.circuit_breaker.record_failure()
-                raise ShopifyAPIError(f"Network error: {e}")
+                raise ShopifyAPIError(
+                    f"Network error contacting Shopify ({last_exc})"
+                )
 
             if resp.status_code in RETRY_CODES:
                 last_exc = ShopifyAPIError(
@@ -125,7 +174,10 @@ class ShopifyClient:
                 if attempt < MAX_RETRIES:
                     retry_after = resp.headers.get('Retry-After')
                     if retry_after:
-                        time.sleep(float(retry_after))
+                        try:
+                            time.sleep(min(float(retry_after), 60.0))
+                        except ValueError:
+                            self._backoff(attempt)
                     else:
                         self._backoff(attempt)
                     continue
@@ -133,8 +185,10 @@ class ShopifyClient:
                 raise last_exc
 
             if resp.status_code != 200:
+                # Strip any accidental header echoes from the error body.
+                body_snippet = _sanitize_error_body(resp.text)[:500]
                 raise ShopifyAPIError(
-                    f"HTTP {resp.status_code}: {resp.text[:500]}",
+                    f"HTTP {resp.status_code}: {body_snippet}",
                     status_code=resp.status_code,
                 )
 

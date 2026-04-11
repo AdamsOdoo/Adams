@@ -14,15 +14,20 @@ def compute_checksum(data):
 
 def product_checksum(product):
     """Compute checksum for an Odoo product.template record."""
+    # Include variant SKUs/prices so variant-level changes trigger re-export
+    variant_digest = sorted([
+        (v.default_code or '', f"{v.lst_price:.4f}", v.barcode or '')
+        for v in product.product_variant_ids
+    ])
     return compute_checksum({
         'name': product.name,
         'description_sale': product.description_sale or '',
-        'list_price': product.list_price,
+        'list_price': f"{product.list_price:.4f}",
         'default_code': product.default_code or '',
         'barcode': product.barcode or '',
-        'weight': product.weight,
+        'weight': f"{product.weight:.4f}" if product.weight else '0',
         'categ_id': product.categ_id.name or '',
-        'type': product.detailed_type,
+        'variants': variant_digest,
     })
 
 
@@ -42,22 +47,35 @@ def customer_checksum(partner):
         'name': partner.name,
         'email': partner.email or '',
         'phone': partner.phone or '',
+        'mobile': partner.mobile or '',
         'street': partner.street or '',
+        'street2': partner.street2 or '',
         'city': partner.city or '',
         'zip': partner.zip or '',
+        'state': partner.state_id.code or '',
         'country': partner.country_id.code or '',
     })
 
 
 def shopify_product_checksum(shopify_data):
     """Compute checksum from a Shopify product node."""
+    # Include variant digest so price/sku changes trigger re-import
+    variant_digest = sorted([
+        (
+            (v.get('node') or {}).get('sku', ''),
+            (v.get('node') or {}).get('price', ''),
+            (v.get('node') or {}).get('barcode', '') or '',
+        )
+        for v in shopify_data.get('variants', {}).get('edges', [])
+    ])
     return compute_checksum({
         'title': shopify_data.get('title', ''),
-        'bodyHtml': shopify_data.get('bodyHtml', ''),
+        'descriptionHtml': shopify_data.get('descriptionHtml', ''),
         'vendor': shopify_data.get('vendor', ''),
         'productType': shopify_data.get('productType', ''),
         'tags': shopify_data.get('tags', []),
         'status': shopify_data.get('status', ''),
+        'variants': variant_digest,
     })
 
 

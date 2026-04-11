@@ -156,6 +156,31 @@ class ShopifyBackend(models.Model):
 
     batch_size = fields.Integer(default=50)
 
+    @api.constrains('batch_size', 'product_sync_interval',
+                    'customer_sync_interval', 'order_sync_interval',
+                    'inventory_sync_interval')
+    def _check_positive_intervals(self):
+        """Guard against misconfiguration that would stall sync loops."""
+        for rec in self:
+            if rec.batch_size is not None and rec.batch_size < 1:
+                raise ValidationError(_(
+                    "Batch size must be at least 1 (got %s).", rec.batch_size,
+                ))
+            if rec.batch_size and rec.batch_size > 250:
+                raise ValidationError(_(
+                    "Batch size cannot exceed 250 (Shopify API limit).",
+                ))
+            for name, val in (
+                ('Product', rec.product_sync_interval),
+                ('Customer', rec.customer_sync_interval),
+                ('Order', rec.order_sync_interval),
+                ('Inventory', rec.inventory_sync_interval),
+            ):
+                if val is not None and val < 1:
+                    raise ValidationError(_(
+                        "%s sync interval must be at least 1 minute.", name,
+                    ))
+
     # ── Field Mapping ───────────────────────────────────────
     field_mapping_ids = fields.One2many(
         'shopify.field.mapping', 'backend_id',
@@ -236,21 +261,79 @@ class ShopifyBackend(models.Model):
     @api.depends_context('uid')
     def _compute_bind_counts(self):
         today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0)
+        backend_ids = self.ids
+        if not backend_ids:
+            return
+
         binding_models = {
             'product': 'shopify.product.binding',
             'customer': 'shopify.customer.binding',
             'order': 'shopify.order.binding',
         }
+
+        # Aggregate counts per (backend_id, sync_status) with a single
+        # read_group per binding model, O(models) queries total.
+        aggregated = {}  # {(model_key, backend_id, status): count}
+        for key, model_name in binding_models.items():
+            Model = self.env[model_name].sudo()
+            groups = Model._read_group(
+                [('backend_id', 'in', backend_ids)],
+                groupby=['backend_id', 'sync_status'],
+                aggregates=['__count'],
+            )
+            for backend, status, count in groups:
+                aggregated[(key, backend.id, status)] = count
+
+        # Other one-off counts also grouped.
+        collection_counts = dict(
+            (b.id, c) for b, c in self.env['shopify.collection.binding'].sudo()._read_group(
+                [('backend_id', 'in', backend_ids), ('sync_status', '=', 'synced')],
+                groupby=['backend_id'],
+                aggregates=['__count'],
+            )
+        )
+        refund_counts = dict(
+            (b.id, c) for b, c in self.env['shopify.refund.binding'].sudo()._read_group(
+                [('backend_id', 'in', backend_ids), ('sync_status', '=', 'synced')],
+                groupby=['backend_id'],
+                aggregates=['__count'],
+            )
+        )
+        log_counts = dict(
+            (b.id, c) for b, c in self.env['shopify.sync.log'].sudo()._read_group(
+                [('backend_id', 'in', backend_ids), ('create_date', '>=', today_start)],
+                groupby=['backend_id'],
+                aggregates=['__count'],
+            )
+        )
+        abandoned_counts = {}
+        if 'shopify.abandoned.cart' in self.env:
+            abandoned_counts = dict(
+                (b.id, c) for b, c in self.env['shopify.abandoned.cart'].sudo()._read_group(
+                    [('backend_id', 'in', backend_ids), ('recovered', '=', False)],
+                    groupby=['backend_id'],
+                    aggregates=['__count'],
+                )
+            )
+
+        # Promoters grouped by company (shared across backends).
+        company_ids = self.mapped('company_id').ids
+        promoter_counts = {}
+        if company_ids:
+            promoter_counts = dict(
+                (c.id, n) for c, n in self.env['shopify.promoter'].sudo()._read_group(
+                    [('company_id', 'in', company_ids), ('status', '=', 'active')],
+                    groupby=['company_id'],
+                    aggregates=['__count'],
+                )
+            )
+
         for rec in self:
             synced_total = error_total = pending_total = 0
-            for key, model_name in binding_models.items():
-                Model = self.env[model_name]
-                synced = Model.search_count(
-                    [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')])
-                errors = Model.search_count(
-                    [('backend_id', '=', rec.id), ('sync_status', '=', 'error')])
-                pending = Model.search_count(
-                    [('backend_id', '=', rec.id), ('sync_status', '=', 'pending')])
+            for key in binding_models:
+                synced = aggregated.get((key, rec.id, 'synced'), 0)
+                errors = aggregated.get((key, rec.id, 'error'), 0)
+                pending = aggregated.get((key, rec.id, 'pending'), 0)
                 setattr(rec, f'{key}_bind_count', synced)
                 setattr(rec, f'{key}_error_count', errors)
                 synced_total += synced
@@ -261,30 +344,16 @@ class ShopifyBackend(models.Model):
             rec.total_synced_count = synced_total
             rec.total_pending_count = pending_total
 
-            # Sync health percentage
             grand_total = synced_total + error_total + pending_total
             rec.sync_health_pct = int(
                 (synced_total / grand_total * 100) if grand_total else 100
             )
 
-            rec.collection_bind_count = self.env['shopify.collection.binding'].search_count(
-                [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
-            )
-            rec.refund_bind_count = self.env['shopify.refund.binding'].search_count(
-                [('backend_id', '=', rec.id), ('sync_status', '=', 'synced')],
-            )
-            rec.sync_log_today_count = self.env['shopify.sync.log'].search_count(
-                [('backend_id', '=', rec.id), ('create_date', '>=', today_start)],
-            )
-            rec.promoter_count = self.env['shopify.promoter'].search_count(
-                [('company_id', '=', rec.company_id.id), ('status', '=', 'active')],
-            )
-            # Abandoned carts
-            if 'shopify.abandoned.cart' in self.env:
-                rec.abandoned_cart_count = self.env['shopify.abandoned.cart'].search_count(
-                    [('backend_id', '=', rec.id), ('recovered', '=', False)])
-            else:
-                rec.abandoned_cart_count = 0
+            rec.collection_bind_count = collection_counts.get(rec.id, 0)
+            rec.refund_bind_count = refund_counts.get(rec.id, 0)
+            rec.sync_log_today_count = log_counts.get(rec.id, 0)
+            rec.promoter_count = promoter_counts.get(rec.company_id.id, 0)
+            rec.abandoned_cart_count = abandoned_counts.get(rec.id, 0)
 
     # ── Actions ─────────────────────────────────────────────
 

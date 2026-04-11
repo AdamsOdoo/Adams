@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+import threading
 import time
 
 from odoo import http
@@ -13,26 +14,43 @@ _logger = logging.getLogger(__name__)
 # ── Rate limiter for webhook endpoint ──────────────────────
 # Per-backend rate limiting: max requests within a time window
 _webhook_rate_buckets = {}  # {backend_id: [timestamps]}
+_webhook_rate_lock = threading.Lock()
 WEBHOOK_RATE_LIMIT = 200  # max requests per window
 WEBHOOK_RATE_WINDOW = 60  # seconds
+# Maximum number of distinct backend IDs tracked, to prevent an attacker
+# from OOMing the dict by spamming random IDs.
+WEBHOOK_RATE_MAX_BUCKETS = 1000
 
 # Maximum webhook payload size (10 MB)
 MAX_PAYLOAD_SIZE = 10 * 1024 * 1024
 
 
 def _check_rate_limit(backend_id):
-    """Return True if the request is allowed, False if rate-limited."""
+    """Return True if the request is allowed, False if rate-limited.
+
+    Thread-safe: guarded by a module-level lock because Odoo webhook
+    workers share process memory.
+    """
     now = time.time()
-    bucket = _webhook_rate_buckets.get(backend_id, [])
-    # Prune old entries
     cutoff = now - WEBHOOK_RATE_WINDOW
-    bucket = [t for t in bucket if t > cutoff]
-    if len(bucket) >= WEBHOOK_RATE_LIMIT:
+    with _webhook_rate_lock:
+        # Evict oldest buckets if dict has grown too large
+        if len(_webhook_rate_buckets) > WEBHOOK_RATE_MAX_BUCKETS:
+            # Drop any buckets whose newest entry is already expired
+            stale = [
+                k for k, ts in _webhook_rate_buckets.items()
+                if not ts or ts[-1] < cutoff
+            ]
+            for k in stale:
+                _webhook_rate_buckets.pop(k, None)
+        bucket = _webhook_rate_buckets.get(backend_id, [])
+        bucket = [t for t in bucket if t > cutoff]
+        if len(bucket) >= WEBHOOK_RATE_LIMIT:
+            _webhook_rate_buckets[backend_id] = bucket
+            return False
+        bucket.append(now)
         _webhook_rate_buckets[backend_id] = bucket
-        return False
-    bucket.append(now)
-    _webhook_rate_buckets[backend_id] = bucket
-    return True
+        return True
 
 
 class ShopifyWebhookController(http.Controller):
@@ -59,19 +77,11 @@ class ShopifyWebhookController(http.Controller):
                 {'status': 'error', 'message': 'Payload too large'}, status=413,
             )
 
-        # ── Rate limiting ───────────────────────────────────
-        if not _check_rate_limit(backend_id):
-            _logger.warning(
-                "Webhook rate limit exceeded for backend %s", backend_id,
-            )
-            return request.make_json_response(
-                {'status': 'error', 'message': 'Rate limit exceeded'}, status=429,
-            )
-
         headers = request.httprequest.headers
         hmac_header = headers.get('X-Shopify-Hmac-Sha256', '')
         topic = headers.get('X-Shopify-Topic', '')
         webhook_id = headers.get('X-Shopify-Webhook-Id', '')
+        shop_domain_header = headers.get('X-Shopify-Shop-Domain', '')
 
         # Lookup backend
         backend = request.env['shopify.backend'].sudo().browse(backend_id)
@@ -80,7 +90,25 @@ class ShopifyWebhookController(http.Controller):
                 {'status': 'error'}, status=404,
             )
 
-        # ── HMAC verification ───────────────────────────────
+        # ── Shop domain sanity check ────────────────────────
+        # Reject webhooks whose shop domain header doesn't match the backend.
+        # Shopify always sends this header; a mismatch indicates a misrouted
+        # or forged request.
+        if shop_domain_header and backend.shop_url:
+            expected = (backend.shop_url or '').strip().lower()
+            if '://' in expected:
+                expected = expected.split('://', 1)[1]
+            expected = expected.split('/')[0]
+            if shop_domain_header.strip().lower() != expected:
+                _logger.warning(
+                    "Webhook shop domain mismatch for backend %s: got %s, expected %s",
+                    backend_id, shop_domain_header, expected,
+                )
+                return request.make_json_response(
+                    {'status': 'error'}, status=404,
+                )
+
+        # ── HMAC verification (BEFORE rate limit to avoid DoS on rate dict) ─
         if not self._verify_hmac(raw_body, hmac_header, backend.webhook_secret):
             _logger.warning(
                 "HMAC verification failed for backend %s, topic %s",
@@ -88,6 +116,15 @@ class ShopifyWebhookController(http.Controller):
             )
             return request.make_json_response(
                 {'status': 'unauthorized'}, status=401,
+            )
+
+        # ── Rate limiting (after HMAC so unauth cannot poison the bucket) ──
+        if not _check_rate_limit(backend_id):
+            _logger.warning(
+                "Webhook rate limit exceeded for backend %s", backend_id,
+            )
+            return request.make_json_response(
+                {'status': 'error', 'message': 'Rate limit exceeded'}, status=429,
             )
 
         # ── Deduplicate by webhook_id ───────────────────────

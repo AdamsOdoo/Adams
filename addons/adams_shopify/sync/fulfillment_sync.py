@@ -12,8 +12,8 @@ from odoo import _
 _logger = logging.getLogger(__name__)
 
 FULFILLMENT_CREATE_MUTATION = """
-mutation FulfillmentCreate($fulfillment: FulfillmentV2Input!) {
-  fulfillmentCreateV2(fulfillment: $fulfillment) {
+mutation FulfillmentCreate($fulfillment: FulfillmentInput!) {
+  fulfillmentCreate(fulfillment: $fulfillment) {
     fulfillment {
       id
       status
@@ -216,7 +216,7 @@ class FulfillmentSync:
             self.client.execute_mutation(
                 FULFILLMENT_CREATE_MUTATION,
                 {'fulfillment': fulfillment_input},
-                result_key='fulfillmentCreateV2',
+                result_key='fulfillmentCreate',
                 estimated_cost=10,
             )
 

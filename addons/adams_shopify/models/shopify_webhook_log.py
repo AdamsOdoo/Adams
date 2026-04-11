@@ -70,10 +70,15 @@ class ShopifyWebhookLog(models.Model):
                 log.state = 'processing'
                 log.flush_recordset()
                 log._process_event()
-                log.write({
-                    'state': 'done',
-                    'processed_at': fields.Datetime.now(),
-                })
+                # _process_event() may set state='skipped' for
+                # no-op topics; preserve it instead of clobbering.
+                if log.state != 'skipped':
+                    log.write({
+                        'state': 'done',
+                        'processed_at': fields.Datetime.now(),
+                    })
+                else:
+                    log.write({'processed_at': fields.Datetime.now()})
             except Exception as e:
                 _logger.exception("Webhook processing failed for %s", log.id)
                 new_retry = log.retry_count + 1
@@ -269,8 +274,22 @@ class ShopifyWebhookLog(models.Model):
                 'reason': f"Shopify Refund #{data.get('id', '')}",
                 'journal_id': invoices[0].journal_id.id,
             })
-            reversal = move_reversal.reverse_moves()
-            _logger.info("Credit note created for Shopify refund on order %s", order.name)
+            move_reversal.reverse_moves()
+            # Post the newly created credit notes so the refund is
+            # actually reflected in the books.
+            new_moves = move_reversal.new_move_ids
+            if new_moves:
+                try:
+                    new_moves.action_post()
+                except Exception as post_err:
+                    _logger.warning(
+                        "Failed to post credit note %s for order %s: %s",
+                        new_moves.ids, order.name, post_err,
+                    )
+            _logger.info(
+                "Credit note created for Shopify refund on order %s (refund amount: %s)",
+                order.name, refund_amount,
+            )
         except Exception as e:
             _logger.warning("Failed to create credit note for order %s: %s", order.name, e)
 

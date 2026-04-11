@@ -11,6 +11,7 @@ from .checksum import product_checksum, shopify_product_checksum
 from ..shopify_api.queries.product import (
     FETCH_PRODUCTS,
     PRODUCT_CREATE_MUTATION,
+    PRODUCT_SET_MUTATION,
     PRODUCT_UPDATE_MUTATION,
     VARIANT_BULK_UPDATE_MUTATION,
 )
@@ -55,8 +56,14 @@ class ProductExporter(BaseExporter):
     def _get_variant_price(self, variant):
         """Get variant price using backend pricelist if configured, else lst_price."""
         pricelist = self.backend.pricelist_id
-        if pricelist:
-            return pricelist._get_product_price(variant, 1.0)
+        if pricelist and variant:
+            try:
+                return pricelist._get_product_price(
+                    variant, 1.0, currency=pricelist.currency_id,
+                )
+            except TypeError:
+                # Older Odoo versions without currency kwarg
+                return pricelist._get_product_price(variant, 1.0)
         return variant.lst_price
 
     def _export_one(self, binding):
@@ -67,9 +74,15 @@ class ProductExporter(BaseExporter):
             self._create_product(binding, product)
 
     def _create_product(self, binding, product):
+        """Create a product on Shopify using productSet (2026-01 compatible).
+
+        productSet accepts product data, variants, options, and files in a
+        single mutation, replacing the deprecated embedded variants/images
+        arrays in productCreate.
+        """
         product_input = {
             'title': product.name,
-            'bodyHtml': product.description_sale or '',
+            'descriptionHtml': product.description_sale or '',
             'productType': product.categ_id.name or '',
             'vendor': product.seller_ids[:1].partner_id.name if product.seller_ids else '',
             'status': 'ACTIVE',
@@ -78,16 +91,13 @@ class ProductExporter(BaseExporter):
         }
         options = self._build_options(product)
         if options:
-            product_input['options'] = options
-        images = self._build_image_inputs(product)
-        if images:
-            product_input['images'] = images
+            product_input['productOptions'] = options
         variables = {'input': product_input}
         result = self.client.execute_mutation(
-            PRODUCT_CREATE_MUTATION,
+            PRODUCT_SET_MUTATION,
             variables,
-            result_key='productCreate',
-            estimated_cost=10,
+            result_key='productSet',
+            estimated_cost=15,
         )
         shopify_product = result.get('product', {})
         binding.shopify_id = shopify_product.get('id')
@@ -104,7 +114,7 @@ class ProductExporter(BaseExporter):
             'input': {
                 'id': shopify_gid,
                 'title': product.name,
-                'bodyHtml': product.description_sale or '',
+                'descriptionHtml': product.description_sale or '',
                 'productType': product.categ_id.name or '',
                 'tags': binding.shopify_tags.split(', ') if binding.shopify_tags else [],
             },
@@ -140,7 +150,11 @@ class ProductExporter(BaseExporter):
             )
 
     def _build_options(self, product):
-        """Build Shopify options list from product attribute lines."""
+        """Build Shopify productOptions list from product attribute lines.
+
+        productSet expects `productOptions: [OptionCreateInput]` where each
+        option has `name` and `values: [OptionValueCreateInput]`.
+        """
         options = []
         for line in product.attribute_line_ids:
             options.append({
@@ -156,9 +170,17 @@ class ProductExporter(BaseExporter):
                 'sku': v.default_code or '',
                 'price': str(self._get_variant_price(v)),
                 'barcode': v.barcode or None,
-                'weight': v.weight,
-                'weightUnit': 'KILOGRAMS',
             }
+            # In 2026-01, weight moved to inventoryItem.measurement.weight
+            if v.weight:
+                variant_input['inventoryItem'] = {
+                    'measurement': {
+                        'weight': {
+                            'value': float(v.weight),
+                            'unit': 'KILOGRAMS',
+                        },
+                    },
+                }
             # Add option values from variant attributes
             option_values = []
             for ptav in v.product_template_attribute_value_ids:
@@ -170,10 +192,13 @@ class ProductExporter(BaseExporter):
                 variant_input['optionValues'] = option_values
             variants.append(variant_input)
         if not variants:
-            pricelist = self.backend.pricelist_id
-            price = pricelist._get_product_price(
-                product.product_variant_ids[:1], 1.0,
-            ) if pricelist and product.product_variant_ids else product.list_price
+            first_variant = (
+                product.product_variant_ids[0] if product.product_variant_ids else None
+            )
+            price = (
+                self._get_variant_price(first_variant) if first_variant
+                else product.list_price
+            )
             return [{'price': str(price)}]
         return variants
 
@@ -287,13 +312,19 @@ class ProductImporter(BaseImporter):
         if variant_edges:
             first_variant = variant_edges[0].get('node', {})
 
+        # Extract weight from inventoryItem.measurement.weight (2026-01 shape)
+        inv_item = first_variant.get('inventoryItem') or {}
+        measurement = inv_item.get('measurement') or {}
+        weight_data = measurement.get('weight') or {}
+        weight = float(weight_data.get('value', 0) or 0)
+
         vals = {
             'name': node.get('title', 'Untitled'),
-            'description_sale': node.get('bodyHtml', ''),
+            'description_sale': node.get('descriptionHtml', ''),
             'list_price': float(first_variant.get('price', 0)),
             'default_code': first_variant.get('sku', ''),
             'barcode': first_variant.get('barcode') or False,
-            'weight': first_variant.get('weight', 0),
+            'weight': weight,
         }
 
         # Download main image from first image node
@@ -500,15 +531,20 @@ class ProductSync:
             query = """
             query GetProduct($id: ID!) {
               product(id: $id) {
-                id title bodyHtml vendor productType tags status handle
+                id title descriptionHtml vendor productType tags status handle
                 createdAt updatedAt
                 options { name values }
                 variants(first: 100) {
                   edges {
                     node {
                       id title sku barcode price compareAtPrice
-                      weight weightUnit inventoryQuantity
-                      inventoryItem { id }
+                      inventoryQuantity
+                      inventoryItem {
+                        id
+                        measurement {
+                          weight { value unit }
+                        }
+                      }
                       selectedOptions { name value }
                     }
                   }

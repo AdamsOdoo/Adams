@@ -5,7 +5,9 @@ class ShopifySyncLog(models.Model):
     _name = 'shopify.sync.log'
     _description = 'Shopify Sync Log'
     _order = 'create_date desc'
+    _rec_name = 'display_name'
 
+    display_name = fields.Char(compute='_compute_display_name', store=False)
     backend_id = fields.Many2one(
         'shopify.backend', required=True, ondelete='cascade', index=True,
     )
@@ -41,6 +43,14 @@ class ShopifySyncLog(models.Model):
     error_count = fields.Integer()
     skipped_count = fields.Integer()
     error_details = fields.Text()
+
+    @api.depends('entity', 'operation', 'started_at')
+    def _compute_display_name(self):
+        for rec in self:
+            entity = dict(rec._fields['entity'].selection).get(rec.entity, '') if rec.entity else ''
+            op = dict(rec._fields['operation'].selection).get(rec.operation, '') if rec.operation else ''
+            ts = fields.Datetime.to_string(rec.started_at) if rec.started_at else ''
+            rec.display_name = f"{op} {entity} @ {ts}".strip()
 
     @api.depends('started_at', 'finished_at')
     def _compute_duration(self):

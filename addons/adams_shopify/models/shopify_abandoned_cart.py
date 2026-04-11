@@ -1,7 +1,8 @@
 import json
 import logging
 
-from odoo import api, fields, models, _
+from odoo import api, fields, models, tools, _
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -11,7 +12,17 @@ class ShopifyAbandonedCart(models.Model):
     _inherit = ['shopify.binding']
     _description = 'Shopify Abandoned Cart'
     _order = 'abandoned_at desc'
-    _rec_name = 'display_name'
+
+    # ── Identity ────────────────────────────────────────
+    name = fields.Char(
+        'Name', compute='_compute_name', store=True, index=True,
+    )
+
+    # ── Multi-company ───────────────────────────────────
+    company_id = fields.Many2one(
+        'res.company', related='backend_id.company_id',
+        store=True, index=True, readonly=True,
+    )
 
     # ── Shopify data ────────────────────────────────────
     shopify_checkout_token = fields.Char('Checkout Token', index=True)
@@ -21,9 +32,12 @@ class ShopifyAbandonedCart(models.Model):
     customer_phone = fields.Char('Customer Phone')
     customer_name = fields.Char('Customer Name')
     shopify_customer_id = fields.Char('Shopify Customer ID')
-    total_price = fields.Float('Total Price', digits='Product Price')
-    subtotal_price = fields.Float('Subtotal Price', digits='Product Price')
+    total_price = fields.Monetary('Total Price', currency_field='currency_id')
+    subtotal_price = fields.Monetary('Subtotal Price', currency_field='currency_id')
     currency_code = fields.Char('Currency Code', default='USD')
+    currency_id = fields.Many2one(
+        'res.currency', compute='_compute_currency_id', store=True,
+    )
     line_items_json = fields.Text(
         'Line Items (JSON)',
         help='Serialized line item data from Shopify.',
@@ -52,23 +66,35 @@ class ShopifyAbandonedCart(models.Model):
     )
     recovery_email_sent = fields.Boolean('Recovery Email Sent', default=False)
 
-    # ── Display ─────────────────────────────────────────
-    display_name = fields.Char(compute='_compute_display_name', store=True)
-
     _sql_constraints = [
         ('backend_shopify_unique', 'UNIQUE(backend_id, shopify_id)',
          'Abandoned cart binding must be unique per backend.'),
     ]
 
     @api.depends('customer_name', 'customer_email', 'shopify_id')
-    def _compute_display_name(self):
+    def _compute_name(self):
         for rec in self:
-            name = rec.customer_name or rec.customer_email or ''
+            who = rec.customer_name or rec.customer_email or ''
             if rec.shopify_id:
-                short_id = rec.shopify_id.split('/')[-1] if '/' in (rec.shopify_id or '') else rec.shopify_id
-                rec.display_name = f"Cart #{short_id} - {name}"
+                short_id = (
+                    rec.shopify_id.split('/')[-1]
+                    if '/' in (rec.shopify_id or '') else rec.shopify_id
+                )
+                rec.name = f"Cart #{short_id} - {who}" if who else f"Cart #{short_id}"
             else:
-                rec.display_name = name or 'Unknown Cart'
+                rec.name = who or _('Unknown Cart')
+
+    @api.depends('currency_code')
+    def _compute_currency_id(self):
+        Currency = self.env['res.currency']
+        for rec in self:
+            if rec.currency_code:
+                currency = Currency.with_context(active_test=False).search([
+                    ('name', '=', rec.currency_code),
+                ], limit=1)
+                rec.currency_id = currency.id if currency else False
+            else:
+                rec.currency_id = False
 
     @api.depends('line_items_json')
     def _compute_line_item_count(self):
@@ -103,16 +129,20 @@ class ShopifyAbandonedCart(models.Model):
                 'view_mode': 'form',
             }
         order = self._create_draft_quotation()
-        if order:
-            return {
-                'type': 'ir.actions.act_window',
-                'res_model': 'sale.order',
-                'res_id': order.id,
-                'view_mode': 'form',
-            }
+        if not order:
+            raise UserError(_(
+                "Cannot create quotation: no customer email or name on this cart."
+            ))
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'sale.order',
+            'res_id': order.id,
+            'view_mode': 'form',
+        }
 
     def _create_draft_quotation(self):
         """Create a draft sale.order from this abandoned cart data."""
+        self.ensure_one()
         partner = self._resolve_partner()
         if not partner:
             _logger.warning(
@@ -132,11 +162,11 @@ class ShopifyAbandonedCart(models.Model):
             ),
         }
 
-        # Resolve currency
+        # Resolve currency (use non-active too; backends may reference inactive)
         if self.currency_code:
-            currency = self.env['res.currency'].search([
-                ('name', '=', self.currency_code),
-            ], limit=1)
+            currency = self.env['res.currency'].with_context(
+                active_test=False,
+            ).search([('name', '=', self.currency_code)], limit=1)
             if currency and currency != backend.company_id.currency_id:
                 order_vals['currency_id'] = currency.id
                 pricelist = self.env['product.pricelist'].search([
@@ -145,8 +175,16 @@ class ShopifyAbandonedCart(models.Model):
                 ], limit=1)
                 if pricelist:
                     order_vals['pricelist_id'] = pricelist.id
+                else:
+                    _logger.warning(
+                        "No pricelist found for currency %s on backend %s; "
+                        "quotation will use company default pricelist",
+                        self.currency_code, backend.id,
+                    )
 
-        order = self.env['sale.order'].create(order_vals)
+        order = self.env['sale.order'].with_context(
+            shopify_no_auto_export=True,
+        ).create(order_vals)
 
         # Create order lines from stored line items
         line_items = self.get_line_items()
@@ -165,11 +203,16 @@ class ShopifyAbandonedCart(models.Model):
         variant_shopify_id = item.get('variant_id')
         sku = item.get('sku')
 
-        # Try to find product by Shopify variant binding
+        # Try to find product by Shopify variant binding. The stored JSON can
+        # contain either a full GID or a bare numeric id, so support both.
         if variant_shopify_id:
+            if '/' not in str(variant_shopify_id):
+                lookup_id = f"gid://shopify/ProductVariant/{variant_shopify_id}"
+            else:
+                lookup_id = variant_shopify_id
             variant_binding = self.env['shopify.variant.binding'].search([
                 ('backend_id', '=', self.backend_id.id),
-                ('shopify_id', '=', variant_shopify_id),
+                ('shopify_id', '=', lookup_id),
             ], limit=1)
             if variant_binding:
                 product = variant_binding.odoo_id
@@ -185,12 +228,14 @@ class ShopifyAbandonedCart(models.Model):
         title = item.get('title', 'Unknown Product')
 
         if product:
-            self.env['sale.order.line'].create({
+            # Create line with product, then write price_unit to override
+            # Odoo's onchange-driven recompute from pricelist
+            line = self.env['sale.order.line'].create({
                 'order_id': order.id,
                 'product_id': product.id,
                 'product_uom_qty': quantity,
-                'price_unit': price,
             })
+            line.write({'price_unit': price})
         else:
             # Create a note line for unresolved products
             self.env['sale.order.line'].create({
@@ -201,27 +246,34 @@ class ShopifyAbandonedCart(models.Model):
 
     def _resolve_partner(self):
         """Find or create the customer for this abandoned cart."""
+        self.ensure_one()
         # Check if already linked
         if self.partner_id:
             return self.partner_id
 
-        # Try by Shopify customer binding
+        # Try by Shopify customer binding. Support both GID and raw id.
         if self.shopify_customer_id:
+            if '/' not in str(self.shopify_customer_id):
+                lookup_id = f"gid://shopify/Customer/{self.shopify_customer_id}"
+            else:
+                lookup_id = self.shopify_customer_id
             binding = self.env['shopify.customer.binding'].search([
                 ('backend_id', '=', self.backend_id.id),
-                ('shopify_id', '=', self.shopify_customer_id),
+                ('shopify_id', '=', lookup_id),
             ], limit=1)
             if binding and binding.odoo_id:
                 return binding.odoo_id
 
-        # Try by email dedup
+        # Try by email dedup (normalized, case-insensitive)
         if self.customer_email:
-            partner = self.env['res.partner'].search([
-                ('email', '=ilike', self.customer_email),
-                ('parent_id', '=', False),
-            ], limit=1)
-            if partner:
-                return partner
+            normalized = tools.email_normalize(self.customer_email)
+            if normalized:
+                partner = self.env['res.partner'].search([
+                    ('email_normalized', '=', normalized),
+                    ('parent_id', '=', False),
+                ], limit=1)
+                if partner:
+                    return partner
 
         # Create new partner
         if self.customer_email or self.customer_name:

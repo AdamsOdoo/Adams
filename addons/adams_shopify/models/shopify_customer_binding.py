@@ -18,6 +18,7 @@ class ShopifyCustomerBinding(models.Model):
     shopify_tags = fields.Char('Shopify Tags')
     shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
 
+    @api.depends('shopify_id', 'backend_id.shop_url')
     def _compute_shopify_url(self):
         for rec in self:
             if rec.shopify_id and rec.backend_id.shop_url:
