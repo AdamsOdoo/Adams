@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 import logging
 
 from odoo import fields
@@ -251,6 +252,14 @@ class OrderImporter(BaseImporter):
                 ('code', '=ilike', code_str),
             ], limit=1)
             if not discount_binding:
+                continue
+
+            # Idempotency: skip if this (code, order) pair was already recorded.
+            existing_usage = self.env['shopify.discount.usage'].search([
+                ('discount_code_id', '=', discount_binding.id),
+                ('order_binding_id', '=', order_binding.id),
+            ], limit=1)
+            if existing_usage:
                 continue
 
             # Compute commission
@@ -512,17 +521,73 @@ class OrderImporter(BaseImporter):
             discount_total += self._get_money_amount(alloc.get('allocatedAmountSet'))
         quantity = line_item.get('quantity', 1)
         discount_pct = 0
-        if price_unit and quantity:
-            discount_pct = (discount_total / (price_unit * quantity)) * 100
+        line_subtotal = price_unit * quantity if price_unit and quantity else 0
+        if line_subtotal:
+            discount_pct = (discount_total / line_subtotal) * 100
 
-        self.env['sale.order.line'].create({
+        line_vals = {
             'order_id': order.id,
             'product_id': product.id if product else False,
             'name': line_item.get('title', 'Shopify Item'),
             'product_uom_qty': quantity,
             'price_unit': price_unit,
             'discount': min(discount_pct, 100),
-        })
+        }
+
+        # Apply tax mapping from Shopify taxLines
+        tax_ids = self._resolve_taxes(line_item.get('taxLines', []))
+        if tax_ids:
+            line_vals['tax_id'] = [(6, 0, tax_ids)]
+
+        self.env['sale.order.line'].create(line_vals)
+
+    def _resolve_taxes(self, tax_lines):
+        """Map Shopify tax lines to Odoo tax IDs via shopify.tax.mapping.
+
+        Falls back to searching Odoo taxes by rate if no mapping is
+        configured for a given tax title.
+        """
+        if not tax_lines:
+            return []
+
+        # Lazy-load tax mapping cache once per importer run
+        if not hasattr(self, '_tax_map_cache'):
+            mappings = self.env['shopify.tax.mapping'].search([
+                ('backend_id', '=', self.backend.id),
+                ('active', '=', True),
+            ])
+            self._tax_map_cache = {
+                m.shopify_tax_name.lower(): m.odoo_tax_id
+                for m in mappings if m.odoo_tax_id
+            }
+            self._tax_rate_cache = {}
+
+        tax_ids = []
+        for tl in tax_lines:
+            title = (tl.get('title') or '').strip()
+            rate = tl.get('rate')  # Shopify rate is a decimal, e.g. 0.1 = 10%
+
+            # 1. Try exact mapping by name
+            mapped_tax = self._tax_map_cache.get(title.lower())
+            if mapped_tax:
+                tax_ids.append(mapped_tax.id)
+                continue
+
+            # 2. Fallback: find Odoo tax by rate (round to 4 decimals)
+            if rate is not None:
+                rate_pct = round(float(rate) * 100, 4)
+                if rate_pct not in self._tax_rate_cache:
+                    odoo_tax = self.env['account.tax'].search([
+                        ('type_tax_use', '=', 'sale'),
+                        ('amount', '=', rate_pct),
+                        ('company_id', '=', self.backend.company_id.id),
+                    ], limit=1)
+                    self._tax_rate_cache[rate_pct] = odoo_tax
+                fallback_tax = self._tax_rate_cache[rate_pct]
+                if fallback_tax:
+                    tax_ids.append(fallback_tax.id)
+
+        return list(set(tax_ids))
 
     def _create_shipping_line(self, order, shipping_line):
         """Create a shipping line on the order."""

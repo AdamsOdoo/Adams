@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 FETCH_DISCOUNT_CODES = """
 query FetchDiscountCodes($first: Int!, $after: String) {
   codeDiscountNodes(first: $first, after: $after) {

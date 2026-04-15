@@ -1,4 +1,5 @@
-from odoo import fields, models
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+from odoo import api, fields, models
 
 
 class ShopifyCustomerTag(models.Model):
@@ -17,6 +18,7 @@ class ShopifyCustomerTag(models.Model):
     partner_count = fields.Integer(compute='_compute_partner_count')
     color = fields.Integer('Color')
 
+    @api.depends('partner_ids')
     def _compute_partner_count(self):
         for rec in self:
             rec.partner_count = len(rec.partner_ids)

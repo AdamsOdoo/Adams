@@ -1,3 +1,24 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+REFUND_CREATE = """
+mutation RefundCreate($input: RefundInput!) {
+  refundCreate(input: $input) {
+    refund {
+      id
+      totalRefundedSet {
+        shopMoney {
+          amount
+          currencyCode
+        }
+      }
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
 FETCH_REFUNDS = """
 query FetchRefunds($orderId: ID!) {
   order(id: $orderId) {

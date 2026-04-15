@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 """Payment status transition handler for Shopify → Odoo.
 
 Handles financial status changes received via webhooks or periodic imports
@@ -242,8 +243,8 @@ class PaymentStatusHandler:
             try:
                 order.action_cancel()
                 _logger.info("Cancelled order %s after Shopify void", order.name)
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.warning("Failed to cancel order %s after Shopify void: %s", order.name, e)
         elif order.state == 'sale':
             # Check if anything shipped
             done_pickings = order.picking_ids.filtered(lambda p: p.state == 'done')
@@ -251,7 +252,8 @@ class PaymentStatusHandler:
                 try:
                     order.with_context(disable_cancel_warning=True).action_cancel()
                     _logger.info("Cancelled unshipped order %s after Shopify void", order.name)
-                except Exception:
+                except Exception as e:
+                    _logger.warning("Failed to cancel order %s: %s", order.name, e)
                     self._schedule_activity(
                         order,
                         _("Payment voided on Shopify. Order could not be auto-cancelled. "

@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 import logging
 
 from odoo import fields
@@ -107,6 +108,24 @@ class CustomerImporter(BaseImporter):
             existing_binding.odoo_id.write(vals)
             existing_binding._mark_synced(checksum=checksum)
         else:
+            # Acquire a PostgreSQL advisory lock keyed on the Shopify GID
+            # hash to prevent concurrent imports from creating duplicate
+            # partner records for the same customer.
+            lock_key = hash(f"shopify_customer_{self.backend.id}_{shopify_id}") & 0x7FFFFFFF
+            self.env.cr.execute(
+                "SELECT pg_advisory_xact_lock(%s)", (lock_key,),
+            )
+
+            # Re-check binding after lock in case another worker just created it.
+            existing_binding = self.env['shopify.customer.binding'].search([
+                ('backend_id', '=', self.backend.id),
+                ('shopify_id', '=', shopify_id),
+            ], limit=1)
+            if existing_binding:
+                existing_binding.odoo_id.write(vals)
+                existing_binding._mark_synced(checksum=checksum)
+                return
+
             partner = self._find_odoo_partner(node)
             if not partner:
                 vals['is_shopify_customer'] = True

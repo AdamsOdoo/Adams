@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 FETCH_PRODUCTS = """
 query FetchProducts($first: Int!, $after: String) {
   products(first: $first, after: $after) {

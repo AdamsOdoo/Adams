@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 """Payout / settlement import from Shopify Payments."""
 
 import logging
@@ -54,7 +55,7 @@ class PayoutSync:
                     errors += 1
 
             has_more = page_info.get('hasNextPage', False)
-            cursor = page_info.get('endCursor')
+            cursor = page_info.get('endCursor') or None
 
         _logger.info(
             "Payout import for backend %s: %d success, %d errors",
@@ -170,7 +171,7 @@ class PayoutSync:
                     PayoutTxn.create(txn_vals)
 
             has_more = page_info.get('hasNextPage', False)
-            cursor = page_info.get('endCursor')
+            cursor = page_info.get('endCursor') or None
 
     def _map_status(self, status):
         """Map Shopify payout status to selection value."""

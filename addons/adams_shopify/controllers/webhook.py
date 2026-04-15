@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 import base64
 import hashlib
 import hmac
@@ -176,3 +177,55 @@ class ShopifyWebhookController(http.Controller):
             ).digest()
         ).decode('utf-8')
         return hmac.compare_digest(computed, hmac_header)
+
+
+class ShopifyHealthController(http.Controller):
+    """Lightweight health-check endpoint for monitoring.
+
+    Returns connection status and summary sync stats for a backend.
+    No authentication required beyond Odoo session.
+    """
+
+    @http.route(
+        '/shopify/health/<int:backend_id>',
+        type='http', auth='user', methods=['GET'],
+    )
+    def health_check(self, backend_id):
+        backend = request.env['shopify.backend'].browse(backend_id)
+        if not backend.exists():
+            return request.make_json_response(
+                {'status': 'not_found'}, status=404,
+            )
+
+        # Gather summary stats
+        data = {
+            'status': 'ok' if backend.state == 'connected' else backend.state,
+            'shop_name': backend.shop_name or '',
+            'last_sync': backend.last_sync_date and str(backend.last_sync_date) or None,
+            'sync_health_pct': backend.sync_health_pct,
+            'counts': {
+                'products': backend.product_bind_count,
+                'customers': backend.customer_bind_count,
+                'orders': backend.order_bind_count,
+                'errors': backend.total_error_count,
+                'pending': backend.total_pending_count,
+            },
+        }
+
+        # Check if crons are still running within expected intervals
+        WebhookLog = request.env['shopify.webhook.log'].sudo()
+        pending_webhooks = WebhookLog.search_count([
+            ('backend_id', '=', backend_id),
+            ('state', '=', 'pending'),
+        ])
+        dead_letters = WebhookLog.search_count([
+            ('backend_id', '=', backend_id),
+            ('state', '=', 'dead_letter'),
+        ])
+        data['webhooks'] = {
+            'pending': pending_webhooks,
+            'dead_letters': dead_letters,
+        }
+
+        status_code = 200 if backend.state == 'connected' else 503
+        return request.make_json_response(data, status=status_code)

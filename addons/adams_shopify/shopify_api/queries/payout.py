@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 """GraphQL queries for Shopify Payouts (Shopify Payments)."""
 
 FETCH_PAYOUTS = """

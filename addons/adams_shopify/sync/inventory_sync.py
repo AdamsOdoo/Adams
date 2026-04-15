@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 import logging
 
 from odoo import fields
@@ -24,6 +25,20 @@ class InventorySync:
 
     def export_inventory(self, backend):
         """Push current stock levels for all variant bindings."""
+        # Acquire a per-backend advisory lock to prevent overlapping
+        # cron runs from racing against each other.
+        lock_key = hash(f"shopify_inventory_{backend.id}") & 0x7FFFFFFF
+        self.env.cr.execute(
+            "SELECT pg_try_advisory_xact_lock(%s)", (lock_key,),
+        )
+        acquired = self.env.cr.fetchone()[0]
+        if not acquired:
+            _logger.info(
+                "Inventory sync skipped for backend %s — another run in progress",
+                backend.id,
+            )
+            return 0, 0, 0
+
         location_mappings = self._get_location_mappings(backend)
         if not location_mappings:
             _logger.warning("No Shopify location configured for backend %s", backend.id)

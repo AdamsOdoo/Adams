@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 from . import shopify_backend
 from . import shopify_binding
 from . import shopify_sync_log

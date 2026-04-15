@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 from unittest.mock import patch, MagicMock
 
 from odoo.tests.common import TransactionCase

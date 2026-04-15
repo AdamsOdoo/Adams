@@ -1,3 +1,4 @@
+# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
 import logging
 
 from ..shopify_api.queries.location import FETCH_LOCATIONS
