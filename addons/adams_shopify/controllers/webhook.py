@@ -191,7 +191,7 @@ class ShopifyHealthController(http.Controller):
         type='http', auth='user', methods=['GET'],
     )
     def health_check(self, backend_id):
-        backend = request.env['shopify.backend'].browse(backend_id)
+        backend = request.env['shopify.backend'].sudo().browse(backend_id)
         if not backend.exists():
             return request.make_json_response(
                 {'status': 'not_found'}, status=404,

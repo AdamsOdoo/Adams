@@ -1,25 +1,4 @@
 # Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
-FETCH_LOCATIONS = """
-query FetchLocations {
-  locations(first: 250) {
-    edges {
-      node {
-        id
-        name
-        isActive
-        address {
-          address1
-          city
-          province
-          country
-          zip
-        }
-      }
-    }
-  }
-}
-"""
-
 INVENTORY_SET_QUANTITIES = """
 mutation InventorySet($input: InventorySetQuantitiesInput!) {
   inventorySetQuantities(input: $input) {

@@ -221,7 +221,11 @@ class ShopifyClient:
         body = self.execute(query, variables, estimated_cost)
         data = body.get('data', {})
 
-        if result_key and result_key in data:
+        if result_key:
+            if result_key not in data:
+                raise ShopifyAPIError(
+                    f"Missing expected key '{result_key}' in mutation response"
+                )
             result = data[result_key]
             user_errors = result.get('userErrors', [])
             if user_errors:
@@ -291,6 +295,9 @@ class ShopifyClient:
             if not page_info.get('hasNextPage'):
                 break
             cursor = page_info.get('endCursor')
+            if not cursor:
+                _logger.warning("Missing endCursor despite hasNextPage=true, stopping pagination")
+                break
 
     @staticmethod
     def _backoff(attempt):

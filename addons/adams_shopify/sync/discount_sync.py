@@ -32,6 +32,12 @@ class DiscountExporter(BaseExporter):
             self._create_discount(binding)
 
     def _create_discount(self, binding):
+        if binding.discount_type == 'free_shipping':
+            self._create_free_shipping_discount(binding)
+        else:
+            self._create_basic_discount(binding)
+
+    def _create_basic_discount(self, binding):
         from ..shopify_api.queries.discount import DISCOUNT_CODE_BASIC_CREATE
 
         customer_gets = self._build_customer_gets(binding)
@@ -68,7 +74,50 @@ class DiscountExporter(BaseExporter):
         discount_node = result.get('codeDiscountNode', {})
         binding.shopify_id = discount_node.get('id', '')
 
+    def _create_free_shipping_discount(self, binding):
+        from ..shopify_api.queries.discount import DISCOUNT_CODE_FREE_SHIPPING_CREATE
+
+        starts_at = (
+            binding.starts_at.isoformat()
+            if binding.starts_at
+            else fields.Datetime.now().isoformat()
+        )
+        variables = {
+            'freeShippingCodeDiscount': {
+                'title': f"{binding.promoter_id.name} - {binding.code}",
+                'code': binding.code,
+                'startsAt': starts_at,
+                'appliesOncePerCustomer': binding.one_per_customer,
+                'destination': {'all': True},
+            }
+        }
+        if binding.ends_at:
+            variables['freeShippingCodeDiscount']['endsAt'] = binding.ends_at.isoformat()
+        if binding.usage_limit:
+            variables['freeShippingCodeDiscount']['usageLimit'] = binding.usage_limit
+        if binding.minimum_order_amount:
+            variables['freeShippingCodeDiscount']['minimumRequirement'] = {
+                'subtotal': {
+                    'greaterThanOrEqualToSubtotal': str(binding.minimum_order_amount),
+                }
+            }
+
+        result = self.client.execute_mutation(
+            DISCOUNT_CODE_FREE_SHIPPING_CREATE,
+            variables,
+            result_key='discountCodeFreeShippingCreate',
+            estimated_cost=10,
+        )
+        discount_node = result.get('codeDiscountNode', {})
+        binding.shopify_id = discount_node.get('id', '')
+
     def _update_discount(self, binding):
+        if binding.discount_type == 'free_shipping':
+            self._update_free_shipping_discount(binding)
+        else:
+            self._update_basic_discount(binding)
+
+    def _update_basic_discount(self, binding):
         from ..shopify_api.queries.discount import DISCOUNT_CODE_BASIC_UPDATE
 
         customer_gets = self._build_customer_gets(binding)
@@ -92,13 +141,36 @@ class DiscountExporter(BaseExporter):
             estimated_cost=10,
         )
 
+    def _update_free_shipping_discount(self, binding):
+        from ..shopify_api.queries.discount import DISCOUNT_CODE_FREE_SHIPPING_UPDATE
+
+        variables = {
+            'id': binding.shopify_id,
+            'freeShippingCodeDiscount': {
+                'title': f"{binding.promoter_id.name} - {binding.code}",
+                'appliesOncePerCustomer': binding.one_per_customer,
+                'destination': {'all': True},
+            }
+        }
+        if binding.ends_at:
+            variables['freeShippingCodeDiscount']['endsAt'] = binding.ends_at.isoformat()
+        if binding.usage_limit:
+            variables['freeShippingCodeDiscount']['usageLimit'] = binding.usage_limit
+
+        self.client.execute_mutation(
+            DISCOUNT_CODE_FREE_SHIPPING_UPDATE,
+            variables,
+            result_key='discountCodeFreeShippingUpdate',
+            estimated_cost=10,
+        )
+
     def _build_customer_gets(self, binding):
         if binding.discount_type == 'percentage':
             return {
                 'value': {'percentage': binding.discount_value / 100.0},
                 'items': {'allItems': True},
             }
-        elif binding.discount_type == 'fixed_amount':
+        else:
             return {
                 'value': {
                     'discountAmount': {
@@ -106,11 +178,6 @@ class DiscountExporter(BaseExporter):
                         'appliesOnEachItem': False,
                     },
                 },
-                'items': {'allItems': True},
-            }
-        else:  # free_shipping
-            return {
-                'value': {'percentage': 1.0},
                 'items': {'allItems': True},
             }
 

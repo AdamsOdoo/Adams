@@ -412,11 +412,8 @@ class ShopifyBackend(models.Model):
             rec.promoter_count = promoter_counts.get(rec.company_id.id, 0)
             rec.abandoned_cart_count = abandoned_counts.get(rec.id, 0)
 
+    @api.depends_context('uid')
     def _compute_last_entity_sync(self):
-        backend_ids = self.ids
-        if not backend_ids:
-            return
-
         entity_field_map = {
             'product': 'last_product_sync',
             'customer': 'last_customer_sync',
@@ -426,47 +423,51 @@ class ShopifyBackend(models.Model):
             'collection': 'last_collection_sync',
         }
 
-        groups = self.env['shopify.sync.log'].sudo()._read_group(
-            [
-                ('backend_id', 'in', backend_ids),
-                ('state', 'in', ('done', 'partial')),
-                ('entity', 'in', list(entity_field_map.keys())),
-            ],
-            groupby=['backend_id', 'entity'],
-            aggregates=['finished_at:max'],
-        )
         latest = {}
-        for backend, entity, max_finished in groups:
-            latest[(backend.id, entity)] = max_finished
+        backend_ids = self.ids
+        if backend_ids:
+            groups = self.env['shopify.sync.log'].sudo()._read_group(
+                [
+                    ('backend_id', 'in', backend_ids),
+                    ('state', 'in', ('done', 'partial')),
+                    ('entity', 'in', list(entity_field_map.keys())),
+                ],
+                groupby=['backend_id', 'entity'],
+                aggregates=['finished_at:max'],
+            )
+            for backend, entity, max_finished in groups:
+                latest[(backend.id, entity)] = max_finished
 
         for rec in self:
             for entity, field_name in entity_field_map.items():
                 setattr(rec, field_name, latest.get((rec.id, entity), False))
 
+    @api.depends_context('uid')
     def _compute_webhook_health(self):
+        pending = {}
+        dead = {}
         backend_ids = self.ids
-        if not backend_ids:
-            return
-
-        WebhookLog = self.env['shopify.webhook.log'].sudo()
-        pending = dict(
-            (b.id, c) for b, c in WebhookLog._read_group(
-                [('backend_id', 'in', backend_ids), ('state', '=', 'pending')],
-                groupby=['backend_id'],
-                aggregates=['__count'],
+        if backend_ids:
+            WebhookLog = self.env['shopify.webhook.log'].sudo()
+            pending = dict(
+                (b.id, c) for b, c in WebhookLog._read_group(
+                    [('backend_id', 'in', backend_ids), ('state', '=', 'pending')],
+                    groupby=['backend_id'],
+                    aggregates=['__count'],
+                )
             )
-        )
-        dead = dict(
-            (b.id, c) for b, c in WebhookLog._read_group(
-                [('backend_id', 'in', backend_ids), ('state', '=', 'dead_letter')],
-                groupby=['backend_id'],
-                aggregates=['__count'],
+            dead = dict(
+                (b.id, c) for b, c in WebhookLog._read_group(
+                    [('backend_id', 'in', backend_ids), ('state', '=', 'dead_letter')],
+                    groupby=['backend_id'],
+                    aggregates=['__count'],
+                )
             )
-        )
         for rec in self:
             rec.webhook_pending_count = pending.get(rec.id, 0)
             rec.webhook_dead_letter_count = dead.get(rec.id, 0)
 
+    @api.depends_context('uid')
     def _compute_reconciliation_health(self):
         cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=30)
         for rec in self:

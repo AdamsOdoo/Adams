@@ -104,8 +104,9 @@ class CustomerImporter(BaseImporter):
         vals = self._map_to_odoo(node)
         checksum = self._compute_shopify_checksum(node)
 
+        ctx = {'shopify_no_auto_export': True}
         if existing_binding:
-            existing_binding.odoo_id.write(vals)
+            existing_binding.odoo_id.with_context(**ctx).write(vals)
             existing_binding._mark_synced(checksum=checksum)
         else:
             # Acquire a PostgreSQL advisory lock keyed on the Shopify GID
@@ -122,16 +123,16 @@ class CustomerImporter(BaseImporter):
                 ('shopify_id', '=', shopify_id),
             ], limit=1)
             if existing_binding:
-                existing_binding.odoo_id.write(vals)
+                existing_binding.odoo_id.with_context(**ctx).write(vals)
                 existing_binding._mark_synced(checksum=checksum)
                 return
 
             partner = self._find_odoo_partner(node)
             if not partner:
                 vals['is_shopify_customer'] = True
-                partner = self.env['res.partner'].create(vals)
+                partner = self.env['res.partner'].with_context(**ctx).create(vals)
             else:
-                partner.write(vals)
+                partner.with_context(**ctx).write(vals)
 
             self.env['shopify.customer.binding'].create({
                 'backend_id': self.backend.id,

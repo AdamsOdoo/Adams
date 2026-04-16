@@ -40,6 +40,47 @@ mutation discountCodeBasicUpdate($id: ID!, $basicCodeDiscount: DiscountCodeBasic
 }
 """
 
+DISCOUNT_CODE_FREE_SHIPPING_CREATE = """
+mutation discountCodeFreeShippingCreate($freeShippingCodeDiscount: DiscountCodeFreeShippingInput!) {
+  discountCodeFreeShippingCreate(freeShippingCodeDiscount: $freeShippingCodeDiscount) {
+    codeDiscountNode {
+      id
+      codeDiscount {
+        ... on DiscountCodeFreeShipping {
+          title
+          status
+          codes(first: 1) {
+            edges {
+              node {
+                code
+              }
+            }
+          }
+        }
+      }
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
+DISCOUNT_CODE_FREE_SHIPPING_UPDATE = """
+mutation discountCodeFreeShippingUpdate($id: ID!, $freeShippingCodeDiscount: DiscountCodeFreeShippingInput!) {
+  discountCodeFreeShippingUpdate(id: $id, freeShippingCodeDiscount: $freeShippingCodeDiscount) {
+    codeDiscountNode {
+      id
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
 DISCOUNT_CODE_DELETE = """
 mutation discountCodeDelete($id: ID!) {
   discountCodeDelete(id: $id) {
