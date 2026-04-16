@@ -43,6 +43,12 @@
                 <field name="promoter_count"/>
                 <field name="abandoned_cart_count"/>
                 <field name="sync_health_pct"/>
+                <field name="inventory_bind_count"/>
+                <field name="inventory_error_count"/>
+                <field name="payout_count"/>
+                <field name="webhook_pending_count"/>
+                <field name="payment_mismatch_count"/>
+                <field name="permanent_error_count"/>
                 <templates>
                     <t t-name="card">
                         <div class="o_kanban_card_content">
@@ -145,6 +151,26 @@
                                     </div>
                                     <div class="text-muted small">Promoters</div>
                                 </div>
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.inventory_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold">
+                                        <field name="inventory_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Inventory</div>
+                                    <t t-if="record.inventory_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="inventory_error_count"/> errors
+                                        </small>
+                                    </t>
+                                </div>
+                                <t t-if="record.payout_count.raw_value > 0">
+                                    <div class="text-center border rounded p-2 flex-fill">
+                                        <div class="fw-bold">
+                                            <field name="payout_count"/>
+                                        </div>
+                                        <div class="text-muted small">Payouts</div>
+                                    </div>
+                                </t>
                                 <t t-if="record.abandoned_cart_count.raw_value > 0">
                                     <div class="text-center border rounded p-2 flex-fill"
                                          style="border-left: 3px solid #fd7e14 !important;">
@@ -170,13 +196,30 @@
                                             <field name="total_pending_count"/> pending
                                         </span>
                                     </t>
+                                    <t t-if="record.permanent_error_count.raw_value > 0">
+                                        <span class="badge text-bg-dark">
+                                            <field name="permanent_error_count"/> permanent
+                                        </span>
+                                    </t>
                                     <t t-if="record.total_error_count.raw_value == 0 and record.total_pending_count.raw_value == 0">
                                         <span class="badge text-bg-success">All synced</span>
                                     </t>
                                 </div>
-                                <span class="badge text-bg-info">
-                                    <field name="sync_log_today_count"/> syncs today
-                                </span>
+                                <div class="d-flex gap-1 align-items-center">
+                                    <t t-if="record.webhook_pending_count.raw_value > 0">
+                                        <span class="badge text-bg-warning">
+                                            <field name="webhook_pending_count"/> queued
+                                        </span>
+                                    </t>
+                                    <t t-if="record.payment_mismatch_count.raw_value > 0">
+                                        <span class="badge text-bg-danger">
+                                            <field name="payment_mismatch_count"/> pay. mismatches
+                                        </span>
+                                    </t>
+                                    <span class="badge text-bg-info">
+                                        <field name="sync_log_today_count"/> syncs today
+                                    </span>
+                                </div>
                             </div>
 
                             <!-- Last sync info -->

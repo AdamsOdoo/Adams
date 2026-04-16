@@ -61,6 +61,11 @@
                             <field name="order_bind_count" widget="statinfo"
                                    string="Orders"/>
                         </button>
+                        <button name="action_open_inventory_bindings" type="object"
+                                class="oe_stat_button" icon="fa-warehouse">
+                            <field name="inventory_bind_count" widget="statinfo"
+                                   string="Inventory"/>
+                        </button>
                         <button name="action_open_sync_logs" type="object"
                                 class="oe_stat_button" icon="fa-history">
                             <span class="o_stat_text">Sync Logs</span>
@@ -269,13 +274,130 @@
                             </div>
                         </page>
 
-                        <!-- Tab 7: Logs &amp; Status -->
-                        <page string="Logs &amp; Status" name="logs_status">
-                            <group>
-                                <field name="last_sync_date"/>
-                                <field name="product_error_count" string="Product Errors"/>
-                                <field name="total_error_count" string="Total Errors"/>
+                        <!-- Tab 7: Health Dashboard -->
+                        <page string="Health Dashboard" name="health_dashboard">
+                            <!-- Overall Health Banner -->
+                            <field name="sync_health_pct" invisible="1"/>
+                            <div class="alert alert-success" role="alert"
+                                 invisible="sync_health_pct &lt; 90">
+                                <strong>Integration Healthy</strong> —
+                                <field name="sync_health_pct" class="d-inline"/>% of bindings synced successfully.
+                            </div>
+                            <div class="alert alert-warning" role="alert"
+                                 invisible="sync_health_pct &lt; 70 or sync_health_pct &gt;= 90">
+                                <strong>Attention Needed</strong> —
+                                <field name="sync_health_pct" class="d-inline"/>% sync health. Review errors below.
+                            </div>
+                            <div class="alert alert-danger" role="alert"
+                                 invisible="sync_health_pct &gt;= 70">
+                                <strong>Sync Issues Detected</strong> —
+                                <field name="sync_health_pct" class="d-inline"/>% sync health. Immediate attention required.
+                            </div>
+
+                            <!-- Connection & Overall Status -->
+                            <group string="Connection &amp; Sync Status">
+                                <group>
+                                    <field name="state" readonly="1"/>
+                                    <field name="shop_name" readonly="1"/>
+                                    <field name="last_sync_date" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="sync_health_pct" widget="progressbar"/>
+                                    <field name="sync_log_today_count" string="Sync Operations Today" readonly="1"/>
+                                </group>
                             </group>
+
+                            <!-- Per-Entity Last Sync -->
+                            <group string="Last Sync Per Entity">
+                                <group>
+                                    <field name="last_product_sync" readonly="1"/>
+                                    <field name="last_customer_sync" readonly="1"/>
+                                    <field name="last_order_sync" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="last_inventory_sync" readonly="1"/>
+                                    <field name="last_fulfillment_sync" readonly="1"/>
+                                    <field name="last_collection_sync" readonly="1"/>
+                                </group>
+                            </group>
+
+                            <!-- Sync Counts -->
+                            <group string="Binding Counts">
+                                <group>
+                                    <field name="product_bind_count" string="Products (synced)" readonly="1"/>
+                                    <field name="product_error_count" string="Product Errors" readonly="1"/>
+                                    <field name="customer_bind_count" string="Customers (synced)" readonly="1"/>
+                                    <field name="customer_error_count" string="Customer Errors" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="order_bind_count" string="Orders (synced)" readonly="1"/>
+                                    <field name="order_error_count" string="Order Errors" readonly="1"/>
+                                    <field name="inventory_bind_count" string="Inventory (synced)" readonly="1"/>
+                                    <field name="inventory_error_count" string="Inventory Errors" readonly="1"/>
+                                </group>
+                            </group>
+                            <group>
+                                <group>
+                                    <field name="collection_bind_count" string="Collections" readonly="1"/>
+                                    <field name="refund_bind_count" string="Refunds" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="payout_count" string="Payouts" readonly="1"/>
+                                    <field name="abandoned_cart_count" string="Abandoned Carts" readonly="1"/>
+                                </group>
+                            </group>
+
+                            <!-- Data Integrity Alerts -->
+                            <group string="Data Integrity"
+                                   invisible="payment_mismatch_count == 0 and fulfillment_mismatch_count == 0 and permanent_error_count == 0">
+                                <group>
+                                    <field name="payment_mismatch_count" string="Payment Mismatches"
+                                           readonly="1" help="Orders paid on Shopify but missing posted invoice in Odoo"/>
+                                    <field name="fulfillment_mismatch_count" string="Fulfillment Mismatches"
+                                           readonly="1" help="Orders fulfilled on Shopify but with pending deliveries in Odoo"/>
+                                    <field name="permanent_error_count" string="Permanent Errors"
+                                           readonly="1" help="Bindings that exhausted all retry attempts"/>
+                                </group>
+                            </group>
+
+                            <!-- Webhook Queue -->
+                            <group string="Webhook Queue" invisible="state != 'connected'">
+                                <group>
+                                    <field name="webhook_pending_count" string="Pending Webhooks" readonly="1"/>
+                                    <field name="webhook_dead_letter_count" string="Dead Letters" readonly="1"/>
+                                </group>
+                            </group>
+
+                            <!-- Error Summary -->
+                            <group string="Error Totals">
+                                <group>
+                                    <field name="total_error_count" string="Total Errors" readonly="1"/>
+                                    <field name="total_pending_count" string="Total Pending" readonly="1"/>
+                                </group>
+                            </group>
+
+                            <!-- Quick Actions -->
+                            <div class="mt-3 mb-3" invisible="state != 'connected'">
+                                <button name="action_test_connection" type="object"
+                                        string="Test Connection" class="btn-secondary me-2"/>
+                                <button name="action_retry_all_errors" type="object"
+                                        string="Retry All Errors" class="btn-warning me-2"
+                                        invisible="total_error_count == 0"
+                                        confirm="This will reset all errored bindings to pending for retry. Continue?"/>
+                                <button name="action_open_sync_logs" type="object"
+                                        string="View Sync Logs" class="btn-secondary me-2"/>
+                                <button name="action_open_error_bindings" type="object"
+                                        string="View Error Details" class="btn-outline-danger me-2"
+                                        invisible="total_error_count == 0"/>
+                                <button name="action_open_payment_mismatches" type="object"
+                                        string="Payment Mismatches" class="btn-outline-warning me-2"
+                                        invisible="payment_mismatch_count == 0"/>
+                                <button name="action_open_fulfillment_mismatches" type="object"
+                                        string="Fulfillment Mismatches" class="btn-outline-warning me-2"
+                                        invisible="fulfillment_mismatch_count == 0"/>
+                                <button name="action_run_reconciliation" type="object"
+                                        string="Run Reconciliation" class="btn-secondary"/>
+                            </div>
                         </page>
                     </notebook>
                 </sheet>

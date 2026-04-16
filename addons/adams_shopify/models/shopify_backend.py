@@ -226,6 +226,26 @@ class ShopifyBackend(models.Model):
         string='Sync Health %',
         help='Percentage of bindings in synced state (vs error/pending).',
     )
+    inventory_bind_count = fields.Integer(compute='_compute_bind_counts')
+    inventory_error_count = fields.Integer(compute='_compute_bind_counts')
+    payout_count = fields.Integer(compute='_compute_bind_counts')
+    permanent_error_count = fields.Integer(compute='_compute_bind_counts')
+
+    # ── Per-entity last sync (computed) ────────────────────
+    last_product_sync = fields.Datetime(compute='_compute_last_entity_sync')
+    last_customer_sync = fields.Datetime(compute='_compute_last_entity_sync')
+    last_order_sync = fields.Datetime(compute='_compute_last_entity_sync')
+    last_inventory_sync = fields.Datetime(compute='_compute_last_entity_sync')
+    last_fulfillment_sync = fields.Datetime(compute='_compute_last_entity_sync')
+    last_collection_sync = fields.Datetime(compute='_compute_last_entity_sync')
+
+    # ── Webhook health (computed) ──────────────────────────
+    webhook_pending_count = fields.Integer(compute='_compute_webhook_health')
+    webhook_dead_letter_count = fields.Integer(compute='_compute_webhook_health')
+
+    # ── Reconciliation health (computed) ───────────────────
+    payment_mismatch_count = fields.Integer(compute='_compute_reconciliation_health')
+    fulfillment_mismatch_count = fields.Integer(compute='_compute_reconciliation_health')
 
     # ── Constraints ─────────────────────────────────────────
     @api.constrains('shop_url')
@@ -285,6 +305,26 @@ class ShopifyBackend(models.Model):
             for backend, status, count in groups:
                 aggregated[(key, backend.id, status)] = count
 
+        # Inventory binding counts
+        inv_aggregated = {}
+        InvModel = self.env['shopify.inventory.binding'].sudo()
+        inv_groups = InvModel._read_group(
+            [('backend_id', 'in', backend_ids)],
+            groupby=['backend_id', 'sync_status'],
+            aggregates=['__count'],
+        )
+        for backend, status, count in inv_groups:
+            inv_aggregated[(backend.id, status)] = count
+
+        # Payout counts
+        payout_counts = dict(
+            (b.id, c) for b, c in self.env['shopify.payout'].sudo()._read_group(
+                [('backend_id', 'in', backend_ids)],
+                groupby=['backend_id'],
+                aggregates=['__count'],
+            )
+        )
+
         # Other one-off counts also grouped.
         collection_counts = dict(
             (b.id, c) for b, c in self.env['shopify.collection.binding'].sudo()._read_group(
@@ -330,20 +370,35 @@ class ShopifyBackend(models.Model):
             )
 
         for rec in self:
-            synced_total = error_total = pending_total = 0
+            synced_total = error_total = pending_total = perm_total = 0
             for key in binding_models:
                 synced = aggregated.get((key, rec.id, 'synced'), 0)
                 errors = aggregated.get((key, rec.id, 'error'), 0)
+                perm = aggregated.get((key, rec.id, 'permanent_error'), 0)
                 pending = aggregated.get((key, rec.id, 'pending'), 0)
                 setattr(rec, f'{key}_bind_count', synced)
-                setattr(rec, f'{key}_error_count', errors)
+                setattr(rec, f'{key}_error_count', errors + perm)
                 synced_total += synced
-                error_total += errors
+                error_total += errors + perm
                 pending_total += pending
+                perm_total += perm
+
+            # Inventory counts
+            inv_synced = inv_aggregated.get((rec.id, 'synced'), 0)
+            inv_error = inv_aggregated.get((rec.id, 'error'), 0)
+            inv_perm = inv_aggregated.get((rec.id, 'permanent_error'), 0)
+            inv_pending = inv_aggregated.get((rec.id, 'pending'), 0)
+            rec.inventory_bind_count = inv_synced
+            rec.inventory_error_count = inv_error + inv_perm
+            synced_total += inv_synced
+            error_total += inv_error + inv_perm
+            pending_total += inv_pending
+            perm_total += inv_perm
 
             rec.total_error_count = error_total
             rec.total_synced_count = synced_total
             rec.total_pending_count = pending_total
+            rec.permanent_error_count = perm_total
 
             grand_total = synced_total + error_total + pending_total
             rec.sync_health_pct = int(
@@ -352,11 +407,213 @@ class ShopifyBackend(models.Model):
 
             rec.collection_bind_count = collection_counts.get(rec.id, 0)
             rec.refund_bind_count = refund_counts.get(rec.id, 0)
+            rec.payout_count = payout_counts.get(rec.id, 0)
             rec.sync_log_today_count = log_counts.get(rec.id, 0)
             rec.promoter_count = promoter_counts.get(rec.company_id.id, 0)
             rec.abandoned_cart_count = abandoned_counts.get(rec.id, 0)
 
+    def _compute_last_entity_sync(self):
+        backend_ids = self.ids
+        if not backend_ids:
+            return
+
+        entity_field_map = {
+            'product': 'last_product_sync',
+            'customer': 'last_customer_sync',
+            'order': 'last_order_sync',
+            'inventory': 'last_inventory_sync',
+            'fulfillment': 'last_fulfillment_sync',
+            'collection': 'last_collection_sync',
+        }
+
+        groups = self.env['shopify.sync.log'].sudo()._read_group(
+            [
+                ('backend_id', 'in', backend_ids),
+                ('state', 'in', ('done', 'partial')),
+                ('entity', 'in', list(entity_field_map.keys())),
+            ],
+            groupby=['backend_id', 'entity'],
+            aggregates=['finished_at:max'],
+        )
+        latest = {}
+        for backend, entity, max_finished in groups:
+            latest[(backend.id, entity)] = max_finished
+
+        for rec in self:
+            for entity, field_name in entity_field_map.items():
+                setattr(rec, field_name, latest.get((rec.id, entity), False))
+
+    def _compute_webhook_health(self):
+        backend_ids = self.ids
+        if not backend_ids:
+            return
+
+        WebhookLog = self.env['shopify.webhook.log'].sudo()
+        pending = dict(
+            (b.id, c) for b, c in WebhookLog._read_group(
+                [('backend_id', 'in', backend_ids), ('state', '=', 'pending')],
+                groupby=['backend_id'],
+                aggregates=['__count'],
+            )
+        )
+        dead = dict(
+            (b.id, c) for b, c in WebhookLog._read_group(
+                [('backend_id', 'in', backend_ids), ('state', '=', 'dead_letter')],
+                groupby=['backend_id'],
+                aggregates=['__count'],
+            )
+        )
+        for rec in self:
+            rec.webhook_pending_count = pending.get(rec.id, 0)
+            rec.webhook_dead_letter_count = dead.get(rec.id, 0)
+
+    def _compute_reconciliation_health(self):
+        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=30)
+        for rec in self:
+            if rec.state != 'connected':
+                rec.payment_mismatch_count = 0
+                rec.fulfillment_mismatch_count = 0
+                continue
+
+            OrderBinding = self.env['shopify.order.binding'].sudo()
+
+            # Payment mismatches: paid on Shopify but no posted invoice
+            paid_bindings = OrderBinding.search([
+                ('backend_id', '=', rec.id),
+                ('shopify_financial_status', '=', 'paid'),
+                ('sync_status', '=', 'synced'),
+                ('create_date', '>=', cutoff),
+            ])
+            pay_mismatch = 0
+            for binding in paid_bindings:
+                order = binding.odoo_id
+                if not order:
+                    continue
+                posted = order.invoice_ids.filtered(
+                    lambda i: i.move_type == 'out_invoice' and i.state == 'posted'
+                )
+                if not posted:
+                    pay_mismatch += 1
+            rec.payment_mismatch_count = pay_mismatch
+
+            # Fulfillment mismatches: fulfilled on Shopify but pending in Odoo
+            fulfilled_bindings = OrderBinding.search([
+                ('backend_id', '=', rec.id),
+                ('shopify_fulfillment_status', '=', 'fulfilled'),
+                ('sync_status', '=', 'synced'),
+                ('create_date', '>=', cutoff),
+            ])
+            ful_mismatch = 0
+            for binding in fulfilled_bindings:
+                order = binding.odoo_id
+                if not order:
+                    continue
+                out_pickings = order.picking_ids.filtered(
+                    lambda p: p.picking_type_code == 'outgoing'
+                )
+                if not out_pickings:
+                    continue
+                pending = out_pickings.filtered(
+                    lambda p: p.state not in ('done', 'cancel')
+                )
+                if pending:
+                    ful_mismatch += 1
+            rec.fulfillment_mismatch_count = ful_mismatch
+
     # ── Actions ─────────────────────────────────────────────
+
+    def action_retry_all_errors(self):
+        self.ensure_one()
+        binding_models = [
+            'shopify.product.binding',
+            'shopify.customer.binding',
+            'shopify.order.binding',
+            'shopify.inventory.binding',
+        ]
+        total = 0
+        for model_name in binding_models:
+            bindings = self.env[model_name].search([
+                ('backend_id', '=', self.id),
+                ('sync_status', '=', 'error'),
+            ])
+            if bindings:
+                bindings.write({
+                    'sync_status': 'pending',
+                    'sync_error': False,
+                    'retry_count': 0,
+                })
+                total += len(bindings)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Errors Reset"),
+                'message': _("%d bindings reset to pending for retry.") % total,
+                'type': 'success' if total else 'info',
+                'sticky': False,
+            },
+        }
+
+    def action_open_error_bindings(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Sync Errors'),
+            'res_model': 'shopify.sync.log',
+            'view_mode': 'list,form',
+            'domain': [
+                ('backend_id', '=', self.id),
+                ('state', 'in', ('error', 'partial')),
+            ],
+        }
+
+    def action_open_payment_mismatches(self):
+        self.ensure_one()
+        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=30)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Payment Mismatches'),
+            'res_model': 'shopify.order.binding',
+            'view_mode': 'list,form',
+            'domain': [
+                ('backend_id', '=', self.id),
+                ('shopify_financial_status', '=', 'paid'),
+                ('sync_status', '=', 'synced'),
+                ('create_date', '>=', str(cutoff)),
+            ],
+        }
+
+    def action_open_fulfillment_mismatches(self):
+        self.ensure_one()
+        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=30)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Fulfillment Mismatches'),
+            'res_model': 'shopify.order.binding',
+            'view_mode': 'list,form',
+            'domain': [
+                ('backend_id', '=', self.id),
+                ('shopify_fulfillment_status', '=', 'fulfilled'),
+                ('sync_status', '=', 'synced'),
+                ('create_date', '>=', str(cutoff)),
+            ],
+        }
+
+    def action_run_reconciliation(self):
+        self.ensure_one()
+        if self.state != 'connected':
+            raise UserError(_("Please test your connection first."))
+        self.env['shopify.reconciliation']._reconcile_backend(self)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Reconciliation Complete"),
+                'message': _("Reconciliation finished. Check sync logs for details."),
+                'type': 'info',
+                'sticky': False,
+            },
+        }
 
     def action_test_connection(self):
         """Test the Shopify API connection and update status."""
@@ -466,6 +723,16 @@ class ShopifyBackend(models.Model):
             'type': 'ir.actions.act_window',
             'name': _('Order Bindings'),
             'res_model': 'shopify.order.binding',
+            'view_mode': 'list,form',
+            'domain': [('backend_id', '=', self.id)],
+        }
+
+    def action_open_inventory_bindings(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Inventory Bindings'),
+            'res_model': 'shopify.inventory.binding',
             'view_mode': 'list,form',
             'domain': [('backend_id', '=', self.id)],
         }

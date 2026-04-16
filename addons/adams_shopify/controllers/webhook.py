@@ -197,7 +197,6 @@ class ShopifyHealthController(http.Controller):
                 {'status': 'not_found'}, status=404,
             )
 
-        # Gather summary stats
         data = {
             'status': 'ok' if backend.state == 'connected' else backend.state,
             'shop_name': backend.shop_name or '',
@@ -207,24 +206,36 @@ class ShopifyHealthController(http.Controller):
                 'products': backend.product_bind_count,
                 'customers': backend.customer_bind_count,
                 'orders': backend.order_bind_count,
+                'inventory': backend.inventory_bind_count,
+                'collections': backend.collection_bind_count,
+                'refunds': backend.refund_bind_count,
+                'payouts': backend.payout_count,
                 'errors': backend.total_error_count,
+                'permanent_errors': backend.permanent_error_count,
                 'pending': backend.total_pending_count,
             },
-        }
-
-        # Check if crons are still running within expected intervals
-        WebhookLog = request.env['shopify.webhook.log'].sudo()
-        pending_webhooks = WebhookLog.search_count([
-            ('backend_id', '=', backend_id),
-            ('state', '=', 'pending'),
-        ])
-        dead_letters = WebhookLog.search_count([
-            ('backend_id', '=', backend_id),
-            ('state', '=', 'dead_letter'),
-        ])
-        data['webhooks'] = {
-            'pending': pending_webhooks,
-            'dead_letters': dead_letters,
+            'errors_by_entity': {
+                'products': backend.product_error_count,
+                'customers': backend.customer_error_count,
+                'orders': backend.order_error_count,
+                'inventory': backend.inventory_error_count,
+            },
+            'last_sync_per_entity': {
+                'products': backend.last_product_sync and str(backend.last_product_sync) or None,
+                'customers': backend.last_customer_sync and str(backend.last_customer_sync) or None,
+                'orders': backend.last_order_sync and str(backend.last_order_sync) or None,
+                'inventory': backend.last_inventory_sync and str(backend.last_inventory_sync) or None,
+                'fulfillments': backend.last_fulfillment_sync and str(backend.last_fulfillment_sync) or None,
+                'collections': backend.last_collection_sync and str(backend.last_collection_sync) or None,
+            },
+            'webhooks': {
+                'pending': backend.webhook_pending_count,
+                'dead_letters': backend.webhook_dead_letter_count,
+            },
+            'data_integrity': {
+                'payment_mismatches': backend.payment_mismatch_count,
+                'fulfillment_mismatches': backend.fulfillment_mismatch_count,
+            },
         }
 
         status_code = 200 if backend.state == 'connected' else 503
