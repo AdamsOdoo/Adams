@@ -18,7 +18,7 @@ class ShopifyWebhookLog(models.Model):
     webhook_id = fields.Char('Shopify Webhook ID', index=True)
     topic = fields.Char(required=True, index=True)
     shopify_id = fields.Char('Resource Shopify ID')
-    payload = fields.Text(groups='adams_shopify.group_shopify_manager')
+    payload = fields.Text(groups='adams_shopify.group_shopify_user')
     state = fields.Selection([
         ('pending', 'Pending'),
         ('processing', 'Processing'),

@@ -14,17 +14,15 @@
         <field name="category_id" ref="module_category_shopify"/>
     </record>
 
-    <!-- Groups -->
+    <!--
+        Single access group: "User"
+        Any Odoo user assigned this group gains full access to the module.
+        Users without this group cannot see the Shopify menu or any Shopify data.
+    -->
     <record id="group_shopify_user" model="res.groups">
         <field name="name">User</field>
         <field name="privilege_id" ref="privilege_shopify"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-    </record>
-
-    <record id="group_shopify_manager" model="res.groups">
-        <field name="name">Manager</field>
-        <field name="privilege_id" ref="privilege_shopify"/>
-        <field name="implied_ids" eval="[(4, ref('group_shopify_user'))]"/>
     </record>
 
     <!-- Record Rules: Multi-Company -->
@@ -81,7 +79,6 @@
             ('backend_id.company_id', 'in', company_ids)
         ]</field>
     </record>
-
 
     <record id="shopify_promoter_company_rule" model="ir.rule">
         <field name="name">Shopify Promoter: multi-company</field>

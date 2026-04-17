@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Top-level App Menu -->
+    <!-- Top-level App Menu — only visible to users in the Shopify group -->
     <menuitem id="menu_shopify_root"
               name="Shopify"
               web_icon="adams_shopify,static/description/icon.png"
+              groups="adams_shopify.group_shopify_user"
               sequence="50"/>
 
     <!-- Dashboard -->
@@ -18,7 +19,6 @@
     <menuitem id="menu_shopify_configuration"
               name="Configuration"
               parent="menu_shopify_root"
-              groups="adams_shopify.group_shopify_manager"
               sequence="20"/>
 
     <menuitem id="menu_shopify_stores"

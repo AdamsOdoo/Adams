@@ -36,11 +36,11 @@
                     <button name="action_register_webhooks" type="object"
                             string="Register Webhooks"
                             invisible="state != 'connected'"
-                            groups="adams_shopify.group_shopify_manager"/>
+                            groups="adams_shopify.group_shopify_user"/>
                     <button name="action_import_locations" type="object"
                             string="Import Locations"
                             invisible="state != 'connected'"
-                            groups="adams_shopify.group_shopify_manager"/>
+                            groups="adams_shopify.group_shopify_user"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,connected"/>
                 </header>
@@ -180,7 +180,7 @@
 
                         <!-- Tab 4: Field Mapping -->
                         <page string="Field Mapping" name="field_mapping"
-                              groups="adams_shopify.group_shopify_manager">
+                              groups="adams_shopify.group_shopify_user">
                             <div class="mb-3">
                                 <button name="action_init_field_mappings" type="object"
                                         string="Load Default Mappings"
@@ -202,7 +202,7 @@
 
                         <!-- Tab 4: Tax Mapping -->
                         <page string="Tax Mapping" name="tax_mapping"
-                              groups="adams_shopify.group_shopify_manager">
+                              groups="adams_shopify.group_shopify_user">
                             <field name="tax_mapping_ids" nolabel="1"
                                    context="{'default_backend_id': id}">
                                 <list editable="bottom">
@@ -217,7 +217,7 @@
 
                         <!-- Tab 5: Metafield Mapping -->
                         <page string="Metafield Mapping" name="metafield_mapping"
-                              groups="adams_shopify.group_shopify_manager">
+                              groups="adams_shopify.group_shopify_user">
                             <field name="metafield_mapping_ids" nolabel="1"
                                    context="{'default_backend_id': id}">
                                 <list editable="bottom">
@@ -235,20 +235,20 @@
                         <!-- Tab 6: Webhooks -->
                         <page string="Webhooks" name="webhooks"
                               invisible="state != 'connected'"
-                              groups="adams_shopify.group_shopify_manager">
+                              groups="adams_shopify.group_shopify_user">
                             <div class="mb-3">
                                 <button name="action_register_webhooks" type="object"
                                         string="Register All Webhooks"
                                         class="btn-primary me-2"
-                                        groups="adams_shopify.group_shopify_manager"/>
+                                        groups="adams_shopify.group_shopify_user"/>
                                 <button name="action_check_webhook_status" type="object"
                                         string="Check Status"
                                         class="btn-secondary me-2"
-                                        groups="adams_shopify.group_shopify_manager"/>
+                                        groups="adams_shopify.group_shopify_user"/>
                                 <button name="action_unregister_webhooks" type="object"
                                         string="Unregister All"
                                         class="btn-outline-danger me-2"
-                                        groups="adams_shopify.group_shopify_manager"
+                                        groups="adams_shopify.group_shopify_user"
                                         confirm="This will remove all webhook registrations from Shopify. Are you sure?"/>
                                 <button name="action_open_webhook_logs" type="object"
                                         string="View Webhook Logs"
