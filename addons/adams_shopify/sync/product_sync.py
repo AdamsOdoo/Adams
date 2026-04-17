@@ -234,13 +234,13 @@ class ProductExporter(BaseExporter):
         odoo_variants = product.product_variant_ids
         for i, edge in enumerate(shopify_variants):
             sv = edge.get('node', {})
-            odoo_variant = odoo_variants[i] if i < len(odoo_variants) else odoo_variants[-1:]
+            odoo_variant = odoo_variants[i] if i < len(odoo_variants) else odoo_variants[-1]
             if not odoo_variant:
                 continue
             inv_item = sv.get('inventoryItem', {})
             self.env['shopify.variant.binding'].create({
                 'backend_id': self.backend.id,
-                'odoo_id': odoo_variant.id if hasattr(odoo_variant, 'id') else odoo_variant.ids[0],
+                'odoo_id': odoo_variant.id,
                 'shopify_id': sv.get('id'),
                 'product_binding_id': product_binding.id,
                 'shopify_inventory_item_id': inv_item.get('id', ''),

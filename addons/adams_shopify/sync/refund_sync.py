@@ -105,9 +105,8 @@ class RefundImporter:
                         'reason': refund_data.get('note') or 'Shopify Refund',
                         'journal_id': posted_invoices[0].journal_id.id,
                     })
-                    reversal = move_reversal.refund_moves()
-                    if reversal and reversal.get('res_id'):
-                        credit_note = self.env['account.move'].browse(reversal['res_id'])
+                    move_reversal.reverse_moves()
+                    credit_note = move_reversal.new_move_ids[:1] if move_reversal.new_move_ids else None
                 except Exception as e:
                     _logger.warning("Could not create credit note for refund %s: %s",
                                     shopify_refund_id, e)

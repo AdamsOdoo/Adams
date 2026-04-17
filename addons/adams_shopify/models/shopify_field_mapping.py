@@ -33,7 +33,7 @@ class ShopifyFieldMapping(models.Model):
         """Return the default product field mapping configuration."""
         return [
             {'odoo_field': 'name', 'shopify_field': 'title', 'direction': 'both'},
-            {'odoo_field': 'description_sale', 'shopify_field': 'bodyHtml', 'direction': 'both'},
+            {'odoo_field': 'description_sale', 'shopify_field': 'descriptionHtml', 'direction': 'both'},
             {'odoo_field': 'default_code', 'shopify_field': 'sku', 'direction': 'both'},
             {'odoo_field': 'list_price', 'shopify_field': 'price', 'direction': 'export'},
             {'odoo_field': 'weight', 'shopify_field': 'weight', 'direction': 'both'},

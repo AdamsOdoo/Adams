@@ -99,6 +99,7 @@ class OrderImporter(BaseImporter):
                         shopify_no_auto_export=True,
                     ).write(update_vals)
             existing_binding._mark_synced(checksum=checksum)
+            self._track_discount_usage(existing_binding, node)
         else:
             order = self._create_sale_order(node)
             if order:

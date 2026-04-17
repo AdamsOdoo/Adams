@@ -25,12 +25,7 @@ class ShopifyOrderBinding(models.Model):
         ('refunded', 'Refunded'),
         ('voided', 'Voided'),
     ], string='Financial Status')
-    shopify_fulfillment_status = fields.Selection([
-        ('unfulfilled', 'Unfulfilled'),
-        ('partial', 'Partially Fulfilled'),
-        ('fulfilled', 'Fulfilled'),
-        ('restocked', 'Restocked'),
-    ], string='Fulfillment Status')
+    shopify_fulfillment_status = fields.Char('Fulfillment Status')
     shopify_created_at = fields.Datetime('Shopify Created At')
     shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
 

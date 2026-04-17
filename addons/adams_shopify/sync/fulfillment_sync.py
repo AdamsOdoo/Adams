@@ -359,7 +359,8 @@ class FulfillmentSync:
                     move.quantity = move.product_uom_qty
                 picking.with_context(
                     skip_backorder=True,
-                    shopify_no_auto_export=True,  # prevent re-pushing to Shopify
+                    shopify_no_auto_export=True,
+                    shopify_no_inventory_push=True,
                 ).button_validate()
                 _logger.info(
                     "Auto-validated picking %s for externally fulfilled order %s",

@@ -65,34 +65,33 @@ class ShopifyImportJob(models.Model):
         ], order='create_date asc')
 
         for job in jobs:
-            try:
-                if job.state == 'pending':
-                    job.write({
-                        'state': 'running',
-                        'started_at': fields.Datetime.now(),
-                    })
+            with self.env.cr.savepoint():
+                try:
+                    if job.state == 'pending':
+                        job.write({
+                            'state': 'running',
+                            'started_at': fields.Datetime.now(),
+                        })
 
-                has_more = job._process_next_page()
-                if not has_more:
+                    has_more = job._process_next_page()
+                    if not has_more:
+                        job.write({
+                            'state': 'done',
+                            'finished_at': fields.Datetime.now(),
+                        })
+                        job.backend_id.last_sync_date = fields.Datetime.now()
+                        _logger.info(
+                            "Import job %s complete: %d success, %d errors, %d skipped",
+                            job.id, job.success_count, job.error_count, job.skipped_count,
+                        )
+
+                except Exception as e:
+                    _logger.exception("Import job %s failed: %s", job.id, e)
                     job.write({
-                        'state': 'done',
+                        'state': 'error',
+                        'error_details': str(e),
                         'finished_at': fields.Datetime.now(),
                     })
-                    job.backend_id.last_sync_date = fields.Datetime.now()
-                    _logger.info(
-                        "Import job %s complete: %d success, %d errors, %d skipped",
-                        job.id, job.success_count, job.error_count, job.skipped_count,
-                    )
-
-            except Exception as e:
-                _logger.exception("Import job %s failed: %s", job.id, e)
-                job.write({
-                    'state': 'error',
-                    'error_details': str(e),
-                    'finished_at': fields.Datetime.now(),
-                })
-            # Commit per job to prevent one failure from rolling back others
-            self.env.cr.commit()  # noqa: E501
 
     def _process_next_page(self):
         """Fetch and process the next page of data. Returns True if more pages exist."""

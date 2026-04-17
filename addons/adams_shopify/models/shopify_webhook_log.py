@@ -67,42 +67,41 @@ class ShopifyWebhookLog(models.Model):
             ('retry_count', '<', 5),
         ], limit=100, order='received_at asc')
         for log in pending:
-            try:
-                log.state = 'processing'
-                log.flush_recordset()
-                log._process_event()
-                # _process_event() may set state='skipped' for
-                # no-op topics; preserve it instead of clobbering.
-                if log.state != 'skipped':
-                    log.write({
-                        'state': 'done',
-                        'processed_at': fields.Datetime.now(),
-                    })
-                else:
-                    log.write({'processed_at': fields.Datetime.now()})
-            except Exception as e:
-                _logger.exception("Webhook processing failed for %s", log.id)
-                new_retry = log.retry_count + 1
-                if new_retry >= log.max_retries:
-                    log.write({
-                        'state': 'dead_letter',
-                        'error_message': str(e),
-                        'retry_count': new_retry,
-                        'processed_at': fields.Datetime.now(),
-                    })
-                    _logger.warning(
-                        "Webhook %s moved to dead letter after %d retries",
-                        log.id, new_retry,
-                    )
-                else:
-                    log.write({
-                        'state': 'error',
-                        'error_message': str(e),
-                        'retry_count': new_retry,
-                        'processed_at': fields.Datetime.now(),
-                    })
-            # Commit after each event to release locks and ensure progress
-            self.env.cr.commit()  # noqa: E501
+            with self.env.cr.savepoint():
+                try:
+                    log.state = 'processing'
+                    log.flush_recordset()
+                    log._process_event()
+                    # _process_event() may set state='skipped' for
+                    # no-op topics; preserve it instead of clobbering.
+                    if log.state != 'skipped':
+                        log.write({
+                            'state': 'done',
+                            'processed_at': fields.Datetime.now(),
+                        })
+                    else:
+                        log.write({'processed_at': fields.Datetime.now()})
+                except Exception as e:
+                    _logger.exception("Webhook processing failed for %s", log.id)
+                    new_retry = log.retry_count + 1
+                    if new_retry >= log.max_retries:
+                        log.write({
+                            'state': 'dead_letter',
+                            'error_message': str(e),
+                            'retry_count': new_retry,
+                            'processed_at': fields.Datetime.now(),
+                        })
+                        _logger.warning(
+                            "Webhook %s moved to dead letter after %d retries",
+                            log.id, new_retry,
+                        )
+                    else:
+                        log.write({
+                            'state': 'error',
+                            'error_message': str(e),
+                            'retry_count': new_retry,
+                            'processed_at': fields.Datetime.now(),
+                        })
 
     def action_retry_webhook(self):
         """Manually retry a dead-letter or error webhook."""
@@ -203,7 +202,10 @@ class ShopifyWebhookLog(models.Model):
             ('shopify_id', '=', shopify_gid),
         ], limit=1)
         if binding and binding.odoo_id:
-            binding.odoo_id.with_context(disable_cancel_warning=True).action_cancel()
+            binding.odoo_id.with_context(
+                disable_cancel_warning=True,
+                shopify_no_auto_export=True,
+            ).action_cancel()
 
     def _handle_customer_webhook(self, data):
         self.env['shopify.customer.binding'].process_webhook_event(

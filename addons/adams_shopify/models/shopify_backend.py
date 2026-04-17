@@ -1,6 +1,7 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
 import re
+from datetime import timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -279,6 +280,7 @@ class ShopifyBackend(models.Model):
                     "Please use a valid Shopify Admin API access token.",
                 ))
 
+    @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')
     def _compute_bind_counts(self):
         today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0)
@@ -412,6 +414,7 @@ class ShopifyBackend(models.Model):
             rec.promoter_count = promoter_counts.get(rec.company_id.id, 0)
             rec.abandoned_cart_count = abandoned_counts.get(rec.id, 0)
 
+    @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')
     def _compute_last_entity_sync(self):
         entity_field_map = {
@@ -442,6 +445,7 @@ class ShopifyBackend(models.Model):
             for entity, field_name in entity_field_map.items():
                 setattr(rec, field_name, latest.get((rec.id, entity), False))
 
+    @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')
     def _compute_webhook_health(self):
         pending = {}
@@ -467,9 +471,10 @@ class ShopifyBackend(models.Model):
             rec.webhook_pending_count = pending.get(rec.id, 0)
             rec.webhook_dead_letter_count = dead.get(rec.id, 0)
 
+    @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')
     def _compute_reconciliation_health(self):
-        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=30)
+        cutoff = fields.Datetime.now() - timedelta(days=30)
         for rec in self:
             if rec.state != 'connected':
                 rec.payment_mismatch_count = 0
@@ -570,7 +575,7 @@ class ShopifyBackend(models.Model):
 
     def action_open_payment_mismatches(self):
         self.ensure_one()
-        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=30)
+        cutoff = fields.Datetime.now() - timedelta(days=30)
         return {
             'type': 'ir.actions.act_window',
             'name': _('Payment Mismatches'),
@@ -586,7 +591,7 @@ class ShopifyBackend(models.Model):
 
     def action_open_fulfillment_mismatches(self):
         self.ensure_one()
-        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=30)
+        cutoff = fields.Datetime.now() - timedelta(days=30)
         return {
             'type': 'ir.actions.act_window',
             'name': _('Fulfillment Mismatches'),

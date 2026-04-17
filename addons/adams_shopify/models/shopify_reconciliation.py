@@ -1,5 +1,6 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
+from datetime import timedelta
 
 from odoo import api, fields, models
 
@@ -95,7 +96,7 @@ class ShopifyReconciliation(models.TransientModel):
     def _reconcile_stale_bindings(self, backend):
         """Find bindings that haven't synced in over 24 hours while auto-sync is on."""
         errors = 0
-        cutoff = fields.Datetime.subtract(fields.Datetime.now(), hours=24)
+        cutoff = fields.Datetime.now() - timedelta(hours=24)
 
         stale_products = self.env['shopify.product.binding'].search_count([
             ('backend_id', '=', backend.id),
@@ -127,7 +128,7 @@ class ShopifyReconciliation(models.TransientModel):
 
     def _reconcile_retry_errors(self, backend):
         """Reset retryable errors that have been stuck for too long."""
-        stuck_cutoff = fields.Datetime.subtract(fields.Datetime.now(), hours=6)
+        stuck_cutoff = fields.Datetime.now() - timedelta(hours=6)
         stuck_bindings = self.env['shopify.product.binding'].search([
             ('backend_id', '=', backend.id),
             ('sync_status', '=', 'error'),
@@ -157,7 +158,7 @@ class ShopifyReconciliation(models.TransientModel):
         - Flag mismatches as sync log warnings
         """
         days = backend.reconciliation_order_days or 30
-        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=days)
+        cutoff = fields.Datetime.now() - timedelta(days=days)
         errors = 0
 
         # Orders marked as paid on Shopify but no posted invoice in Odoo
@@ -292,7 +293,7 @@ class ShopifyReconciliation(models.TransientModel):
     def _reconcile_fulfillment_status(self, backend):
         """Check that Odoo delivery state matches Shopify fulfillment status."""
         days = backend.reconciliation_order_days or 30
-        cutoff = fields.Datetime.subtract(fields.Datetime.now(), days=days)
+        cutoff = fields.Datetime.now() - timedelta(days=days)
         errors = 0
 
         # Orders fulfilled on Shopify but not all pickings done in Odoo

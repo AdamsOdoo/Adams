@@ -75,6 +75,9 @@ mutation ProductSet($input: ProductSetInput!) {
           node {
             id
             sku
+            inventoryItem {
+              id
+            }
           }
         }
       }
