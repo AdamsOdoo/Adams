@@ -1,4 +1,4 @@
-# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
 
 from odoo import api, fields, models, _

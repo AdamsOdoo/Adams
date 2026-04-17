@@ -1,4 +1,4 @@
-# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 FETCH_COLLECTIONS = """
 query FetchCollections($first: Int!, $after: String) {
   collections(first: $first, after: $after) {

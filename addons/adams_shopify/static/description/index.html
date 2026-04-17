@@ -1,6 +1,6 @@
 <section class="oe_container">
     <div class="oe_row oe_spaced">
-        <h2 class="oe_slogan" style="font-size:36px; color:#0D6EFD;">Adams Shopify Connector</h2>
+        <h2 class="oe_slogan" style="font-size:36px; color:#0D6EFD;">Shopify Connector Pro</h2>
         <h3 class="oe_slogan" style="font-size:20px; color:#555;">
             The Most Complete Shopify Integration for Odoo 19
         </h3>
@@ -22,7 +22,7 @@
 
 <section class="oe_container oe_dark">
     <div class="oe_row oe_spaced">
-        <h2 class="oe_slogan" style="color:#0D6EFD;">Why Adams Shopify Connector?</h2>
+        <h2 class="oe_slogan" style="color:#0D6EFD;">Why Shopify Connector Pro?</h2>
 
         <div class="oe_span4" style="text-align:center; padding:15px;">
             <h3 style="font-size:16px; font-weight:bold;">GraphQL-Native</h3>
@@ -353,11 +353,14 @@
         <div class="oe_span6">
             <h3>Store Health Dashboard</h3>
             <ul style="line-height:1.8;">
-                <li>All connected stores in a single view</li>
-                <li>Real-time counters: products, orders, customers, collections</li>
+                <li>All connected stores in a single kanban view with colour-coded health status</li>
+                <li>Real-time counters: products, orders, customers, inventory, payouts</li>
                 <li>Error badges with drill-down to specific failures</li>
-                <li>Connection status and last sync timestamps</li>
-                <li>Sync log analytics with graph and pivot views</li>
+                <li>Per-entity last sync times &mdash; spot stalled crons instantly</li>
+                <li>Payment mismatch and fulfillment mismatch alerts</li>
+                <li>Webhook queue status (pending + dead-letter count)</li>
+                <li>One-click &ldquo;Retry All Errors&rdquo; and &ldquo;Run Reconciliation&rdquo; buttons</li>
+                <li>JSON health endpoint for external monitoring (Datadog, Uptime Robot, etc.)</li>
             </ul>
         </div>
         <div class="oe_span6">
@@ -365,8 +368,10 @@
             <ul style="line-height:1.8;">
                 <li>Drift detection every 6 hours (Shopify vs. Odoo counts)</li>
                 <li>Stale binding detection (no sync in 24+ hours)</li>
+                <li>Payment mismatch detection: paid on Shopify, no invoice in Odoo</li>
+                <li>Fulfillment mismatch detection: fulfilled on Shopify, pending delivery in Odoo</li>
                 <li>Automatic error retry after cooldown</li>
-                <li>Payment and fulfillment status reconciliation</li>
+                <li>Permanent error tracking for exhausted-retry bindings</li>
                 <li>Bulk retry wizard for manual intervention</li>
             </ul>
         </div>

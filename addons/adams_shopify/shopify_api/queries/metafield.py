@@ -1,4 +1,4 @@
-# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 FETCH_PRODUCT_METAFIELDS = """
 query FetchProductMetafields($productId: ID!) {
   product(id: $productId) {

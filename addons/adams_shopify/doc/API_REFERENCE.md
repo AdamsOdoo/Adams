@@ -1,4 +1,4 @@
-# API Reference — Adams Shopify Connector
+# API Reference — Shopify Connector Pro
 
 Programmatic reference for developers extending or integrating with the connector.
 

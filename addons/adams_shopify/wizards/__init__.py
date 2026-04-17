@@ -1,4 +1,4 @@
-# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 from . import shopify_sync_wizard
 from . import shopify_import_wizard
 from . import shopify_bulk_retry_wizard

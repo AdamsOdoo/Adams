@@ -1,6 +1,6 @@
-===============================
-Adams Shopify Connector — v19.0
-===============================
+===========================
+Shopify Connector Pro v19.0
+===========================
 
 A production-grade, bidirectional connector between Odoo 19 and Shopify,
 built on Shopify's GraphQL Admin API (2026-01).

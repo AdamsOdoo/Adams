@@ -1,4 +1,4 @@
-# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 FETCH_ABANDONED_CHECKOUTS = """
 query FetchAbandonedCheckouts($first: Int!, $after: String) {
   abandonedCheckouts(first: $first, after: $after) {

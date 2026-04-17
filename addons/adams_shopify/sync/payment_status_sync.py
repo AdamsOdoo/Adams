@@ -1,4 +1,4 @@
-# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 """Payment status transition handler for Shopify → Odoo.
 
 Handles financial status changes received via webhooks or periodic imports

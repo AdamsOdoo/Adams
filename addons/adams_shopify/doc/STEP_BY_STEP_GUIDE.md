@@ -1,6 +1,6 @@
 # Step-by-Step User Guide
 
-Complete walkthrough of every configuration step and every feature workflow in the Adams Shopify Connector. This guide assumes zero prior knowledge and walks you through every click and field.
+Complete walkthrough of every configuration step and every feature workflow in **Shopify Connector Pro**. This guide assumes zero prior knowledge and walks you through every click and field.
 
 ## Table of Contents
 
@@ -22,6 +22,7 @@ Complete walkthrough of every configuration step and every feature workflow in t
 13. [Manage a Promoter & Commission](#workflow-manage-a-promoter)
 14. [Retry Failed Records](#workflow-retry-failed-records)
 15. [Reconcile Shopify ↔ Odoo](#workflow-reconcile)
+16. [Monitor Integration Health](#workflow-monitor-health)
 
 ### Part C — Advanced
 16. [Multi-Store Configuration](#multi-store-configuration)
@@ -39,8 +40,8 @@ Complete walkthrough of every configuration step and every feature workflow in t
 2. Navigate to **Apps** in the main menu.
 3. Click the **Update Apps List** menu item (top-left under Apps).
 4. In the search bar at the top, remove the default `Apps` filter tag.
-5. Type `Shopify Connector` and press Enter.
-6. Find **Adams Shopify Connector** in the results.
+5. Type `Shopify Connector Pro` and press Enter.
+6. Find **Shopify Connector Pro** in the results.
 7. Click the **Activate** (or Install) button on the module card.
 8. Wait for installation to finish. Odoo will redirect you.
 9. Confirm success: a new **Shopify** menu appears in the top menu bar.
@@ -473,6 +474,109 @@ The reconciliation cron runs every 6 hours and compares Odoo and Shopify status.
    - Odoo status vs Shopify status
    - Suggested action
 4. Click **Auto-fix** to resolve simple mismatches.
+
+---
+
+## Workflow: Monitor Integration Health
+
+The **Health Dashboard** tab on each store form gives you a complete picture of your integration's status without needing to navigate to multiple screens.
+
+### Daily Health Check (2 minutes)
+
+1. Go to **Shopify > Dashboard** (kanban view).
+2. Scan your store cards:
+   - Green badge = healthy.
+   - Orange badge = webhook queue or inventory errors.
+   - Red badge = payment mismatches or permanent errors needing attention.
+3. If everything is green, you're done.
+
+### Investigating a Warning
+
+1. Click on the store card to open the backend form.
+2. Click the **Health Dashboard** tab.
+3. Read the **Overall Health Banner** — green (≥ 90 %), yellow (70–89 %), or red (< 70 %).
+
+#### If you see error bindings
+
+1. Scroll to **Section 4 — Sync Counts**. Note which entity has errors (e.g. Products: 3 errors).
+2. Click **View Error Details** button (Section 7).
+3. Review each error binding. The **Sync Error** field explains what went wrong:
+   - `PRODUCT_SET_MUTATION userErrors: Title can't be blank` → Product has no name. Fix the product in Odoo, then retry.
+   - `HTTP 429` → Rate limit hit. Will auto-resolve on next cron run.
+   - `GraphQL errors: Access denied` → Scope missing on Shopify Custom App. Add the scope and click **Test Connection** to re-verify.
+4. Once you've fixed the root causes, click **Retry All Errors** to re-queue all failed bindings at once. They will be processed on the next cron run.
+
+#### If you see payment mismatches
+
+A payment mismatch means an order is marked **paid** on Shopify but has no corresponding **posted invoice** in Odoo.
+
+1. In Section 5, click **View Payment Mismatches**.
+2. You'll see a filtered list of order bindings.
+3. For each mismatch:
+   - Open the binding, then click through to the Odoo sale order.
+   - Check: is **Auto-create Invoice** enabled on the backend? If not, enable it and re-import the order.
+   - If the setting is correct but the invoice is missing, manually create and post the invoice from the sale order.
+4. After fixing, click **Run Reconciliation** to re-check and clear resolved mismatches.
+
+#### If you see fulfillment mismatches
+
+A fulfillment mismatch means an order is marked **fulfilled** on Shopify but the Odoo delivery is still pending.
+
+1. In Section 5, click **View Fulfillment Mismatches**.
+2. For each mismatch:
+   - Open the binding and click through to the sale order.
+   - Check the delivery order (stock.picking). Validate it if the goods were actually shipped.
+   - If the fulfillment came from a 3PL or Shopify dropshipper and **Inbound Fulfillment Mode** is set to "Create Activity", check the scheduled activities on the order.
+3. Click **Run Reconciliation** after fixing to confirm the mismatches are resolved.
+
+#### If you see permanent errors
+
+Permanent errors are bindings that have been retried 5 times and still fail. They require manual intervention.
+
+1. In Section 5, note the **Permanent Errors** count.
+2. Click **View Error Details** and filter by `sync_status = permanent_error`.
+3. For each record, read the error and take corrective action (fix data, fix config).
+4. Click **Retry Sync** on each binding to reset it to `pending`.
+
+### Webhook Queue Health
+
+If **Webhook Pending** count in Section 6 is growing:
+
+1. Check the cron: **Settings > Technical > Automation > Scheduled Actions**, find "Process Shopify Webhooks" and verify it is running (last execution time, active status).
+2. If the cron is stuck, check `/var/log/odoo/odoo.log` for errors.
+3. If **Dead Letter** count is > 0, go to **Shopify > Logs > Webhook Log**, filter by "Dead Letter", review each error and click **Retry** after fixing the cause.
+
+### Per-Entity Sync Times (Section 3)
+
+Use the per-entity sync grid to detect stalled crons:
+
+- If "Last Order Sync" is > 30 minutes ago but your order cron runs every 5 minutes → the cron may be failing silently. Check the Odoo scheduled action log.
+- If "Last Inventory Sync" is stale → check the delta queue and inventory cron.
+
+Expected freshness by entity:
+
+| Entity | Expected freshness |
+|--------|-------------------|
+| Orders | < 10 min |
+| Inventory | < 15 min |
+| Products | < 20 min |
+| Customers | < 20 min |
+| Fulfillments | < 30 min |
+| Collections | < 70 min |
+
+### Automated External Monitoring
+
+For production environments, set up an HTTP monitor on:
+
+```
+GET https://<your-odoo>/shopify/health/<backend_id>
+```
+
+Alert when:
+- HTTP response is not 200
+- `sync_health_pct` drops below 80
+- `webhook_dead_letter_count` is > 0
+- `data_integrity.payment_mismatches` is > 0
 
 ---
 

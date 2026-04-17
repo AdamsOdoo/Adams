@@ -1,4 +1,4 @@
-# Adams Shopify Connector — User Guide
+# Shopify Connector Pro — User Guide
 
 ## Table of Contents
 
@@ -18,6 +18,9 @@
 14. [Multi-Store and Multi-Company](#multi-store-and-multi-company)
 15. [B2B and Wholesale Isolation](#b2b-and-wholesale-isolation)
 16. [Dashboard and Monitoring](#dashboard-and-monitoring)
+    - [Store Health Kanban](#store-health-kanban-overview)
+    - [Health Dashboard Tab](#health-dashboard-backend-form-tab)
+    - [API Health Endpoint](#api-health-endpoint)
 17. [Scheduled Actions](#scheduled-actions)
 18. [Troubleshooting](#troubleshooting)
 19. [FAQ](#faq)
@@ -36,7 +39,7 @@
 
 1. Place the `adams_shopify` folder in your Odoo addons path
 2. Update the apps list: **Settings > General Settings > Developer Tools > Update Apps List**
-3. Search for "Adams Shopify Connector" and click **Install**
+3. Search for "Shopify Connector Pro" and click **Install**
 
 The module will automatically install its dependencies: `adams_base`, `sale_management`, `stock`, `account`, and `mail`.
 
@@ -467,17 +470,103 @@ No configuration needed — this works automatically.
 
 ## Dashboard and Monitoring
 
-### Store Health Dashboard
+### Store Health Kanban (Overview)
 
-Access via **Shopify > Dashboard** (kanban view of all stores):
+Access via **Shopify > Dashboard** — a kanban card for every connected store:
 
-Each store card shows:
-- Connection status (Connected / Not Connected / Error)
-- Synced counts: products, orders, customers, collections, refunds
-- Error counts with badges
+Each card shows at a glance:
+- Connection status badge: **Connected** (green) / **Error** (red) / **Not Connected** (grey)
+- Synced counts: products, customers, orders, inventory, collections, refunds, payouts
+- Error counts with colour-coded badges
+- Inventory error indicator (orange badge when inventory bindings have errors)
 - Active promoter count
 - Today's sync log count
 - Last sync timestamp
+- **Webhook queue badge** — orange badge showing pending webhook count when > 0
+- **Payment mismatch warning** — red badge when Shopify shows paid but no Odoo invoice exists
+- **Permanent error badge** — bindings that exhausted all retry attempts
+
+### Health Dashboard (Backend Form Tab)
+
+Open any store record (**Shopify > Configuration > Shopify Stores**) and click the **Health Dashboard** tab for full diagnostic detail.
+
+#### Section 1 — Overall Health Banner
+
+A colour-coded alert bar shows your integration health at a glance:
+
+| Colour | Condition | Meaning |
+|--------|-----------|---------|
+| Green | Sync health ≥ 90 % | All systems normal |
+| Yellow | Sync health 70–89 % | Some records have errors |
+| Red | Sync health < 70 % | Significant errors — attention needed |
+
+The health percentage is calculated as: `(synced records) / (synced + errored records) × 100`.
+
+#### Section 2 — Connection & Overall Status
+
+Shows the current backend state, shop name, last sync timestamp, today's sync count, and the overall health percentage score.
+
+#### Section 3 — Per-Entity Last Sync Times
+
+A 2×3 grid showing the most recent successful sync time for each entity type:
+
+| Entity | Field |
+|--------|-------|
+| Products | Last sync time |
+| Customers | Last sync time |
+| Orders | Last sync time |
+| Inventory | Last sync time |
+| Fulfillments | Last sync time |
+| Collections | Last sync time |
+
+If a sync time is more than 24 hours ago, it will stand out naturally (Odoo renders old datetimes in a warning colour). Use this to detect stalled crons or connectivity gaps.
+
+#### Section 4 — Sync Counts
+
+Complete binding counts broken down by entity and status:
+
+| Entity | Synced | Errors |
+|--------|--------|--------|
+| Products | ✓ | ✓ |
+| Customers | ✓ | ✓ |
+| Orders | ✓ | ✓ |
+| Inventory | ✓ | ✓ |
+| Collections | ✓ | — |
+| Refunds | ✓ | — |
+| Payouts | ✓ | — |
+| Abandoned Carts | ✓ | — |
+
+#### Section 5 — Data Integrity Alerts
+
+This section is only visible when there are mismatches. It shows:
+
+- **Payment mismatches** — Shopify orders marked `paid` but no posted invoice exists in Odoo. Click **View Payment Mismatches** to open the filtered list and investigate.
+- **Fulfillment mismatches** — Shopify orders marked `fulfilled` but the corresponding Odoo delivery is still pending/draft. Click **View Fulfillment Mismatches** to review.
+- **Permanent errors** — Bindings that have exhausted all retry attempts (default: 5). These require manual intervention.
+
+> **What to do about mismatches**: Payment mismatches usually indicate an auto-invoice configuration gap or a failed payment registration. Fulfillment mismatches may mean a webhook was lost or the delivery was validated outside of normal flow. Use the "Run Reconciliation" button to auto-fix simple cases.
+
+#### Section 6 — Webhook Queue
+
+Shows the current state of your webhook pipeline:
+- **Pending** — events received but not yet processed (processed every 1 minute by cron)
+- **Dead Letter** — events that failed all 5 retry attempts
+
+A high pending count indicates the webhook cron may be delayed or not running. Dead-letter events require manual investigation — click **Shopify > Logs > Webhook Log** and filter by "Dead Letter".
+
+#### Section 7 — Quick Actions
+
+| Button | What it does |
+|--------|-------------|
+| **Test Connection** | Re-tests the API connection and updates status |
+| **Retry All Errors** | Resets ALL error bindings across all entity types to `pending`, clearing the error message and retry count. They will be re-processed on the next cron run. |
+| **View Sync Logs** | Opens **Shopify > Logs > Sync Log** filtered to this backend |
+| **View Error Details** | Opens sync logs filtered to errors for this backend |
+| **View Payment Mismatches** | Opens order bindings where Shopify shows paid but no Odoo invoice exists |
+| **View Fulfillment Mismatches** | Opens order bindings where Shopify shows fulfilled but Odoo delivery is pending |
+| **Run Reconciliation** | Triggers the reconciliation check immediately for this backend (normally runs every 6 hours) |
+
+> **Retry All Errors** is only visible when there are error bindings. **View Error Details** is only visible when errors exist.
 
 ### Sync Logs
 
@@ -489,13 +578,54 @@ Access via **Shopify > Logs > Sync Log**:
 - Pivot table for analysis
 - Each log entry shows: records processed, successes, errors, and skipped
 
+### API Health Endpoint
+
+A JSON health check endpoint is available for external monitoring:
+
+```
+GET /shopify/health/<backend_id>
+```
+
+Response includes:
+```json
+{
+  "status": "ok",
+  "shop_name": "My Store",
+  "state": "connected",
+  "sync_health_pct": 97.3,
+  "product_bind_count": 412,
+  "order_bind_count": 1840,
+  "customer_bind_count": 923,
+  "inventory_bind_count": 412,
+  "errors_by_entity": {
+    "product": 2,
+    "order": 0,
+    "customer": 11
+  },
+  "last_sync_per_entity": {
+    "product": "2026-04-17T10:30:00",
+    "order": "2026-04-17T11:15:00",
+    "customer": "2026-04-17T10:45:00"
+  },
+  "data_integrity": {
+    "payment_mismatches": 0,
+    "fulfillment_mismatches": 2,
+    "permanent_errors": 0
+  },
+  "webhook_pending_count": 0,
+  "webhook_dead_letter_count": 0
+}
+```
+
+Use this endpoint to integrate with Uptime Robot, Datadog, or any HTTP-based monitoring system.
+
 ### Error Investigation
 
-1. Check error counts on the dashboard
-2. Click the error badge to see affected bindings
+1. Check error counts on the Dashboard kanban or the Health Dashboard tab
+2. Click **View Error Details** to see affected bindings
 3. Review the error message on each binding record
-4. Fix the underlying issue
-5. Use the **Bulk Retry Wizard** to re-process failed records
+4. Fix the underlying issue (e.g. missing tax mapping, invalid product data)
+5. Click **Retry All Errors** to reset all errored bindings, or use the **Bulk Retry Wizard** for selective retry
 
 ---
 

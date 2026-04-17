@@ -1,10 +1,10 @@
-# Part of Adams Shopify Connector. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 {
-    'name': 'Adams Shopify Connector',
+    'name': 'Shopify Connector Pro',
     'version': '19.0.1.0.0',
     'category': 'Sales/Sales',
-    'summary': 'Sync products, orders, customers and inventory with Shopify',
-    'description': 'Bidirectional Shopify ↔ Odoo connector built on Shopify GraphQL Admin API 2026-01.',
+    'summary': 'Production-grade bidirectional Shopify ↔ Odoo connector: products, orders, customers, inventory, fulfillments, refunds, payouts, promoters, webhooks, and more.',
+    'description': 'Shopify Connector Pro — enterprise-grade bidirectional Shopify ↔ Odoo 19 connector built on Shopify GraphQL Admin API 2026-01.',
     'author': 'Adams',
     'website': 'https://github.com/adamsodoo/adams',
     'support': 'support@adamsodoo.com',
