@@ -154,9 +154,18 @@ class ShopifyWebhookController(http.Controller):
                 'payload': json.dumps(payload),
                 'state': 'pending',
             })
-        except Exception:
-            # IntegrityError from unique constraint = duplicate, which is fine
-            _logger.debug("Webhook %s already exists (race condition)", webhook_id)
+        except Exception as e:
+            # An IntegrityError/UniqueViolation means a duplicate — fine to ignore.
+            # Any other exception means the webhook was not stored; log loudly so
+            # it is not silently lost (Shopify receives 200 and won't retry).
+            if 'IntegrityError' in type(e).__name__ or 'UniqueViolation' in type(e).__name__:
+                _logger.debug("Webhook %s already exists (race condition)", webhook_id)
+            else:
+                _logger.exception(
+                    "Failed to enqueue webhook %s (topic=%s, backend=%s) — "
+                    "webhook will not be processed: %s",
+                    webhook_id, topic, backend_id, e,
+                )
 
         # Return 200 immediately — processing happens via cron
         return request.make_json_response({'status': 'ok'})

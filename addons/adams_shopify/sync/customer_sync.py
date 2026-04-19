@@ -109,10 +109,13 @@ class CustomerImporter(BaseImporter):
             existing_binding.odoo_id.with_context(**ctx).write(vals)
             existing_binding._mark_synced(checksum=checksum)
         else:
-            # Acquire a PostgreSQL advisory lock keyed on the Shopify GID
-            # hash to prevent concurrent imports from creating duplicate
-            # partner records for the same customer.
-            lock_key = hash(f"shopify_customer_{self.backend.id}_{shopify_id}") & 0x7FFFFFFF
+            # Acquire a PostgreSQL advisory lock to prevent concurrent workers
+            # from creating duplicate partner records for the same customer.
+            # Use a deterministic integer key: Python's hash() is randomised
+            # per-process (PYTHONHASHSEED), so it cannot be used for
+            # cross-process coordination.
+            numeric_id = int(shopify_id.split('/')[-1]) if shopify_id else 0
+            lock_key = (self.backend.id << 32) | (numeric_id & 0xFFFFFFFF)
             self.env.cr.execute(
                 "SELECT pg_advisory_xact_lock(%s)", (lock_key,),
             )
@@ -134,16 +137,30 @@ class CustomerImporter(BaseImporter):
             else:
                 partner.with_context(**ctx).write(vals)
 
-            self.env['shopify.customer.binding'].create({
-                'backend_id': self.backend.id,
-                'odoo_id': partner.id,
-                'shopify_id': shopify_id,
-                'shopify_email': node.get('email', ''),
-                'shopify_tags': ', '.join(node.get('tags', [])) if isinstance(node.get('tags'), list) else node.get('tags', ''),
-                'sync_status': 'synced',
-                'sync_checksum': checksum,
-                'last_sync_date': fields.Datetime.now(),
-            })
+            try:
+                with self.env.cr.savepoint():
+                    self.env['shopify.customer.binding'].create({
+                        'backend_id': self.backend.id,
+                        'odoo_id': partner.id,
+                        'shopify_id': shopify_id,
+                        'shopify_email': node.get('email', ''),
+                        'shopify_tags': ', '.join(node.get('tags', [])) if isinstance(node.get('tags'), list) else node.get('tags', ''),
+                        'sync_status': 'synced',
+                        'sync_checksum': checksum,
+                        'last_sync_date': fields.Datetime.now(),
+                    })
+            except Exception:
+                # Another worker created the binding between our re-check and
+                # our create (extremely rare with the advisory lock, but the
+                # savepoint ensures the transaction is not poisoned).
+                existing_binding = self.env['shopify.customer.binding'].search([
+                    ('backend_id', '=', self.backend.id),
+                    ('shopify_id', '=', shopify_id),
+                ], limit=1)
+                if existing_binding:
+                    existing_binding.odoo_id.with_context(**ctx).write(vals)
+                    existing_binding._mark_synced(checksum=checksum)
+                    return
 
             # Import addresses
             self._import_addresses(partner, node)

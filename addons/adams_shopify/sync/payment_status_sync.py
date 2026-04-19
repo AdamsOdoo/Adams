@@ -148,6 +148,13 @@ class PaymentStatusHandler:
             try:
                 with self.env.cr.savepoint():
                     invoice = order._create_invoices()
+                    if not invoice:
+                        _logger.warning(
+                            "No invoiceable lines for order %s — "
+                            "invoice not created",
+                            order.name,
+                        )
+                        return False
                     invoice.action_post()
                 _logger.info(
                     "Created and posted invoice %s for order %s",
