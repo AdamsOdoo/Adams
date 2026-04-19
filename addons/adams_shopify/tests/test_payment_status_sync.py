@@ -34,6 +34,12 @@ class TestPaymentStatusSync(TransactionCase):
         self.product = self.env['product.product'].create({
             'name': 'Widget', 'list_price': 50.0,
         })
+        income_account = self.env['account.account'].search([
+            ('account_type', '=', 'income'),
+            ('company_id', '=', self.env.company.id),
+        ], limit=1)
+        if income_account:
+            self.product.categ_id.property_account_income_categ_id = income_account
         self.order = self.env['sale.order'].create({
             'partner_id': self.partner.id,
             'sales_channel': 'shopify',

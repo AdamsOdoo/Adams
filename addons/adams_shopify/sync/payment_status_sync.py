@@ -146,8 +146,9 @@ class PaymentStatusHandler:
 
         if order.state in ('sale', 'done'):
             try:
-                invoice = order._create_invoices()
-                invoice.action_post()
+                with self.env.cr.savepoint():
+                    invoice = order._create_invoices()
+                    invoice.action_post()
                 _logger.info(
                     "Created and posted invoice %s for order %s",
                     invoice.name, order.name,

@@ -228,7 +228,7 @@ class TestOrderImport(TransactionCase):
         self.backend.import_currency_mode = 'presentment'
 
         # Ensure EUR currency exists and is active
-        eur = self.env['res.currency'].search([('name', '=', 'EUR')], limit=1)
+        eur = self.env['res.currency'].with_context(active_test=False).search([('name', '=', 'EUR')], limit=1)
         if not eur:
             eur = self.env['res.currency'].create({'name': 'EUR', 'symbol': 'E'})
         if not eur.active:

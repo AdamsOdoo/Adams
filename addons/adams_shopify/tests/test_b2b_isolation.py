@@ -36,6 +36,12 @@ class TestB2BIsolation(TransactionCase):
             'name': 'B2B Product', 'list_price': 100.0,
             'type': 'consu', 'is_storable': True, 'default_code': 'B2B-001',
         })
+        income_account = self.env['account.account'].search([
+            ('account_type', '=', 'income'),
+            ('company_id', '=', self.env.company.id),
+        ], limit=1)
+        if income_account:
+            self.product.categ_id.property_account_income_categ_id = income_account
 
     def test_new_order_defaults_to_direct(self):
         """Orders created in Odoo should default to 'direct' channel."""
