@@ -27,7 +27,3 @@ class ShopifyDiscountUsage(models.Model):
     commission_amount = fields.Float()
     date = fields.Datetime()
 
-    _sql_constraints = [
-        ('unique_code_order', 'UNIQUE(discount_code_id, order_binding_id)',
-         'This code usage is already recorded for this order.'),
-    ]

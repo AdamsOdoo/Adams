@@ -6,6 +6,7 @@ from odoo import fields, tools
 
 from .base_importer import BaseImporter
 from .checksum import compute_checksum
+from .order_sync import _parse_shopify_dt
 from ..shopify_api.queries.abandoned_cart import FETCH_ABANDONED_CHECKOUTS
 
 _logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ class AbandonedCartImporter(BaseImporter):
             })
 
         vals = {
-            'abandoned_at': node.get('createdAt'),
+            'abandoned_at': _parse_shopify_dt(node.get('createdAt')),
             'recovery_url': node.get('abandonedCheckoutUrl', ''),
             'customer_email': customer.get('email', ''),
             'customer_phone': customer.get('phone', ''),

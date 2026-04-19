@@ -19,7 +19,3 @@ class ShopifyPaymentGateway(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('unique_code_company', 'UNIQUE(code, company_id)',
-         'Gateway code must be unique per company.'),
-    ]

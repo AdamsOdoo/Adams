@@ -33,10 +33,11 @@ class ShopifyWebhookLog(models.Model):
     received_at = fields.Datetime(default=fields.Datetime.now)
     processed_at = fields.Datetime()
 
-    _sql_constraints = [
-        ('unique_webhook_id', 'UNIQUE(webhook_id)',
-         'This webhook event has already been received.'),
-    ]
+
+    _unique_webhook_id = models.Constraint(
+        'UNIQUE(webhook_id)',
+        'This webhook event has already been received.',
+    )
 
     @api.model
     def _cron_cleanup_old_logs(self, days=90):
@@ -354,7 +355,6 @@ class ShopifyWebhookLog(models.Model):
                     'name': f"Redacted Customer #{partner.id}",
                     'email': False,
                     'phone': False,
-                    'mobile': False,
                     'street': False,
                     'street2': False,
                     'comment': "Personal data redacted per GDPR request.",

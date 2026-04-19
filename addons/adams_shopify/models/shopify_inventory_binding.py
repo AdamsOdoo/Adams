@@ -19,11 +19,11 @@ class ShopifyInventoryBinding(models.Model):
     shopify_location_id = fields.Char('Shopify Location ID')
     last_pushed_qty = fields.Float('Last Pushed Quantity')
 
-    _sql_constraints = [
-        ('unique_backend_shopify',
-         'UNIQUE(backend_id, shopify_id)',
-         'A binding already exists for this Shopify inventory level.'),
-    ]
+
+    _unique_backend_shopify = models.Constraint(
+        'UNIQUE(backend_id, shopify_id)',
+        'A binding already exists for this Shopify inventory level.',
+    )
 
     @api.model
     def run_export(self, backend):

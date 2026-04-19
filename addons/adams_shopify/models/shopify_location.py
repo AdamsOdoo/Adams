@@ -22,7 +22,3 @@ class ShopifyLocation(models.Model):
         help="Map this Shopify location to an Odoo warehouse for inventory sync.",
     )
 
-    _sql_constraints = [
-        ('unique_backend_location', 'UNIQUE(backend_id, shopify_location_id)',
-         'Location already exists for this store.'),
-    ]

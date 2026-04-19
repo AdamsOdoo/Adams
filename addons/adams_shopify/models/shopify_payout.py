@@ -43,10 +43,11 @@ class ShopifyPayout(models.Model):
     )
     transaction_count = fields.Integer(compute='_compute_transaction_count')
 
-    _sql_constraints = [
-        ('unique_payout', 'UNIQUE(backend_id, shopify_payout_id)',
-         'This payout has already been imported.'),
-    ]
+
+    _unique_payout = models.Constraint(
+        'UNIQUE(backend_id, shopify_payout_id)',
+        'This payout has already been imported.',
+    )
 
     @api.depends('transaction_ids')
     def _compute_transaction_count(self):

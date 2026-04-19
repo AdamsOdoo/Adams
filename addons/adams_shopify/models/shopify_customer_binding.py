@@ -19,6 +19,11 @@ class ShopifyCustomerBinding(models.Model):
     shopify_tags = fields.Char('Shopify Tags')
     shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
 
+    _unique_backend_shopify = models.Constraint(
+        'UNIQUE(backend_id, shopify_id)',
+        'A binding already exists for this Shopify customer.',
+    )
+
     @api.depends('shopify_id', 'backend_id.shop_url')
     def _compute_shopify_url(self):
         for rec in self:
@@ -40,11 +45,6 @@ class ShopifyCustomerBinding(models.Model):
                 'target': 'new',
             }
 
-    _sql_constraints = [
-        ('unique_backend_shopify',
-         'UNIQUE(backend_id, shopify_id)',
-         'A binding already exists for this Shopify customer.'),
-    ]
 
     @api.model
     def run_import(self, backend):

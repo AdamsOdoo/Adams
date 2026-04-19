@@ -28,12 +28,13 @@ class ShopifyMetafield(models.Model):
 
     display_name = fields.Char(compute='_compute_display_name', store=True)
 
+    _unique_metafield = models.Constraint(
+        'UNIQUE(backend_id, owner_type, owner_binding_id, namespace, key)',
+        'Metafield already exists for this owner.',
+    )
+
     @api.depends('namespace', 'key')
     def _compute_display_name(self):
         for rec in self:
             rec.display_name = f"{rec.namespace}.{rec.key}"
 
-    _sql_constraints = [
-        ('unique_metafield', 'UNIQUE(backend_id, owner_type, owner_binding_id, namespace, key)',
-         'Metafield already exists for this owner.'),
-    ]

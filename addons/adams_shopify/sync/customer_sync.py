@@ -202,17 +202,12 @@ class CustomerImporter(BaseImporter):
             ], limit=1)
 
         if dedup == 'phone' and phone:
-            # Normalize phone for matching
             return self.env['res.partner'].search([
                 ('phone', '=', phone),
-                ('parent_id', '=', False),
-            ], limit=1) or self.env['res.partner'].search([
-                ('mobile', '=', phone),
                 ('parent_id', '=', False),
             ], limit=1)
 
         if dedup == 'email_phone':
-            # Try email first (more reliable), then phone
             if email:
                 partner = self.env['res.partner'].search([
                     ('email', '=ilike', email),
@@ -223,9 +218,6 @@ class CustomerImporter(BaseImporter):
             if phone:
                 partner = self.env['res.partner'].search([
                     ('phone', '=', phone),
-                    ('parent_id', '=', False),
-                ], limit=1) or self.env['res.partner'].search([
-                    ('mobile', '=', phone),
                     ('parent_id', '=', False),
                 ], limit=1)
                 if partner:

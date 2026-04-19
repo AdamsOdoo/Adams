@@ -79,11 +79,11 @@ class TestCustomerDedup(TransactionCase):
         found = importer._find_odoo_partner(node)
         self.assertEqual(found, existing)
 
-    def test_phone_dedup_matches_by_mobile_field(self):
-        """Phone dedup should also check mobile field."""
+    def test_phone_dedup_matches_by_phone_field_alt(self):
+        """Phone dedup should match by phone field with different number."""
         self.backend.customer_dedup_field = 'phone'
         existing = self.env['res.partner'].create({
-            'name': 'Mobile User', 'mobile': '+15559876543',
+            'name': 'Phone User 2', 'phone': '+15559876543',
         })
         importer = self._get_importer()
         node = self._make_customer_node(

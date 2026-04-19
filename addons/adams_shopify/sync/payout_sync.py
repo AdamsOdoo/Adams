@@ -5,6 +5,8 @@ import logging
 
 from odoo import fields as odoo_fields
 
+from .order_sync import _parse_shopify_dt
+
 _logger = logging.getLogger(__name__)
 
 
@@ -162,7 +164,7 @@ class PayoutSync:
                     'net': float(txn.get('net', {}).get('amount', 0)),
                     'currency_id': currency.id if currency else False,
                     'source_order_id': txn.get('sourceOrderTransactionId', ''),
-                    'processed_at': self._parse_datetime(txn.get('processedAt')),
+                    'processed_at': _parse_shopify_dt(txn.get('processedAt')),
                 }
 
                 if existing_txn:
@@ -199,11 +201,3 @@ class PayoutSync:
         except (ValueError, TypeError):
             return False
 
-    def _parse_datetime(self, dt_str):
-        """Parse ISO datetime string."""
-        if not dt_str:
-            return False
-        try:
-            return odoo_fields.Datetime.to_datetime(dt_str.replace('T', ' ').replace('Z', ''))
-        except (ValueError, TypeError):
-            return False

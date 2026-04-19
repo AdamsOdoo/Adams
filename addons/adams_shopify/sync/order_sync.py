@@ -3,6 +3,18 @@ import logging
 
 from odoo import fields
 
+
+def _parse_shopify_dt(dt_str):
+    """Convert Shopify ISO 8601 datetime to Odoo format."""
+    if not dt_str:
+        return False
+    try:
+        return fields.Datetime.to_datetime(
+            dt_str.replace('T', ' ').replace('Z', '')
+        )
+    except (ValueError, TypeError):
+        return False
+
 from .base_exporter import BaseExporter
 from .base_importer import BaseImporter
 from .checksum import compute_checksum
@@ -110,7 +122,7 @@ class OrderImporter(BaseImporter):
                     'shopify_order_name': node.get('name', ''),
                     'shopify_financial_status': financial_status,
                     'shopify_fulfillment_status': fulfillment_status,
-                    'shopify_created_at': node.get('createdAt'),
+                    'shopify_created_at': _parse_shopify_dt(node.get('createdAt')),
                     'sync_status': 'synced',
                     'sync_checksum': checksum,
                     'last_sync_date': fields.Datetime.now(),
@@ -446,16 +458,10 @@ class OrderImporter(BaseImporter):
             ], limit=1)
 
         if dedup == 'phone' and phone:
-            return (
-                self.env['res.partner'].search([
-                    ('phone', '=', phone),
-                    ('parent_id', '=', False),
-                ], limit=1)
-                or self.env['res.partner'].search([
-                    ('mobile', '=', phone),
-                    ('parent_id', '=', False),
-                ], limit=1)
-            )
+            return self.env['res.partner'].search([
+                ('phone', '=', phone),
+                ('parent_id', '=', False),
+            ], limit=1)
 
         if dedup == 'email_phone':
             if email:
@@ -466,16 +472,10 @@ class OrderImporter(BaseImporter):
                 if partner:
                     return partner
             if phone:
-                return (
-                    self.env['res.partner'].search([
-                        ('phone', '=', phone),
-                        ('parent_id', '=', False),
-                    ], limit=1)
-                    or self.env['res.partner'].search([
-                        ('mobile', '=', phone),
-                        ('parent_id', '=', False),
-                    ], limit=1)
-                )
+                return self.env['res.partner'].search([
+                    ('phone', '=', phone),
+                    ('parent_id', '=', False),
+                ], limit=1)
 
         return None
 

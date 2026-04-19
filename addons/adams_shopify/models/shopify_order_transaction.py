@@ -33,7 +33,3 @@ class ShopifyOrderTransaction(models.Model):
     processed_at = fields.Datetime('Processed At')
     error_code = fields.Char('Error Code')
 
-    _sql_constraints = [
-        ('unique_transaction', 'UNIQUE(order_binding_id, shopify_transaction_id)',
-         'Transaction already recorded.'),
-    ]

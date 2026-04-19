@@ -36,10 +36,11 @@ class ShopifyPromoter(models.Model):
     total_discount_given = fields.Float(compute='_compute_performance', store=True)
     total_commission = fields.Float(compute='_compute_performance', store=True)
 
-    _sql_constraints = [
-        ('unique_company_partner', 'UNIQUE(company_id, partner_id)',
-         'A promoter already exists for this contact in this company.'),
-    ]
+
+    _unique_company_partner = models.Constraint(
+        'UNIQUE(company_id, partner_id)',
+        'A promoter already exists for this contact in this company.',
+    )
 
     @api.depends(
         'discount_code_ids.usage_ids.order_total',

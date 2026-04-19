@@ -33,6 +33,15 @@ class ShopifyProductBinding(models.Model):
     )
     shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
 
+    _unique_backend_shopify = models.Constraint(
+        'UNIQUE(backend_id, shopify_id)',
+        'A binding already exists for this Shopify product.',
+    )
+    _unique_backend_odoo = models.Constraint(
+        'UNIQUE(backend_id, odoo_id)',
+        'This Odoo product is already linked to this Shopify store.',
+    )
+
     @api.depends('shopify_id', 'backend_id.shop_url')
     def _compute_shopify_url(self):
         for rec in self:
@@ -55,14 +64,6 @@ class ShopifyProductBinding(models.Model):
                 'target': 'new',
             }
 
-    _sql_constraints = [
-        ('unique_backend_shopify',
-         'UNIQUE(backend_id, shopify_id)',
-         'A binding already exists for this Shopify product.'),
-        ('unique_backend_odoo',
-         'UNIQUE(backend_id, odoo_id)',
-         'This Odoo product is already linked to this Shopify store.'),
-    ]
 
     @api.model
     def run_sync(self, backend):

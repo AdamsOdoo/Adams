@@ -18,11 +18,3 @@ class ShopifyVariantBinding(models.Model):
     shopify_inventory_item_id = fields.Char('Inventory Item ID')
     shopify_sku = fields.Char('Shopify SKU')
 
-    _sql_constraints = [
-        ('unique_backend_shopify',
-         'UNIQUE(backend_id, shopify_id)',
-         'A binding already exists for this Shopify variant.'),
-        ('unique_backend_odoo',
-         'UNIQUE(backend_id, odoo_id)',
-         'This Odoo variant is already linked to this Shopify store.'),
-    ]

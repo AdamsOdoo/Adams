@@ -48,7 +48,6 @@ def customer_checksum(partner):
         'name': partner.name,
         'email': partner.email or '',
         'phone': partner.phone or '',
-        'mobile': partner.mobile or '',
         'street': partner.street or '',
         'street2': partner.street2 or '',
         'city': partner.city or '',

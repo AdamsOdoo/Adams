@@ -30,12 +30,15 @@ class ShopifyDiscountCode(models.Model):
     total_discount_amount = fields.Float(compute='_compute_usage_stats', store=True)
     total_order_revenue = fields.Float(compute='_compute_usage_stats', store=True)
 
-    _sql_constraints = [
-        ('unique_backend_code', 'UNIQUE(backend_id, code)',
-         'This discount code already exists for this store.'),
-        ('unique_backend_shopify', 'UNIQUE(backend_id, shopify_id)',
-         'A binding already exists for this Shopify discount.'),
-    ]
+
+    _unique_backend_code = models.Constraint(
+        'UNIQUE(backend_id, code)',
+        'This discount code already exists for this store.',
+    )
+    _unique_backend_shopify = models.Constraint(
+        'UNIQUE(backend_id, shopify_id)',
+        'A binding already exists for this Shopify discount.',
+    )
 
     @api.depends('usage_ids.discount_amount', 'usage_ids.order_total')
     def _compute_usage_stats(self):

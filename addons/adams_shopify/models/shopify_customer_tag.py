@@ -18,12 +18,13 @@ class ShopifyCustomerTag(models.Model):
     partner_count = fields.Integer(compute='_compute_partner_count')
     color = fields.Integer('Color')
 
+    _unique_backend_tag = models.Constraint(
+        'UNIQUE(backend_id, name)',
+        'Tag already exists for this store.',
+    )
+
     @api.depends('partner_ids')
     def _compute_partner_count(self):
         for rec in self:
             rec.partner_count = len(rec.partner_ids)
 
-    _sql_constraints = [
-        ('unique_backend_tag', 'UNIQUE(backend_id, name)',
-         'Tag already exists for this store.'),
-    ]

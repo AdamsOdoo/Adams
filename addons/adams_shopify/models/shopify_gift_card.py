@@ -26,7 +26,3 @@ class ShopifyGiftCard(models.Model):
     )
     expires_on = fields.Date('Expires On')
 
-    _sql_constraints = [
-        ('unique_backend_shopify', 'UNIQUE(backend_id, shopify_id)',
-         'Gift card already exists for this store.'),
-    ]

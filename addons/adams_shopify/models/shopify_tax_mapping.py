@@ -25,7 +25,3 @@ class ShopifyTaxMapping(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('unique_backend_tax', 'UNIQUE(backend_id, shopify_tax_name)',
-         'Tax mapping already exists for this name on this store.'),
-    ]

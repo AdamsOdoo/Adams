@@ -67,10 +67,11 @@ class ShopifyAbandonedCart(models.Model):
     )
     recovery_email_sent = fields.Boolean('Recovery Email Sent', default=False)
 
-    _sql_constraints = [
-        ('backend_shopify_unique', 'UNIQUE(backend_id, shopify_id)',
-         'Abandoned cart binding must be unique per backend.'),
-    ]
+
+    _backend_shopify_unique = models.Constraint(
+        'UNIQUE(backend_id, shopify_id)',
+        'Abandoned cart binding must be unique per backend.',
+    )
 
     @api.depends('customer_name', 'customer_email', 'shopify_id')
     def _compute_name(self):

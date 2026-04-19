@@ -36,7 +36,3 @@ class ShopifyMetafieldMapping(models.Model):
     ], default='both', required=True)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('unique_mapping', 'UNIQUE(backend_id, owner_type, shopify_namespace, shopify_key)',
-         'Mapping already exists for this metafield.'),
-    ]

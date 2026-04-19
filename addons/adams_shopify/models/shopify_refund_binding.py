@@ -22,7 +22,3 @@ class ShopifyRefundBinding(models.Model):
         'shopify.refund.line', 'refund_binding_id', string='Refund Lines',
     )
 
-    _sql_constraints = [
-        ('unique_backend_shopify', 'UNIQUE(backend_id, shopify_id)',
-         'A binding already exists for this Shopify refund.'),
-    ]
