@@ -32,9 +32,20 @@ class TestB2BIsolation(TransactionCase):
         self.partner = self.env['res.partner'].create({
             'name': 'B2B Customer', 'email': 'b2b@corp.com',
         })
+        # Ensure accounting is configured for invoice-line creation in tests.
+        # Odoo v19 account.account no longer exposes a simple `company_id`
+        # domain in every context, so only filter on stable fields.
+        income_account = self.env['account.account'].search([
+            ('account_type', '=', 'income'),
+            ('deprecated', '=', False),
+        ], limit=1)
         self.product = self.env['product.product'].create({
             'name': 'B2B Product', 'list_price': 100.0,
             'type': 'consu', 'is_storable': True, 'default_code': 'B2B-001',
+            'categ_id': self.env['product.category'].create({
+                'name': 'B2B Test Category',
+                'property_account_income_categ_id': income_account.id if income_account else False,
+            }).id,
         })
 
     def test_new_order_defaults_to_direct(self):
