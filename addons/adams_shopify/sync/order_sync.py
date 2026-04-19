@@ -230,20 +230,66 @@ class OrderImporter(BaseImporter):
             ).action_confirm()
             # Auto-create invoice if configured
             if self.backend.auto_create_invoice and order_vals['shopify_financial_status'] == 'paid':
-                try:
-                    invoice = order.with_company(
-                        self.backend.company_id,
-                    ).with_context(
-                        shopify_no_auto_export=True,
-                    )._create_invoices()
-                    if invoice:
-                        invoice.with_context(
-                            shopify_no_auto_export=True,
-                        ).action_post()
-                except Exception as e:
-                    _logger.warning("Auto-invoice failed for order %s: %s", order.name, e)
+                self._auto_create_invoice(order)
 
         return order
+
+    def _auto_create_invoice(self, order):
+        """Create and post an invoice inside a savepoint.
+
+        A savepoint isolates accounting failures (missing income account,
+        fiscal position gaps, etc.) so the surrounding order import
+        transaction is never poisoned.
+        """
+        missing = []
+        for line in order.order_line:
+            product = line.product_id
+            if not product:
+                continue
+            accounts = product.product_tmpl_id.get_product_accounts(
+                fiscal_pos=order.fiscal_position_id,
+            )
+            if not accounts.get('income'):
+                missing.append(product.display_name)
+        if missing:
+            msg = (
+                "Auto-invoice skipped: no income account for product(s) "
+                "%s. Check the product category accounting tab or fiscal "
+                "position mappings." % ', '.join(missing)
+            )
+            _logger.warning("Order %s: %s", order.name, msg)
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify auto-invoice skipped",
+                note=msg,
+            )
+            return
+
+        try:
+            with self.env.cr.savepoint():
+                invoice = order.with_company(
+                    self.backend.company_id,
+                ).with_context(
+                    shopify_no_auto_export=True,
+                )._create_invoices()
+                if invoice:
+                    invoice.with_context(
+                        shopify_no_auto_export=True,
+                    ).action_post()
+        except Exception as e:
+            _logger.warning(
+                "Auto-invoice failed for order %s (products: %s): %s. "
+                "Check income account, fiscal position, and company "
+                "chart of accounts.",
+                order.name,
+                ', '.join(order.order_line.product_id.mapped('display_name')),
+                e,
+            )
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify auto-invoice failed",
+                note="Invoice creation failed: %s" % e,
+            )
 
     def _track_discount_usage(self, order_binding, node):
         """Check for promoter discount codes and record usage."""

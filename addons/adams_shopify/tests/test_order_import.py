@@ -1,5 +1,5 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
 
@@ -312,3 +312,70 @@ class TestOrderImport(TransactionCase):
             'presentmentMoney': {'amount': '85.00', 'currencyCode': 'EUR'},
         }
         self.assertEqual(importer._get_money_amount(price_set), 85.0)
+
+    def test_invoice_failure_does_not_abort_transaction(self):
+        """SQL error in _create_invoices must not poison the transaction."""
+        from ..sync.order_sync import OrderImporter
+
+        node = self._make_order_node(financial_status='PAID')
+
+        importer = OrderImporter.__new__(OrderImporter)
+        importer.env = self.env
+        importer.backend = self.backend
+        importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
+
+        def _boom(*args, **kwargs):
+            raise Exception("Simulated accounting failure")
+
+        with patch.object(
+            type(self.env['sale.order']),
+            '_create_invoices',
+            _boom,
+        ):
+            importer._import_one(node, existing_binding=None)
+
+        # Transaction must still be usable
+        binding = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Order/1000'),
+        ])
+        self.assertTrue(binding, "Binding should exist despite invoice failure")
+        self.assertEqual(binding.shopify_financial_status, 'paid')
+
+    def test_invoice_skipped_when_no_income_account(self):
+        """Auto-invoice should be skipped with activity when income account missing."""
+        from ..sync.order_sync import OrderImporter
+
+        # Remove income account from product category
+        self.product.categ_id.property_account_income_categ_id = False
+        self.product.property_account_income_id = False
+
+        node = self._make_order_node(financial_status='PAID')
+
+        importer = OrderImporter.__new__(OrderImporter)
+        importer.env = self.env
+        importer.backend = self.backend
+        importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
+
+        importer._import_one(node, existing_binding=None)
+
+        binding = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Order/1000'),
+        ])
+        self.assertTrue(binding)
+        order = binding.odoo_id
+        self.assertFalse(
+            order.invoice_ids,
+            "No invoice should be created when income account is missing",
+        )
