@@ -230,18 +230,19 @@ class OrderImporter(BaseImporter):
             ).action_confirm()
             # Auto-create invoice if configured
             if self.backend.auto_create_invoice and order_vals['shopify_financial_status'] == 'paid':
-                try:
-                    invoice = order.with_company(
-                        self.backend.company_id,
-                    ).with_context(
-                        shopify_no_auto_export=True,
-                    )._create_invoices()
-                    if invoice:
-                        invoice.with_context(
+                with self.env.cr.savepoint():
+                    try:
+                        invoice = order.with_company(
+                            self.backend.company_id,
+                        ).with_context(
                             shopify_no_auto_export=True,
-                        ).action_post()
-                except Exception as e:
-                    _logger.warning("Auto-invoice failed for order %s: %s", order.name, e)
+                        )._create_invoices()
+                        if invoice:
+                            invoice.with_context(
+                                shopify_no_auto_export=True,
+                            ).action_post()
+                    except Exception as e:
+                        _logger.warning("Auto-invoice failed for order %s: %s", order.name, e)
 
         return order
 
