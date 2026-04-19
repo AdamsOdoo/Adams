@@ -285,8 +285,6 @@ class ShopifyBackend(models.Model):
     def _compute_bind_counts(self):
         today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0)
         backend_ids = self.ids
-        if not backend_ids:
-            return
 
         binding_models = {
             'product': 'shopify.product.binding',
@@ -294,82 +292,88 @@ class ShopifyBackend(models.Model):
             'order': 'shopify.order.binding',
         }
 
-        # Aggregate counts per (backend_id, sync_status) with a single
-        # read_group per binding model, O(models) queries total.
-        aggregated = {}  # {(model_key, backend_id, status): count}
-        for key, model_name in binding_models.items():
-            Model = self.env[model_name].sudo()
-            groups = Model._read_group(
+        aggregated = {}
+        inv_aggregated = {}
+        payout_counts = {}
+        collection_counts = {}
+        refund_counts = {}
+        log_counts = {}
+        abandoned_counts = {}
+        promoter_counts = {}
+
+        if backend_ids:
+            # Aggregate counts per (backend_id, sync_status) with a single
+            # read_group per binding model, O(models) queries total.
+            for key, model_name in binding_models.items():
+                Model = self.env[model_name].sudo()
+                groups = Model._read_group(
+                    [('backend_id', 'in', backend_ids)],
+                    groupby=['backend_id', 'sync_status'],
+                    aggregates=['__count'],
+                )
+                for backend, status, count in groups:
+                    aggregated[(key, backend.id, status)] = count
+
+            # Inventory binding counts
+            InvModel = self.env['shopify.inventory.binding'].sudo()
+            inv_groups = InvModel._read_group(
                 [('backend_id', 'in', backend_ids)],
                 groupby=['backend_id', 'sync_status'],
                 aggregates=['__count'],
             )
-            for backend, status, count in groups:
-                aggregated[(key, backend.id, status)] = count
+            for backend, status, count in inv_groups:
+                inv_aggregated[(backend.id, status)] = count
 
-        # Inventory binding counts
-        inv_aggregated = {}
-        InvModel = self.env['shopify.inventory.binding'].sudo()
-        inv_groups = InvModel._read_group(
-            [('backend_id', 'in', backend_ids)],
-            groupby=['backend_id', 'sync_status'],
-            aggregates=['__count'],
-        )
-        for backend, status, count in inv_groups:
-            inv_aggregated[(backend.id, status)] = count
-
-        # Payout counts
-        payout_counts = dict(
-            (b.id, c) for b, c in self.env['shopify.payout'].sudo()._read_group(
-                [('backend_id', 'in', backend_ids)],
-                groupby=['backend_id'],
-                aggregates=['__count'],
-            )
-        )
-
-        # Other one-off counts also grouped.
-        collection_counts = dict(
-            (b.id, c) for b, c in self.env['shopify.collection.binding'].sudo()._read_group(
-                [('backend_id', 'in', backend_ids), ('sync_status', '=', 'synced')],
-                groupby=['backend_id'],
-                aggregates=['__count'],
-            )
-        )
-        refund_counts = dict(
-            (b.id, c) for b, c in self.env['shopify.refund.binding'].sudo()._read_group(
-                [('backend_id', 'in', backend_ids), ('sync_status', '=', 'synced')],
-                groupby=['backend_id'],
-                aggregates=['__count'],
-            )
-        )
-        log_counts = dict(
-            (b.id, c) for b, c in self.env['shopify.sync.log'].sudo()._read_group(
-                [('backend_id', 'in', backend_ids), ('create_date', '>=', today_start)],
-                groupby=['backend_id'],
-                aggregates=['__count'],
-            )
-        )
-        abandoned_counts = {}
-        if 'shopify.abandoned.cart' in self.env:
-            abandoned_counts = dict(
-                (b.id, c) for b, c in self.env['shopify.abandoned.cart'].sudo()._read_group(
-                    [('backend_id', 'in', backend_ids), ('recovered', '=', False)],
+            # Payout counts
+            payout_counts = dict(
+                (b.id, c) for b, c in self.env['shopify.payout'].sudo()._read_group(
+                    [('backend_id', 'in', backend_ids)],
                     groupby=['backend_id'],
                     aggregates=['__count'],
                 )
             )
 
-        # Promoters grouped by company (shared across backends).
-        company_ids = self.mapped('company_id').ids
-        promoter_counts = {}
-        if company_ids:
-            promoter_counts = dict(
-                (c.id, n) for c, n in self.env['shopify.promoter'].sudo()._read_group(
-                    [('company_id', 'in', company_ids), ('status', '=', 'active')],
-                    groupby=['company_id'],
+            # Other one-off counts also grouped.
+            collection_counts = dict(
+                (b.id, c) for b, c in self.env['shopify.collection.binding'].sudo()._read_group(
+                    [('backend_id', 'in', backend_ids), ('sync_status', '=', 'synced')],
+                    groupby=['backend_id'],
                     aggregates=['__count'],
                 )
             )
+            refund_counts = dict(
+                (b.id, c) for b, c in self.env['shopify.refund.binding'].sudo()._read_group(
+                    [('backend_id', 'in', backend_ids), ('sync_status', '=', 'synced')],
+                    groupby=['backend_id'],
+                    aggregates=['__count'],
+                )
+            )
+            log_counts = dict(
+                (b.id, c) for b, c in self.env['shopify.sync.log'].sudo()._read_group(
+                    [('backend_id', 'in', backend_ids), ('create_date', '>=', today_start)],
+                    groupby=['backend_id'],
+                    aggregates=['__count'],
+                )
+            )
+            if 'shopify.abandoned.cart' in self.env:
+                abandoned_counts = dict(
+                    (b.id, c) for b, c in self.env['shopify.abandoned.cart'].sudo()._read_group(
+                        [('backend_id', 'in', backend_ids), ('recovered', '=', False)],
+                        groupby=['backend_id'],
+                        aggregates=['__count'],
+                    )
+                )
+
+            # Promoters grouped by company (shared across backends).
+            company_ids = self.mapped('company_id').ids
+            if company_ids:
+                promoter_counts = dict(
+                    (c.id, n) for c, n in self.env['shopify.promoter'].sudo()._read_group(
+                        [('company_id', 'in', company_ids), ('status', '=', 'active')],
+                        groupby=['company_id'],
+                        aggregates=['__count'],
+                    )
+                )
 
         for rec in self:
             synced_total = error_total = pending_total = perm_total = 0
