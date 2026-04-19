@@ -8,6 +8,15 @@ class TestPaymentStatusSync(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        if not self.env['account.journal'].search(
+            [('type', '=', 'sale'), ('company_id', '=', self.env.company.id)], limit=1,
+        ):
+            self.env['account.journal'].create({
+                'name': 'Test Sales Journal',
+                'type': 'sale',
+                'code': 'TSHP',
+                'company_id': self.env.company.id,
+            })
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',
