@@ -33,12 +33,20 @@ class TestB2BIsolation(TransactionCase):
             'name': 'B2B Customer', 'email': 'b2b@corp.com',
         })
         # Ensure accounting is configured for invoice-line creation in tests.
-        # Odoo v19 account.account no longer exposes a simple `company_id`
-        # domain in every context, so only filter on stable fields.
-        income_account = self.env['account.account'].search([
-            ('account_type', '=', 'income'),
-            ('deprecated', '=', False),
-        ], limit=1)
+        # Build a version-safe domain: account.account fields vary across
+        # Odoo versions/environments (e.g. no company_id/deprecated field).
+        account_model = self.env['account.account']
+        account_fields = account_model._fields
+        account_domain = []
+        if 'account_type' in account_fields:
+            account_domain.append(('account_type', '=', 'income'))
+        elif 'internal_group' in account_fields:
+            account_domain.append(('internal_group', '=', 'income'))
+        if 'deprecated' in account_fields:
+            account_domain.append(('deprecated', '=', False))
+        income_account = account_model.search(account_domain, limit=1)
+        if not income_account:
+            income_account = account_model.search([], limit=1)
         self.product = self.env['product.product'].create({
             'name': 'B2B Product', 'list_price': 100.0,
             'type': 'consu', 'is_storable': True, 'default_code': 'B2B-001',
