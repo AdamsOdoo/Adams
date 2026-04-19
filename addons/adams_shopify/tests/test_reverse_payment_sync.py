@@ -38,7 +38,7 @@ class TestReversePaymentSync(TransactionCase):
         })
         income_account = self.env['account.account'].search([
             ('account_type', '=', 'income'),
-            ('company_id', '=', self.env.company.id),
+            ('company_ids', 'in', [self.env.company.id]),
         ], limit=1)
         if income_account:
             self.product.categ_id.property_account_income_categ_id = income_account
