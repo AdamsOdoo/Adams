@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Dashboard Action using Kanban of backends -->
+    <record id="shopify_dashboard_action" model="ir.actions.act_window">
+        <field name="name">Shopify Dashboard</field>
+        <field name="res_model">shopify.backend</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Connect your first Shopify store
+            </p>
+            <p>
+                Set up your Shopify store connection to start syncing
+                products, orders, customers, and inventory.
+            </p>
+        </field>
+    </record>
+
+    <!-- Dashboard Kanban View -->
+    <record id="shopify_backend_view_kanban" model="ir.ui.view">
+        <field name="name">shopify.backend.kanban.dashboard</field>
+        <field name="model">shopify.backend</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_dashboard" create="true">
+                <field name="name"/>
+                <field name="shop_url"/>
+                <field name="shop_name"/>
+                <field name="state"/>
+                <field name="last_sync_date"/>
+                <field name="product_bind_count"/>
+                <field name="customer_bind_count"/>
+                <field name="order_bind_count"/>
+                <field name="product_error_count"/>
+                <field name="customer_error_count"/>
+                <field name="order_error_count"/>
+                <field name="total_error_count"/>
+                <field name="total_synced_count"/>
+                <field name="total_pending_count"/>
+                <field name="collection_bind_count"/>
+                <field name="refund_bind_count"/>
+                <field name="sync_log_today_count"/>
+                <field name="promoter_count"/>
+                <field name="abandoned_cart_count"/>
+                <field name="sync_health_pct"/>
+                <field name="inventory_bind_count"/>
+                <field name="inventory_error_count"/>
+                <field name="payout_count"/>
+                <field name="webhook_pending_count"/>
+                <field name="payment_mismatch_count"/>
+                <field name="permanent_error_count"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_card_content">
+                            <!-- Header with connection status -->
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h3 class="mb-0"><field name="name"/></h3>
+                                    <small class="text-muted"><field name="shop_url"/></small>
+                                </div>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'connected'"
+                                       decoration-danger="state == 'error'"
+                                       decoration-info="state == 'draft'"/>
+                            </div>
+
+                            <!-- Sync Health Progress Bar -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small class="fw-bold">Sync Health</small>
+                                    <small class="fw-bold">
+                                        <field name="sync_health_pct"/>%
+                                    </small>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <t t-if="record.sync_health_pct.raw_value >= 90">
+                                        <div class="progress-bar bg-success"
+                                             role="progressbar"
+                                             t-attf-style="width: #{record.sync_health_pct.raw_value}%"/>
+                                    </t>
+                                    <t t-elif="record.sync_health_pct.raw_value >= 70">
+                                        <div class="progress-bar bg-warning"
+                                             role="progressbar"
+                                             t-attf-style="width: #{record.sync_health_pct.raw_value}%"/>
+                                    </t>
+                                    <t t-else="">
+                                        <div class="progress-bar bg-danger"
+                                             role="progressbar"
+                                             t-attf-style="width: #{record.sync_health_pct.raw_value}%"/>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Primary stats row -->
+                            <div class="d-flex gap-2 mb-2">
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.product_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold fs-4">
+                                        <field name="product_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Products</div>
+                                    <t t-if="record.product_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="product_error_count"/> errors
+                                        </small>
+                                    </t>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.order_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold fs-4">
+                                        <field name="order_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Orders</div>
+                                    <t t-if="record.order_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="order_error_count"/> errors
+                                        </small>
+                                    </t>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.customer_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold fs-4">
+                                        <field name="customer_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Customers</div>
+                                    <t t-if="record.customer_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="customer_error_count"/> errors
+                                        </small>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Secondary stats row -->
+                            <div class="d-flex gap-2 mb-2">
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold">
+                                        <field name="collection_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Collections</div>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold">
+                                        <field name="refund_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Refunds</div>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill">
+                                    <div class="fw-bold">
+                                        <field name="promoter_count"/>
+                                    </div>
+                                    <div class="text-muted small">Promoters</div>
+                                </div>
+                                <div class="text-center border rounded p-2 flex-fill"
+                                     t-attf-style="border-left: 3px solid #{record.inventory_error_count.raw_value > 0 ? '#dc3545' : '#198754'} !important;">
+                                    <div class="fw-bold">
+                                        <field name="inventory_bind_count"/>
+                                    </div>
+                                    <div class="text-muted small">Inventory</div>
+                                    <t t-if="record.inventory_error_count.raw_value > 0">
+                                        <small class="text-danger">
+                                            <field name="inventory_error_count"/> errors
+                                        </small>
+                                    </t>
+                                </div>
+                                <t t-if="record.payout_count.raw_value > 0">
+                                    <div class="text-center border rounded p-2 flex-fill">
+                                        <div class="fw-bold">
+                                            <field name="payout_count"/>
+                                        </div>
+                                        <div class="text-muted small">Payouts</div>
+                                    </div>
+                                </t>
+                                <t t-if="record.abandoned_cart_count.raw_value > 0">
+                                    <div class="text-center border rounded p-2 flex-fill"
+                                         style="border-left: 3px solid #fd7e14 !important;">
+                                        <div class="fw-bold text-warning">
+                                            <field name="abandoned_cart_count"/>
+                                        </div>
+                                        <div class="text-muted small">Abandoned</div>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <!-- Health footer -->
+                            <div class="d-flex justify-content-between align-items-center pt-2"
+                                 style="border-top: 1px solid #dee2e6;">
+                                <div class="d-flex gap-1">
+                                    <t t-if="record.total_error_count.raw_value > 0">
+                                        <span class="badge text-bg-danger">
+                                            <field name="total_error_count"/> errors
+                                        </span>
+                                    </t>
+                                    <t t-if="record.total_pending_count.raw_value > 0">
+                                        <span class="badge text-bg-warning">
+                                            <field name="total_pending_count"/> pending
+                                        </span>
+                                    </t>
+                                    <t t-if="record.permanent_error_count.raw_value > 0">
+                                        <span class="badge text-bg-dark">
+                                            <field name="permanent_error_count"/> permanent
+                                        </span>
+                                    </t>
+                                    <t t-if="record.total_error_count.raw_value == 0 and record.total_pending_count.raw_value == 0">
+                                        <span class="badge text-bg-success">All synced</span>
+                                    </t>
+                                </div>
+                                <div class="d-flex gap-1 align-items-center">
+                                    <t t-if="record.webhook_pending_count.raw_value > 0">
+                                        <span class="badge text-bg-warning">
+                                            <field name="webhook_pending_count"/> queued
+                                        </span>
+                                    </t>
+                                    <t t-if="record.payment_mismatch_count.raw_value > 0">
+                                        <span class="badge text-bg-danger">
+                                            <field name="payment_mismatch_count"/> pay. mismatches
+                                        </span>
+                                    </t>
+                                    <span class="badge text-bg-info">
+                                        <field name="sync_log_today_count"/> syncs today
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Last sync info -->
+                            <div class="text-muted small mt-1"
+                                 t-if="record.last_sync_date.raw_value">
+                                Last sync: <field name="last_sync_date"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Sync Log Pivot View for analysis -->
+    <record id="shopify_sync_log_view_pivot" model="ir.ui.view">
+        <field name="name">shopify.sync.log.pivot</field>
+        <field name="model">shopify.sync.log</field>
+        <field name="arch" type="xml">
+            <pivot string="Sync Statistics">
+                <field name="entity" type="col"/>
+                <field name="create_date" interval="day" type="row"/>
+                <field name="success_count" type="measure"/>
+                <field name="error_count" type="measure"/>
+                <field name="skipped_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Sync Log Graph View -->
+    <record id="shopify_sync_log_view_graph" model="ir.ui.view">
+        <field name="name">shopify.sync.log.graph</field>
+        <field name="model">shopify.sync.log</field>
+        <field name="arch" type="xml">
+            <graph string="Sync Activity" type="bar" stacked="1">
+                <field name="create_date" interval="day" type="row"/>
+                <field name="success_count" type="measure"/>
+                <field name="error_count" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Sync Analytics Action -->
+    <record id="shopify_sync_analytics_action" model="ir.actions.act_window">
+        <field name="name">Sync Analytics</field>
+        <field name="res_model">shopify.sync.log</field>
+        <field name="view_mode">graph,pivot,list</field>
+    </record>
+
+</odoo>
