@@ -23,7 +23,7 @@ class TestFulfillmentInbound(TransactionCase):
         })
         self.product = self.env['product.product'].create({
             'name': 'Shipped Widget', 'list_price': 25.0,
-            'detailed_type': 'product', 'default_code': 'SHIP-001',
+            'type': 'consu', 'is_storable': True, 'default_code': 'SHIP-001',
         })
         self.order = self.env['sale.order'].create({
             'partner_id': self.partner.id,

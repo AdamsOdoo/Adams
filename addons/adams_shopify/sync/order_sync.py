@@ -608,7 +608,7 @@ class OrderImporter(BaseImporter):
                 shipping_product = self.env['product.product'].create({
                     'name': 'Shopify Shipping',
                     'default_code': 'SHOPIFY-SHIPPING',
-                    'detailed_type': 'service',
+                    'type': 'service',
                     'list_price': 0,
                 })
             self._shipping_product = shipping_product

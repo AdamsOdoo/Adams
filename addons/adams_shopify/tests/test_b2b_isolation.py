@@ -25,7 +25,7 @@ class TestB2BIsolation(TransactionCase):
         })
         self.product = self.env['product.product'].create({
             'name': 'B2B Product', 'list_price': 100.0,
-            'detailed_type': 'product', 'default_code': 'B2B-001',
+            'type': 'consu', 'is_storable': True, 'default_code': 'B2B-001',
         })
 
     def test_new_order_defaults_to_direct(self):
