@@ -125,7 +125,7 @@
                         domain="[('abandoned_at', '>=', (context_today()).strftime('%%Y-%%m-%%d'))]"/>
                 <filter name="last_7_days" string="Last 7 Days"
                         domain="[('abandoned_at', '>=', (context_today() - datetime.timedelta(days=7)).strftime('%%Y-%%m-%%d'))]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_backend" string="Backend"
                             context="{'group_by': 'backend_id'}"/>
                     <filter name="group_recovered" string="Recovered"
