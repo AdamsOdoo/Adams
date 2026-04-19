@@ -107,8 +107,21 @@ class AccountMove(models.Model):
                     from ..shopify_api.queries.refund import REFUND_CREATE
                     client = ShopifyClient(backend)
 
-                    refund_amount = abs(move.amount_total)
-                    currency_code = move.currency_id.name or 'USD'
+                    # Shopify expects the amount in the order's own currency.
+                    # The credit note may be in a different currency (e.g. company
+                    # books in EUR but the Shopify order was captured in USD), so
+                    # convert when necessary.
+                    order_currency = order.currency_id
+                    if move.currency_id and move.currency_id != order_currency:
+                        refund_amount = move.currency_id._convert(
+                            abs(move.amount_total),
+                            order_currency,
+                            backend.company_id,
+                            move.date,
+                        )
+                    else:
+                        refund_amount = abs(move.amount_total)
+                    currency_code = order_currency.name
 
                     refund_input = {
                         'orderId': binding.shopify_id,

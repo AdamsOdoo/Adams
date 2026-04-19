@@ -36,10 +36,16 @@ class TestPaymentStatusSync(TransactionCase):
         })
         income_account = self.env['account.account'].search([
             ('account_type', '=', 'income'),
-            ('company_id', '=', self.env.company.id),
+            ('company_ids', 'in', [self.env.company.id]),
         ], limit=1)
-        if income_account:
-            self.product.categ_id.property_account_income_categ_id = income_account
+        if not income_account:
+            income_account = self.env['account.account'].create({
+                'name': 'Test Income Account',
+                'code': 'TINC',
+                'account_type': 'income',
+                'company_ids': [(6, 0, [self.env.company.id])],
+            })
+        self.product.categ_id.property_account_income_categ_id = income_account
         self.order = self.env['sale.order'].create({
             'partner_id': self.partner.id,
             'sales_channel': 'shopify',

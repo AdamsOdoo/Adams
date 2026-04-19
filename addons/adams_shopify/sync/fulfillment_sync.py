@@ -160,7 +160,7 @@ class FulfillmentSync:
             for move in picking.move_ids.filtered(lambda m: m.state == 'done'):
                 sku = move.product_id.default_code
                 if sku:
-                    picking_sku_qty[sku] = picking_sku_qty.get(sku, 0) + move.quantity
+                    picking_sku_qty[sku] = picking_sku_qty.get(sku, 0) + int(round(move.quantity))
 
         for fo_edge in fulfillment_orders:
             fo = fo_edge.get('node', {})

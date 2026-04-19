@@ -9,6 +9,15 @@ class TestReversePaymentSync(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        if not self.env['account.journal'].search(
+            [('type', '=', 'sale'), ('company_id', '=', self.env.company.id)], limit=1,
+        ):
+            self.env['account.journal'].create({
+                'name': 'Test Sales Journal',
+                'type': 'sale',
+                'code': 'TSHP',
+                'company_id': self.env.company.id,
+            })
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',
@@ -27,6 +36,18 @@ class TestReversePaymentSync(TransactionCase):
         self.product = self.env['product.product'].create({
             'name': 'Reverse Widget', 'list_price': 75.0,
         })
+        income_account = self.env['account.account'].search([
+            ('account_type', '=', 'income'),
+            ('company_ids', 'in', [self.env.company.id]),
+        ], limit=1)
+        if not income_account:
+            income_account = self.env['account.account'].create({
+                'name': 'Test Income Account',
+                'code': 'TINC',
+                'account_type': 'income',
+                'company_ids': [(6, 0, [self.env.company.id])],
+            })
+        self.product.categ_id.property_account_income_categ_id = income_account
 
     def _create_shopify_order(self, financial_status='pending'):
         order = self.env['sale.order'].create({

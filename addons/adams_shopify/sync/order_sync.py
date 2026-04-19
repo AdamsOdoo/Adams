@@ -620,13 +620,15 @@ class OrderImporter(BaseImporter):
                 tax_ids.append(mapped_tax.id)
                 continue
 
-            # 2. Fallback: find Odoo tax by rate (round to 4 decimals)
+            # 2. Fallback: find Odoo tax by rate (2 dp is sufficient for tax
+            # rates; a ±0.005 tolerance avoids float→SQL precision drift).
             if rate is not None:
-                rate_pct = round(float(rate) * 100, 4)
+                rate_pct = round(float(rate) * 100, 2)
                 if rate_pct not in self._tax_rate_cache:
                     odoo_tax = self.env['account.tax'].search([
                         ('type_tax_use', '=', 'sale'),
-                        ('amount', '=', rate_pct),
+                        ('amount', '>=', rate_pct - 0.005),
+                        ('amount', '<=', rate_pct + 0.005),
                         ('company_id', '=', self.backend.company_id.id),
                     ], limit=1)
                     self._tax_rate_cache[rate_pct] = odoo_tax
