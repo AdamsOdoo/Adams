@@ -283,6 +283,23 @@ class ShopifyBackend(models.Model):
     @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')
     def _compute_bind_counts(self):
+        # Seed defaults on every record so unsaved NewId records (and empty
+        # recordsets) still satisfy Odoo's compute-assignment contract during
+        # onchange snapshotting. Real records get overwritten below.
+        _zero_fields = (
+            'product_bind_count', 'customer_bind_count', 'order_bind_count',
+            'product_error_count', 'customer_error_count', 'order_error_count',
+            'inventory_bind_count', 'inventory_error_count',
+            'total_error_count', 'total_synced_count', 'total_pending_count',
+            'permanent_error_count', 'collection_bind_count',
+            'refund_bind_count', 'sync_log_today_count', 'promoter_count',
+            'abandoned_cart_count', 'payout_count',
+        )
+        for rec in self:
+            for fname in _zero_fields:
+                setattr(rec, fname, 0)
+            rec.sync_health_pct = 100
+
         today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0)
         backend_ids = self.ids
         if not backend_ids:
