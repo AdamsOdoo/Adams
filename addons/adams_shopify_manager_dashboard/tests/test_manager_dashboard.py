@@ -187,3 +187,13 @@ class TestManagerDashboardAggregator(TransactionCase):
         data = self.Dashboard.get_data(backend_ids=[self.backend_a.id], period='mtd')
         # When prior = 0, fallback delta = 100.0 for non-zero current.
         self.assertGreaterEqual(data['kpis']['revenue']['delta_pct'], 0)
+
+    def test_new_backend_onchange_does_not_raise(self):
+        """Regression: reading a computed count on a NewId shopify.backend
+        must not raise "Compute method failed to assign ..." — the bug that
+        broke the Create Store form before we default-initialised the
+        bind-count fields."""
+        new_rec = self.Backend.new({'name': 'Draft Store'})
+        self.assertEqual(new_rec.product_bind_count, 0)
+        self.assertEqual(new_rec.order_bind_count, 0)
+        self.assertEqual(new_rec.sync_health_pct, 100)
