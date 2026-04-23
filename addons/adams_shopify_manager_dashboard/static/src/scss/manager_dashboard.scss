@@ -1,0 +1,253 @@
+.o_shopify_manager_dashboard {
+    padding: 16px;
+    background: #f6f7f9;
+    min-height: 100%;
+
+    .o_smd_toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .o_smd_stores {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+
+        .o_smd_label {
+            font-weight: 600;
+            margin-right: 6px;
+            color: #4c4c4c;
+        }
+    }
+
+    .o_smd_chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #fff;
+        border: 1px solid #d4d4d4;
+        border-radius: 16px;
+        padding: 2px 10px;
+        cursor: pointer;
+        font-size: 12px;
+        user-select: none;
+
+        input {
+            margin: 0;
+        }
+    }
+
+    .o_smd_periods {
+        display: flex;
+        gap: 4px;
+
+        .o_smd_refresh {
+            margin-left: 8px;
+        }
+    }
+
+    .o_smd_loading {
+        padding: 40px;
+        text-align: center;
+        color: #888;
+    }
+
+    // KPI cards --------------------------------------------------------
+
+    .o_smd_kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .o_smd_kpi {
+        background: #fff;
+        border-radius: 6px;
+        padding: 12px 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        cursor: pointer;
+        transition: box-shadow 0.15s ease;
+
+        &:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        .o_smd_kpi_label {
+            font-size: 12px;
+            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .o_smd_kpi_value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #222;
+            margin-top: 4px;
+        }
+
+        .o_smd_kpi_delta {
+            font-size: 12px;
+            margin-top: 4px;
+
+            .o_smd_kpi_prior {
+                color: #999;
+            }
+        }
+    }
+
+    .o_smd_delta_up { color: #1fae43; }
+    .o_smd_delta_down { color: #d9534f; }
+    .o_smd_delta_flat { color: #8a8a8a; }
+
+    // Panels -----------------------------------------------------------
+
+    .o_smd_panel {
+        background: #fff;
+        border-radius: 6px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+        .o_smd_panel_title {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+        }
+    }
+
+    .o_smd_chart_wrap {
+        position: relative;
+        height: 260px;
+
+        &.o_smd_chart_short {
+            height: 140px;
+        }
+    }
+
+    .o_smd_row_two {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 16px;
+    }
+
+    .o_smd_row_three {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+    }
+
+    .o_smd_table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+
+        th, td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+
+        th {
+            font-weight: 600;
+            color: #666;
+            background: #fafafa;
+        }
+
+        tbody tr {
+            cursor: pointer;
+
+            &:hover { background: #f2f6fb; }
+        }
+
+        .text-end { text-align: right; }
+
+        .o_smd_empty {
+            text-align: center;
+            color: #999;
+            padding: 16px;
+        }
+    }
+
+    .o_smd_table_compact td {
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+
+    // Deliveries mini-KPIs --------------------------------------------
+
+    .o_smd_mini_kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .o_smd_mini_kpi {
+        border: 1px solid #e4e4e4;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+        background: #fafcfd;
+
+        .o_smd_mini_label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .o_smd_mini_value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #222;
+        }
+
+        &:hover { background: #eaf3fb; }
+    }
+
+    // Stat lines (carts/refunds/payouts) ------------------------------
+
+    .o_smd_stat_line {
+        font-size: 13px;
+        padding: 2px 0;
+        color: #333;
+
+        &.o_smd_clickable {
+            cursor: pointer;
+
+            &:hover { color: #00a09d; }
+        }
+
+        .o_smd_muted { color: #999; font-size: 12px; }
+    }
+
+    // Alerts strip -----------------------------------------------------
+
+    .o_smd_alerts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .o_smd_alert {
+        border-radius: 14px;
+        padding: 4px 12px;
+        font-size: 12px;
+        background: #eef;
+        border: 1px solid #dde;
+
+        &.o_smd_alert_warn { background: #fff7e6; border-color: #f0ad4e; color: #8a5a00; }
+        &.o_smd_alert_err  { background: #fdecea; border-color: #d9534f; color: #8a1a1a; }
+        &.o_smd_alert_info { background: #e6f4ff; border-color: #2196f3; color: #0d5a9c; }
+    }
+}
