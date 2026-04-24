@@ -104,9 +104,12 @@ class RefundImporter:
                 'restock_type': restock,
             })
 
-        # Try to create credit note from posted invoice
+        # Try to create credit note from posted invoice.
+        # Use shopify_no_auto_export context to prevent the credit note
+        # from triggering reverse-sync (creating a duplicate Shopify refund).
         order = order_binding.odoo_id
         credit_note = None
+        ctx = {'shopify_no_auto_export': True}
         if order and order.invoice_ids:
             posted_invoices = order.invoice_ids.filtered(lambda i: i.state == 'posted')
             if posted_invoices:
@@ -114,6 +117,7 @@ class RefundImporter:
                     move_reversal = self.env['account.move.reversal'].with_context(
                         active_model='account.move',
                         active_ids=posted_invoices[0].ids,
+                        **ctx,
                     ).create({
                         'reason': refund_data.get('note') or 'Shopify Refund',
                         'journal_id': posted_invoices[0].journal_id.id,

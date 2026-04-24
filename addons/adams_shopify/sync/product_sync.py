@@ -535,6 +535,14 @@ class ProductSync:
                 id title descriptionHtml vendor productType tags status handle
                 createdAt updatedAt
                 options { name values }
+                images(first: 20) {
+                  edges {
+                    node {
+                      url
+                      altText
+                    }
+                  }
+                }
                 variants(first: 100) {
                   edges {
                     node {
