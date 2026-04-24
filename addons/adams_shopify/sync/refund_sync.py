@@ -55,20 +55,33 @@ class RefundImporter:
 
         return success, errors, skipped
 
+    def _money(self, price_set):
+        """Extract amount from a priceSet respecting backend import_currency_mode.
+        Mirrors order_sync._get_money_amount so refund totals match the order/
+        invoice currency when the backend is in 'presentment' mode."""
+        if not price_set:
+            return 0.0, ''
+        if self.backend.import_currency_mode == 'presentment':
+            money = price_set.get('presentmentMoney') or price_set.get('shopMoney') or {}
+        else:
+            money = price_set.get('shopMoney') or {}
+        return float(money.get('amount', 0) or 0), money.get('currencyCode', '') or ''
+
     def _import_one_refund(self, refund_data, order_binding):
         """Create a credit note from a Shopify refund."""
         shopify_refund_id = refund_data.get('id')
-        total_refund = refund_data.get('totalRefundedSet', {}).get('shopMoney', {})
-        refund_amount = float(total_refund.get('amount', 0))
-        currency_code = total_refund.get('currencyCode', '')
+        refund_amount, currency_code = self._money(refund_data.get('totalRefundedSet'))
 
         # Parse refund lines
         refund_lines = []
-        for edge in refund_data.get('refundLineItems', {}).get('edges', []):
-            node = edge.get('node', {})
-            line_item = node.get('lineItem', {})
-            variant = line_item.get('variant', {})
-            subtotal = node.get('subtotalSet', {}).get('shopMoney', {})
+        for edge in (refund_data.get('refundLineItems') or {}).get('edges', []):
+            node = edge.get('node') or {}
+            # dict.get(k, {}) returns {} only when k is absent, NOT when the
+            # value is explicitly null. Shopify returns null for deleted
+            # variants / lineItems, so guard every nested hop with `or {}`.
+            line_item = node.get('lineItem') or {}
+            variant = line_item.get('variant') or {}
+            subtotal_amount, _ = self._money(node.get('subtotalSet'))
 
             product = None
             variant_id = variant.get('id', '')
@@ -87,7 +100,7 @@ class RefundImporter:
             refund_lines.append({
                 'product_id': product.id if product else False,
                 'quantity': node.get('quantity', 0),
-                'amount': float(subtotal.get('amount', 0)),
+                'amount': subtotal_amount,
                 'restock_type': restock,
             })
 

@@ -740,14 +740,39 @@ class OrderSync:
         try:
             from ..shopify_api.client import ShopifyClient
             client = ShopifyClient(self.backend)
+            # Must match FETCH_ORDERS shape: include currencyCode +
+            # presentmentCurrencyCode, presentmentMoney on every priceSet,
+            # subtotal/shipping/tax totals, and per-line taxLines. Otherwise
+            # presentment-mode backends silently fall back to shop currency
+            # and imported orders lose tax mappings.
             query = """
             query GetOrder($id: ID!) {
               order(id: $id) {
                 id name createdAt updatedAt
                 displayFinancialStatus displayFulfillmentStatus
                 cancelledAt closed note tags
-                totalPriceSet { shopMoney { amount currencyCode } }
-                totalDiscountsSet { shopMoney { amount currencyCode } }
+                currencyCode
+                presentmentCurrencyCode
+                totalPriceSet {
+                  shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
+                }
+                subtotalPriceSet {
+                  shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
+                }
+                totalShippingPriceSet {
+                  shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
+                }
+                totalTaxSet {
+                  shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
+                }
+                totalDiscountsSet {
+                  shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
+                }
                 discountCodes
                 customer { id email firstName lastName }
                 shippingAddress {
@@ -757,23 +782,40 @@ class OrderSync:
                 billingAddress {
                   address1 address2 city province country countryCodeV2 zip
                 }
-                lineItems(first: 50) {
+                lineItems(first: 150) {
                   edges {
                     node {
                       id title quantity
                       variant { id sku product { id } }
-                      originalUnitPriceSet { shopMoney { amount currencyCode } }
+                      originalUnitPriceSet {
+                        shopMoney { amount currencyCode }
+                        presentmentMoney { amount currencyCode }
+                      }
                       discountAllocations {
-                        allocatedAmountSet { shopMoney { amount currencyCode } }
+                        allocatedAmountSet {
+                          shopMoney { amount currencyCode }
+                          presentmentMoney { amount currencyCode }
+                        }
+                      }
+                      taxLines {
+                        title
+                        rate
+                        priceSet {
+                          shopMoney { amount currencyCode }
+                          presentmentMoney { amount currencyCode }
+                        }
                       }
                     }
                   }
                 }
-                shippingLines(first: 5) {
+                shippingLines(first: 10) {
                   edges {
                     node {
                       title code
-                      originalPriceSet { shopMoney { amount currencyCode } }
+                      originalPriceSet {
+                        shopMoney { amount currencyCode }
+                        presentmentMoney { amount currencyCode }
+                      }
                     }
                   }
                 }

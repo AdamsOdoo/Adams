@@ -27,10 +27,8 @@ query FetchRefunds($orderId: ID!) {
       note
       createdAt
       totalRefundedSet {
-        shopMoney {
-          amount
-          currencyCode
-        }
+        shopMoney { amount currencyCode }
+        presentmentMoney { amount currencyCode }
       }
       refundLineItems(first: 50) {
         edges {
@@ -46,9 +44,8 @@ query FetchRefunds($orderId: ID!) {
             quantity
             restockType
             subtotalSet {
-              shopMoney {
-                amount
-              }
+              shopMoney { amount currencyCode }
+              presentmentMoney { amount currencyCode }
             }
           }
         }
