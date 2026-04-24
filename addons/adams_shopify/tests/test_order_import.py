@@ -351,10 +351,6 @@ class TestOrderImport(TransactionCase):
         """Auto-invoice should be skipped with activity when income account missing."""
         from ..sync.order_sync import OrderImporter
 
-        # Remove income account from product category
-        self.product.categ_id.property_account_income_categ_id = False
-        self.product.property_account_income_id = False
-
         node = self._make_order_node(financial_status='PAID')
 
         importer = OrderImporter.__new__(OrderImporter)
@@ -367,7 +363,18 @@ class TestOrderImport(TransactionCase):
         importer._country_cache = {}
         importer._state_cache = {}
 
-        importer._import_one(node, existing_binding=None)
+        # Mock get_product_accounts to return no income account, which is
+        # more reliable than clearing property fields that may have
+        # company-level defaults from the chart of accounts.
+        def _no_income_account(self_tmpl, fiscal_pos=None):
+            return {'income': False, 'expense': False}
+
+        with patch.object(
+            type(self.product.product_tmpl_id),
+            'get_product_accounts',
+            _no_income_account,
+        ):
+            importer._import_one(node, existing_binding=None)
 
         binding = self.env['shopify.order.binding'].search([
             ('backend_id', '=', self.backend.id),

@@ -23,7 +23,12 @@ class ShopifyBackend(models.Model):
         new_records = self.filtered(lambda r: not isinstance(r.id, int))
         for rec in new_records:
             for fname in _BIND_COUNT_FIELDS:
-                setattr(rec, fname, 0)
+                # sync_health_pct defaults to 100 (fully healthy) when there
+                # are no bindings yet, matching the base compute logic.
+                if fname == 'sync_health_pct':
+                    setattr(rec, fname, 100)
+                else:
+                    setattr(rec, fname, 0)
         real_records = self - new_records
         if real_records:
             super(ShopifyBackend, real_records)._compute_bind_counts()
