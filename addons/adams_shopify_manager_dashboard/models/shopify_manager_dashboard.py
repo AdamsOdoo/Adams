@@ -427,11 +427,21 @@ class ShopifyManagerDashboard(models.AbstractModel):
         recovery_rate = (count_recovered / total_count * 100) if total_count else 0
 
         recent = Cart.search(domain + [('recovered', '=', False)], limit=5, order='abandoned_at desc')
+        # Unrecovered carts almost never have sale_order_id (it is only set
+        # when a user manually creates a quotation from the cart). Fall back
+        # to the customer_name / customer_email fields that the importer
+        # populates directly from the Shopify checkout payload so the row
+        # is never labelled with an empty string.
         recent_rows = [{
             'id': c.id,
             'abandoned_at': fields.Datetime.to_string(c.abandoned_at) if c.abandoned_at else False,
             'total_price': round(float(c.total_price or 0.0), 2),
-            'partner_name': c.sale_order_id.partner_id.display_name if c.sale_order_id and c.sale_order_id.partner_id else '',
+            'partner_name': (
+                (c.sale_order_id.partner_id.display_name if c.sale_order_id and c.sale_order_id.partner_id else '')
+                or c.customer_name
+                or c.customer_email
+                or ''
+            ),
             'recovery_url': c.recovery_url or '',
         } for c in recent]
 

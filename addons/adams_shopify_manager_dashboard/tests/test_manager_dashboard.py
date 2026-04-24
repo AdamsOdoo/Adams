@@ -165,14 +165,14 @@ class TestManagerDashboardAggregator(TransactionCase):
     def test_payouts_status_breakdown(self):
         self.Payout.create({
             'backend_id': self.backend_a.id,
-            'shopify_id': 'p-1',
+            'shopify_payout_id': 'p-1',
             'status': 'scheduled',
             'amount': 500.0,
             'payout_date': fields.Date.today() + timedelta(days=3),
         })
         self.Payout.create({
             'backend_id': self.backend_a.id,
-            'shopify_id': 'p-2',
+            'shopify_payout_id': 'p-2',
             'status': 'paid',
             'amount': 200.0,
             'payout_date': fields.Date.today() - timedelta(days=1),
@@ -187,6 +187,26 @@ class TestManagerDashboardAggregator(TransactionCase):
         data = self.Dashboard.get_data(backend_ids=[self.backend_a.id], period='mtd')
         # When prior = 0, fallback delta = 100.0 for non-zero current.
         self.assertGreaterEqual(data['kpis']['revenue']['delta_pct'], 0)
+
+    def test_abandoned_cart_row_falls_back_to_customer_name(self):
+        """Regression: unrecovered carts have no sale_order_id, so the
+        recent-rows list used to show an empty partner_name. The dashboard
+        must now fall back to customer_name / customer_email."""
+        self.Cart.create({
+            'backend_id': self.backend_a.id,
+            'shopify_id': 'c-namefallback',
+            'abandoned_at': fields.Datetime.now() - timedelta(days=1),
+            'total_price': 75.0,
+            'recovered': False,
+            'customer_name': 'Cart Owner',
+            'customer_email': 'owner@example.com',
+        })
+        data = self.Dashboard.get_data(backend_ids=[self.backend_a.id], period='mtd')
+        rows = data['abandoned_carts']['recent']
+        self.assertTrue(rows, "Dashboard returned no recent carts")
+        owner_row = next((r for r in rows if r.get('total_price') == 75.0), None)
+        self.assertIsNotNone(owner_row, "Seeded cart missing from recent rows")
+        self.assertEqual(owner_row['partner_name'], 'Cart Owner')
 
     def test_new_backend_onchange_does_not_raise(self):
         """Regression: reading a computed count on a NewId shopify.backend
