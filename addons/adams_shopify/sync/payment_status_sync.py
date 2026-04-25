@@ -100,6 +100,10 @@ class PaymentStatusHandler:
         if not order:
             return False
 
+        # All accounting actions must suppress reverse-sync to avoid a loop:
+        # Shopify→paid → post invoice → action_post override → orderMarkAsPaid → loop
+        ctx = {'shopify_no_auto_export': True}
+
         # Find draft invoice → post it
         draft_invoices = order.invoice_ids.filtered(
             lambda i: i.move_type == 'out_invoice' and i.state == 'draft'
@@ -110,7 +114,7 @@ class PaymentStatusHandler:
 
         if draft_invoices:
             try:
-                draft_invoices[0].action_post()
+                draft_invoices[0].with_context(**ctx).action_post()
                 _logger.info(
                     "Posted draft invoice %s for order %s (Shopify payment captured)",
                     draft_invoices[0].name, order.name,
@@ -135,7 +139,7 @@ class PaymentStatusHandler:
         # No invoice exists — try to create one
         if order.state == 'draft':
             try:
-                order.action_confirm()
+                order.with_context(**ctx).action_confirm()
             except Exception as e:
                 _logger.warning("Could not confirm order %s: %s", order.name, e)
                 self._schedule_activity(
@@ -147,7 +151,7 @@ class PaymentStatusHandler:
         if order.state in ('sale', 'done'):
             try:
                 with self.env.cr.savepoint():
-                    invoice = order._create_invoices()
+                    invoice = order.with_context(**ctx)._create_invoices()
                     if not invoice:
                         _logger.warning(
                             "No invoiceable lines for order %s — "
@@ -155,7 +159,7 @@ class PaymentStatusHandler:
                             order.name,
                         )
                         return False
-                    invoice.action_post()
+                    invoice.with_context(**ctx).action_post()
                 _logger.info(
                     "Created and posted invoice %s for order %s",
                     invoice.name, order.name,
@@ -189,13 +193,16 @@ class PaymentStatusHandler:
         if not order:
             return False
 
+        # Suppress reverse-sync to avoid a loop (same as _transition_to_paid)
+        ctx = {'shopify_no_auto_export': True}
+
         draft_invoices = order.invoice_ids.filtered(
             lambda i: i.move_type == 'out_invoice' and i.state == 'draft'
         )
 
         if draft_invoices:
             try:
-                draft_invoices[0].action_post()
+                draft_invoices[0].with_context(**ctx).action_post()
                 _logger.info(
                     "Posted invoice %s for partially paid order %s",
                     draft_invoices[0].name, order.name,
@@ -219,13 +226,16 @@ class PaymentStatusHandler:
         if not order:
             return False
 
+        # Suppress reverse-sync for all accounting operations
+        ctx = {'shopify_no_auto_export': True}
+
         # Cancel draft invoices safely
         draft_invoices = order.invoice_ids.filtered(
             lambda i: i.move_type == 'out_invoice' and i.state == 'draft'
         )
         if draft_invoices:
             try:
-                draft_invoices.button_cancel()
+                draft_invoices.with_context(**ctx).button_cancel()
                 _logger.info(
                     "Cancelled draft invoice(s) for voided order %s", order.name,
                 )

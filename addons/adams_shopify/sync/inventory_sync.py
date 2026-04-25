@@ -27,7 +27,12 @@ class InventorySync:
         """Push current stock levels for all variant bindings."""
         # Acquire a per-backend advisory lock to prevent overlapping
         # cron runs from racing against each other.
-        lock_key = hash(f"shopify_inventory_{backend.id}") & 0x7FFFFFFF
+        # Python's hash() is randomised per process (PYTHONHASHSEED), so
+        # two Odoo workers computing hash(same_str) produce different
+        # integers and the lock fails to coordinate. Pack backend.id into
+        # the upper 32 bits and a fixed namespace discriminator ('INVS'
+        # as ASCII) into the lower 32 — mirrors customer_sync.py:118.
+        lock_key = (backend.id << 32) | 0x494E5653
         self.env.cr.execute(
             "SELECT pg_try_advisory_xact_lock(%s)", (lock_key,),
         )

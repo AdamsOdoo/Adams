@@ -283,6 +283,23 @@ class ShopifyBackend(models.Model):
     @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')
     def _compute_bind_counts(self):
+        # Seed defaults on every record so unsaved NewId records (and empty
+        # recordsets) still satisfy Odoo's compute-assignment contract during
+        # onchange snapshotting. Real records get overwritten below.
+        _zero_fields = (
+            'product_bind_count', 'customer_bind_count', 'order_bind_count',
+            'product_error_count', 'customer_error_count', 'order_error_count',
+            'inventory_bind_count', 'inventory_error_count',
+            'total_error_count', 'total_synced_count', 'total_pending_count',
+            'permanent_error_count', 'collection_bind_count',
+            'refund_bind_count', 'sync_log_today_count', 'promoter_count',
+            'abandoned_cart_count', 'payout_count',
+        )
+        for rec in self:
+            for fname in _zero_fields:
+                setattr(rec, fname, 0)
+            rec.sync_health_pct = 100
+
         today_start = fields.Datetime.now().replace(hour=0, minute=0, second=0)
         backend_ids = self.ids
 
@@ -766,6 +783,87 @@ class ShopifyBackend(models.Model):
             f"<p>{error_details[:500] if error_details else 'Check the sync log for details.'}</p>"
         )
         self.message_post(body=body, message_type='notification', subtype_xmlid='mail.mt_note')
+
+    # ── Error Monitoring ──────────────────────────────────────
+
+    @api.model
+    def _cron_error_digest(self):
+        """Daily error digest — posts a summary to chatter for each backend
+        that accumulated sync errors in the last 24 hours.
+
+        This ensures sync failures are visible to followers without requiring
+        someone to check the sync log manually.
+        """
+        cutoff = fields.Datetime.now() - timedelta(hours=24)
+        backends = self.search([('state', '=', 'connected')])
+
+        for backend in backends:
+            # Gather error/partial sync logs from the last 24 hours
+            error_logs = self.env['shopify.sync.log'].sudo().search([
+                ('backend_id', '=', backend.id),
+                ('state', 'in', ('error', 'partial')),
+                ('create_date', '>=', cutoff),
+            ])
+            if not error_logs:
+                continue
+
+            # Count binding errors (persistent)
+            binding_models = {
+                'Products': 'shopify.product.binding',
+                'Customers': 'shopify.customer.binding',
+                'Orders': 'shopify.order.binding',
+                'Inventory': 'shopify.inventory.binding',
+            }
+            error_lines = []
+            total_binding_errors = 0
+            for label, model_name in binding_models.items():
+                count = self.env[model_name].sudo().search_count([
+                    ('backend_id', '=', backend.id),
+                    ('sync_status', 'in', ('error', 'permanent_error')),
+                ])
+                if count:
+                    error_lines.append(f"<li>{label}: {count} binding(s) in error</li>")
+                    total_binding_errors += count
+
+            # Count dead-letter webhooks
+            dead_count = self.env['shopify.webhook.log'].sudo().search_count([
+                ('backend_id', '=', backend.id),
+                ('state', '=', 'dead_letter'),
+            ])
+
+            # Build digest message
+            parts = [
+                "<p><strong>🔔 Daily Sync Error Digest</strong></p>",
+                f"<p>In the last 24 hours: <b>{len(error_logs)}</b> sync "
+                f"run(s) with errors.</p>",
+            ]
+            if error_lines:
+                parts.append(
+                    "<p><b>Bindings in error state:</b></p><ul>"
+                    + ''.join(error_lines)
+                    + "</ul>"
+                )
+            if dead_count:
+                parts.append(
+                    f"<p>⚠ <b>{dead_count}</b> dead-letter webhook(s) "
+                    "require manual investigation.</p>"
+                )
+            total = total_binding_errors + dead_count
+            if total == 0:
+                parts.append(
+                    "<p>All sync-run errors were transient (retryable). "
+                    "No persistent binding errors.</p>"
+                )
+            parts.append(
+                "<p><i>Tip: open the Shopify backend form → Sync Errors "
+                "to review and retry.</i></p>"
+            )
+
+            backend.message_post(
+                body=''.join(parts),
+                message_type='notification',
+                subtype_xmlid='mail.mt_note',
+            )
 
     # ── Cron entry points ───────────────────────────────────
 

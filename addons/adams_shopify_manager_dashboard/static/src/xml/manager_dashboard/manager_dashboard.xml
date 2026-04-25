@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="shopify_manager_dashboard.Main">
+    <div class="o_shopify_manager_dashboard">
+        <div class="o_smd_toolbar">
+            <div class="o_smd_stores">
+                <span class="o_smd_label">Stores</span>
+                <button class="btn btn-sm btn-link" t-on-click="onBackendAll">All</button>
+                <t t-foreach="state.data?.backends || []" t-as="b" t-key="b.id">
+                    <label class="o_smd_chip">
+                        <input type="checkbox"
+                               t-att-value="b.id"
+                               t-att-checked="state.backendIds.includes(b.id)"
+                               t-on-change="onBackendToggle"/>
+                        <span t-esc="b.name"/>
+                    </label>
+                </t>
+            </div>
+            <div class="o_smd_periods">
+                <t t-foreach="state.periods" t-as="p" t-key="p.key">
+                    <button class="btn btn-sm"
+                            t-att-class="{
+                                'btn-primary': state.period === p.key,
+                                'btn-outline-secondary': state.period !== p.key,
+                            }"
+                            t-on-click="() => this.onPeriodChange(p.key)">
+                        <t t-esc="p.label"/>
+                    </button>
+                </t>
+                <button class="btn btn-sm btn-outline-secondary o_smd_refresh"
+                        t-on-click="refresh" title="Refresh">⟳</button>
+            </div>
+        </div>
+
+        <div t-if="state.loading" class="o_smd_loading">Loading…</div>
+
+        <t t-if="!state.loading and state.data">
+            <!-- KPI cards -->
+            <div class="o_smd_kpis">
+                <div class="o_smd_kpi" t-on-click="openOrders">
+                    <div class="o_smd_kpi_label">Revenue</div>
+                    <div class="o_smd_kpi_value" t-esc="formatCurrency(state.data.kpis.revenue.value)"/>
+                    <div t-att-class="'o_smd_kpi_delta ' + deltaClass(state.data.kpis.revenue.delta_pct)">
+                        <t t-esc="deltaArrow(state.data.kpis.revenue.delta_pct)"/>
+                        <t t-esc="formatPct(state.data.kpis.revenue.delta_pct)"/>
+                        <span class="o_smd_kpi_prior"> vs <t t-esc="formatCurrency(state.data.kpis.revenue.prior)"/></span>
+                    </div>
+                </div>
+                <div class="o_smd_kpi" t-on-click="openOrders">
+                    <div class="o_smd_kpi_label">Orders</div>
+                    <div class="o_smd_kpi_value" t-esc="formatNumber(state.data.kpis.orders.value)"/>
+                    <div t-att-class="'o_smd_kpi_delta ' + deltaClass(state.data.kpis.orders.delta_pct)">
+                        <t t-esc="deltaArrow(state.data.kpis.orders.delta_pct)"/>
+                        <t t-esc="formatPct(state.data.kpis.orders.delta_pct)"/>
+                        <span class="o_smd_kpi_prior"> vs <t t-esc="formatNumber(state.data.kpis.orders.prior)"/></span>
+                    </div>
+                </div>
+                <div class="o_smd_kpi">
+                    <div class="o_smd_kpi_label">Avg order value</div>
+                    <div class="o_smd_kpi_value" t-esc="formatCurrency(state.data.kpis.aov.value)"/>
+                    <div t-att-class="'o_smd_kpi_delta ' + deltaClass(state.data.kpis.aov.delta_pct)">
+                        <t t-esc="deltaArrow(state.data.kpis.aov.delta_pct)"/>
+                        <t t-esc="formatPct(state.data.kpis.aov.delta_pct)"/>
+                        <span class="o_smd_kpi_prior"> vs <t t-esc="formatCurrency(state.data.kpis.aov.prior)"/></span>
+                    </div>
+                </div>
+                <div class="o_smd_kpi">
+                    <div class="o_smd_kpi_label">New customers</div>
+                    <div class="o_smd_kpi_value" t-esc="formatNumber(state.data.kpis.new_customers.value)"/>
+                    <div t-att-class="'o_smd_kpi_delta ' + deltaClass(state.data.kpis.new_customers.delta_pct)">
+                        <t t-esc="deltaArrow(state.data.kpis.new_customers.delta_pct)"/>
+                        <t t-esc="formatPct(state.data.kpis.new_customers.delta_pct)"/>
+                        <span class="o_smd_kpi_prior"> vs <t t-esc="formatNumber(state.data.kpis.new_customers.prior)"/></span>
+                    </div>
+                </div>
+                <div class="o_smd_kpi" t-on-click="openRefunds">
+                    <div class="o_smd_kpi_label">Refund rate</div>
+                    <div class="o_smd_kpi_value" t-esc="formatPct(state.data.kpis.refund_rate.value)"/>
+                    <div t-att-class="'o_smd_kpi_delta ' + deltaClass(-state.data.kpis.refund_rate.delta_pct)">
+                        <t t-esc="deltaArrow(-state.data.kpis.refund_rate.delta_pct)"/>
+                        <t t-esc="formatPct(state.data.kpis.refund_rate.delta_pct)"/>
+                        <span class="o_smd_kpi_prior"> vs <t t-esc="formatPct(state.data.kpis.refund_rate.prior)"/></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trend chart -->
+            <div class="o_smd_panel">
+                <h3 class="o_smd_panel_title">Sales trend</h3>
+                <div class="o_smd_chart_wrap">
+                    <canvas t-ref="trendChart"/>
+                </div>
+            </div>
+
+            <!-- Top products + customers -->
+            <div class="o_smd_row_two">
+                <div class="o_smd_panel">
+                    <h3 class="o_smd_panel_title">Top products</h3>
+                    <table class="o_smd_table">
+                        <thead>
+                            <tr><th>Product</th><th class="text-end">Units</th><th class="text-end">Revenue</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.data.top_products" t-as="p" t-key="p.product_id"
+                                t-on-click="() => this.openProduct(p.product_id)">
+                                <td t-esc="p.name"/>
+                                <td class="text-end" t-esc="formatNumber(p.units)"/>
+                                <td class="text-end" t-esc="formatCurrency(p.revenue)"/>
+                            </tr>
+                            <tr t-if="!state.data.top_products.length">
+                                <td colspan="3" class="o_smd_empty">No orders in this period.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="o_smd_panel">
+                    <h3 class="o_smd_panel_title">Top customers</h3>
+                    <table class="o_smd_table">
+                        <thead>
+                            <tr><th>Customer</th><th class="text-end">Orders</th><th class="text-end">Spend</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="state.data.top_customers" t-as="c" t-key="c.partner_id"
+                                t-on-click="() => this.openCustomer(c.partner_id)">
+                                <td t-esc="c.name"/>
+                                <td class="text-end" t-esc="formatNumber(c.orders)"/>
+                                <td class="text-end" t-esc="formatCurrency(c.revenue)"/>
+                            </tr>
+                            <tr t-if="!state.data.top_customers.length">
+                                <td colspan="3" class="o_smd_empty">No orders in this period.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Deliveries -->
+            <div class="o_smd_panel">
+                <h3 class="o_smd_panel_title">Deliveries</h3>
+                <div class="o_smd_mini_kpis">
+                    <div class="o_smd_mini_kpi" t-on-click="() => this.openPickings('unfulfilled')">
+                        <div class="o_smd_mini_label">Unfulfilled</div>
+                        <div class="o_smd_mini_value" t-esc="formatNumber(state.data.deliveries.unfulfilled)"/>
+                    </div>
+                    <div class="o_smd_mini_kpi" t-on-click="() => this.openPickings('ready')">
+                        <div class="o_smd_mini_label">Ready to ship</div>
+                        <div class="o_smd_mini_value" t-esc="formatNumber(state.data.deliveries.ready_to_ship)"/>
+                    </div>
+                    <div class="o_smd_mini_kpi" t-on-click="() => this.openPickings('shipped')">
+                        <div class="o_smd_mini_label">Shipped (total)</div>
+                        <div class="o_smd_mini_value" t-esc="formatNumber(state.data.deliveries.shipped_total)"/>
+                    </div>
+                    <div class="o_smd_mini_kpi" t-on-click="() => this.openPickings('shipped_today')">
+                        <div class="o_smd_mini_label">Shipped today</div>
+                        <div class="o_smd_mini_value" t-esc="formatNumber(state.data.deliveries.shipped_today)"/>
+                    </div>
+                    <div class="o_smd_mini_kpi">
+                        <div class="o_smd_mini_label">Avg fulfill time</div>
+                        <div class="o_smd_mini_value">
+                            <t t-esc="formatNumber(state.data.deliveries.avg_fulfill_hours)"/> h
+                        </div>
+                    </div>
+                </div>
+                <div class="o_smd_chart_wrap o_smd_chart_short">
+                    <canvas t-ref="deliveriesChart"/>
+                </div>
+            </div>
+
+            <!-- Carts / refunds / payouts -->
+            <div class="o_smd_row_three">
+                <div class="o_smd_panel">
+                    <h3 class="o_smd_panel_title" t-on-click="openCarts">Abandoned carts</h3>
+                    <div class="o_smd_stat_line">
+                        <span t-esc="formatNumber(state.data.abandoned_carts.count)"/> carts ·
+                        <span t-esc="formatCurrency(state.data.abandoned_carts.value_total)"/> total
+                    </div>
+                    <div class="o_smd_stat_line">
+                        Recovery rate: <b t-esc="formatPct(state.data.abandoned_carts.recovery_rate_pct)"/>
+                    </div>
+                    <div class="o_smd_stat_line">
+                        Recoverable: <b t-esc="formatCurrency(state.data.abandoned_carts.recoverable_value)"/>
+                    </div>
+                    <table class="o_smd_table o_smd_table_compact">
+                        <tbody>
+                            <tr t-foreach="state.data.abandoned_carts.recent" t-as="c" t-key="c.id">
+                                <td t-esc="c.partner_name || '—'"/>
+                                <td class="text-end" t-esc="formatCurrency(c.total_price)"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="o_smd_panel">
+                    <h3 class="o_smd_panel_title" t-on-click="openRefunds">Refunds</h3>
+                    <div class="o_smd_stat_line">
+                        <span t-esc="formatNumber(state.data.refunds.count)"/> refunds ·
+                        <span t-esc="formatCurrency(state.data.refunds.amount)"/>
+                    </div>
+                    <div class="o_smd_stat_line">
+                        Rate: <b t-esc="formatPct(state.data.refunds.refund_rate_pct)"/>
+                    </div>
+                    <table class="o_smd_table o_smd_table_compact">
+                        <tbody>
+                            <tr t-foreach="state.data.refunds.recent" t-as="r" t-key="r.id">
+                                <td t-esc="r.order_name || '—'"/>
+                                <td class="text-end" t-esc="formatCurrency(r.refund_amount)"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="o_smd_panel">
+                    <h3 class="o_smd_panel_title" t-on-click="() => this.openPayouts()">Payouts</h3>
+                    <div class="o_smd_stat_line o_smd_clickable" t-on-click="() => this.openPayouts('scheduled')">
+                        Scheduled: <b t-esc="formatCurrency(state.data.payouts.scheduled.amount)"/>
+                        <span class="o_smd_muted">(<t t-esc="formatNumber(state.data.payouts.scheduled.count)"/>)</span>
+                    </div>
+                    <div class="o_smd_stat_line o_smd_clickable" t-on-click="() => this.openPayouts('in_transit')">
+                        In transit: <b t-esc="formatCurrency(state.data.payouts.in_transit.amount)"/>
+                        <span class="o_smd_muted">(<t t-esc="formatNumber(state.data.payouts.in_transit.count)"/>)</span>
+                    </div>
+                    <div class="o_smd_stat_line o_smd_clickable" t-on-click="() => this.openPayouts('paid')">
+                        Paid MTD: <b t-esc="formatCurrency(state.data.payouts.paid_mtd.amount)"/>
+                        <span class="o_smd_muted">(<t t-esc="formatNumber(state.data.payouts.paid_mtd.count)"/>)</span>
+                    </div>
+                    <div class="o_smd_stat_line" t-if="state.data.payouts.next_payout_date">
+                        Next payout: <b t-esc="state.data.payouts.next_payout_date"/>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts strip -->
+            <div class="o_smd_alerts">
+                <div class="o_smd_alert o_smd_alert_warn">
+                    Payment mismatches: <b t-esc="formatNumber(state.data.alerts.payment_mismatches)"/>
+                </div>
+                <div class="o_smd_alert o_smd_alert_warn">
+                    Fulfillment mismatches: <b t-esc="formatNumber(state.data.alerts.fulfillment_mismatches)"/>
+                </div>
+                <div class="o_smd_alert o_smd_alert_info">
+                    Webhooks pending: <b t-esc="formatNumber(state.data.alerts.webhook_pending)"/>
+                </div>
+                <div class="o_smd_alert o_smd_alert_err">
+                    Permanent errors: <b t-esc="formatNumber(state.data.alerts.permanent_errors)"/>
+                </div>
+            </div>
+        </t>
+    </div>
+</t>
+
+</templates>

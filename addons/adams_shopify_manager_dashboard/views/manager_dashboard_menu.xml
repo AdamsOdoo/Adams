@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Dedicated top-level menu so the new dashboard is fully isolated from the
+        existing `adams_shopify` menu tree. Once the dashboard has been validated
+        in production, a follow-up can merge it under Shopify.
+    -->
+    <menuitem id="menu_shopify_manager_root"
+              name="Shopify Manager"
+              web_icon="adams_shopify,static/description/icon.png"
+              groups="adams_shopify.group_shopify_user"
+              sequence="51"/>
+
+    <menuitem id="menu_shopify_manager_dashboard"
+              name="Dashboard"
+              parent="menu_shopify_manager_root"
+              action="action_manager_dashboard"
+              sequence="10"/>
+</odoo>

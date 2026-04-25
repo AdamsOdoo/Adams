@@ -248,7 +248,11 @@ class ShopifyWebhookLog(models.Model):
             syncer.handle_inbound_fulfillment(binding, webhook_data=data)
 
     def _handle_refund_webhook(self, data):
-        """Create credit note from Shopify refund."""
+        """Create credit note from Shopify refund by delegating to the
+        canonical RefundImporter. The importer creates a shopify.refund.binding
+        record, which is what prevents the RefundSync cron from later
+        re-importing the same refund and producing a duplicate credit note.
+        """
         order_id = data.get('order_id')
         if not order_id:
             return
@@ -260,42 +264,19 @@ class ShopifyWebhookLog(models.Model):
         if not binding or not binding.odoo_id:
             _logger.warning("No order found for refund, order_id=%s", order_id)
             return
-        order = binding.odoo_id
-        # Find posted invoices to create credit notes from
-        invoices = order.invoice_ids.filtered(lambda i: i.move_type == 'out_invoice' and i.state == 'posted')
-        if not invoices:
-            _logger.info("No posted invoice found for refund on order %s", order.name)
-            return
         try:
-            refund_amount = sum(
-                float(li.get('subtotal', 0)) for li in data.get('refund_line_items', [])
-            )
-            # Create credit note using the reversal wizard
-            move_reversal = self.env['account.move.reversal'].with_context(
-                active_model='account.move',
-                active_ids=invoices[0].ids,
-            ).create({
-                'reason': f"Shopify Refund #{data.get('id', '')}",
-                'journal_id': invoices[0].journal_id.id,
-            })
-            move_reversal.reverse_moves()
-            # Post the newly created credit notes so the refund is
-            # actually reflected in the books.
-            new_moves = move_reversal.new_move_ids
-            if new_moves:
-                try:
-                    new_moves.action_post()
-                except Exception as post_err:
-                    _logger.warning(
-                        "Failed to post credit note %s for order %s: %s",
-                        new_moves.ids, order.name, post_err,
-                    )
+            from ..sync.refund_sync import RefundImporter
+            importer = RefundImporter(self.env, self.backend_id)
+            success, errors, skipped = importer.import_refunds_for_order(binding)
             _logger.info(
-                "Credit note created for Shopify refund on order %s (refund amount: %s)",
-                order.name, refund_amount,
+                "Refund webhook processed for order %s: %s imported, %s errors, %s skipped",
+                binding.odoo_id.name, success, errors, skipped,
             )
         except Exception as e:
-            _logger.warning("Failed to create credit note for order %s: %s", order.name, e)
+            _logger.warning(
+                "Failed to process refund webhook for order %s: %s",
+                binding.odoo_id.name, e,
+            )
 
     def _handle_app_uninstalled(self, data):
         _logger.warning("App uninstalled webhook for backend %s", self.backend_id.id)

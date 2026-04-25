@@ -43,8 +43,9 @@ class ShopifyBinding(models.AbstractModel):
         self.write(vals)
 
     def _mark_error(self, error_message, permanent=False):
-        self.write({
-            'sync_status': 'permanent_error' if permanent else 'error',
-            'sync_error': error_message,
-            'retry_count': self.retry_count + 1 if not permanent else self.retry_count,
-        })
+        for rec in self:
+            rec.write({
+                'sync_status': 'permanent_error' if permanent else 'error',
+                'sync_error': error_message,
+                'retry_count': rec.retry_count + 1 if not permanent else rec.retry_count,
+            })
