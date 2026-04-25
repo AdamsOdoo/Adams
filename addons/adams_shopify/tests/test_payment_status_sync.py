@@ -46,6 +46,7 @@ class TestPaymentStatusSync(TransactionCase):
                 'company_ids': [(6, 0, [self.env.company.id])],
             })
         self.product.categ_id.property_account_income_categ_id = income_account
+        self.product.product_tmpl_id.property_account_income_id = income_account
         self.order = self.env['sale.order'].create({
             'partner_id': self.partner.id,
             'sales_channel': 'shopify',

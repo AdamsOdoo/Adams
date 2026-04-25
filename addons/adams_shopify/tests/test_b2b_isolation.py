@@ -48,6 +48,7 @@ class TestB2BIsolation(TransactionCase):
                 'company_ids': [(6, 0, [self.env.company.id])],
             })
         self.product.categ_id.property_account_income_categ_id = income_account
+        self.product.product_tmpl_id.property_account_income_id = income_account
 
     def test_new_order_defaults_to_direct(self):
         """Orders created in Odoo should default to 'direct' channel."""
