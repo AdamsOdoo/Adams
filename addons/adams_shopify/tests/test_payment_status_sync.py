@@ -27,9 +27,35 @@ class TestPaymentStatusSync(TransactionCase):
             ).id,
             'auto_handle_payment_transitions': True,
         })
+        receivable_account = self.env['account.account'].search([
+            ('account_type', '=', 'asset_receivable'),
+            ('company_ids', 'in', [self.env.company.id]),
+        ], limit=1)
+        if not receivable_account:
+            receivable_account = self.env['account.account'].create({
+                'name': 'Test Receivable',
+                'code': 'TREC',
+                'account_type': 'asset_receivable',
+                'reconcile': True,
+                'company_ids': [(6, 0, [self.env.company.id])],
+            })
+        payable_account = self.env['account.account'].search([
+            ('account_type', '=', 'liability_payable'),
+            ('company_ids', 'in', [self.env.company.id]),
+        ], limit=1)
+        if not payable_account:
+            payable_account = self.env['account.account'].create({
+                'name': 'Test Payable',
+                'code': 'TPAY',
+                'account_type': 'liability_payable',
+                'reconcile': True,
+                'company_ids': [(6, 0, [self.env.company.id])],
+            })
         self.partner = self.env['res.partner'].create({
             'name': 'Test Buyer',
             'email': 'buyer@example.com',
+            'property_account_receivable_id': receivable_account.id,
+            'property_account_payable_id': payable_account.id,
         })
         self.product = self.env['product.product'].create({
             'name': 'Widget', 'list_price': 50.0,

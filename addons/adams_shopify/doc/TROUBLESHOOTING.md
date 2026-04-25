@@ -95,6 +95,57 @@ Quick-reference for common problems and their solutions.
 
 ---
 
+## Invoice Creation Failures
+
+### "account_move_line_check_accountable_required_fields" constraint violation
+
+**Cause:** This is the **most common invoice creation error**. It means the database rejected an invoice line because `account_id` is NULL. This happens when:
+
+1. The **product has no income account** — neither on the product template (`property_account_income_id`) nor on its category (`property_account_income_categ_id`)
+2. The **partner has no receivable account** — `property_account_receivable_id` is not set
+3. **No sales journal** exists for the company
+
+**Fix:**
+
+1. **Set income account on the product category** (recommended — fixes all products in that category):
+   - Go to **Inventory > Configuration > Product Categories**
+   - Open the relevant category
+   - Set **Income Account** in the Account Properties section (e.g., "Product Sales" or "200000 Revenue")
+
+2. **Set receivable account on the partner** (usually automatic from chart of accounts):
+   - Go to **Contacts** > open the customer
+   - **Accounting** tab > verify **Account Receivable** is set
+   - If blank, set it to your default receivable account (e.g., "121000 Account Receivable")
+
+3. **Create a sales journal** if missing:
+   - **Accounting > Configuration > Journals > New**
+   - Type: Sale, Code: SHOP, Name: "Shopify Sales"
+
+**Symptoms in logs:**
+```
+psycopg2.errors.CheckViolation: new row for relation "account_move_line"
+violates check constraint "account_move_line_check_accountable_required_fields"
+```
+
+**Note:** This error may appear in logs even when the connector appears to work, because the connector uses savepoints to catch the failure and skip invoice creation gracefully. Check your sync logs for "Auto-invoice skipped" warnings.
+
+### "Auto-invoice skipped: no income account for product(s)"
+
+**Cause:** The connector proactively detected that your product(s) have no income account and skipped invoice creation to avoid the constraint violation above.
+
+**Fix:** Same as above — set the income account on the product or product category.
+
+### Invoice created but not posted
+
+**Cause:** The invoice was created in `draft` state but `action_post()` failed. Common reasons:
+- Missing tax configuration
+- Currency mismatch
+- Fiscal position mapping issue
+
+**Fix:** Open the draft invoice, review the error in the chatter, and fix the underlying issue before posting manually.
+
+---
+
 ## Fulfillment Issues
 
 ### Delivery validated in Odoo but not pushed to Shopify

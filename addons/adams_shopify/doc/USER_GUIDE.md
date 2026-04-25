@@ -12,18 +12,25 @@
 8. [Inventory Management](#inventory-management)
 9. [Fulfillment Sync](#fulfillment-sync)
 10. [Refund Handling](#refund-handling)
-11. [Financial Configuration](#financial-configuration)
-12. [Promoter and Coupon System](#promoter-and-coupon-system)
-13. [Webhooks](#webhooks)
-14. [Multi-Store and Multi-Company](#multi-store-and-multi-company)
-15. [B2B and Wholesale Isolation](#b2b-and-wholesale-isolation)
-16. [Dashboard and Monitoring](#dashboard-and-monitoring)
+11. [Payment Status Sync](#payment-status-sync)
+12. [Financial Configuration](#financial-configuration)
+13. [Multi-Currency and Shopify Markets](#multi-currency-and-shopify-markets)
+14. [Abandoned Cart Recovery](#abandoned-cart-recovery)
+15. [Gift Card Tracking](#gift-card-tracking)
+16. [Metafield Synchronization](#metafield-synchronization)
+17. [Promoter and Coupon System](#promoter-and-coupon-system)
+18. [Webhooks](#webhooks)
+19. [Multi-Store and Multi-Company](#multi-store-and-multi-company)
+20. [B2B and Wholesale Isolation](#b2b-and-wholesale-isolation)
+21. [Dashboard and Monitoring](#dashboard-and-monitoring)
     - [Store Health Kanban](#store-health-kanban-overview)
     - [Health Dashboard Tab](#health-dashboard-backend-form-tab)
     - [API Health Endpoint](#api-health-endpoint)
-17. [Scheduled Actions](#scheduled-actions)
-18. [Troubleshooting](#troubleshooting)
-19. [FAQ](#faq)
+22. [Manager Dashboard](#manager-dashboard)
+23. [Scheduled Actions](#scheduled-actions)
+24. [Accounting Prerequisites](#accounting-prerequisites)
+25. [Troubleshooting](#troubleshooting)
+26. [FAQ](#faq)
 
 ---
 
@@ -310,6 +317,47 @@ If enabled (**Status Sync > Reverse Sync: Refund**):
 
 ---
 
+## Payment Status Sync
+
+### How It Works
+
+The connector tracks Shopify payment status transitions and automatically performs the corresponding accounting actions in Odoo. When Shopify notifies a status change (e.g., `authorized` to `paid`), the connector handles the invoice workflow without manual intervention.
+
+### Supported Transitions
+
+| From | To | Odoo Action |
+|------|----|-------------|
+| `authorized` | `paid` | Posts the draft invoice (Shopify captured payment) |
+| `pending` | `paid` | Creates a new invoice, validates, and posts it |
+| `pending` | `partially_paid` | Posts the invoice and creates a scheduled activity for follow-up |
+| `pending` / `authorized` | `voided` | Cancels the draft invoice; if the order is unshipped, cancels the order |
+| `paid` | `partially_refunded` | Updates status (refund handled separately by Refund Sync) |
+| `paid` | `refunded` | Updates status (refund handled separately by Refund Sync) |
+
+### Configuration
+
+On the backend form, under the **Status Sync** tab:
+
+- **Auto-handle Payment Transitions**: Enable/disable automatic invoice actions on payment status changes. When disabled, the status field on the binding still updates, but no invoices are created or posted.
+- **Reverse Sync: Payment**: When enabled, posting an invoice in Odoo for a Shopify order calls `orderMarkAsPaid` on Shopify. This is **off by default** to prevent unintended API calls.
+
+### Edge Cases
+
+- **Voided with posted invoice**: If a payment is voided but the invoice is already posted, the connector does **not** auto-cancel the posted invoice (which could have legal/accounting implications). Instead, it creates a scheduled activity alerting the accountant to take manual action.
+- **B2B orders excluded**: Payment sync only fires for orders with `sales_channel = 'shopify'`. B2B/direct orders are never affected.
+
+### Prerequisites
+
+For payment status sync to create invoices successfully, your products and partners must have proper accounting configuration:
+
+- Products must have an **income account** set (on the product template or product category)
+- Partners must have a **receivable account** (`property_account_receivable_id`)
+- A **sales journal** must exist for the company
+
+See [Accounting Prerequisites](#accounting-prerequisites) for setup instructions.
+
+---
+
 ## Financial Configuration
 
 ### Tax Mapping
@@ -343,6 +391,158 @@ Shopify Payments payouts are imported every **6 hours**:
 - Each payout shows: net amount, gross, fees, adjustments, and status
 - Transaction-level detail includes: charges, refunds, disputes, reserves
 - Each transaction links back to its source order
+
+---
+
+## Multi-Currency and Shopify Markets
+
+### Overview
+
+If you sell internationally using Shopify Markets, customers may pay in their local currency (EUR, GBP, JPY, etc.) while your Shopify store's base currency is different (e.g., USD). The connector supports three currency modes to handle this.
+
+### Currency Modes
+
+On the backend form, under the **Sync Settings** tab:
+
+| Mode | Behavior | Best For |
+|------|----------|----------|
+| **Company Currency** (default) | All orders use your Odoo company's currency | Single-currency businesses |
+| **Shopify Store Currency** | Orders use the Shopify store's base currency | Stores with one currency |
+| **Customer Currency (Shopify Markets)** | Orders use the currency the customer actually paid in | International stores using Shopify Markets |
+
+### How Customer Currency Mode Works
+
+When set to **Customer Currency**:
+
+1. The connector reads prices from `presentmentMoney` fields (the customer-facing amounts)
+2. It finds or creates an Odoo pricelist for each new currency encountered
+3. The sale order is created with the correct currency and presentment prices
+4. Invoices inherit the order currency
+
+### Setup
+
+1. Open your Shopify store form in Odoo
+2. Go to **Sync Settings** tab > **Order Currency Mode**
+3. Select **Use Customer Currency (Shopify Markets)**
+4. Ensure all required currencies are **active** in Odoo: **Accounting > Configuration > Currencies**
+5. Click **Save**
+
+> **Tip**: The connector activates currencies automatically when it encounters them. However, pre-activating expected currencies ensures exchange rates are configured before the first order arrives.
+
+---
+
+## Abandoned Cart Recovery
+
+### Overview
+
+Recover lost revenue by importing abandoned checkouts from Shopify into Odoo. The connector imports carts that were abandoned (items added but checkout not completed) and lets you follow up with quotations or recovery emails.
+
+### Configuration
+
+1. Open your Shopify store form
+2. Go to **Sync Settings** tab > **Abandoned Carts** section
+3. Check **Sync Abandoned Carts**
+4. Optionally check **Auto-create Quotations** to automatically generate draft quotations
+5. Click **Save**
+
+Abandoned carts are imported every **30 minutes** by the cron job.
+
+### Viewing Abandoned Carts
+
+Navigate to **Shopify > Sync Status > Abandoned Carts**:
+
+Each cart shows:
+- **Customer Email** and name
+- **Total Price** and currency
+- **Abandoned At** timestamp
+- **Line Items** (JSON detail of what was in the cart)
+- **Recovery URL** — Shopify's native checkout recovery link
+- **Status** — Not Recovered / Recovered
+
+### Creating a Quotation from an Abandoned Cart
+
+1. Open the abandoned cart record
+2. Click **Create Quotation** at the top
+3. The connector:
+   - Finds or creates the customer in Odoo (using email deduplication)
+   - Creates a draft `sale.order` with all cart line items
+   - Links the quotation to the abandoned cart record
+4. Send the quotation to the customer via email, or share the Shopify recovery URL
+
+### Automatic Recovery Detection
+
+When an order is imported from Shopify for the same customer and overlapping products, the connector automatically marks the abandoned cart as **Recovered** and links it to the new order.
+
+### Manual Recovery
+
+Click **Mark Recovered** on any abandoned cart to flag it manually (e.g., after a phone follow-up).
+
+---
+
+## Gift Card Tracking
+
+### Overview
+
+Shopify gift cards are imported into Odoo as read-only tracking records. This gives your team visibility into outstanding gift card balances without leaving Odoo.
+
+### What Gets Imported
+
+| Field | Description |
+|-------|-------------|
+| **Code (masked)** | Last 4 characters only (e.g., `••••ABCD`) for security |
+| **Initial Amount** | The original gift card value |
+| **Current Balance** | Remaining balance |
+| **Status** | Active, Disabled, or Expired |
+| **Expires On** | Expiration date (if set) |
+| **Customer** | Linked to the Odoo partner who received/owns the card |
+
+### Viewing Gift Cards
+
+Navigate to **Shopify > Sync Status > Gift Cards** to see all imported gift cards.
+
+### Import Schedule
+
+Gift cards are imported as part of the regular sync cycle. They are **read-only** in Odoo — all gift card management (issuing, disabling, adjusting balances) happens in Shopify.
+
+### Gift Card Payments on Orders
+
+When a Shopify order is partially or fully paid with a gift card, the connector:
+1. Records the gift card payment as a separate payment line on the sale order
+2. The remaining balance (if any) is paid by the customer's other payment method
+3. Both payments are visible on the order's payment registration
+
+---
+
+## Metafield Synchronization
+
+### Overview
+
+Shopify metafields are custom data fields attached to products, variants, customers, or orders. The connector supports bidirectional metafield sync, allowing you to map Shopify metafields to Odoo fields without writing code.
+
+### Configuration
+
+1. Open your Shopify store form
+2. Go to the **Field Mappings** tab
+3. Click **Add a line** to create a metafield mapping:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| **Entity** | Which Shopify object | Product / Customer / Order |
+| **Odoo Field** | The Odoo field to map to | `x_studio_material` (custom field) |
+| **Shopify Field** | Metafield namespace.key path | `metafields.custom.material` |
+| **Direction** | Sync direction | Export / Import / Both |
+
+4. Click **Save**
+
+### How It Works
+
+- **Import**: When products/customers/orders are imported, the connector reads the mapped metafield values from Shopify and writes them to the corresponding Odoo fields
+- **Export**: When records are exported, the connector reads the Odoo field values and creates/updates the metafield on Shopify
+- **Change detection**: Metafield values are included in the checksum calculation, so unchanged metafields are not re-synced
+
+### Supported Metafield Types
+
+The connector handles all Shopify metafield types: `single_line_text_field`, `multi_line_text_field`, `number_integer`, `number_decimal`, `boolean`, `date`, `json`, `url`, `color`, and `rich_text_field`.
 
 ---
 
@@ -629,6 +829,59 @@ Use this endpoint to integrate with Uptime Robot, Datadog, or any HTTP-based mon
 
 ---
 
+## Manager Dashboard
+
+### Overview
+
+The **Shopify Manager Dashboard** is a companion module (`adams_shopify_manager_dashboard`) that provides a visual, executive-level overview of your Shopify operations. It aggregates data across all connected stores into interactive charts and KPI cards.
+
+### Installation
+
+The Manager Dashboard is a separate module that depends on `adams_shopify`. Install it from **Apps > Search "Shopify Manager Dashboard" > Install**.
+
+### Accessing the Dashboard
+
+Navigate to **Shopify > Manager Dashboard** to open the interactive dashboard view.
+
+### KPI Cards
+
+The dashboard displays the following metrics, filterable by time period (Today, Week-to-Date, Month-to-Date, Year-to-Date, or Custom range):
+
+| KPI | Description |
+|-----|-------------|
+| **Revenue** | Total sales revenue for the period, with comparison to prior period |
+| **Average Order Value** | Revenue divided by order count |
+| **Order Count** | Total Shopify orders imported |
+| **Customer Count** | New customers created during the period |
+| **Refund Rate** | Refund amount as a percentage of revenue |
+| **Abandoned Cart Recovery Rate** | Percentage of abandoned carts that converted to orders |
+
+### Charts and Tables
+
+- **Sales Trend**: Line chart showing daily revenue over the selected period
+- **Top Products**: Best-selling products by revenue and quantity
+- **Top Customers**: Highest-spending customers
+- **Delivery Status**: Breakdown of pending, shipped, delivered, and failed deliveries
+- **Refund Summary**: Refund count and total amount
+- **Payout Overview**: Payout status breakdown and total disbursed amount
+
+### Alerts
+
+The dashboard highlights operational issues requiring attention:
+
+| Alert | Trigger |
+|-------|---------|
+| **High Refund Rate** | Refund rate exceeds 5% of revenue |
+| **Stale Syncs** | Any entity hasn't synced in over 24 hours |
+| **Error Spike** | Error count exceeds 10% of total bindings |
+| **Webhook Backlog** | More than 50 pending webhooks |
+
+### Access Control
+
+The Manager Dashboard is read-only. All users with the `Shopify User` access group can view it. No data can be modified from the dashboard.
+
+---
+
 ## Scheduled Actions
 
 All sync operations run as Odoo scheduled actions (crons). To adjust:
@@ -651,6 +904,72 @@ All sync operations run as Odoo scheduled actions (crons). To adjust:
 | Import Payouts | 6 hours | Import Shopify payouts |
 | Reconciliation Check | 6 hours | Detect data drift |
 | Webhook Log Cleanup | Daily | Purge old webhook logs |
+
+---
+
+## Accounting Prerequisites
+
+For the connector to create and post invoices automatically (e.g., auto-invoice on paid orders, payment status sync), your Odoo accounting configuration must be complete. Missing accounting setup is the **most common cause of invoice creation failures**.
+
+### Required Configuration
+
+#### 1. Chart of Accounts
+
+Your Odoo company must have a chart of accounts installed. This is typically done during initial Odoo setup. Verify by going to **Accounting > Configuration > Chart of Accounts** and confirming accounts exist.
+
+#### 2. Income Account on Products
+
+Every product sold through Shopify must have an income account configured. This can be set at two levels:
+
+**Option A — Product Category (recommended for bulk setup):**
+1. Go to **Inventory > Configuration > Product Categories**
+2. Open the category used by your Shopify products
+3. In the **Account Properties** section, set **Income Account** (e.g., "Product Sales" or "Revenue")
+4. All products in this category will inherit the income account
+
+**Option B — Individual Product:**
+1. Open the product template
+2. Go to the **Accounting** tab
+3. Set the **Income Account** field
+
+> **If the income account is missing**, invoice creation will fail with a database constraint error. The connector detects this condition and skips auto-invoicing with a warning log and scheduled activity, but it's best to configure accounts proactively.
+
+#### 3. Receivable Account on Customers
+
+Odoo requires a receivable account on each partner for invoice line creation. In most setups, this is configured automatically via the chart of accounts defaults. Verify by:
+
+1. Opening any customer record
+2. Going to the **Accounting** tab (or **Sales & Purchase** tab depending on Odoo version)
+3. Confirming **Account Receivable** and **Account Payable** are set
+
+If these are blank, set them to your default receivable/payable accounts, or configure defaults via **Accounting > Configuration > Settings > Default Accounts**.
+
+#### 4. Sales Journal
+
+A sales journal must exist for each company using the connector:
+
+1. Go to **Accounting > Configuration > Journals**
+2. Verify a journal with **Type = Sale** exists
+3. If not, create one (e.g., "Shopify Sales", code "SHOP", type "Sale")
+
+#### 5. Bank/Payment Journal (for payment registration)
+
+If you want the connector to register payments automatically:
+
+1. Go to **Accounting > Configuration > Journals**
+2. Create a journal for each Shopify payment gateway (e.g., "Shopify Payments", type "Bank")
+3. Map these journals in **Shopify > Configuration > Payment Gateways**
+
+### Diagnostic Checklist
+
+If auto-invoicing is not working, check these in order:
+
+1. Is **Auto-create Invoice** enabled on the backend? (Sync Settings tab)
+2. Does the product have an income account? (Product > Accounting tab, or Product Category)
+3. Does the customer have a receivable account? (Partner > Accounting tab)
+4. Does a sales journal exist for the company?
+5. Check **Shopify > Logs > Sync Log** for invoice-related warnings
+6. Check the Odoo server log for `account_move_line_check_accountable_required_fields` errors
 
 ---
 
@@ -770,3 +1089,24 @@ A: Yes. Use the **Field Mapping** tab on the backend form to control which field
 
 **Q: How do I handle taxes for different countries?**
 A: Use the **Tax Mapping** tab to create rules that match Shopify tax names/rates to Odoo taxes. You can also assign fiscal positions automatically based on tax mappings.
+
+**Q: Why are invoices not being created for paid orders?**
+A: This is almost always a missing accounting configuration. Check that: (1) The product has an income account set on its template or category, (2) The customer has a receivable account, (3) A sales journal exists. See the [Accounting Prerequisites](#accounting-prerequisites) section for detailed setup instructions.
+
+**Q: Does it work with Shopify Markets (multi-currency)?**
+A: Yes. Set the **Order Currency Mode** to "Customer Currency" on the backend. Orders will be created using the currency the customer paid in, with prices from Shopify's `presentmentMoney` fields. See [Multi-Currency and Shopify Markets](#multi-currency-and-shopify-markets).
+
+**Q: Can I recover abandoned carts?**
+A: Yes. Enable **Sync Abandoned Carts** on the backend. Abandoned checkouts are imported every 30 minutes. You can create Odoo quotations from them or use Shopify's recovery URL. See [Abandoned Cart Recovery](#abandoned-cart-recovery).
+
+**Q: What API does this connector use?**
+A: The connector uses exclusively Shopify's **GraphQL Admin API (version 2026-01)** — the only API Shopify actively develops. It does not use the deprecated REST API, making it future-proof against Shopify's ongoing API migration.
+
+**Q: How does it compare to other Shopify connectors on the Odoo App Store?**
+A: This connector offers significantly more features than competing connectors, including: payment status sync, reverse payment sync (Odoo to Shopify), payout import with transaction detail, gift card tracking, promoter/affiliate system, abandoned cart recovery, metafield sync, B2B isolation, automated reconciliation, dead-letter webhook queue, and checksum-based change detection. See the Commercial Documentation for a detailed comparison.
+
+**Q: Is there a Manager Dashboard?**
+A: Yes. Install the companion module **Shopify Manager Dashboard** for an executive-level view with revenue KPIs, sales trends, top products/customers, delivery status, and refund analytics. See [Manager Dashboard](#manager-dashboard).
+
+**Q: What happens when invoice creation fails due to missing accounts?**
+A: The connector uses savepoints to isolate invoice creation failures. If an invoice cannot be created (e.g., missing income account), the order is still imported and confirmed successfully. A warning is logged and a scheduled activity is created on the order, alerting the responsible user to fix the accounting setup and create the invoice manually.
