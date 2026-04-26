@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_order_binding_view_tree" model="ir.ui.view">
+        <field name="name">shopify.order.binding.tree</field>
+        <field name="model">shopify.order.binding</field>
+        <field name="arch" type="xml">
+            <list string="Shopify Order Bindings"
+                  decoration-danger="sync_status == 'error'"
+                  decoration-warning="sync_status == 'pending'">
+                <field name="backend_id"/>
+                <field name="shopify_order_name"/>
+                <field name="odoo_id"/>
+                <field name="shopify_financial_status"/>
+                <field name="shopify_fulfillment_status"/>
+                <field name="sync_status" widget="badge"
+                       decoration-success="sync_status == 'synced'"
+                       decoration-danger="sync_status == 'error'"
+                       decoration-warning="sync_status == 'pending'"/>
+                <field name="shopify_created_at"/>
+                <field name="last_sync_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="shopify_order_binding_view_form" model="ir.ui.view">
+        <field name="name">shopify.order.binding.form</field>
+        <field name="model">shopify.order.binding</field>
+        <field name="arch" type="xml">
+            <form string="Shopify Order Binding">
+                <header>
+                    <button name="action_retry_sync" type="object"
+                            string="Retry Sync"
+                            invisible="sync_status not in ('error', 'permanent_error')"
+                            class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="backend_id"/>
+                            <field name="odoo_id"/>
+                            <field name="shopify_id"/>
+                            <field name="shopify_order_name"/>
+                        </group>
+                        <group>
+                            <field name="shopify_financial_status"/>
+                            <field name="shopify_fulfillment_status"/>
+                            <field name="shopify_created_at"/>
+                            <field name="sync_status"/>
+                            <field name="last_sync_date"/>
+                        </group>
+                    </group>
+                    <group string="Error" invisible="not sync_error">
+                        <field name="sync_error" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_order_binding_view_search" model="ir.ui.view">
+        <field name="name">shopify.order.binding.search</field>
+        <field name="model">shopify.order.binding</field>
+        <field name="arch" type="xml">
+            <search string="Shopify Orders">
+                <field name="shopify_order_name"/>
+                <field name="odoo_id"/>
+                <field name="shopify_id"/>
+                <filter name="synced" string="Synced"
+                        domain="[('sync_status', '=', 'synced')]"/>
+                <filter name="errors" string="Errors"
+                        domain="[('sync_status', 'in', ['error', 'permanent_error'])]"/>
+                <group>
+                    <filter name="group_backend" string="Store"
+                            context="{'group_by': 'backend_id'}"/>
+                    <filter name="group_financial" string="Financial Status"
+                            context="{'group_by': 'shopify_financial_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="shopify_order_binding_action" model="ir.actions.act_window">
+        <field name="name">Shopify Orders</field>
+        <field name="res_model">shopify.order.binding</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>
