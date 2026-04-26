@@ -336,7 +336,7 @@ The Shopify-Odoo integration market in 2026 breaks into four categories:
 | **Tax mapping (name + rate + fiscal position)** | Yes | Basic | Basic |
 | **Payment gateway mapping** | Yes (per gateway) | Basic | Basic |
 | | | | |
-| **Promoter/affiliate system** | Built-in | No | No |
+| **Promoter/affiliate system** | Yes Built-in | No | No |
 | **Discount code management** | Yes | Basic | Basic |
 | **Commission tracking** | Yes | No | No |
 | | | | |
