@@ -3,20 +3,13 @@ from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
 
+from .common import ShopifyAccountingMixin
 
-class TestPaymentStatusSync(TransactionCase):
+
+class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
-        if not self.env['account.journal'].search(
-            [('type', '=', 'sale'), ('company_id', '=', self.env.company.id)], limit=1,
-        ):
-            self.env['account.journal'].create({
-                'name': 'Test Sales Journal',
-                'type': 'sale',
-                'code': 'TSHP',
-                'company_id': self.env.company.id,
-            })
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',
@@ -27,52 +20,13 @@ class TestPaymentStatusSync(TransactionCase):
             ).id,
             'auto_handle_payment_transitions': True,
         })
-        receivable_account = self.env['account.account'].search([
-            ('account_type', '=', 'asset_receivable'),
-            ('company_ids', 'in', [self.env.company.id]),
-        ], limit=1)
-        if not receivable_account:
-            receivable_account = self.env['account.account'].create({
-                'name': 'Test Receivable',
-                'code': 'TREC',
-                'account_type': 'asset_receivable',
-                'reconcile': True,
-                'company_ids': [(6, 0, [self.env.company.id])],
-            })
-        payable_account = self.env['account.account'].search([
-            ('account_type', '=', 'liability_payable'),
-            ('company_ids', 'in', [self.env.company.id]),
-        ], limit=1)
-        if not payable_account:
-            payable_account = self.env['account.account'].create({
-                'name': 'Test Payable',
-                'code': 'TPAY',
-                'account_type': 'liability_payable',
-                'reconcile': True,
-                'company_ids': [(6, 0, [self.env.company.id])],
-            })
-        self.partner = self.env['res.partner'].create({
-            'name': 'Test Buyer',
-            'email': 'buyer@example.com',
-            'property_account_receivable_id': receivable_account.id,
-            'property_account_payable_id': payable_account.id,
-        })
+        self.partner = self._create_accounting_partner(
+            'Test Buyer', email='buyer@example.com',
+        )
         self.product = self.env['product.product'].create({
             'name': 'Widget', 'list_price': 50.0,
         })
-        income_account = self.env['account.account'].search([
-            ('account_type', '=', 'income'),
-            ('company_ids', 'in', [self.env.company.id]),
-        ], limit=1)
-        if not income_account:
-            income_account = self.env['account.account'].create({
-                'name': 'Test Income Account',
-                'code': 'TINC',
-                'account_type': 'income',
-                'company_ids': [(6, 0, [self.env.company.id])],
-            })
-        self.product.categ_id.property_account_income_categ_id = income_account
-        self.product.product_tmpl_id.property_account_income_id = income_account
+        self._set_product_income_account(self.product)
         self.order = self.env['sale.order'].create({
             'partner_id': self.partner.id,
             'sales_channel': 'shopify',

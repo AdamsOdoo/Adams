@@ -1,35 +1,19 @@
+# Part of Shopify Connector Pro Ultimate Edition. See LICENSE file for full copyright and licensing details.
+#
+# This module has been merged into adams_shopify. It is kept as a hollow
+# stub so Odoo can cleanly uninstall it from databases where it was
+# previously installed.
 {
-    'name': 'Adams Shopify Manager Dashboard',
-    'version': '19.0.1.0.0',
+    'name': 'Shopify Manager Dashboard (Merged)',
+    'version': '19.0.1.1.0',
     'category': 'Sales/Sales',
-    'summary': 'Manager-facing Shopify dashboard: revenue, AOV, deliveries, abandoned carts, refunds, payouts.',
-    'description': (
-        'Standalone dashboard addon for store managers. Aggregates KPIs, sales trend, '
-        'top products and customers, delivery status, abandoned carts, refunds, and '
-        'payouts on top of the adams_shopify connector. Read-only: does not modify '
-        'any existing adams_shopify model, view, or data file.'
-    ),
-    'author': 'Adams',
+    'summary': 'Merged into Shopify Connector Pro Ultimate Edition. This module is no longer needed.',
+    'author': 'Shopify Connector Pro',
     'website': 'https://github.com/adamsodoo/adams',
     'license': 'OPL-1',
-    'depends': [
-        'adams_shopify',
-        'sale_management',
-        'stock',
-        'account',
-    ],
-    'data': [
-        'security/ir.model.access.csv',
-        'views/manager_dashboard_action.xml',
-        'views/manager_dashboard_menu.xml',
-    ],
-    'assets': {
-        'web.assets_backend': [
-            'adams_shopify_manager_dashboard/static/src/scss/manager_dashboard.scss',
-            'adams_shopify_manager_dashboard/static/src/js/manager_dashboard/**/*.js',
-            'adams_shopify_manager_dashboard/static/src/xml/manager_dashboard/**/*.xml',
-        ],
-    },
+    'depends': ['adams_shopify'],
+    'data': [],
+    'assets': {},
     'installable': True,
     'application': False,
     'auto_install': False,

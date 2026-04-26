@@ -1,1 +1,1 @@
-from . import test_manager_dashboard
+# Merged into adams_shopify — no tests remain in this module.

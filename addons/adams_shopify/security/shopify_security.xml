@@ -15,17 +15,35 @@
     </record>
 
     <!--
-        Single access group: "User"
-        Any Odoo user assigned this group gains full access to the module.
-        Users without this group cannot see the Shopify menu or any Shopify data.
+        User group: read-only view of sync data, orders, logs, and dashboard.
+        Users can monitor the integration but cannot configure backends,
+        run wizards, or change settings.
     -->
     <record id="group_shopify_user" model="res.groups">
         <field name="name">User</field>
+        <field name="sequence">10</field>
         <field name="privilege_id" ref="privilege_shopify"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">View Shopify sync status, orders, products, logs, and dashboard. Cannot configure backends or run sync operations.</field>
     </record>
 
-    <!-- Record Rules: Multi-Company -->
+    <!--
+        Administrator group: full access to configuration, wizards, sync
+        operations, and all module features.  Implies User.
+    -->
+    <record id="group_shopify_admin" model="res.groups">
+        <field name="name">Administrator</field>
+        <field name="sequence">20</field>
+        <field name="privilege_id" ref="privilege_shopify"/>
+        <field name="implied_ids" eval="[(4, ref('group_shopify_user'))]"/>
+        <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        <field name="comment">Full access to Shopify configuration, sync operations, wizards, backend settings, and all module features.</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════ -->
+    <!-- Record Rules: Multi-Company                                 -->
+    <!-- ════════════════════════════════════════════════════════════ -->
+
     <record id="shopify_backend_company_rule" model="ir.rule">
         <field name="name">Shopify Backend: multi-company</field>
         <field name="model_id" ref="model_shopify_backend"/>

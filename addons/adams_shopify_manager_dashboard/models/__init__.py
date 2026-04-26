@@ -1,2 +1,1 @@
-from . import shopify_manager_dashboard
-from . import shopify_backend_patch
+# Merged into adams_shopify — no models remain in this module.

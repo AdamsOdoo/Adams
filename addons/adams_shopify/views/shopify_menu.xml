@@ -1,24 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- Top-level App Menu — only visible to users in the Shopify group -->
+    <!-- Top-level App Menu — visible to all Shopify users -->
     <menuitem id="menu_shopify_root"
               name="Shopify"
               web_icon="adams_shopify,static/description/icon.png"
               groups="adams_shopify.group_shopify_user"
               sequence="50"/>
 
-    <!-- Dashboard -->
+    <!-- Dashboard (built-in sync overview) -->
     <menuitem id="menu_shopify_dashboard"
               name="Dashboard"
               parent="menu_shopify_root"
               action="shopify_dashboard_action"
               sequence="10"/>
 
-    <!-- Configuration -->
+    <!-- Manager Dashboard (KPIs, charts, analytics) -->
+    <menuitem id="menu_shopify_manager_dashboard"
+              name="Manager Dashboard"
+              parent="menu_shopify_root"
+              action="action_manager_dashboard"
+              sequence="15"/>
+
+    <!-- Configuration (Admin only) -->
     <menuitem id="menu_shopify_configuration"
               name="Configuration"
               parent="menu_shopify_root"
+              groups="adams_shopify.group_shopify_admin"
               sequence="20"/>
 
     <menuitem id="menu_shopify_stores"
@@ -51,10 +59,11 @@
               action="shopify_metafield_mapping_action"
               sequence="50"/>
 
-    <!-- Operations -->
+    <!-- Operations (Admin only) -->
     <menuitem id="menu_shopify_operations"
               name="Operations"
               parent="menu_shopify_root"
+              groups="adams_shopify.group_shopify_admin"
               sequence="30"/>
 
     <menuitem id="menu_shopify_sync_now"
@@ -91,7 +100,7 @@
               name="Generate Demo Data"
               parent="menu_shopify_operations"
               action="shopify_demo_data_wizard_action"
-              groups="base.group_system"
+              groups="adams_shopify.group_shopify_admin"
               sequence="90"/>
 
     <!-- Sync Status -->

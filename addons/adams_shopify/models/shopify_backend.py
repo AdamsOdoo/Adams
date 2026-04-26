@@ -25,12 +25,12 @@ class ShopifyBackend(models.Model):
     )
     access_token = fields.Char(
         'Access Token', required=True,
-        groups='base.group_system',
+        groups='adams_shopify.group_shopify_admin',
     )
     api_version = fields.Char(default=DEFAULT_API_VERSION)
     webhook_secret = fields.Char(
         'Webhook Secret',
-        groups='base.group_system',
+        groups='adams_shopify.group_shopify_admin',
     )
 
     # ── Company / Warehouse ─────────────────────────────────

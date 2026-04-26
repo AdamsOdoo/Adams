@@ -11,8 +11,10 @@ from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
 
+from .common import ShopifyAccountingMixin
 
-class TestSyncLoopPrevention(TransactionCase):
+
+class TestSyncLoopPrevention(ShopifyAccountingMixin, TransactionCase):
     """Guard against Shopify<->Odoo infinite sync loops.
 
     The reverse-sync hooks on account.move.action_post fire when invoices
@@ -22,16 +24,6 @@ class TestSyncLoopPrevention(TransactionCase):
 
     def setUp(self):
         super().setUp()
-        # Ensure sales journal exists
-        if not self.env['account.journal'].search(
-            [('type', '=', 'sale'), ('company_id', '=', self.env.company.id)],
-            limit=1,
-        ):
-            self.env['account.journal'].create({
-                'name': 'Test Sales Journal', 'type': 'sale', 'code': 'TSLP',
-                'company_id': self.env.company.id,
-            })
-
         self.backend = self.env['shopify.backend'].create({
             'name': 'Loop Test Store',
             'shop_url': 'loop-test.myshopify.com',
@@ -47,9 +39,11 @@ class TestSyncLoopPrevention(TransactionCase):
         self.product = self.env['product.product'].create({
             'name': 'Loop Widget', 'list_price': 100.0,
         })
-        self.partner = self.env['res.partner'].create({
-            'name': 'Loop Customer', 'email': 'loop@example.com',
-        })
+        self._set_product_income_account(self.product)
+
+        self.partner = self._create_accounting_partner(
+            'Loop Customer', email='loop@example.com',
+        )
 
     def _create_confirmed_order_with_binding(self, financial_status='authorized'):
         order = self.env['sale.order'].with_context(

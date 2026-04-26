@@ -256,7 +256,7 @@
                             </div>
                             <group string="Webhook Configuration">
                                 <field name="webhook_secret" password="True"
-                                       groups="base.group_system"/>
+                                       groups="adams_shopify.group_shopify_admin"/>
                             </group>
                             <div class="alert alert-info" role="alert">
                                 <strong>Registered webhook topics:</strong>

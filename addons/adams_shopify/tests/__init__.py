@@ -18,3 +18,4 @@ from . import test_reverse_payment_sync
 from . import test_regression_fixes
 from . import test_performance
 from . import test_e2e_smoke
+from . import test_manager_dashboard

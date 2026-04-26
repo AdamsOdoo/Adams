@@ -1,11 +1,11 @@
-# Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro Ultimate Edition. See LICENSE file for full copyright and licensing details.
 {
-    'name': 'Shopify Connector Pro',
-    'version': '19.0.1.0.0',
+    'name': 'Shopify Connector Pro Ultimate Edition',
+    'version': '19.0.1.1.0',
     'category': 'Sales/Sales',
-    'summary': 'Production-grade bidirectional Shopify ↔ Odoo connector: products, orders, customers, inventory, fulfillments, refunds, payouts, promoters, webhooks, and more.',
-    'description': 'Shopify Connector Pro — enterprise-grade bidirectional Shopify ↔ Odoo 19 connector built on Shopify GraphQL Admin API 2026-01.',
-    'author': 'Adams',
+    'summary': 'Production-grade bidirectional Shopify <> Odoo connector with manager dashboard: products, orders, customers, inventory, fulfillments, refunds, payouts, promoters, webhooks, and more.',
+    'description': 'Shopify Connector Pro Ultimate Edition — enterprise-grade bidirectional Shopify <> Odoo 19 connector built on Shopify GraphQL Admin API 2026-01 with integrated manager dashboard, KPI analytics, and delivery tracking.',
+    'author': 'Shopify Connector Pro',
     'website': 'https://github.com/adamsodoo/adams',
     'support': 'support@adamsodoo.com',
     'license': 'OPL-1',
@@ -35,6 +35,7 @@
         'views/shopify_sync_log_views.xml',
         'views/shopify_webhook_log_views.xml',
         'views/shopify_dashboard_views.xml',
+        'views/manager_dashboard_action.xml',
         'views/product_template_views.xml',
         'views/res_partner_views.xml',
         'views/sale_order_views.xml',
@@ -62,7 +63,13 @@
         'views/shopify_menu.xml',
     ],
     'demo': [],
-    'assets': {},
+    'assets': {
+        'web.assets_backend': [
+            'adams_shopify/static/src/scss/manager_dashboard.scss',
+            'adams_shopify/static/src/js/manager_dashboard/**/*.js',
+            'adams_shopify/static/src/xml/manager_dashboard/**/*.xml',
+        ],
+    },
     'installable': True,
     'application': True,
     'auto_install': False,

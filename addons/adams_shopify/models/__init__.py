@@ -35,3 +35,4 @@ from . import shopify_import_job
 from . import shopify_payout
 from . import shopify_abandoned_cart
 from . import account_move
+from . import shopify_manager_dashboard
