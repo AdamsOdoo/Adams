@@ -1,13 +1,16 @@
-# Part of Shopify Connector Pro Ultimate Edition. See LICENSE file for full copyright and licensing details.
+# Part of Shopify Connector Pro Ultimate Edition.
+# Copyright (C) 2026 Qamah Solutions — Managed by Odoo Partner Ahmed Saad (ahmedsaad@tech-oriented.com)
+# See LICENSE file for full copyright and licensing details.
 {
     'name': 'Shopify Connector Pro Ultimate Edition',
     'version': '19.0.1.1.0',
     'category': 'Sales/Sales',
     'summary': 'Production-grade bidirectional Shopify <> Odoo connector with manager dashboard: products, orders, customers, inventory, fulfillments, refunds, payouts, promoters, webhooks, and more.',
     'description': 'Shopify Connector Pro Ultimate Edition — enterprise-grade bidirectional Shopify <> Odoo 19 connector built on Shopify GraphQL Admin API 2026-01 with integrated manager dashboard, KPI analytics, and delivery tracking.',
-    'author': 'Shopify Connector Pro Ultimate Edition',
+    'author': 'Qamah Solutions',
+    'maintainer': 'Qamah Solutions — Managed by Odoo Partner Ahmed Saad',
     'website': 'https://apps.odoo.com/apps/modules/19.0/shopify_connector_pro/',
-    'support': 'support@shopifyconnectorpro.com',
+    'support': 'ahmedsaad@tech-oriented.com',
     'license': 'OPL-1',
     'price': 0,
     'currency': 'USD',

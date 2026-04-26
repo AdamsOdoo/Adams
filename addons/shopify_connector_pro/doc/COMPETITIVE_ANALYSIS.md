@@ -1,6 +1,6 @@
 # Shopify Connector Pro — Competitive Analysis & Pricing
 
-### Shopify Connector Pro Ultimate Edition | April 2026
+### Qamah Solutions | Managed by Odoo Partner Ahmed Saad | April 2026
 
 ---
 
