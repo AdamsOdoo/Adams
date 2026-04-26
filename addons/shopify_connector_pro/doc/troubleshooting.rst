@@ -165,7 +165,7 @@ Getting Help
 2. Check the **Webhook Logs** for webhook-specific issues.
 3. Enable Odoo debug mode and check the server log for
    ``shopify_connector_pro`` log entries.
-4. Contact support at support@shopifyconnectorpro.com with:
+4. Contact support at ahmedsaad@tech-oriented.com (Qamah Solutions) with:
 
    - Odoo version and module version
    - Backend configuration (screenshot)

@@ -337,4 +337,6 @@ Competing connectors charge $400–$460 for each Odoo version. When you upgrade 
 
 ---
 
-*Shopify Connector Pro — Built for businesses that demand reliability, completeness, and scalability from their Shopify-Odoo integration.*
+*Shopify Connector Pro Ultimate Edition — Built for businesses that demand reliability, completeness, and scalability from their Shopify-Odoo integration.*
+
+*Developed by Qamah Solutions under the management of Odoo Partner Ahmed Saad (ahmedsaad@tech-oriented.com).*

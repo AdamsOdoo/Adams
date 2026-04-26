@@ -217,8 +217,14 @@ License
 
 OPL-1 (Odoo Proprietary License v1.0)
 
+Author
+=======
+
+Developed by **Qamah Solutions** under the management of
+**Odoo Partner Ahmed Saad** (ahmedsaad@tech-oriented.com).
+
 Support
 ========
 
-For issues or feature requests, contact support or open an issue on the
-project repository.
+For issues or feature requests, contact ahmedsaad@tech-oriented.com
+or open an issue on the project repository.
