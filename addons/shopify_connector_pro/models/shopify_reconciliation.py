@@ -33,8 +33,7 @@ class ShopifyReconciliation(models.TransientModel):
     def _reconcile_backend(self, backend):
         """Run reconciliation checks for a single backend."""
         _logger.info("Starting reconciliation for backend %s (%s)", backend.id, backend.name)
-        from ..shopify_api.client import ShopifyClient
-        client = ShopifyClient(backend)
+        client = backend._make_api_client()
 
         errors_found = 0
         errors_found += self._reconcile_products(backend, client)

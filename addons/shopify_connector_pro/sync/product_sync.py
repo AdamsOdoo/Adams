@@ -527,8 +527,7 @@ class ProductSync:
         # Webhook data is REST format — fetch fresh GraphQL data
         # for consistent field mapping
         try:
-            from ..shopify_api.client import ShopifyClient
-            client = ShopifyClient(self.backend)
+            client = self.backend._make_api_client()
             query = """
             query GetProduct($id: ID!) {
               product(id: $id) {

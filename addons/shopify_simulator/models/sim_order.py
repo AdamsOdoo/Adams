@@ -1,0 +1,269 @@
+# Part of Shopify Simulator. Internal QA tool — not for public distribution.
+import json
+import logging
+
+from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
+
+
+def _money_set(amount, currency='USD', presentment_currency=None):
+    """Build a Shopify MoneyV2Set (shopMoney + presentmentMoney)."""
+    return {
+        'shopMoney': {
+            'amount': str(amount),
+            'currencyCode': currency,
+        },
+        'presentmentMoney': {
+            'amount': str(amount),
+            'currencyCode': presentment_currency or currency,
+        },
+    }
+
+
+class SimShopifyOrder(models.Model):
+    _name = 'sim.shopify.order'
+    _description = 'Simulated Shopify Order'
+    _order = 'create_date desc, id desc'
+    _rec_name = 'name'
+
+    config_id = fields.Many2one(
+        'sim.shopify.config', required=True, ondelete='cascade', index=True,
+    )
+    shopify_gid = fields.Char(string='Shopify GID', index=True, readonly=True)
+    name = fields.Char(string='Order Name', help='e.g. #1001')
+    created_at = fields.Datetime(default=fields.Datetime.now, readonly=True)
+    updated_at = fields.Datetime(default=fields.Datetime.now)
+    closed_at = fields.Datetime()
+    cancelled_at = fields.Datetime()
+
+    financial_status = fields.Selection([
+        ('PENDING', 'Pending'),
+        ('AUTHORIZED', 'Authorized'),
+        ('PARTIALLY_PAID', 'Partially Paid'),
+        ('PAID', 'Paid'),
+        ('PARTIALLY_REFUNDED', 'Partially Refunded'),
+        ('REFUNDED', 'Refunded'),
+        ('VOIDED', 'Voided'),
+    ], default='PAID', required=True)
+    fulfillment_status = fields.Selection([
+        ('UNFULFILLED', 'Unfulfilled'),
+        ('PARTIALLY_FULFILLED', 'Partially Fulfilled'),
+        ('FULFILLED', 'Fulfilled'),
+    ], default='UNFULFILLED')
+
+    note = fields.Text()
+    tags = fields.Char()
+    currency_code = fields.Char(default='USD')
+    presentment_currency_code = fields.Char(default='USD')
+
+    total_price = fields.Float(default=0.0)
+    subtotal_price = fields.Float(default=0.0)
+    total_shipping = fields.Float(default=0.0)
+    total_tax = fields.Float(default=0.0)
+    total_discounts = fields.Float(default=0.0)
+
+    discount_codes_json = fields.Text(
+        string='Discount Codes (JSON)',
+        help='JSON array of {code, amount, type}',
+    )
+
+    customer_id = fields.Many2one('sim.shopify.customer', ondelete='set null')
+    line_item_ids = fields.One2many('sim.shopify.order.line', 'order_id')
+    shipping_line_ids = fields.One2many('sim.shopify.shipping.line', 'order_id')
+
+    # Shipping address
+    ship_first_name = fields.Char()
+    ship_last_name = fields.Char()
+    ship_address1 = fields.Char()
+    ship_address2 = fields.Char()
+    ship_city = fields.Char()
+    ship_province = fields.Char()
+    ship_province_code = fields.Char()
+    ship_country = fields.Char()
+    ship_country_code = fields.Char()
+    ship_zip = fields.Char()
+    ship_phone = fields.Char()
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            config = self.env['sim.shopify.config'].browse(vals.get('config_id'))
+            if config and not vals.get('shopify_gid'):
+                vals['shopify_gid'] = config._next_gid('Order')
+            if not vals.get('name'):
+                # Auto-generate order name
+                vals['name'] = f'#{1000 + (config.next_gid if config else 1)}'
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if 'updated_at' not in vals:
+            vals['updated_at'] = fields.Datetime.now()
+        return super().write(vals)
+
+    def _to_graphql_node(self):
+        """Return dict matching Shopify FETCH_ORDERS GraphQL response shape."""
+        self.ensure_one()
+        cc = self.currency_code or 'USD'
+        pc = self.presentment_currency_code or cc
+
+        customer_node = None
+        if self.customer_id:
+            c = self.customer_id
+            customer_node = {
+                'id': c.shopify_gid,
+                'email': c.email or '',
+                'firstName': c.first_name or '',
+                'lastName': c.last_name or '',
+                'phone': c.phone or '',
+            }
+
+        shipping_address = None
+        if self.ship_address1 or self.ship_city:
+            shipping_address = {
+                'firstName': self.ship_first_name or '',
+                'lastName': self.ship_last_name or '',
+                'address1': self.ship_address1 or '',
+                'address2': self.ship_address2 or '',
+                'city': self.ship_city or '',
+                'province': self.ship_province or '',
+                'provinceCode': self.ship_province_code or '',
+                'country': self.ship_country or '',
+                'countryCodeV2': self.ship_country_code or '',
+                'zip': self.ship_zip or '',
+                'phone': self.ship_phone or '',
+            }
+
+        line_items_edges = []
+        for line in self.line_item_ids:
+            line_items_edges.append({'node': line._to_graphql_node(cc, pc)})
+
+        shipping_lines = []
+        for sl in self.shipping_line_ids:
+            shipping_lines.append(sl._to_graphql_node(cc, pc))
+
+        discount_codes = []
+        if self.discount_codes_json:
+            try:
+                discount_codes = json.loads(self.discount_codes_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return {
+            'id': self.shopify_gid,
+            'name': self.name or '',
+            'createdAt': self.created_at.isoformat() + 'Z' if self.created_at else '',
+            'updatedAt': self.updated_at.isoformat() + 'Z' if self.updated_at else '',
+            'closedAt': self.closed_at.isoformat() + 'Z' if self.closed_at else None,
+            'cancelledAt': self.cancelled_at.isoformat() + 'Z' if self.cancelled_at else None,
+            'displayFinancialStatus': self.financial_status,
+            'displayFulfillmentStatus': self.fulfillment_status,
+            'note': self.note or '',
+            'tags': [t.strip() for t in (self.tags or '').split(',') if t.strip()],
+            'currencyCode': cc,
+            'totalPriceSet': _money_set(self.total_price, cc, pc),
+            'subtotalPriceSet': _money_set(self.subtotal_price, cc, pc),
+            'totalShippingPriceSet': _money_set(self.total_shipping, cc, pc),
+            'totalTaxSet': _money_set(self.total_tax, cc, pc),
+            'totalDiscountsSet': _money_set(self.total_discounts, cc, pc),
+            'discountCodes': discount_codes,
+            'customer': customer_node,
+            'shippingAddress': shipping_address,
+            'billingAddress': shipping_address,  # Simplification: same as shipping
+            'lineItems': {'edges': line_items_edges},
+            'shippingLines': shipping_lines,
+        }
+
+
+class SimShopifyOrderLine(models.Model):
+    _name = 'sim.shopify.order.line'
+    _description = 'Simulated Shopify Order Line Item'
+    _order = 'sequence, id'
+
+    order_id = fields.Many2one(
+        'sim.shopify.order', required=True, ondelete='cascade', index=True,
+    )
+    shopify_gid = fields.Char(string='Line Item GID', readonly=True)
+    title = fields.Char(required=True)
+    quantity = fields.Integer(default=1)
+    sku = fields.Char()
+    variant_gid = fields.Char(string='Variant GID')
+    product_gid = fields.Char(string='Product GID')
+    unit_price = fields.Float(default=0.0)
+    total_discount = fields.Float(default=0.0)
+    tax_amount = fields.Float(default=0.0)
+    tax_rate = fields.Float(default=0.0, help='Tax rate as decimal, e.g. 0.10 for 10%')
+    sequence = fields.Integer(default=10)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            order = self.env['sim.shopify.order'].browse(vals.get('order_id'))
+            config = order.config_id if order else None
+            if config and not vals.get('shopify_gid'):
+                vals['shopify_gid'] = config._next_gid('LineItem')
+        return super().create(vals_list)
+
+    def _to_graphql_node(self, currency='USD', presentment_currency='USD'):
+        self.ensure_one()
+        variant_node = None
+        if self.variant_gid:
+            variant_node = {
+                'id': self.variant_gid,
+                'sku': self.sku or '',
+                'product': {
+                    'id': self.product_gid or '',
+                },
+            }
+
+        discounts = []
+        if self.total_discount:
+            discounts.append({
+                'allocatedAmountSet': _money_set(
+                    self.total_discount, currency, presentment_currency,
+                ),
+            })
+
+        taxes = []
+        if self.tax_amount:
+            taxes.append({
+                'title': 'Tax',
+                'rate': self.tax_rate,
+                'priceSet': _money_set(
+                    self.tax_amount, currency, presentment_currency,
+                ),
+            })
+
+        return {
+            'id': self.shopify_gid,
+            'title': self.title or '',
+            'quantity': self.quantity,
+            'variant': variant_node,
+            'originalUnitPriceSet': _money_set(
+                self.unit_price, currency, presentment_currency,
+            ),
+            'discountAllocations': discounts,
+            'taxLines': taxes,
+        }
+
+
+class SimShopifyShippingLine(models.Model):
+    _name = 'sim.shopify.shipping.line'
+    _description = 'Simulated Shopify Shipping Line'
+
+    order_id = fields.Many2one(
+        'sim.shopify.order', required=True, ondelete='cascade', index=True,
+    )
+    title = fields.Char(default='Standard Shipping')
+    code = fields.Char(default='standard')
+    price = fields.Float(default=0.0)
+
+    def _to_graphql_node(self, currency='USD', presentment_currency='USD'):
+        self.ensure_one()
+        return {
+            'title': self.title or '',
+            'code': self.code or '',
+            'originalPriceSet': _money_set(
+                self.price, currency, presentment_currency,
+            ),
+        }

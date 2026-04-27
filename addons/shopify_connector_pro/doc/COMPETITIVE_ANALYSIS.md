@@ -18,7 +18,7 @@ The Shopify-Odoo integration market in 2026 breaks into four categories:
 
 | Category | Price Range | Examples |
 |----------|-------------|---------|
-| **Native Odoo App Store Connectors** | $430–$540 one-time | Emipro, VentorTech, Webkul, Pragmatic |
+| **Native Odoo App Store Connectors** | $430–$540 with every update | Emipro, VentorTech, Webkul, Pragmatic |
 | **SaaS Middleware (iPaaS)** | $300–$1,500/month | Celigo, Alumio, ECOSIRE, MakerSuite, Workato |
 | **Custom API Integration** | $15,000–$50,000+ build | In-house development teams |
 | **Shopify Connector Pro Ultimate Edition** | **$2,000 one-time** | This product |
@@ -30,7 +30,7 @@ The Shopify-Odoo integration market in 2026 breaks into four categories:
 ### Emipro Technologies — Shopify Odoo Connector
 
 - **Price**: ~€499 (~$540 USD) per Odoo version
-- **Odoo App Store**: [shopify_ept](https://apps.odoo.com/apps/modules/19.0/shopify_ept)
+- **Odoo App Store**: [shopify_ept]
 - **API**: REST Admin API (legacy) with partial GraphQL migration
 - **Support**: 90 days free, then paid
 - **Lines of code**: ~4,629
@@ -38,7 +38,7 @@ The Shopify-Odoo integration market in 2026 breaks into four categories:
 ### VentorTech — Odoo Shopify Connector PRO
 
 - **Price**: ~€399 (~$430 USD) per Odoo version
-- **Odoo App Store**: [integration_shopify](https://apps.odoo.com/apps/modules/19.0/integration_shopify)
+- **Odoo App Store**: [integration_shopify]
 - **API**: Mixed GraphQL + REST
 - **Support**: 90 days via Odoo Apps; unlimited with VentorTech Ecosystem subscription (additional cost)
 
@@ -336,7 +336,7 @@ The Shopify-Odoo integration market in 2026 breaks into four categories:
 | **Tax mapping (name + rate + fiscal position)** | Yes | Basic | Basic |
 | **Payment gateway mapping** | Yes (per gateway) | Basic | Basic |
 | | | | |
-| **Promoter/affiliate system** | Built-in | No | No |
+| **Promoter/affiliate system** | Yes Built-in | No | No |
 | **Discount code management** | Yes | Basic | Basic |
 | **Commission tracking** | Yes | No | No |
 | | | | |
@@ -539,6 +539,6 @@ For businesses that depend on their Shopify-Odoo integration to run reliably eve
 
 **Sources:**
 
-- [Emipro Shopify Connector — Odoo Apps Store](https://apps.odoo.com/apps/modules/19.0/shopify_ept)
-- [VentorTech Shopify Connector PRO — Odoo Apps Store](https://apps.odoo.com/apps/modules/19.0/integration_shopify)
-- [Shopify-Odoo Connectors Compared 2026 — ECOSIRE](https://ecosire.com/blog/shopify-odoo-connector-comparison-2026)
+- [Emipro Shopify Connector — Odoo Apps Store]
+- [VentorTech Shopify Connector PRO — Odoo Apps Store]
+- [Shopify-Odoo Connectors Compared 2026 — ECOSIRE]

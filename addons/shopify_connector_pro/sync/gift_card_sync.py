@@ -14,8 +14,7 @@ class GiftCardSync:
     def __init__(self, env, backend):
         self.env = env
         self.backend = backend
-        from ..shopify_api.client import ShopifyClient
-        self.client = ShopifyClient(backend)
+        self.client = backend._make_api_client()
 
     def import_gift_cards(self):
         """Fetch all gift cards from Shopify and create/update records."""

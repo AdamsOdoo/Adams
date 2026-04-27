@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- No ir.sequence needed — GID generation uses the config's next_gid counter -->
+</odoo>

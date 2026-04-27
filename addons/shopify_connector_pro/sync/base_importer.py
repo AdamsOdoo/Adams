@@ -15,8 +15,7 @@ class BaseImporter:
     def __init__(self, env, backend):
         self.env = env
         self.backend = backend
-        from ..shopify_api.client import ShopifyClient
-        self.client = ShopifyClient(backend)
+        self.client = backend._make_api_client()
 
     def _create_log(self, operation='import'):
         return self.env['shopify.sync.log'].create({

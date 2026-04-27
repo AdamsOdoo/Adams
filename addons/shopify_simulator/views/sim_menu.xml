@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root menu under Settings -->
+    <menuitem id="menu_shopify_simulator_root"
+              name="Shopify Simulator"
+              parent="shopify_connector_pro.menu_shopify_root"
+              sequence="90"
+              groups="group_simulator_admin"/>
+
+    <menuitem id="menu_sim_config"
+              name="Configurations"
+              parent="menu_shopify_simulator_root"
+              action="action_sim_config"
+              sequence="10"/>
+
+    <menuitem id="menu_sim_products"
+              name="Products"
+              parent="menu_shopify_simulator_root"
+              action="action_sim_products"
+              sequence="20"/>
+
+    <menuitem id="menu_sim_customers"
+              name="Customers"
+              parent="menu_shopify_simulator_root"
+              action="action_sim_customers"
+              sequence="30"/>
+</odoo>
