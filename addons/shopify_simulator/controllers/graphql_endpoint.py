@@ -23,6 +23,9 @@ from ..handlers import (
     order_handler,
     inventory_handler,
     location_handler,
+    fulfillment_handler,
+    refund_handler,
+    webhook_handler,
 )
 
 _logger = logging.getLogger(__name__)
@@ -91,9 +94,17 @@ _QUERY_HANDLERS = {
     'products': product_handler.handle_fetch_products,
     'single_product': product_handler.handle_fetch_single_product,
     'customers': customer_handler.handle_fetch_customers,
+    'single_customer': customer_handler.handle_fetch_single_customer,
     'orders': order_handler.handle_fetch_orders,
+    'single_order': order_handler.handle_fetch_single_order,
     'locations': location_handler.handle_fetch_locations,
     'inventory_set': inventory_handler.handle_inventory_set_quantities,
+    # Phase 2: Fulfillments
+    'fulfillments': fulfillment_handler.handle_fetch_order_fulfillments,
+    # Phase 2: Refunds
+    'refunds': refund_handler.handle_fetch_refunds,
+    # Phase 2: Webhooks
+    'webhook_list': webhook_handler.handle_webhook_list,
 }
 
 _MUTATION_HANDLERS = {
@@ -104,8 +115,16 @@ _MUTATION_HANDLERS = {
     'customer_create': customer_handler.handle_customer_create,
     'customer_update': customer_handler.handle_customer_update,
     'order_update': order_handler.handle_order_update,
+    'order_mark_paid': order_handler.handle_order_mark_as_paid,
     'inventory_set': inventory_handler.handle_inventory_set_quantities,
     'inventory_adjust': inventory_handler.handle_inventory_adjust_quantities,
+    # Phase 2: Fulfillments
+    'fulfillment_create': fulfillment_handler.handle_fulfillment_create,
+    # Phase 2: Refunds
+    'refund_create': refund_handler.handle_refund_create,
+    # Phase 2: Webhooks
+    'webhook_create': webhook_handler.handle_webhook_create,
+    'webhook_delete': webhook_handler.handle_webhook_delete,
 }
 
 

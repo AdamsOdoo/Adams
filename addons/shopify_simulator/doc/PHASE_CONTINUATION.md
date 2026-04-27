@@ -3,11 +3,25 @@
 > This document is for starting a new conversation to continue building
 > the simulator. Give this file to the new session as context.
 
-## Current State: Phase 1 COMPLETE ✅
+## Current State: Phase 2 IN PROGRESS 🔧
 
-**Commit:** `7bed0af` on `dev` branch
-**Tests:** 112 tests, 0 failures, 0 errors
-**Connector tests:** 234 tests, 0 failures (backward-compatible refactor)
+**Phase 1:** COMPLETE ✅ (112 tests, 0 failures)
+**Phase 2:** Models + Handlers + Tests COMPLETE ✅ (170 tests, 0 failures)
+**Connector tests:** 292 tests, 0 failures (backward-compatible)
+
+### What Phase 2 Delivered
+
+1. **New models (6):** `sim.shopify.fulfillment`, `sim.shopify.fulfillment.order`, `sim.shopify.fulfillment.order.line`, `sim.shopify.refund`, `sim.shopify.refund.line`, `sim.shopify.webhook.subscription`
+2. **New handlers (3):** `fulfillment_handler.py`, `refund_handler.py`, `webhook_handler.py`
+3. **Updated handlers:** `order_handler.py` (added `handle_fetch_single_order`, `handle_order_mark_as_paid`), `customer_handler.py` (added `handle_fetch_single_customer`)
+4. **Fulfillment lifecycle:** Auto-create FulfillmentOrders on order creation, fulfillmentCreate with partial/full support, order status transitions (UNFULFILLED → PARTIALLY_FULFILLED → FULFILLED)
+5. **Refund lifecycle:** refundCreate with full/partial support, shipping refunds, order financial status updates (PAID → PARTIALLY_REFUNDED → REFUNDED)
+6. **Webhook CRUD:** webhookSubscriptionCreate (with duplicate handling), webhookSubscriptionDelete, WEBHOOK_LIST_QUERY
+7. **Webhook outbound delivery:** HMAC-SHA256 signing (matches Shopify exactly), threaded async POST, topic matching, fires on fulfillmentCreate/refundCreate
+8. **Order lifecycle integration:** Full PENDING → PAID → FULFILLED → REFUNDED flow tested end-to-end
+9. **New tests (5 files, 58 new tests):** test_fulfillment_handlers, test_refund_handlers, test_webhook_handlers, test_webhook_delivery, test_order_lifecycle
+10. **Security:** ACL entries for all 7 new models (user + admin groups)
+11. **Documentation:** User guide (`doc/shopify_simulator_user_guide.md`), updated coverage matrix
 
 ### What Phase 1 Delivered
 
@@ -225,10 +239,10 @@ class TestProductContract(SimulatorTestCase):
 | FETCH_PAYOUTS | P4 | P4 | P4 | P4 |
 | FETCH_PAYOUT_TRANSACTIONS | P4 | P4 | P4 | P4 |
 | FETCH_ABANDONED_CHECKOUTS | P4 | P4 | P4 | P4 |
-| FETCH_REFUNDS | P2 | P2 | P2 | P4 |
+| FETCH_REFUNDS | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
 | FETCH_PRODUCT_METAFIELDS | P4 | P4 | P4 | P4 |
-| FETCH_ORDER_FULFILLMENTS | P2 | P2 | P2 | P4 |
-| WEBHOOK_LIST_QUERY | P2 | P2 | P2 | P4 |
+| FETCH_ORDER_FULFILLMENTS | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
+| WEBHOOK_LIST_QUERY | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
 | PRODUCT_SET_MUTATION | ✅ P1 | ✅ P1 | ✅ P1 | P4 |
 | PRODUCT_UPDATE_MUTATION | ✅ P1 | ✅ P1 | ✅ P1 | P4 |
 | VARIANT_BULK_UPDATE | ✅ P1 | ✅ P1 | ✅ P1 | P4 |
@@ -241,13 +255,13 @@ class TestProductContract(SimulatorTestCase):
 | DISCOUNT_BASIC_CREATE/UPDATE | P4 | P4 | P4 | P4 |
 | DISCOUNT_FS_CREATE/UPDATE | P4 | P4 | P4 | P4 |
 | DISCOUNT_DELETE | P4 | P4 | P4 | P4 |
-| REFUND_CREATE | P2 | P2 | P2 | P4 |
-| FULFILLMENT_CREATE | P2 | P2 | P2 | P4 |
+| REFUND_CREATE | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
+| FULFILLMENT_CREATE | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
 | METAFIELD_SET/DELETE | P4 | P4 | P4 | P4 |
-| WEBHOOK_CREATE/DELETE | P2 | P2 | P2 | P4 |
-| ORDER_MARK_AS_PAID | P2 | P2 | P2 | P4 |
-| GetFulfillmentOrders | P2 | P2 | P2 | P4 |
-| Webhook delivery (outbound) | P2 | P2 | P2 | P4 |
+| WEBHOOK_CREATE/DELETE | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
+| ORDER_MARK_AS_PAID | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
+| GetFulfillmentOrders | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
+| Webhook delivery (outbound) | ✅ P2 | ✅ P2 | ✅ P2 | P4 |
 | Bulk operations | P3 | P3 | P3 | P4 |
 | Rate limit stress | P3 | — | P3 | — |
 | Timeout/retry | P3 | — | P3 | — |

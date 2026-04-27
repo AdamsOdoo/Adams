@@ -7,3 +7,9 @@ from . import test_order_handlers
 from . import test_inventory_handlers
 from . import test_pagination
 from . import test_error_modes
+# Phase 2 tests
+from . import test_fulfillment_handlers
+from . import test_refund_handlers
+from . import test_webhook_handlers
+from . import test_webhook_delivery
+from . import test_order_lifecycle

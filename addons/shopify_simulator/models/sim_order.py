@@ -94,7 +94,53 @@ class SimShopifyOrder(models.Model):
             if not vals.get('name'):
                 # Auto-generate order name
                 vals['name'] = f'#{1000 + (config.next_gid if config else 1)}'
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        # Auto-create fulfillment orders after line items are available
+        # (deferred to write or explicit call since lines are O2M)
+        return records
+
+    def action_create_fulfillment_orders(self):
+        """Create fulfillment orders for this order's line items.
+
+        Called after order lines have been created. Creates one
+        FulfillmentOrder per order (single-location simplification),
+        with one FulfillmentOrderLineItem per order line.
+        """
+        FO = self.env['sim.shopify.fulfillment.order']
+        FOLine = self.env['sim.shopify.fulfillment.order.line']
+
+        for order in self:
+            if not order.line_item_ids:
+                continue
+
+            # Check if FOs already exist
+            existing = FO.search([('order_id', '=', order.id)], limit=1)
+            if existing:
+                continue
+
+            # Find primary location
+            location = self.env['sim.shopify.location'].search([
+                ('config_id', '=', order.config_id.id),
+                ('is_primary', '=', True),
+            ], limit=1)
+
+            fo = FO.create({
+                'config_id': order.config_id.id,
+                'order_id': order.id,
+                'status': 'OPEN',
+                'assigned_location_id': location.id if location else False,
+            })
+
+            for line in order.line_item_ids:
+                FOLine.create({
+                    'fulfillment_order_id': fo.id,
+                    'order_line_id': line.id,
+                    'variant_gid': line.variant_gid or '',
+                    'sku': line.sku or '',
+                    'title': line.title or '',
+                    'total_quantity': line.quantity,
+                    'remaining_quantity': line.quantity,
+                })
 
     def write(self, vals):
         if 'updated_at' not in vals:

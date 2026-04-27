@@ -14,6 +14,20 @@ def handle_fetch_customers(env, config, variables):
     return {'customers': paginate_records(customers, first, after)}
 
 
+def handle_fetch_single_customer(env, config, variables):
+    """Single customer query — fetch by GID (used by webhook re-fetch)."""
+    customer_gid = variables.get('id', '')
+    customer = env['sim.shopify.customer'].search([
+        ('config_id', '=', config.id),
+        ('shopify_gid', '=', customer_gid),
+    ], limit=1)
+
+    if not customer:
+        return {'customer': None}
+
+    return {'customer': customer._to_graphql_node()}
+
+
 def handle_customer_create(env, config, variables):
     """CUSTOMER_CREATE_MUTATION."""
     inp = variables.get('input', {})

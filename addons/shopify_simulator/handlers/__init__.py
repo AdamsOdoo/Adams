@@ -6,3 +6,6 @@ from . import customer_handler
 from . import order_handler
 from . import inventory_handler
 from . import location_handler
+from . import fulfillment_handler
+from . import refund_handler
+from . import webhook_handler

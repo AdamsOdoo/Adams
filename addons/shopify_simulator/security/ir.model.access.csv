@@ -17,3 +17,15 @@ access_sim_location_user,sim.shopify.location user,model_sim_shopify_location,gr
 access_sim_location_admin,sim.shopify.location admin,model_sim_shopify_location,group_simulator_admin,1,1,1,1
 access_sim_inventory_user,sim.shopify.inventory.level user,model_sim_shopify_inventory_level,group_simulator_user,1,0,0,0
 access_sim_inventory_admin,sim.shopify.inventory.level admin,model_sim_shopify_inventory_level,group_simulator_admin,1,1,1,1
+access_sim_fulfillment_user,sim.shopify.fulfillment user,model_sim_shopify_fulfillment,group_simulator_user,1,0,0,0
+access_sim_fulfillment_admin,sim.shopify.fulfillment admin,model_sim_shopify_fulfillment,group_simulator_admin,1,1,1,1
+access_sim_fulfillment_order_user,sim.shopify.fulfillment.order user,model_sim_shopify_fulfillment_order,group_simulator_user,1,0,0,0
+access_sim_fulfillment_order_admin,sim.shopify.fulfillment.order admin,model_sim_shopify_fulfillment_order,group_simulator_admin,1,1,1,1
+access_sim_fulfillment_order_line_user,sim.shopify.fulfillment.order.line user,model_sim_shopify_fulfillment_order_line,group_simulator_user,1,0,0,0
+access_sim_fulfillment_order_line_admin,sim.shopify.fulfillment.order.line admin,model_sim_shopify_fulfillment_order_line,group_simulator_admin,1,1,1,1
+access_sim_refund_user,sim.shopify.refund user,model_sim_shopify_refund,group_simulator_user,1,0,0,0
+access_sim_refund_admin,sim.shopify.refund admin,model_sim_shopify_refund,group_simulator_admin,1,1,1,1
+access_sim_refund_line_user,sim.shopify.refund.line user,model_sim_shopify_refund_line,group_simulator_user,1,0,0,0
+access_sim_refund_line_admin,sim.shopify.refund.line admin,model_sim_shopify_refund_line,group_simulator_admin,1,1,1,1
+access_sim_webhook_sub_user,sim.shopify.webhook.subscription user,model_sim_shopify_webhook_subscription,group_simulator_user,1,0,0,0
+access_sim_webhook_sub_admin,sim.shopify.webhook.subscription admin,model_sim_shopify_webhook_subscription,group_simulator_admin,1,1,1,1

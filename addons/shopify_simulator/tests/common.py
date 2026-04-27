@@ -98,8 +98,14 @@ class SimulatorTestCase(TransactionCase):
 
     @classmethod
     def _seed_order(cls, name='#1001', customer=None, lines=None,
-                    shipping_lines=None, **kwargs):
-        """Create a simulated order with optional line items."""
+                    shipping_lines=None, create_fulfillment_orders=True,
+                    **kwargs):
+        """Create a simulated order with optional line items.
+
+        Args:
+            create_fulfillment_orders: If True (default), automatically create
+                fulfillment orders for the order lines (matching Shopify behavior).
+        """
         vals = {
             'config_id': cls.sim_config.id,
             'name': name,
@@ -116,6 +122,8 @@ class SimulatorTestCase(TransactionCase):
             for sl in shipping_lines:
                 sl['order_id'] = order.id
                 cls.env['sim.shopify.shipping.line'].create(sl)
+        if create_fulfillment_orders and lines:
+            order.action_create_fulfillment_orders()
         return order
 
     @classmethod
