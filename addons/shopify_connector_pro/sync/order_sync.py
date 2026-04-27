@@ -738,8 +738,7 @@ class OrderSync:
         """Import from webhook (REST payload)."""
         shopify_id = f"gid://shopify/Order/{webhook_data.get('id', '')}"
         try:
-            from ..shopify_api.client import ShopifyClient
-            client = ShopifyClient(self.backend)
+            client = self.backend._make_api_client()
             # Must match FETCH_ORDERS shape: include currencyCode +
             # presentmentCurrencyCode, presentmentMoney on every priceSet,
             # subtotal/shipping/tax totals, and per-line taxLines. Otherwise

@@ -280,6 +280,16 @@ class ShopifyBackend(models.Model):
                     "Please use a valid Shopify Admin API access token.",
                 ))
 
+    # ── API Client Factory ─────────────────────────────────
+    def _make_api_client(self):
+        """Return a ShopifyClient (or compatible) for this backend.
+
+        Override this method in test / simulator modules to substitute a
+        different client implementation without monkey-patching.
+        """
+        from ..shopify_api.client import ShopifyClient
+        return ShopifyClient(self)
+
     @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')
     def _compute_bind_counts(self):
@@ -645,9 +655,8 @@ class ShopifyBackend(models.Model):
     def action_test_connection(self):
         """Test the Shopify API connection and update status."""
         self.ensure_one()
-        from ..shopify_api.client import ShopifyClient
         try:
-            client = ShopifyClient(self)
+            client = self._make_api_client()
             shop_data = client.fetch_shop_info()
             self.write({
                 'state': 'connected',
@@ -666,8 +675,7 @@ class ShopifyBackend(models.Model):
         if not self.webhook_secret:
             raise UserError(_("Please set a Webhook Secret before registering webhooks. "
                               "This secret is used to verify incoming webhook signatures."))
-        from ..shopify_api.client import ShopifyClient
-        client = ShopifyClient(self)
+        client = self._make_api_client()
         topics = [
             'PRODUCTS_CREATE', 'PRODUCTS_UPDATE', 'PRODUCTS_DELETE',
             'ORDERS_CREATE', 'ORDERS_UPDATED', 'ORDERS_CANCELLED',
@@ -1044,8 +1052,7 @@ class ShopifyBackend(models.Model):
         self.ensure_one()
         if self.state != 'connected':
             raise UserError(_("Please test your connection first."))
-        from ..shopify_api.client import ShopifyClient
-        client = ShopifyClient(self)
+        client = self._make_api_client()
         # Fetch existing webhook subscriptions and delete them
         query = """
         query {
@@ -1099,8 +1106,7 @@ class ShopifyBackend(models.Model):
         self.ensure_one()
         if self.state != 'connected':
             raise UserError(_("Please test your connection first."))
-        from ..shopify_api.client import ShopifyClient
-        client = ShopifyClient(self)
+        client = self._make_api_client()
         query = """
         query {
           webhookSubscriptions(first: 50) {

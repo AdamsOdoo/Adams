@@ -56,8 +56,7 @@ class AccountMove(models.Model):
                     continue
 
                 try:
-                    from ..shopify_api.client import ShopifyClient
-                    client = ShopifyClient(backend)
+                    client = backend._make_api_client()
                     client.execute_mutation(
                         ORDER_MARK_AS_PAID,
                         {'input': {'id': binding.shopify_id}},
@@ -103,9 +102,8 @@ class AccountMove(models.Model):
                     continue
 
                 try:
-                    from ..shopify_api.client import ShopifyClient
                     from ..shopify_api.queries.refund import REFUND_CREATE
-                    client = ShopifyClient(backend)
+                    client = backend._make_api_client()
 
                     # Shopify expects the amount in the order's own currency.
                     # The credit note may be in a different currency (e.g. company

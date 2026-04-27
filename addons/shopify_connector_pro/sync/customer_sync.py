@@ -316,8 +316,7 @@ class CustomerSync:
         """Import from webhook (REST payload)."""
         shopify_id = f"gid://shopify/Customer/{webhook_data.get('id', '')}"
         try:
-            from ..shopify_api.client import ShopifyClient
-            client = ShopifyClient(self.backend)
+            client = self.backend._make_api_client()
             query = """
             query GetCustomer($id: ID!) {
               customer(id: $id) {

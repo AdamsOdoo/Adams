@@ -96,9 +96,7 @@ class ShopifyImportJob(models.Model):
     def _process_next_page(self):
         """Fetch and process the next page of data. Returns True if more pages exist."""
         self.ensure_one()
-        from ..shopify_api.client import ShopifyClient
-
-        client = ShopifyClient(self.backend_id)
+        client = self.backend_id._make_api_client()
         entity = self.entity
 
         if entity == 'product':

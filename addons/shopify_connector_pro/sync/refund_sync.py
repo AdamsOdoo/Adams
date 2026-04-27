@@ -14,8 +14,7 @@ class RefundImporter:
     def __init__(self, env, backend):
         self.env = env
         self.backend = backend
-        from ..shopify_api.client import ShopifyClient
-        self.client = ShopifyClient(backend)
+        self.client = backend._make_api_client()
 
     def import_refunds_for_order(self, order_binding):
         """Fetch and import all refunds for a given order binding."""

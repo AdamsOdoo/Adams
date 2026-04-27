@@ -1,0 +1,19 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sim_config_user,sim.shopify.config user,model_sim_shopify_config,group_simulator_user,1,0,0,0
+access_sim_config_admin,sim.shopify.config admin,model_sim_shopify_config,group_simulator_admin,1,1,1,1
+access_sim_product_user,sim.shopify.product user,model_sim_shopify_product,group_simulator_user,1,0,0,0
+access_sim_product_admin,sim.shopify.product admin,model_sim_shopify_product,group_simulator_admin,1,1,1,1
+access_sim_variant_user,sim.shopify.variant user,model_sim_shopify_variant,group_simulator_user,1,0,0,0
+access_sim_variant_admin,sim.shopify.variant admin,model_sim_shopify_variant,group_simulator_admin,1,1,1,1
+access_sim_customer_user,sim.shopify.customer user,model_sim_shopify_customer,group_simulator_user,1,0,0,0
+access_sim_customer_admin,sim.shopify.customer admin,model_sim_shopify_customer,group_simulator_admin,1,1,1,1
+access_sim_order_user,sim.shopify.order user,model_sim_shopify_order,group_simulator_user,1,0,0,0
+access_sim_order_admin,sim.shopify.order admin,model_sim_shopify_order,group_simulator_admin,1,1,1,1
+access_sim_order_line_user,sim.shopify.order.line user,model_sim_shopify_order_line,group_simulator_user,1,0,0,0
+access_sim_order_line_admin,sim.shopify.order.line admin,model_sim_shopify_order_line,group_simulator_admin,1,1,1,1
+access_sim_shipping_line_user,sim.shopify.shipping.line user,model_sim_shopify_shipping_line,group_simulator_user,1,0,0,0
+access_sim_shipping_line_admin,sim.shopify.shipping.line admin,model_sim_shopify_shipping_line,group_simulator_admin,1,1,1,1
+access_sim_location_user,sim.shopify.location user,model_sim_shopify_location,group_simulator_user,1,0,0,0
+access_sim_location_admin,sim.shopify.location admin,model_sim_shopify_location,group_simulator_admin,1,1,1,1
+access_sim_inventory_user,sim.shopify.inventory.level user,model_sim_shopify_inventory_level,group_simulator_user,1,0,0,0
+access_sim_inventory_admin,sim.shopify.inventory.level admin,model_sim_shopify_inventory_level,group_simulator_admin,1,1,1,1

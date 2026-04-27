@@ -15,8 +15,7 @@ class MetafieldSync:
     def __init__(self, env, backend):
         self.env = env
         self.backend = backend
-        from ..shopify_api.client import ShopifyClient
-        self.client = ShopifyClient(backend)
+        self.client = backend._make_api_client()
 
     def import_product_metafields(self, product_binding):
         """Import metafields for a specific product binding."""

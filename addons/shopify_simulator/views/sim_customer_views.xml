@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sim_shopify_customer_form" model="ir.ui.view">
+        <field name="name">sim.shopify.customer.form</field>
+        <field name="model">sim.shopify.customer</field>
+        <field name="arch" type="xml">
+            <form string="Simulated Customer">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="config_id"/>
+                            <field name="shopify_gid"/>
+                            <field name="first_name"/>
+                            <field name="last_name"/>
+                            <field name="email"/>
+                            <field name="phone"/>
+                        </group>
+                        <group>
+                            <field name="tags"/>
+                            <field name="state"/>
+                            <field name="address1"/>
+                            <field name="city"/>
+                            <field name="country_code"/>
+                            <field name="zip_code"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="sim_shopify_customer_tree" model="ir.ui.view">
+        <field name="name">sim.shopify.customer.tree</field>
+        <field name="model">sim.shopify.customer</field>
+        <field name="arch" type="xml">
+            <list string="Simulated Customers">
+                <field name="shopify_gid"/>
+                <field name="first_name"/>
+                <field name="last_name"/>
+                <field name="email"/>
+                <field name="config_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_sim_customers" model="ir.actions.act_window">
+        <field name="name">Sim Customers</field>
+        <field name="res_model">sim.shopify.customer</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
