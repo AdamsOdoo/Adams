@@ -85,7 +85,12 @@ class ShopifyManagerDashboard(models.AbstractModel):
         return self.env.company.currency_id
 
     def _resolve_period(self, period, date_from, date_to):
-        now = fields.Datetime.now()
+        # fields.Datetime.now() truncates microseconds to zero and Odoo's
+        # domain serialisation (Datetime.to_string) also drops them, yet
+        # create_date / write_date are stored with full µs precision.
+        # Adding one second ensures ``('create_date', '<', end)`` captures
+        # every record created during the current wall-clock second.
+        now = fields.Datetime.now() + timedelta(seconds=1)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
         if period == 'custom' and date_from and date_to:
