@@ -69,7 +69,10 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
           countryCodeV2
           zip
         }
-        lineItems(first: 150) {
+        lineItems(first: 250) {
+          pageInfo {
+            hasNextPage
+          }
           edges {
             node {
               id

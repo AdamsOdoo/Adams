@@ -70,7 +70,7 @@ mutation ProductSet($input: ProductSetInput!) {
       id
       title
       handle
-      variants(first: 100) {
+      variants(first: 250) {
         edges {
           node {
             id
@@ -98,7 +98,7 @@ mutation ProductCreate($input: ProductInput!) {
       id
       title
       handle
-      variants(first: 100) {
+      variants(first: 250) {
         edges {
           node {
             id

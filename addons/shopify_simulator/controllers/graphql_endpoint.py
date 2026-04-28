@@ -10,6 +10,7 @@ import logging
 import os
 import random
 import re
+import threading
 import time
 
 from odoo import http
@@ -37,6 +38,39 @@ from ..handlers import (
 _logger = logging.getLogger(__name__)
 
 _RUNNING_ENV = os.environ.get('RUNNING_ENV', os.environ.get('ODOO_STAGE', 'dev'))
+
+# ── Simulator abuse safeguards ────────────────────────────
+# Maximum payload size for simulator endpoint (5 MB)
+SIM_MAX_PAYLOAD_SIZE = 5 * 1024 * 1024
+
+# Per-config rate limiting
+_sim_rate_buckets = {}  # {config_id: [timestamps]}
+_sim_rate_lock = threading.Lock()
+SIM_RATE_LIMIT = 300  # max requests per window
+SIM_RATE_WINDOW = 60  # seconds
+SIM_RATE_MAX_BUCKETS = 200
+
+
+def _check_sim_rate_limit(config_id):
+    """Return True if the request is allowed, False if rate-limited."""
+    now = time.time()
+    cutoff = now - SIM_RATE_WINDOW
+    with _sim_rate_lock:
+        if len(_sim_rate_buckets) > SIM_RATE_MAX_BUCKETS:
+            stale = [
+                k for k, ts in _sim_rate_buckets.items()
+                if not ts or ts[-1] < cutoff
+            ]
+            for k in stale:
+                _sim_rate_buckets.pop(k, None)
+        bucket = _sim_rate_buckets.get(config_id, [])
+        bucket = [t for t in bucket if t > cutoff]
+        if len(bucket) >= SIM_RATE_LIMIT:
+            _sim_rate_buckets[config_id] = bucket
+            return False
+        bucket.append(now)
+        _sim_rate_buckets[config_id] = bucket
+        return True
 
 # ── Dispatch tables ───────────────────────────────────────
 # Ordered: more specific patterns first to avoid ambiguity.
@@ -175,6 +209,18 @@ class ShopifySimulatorController(http.Controller):
                 status=403,
             )
 
+        # ── Payload size check ────────────────────────────
+        raw_body = request.httprequest.get_data()
+        if len(raw_body) > SIM_MAX_PAYLOAD_SIZE:
+            _logger.warning(
+                "Simulator payload too large (%d bytes) for config %s",
+                len(raw_body), config_id,
+            )
+            return request.make_json_response(
+                build_error_response('Payload too large'),
+                status=413,
+            )
+
         # ── Load config ───────────────────────────────────
         config = request.env['sim.shopify.config'].sudo().browse(config_id)
         if not config.exists():
@@ -191,6 +237,16 @@ class ShopifySimulatorController(http.Controller):
                 status=401,
             )
 
+        # ── Rate limiting (after auth to prevent bucket poisoning) ─
+        if not _check_sim_rate_limit(config_id):
+            _logger.warning(
+                "Simulator rate limit exceeded for config %s", config_id,
+            )
+            return request.make_json_response(
+                build_error_response('Rate limit exceeded'),
+                status=429,
+            )
+
         # ── Check error mode ──────────────────────────────
         error_response = self._check_error_mode(config)
         if error_response is not None:
@@ -198,8 +254,7 @@ class ShopifySimulatorController(http.Controller):
 
         # ── Parse request body ────────────────────────────
         try:
-            raw = request.httprequest.get_data(as_text=True)
-            body = json.loads(raw)
+            body = json.loads(raw_body)
         except (json.JSONDecodeError, TypeError) as e:
             return request.make_json_response(
                 build_error_response(f'Invalid JSON: {e}'),

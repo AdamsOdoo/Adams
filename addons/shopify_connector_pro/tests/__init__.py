@@ -19,3 +19,4 @@ from . import test_regression_fixes
 from . import test_performance
 from . import test_e2e_smoke
 from . import test_manager_dashboard
+from . import test_business_flows
