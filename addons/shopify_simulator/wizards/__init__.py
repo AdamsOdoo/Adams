@@ -1,4 +1,3 @@
 # Part of Shopify Simulator. Internal QA tool — not for public distribution.
-from . import controllers
-from . import models
-from . import wizards
+from . import sim_seed_wizard
+from . import sim_webhook_console

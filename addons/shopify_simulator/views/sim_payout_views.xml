@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sim_shopify_payout_form" model="ir.ui.view">
+        <field name="name">sim.shopify.payout.form</field>
+        <field name="model">sim.shopify.payout</field>
+        <field name="arch" type="xml">
+            <form string="Simulated Payout">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="config_id"/>
+                            <field name="shopify_gid" readonly="1"/>
+                            <field name="status"/>
+                            <field name="payout_date"/>
+                            <field name="currency_code"/>
+                        </group>
+                        <group string="Amounts">
+                            <field name="amount"/>
+                            <field name="gross_amount"/>
+                            <field name="fees_amount"/>
+                            <field name="adjustments_amount"/>
+                            <field name="refunds_amount"/>
+                            <field name="charges_amount"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Transactions">
+                            <field name="transaction_ids">
+                                <list editable="bottom">
+                                    <field name="shopify_gid" readonly="1"/>
+                                    <field name="transaction_type"/>
+                                    <field name="amount"/>
+                                    <field name="fee"/>
+                                    <field name="net"/>
+                                    <field name="source_order_gid"/>
+                                    <field name="processed_at"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Summary">
+                            <field name="summary"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="sim_shopify_payout_tree" model="ir.ui.view">
+        <field name="name">sim.shopify.payout.tree</field>
+        <field name="model">sim.shopify.payout</field>
+        <field name="arch" type="xml">
+            <list string="Simulated Payouts">
+                <field name="shopify_gid"/>
+                <field name="status"/>
+                <field name="amount"/>
+                <field name="gross_amount"/>
+                <field name="fees_amount"/>
+                <field name="payout_date"/>
+                <field name="currency_code"/>
+                <field name="transaction_count"/>
+                <field name="config_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_sim_payouts" model="ir.actions.act_window">
+        <field name="name">Sim Payouts</field>
+        <field name="res_model">sim.shopify.payout</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

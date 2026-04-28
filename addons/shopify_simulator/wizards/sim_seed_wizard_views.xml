@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sim_seed_data_wizard_form" model="ir.ui.view">
+        <field name="name">sim.seed.data.wizard.form</field>
+        <field name="model">sim.seed.data.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Seed Data Wizard">
+                <group>
+                    <field name="config_id" readonly="1"/>
+                    <field name="seed_mode" widget="radio"/>
+                    <field name="use_demo_store"/>
+                </group>
+                <group invisible="use_demo_store" string="Data Types &amp; Quantities">
+                    <group>
+                        <field name="seed_products"/>
+                        <field name="product_count" invisible="not seed_products"/>
+                        <field name="variants_per_product" invisible="not seed_products"/>
+                        <field name="seed_customers"/>
+                        <field name="customer_count" invisible="not seed_customers"/>
+                    </group>
+                    <group>
+                        <field name="seed_orders"/>
+                        <field name="order_count" invisible="not seed_orders"/>
+                        <field name="seed_locations"/>
+                        <field name="location_count" invisible="not seed_locations"/>
+                        <field name="seed_inventory"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_seed" string="Seed Data"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sim_seed_wizard" model="ir.actions.act_window">
+        <field name="name">Seed Data Wizard</field>
+        <field name="res_model">sim.seed.data.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

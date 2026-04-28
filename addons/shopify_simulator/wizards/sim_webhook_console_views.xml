@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sim_webhook_console_form" model="ir.ui.view">
+        <field name="name">sim.webhook.console.form</field>
+        <field name="model">sim.webhook.console</field>
+        <field name="arch" type="xml">
+            <form string="Webhook Test Console">
+                <group>
+                    <group string="Target">
+                        <field name="config_id" readonly="1"/>
+                        <field name="topic"/>
+                    </group>
+                    <group string="Source Record">
+                        <field name="source_product_id"
+                               invisible="topic not in ('products/create', 'products/update', 'products/delete')"/>
+                        <field name="source_order_id"
+                               invisible="topic not in ('orders/create', 'orders/updated', 'orders/cancelled')"/>
+                        <field name="source_customer_id"
+                               invisible="topic not in ('customers/create', 'customers/update')"/>
+                    </group>
+                </group>
+                <notebook>
+                    <page string="Payload">
+                        <field name="payload_json" widget="ace" options="{'mode': 'json'}"/>
+                    </page>
+                    <page string="Last Response">
+                        <group>
+                            <field name="last_response_code"/>
+                            <field name="last_response_body" readonly="1"/>
+                        </group>
+                    </page>
+                </notebook>
+                <footer>
+                    <button name="action_fire_webhook" string="Fire Webhook"
+                            type="object" class="btn-primary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sim_webhook_console" model="ir.actions.act_window">
+        <field name="name">Webhook Test Console</field>
+        <field name="res_model">sim.webhook.console</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

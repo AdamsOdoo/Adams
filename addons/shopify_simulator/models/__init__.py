@@ -9,3 +9,12 @@ from . import sim_inventory
 from . import sim_fulfillment
 from . import sim_refund
 from . import sim_webhook
+# Phase 3+4 models
+from . import sim_collection
+from . import sim_metafield
+from . import sim_gift_card
+from . import sim_payout
+from . import sim_abandoned_cart
+from . import sim_discount
+from . import sim_scenario
+from . import sim_checklist

@@ -1,27 +1,134 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Root menu under Settings -->
+    <!-- Root menu under Shopify -->
     <menuitem id="menu_shopify_simulator_root"
-              name="Shopify Simulator"
+              name="Simulator"
               parent="shopify_connector_pro.menu_shopify_root"
               sequence="90"
               groups="group_simulator_admin"/>
 
+    <!-- Dashboard / Config -->
     <menuitem id="menu_sim_config"
               name="Configurations"
               parent="menu_shopify_simulator_root"
               action="action_sim_config"
               sequence="10"/>
 
+    <!-- Seed Data Wizard -->
+    <menuitem id="menu_sim_seed_wizard"
+              name="Seed Data Wizard"
+              parent="menu_shopify_simulator_root"
+              action="action_sim_seed_wizard"
+              sequence="15"/>
+
+    <!-- Webhook Test Console -->
+    <menuitem id="menu_sim_webhook_console"
+              name="Webhook Test Console"
+              parent="menu_shopify_simulator_root"
+              action="action_sim_webhook_console"
+              sequence="25"/>
+
+    <!-- Scenario Library -->
+    <menuitem id="menu_sim_scenario_library"
+              name="Scenario Library"
+              parent="menu_shopify_simulator_root"
+              action="action_sim_scenario"
+              sequence="30"/>
+
+    <!-- Validation Checklist -->
+    <menuitem id="menu_sim_checklist"
+              name="Validation Checklist"
+              parent="menu_shopify_simulator_root"
+              action="action_sim_checklist"
+              sequence="35"/>
+
+    <!-- Simulator Records -->
+    <menuitem id="menu_sim_records"
+              name="Simulator Records"
+              parent="menu_shopify_simulator_root"
+              sequence="50"/>
+
     <menuitem id="menu_sim_products"
               name="Products"
-              parent="menu_shopify_simulator_root"
+              parent="menu_sim_records"
               action="action_sim_products"
-              sequence="20"/>
+              sequence="10"/>
 
     <menuitem id="menu_sim_customers"
               name="Customers"
-              parent="menu_shopify_simulator_root"
+              parent="menu_sim_records"
               action="action_sim_customers"
+              sequence="20"/>
+
+    <menuitem id="menu_sim_orders"
+              name="Orders"
+              parent="menu_sim_records"
+              action="action_sim_orders"
               sequence="30"/>
+
+    <menuitem id="menu_sim_locations"
+              name="Locations"
+              parent="menu_sim_records"
+              action="action_sim_locations"
+              sequence="40"/>
+
+    <menuitem id="menu_sim_inventory"
+              name="Inventory Levels"
+              parent="menu_sim_records"
+              action="action_sim_inventory"
+              sequence="50"/>
+
+    <menuitem id="menu_sim_fulfillments"
+              name="Fulfillments"
+              parent="menu_sim_records"
+              action="action_sim_fulfillments"
+              sequence="60"/>
+
+    <menuitem id="menu_sim_refunds"
+              name="Refunds"
+              parent="menu_sim_records"
+              action="action_sim_refunds"
+              sequence="70"/>
+
+    <menuitem id="menu_sim_webhooks"
+              name="Webhook Subscriptions"
+              parent="menu_sim_records"
+              action="action_sim_webhooks"
+              sequence="80"/>
+
+    <menuitem id="menu_sim_collections"
+              name="Collections"
+              parent="menu_sim_records"
+              action="action_sim_collections"
+              sequence="90"/>
+
+    <menuitem id="menu_sim_metafields"
+              name="Metafields"
+              parent="menu_sim_records"
+              action="action_sim_metafields"
+              sequence="100"/>
+
+    <menuitem id="menu_sim_gift_cards"
+              name="Gift Cards"
+              parent="menu_sim_records"
+              action="action_sim_gift_cards"
+              sequence="110"/>
+
+    <menuitem id="menu_sim_payouts"
+              name="Payouts"
+              parent="menu_sim_records"
+              action="action_sim_payouts"
+              sequence="120"/>
+
+    <menuitem id="menu_sim_abandoned_carts"
+              name="Abandoned Carts"
+              parent="menu_sim_records"
+              action="action_sim_abandoned_carts"
+              sequence="130"/>
+
+    <menuitem id="menu_sim_discounts"
+              name="Discount Codes"
+              parent="menu_sim_records"
+              action="action_sim_discounts"
+              sequence="140"/>
 </odoo>

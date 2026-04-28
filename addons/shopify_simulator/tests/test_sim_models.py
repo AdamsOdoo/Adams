@@ -60,7 +60,7 @@ class TestSimConfig(SimulatorTestCase):
     def test_reset_rate_limit(self):
         """Reset should restore full budget."""
         self.sim_config._build_extensions(100)
-        self.sim_config._reset_rate_limit()
+        self.sim_config.action_reset_rate_limit()
         self.sim_config.invalidate_recordset()
         self.assertEqual(
             self.sim_config.rate_limit_available,
@@ -330,5 +330,5 @@ class TestSimInventory(SimulatorTestCase):
         product = self._seed_product('Uniq Test')
         variant = product.variant_ids[0]
         self._seed_inventory(variant, available=10)
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception), self.cr.savepoint():
             self._seed_inventory(variant, available=20)

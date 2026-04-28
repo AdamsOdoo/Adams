@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sim_checklist_form" model="ir.ui.view">
+        <field name="name">sim.checklist.form</field>
+        <field name="model">sim.checklist</field>
+        <field name="arch" type="xml">
+            <form string="Validation Checklist">
+                <group>
+                    <field name="config_id"/>
+                    <field name="all_passed" invisible="1"/>
+                </group>
+                <div class="alert alert-success" role="alert"
+                     invisible="not all_passed">
+                    All checks passed — simulator is ready for sync testing.
+                </div>
+                <div class="alert alert-danger" role="alert"
+                     invisible="all_passed">
+                    Some checks failed — review the results below.
+                </div>
+                <group string="Results">
+                    <field name="result_html" nolabel="1"/>
+                </group>
+                <footer>
+                    <button name="action_run_checks" string="Re-run Checks"
+                            type="object" class="btn-primary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_sim_checklist" model="ir.actions.act_window">
+        <field name="name">Validation Checklist</field>
+        <field name="res_model">sim.checklist</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

@@ -3,450 +3,315 @@
 > Internal QA / Developer guide for testing the Odoo Shopify Connector Pro
 > using the Shopify Simulator module.
 
-**Last updated:** Phase 2 (Orders + Fulfillments + Refunds + Webhooks)
+**Last updated:** Phase 3+4 (Full UI, Collections, Metafields, Gift Cards,
+Payouts, Abandoned Carts, Discounts, Scenarios, Checklist)
 
 ---
 
 ## 1. Purpose of the Simulator
 
-### What the simulator is used for
+### What it does
 - End-to-end testing of the Shopify Connector Pro without a real Shopify store
-- UAT (User Acceptance Testing) of import/export flows
-- Testing webhook handling, HMAC validation, and event processing
-- Testing error handling, rate limiting, and retry behavior
-- Testing fulfillment and refund lifecycle flows
-- Regression testing after connector changes
+- UAT of import/export flows with full UI controls
+- Webhook testing with built-in HMAC signing and payload generation
+- Error and chaos testing (rate limits, timeouts, random errors)
+- Pre-built scenarios for common test flows
+- Validation checklist to verify readiness before sync
 
-### What it is NOT used for
-- Production use (hard-blocked by environment checks)
-- Customer-facing deployment (not distributed publicly)
-- Performance benchmarking against real Shopify API latency
-- Testing Shopify App Store review flows
+### What it is NOT
+- Not for production use (hard-blocked by environment checks)
+- Not customer-facing (not distributed publicly)
+- Not for performance benchmarking
 
-### ⚠️ Internal/Dev/Test Only
-This module is **never installed in production**. It includes hard safeguards:
-- `RUNNING_ENV`/`ODOO_STAGE` environment variable checks
-- `ValidationError` if anyone tries to enable simulator in production
-- Controller returns HTTP 403 in production environments
+### Safety
+- `RUNNING_ENV`/`ODOO_STAGE` checks prevent production use
+- Controller returns HTTP 403 in production
+- `ValidationError` blocks enabling simulator in production
 
 ---
 
 ## 2. Prerequisites
 
-- **Odoo branch:** 19.0
-- **Required modules:** `shopify_connector_pro` (auto-dependency)
-- **Python:** 3.12+
-- **Database:** Any Odoo dev/staging database
+- **Odoo:** 19.0
+- **Required module:** `shopify_connector_pro` (auto-dependency)
 - **Environment:** `RUNNING_ENV` or `ODOO_STAGE` must NOT be `production`
-- **Access rights:** User must belong to `shopify_simulator.group_simulator_admin`
+- **Access rights:** User in `shopify_simulator.group_simulator_admin`
 
 ---
 
-## 3. Installation / Upgrade Steps
+## 3. Quick Start (UI-First)
 
-### Install
-```bash
-# Via CLI
-python3 odoo-bin -d $PGDATABASE --addons-path=$ADDONS_PATH \
-    -i shopify_simulator --stop-after-init --no-http
+### Step 1: Install
+**Apps** > search "Shopify Simulator" > **Install**
 
-# Via UI: Apps → search "Shopify Simulator" → Install
+### Step 2: Create simulator from backend
+1. **Shopify > Backends** > select a backend
+2. Click **"Create Simulator"** in the header
+3. Done — the backend now points to the local simulator
+
+### Step 3: Seed data
+1. **Shopify > Simulator > Configurations** > open your config
+2. Click **"Seed Demo Store"** to create 6 products, 3 customers, 3 orders
+3. Or click **"Advanced Seed Wizard"** for custom quantities
+
+### Step 4: Verify readiness
+1. Click **"Run Checklist"** on the config form
+2. All checks should pass (green checkmarks)
+
+### Step 5: Test sync
+1. Go back to the backend > run **Sync Products** / **Import Orders** / etc.
+2. The connector syncs against the simulator instead of real Shopify
+
+---
+
+## 4. UI Navigation
+
+### Menu Structure
+```
+Shopify > Simulator
+  ├── Configurations          — Manage simulator configs
+  ├── Seed Data Wizard        — Generate test data (modal)
+  ├── Webhook Test Console    — Fire test webhooks (modal)
+  ├── Scenario Library        — Pre-built test flows
+  ├── Validation Checklist    — Pre-flight checks (modal)
+  └── Simulator Records
+        ├── Products
+        ├── Customers
+        ├── Orders
+        ├── Locations
+        ├── Inventory Levels
+        ├── Fulfillments
+        ├── Refunds
+        ├── Webhook Subscriptions
+        ├── Collections
+        ├── Metafields
+        ├── Gift Cards
+        ├── Payouts
+        ├── Abandoned Carts
+        └── Discount Codes
 ```
 
-### Upgrade after code changes
-```bash
-python3 odoo-bin -d $PGDATABASE --addons-path=$ADDONS_PATH \
-    -u shopify_simulator --stop-after-init --no-http
-```
+### Config Form Features
+- **Header buttons:** Seed Demo Store, Reset All Data, Reset Rate Limit,
+  Advanced Seed Wizard, Webhook Console, Run Checklist
+- **Stat buttons:** Click any count to jump to filtered list of records
+- **Connection group:** Backend link, access token, simulator endpoint URL
+- **Error Simulation group:** Error mode selector + rate limit controls
 
-### Confirm installation
-1. Navigate to **Settings → Technical → Modules** → search "shopify_simulator"
-2. Status should be "Installed"
-3. Navigate to **Shopify → Simulator** menu — should be visible
-
----
-
-## 4. Backend Configuration Steps
-
-### Enable simulator mode
-1. Go to **Shopify → Backends** → select or create a backend
-2. Click **"Create Simulator"** button (action_create_simulator)
-3. This automatically:
-   - Creates a `sim.shopify.config` record
-   - Sets `use_simulator = True`
-   - Updates `shop_url` to point to the local simulator endpoint
-   - Copies the simulator access token to the backend
-
-### Manual configuration
-If you prefer manual setup:
-
-| Field | Value |
-|-------|-------|
-| **Use Simulator** | ☑ Enabled |
-| **Shop URL** | `http://localhost:8069/shopify-sim/{config_id}` |
-| **Access Token** | Copy from sim config's `access_token` field |
-| **Simulator Config** | Link to the sim.shopify.config record |
-
-### Confirm connector points to simulator
-1. Check backend's `shop_url` — should contain `/shopify-sim/`
-2. Run **Test Connection** — should return the simulated shop name
-3. Check backend's `use_simulator` checkbox is enabled
-
-### Webhook secret (for webhook testing)
-Set `webhook_secret` on the backend to a known value (e.g., `test_secret_123`).
-The simulator uses this same secret when computing HMAC signatures for outbound webhooks.
+### Backend Form Integration
+When `shopify_simulator` is installed:
+- **"Create Simulator"** button appears on backends without simulator
+- **"Simulator Mode Active"** banner shows on simulator-enabled backends
 
 ---
 
-## 5. Seed Data Setup
+## 5. Seeding Test Data
 
-### Generate demo data programmatically
-```python
-# In Odoo Shell or test setUp
-from odoo.addons.shopify_simulator.fixtures.demo_store import seed_demo_store
-config = env['sim.shopify.config'].browse(CONFIG_ID)
-seed_demo_store(env, config)
-```
+### Quick seed (one click)
+Config form > **"Seed Demo Store"** > creates curated edge-case data:
+- 6 products (simple, multi-variant, Arabic title, draft, zero-price, archived)
+- 3 customers (US, Saudi Arabia, no-email POS customer)
+- 3 orders (paid, pending with discount, fulfilled zero-price)
+- 2 locations (US + EU), inventory levels
 
-This creates:
-- 6 products with variants (including edge cases: Unicode, missing SKU)
-- 3 customers
-- 3 orders (paid, pending, cancelled)
-- 2 locations
-- Inventory levels
+### Advanced seed wizard
+Config form > **"Advanced Seed Wizard"** or **Simulator > Seed Data Wizard**:
+- Toggle which data types to seed (products, customers, orders, locations, inventory)
+- Set exact quantities and variant count
+- Choose **Append** (add to existing) or **Replace** (clear first)
+- **Use Curated Demo Store** checkbox for the fixture above
 
-### Generate individual records
-```python
-# Products
-product = env['sim.shopify.product'].create({
-    'config_id': config.id,
-    'title': 'Test Widget',
-    'product_type': 'Widgets',
-    'vendor': 'Test Vendor',
-    'status': 'ACTIVE',
-})
-# Variants are auto-created (one "Default Title" variant per product)
+### Manual record creation
+Navigate to any **Simulator Records** submenu and create records directly
+via the list/form views. All records auto-generate Shopify GIDs on save.
 
-# Customers
-customer = env['sim.shopify.customer'].create({
-    'config_id': config.id,
-    'first_name': 'Jane',
-    'last_name': 'Doe',
-    'email': 'jane@example.com',
-})
-
-# Orders with line items
-order = env['sim.shopify.order'].create({
-    'config_id': config.id,
-    'name': '#1001',
-    'total_price': 99.99,
-    'financial_status': 'PAID',
-    'customer_id': customer.id,
-})
-env['sim.shopify.order.line'].create({
-    'order_id': order.id,
-    'title': 'Test Widget',
-    'quantity': 2,
-    'variant_gid': product.variant_ids[0].shopify_gid,
-    'unit_price': 49.99,
-})
-# Create fulfillment orders (required for fulfillment testing)
-order.action_create_fulfillment_orders()
-```
-
-### Reset simulator data
-```python
-# Delete all data for a config
-for model in ['sim.shopify.product', 'sim.shopify.customer',
-              'sim.shopify.order', 'sim.shopify.fulfillment',
-              'sim.shopify.refund', 'sim.shopify.webhook.subscription',
-              'sim.shopify.inventory.level']:
-    env[model].search([('config_id', '=', config.id)]).unlink()
-```
+### Reset all data
+Config form > **"Reset All Data"** (with confirmation) > deletes all
+simulator records for this config and resets the GID counter to 1001.
 
 ---
 
-## 6. Product Testing Flow
+## 6. Scenario Library
 
-### Test product import
-1. Seed products in the simulator (see §5)
-2. Run **Shopify → Backends → [Backend] → Sync Products**
-3. Check **Shopify → Products** for imported product bindings
+Navigate to **Simulator > Scenario Library** for pre-built test flows:
 
-### Test product export
-1. Create a product in Odoo with a Shopify binding
-2. Trigger export (manual or cron)
-3. Check `sim.shopify.product` records for the newly created simulator product
+| Scenario | Category | What it does |
+|----------|----------|-------------|
+| Happy Path — Full Import | Import | Seeds complete demo store |
+| Partial Refund Flow | Refunds | Creates order + partial refund |
+| Rate Limit Exhaustion | Error Handling | Drains bucket, enables 429 mode |
+| Multi-Location Inventory | Inventory | Product across 3 locations |
+| Abandoned Cart Recovery | Abandoned Carts | Known + anonymous carts |
+| Discount Code Varieties | Discounts | Percentage, fixed, free shipping |
 
-### Validate results
-- Product title, vendor, product_type match
-- Variants have correct SKU, price, barcode
-- Product images are linked (if applicable)
-
----
-
-## 7. Customer Testing Flow
-
-### Test customer import
-1. Seed customers in the simulator
-2. Run **Shopify → Backends → [Backend] → Sync Customers**
-3. Check **Contacts** for imported customer records
-
-### Validate
-- First/last name, email, phone match
-- Address fields mapped correctly
-- Shopify binding created with correct GID
+**Run a scenario:** Click the **Run** button on any row (or open the form and
+click **Run Scenario** in the header). Results appear as a notification.
 
 ---
 
-## 8. Order Testing Flow
+## 7. Validation Checklist
 
-### Test order import
-1. Seed orders with line items in the simulator
-2. Run **Shopify → Backends → [Backend] → Import Orders**
-3. Check **Sales → Orders** for imported sale orders
+Navigate to **Simulator > Validation Checklist** or click **"Run Checklist"**
+on a config form. Checks include:
 
-### Test paid/pending/cancelled orders
-- Seed orders with different `financial_status` values (PAID, PENDING, AUTHORIZED)
-- Import and verify correct status mapping in Odoo
-
-### Validate
-- Sale order lines match order line items
-- Taxes, discounts, shipping lines mapped
-- Customer linked correctly
-- Financial status reflected in Odoo
-
----
-
-## 9. Inventory Testing Flow
-
-### Test inventory sync
-1. Seed inventory levels at simulator locations
-2. Configure warehouse mapping on backend
-3. Run inventory sync
-4. Check stock quantities in Odoo
-
-### Multi-location
-- Seed inventory at multiple `sim.shopify.location` records
-- Verify each location maps to correct Odoo warehouse/location
+| Check | What it validates |
+|-------|-------------------|
+| Backend Linked | Backend exists and simulator mode is ON |
+| Access Token Match | Config token matches backend token |
+| Has Products | At least 1 active product exists |
+| Has Customers | At least 1 customer exists |
+| Has Orders | At least 1 order exists |
+| Has Active Locations | At least 1 active location |
+| Primary Location Exists | Exactly 1 primary location |
+| Has Inventory Levels | At least 1 inventory level |
+| Rate Limit Sufficient | Available budget > 100 |
+| Error Mode: Normal | Error mode is 'none' |
 
 ---
 
-## 10. Fulfillment and Refund Testing Flow
+## 8. Webhook Test Console
 
-### Test fulfillment creation (Odoo → Shopify)
-1. Import an order from the simulator
-2. Confirm the sale order in Odoo
-3. Validate the delivery (stock.picking)
-4. The connector's `push_fulfillment()` sends a `fulfillmentCreate` mutation
-5. Check `sim.shopify.fulfillment` for the created record
-6. Verify order's `fulfillment_status` updated to `FULFILLED` or `PARTIALLY_FULFILLED`
+Navigate to **Simulator > Webhook Test Console** or click **"Webhook Console"**
+on a config form.
 
-### Test partial fulfillment
-1. Create an order with multiple line items or qty > 1
-2. Validate a partial delivery (not all items)
-3. Verify fulfillment order lines show remaining quantities
-4. Verify order status is `PARTIALLY_FULFILLED`
+### Usage
+1. Select a **topic** (e.g., `products/update`, `orders/create`)
+2. Select a **source record** (product, order, or customer)
+3. Payload auto-generates — edit if needed
+4. Click **"Fire Webhook"**
+5. See response code + body in the **Last Response** tab
 
-### Test refund
-1. Create a refund via the `refundCreate` mutation
-2. Verify `sim.shopify.refund` record created
-3. Verify order's `financial_status` updated to `PARTIALLY_REFUNDED` or `REFUNDED`
+### Supported topics
+`products/create`, `products/update`, `products/delete`,
+`orders/create`, `orders/updated`, `orders/cancelled`,
+`customers/create`, `customers/update`, `refunds/create`,
+`inventory_levels/update`, `fulfillments/create`, `app/uninstalled`
 
-### Validate
-- `sim.shopify.fulfillment.order` lines show correct remaining quantities
-- Fulfillment records have tracking info
-- Refund records have correct amounts and line items
-- Order status transitions are correct
+### HMAC signing
+The console signs payloads with `HMAC-SHA256` using the backend's
+`webhook_secret` (or config's `access_token` as fallback).
 
 ---
 
-## 11. Webhook Testing Flow
+## 9. Error and Chaos Testing
 
-### Register webhooks
-The connector registers webhooks via `webhookSubscriptionCreate` mutation:
-1. Go to backend → **Register Webhooks**
-2. Verify `sim.shopify.webhook.subscription` records created
-3. Check via **WEBHOOK_LIST_QUERY** that all topics appear
-
-### Trigger valid webhooks
-When simulator mutations fire (e.g., `fulfillmentCreate`, `refundCreate`),
-outbound webhooks are automatically sent to registered callback URLs:
-1. Register a webhook for `FULFILLMENTS_CREATE`
-2. Create a fulfillment via the simulator
-3. Check `shopify.webhook.log` for the received webhook
-4. Run webhook processing cron
-5. Verify Odoo records updated
-
-### Trigger invalid HMAC webhooks
-1. Set a wrong `webhook_secret` on the backend
-2. Trigger a mutation that fires a webhook
-3. Verify the connector returns HTTP 401
-
-### Trigger duplicate webhooks
-The connector deduplicates by `X-Shopify-Webhook-Id`:
-1. Send the same webhook twice with the same ID
-2. Verify only one `shopify.webhook.log` record exists
-
-### Validate
-- Check `shopify.webhook.log` for received webhooks
-- Verify `state` transitions: pending → processing → done
-- Verify dead_letter state after max retries
-
----
-
-## 12. Error and Chaos Testing
-
-### Enable error modes
-Set `error_mode` on `sim.shopify.config`:
+Set **Error Mode** on the config form:
 
 | Mode | Behavior |
 |------|----------|
-| `none` | Normal operation |
-| `random_errors` | Random GraphQL errors at configured rate |
-| `always_error` | Every request returns error |
-| `rate_limit` | Returns 429 when budget exhausted |
-| `timeout` | Sleeps 35s (exceeds client timeout) |
-| `user_errors` | Mutations return userErrors |
+| Normal | All requests succeed |
+| Random GraphQL Errors | Random errors at configured % rate |
+| Always Return Error | Every request returns error |
+| Rate Limit Exhausted | Returns HTTP 429 when budget=0 |
+| Timeout (35s) | Sleeps 35s per request |
+| Return userErrors on Mutations | Mutations get fake validation error |
 
-### Test rate-limit simulation
-1. Set `error_mode = 'rate_limit'`
-2. Set `rate_limit_available = 0`
-3. Make a request → should get HTTP 429
-4. Reset: `config._reset_rate_limit()`
-
-### Test retry logic
-1. Set `error_mode = 'timeout'`
-2. Trigger a sync operation
-3. Verify the connector retries (check logs)
-
-### Disable chaos modes
-```python
-config.write({'error_mode': 'none'})
-config._reset_rate_limit()
-```
+### Rate limit controls
+- **Reset Rate Limit** button restores full budget
+- Adjust **Bucket Size** and **Restore Rate** for fine-tuning
 
 ---
 
-## 13. Bulk Operation Testing
+## 10. Simulated Feature Coverage
 
-> **Status: Planned / Not Yet Implemented (Phase 3)**
+### Core Sync (Phase 1-2)
+| Feature | Query Handler | Mutation Handler |
+|---------|--------------|-----------------|
+| Products | `products`, `single_product` | `product_set`, `product_create`, `product_update`, `variant_bulk_update` |
+| Customers | `customers`, `single_customer` | `customer_create`, `customer_update` |
+| Orders | `orders`, `single_order` | `order_update`, `order_mark_paid` |
+| Inventory | — | `inventory_set`, `inventory_adjust` |
+| Locations | `locations` | — |
+| Fulfillments | `fulfillments` | `fulfillment_create` |
+| Refunds | `refunds` | `refund_create` |
+| Webhooks | `webhook_list` | `webhook_create`, `webhook_delete` |
 
-Bulk operation simulation is planned for Phase 3:
-- `bulkOperationRunQuery` mutation
-- Status polling endpoint
-- JSONL response serving
-
----
-
-## 14. Test Coverage and Validation Checklist
-
-| Test Area | Steps | Expected Result | Where to Validate | Status |
-|-----------|-------|-----------------|-------------------|--------|
-| Product import | Seed products → sync | Products in Odoo | Shopify → Products | ✅ P1 |
-| Product export | Create Odoo product → export | Sim product created | sim.shopify.product | ✅ P1 |
-| Customer import | Seed customers → sync | Contacts in Odoo | Contacts | ✅ P1 |
-| Customer export | Create contact → export | Sim customer created | sim.shopify.customer | ✅ P1 |
-| Order import | Seed orders → import | Sale orders in Odoo | Sales → Orders | ✅ P1 |
-| Inventory sync | Set inventory → sync | Stock quantities match | Inventory | ✅ P1 |
-| Location mapping | Seed locations → sync | Warehouses mapped | Settings → Warehouses | ✅ P1 |
-| Fulfillment create | Validate picking → push | Sim fulfillment created | sim.shopify.fulfillment | ✅ P2 |
-| Partial fulfillment | Partial pick → push | Remaining qty updated | sim.shopify.fulfillment.order.line | ✅ P2 |
-| Refund create | Create refund mutation | Sim refund created | sim.shopify.refund | ✅ P2 |
-| Order mark as paid | orderMarkAsPaid mutation | Status → PAID | sim.shopify.order | ✅ P2 |
-| Webhook register | Register webhooks | Subscriptions created | sim.shopify.webhook.subscription | ✅ P2 |
-| Webhook delivery | Mutation → outbound POST | Webhook log created | shopify.webhook.log | ✅ P2 |
-| HMAC validation | Valid/invalid signatures | Accept/reject correctly | Webhook controller | ✅ P2 |
-| Rate limit mode | Set error_mode → request | HTTP 429 returned | N/A | ✅ P1 |
-| Timeout mode | Set error_mode → request | HTTP 504 (timeout) | N/A | ✅ P1 |
-| Bulk operations | Run bulk query | JSONL response | Planned | ⏳ P3 |
-| Stress test | 500+ products | Pagination stable | Planned | ⏳ P3 |
-| Contract tests | Field-by-field validation | All fields present | Planned | ⏳ P4 |
+### Extended Features (Phase 3+4)
+| Feature | Query Handler | Mutation Handler |
+|---------|--------------|-----------------|
+| Collections | `collections` | `collection_create` |
+| Metafields | `product_metafields` | `metafield_set`, `metafield_delete` |
+| Gift Cards | `gift_cards` | — |
+| Payouts | `payouts`, `payout_transactions` | — |
+| Abandoned Carts | `abandoned_checkouts` | — |
+| Discount Codes | `discount_codes` | `discount_basic_create/update`, `discount_fs_create/update`, `discount_delete` |
 
 ---
 
-## 15. Troubleshooting
+## 11. Testing Flows
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| Module installation error | Missing `shopify_connector_pro` | Install the connector first |
-| "Simulator disabled in production" | `RUNNING_ENV=production` | Use a dev/staging environment |
-| Test connection fails | Wrong access token or URL | Verify sim config token matches backend token |
-| Connector still pointing to real Shopify | `use_simulator` not enabled | Check backend settings, re-run Create Simulator |
-| Invalid webhook HMAC | `webhook_secret` mismatch | Ensure backend and simulator use same secret |
-| Empty import results | No seed data in simulator | Run `seed_demo_store()` or create records manually |
-| Pagination issues | Cursor encoding mismatch | Check `first` and `after` variables |
-| Queue jobs not running | Cron not triggered | Manually run the cron or call the method directly |
-| Cron not triggered | Module not upgraded | Upgrade the module: `-u shopify_simulator` |
-| Missing mapping records | Products/customers not imported first | Import the base entities before orders |
-| Rate-limit mode left enabled | `error_mode = 'rate_limit'` | Set `error_mode = 'none'` and call `_reset_rate_limit()` |
-| Simulator data not reset | Old data persists | Unlink all sim records for the config |
-| Fulfillment orders missing | `action_create_fulfillment_orders()` not called | Call it after creating order lines |
+### Product import
+1. Seed products > run **Sync Products** on backend
+2. Check **Shopify > Products** for imported bindings
+
+### Order import
+1. Seed orders > run **Import Orders** on backend
+2. Check **Sales > Orders** for imported sale orders
+
+### Fulfillment push
+1. Import order > confirm sale order > validate delivery
+2. Connector pushes `fulfillmentCreate` > check `sim.shopify.fulfillment`
+
+### Refund
+1. Trigger refund via connector or `refundCreate` mutation
+2. Check `sim.shopify.refund` records
+
+### Collection import
+1. Create collections via Simulator Records > Collections
+2. Run collection sync on backend
+
+### Discount code sync
+1. Create discount codes via Simulator Records > Discount Codes
+2. Or run the "Discount Code Varieties" scenario
 
 ---
 
-## 16. Limitations
+## 12. Troubleshooting
 
-### Not yet simulated (Phase 3+)
+| Issue | Fix |
+|-------|-----|
+| Module install error | Install `shopify_connector_pro` first |
+| "Simulator disabled in production" | Use dev/staging environment |
+| Test connection fails | Verify config token matches backend token |
+| Empty import results | Seed data first (Seed Demo Store button) |
+| Rate limit blocking requests | Click "Reset Rate Limit" on config form |
+| Error mode left enabled | Set Error Mode back to "Normal" |
+| Fulfillment orders missing | Open order form > click "Create Fulfillment Orders" |
+
+---
+
+## 13. Limitations
+
+### Not yet simulated
 - Bulk operations (`bulkOperationRunQuery`)
-- Intermittent timeout mode
 - Circuit breaker testing
-- Partial failure scenarios (some variants fail, others succeed)
 - Large catalog stress tests (500+ products)
+- GraphQL introspection
+- Gift card create/update mutations
+- Payout create mutations (read-only simulation)
+- Abandoned cart create mutations (read-only simulation)
 
-### Not yet simulated (Phase 4)
-- Collections (smart + custom)
-- Discount codes
-- Gift cards
-- Payouts and payout transactions
-- Abandoned checkouts/carts
-- Metafields
-- Contract test suite (field-by-field validation)
-
-### Known gaps
-- Webhook outbound delivery is fire-and-forget (no retry on failure)
-- Simulator doesn't enforce Shopify API rate limits realistically
-  (cost deduction is approximated)
-- No GraphQL introspection support
-- Billing address always mirrors shipping address (simplification)
-- Fulfillment orders use single-location simplification (one FO per order)
+### Known simplifications
+- Webhook delivery is fire-and-forget (no retry on failure)
+- Rate limit cost deduction is approximated
+- Billing address mirrors shipping address
+- Fulfillment orders use single-location simplification
 
 ---
 
-## 17. Developer Notes
+## 14. Developer Notes
 
-### Add a new simulated GraphQL operation
+### Adding a new simulated GraphQL operation
+1. **Model:** Create/update in `models/` with `_to_graphql_node()`
+2. **Handler:** Create function in `handlers/`
+3. **Dispatch:** Add regex to `QUERY_DISPATCH` / `MUTATION_DISPATCH`
+4. **Register:** Add to `_QUERY_HANDLERS` / `_MUTATION_HANDLERS`
+5. **Security:** Add ACL in `security/ir.model.access.csv`
+6. **View:** Create XML view + menu entry
+7. **Test:** Add test inheriting `SimulatorTestCase`
 
-1. **Model:** Create or update a model in `models/` with `_to_graphql_node()`
-2. **Handler:** Create a handler function in `handlers/`
-3. **Dispatch:** Add regex pattern to `QUERY_DISPATCH` or `MUTATION_DISPATCH`
-   in `controllers/graphql_endpoint.py`
-4. **Register:** Add the handler to `_QUERY_HANDLERS` or `_MUTATION_HANDLERS`
-5. **Security:** Add ACL entry in `security/ir.model.access.csv`
-6. **Test:** Add test in `tests/`
-
-### Add a new webhook scenario
-
-1. Add the topic to `TOPIC_ENUM_TO_REST` in `models/sim_webhook.py`
-2. In the mutation handler, call:
-   ```python
-   env['sim.shopify.webhook.subscription']._fire_webhook(
-       config, 'topic/name', payload_dict,
-   )
-   ```
-3. Add a test verifying the webhook fires
-
-### Add a fixture
-
-Edit `fixtures/demo_store.py` and add records to the `seed_demo_store()` function.
-
-### Add a test
-
-1. Create a test file in `tests/` inheriting from `SimulatorTestCase`
-2. Use `_seed_product()`, `_seed_customer()`, `_seed_order()` helpers
-3. Use `_call_query()` / `_call_mutation()` to test handlers
-4. Register in `tests/__init__.py`
-
-### Update the coverage matrix
-
-Update the table in `doc/PHASE_CONTINUATION.md` and this guide's §14 checklist.
+### Adding a scenario
+Edit `models/sim_scenario.py`:
+1. Define a function `_scenario_your_flow(env, config)` returning a message string
+2. Add entry to the `SCENARIOS` list
+3. Run module upgrade to sync scenarios to DB

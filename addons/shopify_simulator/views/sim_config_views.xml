@@ -5,11 +5,72 @@
         <field name="model">sim.shopify.config</field>
         <field name="arch" type="xml">
             <form string="Simulator Configuration">
+                <header>
+                    <button name="action_seed_demo_store"
+                            string="Seed Demo Store"
+                            type="object" class="btn-primary"
+                            help="Create 6 products, 3 customers, 3 orders, 2 locations, and inventory levels"/>
+                    <button name="action_reset_all_data"
+                            string="Reset All Data"
+                            type="object" class="btn-secondary"
+                            confirm="This will delete ALL simulator records for this config. Continue?"/>
+                    <button name="action_reset_rate_limit"
+                            string="Reset Rate Limit"
+                            type="object" class="btn-secondary"/>
+                    <button name="action_open_seed_wizard"
+                            string="Advanced Seed Wizard"
+                            type="object" class="btn-secondary"/>
+                    <button name="action_open_webhook_console"
+                            string="Webhook Console"
+                            type="object" class="btn-secondary"/>
+                    <button name="action_open_checklist"
+                            string="Run Checklist"
+                            type="object" class="btn-secondary"/>
+                </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_products" type="object"
+                                class="oe_stat_button" icon="fa-cube">
+                            <field name="product_count" widget="statinfo" string="Products"/>
+                        </button>
+                        <button name="action_view_customers" type="object"
+                                class="oe_stat_button" icon="fa-users">
+                            <field name="customer_count" widget="statinfo" string="Customers"/>
+                        </button>
+                        <button name="action_view_orders" type="object"
+                                class="oe_stat_button" icon="fa-shopping-cart">
+                            <field name="order_count" widget="statinfo" string="Orders"/>
+                        </button>
+                        <button name="action_view_fulfillments" type="object"
+                                class="oe_stat_button" icon="fa-truck">
+                            <field name="fulfillment_count" widget="statinfo" string="Fulfillments"/>
+                        </button>
+                        <button name="action_view_refunds" type="object"
+                                class="oe_stat_button" icon="fa-undo">
+                            <field name="refund_count" widget="statinfo" string="Refunds"/>
+                        </button>
+                        <button name="action_view_webhooks" type="object"
+                                class="oe_stat_button" icon="fa-plug">
+                            <field name="webhook_count" widget="statinfo" string="Webhooks"/>
+                        </button>
+                        <button name="action_view_locations" type="object"
+                                class="oe_stat_button" icon="fa-map-marker">
+                            <field name="location_count" widget="statinfo" string="Locations"/>
+                        </button>
+                        <button name="action_view_inventory" type="object"
+                                class="oe_stat_button" icon="fa-cubes">
+                            <field name="inventory_count" widget="statinfo" string="Inventory"/>
+                        </button>
+                    </div>
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Internal QA Tool</strong> — This simulator is for dev/test only.
+                        Not for production use.
+                    </div>
                     <group>
                         <group string="Connection">
                             <field name="backend_id"/>
                             <field name="access_token"/>
+                            <field name="simulator_url" readonly="1"/>
                         </group>
                         <group string="Shop Identity">
                             <field name="shop_name"/>
@@ -48,6 +109,8 @@
                 <field name="backend_id"/>
                 <field name="error_mode"/>
                 <field name="currency_code"/>
+                <field name="product_count"/>
+                <field name="order_count"/>
             </list>
         </field>
     </record>
@@ -56,5 +119,28 @@
         <field name="name">Simulator Configs</field>
         <field name="res_model">sim.shopify.config</field>
         <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Backend form: add Create Simulator button -->
+    <record id="sim_shopify_backend_form_inherit" model="ir.ui.view">
+        <field name="name">shopify.backend.form.simulator</field>
+        <field name="model">shopify.backend</field>
+        <field name="inherit_id" ref="shopify_connector_pro.shopify_backend_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_create_simulator"
+                        string="Create Simulator"
+                        type="object" class="btn-secondary"
+                        invisible="use_simulator"
+                        groups="shopify_simulator.group_simulator_admin"/>
+            </xpath>
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-info" role="alert"
+                     invisible="not use_simulator">
+                    <strong>Simulator Mode Active</strong> — This backend is connected
+                    to the local Shopify Simulator, not a real Shopify store.
+                </div>
+            </xpath>
+        </field>
     </record>
 </odoo>

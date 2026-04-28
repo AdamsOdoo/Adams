@@ -13,3 +13,7 @@ from . import test_refund_handlers
 from . import test_webhook_handlers
 from . import test_webhook_delivery
 from . import test_order_lifecycle
+# UI features tests (Steps 1-3)
+from . import test_ui_features
+# Phase 3+4 model tests
+from . import test_phase34_models

@@ -26,6 +26,12 @@ from ..handlers import (
     fulfillment_handler,
     refund_handler,
     webhook_handler,
+    collection_handler,
+    metafield_handler,
+    gift_card_handler,
+    payout_handler,
+    abandoned_cart_handler,
+    discount_handler,
 )
 
 _logger = logging.getLogger(__name__)
@@ -105,6 +111,14 @@ _QUERY_HANDLERS = {
     'refunds': refund_handler.handle_fetch_refunds,
     # Phase 2: Webhooks
     'webhook_list': webhook_handler.handle_webhook_list,
+    # Phase 3+4: Collections, Metafields, Gift Cards, Payouts, Abandoned Carts, Discounts
+    'collections': collection_handler.handle_fetch_collections,
+    'product_metafields': metafield_handler.handle_fetch_product_metafields,
+    'gift_cards': gift_card_handler.handle_fetch_gift_cards,
+    'payouts': payout_handler.handle_fetch_payouts,
+    'payout_transactions': payout_handler.handle_fetch_payout_transactions,
+    'abandoned_checkouts': abandoned_cart_handler.handle_fetch_abandoned_checkouts,
+    'discount_codes': discount_handler.handle_fetch_discount_codes,
 }
 
 _MUTATION_HANDLERS = {
@@ -125,6 +139,15 @@ _MUTATION_HANDLERS = {
     # Phase 2: Webhooks
     'webhook_create': webhook_handler.handle_webhook_create,
     'webhook_delete': webhook_handler.handle_webhook_delete,
+    # Phase 3+4: Collections, Metafields, Discounts
+    'collection_create': collection_handler.handle_collection_create,
+    'metafield_set': metafield_handler.handle_metafield_set,
+    'metafield_delete': metafield_handler.handle_metafield_delete,
+    'discount_basic_create': discount_handler.handle_discount_basic_create,
+    'discount_basic_update': discount_handler.handle_discount_basic_update,
+    'discount_fs_create': discount_handler.handle_discount_fs_create,
+    'discount_fs_update': discount_handler.handle_discount_fs_update,
+    'discount_delete': discount_handler.handle_discount_delete,
 }
 
 
