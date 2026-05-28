@@ -420,8 +420,30 @@ class TestBulkExportWizard(TransactionCase):
         self.assertEqual(wizard.entity, 'product')
         self.assertEqual(wizard.product_domain, 'unlinked')
         self.assertEqual(wizard.limit, 10)
-        # Note: action_export() has a Side Finding bug (env.with_company)
-        # that prevents full integration testing here.
+    def test_export_wizard_action_export_dispatches(self):
+        """Export wizard action_export should not crash on env.with_company.
+
+        Regression: env.with_company() is a Model method, not Environment.
+        Verifies the wizard creates the sync class without AttributeError.
+        """
+        wizard = self.env['shopify.bulk.export.wizard'].create({
+            'backend_id': self.backend.id,
+            'entity': 'product',
+            'product_domain': 'all',
+            'limit': 1,
+        })
+        # Mock ProductSync at source — import is local inside the method
+        with patch(
+            'odoo.addons.shopify_connector_pro.sync.'
+            'product_sync.ProductSync'
+        ) as MockSync:
+            mock_instance = MagicMock()
+            mock_instance.export_products.return_value = (0, 0, 0)
+            MockSync.return_value = mock_instance
+            # This should NOT raise AttributeError
+            result = wizard.action_export()
+            MockSync.assert_called_once()
+            self.assertEqual(result['params']['type'], 'success')
 
 
 class TestBulkRetryWizard(TransactionCase):

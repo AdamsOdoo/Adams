@@ -978,7 +978,7 @@ class ShopifyBackend(models.Model):
                 if direction in ('export', 'both'):
                     from ..sync.customer_sync import CustomerSync
                     syncer = CustomerSync(
-                        self.env.with_company(backend.company_id), backend,
+                        self.with_company(backend.company_id).env, backend,
                     )
                     syncer.export_customers()
                 backend.last_sync_date = fields.Datetime.now()
@@ -993,7 +993,7 @@ class ShopifyBackend(models.Model):
             try:
                 from ..sync.discount_sync import DiscountSync
                 syncer = DiscountSync(
-                    self.env.with_company(backend.company_id), backend,
+                    self.with_company(backend.company_id).env, backend,
                 )
                 syncer.export_discounts()
             except Exception as e:
@@ -1007,7 +1007,7 @@ class ShopifyBackend(models.Model):
             try:
                 from ..sync.collection_sync import CollectionSync
                 syncer = CollectionSync(
-                    self.env.with_company(backend.company_id), backend,
+                    self.with_company(backend.company_id).env, backend,
                 )
                 syncer.import_collections()
                 backend.last_sync_date = fields.Datetime.now()
@@ -1022,7 +1022,7 @@ class ShopifyBackend(models.Model):
             try:
                 from ..sync.payout_sync import PayoutSync
                 syncer = PayoutSync(
-                    self.env.with_company(backend.company_id), backend,
+                    self.with_company(backend.company_id).env, backend,
                 )
                 syncer.import_payouts()
             except Exception as e:
@@ -1036,7 +1036,7 @@ class ShopifyBackend(models.Model):
             try:
                 from ..sync.refund_sync import RefundSync
                 syncer = RefundSync(
-                    self.env.with_company(backend.company_id), backend,
+                    self.with_company(backend.company_id).env, backend,
                 )
                 syncer.import_refunds()
             except Exception as e:
@@ -1053,7 +1053,7 @@ class ShopifyBackend(models.Model):
             try:
                 from ..sync.abandoned_cart_sync import AbandonedCartSync
                 syncer = AbandonedCartSync(
-                    self.env.with_company(backend.company_id), backend,
+                    self.with_company(backend.company_id).env, backend,
                 )
                 syncer.import_abandoned_carts()
             except Exception as e:

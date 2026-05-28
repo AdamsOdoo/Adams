@@ -51,7 +51,7 @@ class ShopifyBulkExportWizard(models.TransientModel):
 
     def _export_products(self, backend):
         from ..sync.product_sync import ProductSync
-        syncer = ProductSync(self.env.with_company(backend.company_id), backend)
+        syncer = ProductSync(self.with_company(backend.company_id).env, backend)
 
         if self.product_domain == 'unlinked':
             existing_ids = self.env['shopify.product.binding'].search([
@@ -73,7 +73,7 @@ class ShopifyBulkExportWizard(models.TransientModel):
 
     def _export_customers(self, backend):
         from ..sync.customer_sync import CustomerSync
-        syncer = CustomerSync(self.env.with_company(backend.company_id), backend)
+        syncer = CustomerSync(self.with_company(backend.company_id).env, backend)
 
         if self.customer_domain == 'unlinked':
             existing_ids = self.env['shopify.customer.binding'].search([
@@ -99,13 +99,13 @@ class ShopifyBulkExportWizard(models.TransientModel):
 
     def _export_inventory(self, backend):
         from ..sync.inventory_sync import InventorySync
-        syncer = InventorySync(self.env.with_company(backend.company_id), backend)
+        syncer = InventorySync(self.with_company(backend.company_id).env, backend)
         result = syncer.export_inventory(backend)
         return self._show_result('Inventory', result)
 
     def _export_discounts(self, backend):
         from ..sync.discount_sync import DiscountSync
-        syncer = DiscountSync(self.env.with_company(backend.company_id), backend)
+        syncer = DiscountSync(self.with_company(backend.company_id).env, backend)
         result = syncer.export_discounts()
         return self._show_result('Discounts', result)
 

@@ -133,7 +133,7 @@ class ShopifyImportJob(models.Model):
         page_info = data.get('pageInfo', {})
 
         importer = ProductImporter(
-            self.env.with_company(self.backend_id.company_id),
+            self.with_company(self.backend_id.company_id).env,
             self.backend_id,
         )
 
@@ -157,7 +157,7 @@ class ShopifyImportJob(models.Model):
         page_info = data.get('pageInfo', {})
 
         importer = CustomerImporter(
-            self.env.with_company(self.backend_id.company_id),
+            self.with_company(self.backend_id.company_id).env,
             self.backend_id,
         )
 
@@ -181,7 +181,7 @@ class ShopifyImportJob(models.Model):
         page_info = data.get('pageInfo', {})
 
         importer = OrderImporter(
-            self.env.with_company(self.backend_id.company_id),
+            self.with_company(self.backend_id.company_id).env,
             self.backend_id,
         )
 
