@@ -30,6 +30,7 @@
         'security/shopify_security.xml',
         'security/ir.model.access.csv',
         'data/shopify_cron.xml',
+        'data/shopify_onboarding_todo.xml',
         'views/shopify_backend_views.xml',
         'views/shopify_product_binding_views.xml',
         'views/shopify_customer_binding_views.xml',

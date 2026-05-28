@@ -14,6 +14,13 @@
                 Set up your Shopify store connection to start syncing
                 products, orders, customers, and inventory.
             </p>
+            <p>
+                <a type="action"
+                   name="%(shopify_connector_pro.shopify_onboarding_wizard_action)d"
+                   class="btn btn-primary">
+                    Set Up Your First Store
+                </a>
+            </p>
         </field>
     </record>
 

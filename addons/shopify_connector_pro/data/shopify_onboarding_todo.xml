@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Auto-launch onboarding wizard on first install -->
+    <record id="shopify_onboarding_todo" model="ir.actions.todo">
+        <field name="action_id" ref="shopify_onboarding_wizard_action"/>
+        <field name="state">open</field>
+    </record>
+
+</odoo>

@@ -33,6 +33,13 @@
                             invisible="sync_status not in ('error', 'permanent_error')"
                             class="oe_highlight"/>
                 </header>
+                <div class="alert alert-warning" role="alert"
+                     invisible="sync_status != 'permanent_error'">
+                    <strong>Permanent Error:</strong> This record will not be retried
+                    automatically. Common causes: deleted from Shopify, invalid data,
+                    or permission issue. Review the error below, fix the underlying
+                    issue, then click <b>Retry Sync</b>.
+                </div>
                 <sheet>
                     <group>
                         <group string="Binding">

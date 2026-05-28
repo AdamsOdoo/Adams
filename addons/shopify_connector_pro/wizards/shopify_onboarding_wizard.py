@@ -1,7 +1,7 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
 
-from odoo import fields, models, _
+from odoo import api, fields, models, _
 
 _logger = logging.getLogger(__name__)
 
@@ -41,6 +41,16 @@ class ShopifyOnboardingWizard(models.TransientModel):
     # Result
     backend_id = fields.Many2one('shopify.backend', readonly=True)
     connection_status = fields.Char(readonly=True)
+
+    @api.model
+    def action_open_onboarding(self):
+        """Open the onboarding wizard from the empty state banner."""
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': self._name,
+            'view_mode': 'form',
+            'target': 'new',
+        }
 
     def action_test_connection(self):
         """Test connection and move to settings step."""
@@ -96,28 +106,65 @@ class ShopifyOnboardingWizard(models.TransientModel):
         if not backend:
             return {'type': 'ir.actions.act_window_close'}
 
-        if self.import_products:
-            try:
-                backend._cron_sync_products()
-            except Exception:
-                pass
-        if self.import_customers:
-            try:
-                backend._cron_sync_customers()
-            except Exception:
-                pass
-        if self.import_orders:
-            try:
-                backend._cron_import_orders()
-            except Exception:
-                pass
+        errors = []
+        imports = [
+            (self.import_products, '_cron_sync_products', 'Products'),
+            (self.import_customers, '_cron_sync_customers', 'Customers'),
+            (self.import_orders, '_cron_import_orders', 'Orders'),
+        ]
+        for enabled, method, label in imports:
+            if enabled:
+                try:
+                    getattr(backend, method)()
+                except Exception as e:
+                    _logger.exception("Onboarding import failed for %s", label)
+                    errors.append(f"{label}: {str(e)[:100]}")
+
+        if errors:
+            # Log the errors to sync log for visibility
+            self.env['shopify.sync.log'].create({
+                'backend_id': backend.id,
+                'entity': 'product',
+                'operation': 'import',
+                'state': 'error',
+                'finished_at': fields.Datetime.now(),
+                'error_details': '\n'.join(errors),
+                'error_count': len(errors),
+            })
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("Import Completed with Errors"),
+                    'message': _("%d import(s) failed. Check Sync Logs for details.") % len(errors),
+                    'type': 'warning',
+                    'sticky': True,
+                    'next': {
+                        'type': 'ir.actions.act_window',
+                        'res_model': 'shopify.backend',
+                        'res_id': backend.id,
+                        'view_mode': 'form',
+                        'target': 'current',
+                    },
+                },
+            }
 
         return {
-            'type': 'ir.actions.act_window',
-            'res_model': 'shopify.backend',
-            'res_id': backend.id,
-            'view_mode': 'form',
-            'target': 'current',
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Import Started"),
+                'message': _("Initial import completed. Check Sync Logs or the Health Dashboard for results."),
+                'type': 'success',
+                'sticky': False,
+                'next': {
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'shopify.backend',
+                    'res_id': backend.id,
+                    'view_mode': 'form',
+                    'target': 'current',
+                },
+            },
         }
 
     def action_skip_import(self):

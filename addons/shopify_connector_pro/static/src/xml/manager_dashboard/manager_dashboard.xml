@@ -242,18 +242,23 @@
                 </div>
             </div>
 
-            <!-- Alerts strip -->
-            <div class="o_smd_alerts">
-                <div class="o_smd_alert o_smd_alert_warn">
+            <!-- Alerts strip — only show alerts with non-zero counts -->
+            <div class="o_smd_alerts"
+                 t-if="state.data.alerts.payment_mismatches or state.data.alerts.fulfillment_mismatches or state.data.alerts.webhook_pending or state.data.alerts.permanent_errors">
+                <div class="o_smd_alert o_smd_alert_warn"
+                     t-if="state.data.alerts.payment_mismatches">
                     Payment mismatches: <b t-esc="formatNumber(state.data.alerts.payment_mismatches)"/>
                 </div>
-                <div class="o_smd_alert o_smd_alert_warn">
+                <div class="o_smd_alert o_smd_alert_warn"
+                     t-if="state.data.alerts.fulfillment_mismatches">
                     Fulfillment mismatches: <b t-esc="formatNumber(state.data.alerts.fulfillment_mismatches)"/>
                 </div>
-                <div class="o_smd_alert o_smd_alert_info">
+                <div class="o_smd_alert o_smd_alert_info"
+                     t-if="state.data.alerts.webhook_pending">
                     Webhooks pending: <b t-esc="formatNumber(state.data.alerts.webhook_pending)"/>
                 </div>
-                <div class="o_smd_alert o_smd_alert_err">
+                <div class="o_smd_alert o_smd_alert_err"
+                     t-if="state.data.alerts.permanent_errors">
                     Permanent errors: <b t-esc="formatNumber(state.data.alerts.permanent_errors)"/>
                 </div>
             </div>
