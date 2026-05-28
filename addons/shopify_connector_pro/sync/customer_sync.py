@@ -30,7 +30,7 @@ class CustomerExporter(BaseExporter):
             self._create_customer(binding, partner)
 
     def _create_customer(self, binding, partner):
-        customer_input = self._build_customer_input(partner)
+        customer_input = self._build_customer_input(partner, binding)
         result = self.client.execute_mutation(
             CUSTOMER_CREATE_MUTATION,
             {'input': customer_input},
@@ -42,7 +42,7 @@ class CustomerExporter(BaseExporter):
         binding.shopify_email = shopify_customer.get('email', '')
 
     def _update_customer(self, binding, partner):
-        customer_input = self._build_customer_input(partner)
+        customer_input = self._build_customer_input(partner, binding)
         customer_input['id'] = binding.shopify_id
         self.client.execute_mutation(
             CUSTOMER_UPDATE_MUTATION,
@@ -51,8 +51,12 @@ class CustomerExporter(BaseExporter):
             estimated_cost=10,
         )
 
-    def _build_customer_input(self, partner):
-        """Build Shopify CustomerInput from res.partner data."""
+    def _build_customer_input(self, partner, binding=None):
+        """Build Shopify CustomerInput from res.partner data.
+
+        When *binding* is provided, Shopify tags stored on the binding
+        are included in the payload so they round-trip correctly (BUG-CU1).
+        """
         name_parts = (partner.name or '').split(' ', 1)
         first_name = name_parts[0] if name_parts else ''
         last_name = name_parts[1] if len(name_parts) > 1 else ''
@@ -63,6 +67,12 @@ class CustomerExporter(BaseExporter):
             'email': partner.email or None,
             'phone': partner.phone or None,
         }
+
+        # Include tags from the binding (BUG-CU1)
+        if binding and binding.shopify_tags:
+            customer_input['tags'] = binding.shopify_tags.split(', ')
+        elif binding:
+            customer_input['tags'] = []
 
         # Build addresses from partner
         addresses = []

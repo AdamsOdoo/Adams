@@ -253,16 +253,59 @@ class ShopifyWebhookLog(models.Model):
         )
 
     def _handle_order_cancel_webhook(self, data):
+        """Cancel an Odoo order from a Shopify cancellation webhook.
+
+        Wraps ``action_cancel()`` in error handling so that orders with
+        done pickings or posted invoices schedule an activity instead of
+        silently dead-lettering (BUG-C1).
+        """
         shopify_gid = f"gid://shopify/Order/{data.get('id', '')}"
         binding = self.env['shopify.order.binding'].search([
             ('backend_id', '=', self.backend_id.id),
             ('shopify_id', '=', shopify_gid),
         ], limit=1)
-        if binding and binding.odoo_id:
-            binding.odoo_id.with_context(
+        if not binding or not binding.odoo_id:
+            return
+        order = binding.odoo_id
+        # Idempotent: already cancelled
+        if order.state == 'cancel':
+            return
+        try:
+            order.with_context(
                 disable_cancel_warning=True,
                 shopify_no_auto_export=True,
             ).action_cancel()
+        except Exception as e:
+            _logger.warning(
+                "Could not cancel order %s from webhook: %s", order.name, e,
+            )
+            reasons = []
+            done_pickings = order.picking_ids.filtered(
+                lambda p: p.state == 'done'
+            )
+            if done_pickings:
+                reasons.append(
+                    f"{len(done_pickings)} delivery order(s) already done"
+                )
+            posted_invoices = order.invoice_ids.filtered(
+                lambda i: i.state == 'posted'
+                and i.move_type == 'out_invoice'
+            )
+            if posted_invoices:
+                reasons.append(f"{len(posted_invoices)} posted invoice(s)")
+            note = (
+                "Shopify sent a cancellation for this order but it could "
+                "not be cancelled automatically.\n"
+                f"Reason: {e}\n"
+            )
+            if reasons:
+                note += f"Blocking factors: {', '.join(reasons)}.\n"
+            note += "Please review and handle manually."
+            order.activity_schedule(
+                'mail.mail_activity_data_todo',
+                summary="Shopify Cancellation Failed",
+                note=note,
+            )
 
     def _handle_customer_webhook(self, data):
         self.env['shopify.customer.binding'].process_webhook_event(

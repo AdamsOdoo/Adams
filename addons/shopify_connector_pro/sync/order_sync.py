@@ -626,6 +626,11 @@ class OrderImporter(BaseImporter):
         line_subtotal = price_unit * quantity if price_unit and quantity else 0
         if line_subtotal:
             discount_pct = (discount_total / line_subtotal) * 100
+        elif discount_total > 0:
+            # Zero-price item with a discount allocation (e.g. 100% promo).
+            # Represent as full discount so the line stays visible on the
+            # order with a crossed-out price (BUG-O2).
+            discount_pct = 100.0
 
         line_vals = {
             'order_id': order.id,
@@ -737,11 +742,14 @@ class OrderImporter(BaseImporter):
             if vbinding:
                 return vbinding.odoo_id
 
-        # Fallback: match by SKU
+        # Fallback: match by SKU — scoped to the backend's company (and
+        # company-agnostic products) to prevent cross-company collisions
+        # when multiple Shopify stores share an Odoo instance (BUG-O1).
         sku = variant_data.get('sku', '')
         if sku:
             return self.env['product.product'].search([
                 ('default_code', '=', sku),
+                ('company_id', 'in', [self.backend.company_id.id, False]),
             ], limit=1)
 
         return None

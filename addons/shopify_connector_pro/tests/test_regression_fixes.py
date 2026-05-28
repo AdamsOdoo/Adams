@@ -160,7 +160,13 @@ class TestSyncLoopPrevention(ShopifyAccountingMixin, TransactionCase):
         )
 
     def test_refund_import_suppresses_reverse_sync(self):
-        """RefundImporter._import_one_refund must create credit note with loop guard."""
+        """RefundImporter._import_one_refund must create credit note with loop guard.
+
+        The refund importer now creates account.move directly (instead of
+        account.move.reversal) to support partial-refund amounts.  We
+        verify that the account.move is created under shopify_no_auto_export
+        context so the reverse-sync hook does not fire.
+        """
         from ..sync.refund_sync import RefundImporter
 
         order, binding = self._create_confirmed_order_with_binding('paid')
@@ -181,20 +187,27 @@ class TestSyncLoopPrevention(ShopifyAccountingMixin, TransactionCase):
             'refundLineItems': {'edges': []},
         }
 
-        # Capture context on account.move.reversal creation
-        original_create = type(self.env['account.move.reversal']).create
+        # Capture context on account.move creation (credit note)
+        AccountMove = type(self.env['account.move'])
+        original_create = AccountMove.create
         contexts_seen = []
 
         def capture_create(self_model, vals_list):
-            contexts_seen.append(dict(self_model.env.context))
+            ctx = dict(self_model.env.context)
+            # Only capture credit note creations
+            if isinstance(vals_list, dict):
+                vl = [vals_list]
+            else:
+                vl = vals_list
+            for v in vl:
+                if v.get('move_type') == 'out_refund':
+                    contexts_seen.append(ctx)
             return original_create(self_model, vals_list)
 
-        with patch.object(
-            type(self.env['account.move.reversal']), 'create', capture_create,
-        ):
+        with patch.object(AccountMove, 'create', capture_create):
             importer._import_one_refund(refund_data, binding)
 
-        self.assertTrue(contexts_seen, "account.move.reversal.create should have been called")
+        self.assertTrue(contexts_seen, "account.move.create (out_refund) should have been called")
         self.assertTrue(
             contexts_seen[0].get('shopify_no_auto_export'),
             "Refund import must create credit note with shopify_no_auto_export "

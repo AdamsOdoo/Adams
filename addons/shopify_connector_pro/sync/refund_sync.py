@@ -103,29 +103,17 @@ class RefundImporter:
                 'restock_type': restock,
             })
 
-        # Try to create credit note from posted invoice.
-        # Use shopify_no_auto_export context to prevent the credit note
-        # from triggering reverse-sync (creating a duplicate Shopify refund).
+        # Create a credit note for the actual refund amount.  Previous
+        # implementation used reverse_moves() which always reversed the FULL
+        # invoice — breaking partial refunds and double-crediting when
+        # multiple refunds exist on the same order (BUG-R1/R2).
         order = order_binding.odoo_id
         credit_note = None
         ctx = {'shopify_no_auto_export': True}
-        if order and order.invoice_ids:
-            posted_invoices = order.invoice_ids.filtered(lambda i: i.state == 'posted')
-            if posted_invoices:
-                try:
-                    move_reversal = self.env['account.move.reversal'].with_context(
-                        active_model='account.move',
-                        active_ids=posted_invoices[0].ids,
-                        **ctx,
-                    ).create({
-                        'reason': refund_data.get('note') or 'Shopify Refund',
-                        'journal_id': posted_invoices[0].journal_id.id,
-                    })
-                    move_reversal.reverse_moves()
-                    credit_note = move_reversal.new_move_ids[:1] if move_reversal.new_move_ids else None
-                except Exception as e:
-                    _logger.warning("Could not create credit note for refund %s: %s",
-                                    shopify_refund_id, e)
+        if order:
+            credit_note = self._create_refund_credit_note(
+                order, refund_data, refund_lines, refund_amount, ctx,
+            )
 
         binding_vals = {
             'backend_id': self.backend.id,
@@ -149,6 +137,85 @@ class RefundImporter:
             self.env['shopify.refund.line'].create(line)
 
         return refund_binding
+
+    def _create_refund_credit_note(self, order, refund_data, refund_lines,
+                                   refund_amount, ctx):
+        """Create a credit note matching the actual Shopify refund amount.
+
+        Creates an ``account.move`` with ``move_type='out_refund'`` directly
+        instead of using ``reverse_moves()`` which would always reverse the
+        full invoice amount — causing over-crediting on partial refunds and
+        when multiple refunds target the same order.
+        """
+        # Prefer the journal from an existing posted invoice; fall back to
+        # any sales journal in the backend's company.
+        posted_invoices = order.invoice_ids.filtered(
+            lambda i: i.state == 'posted' and i.move_type == 'out_invoice'
+        )
+        if posted_invoices:
+            journal = posted_invoices[0].journal_id
+        else:
+            journal = self.env['account.journal'].search([
+                ('type', '=', 'sale'),
+                ('company_id', '=', self.backend.company_id.id),
+            ], limit=1)
+
+        if not journal:
+            _logger.warning(
+                "No sales journal found — cannot create credit note for "
+                "refund %s", refund_data.get('id'),
+            )
+            return None
+
+        # Build credit-note lines from the Shopify refund line items.
+        invoice_line_ids = []
+        for rl in refund_lines:
+            qty = rl.get('quantity') or 0
+            amt = rl.get('amount') or 0
+            if qty and amt:
+                line_vals = {
+                    'quantity': qty,
+                    'price_unit': amt / qty,
+                }
+                if rl.get('product_id'):
+                    line_vals['product_id'] = rl['product_id']
+                else:
+                    line_vals['name'] = 'Shopify Refund Item'
+                invoice_line_ids.append((0, 0, line_vals))
+
+        # Fallback: single line for the total when no itemised lines exist
+        # (e.g. manual / shipping-only refund).
+        if not invoice_line_ids and refund_amount:
+            invoice_line_ids.append((0, 0, {
+                'name': refund_data.get('note') or 'Shopify Refund',
+                'quantity': 1,
+                'price_unit': refund_amount,
+            }))
+
+        if not invoice_line_ids:
+            _logger.warning(
+                "No refund lines and zero amount — skipping credit note "
+                "for refund %s", refund_data.get('id'),
+            )
+            return None
+
+        try:
+            credit_note = self.env['account.move'].with_context(**ctx).create({
+                'move_type': 'out_refund',
+                'partner_id': order.partner_id.id,
+                'journal_id': journal.id,
+                'invoice_origin': order.name,
+                'ref': refund_data.get('note') or 'Shopify Refund',
+                'invoice_line_ids': invoice_line_ids,
+            })
+            credit_note.with_context(**ctx).action_post()
+            return credit_note
+        except Exception as e:
+            _logger.warning(
+                "Could not create credit note for refund %s: %s",
+                refund_data.get('id'), e,
+            )
+            return None
 
 
 class RefundSync:
