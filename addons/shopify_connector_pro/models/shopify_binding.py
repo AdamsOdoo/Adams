@@ -1,5 +1,5 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 
 
 class ShopifyBinding(models.AbstractModel):
@@ -28,6 +28,16 @@ class ShopifyBinding(models.AbstractModel):
             'sync_error': False,
             'retry_count': 0,
         })
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Retry Scheduled"),
+                'message': _("%d record(s) reset to pending. They will sync on the next run.") % len(self),
+                'type': 'info',
+                'sticky': False,
+            },
+        }
 
     def _mark_synced(self, shopify_id=None, checksum=None):
         vals = {

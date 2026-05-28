@@ -35,7 +35,19 @@
 
         <div t-if="state.loading" class="o_smd_loading">Loading…</div>
 
-        <t t-if="!state.loading and state.data">
+        <div t-if="!state.loading and (!state.data or !state.data.backends or !state.data.backends.length)"
+             class="o_smd_empty_state text-center py-5">
+            <div class="mb-3">
+                <i class="fa fa-line-chart fa-3x text-muted"/>
+            </div>
+            <h3 class="text-muted">No stores connected yet</h3>
+            <p class="text-muted">
+                Connect a Shopify store under <strong>Configuration &gt; Shopify Stores</strong>
+                and run your first sync to see analytics here.
+            </p>
+        </div>
+
+        <t t-if="!state.loading and state.data and state.data.backends and state.data.backends.length">
             <!-- KPI cards -->
             <div class="o_smd_kpis">
                 <div class="o_smd_kpi" t-on-click="openOrders">

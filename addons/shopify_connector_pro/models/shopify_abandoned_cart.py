@@ -290,12 +290,31 @@ class ShopifyAbandonedCart(models.Model):
     def action_mark_recovered(self):
         """Manually mark this cart as recovered."""
         self.write({'recovered': True})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Cart Recovered"),
+                'message': _("%d cart(s) marked as recovered.") % len(self),
+                'type': 'success',
+                'sticky': False,
+            },
+        }
 
     def action_open_recovery_url(self):
         """Open the Shopify recovery URL in a new tab."""
         self.ensure_one()
         if not self.recovery_url:
-            return
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("No Recovery URL"),
+                    'message': _("This abandoned cart does not have a recovery URL from Shopify."),
+                    'type': 'warning',
+                    'sticky': False,
+                },
+            }
         return {
             'type': 'ir.actions.act_url',
             'url': self.recovery_url,

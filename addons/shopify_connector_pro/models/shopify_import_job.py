@@ -53,9 +53,21 @@ class ShopifyImportJob(models.Model):
 
     def action_cancel(self):
         """Cancel a pending or running job."""
+        cancelled = 0
         for job in self:
             if job.state in ('pending', 'running'):
                 job.state = 'cancelled'
+                cancelled += 1
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Job Cancelled"),
+                'message': _("%d import job(s) cancelled.") % cancelled,
+                'type': 'warning' if cancelled else 'info',
+                'sticky': False,
+            },
+        }
 
     @api.model
     def _cron_process_import_jobs(self):

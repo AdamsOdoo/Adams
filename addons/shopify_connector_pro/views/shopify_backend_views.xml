@@ -70,6 +70,11 @@
                                 class="oe_stat_button" icon="fa-history">
                             <span class="o_stat_text">Sync Logs</span>
                         </button>
+                        <button name="action_open_shopify_admin" type="object"
+                                class="oe_stat_button" icon="fa-external-link"
+                                invisible="state != 'connected'">
+                            <span class="o_stat_text">Shopify Admin</span>
+                        </button>
                     </div>
                     <div class="oe_title">
                         <h1>
@@ -254,10 +259,6 @@
                                         string="View Webhook Logs"
                                         class="btn-secondary"/>
                             </div>
-                            <group string="Webhook Configuration">
-                                <field name="webhook_secret" password="True"
-                                       groups="shopify_connector_pro.group_shopify_admin"/>
-                            </group>
                             <div class="alert alert-info" role="alert">
                                 <strong>Registered webhook topics:</strong>
                                 PRODUCTS_CREATE, PRODUCTS_UPDATE, PRODUCTS_DELETE,

@@ -5,7 +5,10 @@
         <field name="name">shopify.inventory.binding.tree</field>
         <field name="model">shopify.inventory.binding</field>
         <field name="arch" type="xml">
-            <list string="Shopify Inventory Bindings">
+            <list string="Shopify Inventory Bindings"
+                  decoration-danger="sync_status == 'error'"
+                  decoration-warning="sync_status == 'pending'"
+                  decoration-muted="sync_status == 'permanent_error'">
                 <field name="backend_id"/>
                 <field name="variant_binding_id"/>
                 <field name="shopify_inventory_item_id"/>
@@ -13,16 +16,79 @@
                 <field name="last_pushed_qty"/>
                 <field name="sync_status" widget="badge"
                        decoration-success="sync_status == 'synced'"
-                       decoration-danger="sync_status == 'error'"/>
+                       decoration-danger="sync_status == 'error'"
+                       decoration-warning="sync_status == 'pending'"
+                       decoration-muted="sync_status == 'permanent_error'"/>
                 <field name="last_sync_date"/>
+                <field name="sync_error" optional="hide"/>
             </list>
+        </field>
+    </record>
+
+    <record id="shopify_inventory_binding_view_form" model="ir.ui.view">
+        <field name="name">shopify.inventory.binding.form</field>
+        <field name="model">shopify.inventory.binding</field>
+        <field name="arch" type="xml">
+            <form string="Shopify Inventory Binding">
+                <header>
+                    <button name="action_retry_sync" type="object"
+                            string="Retry Sync"
+                            invisible="sync_status not in ('error', 'permanent_error')"
+                            class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Binding">
+                            <field name="backend_id"/>
+                            <field name="variant_binding_id"/>
+                            <field name="shopify_id"/>
+                            <field name="shopify_inventory_item_id"/>
+                            <field name="shopify_location_id"/>
+                        </group>
+                        <group string="Sync Status">
+                            <field name="sync_status"/>
+                            <field name="last_sync_date"/>
+                            <field name="last_pushed_qty"/>
+                            <field name="sync_checksum"/>
+                            <field name="retry_count"/>
+                        </group>
+                    </group>
+                    <group string="Error" invisible="not sync_error">
+                        <field name="sync_error" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_inventory_binding_view_search" model="ir.ui.view">
+        <field name="name">shopify.inventory.binding.search</field>
+        <field name="model">shopify.inventory.binding</field>
+        <field name="arch" type="xml">
+            <search string="Shopify Inventory">
+                <field name="variant_binding_id"/>
+                <field name="shopify_inventory_item_id"/>
+                <field name="shopify_location_id"/>
+                <filter name="synced" string="Synced"
+                        domain="[('sync_status', '=', 'synced')]"/>
+                <filter name="errors" string="Errors"
+                        domain="[('sync_status', 'in', ['error', 'permanent_error'])]"/>
+                <filter name="pending" string="Pending"
+                        domain="[('sync_status', '=', 'pending')]"/>
+                <group>
+                    <filter name="group_backend" string="Store"
+                            context="{'group_by': 'backend_id'}"/>
+                    <filter name="group_location" string="Location"
+                            context="{'group_by': 'shopify_location_id'}"/>
+                </group>
+            </search>
         </field>
     </record>
 
     <record id="shopify_inventory_binding_action" model="ir.actions.act_window">
         <field name="name">Shopify Inventory</field>
         <field name="res_model">shopify.inventory.binding</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">list,form</field>
     </record>
 
 </odoo>

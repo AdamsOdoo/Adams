@@ -23,6 +23,7 @@
                        decoration-warning="state == 'partial'"
                        decoration-info="state == 'running'"/>
                 <field name="duration" string="Duration (s)" widget="float_time"/>
+                <field name="error_summary" optional="show"/>
             </list>
         </field>
     </record>
@@ -32,6 +33,12 @@
         <field name="model">shopify.sync.log</field>
         <field name="arch" type="xml">
             <form string="Sync Log Detail">
+                <header>
+                    <button name="action_open_error_bindings" type="object"
+                            string="View Failed Records"
+                            invisible="error_count == 0"
+                            class="oe_highlight"/>
+                </header>
                 <sheet>
                     <group>
                         <group string="Operation">

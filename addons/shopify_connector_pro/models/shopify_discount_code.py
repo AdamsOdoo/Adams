@@ -51,3 +51,13 @@ class ShopifyDiscountCode(models.Model):
         """Manual push button to create/update discount on Shopify."""
         self.ensure_one()
         self.write({'sync_status': 'pending'})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Push Scheduled"),
+                'message': _("Discount code '%s' queued for push to Shopify.") % self.code,
+                'type': 'info',
+                'sticky': False,
+            },
+        }

@@ -6,7 +6,8 @@
         <field name="model">shopify.refund.binding</field>
         <field name="arch" type="xml">
             <list string="Shopify Refunds"
-                  decoration-danger="sync_status == 'error'">
+                  decoration-danger="sync_status == 'error'"
+                  decoration-muted="sync_status == 'permanent_error'">
                 <field name="backend_id"/>
                 <field name="order_binding_id"/>
                 <field name="refund_amount"/>
@@ -25,6 +26,12 @@
         <field name="model">shopify.refund.binding</field>
         <field name="arch" type="xml">
             <form string="Shopify Refund">
+                <header>
+                    <button name="action_retry_sync" type="object"
+                            string="Retry Sync"
+                            invisible="sync_status not in ('error', 'permanent_error')"
+                            class="oe_highlight"/>
+                </header>
                 <sheet>
                     <group>
                         <group string="Binding">
@@ -42,6 +49,10 @@
                     <group string="Sync">
                         <field name="sync_status"/>
                         <field name="last_sync_date"/>
+                        <field name="retry_count"/>
+                    </group>
+                    <group string="Error" invisible="not sync_error">
+                        <field name="sync_error" readonly="1"/>
                     </group>
                     <group string="Refund Lines">
                         <field name="refund_line_ids" nolabel="1">

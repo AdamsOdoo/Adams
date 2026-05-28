@@ -1,5 +1,5 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 
 
 class ShopifySyncLog(models.Model):
@@ -44,6 +44,22 @@ class ShopifySyncLog(models.Model):
     error_count = fields.Integer()
     skipped_count = fields.Integer()
     error_details = fields.Text()
+    error_summary = fields.Char(
+        string='Error Summary', compute='_compute_error_summary', store=False,
+        help='Brief summary of error_details for list views.',
+    )
+
+    @api.depends('error_details', 'error_count')
+    def _compute_error_summary(self):
+        for rec in self:
+            if not rec.error_details:
+                rec.error_summary = ''
+                continue
+            lines = [ln.strip() for ln in rec.error_details.strip().splitlines() if ln.strip()]
+            if len(lines) == 1:
+                rec.error_summary = lines[0][:120]
+            else:
+                rec.error_summary = f"{lines[0][:80]} (+{len(lines) - 1} more)"
 
     @api.depends('entity', 'operation', 'started_at')
     def _compute_display_name(self):
@@ -61,6 +77,41 @@ class ShopifySyncLog(models.Model):
                 rec.duration = delta.total_seconds()
             else:
                 rec.duration = 0.0
+
+    _entity_model_map = {
+        'product': 'shopify.product.binding',
+        'customer': 'shopify.customer.binding',
+        'order': 'shopify.order.binding',
+        'inventory': 'shopify.inventory.binding',
+        'collection': 'shopify.collection.binding',
+        'refund': 'shopify.refund.binding',
+    }
+
+    def action_open_error_bindings(self):
+        """Open failed binding records related to this sync log's entity + backend."""
+        self.ensure_one()
+        model = self._entity_model_map.get(self.entity)
+        if not model:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("Not Available"),
+                    'message': _("No binding model for entity '%s'.") % self.entity,
+                    'type': 'info',
+                    'sticky': False,
+                },
+            }
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Failed %s Records") % self.entity.capitalize(),
+            'res_model': model,
+            'view_mode': 'list,form',
+            'domain': [
+                ('backend_id', '=', self.backend_id.id),
+                ('sync_status', 'in', ['error', 'permanent_error']),
+            ],
+        }
 
     def _finalize(self, success=0, errors=0, skipped=0, error_details=None):
         state = 'done'

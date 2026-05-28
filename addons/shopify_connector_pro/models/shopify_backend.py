@@ -27,7 +27,12 @@ class ShopifyBackend(models.Model):
         'Access Token', required=True,
         groups='shopify_connector_pro.group_shopify_admin',
     )
-    api_version = fields.Char(default=DEFAULT_API_VERSION)
+    api_version = fields.Char(
+        string='API Version', default=DEFAULT_API_VERSION,
+        help="Shopify GraphQL Admin API version (e.g. 2026-01). "
+             "Only change this if Shopify announces a new stable version. "
+             "Using an unsupported version may cause sync failures.",
+    )
     webhook_secret = fields.Char(
         'Webhook Secret',
         groups='shopify_connector_pro.group_shopify_admin',
@@ -666,6 +671,18 @@ class ShopifyBackend(models.Model):
         except Exception as e:
             self.write({'state': 'error'})
             raise UserError(_("Connection failed: %s") % str(e))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Connection Successful"),
+                'message': _("Connected to %s (%s plan).") % (
+                    self.shop_name or self.shop_url, self.shop_plan or 'unknown',
+                ),
+                'type': 'success',
+                'sticky': False,
+            },
+        }
 
     def action_register_webhooks(self):
         """Register all required webhooks on Shopify."""
@@ -708,7 +725,16 @@ class ShopifyBackend(models.Model):
         """Initialize default field mappings if none exist."""
         self.ensure_one()
         if self.field_mapping_ids:
-            return
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("Already Configured"),
+                    'message': _("Field mappings already exist. Remove them first to re-initialize."),
+                    'type': 'info',
+                    'sticky': False,
+                },
+            }
         FieldMapping = self.env['shopify.field.mapping']
         seq = 10
         for m in FieldMapping._get_default_product_mappings():
@@ -731,6 +757,16 @@ class ShopifyBackend(models.Model):
                 'sequence': seq,
             })
             seq += 10
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Field Mappings Initialized"),
+                'message': _("Default product and customer field mappings have been created."),
+                'type': 'success',
+                'sticky': False,
+            },
+        }
 
     def action_open_product_bindings(self):
         self.ensure_one()
@@ -770,6 +806,21 @@ class ShopifyBackend(models.Model):
             'res_model': 'shopify.inventory.binding',
             'view_mode': 'list,form',
             'domain': [('backend_id', '=', self.id)],
+        }
+
+    def action_open_shopify_admin(self):
+        """Open the Shopify admin panel in a new browser tab."""
+        self.ensure_one()
+        url = self.shop_url or ''
+        if not url.startswith('http'):
+            url = f"https://{url}"
+        # Normalize to admin URL
+        if '/admin' not in url:
+            url = url.rstrip('/') + '/admin'
+        return {
+            'type': 'ir.actions.act_url',
+            'url': url,
+            'target': 'new',
         }
 
     def action_open_sync_logs(self):

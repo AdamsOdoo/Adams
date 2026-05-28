@@ -3,7 +3,7 @@ import hashlib
 import logging
 from datetime import timedelta
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -146,6 +146,7 @@ class ShopifyWebhookLog(models.Model):
 
     def action_retry_webhook(self):
         """Manually retry a dead-letter or error webhook."""
+        retried = 0
         for log in self:
             if log.state in ('error', 'dead_letter'):
                 log.write({
@@ -153,6 +154,17 @@ class ShopifyWebhookLog(models.Model):
                     'retry_count': 0,
                     'error_message': False,
                 })
+                retried += 1
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _("Webhook Retry"),
+                'message': _("%d webhook(s) queued for retry.") % retried,
+                'type': 'info' if retried else 'warning',
+                'sticky': False,
+            },
+        }
 
     def _process_event(self):
         """Dispatch webhook event to the appropriate handler."""

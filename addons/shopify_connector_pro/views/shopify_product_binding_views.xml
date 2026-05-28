@@ -19,7 +19,7 @@
                        decoration-warning="sync_status == 'pending'"
                        decoration-muted="sync_status == 'permanent_error'"/>
                 <field name="last_sync_date"/>
-                <field name="sync_error" optional="hide"/>
+                <field name="sync_error" optional="show"/>
             </list>
         </field>
     </record>

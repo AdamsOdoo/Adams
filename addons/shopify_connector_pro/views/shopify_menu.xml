@@ -10,7 +10,7 @@
 
     <!-- Dashboard (built-in sync overview) -->
     <menuitem id="menu_shopify_dashboard"
-              name="Dashboard"
+              name="Store Overview"
               parent="menu_shopify_root"
               action="shopify_dashboard_action"
               sequence="10"/>
@@ -145,47 +145,53 @@
               action="shopify_refund_binding_action"
               sequence="55"/>
 
-    <menuitem id="menu_shopify_abandoned_carts"
-              name="Abandoned Carts"
-              parent="menu_shopify_sync_status"
-              action="shopify_abandoned_cart_action"
-              sequence="57"/>
-
     <menuitem id="menu_shopify_locations"
               name="Locations"
               parent="menu_shopify_sync_status"
               action="shopify_location_action"
               sequence="60"/>
 
+    <!-- Sync Status — Additional Data -->
+    <menuitem id="menu_shopify_sync_additional"
+              name="Additional Data"
+              parent="menu_shopify_sync_status"
+              sequence="100"/>
+
+    <menuitem id="menu_shopify_abandoned_carts"
+              name="Abandoned Carts"
+              parent="menu_shopify_sync_additional"
+              action="shopify_abandoned_cart_action"
+              sequence="10"/>
+
     <menuitem id="menu_shopify_transactions"
               name="Transactions"
-              parent="menu_shopify_sync_status"
+              parent="menu_shopify_sync_additional"
               action="shopify_order_transaction_action"
-              sequence="65"/>
+              sequence="20"/>
 
     <menuitem id="menu_shopify_payouts"
               name="Payouts"
-              parent="menu_shopify_sync_status"
+              parent="menu_shopify_sync_additional"
               action="shopify_payout_action"
-              sequence="67"/>
+              sequence="30"/>
 
     <menuitem id="menu_shopify_gift_cards"
               name="Gift Cards"
-              parent="menu_shopify_sync_status"
+              parent="menu_shopify_sync_additional"
               action="shopify_gift_card_action"
-              sequence="70"/>
+              sequence="40"/>
 
     <menuitem id="menu_shopify_customer_tags"
               name="Customer Tags"
-              parent="menu_shopify_sync_status"
+              parent="menu_shopify_sync_additional"
               action="shopify_customer_tag_action"
-              sequence="75"/>
+              sequence="50"/>
 
     <menuitem id="menu_shopify_metafields"
               name="Metafields"
-              parent="menu_shopify_sync_status"
+              parent="menu_shopify_sync_additional"
               action="shopify_metafield_action"
-              sequence="80"/>
+              sequence="60"/>
 
     <!-- Promoters -->
     <menuitem id="menu_shopify_promoters_section"
