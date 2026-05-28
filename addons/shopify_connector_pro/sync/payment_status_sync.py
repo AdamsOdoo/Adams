@@ -7,7 +7,7 @@ and applies the corresponding accounting actions in Odoo.
 
 import logging
 
-from odoo import _
+from odoo import _, fields
 
 _logger = logging.getLogger(__name__)
 
@@ -112,14 +112,16 @@ class PaymentStatusHandler:
             lambda i: i.move_type == 'out_invoice' and i.state == 'posted'
         )
 
+        invoice = False
+
         if draft_invoices:
             try:
                 draft_invoices[0].with_context(**ctx).action_post()
+                invoice = draft_invoices[0]
                 _logger.info(
                     "Posted draft invoice %s for order %s (Shopify payment captured)",
-                    draft_invoices[0].name, order.name,
+                    invoice.name, order.name,
                 )
-                return True
             except Exception as e:
                 _logger.warning(
                     "Failed to post invoice for order %s: %s", order.name, e,
@@ -130,57 +132,64 @@ class PaymentStatusHandler:
                 )
                 return False
 
-        if posted_invoices:
+        elif posted_invoices:
+            invoice = posted_invoices[0]
             _logger.info(
-                "Invoice already posted for order %s — no action needed", order.name,
+                "Invoice already posted for order %s — proceeding to payment registration",
+                order.name,
             )
-            return True
 
-        # No invoice exists — try to create one
-        if order.state == 'draft':
-            try:
-                order.with_context(**ctx).action_confirm()
-            except Exception as e:
-                _logger.warning("Could not confirm order %s: %s", order.name, e)
+        else:
+            # No invoice exists — try to create one
+            if order.state == 'draft':
+                try:
+                    order.with_context(**ctx).action_confirm()
+                except Exception as e:
+                    _logger.warning("Could not confirm order %s: %s", order.name, e)
+                    self._schedule_activity(
+                        order,
+                        _("Payment received on Shopify but order could not be confirmed: %s") % e,
+                    )
+                    return False
+
+            if order.state in ('sale', 'done'):
+                try:
+                    with self.env.cr.savepoint():
+                        invoice = order.with_context(**ctx)._create_invoices()
+                        if not invoice:
+                            _logger.warning(
+                                "No invoiceable lines for order %s — "
+                                "invoice not created",
+                                order.name,
+                            )
+                            return False
+                        invoice.with_context(**ctx).action_post()
+                    _logger.info(
+                        "Created and posted invoice %s for order %s",
+                        invoice.name, order.name,
+                    )
+                except Exception as e:
+                    _logger.warning(
+                        "Failed to create invoice for order %s: %s", order.name, e,
+                    )
+                    self._schedule_activity(
+                        order,
+                        _("Payment received on Shopify but invoice creation failed: %s") % e,
+                    )
+                    return False
+            else:
                 self._schedule_activity(
                     order,
-                    _("Payment received on Shopify but order could not be confirmed: %s") % e,
+                    _("Payment captured on Shopify (status: %s) but order is in state '%s'. "
+                      "Manual invoice creation may be required.") % (new_status, order.state),
                 )
                 return False
 
-        if order.state in ('sale', 'done'):
-            try:
-                with self.env.cr.savepoint():
-                    invoice = order.with_context(**ctx)._create_invoices()
-                    if not invoice:
-                        _logger.warning(
-                            "No invoiceable lines for order %s — "
-                            "invoice not created",
-                            order.name,
-                        )
-                        return False
-                    invoice.with_context(**ctx).action_post()
-                _logger.info(
-                    "Created and posted invoice %s for order %s",
-                    invoice.name, order.name,
-                )
-                return True
-            except Exception as e:
-                _logger.warning(
-                    "Failed to create invoice for order %s: %s", order.name, e,
-                )
-                self._schedule_activity(
-                    order,
-                    _("Payment received on Shopify but invoice creation failed: %s") % e,
-                )
-                return False
+        # Register payment on the posted invoice
+        if invoice and invoice.state == 'posted' and invoice.amount_residual > 0:
+            self._register_payment(invoice, binding)
 
-        self._schedule_activity(
-            order,
-            _("Payment captured on Shopify (status: %s) but order is in state '%s'. "
-              "Manual invoice creation may be required.") % (new_status, order.state),
-        )
-        return False
+        return True
 
     def _transition_to_partially_paid(self, binding, old_status, new_status):
         """Handle transition to 'partially_paid'.
@@ -288,6 +297,191 @@ class PaymentStatusHandler:
             old_status, new_status, binding.shopify_order_name,
         )
         return True
+
+    # ── Payment registration ─────────────────────────────
+
+    def _register_payment(self, invoice, order_binding):
+        """Register a payment on the invoice using gateway journal mapping.
+
+        Idempotent: skips if a payment with the same reference already exists.
+        Uses shopify.payment.gateway to resolve the journal, falling back to
+        the company's default bank journal.
+        """
+        ctx = {'shopify_no_auto_export': True}
+        memo = "SHOPIFY-%s" % order_binding.shopify_order_name
+
+        # Idempotency: check if payment already registered
+        existing = self.env['account.payment'].search([
+            ('memo', '=', memo),
+            ('state', '!=', 'cancelled'),
+        ], limit=1)
+        if existing:
+            _logger.info(
+                "Payment already registered for order %s (memo=%s)",
+                order_binding.shopify_order_name, memo,
+            )
+            return True
+
+        journal = self._resolve_payment_journal(order_binding)
+        if not journal:
+            self._schedule_activity(
+                order_binding.odoo_id,
+                _("Payment captured on Shopify but no payment journal "
+                  "could be determined. Please register payment manually "
+                  "or configure a Shopify Payment Gateway mapping."),
+            )
+            return False
+
+        amount = invoice.amount_residual
+        if amount <= 0:
+            _logger.info("Invoice %s already fully paid", invoice.name)
+            return True
+
+        try:
+            with self.env.cr.savepoint():
+                payment = self.env['account.payment'].with_context(**ctx).create({
+                    'payment_type': 'inbound',
+                    'partner_type': 'customer',
+                    'partner_id': invoice.partner_id.id,
+                    'amount': amount,
+                    'journal_id': journal.id,
+                    'memo': memo,
+                    'date': invoice.date or fields.Date.today(),
+                    'currency_id': invoice.currency_id.id,
+                })
+                payment.with_context(**ctx).action_post()
+
+                # Reconcile payment with invoice
+                receivable_lines = (
+                    payment.move_id.line_ids + invoice.line_ids
+                ).filtered(
+                    lambda l: l.account_type == 'asset_receivable'
+                    and not l.reconciled
+                )
+                if receivable_lines:
+                    receivable_lines.reconcile()
+
+                _logger.info(
+                    "Payment registered for order %s: %s %s (journal: %s)",
+                    order_binding.shopify_order_name, amount,
+                    invoice.currency_id.name, journal.name,
+                )
+                return True
+        except Exception as e:
+            _logger.warning(
+                "Failed to register payment for order %s: %s",
+                order_binding.shopify_order_name, e,
+            )
+            self._schedule_activity(
+                order_binding.odoo_id,
+                _("Payment captured on Shopify but auto-registration "
+                  "failed: %s. Please register payment manually.") % e,
+            )
+            return False
+
+    def _resolve_payment_journal(self, order_binding):
+        """Find the payment journal via gateway mapping or fallback.
+
+        Resolution order:
+        1. Fetch gateway name from Shopify transactions
+        2. Match shopify.payment.gateway by name or code → journal_id
+        3. Fallback: company's default bank journal
+        """
+        company = self.backend.company_id
+        gateway_name = self._get_transaction_gateway(order_binding)
+
+        if gateway_name:
+            gateway = self.env['shopify.payment.gateway'].search([
+                '|', ('name', '=ilike', gateway_name),
+                ('code', '=ilike', gateway_name),
+                '|', ('company_id', '=', company.id),
+                ('company_id', '=', False),
+                ('active', '=', True),
+            ], limit=1)
+            if gateway and gateway.journal_id:
+                return gateway.journal_id
+
+        # Fallback: default bank journal
+        journal = self.env['account.journal'].search([
+            ('type', '=', 'bank'),
+            ('company_id', '=', company.id),
+        ], limit=1)
+        if journal:
+            _logger.info(
+                "No gateway mapping for '%s' — using default bank journal %s",
+                gateway_name or 'unknown', journal.name,
+            )
+        return journal
+
+    def _get_transaction_gateway(self, order_binding):
+        """Fetch the payment gateway name from Shopify order transactions.
+
+        Also records transactions in shopify.order.transaction for audit.
+        Returns the gateway name of the first successful sale/capture, or None.
+        """
+        if not order_binding.shopify_id:
+            return None
+        try:
+            client = self.backend._make_api_client()
+            query = """
+            query GetOrderTransactions($id: ID!) {
+              order(id: $id) {
+                transactions(first: 20) {
+                  id
+                  gateway
+                  kind
+                  status
+                  amountSet {
+                    shopMoney { amount currencyCode }
+                  }
+                  processedAt
+                }
+              }
+            }
+            """
+            body = client.execute(
+                query, {'id': order_binding.shopify_id}, estimated_cost=5,
+            )
+            transactions = (
+                body.get('data', {}).get('order', {}).get('transactions', [])
+            )
+
+            gateway_name = None
+            for txn in transactions:
+                kind = (txn.get('kind') or '').lower()
+                status = (txn.get('status') or '').lower()
+                txn_id = txn.get('id', '')
+
+                # Record every transaction for audit (idempotent)
+                if txn_id:
+                    existing_txn = self.env['shopify.order.transaction'].search([
+                        ('shopify_transaction_id', '=', txn_id),
+                        ('order_binding_id', '=', order_binding.id),
+                    ], limit=1)
+                    if not existing_txn:
+                        money = txn.get('amountSet', {}).get('shopMoney', {})
+                        self.env['shopify.order.transaction'].create({
+                            'order_binding_id': order_binding.id,
+                            'shopify_transaction_id': txn_id,
+                            'gateway': txn.get('gateway', ''),
+                            'kind': kind if kind in ('sale', 'capture', 'authorization', 'refund', 'void') else False,
+                            'status': status if status in ('success', 'pending', 'failure', 'error') else False,
+                            'amount': float(money.get('amount', 0)),
+                            'currency_code': money.get('currencyCode', ''),
+                            'processed_at': txn.get('processedAt'),
+                        })
+
+                # Use the first successful sale/capture for gateway
+                if not gateway_name and kind in ('sale', 'capture') and status == 'success':
+                    gateway_name = txn.get('gateway', '')
+
+            return gateway_name
+        except Exception as e:
+            _logger.warning(
+                "Could not fetch transactions for order %s: %s",
+                order_binding.shopify_order_name, e,
+            )
+            return None
 
     def _schedule_activity(self, order, note):
         """Schedule a to-do activity on the sale order for manual review."""

@@ -1,10 +1,16 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
+import hashlib
 import logging
 from datetime import timedelta
 
 from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
+
+# Maximum age (in hours) of a webhook payload's updated_at before
+# it is treated as stale.  Matches Shopify's 48-hour retry window
+# plus a generous margin for clock skew.
+WEBHOOK_STALE_HOURS = 50
 
 
 class ShopifyWebhookLog(models.Model):
@@ -16,6 +22,11 @@ class ShopifyWebhookLog(models.Model):
         'shopify.backend', required=True, ondelete='cascade', index=True,
     )
     webhook_id = fields.Char('Shopify Webhook ID', index=True)
+    webhook_fingerprint = fields.Char(
+        'Webhook Fingerprint', index=True,
+        help="SHA-256 fingerprint of topic + resource ID + updated_at, "
+             "used as fallback dedup when webhook_id is absent.",
+    )
     topic = fields.Char(required=True, index=True)
     shopify_id = fields.Char('Resource Shopify ID')
     payload = fields.Text(groups='shopify_connector_pro.group_shopify_user')
@@ -38,6 +49,35 @@ class ShopifyWebhookLog(models.Model):
         'UNIQUE(webhook_id)',
         'This webhook event has already been received.',
     )
+
+    @api.model
+    def compute_fingerprint(self, topic, resource_id, updated_at):
+        """Compute a deterministic fingerprint for dedup fallback.
+
+        The fingerprint is a SHA-256 hash of the topic, resource ID, and
+        updated_at timestamp.  This catches duplicate events when the
+        webhook_id header is missing or empty.
+        """
+        raw = "%s|%s|%s" % (topic or '', resource_id or '', updated_at or '')
+        return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:40]
+
+    @api.model
+    def is_stale_payload(self, payload):
+        """Return True if the payload's updated_at is older than the
+        staleness window.  Returns False (allow) when the timestamp
+        cannot be parsed — we err on the side of processing.
+        """
+        updated_at = payload.get('updated_at') or payload.get('updatedAt')
+        if not updated_at:
+            return False
+        try:
+            dt = fields.Datetime.to_datetime(
+                str(updated_at).replace('T', ' ').replace('Z', ''),
+            )
+            cutoff = fields.Datetime.now() - timedelta(hours=WEBHOOK_STALE_HOURS)
+            return dt < cutoff
+        except (ValueError, TypeError):
+            return False
 
     @api.model
     def _cron_cleanup_old_logs(self, days=90):
@@ -181,7 +221,7 @@ class ShopifyWebhookLog(models.Model):
                     handler = PaymentStatusHandler(self.env, self.backend_id)
                     handler.handle_status_change(binding, old_financial, new_financial)
 
-                # Detect fulfillment status change
+                # Detect fulfillment status change and trigger sync
                 new_fulfillment = (data.get('fulfillment_status') or 'unfulfilled').lower()
                 old_fulfillment = binding.shopify_fulfillment_status or 'unfulfilled'
                 if new_fulfillment != old_fulfillment:
@@ -190,6 +230,22 @@ class ShopifyWebhookLog(models.Model):
                         binding.odoo_id.with_context(
                             shopify_no_auto_export=True,
                         ).write({'shopify_fulfillment_status': new_fulfillment})
+                        # Trigger fulfillment workflow (not just status update)
+                        if new_fulfillment in ('fulfilled', 'partial'):
+                            try:
+                                from ..sync.fulfillment_sync import FulfillmentSync
+                                syncer = FulfillmentSync(
+                                    self.env, self.backend_id,
+                                )
+                                syncer.handle_inbound_fulfillment(
+                                    binding, webhook_data=data,
+                                )
+                            except Exception as e:
+                                _logger.warning(
+                                    "Fulfillment sync failed for order %s "
+                                    "during orders/updated: %s",
+                                    binding.shopify_order_name, e,
+                                )
 
         # Still run the standard order import/update logic
         self.env['shopify.order.binding'].process_webhook_event(

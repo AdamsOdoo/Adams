@@ -542,7 +542,7 @@ class ProductSync:
                     }
                   }
                 }
-                variants(first: 100) {
+                variants(first: 250) {
                   edges {
                     node {
                       id title sku barcode price compareAtPrice

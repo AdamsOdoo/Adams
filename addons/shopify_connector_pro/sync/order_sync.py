@@ -128,6 +128,10 @@ class OrderImporter(BaseImporter):
                     'last_sync_date': fields.Datetime.now(),
                 })
                 self._track_discount_usage(order_binding, node)
+                # Register payment for fully paid orders with posted invoices
+                if (self.backend.auto_create_invoice
+                        and financial_status == 'paid'):
+                    self._auto_register_payment(order, order_binding)
 
     def _create_sale_order(self, node):
         """Create an Odoo sale.order from Shopify order data."""
@@ -198,7 +202,14 @@ class OrderImporter(BaseImporter):
         order = SaleOrder.create(order_vals)
 
         # Create order lines
-        line_items = node.get('lineItems', {}).get('edges', [])
+        line_items_conn = node.get('lineItems', {})
+        line_items = line_items_conn.get('edges', [])
+        if line_items_conn.get('pageInfo', {}).get('hasNextPage'):
+            _logger.warning(
+                "Order %s has more than %d line items — some may be "
+                "truncated. Review manually on Shopify.",
+                node.get('name'), len(line_items),
+            )
         for edge in line_items:
             li = edge.get('node', {})
             self._create_order_line(order, li)
@@ -229,8 +240,17 @@ class OrderImporter(BaseImporter):
                 shopify_no_auto_export=True,
             ).action_confirm()
             # Auto-create invoice if configured
-            if self.backend.auto_create_invoice and order_vals['shopify_financial_status'] == 'paid':
-                self._auto_create_invoice(order)
+            if self.backend.auto_create_invoice:
+                fin_status = order_vals['shopify_financial_status']
+                if fin_status in ('paid', 'partially_paid'):
+                    self._auto_create_invoice(order)
+                    if fin_status == 'partially_paid':
+                        order.activity_schedule(
+                            'mail.mail_activity_data_todo',
+                            summary="Shopify Partial Payment",
+                            note="Order imported as partially paid on Shopify. "
+                                 "Please register the partial payment on the invoice.",
+                        )
 
         return order
 
@@ -240,7 +260,20 @@ class OrderImporter(BaseImporter):
         A savepoint isolates accounting failures (missing income account,
         fiscal position gaps, etc.) so the surrounding order import
         transaction is never poisoned.
+
+        Idempotent: skips if the order already has a non-cancelled invoice.
         """
+        # Idempotency guard: skip if invoice already exists
+        existing_invoices = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state != 'cancel'
+        )
+        if existing_invoices:
+            _logger.info(
+                "Order %s already has invoice(s) — skipping auto-create",
+                order.name,
+            )
+            return
+
         missing = []
         for line in order.order_line:
             product = line.product_id
@@ -289,6 +322,28 @@ class OrderImporter(BaseImporter):
                 'mail.mail_activity_data_warning',
                 summary="Shopify auto-invoice failed",
                 note="Invoice creation failed: %s" % e,
+            )
+
+    def _auto_register_payment(self, order, order_binding):
+        """Register payment on posted invoices for fully paid orders.
+
+        Delegates to PaymentStatusHandler for gateway resolution and
+        idempotency. Safe to call multiple times.
+        """
+        posted_invoices = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state == 'posted'
+            and i.amount_residual > 0
+        )
+        if not posted_invoices:
+            return
+        try:
+            from .payment_status_sync import PaymentStatusHandler
+            handler = PaymentStatusHandler(self.env, self.backend)
+            handler._register_payment(posted_invoices[0], order_binding)
+        except Exception as e:
+            _logger.warning(
+                "Auto payment registration failed for order %s: %s",
+                order.name, e,
             )
 
     def _track_discount_usage(self, order_binding, node):
@@ -781,7 +836,10 @@ class OrderSync:
                 billingAddress {
                   address1 address2 city province country countryCodeV2 zip
                 }
-                lineItems(first: 150) {
+                lineItems(first: 250) {
+                  pageInfo {
+                    hasNextPage
+                  }
                   edges {
                     node {
                       id title quantity

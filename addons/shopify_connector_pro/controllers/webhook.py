@@ -128,15 +128,7 @@ class ShopifyWebhookController(http.Controller):
                 {'status': 'error', 'message': 'Rate limit exceeded'}, status=429,
             )
 
-        # ── Deduplicate by webhook_id ───────────────────────
-        if webhook_id:
-            existing = request.env['shopify.webhook.log'].sudo().search([
-                ('webhook_id', '=', webhook_id),
-            ], limit=1)
-            if existing:
-                return request.make_json_response({'status': 'ok'})
-
-        # ── Parse payload ───────────────────────────────────
+        # ── Parse payload (before dedup — needed for fingerprint) ──
         try:
             payload = json.loads(raw_body) if raw_body else {}
         except (json.JSONDecodeError, ValueError):
@@ -144,11 +136,50 @@ class ShopifyWebhookController(http.Controller):
 
         shopify_resource_id = str(payload.get('id', '')) if payload else ''
 
+        WebhookLog = request.env['shopify.webhook.log'].sudo()
+
+        # ── Deduplicate by webhook_id ───────────────────────
+        if webhook_id:
+            existing = WebhookLog.search([
+                ('webhook_id', '=', webhook_id),
+            ], limit=1)
+            if existing:
+                return request.make_json_response({'status': 'ok'})
+
+        # ── Timestamp-window validation ─────────────────────
+        # Reject payloads whose updated_at is older than the staleness
+        # window (default 50h, generous enough for Shopify's 48h retry).
+        if payload and WebhookLog.is_stale_payload(payload):
+            _logger.info(
+                "Stale webhook payload for backend %s, topic %s "
+                "(resource %s) — skipping",
+                backend_id, topic, shopify_resource_id,
+            )
+            return request.make_json_response({'status': 'ok'})
+
+        # ── Fingerprint fallback dedup ──────────────────────
+        # When webhook_id is absent, use a content-based fingerprint.
+        updated_at = payload.get('updated_at', '') if payload else ''
+        fingerprint = WebhookLog.compute_fingerprint(
+            topic, shopify_resource_id, updated_at,
+        )
+        if not webhook_id and fingerprint:
+            existing_fp = WebhookLog.search([
+                ('webhook_fingerprint', '=', fingerprint),
+                ('backend_id', '=', backend_id),
+            ], limit=1)
+            if existing_fp:
+                _logger.debug(
+                    "Duplicate webhook by fingerprint for backend %s", backend_id,
+                )
+                return request.make_json_response({'status': 'ok'})
+
         # ── Enqueue ─────────────────────────────────────────
         try:
-            request.env['shopify.webhook.log'].sudo().create({
+            WebhookLog.create({
                 'backend_id': backend_id,
                 'webhook_id': webhook_id,
+                'webhook_fingerprint': fingerprint,
                 'topic': topic,
                 'shopify_id': shopify_resource_id,
                 'payload': json.dumps(payload),
@@ -207,8 +238,14 @@ class ShopifyHealthController(http.Controller):
         type='http', auth='user', methods=['GET'],
     )
     def health_check(self, backend_id):
-        backend = request.env['shopify.backend'].sudo().browse(backend_id)
-        if not backend.exists():
+        # Use search() without sudo() so Odoo record rules enforce
+        # multi-company isolation — users only see backends in their
+        # allowed companies.  This also respects ir.model.access
+        # (group_shopify_user required for read).
+        backend = request.env['shopify.backend'].search(
+            [('id', '=', backend_id)], limit=1,
+        )
+        if not backend:
             return request.make_json_response(
                 {'status': 'not_found'}, status=404,
             )
