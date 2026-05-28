@@ -21,3 +21,6 @@ from . import test_e2e_smoke
 from . import test_manager_dashboard
 from . import test_business_flows
 from . import test_core_workflow_hardening
+from . import test_field_mapping
+from . import test_reconciliation
+from . import test_extended_workflows

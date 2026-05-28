@@ -695,6 +695,19 @@ class OrderImporter(BaseImporter):
                 fallback_tax = self._tax_rate_cache[rate_pct]
                 if fallback_tax:
                     tax_ids.append(fallback_tax.id)
+                else:
+                    _logger.warning(
+                        "Tax line dropped: no mapping for '%s' and no Odoo tax "
+                        "matching rate %.2f%% (backend %s). Create a tax mapping "
+                        "or an Odoo tax with this rate.",
+                        title, rate_pct, self.backend.id,
+                    )
+            else:
+                _logger.warning(
+                    "Tax line dropped: no mapping for '%s' and no rate provided "
+                    "(backend %s). Create a tax mapping for this title.",
+                    title, self.backend.id,
+                )
 
         return list(set(tax_ids))
 

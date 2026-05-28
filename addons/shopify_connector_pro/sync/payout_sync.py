@@ -153,11 +153,29 @@ class PayoutSync:
                     ('shopify_transaction_id', '=', txn_id),
                 ], limit=1)
 
+                raw_type = (txn.get('type', '') or '').lower() or False
+                raw_source = (txn.get('sourceType', '') or '').lower() or False
+                valid_types = {'charge', 'refund', 'dispute', 'reserve', 'adjustment', 'payout'}
+                if raw_type and raw_type not in valid_types:
+                    _logger.warning(
+                        "Unknown payout transaction_type '%s' for txn %s — "
+                        "storing as empty. Add this type to the selection field.",
+                        raw_type, txn_id,
+                    )
+                    raw_type = False
+                if raw_source and raw_source not in valid_types:
+                    _logger.warning(
+                        "Unknown payout source_type '%s' for txn %s — "
+                        "storing as empty.",
+                        raw_source, txn_id,
+                    )
+                    raw_source = False
+
                 txn_vals = {
                     'payout_id': payout.id,
                     'shopify_transaction_id': txn_id,
-                    'transaction_type': (txn.get('type', '') or '').lower() or False,
-                    'source_type': (txn.get('sourceType', '') or '').lower() or False,
+                    'transaction_type': raw_type,
+                    'source_type': raw_source,
                     'amount': float(txn.get('amount', {}).get('amount', 0)),
                     'fee': float(txn.get('fee', {}).get('amount', 0)),
                     'net': float(txn.get('net', {}).get('amount', 0)),

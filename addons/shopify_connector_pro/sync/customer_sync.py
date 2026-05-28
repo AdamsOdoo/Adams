@@ -31,6 +31,8 @@ class CustomerExporter(BaseExporter):
 
     def _create_customer(self, binding, partner):
         customer_input = self._build_customer_input(partner, binding)
+        # Apply custom field mappings AFTER hardcoded defaults (BUG-EW-08)
+        self._apply_export_mappings(customer_input, binding)
         result = self.client.execute_mutation(
             CUSTOMER_CREATE_MUTATION,
             {'input': customer_input},
@@ -44,6 +46,8 @@ class CustomerExporter(BaseExporter):
     def _update_customer(self, binding, partner):
         customer_input = self._build_customer_input(partner, binding)
         customer_input['id'] = binding.shopify_id
+        # Apply custom field mappings AFTER hardcoded defaults (BUG-EW-08)
+        self._apply_export_mappings(customer_input, binding)
         self.client.execute_mutation(
             CUSTOMER_UPDATE_MUTATION,
             {'input': customer_input},
@@ -70,7 +74,7 @@ class CustomerExporter(BaseExporter):
 
         # Include tags from the binding (BUG-CU1)
         if binding and binding.shopify_tags:
-            customer_input['tags'] = binding.shopify_tags.split(', ')
+            customer_input['tags'] = [t.strip() for t in binding.shopify_tags.split(',') if t.strip()]
         elif binding:
             customer_input['tags'] = []
 
@@ -112,6 +116,8 @@ class CustomerImporter(BaseImporter):
     def _import_one(self, node, existing_binding=None):
         shopify_id = node.get('id')
         vals = self._map_to_odoo(node)
+        # Apply custom field mappings AFTER hardcoded defaults (BUG-EW-08)
+        self._apply_import_mappings(vals, node)
         checksum = self._compute_shopify_checksum(node)
 
         ctx = {'shopify_no_auto_export': True}

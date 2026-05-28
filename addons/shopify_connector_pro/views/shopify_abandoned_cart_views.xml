@@ -81,7 +81,10 @@
                             <field name="recovered_order_binding_id"/>
                             <field name="sale_order_id"/>
                             <field name="recovery_url" widget="url"/>
-                            <field name="recovery_email_sent"/>
+                            <!-- recovery_email_sent hidden: field exists in model
+                                 but recovery email feature is not yet implemented.
+                                 Showing it misleads users (BUG-EW-15a deferred). -->
+                            <field name="recovery_email_sent" invisible="1"/>
                         </group>
                         <group string="Sync Info">
                             <field name="backend_id"/>

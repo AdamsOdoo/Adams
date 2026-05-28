@@ -117,7 +117,7 @@ class MetafieldSync:
                 'namespace': mapping.shopify_namespace,
                 'key': mapping.shopify_key,
                 'type': mapping.shopify_type,
-                'value': str(value),
+                'value': self._serialize_metafield_value(value, mapping.shopify_type),
             })
 
         if not metafields_input:
@@ -133,6 +133,23 @@ class MetafieldSync:
         except Exception as e:
             _logger.warning("Failed to export metafields for %s: %s",
                             product_binding.shopify_id, e)
+
+    @staticmethod
+    def _serialize_metafield_value(value, shopify_type):
+        """Type-aware serialization of Python values for Shopify metafields.
+
+        Handles booleans (True→"true"), floats (avoid repr noise),
+        and falls back to str() for everything else.  (BUG-EW-02a)
+        """
+        if isinstance(value, bool):
+            return 'true' if value else 'false'
+        if isinstance(value, float):
+            # Round to reasonable precision, strip trailing zeros
+            return f'{value:.10g}'
+        # Recordsets: use display_name
+        if hasattr(value, '_name'):
+            return value.display_name or ''
+        return str(value)
 
     def _apply_metafield_to_odoo(self, record, field_name, value, mf_type):
         """Apply a metafield value to an Odoo record field."""

@@ -77,6 +77,73 @@ class BaseExporter:
         """Override: export a single binding to Shopify."""
         raise NotImplementedError
 
+    # ── Field mapping helpers ──────────────────────────────────────
+
+    def _apply_export_mappings(self, input_dict, binding):
+        """Apply custom field mappings from backend configuration (export direction).
+
+        Called AFTER hardcoded defaults so custom mappings can override.
+        Reads Odoo field values (supporting dotted relational paths like
+        'categ_id.name') and writes them into the Shopify mutation input dict.
+        """
+        mappings = self.env['shopify.field.mapping'].search([
+            ('backend_id', '=', self.backend.id),
+            ('entity', '=', self.entity_name),
+            ('direction', 'in', ('export', 'both')),
+            ('active', '=', True),
+        ], order='sequence, id')
+
+        if not mappings:
+            return
+
+        record = binding.odoo_id
+
+        for mapping in mappings:
+            odoo_field = mapping.odoo_field
+            shopify_field = mapping.shopify_field
+
+            # Skip composite Shopify fields (handled by hardcoded logic)
+            if '+' in shopify_field:
+                continue
+
+            # Read value from Odoo record (supports dotted paths)
+            value = self._read_odoo_field(record, odoo_field)
+            if value is None:
+                continue
+
+            input_dict[shopify_field] = value
+
+    def _read_odoo_field(self, record, field_path):
+        """Read a field value from an Odoo record, supporting dotted paths.
+
+        E.g., 'categ_id.name' reads record.categ_id.name.
+        Returns None if any segment is missing or the field doesn't exist.
+        Converts recordset results to display_name.
+        """
+        current = record
+        segments = field_path.split('.')
+        for i, segment in enumerate(segments):
+            if not current:
+                return None
+            # current must be a recordset to read fields from
+            if not hasattr(current, '_fields'):
+                return None
+            if segment not in current._fields:
+                _logger.warning(
+                    "Export mapping skipped: field '%s' not found on model '%s'",
+                    segment, current._name,
+                )
+                return None
+            current = current[segment]
+
+        # Convert recordsets to display name
+        if hasattr(current, '_name'):
+            return current.display_name or None
+        # Convert falsy values to None (skip empty strings, 0, False)
+        if not current and current != 0:
+            return None
+        return current
+
     @staticmethod
     def _is_permanent_error(exc):
         """Determine if an error should not be retried."""

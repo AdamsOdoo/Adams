@@ -43,8 +43,12 @@ class CollectionExporter:
                     continue
 
                 if binding.shopify_id:
-                    # Update not yet supported via simple mutation
-                    binding._mark_synced(checksum=checksum)
+                    # Update not yet supported — skip without marking
+                    # synced to avoid false confidence (BUG-EW-01a)
+                    _logger.debug(
+                        "Collection update not yet supported, skipping %s",
+                        binding.shopify_id,
+                    )
                     skipped += 1
                     continue
 

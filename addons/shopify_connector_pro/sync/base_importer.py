@@ -81,3 +81,83 @@ class BaseImporter:
     def _import_one(self, node, existing_binding=None):
         """Override: import a single Shopify node into Odoo."""
         raise NotImplementedError
+
+    # ── Field mapping helpers ──────────────────────────────────────
+
+    def _apply_import_mappings(self, vals, node):
+        """Apply custom field mappings from backend configuration (import direction).
+
+        Called AFTER hardcoded defaults so custom mappings can override.
+        Skips composite Shopify fields (containing '+'), dotted Odoo fields,
+        invalid Odoo fields, and missing Shopify keys — all gracefully.
+        """
+        mappings = self.env['shopify.field.mapping'].search([
+            ('backend_id', '=', self.backend.id),
+            ('entity', '=', self.entity_name),
+            ('direction', 'in', ('import', 'both')),
+            ('active', '=', True),
+        ], order='sequence, id')
+
+        if not mappings:
+            return
+
+        # Resolve target model from the binding's odoo_id field
+        binding_model = self.env[self.binding_model]
+        target_model_name = binding_model._fields['odoo_id'].comodel_name
+        target_model = self.env[target_model_name]
+
+        for mapping in mappings:
+            shopify_field = mapping.shopify_field
+            odoo_field = mapping.odoo_field
+
+            # Skip composite fields (handled by hardcoded logic)
+            if '+' in shopify_field:
+                continue
+
+            # Skip dotted Odoo fields (relational writes need special handling)
+            if '.' in odoo_field:
+                _logger.debug(
+                    "Skipping dotted Odoo field %s in import mapping", odoo_field,
+                )
+                continue
+
+            # Validate field exists on target model
+            if odoo_field not in target_model._fields:
+                _logger.warning(
+                    "Import mapping skipped: field '%s' not found on model '%s'",
+                    odoo_field, target_model._name,
+                )
+                continue
+
+            # Traverse Shopify node to get value
+            value = self._traverse_shopify_node(node, shopify_field)
+            if value is None:
+                continue
+
+            vals[odoo_field] = value
+
+    @staticmethod
+    def _traverse_shopify_node(node, path):
+        """Traverse a Shopify node dict using dot-separated path.
+
+        Supports dict keys and integer list indices.
+        Returns None if any segment is missing.
+
+        Examples:
+            'title'                          → node['title']
+            'variants.edges.0.node.price'    → node['variants']['edges'][0]['node']['price']
+        """
+        current = node
+        for segment in path.split('.'):
+            if current is None:
+                return None
+            if isinstance(current, dict):
+                current = current.get(segment)
+            elif isinstance(current, (list, tuple)):
+                try:
+                    current = current[int(segment)]
+                except (ValueError, IndexError):
+                    return None
+            else:
+                return None
+        return current

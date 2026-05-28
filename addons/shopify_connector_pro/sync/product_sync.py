@@ -87,12 +87,14 @@ class ProductExporter(BaseExporter):
             'productType': product.categ_id.name or '',
             'vendor': product.seller_ids[:1].partner_id.name if product.seller_ids else '',
             'status': 'ACTIVE',
-            'tags': binding.shopify_tags.split(', ') if binding.shopify_tags else [],
+            'tags': [t.strip() for t in binding.shopify_tags.split(',') if t.strip()] if binding.shopify_tags else [],
             'variants': self._build_variant_inputs(product),
         }
         options = self._build_options(product)
         if options:
             product_input['productOptions'] = options
+        # Apply custom field mappings AFTER hardcoded defaults (BUG-EW-08)
+        self._apply_export_mappings(product_input, binding)
         variables = {'input': product_input}
         result = self.client.execute_mutation(
             PRODUCT_SET_MUTATION,
@@ -111,15 +113,16 @@ class ProductExporter(BaseExporter):
 
     def _update_product(self, binding, product):
         shopify_gid = binding.shopify_id
-        variables = {
-            'input': {
-                'id': shopify_gid,
-                'title': product.name,
-                'descriptionHtml': product.description_sale or '',
-                'productType': product.categ_id.name or '',
-                'tags': binding.shopify_tags.split(', ') if binding.shopify_tags else [],
-            },
+        product_input = {
+            'id': shopify_gid,
+            'title': product.name,
+            'descriptionHtml': product.description_sale or '',
+            'productType': product.categ_id.name or '',
+            'tags': [t.strip() for t in binding.shopify_tags.split(',') if t.strip()] if binding.shopify_tags else [],
         }
+        # Apply custom field mappings AFTER hardcoded defaults (BUG-EW-08)
+        self._apply_export_mappings(product_input, binding)
+        variables = {'input': product_input}
         self.client.execute_mutation(
             PRODUCT_UPDATE_MUTATION,
             variables,
@@ -260,6 +263,8 @@ class ProductImporter(BaseImporter):
     def _import_one(self, node, existing_binding=None):
         shopify_id = node.get('id')
         vals = self._map_to_odoo(node)
+        # Apply custom field mappings AFTER hardcoded defaults (BUG-EW-08)
+        self._apply_import_mappings(vals, node)
         checksum = self._compute_shopify_checksum(node)
 
         # Build tags string
@@ -472,10 +477,22 @@ class ProductImporter(BaseImporter):
 
 
     def _import_images(self, product, node):
-        """Import additional product images (beyond the first) as product.image records."""
+        """Import additional product images (beyond the first) as product.image records.
+
+        Removes existing extra images before re-importing to prevent
+        duplicates accumulating on re-sync (BUG-EW-09).
+        """
         image_edges = node.get('images', {}).get('edges', [])
         if len(image_edges) <= 1:
             return  # First image already set as image_1920 via _map_to_odoo
+
+        # Remove stale extra images to avoid duplicates on re-sync
+        if 'product.image' in self.env:
+            existing_extra = self.env['product.image'].search([
+                ('product_tmpl_id', '=', product.id),
+            ])
+            if existing_extra:
+                existing_extra.unlink()
 
         for edge in image_edges[1:]:
             image_node = edge.get('node', {})

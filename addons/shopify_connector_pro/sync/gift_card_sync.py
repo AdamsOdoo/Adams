@@ -24,7 +24,13 @@ class GiftCardSync:
             estimated_cost_per_page=10,
         )
 
+        log = self.env['shopify.sync.log'].create({
+            'backend_id': self.backend.id,
+            'entity': 'gift_card',
+            'operation': 'import',
+        })
         success = errors = skipped = 0
+        error_details = []
         for node in nodes:
             shopify_id = node.get('id', '')
             try:
@@ -85,5 +91,7 @@ class GiftCardSync:
             except Exception as e:
                 _logger.warning("Failed to import gift card %s: %s", shopify_id, e)
                 errors += 1
+                error_details.append(f"{shopify_id}: {e}")
 
+        log._finalize(success, errors, skipped, '\n'.join(error_details) or None)
         return success, errors, skipped

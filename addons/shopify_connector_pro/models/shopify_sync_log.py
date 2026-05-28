@@ -24,6 +24,7 @@ class ShopifySyncLog(models.Model):
         ('metafield', 'Metafields'),
         ('location', 'Locations'),
         ('abandoned_cart', 'Abandoned Carts'),
+        ('gift_card', 'Gift Cards'),
     ], required=True)
     operation = fields.Selection([
         ('export', 'Export'),

@@ -126,26 +126,43 @@ class ShopifyReconciliation(models.TransientModel):
         return errors
 
     def _reconcile_retry_errors(self, backend):
-        """Reset retryable errors that have been stuck for too long."""
+        """Reset retryable errors that have been stuck for too long.
+
+        Iterates all binding model types (not just products — BUG-EW-12a)
+        and increments retry_count instead of resetting it (BUG-EW-12b).
+        """
         stuck_cutoff = fields.Datetime.now() - timedelta(hours=6)
-        stuck_bindings = self.env['shopify.product.binding'].search([
-            ('backend_id', '=', backend.id),
-            ('sync_status', '=', 'error'),
-            ('retry_count', '<', 5),
-            ('write_date', '<', stuck_cutoff),
-        ])
+        total_reset = 0
 
-        if stuck_bindings:
-            _logger.info(
-                "Resetting %d stuck error bindings for backend %s",
-                len(stuck_bindings), backend.id,
-            )
-            stuck_bindings.write({
-                'sync_status': 'pending',
-                'retry_count': 0,
-            })
+        binding_models = [
+            'shopify.product.binding',
+            'shopify.customer.binding',
+            'shopify.order.binding',
+            'shopify.inventory.binding',
+            'shopify.collection.binding',
+        ]
 
-        return len(stuck_bindings)
+        for model_name in binding_models:
+            stuck_bindings = self.env[model_name].search([
+                ('backend_id', '=', backend.id),
+                ('sync_status', '=', 'error'),
+                ('retry_count', '<', 5),
+                ('write_date', '<', stuck_cutoff),
+            ])
+
+            if stuck_bindings:
+                _logger.info(
+                    "Resetting %d stuck %s error bindings for backend %s",
+                    len(stuck_bindings), model_name, backend.id,
+                )
+                for binding in stuck_bindings:
+                    binding.write({
+                        'sync_status': 'pending',
+                        'retry_count': binding.retry_count + 1,
+                    })
+                total_reset += len(stuck_bindings)
+
+        return total_reset
 
     # ── Payment Status Reconciliation ──────────────────────
 
