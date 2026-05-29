@@ -17,3 +17,5 @@ from . import test_order_lifecycle
 from . import test_ui_features
 # Phase 3+4 model tests
 from . import test_phase34_models
+# Fidelity guard (prevents simulator/connector shape divergence)
+from . import test_fidelity_guard

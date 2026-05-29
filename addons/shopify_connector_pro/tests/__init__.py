@@ -27,3 +27,4 @@ from . import test_extended_workflows
 from . import test_reverse_sync_toggle
 from . import test_coverage_gaps
 from . import test_credential_encryption
+from . import test_simulator_fidelity_coverage
