@@ -31,6 +31,7 @@
 24. [Accounting Prerequisites](#accounting-prerequisites)
 25. [Troubleshooting](#troubleshooting)
 26. [FAQ](#faq)
+27. [Financial Sync Directions & Limitations](#financial-sync-directions--limitations)
 
 ---
 
@@ -1110,3 +1111,101 @@ A: Yes. Install the companion module **Shopify Manager Dashboard** for an execut
 
 **Q: What happens when invoice creation fails due to missing accounts?**
 A: The connector uses savepoints to isolate invoice creation failures. If an invoice cannot be created (e.g., missing income account), the order is still imported and confirmed successfully. A warning is logged and a scheduled activity is created on the order, alerting the responsible user to fix the accounting setup and create the invoice manually.
+
+---
+
+## Financial Sync Directions & Limitations
+
+This section documents exactly what financial data flows between Shopify and Odoo, what controls it, and what does NOT sync.
+
+### Automatic Sync: Shopify to Odoo
+
+These flows run automatically via scheduled actions (crons). No user action is required.
+
+| Shopify Event | Odoo Result | Cron Frequency |
+|---|---|---|
+| Order paid | Invoice created and posted | Every 5 minutes |
+| Payment captured | Payment registered and reconciled with invoice | Every 5 minutes |
+| Financial status changed to "voided" | Draft invoices cancelled | Every 5 minutes |
+| Refund issued | Credit note (out_refund) created | Every 30 minutes |
+| Financial status updated | Order binding status updated | Every 5 minutes |
+
+**Prerequisite:** "Auto Create Invoice" must be enabled on the backend for automatic invoice creation.
+
+### Conditional Sync: Odoo to Shopify (Reverse Sync)
+
+These flows are triggered by user actions in Odoo and are controlled by TWO settings that must both be enabled.
+
+| Odoo Action | Shopify Result | Backend Setting Required | Per-Order Toggle Required |
+|---|---|---|---|
+| Post an invoice | Order marked as paid (orderMarkAsPaid) | "Reverse Sync: Payment" ON | "Sync to Shopify" ON |
+| Post a credit note | Refund created (refundCreate, amount only) | "Reverse Sync: Refund" ON | "Sync to Shopify" ON |
+| Validate a delivery | Fulfillment created | None (always active) | "Sync to Shopify" ON |
+
+### Control Settings
+
+#### Backend-Level Flags (Settings > Shopify Backend > Sync Settings)
+
+- **Reverse Sync: Payment** (default: OFF) — When enabled, posting an invoice for a Shopify order with "pending" or "authorized" status will mark the order as paid on Shopify.
+- **Reverse Sync: Refund** (default: OFF) — When enabled, posting a credit note for a Shopify order will create a monetary refund on Shopify.
+
+These are admin-level policy settings that apply to ALL orders for this backend.
+
+#### Per-Order Toggle (Sale Order > Shopify tab)
+
+- **Sync to Shopify** (default: ON) — Controls whether this specific order participates in Odoo-to-Shopify sync. Visible only on Shopify-channel orders.
+
+#### Precedence Rules
+
+The per-order toggle can only NARROW the backend policy, never override it:
+
+| Backend Flag | Order Toggle | Result |
+|---|---|---|
+| OFF | OFF | No sync — backend disabled |
+| OFF | ON | No sync — backend disabled (toggle cannot override) |
+| ON | OFF | No sync — order opted out |
+| ON | ON | Sync fires |
+
+**Important:** The per-order toggle affects OUTBOUND sync only (Odoo to Shopify). Inbound sync (Shopify to Odoo) always runs regardless of the toggle setting. Shopify remains the source of truth for order status.
+
+#### Sync Status Indicator
+
+The Shopify tab on the sale order form shows a "Reverse Sync Status" field that displays:
+- **Active (payments)** — Reverse payment sync is enabled for this order
+- **Active (refunds)** — Reverse refund sync is enabled for this order
+- **Active (payments, refunds)** — Both are enabled
+- **Disabled for this order** — The per-order toggle is unchecked
+- **Disabled on backend** — The backend flags are off (toggle is on but backend prevents sync)
+
+### What Does NOT Sync
+
+| Action in Odoo | Effect on Shopify | Reason |
+|---|---|---|
+| Register a payment on an invoice | Nothing | Only invoice posting triggers reverse sync, not payment registration |
+| Cancel a posted invoice | Nothing (a warning activity is created on the order) | There is no "unpay" API on Shopify; auto-reversing could trigger real refunds |
+| Create a partial payment | Nothing | Partial payment registration is not mapped to Shopify status |
+| Post a credit note with specific line items | Monetary refund only (no line-item detail) | Shopify's refundCreate accepts an amount but the connector does not map Odoo invoice lines to Shopify line items |
+| Create an invoice for a non-Shopify order | Nothing | Only orders with sales_channel = "shopify" are synced |
+| Register a split payment (multiple gateways) | Single payment in Odoo | The connector registers one payment per order, not per Shopify transaction |
+
+### Invoice Cancellation Warning
+
+When you cancel a posted invoice that is linked to a Shopify order, the connector schedules a warning activity on the sale order. This activity:
+
+- Explains that Shopify still shows the original payment status
+- Advises you to create a credit note if a refund is needed (which the connector will sync to Shopify if reverse sync is enabled)
+- Can be dismissed if the cancellation was an accounting correction only
+
+The connector does NOT automatically reverse payments or create refunds on Shopify when an invoice is cancelled. This is a deliberate safety measure — automatic reversal could trigger real money movement on captured payments.
+
+### Quick Reference: If You Do X, Expect Y
+
+| You do this in Odoo | Shopify shows | Toggle ON | Toggle OFF |
+|---|---|---|---|
+| Post invoice for a pending Shopify order | Order marked as paid | Syncs (if backend flag on) | Skipped |
+| Post invoice for an already-paid order | No change | No change | No change |
+| Post credit note for a Shopify order | Refund created (amount only) | Syncs (if backend flag on) | Skipped |
+| Cancel a posted Shopify invoice | Still shows paid | Activity warns you | Activity warns you |
+| Validate delivery for a Shopify order | Fulfillment created | Syncs | Skipped |
+| Register payment on invoice | No change | N/A | N/A |
+| Edit order note or tags | Updated on Shopify | Updated | Updated (note/tag sync is separate) |

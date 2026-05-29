@@ -13,6 +13,11 @@
                     <group>
                         <group>
                             <field name="sales_channel"/>
+                            <field name="shopify_reverse_sync" widget="boolean_toggle"
+                                   invisible="sales_channel != 'shopify'"/>
+                            <field name="shopify_sync_status_display"
+                                   invisible="sales_channel != 'shopify'"
+                                   readonly="1"/>
                             <field name="shopify_order_name"/>
                             <field name="shopify_financial_status"/>
                             <field name="shopify_fulfillment_status"/>

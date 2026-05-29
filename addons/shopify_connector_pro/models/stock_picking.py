@@ -22,6 +22,8 @@ class StockPicking(models.Model):
             # B2B guard: only sync Shopify-channel orders
             if sale_order.sales_channel != 'shopify':
                 continue
+            if not sale_order.shopify_reverse_sync:
+                continue
             if picking.picking_type_code == 'outgoing':
                 self._push_outbound_fulfillment(picking, sale_order)
             elif picking.picking_type_code == 'incoming':

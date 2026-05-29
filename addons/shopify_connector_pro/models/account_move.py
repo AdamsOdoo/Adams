@@ -1,7 +1,7 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
 
-from odoo import models
+from odoo import _, models
 
 _logger = logging.getLogger(__name__)
 
@@ -43,6 +43,8 @@ class AccountMove(models.Model):
         sale_orders = move.line_ids.sale_line_ids.order_id
         for order in sale_orders:
             if order.sales_channel != 'shopify':
+                continue
+            if not order.shopify_reverse_sync:
                 continue
             for binding in order.shopify_bind_ids:
                 if not binding.shopify_id:
@@ -91,6 +93,8 @@ class AccountMove(models.Model):
 
         for order in sale_orders:
             if order.sales_channel != 'shopify':
+                continue
+            if not order.shopify_reverse_sync:
                 continue
             for binding in order.shopify_bind_ids:
                 if not binding.shopify_id:
@@ -149,3 +153,40 @@ class AccountMove(models.Model):
                         "Failed to create Shopify refund for order %s: %s",
                         binding.shopify_order_name, e,
                     )
+
+    def button_cancel(self):
+        """Override to warn when a Shopify-linked invoice is cancelled."""
+        # Collect Shopify-linked posted invoices BEFORE cancel changes state
+        shopify_moves = {}
+        for move in self:
+            if move.state != 'posted' or move.move_type not in ('out_invoice', 'out_refund'):
+                continue
+            sale_orders = move.line_ids.sale_line_ids.order_id
+            for order in sale_orders:
+                if order.sales_channel != 'shopify' and not order.shopify_bind_ids:
+                    continue
+                for binding in order.shopify_bind_ids:
+                    if binding.shopify_order_name:
+                        shopify_moves[move.id] = (order, binding.shopify_order_name)
+                        break
+
+        res = super().button_cancel()
+
+        # Schedule warning activities for Shopify-linked cancellations
+        activity_type = self.env.ref('mail.mail_activity_data_warning', raise_if_not_found=False)
+        for _move_id, (order, order_name) in shopify_moves.items():
+            order.activity_schedule(
+                activity_type_id=activity_type.id if activity_type else False,
+                summary=_("Shopify financial status may be out of sync"),
+                note=_(
+                    "An invoice linked to Shopify order %(order_name)s was cancelled in "
+                    "Odoo, but Shopify still shows the original payment status. If a "
+                    "refund is needed, create a credit note and post it — the connector "
+                    "will create the refund on Shopify automatically (if reverse sync is "
+                    "enabled). If this was an accounting correction only, dismiss this "
+                    "activity.",
+                    order_name=order_name,
+                ),
+                user_id=self.env.uid,
+            )
+        return res
