@@ -34,6 +34,7 @@ class SimShopifyProduct(models.Model):
     updated_at = fields.Datetime(default=fields.Datetime.now)
 
     variant_ids = fields.One2many('sim.shopify.variant', 'product_id', string='Variants')
+    image_ids = fields.One2many('sim.shopify.image', 'product_id', string='Images')
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -67,21 +68,25 @@ class SimShopifyProduct(models.Model):
             variants_edges.append({
                 'node': v._to_graphql_node(),
             })
-        # Build options from variant data
+        # Build options from variant data (all 3 axes, matching real Shopify)
         options = []
         if self.variant_ids:
-            option_names = set()
-            for v in self.variant_ids:
-                if v.option1_name and v.option1_name not in option_names:
-                    option_names.add(v.option1_name)
-                    options.append({
-                        'name': v.option1_name,
-                        'values': list({
-                            vv.option1_value
+            seen = set()
+            for axis in ('option1', 'option2', 'option3'):
+                name_field = f'{axis}_name'
+                value_field = f'{axis}_value'
+                for v in self.variant_ids:
+                    opt_name = getattr(v, name_field)
+                    if opt_name and opt_name not in seen:
+                        seen.add(opt_name)
+                        values = sorted({
+                            getattr(vv, value_field)
                             for vv in self.variant_ids
-                            if vv.option1_value and vv.option1_name == v.option1_name
-                        }),
-                    })
+                            if getattr(vv, name_field) == opt_name
+                            and getattr(vv, value_field)
+                        })
+                        if values:
+                            options.append({'name': opt_name, 'values': values})
             if not options:
                 options = [{'name': 'Title', 'values': ['Default Title']}]
         else:
@@ -99,7 +104,9 @@ class SimShopifyProduct(models.Model):
             'createdAt': self.created_at.isoformat() + 'Z' if self.created_at else '',
             'updatedAt': self.updated_at.isoformat() + 'Z' if self.updated_at else '',
             'options': options,
-            'images': {'edges': []},
+            'images': {
+                'edges': [{'node': img._to_graphql_node()} for img in self.image_ids],
+            },
             'variants': {'edges': variants_edges},
         }
 
@@ -179,6 +186,12 @@ class SimShopifyVariant(models.Model):
             'inventoryQuantity': self.inventory_quantity,
             'inventoryItem': {
                 'id': self.inventory_item_gid,
+                'measurement': {
+                    'weight': {
+                        'value': self.weight,
+                        'unit': self.weight_unit or 'KILOGRAMS',
+                    },
+                },
             },
             'weight': self.weight,
             'weightUnit': self.weight_unit or 'KILOGRAMS',

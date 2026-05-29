@@ -288,9 +288,9 @@ class TestSimOrder(SimulatorTestCase):
         line_node = node['lineItems']['edges'][0]['node']
         self.assertEqual(line_node['title'], 'Widget')
         self.assertEqual(line_node['quantity'], 2)
-        # Shipping lines
-        self.assertEqual(len(node['shippingLines']), 1)
-        self.assertEqual(node['shippingLines'][0]['title'], 'Standard Shipping')
+        # Shipping lines (edges/node wrapping, matching real Shopify shape)
+        self.assertEqual(len(node['shippingLines']['edges']), 1)
+        self.assertEqual(node['shippingLines']['edges'][0]['node']['title'], 'Standard Shipping')
 
 
 class TestSimLocation(SimulatorTestCase):

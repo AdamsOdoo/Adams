@@ -184,6 +184,196 @@ def _scenario_discount_codes(env, config):
     return f"Created {len(codes)} discount codes: SAVE10 (10%), FLAT20 ($20), FREESHIP."
 
 
+def _scenario_full_refund(env, config):
+    """Create an order with a full refund."""
+    from ..fixtures.demo_store import seed_demo_store
+    data = seed_demo_store(env, config)
+    order = data['orders'][0]
+    Refund = env['sim.shopify.refund']
+    RefundLine = env['sim.shopify.refund.line']
+
+    total = sum(l.unit_price * l.quantity for l in order.line_item_ids)
+    refund = Refund.create({
+        'config_id': config.id,
+        'order_id': order.id,
+        'total_refunded': total,
+        'currency_code': order.currency_code,
+        'note': 'Full refund — all items returned',
+    })
+    for line in order.line_item_ids:
+        RefundLine.create({
+            'refund_id': refund.id,
+            'line_item_gid': line.shopify_gid,
+            'line_item_title': line.title,
+            'variant_gid': line.variant_gid,
+            'variant_sku': line.sku,
+            'quantity': line.quantity,
+            'restock_type': 'RETURN',
+            'subtotal': float(line.unit_price * line.quantity),
+        })
+    order.write({'financial_status': 'REFUNDED'})
+    return (
+        f"Order {order.name}: fully refunded ${total:.2f}. "
+        f"Status → REFUNDED."
+    )
+
+
+def _scenario_cancelled_order(env, config):
+    """Create an order then cancel it."""
+    Order = env['sim.shopify.order']
+    customer = env['sim.shopify.customer'].search(
+        [('config_id', '=', config.id)], limit=1,
+    )
+    if not customer:
+        customer = env['sim.shopify.customer'].create({
+            'config_id': config.id,
+            'first_name': 'Cancel', 'last_name': 'Test',
+            'email': 'cancel@example.com',
+        })
+    order = Order.create({
+        'config_id': config.id,
+        'name': '#CANCEL01',
+        'financial_status': 'PAID',
+        'customer_id': customer.id,
+        'total_price': 50.0,
+        'subtotal_price': 50.0,
+    })
+    env['sim.shopify.order.line'].create({
+        'order_id': order.id,
+        'title': 'Cancelled Widget',
+        'quantity': 1,
+        'unit_price': 50.0,
+    })
+    # Cancel: set cancelledAt to now
+    order.write({
+        'cancelled_at': fields.Datetime.now(),
+        'financial_status': 'VOIDED',
+    })
+    return (
+        f"Order {order.name}: created and cancelled. "
+        f"cancelledAt is set, status → VOIDED."
+    )
+
+
+def _scenario_multi_currency_order(env, config):
+    """Create an order with different shop and presentment currencies."""
+    Order = env['sim.shopify.order']
+    customer = env['sim.shopify.customer'].search(
+        [('config_id', '=', config.id)], limit=1,
+    )
+    if not customer:
+        customer = env['sim.shopify.customer'].create({
+            'config_id': config.id,
+            'first_name': 'Euro', 'last_name': 'Customer',
+            'email': 'euro@example.com',
+        })
+    order = Order.create({
+        'config_id': config.id,
+        'name': '#MC001',
+        'financial_status': 'PAID',
+        'customer_id': customer.id,
+        'currency_code': 'USD',
+        'presentment_currency_code': 'EUR',
+        'total_price': 100.0,
+        'subtotal_price': 90.0,
+        'total_shipping': 10.0,
+        'ship_address1': '1 Rue Test',
+        'ship_city': 'Paris',
+        'ship_country': 'France',
+        'ship_country_code': 'FR',
+    })
+    env['sim.shopify.order.line'].create({
+        'order_id': order.id,
+        'title': 'Euro Widget',
+        'quantity': 2,
+        'unit_price': 45.0,
+    })
+    env['sim.shopify.shipping.line'].create({
+        'order_id': order.id,
+        'title': 'International Shipping',
+        'price': 10.0,
+    })
+    return (
+        f"Order {order.name}: shopCurrency=USD, presentmentCurrency=EUR. "
+        f"Total $100.00 (€ equivalent via presentment)."
+    )
+
+
+def _scenario_zero_price_line(env, config):
+    """Create an order with a $0.00 line item (free gift / 100% discount)."""
+    Order = env['sim.shopify.order']
+    customer = env['sim.shopify.customer'].search(
+        [('config_id', '=', config.id)], limit=1,
+    )
+    if not customer:
+        customer = env['sim.shopify.customer'].create({
+            'config_id': config.id,
+            'first_name': 'Free', 'last_name': 'Gift',
+            'email': 'free@example.com',
+        })
+    order = Order.create({
+        'config_id': config.id,
+        'name': '#ZERO01',
+        'financial_status': 'PAID',
+        'customer_id': customer.id,
+        'total_price': 29.99,
+        'subtotal_price': 29.99,
+    })
+    # Normal line
+    env['sim.shopify.order.line'].create({
+        'order_id': order.id,
+        'title': 'Paid Widget',
+        'quantity': 1,
+        'unit_price': 29.99,
+    })
+    # Zero-price line (free gift with 100% discount)
+    env['sim.shopify.order.line'].create({
+        'order_id': order.id,
+        'title': 'Free Gift',
+        'quantity': 1,
+        'unit_price': 0.0,
+        'total_discount': 0.0,
+    })
+    return (
+        f"Order {order.name}: 1 paid line ($29.99) + 1 free gift ($0.00). "
+        f"Tests zero-price line handling."
+    )
+
+
+def _scenario_no_shipping_order(env, config):
+    """Create a digital-only order with no shipping lines."""
+    Order = env['sim.shopify.order']
+    customer = env['sim.shopify.customer'].search(
+        [('config_id', '=', config.id)], limit=1,
+    )
+    if not customer:
+        customer = env['sim.shopify.customer'].create({
+            'config_id': config.id,
+            'first_name': 'Digital', 'last_name': 'Buyer',
+            'email': 'digital@example.com',
+        })
+    order = Order.create({
+        'config_id': config.id,
+        'name': '#NOSHP01',
+        'financial_status': 'PAID',
+        'customer_id': customer.id,
+        'total_price': 9.99,
+        'subtotal_price': 9.99,
+        'total_shipping': 0.0,
+    })
+    env['sim.shopify.order.line'].create({
+        'order_id': order.id,
+        'title': 'Digital Download',
+        'quantity': 1,
+        'unit_price': 9.99,
+    })
+    # No shipping lines created — digital product
+    return (
+        f"Order {order.name}: digital-only order, no shipping lines. "
+        f"Total $9.99. Tests empty shippingLines handling."
+    )
+
+
 # ── Scenario registry ────────────────────────────────────
 SCENARIOS = [
     {
@@ -233,6 +423,46 @@ SCENARIOS = [
                        'Tests discount code sync with different types.',
         'category': 'Discounts',
         'run': _scenario_discount_codes,
+    },
+    {
+        'key': 'full_refund',
+        'name': 'Full Refund',
+        'description': 'Creates a paid order then fully refunds all line items. '
+                       'Status changes to REFUNDED. Tests full-refund import path.',
+        'category': 'Refunds',
+        'run': _scenario_full_refund,
+    },
+    {
+        'key': 'cancelled_order',
+        'name': 'Cancelled Order Import',
+        'description': 'Creates a paid order then cancels it (sets cancelledAt). '
+                       'Tests cancelled-order detection and status mapping.',
+        'category': 'Import',
+        'run': _scenario_cancelled_order,
+    },
+    {
+        'key': 'multi_currency_order',
+        'name': 'Multi-Currency Order',
+        'description': 'Creates an order with shopCurrency=USD and '
+                       'presentmentCurrency=EUR. Tests presentment mode import.',
+        'category': 'Import',
+        'run': _scenario_multi_currency_order,
+    },
+    {
+        'key': 'zero_price_line',
+        'name': 'Zero-Price Line Item',
+        'description': 'Creates an order with a $0.00 free-gift line alongside a '
+                       'paid line. Tests edge case handling of zero-price lines.',
+        'category': 'Import',
+        'run': _scenario_zero_price_line,
+    },
+    {
+        'key': 'no_shipping_order',
+        'name': 'No-Shipping Order (Digital)',
+        'description': 'Creates a digital-only order with zero shipping lines. '
+                       'Tests empty shippingLines.edges handling.',
+        'category': 'Import',
+        'run': _scenario_no_shipping_order,
     },
 ]
 

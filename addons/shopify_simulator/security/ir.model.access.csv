@@ -50,3 +50,5 @@ access_sim_discount_usage_admin,sim.shopify.discount.usage admin,model_sim_shopi
 access_sim_scenario_user,sim.scenario user,model_sim_scenario,group_simulator_user,1,0,0,0
 access_sim_scenario_admin,sim.scenario admin,model_sim_scenario,group_simulator_admin,1,1,1,1
 access_sim_checklist_admin,sim.checklist admin,model_sim_checklist,group_simulator_admin,1,1,1,1
+access_sim_image_user,sim.shopify.image user,model_sim_shopify_image,group_simulator_user,1,0,0,0
+access_sim_image_admin,sim.shopify.image admin,model_sim_shopify_image,group_simulator_admin,1,1,1,1

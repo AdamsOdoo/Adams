@@ -130,6 +130,6 @@ class TestOrderUpdate(SimulatorTestCase):
         # Tax lines
         self.assertEqual(len(li['taxLines']), 1)
         self.assertEqual(li['taxLines'][0]['rate'], 0.10)
-        # Shipping lines
-        self.assertEqual(len(node['shippingLines']), 1)
-        self.assertEqual(node['shippingLines'][0]['code'], 'express')
+        # Shipping lines (edges/node wrapping, matching real Shopify shape)
+        self.assertEqual(len(node['shippingLines']['edges']), 1)
+        self.assertEqual(node['shippingLines']['edges'][0]['node']['code'], 'express')

@@ -85,6 +85,15 @@ class SimShopifyOrder(models.Model):
     ship_zip = fields.Char()
     ship_phone = fields.Char()
 
+    # Billing address (separate from shipping — real Shopify can differ)
+    bill_address1 = fields.Char()
+    bill_address2 = fields.Char()
+    bill_city = fields.Char()
+    bill_province = fields.Char()
+    bill_country = fields.Char()
+    bill_country_code = fields.Char()
+    bill_zip = fields.Char()
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -184,9 +193,9 @@ class SimShopifyOrder(models.Model):
         for line in self.line_item_ids:
             line_items_edges.append({'node': line._to_graphql_node(cc, pc)})
 
-        shipping_lines = []
-        for sl in self.shipping_line_ids:
-            shipping_lines.append(sl._to_graphql_node(cc, pc))
+        shipping_lines_edges = [
+            {'node': sl._to_graphql_node(cc, pc)} for sl in self.shipping_line_ids
+        ]
 
         discount_codes = []
         if self.discount_codes_json:
@@ -202,11 +211,13 @@ class SimShopifyOrder(models.Model):
             'updatedAt': self.updated_at.isoformat() + 'Z' if self.updated_at else '',
             'closedAt': self.closed_at.isoformat() + 'Z' if self.closed_at else None,
             'cancelledAt': self.cancelled_at.isoformat() + 'Z' if self.cancelled_at else None,
+            'closed': bool(self.closed_at),
             'displayFinancialStatus': self.financial_status,
             'displayFulfillmentStatus': self.fulfillment_status,
             'note': self.note or '',
             'tags': [t.strip() for t in (self.tags or '').split(',') if t.strip()],
             'currencyCode': cc,
+            'presentmentCurrencyCode': pc,
             'totalPriceSet': _money_set(self.total_price, cc, pc),
             'subtotalPriceSet': _money_set(self.subtotal_price, cc, pc),
             'totalShippingPriceSet': _money_set(self.total_shipping, cc, pc),
@@ -215,9 +226,31 @@ class SimShopifyOrder(models.Model):
             'discountCodes': discount_codes,
             'customer': customer_node,
             'shippingAddress': shipping_address,
-            'billingAddress': shipping_address,  # Simplification: same as shipping
-            'lineItems': {'edges': line_items_edges},
-            'shippingLines': shipping_lines,
+            'billingAddress': self._build_billing_address() or shipping_address,
+            'lineItems': {
+                'edges': line_items_edges,
+                'pageInfo': {
+                    'hasNextPage': False,
+                },
+            },
+            'shippingLines': {'edges': shipping_lines_edges},
+        }
+
+    def _build_billing_address(self):
+        """Build billing address dict if billing fields are set, else None."""
+        self.ensure_one()
+        if not (self.bill_address1 or self.bill_city):
+            return None
+        # billingAddress in FETCH_ORDERS has fewer fields than shippingAddress
+        # (no phone, no firstName/lastName, no provinceCode — see order.py:63-71)
+        return {
+            'address1': self.bill_address1 or '',
+            'address2': self.bill_address2 or '',
+            'city': self.bill_city or '',
+            'province': self.bill_province or '',
+            'country': self.bill_country or '',
+            'countryCodeV2': self.bill_country_code or '',
+            'zip': self.bill_zip or '',
         }
 
 
