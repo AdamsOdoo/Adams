@@ -1,5 +1,5 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 
 
 class ShopifyBinding(models.AbstractModel):

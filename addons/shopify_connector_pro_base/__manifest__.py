@@ -1,13 +1,15 @@
 {
-    'name': 'Shopify Connector Pro Ultimate Edition — Base',
-    'version': '19.0.1.0.0',
-    'summary': 'Base module for Shopify Connector Pro Ultimate Edition',
+    'name': 'Shopify Connector Pro — Base (Deprecated)',
+    'version': '19.0.1.1.0',
+    'summary': 'Deprecated — all functionality merged into Shopify Connector Pro Ultimate Edition. '
+               'This module is retained only for upgrade compatibility.',
     'author': 'Qamah Solutions',
     'maintainer': 'Qamah Solutions — Managed by Odoo Partner Ahmed Saad',
     'support': 'ahmedsaad@tech-oriented.com',
-    'license': 'LGPL-3',
+    'license': 'OPL-1',
     'depends': ['base'],
     'data': [],
     'installable': True,
+    'auto_install': False,
     'application': False,
 }

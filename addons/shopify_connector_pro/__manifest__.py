@@ -9,13 +9,12 @@
     'description': 'Shopify Connector Pro Ultimate Edition — enterprise-grade bidirectional Shopify <> Odoo 19 connector built on Shopify GraphQL Admin API 2026-01 with integrated manager dashboard, KPI analytics, and delivery tracking.',
     'author': 'Qamah Solutions',
     'maintainer': 'Qamah Solutions — Managed by Odoo Partner Ahmed Saad',
-    'website': 'https://apps.odoo.com/apps/modules/19.0/shopify_connector_pro/',
+    'website': 'https://qamah.odoo.com',
     'support': 'ahmedsaad@tech-oriented.com',
     'license': 'OPL-1',
-    'price': 0,
+    'price': 1800.00,
     'currency': 'USD',
     'depends': [
-        'shopify_connector_pro_base',
         'product',
         'sale_management',
         'stock',
@@ -24,7 +23,7 @@
         'account',
     ],
     'external_dependencies': {
-        'python': ['requests'],
+        'python': ['requests', 'cryptography'],
     },
     'data': [
         'security/shopify_security.xml',
@@ -77,5 +76,12 @@
     'installable': True,
     'application': True,
     'auto_install': False,
-    'images': ['static/description/icon.png'],
+    'images': [
+        'static/description/icon.png',
+        'static/description/screenshot_01_dashboard.png',
+        'static/description/screenshot_02_backend_form.png',
+        'static/description/screenshot_03_manager_dashboard.png',
+        'static/description/screenshot_04_order_bindings.png',
+        'static/description/screenshot_05_onboarding.png',
+    ],
 }
