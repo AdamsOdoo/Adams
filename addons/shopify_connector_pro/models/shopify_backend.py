@@ -23,8 +23,24 @@ class ShopifyBackend(models.Model):
         'Shop URL', required=True,
         help="Your myshopify.com domain, e.g. my-store.myshopify.com",
     )
+
+    # Encrypted storage columns — the actual DB columns.
+    # Code outside this model should use the ``access_token`` /
+    # ``webhook_secret`` computed properties, never these directly.
+    _encrypted_access_token = fields.Char(
+        'Encrypted Access Token', copy=False,
+    )
+    _encrypted_webhook_secret = fields.Char(
+        'Encrypted Webhook Secret', copy=False,
+    )
+
+    # Transparent decrypt-on-read, encrypt-on-write fields (non-stored).
+    # create() override handles initial creation from dict values.
+    # Inverse methods handle field assignment and form saves.
     access_token = fields.Char(
-        'Access Token', required=True,
+        'Access Token',
+        compute='_compute_access_token',
+        inverse='_inverse_access_token',
         groups='shopify_connector_pro.group_shopify_admin',
     )
     api_version = fields.Char(
@@ -35,6 +51,8 @@ class ShopifyBackend(models.Model):
     )
     webhook_secret = fields.Char(
         'Webhook Secret',
+        compute='_compute_webhook_secret',
+        inverse='_inverse_webhook_secret',
         groups='shopify_connector_pro.group_shopify_admin',
     )
 
@@ -253,6 +271,64 @@ class ShopifyBackend(models.Model):
     payment_mismatch_count = fields.Integer(compute='_compute_reconciliation_health')
     fulfillment_mismatch_count = fields.Integer(compute='_compute_reconciliation_health')
 
+    # ── Credential encryption ─────────────────────────────────
+    #
+    # Plaintext is NEVER stored in the DB.  ``access_token`` and
+    # ``webhook_secret`` are non-stored computed fields that decrypt
+    # on read.  ``create()`` and ``write()`` intercept plaintext values,
+    # validate, encrypt, and store in ``_encrypted_*`` columns.
+
+    @api.depends('_encrypted_access_token')
+    def _compute_access_token(self):
+        crypto = self.env['shopify.crypto']
+        for rec in self:
+            rec.access_token = crypto.decrypt(rec._encrypted_access_token)
+
+    def _inverse_access_token(self):
+        crypto = self.env['shopify.crypto']
+        for rec in self:
+            token = rec.access_token or ''
+            if token and not token.startswith('shpat_'):
+                raise ValidationError(_(
+                    "Access token should start with 'shpat_'. "
+                    "Please use a valid Shopify Admin API access token.",
+                ))
+            rec._encrypted_access_token = crypto.encrypt(token)
+
+    @api.depends('_encrypted_webhook_secret')
+    def _compute_webhook_secret(self):
+        crypto = self.env['shopify.crypto']
+        for rec in self:
+            rec.webhook_secret = crypto.decrypt(rec._encrypted_webhook_secret)
+
+    def _inverse_webhook_secret(self):
+        crypto = self.env['shopify.crypto']
+        for rec in self:
+            rec._encrypted_webhook_secret = crypto.encrypt(rec.webhook_secret)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Intercept plaintext credentials in create dicts and encrypt them.
+
+        This is needed because non-stored computed fields with inverse do
+        not reliably trigger their inverse during ``create()`` in all Odoo
+        versions/configurations.
+        """
+        crypto = self.env['shopify.crypto']
+        for vals in vals_list:
+            if 'access_token' in vals:
+                token = vals.pop('access_token') or ''
+                if token and not token.startswith('shpat_'):
+                    raise ValidationError(_(
+                        "Access token should start with 'shpat_'. "
+                        "Please use a valid Shopify Admin API access token.",
+                    ))
+                vals['_encrypted_access_token'] = crypto.encrypt(token)
+            if 'webhook_secret' in vals:
+                secret = vals.pop('webhook_secret')
+                vals['_encrypted_webhook_secret'] = crypto.encrypt(secret)
+        return super().create(vals_list)
+
     # ── Constraints ─────────────────────────────────────────
     @api.constrains('shop_url')
     def _check_shop_url(self):
@@ -272,17 +348,6 @@ class ShopifyBackend(models.Model):
                     "Shop URL must be a valid myshopify.com domain "
                     "(e.g. my-store.myshopify.com). Got: %s",
                     rec.shop_url,
-                ))
-
-    @api.constrains('access_token')
-    def _check_access_token(self):
-        """Validate access token format (Shopify custom app tokens start with shpat_)."""
-        for rec in self:
-            token = rec.access_token or ''
-            if token and not token.startswith('shpat_'):
-                raise ValidationError(_(
-                    "Access token should start with 'shpat_'. "
-                    "Please use a valid Shopify Admin API access token.",
                 ))
 
     # ── API Client Factory ─────────────────────────────────
