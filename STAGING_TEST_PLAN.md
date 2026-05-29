@@ -230,6 +230,8 @@ silently dropped or malformed.
 | Vendor field | Check product #1 | Vendor matches Shopify value |
 | Product type | Check product #1 | Product type matches |
 | Tags | Check any product with tags | Tags imported as comma-separated |
+| Product weight | Check product #2 or #3 | Weight matches Shopify variant weight (e.g. 0.5 kg) |
+| Multi-option attributes | Check product #3 (Color+Size) | 2 attribute lines: Color and Size with correct values |
 | Metafield (product #1) | Check for care_instructions metafield | Metafield value visible (if metafield sync enabled) |
 
 **Fields most likely to break:**
@@ -271,6 +273,7 @@ silently dropped or malformed.
 | Shipping line present | $5.99 (or your amount) | $0 (free) | Express amount | — |
 | Customer linked | Customer A or B | Same | Same | — |
 | Shipping address | Full address present | Same | Same | — |
+| Billing ≠ shipping | Create order with different billing address | Billing partner differs from shipping partner | — | — |
 | Order status | Confirmed/Sale | Confirmed/Sale | Confirmed/Sale | Cancelled |
 | Financial status | Paid | Paid | Paid | — |
 | Order name | Matches Shopify (e.g., #1001) | #1002 | #1003 | #1004 |
