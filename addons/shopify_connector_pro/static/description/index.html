@@ -92,7 +92,7 @@
                 <li>Customer tag sync (Shopify tags &rarr; Odoo categories)</li>
                 <li>Guest checkout customer handling</li>
                 <li>Bulk export wizard for pushing Odoo customers to Shopify</li>
-                <li>GDPR-compliant data handling and redaction</li>
+                <li>Automatic customer data anonymization on GDPR redaction requests</li>
             </ul>
         </div>
         <div class="oe_span6">
@@ -411,7 +411,7 @@
                 <li><strong>Per-store configuration:</strong> sync settings, tax mappings, payment journals, warehouses, and pricelists</li>
                 <li><strong>Shared or separate catalogs</strong> across stores</li>
                 <li><strong>Independent sync schedules</strong> per store (can pause any store independently)</li>
-                <li><strong>Role-based access:</strong> User, Manager, and System Administrator tiers</li>
+                <li><strong>Role-based access:</strong> User and Administrator tiers</li>
             </ul>
         </div>
     </div>
@@ -428,8 +428,8 @@
         <div class="oe_span6">
             <h3>Security</h3>
             <ul style="line-height:1.8;">
-                <li>Three-tier role-based access control</li>
-                <li>Encrypted credential storage (system admin only)</li>
+                <li>Two-tier role-based access control (User and Administrator)</li>
+                <li>Encrypted credential storage (AES-128 via Fernet, admin only)</li>
                 <li>HMAC-SHA256 webhook verification</li>
                 <li>Replay attack protection (timestamps + fingerprints)</li>
                 <li>Rate limiting on webhook endpoints</li>
@@ -439,12 +439,46 @@
         <div class="oe_span6">
             <h3>GDPR Compliance</h3>
             <ul style="line-height:1.8;">
-                <li>Automated processing of Shopify GDPR webhooks</li>
-                <li>Customer data request endpoint</li>
-                <li>Customer and shop data redaction</li>
+                <li>Handles all three Shopify GDPR webhooks</li>
+                <li>Automatic customer data anonymization on redaction requests</li>
+                <li>Data request and shop redaction create review activities for the merchant</li>
                 <li>Webhook log retention policy (90-day auto-purge)</li>
-                <li>Full audit trail of all data operations</li>
+                <li>Webhook event audit trail with full payloads</li>
             </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DATA AND PRIVACY -->
+<!-- ============================================================ -->
+
+<section class="oe_container">
+    <div class="oe_row oe_spaced">
+        <h2 class="oe_slogan">Data Storage and Privacy</h2>
+        <div class="oe_span12">
+            <p style="text-align:center; font-size:15px; max-width:800px; margin:0 auto 24px auto; line-height:1.8;">
+                This module stores the following data in your Odoo database:
+            </p>
+            <ul style="line-height:2.0; max-width:800px; margin:0 auto;">
+                <li><strong>Shopify API credentials:</strong> Access token and webhook
+                    secret, stored encrypted (AES-128 via Fernet), accessible only to
+                    Shopify Administrators</li>
+                <li><strong>Customer personal data:</strong> Names, email addresses,
+                    phone numbers, and shipping/billing addresses imported from Shopify</li>
+                <li><strong>Order data:</strong> Order details, line items, payment
+                    references, and transaction amounts</li>
+                <li><strong>Gift card codes:</strong> Stored with last-four masking for
+                    reference</li>
+                <li><strong>Payout data:</strong> Transaction-level payout details from
+                    Shopify Payments</li>
+                <li><strong>Webhook logs:</strong> Automatically purged after 90 days</li>
+            </ul>
+            <p style="text-align:center; font-size:15px; max-width:800px; margin:0 auto 0 auto; line-height:1.8;">
+                All data is stored within your Odoo database and is never transmitted
+                to third parties. Shopify API calls are made directly between your Odoo
+                server and Shopify's servers.
+            </p>
         </div>
     </div>
 </section>
@@ -453,7 +487,7 @@
 <!-- ARCHITECTURE -->
 <!-- ============================================================ -->
 
-<section class="oe_container">
+<section class="oe_container oe_dark">
     <div class="oe_row oe_spaced">
         <h2 class="oe_slogan">Built for Performance</h2>
         <div class="oe_span12">
@@ -465,7 +499,7 @@
                 <li><strong>Circuit breaker</strong> prevents cascading failures when Shopify is down</li>
                 <li><strong>PostgreSQL advisory locks</strong> prevent concurrent cron conflicts</li>
                 <li><strong>Batch operations</strong> with configurable batch sizes</li>
-                <li><strong>No external dependencies</strong> beyond Python <code>requests</code> (included in Odoo)</li>
+                <li><strong>Minimal dependencies:</strong> Python <code>requests</code> and <code>cryptography</code> (both included with standard Odoo)</li>
             </ul>
         </div>
     </div>
@@ -538,7 +572,7 @@
                 <li><strong>Shopify store</strong> (Basic plan or above) with a <a href="https://shopify.dev/docs/apps/build/authentication/access-tokens">Custom App access token</a></li>
                 <li><strong>API scopes:</strong> read/write products, customers, orders, inventory, fulfillments, locations, gift cards, discounts</li>
                 <li><strong>Dependencies:</strong> Shopify Connector Pro Ultimate Edition — Base, sale_management, stock, account, mail (all standard Odoo modules)</li>
-                <li><strong>No external Python packages required</strong> beyond standard Odoo</li>
+                <li><strong>Dependencies:</strong> <code>requests</code> and <code>cryptography</code> (both included with standard Odoo)</li>
             </ul>
         </div>
     </div>
