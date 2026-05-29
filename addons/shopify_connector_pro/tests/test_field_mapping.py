@@ -228,6 +228,111 @@ class TestFieldMappingImport(TransactionCase):
         self.assertTrue(binding, "Import should succeed despite invalid mapping")
         self.assertEqual(binding.odoo_id.name, 'Safe Product')
 
+    def test_import_mapping_incompatible_type_skipped(self):
+        """Mapping a string to a Many2one field should be skipped, not crash."""
+        self.env['shopify.field.mapping'].create({
+            'backend_id': self.backend.id,
+            'entity': 'product',
+            'odoo_field': 'categ_id',
+            'shopify_field': 'vendor',
+            'direction': 'import',
+            'active': True,
+        })
+
+        from ..sync.product_sync import ProductImporter
+        importer = self._make_importer(ProductImporter)
+        node = self._base_node(
+            'gid://shopify/Product/891',
+            title='Type Safety Product',
+            vendor='SomeVendor',
+        )
+
+        with patch.object(importer, '_import_images'):
+            importer._import_one(node)
+
+        binding = self.env['shopify.product.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Product/891'),
+        ])
+        self.assertTrue(binding, "Import should succeed despite incompatible mapping")
+        # Also verify via _apply_import_mappings directly: string should not land in vals
+        vals = {}
+        importer._apply_import_mappings(vals, node)
+        self.assertNotIn('categ_id', vals, "String value should not be applied to Many2one field")
+
+    def test_import_mapping_numeric_coercion(self):
+        """Mapping a numeric string to a Float field should coerce correctly."""
+        self.env['shopify.field.mapping'].create({
+            'backend_id': self.backend.id,
+            'entity': 'product',
+            'odoo_field': 'weight',
+            'shopify_field': 'vendor',
+            'direction': 'import',
+            'active': True,
+        })
+
+        from ..sync.product_sync import ProductImporter
+        importer = self._make_importer(ProductImporter)
+        node = self._base_node(
+            'gid://shopify/Product/892',
+            title='Numeric Coerce Product',
+            vendor='42.5',
+        )
+
+        with patch.object(importer, '_import_images'):
+            importer._import_one(node)
+
+        binding = self.env['shopify.product.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Product/892'),
+        ])
+        self.assertTrue(binding)
+        self.assertAlmostEqual(binding.odoo_id.weight, 42.5)
+
+    def test_import_mapping_unrecognized_boolean_skipped(self):
+        """Mapping an unrecognized string to a Boolean field should be skipped.
+
+        Without type safety, 'banana' → bool('banana') → True via ORM coercion,
+        silently corrupting a False value. With the fix, unrecognized strings
+        are skipped entirely.
+        """
+        self.env['shopify.field.mapping'].create({
+            'backend_id': self.backend.id,
+            'entity': 'product',
+            'odoo_field': 'sale_ok',
+            'shopify_field': 'vendor',
+            'direction': 'import',
+            'active': True,
+        })
+
+        from ..sync.product_sync import ProductImporter
+        importer = self._make_importer(ProductImporter)
+        node = self._base_node(
+            'gid://shopify/Product/893',
+            title='Bool Skip Product',
+            vendor='banana',
+        )
+
+        with patch.object(importer, '_import_images'):
+            importer._import_one(node)
+
+        binding = self.env['shopify.product.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Product/893'),
+        ])
+        self.assertTrue(binding, "Import should succeed despite unrecognized boolean")
+        # Set sale_ok to False explicitly, then re-import with 'banana' mapping.
+        # If type safety works, sale_ok should stay False (mapping skipped).
+        binding.odoo_id.sale_ok = False
+        # Re-apply the mappings directly to test the guard
+        vals = {'sale_ok': False}
+        importer._apply_import_mappings(vals, node)
+        # 'banana' is not a recognized boolean → should NOT be in vals
+        self.assertFalse(
+            vals.get('sale_ok'),
+            "Unrecognized boolean 'banana' should be skipped, not coerced",
+        )
+
     def test_import_mapping_missing_shopify_key_skipped(self):
         """Missing key in Shopify data should skip mapping, not crash."""
         self.env['shopify.field.mapping'].create({

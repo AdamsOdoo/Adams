@@ -25,3 +25,4 @@ from . import test_field_mapping
 from . import test_reconciliation
 from . import test_extended_workflows
 from . import test_reverse_sync_toggle
+from . import test_coverage_gaps

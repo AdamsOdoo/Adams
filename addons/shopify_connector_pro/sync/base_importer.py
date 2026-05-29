@@ -134,6 +134,51 @@ class BaseImporter:
             if value is None:
                 continue
 
+            # Type-compatibility validation before assignment
+            field_def = target_model._fields[odoo_field]
+
+            if field_def.type in ('many2one', 'one2many', 'many2many'):
+                if not isinstance(value, int):
+                    _logger.warning(
+                        "Field mapping skipped: '%s' is a %s field but got %s "
+                        "(mapping %s → %s, backend %s)",
+                        odoo_field, field_def.type, type(value).__name__,
+                        shopify_field, odoo_field, self.backend.id,
+                    )
+                    continue
+
+            if field_def.type in ('integer', 'float', 'monetary'):
+                if not isinstance(value, (int, float)):
+                    try:
+                        value = float(value)
+                        if field_def.type == 'integer':
+                            value = int(value)
+                    except (ValueError, TypeError):
+                        _logger.warning(
+                            "Field mapping skipped: '%s' is %s but value '%s' "
+                            "is not numeric (mapping %s → %s, backend %s)",
+                            odoo_field, field_def.type, value,
+                            shopify_field, odoo_field, self.backend.id,
+                        )
+                        continue
+
+            if field_def.type == 'boolean':
+                if isinstance(value, str):
+                    lower = value.lower()
+                    if lower in ('true', '1', 'yes'):
+                        value = True
+                    elif lower in ('false', '0', 'no'):
+                        value = False
+                    else:
+                        _logger.warning(
+                            "Field mapping skipped: '%s' is boolean but '%s' "
+                            "is not a recognized boolean string "
+                            "(mapping %s → %s, backend %s)",
+                            odoo_field, value,
+                            shopify_field, odoo_field, self.backend.id,
+                        )
+                        continue
+
             vals[odoo_field] = value
 
     @staticmethod
