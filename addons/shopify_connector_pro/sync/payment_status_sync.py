@@ -323,16 +323,54 @@ class PaymentStatusHandler:
         the company's default bank journal.
         """
         ctx = {'shopify_no_auto_export': True}
-        memo = "SHOPIFY-%s" % order_binding.shopify_order_name
+        # Key the memo on the Shopify GID (globally unique across all
+        # stores) rather than the human-readable order name (#1001)
+        # which is only sequential within a single store.
+        shopify_gid = order_binding.shopify_id
+        if not shopify_gid:
+            _logger.error(
+                "Cannot register payment: binding %s has no shopify_id",
+                order_binding.id,
+            )
+            return False
+        memo = "SHOPIFY-%s" % shopify_gid
 
-        # Idempotency: check if payment already registered
+        # ── Primary idempotency: structural link on the binding ──
+        # Each binding tracks its own payment_id, so two backends in
+        # the same company with the same order name (#1001) never collide.
+        if order_binding.payment_id and order_binding.payment_id.state != 'cancelled':
+            _logger.info(
+                "Payment already registered for binding %s (payment %s)",
+                order_binding.shopify_order_name, order_binding.payment_id.name,
+            )
+            return True
+
+        # ── Secondary idempotency: memo-based guard (crash recovery) ──
+        # Catches edge cases where payment exists but the payment_id
+        # write-back was lost (e.g. crash between payment creation and
+        # binding update).  Because the memo now contains the Shopify
+        # GID — globally unique across all stores — company_id is the
+        # only additional scope needed; no partner or journal scoping.
         existing = self.env['account.payment'].search([
             ('memo', '=', memo),
             ('state', '!=', 'cancelled'),
+            ('company_id', '=', self.backend.company_id.id),
         ], limit=1)
         if existing:
+            # Repair the structural link while we're here.
+            # Wrapped in a savepoint so a DB-level failure cannot
+            # poison the cursor — the dedup result is still valid.
+            try:
+                with self.env.cr.savepoint():
+                    order_binding.payment_id = existing
+            except Exception:
+                _logger.warning(
+                    "Could not repair payment_id link on binding %s",
+                    order_binding.id, exc_info=True,
+                )
             _logger.info(
-                "Payment already registered for order %s (memo=%s)",
+                "Payment already registered for order %s (memo=%s, "
+                "repaired binding link)",
                 order_binding.shopify_order_name, memo,
             )
             return True
@@ -368,6 +406,9 @@ class PaymentStatusHandler:
                     'currency_id': invoice.currency_id.id,
                 })
                 payment.with_context(**ctx).action_post()
+                # Write-back INSIDE the savepoint so that if the
+                # savepoint rolls back, the binding link is also undone.
+                order_binding.payment_id = payment
         except Exception as e:
             _logger.warning(
                 "Failed to create/post payment for order %s: %s",

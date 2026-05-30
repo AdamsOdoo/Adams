@@ -208,9 +208,10 @@ class TestPaymentRegistration(ShopifyAccountingMixin, TransactionCase):
         with patch.object(handler, '_get_transaction_gateway', return_value='shopify_payments'):
             handler._register_payment(invoice, self.binding)
 
-        # Check payment was created
+        # Check payment was created (memo keys on GID, not order name)
+        expected_memo = 'SHOPIFY-%s' % self.binding.shopify_id
         payments = self.env['account.payment'].search([
-            ('memo', '=', 'SHOPIFY-#2001'),
+            ('memo', '=', expected_memo),
         ])
         self.assertTrue(payments, "Payment should be created")
         self.assertIn(payments[0].state, ('posted', 'paid', 'reconciled'))
@@ -227,8 +228,9 @@ class TestPaymentRegistration(ShopifyAccountingMixin, TransactionCase):
             handler._register_payment(invoice, self.binding)
             handler._register_payment(invoice, self.binding)  # 2nd call
 
+        expected_memo = 'SHOPIFY-%s' % self.binding.shopify_id
         payments = self.env['account.payment'].search([
-            ('memo', '=', 'SHOPIFY-#2001'),
+            ('memo', '=', expected_memo),
         ])
         self.assertEqual(len(payments), 1, "Should have exactly one payment")
 
@@ -302,6 +304,103 @@ class TestPaymentRegistration(ShopifyAccountingMixin, TransactionCase):
             result = handler._register_payment(invoice, self.binding)
 
         self.assertFalse(result, "Should return False when no journal found")
+
+    def test_multi_backend_payment_isolation(self):
+        """Two backends in the same company with identical order names
+        AND the same partner must each get their own payment.
+
+        Regression test for P0-1: the old memo-only dedup keyed on the
+        human-readable order name (SHOPIFY-#2001) which is store-local,
+        causing backend B's payment to be silently dropped when backend
+        A had already created a payment with the same memo.
+
+        This test uses the SAME partner for both backends — the hardest
+        case, where partner_id cannot distinguish the payments.  The
+        fix keys the memo on the Shopify GID (globally unique), so the
+        secondary guard is collision-proof by construction.
+        """
+        from ..sync.payment_status_sync import PaymentStatusHandler
+
+        # ── Backend A (already set up by setUp) ──
+        invoice_a = self.order._create_invoices()
+        invoice_a.action_post()
+        handler_a = PaymentStatusHandler(self.env, self.backend)
+        with patch.object(handler_a, '_get_transaction_gateway',
+                          return_value='manual'):
+            result_a = handler_a._register_payment(invoice_a, self.binding)
+        self.assertTrue(result_a, "Backend A payment registration must succeed")
+        self.assertEqual(invoice_a.amount_residual, 0,
+                         "Backend A invoice must be fully paid")
+
+        # ── Backend B — same company, SAME partner, SAME order name ──
+        # Uses self.partner (not a different one) to prove isolation
+        # does NOT rely on partner_id scoping.
+        backend_b = self.env['shopify.backend'].create({
+            'name': 'Second Store',
+            'shop_url': 'store-b.myshopify.com',
+            'access_token': 'shpat_store_b',
+            'company_id': self.env.company.id,
+            'warehouse_id': self.backend.warehouse_id.id,
+            'auto_handle_payment_transitions': True,
+        })
+        order_b = self.env['sale.order'].create({
+            'partner_id': self.partner.id,   # ← SAME partner as A
+            'sales_channel': 'shopify',
+            'company_id': self.env.company.id,
+            'order_line': [(0, 0, {
+                'product_id': self.product.id,
+                'product_uom_qty': 1,
+                'price_unit': 75.0,
+            })],
+        })
+        order_b.action_confirm()
+        binding_b = self.env['shopify.order.binding'].create({
+            'backend_id': backend_b.id,
+            'odoo_id': order_b.id,
+            'shopify_id': 'gid://shopify/Order/9000',  # different GID
+            'shopify_order_name': '#2001',   # ← same name as backend A
+            'shopify_financial_status': 'authorized',
+            'sync_status': 'synced',
+        })
+
+        invoice_b = order_b._create_invoices()
+        invoice_b.action_post()
+        handler_b = PaymentStatusHandler(self.env, backend_b)
+        with patch.object(handler_b, '_get_transaction_gateway',
+                          return_value='manual'):
+            result_b = handler_b._register_payment(invoice_b, binding_b)
+
+        # ── Assertions: both backends must have independent payments ──
+        self.assertTrue(result_b,
+                        "Backend B payment registration must succeed")
+        self.assertEqual(
+            invoice_b.amount_residual, 0,
+            "Backend B invoice must be fully paid — not silently skipped "
+            "because backend A already has a payment with the same order name",
+        )
+
+        # Memos are GID-keyed, so they differ even though order name
+        # and partner are the same across backends.
+        memo_a = 'SHOPIFY-%s' % self.binding.shopify_id
+        memo_b = 'SHOPIFY-%s' % binding_b.shopify_id
+        payments_a = self.env['account.payment'].search([
+            ('memo', '=', memo_a),
+            ('state', '!=', 'cancelled'),
+        ])
+        payments_b = self.env['account.payment'].search([
+            ('memo', '=', memo_b),
+            ('state', '!=', 'cancelled'),
+        ])
+        self.assertEqual(len(payments_a), 1,
+                         "Backend A must have exactly one payment")
+        self.assertEqual(len(payments_b), 1,
+                         "Backend B must have exactly one payment")
+
+        # Structural links must be set on each binding
+        self.assertEqual(self.binding.payment_id, payments_a,
+                         "Backend A binding must link to its payment")
+        self.assertEqual(binding_b.payment_id, payments_b,
+                         "Backend B binding must link to its payment")
 
 
 class TestFulfillmentSync(ShopifyAccountingMixin, TransactionCase):

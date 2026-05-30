@@ -25,6 +25,13 @@ class ShopifyOrderBinding(models.Model):
         ('refunded', 'Refunded'),
         ('voided', 'Voided'),
     ], string='Financial Status')
+    payment_id = fields.Many2one(
+        'account.payment', string='Registered Payment',
+        ondelete='set null', index=True,
+        help='Payment auto-registered when Shopify captures funds. '
+             'Used for per-binding idempotency so multi-backend setups '
+             'with identical order names do not collide.',
+    )
     shopify_fulfillment_status = fields.Char('Fulfillment Status')
     shopify_created_at = fields.Datetime('Shopify Created At')
     shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
