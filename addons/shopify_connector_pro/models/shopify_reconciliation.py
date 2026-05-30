@@ -219,7 +219,12 @@ class ShopifyReconciliation(models.TransientModel):
             })
             errors += 1
 
-        # Orders with refund status but no credit note
+        # Orders with refund status but missing or incomplete refund imports.
+        # Compares the shopify_refund_count (synced from Shopify's
+        # ``refunds { id }`` on each order import) against the actual number
+        # of imported shopify.refund.binding records.  This catches both
+        # "no refund bindings at all" and "2 Shopify refunds but only 1
+        # imported" — the latter was a blind spot when using a boolean check.
         refund_bindings = self.env['shopify.order.binding'].search([
             ('backend_id', '=', backend.id),
             ('shopify_financial_status', 'in', ['refunded', 'partially_refunded']),
@@ -227,31 +232,31 @@ class ShopifyReconciliation(models.TransientModel):
             ('create_date', '>=', cutoff),
         ])
 
-        missing_credit_count = 0
+        missing_refund_count = 0
         for binding in refund_bindings:
-            order = binding.odoo_id
-            if not order:
-                continue
-            credit_notes = order.invoice_ids.filtered(
-                lambda i: i.move_type == 'out_refund'
-            )
-            refund_bindings_exist = self.env['shopify.refund.binding'].search_count([
+            imported = self.env['shopify.refund.binding'].search_count([
                 ('order_binding_id', '=', binding.id),
             ])
-            if not credit_notes and not refund_bindings_exist:
-                missing_credit_count += 1
+            expected = binding.shopify_refund_count or 0
+            if imported < expected:
+                missing_refund_count += 1
+                _logger.warning(
+                    "Refund mismatch: Shopify order %s has %d refund(s) but "
+                    "only %d imported in Odoo",
+                    binding.shopify_order_name, expected, imported,
+                )
 
-        if missing_credit_count:
+        if missing_refund_count:
             self.env['shopify.sync.log'].create({
                 'backend_id': backend.id,
                 'entity': 'order',
                 'operation': 'import',
                 'state': 'partial',
-                'total_records': missing_credit_count,
-                'error_count': missing_credit_count,
+                'total_records': missing_refund_count,
+                'error_count': missing_refund_count,
                 'error_details': (
-                    f"Reconciliation: {missing_credit_count} orders marked as refunded "
-                    f"on Shopify but no credit note or refund binding in Odoo. "
+                    f"Reconciliation: {missing_refund_count} orders have fewer "
+                    f"refund bindings in Odoo than refunds on Shopify. "
                     f"Run refund import to resolve."
                 ),
                 'started_at': fields.Datetime.now(),

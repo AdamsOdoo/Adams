@@ -118,6 +118,7 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
             }
           }
         }
+        refunds { id }
       }
     }
   }

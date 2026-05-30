@@ -234,6 +234,12 @@ class SimShopifyOrder(models.Model):
                 },
             },
             'shippingLines': {'edges': shipping_lines_edges},
+            'refunds': [
+                {'id': r.shopify_gid}
+                for r in self.env['sim.shopify.refund'].search([
+                    ('order_id', '=', self.id),
+                ])
+            ],
         }
 
     def _build_billing_address(self):

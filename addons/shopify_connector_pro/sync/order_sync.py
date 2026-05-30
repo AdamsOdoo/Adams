@@ -83,6 +83,7 @@ class OrderImporter(BaseImporter):
         checksum = self._compute_shopify_checksum(node)
         financial_status = (node.get('displayFinancialStatus', '') or '').lower()
         fulfillment_status = (node.get('displayFulfillmentStatus', '') or '').lower()
+        refund_count = len(node.get('refunds') or [])
 
         if existing_binding:
             # Detect financial status change → trigger transition handler
@@ -100,17 +101,23 @@ class OrderImporter(BaseImporter):
                         existing_binding.shopify_order_name, e,
                     )
 
-            # Update fulfillment status
+            # Update fulfillment status and refund count
             old_fulfillment = existing_binding.shopify_fulfillment_status or ''
             update_vals = {}
             if fulfillment_status != old_fulfillment:
                 update_vals['shopify_fulfillment_status'] = fulfillment_status
+            if refund_count != existing_binding.shopify_refund_count:
+                update_vals['shopify_refund_count'] = refund_count
             if update_vals:
+                # Only propagate fulfillment_status to the sale order —
+                # shopify_refund_count is binding-only metadata.
+                so_vals = {k: v for k, v in update_vals.items()
+                           if k != 'shopify_refund_count'}
                 existing_binding.write(update_vals)
-                if existing_binding.odoo_id:
+                if existing_binding.odoo_id and so_vals:
                     existing_binding.odoo_id.with_context(
                         shopify_no_auto_export=True,
-                    ).write(update_vals)
+                    ).write(so_vals)
             existing_binding._mark_synced(checksum=checksum)
             self._track_discount_usage(existing_binding, node)
         else:
@@ -123,6 +130,7 @@ class OrderImporter(BaseImporter):
                     'shopify_order_name': node.get('name', ''),
                     'shopify_financial_status': financial_status,
                     'shopify_fulfillment_status': fulfillment_status,
+                    'shopify_refund_count': refund_count,
                     'shopify_created_at': _parse_shopify_dt(node.get('createdAt')),
                     'sync_status': 'synced',
                     'sync_checksum': checksum,
@@ -912,6 +920,7 @@ class OrderSync:
                     }
                   }
                 }
+                refunds { id }
               }
             }
             """

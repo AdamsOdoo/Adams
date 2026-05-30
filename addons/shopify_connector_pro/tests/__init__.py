@@ -29,3 +29,4 @@ from . import test_coverage_gaps
 from . import test_credential_encryption
 from . import test_simulator_fidelity_coverage
 from . import test_account_validation
+from . import test_refund_scan_pruning

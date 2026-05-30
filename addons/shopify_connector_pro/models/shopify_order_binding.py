@@ -24,7 +24,7 @@ class ShopifyOrderBinding(models.Model):
         ('partially_refunded', 'Partially Refunded'),
         ('refunded', 'Refunded'),
         ('voided', 'Voided'),
-    ], string='Financial Status')
+    ], string='Financial Status', index=True)
     payment_id = fields.Many2one(
         'account.payment', string='Registered Payment',
         ondelete='set null', index=True,
@@ -32,7 +32,13 @@ class ShopifyOrderBinding(models.Model):
              'Used for per-binding idempotency so multi-backend setups '
              'with identical order names do not collide.',
     )
-    shopify_fulfillment_status = fields.Char('Fulfillment Status')
+    shopify_fulfillment_status = fields.Char('Fulfillment Status', index=True)
+    shopify_refund_count = fields.Integer(
+        'Shopify Refund Count', default=0,
+        help="Number of refunds on the Shopify order, updated on each "
+             "import/sync. Used by reconciliation to detect partially "
+             "imported refund sets without an extra API call.",
+    )
     shopify_created_at = fields.Datetime('Shopify Created At')
     shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
 

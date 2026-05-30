@@ -1,5 +1,6 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
+from datetime import timedelta
 
 from odoo import fields
 
@@ -482,12 +483,56 @@ class RefundSync:
         self.importer = RefundImporter(env, backend)
 
     def import_refunds(self):
-        """Import refunds for orders with refund status."""
-        order_bindings = self.env['shopify.order.binding'].search([
+        """Import refunds for orders with refund status.
+
+        Two-layer pruning to avoid unbounded API fan-out:
+
+        Layer 1 — ``refunded`` (terminal state): skip orders that
+        already have at least one refund binding.  ``refunded`` means
+        the full amount has been refunded; Shopify will not add further
+        refunds.  ``import_refunds_for_order`` fetches ALL refunds for
+        the order in one call and creates bindings for each, so if any
+        binding exists we have seen all of them.
+
+        Layer 2 — ``partially_refunded`` (open-ended): new refunds can
+        appear at any time.  We bound the scan to orders whose
+        ``write_date`` falls within ``reconciliation_order_days``.  The
+        ``orders/updated`` webhook advances ``write_date`` on the order
+        binding whenever a refund changes the financial status (via
+        ``_update_status_fields`` and ``_mark_synced``), so recently-
+        refunded orders stay inside the window.  The cron acts as a
+        catch-all for missed webhooks.
+        """
+        # ── Layer 1: fully-refunded orders ──
+        fully_refunded = self.env['shopify.order.binding'].search([
             ('backend_id', '=', self.backend.id),
             ('sync_status', '=', 'synced'),
-            ('shopify_financial_status', 'in', ['refunded', 'partially_refunded']),
+            ('shopify_financial_status', '=', 'refunded'),
         ])
+        if fully_refunded:
+            already_imported_ids = set(
+                self.env['shopify.refund.binding'].search([
+                    ('order_binding_id', 'in', fully_refunded.ids),
+                ]).mapped('order_binding_id').ids
+            )
+            unchecked_refunded = fully_refunded.filtered(
+                lambda b: b.id not in already_imported_ids
+            )
+        else:
+            unchecked_refunded = self.env['shopify.order.binding']
+
+        # ── Layer 2: partially-refunded orders (date-bounded) ──
+        days = self.backend.reconciliation_order_days or 30
+        cutoff = fields.Datetime.now() - timedelta(days=days)
+        partially_refunded = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('sync_status', '=', 'synced'),
+            ('shopify_financial_status', '=', 'partially_refunded'),
+            ('write_date', '>=', cutoff),
+        ])
+
+        order_bindings = unchecked_refunded | partially_refunded
+
         total_success = total_errors = total_skipped = 0
         for ob in order_bindings:
             s, e, sk = self.importer.import_refunds_for_order(ob)
