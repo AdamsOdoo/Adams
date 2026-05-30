@@ -71,9 +71,17 @@ class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
 
         self.assertTrue(result)
         invoices = self.order.invoice_ids.filtered(
-            lambda i: i.move_type == 'out_invoice' and i.state == 'posted'
+            lambda i: i.move_type == 'out_invoice'
         )
-        self.assertTrue(invoices)
+        self.assertEqual(
+            len(invoices), 1,
+            "Exactly one invoice should be created (not zero, not duplicates)",
+        )
+        self.assertEqual(invoices.state, 'posted')
+        self.assertEqual(
+            invoices.amount_total, self.order.amount_total,
+            "Invoice total must match the sale order total",
+        )
 
     def test_pending_to_voided_cancels_draft_invoice(self):
         """When payment is voided, draft invoice should be cancelled."""
