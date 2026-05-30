@@ -123,12 +123,25 @@ class RefundImporter:
             'refund_note': refund_data.get('note') or '',
             'refund_amount': refund_amount,
             'currency_code': currency_code,
-            'sync_status': 'synced',
             'sync_checksum': shopify_refund_id,
             'last_sync_date': fields.Datetime.now(),
         }
         if credit_note:
             binding_vals['odoo_id'] = credit_note.id
+            binding_vals['sync_status'] = 'synced'
+        else:
+            # Record the binding with error state so it is not retried
+            # blindly on the next sync (the existing-binding check at
+            # import_refunds_for_order skips it).  The merchant can
+            # fix accounting setup and use action_retry_sync.
+            binding_vals['sync_status'] = 'error'
+            binding_vals['sync_error'] = (
+                'Credit note could not be created. Check the scheduled '
+                'activity on order %s for details.' % (
+                    order_binding.odoo_id.name if order_binding.odoo_id else
+                    order_binding.shopify_order_name
+                )
+            )
 
         refund_binding = self.env['shopify.refund.binding'].create(binding_vals)
 
@@ -146,6 +159,11 @@ class RefundImporter:
         instead of using ``reverse_moves()`` which would always reverse the
         full invoice amount — causing over-crediting on partial refunds and
         when multiple refunds target the same order.
+
+        Mirrors the defensive pattern from ``OrderImporter._auto_create_invoice``:
+        - Pre-validates income accounts on products before building lines
+        - Wraps create+post in a savepoint to isolate SQL failures
+        - Schedules a visible activity on the sale order when creation fails
         """
         # Prefer the journal from an existing posted invoice; fall back to
         # any sales journal in the backend's company.
@@ -161,9 +179,47 @@ class RefundImporter:
             ], limit=1)
 
         if not journal:
-            _logger.warning(
+            msg = (
                 "No sales journal found — cannot create credit note for "
-                "refund %s", refund_data.get('id'),
+                "refund %s" % refund_data.get('id')
+            )
+            _logger.warning("Order %s: %s", order.name, msg)
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify refund credit note failed",
+                note=msg,
+            )
+            return None
+
+        # ── Account pre-validation (mirrors _auto_create_invoice) ────
+        # Resolve the journal's default income account as a fallback for
+        # products that lack an income account on template or category.
+        journal_default_account = journal.default_account_id
+
+        missing_accounts = []
+        for rl in refund_lines:
+            product_id = rl.get('product_id')
+            if not product_id:
+                continue
+            product = self.env['product.product'].browse(product_id)
+            accounts = product.product_tmpl_id.get_product_accounts(
+                fiscal_pos=order.fiscal_position_id,
+            )
+            if not accounts.get('income') and not journal_default_account:
+                missing_accounts.append(product.display_name)
+
+        if missing_accounts:
+            msg = (
+                "Refund credit note skipped: no income account for "
+                "product(s) %s and no journal default account. Check the "
+                "product category accounting tab or fiscal position "
+                "mappings." % ', '.join(missing_accounts)
+            )
+            _logger.warning("Order %s: %s", order.name, msg)
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify refund credit note skipped",
+                note=msg,
             )
             return None
 
@@ -178,19 +234,33 @@ class RefundImporter:
                     'price_unit': amt / qty,
                 }
                 if rl.get('product_id'):
-                    line_vals['product_id'] = rl['product_id']
+                    product = self.env['product.product'].browse(rl['product_id'])
+                    line_vals['product_id'] = product.id
+                    # Resolve income account: product → category → journal default
+                    accounts = product.product_tmpl_id.get_product_accounts(
+                        fiscal_pos=order.fiscal_position_id,
+                    )
+                    account = accounts.get('income') or journal_default_account
+                    if account:
+                        line_vals['account_id'] = account.id
                 else:
                     line_vals['name'] = 'Shopify Refund Item'
+                    # Non-product lines use journal default
+                    if journal_default_account:
+                        line_vals['account_id'] = journal_default_account.id
                 invoice_line_ids.append((0, 0, line_vals))
 
         # Fallback: single line for the total when no itemised lines exist
         # (e.g. manual / shipping-only refund).
         if not invoice_line_ids and refund_amount:
-            invoice_line_ids.append((0, 0, {
+            fallback_vals = {
                 'name': refund_data.get('note') or 'Shopify Refund',
                 'quantity': 1,
                 'price_unit': refund_amount,
-            }))
+            }
+            if journal_default_account:
+                fallback_vals['account_id'] = journal_default_account.id
+            invoice_line_ids.append((0, 0, fallback_vals))
 
         if not invoice_line_ids:
             _logger.warning(
@@ -200,20 +270,37 @@ class RefundImporter:
             return None
 
         try:
-            credit_note = self.env['account.move'].with_context(**ctx).create({
-                'move_type': 'out_refund',
-                'partner_id': order.partner_id.id,
-                'journal_id': journal.id,
-                'invoice_origin': order.name,
-                'ref': refund_data.get('note') or 'Shopify Refund',
-                'invoice_line_ids': invoice_line_ids,
-            })
-            credit_note.with_context(**ctx).action_post()
-            return credit_note
+            with self.env.cr.savepoint():
+                credit_note = self.env['account.move'].with_context(**ctx).create({
+                    'move_type': 'out_refund',
+                    'partner_id': order.partner_id.id,
+                    'journal_id': journal.id,
+                    'invoice_origin': order.name,
+                    'ref': refund_data.get('note') or 'Shopify Refund',
+                    'invoice_line_ids': invoice_line_ids,
+                })
+                credit_note.with_context(**ctx).action_post()
+                return credit_note
         except Exception as e:
             _logger.warning(
-                "Could not create credit note for refund %s: %s",
-                refund_data.get('id'), e,
+                "Could not create credit note for refund %s "
+                "(products: %s): %s. Check income account, fiscal "
+                "position, and company chart of accounts.",
+                refund_data.get('id'),
+                ', '.join(
+                    self.env['product.product'].browse(
+                        rl['product_id']
+                    ).display_name
+                    for rl in refund_lines if rl.get('product_id')
+                ) or 'none',
+                e,
+            )
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify refund credit note failed",
+                note="Credit note creation failed for refund %s: %s" % (
+                    refund_data.get('id'), e,
+                ),
             )
             return None
 
