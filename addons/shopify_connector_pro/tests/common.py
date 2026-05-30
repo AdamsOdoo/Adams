@@ -43,7 +43,13 @@ class ShopifyAccountingMixin:
     # ------------------------------------------------------------------
 
     def _setup_accounting(self):
-        """Ensure all required accounting objects exist for the test company."""
+        """Ensure all required accounting objects exist for the test company.
+
+        Covers:
+        - Sales journal (for invoice creation)
+        - Receivable / Payable / Income accounts (for invoices)
+        - Outstanding payment account + transfer account (for payments)
+        """
         company = self.env.company
 
         # Sales journal
@@ -97,6 +103,26 @@ class ShopifyAccountingMixin:
                 'account_type': 'income',
                 'company_ids': [(6, 0, [company.id])],
             })
+
+        # Outstanding / transfer account for payments.
+        # Odoo 19 needs an outstanding account on payments to generate
+        # journal entries.  ``account.payment._get_outstanding_account``
+        # falls back to ``company.transfer_account_id`` when the chart
+        # template doesn't provide one (common in minimal test setups).
+        if not company.transfer_account_id:
+            transfer_account = self.env['account.account'].search([
+                ('account_type', '=', 'asset_current'),
+                ('company_ids', 'in', [company.id]),
+            ], limit=1)
+            if not transfer_account:
+                transfer_account = self.env['account.account'].create({
+                    'name': 'Test Transfer Account',
+                    'code': 'TXFR',
+                    'account_type': 'asset_current',
+                    'reconcile': True,
+                    'company_ids': [(6, 0, [company.id])],
+                })
+            company.transfer_account_id = transfer_account
 
     # ------------------------------------------------------------------
     # Helpers

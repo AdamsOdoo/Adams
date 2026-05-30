@@ -4,6 +4,7 @@ import logging
 from odoo import fields
 
 from ..shopify_api.queries.refund import FETCH_REFUNDS
+from .accounting import validate_order_income_accounts, schedule_account_activity
 
 _logger = logging.getLogger(__name__)
 
@@ -191,53 +192,18 @@ class RefundImporter:
             )
             return None
 
-        # ── Account pre-validation (mirrors _auto_create_invoice) ────
-        # Resolve the journal's default income account as a fallback for
-        # products that lack an income account on template or category.
-        # Fallback chain: journal default → original invoice lines → any
-        # income account in the company.
-        journal_default_account = journal.default_account_id
-        if not journal_default_account:
-            # Try the account used on the original posted invoice's product
-            # lines (most accurate for the merchant's chart of accounts).
-            posted_inv_lines = order.invoice_ids.filtered(
-                lambda i: i.state == 'posted' and i.move_type == 'out_invoice'
-            ).mapped('invoice_line_ids').filtered(
-                lambda l: l.display_type == 'product' and l.account_id
-            )
-            if posted_inv_lines:
-                journal_default_account = posted_inv_lines[0].account_id
-        if not journal_default_account:
-            # Last resort: any income account in the company
-            journal_default_account = self.env['account.account'].search([
-                ('account_type', '=', 'income'),
-                ('company_ids', 'in', [self.backend.company_id.id]),
-            ], limit=1)
+        # ── Account pre-validation (shared helper) ─────────────────
+        # Uses the centralised validate_order_income_accounts() which
+        # resolves the same fallback chain: journal default → posted
+        # invoice lines → any income account in the company.
+        missing_accounts, journal_default_account = \
+            validate_order_income_accounts(self.env, order, journal=journal)
 
-        missing_accounts = []
-        for rl in refund_lines:
-            product_id = rl.get('product_id')
-            if not product_id:
-                continue
-            product = self.env['product.product'].browse(product_id)
-            accounts = product.product_tmpl_id.get_product_accounts(
-                fiscal_pos=order.fiscal_position_id,
-            )
-            if not accounts.get('income') and not journal_default_account:
-                missing_accounts.append(product.display_name)
-
-        if missing_accounts:
-            msg = (
-                "Refund credit note skipped: no income account for "
-                "product(s) %s and no journal default account. Check the "
-                "product category accounting tab or fiscal position "
-                "mappings." % ', '.join(missing_accounts)
-            )
-            _logger.warning("Order %s: %s", order.name, msg)
-            order.activity_schedule(
-                'mail.mail_activity_data_warning',
+        if missing_accounts and not journal_default_account:
+            schedule_account_activity(
+                order,
                 summary="Shopify refund credit note skipped",
-                note=msg,
+                products=missing_accounts,
             )
             return None
 

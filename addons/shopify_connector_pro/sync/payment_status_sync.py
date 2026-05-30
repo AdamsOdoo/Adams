@@ -9,6 +9,8 @@ import logging
 
 from odoo import _, fields
 
+from .accounting import validate_order_income_accounts, schedule_account_activity
+
 _logger = logging.getLogger(__name__)
 
 
@@ -153,6 +155,19 @@ class PaymentStatusHandler:
                     return False
 
             if order.state in ('sale', 'done'):
+                # Pre-validate income accounts before attempting invoice
+                # creation.  Uses the shared helper so every path that
+                # builds account.move.line records applies the same check.
+                missing, _fallback = validate_order_income_accounts(
+                    self.env, order,
+                )
+                if missing:
+                    schedule_account_activity(
+                        order,
+                        summary="Shopify payment received — invoice skipped",
+                        products=missing,
+                    )
+                    return False
                 try:
                     with self.env.cr.savepoint():
                         invoice = order.with_context(**ctx)._create_invoices()
@@ -337,6 +352,9 @@ class PaymentStatusHandler:
             _logger.info("Invoice %s already fully paid", invoice.name)
             return True
 
+        # Step 1: Create and post the payment in a savepoint.
+        # Kept separate from reconciliation so that a reconciliation
+        # failure does not roll back the payment itself.
         try:
             with self.env.cr.savepoint():
                 payment = self.env['account.payment'].with_context(**ctx).create({
@@ -350,26 +368,9 @@ class PaymentStatusHandler:
                     'currency_id': invoice.currency_id.id,
                 })
                 payment.with_context(**ctx).action_post()
-
-                # Reconcile payment with invoice
-                receivable_lines = (
-                    payment.move_id.line_ids + invoice.line_ids
-                ).filtered(
-                    lambda l: l.account_type == 'asset_receivable'
-                    and not l.reconciled
-                )
-                if receivable_lines:
-                    receivable_lines.reconcile()
-
-                _logger.info(
-                    "Payment registered for order %s: %s %s (journal: %s)",
-                    order_binding.shopify_order_name, amount,
-                    invoice.currency_id.name, journal.name,
-                )
-                return True
         except Exception as e:
             _logger.warning(
-                "Failed to register payment for order %s: %s",
+                "Failed to create/post payment for order %s: %s",
                 order_binding.shopify_order_name, e,
             )
             self._schedule_activity(
@@ -378,6 +379,33 @@ class PaymentStatusHandler:
                   "failed: %s. Please register payment manually.") % e,
             )
             return False
+
+        # Step 2: Reconcile payment with invoice (best-effort).
+        # If reconciliation fails the payment still exists; the user
+        # can reconcile manually from the invoice.
+        try:
+            if payment.move_id:
+                receivable_lines = (
+                    payment.move_id.line_ids + invoice.line_ids
+                ).filtered(
+                    lambda l: l.account_type == 'asset_receivable'
+                    and not l.reconciled
+                )
+                if receivable_lines:
+                    receivable_lines.reconcile()
+        except Exception as e:
+            _logger.warning(
+                "Payment created for order %s but reconciliation "
+                "failed: %s — manual reconciliation required.",
+                order_binding.shopify_order_name, e,
+            )
+
+        _logger.info(
+            "Payment registered for order %s: %s %s (journal: %s)",
+            order_binding.shopify_order_name, amount,
+            invoice.currency_id.name, journal.name,
+        )
+        return True
 
     def _resolve_payment_journal(self, order_binding):
         """Find the payment journal via gateway mapping or fallback.

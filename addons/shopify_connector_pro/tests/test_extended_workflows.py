@@ -202,7 +202,7 @@ class TestDiscountExport(TransactionCase):
             'discount_value': 20.0,
         })
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception), self.cr.savepoint():
             self.env['shopify.discount.code'].create({
                 'backend_id': self.backend.id,
                 'promoter_id': self.promoter.id,

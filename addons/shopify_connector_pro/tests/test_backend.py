@@ -157,7 +157,7 @@ class TestShopifyBinding(TransactionCase):
             'name': 'Product 2',
             'list_price': 10.0,
         })
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception), self.cr.savepoint():
             self.env['shopify.product.binding'].create({
                 'backend_id': self.backend.id,
                 'odoo_id': product2.id,
@@ -247,7 +247,7 @@ class TestWebhookLog(TransactionCase):
             'webhook_id': 'wh_unique_123',
             'topic': 'products/create',
         })
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception), self.cr.savepoint():
             self.env['shopify.webhook.log'].create({
                 'backend_id': self.backend.id,
                 'webhook_id': 'wh_unique_123',

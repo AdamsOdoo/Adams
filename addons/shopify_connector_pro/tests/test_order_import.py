@@ -3,20 +3,13 @@ from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
 
+from .common import ShopifyAccountingMixin
 
-class TestOrderImport(TransactionCase):
+
+class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
-        if not self.env['account.journal'].search(
-            [('type', '=', 'sale'), ('company_id', '=', self.env.company.id)], limit=1,
-        ):
-            self.env['account.journal'].create({
-                'name': 'Test Sales Journal',
-                'type': 'sale',
-                'code': 'TSHP',
-                'company_id': self.env.company.id,
-            })
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',
@@ -31,6 +24,7 @@ class TestOrderImport(TransactionCase):
             'list_price': 29.99,
             'default_code': 'WIDGET-001',
         })
+        self._set_product_income_account(self.product)
         # Create variant binding so order can resolve the product
         product_binding = self.env['shopify.product.binding'].create({
             'backend_id': self.backend.id,

@@ -15,6 +15,7 @@ def _parse_shopify_dt(dt_str):
     except (ValueError, TypeError):
         return False
 
+from .accounting import validate_order_income_accounts, schedule_account_activity
 from .base_exporter import BaseExporter
 from .base_importer import BaseImporter
 from .checksum import compute_checksum
@@ -274,27 +275,14 @@ class OrderImporter(BaseImporter):
             )
             return
 
-        missing = []
-        for line in order.order_line:
-            product = line.product_id
-            if not product:
-                continue
-            accounts = product.product_tmpl_id.get_product_accounts(
-                fiscal_pos=order.fiscal_position_id,
-            )
-            if not accounts.get('income'):
-                missing.append(product.display_name)
+        missing, _fallback = validate_order_income_accounts(
+            self.env, order,
+        )
         if missing:
-            msg = (
-                "Auto-invoice skipped: no income account for product(s) "
-                "%s. Check the product category accounting tab or fiscal "
-                "position mappings." % ', '.join(missing)
-            )
-            _logger.warning("Order %s: %s", order.name, msg)
-            order.activity_schedule(
-                'mail.mail_activity_data_warning',
+            schedule_account_activity(
+                order,
                 summary="Shopify auto-invoice skipped",
-                note=msg,
+                products=missing,
             )
             return
 

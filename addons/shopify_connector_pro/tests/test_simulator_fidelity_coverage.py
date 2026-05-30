@@ -18,19 +18,14 @@ from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
 
+from .common import ShopifyAccountingMixin
 
-class TestShippingLineImport(TransactionCase):
+
+class TestShippingLineImport(ShopifyAccountingMixin, TransactionCase):
     """B-1: Verify connector imports shipping lines from edges/node structure."""
 
     def setUp(self):
         super().setUp()
-        if not self.env['account.journal'].search(
-            [('type', '=', 'sale'), ('company_id', '=', self.env.company.id)], limit=1,
-        ):
-            self.env['account.journal'].create({
-                'name': 'Test Sales Journal', 'type': 'sale',
-                'code': 'TSHP', 'company_id': self.env.company.id,
-            })
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',
@@ -44,6 +39,7 @@ class TestShippingLineImport(TransactionCase):
             'name': 'Test Widget', 'list_price': 29.99,
             'default_code': 'WIDGET-SL',
         })
+        self._set_product_income_account(self.product)
         product_binding = self.env['shopify.product.binding'].create({
             'backend_id': self.backend.id,
             'odoo_id': self.product.product_tmpl_id.id,
