@@ -135,3 +135,106 @@ class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
         result = handler.handle_status_change(self.binding, 'pending', 'partially_paid')
         self.assertTrue(result)
         self.assertEqual(invoice.state, 'posted')
+
+    def _make_poisoning_action_post(self, invoice):
+        """Return a replacement for action_post that triggers a real
+        DB-level CHECK-constraint violation, genuinely poisoning the
+        PostgreSQL cursor (InFailedSqlTransaction on all subsequent
+        queries) — exactly the production failure mode.
+
+        The INSERT violates ``account_move_line_check_accountable_required_fields``
+        (``account_id IS NOT NULL`` for product-display lines).  This is the
+        same constraint that fires in production when a draft invoice's
+        line loses its income account between draft creation and posting.
+
+        A Python-only mock (raise Exception) would NOT poison the cursor,
+        so the test would pass even without the savepoint fix.
+        """
+        def poisoning_post(self_move):
+            self_move.env.cr.execute(
+                "INSERT INTO account_move_line "
+                "(display_type, account_id, move_id, currency_id) "
+                "VALUES ('product', NULL, %s, %s)",
+                [invoice.id, invoice.currency_id.id],
+            )
+        return poisoning_post
+
+    def test_paid_draft_post_failure_no_cursor_poison(self):
+        """action_post() failure on a draft must NOT poison the cursor.
+
+        Regression test for P0-2: when action_post() triggers a DB-level
+        failure (e.g. CheckViolation), PostgreSQL aborts the transaction.
+        Without a savepoint, _update_status_fields() and every subsequent
+        ORM call fails with InFailedSqlTransaction.
+
+        After the fix the action_post() is wrapped in a savepoint, so:
+        (a) the cursor remains healthy,
+        (b) status is NOT advanced to a success-implying state, and
+        (c) an activity is scheduled for manual intervention.
+        """
+        invoice = self.order._create_invoices()
+        self.assertEqual(invoice.state, 'draft')
+
+        handler = self._get_handler()
+        poisoning_post = self._make_poisoning_action_post(invoice)
+
+        with patch.object(type(invoice), 'action_post', poisoning_post):
+            result = handler.handle_status_change(
+                self.binding, 'authorized', 'paid',
+            )
+
+        # (a) Cursor is healthy — force a real DB round-trip (not cache)
+        self.binding.invalidate_recordset()
+        status = self.binding.read(['shopify_financial_status'])[0]
+
+        # (b) Status must NOT advance to 'paid'
+        self.assertEqual(
+            status['shopify_financial_status'], 'authorized',
+            "Status must stay at old value when invoice posting fails",
+        )
+        self.assertFalse(result, "Handler must return False on post failure")
+
+        # (c) Activity scheduled
+        activities = self.env['mail.activity'].search([
+            ('res_model', '=', 'sale.order'),
+            ('res_id', '=', self.order.id),
+        ])
+        self.assertTrue(activities, "Activity must be scheduled on failure")
+
+    def test_partially_paid_draft_post_failure_no_cursor_poison(self):
+        """action_post() failure on partially_paid must NOT poison cursor.
+
+        Same bug class as the paid-path test above, but on the
+        _transition_to_partially_paid branch which also calls
+        action_post() on a pre-existing draft outside a savepoint.
+        """
+        invoice = self.order._create_invoices()
+        self.assertEqual(invoice.state, 'draft')
+
+        self.binding.shopify_financial_status = 'pending'
+        handler = self._get_handler()
+        poisoning_post = self._make_poisoning_action_post(invoice)
+
+        with patch.object(type(invoice), 'action_post', poisoning_post):
+            result = handler.handle_status_change(
+                self.binding, 'pending', 'partially_paid',
+            )
+
+        # (a) Cursor is healthy — force a real DB round-trip (not cache)
+        self.binding.invalidate_recordset()
+        status = self.binding.read(['shopify_financial_status'])[0]
+
+        # (b) Status must NOT advance to 'partially_paid'
+        self.assertEqual(
+            status['shopify_financial_status'], 'pending',
+            "Status must stay at old value when invoice posting fails",
+        )
+        self.assertFalse(result, "Handler must return False on post failure")
+
+        # (c) Activity scheduled (the partial-payment notice should
+        #     NOT fire if posting failed; only the failure activity)
+        activities = self.env['mail.activity'].search([
+            ('res_model', '=', 'sale.order'),
+            ('res_id', '=', self.order.id),
+        ])
+        self.assertTrue(activities, "Activity must be scheduled on failure")

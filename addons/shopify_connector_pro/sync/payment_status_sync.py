@@ -76,7 +76,12 @@ class PaymentStatusHandler:
             )
             handler = getattr(self, method_name)
             result = handler(order_binding, old_status, new_status)
-            self._update_status_fields(order_binding, new_status)
+            # Only advance the binding's financial status when the handler
+            # succeeded.  Advancing on failure would mark the binding as
+            # paid/partially_paid even though the invoice was never posted,
+            # creating a silent inconsistency and preventing retries.
+            if result:
+                self._update_status_fields(order_binding, new_status)
             return result
         else:
             _logger.warning(
@@ -117,9 +122,24 @@ class PaymentStatusHandler:
         invoice = False
 
         if draft_invoices:
+            invoice = draft_invoices[0]
+            # Optional early-exit for the common NULL-account case.
+            # The savepoint below is the real protection (catches every
+            # DB-level failure), but pre-validation gives a cleaner
+            # user-facing message for the most common trigger.
+            missing, _fallback = validate_order_income_accounts(
+                self.env, order,
+            )
+            if missing:
+                schedule_account_activity(
+                    order,
+                    summary="Shopify payment received — invoice posting skipped",
+                    products=missing,
+                )
+                return False
             try:
-                draft_invoices[0].with_context(**ctx).action_post()
-                invoice = draft_invoices[0]
+                with self.env.cr.savepoint():
+                    invoice.with_context(**ctx).action_post()
                 _logger.info(
                     "Posted draft invoice %s for order %s (Shopify payment captured)",
                     invoice.name, order.name,
@@ -225,17 +245,36 @@ class PaymentStatusHandler:
         )
 
         if draft_invoices:
+            invoice = draft_invoices[0]
+            # Optional early-exit for the common NULL-account case.
+            missing, _fallback = validate_order_income_accounts(
+                self.env, order,
+            )
+            if missing:
+                schedule_account_activity(
+                    order,
+                    summary="Shopify partial payment — invoice posting skipped",
+                    products=missing,
+                )
+                return False
             try:
-                draft_invoices[0].with_context(**ctx).action_post()
+                with self.env.cr.savepoint():
+                    invoice.with_context(**ctx).action_post()
                 _logger.info(
                     "Posted invoice %s for partially paid order %s",
-                    draft_invoices[0].name, order.name,
+                    invoice.name, order.name,
                 )
             except Exception as e:
                 _logger.warning(
                     "Failed to post invoice for partially paid order %s: %s",
                     order.name, e,
                 )
+                self._schedule_activity(
+                    order,
+                    _("Partial payment received on Shopify but invoice could "
+                      "not be posted: %s") % e,
+                )
+                return False
 
         self._schedule_activity(
             order,
