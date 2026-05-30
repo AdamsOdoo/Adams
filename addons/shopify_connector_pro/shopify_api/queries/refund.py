@@ -47,8 +47,37 @@ query FetchRefunds($orderId: ID!) {
               shopMoney { amount currencyCode }
               presentmentMoney { amount currencyCode }
             }
+            totalTaxSet {
+              shopMoney { amount currencyCode }
+              presentmentMoney { amount currencyCode }
+            }
           }
         }
+      }
+      refundShippingLines(first: 10) {
+        edges {
+          node {
+            subtotalAmountSet {
+              shopMoney { amount currencyCode }
+              presentmentMoney { amount currencyCode }
+            }
+            taxAmountSet {
+              shopMoney { amount currencyCode }
+              presentmentMoney { amount currencyCode }
+            }
+          }
+        }
+      }
+      orderAdjustments {
+        amountSet {
+          shopMoney { amount currencyCode }
+          presentmentMoney { amount currencyCode }
+        }
+        taxAmountSet {
+          shopMoney { amount currencyCode }
+          presentmentMoney { amount currencyCode }
+        }
+        reason
       }
     }
   }

@@ -700,7 +700,34 @@ class OrderImporter(BaseImporter):
         return list(set(tax_ids))
 
     def _create_shipping_line(self, order, shipping_line):
-        """Create a shipping line on the order."""
+        """Create a shipping line on the order.
+
+        .. warning:: Shipping taxes not mapped (known gap)
+
+            Shopify shipping lines carry ``taxLines`` with tax title and
+            rate, but this method does NOT call ``_resolve_taxes()`` on
+            them.  The SHOPIFY-SHIPPING product is created without
+            ``taxes_id``, so the resulting SO line and invoice line have
+            no taxes.
+
+            **Impact:** For stores where shipping is taxable (UK VAT,
+            most EU countries, some US states), the original invoice
+            under-taxes the shipping line.  This also affects refund
+            credit notes: the refund sync falls back to including
+            shipping tax in the line amount rather than reversing it
+            against the correct tax account.
+
+            **Who is affected:** Any merchant with taxable shipping
+            (common in UK/EU/AU stores with VAT).
+
+            **Severity:** P2 — VAT/sales-tax returns may under-report
+            on shipping.  Independent of the refund credit note fix
+            (P0/P2-3) and should be triaged separately.
+
+            **Fix:** Call ``_resolve_taxes(shipping_line.get('taxLines',
+            []))`` and set ``tax_ids`` on the SO line, mirroring how
+            product lines are handled in ``_create_order_line()``.
+        """
         price = self._get_money_amount(shipping_line.get('originalPriceSet'))
         if not price:
             return

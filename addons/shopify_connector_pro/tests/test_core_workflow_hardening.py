@@ -682,3 +682,268 @@ class TestCustomerExportTags(TransactionCase):
             'tags', result,
             "Without binding, tags must not be in payload",
         )
+
+
+# ===================================================================
+# P0/P2-3 — Taxed Refund Credit Note
+# ===================================================================
+
+class TestTaxedRefundCreditNote(ShopifyAccountingMixin, TransactionCase):
+    """P0/P2-3: Credit note must match Shopify's totalRefundedSet
+    (including tax + shipping) and carry tax_ids for proper reversal.
+
+    Current (broken) code uses subtotalSet only — under-crediting by
+    the tax + shipping amount on every taxed refund.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.backend = self.env['shopify.backend'].create({
+            'name': 'Taxed Refund Store',
+            'shop_url': 'taxed-refund.myshopify.com',
+            'access_token': 'shpat_taxed_refund',
+            'company_id': self.env.company.id,
+            'warehouse_id': self.env['stock.warehouse'].search(
+                [('company_id', '=', self.env.company.id)], limit=1,
+            ).id,
+        })
+        self.partner = self._create_accounting_partner('Taxed Refund Buyer')
+
+        # 10% sales tax
+        self.tax_10 = self.env['account.tax'].create({
+            'name': 'Test Tax 10%',
+            'type_tax_use': 'sale',
+            'amount': 10.0,
+            'amount_type': 'percent',
+            'company_id': self.env.company.id,
+        })
+
+        # Product with tax
+        self.product = self.env['product.product'].create({
+            'name': 'Taxed Widget',
+            'list_price': 100.0,
+            'taxes_id': [(6, 0, [self.tax_10.id])],
+        })
+        self._set_product_income_account(self.product)
+
+        # Shipping product (mirroring order_sync._create_shipping_line)
+        self.shipping_product = self.env['product.product'].search([
+            ('default_code', '=', 'SHOPIFY-SHIPPING'),
+        ], limit=1)
+        if not self.shipping_product:
+            self.shipping_product = self.env['product.product'].create({
+                'name': 'Shopify Shipping',
+                'default_code': 'SHOPIFY-SHIPPING',
+                'type': 'service',
+                'list_price': 0,
+            })
+        self._set_product_income_account(self.shipping_product)
+
+        # Variant binding so refund line can map back to product
+        self.variant_binding = self.env['shopify.variant.binding'].create({
+            'backend_id': self.backend.id,
+            'odoo_id': self.product.id,
+            'shopify_id': 'gid://shopify/ProductVariant/VAR-TX-1',
+        })
+
+        # Order: 2 × $100 product (taxed) + $15 shipping (untaxed)
+        self.order = self.env['sale.order'].with_context(
+            shopify_no_auto_export=True,
+        ).create({
+            'partner_id': self.partner.id,
+            'company_id': self.env.company.id,
+            'order_line': [
+                (0, 0, {
+                    'product_id': self.product.id,
+                    'product_uom_qty': 2,
+                    'price_unit': 100.0,
+                    'tax_ids': [(6, 0, [self.tax_10.id])],
+                }),
+                (0, 0, {
+                    'product_id': self.shipping_product.id,
+                    'product_uom_qty': 1,
+                    'price_unit': 15.0,
+                }),
+            ],
+        })
+        self.order.with_context(shopify_no_auto_export=True).action_confirm()
+
+        # Posted invoice: $200 + $20 tax + $15 shipping = $235
+        self.invoice = self.order.with_context(
+            shopify_no_auto_export=True,
+        )._create_invoices()
+        self.invoice.with_context(shopify_no_auto_export=True).action_post()
+
+        self.order_binding = self.env['shopify.order.binding'].create({
+            'backend_id': self.backend.id,
+            'shopify_id': 'gid://shopify/Order/TX-9001',
+            'odoo_id': self.order.id,
+            'shopify_order_name': '#TX-1001',
+            'shopify_financial_status': 'paid',
+            'sync_status': 'synced',
+        })
+
+        from ..sync.refund_sync import RefundImporter
+        self.importer = RefundImporter.__new__(RefundImporter)
+        self.importer.env = self.env
+        self.importer.backend = self.backend
+        self.importer.client = MagicMock()
+
+    def test_taxed_refund_credit_note_matches_total(self):
+        """Credit note must match totalRefundedSet AND carry tax reversal.
+
+        Refund: 1 unit of $100 product ($100 subtotal + $10 tax) + $15
+        shipping = $125 total.  Current code only captures $100
+        (subtotalSet, no tax, no shipping) — a 20% under-credit.
+        """
+        refund_data = {
+            'id': 'gid://shopify/Refund/TX-1001',
+            'note': 'Test taxed refund',
+            'totalRefundedSet': {
+                'shopMoney': {'amount': '125.0', 'currencyCode': 'USD'},
+                'presentmentMoney': {'amount': '125.0', 'currencyCode': 'USD'},
+            },
+            'refundLineItems': {'edges': [{
+                'node': {
+                    'lineItem': {
+                        'id': 'gid://shopify/LineItem/LI-TX-1',
+                        'title': 'Taxed Widget',
+                        'variant': {
+                            'id': self.variant_binding.shopify_id,
+                            'sku': 'TW',
+                        },
+                    },
+                    'quantity': 1,
+                    'restockType': 'RETURN',
+                    'subtotalSet': {
+                        'shopMoney': {'amount': '100.0', 'currencyCode': 'USD'},
+                        'presentmentMoney': {'amount': '100.0', 'currencyCode': 'USD'},
+                    },
+                    'totalTaxSet': {
+                        'shopMoney': {'amount': '10.0', 'currencyCode': 'USD'},
+                        'presentmentMoney': {'amount': '10.0', 'currencyCode': 'USD'},
+                    },
+                },
+            }]},
+            'refundShippingLines': {'edges': [{
+                'node': {
+                    'subtotalAmountSet': {
+                        'shopMoney': {'amount': '15.0', 'currencyCode': 'USD'},
+                        'presentmentMoney': {'amount': '15.0', 'currencyCode': 'USD'},
+                    },
+                    'taxAmountSet': {
+                        'shopMoney': {'amount': '0.0', 'currencyCode': 'USD'},
+                        'presentmentMoney': {'amount': '0.0', 'currencyCode': 'USD'},
+                    },
+                },
+            }]},
+            'orderAdjustments': [],
+        }
+
+        binding = self.importer._import_one_refund(
+            refund_data, self.order_binding,
+        )
+        cn = binding.odoo_id
+        self.assertTrue(cn, "Credit note must be created")
+        self.assertEqual(cn.state, 'posted')
+
+        # (a) Total matches totalRefundedSet — NOT the old under-credit
+        self.assertAlmostEqual(
+            cn.amount_total, 125.0, places=2,
+            msg="Credit note must include tax + shipping ($125), "
+                "not just subtotal ($100)",
+        )
+
+        # (b) Product line carries tax_ids for proper VAT reversal
+        product_lines = cn.line_ids.filtered(
+            lambda l: l.product_id == self.product
+            and l.display_type == 'product'
+        )
+        self.assertTrue(product_lines, "Must have a product refund line")
+        self.assertTrue(
+            product_lines[0].tax_ids,
+            "Product line must carry tax_ids for reversal",
+        )
+        self.assertIn(
+            self.tax_10, product_lines[0].tax_ids,
+            "Tax must match original invoice's 10% tax",
+        )
+
+        # (c) Shipping line present with correct amount
+        shipping_lines = cn.line_ids.filtered(
+            lambda l: l.product_id == self.shipping_product
+            and l.display_type == 'product'
+        )
+        self.assertTrue(shipping_lines, "Must have a shipping refund line")
+        self.assertAlmostEqual(
+            shipping_lines[0].price_unit, 15.0, places=2,
+            msg="Shipping refund line must be $15",
+        )
+
+    def test_taxed_refund_auto_balancing_adjustment(self):
+        """When totalRefundedSet differs from the component sum (Shopify
+        rounding), the credit note must auto-balance with an adjustment
+        line so amount_total matches EXACTLY.
+
+        Uses a deterministic injected delta ($0.03) rather than relying
+        on natural rounding drift (which would be flaky).
+        """
+        # Refund: 1 × $100 product, $10 tax, $0 shipping
+        # BUT totalRefundedSet = $110.03 (Shopify-side rounding adj)
+        refund_data = {
+            'id': 'gid://shopify/Refund/TX-2001',
+            'note': 'Rounding refund',
+            'totalRefundedSet': {
+                'shopMoney': {'amount': '110.03', 'currencyCode': 'USD'},
+                'presentmentMoney': {'amount': '110.03', 'currencyCode': 'USD'},
+            },
+            'refundLineItems': {'edges': [{
+                'node': {
+                    'lineItem': {
+                        'id': 'gid://shopify/LineItem/LI-TX-2',
+                        'title': 'Taxed Widget',
+                        'variant': {
+                            'id': self.variant_binding.shopify_id,
+                            'sku': 'TW',
+                        },
+                    },
+                    'quantity': 1,
+                    'restockType': 'RETURN',
+                    'subtotalSet': {
+                        'shopMoney': {'amount': '100.0', 'currencyCode': 'USD'},
+                        'presentmentMoney': {'amount': '100.0', 'currencyCode': 'USD'},
+                    },
+                    'totalTaxSet': {
+                        'shopMoney': {'amount': '10.0', 'currencyCode': 'USD'},
+                        'presentmentMoney': {'amount': '10.0', 'currencyCode': 'USD'},
+                    },
+                },
+            }]},
+            'refundShippingLines': {'edges': []},
+            'orderAdjustments': [],
+        }
+
+        binding = self.importer._import_one_refund(
+            refund_data, self.order_binding,
+        )
+        cn = binding.odoo_id
+        self.assertTrue(cn, "Credit note must be created")
+        self.assertEqual(cn.state, 'posted')
+
+        # (a) Total matches totalRefundedSet EXACTLY
+        self.assertAlmostEqual(
+            cn.amount_total, 110.03, places=2,
+            msg="Credit note must match totalRefundedSet exactly ($110.03), "
+                "including auto-balancing adjustment",
+        )
+
+        # (b) A rounding adjustment line exists for the $0.03 delta
+        adjustment_lines = cn.line_ids.filtered(
+            lambda l: l.display_type == 'product'
+            and 'adjustment' in (l.name or '').lower()
+        )
+        self.assertTrue(
+            adjustment_lines,
+            "An auto-balancing adjustment line must exist for the "
+            "$0.03 Shopify rounding delta",
+        )

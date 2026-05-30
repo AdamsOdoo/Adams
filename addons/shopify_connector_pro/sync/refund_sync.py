@@ -82,6 +82,7 @@ class RefundImporter:
             line_item = node.get('lineItem') or {}
             variant = line_item.get('variant') or {}
             subtotal_amount, _ = self._money(node.get('subtotalSet'))
+            tax_amount, _ = self._money(node.get('totalTaxSet'))
 
             product = None
             variant_id = variant.get('id', '')
@@ -101,6 +102,7 @@ class RefundImporter:
                 'product_id': product.id if product else False,
                 'quantity': node.get('quantity', 0),
                 'amount': subtotal_amount,
+                'tax_amount': tax_amount,
                 'restock_type': restock,
             })
 
@@ -147,8 +149,12 @@ class RefundImporter:
         refund_binding = self.env['shopify.refund.binding'].create(binding_vals)
 
         for line in refund_lines:
-            line['refund_binding_id'] = refund_binding.id
-            self.env['shopify.refund.line'].create(line)
+            line_vals = dict(line)
+            line_vals['refund_binding_id'] = refund_binding.id
+            # tax_amount is used by _create_refund_credit_note but is
+            # not a field on shopify.refund.line
+            line_vals.pop('tax_amount', None)
+            self.env['shopify.refund.line'].create(line_vals)
 
         return refund_binding
 
@@ -207,11 +213,19 @@ class RefundImporter:
             )
             return None
 
-        # Build credit-note lines from the Shopify refund line items.
+        # ── Build credit-note lines from refund line items ─────────
         invoice_line_ids = []
+        tax_fallback_activities = []
+
+        # Cache the posted invoice for tax mapping
+        posted_invoices = order.invoice_ids.filtered(
+            lambda i: i.state == 'posted' and i.move_type == 'out_invoice'
+        )
+
         for rl in refund_lines:
             qty = rl.get('quantity') or 0
             amt = rl.get('amount') or 0
+            tax_amt = rl.get('tax_amount') or 0
             if qty and amt:
                 line_vals = {
                     'quantity': qty,
@@ -227,26 +241,92 @@ class RefundImporter:
                     account = accounts.get('income') or journal_default_account
                     if account:
                         line_vals['account_id'] = account.id
+
+                    # Tax strategy (a): carry tax_ids from original invoice line
+                    original_tax_ids = self._find_original_tax_ids(
+                        posted_invoices, product, order,
+                    )
+                    if original_tax_ids is not None:
+                        line_vals['tax_ids'] = [(6, 0, original_tax_ids.ids)]
+                    elif tax_amt:
+                        # Fallback (b): include tax in amount, flag for review
+                        line_vals['price_unit'] = (amt + tax_amt) / qty
+                        line_vals['tax_ids'] = [(5,)]  # clear auto-detected taxes
+                        tax_fallback_activities.append(
+                            product.display_name
+                        )
                 else:
                     line_vals['name'] = 'Shopify Refund Item'
-                    # Non-product lines must always have an explicit account
                     if journal_default_account:
                         line_vals['account_id'] = journal_default_account.id
                     else:
-                        # Should not reach here (pre-validation catches it),
-                        # but guard defensively.
                         continue
+                    # Non-product line: include tax in amount if present
+                    if tax_amt:
+                        line_vals['price_unit'] = (amt + tax_amt) / qty
+                        line_vals['tax_ids'] = [(5,)]
                 invoice_line_ids.append((0, 0, line_vals))
 
-        # Fallback: single line for the total when no itemised lines exist
-        # (e.g. manual / shipping-only refund).
+        # ── Shipping refund lines ─────────────────────────────
+        shipping_product = (
+            self.backend.shipping_product_id
+            or self.env['product.product'].search(
+                [('default_code', '=', 'SHOPIFY-SHIPPING')], limit=1,
+            )
+        )
+        for edge in (refund_data.get('refundShippingLines') or {}).get('edges', []):
+            node = edge.get('node') or {}
+            ship_subtotal, _ = self._money(node.get('subtotalAmountSet'))
+            ship_tax, _ = self._money(node.get('taxAmountSet'))
+            if ship_subtotal or ship_tax:
+                ship_line = {
+                    'quantity': 1,
+                    'price_unit': ship_subtotal,
+                    'name': 'Shipping Refund',
+                }
+                if shipping_product:
+                    ship_line['product_id'] = shipping_product.id
+                    # Tax from original invoice shipping line
+                    ship_tax_ids = self._find_original_tax_ids(
+                        posted_invoices, shipping_product, order,
+                    )
+                    if ship_tax_ids is not None:
+                        ship_line['tax_ids'] = [(6, 0, ship_tax_ids.ids)]
+                    elif ship_tax:
+                        ship_line['price_unit'] = ship_subtotal + ship_tax
+                        ship_line['tax_ids'] = [(5,)]
+                        tax_fallback_activities.append('Shipping')
+                if journal_default_account:
+                    ship_line['account_id'] = journal_default_account.id
+                invoice_line_ids.append((0, 0, ship_line))
+
+        # ── Order adjustments (rounding / discrepancies) ──────
+        for adj in refund_data.get('orderAdjustments') or []:
+            adj_amount, _ = self._money(adj.get('amountSet'))
+            adj_tax, _ = self._money(adj.get('taxAmountSet'))
+            total_adj = adj_amount + adj_tax
+            if abs(total_adj) > 0.001:
+                reason = adj.get('reason') or 'rounding'
+                adj_line = {
+                    'name': 'Shopify refund adjustment (%s)' % reason,
+                    'quantity': 1,
+                    'price_unit': total_adj,
+                    'tax_ids': [(5,)],
+                }
+                if journal_default_account:
+                    adj_line['account_id'] = journal_default_account.id
+                invoice_line_ids.append((0, 0, adj_line))
+
+        # ── Fallback: single line when no itemised lines exist ─
         if not invoice_line_ids and refund_amount:
             if not journal_default_account:
                 msg = (
                     "Refund credit note skipped: no income account could be "
                     "resolved (journal has no default account, no posted "
                     "invoice lines, and no income account in the chart of "
-                    "accounts). Refund %s" % refund_data.get('id')
+                    "accounts). Refund %s on order %s." % (
+                        refund_data.get('id'), order.name,
+                    )
                 )
                 _logger.warning("Order %s: %s", order.name, msg)
                 order.activity_schedule(
@@ -260,8 +340,10 @@ class RefundImporter:
                 'quantity': 1,
                 'price_unit': refund_amount,
                 'account_id': journal_default_account.id,
+                'tax_ids': [(5,)],
             }
             invoice_line_ids.append((0, 0, fallback_vals))
+            tax_fallback_activities.append('(lump-sum refund)')
 
         if not invoice_line_ids:
             _logger.warning(
@@ -280,14 +362,70 @@ class RefundImporter:
                     'ref': refund_data.get('note') or 'Shopify Refund',
                     'invoice_line_ids': invoice_line_ids,
                 })
+
+                # ── Auto-balance to totalRefundedSet ──────────
+                # Shopify is the source of truth for the actual money
+                # refunded.  Odoo's tax recomputation may differ by a
+                # cent or two due to per-unit rounding.  Force an exact
+                # match so the receivable always reconciles.
+                delta = refund_amount - credit_note.amount_total
+                if abs(delta) > 0.001:
+                    credit_note.write({
+                        'invoice_line_ids': [(0, 0, {
+                            'name': 'Shopify refund rounding adjustment',
+                            'quantity': 1,
+                            'price_unit': delta,
+                            'account_id': (
+                                journal_default_account.id
+                                if journal_default_account
+                                else journal.default_account_id.id
+                            ),
+                            'tax_ids': [(5,)],
+                        })],
+                    })
+                    if abs(delta) > 0.05:
+                        order.activity_schedule(
+                            'mail.mail_activity_data_todo',
+                            summary="Shopify refund rounding adjustment",
+                            note=(
+                                "Credit note for refund %s on order %s "
+                                "includes a %s %.2f rounding adjustment to "
+                                "match the actual amount refunded on Shopify. "
+                                "This exceeds normal rounding — verify against "
+                                "the original invoice." % (
+                                    refund_data.get('id'), order.name,
+                                    credit_note.currency_id.symbol, abs(delta),
+                                )
+                            ),
+                        )
+
                 credit_note.with_context(**ctx).action_post()
+
+                # Schedule activity for any tax-fallback lines
+                if tax_fallback_activities:
+                    order.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary="Shopify refund — verify tax reversal",
+                        note=(
+                            "Credit note %s for refund %s on order %s: tax "
+                            "reversal could not be determined from the original "
+                            "invoice for: %s. Tax amount was included in the "
+                            "line total instead. Verify tax treatment against "
+                            "the original invoice." % (
+                                credit_note.name, refund_data.get('id'),
+                                order.name,
+                                ', '.join(tax_fallback_activities),
+                            )
+                        ),
+                    )
+
                 return credit_note
         except Exception as e:
             _logger.warning(
-                "Could not create credit note for refund %s "
+                "Could not create credit note for refund %s on order %s "
                 "(products: %s): %s. Check income account, fiscal "
                 "position, and company chart of accounts.",
-                refund_data.get('id'),
+                refund_data.get('id'), order.name,
                 ', '.join(
                     self.env['product.product'].browse(
                         rl['product_id']
@@ -299,11 +437,42 @@ class RefundImporter:
             order.activity_schedule(
                 'mail.mail_activity_data_warning',
                 summary="Shopify refund credit note failed",
-                note="Credit note creation failed for refund %s: %s" % (
-                    refund_data.get('id'), e,
-                ),
+                note="Credit note creation failed for refund %s on "
+                     "order %s: %s" % (
+                         refund_data.get('id'), order.name, e,
+                     ),
             )
             return None
+
+    def _find_original_tax_ids(self, posted_invoices, product, order):
+        """Find tax_ids from the original posted invoice line for a product.
+
+        Returns:
+            - recordset of account.tax if a confident match is found
+            - None if no match or conflicting taxes (caller should fallback)
+        """
+        for inv in posted_invoices:
+            matching = inv.line_ids.filtered(
+                lambda l: l.product_id.id == product.id
+                and l.display_type == 'product'
+                and l.sale_line_ids.order_id == order
+            )
+            if matching:
+                # Check all matching lines have the same tax_ids
+                tax_sets = [frozenset(l.tax_ids.ids) for l in matching]
+                if len(set(tax_sets)) == 1:
+                    return matching[0].tax_ids
+                else:
+                    # Conflicting taxes on the same product — can't
+                    # determine which to reverse
+                    _logger.warning(
+                        "Order %s: product %s has conflicting tax "
+                        "treatments on invoice %s — falling back to "
+                        "tax-inclusive amount",
+                        order.name, product.display_name, inv.name,
+                    )
+                    return None
+        return None
 
 
 class RefundSync:
