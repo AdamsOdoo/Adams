@@ -640,7 +640,7 @@ class OrderImporter(BaseImporter):
         # Apply tax mapping from Shopify taxLines
         tax_ids = self._resolve_taxes(line_item.get('taxLines', []))
         if tax_ids:
-            line_vals['tax_id'] = [(6, 0, tax_ids)]
+            line_vals['tax_ids'] = [(6, 0, tax_ids)]
 
         self.env['sale.order.line'].create(line_vals)
 

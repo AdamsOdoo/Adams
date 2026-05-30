@@ -380,3 +380,199 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
             order.invoice_ids,
             "No invoice should be created when income account is missing",
         )
+
+    # ── Taxed order import baseline ────────────────────────────────
+
+    def test_import_taxed_order_creates_invoice_with_tax_lines(self):
+        """Import a PAID order with product tax → invoice must carry
+        tax lines and amount_total must include tax.
+
+        This is the forward-path baseline for all tax correctness
+        work.  The import path maps Shopify taxLines to Odoo taxes
+        via rate matching (_resolve_taxes), and _create_invoices()
+        carries those taxes to the invoice.
+
+        Not a fail-before/pass-after (the path works today) — this
+        is a regression guard that locks the behaviour.
+        """
+        from ..sync.order_sync import OrderImporter
+
+        # Create a 10% sales tax in Odoo for rate-matching fallback
+        tax_10 = self.env['account.tax'].create({
+            'name': 'Test Tax 10%',
+            'type_tax_use': 'sale',
+            'amount': 10.0,
+            'amount_type': 'percent',
+            'company_id': self.env.company.id,
+        })
+
+        # Build a Shopify order with 2×$50 product + 10% tax ($10) +
+        # $10 shipping = $120 total.
+        node = {
+            'id': 'gid://shopify/Order/TAX001',
+            'name': '#TAX001',
+            'createdAt': '2026-03-28T10:00:00Z',
+            'updatedAt': '2026-03-28T10:00:00Z',
+            'displayFinancialStatus': 'PAID',
+            'displayFulfillmentStatus': 'UNFULFILLED',
+            'cancelledAt': None,
+            'closed': False,
+            'closedAt': None,
+            'note': '',
+            'tags': [],
+            'currencyCode': 'USD',
+            'presentmentCurrencyCode': 'USD',
+            'totalPriceSet': {
+                'shopMoney': {'amount': '120.00', 'currencyCode': 'USD'},
+            },
+            'subtotalPriceSet': {
+                'shopMoney': {'amount': '100.00', 'currencyCode': 'USD'},
+            },
+            'totalShippingPriceSet': {
+                'shopMoney': {'amount': '10.00', 'currencyCode': 'USD'},
+            },
+            'totalTaxSet': {
+                'shopMoney': {'amount': '10.00', 'currencyCode': 'USD'},
+            },
+            'totalDiscountsSet': {
+                'shopMoney': {'amount': '0.00', 'currencyCode': 'USD'},
+            },
+            'discountCodes': [],
+            'customer': {
+                'id': 'gid://shopify/Customer/500',
+                'email': 'taxbuyer@example.com',
+                'firstName': 'Tax',
+                'lastName': 'Buyer',
+            },
+            'shippingAddress': {
+                'address1': '789 Tax Ave',
+                'address2': '',
+                'city': 'London',
+                'province': '',
+                'provinceCode': '',
+                'country': 'United Kingdom',
+                'countryCodeV2': 'GB',
+                'zip': 'SW1A 1AA',
+                'phone': '',
+                'firstName': 'Tax',
+                'lastName': 'Buyer',
+            },
+            'billingAddress': None,
+            'lineItems': {
+                'edges': [{
+                    'node': {
+                        'id': 'gid://shopify/LineItem/T1',
+                        'title': 'Test Widget',
+                        'quantity': 2,
+                        'variant': {
+                            'id': 'gid://shopify/ProductVariant/200',
+                            'sku': 'WIDGET-001',
+                            'product': {'id': 'gid://shopify/Product/100'},
+                        },
+                        'originalUnitPriceSet': {
+                            'shopMoney': {
+                                'amount': '50.00',
+                                'currencyCode': 'USD',
+                            },
+                        },
+                        'discountAllocations': [],
+                        'taxLines': [{
+                            'title': 'VAT',
+                            'rate': 0.1,
+                            'priceSet': {
+                                'shopMoney': {
+                                    'amount': '10.00',
+                                    'currencyCode': 'USD',
+                                },
+                            },
+                        }],
+                    },
+                }],
+                'pageInfo': {'hasNextPage': False},
+            },
+            'shippingLines': {
+                'edges': [{
+                    'node': {
+                        'title': 'Standard Shipping',
+                        'code': 'standard',
+                        'originalPriceSet': {
+                            'shopMoney': {
+                                'amount': '10.00',
+                                'currencyCode': 'USD',
+                            },
+                        },
+                    },
+                }],
+            },
+            'refunds': [],
+        }
+
+        # auto_create_invoice is True by default
+        self.assertTrue(self.backend.auto_create_invoice)
+
+        importer = OrderImporter.__new__(OrderImporter)
+        importer.env = self.env
+        importer.backend = self.backend
+        importer.client = MagicMock()
+        importer._currency_cache = {}
+        importer._pricelist_cache = {}
+        importer._shipping_product = None
+        importer._country_cache = {}
+        importer._state_cache = {}
+
+        importer._import_one(node, existing_binding=None)
+
+        binding = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Order/TAX001'),
+        ])
+        self.assertTrue(binding)
+        order = binding.odoo_id
+        self.assertIn(order.state, ('sale', 'done'))
+
+        # ── Sale order line must carry the 10% tax ──
+        product_line = order.order_line.filtered(
+            lambda l: l.product_id == self.product
+        )
+        self.assertTrue(product_line, "Product line must exist")
+        self.assertIn(
+            tax_10, product_line.tax_ids,
+            "Product line must carry the 10% tax from rate-matching",
+        )
+
+        # ── Invoice must exist and be posted ──
+        invoices = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state == 'posted'
+        )
+        self.assertTrue(invoices, "Auto-invoice must be created and posted")
+        invoice = invoices[0]
+
+        # ── Invoice product line must carry tax ──
+        inv_product_lines = invoice.invoice_line_ids.filtered(
+            lambda l: l.product_id == self.product
+            and l.display_type == 'product'
+        )
+        self.assertTrue(inv_product_lines, "Invoice must have product line")
+        self.assertIn(
+            tax_10, inv_product_lines[0].tax_ids,
+            "Invoice product line must carry the 10% tax",
+        )
+
+        # ── amount_total must include tax ──
+        # Product: 2 × $50 = $100, tax at 10% = $10, shipping = $10.
+        # Odoo may auto-apply default taxes to the shipping product
+        # via _compute_tax_ids, so we assert the minimum: untaxed
+        # base is $110 and tax amount includes at least the $10
+        # product tax.
+        self.assertAlmostEqual(
+            invoice.amount_untaxed, 110.0, places=2,
+            msg="Untaxed total: $100 product + $10 shipping = $110",
+        )
+        self.assertGreaterEqual(
+            invoice.amount_tax, 10.0,
+            msg="Tax amount must include at least $10 product tax",
+        )
+        self.assertGreater(
+            invoice.amount_total, 110.0,
+            msg="Invoice total must exceed untaxed amount (tax present)",
+        )
