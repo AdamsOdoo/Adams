@@ -233,7 +233,12 @@ class TestPaymentRegistration(ShopifyAccountingMixin, TransactionCase):
         self.assertEqual(len(payments), 1, "Should have exactly one payment")
 
     def test_gateway_mapping_journal(self):
-        """Payment gateway mapping should select the correct journal."""
+        """Payment gateway mapping should select the correct mapped journal.
+
+        When _get_transaction_gateway returns a gateway name that matches a
+        shopify.payment.gateway record, _resolve_payment_journal must return
+        that gateway's journal — not the fallback bank journal.
+        """
         # Create a specific gateway mapping
         stripe_journal = self.env['account.journal'].create({
             'name': 'Stripe',
@@ -249,9 +254,42 @@ class TestPaymentRegistration(ShopifyAccountingMixin, TransactionCase):
         })
 
         handler = self._get_handler()
-        journal = handler._resolve_payment_journal(self.binding)
-        # Without transaction data, falls back to default bank journal
-        self.assertTrue(journal, "Should resolve a journal")
+        # Mock the API call so the gateway name is actually resolved
+        # (without the mock, Odoo's test request interceptor blocks the
+        # HTTP call and _get_transaction_gateway returns None, silently
+        # falling through to the bank-journal fallback).
+        with patch.object(handler, '_get_transaction_gateway', return_value='stripe'):
+            journal = handler._resolve_payment_journal(self.binding)
+
+        self.assertEqual(
+            journal, stripe_journal,
+            "Gateway 'stripe' must resolve to the mapped Stripe journal, "
+            "not the fallback bank journal",
+        )
+
+    def test_unknown_gateway_falls_back_to_bank_journal(self):
+        """Unknown gateway name should fall back to the default bank journal.
+
+        When no shopify.payment.gateway record matches the gateway name
+        returned by the Shopify API, _resolve_payment_journal must return
+        the company's default bank journal as a last resort.
+        """
+        # Ensure a bank journal exists (ShopifyAccountingMixin creates one)
+        bank_journal = self.env['account.journal'].search([
+            ('type', '=', 'bank'),
+            ('company_id', '=', self.env.company.id),
+        ], limit=1)
+        self.assertTrue(bank_journal, "Precondition: bank journal must exist")
+
+        handler = self._get_handler()
+        # Mock with a gateway name that has no matching gateway record
+        with patch.object(handler, '_get_transaction_gateway', return_value='unknown_provider'):
+            journal = handler._resolve_payment_journal(self.binding)
+
+        self.assertEqual(
+            journal, bank_journal,
+            "Unknown gateway must fall back to the default bank journal",
+        )
 
     def test_no_journal_schedules_activity(self):
         """Missing journal should schedule activity instead of crashing."""
