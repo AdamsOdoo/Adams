@@ -194,7 +194,25 @@ class RefundImporter:
         # ── Account pre-validation (mirrors _auto_create_invoice) ────
         # Resolve the journal's default income account as a fallback for
         # products that lack an income account on template or category.
+        # Fallback chain: journal default → original invoice lines → any
+        # income account in the company.
         journal_default_account = journal.default_account_id
+        if not journal_default_account:
+            # Try the account used on the original posted invoice's product
+            # lines (most accurate for the merchant's chart of accounts).
+            posted_inv_lines = order.invoice_ids.filtered(
+                lambda i: i.state == 'posted' and i.move_type == 'out_invoice'
+            ).mapped('invoice_line_ids').filtered(
+                lambda l: l.display_type == 'product' and l.account_id
+            )
+            if posted_inv_lines:
+                journal_default_account = posted_inv_lines[0].account_id
+        if not journal_default_account:
+            # Last resort: any income account in the company
+            journal_default_account = self.env['account.account'].search([
+                ('account_type', '=', 'income'),
+                ('company_ids', 'in', [self.backend.company_id.id]),
+            ], limit=1)
 
         missing_accounts = []
         for rl in refund_lines:
@@ -245,21 +263,38 @@ class RefundImporter:
                         line_vals['account_id'] = account.id
                 else:
                     line_vals['name'] = 'Shopify Refund Item'
-                    # Non-product lines use journal default
+                    # Non-product lines must always have an explicit account
                     if journal_default_account:
                         line_vals['account_id'] = journal_default_account.id
+                    else:
+                        # Should not reach here (pre-validation catches it),
+                        # but guard defensively.
+                        continue
                 invoice_line_ids.append((0, 0, line_vals))
 
         # Fallback: single line for the total when no itemised lines exist
         # (e.g. manual / shipping-only refund).
         if not invoice_line_ids and refund_amount:
+            if not journal_default_account:
+                msg = (
+                    "Refund credit note skipped: no income account could be "
+                    "resolved (journal has no default account, no posted "
+                    "invoice lines, and no income account in the chart of "
+                    "accounts). Refund %s" % refund_data.get('id')
+                )
+                _logger.warning("Order %s: %s", order.name, msg)
+                order.activity_schedule(
+                    'mail.mail_activity_data_warning',
+                    summary="Shopify refund credit note failed",
+                    note=msg,
+                )
+                return None
             fallback_vals = {
                 'name': refund_data.get('note') or 'Shopify Refund',
                 'quantity': 1,
                 'price_unit': refund_amount,
+                'account_id': journal_default_account.id,
             }
-            if journal_default_account:
-                fallback_vals['account_id'] = journal_default_account.id
             invoice_line_ids.append((0, 0, fallback_vals))
 
         if not invoice_line_ids:

@@ -76,6 +76,7 @@ class TestRefundCreditNote(ShopifyAccountingMixin, TransactionCase):
         self.importer = RefundImporter.__new__(RefundImporter)
         self.importer.env = self.env
         self.importer.backend = self.backend
+        self.importer.client = MagicMock()
 
     def _make_refund_data(self, refund_id, amount, note='Test refund',
                           lines=None):
