@@ -277,12 +277,45 @@ class ShopifyBackend(models.Model):
     # ``webhook_secret`` are non-stored computed fields that decrypt
     # on read.  ``create()`` and ``write()`` intercept plaintext values,
     # validate, encrypt, and store in ``_encrypted_*`` columns.
+    #
+    # If decryption fails (e.g. database.uuid changed after a restore),
+    # the compute returns False instead of raising, so the form/list
+    # views remain openable.  ``credential_issue`` is a pure derived
+    # compute that detects "encrypted value present but decrypt returned
+    # False."  The hard error is deferred to API-use time
+    # (ShopifyClient.__init__).
+
+    credential_issue = fields.Boolean(
+        string='Credential Decryption Issue',
+        compute='_compute_credential_issue',
+        help="True when stored credentials cannot be decrypted, "
+             "typically after a database restore with a different UUID. "
+             "Re-enter your credentials to resolve.",
+    )
+
+    @api.depends('access_token', 'webhook_secret',
+                 '_encrypted_access_token', '_encrypted_webhook_secret')
+    def _compute_credential_issue(self):
+        for rec in self:
+            rec.credential_issue = bool(
+                (rec._encrypted_access_token and not rec.access_token)
+                or (rec._encrypted_webhook_secret and not rec.webhook_secret)
+            )
 
     @api.depends('_encrypted_access_token')
     def _compute_access_token(self):
         crypto = self.env['shopify.crypto']
         for rec in self:
-            rec.access_token = crypto.decrypt(rec._encrypted_access_token)
+            try:
+                rec.access_token = crypto.decrypt(rec._encrypted_access_token)
+            except ValueError:
+                _logger.warning(
+                    "Cannot decrypt access token for backend %s (id=%s). "
+                    "The database UUID may have changed (e.g. after a restore). "
+                    "Re-enter the token on the backend form.",
+                    rec.name, rec.id,
+                )
+                rec.access_token = False
 
     def _inverse_access_token(self):
         crypto = self.env['shopify.crypto']
@@ -299,7 +332,16 @@ class ShopifyBackend(models.Model):
     def _compute_webhook_secret(self):
         crypto = self.env['shopify.crypto']
         for rec in self:
-            rec.webhook_secret = crypto.decrypt(rec._encrypted_webhook_secret)
+            try:
+                rec.webhook_secret = crypto.decrypt(rec._encrypted_webhook_secret)
+            except ValueError:
+                _logger.warning(
+                    "Cannot decrypt webhook secret for backend %s (id=%s). "
+                    "The database UUID may have changed (e.g. after a restore). "
+                    "Re-enter the secret on the backend form.",
+                    rec.name, rec.id,
+                )
+                rec.webhook_secret = False
 
     def _inverse_webhook_secret(self):
         crypto = self.env['shopify.crypto']
@@ -356,9 +398,57 @@ class ShopifyBackend(models.Model):
 
         Override this method in test / simulator modules to substitute a
         different client implementation without monkey-patching.
+
+        If the access token is missing or cannot be decrypted, a
+        ``ShopifyAPIError`` is raised from the client constructor.  When
+        this is due to a credential-decryption issue, we schedule a
+        debounced activity so the merchant is notified.
         """
         from ..shopify_api.client import ShopifyClient
-        return ShopifyClient(self)
+        try:
+            return ShopifyClient(self)
+        except Exception:
+            if self.credential_issue:
+                # Note: activity may not persist if the caller's
+                # transaction rolls back on the re-raise; the form
+                # banner (credential_issue compute) is the primary signal.
+                try:
+                    self._schedule_credential_activity()
+                except Exception:
+                    _logger.warning(
+                        "Could not schedule credential activity for "
+                        "backend %s (id=%s), will re-raise original error.",
+                        self.name, self.id, exc_info=True,
+                    )
+            raise
+
+    _CREDENTIAL_ACTIVITY_SUMMARY = "Shopify credentials need re-entry"
+
+    def _schedule_credential_activity(self):
+        """Schedule (debounced) an activity for credential decryption failure.
+
+        Uses activity_type + exact summary + record as the debounce key,
+        so unrelated activities are never suppressed.
+        """
+        activity_type = self.env.ref('mail.mail_activity_data_warning')
+        existing = self.env['mail.activity'].search([
+            ('res_model', '=', self._name),
+            ('res_id', '=', self.id),
+            ('activity_type_id', '=', activity_type.id),
+            ('summary', '=', self._CREDENTIAL_ACTIVITY_SUMMARY),
+        ], limit=1)
+        if not existing:
+            self.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary=self._CREDENTIAL_ACTIVITY_SUMMARY,
+                note=_(
+                    "The Shopify access token or webhook secret could "
+                    "not be decrypted. This usually happens after "
+                    "restoring a database from a different instance. "
+                    "Open the backend form and re-enter both "
+                    "credentials to restore connectivity."
+                ),
+            )
 
     @api.depends('state', 'last_sync_date')
     @api.depends_context('uid')

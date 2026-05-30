@@ -7,10 +7,11 @@ These tests MUST pass before the migration script runs.  They prove:
 3. _make_api_client() still gets correct plaintext
 4. Token never appears in logs
 5. test_connection still succeeds end-to-end (mocked)
+6. Decrypt failure degrades gracefully (form openable, not raising)
 """
 import logging
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
 
@@ -203,3 +204,217 @@ class TestBackendEncryptedFields(TransactionCase):
         self.assertNotEqual(copied_enc_token, orig_enc_token)
         # Webhook secret should be empty (copy=False, not re-set)
         self.assertFalse(copied_enc_secret)
+
+
+class TestCredentialDecryptionRecovery(TransactionCase):
+    """Regression tests for P1-10: decrypt failure must not brick the UI.
+
+    When the database UUID changes (restore, clone), Fernet decryption
+    fails.  Previously, the _compute_* methods propagated the ValueError,
+    crashing form/list views and 500-ing every webhook.
+
+    After the fix, the computes catch the error and return False; a
+    ``credential_issue`` computed flag surfaces the problem in the UI;
+    and the hard failure is deferred to API-use time
+    (ShopifyClient.__init__).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.backend = self.env['shopify.backend'].create({
+            'name': 'Decrypt Recovery Test',
+            'shop_url': 'decrypt-test.myshopify.com',
+            'access_token': 'shpat_valid_token_for_recovery_test',
+            'company_id': self.env.company.id,
+        })
+        self.backend.webhook_secret = 'whsec_valid_secret_for_test'
+        self.env.flush_all()
+
+    def _corrupt_credentials(self):
+        """Overwrite encrypted columns with un-decryptable garbage."""
+        self.env.cr.execute(
+            "UPDATE shopify_backend "
+            "SET _encrypted_access_token = %s, "
+            "    _encrypted_webhook_secret = %s "
+            "WHERE id = %s",
+            ('not-a-valid-fernet-token', 'also-not-valid', self.backend.id),
+        )
+        self.env.invalidate_all()
+
+    # ── (a) Undecryptable credential → readable, False, flag set ──
+
+    def test_decrypt_failure_does_not_raise_on_read(self):
+        """Reading a backend with corrupt credentials must NOT raise.
+
+        Before the fix, this raises ValueError from decrypt(), crashing
+        the form and list views.
+        """
+        self._corrupt_credentials()
+        # This line is the regression — it MUST NOT raise
+        backend = self.env['shopify.backend'].browse(self.backend.id)
+        self.assertFalse(backend.access_token)
+        self.assertFalse(backend.webhook_secret)
+        self.assertTrue(backend.credential_issue)
+
+    # ── (b) Re-entering credentials clears the flag ──
+
+    def test_reenter_token_clears_credential_issue(self):
+        """Re-entering credentials must clear credential_issue."""
+        self._corrupt_credentials()
+        backend = self.env['shopify.backend'].browse(self.backend.id)
+        # Trigger the compute so credential_issue is set
+        self.assertTrue(backend.credential_issue)
+        # Re-enter both credentials via the inverse fields
+        backend.access_token = 'shpat_fresh_token'
+        backend.webhook_secret = 'whsec_fresh_secret'
+        self.env.invalidate_all()
+        backend = self.env['shopify.backend'].browse(self.backend.id)
+        self.assertFalse(backend.credential_issue)
+        self.assertEqual(backend.access_token, 'shpat_fresh_token')
+        self.assertEqual(backend.webhook_secret, 'whsec_fresh_secret')
+
+    # ── (c) Webhook path with bad secret → no crash, HMAC rejects ──
+
+    def test_webhook_corrupt_secret_no_crash(self):
+        """Webhook flow must not crash when secret is undecryptable.
+
+        Proves the read-then-HMAC path that the webhook controller
+        follows, but does NOT exercise the full HTTP endpoint
+        end-to-end (the ``@http.route`` decorator's ``Response.load``
+        wrapper rejects non-Response returns, making TransactionCase
+        controller calls impractical; a full end-to-end test would
+        require ``HttpCase`` + a running HTTP server).
+
+        **What this test proves:**
+        1. ``backend.webhook_secret`` read (the line that previously
+           raised ``ValueError``) now returns ``False`` without raising.
+        2. ``_verify_hmac(body, hmac, False)`` returns ``False``
+           (existing guard at line 217), which the controller uses
+           to return 401.
+
+        **Controller composition verified by inspection:**
+        Between ``browse(backend_id)`` (line 88) and the HMAC check
+        (line 113), the controller only reads stored fields
+        (``exists()``, ``state``, ``shop_url``).  None of these
+        trigger decrypt computes.  ``backend.webhook_secret`` at
+        line 113 is the sole decrypt-compute access, so if it
+        returns ``False`` without raising (proven here), the
+        controller reaches ``_verify_hmac`` and returns 401.
+        """
+        self._corrupt_credentials()
+        self.backend.state = 'connected'
+
+        # Step 1: reproduce the exact controller access pattern
+        # (sudo browse, then read webhook_secret) — line 88 + 113
+        backend = self.env['shopify.backend'].sudo().browse(self.backend.id)
+
+        # Also read the stored fields the controller reads between
+        # browse and HMAC, confirming they don't blow up on a
+        # credential_issue backend:
+        self.assertTrue(backend.exists())
+        self.assertEqual(backend.state, 'connected')
+        _ = backend.shop_url  # stored field, must not raise
+
+        # The critical line — previously raised ValueError:
+        secret = backend.webhook_secret  # Must NOT raise
+        self.assertFalse(
+            secret,
+            "Corrupt secret must decrypt to False, not raise",
+        )
+
+        # Step 2: verify that _verify_hmac handles the False secret
+        # exactly as the webhook controller would use it (line 113)
+        from ..controllers.webhook import ShopifyWebhookController
+        result = ShopifyWebhookController._verify_hmac(
+            b'{"id": 123}', 'some-hmac-value', secret,
+        )
+        self.assertFalse(
+            result,
+            "HMAC check must return False (→ 401), not crash",
+        )
+
+    # ── (d) API use with missing token fails loudly ──
+
+    def test_api_client_missing_token_raises(self):
+        """_make_api_client() with undecryptable token must raise loudly.
+
+        The form/list gracefully degrade (access_token=False), but
+        actually creating an API client with absent credentials must
+        fail with a clear error, not silently send requests.
+        """
+        self._corrupt_credentials()
+        backend = self.env['shopify.backend'].browse(self.backend.id)
+        # Verify the prerequisite: access_token is False (not raising)
+        self.assertFalse(backend.access_token)
+        # But creating an API client must raise
+        with self.assertRaises(Exception) as cm:
+            backend._make_api_client()
+        self.assertIn('access token', str(cm.exception).lower())
+
+    # ── (e) Happy path unchanged ──
+
+    def test_valid_credentials_still_decrypt(self):
+        """Valid credentials must still decrypt exactly as before."""
+        backend = self.env['shopify.backend'].browse(self.backend.id)
+        self.assertEqual(
+            backend.access_token, 'shpat_valid_token_for_recovery_test',
+        )
+        self.assertEqual(
+            backend.webhook_secret, 'whsec_valid_secret_for_test',
+        )
+        self.assertFalse(backend.credential_issue)
+
+    # ── (f) Activity scheduling: debounced, exactly once ──
+
+    def test_make_api_client_schedules_one_activity(self):
+        """_make_api_client on a credential_issue backend must schedule
+        exactly ONE activity, even when called multiple times.
+
+        Verifies the debounce: the second call must find the existing
+        activity (matched by activity_type + exact summary + record)
+        and skip creation.
+        """
+        self._corrupt_credentials()
+        backend = self.env['shopify.backend'].browse(self.backend.id)
+
+        Activity = self.env['mail.activity']
+        domain = [
+            ('res_model', '=', 'shopify.backend'),
+            ('res_id', '=', backend.id),
+            ('summary', '=', backend._CREDENTIAL_ACTIVITY_SUMMARY),
+        ]
+
+        # No activities before
+        self.assertFalse(Activity.search(domain))
+
+        # First call — should raise AND schedule activity.
+        # We catch manually rather than using assertRaises, because
+        # the re-raised exception can trigger ORM cache invalidation
+        # before we get a chance to check the activity records.
+        raised = False
+        try:
+            backend._make_api_client()
+        except Exception:
+            raised = True
+            # Flush immediately while still in the except context,
+            # before any ORM cleanup can discard the pending write
+            self.env.flush_all()
+        self.assertTrue(raised, "_make_api_client must raise on bad credentials")
+
+        activities = Activity.search(domain)
+        self.assertEqual(len(activities), 1, "First call must create one activity")
+
+        # Second call — should raise but NOT create a duplicate
+        raised = False
+        try:
+            backend._make_api_client()
+        except Exception:
+            raised = True
+            self.env.flush_all()
+        self.assertTrue(raised)
+
+        activities = Activity.search(domain)
+        self.assertEqual(
+            len(activities), 1,
+            "Second call must NOT duplicate the activity",
+        )

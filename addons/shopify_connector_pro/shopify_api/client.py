@@ -104,6 +104,12 @@ class ShopifyClient:
             )
         self.shop_url = f"https://{host}"
         self.access_token = backend.access_token
+        if not self.access_token:
+            raise ShopifyAPIError(
+                "Cannot create API client: Shopify access token is missing or "
+                "could not be decrypted. Please re-enter your credentials on "
+                "the backend configuration."
+            )
         self.api_version = backend.api_version or '2026-01'
         self.rate_limiter = ShopifyRateLimiter()
         self.circuit_breaker = CircuitBreaker()
