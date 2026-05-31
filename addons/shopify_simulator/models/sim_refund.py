@@ -3,7 +3,14 @@
 
 Simulates Shopify refund data returned by FETCH_REFUNDS and
 created via the refundCreate mutation.
+
+The response shape must match every field the connector's
+FETCH_REFUNDS query requests (shopify_api/queries/refund.py):
+  - refundLineItems.totalTaxSet
+  - refundShippingLines (subtotalAmountSet + taxAmountSet)
+  - orderAdjustments (amountSet + taxAmountSet + reason)
 """
+import json
 import logging
 
 from odoo import api, fields, models
@@ -52,6 +59,24 @@ class SimShopifyRefund(models.Model):
         'sim.shopify.refund.line', 'refund_id', string='Refund Lines',
     )
 
+    # ── Shipping refund (inline — one shipping line per refund) ──
+    shipping_refund_subtotal = fields.Float(
+        string='Shipping Refund Subtotal', default=0.0,
+        help='Shipping refund amount (pre-tax) in shop currency.',
+    )
+    shipping_refund_tax = fields.Float(
+        string='Shipping Refund Tax', default=0.0,
+        help='Tax on shipping refund in shop currency.',
+    )
+
+    # ── Order adjustments (JSON array) ──
+    order_adjustments_json = fields.Text(
+        string='Order Adjustments (JSON)',
+        help='JSON array of {amount, tax_amount, reason} dicts. '
+             'Each emits an orderAdjustment node in the FETCH_REFUNDS '
+             'response.',
+    )
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -67,7 +92,11 @@ class SimShopifyRefund(models.Model):
         return super().create(vals_list)
 
     def _to_graphql_node(self):
-        """Return dict matching Shopify FETCH_REFUNDS response shape."""
+        """Return dict matching Shopify FETCH_REFUNDS response shape.
+
+        Must include every field the connector's FETCH_REFUNDS query
+        requests — see shopify_api/queries/refund.py.
+        """
         self.ensure_one()
         cc = self.currency_code or 'USD'
         pc = self.presentment_currency_code or cc
@@ -75,6 +104,38 @@ class SimShopifyRefund(models.Model):
         refund_line_edges = []
         for line in self.refund_line_ids:
             refund_line_edges.append({'node': line._to_graphql_node(cc, pc)})
+
+        # refundShippingLines: only emit if there's a shipping refund
+        shipping_edges = []
+        if self.shipping_refund_subtotal or self.shipping_refund_tax:
+            shipping_edges.append({
+                'node': {
+                    'subtotalAmountSet': _money_set(
+                        self.shipping_refund_subtotal, cc, pc,
+                    ),
+                    'taxAmountSet': _money_set(
+                        self.shipping_refund_tax, cc, pc,
+                    ),
+                },
+            })
+
+        # orderAdjustments: parse from JSON
+        adjustments = []
+        if self.order_adjustments_json:
+            try:
+                raw = json.loads(self.order_adjustments_json)
+                for adj in raw:
+                    adjustments.append({
+                        'amountSet': _money_set(
+                            float(adj.get('amount', 0)), cc, pc,
+                        ),
+                        'taxAmountSet': _money_set(
+                            float(adj.get('tax_amount', 0)), cc, pc,
+                        ),
+                        'reason': adj.get('reason', 'other'),
+                    })
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         return {
             'id': self.shopify_gid,
@@ -88,6 +149,10 @@ class SimShopifyRefund(models.Model):
             'refundLineItems': {
                 'edges': refund_line_edges,
             },
+            'refundShippingLines': {
+                'edges': shipping_edges,
+            },
+            'orderAdjustments': adjustments,
         }
 
 
@@ -117,6 +182,10 @@ class SimShopifyRefundLine(models.Model):
         default=0.0, string='Subtotal',
         help='Refund amount for this line in shop currency.',
     )
+    tax_amount = fields.Float(
+        default=0.0, string='Tax Amount',
+        help='Tax refunded for this line in shop currency.',
+    )
 
     def _to_graphql_node(self, currency='USD', presentment_currency='USD'):
         """Return dict matching Shopify refundLineItem node shape."""
@@ -138,5 +207,8 @@ class SimShopifyRefundLine(models.Model):
             'restockType': self.restock_type or 'NO_RESTOCK',
             'subtotalSet': _money_set(
                 self.subtotal, currency, presentment_currency,
+            ),
+            'totalTaxSet': _money_set(
+                self.tax_amount, currency, presentment_currency,
             ),
         }

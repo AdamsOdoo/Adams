@@ -551,3 +551,13 @@ class TestImageNodeShape(TransactionCase):
             product.image_1920,
             "Product image_1920 should be set from the downloaded image.",
         )
+
+
+# ======================================================================
+# B-6: Refund response fidelity guard + taxed e2e refund test
+# ======================================================================
+# NOTE: These tests live in the shopify_simulator module
+# (tests/test_refund_fidelity.py) because they need access to both
+# simulator models AND connector models. The simulator depends on
+# shopify_connector_pro, so its tests can access both.
+# ======================================================================

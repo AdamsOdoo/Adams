@@ -19,3 +19,5 @@ from . import test_ui_features
 from . import test_phase34_models
 # Fidelity guard (prevents simulator/connector shape divergence)
 from . import test_fidelity_guard
+# Refund fidelity: response shape guard + taxed e2e refund test
+from . import test_refund_fidelity
