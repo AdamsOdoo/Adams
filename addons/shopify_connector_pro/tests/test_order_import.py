@@ -384,16 +384,21 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
     # ── Taxed order import baseline ────────────────────────────────
 
     def test_import_taxed_order_creates_invoice_with_tax_lines(self):
-        """Import a PAID order with product tax → invoice must carry
-        tax lines and amount_total must include tax.
+        """Regression guard for the tax_id→tax_ids fix (0eaae3b).
 
-        This is the forward-path baseline for all tax correctness
-        work.  The import path maps Shopify taxLines to Odoo taxes
-        via rate matching (_resolve_taxes), and _create_invoices()
-        carries those taxes to the invoice.
+        Uses the full production import path (import_batch with its
+        savepoint + except wrapper) so the test reproduces the exact
+        production symptom:
 
-        Not a fail-before/pass-after (the path works today) — this
-        is a regression guard that locks the behaviour.
+          BEFORE FIX: import_batch catches the ValueError for the
+          nonexistent 'tax_id' field, counts errors=1, and the
+          order is never created.  The test asserts no binding exists
+          and errors == 1.
+
+          AFTER FIX: import_batch succeeds, the order is imported
+          with tax_ids on the SO line, and the auto-invoice carries
+          tax.  The test asserts success == 1, binding exists, and
+          invoice.amount_tax >= $10.
         """
         from ..sync.order_sync import OrderImporter
 
@@ -510,23 +515,19 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
         # auto_create_invoice is True by default
         self.assertTrue(self.backend.auto_create_invoice)
 
-        importer = OrderImporter.__new__(OrderImporter)
-        importer.env = self.env
-        importer.backend = self.backend
-        importer.client = MagicMock()
-        importer._currency_cache = {}
-        importer._pricelist_cache = {}
-        importer._shipping_product = None
-        importer._country_cache = {}
-        importer._state_cache = {}
+        # Use full production path: import_batch (savepoint + except)
+        importer = OrderImporter(self.env, self.backend)
+        success, errors, skipped = importer.import_batch([node])
 
-        importer._import_one(node, existing_binding=None)
+        # After fix: import succeeds
+        self.assertEqual(success, 1, "Taxed order import must succeed")
+        self.assertEqual(errors, 0, "No errors expected")
 
         binding = self.env['shopify.order.binding'].search([
             ('backend_id', '=', self.backend.id),
             ('shopify_id', '=', 'gid://shopify/Order/TAX001'),
         ])
-        self.assertTrue(binding)
+        self.assertTrue(binding, "Order binding must exist after import")
         order = binding.odoo_id
         self.assertIn(order.state, ('sale', 'done'))
 
