@@ -2,6 +2,7 @@
 import logging
 
 from odoo import fields
+from odoo.tools import config
 
 _logger = logging.getLogger(__name__)
 
@@ -64,6 +65,11 @@ class BaseImporter:
                     _logger.info("Duplicate binding for %s %s — skipping", self.entity_name, shopify_id)
                     skipped += 1
                 else:
+                    # Under test mode, re-raise non-Integrity exceptions
+                    # so field-name bugs and programming errors fail CI
+                    # instead of being silently swallowed.
+                    if config['test_enable']:
+                        raise
                     _logger.warning(
                         "Import failed for %s %s: %s",
                         self.entity_name, shopify_id, e,
@@ -72,6 +78,26 @@ class BaseImporter:
                     error_details.append(f"{shopify_id}: {e}")
 
         log._finalize(success, errors, skipped, '\n'.join(error_details) or None)
+
+        # Surface import errors as a warning activity on the backend
+        # so the merchant sees them in the UI (not just server logs).
+        if errors > 0:
+            detail_str = '\n'.join(error_details)
+            summary = "Shopify %s import: %d error(s)" % (
+                self.entity_name, errors,
+            )
+            note = "%d of %d %s failed to import.\n\n%s" % (
+                errors,
+                success + errors + skipped,
+                self.entity_name,
+                detail_str,
+            )
+            self.backend.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary=summary,
+                note=note,
+            )
+
         return success, errors, skipped
 
     def _compute_shopify_checksum(self, node):
