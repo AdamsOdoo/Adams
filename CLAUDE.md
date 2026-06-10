@@ -111,17 +111,43 @@ audit for defects, not preferences.
     Ahmed runs or relays those confirmation commands.
   - Anything verifiable only against Enterprise code is flagged
     "unverified — needs build check".
-- Local setup (record exact verified commands here once the build is green;
-  update this section without approval as facts are learned):
-  - Odoo core: `/home/user/odoo` (odoo/odoo, branch 19.0, shallow clone).
-  - Test command (template, to be confirmed):
-    `python3 /home/user/odoo/odoo-bin -d <db> --addons-path=/home/user/odoo/addons,/home/user/Adams/addons -i shopify_connector_pro,shopify_simulator --test-tags <tags> --stop-after-init --no-http`
+- Local setup (VERIFIED 2026-06-10, suite green on adams_strict1):
+  - Odoo core: `/home/user/odoo` (odoo/odoo branch 19.0, shallow clone,
+    commit 07a333c8). PostgreSQL 16 local cluster, DB user `root`.
+  - Python dep quirks vs upstream requirements.txt (Python 3.11 here):
+    `psycopg2-binary` instead of psycopg2; unpinned `rjsmin`/`vobject`
+    (pinned versions fail to build); `docopt-ng` + `num2words --no-deps`;
+    system `cryptography 41.0.7` kept with `urllib3==2.0.7` and
+    `pyopenssl==24.1.0` (the Noble combo — Jammy's urllib3 1.26.5 is
+    incompatible with cryptography ≥39); `beautifulsoup4` added.
+  - Test command (verified):
+    `python3 /home/user/odoo/odoo-bin -d <db> --addons-path=/home/user/odoo/addons,/home/user/Adams/addons -u shopify_connector_pro,shopify_simulator,shopify_connector_pro_dashboard --test-tags /shopify_connector_pro,/shopify_simulator,/shopify_connector_pro_dashboard --stop-after-init --no-http --log-level=info`
+  - DB profiles (kept in the local cluster; recreate with the steps below):
+    1. `adams_test_fresh` — fresh install, NO chart of accounts. Exposes
+       env-sensitivity: 4 tests error (account.tax without tax_group_id —
+       AUDIT.md ENV-1). Baseline 2026-06-10: 0 failed, 4 errors of 532.
+    2. `adams_strict1` — install `l10n_generic_coa` + the 3 modules, then
+       apply the chart via odoo shell
+       (`env['account.chart.template'].try_loading('generic_coa', env.company)`),
+       then run tests via `-u` (exercises the upgraded/existing-data path,
+       not fresh-install-only). Baseline 2026-06-10: 0 failed, 0 errors of
+       532 (shopify_connector_pro 280 + shopify_simulator 241 at_install,
+       11 post-install).
+    3. `adams_strict_vat` — clone of adams_strict1 with
+       `env.company.account_price_include = 'tax_included'` (verified field,
+       odoo/addons/account/models/company.py:282), EUR activated,
+       base.group_multi_currency implied for internal users. Baseline
+       2026-06-10: 1 failed, 0 errors of 532 — caught AUD-001 (VAT-inclusive
+       order import totals).
 - Strict DB: its definition is not recorded anywhere; we derive it. For each
   financial bug in LEGACY_NOTES.md §1, determine what DB condition surfaced
   it (localization/chart of accounts, multi-currency, rounding settings,
   constraints, existing data vs fresh install) and configure local test DBs
-  to reproduce those conditions. Document the resulting "strict profile"
-  here. Known-relevant facts from Ahmed:
+  to reproduce those conditions. Derivation status: chart-presence,
+  upgraded-DB, and VAT-inclusive+multi-currency conditions are reproduced by
+  profiles 1–3 above; per-bug derivation for the remaining LEGACY_NOTES.md §1
+  financial bugs continues during Tier 1/4, extending the profile list here.
+  Known-relevant facts from Ahmed:
   - A UoM rounding fix in a sibling project was silently ignored on EXISTING
     databases and needed a post_init_hook — always test against
     upgraded/existing-data DBs, not only fresh installs.
