@@ -115,3 +115,18 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_co
 ```
 
 Expected: 0 failed, 0 errors of 3 / of 6 / of 6 respectively.
+
+## Item 3b evidence trail (AUD-016 — explicit zero-tax lines)
+
+- Fail-before: 2 failed, 0 errors of 2 (TestUntaxedOrderImport,
+  adams_strict1) — both tests showed Shopify-untaxed lines inheriting the
+  company default 15% sale tax through the production import path.
+- Fix: order_sync.py `_create_order_line` — `tax_ids` is now ALWAYS set
+  explicitly: resolved Shopify taxes, or `[(5,)]` (no taxes) when nothing
+  resolves; the product default sale tax can no longer leak onto imported
+  lines. Unmapped remainders are caught by the total-check guard (3a).
+- Pass-after: 0 failed, 0 errors of 14 (TestUntaxedOrderImport,
+  TestOrderImport, TestTotalGuardAutoInvoice).
+- Full suites: adams_strict1 0 failed, 0 errors of 549; adams_strict_vat
+  2 failed, 0 errors of 549 (unchanged known baseline: both AUD-001-rooted,
+  clear at 3e).
