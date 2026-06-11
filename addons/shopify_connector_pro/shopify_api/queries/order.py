@@ -115,6 +115,14 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
                 shopMoney { amount currencyCode }
                 presentmentMoney { amount currencyCode }
               }
+              taxLines {
+                title
+                rate
+                priceSet {
+                  shopMoney { amount currencyCode }
+                  presentmentMoney { amount currencyCode }
+                }
+              }
             }
           }
         }
