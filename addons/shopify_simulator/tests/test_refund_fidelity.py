@@ -226,6 +226,21 @@ class TestTaxedRefundE2E(ShopifyAccountingMixin, TransactionCase):
             'amount_type': 'percent',
             'company_id': self.env.company.id,
         })
+        # The fixture charges untaxed shipping; pre-create the shipping
+        # product WITHOUT the company default sale tax so the computed
+        # invoice matches the Shopify charge and the total-check guard
+        # (DEC-011) lets it post. The shipping default-tax leak itself is
+        # AUD-015 (item 3c) with its own coverage — not under test here.
+        if not self.env['product.product'].search(
+            [('default_code', '=', 'SHOPIFY-SHIPPING')], limit=1,
+        ):
+            self.env['product.product'].create({
+                'name': 'Shopify Shipping',
+                'default_code': 'SHOPIFY-SHIPPING',
+                'type': 'service',
+                'list_price': 0,
+                'taxes_id': [(5, 0, 0)],
+            })
 
     def test_taxed_partial_refund_e2e_through_simulator(self):
         """Seed a taxed order, build a partial refund from the

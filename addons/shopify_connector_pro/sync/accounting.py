@@ -121,6 +121,52 @@ def schedule_account_activity(order, summary, products, error=None):
     )
 
 
+def check_total_against_shopify(move, expected_total):
+    """Permanent total-check guard (DEC-011/012, AUD-001 workstream).
+
+    Compares the computed total of *move* against *expected_total* (the
+    Shopify charged total stamped on the order binding, in the same
+    currency as the move per items 1-2 of the currency workstream).
+
+    Returns ``(ok, tolerance)``. ``ok`` is True when *expected_total* is
+    falsy (no stamp — e.g. bindings created before the stamp field
+    existed; the guard must not fire on legacy data) or when the
+    difference is within tolerance (DEC-012: 2 × currency rounding —
+    absorbs per-line rounding drift, catches any real tax/price error).
+    """
+    if not expected_total:
+        return True, 0.0
+    tolerance = 2 * (move.currency_id.rounding or 0.01)
+    return abs(move.amount_total - expected_total) <= tolerance, tolerance
+
+
+def schedule_total_mismatch_activity(order, move, expected_total, tolerance):
+    """Visible degradation for a blocked posting (rule 5 / DEC-011)."""
+    note = (
+        "Invoice %(move)s totals %(computed).2f %(ccy)s but Shopify "
+        "charged %(expected).2f %(ccy)s for order %(order)s (allowed "
+        "difference: %(tol).2f). The invoice was left in DRAFT to protect "
+        "your books. Common causes: a tax configured differently in Odoo "
+        "than in Shopify (check Shopify > Configuration > Tax Mappings), "
+        "or shipping taxes. Review the invoice, fix the cause, then post "
+        "it manually — or run Retry Sync after fixing." % {
+            'move': move.name or '(draft)',
+            'computed': move.amount_total,
+            'expected': expected_total,
+            'ccy': move.currency_id.name,
+            'order': order.name,
+            'tol': tolerance,
+        }
+    )
+    _logger.warning("Order %s: total-check guard blocked posting — %s",
+                    order.name, note)
+    order.activity_schedule(
+        'mail.mail_activity_data_warning',
+        summary="Shopify total mismatch — invoice NOT posted",
+        note=note,
+    )
+
+
 # ------------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------------

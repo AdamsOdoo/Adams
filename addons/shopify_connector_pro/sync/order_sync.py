@@ -15,7 +15,12 @@ def _parse_shopify_dt(dt_str):
     except (ValueError, TypeError):
         return False
 
-from .accounting import validate_order_income_accounts, schedule_account_activity
+from .accounting import (
+    check_total_against_shopify,
+    schedule_account_activity,
+    schedule_total_mismatch_activity,
+    validate_order_income_accounts,
+)
 from .base_exporter import BaseExporter
 from .base_importer import BaseImporter
 from .checksum import compute_checksum
@@ -97,6 +102,8 @@ class OrderImporter(BaseImporter):
             if order:
                 existing_binding.write({
                     'odoo_id': order.id,
+                    'shopify_total_amount': self._get_money_amount(
+                        node.get('totalPriceSet')),
                     'sync_status': 'synced',
                     'sync_error': False,
                     'shopify_financial_status': financial_status,
@@ -153,6 +160,8 @@ class OrderImporter(BaseImporter):
                 order_binding = self.env['shopify.order.binding'].create({
                     'backend_id': self.backend.id,
                     'odoo_id': order.id,
+                    'shopify_total_amount': self._get_money_amount(
+                        node.get('totalPriceSet')),
                     'shopify_id': shopify_id,
                     'shopify_order_name': node.get('name', ''),
                     'shopify_financial_status': financial_status,
@@ -323,7 +332,10 @@ class OrderImporter(BaseImporter):
             if self.backend.auto_create_invoice:
                 fin_status = order_vals['shopify_financial_status']
                 if fin_status in ('paid', 'partially_paid'):
-                    self._auto_create_invoice(order)
+                    self._auto_create_invoice(
+                        order,
+                        self._get_money_amount(node.get('totalPriceSet')),
+                    )
                     if fin_status == 'partially_paid':
                         order.activity_schedule(
                             'mail.mail_activity_data_todo',
@@ -334,7 +346,7 @@ class OrderImporter(BaseImporter):
 
         return order
 
-    def _auto_create_invoice(self, order):
+    def _auto_create_invoice(self, order, expected_total=0.0):
         """Create and post an invoice inside a savepoint.
 
         A savepoint isolates accounting failures (missing income account,
@@ -373,6 +385,18 @@ class OrderImporter(BaseImporter):
                     shopify_no_auto_export=True,
                 )._create_invoices()
                 if invoice:
+                    # Permanent total-check guard (DEC-011): never post
+                    # an invoice whose total differs from what Shopify
+                    # actually charged. The invoice stays in draft with
+                    # a visible activity.
+                    ok, tol = check_total_against_shopify(
+                        invoice, expected_total,
+                    )
+                    if not ok:
+                        schedule_total_mismatch_activity(
+                            order, invoice, expected_total, tol,
+                        )
+                        return
                     invoice.with_context(
                         shopify_no_auto_export=True,
                     ).action_post()
