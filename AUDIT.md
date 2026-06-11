@@ -420,6 +420,175 @@ AUD-001 (2026-06-10) — VAT-inclusive company breaks taxed order import totals
   in three of the four store×company combinations. The AUD-001 branch map
   is the implementation spec; the AUD-001 guard is the v1 stopgap.
 
+## AUD-019 — Refund credit notes are created without currency: foreign-currency refunds are misbooked
+
+- **Severity:** critical (wrong money posted silently in a realistic configuration)
+- **Status:** open (verified — Tier 1)
+- **Evidence:**
+  - `sync/refund_sync.py:358-365` — `account.move.create({...})` passes
+    `move_type, partner_id, journal_id, invoice_origin, ref,
+    invoice_line_ids` — NO `currency_id`. The move therefore defaults to the
+    journal/company currency.
+  - Amounts on those lines come from `_money()`
+    (`refund_sync.py:59-69`), which returns presentment- or shop-currency
+    amounts per `backend.import_currency_mode`.
+  - The original invoice, by contrast, IS in the order currency (order
+    import sets `currency_id` + auto-created pricelist,
+    `sync/order_sync.py:184-191`, `:434-457`).
+- **Description:** for any order whose currency differs from the company
+  currency (EUR presentment on a USD company, or EUR shop currency on a USD
+  company), the refund posts a credit note labeled in COMPANY currency
+  carrying ORDER-currency numerals. The receivable cannot reconcile against
+  the foreign-currency invoice, and the auto-balance delta
+  (`refund_sync.py:372`) compares amounts across currencies. Books are
+  wrong with no signal. (The >0.05 delta activity may fire incidentally —
+  with a misleading message.)
+- **Test gap:** suite is green because no test refunds a non-company-
+  currency order through the credit-note path (Tier 4 item).
+- **Proposed fix (not implemented):** set `currency_id` on the credit note
+  from the original invoice (preferred: `posted_invoices[0].currency_id`)
+  or the order currency; assert the `_money()` currency code matches it and
+  degrade visibly when it doesn't.
+
+## AUD-020 — Unresolvable order currency: import proceeds, foreign amounts booked as company currency
+
+- **Severity:** critical (silent misbooking in the DEFAULT Odoo configuration)
+- **Status:** open (verified — Tier 1)
+- **Evidence:**
+  - `sync/order_sync.py:405-432` — `_resolve_currency` returns `False` when
+    the currency is not found OR exists but is inactive (warning log:
+    "Currency %s is inactive; activate it to import order %s with correct
+    currency.").
+  - Caller `order_sync.py:183-191` — `if currency:` block simply skipped on
+    False → `order_vals` gets neither `currency_id` nor `pricelist_id` →
+    the sale order lands in company currency.
+  - Line amounts still come from `_get_money_amount`
+    (`order_sync.py:392-404`), which returns presentment/shop amounts
+    regardless of resolution outcome.
+- **Description:** Odoo ships all non-company currencies INACTIVE by
+  default, so a merchant with a USD company importing EUR-presentment
+  orders hits this on day one: 110.00 EUR order books as a 110.00 USD sale
+  order, invoice, and payment. Server-log warning only; order, invoice and
+  payment all look healthy. This is the silent-wrong-money pattern at its
+  worst.
+- **Proposed fix (not implemented):** when the currency cannot be resolved,
+  do not import silently — put the order binding in error state with an
+  actionable `sync_error` ("Activate currency EUR in Odoo, then retry"),
+  consistent with rule 5. Optionally auto-activate the currency (decision
+  for Ahmed — touches config policy).
+
+## AUD-021 — Refund idempotency hole: binding-create failure orphans a posted credit note → duplicate on retry
+
+- **Severity:** major (double credit notes possible; low probability, high
+  financial impact)
+- **Status:** open (verified — Tier 1)
+- **Evidence:**
+  - Dedup is ONLY the binding-existence check
+    (`refund_sync.py:42-48`).
+  - `_create_refund_credit_note` creates AND posts the credit note inside
+    its own savepoint (`refund_sync.py:356-403`), which is released before
+    the binding is created at `refund_sync.py:150`.
+  - A failure in `refund_binding.create()` (or anything between savepoint
+    release and binding creation) is caught by the per-refund handler
+    (`refund_sync.py:53-55`): the posted credit note SURVIVES in the
+    transaction, the binding does not exist, and the next sync re-imports
+    the refund and posts a second credit note.
+  - No secondary marker exists on the move (no refund GID stored; `ref` is
+    the free-text note), so no memo-style recovery guard is possible —
+    contrast with `_register_payment`'s two-layer idempotency
+    (`payment_status_sync.py:377-415`).
+- **Proposed fix (not implemented):** create the binding (error state)
+  BEFORE creating the credit note and update it after, OR wrap credit-note
+  + binding creation in one savepoint, AND stamp the refund GID on the
+  credit note (e.g. in `ref` or a dedicated field) with a search guard
+  mirroring the payment memo pattern.
+
+## AUD-022 — No cumulative over-refund guard on credit notes
+
+- **Severity:** major
+- **Status:** open (verified — Tier 1)
+- **Evidence:** `refund_sync.py:74` takes Shopify's `totalRefundedSet` as
+  truth; lines are built (`:226-346`) and the auto-balance delta
+  (`:367-401`) forces the credit-note total to equal the Shopify refund
+  amount. Nothing compares the refund — or the SUM of all refunds for the
+  order — against the posted invoice total or captured amount. The only
+  tripwire is the >0.05 delta activity (`:387-401`), which does NOT fire
+  when Shopify itemizes the full amount (delta ≈ 0).
+- **Description:** Shopify itself prevents refunding more than was
+  captured, so the realistic exposure is Odoo-side mismatch (partial
+  invoice, edited invoice, duplicate refund payloads, or AUD-021
+  duplicates): credit notes can exceed the invoiced/captured amount and
+  post silently.
+- **Proposed fix (not implemented):** before posting, compare cumulative
+  refund-binding amounts + current refund against the posted invoice
+  total (same currency per AUD-019); degrade visibly above tolerance.
+
+## AUD-023 — Refund line-building edge cases (bundled minor)
+
+- **Severity:** minor (failure modes end visibly via the savepoint +
+  activity backstop; bundled for the record)
+- **Status:** open (verified — Tier 1)
+- **Evidence / branches:**
+  - `refund_sync.py:230` — zero-qty or zero-amount refund lines are
+    skipped; any tax on them is recovered only via the untaxed delta
+    adjustment line.
+  - `refund_sync.py:259-264` — non-product line with no fallback account:
+    `continue` (silent drop); the delta line then re-adds the amount
+    untaxed, or the post fails into the visible handler (`:424-446`).
+  - `refund_sync.py:300-302` — shipping line appended without `account_id`
+    when no fallback account; relies on Odoo's product-based account
+    auto-resolution; crashes visibly only when nothing resolves.
+  - Tax-fallback branches (`:252-258`, `:296-299`) book gross amounts with
+    taxes cleared and DO schedule review activities — visible by design
+    (settled hardening; no finding).
+- **Proposed fix (not implemented):** log+count the `:264` silent drop;
+  resolve shipping account via `get_product_accounts` like product lines.
+
+---
+
+## Regression checklist — LEGACY_NOTES.md §1 (18 fixed bugs), verified 2026-06-11
+
+Method: subagent scan + my spot-verification of the two shakiest items
+(BUG-R2, BUG-EW-09). Suite context: 0 failed, 0 errors of 532 on
+adams_strict1 (2026-06-10 baseline).
+
+| Bug | Fix present? | Evidence | Test coverage |
+|---|---|---|---|
+| BUG-R1 | yes | refund_sync.py:114-117 None-guard | tested (test_core_workflow_hardening: TestRefundCreditNote, 6 methods) |
+| BUG-R2 | yes (evolved) | both sides now use full GIDs: product_sync.py:244-247 stores `sv.get('id')`; refund matching searches full GID (refund_sync.py:89-94) — spot-verified | tested (variant fixtures use full GIDs, e.g. test_core_workflow_hardening.py:746) |
+| BUG-O1 | yes | order_sync.py:647-708 rate fallback | tested (test_order_import taxed-order test) — but see AUD-001/015/016/017 |
+| BUG-O2 | yes | order_sync.py:625-629 + base_importer.py:52 | tested (TestZeroPriceDiscount) |
+| BUG-C1 | yes | collection_sync.py:52 | implicit only — Tier 4 gap |
+| BUG-CU1 | yes | customer_sync.py:159 backend_id in dedup | tested (TestCustomerExportTags + dedup tests) |
+| BUG-EW-08 | yes | base_importer.py:113 `_apply_import_mappings` | tested (test_field_mapping, 4+ methods) |
+| BUG-EW-12a | yes | shopify_reconciliation.py:137-143 all 5 models | tested (test_reconciliation) |
+| BUG-EW-12b | yes | shopify_reconciliation.py:161 increment | tested (test_retry_count_increments_not_resets) |
+| BUG-EW-14a | yes | customer_sync.py:77 strip-split | implicit only — Tier 4 gap |
+| BUG-EW-01a | yes | collection_export.py:45-53 skip w/o mark | implicit only — Tier 4 gap |
+| BUG-EW-02a | yes | metafield_sync.py:137-152 type-aware serializer | implicit only — Tier 4 gap |
+| BUG-EW-04a | yes | gift_card_sync.py:27-31, :96 | implicit only — Tier 4 gap |
+| BUG-EW-07 | yes | order_sync.py:695-706 warnings | tested — but drop branch is log-only (AUD-016) |
+| BUG-EW-09 | yes | product_sync.py:489-495 stale-image unlink — spot-verified | covered in test_product_sync |
+| BUG-EW-05a | yes | payout_sync.py:156-172 type validation | covered in test_payout_import |
+| EW side finding | yes | zero `self.env.with_company(` occurrences module-wide | exercised by suite execution |
+
+Verdict: 18/18 fixes present. 5 bugs covered only implicitly → explicit
+regression tests queued for Tier 4 (BUG-C1, EW-14a, EW-01a, EW-02a,
+EW-04a).
+
+## Tier 1 leads deferred to later tiers
+
+- product_sync.py:240 — POSITIONAL variant matching
+  (`odoo_variants[i] ... else odoo_variants[-1]`) when creating variant
+  bindings; mis-ordered variants would silently mis-bind products (wrong
+  product on orders/refunds). Needs Tier 2 verification of the call
+  contexts (export-create vs import paths; SKU-based path exists at :449).
+- shopify_reconciliation.py:95-126 — stale-binding heuristic warns on any
+  catalog unchanged >24h; log-only noise, counter discarded (Tier 3).
+- TestPaymentStatusSync exercises the gateway-fetch leg against the
+  harness's BlockedRequest instead of a mocked client (Tier 4, with the
+  AUD-002 timeout-tuple note).
+
 ---
 
 ## Environment-sensitivity notes (not defects in shipped code)

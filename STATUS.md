@@ -1,31 +1,37 @@
 # STATUS.md
 
-Updated: 2026-06-10 (session: STEP -1 reset + STEP 0 environment)
+Updated: 2026-06-11 (session: Tier 1 — financial correctness audit)
 
 ## Done this session
-- STEP -1: deleted 26 AI orchestration/instruction artifacts (approved kill
-  list); salvaged bug ledger, deferred features, known limitations, and the
-  mandatory accounting test recipe into LEGACY_NOTES.md; wrote the new
-  governing CLAUDE.md. Commit be0568b on claude/admiring-bell-e9g6qp.
-- STEP 0: SSH to Odoo.sh impossible (port 22 blocked) → hybrid runtime
-  approved and built: local Odoo 19 Community (commit 07a333c8) + PG16.
-  Test command + dependency quirks recorded in CLAUDE.md Environment.
-- Baseline runs (literal counts): adams_strict1 (chart applied, upgraded
-  path): 0 failed, 0 errors of 532 tests (connector 280 + simulator 241
-  at_install, 11 post-install). adams_test_fresh (chartless): 0 failed,
-  4 errors of 532 (ENV-1, test-setup gap). adams_strict_vat (tax-included
-  pricing + EUR): 1 failed, 0 errors of 532 → AUD-001.
-- AUDIT.md opened with: AUD-001 (major, VAT-inclusive order import totals
-  wrong, failing production-path test attached), AUD-002 (lead: swallowed
-  TypeError in payment transaction fetch, payment_status_sync.py:587-592),
-  ENV-1 (test-infra: account.tax without tax_group_id, 3 files).
+- AUD-002 resolved: TypeError = Odoo test-harness artifact
+  (core tests/common.py:341-344 vs client.py:21 tuple timeout); the real
+  finding is silent default-journal fallback. Full broad-except sweep of
+  financial code: 36 except clauses reviewed against rule 5 →
+  AUD-002..AUD-014 ledgered (4 major, 8 minor + 1 reclassified).
+- AUD-001 completed: full tax-resolution branch map in AUDIT.md (doubles as
+  the VAT-inclusive spec). Verdict for Ahmed: YES, a tax-included company
+  produces legally wrong posted invoices today. Three new tax findings:
+  AUD-015 (shipping taxed at company default rate — wrong on tax-excluded
+  companies too), AUD-016 (default-tax leak on unresolved/empty tax lines +
+  log-only drops), AUD-017 (fallback matches wrong tax flavor), AUD-018
+  (taxesIncluded never fetched — deferred-by-design spec item).
+- Refund/credit-note deep audit: AUD-019 (CRITICAL: credit note created
+  without currency_id — foreign-currency refunds misbooked), AUD-020
+  (CRITICAL: unresolvable/inactive currency → foreign amounts booked as
+  company currency, default Odoo config), AUD-021 (idempotency hole →
+  possible duplicate credit notes), AUD-022 (no cumulative over-refund
+  guard), AUD-023 (minor edge bundle).
+- Regression checklist: 18/18 LEGACY_NOTES fixes present (BUG-R2 evolved,
+  verified); 5 covered only implicitly → Tier 4 test backlog.
+- Reconciliation reviewed: financial checks write visible sync logs (good);
+  digest omits refund bindings from its error census.
 
 ## Next
-- CHECKPOINT: Ahmed reviews STEP 0 results, then Tier 1 begins (financial
-  correctness, line-by-line: payments, refunds, taxes, reconciliation).
-- Tier 1 must resolve AUD-001 root path and AUD-002 TypeError site.
-- Tier 4 backlog seeded: fix ENV-1 test setups (tax_group_id-safe).
+- CHECKPOINT: Ahmed reviews Tier 1 (this is the stop point).
+- Severity ranking and Phase 2 recommendation in the checkpoint report.
+- Tier 2 leads parked: positional variant matching (product_sync.py:240),
+  product/customer webhook swallow check (AUD-005 sibling paths).
 
 ## Open questions for Ahmed
-- None blocking; Odoo.sh confirmation pass channel to be exercised when the
-  first Phase 2 fix lands (per hybrid runtime rule).
+- AUD-001: approve "total-check guard" direction for v1 vs full deferral?
+- AUD-020: may the connector auto-activate currencies, or error-state only?
