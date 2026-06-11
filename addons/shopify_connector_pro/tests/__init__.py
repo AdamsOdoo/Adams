@@ -8,6 +8,7 @@ from . import test_customer_sync
 from . import test_order_import
 from . import test_order_currency
 from . import test_tax_fallback
+from . import test_taxes_included_import
 from . import test_total_guard
 from . import test_inventory_sync
 from . import test_promoter

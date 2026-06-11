@@ -64,9 +64,10 @@ pass-after 0/0 of 5 (TestTaxFallbackFlavor, strict1); full suites
 strict1 0/0 of 557, strict_vat 2/0 of 557 (unchanged known AUD-001
 pair).
 
-**No-go revert:** `git revert <3d-fix-sha> <3d-test-sha>` on the working
-branch (shas in section 2; revert both to drop the now-failing tests
-with the fix, or only the fix sha if you want the red tests kept).
+**No-go revert:** `git revert 17a55bd b012e65` on
+`claude/determined-cori-glvysk` (17a55bd = fix+docs, b012e65 = tests;
+revert both to drop the now-failing tests with the fix, or only
+17a55bd if you want the red tests kept).
 
 ## 2) Completed with evidence
 
@@ -90,6 +91,16 @@ with the fix, or only the fix sha if you want the red tests kept).
   suspects fired (XML/ACL/deprecation/menu/manifest). DEC-014 records
   keeping `shopify_connector_pro_base` as a deprecation tombstone.
   Odoo.sh leg queued for your relay (see section 5).
+
+- **Item 3d DONE and pushed** (commits b012e65 tests, 17a55bd fix+docs,
+  branch claude/determined-cori-glvysk): percent-only rate fallback
+  (AUD-017), visible dropped-tax activity (AUD-016 remainder),
+  deterministic ordering verified already guaranteed by core. Evidence:
+  fail-before 4 failed/0 errors of 5 → pass-after 0/0 of 5
+  (TestTaxFallbackFlavor, strict1); full suites strict1 0/0 of 557,
+  strict_vat 2/0 of 557 (unchanged known AUD-001 pair). PENDING
+  RETROACTIVE GO (statement in §1) + Odoo.sh confirmation (command 6 in
+  the FINALIZE.md batch).
 
 ## 3) In progress
 

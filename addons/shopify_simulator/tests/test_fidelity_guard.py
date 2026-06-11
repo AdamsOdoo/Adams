@@ -24,6 +24,7 @@ ORDER_NODE_FIELDS = {
     'displayFinancialStatus', 'displayFulfillmentStatus',
     'cancelledAt', 'closed', 'note', 'tags',
     'currencyCode', 'presentmentCurrencyCode',
+    'taxesIncluded',
     'totalPriceSet', 'subtotalPriceSet', 'totalShippingPriceSet',
     'totalTaxSet', 'totalDiscountsSet', 'discountCodes',
     'customer', 'shippingAddress', 'billingAddress',
