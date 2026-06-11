@@ -1,33 +1,30 @@
 # STATUS.md
 
-Updated: 2026-06-11 (session: governance change + item 3a)
+Updated: 2026-06-11 (session: items 3b, 3c + GREEN BUILD intake)
 
 ## Done this session
-- Governance: CLAUDE.md updated to standing-approval/self-verification
-  model with three human touchpoints; M1-M3 milestones recorded. DEC-011
-  (guard blocks posting), DEC-012 (tolerance = 2 × currency rounding),
-  DEC-013 (no auto-created taxes; degrade to mapping instruction) in
-  docs/architecture/DECISIONS.md. Committed.
-- ITEM 3a (total-check guard) IMPLEMENTED + verified locally; UNCOMMITTED,
-  awaiting Ahmed's go on the touchpoint-2 consequence statement.
-  - shopify_order_binding.shopify_total_amount stamp (import + retry paths)
-  - check_total_against_shopify + mismatch activity (accounting.py)
-  - guard wired before all 4 auto-posting branches (order_sync auto-invoice;
-    payment_status_sync paid×2 + partially_paid)
-  - Evidence trail in FINALIZE.md (fail-before 1f/4e of 6; impacted classes
-    0/0 of 26; strict1 full 0/0 of 547; strict_vat 2/0 of 547 = new
-    baseline, both failures AUD-001-rooted and now VISIBLY blocked instead
-    of silently wrong — clear at 3e).
-- Batched Odoo.sh confirmations for items 1, 2, 3a in FINALIZE.md.
-- SSH enablement instructions sent to Ahmed (eliminates touchpoint 1).
+- ITEM 3b (AUD-016 explicit zero-tax lines): committed + pushed on go.
+- ITEM 3c (AUD-015 shipping tax resolution): fail-before committed
+  (4f/0e of 13), fix implemented and verified (pass-after 0/0 of 24;
+  strict1 full 0/0 of 552; strict_vat 2/0 of 552 = unchanged AUD-001
+  baseline). Fix diff HELD uncommitted (order_sync.py +
+  queries/order.py) awaiting touchpoint-2 go.
+- Simulator: shipping lines emit taxLines; fidelity guard extended.
+- GREEN BUILD standalone item recorded in FINALIZE.md; tier-checkpoint
+  build-log rule added to CLAUDE.md. Sequenced 3c → GREEN BUILD → 3d.
+- SSH verified still BLOCKED from this container (TCP timeout to
+  adamsmen.dev.odoo.com:22; DNS ok). Policy changes + ODOO_SH_SSH_KEY
+  env var reach NEW session containers only — retest at next session
+  start. Odoo.sh confirmations (5 batched commands in FINALIZE.md)
+  still pending.
 
 ## Next
-- On Ahmed's go: commit+push 3a, then 3b (explicit zero-tax lines), 3c
-  (shipping tax), 3d (fallback flavor + dropped-tax visibility), 3e
-  (taxesIncluded/VAT-inclusive core — clears the 2 strict_vat baseline
-  failures), 3f (docs sweep). Touchpoint-2 statement before each commit.
-- Then items 4-5, then Tier 2 audit resume.
+- On go: commit 3c, then GREEN BUILD (local install-log proxy first;
+  SSH log pull when available), then 3d (rate fallback flavor +
+  dropped-tax visibility), 3e (taxesIncluded/VAT-inclusive core), 3f
+  (docs sweep). Then items 4-5, then Tier 2 resume.
 
 ## Open questions for Ahmed
-- Go/no-go on 3a consequence statement (in chat).
-- Odoo.sh batch results when convenient.
+- Go/no-go on 3c consequence statement (in chat).
+- SSH: confirm network policy allows outbound 22 + ODOO_SH_SSH_KEY env
+  var is set in the environment config, then next session verifies.
