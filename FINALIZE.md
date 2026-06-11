@@ -58,7 +58,7 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
   --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency \
   --stop-after-init --no-http
 ```
-| 3 | Tax workstream (breakdown to be proposed & approved before work) | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split into S/M steps) | not started — proposal due after item 2 | pending |
+| 3 | Tax workstream — steps 3a-3f approved 2026-06-11; 3a (total-check guard) implemented, awaiting go on consequence statement (touchpoint 2) | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S, 3c S, 3d S, 3e L, 3f S) | 3a: verified locally | 3a: pending go + Odoo.sh |
 | 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | not started | pending |
 | 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | not started | pending |
 
@@ -83,3 +83,35 @@ edits outside the granted item.
   TestPaymentStatusSync (AUD-002 harness note); ENV-1 chartless test setup.
 - AUD-009 (dead payout journal_entry_id field), AUD-010, AUD-014 and other
   minors not riding along — re-prioritized at the Tier 4/6 checkpoints.
+
+## Item 3a evidence trail (total-check guard, DEC-011/012)
+
+- Fail-before: 1 failed, 4 errors of 6 — test_total_guard.py on
+  adams_strict1 before implementation (FAIL = production path posted a
+  mismatched invoice silently; errors = stamp field absent).
+- Pass-after: 0 failed, 0 errors of 26 (TestTotalGuardPaymentPath,
+  TestTotalGuardAutoInvoice, TestOrderImport, TestPaymentStatusSync).
+- Full suites: adams_strict1 0 failed, 0 errors of 547. adams_strict_vat
+  2 failed, 0 errors of 547 — NEW BASELINE: both failures are
+  AUD-001-rooted and now represent the guard VISIBLY blocking wrong
+  invoices that previously posted silently on tax-included companies
+  (test_import_taxed_order... exact-totals marker; TestTaxedRefundE2E
+  needs a posted invoice). Both clear at 3e.
+- Guard exposed and fixed two inconsistent test fixtures (test_order_import
+  totalPriceSet 29.99 vs 59.98 lines; e2e fixture's untaxed shipping vs
+  default-taxed shipping product) — both were masking AUD-015/016 symptoms.
+- Upgraded-DB safety: zero/absent stamp ⇒ guard skips (tested).
+
+Item 3a Odoo.sh confirmation (batched below).
+
+## Batched Odoo.sh confirmation commands (touchpoint 1)
+
+Run all three on the staging build; paste the three result lines.
+
+```
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency --stop-after-init --no-http
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestOrderImportCurrency --stop-after-init --no-http
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestTotalGuardPaymentPath,/shopify_connector_pro:TestTotalGuardAutoInvoice --stop-after-init --no-http
+```
+
+Expected: 0 failed, 0 errors of 3 / of 6 / of 6 respectively.

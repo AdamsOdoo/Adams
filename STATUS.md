@@ -1,33 +1,33 @@
 # STATUS.md
 
-Updated: 2026-06-11 (session: Phase 2 item 2 + item 3 plan)
+Updated: 2026-06-11 (session: governance change + item 3a)
 
 ## Done this session
-- ITEM 2 (AUD-020) FIXED, pending Odoo.sh confirmation. order_sync.py:
-  visible currency auto-activation; usable-rate hierarchy (order money-pair
-  preferred → company-scoped rate record dated to the order, never
-  overwriting existing rates; Odoo rates fallback; error-state binding with
-  actionable message otherwise); company mode CONVERTS per decision
-  (presentment-side direct when company currency — pair beats Odoo daily
-  rate; else dated Odoo-rate conversion); Retry Sync completes SO creation
-  via pending-gated branch in _import_one.
-- Verification: fail-before 3 failed of 3 → pass-after 0 failed, 0 errors
-  of 6 (TestOrderImportCurrency, incl. exact conversion arithmetic,
-  pair-vs-daily-rate, retry idempotency, rate scoping). Full suites:
-  adams_strict1 0 failed/0 errors of 541; adams_strict_vat 1 failed/0
-  errors of 541 (sole failure = known AUD-001). Regression caught during
-  verification (retry branch vs webhook write_date invariant) and fixed by
-  gating on sync_status='pending' — documented in AUDIT.md.
-- FINALIZE.md: items 1-2 pending Odoo.sh confirmation with commands.
-- Item 3 (tax workstream) breakdown plan presented to Ahmed — AWAITING
-  APPROVAL, no shipped-code edits made for it.
+- Governance: CLAUDE.md updated to standing-approval/self-verification
+  model with three human touchpoints; M1-M3 milestones recorded. DEC-011
+  (guard blocks posting), DEC-012 (tolerance = 2 × currency rounding),
+  DEC-013 (no auto-created taxes; degrade to mapping instruction) in
+  docs/architecture/DECISIONS.md. Committed.
+- ITEM 3a (total-check guard) IMPLEMENTED + verified locally; UNCOMMITTED,
+  awaiting Ahmed's go on the touchpoint-2 consequence statement.
+  - shopify_order_binding.shopify_total_amount stamp (import + retry paths)
+  - check_total_against_shopify + mismatch activity (accounting.py)
+  - guard wired before all 4 auto-posting branches (order_sync auto-invoice;
+    payment_status_sync paid×2 + partially_paid)
+  - Evidence trail in FINALIZE.md (fail-before 1f/4e of 6; impacted classes
+    0/0 of 26; strict1 full 0/0 of 547; strict_vat 2/0 of 547 = new
+    baseline, both failures AUD-001-rooted and now VISIBLY blocked instead
+    of silently wrong — clear at 3e).
+- Batched Odoo.sh confirmations for items 1, 2, 3a in FINALIZE.md.
+- SSH enablement instructions sent to Ahmed (eliminates touchpoint 1).
 
 ## Next
-- Ahmed: relay items 1-2 Odoo.sh confirmations; approve/adjust item 3
-  breakdown (steps 3a-3f in chat; decisions: guard blocking vs
-  activity-only, guard tolerance, missing tax-flavor handling).
-- Then execute item 3 step by step, one per session.
+- On Ahmed's go: commit+push 3a, then 3b (explicit zero-tax lines), 3c
+  (shipping tax), 3d (fallback flavor + dropped-tax visibility), 3e
+  (taxesIncluded/VAT-inclusive core — clears the 2 strict_vat baseline
+  failures), 3f (docs sweep). Touchpoint-2 statement before each commit.
+- Then items 4-5, then Tier 2 audit resume.
 
 ## Open questions for Ahmed
-- Item 3 decisions (see plan): guard behavior on mismatch, tolerance,
-  and tax-flavor fallback when no matching price-include variant exists.
+- Go/no-go on 3a consequence statement (in chat).
+- Odoo.sh batch results when convenient.
