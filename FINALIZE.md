@@ -58,7 +58,7 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
   --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency \
   --stop-after-init --no-http
 ```
-| 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S, 3d S, 3e L, 3f S) | 3a COMMITTED (go 2026-06-11); 3b COMMITTED (go 2026-06-11); 3c in progress | 3a+3b: **pending Odoo.sh confirmation** |
+| 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S done, 3d S, 3e L, 3f S) | 3a, 3b, 3c COMMITTED (go 2026-06-11); next: GREEN BUILD, then 3d | 3a+3b+3c: **pending Odoo.sh confirmation** |
 | 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | not started | pending |
 | 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | not started | pending |
 

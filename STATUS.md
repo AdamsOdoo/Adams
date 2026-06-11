@@ -1,30 +1,36 @@
 # STATUS.md
 
-Updated: 2026-06-11 (session: items 3b, 3c + GREEN BUILD intake)
+Updated: 2026-06-11 (session end: 3b + 3c committed; next = GREEN BUILD)
 
-## Done this session
-- ITEM 3b (AUD-016 explicit zero-tax lines): committed + pushed on go.
-- ITEM 3c (AUD-015 shipping tax resolution): fail-before committed
-  (4f/0e of 13), fix implemented and verified (pass-after 0/0 of 24;
-  strict1 full 0/0 of 552; strict_vat 2/0 of 552 = unchanged AUD-001
-  baseline). Fix diff HELD uncommitted (order_sync.py +
-  queries/order.py) awaiting touchpoint-2 go.
-- Simulator: shipping lines emit taxLines; fidelity guard extended.
-- GREEN BUILD standalone item recorded in FINALIZE.md; tier-checkpoint
-  build-log rule added to CLAUDE.md. Sequenced 3c → GREEN BUILD → 3d.
-- SSH verified still BLOCKED from this container (TCP timeout to
-  adamsmen.dev.odoo.com:22; DNS ok). Policy changes + ODOO_SH_SSH_KEY
-  env var reach NEW session containers only — retest at next session
-  start. Odoo.sh confirmations (5 batched commands in FINALIZE.md)
-  still pending.
+## Resume here (fresh session)
+1. FIRST: verify SSH — `ODOO_SH_SSH_KEY` env var should now exist
+   (write it to ~/.ssh/id_ed25519, chmod 600) and outbound 22 should be
+   open (policy changed; applies to new containers). Connect line:
+   `ssh 33403099@adamsmen.dev.odoo.com` (build id may have changed —
+   it's the build of claude/admiring-bell-e9g6qp). No ssh client in
+   the container image: install openssh-client or use paramiko.
+2. If SSH works: run the 5 batched Odoo.sh confirmation commands in
+   FINALIZE.md (items 1, 2, 3a+guard, 3b, 3c) — expect 0/0 of
+   3 / 6 / 6 / 2 / 13 — and report literal counts to Ahmed.
+3. Then run the GREEN BUILD item (FINALIZE.md, full spec there):
+   pull build log via SSH, classify ERROR/WARNING a/b/c, fix all (a)
+   under rules 1-6, NEVER suppress/filter logs, money-path fixes need
+   touchpoint-2 go. Local prep allowed: fresh-install log proxy.
+4. Then resume tax workstream: 3d (rate-fallback amount_type +
+   deterministic ordering + dropped-tax visible activity), 3e
+   (taxesIncluded/VAT-inclusive core — clears the 2 strict_vat baseline
+   failures), 3f (docs sweep + final matrix). Touchpoint-2 statement
+   before each commit.
 
-## Next
-- On go: commit 3c, then GREEN BUILD (local install-log proxy first;
-  SSH log pull when available), then 3d (rate fallback flavor +
-  dropped-tax visibility), 3e (taxesIncluded/VAT-inclusive core), 3f
-  (docs sweep). Then items 4-5, then Tier 2 resume.
+## State
+- Committed+pushed: items 1, 2, 3a, 3b, 3c (all pending Odoo.sh
+  confirmation). Working tree clean.
+- Local baselines (2026-06-11): adams_strict1 0 failed, 0 errors of
+  552; adams_strict_vat 2 failed, 0 errors of 552 (known AUD-001 pair:
+  TestOrderImport.test_import_taxed_order_creates_invoice_with_tax_lines,
+  TestTaxedRefundE2E.test_taxed_partial_refund_e2e_through_simulator —
+  both clear at 3e).
+- PostgreSQL stops between sessions: `pg_ctlcluster 16 main start`.
 
 ## Open questions for Ahmed
-- Go/no-go on 3c consequence statement (in chat).
-- SSH: confirm network policy allows outbound 22 + ODOO_SH_SSH_KEY env
-  var is set in the environment config, then next session verifies.
+- None blocking; Odoo.sh confirmations report when SSH verified.
