@@ -11,7 +11,13 @@ full source-path walk during Tier 1 before any fix is proposed.
 
 Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
 
-- **approved:** AUD-019, AUD-020 (items 1-2); AUD-001, AUD-015, AUD-016,
+- **fixed (pending Odoo.sh confirmation):** AUD-019 — fix applied 2026-06-11
+  (refund_sync.py: cn_currency from posted invoice/order + mismatch guard +
+  currency_id on create). Fail-before 1 failed of 1; pass-after 0/0 of 3
+  (TestRefundCreditNoteMultiCurrency, adams_strict_vat); no regression:
+  0/0 of 535 (adams_strict1 full), 1/0 of 535 (adams_strict_vat full, sole
+  failure = known AUD-001).
+- **approved:** AUD-020 (item 2); AUD-001, AUD-015, AUD-016,
   AUD-018 (item 3 — VAT-inclusive support now IN v1 scope, total-check guard
   permanent); AUD-003, AUD-004, AUD-005, AUD-006 (item 4); AUD-021, AUD-022
   (item 5).

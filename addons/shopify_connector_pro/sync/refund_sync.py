@@ -353,12 +353,41 @@ class RefundImporter:
             )
             return None
 
+        # ── Credit-note currency (AUD-019) ─────────────────────
+        # The credit note must reconcile against the original invoice, so
+        # it carries the invoice currency (order currency when no invoice
+        # was posted) — never the company currency by default. A refund
+        # reported in a different currency is not converted here: it is
+        # degraded visibly and left retryable after review.
+        cn_currency = (
+            posted_invoices[0].currency_id if posted_invoices
+            else order.currency_id
+        )
+        _, refund_ccy = self._money(refund_data.get('totalRefundedSet'))
+        if refund_ccy and refund_ccy != cn_currency.name:
+            msg = (
+                "Shopify refund %s is in %s but the order/invoice is in %s. "
+                "The credit note was NOT created. Review the refund in "
+                "Shopify and the invoice currency in Odoo, then use Retry "
+                "Sync on the refund binding to create it." % (
+                    refund_data.get('id'), refund_ccy, cn_currency.name,
+                )
+            )
+            _logger.warning("Order %s: %s", order.name, msg)
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify refund credit note failed",
+                note=msg,
+            )
+            return None
+
         try:
             with self.env.cr.savepoint():
                 credit_note = self.env['account.move'].with_context(**ctx).create({
                     'move_type': 'out_refund',
                     'partner_id': order.partner_id.id,
                     'journal_id': journal.id,
+                    'currency_id': cn_currency.id,
                     'invoice_origin': order.name,
                     'ref': refund_data.get('note') or 'Shopify Refund',
                     'invoice_line_ids': invoice_line_ids,

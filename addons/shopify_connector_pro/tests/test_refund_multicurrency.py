@@ -113,6 +113,83 @@ class TestRefundCreditNoteMultiCurrency(ShopifyAccountingMixin, TransactionCase)
             'refundLineItems': {'edges': []},
         }
 
+    def test_credit_note_currency_from_order_when_no_invoice(self):
+        """No posted invoice: the credit note takes the ORDER currency.
+
+        Covers the fallback branch of the AUD-019 currency source
+        (order.currency_id) with the same assertions as the
+        posted-invoice branch.
+        """
+        # Remove the posted invoice so the fallback branch is exercised
+        self.invoice.with_context(shopify_no_auto_export=True).button_cancel()
+        self.assertFalse(self.order.invoice_ids.filtered(
+            lambda i: i.state == 'posted' and i.move_type == 'out_invoice'
+        ))
+        refund_data = self._make_refund_data(77002, 50.0)
+        binding = self.importer._import_one_refund(
+            refund_data, self.order_binding,
+        )
+        self.assertTrue(
+            binding.odoo_id,
+            "Credit note must be created and linked on the refund binding",
+        )
+        cn = binding.odoo_id
+        self.assertEqual(cn.state, 'posted')
+        self.assertEqual(
+            cn.currency_id, self.eur,
+            "AUD-019 fallback: with no posted invoice, the credit note "
+            "must carry the ORDER currency (EUR), not the company currency",
+        )
+        self.assertAlmostEqual(
+            cn.amount_total, 50.0, places=2,
+            msg="Credit note total must equal the refunded EUR amount",
+        )
+
+    def test_currency_mismatch_degrades_visibly_no_credit_note(self):
+        """Refund currency ≠ invoice currency: no credit note, error-state
+        binding, actionable activity, nothing financial half-written."""
+        refund_data = self._make_refund_data(77003, 100.0)
+        refund_data['totalRefundedSet']['shopMoney']['currencyCode'] = 'USD'
+
+        moves_before = self.env['account.move'].search_count([
+            ('move_type', '=', 'out_refund'),
+            ('company_id', '=', self.env.company.id),
+        ])
+        binding = self.importer._import_one_refund(
+            refund_data, self.order_binding,
+        )
+
+        # Record lands in the right state, retryable
+        self.assertFalse(binding.odoo_id, "No credit note may be linked")
+        self.assertEqual(binding.sync_status, 'error')
+        self.assertIn('activity', binding.sync_error or '',
+                      "Binding error must point at the scheduled activity")
+
+        # Nothing financial half-written
+        moves_after = self.env['account.move'].search_count([
+            ('move_type', '=', 'out_refund'),
+            ('company_id', '=', self.env.company.id),
+        ])
+        self.assertEqual(moves_before, moves_after,
+                         "No credit note may be created on mismatch")
+
+        # Merchant-visible message is actionable on its own:
+        # names both currencies, states non-creation, states retryability
+        activity = self.env['mail.activity'].search([
+            ('res_model', '=', 'sale.order'),
+            ('res_id', '=', self.order.id),
+            ('summary', '=', 'Shopify refund credit note failed'),
+        ], limit=1)
+        self.assertTrue(activity, "A warning activity must be scheduled")
+        note = activity.note or ''
+        self.assertIn('USD', note, "Message must name the refund currency")
+        self.assertIn('EUR', note,
+                      "Message must name the invoice/order currency")
+        self.assertIn('NOT created', note,
+                      "Message must state the credit note was not created")
+        self.assertIn('Retry Sync', note,
+                      "Message must state how to retry after review")
+
     def test_credit_note_currency_matches_invoice_currency(self):
         """A EUR refund on a EUR order must post a EUR credit note.
 

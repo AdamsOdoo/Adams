@@ -26,8 +26,18 @@ only when they touch the same file and keep the diff small.
 
 | # | Item | Findings | Size | Status | Odoo.sh |
 |---|------|----------|------|--------|---------|
-| 1 | Credit note currency_id | AUD-019 | S | in progress (plan + fail-before test this session) | pending |
-| 2 | Order-currency handling per currency policy | AUD-020 | M | not started | pending |
+| 1 | Credit note currency_id | AUD-019 | S | FIXED locally (fail-before 1/1 → pass-after 0/0 of 3; strict1 full 0/0 of 535; strict_vat full 1/0 of 535, sole failure = known AUD-001) | **pending Odoo.sh confirmation** |
+| 2 | Order-currency handling per currency policy | AUD-020 | M | plan presented; fail-before 3/3 committed | pending |
+
+Item 1 Odoo.sh confirmation command (Ahmed relays, expect "0 failed, 0
+error(s) of 3 tests"):
+
+```
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
+  -u shopify_connector_pro \
+  --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency \
+  --stop-after-init --no-http
+```
 | 3 | Tax workstream (breakdown to be proposed & approved before work) | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split into S/M steps) | not started — proposal due after item 2 | pending |
 | 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | not started | pending |
 | 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | not started | pending |

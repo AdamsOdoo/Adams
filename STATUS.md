@@ -1,37 +1,35 @@
 # STATUS.md
 
-Updated: 2026-06-11 (session: Tier 1 — financial correctness audit)
+Updated: 2026-06-11 (session: Phase 2 items 1-2)
 
 ## Done this session
-- AUD-002 resolved: TypeError = Odoo test-harness artifact
-  (core tests/common.py:341-344 vs client.py:21 tuple timeout); the real
-  finding is silent default-journal fallback. Full broad-except sweep of
-  financial code: 36 except clauses reviewed against rule 5 →
-  AUD-002..AUD-014 ledgered (4 major, 8 minor + 1 reclassified).
-- AUD-001 completed: full tax-resolution branch map in AUDIT.md (doubles as
-  the VAT-inclusive spec). Verdict for Ahmed: YES, a tax-included company
-  produces legally wrong posted invoices today. Three new tax findings:
-  AUD-015 (shipping taxed at company default rate — wrong on tax-excluded
-  companies too), AUD-016 (default-tax leak on unresolved/empty tax lines +
-  log-only drops), AUD-017 (fallback matches wrong tax flavor), AUD-018
-  (taxesIncluded never fetched — deferred-by-design spec item).
-- Refund/credit-note deep audit: AUD-019 (CRITICAL: credit note created
-  without currency_id — foreign-currency refunds misbooked), AUD-020
-  (CRITICAL: unresolvable/inactive currency → foreign amounts booked as
-  company currency, default Odoo config), AUD-021 (idempotency hole →
-  possible duplicate credit notes), AUD-022 (no cumulative over-refund
-  guard), AUD-023 (minor edge bundle).
-- Regression checklist: 18/18 LEGACY_NOTES fixes present (BUG-R2 evolved,
-  verified); 5 covered only implicitly → Tier 4 test backlog.
-- Reconciliation reviewed: financial checks write visible sync logs (good);
-  digest omits refund bindings from its error census.
+- Scope decision recorded: VAT-inclusive support IN v1 (CLAUDE.md updated);
+  FINALIZE.md created with granted Phase 2 sequence + standing decisions
+  (permanent total-check guard; currency policy).
+- Strict profile 3 extended: explicit EUR rate 0.92 → tax-included AND
+  multi-currency hold simultaneously on adams_strict_vat.
+- ITEM 1 (AUD-019) FIXED, pending Odoo.sh confirmation:
+  refund_sync.py — credit note carries invoice currency (order currency
+  fallback) + visible mismatch guard. Fail-before: 1 failed of 1.
+  Pass-after: 0 failed, 0 errors of 3 (TestRefundCreditNoteMultiCurrency).
+  Full suites: adams_strict1 0 failed/0 errors of 535; adams_strict_vat
+  1 failed/0 errors of 535 (sole failure = known AUD-001 taxed-order test).
+  Confirmation command in FINALIZE.md.
+- ITEM 2 (AUD-020) fail-before committed: 3 failed, 0 errors of 3
+  (TestOrderImportCurrency on adams_strict1) — EUR not auto-activated,
+  orders created in company currency despite unresolvable currency/no rate.
+  Plan presented to Ahmed; AWAITING APPROVAL before editing shipped code.
+- New scope note for item 2: import_currency_mode='company' (the DEFAULT)
+  books shopMoney amounts with no conversion — only correct when shop
+  currency equals company currency; folded into the item 2 plan as a
+  decision point.
 
 ## Next
-- CHECKPOINT: Ahmed reviews Tier 1 (this is the stop point).
-- Severity ranking and Phase 2 recommendation in the checkpoint report.
-- Tier 2 leads parked: positional variant matching (product_sync.py:240),
-  product/customer webhook swallow check (AUD-005 sibling paths).
+- Ahmed: approve/adjust item 2 plan (see chat + FINALIZE.md), relay item 1
+  Odoo.sh confirmation.
+- Then items 3 (tax workstream breakdown proposal), 4, 5 per FINALIZE.md.
 
 ## Open questions for Ahmed
-- AUD-001: approve "total-check guard" direction for v1 vs full deferral?
-- AUD-020: may the connector auto-activate currencies, or error-state only?
+- Item 2, 'company' mode: validate-at-setup (refuse foreign shop currency)
+  or convert amounts to company currency using the usable rate? Plan
+  recommends convert-with-rate (policy-consistent), validate as fallback.
