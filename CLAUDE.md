@@ -141,9 +141,14 @@ audit for defects, not preferences.
   develop and push on their harness-mandated working branch (this session:
   `claude/admiring-bell-e9g6qp`); Ahmed merges into `review/full-audit` via
   PR at each approved checkpoint. Never push to `review/full-audit` directly.
-- Odoo.sh runtime access: NOT possible from this container — outbound port
-  22 is blocked by the environment network policy (verified 2026-06-10).
-  Runtime strategy is hybrid, approved by Ahmed:
+- Odoo.sh runtime access: NOT possible from ANY session container —
+  Claude Code cloud environments sit behind an HTTP/HTTPS-only egress
+  proxy, so raw TCP/SSH (port 22) is unsupported under every network
+  policy including "Full" (platform constraint, confirmed against
+  code.claude.com docs + empirically 2026-06-11: port 22 times out to
+  all hosts, 443 to the same hosts connects). No environment setting
+  fixes this; do not re-test SSH. Odoo.sh checks go through Ahmed
+  (touchpoint 1). Runtime strategy is hybrid, approved by Ahmed:
   - LOCAL: an Odoo 19 Community runtime in this container (PostgreSQL 16,
     Python 3.11, odoo/odoo branch 19.0 cloned over HTTPS) is used for
     iteration, audit verification against core source, and
@@ -155,28 +160,45 @@ audit for defects, not preferences.
     Ahmed runs or relays those confirmation commands.
   - Anything verifiable only against Enterprise code is flagged
     "unverified — needs build check".
-- Local setup (VERIFIED 2026-06-10, suite green on adams_strict1):
-  - Odoo core: `/home/user/odoo` (odoo/odoo branch 19.0, shallow clone,
-    commit 07a333c8). PostgreSQL 16 local cluster, DB user `root`.
+- Local setup (re-VERIFIED 2026-06-11 from scratch; baselines reproduced
+  exactly). CONTAINERS ARE EPHEMERAL: the Odoo checkout, pip deps, PG
+  role and all DB profiles are LOST between sessions — rebuild at
+  session start (~20 min: clone + pip + 2 installs + chart). Until an
+  environment setup script exists (recommended to Ahmed), the recipe is:
+  - Odoo core: `/home/user/odoo` (odoo/odoo branch 19.0, shallow clone;
+    2026-06-11 tip b4c7247f — suite-equivalent to the 2026-06-10
+    baseline commit 07a333c8). PostgreSQL 16 local cluster
+    (`pg_ctlcluster 16 main start`), DB superuser `root`
+    (`su - postgres -c "createuser -s root && createdb root"`).
   - Python dep quirks vs upstream requirements.txt (Python 3.11 here):
     `psycopg2-binary` instead of psycopg2; unpinned `rjsmin`/`vobject`
     (pinned versions fail to build); `docopt-ng` + `num2words --no-deps`;
     system `cryptography 41.0.7` kept with `urllib3==2.0.7` and
     `pyopenssl==24.1.0` (the Noble combo — Jammy's urllib3 1.26.5 is
-    incompatible with cryptography ≥39); `beautifulsoup4` added.
+    incompatible with cryptography ≥39); `beautifulsoup4` added; `cffi`
+    added (missing in the image — without it odoo-bin dies at startup
+    with ModuleNotFoundError `_cffi_backend` via OpenSSL import);
+    EXCLUDE `python-ldap` and `ofxparse` (no build headers; unused by
+    our dependency set — and a single failing wheel aborts the whole
+    `pip install -r`).
+  - Run test DBs ONE AT A TIME: `--test-tags` spawns an HTTP server even
+    with `--no-http` (port collision), and two parallel suite runs can
+    OOM-kill PostgreSQL (observed 2026-06-11).
   - Test command (verified):
     `python3 /home/user/odoo/odoo-bin -d <db> --addons-path=/home/user/odoo/addons,/home/user/Adams/addons -u shopify_connector_pro,shopify_simulator,shopify_connector_pro_dashboard --test-tags /shopify_connector_pro,/shopify_simulator,/shopify_connector_pro_dashboard --stop-after-init --no-http --log-level=info`
-  - DB profiles (kept in the local cluster; recreate with the steps below):
+  - DB profiles (rebuilt every session; steps below):
     1. `adams_test_fresh` — fresh install, NO chart of accounts. Exposes
        env-sensitivity: 4 tests error (account.tax without tax_group_id —
        AUDIT.md ENV-1). Baseline 2026-06-10: 0 failed, 4 errors of 532.
-    2. `adams_strict1` — install `l10n_generic_coa` + the 3 modules, then
-       apply the chart via odoo shell
-       (`env['account.chart.template'].try_loading('generic_coa', env.company)`),
-       then run tests via `-u` (exercises the upgraded/existing-data path,
-       not fresh-install-only). Baseline 2026-06-10: 0 failed, 0 errors of
-       532 (shopify_connector_pro 280 + shopify_simulator 241 at_install,
-       11 post-install).
+    2. `adams_strict1` — install the 3 modules (NOTE 2026-06-11:
+       `l10n_generic_coa` is NOT a module in Odoo 19 — the loader ignores
+       it with "invalid module names"; the chart comes entirely from the
+       next step), then apply the chart via odoo shell
+       (`env['account.chart.template'].try_loading('generic_coa', env.company)`
+       + `env.cr.commit()`), then run tests via `-u` (exercises the
+       upgraded/existing-data path, not fresh-install-only). Baseline
+       2026-06-10: 0 failed, 0 errors of 532; reproduced 2026-06-11
+       after rebuild: 0 failed, 0 errors of 552.
     3. `adams_strict_vat` — clone of adams_strict1 with
        `env.company.account_price_include = 'tax_included'` (verified field,
        odoo/addons/account/models/company.py:282), EUR activated,
@@ -184,9 +206,13 @@ audit for defects, not preferences.
        2026-06-11 per Ahmed) an explicit EUR exchange rate
        (res.currency.rate, 1 USD = 0.92 EUR) so tax-included AND
        multi-currency conditions hold SIMULTANEOUSLY — the
-       AUD-019/020/001 compound-bug surface. Baseline 2026-06-10:
-       1 failed, 0 errors of 532 — caught AUD-001 (VAT-inclusive order
-       import totals).
+       AUD-019/020/001 compound-bug surface. Build:
+       `createdb -T adams_strict1 adams_strict_vat`, then odoo shell for
+       the three settings + rate + `env.cr.commit()`. Baseline
+       2026-06-10: 1 failed, 0 errors of 532 — caught AUD-001
+       (VAT-inclusive order import totals); reproduced 2026-06-11 after
+       rebuild: 2 failed, 0 errors of 552 (the known AUD-001 pair, both
+       clear at 3e).
 - Strict DB: its definition is not recorded anywhere; we derive it. For each
   financial bug in LEGACY_NOTES.md §1, determine what DB condition surfaced
   it (localization/chart of accounts, multi-currency, rounding settings,

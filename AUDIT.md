@@ -34,6 +34,20 @@ Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
   (item 5).
 - **approved as ride-along (same-file, small-diff only):** AUD-017 (item 3),
   AUD-007/008/011/012/013 (item 4), AUD-023 (item 5).
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-017 (item 3d — amount_type='percent' filter on
+  the rate fallback; deterministic-ordering sub-item verified moot: core
+  account.tax _order='sequence,id') and the AUD-016 remainder (dropped
+  tax lines now schedule one deduplicated warning activity per order).
+  Evidence in FINALIZE.md item 3d trail; consequence statement in
+  MORNING_REVIEW.md §1.
+- **GREEN BUILD ledger (2026-06-11, local proxy):** class (c) noise, listed
+  once per method step 2: docutils "(ERROR/3) Unexpected indentation" +
+  "(WARNING/2) Block quote ends without a blank line" during install =
+  CORE `mail` manifest description RST (proven by rendering every
+  installed module's description; ours are clean). Container-only
+  "Running as user 'root'" notice. Zero (a)-class lines on fresh-install
+  AND upgrade logs of all 4 modules at warn level.
 - **open (re-prioritized at later checkpoints):** AUD-009, AUD-010, AUD-014,
   ENV-1.
 

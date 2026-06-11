@@ -290,7 +290,9 @@ class OrderImporter(BaseImporter):
         ).with_context(shopify_no_auto_export=True)
         order = SaleOrder.create(order_vals)
 
-        # Create order lines
+        # Create order lines. Tax drops are accumulated per order and
+        # surfaced as one activity after all lines (incl. shipping).
+        self._dropped_taxes = []
         line_items_conn = node.get('lineItems', {})
         line_items = line_items_conn.get('edges', [])
         if line_items_conn.get('pageInfo', {}).get('hasNextPage'):
@@ -308,6 +310,9 @@ class OrderImporter(BaseImporter):
         for edge in shipping_lines:
             sl = edge.get('node', {})
             self._create_shipping_line(order, sl)
+
+        # Visible degradation for any tax line dropped above (AUD-016)
+        self._schedule_dropped_tax_activity(order)
 
         if is_cancelled:
             # Record as cancelled in Odoo — do NOT confirm or invoice.
@@ -923,11 +928,17 @@ class OrderImporter(BaseImporter):
 
             # 2. Fallback: find Odoo tax by rate (2 dp is sufficient for tax
             # rates; a ±0.005 tolerance avoids float→SQL precision drift).
+            # Percent taxes only (AUD-017): a fixed-amount tax of 10.0
+            # currency units must never satisfy a 10% rate lookup.
+            # Same-rate ties resolve deterministically via the model
+            # order (account.tax _order = 'sequence,id'); merchants steer
+            # the pick with the tax sequence or an explicit mapping.
             if rate is not None:
                 rate_pct = round(float(rate) * 100, 2)
                 if rate_pct not in self._tax_rate_cache:
                     odoo_tax = self.env['account.tax'].search([
                         ('type_tax_use', '=', 'sale'),
+                        ('amount_type', '=', 'percent'),
                         ('amount', '>=', rate_pct - 0.005),
                         ('amount', '<=', rate_pct + 0.005),
                         ('company_id', '=', self.backend.company_id.id),
@@ -937,6 +948,7 @@ class OrderImporter(BaseImporter):
                 if fallback_tax:
                     tax_ids.append(fallback_tax.id)
                 else:
+                    self._record_dropped_tax(title, rate_pct)
                     _logger.warning(
                         "Tax line dropped: no mapping for '%s' and no Odoo tax "
                         "matching rate %.2f%% (backend %s). Create a tax mapping "
@@ -944,6 +956,7 @@ class OrderImporter(BaseImporter):
                         title, rate_pct, self.backend.id,
                     )
             else:
+                self._record_dropped_tax(title, None)
                 _logger.warning(
                     "Tax line dropped: no mapping for '%s' and no rate provided "
                     "(backend %s). Create a tax mapping for this title.",
@@ -951,6 +964,43 @@ class OrderImporter(BaseImporter):
                 )
 
         return list(set(tax_ids))
+
+    def _record_dropped_tax(self, title, rate_pct):
+        """Accumulate a dropped Shopify tax line for the per-order
+        warning activity (AUD-016 remainder: dropping a tax must be
+        merchant-visible, never server-log-only — rule 5)."""
+        if not hasattr(self, '_dropped_taxes'):
+            self._dropped_taxes = []
+        entry = (title, rate_pct)
+        if entry not in self._dropped_taxes:
+            self._dropped_taxes.append(entry)
+
+    def _schedule_dropped_tax_activity(self, order):
+        """Schedule ONE warning activity on the order naming every
+        Shopify tax line that resolved to no Odoo tax, with the action
+        the merchant must take. The total-check guard (DEC-011)
+        additionally holds any now-mismatched auto-invoice in draft."""
+        dropped = getattr(self, '_dropped_taxes', None)
+        if not dropped:
+            return
+        details = ", ".join(
+            "'%s' (%.2f%%)" % (title, rate) if rate is not None
+            else "'%s' (no rate)" % title
+            for title, rate in dropped
+        )
+        order.activity_schedule(
+            'mail.mail_activity_data_warning',
+            summary="Shopify taxes not mapped",
+            note="The following Shopify tax lines could not be matched "
+                 "to an Odoo tax and were NOT applied: %s. Create a tax "
+                 "mapping (Shopify > Configuration > Tax Mappings) or an "
+                 "Odoo sales tax with the same rate, then re-import the "
+                 "order. Until then the order and its invoice may not "
+                 "match what the customer was charged; a mismatched "
+                 "auto-invoice is kept in draft by the total check."
+                 % details,
+        )
+        self._dropped_taxes = []
 
     def _create_shipping_line(self, order, shipping_line):
         """Create a shipping line on the order.
