@@ -111,7 +111,7 @@ These were identified during the extended workflow audit but explicitly deferred
 | DEF-EW-15a | Abandoned cart recovery emails | Medium | `recovery_email_sent` field exists, UI field hidden, email logic not built |
 | DEF-EW-15b | Abandoned cart auto-matching | Low | Match recovered carts to orders by email/amount |
 | DEF-EW-06a | Location-to-warehouse auto-mapping | Low | Currently only maps primary location |
-| DEF-EW-10 | Multi-currency rate sync from Shopify | Low | Uses Odoo rates; Shopify rates ignored |
+| DEF-EW-10 | Multi-currency rate sync from Shopify | Low | Uses Odoo rates; Shopify rates ignored. UPDATE 2026-06-12 (item 2/AUD-020): order-derived pair rates ARE now created when no Odoo rate exists for the order date; a daily/bulk rate sync remains unbuilt |
 | DEF-EW-13 | Sync log email digest | Low | Log finalization works; scheduled digest not built |
 
 ---

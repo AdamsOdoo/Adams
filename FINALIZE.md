@@ -240,6 +240,35 @@ Item 3d Odoo.sh confirmation (batched above, command 6).
 
 Item 3e Odoo.sh confirmation (batched above, command 7).
 
+## Item 3f evidence trail (docs sweep + final tax matrix)
+
+Sweep (2026-06-12): `_resolve_taxes` docstring rewritten to describe
+the full resolution contract (was 2 stale lines); LEGACY_NOTES.md
+DEF-EW-10 annotated (order-derived pair rates exist since item 2);
+AUDIT.md status block updated (AUD-001/015/016/017/018 closed pending
+retroactive go + Odoo.sh); no KNOWN_LIMITATIONS.md exists in the repo —
+the stale shipping-tax claim AUD-015 flagged lived only in the
+`_create_shipping_line` docstring, already rewritten at 3c. Verified
+no remaining stale claims: module-wide grep for tax-related "known
+gap"/"not supported"/"deferred" wording reviewed.
+
+FINAL TAX BEHAVIOR MATRIX (after 3a-3e; fallback = no mapping entry):
+
+| Shopify store pricing | Odoo tax available at rate | Result |
+|---|---|---|
+| Tax-exclusive | exclusive-flavor percent | matched, price as-is (correct since BUG-O1) |
+| Tax-exclusive | only included-flavor percent | matched, price ×(1+Σrates) — books equal charge (AUD-001 fixed) |
+| Tax-inclusive | included-flavor percent | matched, price as-is (3e) |
+| Tax-inclusive | only exclusive-flavor percent | matched, price ÷(1+Σrates) — books equal charge (3e) |
+| any | merchant mapping (any flavor) | used as mapped; price aligned when uniform-flavor percent mismatch, else untouched + guard |
+| any | only fixed-amount at that number | NOT matched (AUD-017); line dropped visibly |
+| any | nothing | dropped: warning activity names each tax (AUD-016) + guard holds mismatched invoice in draft |
+| any | mixed flavors on one line / compound cases | no price conversion; guard (DEC-011) blocks mismatches visibly |
+
+Tax-exempt orders (no taxLines): explicitly NO taxes on lines (3b/3c) —
+never a product/company default. Shipping lines follow the identical
+contract (3c + 3e). Guard (DEC-011) is permanent product behavior.
+
 ## Item 3c evidence trail (AUD-015 — shipping tax resolution)
 
 - Fail-before: 4 failed, 0 errors of 13 (TestShippingTaxImport ×3 +

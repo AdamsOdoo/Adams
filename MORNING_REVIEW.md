@@ -25,10 +25,10 @@ don't apply unless sessions are started IN that environment.
 1. Stop pursuing SSH from sessions. Remove the key from the environment
    config if you added it (no dedicated secrets store; env vars are
    visible to anyone who can edit the environment).
-2. Odoo.sh confirmations stay touchpoint-1 (you relay). The 6 batched
+2. Odoo.sh confirmations stay touchpoint-1 (you relay). The 7 batched
    commands are in FINALIZE.md ("Batched Odoo.sh confirmation
-   commands") — now items 1, 2, 3a, 3b, 3c (+3d once you say go).
-   Expected: 0 failed/0 errors of 3 / 6 / 6 / 2 / 13 / 5.
+   commands") — items 1, 2, 3a, 3b, 3c, 3d, 3e. Expected:
+   0 failed/0 errors of 3 / 6 / 6 / 2 / 13 / 5 / 11.
 3. GREEN BUILD Odoo.sh leg: from the Odoo.sh editor/web shell, run
    `grep -iE "error|warning" ~/logs/install.log` (or paste the build
    log page) — the local proxy already classified everything local
@@ -89,8 +89,8 @@ pass-after 0/0 of 11; full suites BOTH GREEN — strict_vat 0 failed,
 0 errors of 562 (the 2 standing AUD-001 failures CLEARED; first
 fully-green strict-VAT run), strict1 0 failed, 0 errors of 562.
 
-**No-go revert:** `git revert <3e-fix-sha> cd1bfd3` on
-`claude/determined-cori-glvysk` (fix sha in section 2 once committed;
+**No-go revert:** `git revert 58af690 cd1bfd3` on
+`claude/determined-cori-glvysk` (58af690 = fix+docs;
 cd1bfd3 = fail-before tests).
 
 ## 2) Completed with evidence
@@ -116,6 +116,14 @@ cd1bfd3 = fail-before tests).
   keeping `shopify_connector_pro_base` as a deprecation tombstone.
   Odoo.sh leg queued for your relay (see section 5).
 
+- **Item 3e DONE and pushed** (commits cd1bfd3 tests, 58af690 fix+docs):
+  taxesIncluded fetched + honored; flavor-preferring fallback; price
+  alignment both directions on product and shipping lines; simulator
+  emits the flag. Evidence: fail-before 4/0 of 11 → pass-after 0/0 of
+  11; full suites strict_vat 0 failed, 0 errors of 562 (AUD-001 pair
+  CLEARED — first fully-green strict-VAT run) and strict1 0 failed,
+  0 errors of 562. PENDING RETROACTIVE GO (§1) + Odoo.sh confirmation
+  (command 7 in the FINALIZE.md batch).
 - **Item 3d DONE and pushed** (commits b012e65 tests, 17a55bd fix+docs,
   branch claude/determined-cori-glvysk): percent-only rate fallback
   (AUD-017), visible dropped-tax activity (AUD-016 remainder),

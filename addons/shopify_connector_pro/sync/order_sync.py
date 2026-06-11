@@ -907,8 +907,16 @@ class OrderImporter(BaseImporter):
     def _resolve_taxes(self, tax_lines):
         """Map Shopify tax lines to Odoo tax IDs via shopify.tax.mapping.
 
-        Falls back to searching Odoo taxes by rate if no mapping is
-        configured for a given tax title.
+        Falls back to searching Odoo PERCENT taxes by rate if no mapping
+        is configured for a given tax title (AUD-017), preferring the
+        tax whose effective price inclusion matches the order's
+        ``taxesIncluded`` semantics (item 3e); a same-rate tax of the
+        other flavor is used otherwise and the line price is aligned by
+        ``_align_price_with_tax_flavor``. Tax lines that resolve to
+        nothing are dropped VISIBLY: accumulated via
+        ``_record_dropped_tax`` and surfaced as one warning activity
+        per order (AUD-016), with the total-check guard (DEC-011)
+        holding any mismatched auto-invoice in draft.
         """
         if not tax_lines:
             return []
