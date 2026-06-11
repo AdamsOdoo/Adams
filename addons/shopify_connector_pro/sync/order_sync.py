@@ -878,10 +878,14 @@ class OrderImporter(BaseImporter):
             'discount': min(discount_pct, 100),
         }
 
-        # Apply tax mapping from Shopify taxLines
+        # Apply tax mapping from Shopify taxLines. Shopify is
+        # authoritative for line taxes (AUD-016): when nothing resolves
+        # (tax-exempt order, or unmapped tax titles/rates) the line
+        # carries NO taxes — never the product's default sale tax. Any
+        # unmapped remainder is caught visibly by the total-check guard
+        # before auto-posting (DEC-011).
         tax_ids = self._resolve_taxes(line_item.get('taxLines', []))
-        if tax_ids:
-            line_vals['tax_ids'] = [(6, 0, tax_ids)]
+        line_vals['tax_ids'] = [(6, 0, tax_ids)] if tax_ids else [(5,)]
 
         self.env['sale.order.line'].create(line_vals)
 
