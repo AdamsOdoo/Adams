@@ -144,16 +144,49 @@ Item 3a Odoo.sh confirmation (batched below).
 
 ## Batched Odoo.sh confirmation commands (touchpoint 1)
 
-Run all four on the staging build; paste the four result lines.
+Run all five on the staging build; paste the five result lines.
 
 ```
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestOrderImportCurrency --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestTotalGuardPaymentPath,/shopify_connector_pro:TestTotalGuardAutoInvoice --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestUntaxedOrderImport --stop-after-init --no-http
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestShippingTaxImport,/shopify_connector_pro:TestOrderImport --stop-after-init --no-http
 ```
 
-Expected: 0 failed, 0 errors of 3 / of 6 / of 6 / of 2 respectively.
+Expected: 0 failed, 0 errors of 3 / of 6 / of 6 / of 2 / of 13
+respectively (the last requires the 3c fix commit to be on the build).
+
+## Item 3c evidence trail (AUD-015 — shipping tax resolution)
+
+- Fail-before: 4 failed, 0 errors of 13 (TestShippingTaxImport ×3 +
+  tightened TestOrderImport taxed-order exact-totals assertions,
+  adams_strict1) — taxed Shopify shipping resolved NO tax; untaxed
+  shipping inherited the shipping product's default sale tax; both
+  through the production import path. Committed before the fix
+  ("test(P2-3c): AUD-015 fail-before").
+- Fix: shippingLines gains taxLines in BOTH GraphQL queries
+  (shopify_api/queries/order.py FETCH_ORDERS + order_sync.py webhook
+  query); _create_shipping_line resolves them via _resolve_taxes and
+  ALWAYS sets tax_ids explicitly (resolved taxes or none — mirror of
+  3b); auto-created SHOPIFY-SHIPPING product carries no default sale
+  tax. Refund credit notes inherit correct shipping taxes transitively
+  (they mirror the original invoice's shipping line,
+  refund_sync.py:291-295 — no refund-code change).
+- Pass-after: 0 failed, 0 errors of 24 (TestShippingTaxImport,
+  TestOrderImport, TestTotalGuardAutoInvoice, TestUntaxedOrderImport,
+  TestOrderFidelity, TestTaxedRefundE2E, adams_strict1).
+- Full suites: adams_strict1 0 failed, 0 errors of 552; adams_strict_vat
+  2 failed, 0 errors of 552 — unchanged known baseline
+  (test_import_taxed_order... + TestTaxedRefundE2E, both AUD-001-rooted,
+  clear at 3e). New shipping tests green on BOTH profiles (test tax
+  pinned price_include_override='tax_excluded' to stay orthogonal to
+  the 3e surface).
+- Simulator extended (documented in test commit): shipping lines emit
+  taxLines (tax_amount/tax_rate), matching Shopify 2026-01
+  ShippingLine.taxLines shape; fidelity guard asserts it.
+
+Item 3c Odoo.sh confirmation (batched above).
 
 ## Item 3b evidence trail (AUD-016 — explicit zero-tax lines)
 
