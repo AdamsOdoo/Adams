@@ -58,7 +58,7 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
   --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency \
   --stop-after-init --no-http
 ```
-| 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S done, 3d S done, 3e L, 3f S) | 3a, 3b, 3c COMMITTED (go 2026-06-11); 3d COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1); next: 3e | 3a+3b+3c+3d: **pending Odoo.sh confirmation** |
+| 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S done, 3d S done, 3e L done, 3f S) | 3a, 3b, 3c COMMITTED (go 2026-06-11); 3d+3e COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1); next: 3f | 3a-3e: **pending Odoo.sh confirmation** |
 | 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | not started | pending |
 | 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | not started | pending |
 
@@ -172,11 +172,12 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_co
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestUntaxedOrderImport --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestShippingTaxImport,/shopify_connector_pro:TestOrderImport --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestTaxFallbackFlavor --stop-after-init --no-http
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro,shopify_simulator --test-tags /shopify_connector_pro:TestTaxesIncludedImport,/shopify_simulator:TestOrderFidelity --stop-after-init --no-http
 ```
 
-Expected: 0 failed, 0 errors of 3 / of 6 / of 6 / of 2 / of 13 / of 5
-respectively (the last two require the 3c and 3d fix commits to be on
-the build).
+Expected: 0 failed, 0 errors of 3 / of 6 / of 6 / of 2 / of 13 / of 5 /
+of 11 respectively (the last three require the 3c, 3d and 3e fix
+commits to be on the build).
 
 ## Item 3d evidence trail (AUD-017 + AUD-016 remainder — tax-fallback flavor, dropped-tax visibility)
 
@@ -207,6 +208,37 @@ the build).
   All 5 new TestTaxFallbackFlavor tests green on BOTH profiles.
 
 Item 3d Odoo.sh confirmation (batched above, command 6).
+
+## Item 3e evidence trail (AUD-018/AUD-001 — taxesIncluded core)
+
+- Verified inputs: `Order.taxesIncluded: Boolean!` confirmed in the
+  live Shopify Admin GraphQL docs (2026-06-12); Odoo flavor derivation
+  confirmed in core (`account.tax._compute_price_include`,
+  odoo/addons/account/models/account_tax.py:302-308; company field
+  `account_price_include`, odoo/addons/account/models/company.py:282).
+- Fail-before: 4 failed, 0 errors of 11 (TestTaxesIncludedImport +
+  simulator TestOrderFidelity, adams_strict1; commit cd1bfd3) — both
+  conversion directions absent, no flavor preference, simulator node
+  lacked the field. PLUS the standing adams_strict_vat pair (2 failed
+  of 557 after 3d) — same defect through the production path.
+- Fix: `taxesIncluded` fetched in BOTH queries (FETCH_ORDERS +
+  webhook GetOrder); `_resolve_taxes` rate fallback prefers the tax
+  whose effective price inclusion matches the store semantics
+  (explicit-override-aware domain mirroring core's compute), falling
+  back to any percent match; `_align_price_with_tax_flavor` converts
+  the unit price by (1+sum(rates)) on uniform-flavor percent mismatch
+  (both directions, product AND shipping lines); mixed flavors /
+  non-percent mapped taxes untouched — guard (DEC-011) backstops; no
+  tax auto-creation (DEC-013). Legacy payloads without the flag =
+  exclusive (Shopify default). Checksum-neutral (checksum reads only
+  name/status/updatedAt). Simulator: `taxes_included` field emitted as
+  `taxesIncluded`; fidelity guard asserts it.
+- Pass-after: 0 failed, 0 errors of 11 (same tags, adams_strict1).
+- Full suites: adams_strict_vat 0 failed, 0 errors of 562 — the
+  standing AUD-001 pair CLEARED; first fully-green run on the strict
+  VAT profile. adams_strict1 0 failed, 0 errors of 562.
+
+Item 3e Odoo.sh confirmation (batched above, command 7).
 
 ## Item 3c evidence trail (AUD-015 — shipping tax resolution)
 

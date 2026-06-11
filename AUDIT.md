@@ -41,6 +41,14 @@ Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
   tax lines now schedule one deduplicated warning activity per order).
   Evidence in FINALIZE.md item 3d trail; consequence statement in
   MORNING_REVIEW.md §1.
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-018 and AUD-001 (item 3e — taxesIncluded
+  fetched and honored: flavor-preferring rate fallback + price/flavor
+  alignment on product and shipping lines; simulator emits the flag).
+  Both strict profiles fully green: strict1 0/0 of 562, strict_vat 0/0
+  of 562 (standing AUD-001 pair cleared). Evidence in FINALIZE.md item
+  3e trail; consequence statement in MORNING_REVIEW.md §1. With 3b+3c+
+  3d+3e, AUD-015 and AUD-016 are also fully closed (same gating).
 - **GREEN BUILD ledger (2026-06-11, local proxy):** class (c) noise, listed
   once per method step 2: docutils "(ERROR/3) Unexpected indentation" +
   "(WARNING/2) Block quote ends without a blank line" during install =

@@ -20,6 +20,7 @@ query FetchOrders($first: Int!, $after: String, $query: String) {
         tags
         currencyCode
         presentmentCurrencyCode
+        taxesIncluded
         totalPriceSet {
           shopMoney { amount currencyCode }
           presentmentMoney { amount currencyCode }

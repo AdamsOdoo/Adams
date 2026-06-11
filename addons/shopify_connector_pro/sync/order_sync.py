@@ -293,6 +293,10 @@ class OrderImporter(BaseImporter):
         # Create order lines. Tax drops are accumulated per order and
         # surfaced as one activity after all lines (incl. shipping).
         self._dropped_taxes = []
+        # Shopify price semantics for this order (item 3e): True when
+        # line/shipping prices include tax (Order.taxesIncluded).
+        # Absent flag (legacy payloads) = exclusive, Shopify's default.
+        self._taxes_included = bool(node.get('taxesIncluded'))
         line_items_conn = node.get('lineItems', {})
         line_items = line_items_conn.get('edges', [])
         if line_items_conn.get('pageInfo', {}).get('hasNextPage'):
@@ -891,6 +895,12 @@ class OrderImporter(BaseImporter):
         # before auto-posting (DEC-011).
         tax_ids = self._resolve_taxes(line_item.get('taxLines', []))
         line_vals['tax_ids'] = [(6, 0, tax_ids)] if tax_ids else [(5,)]
+        # Item 3e: convert the price when the taxes' flavor disagrees
+        # with the store's taxesIncluded semantics (discount % above is
+        # basis-independent, so it stays valid).
+        line_vals['price_unit'] = self._align_price_with_tax_flavor(
+            price_unit, tax_ids,
+        )
 
         self.env['sale.order.line'].create(line_vals)
 
@@ -935,16 +945,29 @@ class OrderImporter(BaseImporter):
             # the pick with the tax sequence or an explicit mapping.
             if rate is not None:
                 rate_pct = round(float(rate) * 100, 2)
-                if rate_pct not in self._tax_rate_cache:
-                    odoo_tax = self.env['account.tax'].search([
+                wanted = bool(getattr(self, '_taxes_included', False))
+                cache_key = (rate_pct, wanted)
+                if cache_key not in self._tax_rate_cache:
+                    base_domain = [
                         ('type_tax_use', '=', 'sale'),
                         ('amount_type', '=', 'percent'),
                         ('amount', '>=', rate_pct - 0.005),
                         ('amount', '<=', rate_pct + 0.005),
                         ('company_id', '=', self.backend.company_id.id),
-                    ], limit=1)
-                    self._tax_rate_cache[rate_pct] = odoo_tax
-                fallback_tax = self._tax_rate_cache[rate_pct]
+                    ]
+                    # Prefer the tax whose effective price inclusion
+                    # matches the store's semantics (no price conversion
+                    # needed); otherwise any percent match — the line
+                    # price is then aligned to the tax flavor (item 3e,
+                    # _align_price_with_tax_flavor).
+                    odoo_tax = self.env['account.tax'].search(
+                        base_domain + self._tax_flavor_domain(wanted),
+                        limit=1,
+                    ) or self.env['account.tax'].search(
+                        base_domain, limit=1,
+                    )
+                    self._tax_rate_cache[cache_key] = odoo_tax
+                fallback_tax = self._tax_rate_cache[cache_key]
                 if fallback_tax:
                     tax_ids.append(fallback_tax.id)
                 else:
@@ -964,6 +987,54 @@ class OrderImporter(BaseImporter):
                 )
 
         return list(set(tax_ids))
+
+    def _tax_flavor_domain(self, included):
+        """Domain matching taxes whose EFFECTIVE price inclusion equals
+        ``included`` — price_include_override, falling back to the
+        company default, mirroring account.tax._compute_price_include
+        (odoo/addons/account/models/account_tax.py:302-308)."""
+        flavor = 'tax_included' if included else 'tax_excluded'
+        company_default = (self.backend.company_id.account_price_include
+                           or 'tax_excluded')
+        if company_default == flavor:
+            return [('price_include_override', 'in', [False, flavor])]
+        return [('price_include_override', '=', flavor)]
+
+    def _align_price_with_tax_flavor(self, price_unit, tax_ids):
+        """Reconcile Shopify price semantics with the resolved taxes'
+        flavor (item 3e — AUD-018/AUD-001).
+
+        Shopify prices are tax-inclusive iff the order's
+        ``taxesIncluded`` flag is true; Odoo reads a line price as
+        tax-inclusive iff the taxes' effective price_include is true.
+        When the two disagree and ALL the line's taxes are percent
+        taxes of one uniform flavor, convert the unit price by
+        (1 + sum(rates)) so the booked base, tax and total equal what
+        the customer was actually charged. Mixed flavors and
+        non-percent mapped taxes are left untouched — the total-check
+        guard (DEC-011) blocks any resulting mismatch visibly, and we
+        never auto-create taxes (DEC-013).
+        """
+        if not price_unit or not tax_ids:
+            return price_unit
+        taxes = self.env['account.tax'].browse(tax_ids)
+        if any(t.amount_type != 'percent' for t in taxes):
+            return price_unit
+        flavors = set(taxes.mapped('price_include'))
+        if len(flavors) != 1:
+            return price_unit
+        tax_included_flavor = flavors.pop()
+        store_included = bool(getattr(self, '_taxes_included', False))
+        if tax_included_flavor == store_included:
+            return price_unit
+        factor = 1 + sum(taxes.mapped('amount')) / 100.0
+        if factor <= 0:
+            return price_unit
+        if tax_included_flavor:
+            # Exclusive Shopify price, price-included Odoo taxes
+            return price_unit * factor
+        # Inclusive Shopify price, price-excluded Odoo taxes
+        return price_unit / factor
 
     def _record_dropped_tax(self, title, rate_pct):
         """Accumulate a dropped Shopify tax line for the per-order
@@ -1046,7 +1117,10 @@ class OrderImporter(BaseImporter):
             'product_id': shipping_product.id,
             'name': shipping_line.get('title', 'Shipping'),
             'product_uom_qty': 1,
-            'price_unit': price,
+            # Item 3e: same flavor alignment as product lines
+            'price_unit': self._align_price_with_tax_flavor(
+                price, tax_ids,
+            ),
             'tax_ids': [(6, 0, tax_ids)] if tax_ids else [(5,)],
         })
 
@@ -1136,6 +1210,7 @@ class OrderSync:
                 cancelledAt closed note tags
                 currencyCode
                 presentmentCurrencyCode
+                taxesIncluded
                 totalPriceSet {
                   shopMoney { amount currencyCode }
                   presentmentMoney { amount currencyCode }

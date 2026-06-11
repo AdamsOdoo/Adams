@@ -56,6 +56,10 @@ class SimShopifyOrder(models.Model):
     tags = fields.Char()
     currency_code = fields.Char(default='USD')
     presentment_currency_code = fields.Char(default='USD')
+    # Shopify Order.taxesIncluded (Boolean!): line/shipping prices are
+    # tax-inclusive when true. Default False = Shopify's default
+    # (tax-exclusive pricing).
+    taxes_included = fields.Boolean(default=False)
 
     total_price = fields.Float(default=0.0)
     subtotal_price = fields.Float(default=0.0)
@@ -218,6 +222,7 @@ class SimShopifyOrder(models.Model):
             'tags': [t.strip() for t in (self.tags or '').split(',') if t.strip()],
             'currencyCode': cc,
             'presentmentCurrencyCode': pc,
+            'taxesIncluded': bool(self.taxes_included),
             'totalPriceSet': _money_set(self.total_price, cc, pc),
             'subtotalPriceSet': _money_set(self.subtotal_price, cc, pc),
             'totalShippingPriceSet': _money_set(self.total_shipping, cc, pc),

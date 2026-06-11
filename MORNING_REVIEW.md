@@ -69,6 +69,30 @@ pair).
 revert both to drop the now-failing tests with the fix, or only
 17a55bd if you want the red tests kept).
 
+### 3e — taxesIncluded / VAT-inclusive core (money path: taxes)
+
+The importer now reads Shopify's `taxesIncluded` flag and reconciles it
+with the Odoo tax it resolves. Concretely: when a store's prices and
+the matched Odoo tax disagree about whether tax is inside the price
+(e.g. any VAT-style tax-included Odoo company importing from a
+standard exclusive-pricing store — the AUD-001 wrong-invoice bug), the
+unit price is converted by the tax rate so the posted base, tax and
+total equal exactly what the customer was charged, in both directions.
+The rate fallback now also PREFERS a tax whose inclusion flavor
+already matches the store, so conversion is the exception, not the
+rule. Inclusive-pricing stores (EU/UK/AU) are now supported end to
+end; legacy payloads without the flag behave exactly as before. Where
+the arithmetic can't be made safe (mixed flavors, non-percent mapped
+taxes) prices are left untouched and the permanent total-check guard
+blocks any mismatch visibly. Evidence: fail-before 4/0 of 11 →
+pass-after 0/0 of 11; full suites BOTH GREEN — strict_vat 0 failed,
+0 errors of 562 (the 2 standing AUD-001 failures CLEARED; first
+fully-green strict-VAT run), strict1 0 failed, 0 errors of 562.
+
+**No-go revert:** `git revert <3e-fix-sha> cd1bfd3` on
+`claude/determined-cori-glvysk` (fix sha in section 2 once committed;
+cd1bfd3 = fail-before tests).
+
 ## 2) Completed with evidence
 
 - **Environment rebuilt from scratch** (container was fresh: no Odoo
