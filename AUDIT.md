@@ -7,6 +7,19 @@ Entries recorded before Tier 1 begins are marked PRELIMINARY: they came out of
 STEP 0 environment runs, carry failing-test or log evidence, and still need the
 full source-path walk during Tier 1 before any fix is proposed.
 
+## Status updates — 2026-06-11 (Tier 1 checkpoint approved; Phase 2 granted)
+
+Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
+
+- **approved:** AUD-019, AUD-020 (items 1-2); AUD-001, AUD-015, AUD-016,
+  AUD-018 (item 3 — VAT-inclusive support now IN v1 scope, total-check guard
+  permanent); AUD-003, AUD-004, AUD-005, AUD-006 (item 4); AUD-021, AUD-022
+  (item 5).
+- **approved as ride-along (same-file, small-diff only):** AUD-017 (item 3),
+  AUD-007/008/011/012/013 (item 4), AUD-023 (item 5).
+- **open (re-prioritized at later checkpoints):** AUD-009, AUD-010, AUD-014,
+  ENV-1.
+
 ---
 
 ## AUD-001 — Tax resolution on imported orders: branch map, and wrong invoices on tax-included companies

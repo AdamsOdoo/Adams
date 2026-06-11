@@ -17,8 +17,13 @@ Ship the best Shopify connector on the Odoo App Store. "Best" means, in order:
 Definition of DONE for v1: full-coverage audit completed, all critical and
 major findings fixed and verified fail-before/pass-after, COVERAGE.md shows
 every enumerated surface covered and green on the strict DB, UX pass
-completed, docs/listing accurate. Not in v1's definition of done: new
-feature development.
+completed, docs/listing accurate. SCOPE DECISION (Ahmed, 2026-06-11): full
+VAT-inclusive (tax-included pricing) support is IN v1 — no longer deferred.
+The AUD-001 branch map in AUDIT.md is its spec; the workstream covers
+AUD-001, AUD-015, AUD-016, AUD-018 plus the permanent total-check guard
+(computed invoice totals vs Shopify totalPriceSet, visible degradation on
+mismatch — stays in the product after full support lands). Otherwise not in
+v1's definition of done: new feature development.
 
 ## Project
 Odoo 19 Enterprise third-party connector for Shopify (GraphQL Admin API
@@ -136,9 +141,13 @@ audit for defects, not preferences.
     3. `adams_strict_vat` — clone of adams_strict1 with
        `env.company.account_price_include = 'tax_included'` (verified field,
        odoo/addons/account/models/company.py:282), EUR activated,
-       base.group_multi_currency implied for internal users. Baseline
-       2026-06-10: 1 failed, 0 errors of 532 — caught AUD-001 (VAT-inclusive
-       order import totals).
+       base.group_multi_currency implied for internal users, AND (added
+       2026-06-11 per Ahmed) an explicit EUR exchange rate
+       (res.currency.rate, 1 USD = 0.92 EUR) so tax-included AND
+       multi-currency conditions hold SIMULTANEOUSLY — the
+       AUD-019/020/001 compound-bug surface. Baseline 2026-06-10:
+       1 failed, 0 errors of 532 — caught AUD-001 (VAT-inclusive order
+       import totals).
 - Strict DB: its definition is not recorded anywhere; we derive it. For each
   financial bug in LEGACY_NOTES.md §1, determine what DB condition surfaced
   it (localization/chart of accounts, multi-currency, rounding settings,
