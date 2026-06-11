@@ -130,6 +130,11 @@ audit for defects, not preferences.
   file:line evidence, description, proposed fix (not implemented), status
   (open/approved/fixed/wontfix).
 - Use subagents for broad scans so the main context stays lean.
+- GREEN BUILD standing rule (Ahmed, 2026-06-11): at each tier checkpoint,
+  pull the latest Odoo.sh build log and confirm zero errors/warnings
+  attributable to our modules — any new warning is a finding. Warnings are
+  cleared by removing their cause, never by suppressing/downgrading/
+  filtering log output. Part of v1 DONE (see FINALIZE.md GREEN BUILD item).
 
 ## Environment
 - Repo: AdamsOdoo/Adams. Review/merge branch: `review/full-audit`. Sessions

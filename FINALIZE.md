@@ -58,13 +58,51 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
   --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency \
   --stop-after-init --no-http
 ```
-| 3 | Tax workstream — steps 3a-3f approved 2026-06-11; 3a (total-check guard) implemented, awaiting go on consequence statement (touchpoint 2) | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S, 3c S, 3d S, 3e L, 3f S) | 3a: verified locally | 3a: pending go + Odoo.sh |
+| 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S, 3d S, 3e L, 3f S) | 3a COMMITTED (go 2026-06-11); 3b COMMITTED (go 2026-06-11); 3c in progress | 3a+3b: **pending Odoo.sh confirmation** |
 | 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | not started | pending |
 | 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | not started | pending |
 
 After item 5: pause fixes, resume audit at Tier 2. Tier 2-3 findings that
 touch already-fixed files are ledgered as NEW findings — no opportunistic
 edits outside the granted item.
+
+## Standalone item: GREEN BUILD (Ahmed, 2026-06-11)
+
+Goal: the Odoo.sh build installs with ZERO errors and ZERO warnings
+attributable to our modules (shopify_connector_pro, shopify_simulator,
+dashboard, base skeleton). Build-log cleanliness is part of v1 DONE and is
+re-checked at every tier checkpoint (see CLAUDE.md session protocol).
+
+Sequencing: runs after the current tax sub-item (3c) completes, BEFORE the
+tax workstream resumes (3d).
+
+Method (per Ahmed):
+1. Pull the full install/upgrade log of the current build of
+   claude/admiring-bell-e9g6qp via SSH; diff against the most recent
+   pre-change build log if accessible (pre-existing vs introduced).
+2. Classify every ERROR/WARNING: (a) ours → fix; (b) real core/third-party
+   issue affecting us → ledger in AUDIT.md, don't fix core; (c) noise →
+   list once, ignore.
+3. Fix all (a) under standing approval + rules 1-6. Explicit suspects:
+   empty shopify_connector_pro_base skeleton (real content or remove —
+   decision in DECISIONS.md), view/XML warnings, missing-ACL warnings,
+   Odoo 19 deprecation warnings, missing menu/action refs, manifest
+   dependency warnings.
+4. HARD RULE: no fix may suppress, downgrade, or filter log output. A
+   warning is cleared by removing its cause, or it stays and is ledgered
+   with a reason.
+5. Money-path exception unchanged (touchpoint 2 per fix).
+6. Verification: push → Odoo.sh build → pull NEW log via SSH →
+   before/after literal counts of ours-attributable errors/warnings
+   (expect zero) + full-suite counts on both local profiles.
+
+Status: BLOCKED on SSH — outbound port 22 from the session container is
+still closed (TCP timeout to adamsmen.dev.odoo.com:22, verified
+2026-06-11 ~15:45; DNS resolves). Network-policy changes likely apply only
+to NEW session containers. Fallback if SSH stays closed: Ahmed relays the
+build log (touchpoint 1). Local proxy for step 2 prep: a clean local
+install log (fresh DB, -i all 4 modules, log-level=warn) can pre-classify
+most (a)-class lines before the Odoo.sh pass.
 
 ## Verification matrix per item
 
@@ -106,15 +144,16 @@ Item 3a Odoo.sh confirmation (batched below).
 
 ## Batched Odoo.sh confirmation commands (touchpoint 1)
 
-Run all three on the staging build; paste the three result lines.
+Run all four on the staging build; paste the four result lines.
 
 ```
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestOrderImportCurrency --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestTotalGuardPaymentPath,/shopify_connector_pro:TestTotalGuardAutoInvoice --stop-after-init --no-http
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestUntaxedOrderImport --stop-after-init --no-http
 ```
 
-Expected: 0 failed, 0 errors of 3 / of 6 / of 6 respectively.
+Expected: 0 failed, 0 errors of 3 / of 6 / of 6 / of 2 respectively.
 
 ## Item 3b evidence trail (AUD-016 — explicit zero-tax lines)
 
