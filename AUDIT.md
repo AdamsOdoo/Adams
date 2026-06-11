@@ -42,6 +42,18 @@ Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
   Evidence in FINALIZE.md item 3d trail; consequence statement in
   MORNING_REVIEW.md §1.
 - **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-003, AUD-004, AUD-005, AUD-006 and ride-along
+  minors AUD-007, AUD-008, AUD-011, AUD-012, AUD-013 (item 4 —
+  visibility batch: cron counters surfaced via _notify_sync_error,
+  webhook re-raise into the retry/dead-letter machine, reverse-sync
+  failure activities, reconcile/cancel-failure activities, ERROR+
+  traceback on unexpected raises incl. the activity helper itself).
+  Evidence in FINALIZE.md item 4 trail; consequence statement in
+  MORNING_REVIEW.md §1. AUD-008 note: the binding still advances to
+  voided when the draft-invoice cancel fails — now WITH a visible
+  activity; "do not return True" was considered and rejected as a
+  behavior change beyond the approved visibility scope.
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
   overnight window:** AUD-018 and AUD-001 (item 3e — taxesIncluded
   fetched and honored: flavor-preferring rate fallback + price/flavor
   alignment on product and shipping lines; simulator emits the flag).

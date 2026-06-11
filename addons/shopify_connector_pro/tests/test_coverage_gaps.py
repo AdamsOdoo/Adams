@@ -86,6 +86,7 @@ class TestCronMethods(TransactionCase):
             'odoo.addons.shopify_connector_pro.sync.payout_sync.PayoutSync',
         ) as MockSync:
             mock_instance = MagicMock()
+            mock_instance.import_payouts.return_value = (0, 0)
             MockSync.return_value = mock_instance
             self.env['shopify.backend']._cron_import_payouts()
             MockSync.assert_called_once()
@@ -97,6 +98,7 @@ class TestCronMethods(TransactionCase):
             'odoo.addons.shopify_connector_pro.sync.refund_sync.RefundSync',
         ) as MockSync:
             mock_instance = MagicMock()
+            mock_instance.import_refunds.return_value = (0, 0, 0)
             MockSync.return_value = mock_instance
             self.env['shopify.backend']._cron_import_refunds()
             MockSync.assert_called_once()

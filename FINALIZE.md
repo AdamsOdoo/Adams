@@ -59,7 +59,7 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
   --stop-after-init --no-http
 ```
 | 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S done, 3d S done, 3e L done, 3f S) | 3a, 3b, 3c COMMITTED (go 2026-06-11); 3d+3e COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1); next: 3f | 3a-3e: **pending Odoo.sh confirmation** |
-| 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | not started | pending |
+| 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1) | **pending Odoo.sh confirmation** |
 | 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | not started | pending |
 
 After item 5: pause fixes, resume audit at Tier 2. Tier 2-3 findings that
@@ -173,11 +173,12 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_co
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestShippingTaxImport,/shopify_connector_pro:TestOrderImport --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestTaxFallbackFlavor --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro,shopify_simulator --test-tags /shopify_connector_pro:TestTaxesIncludedImport,/shopify_simulator:TestOrderFidelity --stop-after-init --no-http
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestCronCounterVisibility,/shopify_connector_pro:TestWebhookOrderRetry,/shopify_connector_pro:TestReverseSyncFailureVisibility,/shopify_connector_pro:TestPaymentPathMinorVisibility --stop-after-init --no-http
 ```
 
 Expected: 0 failed, 0 errors of 3 / of 6 / of 6 / of 2 / of 13 / of 5 /
-of 11 respectively (the last three require the 3c, 3d and 3e fix
-commits to be on the build).
+of 11 / of 10 respectively (the last four require the 3c, 3d, 3e and
+item-4 fix commits to be on the build).
 
 ## Item 3d evidence trail (AUD-017 + AUD-016 remainder — tax-fallback flavor, dropped-tax visibility)
 
@@ -239,6 +240,42 @@ Item 3d Odoo.sh confirmation (batched above, command 6).
   VAT profile. adams_strict1 0 failed, 0 errors of 562.
 
 Item 3e Odoo.sh confirmation (batched above, command 7).
+
+## Item 4 evidence trail (visibility batch — AUD-003/004/005/006 + minors 007/008/011/012/013)
+
+- Fail-before: 10 failed, 0 errors of 10 (test_visibility_batch.py,
+  adams_strict1, commit 52a268c) — every targeted silent branch proven
+  silent through the production path (incl. the AUD-005 smoking gun: a
+  crashed orders/create webhook recorded state='done').
+- Fixes, one per finding (no behavior beyond visibility):
+  - AUD-003/004 `shopify_backend.py`: both crons now unpack the
+    returned counters and post the existing `_notify_sync_error`
+    chatter alert when errors>0 (messages state the consequence:
+    credit notes NOT created / payout reconciliation incomplete).
+  - AUD-005 `order_sync.py import_single_order`: log + RE-RAISE so the
+    webhook retry → dead-letter machine works; all three
+    `process_webhook_event` call sites verified to sit inside
+    `_cron_process_pending`'s savepoint+try.
+  - AUD-006 `account_move.py`: failed orderMarkAsPaid / refundCreate
+    now schedule the button_cancel-style warning activity naming the
+    move, the Shopify order, and the manual action.
+  - AUD-007/008 `payment_status_sync.py`: reconcile failure, draft-
+    invoice cancel failure (binding still advances; the live draft is
+    flagged) and draft/sent SO cancel failure all schedule activities.
+  - AUD-011/012 `order_sync.py`: unexpected raises in the payment
+    transition wrapper / auto-registration log at ERROR with traceback;
+    auto-registration also schedules an activity (captured payment
+    never registered).
+  - AUD-013 `payment_status_sync.py _schedule_activity`: guard kept,
+    inner failure now ERROR with traceback.
+  - Test-only: the two cron wiring tests in test_coverage_gaps.py give
+    their mocks counter return values.
+- Pass-after: 0 failed, 0 errors of 16 (the 10 new + TestCronMethods,
+  adams_strict1).
+- Full suites: adams_strict1 0 failed, 0 errors of 572; adams_strict_vat
+  0 failed, 0 errors of 572.
+
+Item 4 Odoo.sh confirmation (batched above, command 8).
 
 ## Item 3f evidence trail (docs sweep + final tax matrix)
 

@@ -129,10 +129,14 @@ class OrderImporter(BaseImporter):
                     handler.handle_status_change(
                         existing_binding, old_financial, financial_status,
                     )
-                except Exception as e:
-                    _logger.warning(
-                        "Payment transition failed for order %s: %s",
-                        existing_binding.shopify_order_name, e,
+                except Exception:
+                    # ERROR + traceback (AUD-011): transient errors
+                    # self-heal on the next status change, but a
+                    # persistent programming error must not repeat as a
+                    # quiet warning.
+                    _logger.exception(
+                        "Payment transition failed for order %s",
+                        existing_binding.shopify_order_name,
                     )
 
             # Update fulfillment status and refund count
@@ -441,9 +445,21 @@ class OrderImporter(BaseImporter):
             handler = PaymentStatusHandler(self.env, self.backend)
             handler._register_payment(posted_invoices[0], order_binding)
         except Exception as e:
-            _logger.warning(
-                "Auto payment registration failed for order %s: %s",
-                order.name, e,
+            # A swallowed failure here means a captured payment was
+            # never registered (AUD-012) — ERROR + activity, the inner
+            # handler's own failure paths stay authoritative when they
+            # ran.
+            _logger.exception(
+                "Auto payment registration failed for order %s",
+                order.name,
+            )
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify payment not registered",
+                note="The Shopify order is paid but automatic payment "
+                     "registration failed unexpectedly: %s. Register "
+                     "the payment on the invoice manually, or use Retry "
+                     "Sync on the order binding." % e,
             )
 
     def _track_discount_usage(self, order_binding, node):
@@ -1307,3 +1323,7 @@ class OrderSync:
                 self.importer._import_one(node, binding)
         except Exception:
             _logger.exception("Failed to import order from webhook: %s", shopify_id)
+            # Re-raise so the webhook log's retry → dead-letter state
+            # machine handles the failure (AUD-005); swallowing here
+            # recorded crashed imports as state='done'.
+            raise

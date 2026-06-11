@@ -78,6 +78,23 @@ class AccountMove(models.Model):
                         "Failed to mark Shopify order %s as paid: %s",
                         binding.shopify_order_name, e,
                     )
+                    # Visible divergence (AUD-006): Odoo shows the
+                    # invoice paid-tracked, Shopify still shows unpaid.
+                    order.activity_schedule(
+                        'mail.mail_activity_data_warning',
+                        summary=_("Shopify not marked as paid"),
+                        note=_(
+                            "Invoice %(move)s was posted but marking "
+                            "Shopify order %(order_name)s as paid "
+                            "failed: %(error)s. Shopify still shows the "
+                            "order unpaid — mark it as paid in the "
+                            "Shopify admin, or re-post after fixing the "
+                            "connection.",
+                            move=move.name,
+                            order_name=binding.shopify_order_name,
+                            error=e,
+                        ),
+                    )
 
     def _shopify_reverse_sync_refund(self, move):
         """When a credit note is posted for a Shopify order and
@@ -152,6 +169,23 @@ class AccountMove(models.Model):
                     _logger.warning(
                         "Failed to create Shopify refund for order %s: %s",
                         binding.shopify_order_name, e,
+                    )
+                    # Visible divergence (AUD-006): the credit note is
+                    # posted in Odoo but Shopify has no refund — the
+                    # money story differs between systems.
+                    order.activity_schedule(
+                        'mail.mail_activity_data_warning',
+                        summary=_("Shopify refund not created"),
+                        note=_(
+                            "Credit note %(move)s is posted in Odoo but "
+                            "creating the refund on Shopify order "
+                            "%(order_name)s failed: %(error)s. Create "
+                            "the refund manually in the Shopify admin "
+                            "so both systems tell the same money story.",
+                            move=move.name,
+                            order_name=binding.shopify_order_name,
+                            error=e,
+                        ),
                     )
 
     def button_cancel(self):

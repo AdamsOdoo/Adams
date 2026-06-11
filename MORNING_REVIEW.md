@@ -93,6 +93,28 @@ fully-green strict-VAT run), strict1 0 failed, 0 errors of 562.
 `claude/determined-cori-glvysk` (58af690 = fix+docs;
 cd1bfd3 = fail-before tests).
 
+### Item 4 — visibility batch (money-adjacent: refund/payout/payment visibility)
+
+Nine silent-failure branches now surface; no financial computation
+changed anywhere. The merchant-visible effects: refund/payout cron
+failures post a Sync Alert on the store's chatter instead of vanishing
+(a dead token no longer means refunds silently never book); an order
+webhook whose import crashes is retried and eventually dead-lettered
+instead of being recorded as processed; a posted credit note or
+invoice whose Shopify reverse-sync fails gets a warning activity
+naming the manual fix (the two systems can no longer diverge
+silently); reconcile/cancel failures during payment transitions and
+unexpected registration errors get activities and ERROR-level
+tracebacks. Risk is low: every change adds notification on an
+existing failure path; the one behavioral change is AUD-005 (webhook
+re-raise), where the retry machine was already built, tested, and
+simply never reached. Evidence: fail-before 10/0 of 10 → pass-after
+0/0 of 16; full suites (counts in §2).
+
+**No-go revert:** `git revert <item4-fix-sha> 52a268c` on
+`claude/determined-cori-glvysk` (52a268c = fail-before tests; fix sha
+in §2 once committed).
+
 ## 2) Completed with evidence
 
 - **Environment rebuilt from scratch** (container was fresh: no Odoo
