@@ -1,35 +1,33 @@
 # STATUS.md
 
-Updated: 2026-06-11 (session: Phase 2 items 1-2)
+Updated: 2026-06-11 (session: Phase 2 item 2 + item 3 plan)
 
 ## Done this session
-- Scope decision recorded: VAT-inclusive support IN v1 (CLAUDE.md updated);
-  FINALIZE.md created with granted Phase 2 sequence + standing decisions
-  (permanent total-check guard; currency policy).
-- Strict profile 3 extended: explicit EUR rate 0.92 → tax-included AND
-  multi-currency hold simultaneously on adams_strict_vat.
-- ITEM 1 (AUD-019) FIXED, pending Odoo.sh confirmation:
-  refund_sync.py — credit note carries invoice currency (order currency
-  fallback) + visible mismatch guard. Fail-before: 1 failed of 1.
-  Pass-after: 0 failed, 0 errors of 3 (TestRefundCreditNoteMultiCurrency).
-  Full suites: adams_strict1 0 failed/0 errors of 535; adams_strict_vat
-  1 failed/0 errors of 535 (sole failure = known AUD-001 taxed-order test).
-  Confirmation command in FINALIZE.md.
-- ITEM 2 (AUD-020) fail-before committed: 3 failed, 0 errors of 3
-  (TestOrderImportCurrency on adams_strict1) — EUR not auto-activated,
-  orders created in company currency despite unresolvable currency/no rate.
-  Plan presented to Ahmed; AWAITING APPROVAL before editing shipped code.
-- New scope note for item 2: import_currency_mode='company' (the DEFAULT)
-  books shopMoney amounts with no conversion — only correct when shop
-  currency equals company currency; folded into the item 2 plan as a
-  decision point.
+- ITEM 2 (AUD-020) FIXED, pending Odoo.sh confirmation. order_sync.py:
+  visible currency auto-activation; usable-rate hierarchy (order money-pair
+  preferred → company-scoped rate record dated to the order, never
+  overwriting existing rates; Odoo rates fallback; error-state binding with
+  actionable message otherwise); company mode CONVERTS per decision
+  (presentment-side direct when company currency — pair beats Odoo daily
+  rate; else dated Odoo-rate conversion); Retry Sync completes SO creation
+  via pending-gated branch in _import_one.
+- Verification: fail-before 3 failed of 3 → pass-after 0 failed, 0 errors
+  of 6 (TestOrderImportCurrency, incl. exact conversion arithmetic,
+  pair-vs-daily-rate, retry idempotency, rate scoping). Full suites:
+  adams_strict1 0 failed/0 errors of 541; adams_strict_vat 1 failed/0
+  errors of 541 (sole failure = known AUD-001). Regression caught during
+  verification (retry branch vs webhook write_date invariant) and fixed by
+  gating on sync_status='pending' — documented in AUDIT.md.
+- FINALIZE.md: items 1-2 pending Odoo.sh confirmation with commands.
+- Item 3 (tax workstream) breakdown plan presented to Ahmed — AWAITING
+  APPROVAL, no shipped-code edits made for it.
 
 ## Next
-- Ahmed: approve/adjust item 2 plan (see chat + FINALIZE.md), relay item 1
-  Odoo.sh confirmation.
-- Then items 3 (tax workstream breakdown proposal), 4, 5 per FINALIZE.md.
+- Ahmed: relay items 1-2 Odoo.sh confirmations; approve/adjust item 3
+  breakdown (steps 3a-3f in chat; decisions: guard blocking vs
+  activity-only, guard tolerance, missing tax-flavor handling).
+- Then execute item 3 step by step, one per session.
 
 ## Open questions for Ahmed
-- Item 2, 'company' mode: validate-at-setup (refuse foreign shop currency)
-  or convert amounts to company currency using the usable rate? Plan
-  recommends convert-with-rate (policy-consistent), validate as fallback.
+- Item 3 decisions (see plan): guard behavior on mismatch, tolerance,
+  and tax-flavor fallback when no matching price-include variant exists.

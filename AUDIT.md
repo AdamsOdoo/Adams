@@ -17,7 +17,18 @@ Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
   (TestRefundCreditNoteMultiCurrency, adams_strict_vat); no regression:
   0/0 of 535 (adams_strict1 full), 1/0 of 535 (adams_strict_vat full, sole
   failure = known AUD-001).
-- **approved:** AUD-020 (item 2); AUD-001, AUD-015, AUD-016,
+- **fixed (pending Odoo.sh confirmation):** AUD-020 — fix applied 2026-06-11
+  (order_sync.py: visible currency auto-activation, usable-rate hierarchy
+  with company-scoped order-dated pair rates, company-mode conversion,
+  error-state binding + pending-gated retry path). Fail-before 3 failed of
+  3; pass-after 0/0 of 6 (TestOrderImportCurrency) + retry-idempotency and
+  pair-vs-daily-rate conversion tests; full suites strict1 0/0 of 541,
+  strict_vat 1/0 of 541 (sole failure = known AUD-001). One regression
+  caught and corrected during verification: the retry branch initially
+  hijacked 'synced' bindings without odoo_id, breaking the webhook
+  write_date invariant (test_refund_scan_pruning) — now gated on
+  sync_status='pending'.
+- **approved:** AUD-001, AUD-015, AUD-016,
   AUD-018 (item 3 — VAT-inclusive support now IN v1 scope, total-check guard
   permanent); AUD-003, AUD-004, AUD-005, AUD-006 (item 4); AUD-021, AUD-022
   (item 5).

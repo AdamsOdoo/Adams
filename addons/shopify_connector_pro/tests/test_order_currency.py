@@ -33,6 +33,10 @@ class TestOrderImportCurrency(ShopifyAccountingMixin, TransactionCase):
             'list_price': 50.0,
             'default_code': 'CUR-WIDGET-1',
         })
+        # Neutralize the company default sale tax so the currency
+        # assertions are exact (the default-tax leak itself is AUD-016,
+        # item 3 scope — not under test here).
+        self.product.taxes_id = [(5, 0, 0)]
         product_binding = self.env['shopify.product.binding'].create({
             'backend_id': self.backend.id,
             'odoo_id': self.product.product_tmpl_id.id,
@@ -157,6 +161,16 @@ class TestOrderImportCurrency(ShopifyAccountingMixin, TransactionCase):
         self.assertTrue(
             rates, "A usable EUR exchange rate must exist after import")
         self.assertAlmostEqual(rates[0].rate, 100.0 / 108.0, places=3)
+        # Scoping (verification addition 2): company-scoped and dated to
+        # the order, so it cannot leak into another company's conversions
+        self.assertEqual(
+            rates[0].company_id, self.env.company,
+            "Order-pair rate must be company-scoped",
+        )
+        self.assertEqual(
+            str(rates[0].name), '2026-06-01',
+            "Order-pair rate must be dated to the order",
+        )
 
     def test_unknown_currency_error_states_order_visibly(self):
         """Unknown currency code: no sale order, error-state binding with an
@@ -176,6 +190,122 @@ class TestOrderImportCurrency(ShopifyAccountingMixin, TransactionCase):
         self.assertFalse(binding.odoo_id)
         self.assertIn('ZZZ', binding.sync_error or '',
                       "Message must name the unresolvable currency")
+
+    def test_company_mode_pair_rate_wins_over_odoo_daily_rate(self):
+        """Company mode (CONVERT decision): the order's own money pair
+        (shop EUR 100 ↔ presentment USD 108) must win over a differing
+        Odoo daily rate (0.92 → would imply 108.70). Exact to currency
+        rounding: total is 108.00, Shopify's own conversion."""
+        self.backend.import_currency_mode = 'company'
+        self.eur.active = True
+        self.env['res.currency.rate'].create({
+            'currency_id': self.eur.id,
+            'rate': 0.92,
+            'name': '2026-06-01',
+            'company_id': self.env.company.id,
+        })
+        node = self._make_node('gid://shopify/Order/8004', '#CUR-1004')
+        # Shop currency EUR, presentment USD (= company): swap the pair
+        node['currencyCode'] = 'EUR'
+        for ps in (node['totalPriceSet'],
+                   node['lineItems']['edges'][0]['node']['originalUnitPriceSet']):
+            shop, pres = ps['shopMoney'], ps['presentmentMoney']
+            ps['shopMoney'] = {
+                'amount': pres['amount'], 'currencyCode': 'EUR',
+            }
+            ps['presentmentMoney'] = {
+                'amount': shop['amount'], 'currencyCode': 'USD',
+            }
+        self.importer._import_one(node, None)
+
+        order = self._order_for('#CUR-1004')
+        self.assertTrue(order, "Order must be imported")
+        self.assertEqual(
+            order.currency_id, self.env.company.currency_id,
+            "Company mode books in company currency",
+        )
+        self.assertEqual(
+            round(order.amount_total, 2), 108.00,
+            "Order-pair conversion (USD presentment side) must win: "
+            "108.00, not 108.70 from the 0.92 Odoo daily rate",
+        )
+
+    def test_company_mode_converts_via_odoo_rate_when_no_pair(self):
+        """Company mode, no money pair (both sides EUR): convert shopMoney
+        via the Odoo rate, exact to currency rounding
+        (50 / 0.92 = 54.35 per unit → 108.70 total)."""
+        self.backend.import_currency_mode = 'company'
+        self.eur.active = True
+        self.env['res.currency.rate'].create({
+            'currency_id': self.eur.id,
+            'rate': 0.92,
+            'name': '2026-06-01',
+            'company_id': self.env.company.id,
+        })
+        node = self._make_node('gid://shopify/Order/8005', '#CUR-1005')
+        node['currencyCode'] = 'EUR'
+        for ps in (node['totalPriceSet'],
+                   node['lineItems']['edges'][0]['node']['originalUnitPriceSet']):
+            ps['shopMoney']['currencyCode'] = 'EUR'
+            ps['shopMoney']['amount'] = ps['presentmentMoney']['amount']
+            ps['presentmentMoney'] = dict(ps['shopMoney'])
+        self.importer._import_one(node, None)
+
+        order = self._order_for('#CUR-1005')
+        self.assertTrue(order, "Order must be imported")
+        self.assertEqual(order.currency_id, self.env.company.currency_id)
+        self.assertEqual(
+            round(order.amount_total, 2), 108.70,
+            "Odoo-rate conversion: 2 x (50 EUR / 0.92) = 108.70 USD",
+        )
+
+    def test_error_then_retry_yields_exactly_one_order(self):
+        """Verification addition 1: error-state (no usable rate) → add the
+        rate → Retry Sync → exactly ONE sale order, binding linked."""
+        self.backend.import_currency_mode = 'shopify'
+        node = self._make_node('gid://shopify/Order/8006', '#CUR-1006')
+        node['currencyCode'] = 'EUR'
+        for ps in (node['totalPriceSet'],
+                   node['lineItems']['edges'][0]['node']['originalUnitPriceSet']):
+            ps['shopMoney']['currencyCode'] = 'EUR'
+            ps['shopMoney']['amount'] = ps['presentmentMoney']['amount']
+            ps['presentmentMoney'] = dict(ps['shopMoney'])
+
+        # First import: EUR has no rate and none is derivable → error
+        self.importer._import_one(node, None)
+        binding = self._binding_for('gid://shopify/Order/8006')
+        self.assertEqual(binding.sync_status, 'error')
+        self.assertFalse(binding.odoo_id)
+        self.assertFalse(self._order_for('#CUR-1006'))
+
+        # Merchant fixes the rate, retries
+        self.env['res.currency.rate'].create({
+            'currency_id': self.eur.id,
+            'rate': 0.92,
+            'name': '2026-06-01',
+            'company_id': self.env.company.id,
+        })
+        binding.action_retry_sync()
+        self.assertEqual(binding.sync_status, 'pending')
+        self.importer._import_one(node, binding)
+
+        orders = self.env['sale.order'].search([
+            ('shopify_order_name', '=', '#CUR-1006'),
+        ])
+        self.assertEqual(
+            len(orders), 1,
+            "Retry must produce exactly one sale order (no duplicates)",
+        )
+        self.assertEqual(binding.odoo_id, orders,
+                         "Binding must link the created order")
+        self.assertEqual(binding.sync_status, 'synced')
+        self.assertFalse(binding.sync_error)
+        bindings = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', 'gid://shopify/Order/8006'),
+        ])
+        self.assertEqual(len(bindings), 1,
+                         "Retry must not create a second binding")
 
     def test_no_rate_anywhere_error_states_order_visibly(self):
         """Active-able currency but NO rate derivable (identical money pair

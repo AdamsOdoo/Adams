@@ -85,6 +85,33 @@ class OrderImporter(BaseImporter):
         fulfillment_status = (node.get('displayFulfillmentStatus', '') or '').lower()
         refund_count = len(node.get('refunds') or [])
 
+        if (existing_binding and not existing_binding.odoo_id
+                and existing_binding.sync_status == 'pending'):
+            # Retryable binding without a sale order (action_retry_sync
+            # resets an AUD-020 currency failure to 'pending'): retry the
+            # creation path so the retry can actually complete the import.
+            # Other no-order bindings keep the status-update path below —
+            # webhook status changes must still advance write_date on them
+            # (refund-window invariant, test_refund_scan_pruning).
+            order = self._create_sale_order(node)
+            if order:
+                existing_binding.write({
+                    'odoo_id': order.id,
+                    'sync_status': 'synced',
+                    'sync_error': False,
+                    'shopify_financial_status': financial_status,
+                    'shopify_fulfillment_status': fulfillment_status,
+                    'shopify_refund_count': refund_count,
+                    'shopify_created_at': _parse_shopify_dt(node.get('createdAt')),
+                    'sync_checksum': checksum,
+                    'last_sync_date': fields.Datetime.now(),
+                })
+                self._track_discount_usage(existing_binding, node)
+                if (self.backend.auto_create_invoice
+                        and financial_status == 'paid'):
+                    self._auto_register_payment(order, existing_binding)
+            return
+
         if existing_binding:
             # Detect financial status change → trigger transition handler
             old_financial = existing_binding.shopify_financial_status or ''
@@ -164,31 +191,75 @@ class OrderImporter(BaseImporter):
             'warehouse_id': self.backend.warehouse_id.id,
         }
 
-        # Multi-currency support
+        # Multi-currency support (AUD-020). Policy (Ahmed, 2026-06-11):
+        # never book foreign amounts as company currency; auto-activate
+        # currencies visibly; require a usable exchange rate (order
+        # money-pair preferred, Odoo rates fallback); otherwise error-state
+        # the order binding with an actionable message.
         currency_mode = self.backend.import_currency_mode
-        if currency_mode in ('shopify', 'presentment'):
-            if currency_mode == 'presentment':
-                # Use customer-facing currency (Shopify Markets)
-                currency_code = node.get('presentmentCurrencyCode', '')
-                if not currency_code:
-                    currency_code = (
-                        node.get('totalPriceSet', {}).get('presentmentMoney', {}).get('currencyCode', '')
-                    )
-            else:
-                # Use shop base currency
+        company_currency = self.backend.company_id.currency_id
+        self._company_take_presentment = False
+        self._company_convert = None
+        if currency_mode == 'presentment':
+            currency_code = node.get('presentmentCurrencyCode', '')
+            if not currency_code:
                 currency_code = (
-                    node.get('currencyCode', '')
-                    or node.get('totalPriceSet', {}).get('shopMoney', {}).get('currencyCode', '')
+                    node.get('totalPriceSet', {}).get('presentmentMoney', {}).get('currencyCode', '')
                 )
-            if currency_code:
-                currency = self._resolve_currency(currency_code, node.get('name', ''))
-                if currency:
-                    company_currency = self.backend.company_id.currency_id
-                    if currency != company_currency:
-                        order_vals['currency_id'] = currency.id
-                        pricelist = self._resolve_pricelist(currency)
-                        if pricelist:
-                            order_vals['pricelist_id'] = pricelist.id
+        else:
+            # 'shopify' and 'company' modes both source shopMoney amounts
+            currency_code = (
+                node.get('currencyCode', '')
+                or node.get('totalPriceSet', {}).get('shopMoney', {}).get('currencyCode', '')
+            )
+        if currency_code and currency_code != company_currency.name:
+            if currency_mode == 'company':
+                # Convert to TRUE company-currency amounts (decision
+                # 2026-06-11: convert, do not refuse). _get_money_amount
+                # applies the per-order conversion prepared here.
+                if not self._prepare_company_conversion(node):
+                    self._order_import_error(node, (
+                        "Shopify order %s is in %s but this backend books "
+                        "in %s (company currency mode) and no usable "
+                        "exchange rate was found — none derivable from the "
+                        "order and no %s rate configured in Odoo. The "
+                        "order was NOT imported. Add an exchange rate "
+                        "(Accounting > Configuration > Currencies), then "
+                        "use Retry Sync on this order."
+                        % (node.get('name', ''), currency_code,
+                           company_currency.name, currency_code)
+                    ))
+                    return None
+            else:
+                currency = self._resolve_currency(
+                    currency_code, node.get('name', ''),
+                )
+                if not currency:
+                    self._order_import_error(node, (
+                        "Shopify order %s uses currency %s, which does not "
+                        "exist in this Odoo database. The order was NOT "
+                        "imported. Create or activate the currency "
+                        "(Accounting > Configuration > Currencies), then "
+                        "use Retry Sync on this order."
+                        % (node.get('name', ''), currency_code)
+                    ))
+                    return None
+                if not self._ensure_usable_rate(currency, node):
+                    self._order_import_error(node, (
+                        "Shopify order %s is in %s but no usable exchange "
+                        "rate exists — none derivable from the order and "
+                        "no %s rate configured in Odoo. The order was NOT "
+                        "imported. Add an exchange rate (Accounting > "
+                        "Configuration > Currencies), then use Retry Sync "
+                        "on this order."
+                        % (node.get('name', ''), currency_code,
+                           currency_code)
+                    ))
+                    return None
+                order_vals['currency_id'] = currency.id
+                pricelist = self._resolve_pricelist(currency)
+                if pricelist:
+                    order_vals['pricelist_id'] = pricelist.id
 
         # Resolve shipping address
         shipping = node.get('shippingAddress')
@@ -398,12 +469,151 @@ class OrderImporter(BaseImporter):
             return 0.0
         if self.backend.import_currency_mode == 'presentment':
             money = price_set.get('presentmentMoney') or price_set.get('shopMoney', {})
+        elif getattr(self, '_company_take_presentment', False):
+            # Company mode, presentment side IS the company currency:
+            # Shopify's own per-line conversion (the order money-pair
+            # rate) wins over any Odoo daily rate — policy 2026-06-11.
+            money = price_set.get('presentmentMoney') or price_set.get('shopMoney', {})
         else:
             money = price_set.get('shopMoney', {})
-        return float(money.get('amount', 0))
+        amount = float(money.get('amount', 0))
+        conv = getattr(self, '_company_convert', None)
+        if conv and amount:
+            from_currency, company, conv_date = conv
+            amount = from_currency._convert(
+                amount, company.currency_id, company, conv_date,
+            )
+        return amount
+
+    def _prepare_company_conversion(self, node):
+        """Company mode with a foreign shop currency: arrange for
+        _get_money_amount to return TRUE company-currency amounts.
+
+        Preference (policy 2026-06-11): (1) the order's own money pair —
+        when presentmentMoney is in the company currency, take that side
+        directly (Shopify's per-line conversion, exact to the cent);
+        (2) Odoo rates — convert shopMoney via res.currency rates dated to
+        the order; (3) neither usable → False (caller error-states).
+        """
+        company = self.backend.company_id
+        total_set = node.get('totalPriceSet') or {}
+        pres = total_set.get('presentmentMoney') or {}
+        shop = total_set.get('shopMoney') or {}
+        if (pres.get('currencyCode') or '') == company.currency_id.name:
+            self._company_take_presentment = True
+            return True
+        shop_code = shop.get('currencyCode') or ''
+        shop_currency = self._resolve_currency(shop_code, node.get('name', ''))
+        if not shop_currency:
+            return False
+        has_rate = self.env['res.currency.rate'].search_count([
+            ('currency_id', '=', shop_currency.id),
+            ('company_id', 'in', [company.id, False]),
+        ])
+        if not has_rate:
+            return False
+        conv_date = fields.Date.to_date(
+            (node.get('createdAt') or '')[:10] or fields.Date.today(),
+        )
+        self._company_convert = (shop_currency, company, conv_date)
+        return True
+
+    def _ensure_usable_rate(self, currency, node):
+        """Guarantee a usable exchange rate before booking a foreign-
+        currency order (policy 2026-06-11: order money-pair preferred,
+        Odoo rates fallback, otherwise the caller error-states).
+
+        When the order's money pair (shopMoney vs presentmentMoney with
+        the company currency on one side) yields a rate and no rate
+        record exists for the order's date, a company-scoped, dated
+        res.currency.rate is created VISIBLY (log + backend chatter), so
+        it cannot leak into other companies' conversions.
+        """
+        company = self.backend.company_id
+        order_date = fields.Date.to_date(
+            (node.get('createdAt') or '')[:10] or fields.Date.today(),
+        )
+        total_set = node.get('totalPriceSet') or {}
+        sides = [total_set.get('shopMoney') or {},
+                 total_set.get('presentmentMoney') or {}]
+        pair_rate = None
+        cur_amt = company_amt = 0.0
+        for i, side in enumerate(sides):
+            other = sides[1 - i]
+            if (side.get('currencyCode') == currency.name
+                    and other.get('currencyCode') == company.currency_id.name):
+                cur_amt = float(side.get('amount') or 0)
+                company_amt = float(other.get('amount') or 0)
+                if cur_amt > 0 and company_amt > 0:
+                    pair_rate = cur_amt / company_amt
+                break
+        same_date_rate = self.env['res.currency.rate'].search_count([
+            ('currency_id', '=', currency.id),
+            ('company_id', 'in', [company.id, False]),
+            ('name', '=', order_date),
+        ])
+        if pair_rate and not same_date_rate:
+            self.env['res.currency.rate'].create({
+                'currency_id': currency.id,
+                'rate': pair_rate,
+                'name': order_date,
+                'company_id': company.id,
+            })
+            msg = (
+                "Exchange rate %s %.6f per %s created from Shopify order "
+                "%s money fields (dated %s, company %s)." % (
+                    currency.name, pair_rate, company.currency_id.name,
+                    node.get('name', ''), order_date, company.name,
+                )
+            )
+            _logger.info(msg)
+            self.backend.message_post(
+                body=msg, message_type='notification',
+                subtype_xmlid='mail.mt_note',
+            )
+            return True
+        return bool(same_date_rate or self.env['res.currency.rate'].search_count([
+            ('currency_id', '=', currency.id),
+            ('company_id', 'in', [company.id, False]),
+        ]))
+
+    def _order_import_error(self, node, message):
+        """Record a VISIBLE, retryable import failure for this order
+        (rule 5): error-state binding with an actionable message, no
+        sale order. Idempotent — re-uses the existing binding on retry."""
+        shopify_id = node.get('id')
+        binding = self.env['shopify.order.binding'].search([
+            ('backend_id', '=', self.backend.id),
+            ('shopify_id', '=', shopify_id),
+        ], limit=1)
+        vals = {
+            'sync_status': 'error',
+            'sync_error': message,
+            'shopify_order_name': node.get('name', ''),
+            'shopify_financial_status': (
+                node.get('displayFinancialStatus', '') or ''
+            ).lower(),
+        }
+        if binding:
+            binding.write(vals)
+        else:
+            vals.update({
+                'backend_id': self.backend.id,
+                'shopify_id': shopify_id,
+            })
+            binding = self.env['shopify.order.binding'].create(vals)
+        _logger.warning(
+            "Order %s import error: %s", node.get('name', ''), message,
+        )
+        return binding
 
     def _resolve_currency(self, currency_code, order_name=''):
-        """Resolve a currency code to a res.currency record, with caching."""
+        """Resolve a currency code to a res.currency record, with caching.
+
+        Inactive currencies are activated automatically and VISIBLY
+        (policy 2026-06-11): log + backend chatter note. Unknown codes
+        return False — the caller degrades visibly.
+        """
         if currency_code in self._currency_cache:
             return self._currency_cache[currency_code]
 
@@ -412,22 +622,29 @@ class OrderImporter(BaseImporter):
             ('active', '=', True),
         ], limit=1)
         if not currency:
-            currency = self.env['res.currency'].search([
-                ('name', '=', currency_code),
-            ], limit=1)
+            currency = self.env['res.currency'].with_context(
+                active_test=False,
+            ).search([('name', '=', currency_code)], limit=1)
             if currency:
+                currency.active = True
+                msg = (
+                    "Currency %s was activated automatically to import "
+                    "Shopify order %s in its original currency." % (
+                        currency_code, order_name,
+                    )
+                )
+                _logger.info(msg)
+                self.backend.message_post(
+                    body=msg, message_type='notification',
+                    subtype_xmlid='mail.mt_note',
+                )
+            else:
                 _logger.warning(
-                    "Currency %s is inactive; activate it to import "
-                    "order %s with correct currency.",
+                    "Currency %s not found for order %s — the order "
+                    "cannot be imported until it exists in Odoo.",
                     currency_code, order_name,
                 )
                 currency = False
-            else:
-                _logger.warning(
-                    "Currency %s not found for order %s, "
-                    "falling back to company currency.",
-                    currency_code, order_name,
-                )
         self._currency_cache[currency_code] = currency or False
         return self._currency_cache[currency_code]
 

@@ -27,7 +27,27 @@ only when they touch the same file and keep the diff small.
 | # | Item | Findings | Size | Status | Odoo.sh |
 |---|------|----------|------|--------|---------|
 | 1 | Credit note currency_id | AUD-019 | S | FIXED locally (fail-before 1/1 → pass-after 0/0 of 3; strict1 full 0/0 of 535; strict_vat full 1/0 of 535, sole failure = known AUD-001) | **pending Odoo.sh confirmation** |
-| 2 | Order-currency handling per currency policy | AUD-020 | M | plan presented; fail-before 3/3 committed | pending |
+| 2 | Order-currency handling per currency policy | AUD-020 | M | FIXED locally (fail-before 3/3 → pass-after 0/0 of 6 + retry/conversion tests; strict1 full 0/0 of 541; strict_vat full 1/0 of 541, sole failure = known AUD-001) | **pending Odoo.sh confirmation** |
+
+Item 2 Odoo.sh confirmation command (Ahmed relays, expect "0 failed, 0
+error(s) of 6 tests"):
+
+```
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
+  -u shopify_connector_pro \
+  --test-tags /shopify_connector_pro:TestOrderImportCurrency \
+  --stop-after-init --no-http
+```
+
+Item 2 implementation notes: company mode CONVERTS (decision 2026-06-11) —
+presentment side taken directly when it is the company currency (order-pair
+rate wins over Odoo daily rates), Odoo-rate conversion dated to the order
+otherwise, error-state when neither. Foreign-booking modes auto-activate
+currencies visibly and create company-scoped, order-dated res.currency.rate
+records from the money pair only when no rate exists for that date (existing
+merchant rates are never overwritten). Retryability: `_import_one` completes
+SO creation for bindings reset to 'pending' by Retry Sync; non-pending
+no-order bindings keep the status-update path (refund-window invariant).
 
 Item 1 Odoo.sh confirmation command (Ahmed relays, expect "0 failed, 0
 error(s) of 3 tests"):
