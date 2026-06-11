@@ -10,6 +10,7 @@ from . import test_order_currency
 from . import test_tax_fallback
 from . import test_taxes_included_import
 from . import test_total_guard
+from . import test_visibility_batch
 from . import test_inventory_sync
 from . import test_promoter
 from . import test_fulfillment_sync
