@@ -342,13 +342,29 @@ class SimShopifyShippingLine(models.Model):
     title = fields.Char(default='Standard Shipping')
     code = fields.Char(default='standard')
     price = fields.Float(default=0.0)
+    tax_amount = fields.Float(default=0.0)
+    tax_rate = fields.Float(
+        default=0.0, help='Tax rate as decimal, e.g. 0.10 for 10%',
+    )
 
     def _to_graphql_node(self, currency='USD', presentment_currency='USD'):
         self.ensure_one()
+        # Shopify ShippingLine carries taxLines: [TaxLine!]! with the
+        # same shape as line-item tax lines (title/rate/priceSet).
+        taxes = []
+        if self.tax_amount:
+            taxes.append({
+                'title': 'Tax',
+                'rate': self.tax_rate,
+                'priceSet': _money_set(
+                    self.tax_amount, currency, presentment_currency,
+                ),
+            })
         return {
             'title': self.title or '',
             'code': self.code or '',
             'originalPriceSet': _money_set(
                 self.price, currency, presentment_currency,
             ),
+            'taxLines': taxes,
         }
