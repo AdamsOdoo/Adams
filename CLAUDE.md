@@ -25,6 +25,16 @@ AUD-001, AUD-015, AUD-016, AUD-018 plus the permanent total-check guard
 mismatch — stays in the product after full support lands). Otherwise not in
 v1's definition of done: new feature development.
 
+MILESTONES (Ahmed, 2026-06-11):
+- M1 CLIENT-READY: v1 DONE as defined above, PLUS deployment-readiness for
+  a specific client database (install/upgrade path verified, config
+  documented, zero-knowledge onboarding guide written).
+- M2 USER-VALIDATED: human test executed, findings fixed, retested.
+  Client deployment happens at M2.
+- M3 STORE-READY: packaging, listing, docs, demo data, submission
+  requirements verified against current Odoo App Store rules. Store
+  submission happens at M3.
+
 ## Project
 Odoo 19 Enterprise third-party connector for Shopify (GraphQL Admin API
 2026-01), deployed on Odoo.sh, preparing for Odoo App Store publication.
@@ -36,15 +46,39 @@ degradation after DB clone, status-field indexes, refund-scan pruning,
 count-based reconciliation. Do not re-litigate settled design decisions;
 audit for defects, not preferences.
 
-## Role and authority
-- You operate under explicit human approval gates. Ahmed approves before any
-  fix is implemented in shipped connector code and before any commit of it.
-- Current phase: READ-ONLY AUDIT of shipped code unless a session explicitly
-  grants write access. Exception: test code is always writable (see Testing
-  mandate).
-- Anything touching money movement, payment idempotency, credit notes,
-  refunds, or tax computation ALWAYS requires explicit approval before
-  editing, in every phase.
+## Role and authority (GOVERNANCE CHANGE — Ahmed, 2026-06-11, supersedes
+## the original approval-gate model from item 3a onward)
+- STANDING APPROVAL: plan, edit shipped code, and commit without per-item
+  approval for all FINALIZE.md items and all findings from the remaining
+  tiers, PROVIDED every change satisfies rules 1-6. The discipline rules
+  are the gate. A change that cannot meet them does not ship, period.
+- SELF-VERIFICATION REPLACES HUMAN REVIEW: after each item, record the
+  evidence trail in FINALIZE.md (failing test ref, passing counts both
+  strict profiles, full-suite counts). At each tier checkpoint, run a
+  fresh adversarial review of recent diffs via fresh-context subagents
+  (hunting rule violations, regressions, silent degradations) before
+  proceeding.
+- DECISIONS: genuine business decisions are decided here under the
+  standing intent — maximize merchant-friendliness and reliability for
+  real e-commerce stores; never wrong money, never silent failure; prefer
+  reversible choices. Every such decision goes in docs/architecture/
+  DECISIONS.md with rationale and a reversibility note. Escalate to Ahmed
+  only when BOTH irreversible AND high-stakes, as a plain-language
+  consequence statement.
+- THREE HUMAN TOUCHPOINTS (the only ones):
+  1. Odoo.sh confirmation runs — batch the commands; Ahmed relays.
+     (To be eliminated once direct SSH is enabled — see STATUS.md.)
+  2. Money-path changes (payments, refunds, credit notes, taxes,
+     reconciliation): before committing each, Ahmed receives a 3-5
+     sentence plain-language consequence statement and replies go/no-go.
+     The only remaining diff-level gate.
+  3. Final human user test before client deployment: a zero-knowledge
+     test script executed by Ahmed or the client against a dev store.
+- EFFICIENCY MANDATE: the how is owned here — subagents, tooling, harness
+  improvements welcome if rules 1-6 stay intact. One item per session,
+  items as large as safety allows. Periodically re-sync the local Odoo
+  core checkout and re-run the suite to catch upstream drift.
+- Test code remains always writable (see Testing mandate).
 
 ## Non-negotiable discipline rules
 1. Confirm-before-fix: every finding must cite live-source evidence
