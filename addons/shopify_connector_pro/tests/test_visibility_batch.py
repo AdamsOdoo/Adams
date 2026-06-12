@@ -18,6 +18,7 @@ from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
 from odoo.tools import mute_logger
+from .common import mute_case_loggers
 
 
 def _failing_client(exc=None):
@@ -90,6 +91,11 @@ class TestCronCounterVisibility(VisibilityFixtureMixin, TransactionCase):
     reach the merchant (backend chatter via _notify_sync_error), not be
     discarded by the cron."""
 
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.refund_sync')
+
     def test_refund_cron_surfaces_fetch_errors(self):
         backend = self._make_backend(auto_sync_orders=True)
         self._make_order_with_binding(backend, financial_status='refunded')
@@ -153,6 +159,11 @@ class TestReverseSyncFailureVisibility(VisibilityFixtureMixin,
     """AUD-006: Odoo→Shopify divergence (mark-as-paid / refundCreate
     failures) must schedule a warning activity on the sale order."""
 
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.models.account_move')
+
     def test_mark_as_paid_failure_schedules_activity(self):
         backend = self._make_backend(reverse_sync_payment=True)
         order, _binding = self._make_order_with_binding(
@@ -198,6 +209,11 @@ class TestReverseSyncFailureVisibility(VisibilityFixtureMixin,
 class TestPaymentPathMinorVisibility(VisibilityFixtureMixin,
                                      TransactionCase):
     """AUD-007/008/012/013: minor silent branches in the payment path."""
+
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.payment_status_sync')
 
     def _handler(self, backend):
         from ..sync.payment_status_sync import PaymentStatusHandler

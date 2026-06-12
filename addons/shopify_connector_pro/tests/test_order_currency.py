@@ -12,12 +12,15 @@ from unittest.mock import MagicMock
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestOrderImportCurrency(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.order_sync')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Currency Test Store',
             'shop_url': 'currency-test.myshopify.com',

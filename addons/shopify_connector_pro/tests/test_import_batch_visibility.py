@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase
 from odoo.tools import config
+from .common import mute_case_loggers
 
 
 class _FakeImporter:
@@ -46,6 +47,8 @@ class TestImportBatchActivity(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.base_importer')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Activity Test Backend',
             'shop_url': 'activity-test.myshopify.com',

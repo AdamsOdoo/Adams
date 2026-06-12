@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestTotalGuardPaymentPath(ShopifyAccountingMixin, TransactionCase):
@@ -18,6 +19,8 @@ class TestTotalGuardPaymentPath(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Guard Test Store',
             'shop_url': 'guard-test.myshopify.com',
@@ -137,6 +140,8 @@ class TestTotalGuardAutoInvoice(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Guard Import Store',
             'shop_url': 'guard-import.myshopify.com',

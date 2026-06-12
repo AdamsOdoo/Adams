@@ -4,12 +4,16 @@ from unittest.mock import MagicMock, patch
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting',
+                          'odoo.addons.shopify_connector_pro.sync.order_sync')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',
@@ -607,6 +611,9 @@ class TestUntaxedOrderImport(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting',
+                          'odoo.addons.shopify_connector_pro.sync.order_sync')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Untaxed Test Store',
             'shop_url': 'untaxed-test.myshopify.com',

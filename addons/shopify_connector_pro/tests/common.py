@@ -24,6 +24,22 @@ Usage — just inherit the mixin *before* TransactionCase::
 
 from unittest.mock import MagicMock, patch
 
+from odoo.tools import mute_logger
+
+
+def mute_case_loggers(case, *logger_names):
+    """Mute *logger_names* for the remainder of *case*, including the
+    rest of setUp — a method decorator would not cover fixture-time
+    output. For negative-path fixtures whose warnings ARE the asserted
+    behaviour (the tests assert the resulting state/activity, the log
+    line is duplicate noise in the build log). Production loggers are
+    untouched outside the muted test.
+    """
+    muter = mute_logger(*logger_names)
+    muter.__enter__()
+    case.addCleanup(muter.__exit__)
+    return muter
+
 
 class ShopifyAccountingMixin:
     """Mixin that provides accounting setup for Shopify connector tests.

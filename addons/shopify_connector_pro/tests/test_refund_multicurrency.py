@@ -12,12 +12,15 @@ from unittest.mock import MagicMock
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestRefundCreditNoteMultiCurrency(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.refund_sync')
         # Self-provision EUR so the test runs on every strict profile
         # (EUR ships inactive on fresh DBs).
         self.eur = self.env['res.currency'].with_context(

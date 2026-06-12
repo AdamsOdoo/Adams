@@ -12,6 +12,7 @@ from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
+from .common import mute_case_loggers
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -513,6 +514,8 @@ class TestReconciliationWorkflow(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.models.shopify_reconciliation')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',

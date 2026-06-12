@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, patch
 
 from odoo import fields
 from odoo.tests.common import TransactionCase
+from .common import mute_case_loggers
 
 
 class TestRefundScanPruning(TransactionCase):
@@ -566,6 +567,8 @@ class TestReconciliationRefundCount(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.models.shopify_reconciliation')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Recon Count Test',
             'shop_url': 'recon-count.myshopify.com',
