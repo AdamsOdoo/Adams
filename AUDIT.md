@@ -80,6 +80,69 @@ Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
 
 ---
 
+## Tier 2 (data integrity & security) — opened 2026-06-12 overnight
+
+Method: fresh-context subagent fan-out scan + my source verification of
+every reported candidate (rule 1). Surfaces verified CLEAN by the scan
+and spot-checked: timing-safe HMAC (controllers/webhook.py:226), shop-
+domain check, HMAC-before-rate-limit ordering, 10MB payload cap,
+parameterized SQL only (customer_sync.py:136, inventory_sync.py:36),
+record rules with backend scoping, admin-only token fields, Fernet+
+PBKDF2 credential crypto, advisory-lock dedup in customer/inventory
+sync. Tier 1 deferred lead (positional variant matching,
+product_sync.py:240) remains open for this tier — not yet re-verified.
+
+## AUD-024 — Webhook dedup is global, not per backend
+
+- **Severity:** major (silent inbound-event loss in multi-backend setups)
+- **Status:** fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+- **Evidence:** models/shopify_webhook_log.py:48-51 — `UNIQUE(webhook_id)`
+  without backend_id; controllers/webhook.py:142-146 — dedup search
+  `[('webhook_id','=',webhook_id)]` unscoped (every other dedup in the
+  module is backend-scoped, incl. the fingerprint fallback right below).
+- **Description:** when one Shopify shop feeds two backends (e.g. two
+  companies in one DB), the second backend's delivery of the same
+  webhook id is silently dropped: constraint rejects the log, controller
+  answers 200 'ok'. Cross-shop UUID collision is negligible; the
+  same-shop-two-backends case is real.
+- **Fix:** constraint → UNIQUE(backend_id, webhook_id); controller
+  search scoped by backend_id. Fail-before 1 error of 2 (constraint
+  violation through the model), pass-after 0/0 of 2
+  (test_tier2_webhook_integrity.py, adams_strict1; commit 5bdfc40).
+
+## AUD-025 — GDPR customers/redact leaves PII on child contacts and parent city/zip
+
+- **Severity:** major (GDPR compliance)
+- **Status:** fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+- **Evidence:** models/shopify_webhook_log.py:444-453 — redaction wrote
+  only parent name/email/phone/street/street2; order import creates
+  delivery/invoice CHILD partners carrying the customer's address+phone
+  (order_sync.py `_get_or_create_address`, used for shippingAddress /
+  billingAddress), and parent city/zip stayed readable.
+- **Fix:** parent write extended with city/zip; all partner.child_ids
+  redacted (name → "Redacted Contact #id", email/phone/street/street2/
+  city/zip cleared). Fail-before 1 failed of 2 → pass-after 0/0 of 2
+  (test_tier2_webhook_integrity.py, adams_strict1).
+
+## AUD-026 — Webhook payload retention: plaintext PII surface (decision item)
+
+- **Severity:** minor (deliberate design with mitigations; flagged as a
+  data-exposure surface)
+- **Status:** open — decision for Ahmed (Tier 6 / hardening pass)
+- **Evidence:** controllers/webhook.py:185 stores full payload JSON;
+  models/shopify_webhook_log.py:32 restricts the field to
+  group_shopify_user (not admin); 90-day cleanup exists
+  (shopify_webhook_log.py:89-100).
+- **Description:** payloads are needed for the retry/dead-letter machine
+  (AUD-005), so they cannot simply be dropped; but they contain customer
+  PII readable by every connector user and live in DB backups for up to
+  90 days. Options, cheapest first: (a) tighten field group to
+  group_shopify_admin; (b) shorten retention for state='done' logs
+  (payload no longer needed once processed); (c) encrypt at rest via
+  shopify.crypto (cost: dead-letter debugging friction). (a)+(b)
+  recommended; not implemented — visibility/retention trade-off is a
+  product decision.
+
 ## AUD-001 — Tax resolution on imported orders: branch map, and wrong invoices on tax-included companies
 
 - **Severity:** major (financial correctness)

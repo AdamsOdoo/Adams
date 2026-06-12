@@ -140,6 +140,25 @@ fail-before tests). Note: reverting removes the new
 `shopify_refund_gid` column on the next upgrade; GID stamps on
 already-created credit notes are lost on revert.
 
+### Tier 2 openers — webhook dedup scope + GDPR child redaction (not money-path; flagged for completeness)
+
+Two Tier 2 security/integrity fixes under standing approval. First,
+webhook dedup was global instead of per store connection: with one
+Shopify shop feeding two backends (e.g. two companies), the second
+backend's copy of an event was silently dropped with a 200 response —
+dedup is now scoped per backend (DB constraint + controller search).
+Second, GDPR customers/redact now actually erases the customer: it
+previously left full PII (name, street, city, zip, phone, email) on
+the delivery/invoice child contacts created by order import, and left
+city/zip on the main record — all are now cleared. Evidence:
+fail-before 1 failed + 1 error of 2 → pass-after 0/0 of 2; full suites
+strict1 0 failed, 0 errors of 578 AND strict_vat 0 failed, 0 errors
+of 578.
+
+**No-go revert:** `git revert d722bdb 5bdfc40` on
+`claude/determined-cori-glvysk` (sha in §2; 5bdfc40 = fail-before
+tests).
+
 ## 2) Completed with evidence
 
 - **Item 5 DONE and pushed** (commits bd491b2 tests, 15ea94a fix+docs):
@@ -200,9 +219,14 @@ already-created credit notes are lost on revert.
 
 ## 3) In progress
 
-- Tier 2 (data integrity & security audit) — started at the end of the
-  window; candidate findings (if any) are in AUDIT.md marked
-  PRELIMINARY (Tier 2). Exact resume point in STATUS.md.
+- Tier 2 (data integrity & security audit) — OPENED and first pass
+  done: fan-out scan + my source verification. AUD-024 (webhook dedup
+  scope) and AUD-025 (GDPR child redaction) FIXED (statement above);
+  AUD-026 (webhook payload PII retention/visibility) ledgered as an
+  OPEN DECISION for you (see §4). Clean surfaces documented in
+  AUDIT.md Tier 2 header. Remaining Tier 2 work: positional
+  variant-matching lead (product_sync.py:240, Tier 1 deferral) and a
+  deeper concurrency pass — next session.
 - Note: the container restarted mid-window (~21:00 PT / 03:30 log
   time) during the first item-5 verification run; disk survived, the
   suites were re-run from scratch afterwards — the counts above are
@@ -210,5 +234,9 @@ already-created credit notes are lost on revert.
 
 ## 4) Decisions awaiting you
 
+- AUD-026: webhook payloads (customer PII) are stored in plaintext for
+  90 days and readable by every connector user. Recommended cheap
+  hardening: payload field admin-only + short retention once a log is
+  'done'. Not implemented — visibility/retention is your call.
 - DEC-014 (keep base tombstone) made under standing approval —
   reversible, listed for visibility only.

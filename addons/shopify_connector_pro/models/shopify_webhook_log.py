@@ -45,8 +45,11 @@ class ShopifyWebhookLog(models.Model):
     processed_at = fields.Datetime()
 
 
+    # Per-backend scope (AUD-024): Shopify webhook ids are scoped to a
+    # shop/delivery — the same id arriving for another backend is a
+    # distinct, legitimate delivery and must not be rejected.
     _unique_webhook_id = models.Constraint(
-        'UNIQUE(webhook_id)',
+        'UNIQUE(backend_id, webhook_id)',
         'This webhook event has already been received.',
     )
 
@@ -449,8 +452,23 @@ class ShopifyWebhookLog(models.Model):
                     'phone': False,
                     'street': False,
                     'street2': False,
+                    'city': False,
+                    'zip': False,
                     'comment': "Personal data redacted per GDPR request.",
                 })
+                # Delivery/invoice child contacts created by order
+                # import carry the same PII — redact them too
+                # (AUD-025).
+                for child in partner.child_ids:
+                    child.write({
+                        'name': f"Redacted Contact #{child.id}",
+                        'email': False,
+                        'phone': False,
+                        'street': False,
+                        'street2': False,
+                        'city': False,
+                        'zip': False,
+                    })
                 binding.write({
                     'shopify_email': False,
                     'shopify_tags': False,
