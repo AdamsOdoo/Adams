@@ -259,3 +259,7 @@
 - Shopify POS integration
 - Shopify Flow triggers from Odoo events
 - AI-powered field mapping suggestions
+
+## Goal 0 Companion Note
+
+`docs/product/PRICING_AND_TCO.md` is the commercial pricing and total-cost-of-ownership companion to this competitive analysis. Keep app-store/package-facing merchant documentation separate from internal commercial strategy unless intentionally converted for public release.
