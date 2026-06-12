@@ -466,3 +466,9 @@ Expected healthy Odoo.sh log: `0 failed, 0 error(s) of 578`, empty
 errors/warnings filters (a core `mail` docutils warning may still
 appear on Enterprise builds — not ours, not fixable without touching
 core; flag it if present, nothing else should be).
+
+---
+
+## Goal 0 Governance Note (2026-06-12)
+
+Older per-item pre-approval wording in this historical backlog was superseded by the standing approval / `AGENTS.md` operating model. Historical content is preserved for audit traceability; use `AGENTS.md` for current session operating rules and `docs/architecture/DECISIONS.md` for durable decisions.
