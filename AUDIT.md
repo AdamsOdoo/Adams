@@ -727,12 +727,29 @@ EW-04a).
 
 ## Environment-sensitivity notes (not defects in shipped code)
 
-- **ENV-1 (test infrastructure, Tier 4 backlog):** three test setups create
-  `account.tax` without `tax_group_id` and crash with a NOT NULL violation on
-  any DB without a chart of accounts:
-  `tests/test_core_workflow_hardening.py:713`,
-  `tests/test_order_import.py:406` (connector),
-  `tests/test_refund_fidelity.py:222` (simulator).
-  4 tests error on the chartless fresh profile; all pass once `generic_coa`
-  is applied. Test-code fix (always-writable) deferred to Tier 4 to keep this
-  session single-purpose.
+- **ENV-1 (test infrastructure): FIXED 2026-06-12** — promoted from Tier 4
+  backlog after it broke the Odoo.sh build (install.log relayed by Ahmed:
+  5 errors of 221, suite halted at the error cap; all five
+  `null value in column "country_id" of relation "account_tax"`, the
+  Odoo.sh dev DB having no chart and no company country). Full root
+  cause, all chart-provided state the suite silently depended on:
+  (1) `account.tax.country_id` required, computed from company country
+  (core account_tax.py:197) — null without a company country;
+  (2) `account.tax.tax_group_id` required, compute only searches
+  existing groups (account_tax.py:156,284) — none exist without a chart;
+  (3) no bank journal → `_resolve_payment_journal` has no fallback, the
+  AUD-007 reconcile test never reached its assertion;
+  (4) `company.income_account_id` empty — `_get_product_accounts`' final
+  fallback (core account/models/product.py:73; set by charts,
+  template_generic_coa.py:48), so the auto-created SHOPIFY-SHIPPING
+  product resolved no income account and auto-invoicing was skipped in
+  4 tests. Fix (test-code only, both mixins — connector tests/common.py
+  and simulator tests/test_refund_fidelity.py): bootstrap company
+  country (US), a tax group, a bank journal, and
+  company.income_account_id, each ONLY when missing — all four are
+  no-ops on charted DBs (verified: strict1 company already has
+  income_account_id from the chart). Commits 2d88344 (+ efdd2e2
+  predecessor), e39aebc. Evidence: chartless fresh profile fail-before
+  1 failed + 15 errors of 578 → pass-after 0 failed, 0 errors of 578
+  (first-ever green chartless run); regression: adams_strict1 0 failed,
+  0 errors of 578; adams_strict_vat 0 failed, 0 errors of 578.

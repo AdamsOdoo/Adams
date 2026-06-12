@@ -52,6 +52,27 @@ class ShopifyAccountingMixin:
         """
         company = self.env.company
 
+        # Company country — account.tax.country_id is required and its
+        # compute resolves from company.account_fiscal_country_id or
+        # company.country_id (account_tax.py:197,280); a fresh DB without
+        # demo data has neither, so tax creation hits NOT NULL (ENV-1).
+        if not (company.account_fiscal_country_id or company.country_id):
+            company.country_id = self.env.ref('base.us')
+
+        # Tax group — account.tax.tax_group_id is required and its compute
+        # only *searches* existing groups (account_tax.py
+        # _compute_tax_group_id); a DB without a chart of accounts has
+        # none, so any account.tax.create() in a test hits the NOT NULL
+        # constraint (ENV-1). A country-less group satisfies the
+        # compute's fallback search.
+        if not self.env['account.tax.group'].search(
+            [('company_id', '=', company.id)], limit=1,
+        ):
+            self.env['account.tax.group'].create({
+                'name': 'Test Taxes',
+                'company_id': company.id,
+            })
+
         # Sales journal
         if not self.env['account.journal'].search(
             [('type', '=', 'sale'), ('company_id', '=', company.id)], limit=1,
@@ -60,6 +81,21 @@ class ShopifyAccountingMixin:
                 'name': 'Test Sales Journal',
                 'type': 'sale',
                 'code': 'TSHP',
+                'company_id': company.id,
+            })
+
+        # Bank journal — charts create one, a chartless DB has none;
+        # without it _resolve_payment_journal finds no fallback and
+        # payment-path tests never reach registration/reconciliation
+        # (ENV-1).
+        if not self.env['account.journal'].search(
+            [('type', '=', 'bank'), ('company_id', '=', company.id)],
+            limit=1,
+        ):
+            self.env['account.journal'].create({
+                'name': 'Test Bank Journal',
+                'type': 'bank',
+                'code': 'TBNK',
                 'company_id': company.id,
             })
 
@@ -103,6 +139,14 @@ class ShopifyAccountingMixin:
                 'account_type': 'income',
                 'company_ids': [(6, 0, [company.id])],
             })
+
+        # Company default income account — _get_product_accounts' final
+        # fallback (core account/models/product.py:73); charts set it, a
+        # chartless DB leaves it empty, so products created mid-import
+        # (e.g. the auto-created SHOPIFY-SHIPPING service) resolve no
+        # income account and invoice creation is skipped (ENV-1).
+        if not company.income_account_id:
+            company.income_account_id = self.income_account
 
         # Outstanding / transfer account for payments.
         # Odoo 19 needs an outstanding account on payments to generate

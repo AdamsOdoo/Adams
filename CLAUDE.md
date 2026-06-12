@@ -65,15 +65,17 @@ audit for defects, not preferences.
   DECISIONS.md with rationale and a reversibility note. Escalate to Ahmed
   only when BOTH irreversible AND high-stakes, as a plain-language
   consequence statement.
-- THREE HUMAN TOUCHPOINTS (the only ones):
-  1. Odoo.sh confirmation runs — batch the commands; Ahmed relays.
-     (To be eliminated once direct SSH is enabled — see STATUS.md.)
-  2. Money-path changes (payments, refunds, credit notes, taxes,
-     reconciliation): before committing each, Ahmed receives a 3-5
-     sentence plain-language consequence statement and replies go/no-go.
-     The only remaining diff-level gate.
-  3. Final human user test before client deployment: a zero-knowledge
+- TWO HUMAN TOUCHPOINTS (the only ones — GOVERNANCE SIMPLIFICATION,
+  Ahmed 2026-06-12, supersedes the three-touchpoint model):
+  1. Odoo.sh log/command relay — batch the commands; Ahmed relays.
+     (SSH from session containers is impossible — see Environment.)
+  2. Final human user test before client deployment: a zero-knowledge
      test script executed by Ahmed or the client against a dev store.
+  Money-path changes are now covered by STANDING APPROVAL like all
+  other changes — rules 1-6 remain the gate. Each money-path commit
+  still gets a 3-5 sentence plain-language consequence statement,
+  recorded in FINALIZE.md for the record (no pre-commit go/no-go).
+  MORNING_REVIEW.md retired 2026-06-12 (content in git history).
 - EFFICIENCY MANDATE: the how is owned here — subagents, tooling, harness
   improvements welcome if rules 1-6 stay intact. One item per session,
   items as large as safety allows. Periodically re-sync the local Odoo
