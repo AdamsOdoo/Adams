@@ -68,6 +68,10 @@ class ShopifyAccountingMixin:
                 'account_type': 'income',
                 'company_ids': [(6, 0, [company.id])],
             })
+        # Company default income account fallback (ENV-1) — mirrors
+        # shopify_connector_pro/tests/common.py.
+        if not company.income_account_id:
+            company.income_account_id = self.income_account
         if not company.transfer_account_id:
             transfer_account = self.env['account.account'].search([
                 ('account_type', '=', 'asset_current'),

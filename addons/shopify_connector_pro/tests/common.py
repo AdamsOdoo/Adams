@@ -140,6 +140,14 @@ class ShopifyAccountingMixin:
                 'company_ids': [(6, 0, [company.id])],
             })
 
+        # Company default income account — _get_product_accounts' final
+        # fallback (core account/models/product.py:73); charts set it, a
+        # chartless DB leaves it empty, so products created mid-import
+        # (e.g. the auto-created SHOPIFY-SHIPPING service) resolve no
+        # income account and invoice creation is skipped (ENV-1).
+        if not company.income_account_id:
+            company.income_account_id = self.income_account
+
         # Outstanding / transfer account for payments.
         # Odoo 19 needs an outstanding account on payments to generate
         # journal entries.  ``account.payment._get_outstanding_account``
