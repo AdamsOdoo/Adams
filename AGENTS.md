@@ -39,6 +39,44 @@ Do not guess model names, fields, method signatures, API payload shapes, webhook
 - Report literal test scope and counts; do not summarize with bare “green” language.
 - If a goal is documentation-only, run documentation/governance verification instead of unrelated full suites unless a package/runtime reference requires more.
 
+## Project Standing Rules
+
+### Standing Approval
+
+- Work proceeds under standing approval when it stays inside the active goal, follows the non-negotiable rules, and remains reversible.
+- Do not use Ahmed / project owner as a relay for routine reversible implementation choices.
+- Escalate only when the escalation policy requires it.
+
+### Money-Path Consequence Statements
+
+- Every money-path commit must include a 3–5 sentence plain-language consequence statement.
+- It must explain business/accounting impact, reversibility, user-visible behavior, and verification evidence.
+- Record it in `FINALIZE.md` or the active goal evidence log.
+- Money-path areas include invoices, payments, credit notes, refunds, payouts, taxes, currencies, gift cards, reconciliation, and anything that can affect posted accounting documents.
+
+### Green Build Standing Rule
+
+- At checkpoint/merge boundaries, Odoo.sh build logs must have zero errors/warnings attributable to project modules.
+- Warnings must be fixed by removing their cause.
+- Do not suppress, downgrade, filter, or hide warnings just to make logs clean.
+- If a warning is from Odoo core or an external dependency, classify it with evidence instead of hiding it.
+- Odoo.sh verification remains a human relay touchpoint when the agent environment cannot access Odoo.sh directly.
+
+### v1 Definition of Done
+
+- v1 is not done until all critical and major findings are fixed or explicitly accepted, verified with evidence, and no silent failure / wrong-money risk remains in core workflows.
+- Full VAT-inclusive / tax-included pricing support is in v1 scope, per Ahmed’s 2026-06-11 decision.
+- The total-check guard remains permanent product behavior after VAT-inclusive support lands; see DEC-011 and DEC-012.
+- `COVERAGE.md` must map shipped workflows, buttons, crons, webhooks, and negative paths to tests before v1 completion.
+- User-facing docs and listing claims must match implemented and tested behavior.
+- Odoo.sh install, upgrade, and build logs must be clean for project-attributable issues.
+
+### Milestones
+
+- M1 Client-Ready: v1 core behavior verified for the Adams pilot database, install/upgrade path known, setup/config documented, and zero-knowledge onboarding guide available.
+- M2 User-Validated: human/user test executed, issues fixed or accepted, and Adams/client deployment is safe.
+- M3 Store-Ready: public packaging, app-store docs, screenshots, exclusions, licensing, and submission checklist verified.
+
 ## Agent Team Roles
 
 - **Orchestrator / Delivery Lead** — owns goal boundaries, sequencing, evidence, commits, and closure.
@@ -59,7 +97,7 @@ Every goal should move through this loop:
 3. **Design** — propose the smallest safe plan inside the goal boundary.
 4. **Implement** — make minimal changes only in the allowed scope.
 5. **Test** — run the required verification and capture exact outputs.
-6. **Review** — self-review diffs for scope, evidence, silent failure, and packaging risk.
+6. **Review** — run fresh-context adversarial review before goal closure or checkpoint merge; check scope, evidence, silent failure, wrong-money risk, packaging risk, and regression risk.
 7. **Document** — update the appropriate source of truth and evidence log.
 8. **Close or repeat** — close if verified; otherwise repeat the loop with the next smallest correction.
 
@@ -117,12 +155,15 @@ Stop and escalate instead of improvising when:
 1. Review the changed file list for scope violations.
 2. Run the goal-required verification commands.
 3. Commit in small labeled commits.
-4. Record exact verification outcomes in the final report.
-5. Provide rollback instructions.
-6. Recommend ready/not ready for Claude review.
+4. Update `STATUS.md` with a short current-state handoff, normally ≤30 lines.
+5. Keep `STATUS.md` focused on what changed, what is verified, what is pending, and next action.
+6. Record exact verification outcomes in the final report.
+7. Provide rollback instructions.
+8. Recommend ready/not ready for Claude review.
 
 ## Changelog
 
 | Date | Change |
 |---|---|
 | 2026-06-12 | Created Goal 0 operating-system file for future Claude/Codex sessions. |
+| 2026-06-12 | Restored project-specific standing rules from pre-Goal-0 governance: standing approval, money-path consequence statements, green-build rule, v1 DONE including VAT-in-v1 scope, M1–M3 milestones, STATUS handoff, and fresh-context adversarial review. |
