@@ -52,6 +52,13 @@ class ShopifyAccountingMixin:
         """
         company = self.env.company
 
+        # Company country — account.tax.country_id is required and its
+        # compute resolves from company.account_fiscal_country_id or
+        # company.country_id (account_tax.py:197,280); a fresh DB without
+        # demo data has neither, so tax creation hits NOT NULL (ENV-1).
+        if not (company.account_fiscal_country_id or company.country_id):
+            company.country_id = self.env.ref('base.us')
+
         # Tax group — account.tax.tax_group_id is required and its compute
         # only *searches* existing groups (account_tax.py
         # _compute_tax_group_id); a DB without a chart of accounts has
@@ -74,6 +81,21 @@ class ShopifyAccountingMixin:
                 'name': 'Test Sales Journal',
                 'type': 'sale',
                 'code': 'TSHP',
+                'company_id': company.id,
+            })
+
+        # Bank journal — charts create one, a chartless DB has none;
+        # without it _resolve_payment_journal finds no fallback and
+        # payment-path tests never reach registration/reconciliation
+        # (ENV-1).
+        if not self.env['account.journal'].search(
+            [('type', '=', 'bank'), ('company_id', '=', company.id)],
+            limit=1,
+        ):
+            self.env['account.journal'].create({
+                'name': 'Test Bank Journal',
+                'type': 'bank',
+                'code': 'TBNK',
                 'company_id': company.id,
             })
 

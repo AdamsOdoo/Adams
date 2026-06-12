@@ -20,8 +20,10 @@ class ShopifyAccountingMixin:
 
     def _setup_accounting(self):
         company = self.env.company
-        # Tax group bootstrap for chartless DBs (ENV-1) — mirrors
-        # shopify_connector_pro/tests/common.py.
+        # Country + tax group bootstrap for chartless DBs (ENV-1) —
+        # mirrors shopify_connector_pro/tests/common.py.
+        if not (company.account_fiscal_country_id or company.country_id):
+            company.country_id = self.env.ref('base.us')
         if not self.env['account.tax.group'].search(
             [('company_id', '=', company.id)], limit=1,
         ):
