@@ -753,3 +753,9 @@ EW-04a).
   1 failed + 15 errors of 578 → pass-after 0 failed, 0 errors of 578
   (first-ever green chartless run); regression: adams_strict1 0 failed,
   0 errors of 578; adams_strict_vat 0 failed, 0 errors of 578.
+
+---
+
+## Goal 0 Addendum — MORNING_REVIEW References (2026-06-12)
+
+References to `MORNING_REVIEW.md` in this repository are historical audit/governance context. `MORNING_REVIEW.md` was retired before Goal 0 and is not an active instruction source. Consequence statements and operating guidance should now be found in `FINALIZE.md`, `docs/architecture/DECISIONS.md`, and `AGENTS.md` as applicable.
