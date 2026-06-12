@@ -22,6 +22,9 @@ Usage — just inherit the mixin *before* TransactionCase::
 """
 
 
+from unittest.mock import MagicMock, patch
+
+
 class ShopifyAccountingMixin:
     """Mixin that provides accounting setup for Shopify connector tests.
 
@@ -148,6 +151,23 @@ class ShopifyAccountingMixin:
         if not company.income_account_id:
             company.income_account_id = self.income_account
 
+        # Partner receivable/payable company defaults — chart loading
+        # sets these via ir.default (core chart_template.py:773-776).
+        # Without them, partners created mid-import (Shopify customers)
+        # resolve no receivable account — core's destination-account
+        # compute has NO fallback search when the payment has a partner
+        # — and every payment move fails its accountable-fields check
+        # (ENV-1).
+        IrDefault = self.env['ir.default'].sudo()
+        if not IrDefault._get('res.partner', 'property_account_receivable_id',
+                              company_id=company.id):
+            IrDefault.set('res.partner', 'property_account_receivable_id',
+                          self.receivable_account.id, company_id=company.id)
+        if not IrDefault._get('res.partner', 'property_account_payable_id',
+                              company_id=company.id):
+            IrDefault.set('res.partner', 'property_account_payable_id',
+                          self.payable_account.id, company_id=company.id)
+
         # Outstanding / transfer account for payments.
         # Odoo 19 needs an outstanding account on payments to generate
         # journal entries.  ``account.payment._get_outstanding_account``
@@ -187,3 +207,27 @@ class ShopifyAccountingMixin:
         """Set the income account on both the product category and template."""
         product.categ_id.property_account_income_categ_id = self.income_account
         product.product_tmpl_id.property_account_income_id = self.income_account
+
+    def _mock_backend_api_client(self, backend, body=None):
+        """Patch *backend*'s API client for the test duration.
+
+        Fixtures that import paid orders trigger gateway resolution,
+        which builds a REAL API client (backend._make_api_client) and
+        attempts an outbound request. Under the test framework that
+        request dies inside odoo.tests.common._request_handler
+        (`timeout < 10` on our (10, 30) timeout tuple → TypeError) and
+        pollutes the build log with a warning per attempt. Mock at the
+        Shopify boundary — never our own connector logic.
+
+        Returns the MagicMock client so tests can add expectations.
+        """
+        client = MagicMock()
+        client.execute.return_value = body or {
+            'data': {'order': {'transactions': []}},
+        }
+        patcher = patch.object(
+            type(backend), '_make_api_client', return_value=client,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return client

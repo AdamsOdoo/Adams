@@ -72,6 +72,17 @@ class ShopifyAccountingMixin:
         # shopify_connector_pro/tests/common.py.
         if not company.income_account_id:
             company.income_account_id = self.income_account
+        # Partner receivable/payable company defaults (ENV-1) — mirrors
+        # shopify_connector_pro/tests/common.py.
+        IrDefault = self.env['ir.default'].sudo()
+        if not IrDefault._get('res.partner', 'property_account_receivable_id',
+                              company_id=company.id):
+            IrDefault.set('res.partner', 'property_account_receivable_id',
+                          self.receivable_account.id, company_id=company.id)
+        if not IrDefault._get('res.partner', 'property_account_payable_id',
+                              company_id=company.id):
+            IrDefault.set('res.partner', 'property_account_payable_id',
+                          self.payable_account.id, company_id=company.id)
         if not company.transfer_account_id:
             transfer_account = self.env['account.account'].search([
                 ('account_type', '=', 'asset_current'),
@@ -215,6 +226,21 @@ class TestTaxedRefundE2E(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        # Gateway resolution during auto payment registration builds a
+        # real API client and attempts an outbound request, which the
+        # test framework rejects noisily (mirrors
+        # shopify_connector_pro/tests/common.py
+        # _mock_backend_api_client). The refund step's own
+        # patch.object stacks on top of this one and wins while active.
+        _gw_client = MagicMock()
+        _gw_client.execute.return_value = {
+            'data': {'order': {'transactions': []}},
+        }
+        _gw_patcher = patch.object(
+            type(self.backend), '_make_api_client', return_value=_gw_client,
+        )
+        _gw_patcher.start()
+        self.addCleanup(_gw_patcher.stop)
         self.product = self.env['product.product'].create({
             'name': 'Taxed Widget', 'list_price': 100.0,
             'default_code': 'TAX-W001',

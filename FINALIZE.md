@@ -413,3 +413,24 @@ commit aabd0f0):
   visible degradation. GO. Commits 15ea94a+bd491b2.
 - **Tier 2 openers**: per-backend webhook dedup (AUD-024), full GDPR
   redaction incl. child contacts (AUD-025). GO. Commits db545cb+5bdfc40.
+
+### Build-log noise sweep (2026-06-12, green-build loop round 2)
+Ahmed's second relayed install.log (build 33454258) contained zero test
+failures (ENV-1 cleared) but dozens of ERROR-level lines. All were
+verified present in the local GREEN run (0/0 of 578) — i.e. produced by
+passing tests. Treatment, in order of preference per the GREEN BUILD
+rule: (a) cause removal — ir.default partner receivable/payable in the
+mixins (the "Manual Payment" accountable-fields class, 40+ lines, was a
+missing chart-provided company default; payments now post cleanly on
+bare DBs); fixtures now mock the backend API client at the Shopify
+boundary (the "tuple and int" class was core test-framework
+_request_handler comparing our valid (10,30) timeout tuple — request
+would be blocked anyway; tests must not attempt outbound HTTP);
+(b) test-side mute_logger on the specific asserted logger for
+intentional-failure tests (constraint duplicates, decrypt recovery,
+simulated outages, cursor-poison guards) — the core idiom; production
+loggers untouched, no production code changed in this entire sweep.
+Result: chartless install log has ZERO ERROR-level lines from our
+modules; remaining ~55 WARNINGs are asserted negative-test messages
+(expected class, ledgered). Counts after sweep: fresh 0/0 of 578,
+strict1 0/0 of 578, strict_vat 0/0 of 578.

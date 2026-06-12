@@ -2,6 +2,7 @@
 from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 
 class TestPayoutImport(TransactionCase):
@@ -192,6 +193,7 @@ class TestPayoutImport(TransactionCase):
         self.assertEqual(payout.transaction_ids[0].transaction_type, 'charge')
         self.assertAlmostEqual(payout.transaction_ids[0].amount, 110.0)
 
+    @mute_logger('odoo.addons.shopify_connector_pro.sync.payout_sync')
     def test_api_error_returns_error_count(self):
         """API errors should be counted, not crash."""
         from ..sync.payout_sync import PayoutSync

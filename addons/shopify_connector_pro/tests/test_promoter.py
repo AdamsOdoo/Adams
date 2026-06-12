@@ -2,6 +2,7 @@
 from unittest.mock import MagicMock
 
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 
 class TestPromoter(TransactionCase):
@@ -35,6 +36,7 @@ class TestPromoter(TransactionCase):
         self.assertEqual(self.promoter.commission_type, 'percentage')
         self.assertEqual(self.promoter.commission_rate, 10.0)
 
+    @mute_logger('odoo.sql_db')
     def test_promoter_unique_constraint(self):
         """Should prevent duplicate promoter for same partner + company."""
         with self.assertRaises(Exception), self.cr.savepoint():
@@ -57,6 +59,7 @@ class TestPromoter(TransactionCase):
         self.assertTrue(code.active_on_shopify)
         self.assertEqual(code.promoter_id.id, self.promoter.id)
 
+    @mute_logger('odoo.sql_db')
     def test_discount_code_unique_per_backend(self):
         """Should prevent duplicate codes per backend."""
         self.env['shopify.discount.code'].create({

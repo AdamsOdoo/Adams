@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from odoo.tools import mute_logger
 
 
 def _failing_client(exc=None):
@@ -104,6 +105,7 @@ class TestCronCounterVisibility(VisibilityFixtureMixin, TransactionCase):
             "the backend chatter (got %s)" % new_msgs,
         )
 
+    @mute_logger('odoo.addons.shopify_connector_pro.sync.payout_sync')
     def test_payout_cron_surfaces_fetch_errors(self):
         backend = self._make_backend()
         before = backend.message_ids
@@ -123,6 +125,7 @@ class TestWebhookOrderRetry(VisibilityFixtureMixin, TransactionCase):
     """AUD-005: an orders/create webhook whose import crashes must NOT
     be recorded as done — it enters the retry → dead-letter machine."""
 
+    @mute_logger('odoo.addons.shopify_connector_pro.sync.order_sync', 'odoo.addons.shopify_connector_pro.models.shopify_webhook_log')
     def test_failed_order_webhook_enters_retry(self):
         backend = self._make_backend()
         log = self.env['shopify.webhook.log'].create({
@@ -200,6 +203,7 @@ class TestPaymentPathMinorVisibility(VisibilityFixtureMixin,
         from ..sync.payment_status_sync import PaymentStatusHandler
         return PaymentStatusHandler(self.env, backend)
 
+    @mute_logger('odoo.addons.shopify_connector_pro.sync.payment_status_sync')
     def test_reconcile_failure_schedules_activity(self):
         """AUD-007: payment posts but reconciliation fails — 'manual
         reconciliation required' must reach a human."""

@@ -14,6 +14,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 
 class TestShopifyCrypto(TransactionCase):
@@ -47,6 +48,7 @@ class TestShopifyCrypto(TransactionCase):
         self.assertFalse(crypto.decrypt(False))
         self.assertFalse(crypto.decrypt(''))
 
+    @mute_logger('odoo.addons.shopify_connector_pro.models.shopify_crypto', 'odoo.addons.shopify_connector_pro.models.shopify_backend')
     def test_decrypt_corrupt_raises(self):
         """Corrupted ciphertext raises ValueError, not a crash."""
         crypto = self.env['shopify.crypto']
@@ -60,6 +62,7 @@ class TestShopifyCrypto(TransactionCase):
         enc2 = crypto.encrypt('shpat_token_two')
         self.assertNotEqual(enc1, enc2)
 
+    @mute_logger('odoo.addons.shopify_connector_pro.models.shopify_crypto', 'odoo.addons.shopify_connector_pro.models.shopify_backend')
     def test_key_derived_from_database_uuid(self):
         """Key derivation must depend on database.uuid."""
         crypto = self.env['shopify.crypto']
@@ -243,6 +246,7 @@ class TestCredentialDecryptionRecovery(TransactionCase):
 
     # ── (a) Undecryptable credential → readable, False, flag set ──
 
+    @mute_logger('odoo.addons.shopify_connector_pro.models.shopify_crypto', 'odoo.addons.shopify_connector_pro.models.shopify_backend')
     def test_decrypt_failure_does_not_raise_on_read(self):
         """Reading a backend with corrupt credentials must NOT raise.
 
@@ -258,6 +262,7 @@ class TestCredentialDecryptionRecovery(TransactionCase):
 
     # ── (b) Re-entering credentials clears the flag ──
 
+    @mute_logger('odoo.addons.shopify_connector_pro.models.shopify_crypto', 'odoo.addons.shopify_connector_pro.models.shopify_backend')
     def test_reenter_token_clears_credential_issue(self):
         """Re-entering credentials must clear credential_issue."""
         self._corrupt_credentials()
@@ -275,6 +280,7 @@ class TestCredentialDecryptionRecovery(TransactionCase):
 
     # ── (c) Webhook path with bad secret → no crash, HMAC rejects ──
 
+    @mute_logger('odoo.addons.shopify_connector_pro.models.shopify_crypto', 'odoo.addons.shopify_connector_pro.models.shopify_backend')
     def test_webhook_corrupt_secret_no_crash(self):
         """Webhook flow must not crash when secret is undecryptable.
 
@@ -335,6 +341,7 @@ class TestCredentialDecryptionRecovery(TransactionCase):
 
     # ── (d) API use with missing token fails loudly ──
 
+    @mute_logger('odoo.addons.shopify_connector_pro.models.shopify_crypto', 'odoo.addons.shopify_connector_pro.models.shopify_backend')
     def test_api_client_missing_token_raises(self):
         """_make_api_client() with undecryptable token must raise loudly.
 
@@ -366,6 +373,7 @@ class TestCredentialDecryptionRecovery(TransactionCase):
 
     # ── (f) Activity scheduling: debounced, exactly once ──
 
+    @mute_logger('odoo.addons.shopify_connector_pro.models.shopify_crypto', 'odoo.addons.shopify_connector_pro.models.shopify_backend')
     def test_make_api_client_schedules_one_activity(self):
         """_make_api_client on a credential_issue backend must schedule
         exactly ONE activity, even when called multiple times.

@@ -35,6 +35,7 @@ class TestShippingLineImport(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        self._mock_backend_api_client(self.backend)
         self.product = self.env['product.product'].create({
             'name': 'Test Widget', 'list_price': 29.99,
             'default_code': 'WIDGET-SL',

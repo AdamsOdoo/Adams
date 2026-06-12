@@ -1,6 +1,7 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 from odoo.tests.common import TransactionCase
 from odoo.exceptions import UserError
+from odoo.tools import mute_logger
 
 
 class TestShopifyBackend(TransactionCase):
@@ -146,6 +147,7 @@ class TestShopifyBinding(TransactionCase):
         self.assertFalse(binding.sync_error)
         self.assertEqual(binding.retry_count, 0)
 
+    @mute_logger('odoo.sql_db')
     def test_unique_constraint_backend_shopify(self):
         """Should prevent duplicate shopify_id per backend."""
         self.env['shopify.product.binding'].create({
@@ -240,6 +242,7 @@ class TestWebhookLog(TransactionCase):
         })
         self.assertEqual(log.state, 'pending')
 
+    @mute_logger('odoo.sql_db')
     def test_webhook_dedup(self):
         """Should prevent duplicate webhook_id entries."""
         self.env['shopify.webhook.log'].create({

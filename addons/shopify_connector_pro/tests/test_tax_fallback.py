@@ -25,6 +25,7 @@ class TestTaxFallbackFlavor(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        self._mock_backend_api_client(self.backend)
         self.product = self.env['product.product'].create({
             'name': 'Flavor Widget',
             'list_price': 50.0,
