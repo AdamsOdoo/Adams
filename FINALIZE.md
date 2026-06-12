@@ -58,9 +58,9 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
   --test-tags /shopify_connector_pro:TestRefundCreditNoteMultiCurrency \
   --stop-after-init --no-http
 ```
-| 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S done, 3d S done, 3e L done, 3f S) | 3a, 3b, 3c COMMITTED (go 2026-06-11); 3d+3e COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1); next: 3f | 3a-3e: **pending Odoo.sh confirmation** |
-| 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1) | **pending Odoo.sh confirmation** |
-| 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1) | **pending Odoo.sh confirmation** |
+| 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S done, 3d S done, 3e L done, 3f S) | 3a, 3b, 3c COMMITTED (go 2026-06-11); 3d+3e COMMITTED — **GO (retroactive, Ahmed 2026-06-12)**; 3f done | 3a-3e: **pending Odoo.sh confirmation** |
+| 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | COMMITTED — **GO (retroactive, Ahmed 2026-06-12)** | **pending Odoo.sh confirmation** |
+| 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | COMMITTED — **GO (retroactive, Ahmed 2026-06-12)** | **pending Odoo.sh confirmation** |
 
 After item 5: pause fixes, resume audit at Tier 2. Tier 2-3 findings that
 touch already-fixed files are ledgered as NEW findings — no opportunistic
@@ -387,3 +387,29 @@ Item 3c Odoo.sh confirmation (batched above).
 - Full suites: adams_strict1 0 failed, 0 errors of 549; adams_strict_vat
   2 failed, 0 errors of 549 (unchanged known baseline: both AUD-001-rooted,
   clear at 3e).
+
+---
+
+## Consequence-statement record (governance simplification, Ahmed 2026-06-12)
+
+Ahmed's 2026-06-12 message: retroactive go/no-go process cancelled; all
+five queued statements GO; standing approval now covers money-path
+commits (rules 1-6 remain the gate); MORNING_REVIEW.md retired —
+consequence statements are recorded here from now on. The five approved
+statements (full text in git history of MORNING_REVIEW.md §1,
+commit aabd0f0):
+
+- **3d** (taxes): rate fallback matches percent taxes only; dropped
+  taxes surface as one warning activity per order. GO.
+  Commits 17a55bd+b012e65.
+- **3e** (taxes): `taxesIncluded` reconciliation — flavor-preferring
+  fallback + price alignment both directions; cleared AUD-001; first
+  green strict_vat. GO. Commits 58af690+cd1bfd3.
+- **Item 4** (refund/payout/payment visibility): nine silent-failure
+  branches now surface (activities, chatter alerts, webhook retry);
+  no financial computation changed. GO. Commits 18fa21e+52a268c.
+- **Item 5** (refunds/credit notes): per-refund savepoint atomicity,
+  `shopify_refund_gid` recovery guard, cumulative over-refund cap with
+  visible degradation. GO. Commits 15ea94a+bd491b2.
+- **Tier 2 openers**: per-backend webhook dedup (AUD-024), full GDPR
+  redaction incl. child contacts (AUD-025). GO. Commits db545cb+5bdfc40.
