@@ -1,45 +1,38 @@
 # STATUS.md
 
-Updated: 2026-06-12 overnight window (items 3d, 3e, 3f, 4 committed;
-item 5 verification in flight)
+Updated: 2026-06-12 end of overnight window (all FINALIZE items + first
+Tier 2 pass landed)
 
 ## Resume here (fresh session)
-1. Read MORNING_REVIEW.md (overnight governance: retroactive
-   touchpoint 2, consequence statements queued there) and the item
-   table in FINALIZE.md.
-2. Environment: container restarts may keep the disk (check before
-   rebuilding: /home/user/odoo + pip deps + PG cluster with
-   adams_strict1/adams_strict_vat survived the 2026-06-12 ~21:00
-   restart; only `pg_ctlcluster 16 main start` was needed). Full
-   rebuild recipe in CLAUDE.md Environment if the disk is fresh.
-3. IF item 5 is still uncommitted (check `git status`): the fixes are
-   complete in the working tree (refund_sync.py, account_move.py +
-   docs); fail-before bd491b2 is pushed; pass-after was 0/0 of 11
-   (TestRefundIdempotency, TestOverRefundGuard, TestRefundCreditNote,
-   strict1). Re-run BOTH full suites (expect 0/0 of 576 each), fill
-   counts in FINALIZE.md item-5 trail + MORNING_REVIEW.md, commit
-   "fix(P2-item5): ... — PENDING RETROACTIVE GO", push.
-4. Then: Tier 2 (data integrity & security audit) — findings to
-   AUDIT.md, fixes under standing approval, money-path into the
-   retroactive flow (until Ahmed returns).
+1. MORNING FIRST: Ahmed reads MORNING_REVIEW.md — retroactive
+   go/no-go on 3d, 3e, item 4, item 5, Tier 2 fixes (§1, each with
+   revert command); relay the 9 Odoo.sh confirmation commands
+   (FINALIZE.md batch); AUD-026 decision (§4).
+2. Environment: check disk first (`ls /home/user/odoo`, `psql -l`) —
+   a mid-window container restart KEPT the disk (only
+   `pg_ctlcluster 16 main start` needed). Full rebuild recipe in
+   CLAUDE.md Environment if fresh.
+3. Current baselines (core b4c7247f): adams_strict1 0 failed,
+   0 errors of 578; adams_strict_vat 0 failed, 0 errors of 578 —
+   BOTH GREEN (first green strict_vat since 3e cleared AUD-001).
+4. Next work: continue Tier 2 — (a) positional variant-matching lead
+   (product_sync.py:240, Tier 1 deferral, needs call-context
+   verification vs the SKU path at :449); (b) concurrency pass
+   (parallel cron/webhook races beyond the advisory-lock surfaces
+   already verified clean); then Tier 3 per the original tier plan.
 5. SSH to Odoo.sh: IMPOSSIBLE from session containers (platform
-   HTTP/HTTPS-only proxy) — never re-test; 9 batched confirmation
-   commands in FINALIZE.md for Ahmed to relay.
+   constraint, CLAUDE.md Environment) — never re-test.
 
 ## State
-- Pushed on claude/determined-cori-glvysk: items 1, 2, 3a-3c (have
-  go), 3d (b012e65+17a55bd), 3e (cd1bfd3+58af690), 3f (707cca9),
-  item 4 (52a268c+18fa21e), item-5 fail-before (bd491b2). 3d/3e/4
-  PENDING RETROACTIVE GO; all pending Odoo.sh confirmation.
-- MILESTONE: both strict profiles fully green since 3e (562/562 → 572
-  with item 4) — first-ever green strict_vat (AUD-001 pair cleared).
-- GREEN BUILD: local proxy complete, zero (a)-class; Odoo.sh leg
-  queued for Ahmed (MORNING_REVIEW.md §5).
-- Local baselines (rebuilt env, core b4c7247f): pre-overnight
-  strict1 0/0 of 552, strict_vat 2/0 of 552; current expected 0/0 of
-  576 both after item 5.
+- Pushed on claude/determined-cori-glvysk through aabd0f0. Overnight
+  commits (all PENDING RETROACTIVE GO): 3d b012e65+17a55bd,
+  3e cd1bfd3+58af690, 3f 707cca9, item 4 52a268c+18fa21e,
+  item 5 bd491b2+15ea94a, Tier 2 5bdfc40+db545cb.
+- FINALIZE Phase-2 fix sequence (items 1-5, tax workstream 3a-3f):
+  COMPLETE locally. GREEN BUILD local proxy: zero (a)-class.
+- AUDIT: AUD-001..025 all fixed/closed except AUD-009/010/014/026 +
+  ENV-1 (open, re-prioritized later); Tier 2 header lists verified-
+  clean surfaces.
 
 ## Open questions for Ahmed
-- Morning: retroactive go/no-go per MORNING_REVIEW.md §1 (3d, 3e,
-  item 4, item 5); relay the 9 Odoo.sh confirmation commands; consider
-  an environment setup script (MORNING_REVIEW.md §5 step 5).
+- MORNING_REVIEW.md §1 go/no-gos, §4 AUD-026, §5 SSH/setup-script.
