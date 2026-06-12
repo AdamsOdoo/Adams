@@ -1,38 +1,32 @@
 # STATUS.md
 
-Updated: 2026-06-12 end of overnight window (all FINALIZE items + first
-Tier 2 pass landed)
+Updated: 2026-06-12 — green-build loop with Ahmed in progress
 
-## Resume here (fresh session)
-1. MORNING FIRST: Ahmed reads MORNING_REVIEW.md — retroactive
-   go/no-go on 3d, 3e, item 4, item 5, Tier 2 fixes (§1, each with
-   revert command); relay the 9 Odoo.sh confirmation commands
-   (FINALIZE.md batch); AUD-026 decision (§4).
-2. Environment: check disk first (`ls /home/user/odoo`, `psql -l`) —
-   a mid-window container restart KEPT the disk (only
-   `pg_ctlcluster 16 main start` needed). Full rebuild recipe in
-   CLAUDE.md Environment if fresh.
-3. Current baselines (core b4c7247f): adams_strict1 0 failed,
-   0 errors of 578; adams_strict_vat 0 failed, 0 errors of 578 —
-   BOTH GREEN (first green strict_vat since 3e cleared AUD-001).
-4. Next work: continue Tier 2 — (a) positional variant-matching lead
-   (product_sync.py:240, Tier 1 deferral, needs call-context
-   verification vs the SKU path at :449); (b) concurrency pass
-   (parallel cron/webhook races beyond the advisory-lock surfaces
-   already verified clean); then Tier 3 per the original tier plan.
-5. SSH to Odoo.sh: IMPOSSIBLE from session containers (platform
-   constraint, CLAUDE.md Environment) — never re-test.
+## Current goal (Ahmed, 2026-06-12): GREEN ODOO.SH BUILD
+Everything else paused until a green Odoo.sh build of `review/full-audit`
+exists. Governance simplified same day: all five overnight retroactive
+GOs approved; money-path now under standing approval (consequence
+statements recorded in FINALIZE.md); two touchpoints remain (Odoo.sh
+relay, human test). MORNING_REVIEW.md retired.
 
 ## State
-- Pushed on claude/determined-cori-glvysk through aabd0f0. Overnight
-  commits (all PENDING RETROACTIVE GO): 3d b012e65+17a55bd,
-  3e cd1bfd3+58af690, 3f 707cca9, item 4 52a268c+18fa21e,
-  item 5 bd491b2+15ea94a, Tier 2 5bdfc40+db545cb.
-- FINALIZE Phase-2 fix sequence (items 1-5, tax workstream 3a-3f):
-  COMPLETE locally. GREEN BUILD local proxy: zero (a)-class.
-- AUDIT: AUD-001..025 all fixed/closed except AUD-009/010/014/026 +
-  ENV-1 (open, re-prioritized later); Tier 2 header lists verified-
-  clean surfaces.
+- Branch consolidation DONE: PR #16 merged the entire project into
+  `review/full-audit` (13f28cf). Old branches (main/dev/staging/feat/
+  hardening/design-*) verified contained or pre-reset; nothing to salvage.
+- Odoo.sh build failure DIAGNOSED + FIXED: ENV-1 (chartless/countryless
+  dev DB vs chart-provided state assumed by test fixtures). See AUDIT.md
+  ENV-1 for the 4-part root cause. Fix commits: 2d88344, e39aebc
+  (test mixins only). PR #17 carries them to review/full-audit.
+- Verification (core b4c7247f): chartless fresh 0 failed, 0 errors of
+  578 (first-ever green); adams_strict1 0/0 of 578; adams_strict_vat
+  0/0 of 578.
+- Awaiting: Ahmed rebuilds review/full-audit on Odoo.sh, pastes log.
+  Loop until green. Once green: run-down report (fixed-so-far in
+  merchant terms, verified vs pending-Odoo.sh, milestone gaps M1-M3,
+  zero-knowledge test script) + the 9 confirmation commands
+  restructured into web-shell paste blocks (FINALIZE.md has them).
 
-## Open questions for Ahmed
-- MORNING_REVIEW.md §1 go/no-gos, §4 AUD-026, §5 SSH/setup-script.
+## Next work after green build
+- Tier 2 remainder: positional variant-matching lead
+  (product_sync.py:240 vs SKU path :449), concurrency pass.
+- Open: AUD-009/010/014/026 (AUD-026 = payload PII decision, Ahmed).
