@@ -20,6 +20,15 @@ class ShopifyAccountingMixin:
 
     def _setup_accounting(self):
         company = self.env.company
+        # Tax group bootstrap for chartless DBs (ENV-1) — mirrors
+        # shopify_connector_pro/tests/common.py.
+        if not self.env['account.tax.group'].search(
+            [('company_id', '=', company.id)], limit=1,
+        ):
+            self.env['account.tax.group'].create({
+                'name': 'Test Taxes',
+                'company_id': company.id,
+            })
         if not self.env['account.journal'].search(
             [('type', '=', 'sale'), ('company_id', '=', company.id)], limit=1,
         ):

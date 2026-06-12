@@ -52,6 +52,20 @@ class ShopifyAccountingMixin:
         """
         company = self.env.company
 
+        # Tax group — account.tax.tax_group_id is required and its compute
+        # only *searches* existing groups (account_tax.py
+        # _compute_tax_group_id); a DB without a chart of accounts has
+        # none, so any account.tax.create() in a test hits the NOT NULL
+        # constraint (ENV-1). A country-less group satisfies the
+        # compute's fallback search.
+        if not self.env['account.tax.group'].search(
+            [('company_id', '=', company.id)], limit=1,
+        ):
+            self.env['account.tax.group'].create({
+                'name': 'Test Taxes',
+                'company_id': company.id,
+            })
+
         # Sales journal
         if not self.env['account.journal'].search(
             [('type', '=', 'sale'), ('company_id', '=', company.id)], limit=1,
