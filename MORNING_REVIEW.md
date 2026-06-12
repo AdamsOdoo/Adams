@@ -155,7 +155,7 @@ fail-before 1 failed + 1 error of 2 → pass-after 0/0 of 2; full suites
 strict1 0 failed, 0 errors of 578 AND strict_vat 0 failed, 0 errors
 of 578.
 
-**No-go revert:** `git revert d722bdb 5bdfc40` on
+**No-go revert:** `git revert db545cb 5bdfc40` on
 `claude/determined-cori-glvysk` (sha in §2; 5bdfc40 = fail-before
 tests).
 
