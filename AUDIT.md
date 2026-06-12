@@ -753,3 +753,35 @@ EW-04a).
   1 failed + 15 errors of 578 → pass-after 0 failed, 0 errors of 578
   (first-ever green chartless run); regression: adams_strict1 0 failed,
   0 errors of 578; adams_strict_vat 0 failed, 0 errors of 578.
+
+---
+
+## Goal 0 Addendum — MORNING_REVIEW References (2026-06-12)
+
+References to `MORNING_REVIEW.md` in this repository are historical audit/governance context. `MORNING_REVIEW.md` was retired before Goal 0 and is not an active instruction source. Consequence statements and operating guidance should now be found in `FINALIZE.md`, `docs/architecture/DECISIONS.md`, and `AGENTS.md` as applicable.
+
+---
+
+## AUD-027 — Onboarding webhook registration failure is swallowed during setup
+
+- **Severity:** major
+- **Evidence:** `addons/shopify_connector_pro/wizards/shopify_onboarding_wizard.py:92-99` — setup attempts `backend.action_register_webhooks()` but catches `Exception` and executes `pass`; no sync log, activity, notification, or wizard error records the failed webhook registration.
+- **Description:** A merchant can finish setup believing webhooks are registered when registration failed. That violates the no-silent-failure rule for a reliability-critical setup step because future order/payment/refund events may not arrive.
+- **Proposed fix:** Keep setup reversible, but record a warning notification and backend activity/sync log with the registration error and a retry action.
+- **Status:** open
+
+## AUD-028 — Outbound fulfillment push failure is warning-only after Odoo delivery validation
+
+- **Severity:** major
+- **Evidence:** `addons/shopify_connector_pro/models/stock_picking.py:34-59` — `_push_outbound_fulfillment()` catches fulfillment push exceptions and only logs a warning after the Odoo picking is already validated.
+- **Description:** Odoo delivery can be completed while Shopify fulfillment creation fails with no merchant-visible activity on the order/picking. The systems diverge on fulfillment state, and the merchant may not know Shopify still needs manual fulfillment.
+- **Proposed fix:** Schedule an activity and/or create a sync-log error on the sale order/backend when outbound fulfillment push fails; keep picking validation intact.
+- **Status:** open
+
+## AUD-029 — Odoo-to-Shopify refund reverse sync lacks an explicit idempotency key/persisted Shopify refund binding
+
+- **Severity:** major
+- **Evidence:** `addons/shopify_connector_pro/models/account_move.py:134-170` — reverse credit-note sync builds and sends `refundCreate`; no persisted Shopify refund ID/idempotency marker is written after success in this method.
+- **Description:** Posting an Odoo credit note can create a real Shopify refund, but the inspected reverse path does not record a Shopify refund identifier or idempotency token. Retry/replay semantics are therefore unclear for a money-path operation.
+- **Proposed fix:** Before enabling/claiming this in v1, decide the product policy and add a persisted idempotency marker/binding or require manual Shopify refund creation.
+- **Status:** open

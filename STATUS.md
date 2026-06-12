@@ -1,37 +1,23 @@
-# STATUS.md
+# STATUS.md — Current State
 
-Updated: 2026-06-12 — green-build loop with Ahmed in progress
+Updated 2026-06-12 — Goal 1 behavior-contract pass.
 
-## Current goal (Ahmed, 2026-06-12): GREEN ODOO.SH BUILD
-Everything else paused until a green Odoo.sh build of `review/full-audit`
-exists. Governance simplified same day: all five overnight retroactive
-GOs approved; money-path now under standing approval (consequence
-statements recorded in FINALIZE.md); two touchpoints remain (Odoo.sh
-relay, human test). MORNING_REVIEW.md retired.
+## What changed
+- Goal 1 read-code/write-docs pass filled `docs/product/BEHAVIOR_CONTRACT.md` for all 27 sections.
+- `docs/product/SYNC_OWNERSHIP_MATRIX.md` now has 15 current-code ownership rows.
+- DEC-024 was closed by code verification: total-check guard matches DEC-011/012 and blocks posting on mismatch.
+- `COVERAGE.md` has a Goal 1 coverage-debt list only; normal coverage population remains Goal 6.
+- New findings appended: AUD-027 onboarding webhook registration swallow, AUD-028 outbound fulfillment warning-only failure, AUD-029 reverse refund idempotency gap.
+- Ahmed escalation candidates appended: gift-card liability accounting, payout accounting automation, Odoo→Shopify refund in v1.
 
-## State
-- Branch consolidation DONE: PR #16 merged the entire project into
-  `review/full-audit` (13f28cf). Old branches (main/dev/staging/feat/
-  hardening/design-*) verified contained or pre-reset; nothing to salvage.
-- Odoo.sh build failure DIAGNOSED + FIXED: ENV-1, now 5 chart-provided
-  pieces bootstrapped by the test mixins (company country, tax group,
-  bank journal, company income account, ir.default partner
-  receivable/payable). Commits 2d88344, e39aebc, 4888f38 + PR #17/#18.
-- Build-log fully SILENCED (rounds 2+3, commits 4888f38/e2c8b2e/
-  58f7794/d12a040): fixtures mock the Shopify boundary, 31 negative-
-  test classes mute their asserted logger, sim webhook delivery
-  synchronous under current_test. No production logic changed.
-- Verification (core b4c7247f, final code): chartless fresh 0 failed,
-  0 errors of 578 with the ENTIRE install log free of WARNING/ERROR/
-  CRITICAL lines; adams_strict1 0/0 of 578; adams_strict_vat 0/0 of
-  578 (both zero our-module WARNING/ERROR).
-- Awaiting: Ahmed rebuilds review/full-audit on Odoo.sh, pastes log.
-  Loop until green. Once green: run-down report (fixed-so-far in
-  merchant terms, verified vs pending-Odoo.sh, milestone gaps M1-M3,
-  zero-knowledge test script) + the 9 confirmation commands
-  restructured into web-shell paste blocks (FINALIZE.md has them).
+## Verified
+- Goal 1 stayed docs-only and did not modify production code, tests, manifests, XML, security, data, controllers, models, sync, or Shopify API files.
+- DEC-024 evidence covers guard compare/tolerance/block/zero-stamp skip/tests.
 
-## Next work after green build
-- Tier 2 remainder: positional variant-matching lead
-  (product_sync.py:240 vs SKU path :449), concurrency pass.
-- Open: AUD-009/010/014/026 (AUD-026 = payload PII decision, Ahmed).
+## Pending
+- Claude fresh-context adversarial review of Goal 1 docs and citations.
+- Ahmed decisions on the three appended escalation items if Claude agrees they require owner input.
+- Goal 2 charter after review; do not start Goal 2 from this state without explicit instruction.
+
+## Next action
+- Claude adversarial review, then Goal 2 planning/charter if accepted.
