@@ -16,6 +16,7 @@ from unittest.mock import patch
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestValidateOrderIncomeAccounts(ShopifyAccountingMixin, TransactionCase):
@@ -23,6 +24,8 @@ class TestValidateOrderIncomeAccounts(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         self.partner = self._create_accounting_partner('Validation Test')
         self.product_ok = self.env['product.product'].create({
             'name': 'Configured Product', 'list_price': 10.0,
@@ -149,6 +152,8 @@ class TestInvoicePathUsesSharedHelper(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test-inv-val.myshopify.com',
@@ -230,6 +235,8 @@ class TestPaymentTransitionUsesSharedHelper(ShopifyAccountingMixin, TransactionC
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test-pmt-val.myshopify.com',
@@ -322,6 +329,8 @@ class TestRefundPathUsesSharedHelper(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test-ref-val.myshopify.com',

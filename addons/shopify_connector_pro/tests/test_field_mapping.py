@@ -2,6 +2,7 @@
 from unittest.mock import patch, MagicMock
 
 from odoo.tests.common import TransactionCase
+from .common import mute_case_loggers
 
 
 class TestFieldMappingImport(TransactionCase):
@@ -9,6 +10,8 @@ class TestFieldMappingImport(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.base_importer')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',

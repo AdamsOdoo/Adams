@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestTaxFallbackFlavor(ShopifyAccountingMixin, TransactionCase):
@@ -15,6 +16,9 @@ class TestTaxFallbackFlavor(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting',
+                          'odoo.addons.shopify_connector_pro.sync.order_sync')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Tax Flavor Store',
             'shop_url': 'taxflavor-test.myshopify.com',

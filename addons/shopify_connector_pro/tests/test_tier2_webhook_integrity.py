@@ -3,6 +3,7 @@
 redaction (AUD-025)."""
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
+from .common import mute_case_loggers
 
 
 class Tier2Fixture:
@@ -52,6 +53,11 @@ class TestGdprChildRedaction(Tier2Fixture, TransactionCase):
     """AUD-025: customers/redact must clear PII from delivery/invoice
     child contacts (created by order import) and from the parent's
     city/zip — not only the parent's street/email/phone."""
+
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.models.shopify_webhook_log')
 
     def test_redaction_covers_child_contacts_and_city(self):
         backend = self._backend('GDPR Store', 'gdpr-test.myshopify.com')

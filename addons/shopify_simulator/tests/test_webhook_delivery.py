@@ -14,10 +14,16 @@ import json
 from unittest.mock import patch, MagicMock
 
 from .common import SimulatorTestCase
+from odoo.addons.shopify_connector_pro.tests.common import mute_case_loggers
 
 
 class TestWebhookHMAC(SimulatorTestCase):
     """Test HMAC signature computation for outbound webhooks."""
+
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_simulator.models.sim_webhook')
 
     def test_hmac_computation(self):
         """Verify HMAC matches Shopify's algorithm."""

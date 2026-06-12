@@ -2,12 +2,15 @@
 from unittest.mock import MagicMock, call
 
 from odoo.tests.common import TransactionCase
+from .common import mute_case_loggers
 
 
 class TestFulfillmentSync(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.fulfillment_sync')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test.myshopify.com',

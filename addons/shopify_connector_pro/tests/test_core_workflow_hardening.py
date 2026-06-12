@@ -14,6 +14,7 @@ from odoo import fields
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 # ===================================================================
@@ -445,6 +446,8 @@ class TestOrderCancelWebhook(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.models.shopify_webhook_log')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Cancel Test Store',
             'shop_url': 'cancel-test.myshopify.com',

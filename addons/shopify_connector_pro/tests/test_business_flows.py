@@ -21,6 +21,7 @@ from odoo import fields
 from odoo.tests.common import TransactionCase, HttpCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestInvoiceCreation(ShopifyAccountingMixin, TransactionCase):
@@ -28,6 +29,8 @@ class TestInvoiceCreation(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test-a1.myshopify.com',
@@ -408,6 +411,8 @@ class TestFulfillmentSync(ShopifyAccountingMixin, TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.fulfillment_sync')
         self.backend = self.env['shopify.backend'].create({
             'name': 'Test Store',
             'shop_url': 'test-a3.myshopify.com',
@@ -591,6 +596,11 @@ class TestWebhookReplayHardening(TransactionCase):
 
 class TestPaginationLimits(TransactionCase):
     """B1: Verify pagination limits are adequate."""
+
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.order_sync')
 
     def test_order_query_has_250_line_items(self):
         """FETCH_ORDERS should request up to 250 line items with pageInfo."""

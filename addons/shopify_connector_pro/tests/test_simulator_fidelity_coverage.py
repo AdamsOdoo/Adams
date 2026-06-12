@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class TestShippingLineImport(ShopifyAccountingMixin, TransactionCase):
@@ -164,6 +165,8 @@ class TestPresentmentCurrencyImport(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.accounting')
         if not self.env['account.journal'].search(
             [('type', '=', 'sale'), ('company_id', '=', self.env.company.id)], limit=1,
         ):

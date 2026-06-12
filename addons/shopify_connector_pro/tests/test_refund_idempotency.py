@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from .common import mute_case_loggers
 
 
 class RefundGuardFixture(ShopifyAccountingMixin):
@@ -89,6 +90,11 @@ class TestRefundIdempotency(RefundGuardFixture, TransactionCase):
     creation must not leave an orphaned credit note that duplicates on
     the next sync."""
 
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.refund_sync')
+
     def test_binding_failure_does_not_orphan_credit_note(self):
         self._serve(self._refund(6001, 50.0))
         Binding = self.env['shopify.refund.binding']
@@ -141,6 +147,11 @@ class TestRefundIdempotency(RefundGuardFixture, TransactionCase):
 class TestOverRefundGuard(RefundGuardFixture, TransactionCase):
     """AUD-022: cumulative refunds beyond the posted invoice total must
     not post silently."""
+
+    def setUp(self):
+        super().setUp()
+        mute_case_loggers(self,
+                          'odoo.addons.shopify_connector_pro.sync.refund_sync')
 
     def test_cumulative_over_refund_blocked_visibly(self):
         self._serve(self._refund(7001, 150.0))

@@ -182,5 +182,13 @@ class SimShopifyWebhookSubscription(models.Model):
                     topic_rest, callback_url, e,
                 )
 
+        # Synchronous under the test runner: a daemon thread outlives
+        # the test's logger state (mute/capture) and leaks its
+        # connection-failure warning into the build log after the test
+        # finished; it also makes delivery assertions racy.
+        from odoo.modules import module as odoo_module
+        if odoo_module.current_test:
+            _send()
+            return
         thread = threading.Thread(target=_send, daemon=True)
         thread.start()
