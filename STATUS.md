@@ -13,13 +13,19 @@ relay, human test). MORNING_REVIEW.md retired.
 - Branch consolidation DONE: PR #16 merged the entire project into
   `review/full-audit` (13f28cf). Old branches (main/dev/staging/feat/
   hardening/design-*) verified contained or pre-reset; nothing to salvage.
-- Odoo.sh build failure DIAGNOSED + FIXED: ENV-1 (chartless/countryless
-  dev DB vs chart-provided state assumed by test fixtures). See AUDIT.md
-  ENV-1 for the 4-part root cause. Fix commits: 2d88344, e39aebc
-  (test mixins only). PR #17 carries them to review/full-audit.
-- Verification (core b4c7247f): chartless fresh 0 failed, 0 errors of
-  578 (first-ever green); adams_strict1 0/0 of 578; adams_strict_vat
-  0/0 of 578.
+- Odoo.sh build failure DIAGNOSED + FIXED: ENV-1, now 5 chart-provided
+  pieces bootstrapped by the test mixins (company country, tax group,
+  bank journal, company income account, ir.default partner
+  receivable/payable). Commits 2d88344, e39aebc, 4888f38 + PR #17/#18.
+- Build-log NOISE SWEEP done (4888f38 + residual commit): payment-path
+  fixtures mock the Shopify boundary (_mock_backend_api_client),
+  intentional-error tests mute their asserted loggers. Chartless
+  install log now has ZERO ERROR-level lines from our modules;
+  ~55 WARNING lines remain (asserted negative-test messages,
+  documented expected class).
+- Verification (core b4c7247f, after sweep): chartless fresh 0 failed,
+  0 errors of 578; adams_strict1 0/0 of 578; adams_strict_vat 0/0
+  of 578.
 - Awaiting: Ahmed rebuilds review/full-audit on Odoo.sh, pastes log.
   Loop until green. Once green: run-down report (fixed-so-far in
   merchant terms, verified vs pending-Odoo.sh, milestone gaps M1-M3,
