@@ -203,6 +203,7 @@ class TestPaymentPathMinorVisibility(VisibilityFixtureMixin,
         from ..sync.payment_status_sync import PaymentStatusHandler
         return PaymentStatusHandler(self.env, backend)
 
+    @mute_logger('odoo.addons.shopify_connector_pro.sync.payment_status_sync')
     def test_reconcile_failure_schedules_activity(self):
         """AUD-007: payment posts but reconciliation fails — 'manual
         reconciliation required' must reach a human."""

@@ -161,7 +161,8 @@ class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
             )
         return poisoning_post
 
-    @mute_logger('odoo.sql_db')
+    @mute_logger('odoo.sql_db',
+                 'odoo.addons.shopify_connector_pro.sync.payment_status_sync')
     def test_paid_draft_post_failure_no_cursor_poison(self):
         """action_post() failure on a draft must NOT poison the cursor.
 
@@ -204,7 +205,8 @@ class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
         ])
         self.assertTrue(activities, "Activity must be scheduled on failure")
 
-    @mute_logger('odoo.sql_db')
+    @mute_logger('odoo.sql_db',
+                 'odoo.addons.shopify_connector_pro.sync.payment_status_sync')
     def test_partially_paid_draft_post_failure_no_cursor_poison(self):
         """action_post() failure on partially_paid must NOT poison cursor.
 
