@@ -1,7 +1,7 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
 
-from odoo import _, models
+from odoo import _, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -23,6 +23,15 @@ mutation OrderMarkAsPaid($input: OrderMarkAsPaidInput!) {
 
 class AccountMove(models.Model):
     _inherit = 'account.move'
+
+    shopify_refund_gid = fields.Char(
+        string='Shopify Refund ID',
+        index=True,
+        copy=False,
+        help='Shopify refund GID this credit note was created from. '
+             'Idempotency anchor for refund import (AUD-021): a refund '
+             'is never booked twice even if its binding record is lost.',
+    )
 
     def action_post(self):
         res = super().action_post()

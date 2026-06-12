@@ -115,6 +115,31 @@ simply never reached. Evidence: fail-before 10/0 of 10 → pass-after
 `claude/determined-cori-glvysk` (52a268c = fail-before tests; fix sha
 in §2 once committed).
 
+### Item 5 — refund idempotency + over-refund guard (money path: refunds/credit notes)
+
+Two protections around credit notes. First, booking a Shopify refund is
+now atomic and double-entry-proof: the credit note and its tracking
+record are created in one savepoint (a crash between them used to leave
+a posted credit note that the next sync would post AGAIN), and every
+connector credit note now carries the Shopify refund ID in a dedicated
+field, so even if tracking records are lost the refund is recognized
+and reused rather than re-booked. Second, a cumulative cap: when the
+sum of connector credit notes plus the incoming refund would exceed the
+posted invoice total (beyond 2× currency rounding), the credit note is
+NOT created — the merchant gets a warning activity naming the amounts
+and a retryable error-state binding. Legitimate partial refunds up to
+exactly the invoiced total still post. Riders: a silently-dropped
+non-product refund line is now logged, and shipping refund lines
+resolve their income account like product lines instead of only the
+journal default. Evidence: fail-before 2 failed + 1 error of 4 →
+pass-after 0/0 of 11; full suites (counts in §2).
+
+**No-go revert:** `git revert <item5-fix-sha> bd491b2` on
+`claude/determined-cori-glvysk` (bd491b2 = fail-before tests; fix sha
+in §2 once committed). Note: reverting removes the new
+`shopify_refund_gid` column on the next upgrade; GID stamps on
+already-created credit notes are lost on revert.
+
 ## 2) Completed with evidence
 
 - **Environment rebuilt from scratch** (container was fresh: no Odoo

@@ -42,6 +42,13 @@ Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
   Evidence in FINALIZE.md item 3d trail; consequence statement in
   MORNING_REVIEW.md §1.
 - **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-021, AUD-022 and rider AUD-023 (item 5 —
+  per-refund savepoint atomicity, shopify_refund_gid recovery guard on
+  account.move, cumulative over-refund guard with visible degradation
+  and retryable error binding; non-product drop logged, shipping refund
+  account via get_product_accounts). Evidence in FINALIZE.md item 5
+  trail; consequence statement in MORNING_REVIEW.md §1.
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
   overnight window:** AUD-003, AUD-004, AUD-005, AUD-006 and ride-along
   minors AUD-007, AUD-008, AUD-011, AUD-012, AUD-013 (item 4 —
   visibility batch: cron counters surfaced via _notify_sync_error,

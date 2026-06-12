@@ -60,7 +60,7 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons \
 ```
 | 3 | Tax workstream — steps 3a-3f approved 2026-06-11 | AUD-001, AUD-015, AUD-016, AUD-018 + permanent guard; AUD-017 rides along | L (split: 3a M done, 3b S done, 3c S done, 3d S done, 3e L done, 3f S) | 3a, 3b, 3c COMMITTED (go 2026-06-11); 3d+3e COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1); next: 3f | 3a-3e: **pending Odoo.sh confirmation** |
 | 4 | Visibility batch (surface discarded counters, webhook dead-letter, reverse-sync activities) | AUD-003, AUD-004, AUD-005, AUD-006 (minors AUD-007/008/011/012/013 ride along where same-file) | M | COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1) | **pending Odoo.sh confirmation** |
-| 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | not started | pending |
+| 5 | Refund idempotency + over-refund guard | AUD-021, AUD-022 (AUD-023 rides along) | M | COMMITTED overnight 2026-06-12 — **PENDING RETROACTIVE GO** (MORNING_REVIEW.md §1) | **pending Odoo.sh confirmation** |
 
 After item 5: pause fixes, resume audit at Tier 2. Tier 2-3 findings that
 touch already-fixed files are ledgered as NEW findings — no opportunistic
@@ -174,11 +174,12 @@ odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_co
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestTaxFallbackFlavor --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro,shopify_simulator --test-tags /shopify_connector_pro:TestTaxesIncludedImport,/shopify_simulator:TestOrderFidelity --stop-after-init --no-http
 odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestCronCounterVisibility,/shopify_connector_pro:TestWebhookOrderRetry,/shopify_connector_pro:TestReverseSyncFailureVisibility,/shopify_connector_pro:TestPaymentPathMinorVisibility --stop-after-init --no-http
+odoo-bin -d <staging-db> --addons-path=<core-addons>,<repo>/addons -u shopify_connector_pro --test-tags /shopify_connector_pro:TestRefundIdempotency,/shopify_connector_pro:TestOverRefundGuard --stop-after-init --no-http
 ```
 
 Expected: 0 failed, 0 errors of 3 / of 6 / of 6 / of 2 / of 13 / of 5 /
-of 11 / of 10 respectively (the last four require the 3c, 3d, 3e and
-item-4 fix commits to be on the build).
+of 11 / of 10 / of 4 respectively (the last five require the 3c, 3d,
+3e, item-4 and item-5 fix commits to be on the build).
 
 ## Item 3d evidence trail (AUD-017 + AUD-016 remainder — tax-fallback flavor, dropped-tax visibility)
 
@@ -240,6 +241,41 @@ Item 3d Odoo.sh confirmation (batched above, command 6).
   VAT profile. adams_strict1 0 failed, 0 errors of 562.
 
 Item 3e Odoo.sh confirmation (batched above, command 7).
+
+## Item 5 evidence trail (AUD-021/022 — refund idempotency, over-refund guard; AUD-023 riders)
+
+- Fail-before: 2 failed, 1 error of 4 (test_refund_idempotency.py,
+  adams_strict1, commit bd491b2) through import_refunds_for_order: a
+  binding-creation failure orphaned the posted credit note (and the
+  retry then posted a SECOND one), no GID stamp existed (the recovery-
+  guard assertion errored on the missing field), and a cumulative
+  over-refund (250.00 vs 200.00 invoiced) posted silently. The
+  legitimate-partial-refunds contract test passed before and after.
+- Fix:
+  - AUD-021 atomicity: one savepoint per refund around
+    `_import_one_refund` — posted credit note + binding are atomic;
+    a failure between them rolls both back, the next sync imports
+    cleanly once.
+  - AUD-021 recovery net: new indexed `account.move.shopify_refund_gid`
+    (copy=False) stamped on every connector credit note; creation
+    starts with a GID search and REUSES the existing credit note when
+    found (mirror of the payment memo pattern).
+  - AUD-022: before posting, cumulative connector credit notes
+    (GID-stamped, posted, same origin/company) + current refund are
+    compared against the posted invoice total with 2×rounding
+    tolerance (DEC-012 style); a breach skips creation with a warning
+    activity ("Shopify refund exceeds invoiced amount") and an
+    error-state, retryable binding. Guard applies only when a posted
+    invoice exists (no basis otherwise).
+  - AUD-023 riders: non-product line drop now logged (amount recovered
+    by the balancing line as before); shipping refund line resolves its
+    income account via get_product_accounts like product lines.
+- Pass-after: 0 failed, 0 errors of 11 (TestRefundIdempotency,
+  TestOverRefundGuard, TestRefundCreditNote, adams_strict1).
+- Full suites: adams_strict1 0 failed, 0 errors of 576; adams_strict_vat
+  0 failed, 0 errors of 576.
+
+Item 5 Odoo.sh confirmation (batched above, command 9).
 
 ## Item 4 evidence trail (visibility batch — AUD-003/004/005/006 + minors 007/008/011/012/013)
 
