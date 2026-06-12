@@ -1,5 +1,7 @@
 # LEGACY_NOTES.md — Salvaged Content from Pre-Finalization AI Working Files
 
+> Goal 0 archive note (2026-06-12): This file was moved from the repo root to preserve historical audit and reset context without making it an active operating instruction file. Durable active testing knowledge was extracted to `docs/qa/TEST_PATTERNS.md`; future active QA rules should live in `docs/qa/` or the current goal documents. Audit history is preserved here unchanged below this note.
+
 > Created 2026-06-10 during the v1 finalization reset (see CLAUDE.md).
 > Sources, all deleted in the same commit that created this file:
 > - `HARDENING.md` (root) — hardening-mission summary
