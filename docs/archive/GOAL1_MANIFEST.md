@@ -73,6 +73,6 @@ Goal 1 is a read-code / write-docs goal. Production code is read-only. Writes ar
 - T2 filled all 27 behavior contract sections in four cluster commits.
 - T3 filled 15 sync ownership matrix rows.
 - T4 appended Goal 1 coverage debt to `COVERAGE.md` without populating normal coverage rows.
-- T5 appended AUD-025, AUD-026, and AUD-027; no code was fixed.
+- T5 appended AUD-027, AUD-028, and AUD-029; no code was fixed.
 - T6 appended three Ahmed escalation statements to `docs/architecture/DECISIONS.md`.
 - T7 updated this manifest and `STATUS.md` for handoff.
