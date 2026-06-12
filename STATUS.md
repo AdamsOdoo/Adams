@@ -17,15 +17,14 @@ relay, human test). MORNING_REVIEW.md retired.
   pieces bootstrapped by the test mixins (company country, tax group,
   bank journal, company income account, ir.default partner
   receivable/payable). Commits 2d88344, e39aebc, 4888f38 + PR #17/#18.
-- Build-log NOISE SWEEP done (4888f38 + residual commit): payment-path
-  fixtures mock the Shopify boundary (_mock_backend_api_client),
-  intentional-error tests mute their asserted loggers. Chartless
-  install log now has ZERO ERROR-level lines from our modules;
-  ~55 WARNING lines remain (asserted negative-test messages,
-  documented expected class).
-- Verification (core b4c7247f, after sweep): chartless fresh 0 failed,
-  0 errors of 578; adams_strict1 0/0 of 578; adams_strict_vat 0/0
-  of 578.
+- Build-log fully SILENCED (rounds 2+3, commits 4888f38/e2c8b2e/
+  58f7794/d12a040): fixtures mock the Shopify boundary, 31 negative-
+  test classes mute their asserted logger, sim webhook delivery
+  synchronous under current_test. No production logic changed.
+- Verification (core b4c7247f, final code): chartless fresh 0 failed,
+  0 errors of 578 with the ENTIRE install log free of WARNING/ERROR/
+  CRITICAL lines; adams_strict1 0/0 of 578; adams_strict_vat 0/0 of
+  578 (both zero our-module WARNING/ERROR).
 - Awaiting: Ahmed rebuilds review/full-audit on Odoo.sh, pastes log.
   Loop until green. Once green: run-down report (fixed-so-far in
   merchant terms, verified vs pending-Odoo.sh, milestone gaps M1-M3,

@@ -434,3 +434,35 @@ Result: chartless install log has ZERO ERROR-level lines from our
 modules; remaining ~55 WARNINGs are asserted negative-test messages
 (expected class, ledgered). Counts after sweep: fresh 0/0 of 578,
 strict1 0/0 of 578, strict_vat 0/0 of 578.
+
+### Warning sweep — round 3 (2026-06-12, Ahmed: "clear the warnings")
+Ahmed's third relayed log (zero errors, zero failures) still showed
+~50 WARNING lines, all the asserted-negative-test class. Cleared by
+cause class, no production logic changed:
+- Per-class `mute_case_loggers` (tests/common.py helper: mute_logger
+  entered in setUp + addCleanup exit, so fixture-time output is covered
+  where a method decorator would not be) applied to 31 test classes,
+  each muting ONLY the exact logger its assertions already cover
+  (sync.accounting, sync.order_sync, sync.refund_sync,
+  sync.payment_status_sync, sync.fulfillment_sync, sync.inventory_sync,
+  sync.base_importer, models.shopify_webhook_log,
+  models.shopify_reconciliation, models.account_move, sim_webhook).
+- Simulator webhook delivery is synchronous under
+  `odoo.modules.module.current_test` (sim_webhook.py): the daemon
+  thread outlived per-test logger state and leaked its
+  connection-refused warning into the build log after the test ended;
+  also removes delivery-assertion raciness. Production path (threaded)
+  unchanged.
+- TestPresentmentCurrencyImport (plain TransactionCase, missed by the
+  fixture-mock sweep) got the inline Shopify-boundary client mock; on
+  chart-present DBs its PAID-order import reached transaction fetch
+  (1 residual strict1 warning, order #EUR001).
+Commits 58f7794 + d12a040. Evidence (core b4c7247f, 2026-06-12): fresh
+chartless install 0 failed, 0 error(s) of 578 AND the whole install log
+has ZERO WARNING/ERROR/CRITICAL lines (any logger, core included);
+adams_strict1 (-u) 0/0 of 578, zero our-module WARNING/ERROR lines;
+adams_strict_vat (-u) 0/0 of 578, zero our-module WARNING/ERROR lines.
+Expected healthy Odoo.sh log: `0 failed, 0 error(s) of 578`, empty
+errors/warnings filters (a core `mail` docutils warning may still
+appear on Enterprise builds — not ours, not fixable without touching
+core; flag it if present, nothing else should be).
