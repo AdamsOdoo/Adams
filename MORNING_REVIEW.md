@@ -25,10 +25,10 @@ don't apply unless sessions are started IN that environment.
 1. Stop pursuing SSH from sessions. Remove the key from the environment
    config if you added it (no dedicated secrets store; env vars are
    visible to anyone who can edit the environment).
-2. Odoo.sh confirmations stay touchpoint-1 (you relay). The 7 batched
+2. Odoo.sh confirmations stay touchpoint-1 (you relay). The 9 batched
    commands are in FINALIZE.md ("Batched Odoo.sh confirmation
-   commands") — items 1, 2, 3a, 3b, 3c, 3d, 3e. Expected:
-   0 failed/0 errors of 3 / 6 / 6 / 2 / 13 / 5 / 11.
+   commands") — items 1, 2, 3a, 3b, 3c, 3d, 3e, 4, 5. Expected:
+   0 failed/0 errors of 3 / 6 / 6 / 2 / 13 / 5 / 11 / 10 / 4.
 3. GREEN BUILD Odoo.sh leg: from the Odoo.sh editor/web shell, run
    `grep -iE "error|warning" ~/logs/install.log` (or paste the build
    log page) — the local proxy already classified everything local
@@ -111,9 +111,9 @@ re-raise), where the retry machine was already built, tested, and
 simply never reached. Evidence: fail-before 10/0 of 10 → pass-after
 0/0 of 16; full suites (counts in §2).
 
-**No-go revert:** `git revert <item4-fix-sha> 52a268c` on
-`claude/determined-cori-glvysk` (52a268c = fail-before tests; fix sha
-in §2 once committed).
+**No-go revert:** `git revert 18fa21e 52a268c` on
+`claude/determined-cori-glvysk` (18fa21e = fix+docs, 52a268c =
+fail-before tests).
 
 ### Item 5 — refund idempotency + over-refund guard (money path: refunds/credit notes)
 
@@ -134,14 +134,31 @@ resolve their income account like product lines instead of only the
 journal default. Evidence: fail-before 2 failed + 1 error of 4 →
 pass-after 0/0 of 11; full suites (counts in §2).
 
-**No-go revert:** `git revert <item5-fix-sha> bd491b2` on
-`claude/determined-cori-glvysk` (bd491b2 = fail-before tests; fix sha
-in §2 once committed). Note: reverting removes the new
+**No-go revert:** `git revert 15ea94a bd491b2` on
+`claude/determined-cori-glvysk` (15ea94a = fix+docs, bd491b2 =
+fail-before tests). Note: reverting removes the new
 `shopify_refund_gid` column on the next upgrade; GID stamps on
 already-created credit notes are lost on revert.
 
 ## 2) Completed with evidence
 
+- **Item 5 DONE and pushed** (commits bd491b2 tests, 15ea94a fix+docs):
+  refund atomicity savepoint, shopify_refund_gid recovery guard,
+  cumulative over-refund guard, AUD-023 riders. Evidence: fail-before
+  2 failed + 1 error of 4 → pass-after 0/0 of 11; full suites strict1
+  0 failed, 0 errors of 576 AND strict_vat 0 failed, 0 errors of 576.
+  PENDING RETROACTIVE GO (§1) + Odoo.sh confirmation (command 9).
+- **Item 4 DONE and pushed** (commits 52a268c tests, 18fa21e fix+docs):
+  visibility batch AUD-003/004/005/006 + minors 007/008/011/012/013.
+  Evidence: fail-before 10/0 of 10 → pass-after 0/0 of 16; full suites
+  strict1 0/0 of 572, strict_vat 0/0 of 572. PENDING RETROACTIVE GO
+  (§1) + Odoo.sh confirmation (command 8).
+- **Item 3f DONE and pushed** (707cca9, docs-only, no gate):
+  _resolve_taxes docstring contract, LEGACY_NOTES DEF-EW-10 annotation,
+  final store-pricing × tax-flavor matrix in FINALIZE.md, stale-claim
+  grep clean. Sanity: 0/0 of 10 after the docstring edit.
+  **The FINALIZE.md Phase-2 fix sequence (items 1-5 + tax workstream
+  3a-3f) is now COMPLETE locally.**
 - **Environment rebuilt from scratch** (container was fresh: no Odoo
   checkout, no deps, empty PG cluster). Baselines reproduced EXACTLY on
   the rebuilt env, new core tip b4c7247f (was 07a333c8 — no drift):
@@ -183,7 +200,13 @@ already-created credit notes are lost on revert.
 
 ## 3) In progress
 
-- (updated continuously — see STATUS.md "Resume here" for exact state)
+- Tier 2 (data integrity & security audit) — started at the end of the
+  window; candidate findings (if any) are in AUDIT.md marked
+  PRELIMINARY (Tier 2). Exact resume point in STATUS.md.
+- Note: the container restarted mid-window (~21:00 PT / 03:30 log
+  time) during the first item-5 verification run; disk survived, the
+  suites were re-run from scratch afterwards — the counts above are
+  from the post-restart runs.
 
 ## 4) Decisions awaiting you
 
