@@ -40,6 +40,16 @@ class ShopifyOrderBinding(models.Model):
              "imported refund sets without an extra API call.",
     )
     shopify_created_at = fields.Datetime('Shopify Created At')
+    shopify_total_amount = fields.Float(
+        'Shopify Total', digits=0, default=0.0,
+        help="Total charged on Shopify (totalPriceSet) in the order's "
+             "import currency, stamped at import. The permanent "
+             "total-check guard compares computed invoice totals against "
+             "it before any automatic posting and blocks on mismatch "
+             "(invoice stays in draft with a warning activity). Zero "
+             "means no stamp — the guard skips (e.g. bindings created "
+             "before this field existed).",
+    )
     shopify_url = fields.Char('Shopify URL', compute='_compute_shopify_url')
 
     _unique_backend_shopify = models.Constraint(

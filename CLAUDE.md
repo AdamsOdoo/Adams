@@ -17,8 +17,23 @@ Ship the best Shopify connector on the Odoo App Store. "Best" means, in order:
 Definition of DONE for v1: full-coverage audit completed, all critical and
 major findings fixed and verified fail-before/pass-after, COVERAGE.md shows
 every enumerated surface covered and green on the strict DB, UX pass
-completed, docs/listing accurate. Not in v1's definition of done: new
-feature development.
+completed, docs/listing accurate. SCOPE DECISION (Ahmed, 2026-06-11): full
+VAT-inclusive (tax-included pricing) support is IN v1 — no longer deferred.
+The AUD-001 branch map in AUDIT.md is its spec; the workstream covers
+AUD-001, AUD-015, AUD-016, AUD-018 plus the permanent total-check guard
+(computed invoice totals vs Shopify totalPriceSet, visible degradation on
+mismatch — stays in the product after full support lands). Otherwise not in
+v1's definition of done: new feature development.
+
+MILESTONES (Ahmed, 2026-06-11):
+- M1 CLIENT-READY: v1 DONE as defined above, PLUS deployment-readiness for
+  a specific client database (install/upgrade path verified, config
+  documented, zero-knowledge onboarding guide written).
+- M2 USER-VALIDATED: human test executed, findings fixed, retested.
+  Client deployment happens at M2.
+- M3 STORE-READY: packaging, listing, docs, demo data, submission
+  requirements verified against current Odoo App Store rules. Store
+  submission happens at M3.
 
 ## Project
 Odoo 19 Enterprise third-party connector for Shopify (GraphQL Admin API
@@ -31,15 +46,39 @@ degradation after DB clone, status-field indexes, refund-scan pruning,
 count-based reconciliation. Do not re-litigate settled design decisions;
 audit for defects, not preferences.
 
-## Role and authority
-- You operate under explicit human approval gates. Ahmed approves before any
-  fix is implemented in shipped connector code and before any commit of it.
-- Current phase: READ-ONLY AUDIT of shipped code unless a session explicitly
-  grants write access. Exception: test code is always writable (see Testing
-  mandate).
-- Anything touching money movement, payment idempotency, credit notes,
-  refunds, or tax computation ALWAYS requires explicit approval before
-  editing, in every phase.
+## Role and authority (GOVERNANCE CHANGE — Ahmed, 2026-06-11, supersedes
+## the original approval-gate model from item 3a onward)
+- STANDING APPROVAL: plan, edit shipped code, and commit without per-item
+  approval for all FINALIZE.md items and all findings from the remaining
+  tiers, PROVIDED every change satisfies rules 1-6. The discipline rules
+  are the gate. A change that cannot meet them does not ship, period.
+- SELF-VERIFICATION REPLACES HUMAN REVIEW: after each item, record the
+  evidence trail in FINALIZE.md (failing test ref, passing counts both
+  strict profiles, full-suite counts). At each tier checkpoint, run a
+  fresh adversarial review of recent diffs via fresh-context subagents
+  (hunting rule violations, regressions, silent degradations) before
+  proceeding.
+- DECISIONS: genuine business decisions are decided here under the
+  standing intent — maximize merchant-friendliness and reliability for
+  real e-commerce stores; never wrong money, never silent failure; prefer
+  reversible choices. Every such decision goes in docs/architecture/
+  DECISIONS.md with rationale and a reversibility note. Escalate to Ahmed
+  only when BOTH irreversible AND high-stakes, as a plain-language
+  consequence statement.
+- THREE HUMAN TOUCHPOINTS (the only ones):
+  1. Odoo.sh confirmation runs — batch the commands; Ahmed relays.
+     (To be eliminated once direct SSH is enabled — see STATUS.md.)
+  2. Money-path changes (payments, refunds, credit notes, taxes,
+     reconciliation): before committing each, Ahmed receives a 3-5
+     sentence plain-language consequence statement and replies go/no-go.
+     The only remaining diff-level gate.
+  3. Final human user test before client deployment: a zero-knowledge
+     test script executed by Ahmed or the client against a dev store.
+- EFFICIENCY MANDATE: the how is owned here — subagents, tooling, harness
+  improvements welcome if rules 1-6 stay intact. One item per session,
+  items as large as safety allows. Periodically re-sync the local Odoo
+  core checkout and re-run the suite to catch upstream drift.
+- Test code remains always writable (see Testing mandate).
 
 ## Non-negotiable discipline rules
 1. Confirm-before-fix: every finding must cite live-source evidence
@@ -91,15 +130,25 @@ audit for defects, not preferences.
   file:line evidence, description, proposed fix (not implemented), status
   (open/approved/fixed/wontfix).
 - Use subagents for broad scans so the main context stays lean.
+- GREEN BUILD standing rule (Ahmed, 2026-06-11): at each tier checkpoint,
+  pull the latest Odoo.sh build log and confirm zero errors/warnings
+  attributable to our modules — any new warning is a finding. Warnings are
+  cleared by removing their cause, never by suppressing/downgrading/
+  filtering log output. Part of v1 DONE (see FINALIZE.md GREEN BUILD item).
 
 ## Environment
 - Repo: AdamsOdoo/Adams. Review/merge branch: `review/full-audit`. Sessions
   develop and push on their harness-mandated working branch (this session:
   `claude/admiring-bell-e9g6qp`); Ahmed merges into `review/full-audit` via
   PR at each approved checkpoint. Never push to `review/full-audit` directly.
-- Odoo.sh runtime access: NOT possible from this container — outbound port
-  22 is blocked by the environment network policy (verified 2026-06-10).
-  Runtime strategy is hybrid, approved by Ahmed:
+- Odoo.sh runtime access: NOT possible from ANY session container —
+  Claude Code cloud environments sit behind an HTTP/HTTPS-only egress
+  proxy, so raw TCP/SSH (port 22) is unsupported under every network
+  policy including "Full" (platform constraint, confirmed against
+  code.claude.com docs + empirically 2026-06-11: port 22 times out to
+  all hosts, 443 to the same hosts connects). No environment setting
+  fixes this; do not re-test SSH. Odoo.sh checks go through Ahmed
+  (touchpoint 1). Runtime strategy is hybrid, approved by Ahmed:
   - LOCAL: an Odoo 19 Community runtime in this container (PostgreSQL 16,
     Python 3.11, odoo/odoo branch 19.0 cloned over HTTPS) is used for
     iteration, audit verification against core source, and
@@ -111,34 +160,59 @@ audit for defects, not preferences.
     Ahmed runs or relays those confirmation commands.
   - Anything verifiable only against Enterprise code is flagged
     "unverified — needs build check".
-- Local setup (VERIFIED 2026-06-10, suite green on adams_strict1):
-  - Odoo core: `/home/user/odoo` (odoo/odoo branch 19.0, shallow clone,
-    commit 07a333c8). PostgreSQL 16 local cluster, DB user `root`.
+- Local setup (re-VERIFIED 2026-06-11 from scratch; baselines reproduced
+  exactly). CONTAINERS ARE EPHEMERAL: the Odoo checkout, pip deps, PG
+  role and all DB profiles are LOST between sessions — rebuild at
+  session start (~20 min: clone + pip + 2 installs + chart). Until an
+  environment setup script exists (recommended to Ahmed), the recipe is:
+  - Odoo core: `/home/user/odoo` (odoo/odoo branch 19.0, shallow clone;
+    2026-06-11 tip b4c7247f — suite-equivalent to the 2026-06-10
+    baseline commit 07a333c8). PostgreSQL 16 local cluster
+    (`pg_ctlcluster 16 main start`), DB superuser `root`
+    (`su - postgres -c "createuser -s root && createdb root"`).
   - Python dep quirks vs upstream requirements.txt (Python 3.11 here):
     `psycopg2-binary` instead of psycopg2; unpinned `rjsmin`/`vobject`
     (pinned versions fail to build); `docopt-ng` + `num2words --no-deps`;
     system `cryptography 41.0.7` kept with `urllib3==2.0.7` and
     `pyopenssl==24.1.0` (the Noble combo — Jammy's urllib3 1.26.5 is
-    incompatible with cryptography ≥39); `beautifulsoup4` added.
+    incompatible with cryptography ≥39); `beautifulsoup4` added; `cffi`
+    added (missing in the image — without it odoo-bin dies at startup
+    with ModuleNotFoundError `_cffi_backend` via OpenSSL import);
+    EXCLUDE `python-ldap` and `ofxparse` (no build headers; unused by
+    our dependency set — and a single failing wheel aborts the whole
+    `pip install -r`).
+  - Run test DBs ONE AT A TIME: `--test-tags` spawns an HTTP server even
+    with `--no-http` (port collision), and two parallel suite runs can
+    OOM-kill PostgreSQL (observed 2026-06-11).
   - Test command (verified):
     `python3 /home/user/odoo/odoo-bin -d <db> --addons-path=/home/user/odoo/addons,/home/user/Adams/addons -u shopify_connector_pro,shopify_simulator,shopify_connector_pro_dashboard --test-tags /shopify_connector_pro,/shopify_simulator,/shopify_connector_pro_dashboard --stop-after-init --no-http --log-level=info`
-  - DB profiles (kept in the local cluster; recreate with the steps below):
+  - DB profiles (rebuilt every session; steps below):
     1. `adams_test_fresh` — fresh install, NO chart of accounts. Exposes
        env-sensitivity: 4 tests error (account.tax without tax_group_id —
        AUDIT.md ENV-1). Baseline 2026-06-10: 0 failed, 4 errors of 532.
-    2. `adams_strict1` — install `l10n_generic_coa` + the 3 modules, then
-       apply the chart via odoo shell
-       (`env['account.chart.template'].try_loading('generic_coa', env.company)`),
-       then run tests via `-u` (exercises the upgraded/existing-data path,
-       not fresh-install-only). Baseline 2026-06-10: 0 failed, 0 errors of
-       532 (shopify_connector_pro 280 + shopify_simulator 241 at_install,
-       11 post-install).
+    2. `adams_strict1` — install the 3 modules (NOTE 2026-06-11:
+       `l10n_generic_coa` is NOT a module in Odoo 19 — the loader ignores
+       it with "invalid module names"; the chart comes entirely from the
+       next step), then apply the chart via odoo shell
+       (`env['account.chart.template'].try_loading('generic_coa', env.company)`
+       + `env.cr.commit()`), then run tests via `-u` (exercises the
+       upgraded/existing-data path, not fresh-install-only). Baseline
+       2026-06-10: 0 failed, 0 errors of 532; reproduced 2026-06-11
+       after rebuild: 0 failed, 0 errors of 552.
     3. `adams_strict_vat` — clone of adams_strict1 with
        `env.company.account_price_include = 'tax_included'` (verified field,
        odoo/addons/account/models/company.py:282), EUR activated,
-       base.group_multi_currency implied for internal users. Baseline
-       2026-06-10: 1 failed, 0 errors of 532 — caught AUD-001 (VAT-inclusive
-       order import totals).
+       base.group_multi_currency implied for internal users, AND (added
+       2026-06-11 per Ahmed) an explicit EUR exchange rate
+       (res.currency.rate, 1 USD = 0.92 EUR) so tax-included AND
+       multi-currency conditions hold SIMULTANEOUSLY — the
+       AUD-019/020/001 compound-bug surface. Build:
+       `createdb -T adams_strict1 adams_strict_vat`, then odoo shell for
+       the three settings + rate + `env.cr.commit()`. Baseline
+       2026-06-10: 1 failed, 0 errors of 532 — caught AUD-001
+       (VAT-inclusive order import totals); reproduced 2026-06-11 after
+       rebuild: 2 failed, 0 errors of 552 (the known AUD-001 pair, both
+       clear at 3e).
 - Strict DB: its definition is not recorded anywhere; we derive it. For each
   financial bug in LEGACY_NOTES.md §1, determine what DB condition surfaced
   it (localization/chart of accounts, multi-currency, rounding settings,

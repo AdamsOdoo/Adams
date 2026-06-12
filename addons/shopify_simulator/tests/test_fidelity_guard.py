@@ -24,6 +24,7 @@ ORDER_NODE_FIELDS = {
     'displayFinancialStatus', 'displayFulfillmentStatus',
     'cancelledAt', 'closed', 'note', 'tags',
     'currencyCode', 'presentmentCurrencyCode',
+    'taxesIncluded',
     'totalPriceSet', 'subtotalPriceSet', 'totalShippingPriceSet',
     'totalTaxSet', 'totalDiscountsSet', 'discountCodes',
     'customer', 'shippingAddress', 'billingAddress',
@@ -95,6 +96,10 @@ class TestOrderFidelity(SimulatorTestCase):
         sl_node = sl['edges'][0]['node']
         self.assertIn('title', sl_node)
         self.assertIn('originalPriceSet', sl_node)
+        # FETCH_ORDERS requests taxLines on shippingLines (item 3c)
+        self.assertIn('taxLines', sl_node,
+                      "shipping line node missing 'taxLines'")
+        self.assertIsInstance(sl_node['taxLines'], list)
 
     def test_order_shipping_line_node_money_set(self):
         """Shipping line originalPriceSet must have shopMoney + presentmentMoney."""

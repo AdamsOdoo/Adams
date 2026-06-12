@@ -138,9 +138,10 @@ class ShopifyWebhookController(http.Controller):
 
         WebhookLog = request.env['shopify.webhook.log'].sudo()
 
-        # ── Deduplicate by webhook_id ───────────────────────
+        # ── Deduplicate by webhook_id (per backend, AUD-024) ─
         if webhook_id:
             existing = WebhookLog.search([
+                ('backend_id', '=', backend_id),
                 ('webhook_id', '=', webhook_id),
             ], limit=1)
             if existing:

@@ -1,7 +1,7 @@
 # Part of Shopify Connector Pro. See LICENSE file for full copyright and licensing details.
 import logging
 
-from odoo import _, models
+from odoo import _, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -23,6 +23,15 @@ mutation OrderMarkAsPaid($input: OrderMarkAsPaidInput!) {
 
 class AccountMove(models.Model):
     _inherit = 'account.move'
+
+    shopify_refund_gid = fields.Char(
+        string='Shopify Refund ID',
+        index=True,
+        copy=False,
+        help='Shopify refund GID this credit note was created from. '
+             'Idempotency anchor for refund import (AUD-021): a refund '
+             'is never booked twice even if its binding record is lost.',
+    )
 
     def action_post(self):
         res = super().action_post()
@@ -77,6 +86,23 @@ class AccountMove(models.Model):
                     _logger.warning(
                         "Failed to mark Shopify order %s as paid: %s",
                         binding.shopify_order_name, e,
+                    )
+                    # Visible divergence (AUD-006): Odoo shows the
+                    # invoice paid-tracked, Shopify still shows unpaid.
+                    order.activity_schedule(
+                        'mail.mail_activity_data_warning',
+                        summary=_("Shopify not marked as paid"),
+                        note=_(
+                            "Invoice %(move)s was posted but marking "
+                            "Shopify order %(order_name)s as paid "
+                            "failed: %(error)s. Shopify still shows the "
+                            "order unpaid — mark it as paid in the "
+                            "Shopify admin, or re-post after fixing the "
+                            "connection.",
+                            move=move.name,
+                            order_name=binding.shopify_order_name,
+                            error=e,
+                        ),
                     )
 
     def _shopify_reverse_sync_refund(self, move):
@@ -152,6 +178,23 @@ class AccountMove(models.Model):
                     _logger.warning(
                         "Failed to create Shopify refund for order %s: %s",
                         binding.shopify_order_name, e,
+                    )
+                    # Visible divergence (AUD-006): the credit note is
+                    # posted in Odoo but Shopify has no refund — the
+                    # money story differs between systems.
+                    order.activity_schedule(
+                        'mail.mail_activity_data_warning',
+                        summary=_("Shopify refund not created"),
+                        note=_(
+                            "Credit note %(move)s is posted in Odoo but "
+                            "creating the refund on Shopify order "
+                            "%(order_name)s failed: %(error)s. Create "
+                            "the refund manually in the Shopify admin "
+                            "so both systems tell the same money story.",
+                            move=move.name,
+                            order_name=binding.shopify_order_name,
+                            error=e,
+                        ),
                     )
 
     def button_cancel(self):

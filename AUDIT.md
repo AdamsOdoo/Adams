@@ -7,7 +7,141 @@ Entries recorded before Tier 1 begins are marked PRELIMINARY: they came out of
 STEP 0 environment runs, carry failing-test or log evidence, and still need the
 full source-path walk during Tier 1 before any fix is proposed.
 
+## Status updates — 2026-06-11 (Tier 1 checkpoint approved; Phase 2 granted)
+
+Statuses below OVERRIDE the per-entry status lines (sequence in FINALIZE.md):
+
+- **fixed (pending Odoo.sh confirmation):** AUD-019 — fix applied 2026-06-11
+  (refund_sync.py: cn_currency from posted invoice/order + mismatch guard +
+  currency_id on create). Fail-before 1 failed of 1; pass-after 0/0 of 3
+  (TestRefundCreditNoteMultiCurrency, adams_strict_vat); no regression:
+  0/0 of 535 (adams_strict1 full), 1/0 of 535 (adams_strict_vat full, sole
+  failure = known AUD-001).
+- **fixed (pending Odoo.sh confirmation):** AUD-020 — fix applied 2026-06-11
+  (order_sync.py: visible currency auto-activation, usable-rate hierarchy
+  with company-scoped order-dated pair rates, company-mode conversion,
+  error-state binding + pending-gated retry path). Fail-before 3 failed of
+  3; pass-after 0/0 of 6 (TestOrderImportCurrency) + retry-idempotency and
+  pair-vs-daily-rate conversion tests; full suites strict1 0/0 of 541,
+  strict_vat 1/0 of 541 (sole failure = known AUD-001). One regression
+  caught and corrected during verification: the retry branch initially
+  hijacked 'synced' bindings without odoo_id, breaking the webhook
+  write_date invariant (test_refund_scan_pruning) — now gated on
+  sync_status='pending'.
+- **approved:** AUD-001, AUD-015, AUD-016,
+  AUD-018 (item 3 — VAT-inclusive support now IN v1 scope, total-check guard
+  permanent); AUD-003, AUD-004, AUD-005, AUD-006 (item 4); AUD-021, AUD-022
+  (item 5).
+- **approved as ride-along (same-file, small-diff only):** AUD-017 (item 3),
+  AUD-007/008/011/012/013 (item 4), AUD-023 (item 5).
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-017 (item 3d — amount_type='percent' filter on
+  the rate fallback; deterministic-ordering sub-item verified moot: core
+  account.tax _order='sequence,id') and the AUD-016 remainder (dropped
+  tax lines now schedule one deduplicated warning activity per order).
+  Evidence in FINALIZE.md item 3d trail; consequence statement in
+  MORNING_REVIEW.md §1.
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-021, AUD-022 and rider AUD-023 (item 5 —
+  per-refund savepoint atomicity, shopify_refund_gid recovery guard on
+  account.move, cumulative over-refund guard with visible degradation
+  and retryable error binding; non-product drop logged, shipping refund
+  account via get_product_accounts). Evidence in FINALIZE.md item 5
+  trail; consequence statement in MORNING_REVIEW.md §1.
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-003, AUD-004, AUD-005, AUD-006 and ride-along
+  minors AUD-007, AUD-008, AUD-011, AUD-012, AUD-013 (item 4 —
+  visibility batch: cron counters surfaced via _notify_sync_error,
+  webhook re-raise into the retry/dead-letter machine, reverse-sync
+  failure activities, reconcile/cancel-failure activities, ERROR+
+  traceback on unexpected raises incl. the activity helper itself).
+  Evidence in FINALIZE.md item 4 trail; consequence statement in
+  MORNING_REVIEW.md §1. AUD-008 note: the binding still advances to
+  voided when the draft-invoice cancel fails — now WITH a visible
+  activity; "do not return True" was considered and rejected as a
+  behavior change beyond the approved visibility scope.
+- **fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+  overnight window:** AUD-018 and AUD-001 (item 3e — taxesIncluded
+  fetched and honored: flavor-preferring rate fallback + price/flavor
+  alignment on product and shipping lines; simulator emits the flag).
+  Both strict profiles fully green: strict1 0/0 of 562, strict_vat 0/0
+  of 562 (standing AUD-001 pair cleared). Evidence in FINALIZE.md item
+  3e trail; consequence statement in MORNING_REVIEW.md §1. With 3b+3c+
+  3d+3e, AUD-015 and AUD-016 are also fully closed (same gating).
+- **GREEN BUILD ledger (2026-06-11, local proxy):** class (c) noise, listed
+  once per method step 2: docutils "(ERROR/3) Unexpected indentation" +
+  "(WARNING/2) Block quote ends without a blank line" during install =
+  CORE `mail` manifest description RST (proven by rendering every
+  installed module's description; ours are clean). Container-only
+  "Running as user 'root'" notice. Zero (a)-class lines on fresh-install
+  AND upgrade logs of all 4 modules at warn level.
+- **open (re-prioritized at later checkpoints):** AUD-009, AUD-010, AUD-014,
+  ENV-1.
+
 ---
+
+## Tier 2 (data integrity & security) — opened 2026-06-12 overnight
+
+Method: fresh-context subagent fan-out scan + my source verification of
+every reported candidate (rule 1). Surfaces verified CLEAN by the scan
+and spot-checked: timing-safe HMAC (controllers/webhook.py:226), shop-
+domain check, HMAC-before-rate-limit ordering, 10MB payload cap,
+parameterized SQL only (customer_sync.py:136, inventory_sync.py:36),
+record rules with backend scoping, admin-only token fields, Fernet+
+PBKDF2 credential crypto, advisory-lock dedup in customer/inventory
+sync. Tier 1 deferred lead (positional variant matching,
+product_sync.py:240) remains open for this tier — not yet re-verified.
+
+## AUD-024 — Webhook dedup is global, not per backend
+
+- **Severity:** major (silent inbound-event loss in multi-backend setups)
+- **Status:** fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+- **Evidence:** models/shopify_webhook_log.py:48-51 — `UNIQUE(webhook_id)`
+  without backend_id; controllers/webhook.py:142-146 — dedup search
+  `[('webhook_id','=',webhook_id)]` unscoped (every other dedup in the
+  module is backend-scoped, incl. the fingerprint fallback right below).
+- **Description:** when one Shopify shop feeds two backends (e.g. two
+  companies in one DB), the second backend's delivery of the same
+  webhook id is silently dropped: constraint rejects the log, controller
+  answers 200 'ok'. Cross-shop UUID collision is negligible; the
+  same-shop-two-backends case is real.
+- **Fix:** constraint → UNIQUE(backend_id, webhook_id); controller
+  search scoped by backend_id. Fail-before 1 error of 2 (constraint
+  violation through the model), pass-after 0/0 of 2
+  (test_tier2_webhook_integrity.py, adams_strict1; commit 5bdfc40).
+
+## AUD-025 — GDPR customers/redact leaves PII on child contacts and parent city/zip
+
+- **Severity:** major (GDPR compliance)
+- **Status:** fixed (PENDING RETROACTIVE GO + Odoo.sh confirmation), 2026-06-12
+- **Evidence:** models/shopify_webhook_log.py:444-453 — redaction wrote
+  only parent name/email/phone/street/street2; order import creates
+  delivery/invoice CHILD partners carrying the customer's address+phone
+  (order_sync.py `_get_or_create_address`, used for shippingAddress /
+  billingAddress), and parent city/zip stayed readable.
+- **Fix:** parent write extended with city/zip; all partner.child_ids
+  redacted (name → "Redacted Contact #id", email/phone/street/street2/
+  city/zip cleared). Fail-before 1 failed of 2 → pass-after 0/0 of 2
+  (test_tier2_webhook_integrity.py, adams_strict1).
+
+## AUD-026 — Webhook payload retention: plaintext PII surface (decision item)
+
+- **Severity:** minor (deliberate design with mitigations; flagged as a
+  data-exposure surface)
+- **Status:** open — decision for Ahmed (Tier 6 / hardening pass)
+- **Evidence:** controllers/webhook.py:185 stores full payload JSON;
+  models/shopify_webhook_log.py:32 restricts the field to
+  group_shopify_user (not admin); 90-day cleanup exists
+  (shopify_webhook_log.py:89-100).
+- **Description:** payloads are needed for the retry/dead-letter machine
+  (AUD-005), so they cannot simply be dropped; but they contain customer
+  PII readable by every connector user and live in DB backups for up to
+  90 days. Options, cheapest first: (a) tighten field group to
+  group_shopify_admin; (b) shorten retention for state='done' logs
+  (payload no longer needed once processed); (c) encrypt at rest via
+  shopify.crypto (cost: dead-letter debugging friction). (a)+(b)
+  recommended; not implemented — visibility/retention trade-off is a
+  product decision.
 
 ## AUD-001 — Tax resolution on imported orders: branch map, and wrong invoices on tax-included companies
 

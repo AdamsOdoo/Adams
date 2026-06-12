@@ -6,6 +6,13 @@ from . import test_backend
 from . import test_product_sync
 from . import test_customer_sync
 from . import test_order_import
+from . import test_order_currency
+from . import test_refund_idempotency
+from . import test_tax_fallback
+from . import test_tier2_webhook_integrity
+from . import test_taxes_included_import
+from . import test_total_guard
+from . import test_visibility_batch
 from . import test_inventory_sync
 from . import test_promoter
 from . import test_fulfillment_sync
@@ -30,4 +37,5 @@ from . import test_credential_encryption
 from . import test_simulator_fidelity_coverage
 from . import test_account_validation
 from . import test_refund_scan_pruning
+from . import test_refund_multicurrency
 from . import test_import_batch_visibility

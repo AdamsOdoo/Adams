@@ -56,6 +56,10 @@ class SimShopifyOrder(models.Model):
     tags = fields.Char()
     currency_code = fields.Char(default='USD')
     presentment_currency_code = fields.Char(default='USD')
+    # Shopify Order.taxesIncluded (Boolean!): line/shipping prices are
+    # tax-inclusive when true. Default False = Shopify's default
+    # (tax-exclusive pricing).
+    taxes_included = fields.Boolean(default=False)
 
     total_price = fields.Float(default=0.0)
     subtotal_price = fields.Float(default=0.0)
@@ -218,6 +222,7 @@ class SimShopifyOrder(models.Model):
             'tags': [t.strip() for t in (self.tags or '').split(',') if t.strip()],
             'currencyCode': cc,
             'presentmentCurrencyCode': pc,
+            'taxesIncluded': bool(self.taxes_included),
             'totalPriceSet': _money_set(self.total_price, cc, pc),
             'subtotalPriceSet': _money_set(self.subtotal_price, cc, pc),
             'totalShippingPriceSet': _money_set(self.total_shipping, cc, pc),
@@ -342,13 +347,29 @@ class SimShopifyShippingLine(models.Model):
     title = fields.Char(default='Standard Shipping')
     code = fields.Char(default='standard')
     price = fields.Float(default=0.0)
+    tax_amount = fields.Float(default=0.0)
+    tax_rate = fields.Float(
+        default=0.0, help='Tax rate as decimal, e.g. 0.10 for 10%',
+    )
 
     def _to_graphql_node(self, currency='USD', presentment_currency='USD'):
         self.ensure_one()
+        # Shopify ShippingLine carries taxLines: [TaxLine!]! with the
+        # same shape as line-item tax lines (title/rate/priceSet).
+        taxes = []
+        if self.tax_amount:
+            taxes.append({
+                'title': 'Tax',
+                'rate': self.tax_rate,
+                'priceSet': _money_set(
+                    self.tax_amount, currency, presentment_currency,
+                ),
+            })
         return {
             'title': self.title or '',
             'code': self.code or '',
             'originalPriceSet': _money_set(
                 self.price, currency, presentment_currency,
             ),
+            'taxLines': taxes,
         }

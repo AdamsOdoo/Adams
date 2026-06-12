@@ -24,6 +24,11 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
             'list_price': 29.99,
             'default_code': 'WIDGET-001',
         })
+        # The fixture orders carry no taxLines and their totalPriceSet is
+        # the plain line sum — clear the company default sale tax so the
+        # fixture is internally consistent (the default-tax leak on
+        # imported lines is AUD-016, covered by its own tests).
+        self.product.taxes_id = [(5, 0, 0)]
         self._set_product_income_account(self.product)
         # Create variant binding so order can resolve the product
         product_binding = self.env['shopify.product.binding'].create({
@@ -53,7 +58,7 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
             'closed': False,
             'note': 'Test order',
             'tags': [],
-            'totalPriceSet': {'shopMoney': {'amount': '29.99', 'currencyCode': 'USD'}},
+            'totalPriceSet': {'shopMoney': {'amount': '59.98', 'currencyCode': 'USD'}},
             'customer': {
                 'id': 'gid://shopify/Customer/500',
                 'email': 'buyer@example.com',
@@ -541,12 +546,27 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
             "Product line must carry the 10% tax from rate-matching",
         )
 
-        # ── Invoice must exist and be posted ──
+        # ── Invoice must exist: posted, or visibly blocked by the
+        # total-check guard (DEC-011). With shipping taxes resolved
+        # (item 3c) this fixture posts on tax-excluded companies; on
+        # tax-included companies the guard correctly holds the invoice
+        # in draft WITH the mismatch activity until item 3e.
         invoices = order.invoice_ids.filtered(
-            lambda i: i.move_type == 'out_invoice' and i.state == 'posted'
+            lambda i: i.move_type == 'out_invoice' and i.state != 'cancel'
         )
-        self.assertTrue(invoices, "Auto-invoice must be created and posted")
+        self.assertTrue(invoices, "Auto-invoice must be created")
         invoice = invoices[0]
+        if invoice.state != 'posted':
+            guard_activity = self.env['mail.activity'].search([
+                ('res_model', '=', 'sale.order'),
+                ('res_id', '=', order.id),
+                ('summary', 'ilike', 'total mismatch'),
+            ], limit=1)
+            self.assertTrue(
+                guard_activity,
+                "An unposted auto-invoice is only acceptable when the "
+                "total-check guard blocked it visibly",
+            )
 
         # ── Invoice product line must carry tax ──
         inv_product_lines = invoice.invoice_line_ids.filtered(
@@ -559,21 +579,391 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
             "Invoice product line must carry the 10% tax",
         )
 
-        # ── amount_total must include tax ──
-        # Product: 2 × $50 = $100, tax at 10% = $10, shipping = $10.
-        # Odoo may auto-apply default taxes to the shipping product
-        # via _compute_tax_ids, so we assert the minimum: untaxed
-        # base is $110 and tax amount includes at least the $10
-        # product tax.
+        # ── totals must match the Shopify charge exactly ──
+        # Product: 2 × $50 = $100, tax at 10% = $10, shipping = $10
+        # with no taxLines (item 3c: Shopify is authoritative for
+        # shipping taxes too — no default-tax drift on the shipping
+        # product).
         self.assertAlmostEqual(
             invoice.amount_untaxed, 110.0, places=2,
             msg="Untaxed total: $100 product + $10 shipping = $110",
         )
-        self.assertGreaterEqual(
-            invoice.amount_tax, 10.0,
-            msg="Tax amount must include at least $10 product tax",
+        self.assertAlmostEqual(
+            invoice.amount_tax, 10.0, places=2,
+            msg="Tax must be exactly the $10 product tax — untaxed "
+                "Shopify shipping must not carry any tax",
         )
-        self.assertGreater(
-            invoice.amount_total, 110.0,
-            msg="Invoice total must exceed untaxed amount (tax present)",
+        self.assertAlmostEqual(
+            invoice.amount_total, 120.0, places=2,
+            msg="Invoice total must equal the Shopify charge",
         )
+
+
+class TestUntaxedOrderImport(ShopifyAccountingMixin, TransactionCase):
+    """AUD-016 (item 3b): Shopify is authoritative for line taxes.
+    Lines whose Shopify taxes resolve to nothing must carry NO taxes —
+    never the product's default sale tax."""
+
+    def setUp(self):
+        super().setUp()
+        self.backend = self.env['shopify.backend'].create({
+            'name': 'Untaxed Test Store',
+            'shop_url': 'untaxed-test.myshopify.com',
+            'access_token': 'shpat_untaxed_test',
+            'company_id': self.env.company.id,
+            'auto_create_invoice': True,
+            'warehouse_id': self.env['stock.warehouse'].search(
+                [('company_id', '=', self.env.company.id)], limit=1,
+            ).id,
+        })
+        # Product DELIBERATELY keeps the company default sale tax —
+        # that leak is exactly what this class tests.
+        self.product = self.env['product.product'].create({
+            'name': 'Default-Taxed Widget',
+            'list_price': 50.0,
+            'default_code': 'DT-WIDGET-1',
+        })
+        self._set_product_income_account(self.product)
+        pb = self.env['shopify.product.binding'].create({
+            'backend_id': self.backend.id,
+            'odoo_id': self.product.product_tmpl_id.id,
+            'shopify_id': 'gid://shopify/Product/7100',
+            'sync_status': 'synced',
+        })
+        self.env['shopify.variant.binding'].create({
+            'backend_id': self.backend.id,
+            'odoo_id': self.product.id,
+            'shopify_id': 'gid://shopify/ProductVariant/7200',
+            'product_binding_id': pb.id,
+            'sync_status': 'synced',
+        })
+        from ..sync.order_sync import OrderImporter
+        self.importer = OrderImporter.__new__(OrderImporter)
+        self.importer.env = self.env
+        self.importer.backend = self.backend
+        self.importer.client = MagicMock()
+        self.importer._currency_cache = {}
+        self.importer._pricelist_cache = {}
+        self.importer._shipping_product = None
+        self.importer._country_cache = {}
+        self.importer._state_cache = {}
+
+    def _node(self, order_id, name, tax_lines):
+        money = lambda amt: {  # noqa: E731
+            'shopMoney': {'amount': amt, 'currencyCode': 'USD'},
+        }
+        return {
+            'id': order_id,
+            'name': name,
+            'createdAt': '2026-06-01T10:00:00Z',
+            'updatedAt': '2026-06-01T10:00:00Z',
+            'displayFinancialStatus': 'PAID',
+            'displayFulfillmentStatus': 'UNFULFILLED',
+            'cancelledAt': None,
+            'closed': False,
+            'note': '',
+            'tags': [],
+            'totalPriceSet': money('100.0'),
+            'customer': {
+                'id': 'gid://shopify/Customer/7500',
+                'email': 'untaxed-buyer@example.com',
+                'firstName': 'Untaxed', 'lastName': 'Buyer',
+            },
+            'shippingAddress': None,
+            'billingAddress': None,
+            'lineItems': {'edges': [{'node': {
+                'id': 'gid://shopify/LineItem/7001',
+                'title': 'Default-Taxed Widget',
+                'quantity': 2,
+                'variant': {
+                    'id': 'gid://shopify/ProductVariant/7200',
+                    'sku': 'DT-WIDGET-1',
+                    'product': {'id': 'gid://shopify/Product/7100'},
+                },
+                'originalUnitPriceSet': money('50.0'),
+                'discountAllocations': [],
+                'taxLines': tax_lines,
+            }}]},
+            'shippingLines': {'edges': []},
+            'refunds': [],
+        }
+
+    def test_tax_exempt_order_carries_no_tax_and_posts(self):
+        """No taxLines from Shopify (tax-exempt sale): the order line
+        must carry NO taxes, totals must equal the Shopify charge, and
+        the auto-invoice must POST (guard satisfied)."""
+        self.importer._import_one(
+            self._node('gid://shopify/Order/7001', '#UT-1001', []), None,
+        )
+        order = self.env['sale.order'].search([
+            ('shopify_order_name', '=', '#UT-1001')], limit=1)
+        self.assertTrue(order, "Order must be imported")
+        line = order.order_line[0]
+        self.assertFalse(
+            line.tax_ids,
+            "AUD-016: tax-exempt Shopify line must not inherit the "
+            "product default sale tax (got %s)" % line.tax_ids.mapped('name'),
+        )
+        self.assertAlmostEqual(order.amount_total, 100.0, places=2)
+        posted = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state == 'posted')
+        self.assertTrue(posted, "Matching untaxed invoice must post")
+        self.assertAlmostEqual(posted[0].amount_total, 100.0, places=2)
+
+    def test_unresolvable_tax_line_no_silent_under_or_over_tax(self):
+        """taxLines present but unmappable (no 7.77% tax exists): the
+        line carries no taxes AND the guard blocks the now-mismatched
+        invoice visibly — no silent wrong money in either direction."""
+        node = self._node('gid://shopify/Order/7002', '#UT-1002', [{
+            'title': 'Mystery Tax', 'rate': 0.0777,
+            'priceSet': {'shopMoney': {
+                'amount': '7.77', 'currencyCode': 'USD'}},
+        }])
+        node['totalPriceSet']['shopMoney']['amount'] = '107.77'
+        self.importer._import_one(node, None)
+        order = self.env['sale.order'].search([
+            ('shopify_order_name', '=', '#UT-1002')], limit=1)
+        self.assertTrue(order, "Order must be imported")
+        self.assertFalse(
+            order.order_line[0].tax_ids,
+            "Unresolvable Shopify tax must not fall back to the product "
+            "default tax",
+        )
+        invoices = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state != 'cancel')
+        self.assertTrue(invoices, "Invoice must be created")
+        self.assertEqual(
+            invoices[0].state, 'draft',
+            "Guard must block the under-taxed invoice (100.00 vs 107.77)",
+        )
+        self.assertTrue(self.env['mail.activity'].search([
+            ('res_model', '=', 'sale.order'),
+            ('res_id', '=', order.id),
+            ('summary', 'ilike', 'total mismatch'),
+        ], limit=1), "Mismatch must be merchant-visible")
+
+
+class TestShippingTaxImport(ShopifyAccountingMixin, TransactionCase):
+    """AUD-015 (item 3c): Shopify is authoritative for SHIPPING taxes.
+    Shipping taxLines must resolve through the same mapping as product
+    lines; shipping with no taxLines must carry NO taxes — never a
+    product default."""
+
+    def setUp(self):
+        super().setUp()
+        self.backend = self.env['shopify.backend'].create({
+            'name': 'Shipping Tax Store',
+            'shop_url': 'shiptax-test.myshopify.com',
+            'access_token': 'shpat_shiptax_test',
+            'company_id': self.env.company.id,
+            'auto_create_invoice': True,
+            'warehouse_id': self.env['stock.warehouse'].search(
+                [('company_id', '=', self.env.company.id)], limit=1,
+            ).id,
+        })
+        self.product = self.env['product.product'].create({
+            'name': 'Shipped Widget',
+            'list_price': 50.0,
+            'default_code': 'SHIP-WIDGET-1',
+        })
+        # Product default tax is not under test here — clear it so the
+        # product line contributes a clean untaxed/taxed base.
+        self.product.taxes_id = [(5, 0, 0)]
+        self._set_product_income_account(self.product)
+        pb = self.env['shopify.product.binding'].create({
+            'backend_id': self.backend.id,
+            'odoo_id': self.product.product_tmpl_id.id,
+            'shopify_id': 'gid://shopify/Product/8100',
+            'sync_status': 'synced',
+        })
+        self.env['shopify.variant.binding'].create({
+            'backend_id': self.backend.id,
+            'odoo_id': self.product.id,
+            'shopify_id': 'gid://shopify/ProductVariant/8200',
+            'product_binding_id': pb.id,
+            'sync_status': 'synced',
+        })
+        # 10% sale tax, pinned tax-EXCLUDED so these tests stay
+        # orthogonal to the AUD-001 tax-included surface (item 3e):
+        # rate-matching fallback must find it on every DB profile.
+        self.tax_10 = self.env['account.tax'].create({
+            'name': 'Shipping Test Tax 10%',
+            'type_tax_use': 'sale',
+            'amount': 10.0,
+            'amount_type': 'percent',
+            'price_include_override': 'tax_excluded',
+            'company_id': self.env.company.id,
+        })
+        from ..sync.order_sync import OrderImporter
+        self.importer = OrderImporter.__new__(OrderImporter)
+        self.importer.env = self.env
+        self.importer.backend = self.backend
+        self.importer.client = MagicMock()
+        self.importer._currency_cache = {}
+        self.importer._pricelist_cache = {}
+        self.importer._shipping_product = None
+        self.importer._country_cache = {}
+        self.importer._state_cache = {}
+
+    def _node(self, order_id, name, total, line_tax_lines,
+              shipping_tax_lines):
+        money = lambda amt: {  # noqa: E731
+            'shopMoney': {'amount': amt, 'currencyCode': 'USD'},
+        }
+        return {
+            'id': order_id,
+            'name': name,
+            'createdAt': '2026-06-01T10:00:00Z',
+            'updatedAt': '2026-06-01T10:00:00Z',
+            'displayFinancialStatus': 'PAID',
+            'displayFulfillmentStatus': 'UNFULFILLED',
+            'cancelledAt': None,
+            'closed': False,
+            'note': '',
+            'tags': [],
+            'totalPriceSet': money(total),
+            'customer': {
+                'id': 'gid://shopify/Customer/8500',
+                'email': 'shiptax-buyer@example.com',
+                'firstName': 'Ship', 'lastName': 'Taxed',
+            },
+            'shippingAddress': None,
+            'billingAddress': None,
+            'lineItems': {'edges': [{'node': {
+                'id': 'gid://shopify/LineItem/8001',
+                'title': 'Shipped Widget',
+                'quantity': 2,
+                'variant': {
+                    'id': 'gid://shopify/ProductVariant/8200',
+                    'sku': 'SHIP-WIDGET-1',
+                    'product': {'id': 'gid://shopify/Product/8100'},
+                },
+                'originalUnitPriceSet': money('50.0'),
+                'discountAllocations': [],
+                'taxLines': line_tax_lines,
+            }}]},
+            'shippingLines': {'edges': [{'node': {
+                'title': 'Standard Shipping',
+                'code': 'standard',
+                'originalPriceSet': money('10.0'),
+                'taxLines': shipping_tax_lines,
+            }}]},
+            'refunds': [],
+        }
+
+    def _shipping_line(self, order):
+        line = order.order_line.filtered(
+            lambda l: l.product_id.default_code == 'SHOPIFY-SHIPPING'
+            or (l.product_id
+                and l.product_id == self.backend.shipping_product_id)
+        )
+        self.assertTrue(line, "Shipping line must exist on the order")
+        return line
+
+    def test_taxed_shipping_line_carries_resolved_tax(self):
+        """Shopify taxed shipping (10% on $10): the shipping SO line
+        must carry the rate-matched tax, totals must equal the Shopify
+        charge, and the auto-invoice must POST."""
+        tax_line = [{
+            'title': 'VAT', 'rate': 0.1,
+            'priceSet': {'shopMoney': {
+                'amount': '1.00', 'currencyCode': 'USD'}},
+        }]
+        node = self._node(
+            'gid://shopify/Order/8001', '#ST-1001', '121.00',
+            line_tax_lines=[{
+                'title': 'VAT', 'rate': 0.1,
+                'priceSet': {'shopMoney': {
+                    'amount': '10.00', 'currencyCode': 'USD'}},
+            }],
+            shipping_tax_lines=tax_line,
+        )
+        self.importer._import_one(node, None)
+        order = self.env['sale.order'].search([
+            ('shopify_order_name', '=', '#ST-1001')], limit=1)
+        self.assertTrue(order, "Order must be imported")
+        ship_line = self._shipping_line(order)
+        self.assertEqual(
+            ship_line.tax_ids, self.tax_10,
+            "AUD-015: shipping taxLines must resolve to the 10%% tax "
+            "(got %s)" % ship_line.tax_ids.mapped('name'),
+        )
+        posted = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state == 'posted')
+        self.assertTrue(
+            posted,
+            "Invoice matching the Shopify charge must post "
+            "(states: %s)" % order.invoice_ids.mapped('state'),
+        )
+        self.assertAlmostEqual(posted[0].amount_untaxed, 110.0, places=2)
+        self.assertAlmostEqual(posted[0].amount_tax, 11.0, places=2)
+        self.assertAlmostEqual(posted[0].amount_total, 121.0, places=2)
+
+    def test_untaxed_shipping_no_default_tax_leak(self):
+        """Merchant-configured shipping product carries a default sale
+        tax, but Shopify charged NO shipping tax: the shipping line must
+        carry no taxes and the invoice must post at the exact charge."""
+        ship_product = self.env['product.product'].create({
+            'name': 'Configured Shipping',
+            'default_code': 'SHOPIFY-SHIPPING',
+            'type': 'service',
+            'list_price': 0,
+            'taxes_id': [(6, 0, self.tax_10.ids)],
+        })
+        self._set_product_income_account(ship_product)
+        self.backend.shipping_product_id = ship_product
+        node = self._node(
+            'gid://shopify/Order/8002', '#ST-1002', '110.00',
+            line_tax_lines=[], shipping_tax_lines=[],
+        )
+        self.importer._import_one(node, None)
+        order = self.env['sale.order'].search([
+            ('shopify_order_name', '=', '#ST-1002')], limit=1)
+        self.assertTrue(order, "Order must be imported")
+        ship_line = self._shipping_line(order)
+        self.assertFalse(
+            ship_line.tax_ids,
+            "AUD-015: untaxed Shopify shipping must not inherit the "
+            "shipping product's default tax (got %s)"
+            % ship_line.tax_ids.mapped('name'),
+        )
+        posted = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state == 'posted')
+        self.assertTrue(
+            posted,
+            "Invoice matching the Shopify charge must post "
+            "(states: %s)" % order.invoice_ids.mapped('state'),
+        )
+        self.assertAlmostEqual(posted[0].amount_total, 110.0, places=2)
+
+    def test_auto_created_shipping_product_has_no_default_taxes(self):
+        """The lazily auto-created SHOPIFY-SHIPPING product must carry
+        no default sale taxes: shipping tax always comes from Shopify
+        taxLines, and other paths (refund credit notes) must not pick
+        up a company default from this product."""
+        existing = self.env['product.product'].search([
+            ('default_code', '=', 'SHOPIFY-SHIPPING')])
+        existing.unlink()  # transaction rolls back after the test
+        node = self._node(
+            'gid://shopify/Order/8003', '#ST-1003', '110.00',
+            line_tax_lines=[], shipping_tax_lines=[],
+        )
+        self.importer._import_one(node, None)
+        ship_product = self.env['product.product'].search([
+            ('default_code', '=', 'SHOPIFY-SHIPPING')], limit=1)
+        self.assertTrue(ship_product, "Shipping product must be created")
+        self.assertFalse(
+            ship_product.taxes_id,
+            "Auto-created shipping product must have NO default sale "
+            "taxes (got %s)" % ship_product.taxes_id.mapped('name'),
+        )
+        order = self.env['sale.order'].search([
+            ('shopify_order_name', '=', '#ST-1003')], limit=1)
+        posted = order.invoice_ids.filtered(
+            lambda i: i.move_type == 'out_invoice' and i.state == 'posted')
+        self.assertTrue(
+            posted,
+            "Invoice matching the Shopify charge must post "
+            "(states: %s)" % order.invoice_ids.mapped('state'),
+        )
+        self.assertAlmostEqual(posted[0].amount_total, 110.0, places=2)

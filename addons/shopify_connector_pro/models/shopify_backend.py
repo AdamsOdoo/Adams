@@ -1179,7 +1179,17 @@ class ShopifyBackend(models.Model):
                 syncer = PayoutSync(
                     self.with_company(backend.company_id).env, backend,
                 )
-                syncer.import_payouts()
+                # Handled failures are counted, not raised — surface
+                # them like escaped exceptions (AUD-004, rule 5).
+                _success, errors = syncer.import_payouts()
+                if errors:
+                    backend._notify_sync_error(
+                        'payouts', errors,
+                        'Payout import finished with %d error(s) — see '
+                        'the server log for details. Payout-based '
+                        'reconciliation may be incomplete until this is '
+                        'resolved.' % errors,
+                    )
             except Exception as e:
                 _logger.exception("Payout import failed for backend %s", backend.id)
                 backend._notify_sync_error('payouts', 1, str(e))
@@ -1193,7 +1203,19 @@ class ShopifyBackend(models.Model):
                 syncer = RefundSync(
                     self.with_company(backend.company_id).env, backend,
                 )
-                syncer.import_refunds()
+                # Handled failures are counted, not raised — surface
+                # them like escaped exceptions (AUD-003, rule 5): a
+                # persistent fetch failure means Shopify shows refunds
+                # that Odoo never books.
+                _success, errors, _skipped = syncer.import_refunds()
+                if errors:
+                    backend._notify_sync_error(
+                        'refunds', errors,
+                        'Refund import finished with %d error(s) — see '
+                        'the server log for details. Credit notes for '
+                        'the affected Shopify refunds were NOT created.'
+                        % errors,
+                    )
             except Exception as e:
                 _logger.exception("Refund import failed for backend %s", backend.id)
                 backend._notify_sync_error('refunds', 1, str(e))

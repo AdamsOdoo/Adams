@@ -9,7 +9,12 @@ import logging
 
 from odoo import _, fields
 
-from .accounting import validate_order_income_accounts, schedule_account_activity
+from .accounting import (
+    check_total_against_shopify,
+    schedule_account_activity,
+    schedule_total_mismatch_activity,
+    validate_order_income_accounts,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -137,6 +142,17 @@ class PaymentStatusHandler:
                     products=missing,
                 )
                 return False
+            # Permanent total-check guard (DEC-011): never post an
+            # invoice whose total differs from the Shopify charged
+            # total stamped on the binding.
+            ok, tol = check_total_against_shopify(
+                invoice, binding.shopify_total_amount,
+            )
+            if not ok:
+                schedule_total_mismatch_activity(
+                    order, invoice, binding.shopify_total_amount, tol,
+                )
+                return False
             try:
                 with self.env.cr.savepoint():
                     invoice.with_context(**ctx).action_post()
@@ -198,6 +214,16 @@ class PaymentStatusHandler:
                                 order.name,
                             )
                             return False
+                        # Permanent total-check guard (DEC-011)
+                        ok, tol = check_total_against_shopify(
+                            invoice, binding.shopify_total_amount,
+                        )
+                        if not ok:
+                            schedule_total_mismatch_activity(
+                                order, invoice,
+                                binding.shopify_total_amount, tol,
+                            )
+                            return False
                         invoice.with_context(**ctx).action_post()
                     _logger.info(
                         "Created and posted invoice %s for order %s",
@@ -257,6 +283,15 @@ class PaymentStatusHandler:
                     products=missing,
                 )
                 return False
+            # Permanent total-check guard (DEC-011)
+            ok, tol = check_total_against_shopify(
+                invoice, binding.shopify_total_amount,
+            )
+            if not ok:
+                schedule_total_mismatch_activity(
+                    order, invoice, binding.shopify_total_amount, tol,
+                )
+                return False
             try:
                 with self.env.cr.savepoint():
                     invoice.with_context(**ctx).action_post()
@@ -306,6 +341,16 @@ class PaymentStatusHandler:
                 _logger.warning(
                     "Failed to cancel draft invoice for order %s: %s", order.name, e,
                 )
+                # The binding still advances to voided — the live draft
+                # invoice must not stay invisible (AUD-008).
+                self._schedule_activity(
+                    order,
+                    _("Payment voided/expired on Shopify but draft "
+                      "invoice %(inv)s could not be cancelled: "
+                      "%(error)s. Cancel or credit it manually so it "
+                      "is not posted later.",
+                      inv=draft_invoices[0].name, error=e),
+                )
 
         # If there's a posted invoice, we CANNOT auto-cancel — need manual credit note
         posted_invoices = order.invoice_ids.filtered(
@@ -326,6 +371,13 @@ class PaymentStatusHandler:
                 _logger.info("Cancelled order %s after Shopify void", order.name)
             except Exception as e:
                 _logger.warning("Failed to cancel order %s after Shopify void: %s", order.name, e)
+                # Same visibility as the 'sale' branch below (AUD-008)
+                self._schedule_activity(
+                    order,
+                    _("Payment voided on Shopify. Order could not be "
+                      "auto-cancelled: %(error)s. Review and cancel it "
+                      "manually.", error=e),
+                )
         elif order.state == 'sale':
             # Check if anything shipped
             done_pickings = order.picking_ids.filtered(lambda p: p.state == 'done')
@@ -479,6 +531,16 @@ class PaymentStatusHandler:
                 "failed: %s — manual reconciliation required.",
                 order_binding.shopify_order_name, e,
             )
+            # "Manual reconciliation required" must reach a human
+            # (AUD-007) — the payment exists, only the linkage failed.
+            self._schedule_activity(
+                order_binding.odoo_id,
+                _("Payment was registered for Shopify order %(name)s "
+                  "but could not be reconciled with invoice %(inv)s: "
+                  "%(error)s. Reconcile them manually in Accounting.",
+                  name=order_binding.shopify_order_name,
+                  inv=invoice.name, error=e),
+            )
 
         _logger.info(
             "Payment registered for order %s: %s %s (journal: %s)",
@@ -599,5 +661,11 @@ class PaymentStatusHandler:
                 summary=_("Shopify Payment Status Change"),
                 note=note,
             )
-        except Exception as e:
-            _logger.warning("Could not schedule activity on order %s: %s", order.name, e)
+        except Exception:
+            # Keep the guard (an activity failure must never roll back
+            # a payment) but make it detectable: ERROR with traceback
+            # (AUD-013) — every visible degradation in this file
+            # depends on this helper.
+            _logger.exception(
+                "Could not schedule activity on order %s", order.name,
+            )

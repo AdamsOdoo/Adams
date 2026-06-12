@@ -48,7 +48,12 @@ class RefundImporter:
                 continue
 
             try:
-                self._import_one_refund(refund_data, order_binding)
+                # One savepoint per refund (AUD-021): the posted credit
+                # note and its binding are atomic — a failure between
+                # them must not leave an orphaned credit note that
+                # duplicates on the next sync.
+                with self.env.cr.savepoint():
+                    self._import_one_refund(refund_data, order_binding)
                 success += 1
             except Exception as e:
                 _logger.warning("Failed to import refund %s: %s", shopify_refund_id, e)
@@ -173,6 +178,28 @@ class RefundImporter:
         - Wraps create+post in a savepoint to isolate SQL failures
         - Schedules a visible activity on the sale order when creation fails
         """
+        # ── Refund-GID recovery guard (AUD-021) ────────────────
+        # The binding-existence check is the primary dedup; this stamp
+        # search is the recovery net (mirrors the payment memo
+        # pattern): if a credit note for this exact Shopify refund
+        # already exists — e.g. the binding was lost — reuse it,
+        # never book the refund twice.
+        refund_gid = refund_data.get('id')
+        if refund_gid:
+            existing_cn = self.env['account.move'].search([
+                ('shopify_refund_gid', '=', refund_gid),
+                ('move_type', '=', 'out_refund'),
+                ('state', '!=', 'cancel'),
+                ('company_id', '=', self.backend.company_id.id),
+            ], limit=1)
+            if existing_cn:
+                _logger.info(
+                    "Refund %s already booked as credit note %s — "
+                    "reusing it (recovery guard).",
+                    refund_gid, existing_cn.name,
+                )
+                return existing_cn
+
         # Prefer the journal from an existing posted invoice; fall back to
         # any sales journal in the backend's company.
         posted_invoices = order.invoice_ids.filtered(
@@ -261,6 +288,16 @@ class RefundImporter:
                     if journal_default_account:
                         line_vals['account_id'] = journal_default_account.id
                     else:
+                        # Dropped line is recovered untaxed by the
+                        # auto-balance delta below — log it so the gross
+                        # adjustment is explainable (AUD-023).
+                        _logger.warning(
+                            "Refund %s on order %s: non-product line "
+                            "(%.2f) dropped — no journal default "
+                            "account; amount recovered via the "
+                            "balancing adjustment line.",
+                            refund_data.get('id'), order.name, amt,
+                        )
                         continue
                     # Non-product line: include tax in amount if present
                     if tax_amt:
@@ -285,8 +322,20 @@ class RefundImporter:
                     'price_unit': ship_subtotal,
                     'name': 'Shipping Refund',
                 }
+                ship_account = journal_default_account
                 if shipping_product:
                     ship_line['product_id'] = shipping_product.id
+                    # Resolve income account like product lines
+                    # (AUD-023): product → category → journal default
+                    ship_accounts = (
+                        shipping_product.product_tmpl_id
+                        .get_product_accounts(
+                            fiscal_pos=order.fiscal_position_id,
+                        )
+                    )
+                    ship_account = (
+                        ship_accounts.get('income') or ship_account
+                    )
                     # Tax from original invoice shipping line
                     ship_tax_ids = self._find_original_tax_ids(
                         posted_invoices, shipping_product, order,
@@ -297,8 +346,8 @@ class RefundImporter:
                         ship_line['price_unit'] = ship_subtotal + ship_tax
                         ship_line['tax_ids'] = [(5,)]
                         tax_fallback_activities.append('Shipping')
-                if journal_default_account:
-                    ship_line['account_id'] = journal_default_account.id
+                if ship_account:
+                    ship_line['account_id'] = ship_account.id
                 invoice_line_ids.append((0, 0, ship_line))
 
         # ── Order adjustments (rounding / discrepancies) ──────
@@ -353,14 +402,85 @@ class RefundImporter:
             )
             return None
 
+        # ── Credit-note currency (AUD-019) ─────────────────────
+        # The credit note must reconcile against the original invoice, so
+        # it carries the invoice currency (order currency when no invoice
+        # was posted) — never the company currency by default. A refund
+        # reported in a different currency is not converted here: it is
+        # degraded visibly and left retryable after review.
+        cn_currency = (
+            posted_invoices[0].currency_id if posted_invoices
+            else order.currency_id
+        )
+        _, refund_ccy = self._money(refund_data.get('totalRefundedSet'))
+        if refund_ccy and refund_ccy != cn_currency.name:
+            msg = (
+                "Shopify refund %s is in %s but the order/invoice is in %s. "
+                "The credit note was NOT created. Review the refund in "
+                "Shopify and the invoice currency in Odoo, then use Retry "
+                "Sync on the refund binding to create it." % (
+                    refund_data.get('id'), refund_ccy, cn_currency.name,
+                )
+            )
+            _logger.warning("Order %s: %s", order.name, msg)
+            order.activity_schedule(
+                'mail.mail_activity_data_warning',
+                summary="Shopify refund credit note failed",
+                note=msg,
+            )
+            return None
+
+        # ── Cumulative over-refund guard (AUD-022) ─────────────
+        # Shopify itself caps refunds at the captured amount, so a
+        # breach here means an Odoo-side mismatch (partial/edited
+        # invoice, duplicate payloads). Never post credit notes beyond
+        # the posted invoice total: degrade visibly, leave retryable.
+        if posted_invoices:
+            tolerance = 2 * (cn_currency.rounding or 0.01)
+            invoiced_total = sum(posted_invoices.mapped('amount_total'))
+            prior_credit_notes = self.env['account.move'].search([
+                ('move_type', '=', 'out_refund'),
+                ('state', '=', 'posted'),
+                ('company_id', '=', self.backend.company_id.id),
+                ('shopify_refund_gid', '!=', False),
+                ('invoice_origin', '=', order.name),
+            ])
+            cumulative = (
+                sum(prior_credit_notes.mapped('amount_total'))
+                + refund_amount
+            )
+            if cumulative > invoiced_total + tolerance:
+                msg = (
+                    "Shopify refund %s of %s %.2f would bring the total "
+                    "refunded for order %s to %.2f, exceeding the "
+                    "invoiced total of %.2f. The credit note was NOT "
+                    "created. Compare the Shopify refunds with the "
+                    "posted invoice(s) and credit note(s); after "
+                    "correcting the records, use Retry Sync on the "
+                    "refund binding." % (
+                        refund_data.get('id'), cn_currency.name,
+                        refund_amount, order.name, cumulative,
+                        invoiced_total,
+                    )
+                )
+                _logger.warning("Order %s: %s", order.name, msg)
+                order.activity_schedule(
+                    'mail.mail_activity_data_warning',
+                    summary="Shopify refund exceeds invoiced amount",
+                    note=msg,
+                )
+                return None
+
         try:
             with self.env.cr.savepoint():
                 credit_note = self.env['account.move'].with_context(**ctx).create({
                     'move_type': 'out_refund',
                     'partner_id': order.partner_id.id,
                     'journal_id': journal.id,
+                    'currency_id': cn_currency.id,
                     'invoice_origin': order.name,
                     'ref': refund_data.get('note') or 'Shopify Refund',
+                    'shopify_refund_gid': refund_gid,
                     'invoice_line_ids': invoice_line_ids,
                 })
 
