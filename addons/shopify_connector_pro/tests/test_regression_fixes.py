@@ -35,6 +35,7 @@ class TestSyncLoopPrevention(ShopifyAccountingMixin, TransactionCase):
             'auto_handle_payment_transitions': True,
             'reverse_sync_payment': True,
         })
+        self._mock_backend_api_client(self.backend)
 
         self.product = self.env['product.product'].create({
             'name': 'Loop Widget', 'list_price': 100.0,

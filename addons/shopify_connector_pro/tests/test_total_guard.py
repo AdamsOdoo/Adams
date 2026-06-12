@@ -28,6 +28,7 @@ class TestTotalGuardPaymentPath(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        self._mock_backend_api_client(self.backend)
         self.partner = self._create_accounting_partner('Guard Buyer')
         self.product = self.env['product.product'].create({
             'name': 'Guard Widget', 'list_price': 100.0,
@@ -146,6 +147,7 @@ class TestTotalGuardAutoInvoice(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        self._mock_backend_api_client(self.backend)
         self.product = self.env['product.product'].create({
             'name': 'Guard Import Widget',
             'list_price': 50.0,

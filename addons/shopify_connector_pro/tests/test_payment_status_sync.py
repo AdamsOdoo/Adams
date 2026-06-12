@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 from odoo.tests.common import TransactionCase
 
 from .common import ShopifyAccountingMixin
+from odoo.tools import mute_logger
 
 
 class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
@@ -20,6 +21,7 @@ class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
             ).id,
             'auto_handle_payment_transitions': True,
         })
+        self._mock_backend_api_client(self.backend)
         self.partner = self._create_accounting_partner(
             'Test Buyer', email='buyer@example.com',
         )
@@ -159,6 +161,7 @@ class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
             )
         return poisoning_post
 
+    @mute_logger('odoo.sql_db')
     def test_paid_draft_post_failure_no_cursor_poison(self):
         """action_post() failure on a draft must NOT poison the cursor.
 
@@ -201,6 +204,7 @@ class TestPaymentStatusSync(ShopifyAccountingMixin, TransactionCase):
         ])
         self.assertTrue(activities, "Activity must be scheduled on failure")
 
+    @mute_logger('odoo.sql_db')
     def test_partially_paid_draft_post_failure_no_cursor_poison(self):
         """action_post() failure on partially_paid must NOT poison cursor.
 

@@ -7,6 +7,7 @@ import json
 import logging
 
 from .common import SimulatorTestCase
+from odoo.tools import mute_logger
 
 _logger = logging.getLogger(__name__)
 
@@ -308,6 +309,7 @@ class TestSimDiscount(SimulatorTestCase):
         self.assertEqual(dc.title, 'SAVE10')  # Auto-set from code
         self.assertEqual(dc.usage_count, 0)
 
+    @mute_logger('odoo.sql_db')
     def test_discount_unique_code(self):
         self.env['sim.shopify.discount.code'].create({
             'config_id': self.sim_config.id,

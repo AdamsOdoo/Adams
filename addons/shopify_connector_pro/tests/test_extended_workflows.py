@@ -11,6 +11,7 @@ from unittest.mock import patch, MagicMock
 from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -192,6 +193,7 @@ class TestDiscountExport(TransactionCase):
         self.assertTrue(exporter.client.execute_mutation.called)
         self.assertTrue(discount.shopify_id)
 
+    @mute_logger('odoo.sql_db')
     def test_export_dedup_prevents_duplicate_codes(self):
         """Unique constraint should prevent two codes with same name per backend."""
         self.env['shopify.discount.code'].create({

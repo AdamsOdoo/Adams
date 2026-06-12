@@ -19,6 +19,7 @@ class TestOrderImport(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        self._mock_backend_api_client(self.backend)
         self.product = self.env['product.product'].create({
             'name': 'Test Widget',
             'list_price': 29.99,
@@ -616,6 +617,7 @@ class TestUntaxedOrderImport(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        self._mock_backend_api_client(self.backend)
         # Product DELIBERATELY keeps the company default sale tax —
         # that leak is exactly what this class tests.
         self.product = self.env['product.product'].create({
@@ -761,6 +763,7 @@ class TestShippingTaxImport(ShopifyAccountingMixin, TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        self._mock_backend_api_client(self.backend)
         self.product = self.env['product.product'].create({
             'name': 'Shipped Widget',
             'list_price': 50.0,

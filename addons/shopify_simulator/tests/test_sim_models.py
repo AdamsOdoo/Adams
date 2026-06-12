@@ -4,6 +4,7 @@ Tests for simulator models: GID generation, auto-defaults, GraphQL node shape.
 """
 from odoo.tests.common import TransactionCase
 from .common import SimulatorTestCase
+from odoo.tools import mute_logger
 
 
 class TestSimConfig(SimulatorTestCase):
@@ -325,6 +326,7 @@ class TestSimInventory(SimulatorTestCase):
         self.assertEqual(level.location_id, self.primary_location)
         self.assertEqual(level.inventory_item_gid, variant.inventory_item_gid)
 
+    @mute_logger('odoo.sql_db')
     def test_unique_variant_location_constraint(self):
         """Cannot create two inventory levels for same variant+location."""
         product = self._seed_product('Uniq Test')
