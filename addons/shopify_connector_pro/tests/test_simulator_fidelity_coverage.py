@@ -184,6 +184,16 @@ class TestPresentmentCurrencyImport(TransactionCase):
                 [('company_id', '=', self.env.company.id)], limit=1,
             ).id,
         })
+        # Mock the Shopify boundary: with a chart present the PAID-order
+        # payment path fetches transactions via a real API client, which
+        # the test framework blocks (see common._mock_backend_api_client).
+        client = MagicMock()
+        client.execute.return_value = {'data': {'order': {'transactions': []}}}
+        patcher = patch.object(
+            type(self.backend), '_make_api_client', return_value=client,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         # Ensure EUR exists
         eur = self.env['res.currency'].with_context(active_test=False).search(
             [('name', '=', 'EUR')], limit=1,
