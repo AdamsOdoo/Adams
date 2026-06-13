@@ -38,6 +38,7 @@
         <field name="name">Metafields</field>
         <field name="res_model">shopify.metafield</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[('backend_id.enable_metafields', '=', True)]</field>
     </record>
 
     <!-- Metafield Mapping Views -->
@@ -62,6 +63,7 @@
         <field name="name">Metafield Mappings</field>
         <field name="res_model">shopify.metafield.mapping</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[('backend_id.enable_metafields', '=', True)]</field>
     </record>
 
 </odoo>

@@ -170,6 +170,14 @@
                                     <field name="auto_create_abandoned_quotation"
                                            invisible="not auto_sync_abandoned_carts"/>
                                 </group>
+                                <group string="Advanced Feature Flags"
+                                       groups="shopify_connector_pro.group_shopify_admin">
+                                    <field name="enable_promoters"/>
+                                    <field name="enable_payout_import"/>
+                                    <field name="enable_gift_cards"/>
+                                    <field name="enable_metafields"/>
+                                    <field name="enable_customer_tags"/>
+                                </group>
                             </group>
                         </page>
 
