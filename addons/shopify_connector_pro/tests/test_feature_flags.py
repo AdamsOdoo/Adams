@@ -2,7 +2,7 @@
 from unittest.mock import MagicMock, patch
 
 from odoo.exceptions import AccessError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, new_test_user
 
 from ..hooks import _seed_feature_flag_defaults
 from ..sync.gift_card_sync import GiftCardSync
@@ -38,12 +38,14 @@ class TestFeatureFlagMechanism(TransactionCase):
 
     def test_admin_only_non_admin_cannot_flip_flags(self):
         group_user = self.env.ref('shopify_connector_pro.group_shopify_user')
-        user = self.env['res.users'].create({
-            'name': 'Shopify Operator',
-            'login': 'shopify_operator_goal2b',
-            'email': 'operator.goal2b@example.com',
-        })
-        group_user.write({'users': [(4, user.id)]})
+        user = new_test_user(
+            self.env,
+            login='shopify_operator_goal2b',
+            groups='shopify_connector_pro.group_shopify_user',
+        )
+
+        self.assertTrue(user.has_group('shopify_connector_pro.group_shopify_user'))
+        self.assertFalse(user.has_group('shopify_connector_pro.group_shopify_admin'))
         with self.assertRaises(AccessError):
             self.backend.with_user(user).write({'enable_payout_import': False})
 
