@@ -42,8 +42,8 @@ class TestFeatureFlagMechanism(TransactionCase):
             'name': 'Shopify Operator',
             'login': 'shopify_operator_goal2b',
             'email': 'operator.goal2b@example.com',
-            'groups_id': [(6, 0, [group_user.id])],
         })
+        group_user.write({'users': [(4, user.id)]})
         with self.assertRaises(AccessError):
             self.backend.with_user(user).write({'enable_payout_import': False})
 
