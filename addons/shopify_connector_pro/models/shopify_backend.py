@@ -1205,6 +1205,11 @@ class ShopifyBackend(models.Model):
             ('enable_promoters', '=', True),
         ])
         for backend in backends:
+            if not backend.enable_promoters:
+                backend._log_feature_skip(
+                    'discount', 'export', _('Promoters / discount codes'),
+                )
+                continue
             try:
                 from ..sync.discount_sync import DiscountSync
                 syncer = DiscountSync(
@@ -1222,6 +1227,9 @@ class ShopifyBackend(models.Model):
             ('auto_sync_collections', '=', True),
         ])
         for backend in backends:
+            if not backend.auto_sync_collections:
+                backend._log_feature_skip('collection', 'import', _('Collections'))
+                continue
             try:
                 from ..sync.collection_sync import CollectionSync
                 syncer = CollectionSync(
@@ -1240,6 +1248,9 @@ class ShopifyBackend(models.Model):
             ('enable_payout_import', '=', True),
         ])
         for backend in backends:
+            if not backend.enable_payout_import:
+                backend._log_feature_skip('payout', 'import', _('Payout visibility import'))
+                continue
             try:
                 from ..sync.payout_sync import PayoutSync
                 syncer = PayoutSync(
@@ -1288,11 +1299,13 @@ class ShopifyBackend(models.Model):
 
     @api.model
     def _cron_import_abandoned_carts(self):
-        backends = self.search([
-            ('state', '=', 'connected'),
-            ('auto_sync_abandoned_carts', '=', True),
-        ])
+        backends = self.search([('state', '=', 'connected')])
         for backend in backends:
+            if not backend.auto_sync_abandoned_carts:
+                backend._log_feature_skip(
+                    'abandoned_cart', 'import', _('Abandoned carts'),
+                )
+                continue
             try:
                 from ..sync.abandoned_cart_sync import AbandonedCartSync
                 syncer = AbandonedCartSync(
