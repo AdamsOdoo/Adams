@@ -1,19 +1,19 @@
 # STATUS.md — Current State
 
-Updated 2026-06-13 — Goal 3 Phase A completed locally; implementation remains gated.
+Updated 2026-06-13 — Goal 3 Phase B implemented locally; awaiting Claude review.
 
 ## What changed
-- Goal 2B is closed and review/full-audit is accepted green at 1f34d261b8c2342bd44d3e36e013408605cab8f4.
-- RF1 and RF1b are accepted/closed; `_log_feature_skip` references are absent under `addons/shopify_connector_pro`.
-- Goal 3 Phase A research produced `docs/product/MENU_IA.md` and `docs/archive/GOAL3A_MANIFEST.md`.
-- Phase A docs correction applied: dashboard-module live-tree accuracy corrected and promoter `action_dummy` stub finding added; awaiting Claude re-review; Phase B remains gated.
-- DEC-029 and DEC-030 were appended as Proposed IA rows only.
+- Goal 3 Phase B menu IA restructure implemented locally in `shopify_menu.xml`.
+- One live Shopify root retained; Store Overview and Manager Dashboard both kept because B-T0a found distinct actions.
+- Hollow `shopify_connector_pro_dashboard` tombstone-cleaned; AUD-030 and AUD-031 resolved.
+- Generate Demo Data menu gated to `base.group_no_one`; wizard logic untouched.
+- AUD-032 promoter `action_dummy` stat-button defect logged and deferred to Goal 8.
 
 ## Verified locally
-- Menu, button, group, action-domain, and visibility evidence was enumerated from current XML/security files.
-- No code/XML/security/manifest/test/sync/migration/hook/README/AUDIT files were edited.
+- Local static checks ran: Python compile, XML parse, menu/action reference integrity, preserved domain/group regression, forbidden-grep.
+- No sync/controller/API/wizard/model logic, promoter view, money path, manifest, migration, hook, or README change was made.
 
 ## Pending / Next
-- Awaiting Claude review of the Phase A IA proposal.
-- Phase B menu/XML implementation is gated until explicit approval.
-- Goal 4 wizard flow and Goal 5 Sync Command Center remain reserved only, not designed or implemented.
+- Claude review required.
+- Odoo.sh fresh install, upgrade, and full three-profile relay required before acceptance/merge.
+- Goal 4 and Goal 5 are reserved only; neither was implemented.

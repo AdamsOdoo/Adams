@@ -1,10 +1,69 @@
 # PHASE A PROPOSAL — implementation pending Phase B GO
 
+
+## Phase B implementation outcome
+
+Status: IMPLEMENTED locally by Goal 3 Phase B; Odoo.sh relay remains required before acceptance/merge.
+
+Dashboard outcome: B-T0a confirmed the dashboards are distinct, so Phase B kept both under the one Shopify root. `Store Overview` remains the backend kanban/list/form action, while `Manager Dashboard` remains the OWL client action tagged `shopify_manager_dashboard.main`.
+
+As-built tree:
+
+- Shopify
+  - Store Overview
+  - Manager Dashboard
+  - XML comment reservation: Goal 4 Getting Started / Setup
+  - XML comment reservation: Goal 5 Sync Command Center
+  - Catalog Sync
+    - Products
+    - Inventory
+    - Collections
+    - Metafields
+    - Locations
+  - Sales Sync
+    - Customers
+    - Orders
+    - Refunds
+    - Transactions
+  - Advanced / Optional Data
+    - Abandoned Carts
+    - Payouts
+    - Gift Cards
+    - Customer Tags
+    - Promoters
+    - Discount Codes
+    - Discount Usage
+  - Configuration
+    - Shopify Stores
+    - Setup Wizard
+    - Payment Gateways
+    - Tax Mappings
+    - Metafield Mappings
+  - Operations
+    - Sync Now
+    - Import Data
+    - Retry Failed Records
+    - Bulk Export
+    - Import Jobs
+    - Generate Demo Data (`base.group_no_one`, dev/QA only)
+  - Logs & Audit
+    - Sync Log
+    - Webhook Log
+    - Sync Analytics
+
+Reserved Goal 4 home: XML comment only; no live menu was created.
+
+Reserved Goal 5 home: XML comment only; no live menu was created.
+
+Demo-data outcome: `menu_shopify_demo_data` is gated to `base.group_no_one`; the wizard is retained for dev/QA but hidden from normal/admin merchant navigation.
+
+Audit outcome: AUD-030 and AUD-031 are resolved by the dashboard-module tombstone cleanup; AUD-032 is logged and deferred to Goal 8 with no promoter view changes in Goal 3.
+
 ## 1. Executive summary
 
 Goal 3 Phase A is research/planning only. No code, XML, security, manifest, test, sync, migration, hook, README, or AUDIT file is changed by this proposal.
 
-Current IA has one live Shopify root tree from `addons/shopify_connector_pro`, with two live dashboard entries: `Store Overview` using `shopify_dashboard_action` and `Manager Dashboard` using `action_manager_dashboard` from the connector module. The companion `shopify_connector_pro_dashboard` module is a hollow/stub module whose manifest has `data: []` and `assets: {}`, so its dashboard XML files are defined in the repository but not loaded by the running app. The current live tree also exposes admin-only operations under an `Operations` section, including `Generate Demo Data`. Phase B should keep core operations visible, gate setup/configuration and destructive/demo operations for admins, and regroup flag-gated advanced actions so disabled features do not create confusing gaps.
+Current IA has one live Shopify root tree from `addons/shopify_connector_pro`, with two live dashboard entries: `Store Overview` using `shopify_dashboard_action` and `Manager Dashboard` using `action_manager_dashboard` from the connector module. The companion `shopify_connector_pro_dashboard` module is a hollow/stub module whose manifest has `data: []` and `assets: {}`, so its dashboard XML files are defined in the repository but not loaded by the running app. The current live tree also exposes admin-only operations under an `Operations` section, including `Generate Demo Data`. Phase B keeps core operations visible, gates setup/configuration and destructive/demo operations appropriately, and regroups flag-gated advanced actions so disabled features do not create confusing gaps.
 
 ## 2. Current menu tree
 

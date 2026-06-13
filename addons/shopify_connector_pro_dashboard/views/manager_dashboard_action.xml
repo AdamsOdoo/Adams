@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <record id="action_manager_dashboard" model="ir.actions.client">
-        <field name="name">Shopify Manager Dashboard</field>
-        <field name="tag">shopify_manager_dashboard.main</field>
-    </record>
-</odoo>

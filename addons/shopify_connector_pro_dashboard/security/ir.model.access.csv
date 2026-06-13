@@ -1,2 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_shopify_manager_dashboard_user,shopify.manager.dashboard.user,model_shopify_manager_dashboard,shopify_connector_pro.group_shopify_user,1,0,0,0
