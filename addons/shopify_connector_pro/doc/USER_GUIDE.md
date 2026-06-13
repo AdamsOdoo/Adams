@@ -125,6 +125,21 @@ For first-time setup, use the guided wizard:
 
 ---
 
+
+## Advanced Feature Flags
+
+Shopify Connector administrators can control optional advanced surfaces per store from **Shopify > Configuration > Shopify Stores > Sync Settings > Advanced Feature Flags**. Turning an optional feature OFF hides that backend's records from the matching menu action and makes scheduled/import code paths record a visible skipped sync log instead of silently dropping work. Core flows are not controlled here: orders, products, customers, inventory, Shopify-to-Odoo refund import, webhook infrastructure, sync logs, reconciliation, setup, and the total-check guard remain core connector behavior.
+
+Available advanced flags are:
+
+- **Promoters / Discount Codes** — default ON.
+- **Payout Visibility Import** — default ON and visibility-only; it does not create accounting entries.
+- **Gift Card Reference Import** — default ON and reference-only; it does not create liability accounting entries.
+- **Metafields / Mappings** — default OFF until mappings are intentionally configured and tested.
+- **Customer Tags** — default OFF until the store uses customer-tag workflows.
+
+Existing backend toggles continue to control collections, abandoned carts, reverse payment sync, reverse refund sync, external fulfillment handling, and presentment-currency mode. Upgrades preserve those existing values.
+
 ## Product Synchronization
 
 ### How It Works

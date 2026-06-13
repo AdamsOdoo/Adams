@@ -472,3 +472,9 @@ core; flag it if present, nothing else should be).
 ## Goal 0 Governance Note (2026-06-12)
 
 Older per-item pre-approval wording in this historical backlog was superseded by the standing approval / `AGENTS.md` operating model. Historical content is preserved for audit traceability; use `AGENTS.md` for current session operating rules and `docs/architecture/DECISIONS.md` for durable decisions.
+
+---
+
+## Goal 2 Phase B — Feature-flag money-path consequence statement (2026-06-13)
+
+Reverse refund push now explicitly remains governed by the existing per-backend `reverse_sync_refund` flag rather than a parallel field, and the AUD-029 regression test posts a real Odoo credit note through the production account move path with that flag OFF. Business/accounting impact: when the flag is OFF, Odoo credit notes remain posted accounting facts in Odoo but the connector does not create a Shopify `refundCreate` mutation, so merchants must use the Shopify refund-import/core workflow or manually reconcile Shopify if they intentionally keep reverse push disabled. The change is reversible by reverting the Goal 2B commits; existing backend values for `reverse_sync_refund`, `external_fulfillment_handling`, and `import_currency_mode` are preserved on upgrade, so reverting restores pre-feature-flag behavior without deleting records. User-visible behavior is that optional disabled jobs create visible skipped sync logs/chatter instead of silent returns. Verification evidence in this branch: `TestFeatureFlagReverseRefundMoneyPath.test_aud_029_reverse_refund_off_does_not_call_refund_create` was added for runtime execution, while local Odoo execution is pending because this Codex container has no `odoo-bin` or `odoo` Python package.
