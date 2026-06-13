@@ -1,19 +1,19 @@
 # STATUS.md — Current State
 
-Updated 2026-06-13 — Goal 2B accepted green; RF1 implemented locally, awaiting review and Odoo.sh relay.
+Updated 2026-06-13 — Goal 3 Phase B implemented locally; awaiting Claude review.
 
 ## What changed
-- Goal 2B is accepted green: Odoo.sh reported 0 failed / 0 errors of 589, no docutils error, and the feature-flag user assignment uses `new_test_user`.
-- RF1 quiets intentionally disabled advanced scheduled crons by excluding disabled backends from cron domains instead of creating recurring skip logs/chatter.
-- RF1 changes gift-card/metafield disabled helper paths to quiet `_logger.info` early returns with no sync-log/chatter noise.
-- DEC-028 is now Active with the Goal 2B green-build activation note.
+- Goal 3 Phase B menu IA restructure implemented locally in `shopify_menu.xml`.
+- One live Shopify root retained; Store Overview and Manager Dashboard both kept because B-T0a found distinct actions.
+- Hollow `shopify_connector_pro_dashboard` tombstone-cleaned; AUD-030 and AUD-031 resolved.
+- Generate Demo Data menu gated to `base.group_no_one`; wizard logic untouched.
+- AUD-032 promoter `action_dummy` stat-button defect logged and deferred to Goal 8.
 
 ## Verified locally
-- Content-based baseline checks passed because this Codex harness lacks the accepted merge commit object.
-- Static Python compile and XML parse were run for RF1.
-- Odoo runtime is unavailable locally (`/home/user/odoo/odoo-bin` missing), so Odoo.sh relay remains required.
+- Local static checks ran: Python compile, XML parse, menu/action reference integrity, preserved domain/group regression, forbidden-grep.
+- No sync/controller/API/wizard/model logic, promoter view, money path, manifest, migration, hook, or README change was made.
 
 ## Pending / Next
-- Claude RF1 review.
-- If approved, create one PR for RF1, run Odoo.sh targeted feature-flag suite, then one full-suite profile.
-- Do not start Goal 3 until RF1 is reviewed, PR'd, relayed green, and accepted.
+- Claude review required.
+- Odoo.sh fresh install, upgrade, and full three-profile relay required before acceptance/merge.
+- Goal 4 and Goal 5 are reserved only; neither was implemented.
