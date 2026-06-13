@@ -212,15 +212,15 @@ Do not treat blank skeleton fields as specified behavior. Preserve open question
 - Ownership: Odoo posted credit note can push a Shopify refund when reverse-sync refund is enabled.
 - Failure modes: API/mutation exception is caught, warning logged, and a warning activity is scheduled explaining that Odoo credit note is posted but Shopify refund was not created.
 - Idempotency: No explicit Shopify refund idempotency key was found in this reverse path; repeated posting is naturally limited because action_post runs once per draft move, but retry semantics are not specified.
-- Money rules, if applicable: This is a money-path reverse sync. It can create real Shopify refunds; if it fails, systems diverge visibly.
+- Money rules, if applicable: This is a money-path capability that can create real Shopify refunds; per DEC-027 it is not a v1 core promise and should default OFF / not be marketed until idempotency and approval controls exist.
 - Feature flags: none yet — Goal 2
 - Evidence:
   - `addons/shopify_connector_pro/models/account_move.py:108-132` — filters posted credit notes for Shopify reverse refund sync.
   - `addons/shopify_connector_pro/models/account_move.py:138-170` — converts amount and calls Shopify refundCreate.
   - `addons/shopify_connector_pro/models/account_move.py:177-198` — schedules visible activity on Shopify refund failure.
   - TEST: none found — flagged as coverage debt (T4).
-- Decisions needed: Ahmed escalation: confirm whether Odoo → Shopify refund push is in v1 and what approval/idempotency controls are required.
-- Status: DECISION-NEEDED
+- Decisions needed: none after DEC-027, but keep AUD-029 as implementation/idempotency risk. Decided: not a v1 core promise and should default OFF / not marketed until idempotency and approval controls exist. Current: code can push refundCreate when reverse_sync_refund is enabled. Gap: capability exists, but v1 product policy is conservative due to AUD-029.
+- Status: DELTA
 ## Payouts
 
 - Trigger: Payout import fetches Shopify payouts and payout transactions.
@@ -229,7 +229,7 @@ Do not treat blank skeleton fields as specified behavior. Preserve open question
 - Ownership: Current code imports payout data for reconciliation/reporting; accounting-entry automation is not implemented despite a `journal_entry_id` field.
 - Failure modes: Import loop logs warnings and increments errors for failed payout nodes. Unknown transaction/source types are warning-only and stored as empty selection values. Missing currency leaves currency false on monetary rows.
 - Idempotency: Existing payout is found by backend and Shopify payout ID; transaction import updates existing transaction rows by payout and transaction ID.
-- Money rules, if applicable: Payout amounts are stored as monetary data but no verified accounting move is created; payout accounting automation level needs Ahmed decision if legally significant.
+- Money rules, if applicable: Payout data is visibility/reconciliation only in v1; no automatic payout journal entries are created (DEC-026).
 - Feature flags: none yet — Goal 2
 - Evidence:
   - `addons/shopify_connector_pro/sync/payout_sync.py:67-112` — creates/updates payout amounts and imports transactions.
@@ -237,8 +237,8 @@ Do not treat blank skeleton fields as specified behavior. Preserve open question
   - `addons/shopify_connector_pro/models/shopify_payout.py:34-38` — defines journal-entry link field.
   - `addons/shopify_connector_pro/models/shopify_payout.py:47-50` — enforces unique backend+payout ID.
   - TEST: none found — flagged as coverage debt (T4).
-- Decisions needed: Ahmed escalation: decide payout accounting-entry automation level for v1.
-- Status: DECISION-NEEDED
+- Decisions needed: none after DEC-026.
+- Status: SPECIFIED
 ## Reconciliation
 
 - Trigger: Reconciliation cron/action runs for a backend.
@@ -265,15 +265,15 @@ Do not treat blank skeleton fields as specified behavior. Preserve open question
 - Ownership: Shopify is source of gift-card records; Odoo stores mirror records only.
 - Failure modes: Per-card import exception is warning logged, counted, and included in sync log finalization; no accounting liability entry is created.
 - Idempotency: Existing gift cards are found by backend/shopify_id and updated; new records store checksum as Shopify ID.
-- Money rules, if applicable: Current code stores balances but does not define or post gift-card liability accounting.
+- Money rules, if applicable: Gift card amounts are mirrored/reference only in v1; no automatic gift-card liability accounting entries are created or implied (DEC-025).
 - Feature flags: none yet — Goal 2
 - Evidence:
   - `addons/shopify_connector_pro/sync/gift_card_sync.py:19-31` — fetches gift cards and creates sync log.
   - `addons/shopify_connector_pro/sync/gift_card_sync.py:34-96` — creates/updates gift-card records and records errors.
   - `addons/shopify_connector_pro/models/shopify_gift_card.py:11-27` — stores masked code, amounts, status, links, expiry.
   - TEST: none found — flagged as coverage debt (T4).
-- Decisions needed: Ahmed escalation: gift-card liability/accounting treatment is legally significant and not decided in code/docs found.
-- Status: DECISION-NEEDED
+- Decisions needed: none after DEC-025.
+- Status: SPECIFIED
 ## Promoters/discounts
 
 - Trigger: Discount export/import sync runs for promoter discount codes and Shopify discount nodes.
