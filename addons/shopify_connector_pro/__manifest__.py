@@ -3,7 +3,7 @@
 # See LICENSE file for full copyright and licensing details.
 {
     'name': 'Shopify Connector Pro Ultimate Edition',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'category': 'Sales/Sales',
     'summary': 'Production-grade bidirectional Shopify <> Odoo connector with manager dashboard: products, orders, customers, inventory, fulfillments, refunds, payouts, promoters, webhooks, and more.',
     'description': 'Shopify Connector Pro Ultimate Edition — enterprise-grade bidirectional Shopify <> Odoo 19 connector built on Shopify GraphQL Admin API 2026-01 with integrated manager dashboard, KPI analytics, and delivery tracking.',
@@ -76,6 +76,7 @@
     'installable': True,
     'application': True,
     'auto_install': False,
+    'post_init_hook': 'post_init_hook',
     'images': [
         'static/description/icon.png',
         'static/description/screenshot_01_dashboard.png',
