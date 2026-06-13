@@ -3,8 +3,8 @@ import logging
 import re
 from datetime import timedelta
 
-from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo import SUPERUSER_ID, api, fields, models, _
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -134,6 +134,28 @@ class ShopifyBackend(models.Model):
 
     auto_sync_collections = fields.Boolean('Sync Collections', default=True)
 
+    # ── Advanced Feature Flags ─────────────────────────────
+    enable_promoters = fields.Boolean(
+        'Promoters / Discount Codes', default=True,
+        help="Enable promoter and discount-code sync surfaces for this store.",
+    )
+    enable_payout_import = fields.Boolean(
+        'Payout Visibility Import', default=True,
+        help="Import Shopify payout records for visibility only; no journal entries are created.",
+    )
+    enable_gift_cards = fields.Boolean(
+        'Gift Card Reference Import', default=True,
+        help="Enable gift-card reference import and visibility for this store.",
+    )
+    enable_metafields = fields.Boolean(
+        'Metafields / Mappings', default=False,
+        help="Enable metafield import/export mappings for this store.",
+    )
+    enable_customer_tags = fields.Boolean(
+        'Customer Tags', default=False,
+        help="Enable customer-tag visibility for this store.",
+    )
+
     # ── Abandoned Cart Settings ────────────────────────────
     auto_sync_abandoned_carts = fields.Boolean(
         'Sync Abandoned Carts', default=False,
@@ -168,6 +190,22 @@ class ShopifyBackend(models.Model):
         help="When a credit note is posted in Odoo for a Shopify order, "
              "create a refund on Shopify.",
     )
+
+    _FEATURE_FLAG_FIELDS = {
+        'enable_promoters',
+        'enable_payout_import',
+        'enable_gift_cards',
+        'enable_metafields',
+        'enable_customer_tags',
+        'auto_sync_collections',
+        'auto_sync_abandoned_carts',
+        'auto_create_abandoned_quotation',
+        'reverse_sync_payment',
+        'reverse_sync_refund',
+        'external_fulfillment_handling',
+        'import_currency_mode',
+    }
+
     reconciliation_order_days = fields.Integer(
         'Reconciliation Lookback (days)', default=30,
         help="How many days back to check for status mismatches.",
@@ -998,6 +1036,25 @@ class ShopifyBackend(models.Model):
         )
         self.message_post(body=body, message_type='notification', subtype_xmlid='mail.mt_note')
 
+    @api.model
+    def _feature_flag_seed_values(self):
+        return {
+            'enable_promoters': True,
+            'enable_payout_import': True,
+            'enable_gift_cards': True,
+            'enable_metafields': False,
+            'enable_customer_tags': False,
+        }
+
+    def write(self, vals):
+        if (
+            self.env.uid != SUPERUSER_ID
+            and self._FEATURE_FLAG_FIELDS.intersection(vals)
+            and not self.env.user.has_group('shopify_connector_pro.group_shopify_admin')
+        ):
+            raise AccessError(_("Only Shopify Connector administrators can change feature flags."))
+        return super().write(vals)
+
     # ── Error Monitoring ──────────────────────────────────────
 
     @api.model
@@ -1143,7 +1200,10 @@ class ShopifyBackend(models.Model):
 
     @api.model
     def _cron_sync_discounts(self):
-        backends = self.search([('state', '=', 'connected')])
+        backends = self.search([
+            ('state', '=', 'connected'),
+            ('enable_promoters', '=', True),
+        ])
         for backend in backends:
             try:
                 from ..sync.discount_sync import DiscountSync
@@ -1157,7 +1217,10 @@ class ShopifyBackend(models.Model):
 
     @api.model
     def _cron_sync_collections(self):
-        backends = self.search([('state', '=', 'connected'), ('auto_sync_collections', '=', True)])
+        backends = self.search([
+            ('state', '=', 'connected'),
+            ('auto_sync_collections', '=', True),
+        ])
         for backend in backends:
             try:
                 from ..sync.collection_sync import CollectionSync
@@ -1172,7 +1235,10 @@ class ShopifyBackend(models.Model):
 
     @api.model
     def _cron_import_payouts(self):
-        backends = self.search([('state', '=', 'connected')])
+        backends = self.search([
+            ('state', '=', 'connected'),
+            ('enable_payout_import', '=', True),
+        ])
         for backend in backends:
             try:
                 from ..sync.payout_sync import PayoutSync

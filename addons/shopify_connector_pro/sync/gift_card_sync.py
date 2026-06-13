@@ -14,10 +14,18 @@ class GiftCardSync:
     def __init__(self, env, backend):
         self.env = env
         self.backend = backend
-        self.client = backend._make_api_client()
+        self.client = None
 
     def import_gift_cards(self):
         """Fetch all gift cards from Shopify and create/update records."""
+        if not self.backend.enable_gift_cards:
+            _logger.info(
+                "Gift-card reference import is disabled for backend %s; skipping.",
+                self.backend.display_name,
+            )
+            return 0, 0, 1
+
+        self.client = self.backend._make_api_client()
         nodes = self.client.fetch_paginated(
             FETCH_GIFT_CARDS, 'giftCards',
             page_size=min(self.backend.batch_size, 50),

@@ -88,6 +88,7 @@
         <field name="name">Shopify Collections</field>
         <field name="res_model">shopify.collection.binding</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[('backend_id.auto_sync_collections', '=', True)]</field>
     </record>
 
 </odoo>

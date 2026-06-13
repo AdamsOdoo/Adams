@@ -51,6 +51,7 @@
         <field name="name">Discount Usage</field>
         <field name="res_model">shopify.discount.usage</field>
         <field name="view_mode">list</field>
+        <field name="domain">[('backend_id.enable_promoters', '=', True)]</field>
         <field name="context">{'search_default_this_month': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">

@@ -39,3 +39,4 @@ from . import test_account_validation
 from . import test_refund_scan_pruning
 from . import test_refund_multicurrency
 from . import test_import_batch_visibility
+from . import test_feature_flags
