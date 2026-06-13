@@ -4,7 +4,7 @@
 
 Goal 3 Phase A is research/planning only. No code, XML, security, manifest, test, sync, migration, hook, README, or AUDIT file is changed by this proposal.
 
-Current IA has two dashboard entry points in the main module (`Store Overview` and `Manager Dashboard`) and a second dashboard module tree (`Shopify Manager > Dashboard`). The current tree also exposes admin-only operations under an `Operations` section, including `Generate Demo Data`. Phase B should keep core operations visible, gate setup/configuration and destructive/demo operations for admins, and regroup flag-gated advanced actions so disabled features do not create confusing empty gaps.
+Current IA has one live Shopify root tree from `addons/shopify_connector_pro`, with two live dashboard entries: `Store Overview` using `shopify_dashboard_action` and `Manager Dashboard` using `action_manager_dashboard` from the connector module. The companion `shopify_connector_pro_dashboard` module is a hollow/stub module whose manifest has `data: []` and `assets: {}`, so its dashboard XML files are defined in the repository but not loaded by the running app. The current live tree also exposes admin-only operations under an `Operations` section, including `Generate Demo Data`. Phase B should keep core operations visible, gate setup/configuration and destructive/demo operations for admins, and regroup flag-gated advanced actions so disabled features do not create confusing gaps.
 
 ## 2. Current menu tree
 
@@ -51,8 +51,8 @@ Current IA has two dashboard entry points in the main module (`Store Overview` a
 | menu_shopify_sync_log | Sync Log | menu_shopify_logs | 10 | shopify_sync_log_action | (inherits/default) | (none) | addons/shopify_connector_pro/views/shopify_menu.xml:226 |
 | menu_shopify_webhook_log | Webhook Log | menu_shopify_logs | 20 | shopify_webhook_log_action | (inherits/default) | (none) | addons/shopify_connector_pro/views/shopify_menu.xml:232 |
 | menu_shopify_sync_analytics | Sync Analytics | menu_shopify_logs | 30 | shopify_sync_analytics_action | (inherits/default) | (none) | addons/shopify_connector_pro/views/shopify_menu.xml:238 |
-| menu_shopify_manager_root | Shopify Manager | (root) | 51 | (none) | shopify_connector_pro.group_shopify_user | (none) | addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:8 |
-| menu_shopify_manager_dashboard | Dashboard | menu_shopify_manager_root | 10 | action_manager_dashboard | (inherits/default) | (none) | addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:14 |
+| menu_shopify_manager_root | Shopify Manager | (root) | 51 | (none) | shopify_connector_pro.group_shopify_user | (none) | addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:8 — DEFINED in shopify_connector_pro_dashboard but NOT LOADED because manifest data is empty (`addons/shopify_connector_pro_dashboard/__manifest__.py:19`) |
+| menu_shopify_manager_dashboard | Dashboard | menu_shopify_manager_root | 10 | action_manager_dashboard | (inherits/default) | (none) | addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:14 — DEFINED in shopify_connector_pro_dashboard but NOT LOADED because manifest data is empty (`addons/shopify_connector_pro_dashboard/__manifest__.py:19`) |
 
 ### Tree shape
 
@@ -67,8 +67,9 @@ Current IA has two dashboard entry points in the main module (`Store Overview` a
     - Products; Customers; Orders; Inventory; Collections; Refunds; Locations; Additional Data
   - Promoters — source `addons/shopify_connector_pro/views/shopify_menu.xml:197`
   - Logs — source `addons/shopify_connector_pro/views/shopify_menu.xml:221`
-- Shopify Manager (`menu_shopify_manager_root`, user group) — source `addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:8`
-  - Dashboard — source `addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:14`
+- Not live: `shopify_connector_pro_dashboard` defines `Shopify Manager` and child `Dashboard` XML at `addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:8` and `:14`, but the module manifest has `data: []` and `assets: {}` at `addons/shopify_connector_pro_dashboard/__manifest__.py:19-20`, so those XML files are orphaned / not loaded.
+
+Live-tree accuracy: the running app has one live Shopify root tree from `addons/shopify_connector_pro/views/shopify_menu.xml:5`; within that one tree, `Store Overview` uses `shopify_dashboard_action` at `addons/shopify_connector_pro/views/shopify_menu.xml:12-16`, and `Manager Dashboard` uses connector-module `action_manager_dashboard` at `addons/shopify_connector_pro/views/shopify_menu.xml:19-23` plus `addons/shopify_connector_pro/views/manager_dashboard_action.xml:3-6`.
 
 ## 3. Current button inventory
 
@@ -114,10 +115,10 @@ Current IA has two dashboard entry points in the main module (`Store Overview` a
 | Retry Sync | object | action_retry_sync | shopify.inventory.binding | shopify_inventory_binding_view_form | Core | Admin for mutating/recovery operations; User for read-only/open links | addons/shopify_connector_pro/views/shopify_inventory_binding_views.xml:34 |
 | Retry Sync | object | action_retry_sync | shopify.order.binding | shopify_order_binding_view_form | Core | Admin for mutating/recovery operations; User for read-only/open links | addons/shopify_connector_pro/views/shopify_order_binding_views.xml:32 |
 | Retry Sync | object | action_retry_sync | shopify.product.binding | shopify_product_binding_view_form | Core | Admin for mutating/recovery operations; User for read-only/open links | addons/shopify_connector_pro/views/shopify_product_binding_views.xml:33 |
-| Orders | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced | User | addons/shopify_connector_pro/views/shopify_promoter_views.xml:32 |
-| Revenue | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced | User | addons/shopify_connector_pro/views/shopify_promoter_views.xml:35 |
-| Discounts | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced | User | addons/shopify_connector_pro/views/shopify_promoter_views.xml:38 |
-| Commission | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced | User | addons/shopify_connector_pro/views/shopify_promoter_views.xml:41 |
+| Orders | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced — STUB (action_dummy) | User; report-only defect for Phase A | addons/shopify_connector_pro/views/shopify_promoter_views.xml:32 |
+| Revenue | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced — STUB (action_dummy) | User; report-only defect for Phase A | addons/shopify_connector_pro/views/shopify_promoter_views.xml:35 |
+| Discounts | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced — STUB (action_dummy) | User; report-only defect for Phase A | addons/shopify_connector_pro/views/shopify_promoter_views.xml:38 |
+| Commission | object | action_dummy | shopify.promoter | shopify_promoter_view_form | Advanced — STUB (action_dummy) | User; report-only defect for Phase A | addons/shopify_connector_pro/views/shopify_promoter_views.xml:41 |
 | Retry Sync | object | action_retry_sync | shopify.refund.binding | shopify_refund_binding_view_form | Core | Admin for mutating/recovery operations; User for read-only/open links | addons/shopify_connector_pro/views/shopify_refund_binding_views.xml:30 |
 | View Failed Records | object | action_open_error_bindings | shopify.sync.log | shopify_sync_log_view_form | Core | User | addons/shopify_connector_pro/views/shopify_sync_log_views.xml:37 |
 | Retry | object | action_retry_webhook | shopify.webhook.log | shopify_webhook_log_view_form | Advanced | Admin for mutating/recovery operations; User for read-only/open links | addons/shopify_connector_pro/views/shopify_webhook_log_views.xml:34 |
@@ -158,18 +159,18 @@ Current IA has two dashboard entry points in the main module (`Store Overview` a
 
 ## 5. Five IA decisions
 
-### Decision 1 — Two dashboards: Store Overview vs Manager Dashboard
+### Decision 1 — One live tree with two dashboard entries, plus hollow companion dashboard module XML
 
-Current evidence: main tree exposes `Store Overview` at `addons/shopify_connector_pro/views/shopify_menu.xml:12` and `Manager Dashboard` at `addons/shopify_connector_pro/views/shopify_menu.xml:19`; the dashboard stub module also defines `Shopify Manager > Dashboard` at `addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:8` and `:14`.
+Current evidence: the live connector menu exposes `Store Overview` at `addons/shopify_connector_pro/views/shopify_menu.xml:12-16` and `Manager Dashboard` at `addons/shopify_connector_pro/views/shopify_menu.xml:19-23`; connector-module `action_manager_dashboard` is defined at `addons/shopify_connector_pro/views/manager_dashboard_action.xml:3-6`. The companion dashboard module is a hollow/stub module: its manifest says it was merged into `shopify_connector_pro`, depends on the connector, and has `data: []` plus `assets: {}` at `addons/shopify_connector_pro_dashboard/__manifest__.py:5-20`. Therefore its XML files `addons/shopify_connector_pro_dashboard/views/manager_dashboard_menu.xml:8-18` and `addons/shopify_connector_pro_dashboard/views/manager_dashboard_action.xml:3-6` are orphaned / not loaded, and the running app does not have a second live `Shopify Manager` dashboard tree from that module.
 
 Options:
-1. Keep all dashboard entries distinct.
-2. Consolidate to one dashboard menu.
-3. Keep two dashboards but relabel by role and remove duplicate top-level dashboard module entry when safe.
+1. Keep both live dashboard entries under the one Shopify root if Phase B confirms they render distinct content.
+2. Consolidate to one dashboard entry if Phase B confirms `Store Overview` and `Manager Dashboard` are redundant.
+3. Separately decide the fate of `shopify_connector_pro_dashboard`: delete orphaned XML in an upgrade-safe step, fold surviving assets/views into `shopify_connector_pro`, or formally tombstone the module.
 
-Recommendation: keep two dashboard concepts for now but relabel by role in Phase B: `Store Overview` for operator health/status and `Manager Analytics` for KPI/manager reporting; do not keep the separate `Shopify Manager` app tree as a merchant-visible duplicate once module upgrade safety is confirmed.
+Recommendation: keep `Store Overview` + `Manager Dashboard` with role-clear labels only if Phase B confirms they render distinct content; consolidate to one dashboard if they are redundant. Treat the companion dashboard module fate as a separate upgrade-safety decision, following the `shopify_connector_pro_base` / DEC-014 tombstone pattern rather than silently deleting historical module artifacts.
 
-Rationale: merchant-first labels reduce ambiguity, the change is reversible, core operations remain under Shopify, and duplicate dashboard homes are confusing.
+Rationale: merchant-first labels reduce ambiguity, the change is reversible, core operations remain under the one Shopify root, and the hollow companion module should be handled explicitly so upgrade paths stay safe.
 
 ### Decision 2 — Generate Demo Data merchant visibility
 
@@ -227,13 +228,14 @@ Rationale: aligns with DEC-021 target error UX, is reversible, and avoids Phase 
 
 ### Before
 
-Current before tree is the inventory in section 2: Shopify root with Store Overview, Manager Dashboard, Configuration, Operations, Sync Status, Promoters, Logs; plus separate Shopify Manager root.
+Current live before tree is the inventory in section 2 under one Shopify root: Store Overview, Manager Dashboard, Configuration, Operations, Sync Status, Promoters, and Logs. The `shopify_connector_pro_dashboard` XML still defines a separate Shopify Manager root in the repository, but it is not a live tree because the companion module manifest has empty `data` and `assets`.
 
 ### After proposal for Phase B review
 
 - Shopify — users
-  - Store Overview — users; operational status dashboard
-  - Manager Analytics — managers/admins; relabeled manager dashboard
+  - Store Overview — users; operational status dashboard, if distinct
+  - Manager Analytics — managers/admins; relabeled manager dashboard, if distinct
+  - Or one consolidated Dashboard if Phase B confirms redundancy
   - Getting Started / Setup — admins; reserved Goal 4 home only
   - Command Center — users/admins by operation; reserved Goal 5 home only
   - Catalog Sync — users
@@ -284,6 +286,11 @@ Reserved Goal 5 home: `Command Center`; this proposal does not design or impleme
 | shopify_payout_transaction_action | (action) | [('backend_id.enable_payout_import', '=', True)] | addons/shopify_connector_pro/views/shopify_payout_views.xml:167 |
 
 Regression guard: Phase B must preserve every action domain above and every explicit `groups=` marker unless a reviewed IA change intentionally makes visibility stricter.
+
+
+### AUDIT.md candidates, report-only
+
+- Promoter stat buttons are non-functional stubs: Orders, Revenue, Discounts, and Commission all call `action_dummy` at `addons/shopify_connector_pro/views/shopify_promoter_views.xml:32-42`, and `action_dummy` is a literal placeholder stub at `addons/shopify_connector_pro/models/shopify_promoter.py:58-60`. Since promoters are first-class v1 (DEC-022), these non-functional placeholder stat buttons are a Goal-3-relevant defect. Report-only in Phase A; do not edit AUDIT.md and do not fix in this task.
 
 ## 8. Phase B implementation guardrails
 

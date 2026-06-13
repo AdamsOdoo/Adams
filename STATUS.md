@@ -6,6 +6,7 @@ Updated 2026-06-13 — Goal 3 Phase A completed locally; implementation remains 
 - Goal 2B is closed and review/full-audit is accepted green at 1f34d261b8c2342bd44d3e36e013408605cab8f4.
 - RF1 and RF1b are accepted/closed; `_log_feature_skip` references are absent under `addons/shopify_connector_pro`.
 - Goal 3 Phase A research produced `docs/product/MENU_IA.md` and `docs/archive/GOAL3A_MANIFEST.md`.
+- Phase A docs correction applied: dashboard-module live-tree accuracy corrected and promoter `action_dummy` stub finding added; awaiting Claude re-review; Phase B remains gated.
 - DEC-029 and DEC-030 were appended as Proposed IA rows only.
 
 ## Verified locally
