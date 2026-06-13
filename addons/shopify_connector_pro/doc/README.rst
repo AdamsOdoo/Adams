@@ -31,14 +31,6 @@ Connection Requirements
 Architecture
 =============
 
-::
-
-  ┌──────────────┐         ┌──────────────┐         ┌──────────────────┐
-  │  Odoo Models │  ←───→  │  Sync Layer  │  ←───→  │  Shopify GraphQL │
-  │  (Bindings)  │         │  (Importers/ │         │  Admin API       │
-  │              │         │   Exporters) │         │  (2026-01)       │
-  └──────────────┘         └──────────────┘         └──────────────────┘
-
 * **Models layer** (``models/``): Binding records linking Odoo ↔ Shopify IDs.
   Checksum-based change detection to avoid redundant writes.
 * **Sync layer** (``sync/``): Business logic for import/export per entity.

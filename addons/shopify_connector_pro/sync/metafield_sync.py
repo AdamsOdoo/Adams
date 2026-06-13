@@ -15,10 +15,15 @@ class MetafieldSync:
     def __init__(self, env, backend):
         self.env = env
         self.backend = backend
-        self.client = backend._make_api_client()
+        self.client = None
 
     def import_product_metafields(self, product_binding):
         """Import metafields for a specific product binding."""
+        if not self.backend.enable_metafields:
+            self.backend._log_feature_skip(
+                'metafield', 'import', 'Metafields / mappings',
+            )
+            return
         if not product_binding.shopify_id:
             return
 
@@ -31,6 +36,7 @@ class MetafieldSync:
         if not mappings:
             return
 
+        self.client = self.backend._make_api_client()
         try:
             body = self.client.execute(
                 FETCH_PRODUCT_METAFIELDS,
@@ -90,6 +96,11 @@ class MetafieldSync:
 
     def export_product_metafields(self, product_binding):
         """Export metafields from Odoo to Shopify for a product binding."""
+        if not self.backend.enable_metafields:
+            self.backend._log_feature_skip(
+                'metafield', 'export', 'Metafields / mappings',
+            )
+            return
         if not product_binding.shopify_id:
             return
 
@@ -123,6 +134,7 @@ class MetafieldSync:
         if not metafields_input:
             return
 
+        self.client = self.backend._make_api_client()
         try:
             self.client.execute_mutation(
                 METAFIELD_SET_MUTATION,

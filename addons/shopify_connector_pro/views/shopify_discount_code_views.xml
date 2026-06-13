@@ -128,6 +128,7 @@
         <field name="name">Discount Codes</field>
         <field name="res_model">shopify.discount.code</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[('backend_id.enable_promoters', '=', True)]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a discount code
