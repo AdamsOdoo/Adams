@@ -1,19 +1,18 @@
 # STATUS.md — Current State
 
-Updated 2026-06-13 — Goal 2B accepted green; RF1 implemented locally, awaiting review and Odoo.sh relay.
+Updated 2026-06-13 — Goal 3 Phase A completed locally; implementation remains gated.
 
 ## What changed
-- Goal 2B is accepted green: Odoo.sh reported 0 failed / 0 errors of 589, no docutils error, and the feature-flag user assignment uses `new_test_user`.
-- RF1 quiets intentionally disabled advanced scheduled crons by excluding disabled backends from cron domains instead of creating recurring skip logs/chatter.
-- RF1 changes gift-card/metafield disabled helper paths to quiet `_logger.info` early returns with no sync-log/chatter noise.
-- DEC-028 is now Active with the Goal 2B green-build activation note.
+- Goal 2B is closed and review/full-audit is accepted green at 1f34d261b8c2342bd44d3e36e013408605cab8f4.
+- RF1 and RF1b are accepted/closed; `_log_feature_skip` references are absent under `addons/shopify_connector_pro`.
+- Goal 3 Phase A research produced `docs/product/MENU_IA.md` and `docs/archive/GOAL3A_MANIFEST.md`.
+- DEC-029 and DEC-030 were appended as Proposed IA rows only.
 
 ## Verified locally
-- Content-based baseline checks passed because this Codex harness lacks the accepted merge commit object.
-- Static Python compile and XML parse were run for RF1.
-- Odoo runtime is unavailable locally (`/home/user/odoo/odoo-bin` missing), so Odoo.sh relay remains required.
+- Menu, button, group, action-domain, and visibility evidence was enumerated from current XML/security files.
+- No code/XML/security/manifest/test/sync/migration/hook/README/AUDIT files were edited.
 
 ## Pending / Next
-- Claude RF1 review.
-- If approved, create one PR for RF1, run Odoo.sh targeted feature-flag suite, then one full-suite profile.
-- Do not start Goal 3 until RF1 is reviewed, PR'd, relayed green, and accepted.
+- Awaiting Claude review of the Phase A IA proposal.
+- Phase B menu/XML implementation is gated until explicit approval.
+- Goal 4 wizard flow and Goal 5 Sync Command Center remain reserved only, not designed or implemented.
