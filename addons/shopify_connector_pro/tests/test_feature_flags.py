@@ -15,6 +15,9 @@ class TestFeatureFlagMechanism(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        self.env['shopify.backend'].search([('state', '=', 'connected')]).write({
+            'state': 'draft',
+        })
         self.backend = self.env['shopify.backend'].create({
             'name': 'Flag Store',
             'shop_url': 'flags.myshopify.com',
@@ -23,11 +26,11 @@ class TestFeatureFlagMechanism(TransactionCase):
             'state': 'connected',
         })
 
-    def _latest_log(self, entity):
-        return self.env['shopify.sync.log'].search([
+    def _sync_log_count(self, entity):
+        return self.env['shopify.sync.log'].search_count([
             ('backend_id', '=', self.backend.id),
             ('entity', '=', entity),
-        ], order='id desc', limit=1)
+        ])
 
     def test_new_defaults_preserve_current_optional_behavior(self):
         self.assertTrue(self.backend.enable_promoters)
@@ -37,7 +40,6 @@ class TestFeatureFlagMechanism(TransactionCase):
         self.assertFalse(self.backend.enable_customer_tags)
 
     def test_admin_only_non_admin_cannot_flip_flags(self):
-        group_user = self.env.ref('shopify_connector_pro.group_shopify_user')
         user = new_test_user(
             self.env,
             login='shopify_operator_goal2b',
@@ -78,66 +80,60 @@ class TestFeatureFlagMechanism(TransactionCase):
         self.assertFalse(self.backend.enable_metafields)
         self.assertFalse(self.backend.enable_customer_tags)
 
-    def test_promoter_cron_off_logs_visible_skip(self):
+    def test_promoter_cron_off_quietly_excludes_backend(self):
         self.backend.enable_promoters = False
+        before = self._sync_log_count('discount')
         with patch('odoo.addons.shopify_connector_pro.sync.discount_sync.DiscountSync.export_discounts') as sync:
             self.env['shopify.backend']._cron_sync_discounts()
         sync.assert_not_called()
-        log = self._latest_log('discount')
-        self.assertTrue(log)
-        self.assertEqual(log.skipped_count, 1)
-        self.assertIn('disabled', log.error_details)
+        self.assertEqual(self._sync_log_count('discount'), before)
 
-    def test_collections_reused_toggle_off_logs_visible_skip(self):
+    def test_collections_reused_toggle_off_quietly_excludes_backend(self):
         self.backend.auto_sync_collections = False
+        before = self._sync_log_count('collection')
         with patch('odoo.addons.shopify_connector_pro.sync.collection_sync.CollectionSync.import_collections') as sync:
             self.env['shopify.backend']._cron_sync_collections()
         sync.assert_not_called()
-        log = self._latest_log('collection')
-        self.assertTrue(log)
-        self.assertEqual(log.skipped_count, 1)
+        self.assertEqual(self._sync_log_count('collection'), before)
 
-    def test_payout_cron_off_logs_visible_skip(self):
+    def test_payout_cron_off_quietly_excludes_backend(self):
         self.backend.enable_payout_import = False
+        before = self._sync_log_count('payout')
         with patch('odoo.addons.shopify_connector_pro.sync.payout_sync.PayoutSync.import_payouts') as sync:
             self.env['shopify.backend']._cron_import_payouts()
         sync.assert_not_called()
-        log = self._latest_log('payout')
-        self.assertTrue(log)
-        self.assertEqual(log.skipped_count, 1)
+        self.assertEqual(self._sync_log_count('payout'), before)
 
-    def test_abandoned_cart_reused_toggle_off_logs_visible_skip(self):
+    def test_abandoned_cart_reused_toggle_off_quietly_excludes_backend(self):
         self.backend.auto_sync_abandoned_carts = False
+        before = self._sync_log_count('abandoned_cart')
         with patch('odoo.addons.shopify_connector_pro.sync.abandoned_cart_sync.AbandonedCartSync.import_abandoned_carts') as sync:
             self.env['shopify.backend']._cron_import_abandoned_carts()
         sync.assert_not_called()
-        log = self._latest_log('abandoned_cart')
-        self.assertTrue(log)
-        self.assertEqual(log.skipped_count, 1)
+        self.assertEqual(self._sync_log_count('abandoned_cart'), before)
 
-    def test_gift_card_off_logs_skip_before_api_client(self):
+    def test_gift_card_off_quietly_returns_before_api_client(self):
         self.backend.enable_gift_cards = False
+        before = self._sync_log_count('gift_card')
         with patch.object(type(self.backend), '_make_api_client', return_value=MagicMock()) as client:
             result = GiftCardSync(self.env, self.backend).import_gift_cards()
         client.assert_not_called()
         self.assertEqual(result, (0, 0, 1))
-        log = self._latest_log('gift_card')
-        self.assertTrue(log)
-        self.assertEqual(log.skipped_count, 1)
+        self.assertEqual(self._sync_log_count('gift_card'), before)
 
-    def test_metafield_off_logs_skip_before_api_client(self):
+    def test_metafield_off_quietly_returns_before_api_client(self):
         product = self.env['product.product'].create({'name': 'Flag Product'})
         binding = self.env['shopify.product.binding'].create({
             'backend_id': self.backend.id,
             'odoo_id': product.id,
             'shopify_id': 'gid://shopify/Product/1',
         })
+        before = self._sync_log_count('metafield')
         with patch.object(type(self.backend), '_make_api_client', return_value=MagicMock()) as client:
-            MetafieldSync(self.env, self.backend).import_product_metafields(binding)
+            result = MetafieldSync(self.env, self.backend).import_product_metafields(binding)
         client.assert_not_called()
-        log = self._latest_log('metafield')
-        self.assertTrue(log)
-        self.assertEqual(log.skipped_count, 1)
+        self.assertIsNone(result)
+        self.assertEqual(self._sync_log_count('metafield'), before)
 
     def test_menu_actions_filter_disabled_backend_records(self):
         action_expectations = {

@@ -20,8 +20,9 @@ class MetafieldSync:
     def import_product_metafields(self, product_binding):
         """Import metafields for a specific product binding."""
         if not self.backend.enable_metafields:
-            self.backend._log_feature_skip(
-                'metafield', 'import', 'Metafields / mappings',
+            _logger.info(
+                "Metafield import is disabled for backend %s; skipping.",
+                self.backend.display_name,
             )
             return
         if not product_binding.shopify_id:
@@ -97,8 +98,9 @@ class MetafieldSync:
     def export_product_metafields(self, product_binding):
         """Export metafields from Odoo to Shopify for a product binding."""
         if not self.backend.enable_metafields:
-            self.backend._log_feature_skip(
-                'metafield', 'export', 'Metafields / mappings',
+            _logger.info(
+                "Metafield export is disabled for backend %s; skipping.",
+                self.backend.display_name,
             )
             return
         if not product_binding.shopify_id:

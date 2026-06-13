@@ -19,8 +19,9 @@ class GiftCardSync:
     def import_gift_cards(self):
         """Fetch all gift cards from Shopify and create/update records."""
         if not self.backend.enable_gift_cards:
-            self.backend._log_feature_skip(
-                'gift_card', 'import', 'Gift-card reference import',
+            _logger.info(
+                "Gift-card reference import is disabled for backend %s; skipping.",
+                self.backend.display_name,
             )
             return 0, 0, 1
 

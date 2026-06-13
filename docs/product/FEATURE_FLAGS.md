@@ -42,9 +42,10 @@ Core merchant flows required for a correct Shopify Connector Pro Ultimate Editio
 ## Flag Semantics
 
 - OFF hides menus/views and disables scheduled processing where applicable.
-- OFF must not silently drop data. If a webhook or job arrives for a disabled advanced feature, the connector should log/skip visibly.
-- Webhook events for disabled features should be logged/skipped visibly, not ignored.
-- Existing records remain; turning a flag OFF never deletes records, bindings, logs, or audit evidence.
+- Scheduled jobs for disabled features are quietly skipped by domain/out-of-scope behavior; intentionally disabled crons should not create recurring sync-log or chatter noise.
+- Visible disabled-feature messaging applies to user-triggered actions and inbound webhooks.
+- Inbound webhook events for disabled features must never be silently dropped; they must be logged/skipped visibly, not ignored.
+- Existing records remain; turning a feature OFF never deletes records, bindings, logs, or audit evidence.
 - Only admin-level users can flip feature flags.
 - Settings lock/validation belongs to Goal 4; Phase A records this dependency but does not design it.
 - Money-path flags must keep existing safety guards, activities, and audit evidence; turning a feature ON cannot bypass total-check, tax/currency validation, idempotency, or no-silent-failure rules.

@@ -1036,33 +1036,6 @@ class ShopifyBackend(models.Model):
         )
         self.message_post(body=body, message_type='notification', subtype_xmlid='mail.mt_note')
 
-    def _log_feature_skip(self, entity, operation, feature_label):
-        """Record a visible skipped sync when an optional feature is OFF."""
-        self.ensure_one()
-        details = _(
-            "%(feature)s is disabled for backend %(backend)s; %(operation)s skipped visibly.",
-            feature=feature_label,
-            backend=self.display_name,
-            operation=operation,
-        )
-        log = self.env['shopify.sync.log'].sudo().create({
-            'backend_id': self.id,
-            'entity': entity,
-            'operation': operation,
-            'state': 'done',
-            'finished_at': fields.Datetime.now(),
-            'total_records': 1,
-            'skipped_count': 1,
-            'error_details': details,
-        })
-        self.message_post(
-            body="<p><strong>Feature disabled:</strong> %s</p>" % details,
-            message_type='notification',
-            subtype_xmlid='mail.mt_note',
-        )
-        _logger.info(details)
-        return log
-
     @api.model
     def _feature_flag_seed_values(self):
         return {
@@ -1227,7 +1200,10 @@ class ShopifyBackend(models.Model):
 
     @api.model
     def _cron_sync_discounts(self):
-        backends = self.search([('state', '=', 'connected')])
+        backends = self.search([
+            ('state', '=', 'connected'),
+            ('enable_promoters', '=', True),
+        ])
         for backend in backends:
             if not backend.enable_promoters:
                 backend._log_feature_skip(
@@ -1246,7 +1222,10 @@ class ShopifyBackend(models.Model):
 
     @api.model
     def _cron_sync_collections(self):
-        backends = self.search([('state', '=', 'connected')])
+        backends = self.search([
+            ('state', '=', 'connected'),
+            ('auto_sync_collections', '=', True),
+        ])
         for backend in backends:
             if not backend.auto_sync_collections:
                 backend._log_feature_skip('collection', 'import', _('Collections'))
@@ -1264,7 +1243,10 @@ class ShopifyBackend(models.Model):
 
     @api.model
     def _cron_import_payouts(self):
-        backends = self.search([('state', '=', 'connected')])
+        backends = self.search([
+            ('state', '=', 'connected'),
+            ('enable_payout_import', '=', True),
+        ])
         for backend in backends:
             if not backend.enable_payout_import:
                 backend._log_feature_skip('payout', 'import', _('Payout visibility import'))
