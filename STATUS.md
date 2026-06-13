@@ -1,37 +1,30 @@
-# STATUS.md
+# STATUS.md — Current State
 
-Updated: 2026-06-12 — green-build loop with Ahmed in progress
+Updated 2026-06-13 — Goal 2 Phase A design complete; Phase B not started.
 
-## Current goal (Ahmed, 2026-06-12): GREEN ODOO.SH BUILD
-Everything else paused until a green Odoo.sh build of `review/full-audit`
-exists. Governance simplified same day: all five overnight retroactive
-GOs approved; money-path now under standing approval (consequence
-statements recorded in FINALIZE.md); two touchpoints remain (Odoo.sh
-relay, human test). MORNING_REVIEW.md retired.
+## What changed
+- Goal 1 behavior contract remains complete for all 27 sections and sync ownership matrix remains populated.
+- Ahmed approved DEC-025/026/027 conservative defaults: gift cards and payouts are reference/visibility only in v1; Odoo→Shopify refund push is not a v1 core promise and should default OFF / not marketed until controls exist.
+- Goal 2 Phase A researched existing backend toggles, crons, menus/actions, webhook topics, and project-local Odoo toggle patterns.
+- `docs/product/FEATURE_FLAGS.md` is now a Phase A design draft only; no production code or Phase B implementation was performed.
+- `docs/archive/GOAL2A_MANIFEST.md` records files read, existing toggles, surface enumeration, and the no-new-Ahmed-escalation result.
 
-## State
-- Branch consolidation DONE: PR #16 merged the entire project into
-  `review/full-audit` (13f28cf). Old branches (main/dev/staging/feat/
-  hardening/design-*) verified contained or pre-reset; nothing to salvage.
-- Odoo.sh build failure DIAGNOSED + FIXED: ENV-1, now 5 chart-provided
-  pieces bootstrapped by the test mixins (company country, tax group,
-  bank journal, company income account, ir.default partner
-  receivable/payable). Commits 2d88344, e39aebc, 4888f38 + PR #17/#18.
-- Build-log fully SILENCED (rounds 2+3, commits 4888f38/e2c8b2e/
-  58f7794/d12a040): fixtures mock the Shopify boundary, 31 negative-
-  test classes mute their asserted logger, sim webhook delivery
-  synchronous under current_test. No production logic changed.
-- Verification (core b4c7247f, final code): chartless fresh 0 failed,
-  0 errors of 578 with the ENTIRE install log free of WARNING/ERROR/
-  CRITICAL lines; adams_strict1 0/0 of 578; adams_strict_vat 0/0 of
-  578 (both zero our-module WARNING/ERROR).
-- Awaiting: Ahmed rebuilds review/full-audit on Odoo.sh, pastes log.
-  Loop until green. Once green: run-down report (fixed-so-far in
-  merchant terms, verified vs pending-Odoo.sh, milestone gaps M1-M3,
-  zero-knowledge test script) + the 9 confirmation commands
-  restructured into web-shell paste blocks (FINALIZE.md has them).
+## Verified
+- Part 0 and Phase A stayed docs-only and did not modify production code, tests, manifests, XML, security, data, controllers, models, sync, Shopify API, or addon files.
+- DEC-025/026/027 are recorded as Active; DEC-028 is Proposed only for Phase B review.
 
-## Next work after green build
-- Tier 2 remainder: positional variant-matching lead
-  (product_sync.py:240 vs SKU path :449), concurrency pass.
-- Open: AUD-009/010/014/026 (AUD-026 = payload PII decision, Ahmed).
+## Parallel workstream — green Odoo.sh build loop
+- Live state: review/full-audit green-build loop remains pending; local verification already reported all three profiles at 0 failed / 0 errors of 578.
+- Awaiting Ahmed’s next Odoo.sh build log relay; judge the log before merging Goal 1/Goal 2A docs into review/full-audit.
+- Merge docs-only work between green-build rounds so each Odoo.sh log remains attributable to one change set.
+- After green build is judged, continue the run-down report / remaining Tier 2 audit work as previously planned.
+
+## Pending
+- Claude fresh-context adversarial review of Part 0 decision recording and Goal 2 Phase A design.
+- Phase B requires explicit GO before any implementation, migrations, views, tests, or production code changes.
+- Open findings to keep visible: AUD-009, AUD-010, AUD-014, AUD-026, plus Goal 1 findings AUD-027, AUD-028, AUD-029.
+
+## Next action
+- Claude reviews Goal 2 Phase A docs and proposed DEC-028.
+- If passed, decide the Phase B charter and green-build timing before implementation.
+- Do not start Goal 2 Phase B without explicit GO.
