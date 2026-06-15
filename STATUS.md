@@ -1,19 +1,11 @@
-# STATUS.md — Current State
+# STATUS
 
-Updated 2026-06-13 — Goal 2B accepted green; RF1 implemented locally, awaiting review and Odoo.sh relay.
-
-## What changed
-- Goal 2B is accepted green: Odoo.sh reported 0 failed / 0 errors of 589, no docutils error, and the feature-flag user assignment uses `new_test_user`.
-- RF1 quiets intentionally disabled advanced scheduled crons by excluding disabled backends from cron domains instead of creating recurring skip logs/chatter.
-- RF1 changes gift-card/metafield disabled helper paths to quiet `_logger.info` early returns with no sync-log/chatter noise.
-- DEC-028 is now Active with the Goal 2B green-build activation note.
-
-## Verified locally
-- Content-based baseline checks passed because this Codex harness lacks the accepted merge commit object.
-- Static Python compile and XML parse were run for RF1.
-- Odoo runtime is unavailable locally (`/home/user/odoo/odoo-bin` missing), so Odoo.sh relay remains required.
-
-## Pending / Next
-- Claude RF1 review.
-- If approved, create one PR for RF1, run Odoo.sh targeted feature-flag suite, then one full-suite profile.
-- Do not start Goal 3 until RF1 is reviewed, PR'd, relayed green, and accepted.
+- Current mode: local Codex workspace; user will handle branch updates, PR, merge, and Odoo.sh relay.
+- Project-stated baseline: Goal 3 complete and green at review/full-audit @ 2b926746cc90075040af6046cf5b8b7fa64d89d6; commit object may be unavailable locally.
+- Goal 4 Phase A completed locally as docs-only research/design.
+- Produced settings-safety proposal for wizard-first setup, validated backend state, settings lock, admin unlock, credential retest, staged/money-path validation, and upgrade posture.
+- Added Proposed DEC rows only for Goal 4 go-live, lock mechanism, and upgrade posture; none are Active.
+- Phase B remains gated pending Claude/Ahmed review.
+- No Goal 4 implementation started.
+- No code/XML/security/manifest/test files touched.
+- Awaiting Claude review.

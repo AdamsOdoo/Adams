@@ -785,3 +785,26 @@ References to `MORNING_REVIEW.md` in this repository are historical audit/govern
 - **Description:** Posting an Odoo credit note can create a real Shopify refund, but the inspected reverse path does not record a Shopify refund identifier or idempotency token. Retry/replay semantics are therefore unclear for a money-path operation.
 - **Proposed fix:** Before enabling/claiming this in v1, decide the product policy and add a persisted idempotency marker/binding or require manual Shopify refund creation.
 - **Status:** open
+
+---
+
+## AUD-030 — Duplicate `action_manager_dashboard` across connector and hollow dashboard module
+
+- **Severity:** minor
+- **Evidence:** `addons/shopify_connector_pro/views/manager_dashboard_action.xml:3-6` and deleted orphan `addons/shopify_connector_pro_dashboard/views/manager_dashboard_action.xml:3-6` both defined `action_manager_dashboard`; `addons/shopify_connector_pro_dashboard/__manifest__.py:19-20` kept `data: []` and `assets: {}` so the companion copy was not loaded.
+- **Description:** The repository shipped duplicate dashboard action XML in the hollow companion dashboard module even though the live connector already provides the manager dashboard action.
+- **Status:** fixed / resolved by Goal 3 Phase B dashboard-module copy removal.
+
+## AUD-031 — Hollow `shopify_connector_pro_dashboard` shipped orphaned dead files
+
+- **Severity:** minor
+- **Evidence:** `addons/shopify_connector_pro_dashboard/__manifest__.py:5-20` declares a merged hollow stub with empty `data` and `assets`, while the removed companion module files under `views/`, `models/`, `security/`, `static/src/`, and `tests/` were not loaded by the module.
+- **Description:** Keeping orphaned dead files inside a hollow compatibility module increased maintenance risk and made dashboard ownership ambiguous.
+- **Status:** fixed / resolved by Goal 3 Phase B tombstone cleanup; `__init__.py`, `__manifest__.py`, and `models/__init__.py` remain for upgrade/uninstall compatibility.
+
+## AUD-032 — Promoter stat buttons call `action_dummy` stub
+
+- **Severity:** minor
+- **Evidence:** `addons/shopify_connector_pro/views/shopify_promoter_views.xml:32-41` — Orders, Revenue, Discounts, and Commission stat buttons all call `action_dummy`; `addons/shopify_connector_pro/models/shopify_promoter.py:58` defines the placeholder method.
+- **Description:** Since promoters are first-class v1 (DEC-022), non-functional placeholder stat buttons are a Goal-3-relevant UX defect. Goal 3 does not modify promoter views.
+- **Status:** open / deferred to Goal 8.

@@ -61,3 +61,26 @@ These rows are populated now because Goal 2B introduced production feature-flag 
 | Metafield import disabled | workflow/negative | `addons/shopify_connector_pro/tests/test_feature_flags.py::TestFeatureFlagMechanism.test_metafield_off_logs_skip_before_api_client` | Local static check; Odoo runtime pending relay | Implemented | OFF logs a skip before creating a Shopify API client. |
 | Feature menu/action filtering | ui | `addons/shopify_connector_pro/tests/test_feature_flags.py::TestFeatureFlagMechanism.test_menu_actions_filter_disabled_backend_records` | Local static check; Odoo runtime pending relay | Implemented | Menu actions filter records by backend feature flag/reused toggle. |
 | AUD-029 reverse refund push disabled | accounting/negative | `addons/shopify_connector_pro/tests/test_feature_flags.py::TestFeatureFlagReverseRefundMoneyPath.test_aud_029_reverse_refund_off_does_not_call_refund_create` | Local static check; Odoo runtime pending relay | Implemented | Posting a real `out_refund` credit note with `reverse_sync_refund=False` does not create a Shopify API client/refund mutation. |
+
+
+## Goal 3 Phase B UI surface rows
+
+Menu/button surface inventory is recorded here for Goal 6 mapping. Test references are intentionally not fabricated; Goal 6 owns final test mapping.
+
+| Surface | Type: workflow/button/cron/webhook/negative/security/accounting/ui | Test file::method | Profile | Status | Evidence |
+|---|---|---|---|---|---|
+| Shopify root menu | menu | Goal 6 mapping pending | Local XML parse/reference check | present | `addons/shopify_connector_pro/views/shopify_menu.xml` |
+| Store Overview menu | menu | Goal 6 mapping pending | Local XML parse/reference check | present | `menu_shopify_dashboard` -> `shopify_dashboard_action` |
+| Manager Dashboard menu | menu | Goal 6 mapping pending | Local XML parse/reference check | present | `menu_shopify_manager_dashboard` -> `action_manager_dashboard` |
+| Catalog Sync menu group | menu | Goal 6 mapping pending | Local XML parse/reference check | present | Products, Inventory, Collections, Metafields, Locations |
+| Sales Sync menu group | menu | Goal 6 mapping pending | Local XML parse/reference check | present | Customers, Orders, Refunds, Transactions |
+| Advanced / Optional Data menu group | menu | Goal 6 mapping pending | Local XML parse/reference check | present | Abandoned Carts, Payouts, Gift Cards, Customer Tags, Promoters, Discount Codes, Discount Usage |
+| Configuration menu group | menu | Goal 6 mapping pending | Local XML parse/reference check | present | Admin configuration menus retained |
+| Operations menu group | menu | Goal 6 mapping pending | Local XML parse/reference check | present | Sync/import/retry/export/import jobs retained |
+| Generate Demo Data menu | menu | Goal 6 mapping pending | Local XML parse/reference check | present | Gated to `base.group_no_one` |
+| Logs & Audit menu group | menu | Goal 6 mapping pending | Local XML parse/reference check | present | Sync Log, Webhook Log, Sync Analytics |
+| Binding retry buttons | ui/button | Goal 6 mapping pending | Phase A XML inventory | present | Retry buttons on product/customer/order/inventory/collection/refund/discount bindings |
+| Backend connection/webhook/action buttons | ui/button | Goal 6 mapping pending | Phase A XML inventory | present | Backend form buttons for test connection, webhooks, import locations, sync logs, reconciliation |
+| Abandoned cart recovery buttons | ui/button | Goal 6 mapping pending | Phase A XML inventory | present | Create Quotation, Open Recovery URL, Mark Recovered |
+| Wizard action buttons | ui/button | Goal 6 mapping pending | Phase A XML inventory | present | Sync/import/export/retry/onboarding/demo wizard buttons |
+| Promoter stat buttons | ui/button | Goal 6 mapping pending | Phase A XML inventory | present | Present but AUD-032 open: `action_dummy` stubs deferred to Goal 8 |
