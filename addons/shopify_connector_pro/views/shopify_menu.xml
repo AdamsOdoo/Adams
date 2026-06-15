@@ -8,26 +8,142 @@
               groups="shopify_connector_pro.group_shopify_user"
               sequence="50"/>
 
-    <!-- Dashboard (built-in sync overview) -->
+    <!-- Dashboard entries: one live Shopify root, role-clear labels -->
     <menuitem id="menu_shopify_dashboard"
               name="Store Overview"
               parent="menu_shopify_root"
               action="shopify_dashboard_action"
               sequence="10"/>
 
-    <!-- Manager Dashboard (KPIs, charts, analytics) -->
     <menuitem id="menu_shopify_manager_dashboard"
               name="Manager Dashboard"
               parent="menu_shopify_root"
               action="action_manager_dashboard"
               sequence="15"/>
 
+    <!-- seq reserved: Goal 4 Getting Started / Setup -->
+    <!-- seq reserved: Goal 5 Sync Command Center -->
+
+    <!-- Catalog Sync -->
+    <menuitem id="menu_shopify_catalog_sync"
+              name="Catalog Sync"
+              parent="menu_shopify_root"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_products"
+              name="Products"
+              parent="menu_shopify_catalog_sync"
+              action="shopify_product_binding_action"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_inventory"
+              name="Inventory"
+              parent="menu_shopify_catalog_sync"
+              action="shopify_inventory_binding_action"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_collections"
+              name="Collections"
+              parent="menu_shopify_catalog_sync"
+              action="shopify_collection_binding_action"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_metafields"
+              name="Metafields"
+              parent="menu_shopify_catalog_sync"
+              action="shopify_metafield_action"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_locations"
+              name="Locations"
+              parent="menu_shopify_catalog_sync"
+              action="shopify_location_action"
+              sequence="50"/>
+
+    <!-- Sales Sync -->
+    <menuitem id="menu_shopify_sales_sync"
+              name="Sales Sync"
+              parent="menu_shopify_root"
+              sequence="35"/>
+
+    <menuitem id="menu_shopify_customers"
+              name="Customers"
+              parent="menu_shopify_sales_sync"
+              action="shopify_customer_binding_action"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_orders"
+              name="Orders"
+              parent="menu_shopify_sales_sync"
+              action="shopify_order_binding_action"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_refunds"
+              name="Refunds"
+              parent="menu_shopify_sales_sync"
+              action="shopify_refund_binding_action"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_transactions"
+              name="Transactions"
+              parent="menu_shopify_sales_sync"
+              action="shopify_order_transaction_action"
+              sequence="40"/>
+
+    <!-- Advanced / Optional Data -->
+    <menuitem id="menu_shopify_advanced_optional"
+              name="Advanced / Optional Data"
+              parent="menu_shopify_root"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_abandoned_carts"
+              name="Abandoned Carts"
+              parent="menu_shopify_advanced_optional"
+              action="shopify_abandoned_cart_action"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_payouts"
+              name="Payouts"
+              parent="menu_shopify_advanced_optional"
+              action="shopify_payout_action"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_gift_cards"
+              name="Gift Cards"
+              parent="menu_shopify_advanced_optional"
+              action="shopify_gift_card_action"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_customer_tags"
+              name="Customer Tags"
+              parent="menu_shopify_advanced_optional"
+              action="shopify_customer_tag_action"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_promoters"
+              name="Promoters"
+              parent="menu_shopify_advanced_optional"
+              action="shopify_promoter_action"
+              sequence="50"/>
+
+    <menuitem id="menu_shopify_discount_codes"
+              name="Discount Codes"
+              parent="menu_shopify_advanced_optional"
+              action="shopify_discount_code_action"
+              sequence="60"/>
+
+    <menuitem id="menu_shopify_discount_usage"
+              name="Discount Usage"
+              parent="menu_shopify_advanced_optional"
+              action="shopify_discount_usage_action"
+              sequence="70"/>
+
     <!-- Configuration (Admin only) -->
     <menuitem id="menu_shopify_configuration"
               name="Configuration"
               parent="menu_shopify_root"
               groups="shopify_connector_pro.group_shopify_admin"
-              sequence="20"/>
+              sequence="50"/>
 
     <menuitem id="menu_shopify_stores"
               name="Shopify Stores"
@@ -64,7 +180,7 @@
               name="Operations"
               parent="menu_shopify_root"
               groups="shopify_connector_pro.group_shopify_admin"
-              sequence="30"/>
+              sequence="60"/>
 
     <menuitem id="menu_shopify_sync_now"
               name="Sync Now"
@@ -96,132 +212,19 @@
               action="shopify_import_job_action"
               sequence="50"/>
 
+    <!-- Dev/QA only: hidden from normal/admin merchant navigation. -->
     <menuitem id="menu_shopify_demo_data"
               name="Generate Demo Data"
               parent="menu_shopify_operations"
               action="shopify_demo_data_wizard_action"
-              groups="shopify_connector_pro.group_shopify_admin"
+              groups="base.group_no_one"
               sequence="90"/>
 
-    <!-- Sync Status -->
-    <menuitem id="menu_shopify_sync_status"
-              name="Sync Status"
-              parent="menu_shopify_root"
-              sequence="40"/>
-
-    <menuitem id="menu_shopify_products"
-              name="Products"
-              parent="menu_shopify_sync_status"
-              action="shopify_product_binding_action"
-              sequence="10"/>
-
-    <menuitem id="menu_shopify_customers"
-              name="Customers"
-              parent="menu_shopify_sync_status"
-              action="shopify_customer_binding_action"
-              sequence="20"/>
-
-    <menuitem id="menu_shopify_orders"
-              name="Orders"
-              parent="menu_shopify_sync_status"
-              action="shopify_order_binding_action"
-              sequence="30"/>
-
-    <menuitem id="menu_shopify_inventory"
-              name="Inventory"
-              parent="menu_shopify_sync_status"
-              action="shopify_inventory_binding_action"
-              sequence="40"/>
-
-    <menuitem id="menu_shopify_collections"
-              name="Collections"
-              parent="menu_shopify_sync_status"
-              action="shopify_collection_binding_action"
-              sequence="50"/>
-
-    <menuitem id="menu_shopify_refunds"
-              name="Refunds"
-              parent="menu_shopify_sync_status"
-              action="shopify_refund_binding_action"
-              sequence="55"/>
-
-    <menuitem id="menu_shopify_locations"
-              name="Locations"
-              parent="menu_shopify_sync_status"
-              action="shopify_location_action"
-              sequence="60"/>
-
-    <!-- Sync Status — Additional Data -->
-    <menuitem id="menu_shopify_sync_additional"
-              name="Additional Data"
-              parent="menu_shopify_sync_status"
-              sequence="100"/>
-
-    <menuitem id="menu_shopify_abandoned_carts"
-              name="Abandoned Carts"
-              parent="menu_shopify_sync_additional"
-              action="shopify_abandoned_cart_action"
-              sequence="10"/>
-
-    <menuitem id="menu_shopify_transactions"
-              name="Transactions"
-              parent="menu_shopify_sync_additional"
-              action="shopify_order_transaction_action"
-              sequence="20"/>
-
-    <menuitem id="menu_shopify_payouts"
-              name="Payouts"
-              parent="menu_shopify_sync_additional"
-              action="shopify_payout_action"
-              sequence="30"/>
-
-    <menuitem id="menu_shopify_gift_cards"
-              name="Gift Cards"
-              parent="menu_shopify_sync_additional"
-              action="shopify_gift_card_action"
-              sequence="40"/>
-
-    <menuitem id="menu_shopify_customer_tags"
-              name="Customer Tags"
-              parent="menu_shopify_sync_additional"
-              action="shopify_customer_tag_action"
-              sequence="50"/>
-
-    <menuitem id="menu_shopify_metafields"
-              name="Metafields"
-              parent="menu_shopify_sync_additional"
-              action="shopify_metafield_action"
-              sequence="60"/>
-
-    <!-- Promoters -->
-    <menuitem id="menu_shopify_promoters_section"
-              name="Promoters"
-              parent="menu_shopify_root"
-              sequence="45"/>
-
-    <menuitem id="menu_shopify_promoters"
-              name="Promoters"
-              parent="menu_shopify_promoters_section"
-              action="shopify_promoter_action"
-              sequence="10"/>
-
-    <menuitem id="menu_shopify_discount_codes"
-              name="Discount Codes"
-              parent="menu_shopify_promoters_section"
-              action="shopify_discount_code_action"
-              sequence="20"/>
-
-    <menuitem id="menu_shopify_discount_usage"
-              name="Discount Usage"
-              parent="menu_shopify_promoters_section"
-              action="shopify_discount_usage_action"
-              sequence="30"/>
-
-    <!-- Logs -->
+    <!-- Logs &amp; Audit -->
     <menuitem id="menu_shopify_logs"
-              name="Logs"
+              name="Logs &amp; Audit"
               parent="menu_shopify_root"
-              sequence="50"/>
+              sequence="70"/>
 
     <menuitem id="menu_shopify_sync_log"
               name="Sync Log"
