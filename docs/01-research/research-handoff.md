@@ -1,9 +1,88 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint B)**
-> is immediately below; the **Sprint A** handoff is retained underneath as
-> history. The running **Sprint checkpoint log** (one note per stage, both
-> sprints) is at the very bottom.
+> Continuity lives in GitHub, not chat. The **current sprint (Sprint C)** is in
+> progress and its high-power research plan is immediately below; the **Sprint B**
+> handoff follows, and the **Sprint A** handoff is retained underneath as history.
+> The running **Sprint checkpoint log** (one note per stage, all sprints) is at
+> the very bottom. The full Sprint C handoff is written at the end of the sprint
+> (Stage 6); this top block is the pre-launch plan checkpoint.
+
+---
+
+# Research Sprint C (in progress) — Competitor deep dives + UX evidence
+
+> **Research Sprint C — High-Power Competitor Deep Dives, Screenshot/UX Evidence,
+> and Workflow Extraction.** Research-only; no-code gate in force (`CLAUDE.md`
+> §5). High-power research mode **explicitly authorized** for this sprint. Maps to
+> backlog items **RB-02.* (competitor deep dives)**, **RB-03.1 (feature matrix)**,
+> **RB-04.1 (UX/UI benchmark)**, **RB-07.1 (common patterns)**, **RB-08.1
+> (best-in-class)**, **RB-09.1 (gaps/opportunities)**, and **RB-10.1 (avoid-list)**.
+
+## Sprint C high-power research plan
+
+- **Why high-power mode is needed:** Eight user-provided competitor resources
+  (R1–R8) must be studied from **real evidence** — full documentation trees,
+  on-page screenshots, configuration/setup flows, feature claims, release notes,
+  pricing/support, and UX — so the connector is designed from knowledge, not
+  guesses. Several sources are multi-page (Emipro doc tree, VentorTech Confluence
+  hub with ~27 children) and two were previously gated (R2 Teqstars 403; R5
+  Google Doc login wall). Covering this breadth with verification in one pass
+  justifies a controlled parallel fan-out (per `CLAUDE.md` → High-power research
+  mode; the policy is a capability, not a cap).
+- **Workstreams / agents:** One **source-capture agent per resource** (R1 Webkul,
+  R2 Teqstars, R3 Emipro + sub-pages, R4 VentorTech Confluence hub + children, R5
+  Google Doc, R6 ecommerce_shopify, R7 VentorTech site, R8 sh_shopify_connector),
+  each returning **structured, cited, claim-classified evidence** (access status,
+  visible sections, feature claims, visuals/screenshots described, workflow steps,
+  version context). Then a **verification workstream** that re-checks the
+  highest-stakes claims (pricing, sync model, key features, access status) against
+  the captured evidence and flags anything unsupported. Synthesis into the
+  deliverable docs is performed by the worker (main thread) so governance
+  (citation + claim classification + no-MVP/no-architecture gate) is owned
+  centrally.
+- **Sources to inspect:** R1 https://webkul.com/blog/odoo-multichannel-shopify-connector/ ·
+  R2 https://docs.teqstars.com/19.0/applications/shopify/overview.html ·
+  R3 https://docs.emiprotechnologies.com/shopify-odoo-connector/v19/installation.html (+ tree) ·
+  R4 https://ventortech.atlassian.net/wiki/spaces/pd/pages/482639953/Shopify (+ children) ·
+  R5 https://docs.google.com/document/d/1zIwRxp7cvLYeyjl8P_mvsjC-v8Tsd_ugC1JbfTznHC8/edit ·
+  R6 https://apps.odoo.com/apps/modules/19.0/ecommerce_shopify ·
+  R7 https://ventor.tech/solutions/odoo-shopify-connector/ ·
+  R8 https://apps.odoo.com/apps/modules/19.0/sh_shopify_connector#features.
+  Tier-1 grounding only from the existing official Shopify/Odoo baselines (these
+  competitor sources are Tier 2–5 → **competitor claims**, not facts).
+- **Screenshots / UI evidence approach:** Primary evidence is the **screenshot
+  inventory markdown** (`competitor-screenshot-inventory.md` + per-vendor
+  `screenshots/*/README.md`) analysing what each visual/figure on the source
+  pages demonstrates (fields, buttons, tabs, workflow step, status/log surfaces,
+  UX). Actual binary image capture is **attempted only where practical and
+  high-value**; where impractical (JS-gated, heavy, or auth-gated) it is recorded
+  as "no file saved" with the reason — the analysis (not the file's existence) is
+  the deliverable. No authentication wall is bypassed to obtain any visual.
+- **Files to update:** (research) `competitor-deep-dives.md`,
+  `competitor-feature-matrix.md`, `ux-ui-benchmark.md`, `common-patterns.md`,
+  `best-in-class-observations.md`, `gaps-opportunities.md`, `avoid-list.md`,
+  `resource-inventory.md`, `research-handoff.md`; (source materials)
+  `competitor-source-notes.md`, `competitor-screenshot-inventory.md`,
+  `screenshots/README.md` + `screenshots/{webkul,teqstars,emipro,ventortech,odoo-apps}/README.md`;
+  (QA) `defect-pattern-log.md`, `architecture-review-log.md`,
+  `rejected-approaches-log.md`, `technical-debt-register.md`. **No other files.**
+- **Stop condition:** All accessible sources captured + verified; blocked sources
+  (R2/R5 if still gated, R4 gated children) documented without bypass; the nine
+  research deliverables + source/screenshot evidence written with every claim
+  cited and classified; QA logs and handoff updated; quality gate satisfied. Then
+  **stop** — no MVP scope, no architecture decisions, no code, no merge.
+- **Verification method:** Two-pass — topic capture, then an independent
+  verification agent (and worker spot-checks) re-reading the canonical source for
+  the highest-stakes claims; any figure/feature not literally supported on the
+  page is downgraded to **open question / vendor claim**, never asserted as fact
+  (reuses the DP-001 verification-pass gate).
+- **How unsupported claims will be prevented:** Strict claim classification on
+  every line (Fact / Competitor claim / Inference / Open question — `CLAUDE.md`
+  §8); vendor capability statements stay **competitor claims** unless a concrete
+  documented workflow/screenshot demonstrates them (then **visible demonstrated
+  workflow**); blocked/unknown is stated as such; no hidden-feature guessing; no
+  competitor claim is promoted to a Tier-1 fact (those come only from the existing
+  official baselines).
 
 ---
 
@@ -619,3 +698,23 @@ ChatGPT review.
   `technical-debt-register.md` left unchanged (none warranted). Ran the
   end-of-session quality gate (all items satisfied). Next: push branch, open one
   draft PR targeting `Shopify-connector`, then stop.
+
+### Research Sprint C checkpoints
+
+- **Sprint C / Stage 1 — Setup + high-power plan (2026-06-30):** Started Research
+  Sprint C (research-only; no-code gate confirmed via `CLAUDE.md` §5; high-power
+  mode **explicitly authorized** in the prompt). Fetched remote branches and
+  verified preconditions: **PR #50 is merged into `Shopify-connector`** (the
+  branch tip `d6fbcdb` *is* the PR #50 merge commit), the working branch is based
+  on `Shopify-connector` (identical to it at start), and all seven required files
+  are present. **Branch-name note (flagged for ChatGPT):** the harness designated
+  the working branch **`claude/research-sprint-c-competitors-hgoo8t`** (already
+  checked out, based on `Shopify-connector`), whereas the Sprint C prompt body
+  named `research/sprint-c-competitor-deep-dives-ux-evidence`; per the
+  session's hard git rule ("never push to a different branch without explicit
+  permission") the work proceeds on the harness-designated branch and the **PR
+  still targets `Shopify-connector`** — `main`/`dev` untouched. Read the required
+  governance/research files (CLAUDE.md, this handoff, learning rules, methodology,
+  resource inventory, backlog, both official baselines, all QA logs). Wrote the
+  **Sprint C high-power research plan** (above) and committed it. Next: Stage 2
+  source + screenshot evidence capture (controlled parallel fan-out).
