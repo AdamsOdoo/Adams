@@ -99,3 +99,17 @@ _(Filled in Stage 6.)_
   (previous handoff, defect log, rejected log, architecture-review log, decision
   records, current phase, allowed/forbidden files). Next: Stage 4 research
   workspace + source inventory.
+- **Stage 4 — Research workspace + source inventory (2026-06-30):** Created
+  `00-source-materials/README.md` (capture rules; empty until deep dives).
+  Created `resource-inventory.md` registering all 8 sources with the required
+  schema (ID, name, URL, source type, competitor/category, initial value,
+  evidence strength, current access status, what-to-extract-later, open
+  questions, notes); access verified 2026-06-30 (5 Accessible, 1 Partial — R4
+  VentorTech, 2 Blocked — R2 Teqstars 403/bot-block & R5 Google Doc login);
+  Google Doc marked private/user-provided/access-dependent; no detailed feature
+  claims asserted. Created `research-methodology.md` (source hierarchy; citation;
+  competitor-evidence; claim-classification; screenshot/pricing/feature/UX/
+  reliability/technical-risk extraction; deep-dive procedure; MVP/Phase2/Advanced/
+  Optional/Avoid disposition rules). Created `research-backlog.md` (14 sections,
+  RB-01..RB-14, each item with Objective/Inputs/Output file/Acceptance criteria/
+  Dependencies/Status + sequencing). Next: Stage 5 placeholder READMEs.
