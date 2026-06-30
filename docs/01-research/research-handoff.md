@@ -298,3 +298,38 @@ ChatGPT review.
   so the reword to "modular connector addon family" is deferred to a future
   ChatGPT-approved patch rather than edited out of scope here. **(Resolved in the
   final cleanup patch — both files reworded.)**
+
+### Research Sprint B checkpoints
+
+- **Sprint B / Stage 0 — Dedicated branch setup + governance correction
+  (2026-06-30):** Started Research Sprint B (research-only; no-code gate
+  confirmed via `CLAUDE.md` §5; allowed/forbidden files reconfirmed). The
+  original Sprint B prompt named `dev/Shopify-connector` as the dedicated project
+  integration branch. **Blocker (fact):** that branch cannot be created on the
+  remote — a plain `dev` branch already exists, and Git cannot hold both `dev`
+  and `dev/Shopify-connector` (a directory/file ref conflict; the push was
+  rejected with `directory file conflict`). The blocker was reported, not
+  worked around (no `dev` deletion, no force-push). **ChatGPT branch-policy
+  correction (decision, by ChatGPT):** use the existing remote branch
+  **`Shopify-connector`** as the dedicated project integration branch; leave
+  plain `dev` untouched; do not use `dev/Shopify-connector` or
+  `dev-Shopify-connector`. Sprint branches now branch from `Shopify-connector`
+  and Sprint PRs target `Shopify-connector` (not `main`, not `dev`). Verified
+  before acting: `origin/Shopify-connector` was at the old commit `68007a9`, had
+  **no** unique commits beyond `origin/main` (empty `main..Shopify-connector`),
+  and `68007a9` is a direct ancestor of `origin/main` (clean fast-forward). Then
+  fast-forwarded `Shopify-connector` to `origin/main` `a5d4543` (the merged PR
+  #49 Sprint A governance foundation) and pushed normally (`68007a9..a5d4543`,
+  no force). All seven governance-foundation files are present on the branch.
+- **Sprint B / Stage 1 — Pre-session governance check (2026-06-30):** Read
+  `CLAUDE.md`, this handoff, `claude-learning-rules.md`, `quality-feedback-loop.md`,
+  `research-methodology.md`, `resource-inventory.md`, `research-backlog.md`.
+  Confirmed: current phase is **research only**; the no-code gate applies; the
+  Sprint B allowed/forbidden file lists are understood; `Shopify-connector` is
+  the dedicated integration branch; the Sprint B working branch
+  `research/sprint-b-source-access-official-baseline` is based on
+  `Shopify-connector`; the Sprint B PR will target `Shopify-connector`; the old
+  branch `claude/odoo-shopify-research-setup-fs4wzi` remains non-canonical.
+  Sprint B maps to backlog items RB-01.1 (source validation), RB-05.1 (official
+  Shopify notes), RB-06.1 (official Odoo notes), and seeds RB-14 architecture
+  questions. Added this checkpoint note. Next: Stage 2 source validation.
