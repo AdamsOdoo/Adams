@@ -23,8 +23,10 @@ Each implementation task **must** specify all of the following (per CLAUDE.md §
 One scoped outcome. No scope creep.
 
 ### 2. Allowed files
-The exact files/paths this task may create or modify. Keep the connector a
-self-contained addon; do **not** modify `adams_base`/customer code.
+The exact files/paths this task may create or modify. Keep connector work
+isolated from `adams_base`/customer code and within the approved modular
+connector addon-family boundaries defined by architecture/ADRs. Do not bias
+implementation toward one giant connector module.
 
 ### 3. Forbidden files
 What must not be touched. Restate the no-code-elsewhere rule.

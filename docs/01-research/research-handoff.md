@@ -161,6 +161,11 @@ asserted — only registration/triage. Full detail in `resource-inventory.md`.
 - **Should future prompts change? Yes/No:** **Yes** — prompt templates now use
   the canonical research output filenames and the modular-family wording, and
   encode the provisional→canonical taxonomy sequencing.
+- **Final cleanup:** removed remaining "self-contained addon" wording from
+  implementation-phase governance templates so future implementation prompts
+  preserve modular addon-family language. Files updated:
+  `docs/05-qa/pr-review-checklist.md` (§C) and
+  `docs/06-prompts/implementation-task-template.md`.
 
 ## What ChatGPT should review
 
@@ -291,4 +296,5 @@ ChatGPT review.
   `docs/06-prompts/implementation-task-template.md` still contain the phrase
   "self-contained addon"; both are **outside this patch's allowed-files scope**,
   so the reword to "modular connector addon family" is deferred to a future
-  ChatGPT-approved patch rather than edited out of scope here.
+  ChatGPT-approved patch rather than edited out of scope here. **(Resolved in the
+  final cleanup patch — both files reworded.)**

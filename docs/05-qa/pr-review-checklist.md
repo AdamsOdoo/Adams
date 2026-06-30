@@ -56,8 +56,10 @@
 
 ## C. Implementation phase (activate later — gated)
 
-- [ ] **Allowed/forbidden files** honoured exactly; connector stays a
-      self-contained addon; `adams_base`/customer code untouched.
+- [ ] **Allowed/forbidden files** honoured exactly; connector remains isolated
+      from `adams_base`/customer code and follows the approved modular connector
+      addon-family architecture once defined; do not collapse the connector into
+      one giant module.
 - [ ] **Idempotency / duplicate prevention** — stable external-ID mapping;
       re-running a sync does not double-create/update.
 - [ ] **Error handling** — failures caught, surfaced, actionable.
