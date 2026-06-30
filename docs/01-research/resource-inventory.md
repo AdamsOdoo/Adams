@@ -73,3 +73,35 @@ unblock actions, extraction paths, deep-dive readiness) now lives in
 - **Unblock decisions for ChatGPT:** (1) R2 — accept an alternate fetch method
   for the 19.0 docs, or accept the 16.0 mirror as an explicitly non-equivalent
   fallback? (2) R5 — can the owner grant view access or provide an export?
+
+## Sprint C re-validation and access changes (2026-06-30)
+
+Research Sprint C re-ran a controlled anonymous access pass on all 8 resources
+(no auth bypassed) and **deep-crawled** the accessible ones. Net access changes
+vs Sprint B, with full per-source evidence in
+[`../00-source-materials/competitor-source-notes.md`](../00-source-materials/competitor-source-notes.md):
+
+| ID | Sprint B status | Sprint C status | What changed in Sprint C |
+| --- | --- | --- | --- |
+| R1 Webkul | Accessible | **Accessible** | Pricing **resolved**: store page shows **$170.00** (was an open question). **Version discrepancy** found: blog "1.0.0" vs store "3.5.1". |
+| R2 Teqstars 19.0 docs | Blocked (403) | **Blocked (403)** — unchanged, no bypass | The whole `docs.teqstars.com` host (19.0 **and** 16.0) still 403s. **But a different accessible Teqstars source was found:** the **Odoo Apps Store listing** `apps.odoo.com/apps/modules/19.0/shopify` (price **$326.20**, OPL-1, author **TeqStars**, **83 reviews/5.0**, ~28,630 LOC) — gives on-page facts + rich vendor claims. The deep dive is now possible from the **listing** (vendor claims), while the **docs remain blocked**. |
+| R3 Emipro | Accessible | **Accessible** | Deep-crawled ~35 v19 sub-pages (queues, webhooks, Markets, metafields, payouts, analytic mapping, net-profit). **No price/license in docs.** Published changelog stale on the v19 path (only to 17.0.3.2 / Apr 2024). |
+| R4 VentorTech Confluence | Partial | **Partial** — unchanged | 11 of 28 child articles read in full anonymously; 17 not fetched (recorded not-read). Hub dated **Nov 2023**; **Odoo version not stated** in docs. No auth bypassed. |
+| R5 Google Doc | Blocked | **Blocked** — unchanged, no bypass | **New finding:** R5 is the **"Get Started" guide for R6 `ecommerce_shopify`** (R6's `odoo.com/r/ecommerce-shopify` CTA 301-redirects to this exact doc). Still sign-in-gated; **owner access/export required**; content not inferred. |
+| R6 ecommerce_shopify | Accessible | **Accessible** | $195.56 / OPL-1 / "Odoo IN Pvt Ltd" / v19 only / **3824 LOC** / **no ratings yet**. **Cron-based (orders every 10 min), no webhooks, no UI screenshots.** Provenance (official vs partner) **still open** (India-subsidiary inference). |
+| R7 VentorTech site | Accessible | **Accessible** | Confirmed + extended via **ecosystem + Apps Store `integration_shopify`** (USD **569.16** / €499, v **2.1.6** updated 2026-06-23, **300+ installs**, 20 reviews) and a **dated release-notes page** (1.13.0 → 2.1.6) — the most transparent maintenance trail of the set. |
+| R8 sh_shopify_connector | Accessible | **Accessible** | $168.81 / OPL-1 / Softhealer / Odoo 12–19 / **18,951 LOC**. Broadest feature set (gift cards, abandoned-checkout→CRM, recommendations, Buy-with-Prime). **No ratings and no dated changelog** on the listing. |
+
+- **Access summary (2026-06-30, Sprint C):** Accessible **5** (R1, R3, R6, R7, R8;
+  plus the Teqstars **Apps listing** as an accessible R2 surrogate), Partial **1**
+  (R4), Blocked **2** (R2 docs host, R5 Google Doc). **No authentication wall was
+  bypassed on any resource.**
+- **Updated unblock asks for ChatGPT:** (1) **R2** — the Teqstars **docs** remain
+  403; decide whether the **Odoo Apps listing** (now captured) is sufficient
+  competitor evidence, or whether to pursue a browser-UA fetch of the 19.0 docs
+  for workflow/screenshot depth. (2) **R5** — owner view-access or an export;
+  note it is specifically **R6's setup guide**. (3) **R4** — optionally fetch the
+  remaining 17 Confluence child articles for full coverage.
+- **On-page pricing facts captured this sprint (2026-06-30):** R1 **$170**,
+  R2 **$326.20**, R6 **$195.56**, R7 **€499 / $569.16**, R8 **$168.81**; R3 price
+  not shown in its docs.
