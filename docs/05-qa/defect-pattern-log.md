@@ -23,7 +23,7 @@
 
 | Category | Count | At/over threshold? |
 | --- | --- | --- |
-| _none yet_ | 0 | — |
+| incorrect Shopify API assumption (#6) | 1 | No (1st — logged + prevention rule) |
 
 ---
 
@@ -32,6 +32,8 @@
 | ID | Date | Session / PR | Defect or issue pattern | Category | Root cause | Impact | Prevention rule | Required test or review gate | Status | Related files / PRs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | _DP-000_ | _YYYY-MM-DD_ | _e.g. Sprint A / PR #_ | _Concise pattern_ | _taxonomy type_ | _Underlying cause_ | _What it broke/risked_ | _Concrete, reusable rule_ | _Test or gate to add_ | _Open_ | _paths / PR links_ |
+| DP-001 | 2026-06-30 | Sprint B / RB-05.1 | Commonly-cited / training-data Shopify API figures were **stale vs the current official docs** — e.g. webhook retry "19 attempts/48h" (actual: **8 retries/4h**), REST Plus bucket "80" (actual: **400**); the `/usage/rate-limits` page also moved to `/usage/limits` and is now GraphQL-only | incorrect Shopify API assumption (#6) | Shopify limits/policies are version-independent and change **without** an API-version bump; memorized/forum figures drift from the live page | Would have asserted stale numbers as Tier-1 "facts" had they been taken on trust instead of re-read and cited | For high-stakes numeric/policy facts (rate limits, retry windows, version support, scopes), **re-read the exact official page and cite it; if a number is not literally on the page, mark it Open question — never assert a remembered/forum figure** | An **independent verification pass** that re-reads the canonical pages for the highest-stakes facts (applied this sprint and to be reused in future API research) | **Mitigated** (caught pre-merge by the verification pass) | `../01-research/shopify-official-api-notes.md` (Risks), `../00-source-materials/shopify-official.md` |
 
-_No defects logged yet (Research Sprint A — governance/research setup, no code).
-First entries are expected during deep-dive research and, later, implementation._
+_First entry logged in Research Sprint B. DP-001 is a **prevented** issue
+(caught by the verification pass before it became a shipped fact), recorded so
+the anti-repetition counter (§4) is meaningful for future API-research sessions._
