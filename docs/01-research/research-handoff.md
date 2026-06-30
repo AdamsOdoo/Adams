@@ -113,3 +113,11 @@ _(Filled in Stage 6.)_
   Optional/Avoid disposition rules). Created `research-backlog.md` (14 sections,
   RB-01..RB-14, each item with Objective/Inputs/Output file/Acceptance criteria/
   Dependencies/Status + sequencing). Next: Stage 5 placeholder READMEs.
+- **Stage 5 — Placeholder READMEs (2026-06-30):** Created concise READMEs for
+  `docs/02-product`, `docs/03-architecture`, `docs/04-decisions`,
+  `docs/07-implementation-plan`, `docs/08-release-readiness`, and `.claude`,
+  `.claude/skills`, `.claude/agents` — each stating purpose, what belongs, what
+  does not belong yet, and current status. The `.claude/skills` and
+  `.claude/agents` READMEs explicitly recommend **deferring** active skills/
+  agents until the research workflow stabilizes (premature automation may encode
+  weak assumptions). Next: Stage 6 final self-review, handoff, push, draft PR.
