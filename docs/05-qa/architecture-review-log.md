@@ -52,3 +52,29 @@ accepted while its **Evidence required** is missing, and any acceptance must
 route through this log and (when accepted) an ADR in `../04-decisions/`. All
 architecture work remains gated until research is sufficient and ChatGPT
 approves (see `CLAUDE.md` §4–§5; backlog item RB-14)._
+
+_**Research Sprint C competitor-evidence note (2026-06-30) — NOT decisions; AR
+rows remain "Not decided / Evidence pending".** The Sprint C competitor deep
+dives, feature matrix, patterns, gaps, and avoid-list now supply **competitor
+evidence** that informs (does not resolve) several AR rows. For the record only:
+**AR-002 (API)** — every studied connector adopts/positions on **GraphQL**
+(VentorTech migrated REST→GraphQL in v2.0.0, Jan 2026), consistent with Tier-1;
+the custom-app/distribution choice stays open. **AR-003 (sync orchestration)** —
+the market pattern is **webhooks + cron/scheduled + manual** with staging/queues
+common; **VentorTech runs on the OCA `queue_job` async queue** (a real-world data
+point for the queue dependency question), while cron-only/webhook-less
+(ecommerce_shopify) and webhook-only designs risk drift. **AR-005 (mapping/dedup)**
+— competitors bind via **SKU/barcode (products) + email (customers) + Shopify-ID
+write-back**; none clearly documents bound-record-deletion handling. **AR-006
+(error/retry/idempotency)** — **VentorTech ships GraphQL `@idempotent` directives
+(Shopify 2026-04) + automatic retry**; others recover manually — corroborating the
+idempotency+retry direction; **no competitor describes rate-limit/cost-aware
+throttling** (whitespace). **AR-007 (inventory)** — multi-location mapping is
+demonstrated (Emipro/VentorTech); single-location (Webkul) and manual
+stock-adjustment-on-import (Emipro) are anti-patterns to avoid. **AR-008
+(fulfillment)** — FulfillmentOrder-era flows + tracking write-back + multi-package
+(Emipro Put-in-Pack) are the norm. **No AR row is decided, accepted, or
+re-litigated here.** Avoid-list items tagged "Arch review: YES" are seeded against
+these rows and become formal `rejected-approaches-log.md` entries **only after
+ChatGPT review**. Evidence: `../01-research/competitor-deep-dives.md`,
+`../01-research/gaps-opportunities.md`, `../01-research/avoid-list.md`._

@@ -24,5 +24,12 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | _TD-000_ | _YYYY-MM-DD_ | _e.g. Sync engine_ | _What the debt is_ | _Low/Med/High_ | _Why now_ | _What could go wrong_ | _Who owns it_ | _Phase / session_ | _Open_ |
 
-_No technical debt recorded yet (Research Sprint A — no code written). This
+_No technical debt recorded yet (Research Sprints A–C — no code written). This
 register becomes active as design and implementation introduce trade-offs._
+
+_**Research Sprint C note (2026-06-30):** none. Sprint C was research-only
+(competitor deep dives, matrix, UX benchmark, patterns, gaps, avoid-list) — no
+code, no module, no shortcuts. The blocked sources (R2 Teqstars docs 403, R5
+Google Doc) are **research gaps**, tracked in
+[`../01-research/resource-inventory.md`](../01-research/resource-inventory.md) and
+the handoff, **not** technical debt._
