@@ -186,6 +186,25 @@ Odoo pages required RST-source recovery (re-verify load-bearing wording).
   encoded via DP-001). Also: the branch-policy reality is **`Shopify-connector`**
   (not `dev/Shopify-connector`), which future Sprint prompts should state.
 
+**Revision patch (ChatGPT REVISE — branch policy + token controls):**
+
+- Branch policy was promoted into permanent governance files: `Shopify-connector`
+  is the dedicated integration branch; `main` and plain `dev` remain untouched
+  unless explicitly approved.
+- New issue discovered: large parallel-agent fan-out created high token/tool
+  usage.
+- Category: token waste (#17), first occurrence (logged as **DP-002**,
+  Mitigated).
+- Prevention rule: future prompts must cap agent fan-out unless ChatGPT approves
+  (>5 agents or ~150k subagent tokens → stop and ask, or split the work).
+- Rules/checklists updated in this patch: `CLAUDE.md` (new **Branch governance**
+  section), `README.md` (branch-governance summary),
+  `docs/06-prompts/claude-learning-rules.md` (pre-session checklist item 8 +
+  token-control rule), `docs/06-prompts/claude-session-prompts.md` (default branch
+  policy + token-control rule in the standard preamble),
+  `docs/05-qa/pr-review-checklist.md` (branch-target + token-discipline checks),
+  `docs/05-qa/defect-pattern-log.md` (DP-002 + counter), and this handoff.
+
 ## What ChatGPT should review
 
 1. **Branch governance** — confirm `Shopify-connector` is the intended dedicated

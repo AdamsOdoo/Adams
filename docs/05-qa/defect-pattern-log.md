@@ -24,6 +24,7 @@
 | Category | Count | At/over threshold? |
 | --- | --- | --- |
 | incorrect Shopify API assumption (#6) | 1 | No (1st — logged + prevention rule) |
+| token waste (#17) | 1 | No (1st — logged + cap/approval gate added) |
 
 ---
 
@@ -33,7 +34,12 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | _DP-000_ | _YYYY-MM-DD_ | _e.g. Sprint A / PR #_ | _Concise pattern_ | _taxonomy type_ | _Underlying cause_ | _What it broke/risked_ | _Concrete, reusable rule_ | _Test or gate to add_ | _Open_ | _paths / PR links_ |
 | DP-001 | 2026-06-30 | Sprint B / RB-05.1 | Commonly-cited / training-data Shopify API figures were **stale vs the current official docs** — e.g. webhook retry "19 attempts/48h" (actual: **8 retries/4h**), REST Plus bucket "80" (actual: **400**); the `/usage/rate-limits` page also moved to `/usage/limits` and is now GraphQL-only | incorrect Shopify API assumption (#6) | Shopify limits/policies are version-independent and change **without** an API-version bump; memorized/forum figures drift from the live page | Would have asserted stale numbers as Tier-1 "facts" had they been taken on trust instead of re-read and cited | For high-stakes numeric/policy facts (rate limits, retry windows, version support, scopes), **re-read the exact official page and cite it; if a number is not literally on the page, mark it Open question — never assert a remembered/forum figure** | An **independent verification pass** that re-reads the canonical pages for the highest-stakes facts (applied this sprint and to be reused in future API research) | **Mitigated** (caught pre-merge by the verification pass) | `../01-research/shopify-official-api-notes.md` (Risks), `../00-source-materials/shopify-official.md` |
+| DP-002 | 2026-06-30 | Sprint B / PR #50 | Large parallel-agent fan-out used by default for research baseline | token waste (#17) | No explicit cap or approval gate for agent fan-out | High token/tool usage; may make future research expensive and harder to review | If more than 5 agents or ~150k subagent tokens are expected, stop and ask ChatGPT for approval or split into smaller sessions | PR review checklist must check token discipline | **Mitigated** | PR #50; `../06-prompts/claude-learning-rules.md`; `pr-review-checklist.md` |
 
-_First entry logged in Research Sprint B. DP-001 is a **prevented** issue
-(caught by the verification pass before it became a shipped fact), recorded so
-the anti-repetition counter (§4) is meaningful for future API-research sessions._
+_First entries logged in Research Sprint B. DP-001 is a **prevented** issue
+(caught by the verification pass before it became a shipped fact). DP-002 records
+the default large agent fan-out used to build the Sprint B baseline; it is
+**Mitigated** by the new agent-fan-out cap/approval gate in
+`../06-prompts/claude-learning-rules.md` and `../06-prompts/claude-session-prompts.md`
+and the token-discipline check in `pr-review-checklist.md`. Both are recorded so
+the anti-repetition counter (§4) is meaningful for future sessions._

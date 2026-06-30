@@ -31,6 +31,12 @@
 
 - [ ] **Scope respected** — only the sprint's allowed files changed; no code
       files; no forbidden files; no actual Odoo module created.
+- [ ] **Branch target is correct** — PR targets `Shopify-connector`, **not**
+      `main`, **not** plain `dev`, **not** `dev/Shopify-connector`
+      (`CLAUDE.md` → Branch governance).
+- [ ] **Token discipline (agent fan-out)** — no uncontrolled large agent
+      fan-out; if **>5 agents** or **~150k subagent tokens** were used, it is
+      justified or logged (and ChatGPT-approved if it exceeded the cap).
 - [ ] **Citations present** — every external claim has vendor/product + URL +
       access status + date.
 - [ ] **Claims classified** — facts vs competitor claims vs inferences vs

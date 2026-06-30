@@ -40,6 +40,15 @@ hide uncertainty. Never bypass authentication. Stay within scope.
 Work on the designated branch (never main). Follow docs/01-research/
 research-methodology.md.
 
+Default branch policy:
+- branch from `Shopify-connector`
+- open PRs into `Shopify-connector`
+- do not target `main` or plain `dev`
+
+Token control: do not launch large parallel-agent research fan-outs by default.
+If a session would use more than 5 agents, or is likely to exceed ~150k subagent
+tokens, stop and ask ChatGPT for approval or split the work into smaller sessions.
+
 End every session:
 - Run the end-of-session learning review (docs/05-qa/quality-feedback-loop.md §6).
 - Update docs/01-research/research-handoff.md using

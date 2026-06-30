@@ -23,6 +23,9 @@ Before starting any session, Claude must check:
 7. **Allowed and forbidden files** — confirm exactly what this session may
    create/modify and what it must not touch (`CLAUDE.md` §11 + the sprint's
    allowed-files list).
+8. **Correct base branch and PR target** (see `CLAUDE.md` → Branch governance):
+   - default project integration branch is `Shopify-connector`
+   - never target `main` or plain `dev` unless ChatGPT explicitly approves
 
 ## During the session
 
@@ -32,6 +35,10 @@ Before starting any session, Claude must check:
 - Do not proceed if required evidence is missing — log it as an open question.
 - Do not hide uncertainty; state confidence and surface risks.
 - Never bypass authentication walls; record blocked sources.
+- **Token control — cap agent fan-out.** Do not launch large parallel-agent
+  research fan-outs by default. If a session would use more than 5 agents, or is
+  likely to exceed ~150k subagent tokens, stop and ask ChatGPT for approval or
+  split the work into smaller sessions.
 
 ## End of session (post-flight)
 
