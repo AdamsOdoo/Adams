@@ -38,5 +38,8 @@ written yet.
 | Understand the quality loop | [`docs/05-qa/quality-feedback-loop.md`](./docs/05-qa/quality-feedback-loop.md) |
 
 > **Note:** The existing Odoo addon scaffold under `/addons` (e.g.
-> `adams_base`) is unrelated company/base code. The connector, when built, will
-> be a **separate, self-contained addon** and must not be entangled with it.
+> `adams_base`) is unrelated company/base code. The connector must be **isolated
+> from it**, but the final structure may be a **modular connector addon family**
+> under `/addons` — exact module boundaries are not final and will be validated
+> through research and architecture review. We do not bias the project toward one
+> giant connector module.

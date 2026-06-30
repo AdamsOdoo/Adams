@@ -29,23 +29,38 @@
 
 ## 2. Competitor deep-dives
 
-> One file per competitor, using `research-methodology.md` §11 and the fixed
-> feature taxonomy (RB-12). Each is one scoped session.
+> **All competitor deep dives are written as sections inside a single file:**
+> `docs/01-research/competitor-deep-dives.md` — sections: **Webkul**,
+> **Teqstars**, **Emipro**, **VentorTech**, **Odoo Apps listings**, and
+> **Google Doc / internal resource** (only if access is granted). Each deep dive
+> is still one scoped session that fills its section, following
+> `research-methodology.md` §11. A per-competitor subfolder may be introduced
+> later if the single file grows too large, but is **not** created in this patch.
+>
+> **Feature-taxonomy sequencing (avoids a circular dependency):** before the
+> canonical feature taxonomy exists, the first 1–2 competitor deep-dives may use
+> the **provisional capability groups** from `research-methodology.md` (§7).
+> RB-12 then **normalizes** those findings into the **canonical taxonomy**. After
+> RB-12 is accepted, all later deep-dives and the competitor matrix (RB-03) must
+> use the canonical taxonomy.
 
 ### RB-02.1 — Webkul deep dive
 - **Objective:** Cited feature/sync/UX/pricing profile of the Webkul connector.
 - **Inputs:** R1; methodology §5–§11.
-- **Output file:** `docs/01-research/02-webkul.md`
-- **Acceptance criteria:** Taxonomy covered; every claim cited + classified;
-  excerpts captured to `00-source-materials/webkul/`; pricing resolved or logged
-  as open question; strengths/weaknesses/gaps marked inference.
-- **Dependencies:** RB-01.1; RB-12 (taxonomy) preferred.
+- **Output file:** `docs/01-research/competitor-deep-dives.md` (Webkul section).
+- **Acceptance criteria:** Capability groups covered using the **provisional
+  groups (methodology §7)** if RB-12 is not yet accepted, otherwise the
+  **canonical taxonomy**; every claim cited + classified; excerpts captured to
+  `00-source-materials/webkul/`; pricing resolved or logged as open question;
+  strengths/weaknesses/gaps marked inference.
+- **Dependencies:** RB-01.1. May precede RB-12 (uses provisional groups; RB-12
+  later normalizes).
 - **Status:** Not started.
 
 ### RB-02.2 — Teqstars deep dive
 - **Objective:** Cited profile of the Teqstars connector across its doc tree.
 - **Inputs:** R2; methodology.
-- **Output file:** `docs/01-research/03-teqstars.md`
+- **Output file:** `docs/01-research/competitor-deep-dives.md` (Teqstars section).
 - **Acceptance criteria:** As RB-02.1; doc-tree (setup, product/order/customer)
   covered.
 - **Dependencies:** RB-01.1 (must unblock R2 first).
@@ -54,7 +69,7 @@
 ### RB-02.3 — Emipro deep dive
 - **Objective:** Cited profile of the Emipro connector via its doc hub.
 - **Inputs:** R3; methodology.
-- **Output file:** `docs/01-research/04-emipro.md`
+- **Output file:** `docs/01-research/competitor-deep-dives.md` (Emipro section).
 - **Acceptance criteria:** As RB-02.1; nav-hub sub-pages (webhooks, metafields,
   payouts) covered.
 - **Dependencies:** RB-01.1.
@@ -63,7 +78,7 @@
 ### RB-02.4 — VentorTech deep dive (docs + website)
 - **Objective:** Cited profile of the VentorTech connector.
 - **Inputs:** R4 (Confluence) + R7 (website); methodology.
-- **Output file:** `docs/01-research/05-ventortech.md`
+- **Output file:** `docs/01-research/competitor-deep-dives.md` (VentorTech section).
 - **Acceptance criteria:** As RB-02.1; gated Confluence content flagged, not
   bypassed; website pricing (EUR 499) and sync-direction claims captured.
 - **Dependencies:** RB-01.1.
@@ -72,7 +87,7 @@
 ### RB-02.5 — Odoo Apps listings deep dive (ecommerce_shopify + sh_shopify_connector)
 - **Objective:** Cited profiles + pricing/license + provenance check.
 - **Inputs:** R6, R8; methodology.
-- **Output file:** `docs/01-research/06-odoo-apps.md`
+- **Output file:** `docs/01-research/competitor-deep-dives.md` (Odoo Apps listings section).
 - **Acceptance criteria:** As RB-02.1; pricing/license recorded as on-page facts
   ($195.56 / $168.81, OPL-1); R6 official-vs-partner provenance resolved or
   logged as open question; ratings/version history captured.
@@ -83,7 +98,7 @@
 - **Objective:** If access is granted, extract relevant content; else keep
   blocked and document the gap.
 - **Inputs:** R5.
-- **Output file:** `docs/01-research/07-google-doc.md`
+- **Output file:** `docs/01-research/competitor-deep-dives.md` (Google Doc / internal resource section).
 - **Acceptance criteria:** Either a cited extraction, or an explicit "still
   blocked" record with the access action needed.
 - **Dependencies:** RB-01.1 (owner-granted access/export).
@@ -107,7 +122,7 @@
 - **Objective:** Compare onboarding/config and operational UX; identify
   best-in-class patterns and friction.
 - **Inputs:** RB-02 deep dives; screenshots in `00-source-materials/`.
-- **Output file:** `docs/01-research/ux-benchmark.md`
+- **Output file:** `docs/01-research/ux-ui-benchmark.md`
 - **Acceptance criteria:** Flows documented per methodology §8; observation vs
   UX judgement separated; screenshot sources cited.
 - **Dependencies:** RB-02.* (enough deep dives with captured UX).
@@ -119,7 +134,7 @@
 - **Objective:** Tier-1 facts: Admin REST vs GraphQL, webhooks, OAuth scopes,
   versioning/deprecation, rate limits, bulk ops, idempotency, app review.
 - **Inputs:** Official Shopify developer documentation.
-- **Output file:** `docs/01-research/shopify-api-notes.md`
+- **Output file:** `docs/01-research/shopify-official-api-notes.md`
 - **Acceptance criteria:** Every claim cites an official doc + the API version
   it applies to; an explicit "architecture constraints/implications" section
   (marked inference); open questions listed.
@@ -133,7 +148,7 @@
   product/account/delivery, ir.cron & queue/async patterns, external IDs/
   mapping, ORM/performance, security/access rules, addon structure.
 - **Inputs:** Official Odoo 19 developer documentation.
-- **Output file:** `docs/01-research/odoo-architecture-notes.md`
+- **Output file:** `docs/01-research/odoo-official-architecture-notes.md`
 - **Acceptance criteria:** Every claim cites an official doc + Odoo version;
   recommended extension points & modularity boundaries (marked inference); open
   questions listed.
@@ -157,7 +172,7 @@
 ### RB-08.1 — Best-in-class observations
 - **Objective:** Identify the strongest approaches worth emulating and why.
 - **Inputs:** RB-03 matrix; RB-04 UX benchmark; RB-07 patterns.
-- **Output file:** `docs/01-research/best-in-class.md`
+- **Output file:** `docs/01-research/best-in-class-observations.md`
 - **Acceptance criteria:** Each "best-in-class" claim cites the source and
   states the quality bar it sets; marked as inference/recommendation.
 - **Dependencies:** RB-03, RB-04, RB-07.
@@ -169,7 +184,7 @@
 - **Objective:** Identify market gaps, weaknesses, and differentiation
   opportunities for a premium connector.
 - **Inputs:** RB-03, RB-04, RB-07, RB-08; RB-05/RB-06 constraints.
-- **Output file:** `docs/01-research/gaps-and-opportunities.md`
+- **Output file:** `docs/01-research/gaps-opportunities.md`
 - **Acceptance criteria:** Each gap tied to evidence; opportunities marked as
   recommendations; feasibility flagged against Tier-1 constraints.
 - **Dependencies:** RB-03, RB-04, RB-07, RB-08.

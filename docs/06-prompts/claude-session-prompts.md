@@ -54,8 +54,17 @@ End every session:
 ## Research-session prompts (one backlog item per session)
 
 > For each competitor deep dive, fill the template below from the resource row
-> in `resource-inventory.md` and the methodology (§11). Save to the backlog
-> item's **Output file**; capture excerpts into `docs/00-source-materials/`.
+> in `resource-inventory.md` and the methodology (§11). **All deep dives are
+> sections inside `docs/01-research/competitor-deep-dives.md`** (Webkul,
+> Teqstars, Emipro, VentorTech, Odoo Apps listings, Google Doc / internal).
+> Capture excerpts into `docs/00-source-materials/`.
+>
+> **Feature-taxonomy sequencing (avoids a circular dependency):** before the
+> canonical feature taxonomy exists, the first 1–2 competitor deep-dives may use
+> the **provisional capability groups** from `research-methodology.md` (§7).
+> RB-12 then normalizes those findings into the **canonical taxonomy**. After
+> RB-12 is accepted, all later deep-dives and the competitor matrix (RB-03) must
+> use the canonical taxonomy.
 
 ```text
 <standard preamble>
@@ -65,15 +74,17 @@ Source(s): <URL(s) from resource-inventory.md>  Access: <Accessible/Partial/Bloc
 If Blocked/Partial: use the unblock path noted in resource-inventory.md; never
 bypass auth; record anything still blocked.
 
-Produce a cited, classified profile using the feature taxonomy and methodology
-§5–§10 (catalog/products; inventory; orders/fulfilment; customers; pricing/tax;
+Produce a cited, classified profile using the provisional capability groups
+(methodology §7) — or the canonical taxonomy if RB-12 is accepted — plus
+methodology §5–§10 (catalog/products; inventory; orders/fulfilment; customers; pricing/tax;
 payments; multi-store; automation webhooks-vs-cron; technical API + version +
 scopes + rate limits; setup/onboarding UX; reliability — error handling/retry/
 recovery/dedup; reporting; pricing/licensing; marketplace signals;
 strengths/weaknesses/gaps marked as inference). Tag notable findings with a
 disposition (MVP/Phase2/Advanced/Optional/Avoid) as a recommendation.
 
-Output file: <from backlog item>. Do NOT build the cross-competitor matrix,
+Output file: docs/01-research/competitor-deep-dives.md (your competitor's
+section), per the backlog item. Do NOT build the cross-competitor matrix,
 finalize MVP, or make architecture decisions. Stop after this session.
 ```
 
@@ -81,20 +92,20 @@ finalize MVP, or make architecture decisions. Stop after this session.
 
 | Prompt | Backlog | Source(s) | Output file |
 | --- | --- | --- | --- |
-| Validate/unblock sources | RB-01.1 | all 8 | `resource-inventory.md` (update) |
-| Webkul deep dive | RB-02.1 | R1 | `01-research/02-webkul.md` |
-| Teqstars deep dive | RB-02.2 | R2 (unblock first) | `01-research/03-teqstars.md` |
-| Emipro deep dive | RB-02.3 | R3 | `01-research/04-emipro.md` |
-| VentorTech deep dive | RB-02.4 | R4 + R7 | `01-research/05-ventortech.md` |
-| Odoo Apps listings | RB-02.5 | R6 + R8 | `01-research/06-odoo-apps.md` |
-| Google Doc (conditional) | RB-02.6 | R5 (needs access) | `01-research/07-google-doc.md` |
+| Validate/unblock sources | RB-01.1 | all 8 | `01-research/resource-inventory.md` (update) |
+| Webkul deep dive | RB-02.1 | R1 | `01-research/competitor-deep-dives.md` (Webkul) |
+| Teqstars deep dive | RB-02.2 | R2 (unblock first) | `01-research/competitor-deep-dives.md` (Teqstars) |
+| Emipro deep dive | RB-02.3 | R3 | `01-research/competitor-deep-dives.md` (Emipro) |
+| VentorTech deep dive | RB-02.4 | R4 + R7 | `01-research/competitor-deep-dives.md` (VentorTech) |
+| Odoo Apps listings | RB-02.5 | R6 + R8 | `01-research/competitor-deep-dives.md` (Odoo Apps listings) |
+| Google Doc (conditional) | RB-02.6 | R5 (needs access) | `01-research/competitor-deep-dives.md` (Google Doc / internal) |
 | Feature matrix | RB-03.1 | deep dives + taxonomy | `01-research/competitor-feature-matrix.md` |
-| UX benchmark | RB-04.1 | deep dives + screenshots | `01-research/ux-benchmark.md` |
-| Shopify API notes | RB-05.1 | official Shopify docs | `01-research/shopify-api-notes.md` |
-| Odoo architecture notes | RB-06.1 | official Odoo 19 docs | `01-research/odoo-architecture-notes.md` |
+| UX/UI benchmark | RB-04.1 | deep dives + screenshots | `01-research/ux-ui-benchmark.md` |
+| Shopify official API notes | RB-05.1 | official Shopify docs | `01-research/shopify-official-api-notes.md` |
+| Odoo official architecture notes | RB-06.1 | official Odoo 19 docs | `01-research/odoo-official-architecture-notes.md` |
 | Common patterns | RB-07.1 | matrix + notes | `01-research/common-patterns.md` |
-| Best-in-class | RB-08.1 | matrix + UX + patterns | `01-research/best-in-class.md` |
-| Gaps & opportunities | RB-09.1 | RB-03/04/07/08 | `01-research/gaps-and-opportunities.md` |
+| Best-in-class observations | RB-08.1 | matrix + UX + patterns | `01-research/best-in-class-observations.md` |
+| Gaps & opportunities | RB-09.1 | RB-03/04/07/08 | `01-research/gaps-opportunities.md` |
 | Avoid-list | RB-10.1 | RB-07/08/09 | `01-research/avoid-list.md` (+ rejected log) |
 | Product vision | RB-11.1 | RB-08/09/10 | `02-product/product-vision.md` |
 | Feature taxonomy | RB-12.1 | methodology + first deep dives | `02-product/feature-taxonomy.md` |

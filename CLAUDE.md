@@ -118,8 +118,11 @@ When implementation is authorised, **every implementation task** must specify:
   logged, handoff updated, and the change is modular and isolated.
 
 The template for this is `/docs/06-prompts/implementation-task-template.md`.
-Modularity principles: the connector lives as a **self-contained addon** under
-`/addons`, isolated from `adams_base`/customer code, with clear layering
+Modularity principles: the connector must be **isolated from existing
+customer/base code** such as `adams_base`, but the final structure may be a
+**modular connector addon family** under `/addons`. Exact module boundaries are
+**not final** and must be validated through research and architecture review —
+do not bias the project toward one giant connector module. Favour clear layering
 (transport / mapping / orchestration / domain / UI), idempotency and
 duplicate-prevention by design, and resilience (error handling, retry/recovery,
 rate-limit awareness) as first-class concerns.

@@ -30,6 +30,10 @@
 | ID | Date | Topic | Proposed approach | Review decision | Reason | Evidence required | Risks | Follow-up action | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | _AR-000_ | _YYYY-MM-DD_ | _e.g. Sync orchestration model_ | _Short description_ | _accepted/revise/reject_ | _Why_ | _Proof needed_ | _Key risks_ | _ADR link / next step_ | _Proposed_ |
+| AR-001 | 2026-06-30 | Governance foundation branch | Use the Research Sprint A branch (`docs/research-sprint-a-governance-inventory`) as the canonical governance foundation | Accepted after revision patch | It defers active skills/agents and preserves the no-code, research-first gate | n/a — governance/process decision | Branch divergence if the earlier `claude/odoo-shopify-research-setup-fs4wzi` branch is reused | Do not continue from the old branch; treat it as non-canonical unless ChatGPT explicitly reopens it | Accepted |
 
-_No architecture proposals logged yet. Architecture is gated until research is
-sufficient and ChatGPT approves (see `CLAUDE.md` §4–§5)._
+_AR-001 is a governance/process decision (not a product-architecture choice);
+it is recorded here because it concerns the canonical foundation all later
+architecture work builds on. No product-architecture proposals are logged yet —
+that work is gated until research is sufficient and ChatGPT approves (see
+`CLAUDE.md` §4–§5)._

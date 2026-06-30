@@ -4,6 +4,20 @@
 > Source Inventory, and Research Backlog.** Continuity lives in GitHub, not chat.
 > The running **Sprint checkpoint log** (one note per stage) is at the bottom.
 
+## ChatGPT review decision (Research Sprint A)
+
+> ChatGPT review decision: Research Sprint A is the canonical governance
+> foundation after this revision patch is accepted. The earlier branch
+> `claude/odoo-shopify-research-setup-fs4wzi` is non-canonical and must not be
+> used unless ChatGPT explicitly reopens it.
+
+The Sprint A review returned **REVISE — small governance patch required before
+merge.** This patch addresses those findings (modular addon-family wording,
+canonical research output filenames, feature-taxonomy sequencing, the
+non-canonical-branch warning, and this learning-loop update). See the
+revision-patch entry at the bottom of the checkpoint log and the updated
+**Learning feedback loop** section below.
+
 ## Session summary
 
 Research Sprint A established the GitHub-based **governance and research
@@ -83,8 +97,11 @@ asserted — only registration/triage. Full detail in `resource-inventory.md`.
 
 ## Assumptions
 
-- The connector will be a **separate, self-contained addon**; `adams_base` is
-  unrelated company/base code (inference from repo layout + README).
+- The connector must be **isolated from `adams_base`/customer code**; its final
+  structure may be a **modular connector addon family** under `/addons` — exact
+  module boundaries are **not final** and will be validated through research +
+  architecture review. `adams_base` is unrelated company/base code (inference
+  from repo layout + README).
 - "Initial value" / "Evidence strength" in the inventory are **triage
   inferences**, not vendor facts.
 - The default research order in the backlog is reasonable but adjustable once
@@ -114,21 +131,36 @@ asserted — only registration/triage. Full detail in `resource-inventory.md`.
 
 ## Learning feedback loop
 
-- **New issues discovered:** None (setup sprint; no research conclusions or code
-  to review).
-- **Repeated issue patterns:** None (logs initialized empty).
-- **Rules/checklists updated:** Established the entire loop —
-  `quality-feedback-loop.md` + four logs + `pr-review-checklist.md` +
-  `claude-learning-rules.md`; wired references through `CLAUDE.md`, `AGENTS.md`,
-  templates, and the methodology.
-- **New rejected approaches:** None.
+- **New issue discovered:** Governance wording could **bias Claude toward one
+  giant connector addon/module** — the "self-contained addon" phrasing in
+  `CLAUDE.md` §9 and `README.md`. Surfaced by ChatGPT's Sprint A review (REVISE).
+- **Category:** premature architecture / weak modularity (first occurrence;
+  count = 1).
+- **Repeated issue patterns:** None — this is the first occurrence of this
+  category; no escalation threshold reached.
+- **Prevention rule:** Use **"modular connector addon family"** language and
+  state that exact module boundaries are **not final** until validated through
+  research + architecture review; never imply a single giant module. Keep the
+  isolation-from-`adams_base`/customer-code rule.
+- **Rules/checklists updated:** (1) `CLAUDE.md` §9 and `README.md` reworded to
+  the modular-family principle; (2) `research-backlog.md` and
+  `claude-session-prompts.md` updated to the canonical research output filenames,
+  single-file competitor deep dives (`competitor-deep-dives.md`), and the
+  provisional→canonical feature-taxonomy sequencing rule; (3)
+  `architecture-review-log.md` row **AR-001** added recording this branch as the
+  canonical foundation. (No `defect-pattern-log.md` row: this was a pre-merge
+  review finding on governance docs, not a shipped defect — captured here and in
+  the architecture-review log.)
+- **New rejected approaches:** None logged formally; the "one giant connector
+  module" bias is prevented by wording. Revisit/log if it recurs.
 - **New technical debt:** None.
-- **Architecture concerns:** None yet (gated). One forward-looking modularity
-  constraint recorded: keep the connector an isolated addon.
-- **Tests or review gates needed:** None active in research phase; the
+- **Architecture concerns:** Module-boundary design is explicitly **deferred**
+  to research + architecture review (RB-06, RB-14); do not pre-decide it.
+- **Tests or review gates needed:** None active in the research phase; the
   implementation checklist (section C) is staged for later.
-- **Should future prompts change? Yes/No:** No — this sprint produced the
-  reusable prompt library; future sessions should use it as-is.
+- **Should future prompts change? Yes/No:** **Yes** — prompt templates now use
+  the canonical research output filenames and the modular-family wording, and
+  encode the provisional→canonical taxonomy sequencing.
 
 ## What ChatGPT should review
 
@@ -243,3 +275,20 @@ ChatGPT review.
   allowed docs/governance files; forbidden-pattern scan clean; `addons/`
   untouched. Filled all required handoff sections + the sprint self-review.
   Pushed the branch and opened one **draft** PR for ChatGPT review. Stopped.
+- **Revision patch — address Sprint A review findings (2026-06-30):** ChatGPT
+  returned **REVISE**. Applied a small governance patch to the same branch /
+  PR #49 (no new PR, no merge): (1) replaced "self-contained addon" wording in
+  `CLAUDE.md` §9 and `README.md` with the **modular connector addon family**
+  principle (kept the isolation rule); (2) aligned future research output
+  filenames in `research-backlog.md` and `claude-session-prompts.md` to the
+  canonical names and consolidated competitor deep dives into one file
+  `competitor-deep-dives.md` with per-competitor sections; (3) added the
+  **provisional→canonical** feature-taxonomy sequencing rule (first 1–2 deep
+  dives may use provisional groups; RB-12 normalizes); (4) added the
+  non-canonical-branch warning + AR-001 in `architecture-review-log.md`; (5)
+  updated this Learning feedback loop. Allowed files only; no code touched.
+  **Deferred follow-up:** `docs/05-qa/pr-review-checklist.md` (§C) and
+  `docs/06-prompts/implementation-task-template.md` still contain the phrase
+  "self-contained addon"; both are **outside this patch's allowed-files scope**,
+  so the reword to "modular connector addon family" is deferred to a future
+  ChatGPT-approved patch rather than edited out of scope here.
