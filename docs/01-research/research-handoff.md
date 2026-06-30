@@ -186,24 +186,34 @@ Odoo pages required RST-source recovery (re-verify load-bearing wording).
   encoded via DP-001). Also: the branch-policy reality is **`Shopify-connector`**
   (not `dev/Shopify-connector`), which future Sprint prompts should state.
 
-**Revision patch (ChatGPT REVISE — branch policy + token controls):**
+**Revision patch (ChatGPT REVISE — branch policy + high-power research rules):**
 
 - Branch policy was promoted into permanent governance files: `Shopify-connector`
   is the dedicated integration branch; `main` and plain `dev` remain untouched
   unless explicitly approved.
-- New issue discovered: large parallel-agent fan-out created high token/tool
-  usage.
-- Category: token waste (#17), first occurrence (logged as **DP-002**,
-  Mitigated).
-- Prevention rule: future prompts must cap agent fan-out unless ChatGPT approves
-  (>5 agents or ~150k subagent tokens → stop and ask, or split the work).
+- New issue discovered: high-power research fan-out needs a persistent governance
+  rule so large Claude workflows remain intentional, scoped, synthesized, and
+  reviewable.
+- Category: token waste (#17) / unclear handoff, first occurrence (logged as
+  **DP-002**, Mitigated).
+- Prevention rule: high-power research mode is allowed and encouraged for major
+  research and architecture work, but the fan-out plan, workstreams, sources,
+  stop condition, synthesis method, and verification method must be documented.
+- **This rule does not limit Claude's capabilities.** It is a *capability,
+  not a cap* — there is **no** fixed agent/token limit. Claude is expected to use
+  maximum capability when justified to produce a top-tier, state-of-the-art
+  connector; the only requirement is that large research be intentional, scoped
+  to allowed files, documented, and reviewable (and that small patch sessions
+  stay lightweight).
 - Rules/checklists updated in this patch: `CLAUDE.md` (new **Branch governance**
-  section), `README.md` (branch-governance summary),
-  `docs/06-prompts/claude-learning-rules.md` (pre-session checklist item 8 +
-  token-control rule), `docs/06-prompts/claude-session-prompts.md` (default branch
-  policy + token-control rule in the standard preamble),
-  `docs/05-qa/pr-review-checklist.md` (branch-target + token-discipline checks),
-  `docs/05-qa/defect-pattern-log.md` (DP-002 + counter), and this handoff.
+  and **High-power research mode** sections), `README.md` (branch-governance +
+  high-power research summary), `docs/06-prompts/claude-learning-rules.md`
+  (pre-session checklist item 8 + High-power research mode section),
+  `docs/06-prompts/claude-session-prompts.md` (default branch policy + High-power
+  research mode in the standard preamble and as a section),
+  `docs/05-qa/pr-review-checklist.md` (branch-target + capability-use checks),
+  `docs/05-qa/defect-pattern-log.md` (DP-002 reframed + counter), and this
+  handoff.
 
 ## What ChatGPT should review
 

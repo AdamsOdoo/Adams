@@ -34,9 +34,13 @@
 - [ ] **Branch target is correct** — PR targets `Shopify-connector`, **not**
       `main`, **not** plain `dev`, **not** `dev/Shopify-connector`
       (`CLAUDE.md` → Branch governance).
-- [ ] **Token discipline (agent fan-out)** — no uncontrolled large agent
-      fan-out; if **>5 agents** or **~150k subagent tokens** were used, it is
-      justified or logged (and ChatGPT-approved if it exceeded the cap).
+- [ ] **Capability use is appropriate** — large parallel-agent research is
+      allowed when justified by the task, documented in the handoff (plan /
+      workstreams / sources / stop condition / synthesis / verification), and
+      scoped to the allowed files (not a hard agent/token cap).
+- [ ] **Small patch sessions** did not use unnecessary large fan-out.
+- [ ] **High-power research outputs** were synthesized, verified, and classified
+      as facts / claims / inferences / recommendations / open questions.
 - [ ] **Citations present** — every external claim has vendor/product + URL +
       access status + date.
 - [ ] **Claims classified** — facts vs competitor claims vs inferences vs

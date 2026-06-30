@@ -39,6 +39,16 @@ written yet.
 - Promotion from `Shopify-connector` to `main` requires explicit ChatGPT
   approval. Full policy: [`CLAUDE.md` → Branch governance](./CLAUDE.md).
 
+### Research approach (high-power, not capped)
+
+Claude is **encouraged to use maximum capability** — parallel agents, broad
+source collection, verification passes, deep synthesis — when a task genuinely
+requires it, to produce top-tier, trustworthy work. This is **not** capped to a
+fixed agent/token limit. The only requirement is that large research fan-out be
+**intentional, scoped, documented, and reviewable** (and small patch sessions
+stay lightweight). Full policy:
+[`CLAUDE.md` → High-power research mode](./CLAUDE.md).
+
 ### Where to start
 
 | You want to… | Go to |
