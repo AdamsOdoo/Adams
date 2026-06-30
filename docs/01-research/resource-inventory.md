@@ -48,3 +48,28 @@
 - **Provenance to verify:** R6 lists author "Odoo IN Pvt Ltd" — confirm whether
   it is Odoo S.A. official or a partner module before treating it as the
   "official" baseline.
+
+## Sprint B re-validation (2026-06-30)
+
+Research Sprint B (Stage 2) re-ran a normal anonymous access check on all 8
+resources. **No access status changed from Sprint A** — the table above still
+holds. Detailed per-resource access evidence (visible sections, block reasons,
+unblock actions, extraction paths, deep-dive readiness) now lives in
+[`../00-source-materials/source-access-notes.md`](../00-source-materials/source-access-notes.md).
+
+| ID | Access (2026-06-30) | Deep-dive ready? | Unblock action needed |
+| --- | --- | --- | --- |
+| R1 Webkul | Accessible | Yes | None (pricing gated → open question) |
+| R2 Teqstars 19.0 | **Blocked** (HTTP 403 bot-block) | **No** | Alternate UA / browser fetch; or ChatGPT decision on the 16.0 mirror (non-equivalent) |
+| R3 Emipro | Accessible | Yes | None |
+| R4 VentorTech Confluence | **Partial** (anonymous-access banner) | Hub yes; children to test | Owner view-access/export, or per-child anonymous test |
+| R5 Google Doc | **Blocked** (login wall) | **No** | Owner-granted access or export (ChatGPT decision) |
+| R6 ecommerce_shopify | Accessible | Yes | None (confirm official-vs-partner provenance) |
+| R7 VentorTech site | Accessible | Yes | None |
+| R8 sh_shopify_connector | Accessible | Yes | None |
+
+- **No auth bypass** was attempted on any resource; gated content (R2 body, R5
+  body, R4 gated children) was recorded, never captured.
+- **Unblock decisions for ChatGPT:** (1) R2 — accept an alternate fetch method
+  for the 19.0 docs, or accept the 16.0 mirror as an explicitly non-equivalent
+  fallback? (2) R5 — can the owner grant view access or provide an export?
