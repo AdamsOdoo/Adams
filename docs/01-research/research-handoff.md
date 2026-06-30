@@ -88,3 +88,14 @@ _(Filled in Stage 6.)_
   `implementation-task-template.md`, `pr-review-template.md`, and
   `session-handoff-template.md`. Docs only; no forbidden files. Next: Stage 3
   learning feedback loop.
+- **Stage 3 — Learning feedback loop (2026-06-30):** Created
+  `quality-feedback-loop.md` (review-decision categories; 17-type issue
+  taxonomy; 2×→update-rule / 3×→pause-implementation escalation; concrete-lesson
+  rule; end-of-session review; quality + acceptance gates; routing table) and
+  the four logs with the exact required columns — `defect-pattern-log.md`,
+  `architecture-review-log.md`, `rejected-approaches-log.md`,
+  `technical-debt-register.md` (all initialized empty with instructions). Created
+  `claude-learning-rules.md` with the mandatory 7-item pre-session checklist
+  (previous handoff, defect log, rejected log, architecture-review log, decision
+  records, current phase, allowed/forbidden files). Next: Stage 4 research
+  workspace + source inventory.
