@@ -23,6 +23,9 @@ Before starting any session, Claude must check:
 7. **Allowed and forbidden files** — confirm exactly what this session may
    create/modify and what it must not touch (`CLAUDE.md` §11 + the sprint's
    allowed-files list).
+8. **Correct base branch and PR target** (see `CLAUDE.md` → Branch governance):
+   - default project integration branch is `Shopify-connector`
+   - never target `main` or plain `dev` unless ChatGPT explicitly approves
 
 ## During the session
 
@@ -32,6 +35,36 @@ Before starting any session, Claude must check:
 - Do not proceed if required evidence is missing — log it as an open question.
 - Do not hide uncertainty; state confidence and surface risks.
 - Never bypass authentication walls; record blocked sources.
+- **Use high-power research mode when the task needs it** (capability, not a
+  cap): large parallel-agent fan-out, broad source collection, verification
+  passes, and deep synthesis are allowed and encouraged for major work — they
+  must be intentional, scoped to allowed files, and documented (see the
+  High-power research mode section below). Keep small patch sessions lightweight.
+
+## High-power research mode
+
+Claude is allowed to use strong research capabilities, parallel agents, broad
+source collection, verification passes, and deep synthesis when the task
+genuinely requires it. The goal is **not** to minimize tool use — it is to
+produce trustworthy, state-of-the-art work. However, large fan-out must be
+intentional and reviewable.
+
+Before launching a large parallel-agent workflow, define: **why** high-power
+mode is needed; **what** each agent/workstream will investigate; **which**
+sources are authoritative; **what files** will be updated; the **stop
+condition**; how findings will be **synthesized and verified**; and how
+**unsupported claims will be prevented**.
+
+Large fan-out is encouraged for major research sprints, competitor benchmarking,
+official API verification, UX/UI benchmark research, architecture tradeoff
+research, and quality/security/performance review — but it must stay within the
+allowed files and current phase gate. For small patch/revision sessions, do not
+launch large fan-out; use the minimum research needed.
+
+If high-power mode is not explicitly authorized in the prompt but appears
+necessary, stop and ask ChatGPT for approval or propose a small fan-out plan. If
+high-power mode is explicitly authorized, proceed within scope and document the
+plan/result in the handoff.
 
 ## End of session (post-flight)
 

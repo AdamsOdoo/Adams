@@ -26,6 +26,29 @@ written yet.
 - **ChatGPT** — strategy, architecture, prompting, and strict review control
   room.
 
+### Branch governance
+
+- `main` is **stable only** — no direct commits and no sprint PRs into `main`.
+- Plain `dev` is an existing **separate pipeline branch** and is left untouched
+  unless ChatGPT explicitly changes policy.
+- `dev/Shopify-connector` is **not used** — plain `dev` already exists and Git
+  cannot store both branch refs (a directory/file conflict).
+- **`Shopify-connector` is the dedicated project integration branch.** Sprint
+  branches **branch from** `Shopify-connector` and sprint PRs **target**
+  `Shopify-connector`.
+- Promotion from `Shopify-connector` to `main` requires explicit ChatGPT
+  approval. Full policy: [`CLAUDE.md` → Branch governance](./CLAUDE.md).
+
+### Research approach (high-power, not capped)
+
+Claude is **encouraged to use maximum capability** — parallel agents, broad
+source collection, verification passes, deep synthesis — when a task genuinely
+requires it, to produce top-tier, trustworthy work. This is **not** capped to a
+fixed agent/token limit. The only requirement is that large research fan-out be
+**intentional, scoped, documented, and reviewable** (and small patch sessions
+stay lightweight). Full policy:
+[`CLAUDE.md` → High-power research mode](./CLAUDE.md).
+
 ### Where to start
 
 | You want to… | Go to |

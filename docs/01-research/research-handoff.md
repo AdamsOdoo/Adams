@@ -1,4 +1,254 @@
-# Research Sprint A Handoff
+# Research Handoff (rolling)
+
+> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint B)**
+> is immediately below; the **Sprint A** handoff is retained underneath as
+> history. The running **Sprint checkpoint log** (one note per stage, both
+> sprints) is at the very bottom.
+
+---
+
+# Research Sprint B Handoff
+
+> **Research Sprint B — Dedicated Branch Setup + Source Access Validation +
+> Official Shopify/Odoo Baseline.** Research-only; no-code gate in force
+> (`CLAUDE.md` §5). Maps to backlog items **RB-01.1** (source validation),
+> **RB-05.1** (official Shopify notes), **RB-06.1** (official Odoo notes), and
+> **seeds RB-14** architecture questions.
+
+## Session summary
+
+Established the **dedicated project integration branch** (corrected by ChatGPT to
+**`Shopify-connector`** — see Base branch below), then produced a controlled
+**Tier-1 research baseline**: re-validated access for the 8 competitor resources;
+created the **official Shopify API** and **official Odoo 19 architecture** notes
+(every factual claim cited to an exact official URL, accessed 2026-06-30, with
+**Fact / Inference / Open question** labels and a clear "constraints are
+inferences, not decisions" boundary); captured supporting excerpts under
+`docs/00-source-materials/`; and seeded **seven evidence-pending architecture
+questions** (AR-002…AR-008, all "Not decided"). **No connector code, no Odoo
+module, no competitor deep dives, no MVP scope, and no architecture decisions**
+were produced — all gated. Facts were gathered topic-by-topic and then
+**independently verified** on the highest-stakes pages (rate limits, versioning,
+webhooks, Odoo security/manifest).
+
+## Branch and commits
+
+**Working branch:** `research/sprint-b-source-access-official-baseline` (based on
+`Shopify-connector` @ `a5d4543`, the merged PR #49 governance foundation).
+
+| Hash | Message |
+| --- | --- |
+| `54bd6f1` | docs: sprint b governance checkpoint and branch setup |
+| `d05ab49` | docs: validate initial source access |
+| `468efb6` | docs: add official shopify api baseline |
+| `08b4c75` | docs: add official odoo architecture baseline |
+| `21c460b` | docs: seed architecture research questions |
+| _(this commit)_ | docs: finalize research sprint b handoff |
+
+## Base branch and PR target
+
+- **Dedicated project integration branch: `Shopify-connector`.** The original
+  Sprint B prompt named `dev/Shopify-connector`; that branch **cannot exist on
+  the remote** because a plain `dev` branch already exists (Git directory/file
+  ref conflict — the push was rejected with `directory file conflict`). The
+  blocker was reported, **not** worked around. **ChatGPT corrected the policy** to
+  use the existing **`Shopify-connector`** branch; plain `dev` was left untouched.
+- Before acting, verified `origin/Shopify-connector` was at the old `68007a9`,
+  had **no** unique commits beyond `origin/main`, and was a clean fast-forward; it
+  was **fast-forwarded to `origin/main` `a5d4543` and pushed normally (no force)**.
+- **PR target: `Shopify-connector`** — **not** `main`, **not** plain `dev`, **not**
+  `dev/Shopify-connector`. **`main` was not modified; plain `dev` was not modified.**
+
+## Files created or updated
+
+- `docs/00-source-materials/source-access-notes.md` (new) — per-resource access
+  evidence for the 8 sources.
+- `docs/01-research/resource-inventory.md` (updated) — Sprint B re-validation
+  section + unblock decisions for ChatGPT.
+- `docs/01-research/shopify-official-api-notes.md` (new) — Tier-1 Shopify baseline.
+- `docs/00-source-materials/shopify-official.md` (new) — captured Shopify excerpts.
+- `docs/01-research/odoo-official-architecture-notes.md` (new) — Tier-1 Odoo 19
+  baseline.
+- `docs/00-source-materials/odoo-official.md` (new) — captured Odoo excerpts.
+- `docs/05-qa/architecture-review-log.md` (updated) — seeded AR-002…AR-008
+  (evidence-pending only).
+- `docs/05-qa/defect-pattern-log.md` (updated) — DP-001 (prevented stale-figure
+  issue) + occurrence counter.
+- `docs/01-research/research-handoff.md` (this file).
+
+## Source access results
+
+No status changed from Sprint A (both checked 2026-06-30; no auth bypassed).
+**Accessible (5):** R1 Webkul, R3 Emipro, R6 ecommerce_shopify, R7 VentorTech
+site, R8 sh_shopify_connector. **Partial (1):** R4 VentorTech Confluence
+(anonymous-access banner; child pages to test individually). **Blocked (2):** R2
+Teqstars 19.0 (HTTP 403 bot-block — needs an alternate fetch UA, or a ChatGPT
+decision on the non-equivalent 16.0 mirror), R5 Google Doc (login wall — needs
+owner-granted access or export). Full evidence:
+`docs/00-source-materials/source-access-notes.md`.
+
+## Shopify official facts captured
+
+GraphQL Admin API is the primary API (REST legacy since 2024-10-01; new public
+apps GraphQL-only from 2025-04-01); quarterly date-based versioning (`YYYY-MM`,
+min 12-month support, ≥9-month overlap, fall-forward); OAuth + token-exchange,
+online/offline/session tokens, least-privilege scopes, protected customer data
+(60-day order window / `read_all_orders` approval); rate limits (REST 40/2
+standard, 400/20 Plus; GraphQL calculated-cost restore 100/200/1000/2000 pts/s,
+1000-point single-query cap) and the query-cost model; bulk operations (async
+JSONL, concurrency change at 2026-01); webhooks (HMAC-SHA256 on raw body,
+**8 retries/4h**, auto-delete after 8 failures, **delivery not guaranteed →
+reconciliation required**, mandatory compliance webhooks); products/variants
+(2048-variant model, `productSet` delete-on-omit); inventory (variant→item→level→
+location, `committed` read-only, `@idempotent` from 2026-04); orders; fulfillment
+(FulfillmentOrder-based, legacy unsupported since 2022-07); refunds/returns;
+transactions (gateway-agnostic) vs payouts (Shopify Payments only); App Store /
+Built-for-Shopify readiness. Full notes + citations:
+`docs/01-research/shopify-official-api-notes.md`.
+
+## Odoo official facts captured
+
+Module/manifest structure (`name` only required key; full key list); modularity
+via `depends` + `auto_install` link modules; ORM extension (in-place `_inherit`
+preferred; `_inherits` delegation discouraged; `@api.model_create_multi`,
+`@api.ondelete`, always `super()`); security (`ir.model.access.csv` deny-by-
+default, `ir.rule` global=intersect/group=unify, field `groups`, `sudo()`/
+superuser bypass); **`ir.cron` is the only documented background primitive**
+(poll-based, `--max-cron-threads` default 2; failure rules 3-consecutive /
+5-over-7-days→deactivate); **no official built-in job queue — `queue_job` is
+community (Open question)**; external IDs / `ir.model.data` (binding-key
+inference); performance (prefetch, N+1 → `_read_group`, batch `create`, selective
+indexes); testing (`TransactionCase`, `HttpCase`/tours, tags); upgrade scripts
+(`migrations/$version/{pre,post,end}`); logging (`ir.logging`/CLI, **no built-in
+metrics — Open question**); Odoo.sh deployment (worker/time/memory limits;
+**crons disabled on staging/dev**). Full notes + citations:
+`docs/01-research/odoo-official-architecture-notes.md`.
+
+## Inferences and constraints, not decisions
+
+The "Architecture constraints implied by …" sections in both baselines are
+**inferences only**, and AR-002…AR-008 are **evidence-pending, not decided**.
+Key framing (not choices): a new public-app connector effectively needs GraphQL;
+webhooks cannot be the sole source of truth (need reconciliation + idempotency);
+background sync on stock Odoo is `ir.cron`-bound (queue_job is an explicit
+dependency question); modular addon family over a giant module; external IDs as a
+candidate binding key; inventory `committed` is order-driven; fulfillment must use
+FulfillmentOrder mutations. **None of these is a decision.**
+
+## Open questions
+
+Carried into the baselines and AR rows: REST sunset / GraphQL-only scope for
+custom apps; per-plan GraphQL bucket size & throttle error shape; connection-cost
+formula; current max product options; REST product/fulfillment deprecation dates;
+payout scope string; Pub/Sub & EventBridge retry semantics. Odoo: whether any
+official job queue exists beyond `ir.cron`; `ir.cron`/`ir.model.data`/`ir.logging`
+field schemas; manifest defaults; `create`-override signature; `read_group`
+deprecation; Odoo.sh per-stage quotas; built-in metrics. **Source unblocks for
+ChatGPT:** R2 Teqstars (alternate fetch vs 16.0 mirror) and R5 Google Doc (owner
+access/export).
+
+## Risks
+
+Commonly-cited API numbers can be stale (see DP-001); version-independent Shopify
+policy can drift without a version bump; `productSet` delete-on-omit is a
+data-loss footgun; webhook-only designs risk silent drift; treating `ir.cron` as
+a job queue (or assuming `queue_job` is core) is a design trap; some JS-rendered
+Odoo pages required RST-source recovery (re-verify load-bearing wording).
+
+## Learning feedback loop
+
+- **New issues discovered:** one — **DP-001** (incorrect Shopify API assumption,
+  #6): commonly-cited/training-data API figures were **stale vs current official
+  docs** (webhook "19/48h" → actual 8/4h; REST Plus "80" → 400; `/rate-limits`
+  moved to `/limits`, now GraphQL-only). **Prevented** by the independent
+  verification pass.
+- **Repeated issue patterns:** none at threshold — DP-001 is the **1st**
+  occurrence of category #6 (counter updated; no 2×/3× escalation).
+- **Rules/checklists updated:** added the DP-001 **prevention rule** — for
+  high-stakes numeric/policy API facts, re-read and cite the **exact** official
+  page; if a figure is not literally on the page, mark it **Open question**, never
+  assert a remembered/forum figure. The **independent-verification-pass** gate is
+  now the recommended method for future official-API research (RB-05/RB-06-style).
+- **New rejected approaches:** none (research-only; no approaches evaluated to
+  rejection — `rejected-approaches-log.md` unchanged).
+- **New technical debt:** none (no code; blocked sources R2/R5 are research gaps,
+  not debt — `technical-debt-register.md` unchanged).
+- **Architecture concerns:** captured as **AR-002…AR-008 (evidence-pending)**, not
+  decisions; the big ones are sync orchestration (cron vs webhook+reconciliation
+  vs queue) and duplicate-prevention/binding.
+- **Tests or review gates needed:** none active (research phase). For future API
+  research, keep the verification-pass gate. The connector-side test stance
+  (`TransactionCase` for mapping, `HttpCase`/tours for webhooks/UI) is recorded in
+  the Odoo notes for the implementation phase.
+- **Should future prompts change? Yes** — official-API research prompts should
+  explicitly require an **independent verification pass** on high-stakes numeric
+  facts and the "mark Open question if not literally on the page" rule (now
+  encoded via DP-001). Also: the branch-policy reality is **`Shopify-connector`**
+  (not `dev/Shopify-connector`), which future Sprint prompts should state.
+
+**Revision patch (ChatGPT REVISE — branch policy + high-power research rules):**
+
+- Branch policy was promoted into permanent governance files: `Shopify-connector`
+  is the dedicated integration branch; `main` and plain `dev` remain untouched
+  unless explicitly approved.
+- New issue discovered: high-power research fan-out needs a persistent governance
+  rule so large Claude workflows remain intentional, scoped, synthesized, and
+  reviewable.
+- Category: token waste (#17) / unclear handoff, first occurrence (logged as
+  **DP-002**, Mitigated).
+- Prevention rule: high-power research mode is allowed and encouraged for major
+  research and architecture work, but the fan-out plan, workstreams, sources,
+  stop condition, synthesis method, and verification method must be documented.
+- **This rule does not limit Claude's capabilities.** It is a *capability,
+  not a cap* — there is **no** fixed agent/token limit. Claude is expected to use
+  maximum capability when justified to produce a top-tier, state-of-the-art
+  connector; the only requirement is that large research be intentional, scoped
+  to allowed files, documented, and reviewable (and that small patch sessions
+  stay lightweight).
+- Rules/checklists updated in this patch: `CLAUDE.md` (new **Branch governance**
+  and **High-power research mode** sections), `README.md` (branch-governance +
+  high-power research summary), `docs/06-prompts/claude-learning-rules.md`
+  (pre-session checklist item 8 + High-power research mode section),
+  `docs/06-prompts/claude-session-prompts.md` (default branch policy + High-power
+  research mode in the standard preamble and as a section),
+  `docs/05-qa/pr-review-checklist.md` (branch-target + capability-use checks),
+  `docs/05-qa/defect-pattern-log.md` (DP-002 reframed + counter), and this
+  handoff.
+
+## What ChatGPT should review
+
+1. **Branch governance** — confirm `Shopify-connector` is the intended dedicated
+   integration branch and that leaving plain `dev` untouched is correct.
+2. **Citation/classification rigor** — spot-check that Shopify/Odoo facts cite
+   exact official URLs and that constraints are labelled inference, not decision.
+3. **High-stakes facts** — the rate-limit, versioning, and webhook numbers
+   (incl. the corrected 8-retries/4-hours and REST-Plus-400), and the Odoo
+   "no official job queue" finding.
+4. **Open questions / unblocks** — decide R2 (Teqstars alternate fetch vs 16.0
+   mirror) and R5 (Google Doc access/export).
+5. **AR-002…AR-008** — confirm these are the right architecture questions to
+   carry (still evidence-pending), and which to prioritise for RB-14.
+6. **DP-001 + verification gate** — endorse making the independent-verification
+   pass a standing rule for API research.
+
+## Recommended next session
+
+With Tier-1 baselines in place, proceed to **competitor deep dives**
+(`RB-02.1 Webkul`, `RB-02.3 Emipro`, `RB-02.5 Odoo Apps listings` — all
+unblocked), running **RB-12 feature taxonomy** early for grounding, and revisit
+**R2/R5** once ChatGPT decides the unblock path. Keep the no-code gate; one scoped
+session per deep dive; follow `research-methodology.md` §11.
+
+## Stop confirmation
+
+Stopped at the Sprint B boundary as instructed: working branch pushed, **one
+draft PR** opened targeting **`Shopify-connector`**, **not merged**. **No** code,
+**no** Odoo module, **no** competitor deep dives, **no** MVP scope, **no**
+architecture decisions. `main` and plain `dev` untouched. Awaiting ChatGPT review.
+
+---
+
+# Research Sprint A Handoff (history)
 
 > Continuity record for **Research Sprint A — Governance, Research Workspace,
 > Source Inventory, and Research Backlog.** Continuity lives in GitHub, not chat.
@@ -298,3 +548,74 @@ ChatGPT review.
   so the reword to "modular connector addon family" is deferred to a future
   ChatGPT-approved patch rather than edited out of scope here. **(Resolved in the
   final cleanup patch — both files reworded.)**
+
+### Research Sprint B checkpoints
+
+- **Sprint B / Stage 0 — Dedicated branch setup + governance correction
+  (2026-06-30):** Started Research Sprint B (research-only; no-code gate
+  confirmed via `CLAUDE.md` §5; allowed/forbidden files reconfirmed). The
+  original Sprint B prompt named `dev/Shopify-connector` as the dedicated project
+  integration branch. **Blocker (fact):** that branch cannot be created on the
+  remote — a plain `dev` branch already exists, and Git cannot hold both `dev`
+  and `dev/Shopify-connector` (a directory/file ref conflict; the push was
+  rejected with `directory file conflict`). The blocker was reported, not
+  worked around (no `dev` deletion, no force-push). **ChatGPT branch-policy
+  correction (decision, by ChatGPT):** use the existing remote branch
+  **`Shopify-connector`** as the dedicated project integration branch; leave
+  plain `dev` untouched; do not use `dev/Shopify-connector` or
+  `dev-Shopify-connector`. Sprint branches now branch from `Shopify-connector`
+  and Sprint PRs target `Shopify-connector` (not `main`, not `dev`). Verified
+  before acting: `origin/Shopify-connector` was at the old commit `68007a9`, had
+  **no** unique commits beyond `origin/main` (empty `main..Shopify-connector`),
+  and `68007a9` is a direct ancestor of `origin/main` (clean fast-forward). Then
+  fast-forwarded `Shopify-connector` to `origin/main` `a5d4543` (the merged PR
+  #49 Sprint A governance foundation) and pushed normally (`68007a9..a5d4543`,
+  no force). All seven governance-foundation files are present on the branch.
+- **Sprint B / Stage 1 — Pre-session governance check (2026-06-30):** Read
+  `CLAUDE.md`, this handoff, `claude-learning-rules.md`, `quality-feedback-loop.md`,
+  `research-methodology.md`, `resource-inventory.md`, `research-backlog.md`.
+  Confirmed: current phase is **research only**; the no-code gate applies; the
+  Sprint B allowed/forbidden file lists are understood; `Shopify-connector` is
+  the dedicated integration branch; the Sprint B working branch
+  `research/sprint-b-source-access-official-baseline` is based on
+  `Shopify-connector`; the Sprint B PR will target `Shopify-connector`; the old
+  branch `claude/odoo-shopify-research-setup-fs4wzi` remains non-canonical.
+  Sprint B maps to backlog items RB-01.1 (source validation), RB-05.1 (official
+  Shopify notes), RB-06.1 (official Odoo notes), and seeds RB-14 architecture
+  questions. Added this checkpoint note. Next: Stage 2 source validation.
+- **Sprint B / Stage 2 — Source access validation (2026-06-30):** Re-ran a normal
+  anonymous access check on all 8 resources (no auth bypass). No status changed
+  from Sprint A: 5 Accessible, 1 Partial (R4), 2 Blocked (R2 403 bot-block, R5
+  login wall). Created `docs/00-source-materials/source-access-notes.md`
+  (per-resource: date, URL, result, visible sections, block reason, unblock
+  action, extraction path, deep-dive readiness) and added a Sprint B
+  re-validation section + ChatGPT unblock decisions to `resource-inventory.md`.
+  Commit `d05ab49`. Next: Stage 3 Shopify baseline.
+- **Sprint B / Stage 3 — Official Shopify API baseline (2026-06-30):** Created
+  `docs/01-research/shopify-official-api-notes.md` (all required sections; every
+  fact cited to an exact shopify.dev URL + access date; Fact/Inference/Open
+  question labelled; "Architecture constraints implied" marked inference, no
+  decisions) and `docs/00-source-materials/shopify-official.md` (captured
+  quotes/paraphrases). Reconciled the verification pass: REST limits cited to the
+  REST-specific page (40/2 std, 400/20 Plus), general `/usage/limits` is now
+  GraphQL-only; webhook retry corrected to 8/4h. Commit `468efb6`. Next: Stage 4
+  Odoo baseline.
+- **Sprint B / Stage 4 — Official Odoo 19 baseline (2026-06-30):** Created
+  `docs/01-research/odoo-official-architecture-notes.md` (all required sections;
+  every fact cited to an exact odoo.com/19.0 URL; queue/async marked Open question
+  — only `ir.cron` is official, `queue_job` is community; constraints marked
+  inference, no decisions) and `docs/00-source-materials/odoo-official.md`. Commit
+  `08b4c75`. Next: Stage 5 architecture seeds.
+- **Sprint B / Stage 5 — Architecture review seeds (2026-06-30):** Added
+  AR-002…AR-008 to `architecture-review-log.md` (API strategy, sync orchestration,
+  module boundaries, mapping/dedup, error handling/retries, inventory,
+  fulfillment) — all Review decision "Not decided", Status "Evidence pending",
+  with evidence-required/risks/follow-up; updated the log's explanatory note.
+  Commit `21c460b`. Next: Stage 6 handoff + learning loop.
+- **Sprint B / Stage 6 — Handoff + quality loop (2026-06-30):** Wrote the full
+  Sprint B handoff (above) with the learning feedback loop; logged **DP-001**
+  (prevented stale-figure issue, category #6, Mitigated) and updated the
+  occurrence counter in `defect-pattern-log.md`; `rejected-approaches-log.md` and
+  `technical-debt-register.md` left unchanged (none warranted). Ran the
+  end-of-session quality gate (all items satisfied). Next: push branch, open one
+  draft PR targeting `Shopify-connector`, then stop.

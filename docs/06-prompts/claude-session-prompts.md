@@ -40,6 +40,22 @@ hide uncertainty. Never bypass authentication. Stay within scope.
 Work on the designated branch (never main). Follow docs/01-research/
 research-methodology.md.
 
+Default branch policy:
+- branch from `Shopify-connector`
+- open PRs into `Shopify-connector`
+- do not target `main` or plain `dev`
+
+High-power research mode (capability, not a cap): large parallel-agent fan-out,
+broad source collection, verification passes, and deep synthesis are allowed and
+encouraged when the task genuinely requires it (major research/benchmarking/API-
+verification/UX/architecture/quality/security/performance work) — to produce
+trustworthy, state-of-the-art results. Large fan-out must be intentional, scoped
+to allowed files, and documented in the handoff (why; workstreams; authoritative
+sources; files updated; stop condition; synthesis + verification method). For
+small patch/revision sessions, use the minimum research needed. If high-power
+mode is not explicitly authorized but appears necessary, stop and ask ChatGPT or
+propose a small fan-out plan (see CLAUDE.md → High-power research mode).
+
 End every session:
 - Run the end-of-session learning review (docs/05-qa/quality-feedback-loop.md §6).
 - Update docs/01-research/research-handoff.md using
@@ -48,6 +64,33 @@ End every session:
 - Confirm the quality gate. End with the exact next-session prompt. Then STOP
   and await ChatGPT review.
 ```
+
+---
+
+## High-power research mode
+
+> Reference policy (full text in `../../CLAUDE.md` → High-power research mode).
+> **This is a capability, not a cap — there is no fixed agent/token limit.**
+
+Claude is allowed to use strong research capabilities, parallel agents, broad
+source collection, verification passes, and deep synthesis when the task
+genuinely requires it. The goal is not to minimize tool use; it is to produce
+trustworthy, state-of-the-art work. Large fan-out must be intentional and
+reviewable.
+
+Before launching a large parallel-agent workflow, define: why high-power mode is
+needed; what each agent/workstream will investigate; which sources are
+authoritative; what files will be updated; the stop condition; how findings will
+be synthesized and verified; and how unsupported claims will be prevented.
+
+Large fan-out is encouraged for major research sprints, competitor benchmarking,
+official API verification, UX/UI benchmark research, architecture tradeoff
+research, and quality/security/performance review — within the allowed files and
+current phase gate. For small patch/revision sessions, do not launch large
+fan-out; use the minimum research needed. If high-power mode is not explicitly
+authorized but appears necessary, stop and ask ChatGPT or propose a small
+fan-out plan; if it is explicitly authorized, proceed within scope and document
+the plan/result in the handoff.
 
 ---
 

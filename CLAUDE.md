@@ -37,6 +37,55 @@ ChatGPT review/approval (see §6, §8).
 - Produce/update the file first, then summarize in chat. Commit with clear
   messages. Work on the session's designated branch; never commit to `main`.
 
+## Branch governance
+
+- `main` is stable only.
+- Do not commit directly to `main`.
+- Do not open sprint PRs directly into `main`.
+- Plain `dev` is an existing separate pipeline branch and must be left untouched
+  unless ChatGPT explicitly changes policy.
+- `dev/Shopify-connector` must not be used because plain `dev` already exists and
+  Git cannot store both branch refs.
+- `Shopify-connector` is the dedicated project integration branch for this
+  Shopify Connector project.
+- Sprint branches must branch from `Shopify-connector`.
+- Sprint PRs must target `Shopify-connector`.
+- Promotion from `Shopify-connector` to `main` requires explicit ChatGPT approval.
+
+## High-power research mode
+
+Claude is allowed to use strong research capabilities, parallel agents, broad
+source collection, verification passes, and deep synthesis when the task
+genuinely requires it.
+
+The goal is not to minimize tool use. The goal is to produce trustworthy,
+state-of-the-art work.
+
+However, large fan-out must be intentional and reviewable.
+
+Before launching a large parallel-agent workflow, Claude must define:
+
+- why high-power mode is needed
+- what each agent/workstream will investigate
+- what sources are authoritative
+- what files will be updated
+- what the stop condition is
+- how findings will be synthesized and verified
+- how unsupported claims will be prevented
+
+Large fan-out is encouraged for major research sprints, competitor benchmarking,
+official API verification, UX/UI benchmark research, architecture tradeoff
+research, and quality/security/performance review — but it must stay within the
+allowed files and current phase gate.
+
+For small patch/revision sessions, do not launch large fan-out. Use the minimum
+research needed.
+
+If high-power mode is not explicitly authorized in the prompt but appears
+necessary, stop and ask ChatGPT for approval or propose a small fan-out plan. If
+high-power mode is explicitly authorized, proceed within scope and document the
+plan/result in the handoff.
+
 ## 4. Research-first rule
 
 We are in a **research & governance phase**. Understanding the market,

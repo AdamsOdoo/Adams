@@ -31,6 +31,16 @@
 
 - [ ] **Scope respected** — only the sprint's allowed files changed; no code
       files; no forbidden files; no actual Odoo module created.
+- [ ] **Branch target is correct** — PR targets `Shopify-connector`, **not**
+      `main`, **not** plain `dev`, **not** `dev/Shopify-connector`
+      (`CLAUDE.md` → Branch governance).
+- [ ] **Capability use is appropriate** — large parallel-agent research is
+      allowed when justified by the task, documented in the handoff (plan /
+      workstreams / sources / stop condition / synthesis / verification), and
+      scoped to the allowed files (not a hard agent/token cap).
+- [ ] **Small patch sessions** did not use unnecessary large fan-out.
+- [ ] **High-power research outputs** were synthesized, verified, and classified
+      as facts / claims / inferences / recommendations / open questions.
 - [ ] **Citations present** — every external claim has vendor/product + URL +
       access status + date.
 - [ ] **Claims classified** — facts vs competitor claims vs inferences vs
