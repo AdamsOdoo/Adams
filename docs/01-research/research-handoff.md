@@ -1,9 +1,469 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint B)**
-> is immediately below; the **Sprint A** handoff is retained underneath as
-> history. The running **Sprint checkpoint log** (one note per stage, both
-> sprints) is at the very bottom.
+> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint C)**
+> is immediately below; the **Sprint B** and **Sprint A** handoffs are retained
+> underneath as history. The running **Sprint checkpoint log** (one note per
+> stage, all sprints) is at the very bottom.
+
+---
+
+# Research Sprint C Handoff
+
+> **Research Sprint C — High-Power Competitor Deep Dives, Screenshot/UX Evidence,
+> and Workflow Extraction.** Research-only; no-code gate in force (`CLAUDE.md`
+> §5). High-power research mode **explicitly authorized** for this sprint. Maps to
+> backlog items **RB-02.* (competitor deep dives)**, **RB-03.1 (feature matrix)**,
+> **RB-04.1 (UX/UI benchmark)**, **RB-07.1 (common patterns)**, **RB-08.1
+> (best-in-class)**, **RB-09.1 (gaps/opportunities)**, and **RB-10.1 (avoid-list)**.
+
+## Session summary
+
+Studied the **eight user-provided competitor resources (R1–R8)** from real
+evidence and produced the full Sprint C research set: **source notes + an
+analysed screenshot/visual inventory**, **six competitor deep dives** (Webkul,
+Teqstars, Emipro, VentorTech, ecommerce_shopify, sh_shopify_connector + a
+blocked-source record for the Google Doc), a **first cross-competitor feature
+matrix**, a **UX/UI benchmark**, and the **common-patterns / best-in-class /
+gaps-opportunities / avoid-list** synthesis. Evidence was gathered with a
+**controlled high-power capture→verify fan-out** (one capture agent + one
+adversarial verifier per source) and synthesised by the worker so claim
+classification and the no-code/no-MVP/no-architecture gate stayed owned centrally.
+**Every claim is cited and classified**; competitor capability statements remained
+**competitor claims** unless a documented workflow/screenshot demonstrated them;
+**no competitor claim was promoted to a Tier-1 fact**; blocked sources were
+recorded, **never bypassed**. **No connector code, no Odoo module, no MVP scope,
+and no architecture decisions** were produced.
+
+## Branch and commits
+
+**Working branch:** `claude/research-sprint-c-competitors-hgoo8t` (the
+harness-designated branch; based on `Shopify-connector` @ `d6fbcdb`, the merged
+**PR #50** Sprint B baseline). **Branch-name note for ChatGPT (flagged):** the
+Sprint C prompt body named `research/sprint-c-competitor-deep-dives-ux-evidence`,
+but the session's hard git rule designated `claude/research-sprint-c-competitors-hgoo8t`
+("never push to a different branch without explicit permission"), so work proceeded
+on the harness-designated branch; **the PR still targets `Shopify-connector`**;
+`main` and plain `dev` untouched.
+
+| Hash | Message |
+| --- | --- |
+| `6b07fad` | docs: start sprint c high-power competitor research |
+| `e1c5ec4` | docs: capture competitor source and screenshot evidence |
+| `1e027a0` | docs: add competitor deep dives |
+| `da93ba9` | docs: add competitor matrix and ux benchmark |
+| `890ce0b` | docs: synthesize competitor patterns and opportunities |
+| _(this commit)_ | docs: finalize research sprint c handoff |
+
+## High-power research mode used
+
+**Yes — explicitly authorized and documented before launch** (the
+**Sprint C high-power research plan** below was committed in `6b07fad` before any
+agent ran). **Workstreams:** a `pipeline()` workflow of **one capture agent per
+source (R1–R8)** returning structured, cited, claim-classified evidence (access
+status, feature claims, reconstructed workflows, visuals, reliability signals,
+release notes, quotes, open questions), each followed by **one adversarial
+verifier** that re-read the source and **downgraded anything not literally
+supported** (16 agents, 137 tool calls). **Synthesis/verification:** the worker
+read every source digest and wrote all deliverables, preserving per-claim
+classification and citations. **Unsupported-claim prevention:** strict claim
+classes on every line; competitor claims never elevated to facts; blocked/unknown
+stated as such; no hidden-feature guessing. **Result:** all 8 sources captured;
+the verifier produced material corrections (e.g. **R2 Teqstars Partial→Blocked**;
+**ecommerce_shopify "real-time"→cron**; **sh_shopify_connector multi-company→
+not-found**), logged as **DP-003**.
+
+### Sprint C high-power research plan (as committed pre-launch)
+
+- **Why high-power mode is needed:** eight competitor resources, several
+  multi-page (Emipro ~35 sub-pages; VentorTech 28-article Confluence hub) and two
+  previously gated (R2 403; R5 login wall), had to be studied from real evidence
+  with verification in one controlled pass.
+- **Workstreams / agents:** one capture agent per source (R1–R8) + one adversarial
+  verifier per source; worker-owned synthesis.
+- **Sources:** R1 Webkul · R2 Teqstars docs (+Apps listing) · R3 Emipro tree ·
+  R4 VentorTech Confluence · R5 Google Doc · R6 ecommerce_shopify · R7 VentorTech
+  site/ecosystem/Apps · R8 sh_shopify_connector. Tier-1 grounding only from the
+  existing official baselines.
+- **Screenshots / UI evidence:** analysed markdown inventory (proxy fetcher returns
+  markdown/alt-text, not pixels); binaries not forced (sprint rule allows the
+  fallback); no auth bypass for any visual.
+- **Files to update:** the Sprint C allowed-files set only (listed below).
+- **Stop condition:** all accessible sources captured+verified; blocked sources
+  documented without bypass; nine deliverables + evidence written, cited,
+  classified; QA logs + handoff updated; quality gate satisfied — then stop.
+- **Verification method:** two-pass capture→verify; downgrade anything not literally
+  on the page; reuse the DP-001 verification gate.
+- **Unsupported-claim prevention:** strict claim classification; no claim→fact
+  elevation; blocked/unknown stated; no hidden-feature guessing.
+
+## Files created or updated
+
+**Source materials (`docs/00-source-materials/`)**
+- `competitor-source-notes.md` (new), `competitor-screenshot-inventory.md` (new),
+  `screenshots/README.md` + `screenshots/{webkul,teqstars,emipro,ventortech,odoo-apps}/README.md` (new).
+
+**Research (`docs/01-research/`)**
+- `competitor-deep-dives.md` (new), `competitor-feature-matrix.md` (new),
+  `ux-ui-benchmark.md` (new), `common-patterns.md` (new),
+  `best-in-class-observations.md` (new), `gaps-opportunities.md` (new),
+  `avoid-list.md` (new), `resource-inventory.md` (updated — Sprint C access
+  changes), `research-handoff.md` (this file).
+
+**QA / quality memory (`docs/05-qa/`)**
+- `defect-pattern-log.md` (updated — DP-003 + counter), `architecture-review-log.md`
+  (updated — non-decision Sprint C evidence note), `rejected-approaches-log.md`
+  (updated — avoid-list-is-not-rejection note), `technical-debt-register.md`
+  (updated — Sprint C no-debt note).
+
+**No forbidden files touched** (no `*.py`/`*.xml`/`*.csv`/manifests/modules/CI/
+Docker; no `addons/**`; no `docs/02|03|04|07|08`; no `.claude/skills|agents`).
+
+## Source access results
+
+No auth was bypassed. **Accessible (5):** R1 Webkul, R3 Emipro, R6
+ecommerce_shopify, R7 VentorTech site/ecosystem/Apps, R8 sh_shopify_connector —
+**plus the Teqstars Odoo Apps listing** as an accessible R2 surrogate. **Partial
+(1):** R4 VentorTech Confluence (anonymous banner; 11 of 28 child articles read).
+**Blocked (2):** **R2 Teqstars docs host** (HTTP 403 bot-block on the whole
+`docs.teqstars.com`, 19.0 **and** 16.0 — verifier downgraded R2 from Partial to
+**Blocked**), **R5 Google Doc** (sign-in wall). **New cross-source findings:**
+(a) the Teqstars **Apps Store listing is accessible** ($326.20, OPL-1, 83×5.0) and
+supplied the R2 evidence; (b) **R5 is the "Get Started" guide for R6
+`ecommerce_shopify`** (R6's CTA 301-redirects to that exact doc). Full evidence:
+`docs/00-source-materials/competitor-source-notes.md` and the Sprint C section of
+`resource-inventory.md`.
+
+## Screenshots / UI evidence captured
+
+Analysed visual inventory in `competitor-screenshot-inventory.md` (no binary files
+saved — proxy fetcher returns markdown/alt-text; sprint rule allows the markdown
+fallback). **Most demonstrative:** **Emipro** (~29 **real `.png`** screenshots of
+queues/Log Book/config) and **VentorTech R4** (traffic-light webhook health,
+External-Location mapping, Preview/Report dry-run). **Caption-only/weak:**
+Teqstars (17 captions; **docs screenshots 403-blocked**), VentorTech R7 (alt-text
+flows). **None:** **ecommerce_shopify (no UI screenshots at all)**; Google Doc
+(blocked). sh_shopify_connector has the broadest caption walkthrough (~29 groups)
+but no rendered-image verification.
+
+## Competitor deep dives completed
+
+All six in `competitor-deep-dives.md`: **Webkul, Teqstars, Emipro, VentorTech,
+ecommerce_shopify, sh_shopify_connector**, plus a **blocked-source record** for the
+Google Doc. Each separates competitor claims from facts and from demonstrated
+workflows, with per-area feature classification, workflow reconstruction, UX,
+reliability, maintenance, strengths/weaknesses, learn/do-better/avoid, and open
+questions.
+
+## Key feature findings
+
+- **GraphQL is the converging API** (VentorTech migrated REST→GraphQL Jan 2026;
+  all position on it) — consistent with Tier-1.
+- **Webhooks + scheduled + manual** is the table-stakes sync shape; **staging/
+  queues** are near-universal — **except ecommerce_shopify (cron-only, no
+  webhooks, email-only errors)** and Webkul (no webhooks; Feeds staging).
+- **Feature-breadth leaders:** sh_shopify_connector (gift cards, abandoned-
+  checkout→CRM, recommendations, Buy-with-Prime), Teqstars-on-paper (Markets/B2B/
+  payouts/queue — unverified), Emipro (payouts/Markets/metafields/analytic,
+  demonstrated).
+- **Whitespace (no competitor demonstrates well):** **named rate-limit/cost-aware
+  throttling** (none), **first-class user-visible reconciliation** (none),
+  **automatic retry** (only VentorTech), **B2B** (only VentorTech), **payout
+  reconciliation** (only Emipro demonstrated).
+- **Pricing (on-page 2026-06-30):** WK $170 · TQ $326.20 · EC $195.56 · SH
+  $168.81 · VT €499 / $569.16; EM price not in docs.
+
+## Key UX/UI findings
+
+- **Best diagnostics — VentorTech:** traffic-light webhook health with a **named
+  cause + fix hint**; Preview/Report dry-run; Failed-Job Notifications;
+  irreversible-action warnings; honest PII disclosure.
+- **Best observability — Emipro:** state-coloured queues + per-line reason-coded
+  Log Lines + Log Book.
+- **Best monitoring — sh_shopify_connector:** Integration Dashboard + **daily
+  activity chart** + failure counts + re-export recovery flag; access-right-gated
+  setup.
+- **Frustrations to avoid:** "real-time" mislabelling (WK/EC/SH); raw cron
+  internals exposed (WK); manual stock-adjustment (EM); email-only errors (EC);
+  technical install (VT odoo.conf/queue_job; not Odoo Online); toggle-dense config;
+  gated/blocked docs (EC/TQ).
+- **No connector has a unified command center + recovery-first error center
+  together** — a clear UX differentiator.
+
+## Key reliability findings
+
+- **VentorTech leads (demonstrated by dated release notes):** GraphQL
+  **`@idempotent`** directives (Shopify 2026-04), **automatic retry** of safe
+  ops, a real **`queue_job`** async queue, HMAC-SHA256 webhooks, and openly
+  disclosed **CRITICAL silent-data-loss fixes** (paging, timezone).
+- **Emipro:** strong observability (Log Book), email/SKU dedup, stored-reference
+  re-export blocking, manual missed-webhook recovery — **but manual-only retry**
+  and a **stale v19 changelog**, and its docs cite the **outdated Shopify
+  "19 retries/48h"** figure (Tier-1: 8/4h).
+- **Across the field:** idempotency is mostly implicit; **rate-limit handling is
+  absent**; reconciliation is implicit; "real-time" is overstated. These map onto
+  Tier-1 (webhook delivery not guaranteed → reconcile; `@idempotent` from 2026-04).
+
+## Common patterns
+
+Strongly common (≥2 demonstrate): custom-app connect; bidirectional core sync;
+**staging/queue before commit**; scheduled + manual sync; SKU/barcode + email
+dedup + Shopify-ID write-back; auto-workflow; fulfillment/tracking write-back;
+reason-coded in-app logs; per-record failure isolation; GraphQL. Rare/
+differentiating: automatic retry, idempotency directives, real job queue,
+traffic-light health, dry-run, payouts, gift cards, B2B, abandoned-checkout→CRM.
+**Missing across the field:** rate-limit/cost throttling, first-class
+reconciliation, a unified command center, honest latency, documented HMAC.
+(`common-patterns.md`.)
+
+## Best-in-class observations
+
+Onboarding (VT OAuth + scope/connection test; WK Test Connection), product sync
+(EM incremental + CSV fallback; VT testable directional mapping), order flow (VT
+auto-workflow pipeline; EM multi-payment fidelity), inventory (VT quantity-field
+choice + multi-company; EM deterministic export), fulfillment (EM Put-in-Pack),
+logs/errors (EM Log Book; VT diagnostics; SH monitoring), docs/maintenance (EM
+honesty; VT dated changelog), security (SH access groups). (`best-in-class-observations.md`.)
+
+## Gaps and opportunities
+
+Top differentiation themes (recommendations, gated): **demonstrated correctness**
+(idempotency + reconciliation + rate-limit throttling — the biggest whitespace and
+Tier-1-mandated); **best operator UX** (unified command center + recovery-first
+errors + named diagnostics + dry-runs); **effortless install with real
+reliability** (the combo nobody has); **honesty/transparency** (latency labels,
+dated changelog disclosing fixes, open docs/demo); **premium breadth as clean
+add-ons** (payouts, B2B, gift cards, Markets). MVP-relevance is tagged
+candidate/later/unknown per item — **not finalized**. (`gaps-opportunities.md`.)
+
+## Avoid-list highlights
+
+Webhook-only/cron-only sync; no reconciliation; `ir.cron`-as-a-queue; heavy work
+in the webhook request; no rate-limit handling; skipping HMAC; email-only errors;
+manual-only recovery; irreversible "Force Done"; single-location inventory;
+writing `committed`; legacy fulfillment endpoints; non-idempotent refunds;
+assuming payouts exist for all gateways; bot-blocked/gated/stale docs; one-giant-
+module / `_inherits` delegation; `productSet` delete-on-omit as partial update.
+Items tagged **"Arch review: YES"** route through AR-002…AR-008. (`avoid-list.md`.)
+
+## What is still blocked
+
+- **R2 Teqstars docs** (`docs.teqstars.com`, 19.0 + 16.0) — HTTP **403**
+  bot-block on the whole host; no workflow/screenshot evidence. *(The Apps Store
+  listing substituted as accessible vendor-claim evidence.)* **Unblock:** a
+  browser-UA fetch of the 19.0 docs (no auth to bypass), **or** ChatGPT accepts the
+  Apps-listing evidence as sufficient.
+- **R5 Google Doc** — sign-in wall; **owner view-access or export required**; it
+  is specifically **R6's setup guide**.
+- **R4 VentorTech Confluence** — 17 of 28 child articles unread (not gated, just
+  not fetched); optional for fuller coverage.
+
+## Inferences, not decisions
+
+All strengths/weaknesses, "do better", gaps/opportunities, avoid-list items, and
+the architecture-evidence note are **inferences/recommendations**. **No MVP scope
+and no architecture is decided.** Competitor claims are **claims**, not facts;
+on-page price/license/version are **facts about the listing on 2026-06-30**. The
+AR-002…AR-008 rows remain **"Not decided / Evidence pending."**
+
+## Open questions
+
+Teqstars: are the idempotency/queue-retry/Markets claims real (docs blocked)?
+ecommerce_shopify: official vs partner provenance; does product export exist; what
+is in the blocked setup doc (R5)? VentorTech: can install be Odoo-Online-friendly;
+payout/POS/gift-card roadmap; connector permission model? sh_shopify_connector:
+real adoption (no ratings) and currency (no changelog); multi-company; idempotency/
+HMAC details? Field-wide: how do competitors surface rate-limit and reconciliation
+to users (none observed)? (Per-source lists in the deep dives.)
+
+## Risks
+
+- **Evidence asymmetry:** TQ (docs blocked) and EC (no screenshots) are
+  **vendor-claim-heavy** — their real capabilities may differ from the matrix;
+  EM/VT carry the most demonstrated evidence (weight accordingly).
+- **Vendor-claim drift:** marketing "real-time"/idempotency/queue claims can
+  overstate; mitigated by classification + verification (DP-003).
+- **Source volatility:** competitor pricing/pages/changelogs change; re-date on
+  re-visit. Teqstars 403 may persist.
+- **Synthesis temptation:** keep MVP/architecture gated; do not let
+  gaps/opportunities harden into decisions before ChatGPT review.
+
+## Learning feedback loop
+
+- **New issues discovered:** one — **DP-003** (unsupported assumption #3 / weak
+  research #1): competitor capability statements, **especially from a blocked docs
+  site (Teqstars 403) or a screenshot-free listing (ecommerce_shopify)**, risk
+  being recorded as facts; "real-time" marketing risks masking a cron/queue model.
+  **Prevented** by the capture→verify two-pass + strict claim classification
+  (which produced concrete downgrades: R2 Partial→Blocked, EC "real-time"→cron,
+  SH multi-company→not-found).
+- **Repeated issue patterns:** none at threshold. DP-003 is the **1st** occurrence
+  of category #3/#1. Separately, Sprint C found **external confirmation of the
+  DP-001 risk** — Emipro's docs cite the stale Shopify "19 retries/48h" figure
+  (Tier-1: 8/4h); **not adopted** (the verification gate held). No 2×/3× escalation.
+- **Rules/checklists updated:** added **DP-003** + its prevention rule (classify
+  every line; never elevate a competitor claim to a fact; run an adversarial
+  verifier that downgrades anything not literally on the page) and the occurrence
+  counter in `defect-pattern-log.md`. The **per-cell evidence symbol +
+  evidence-note** convention in the feature matrix is now the standard for future
+  competitor matrices.
+- **New rejected approaches:** none (research-only). The **avoid-list** holds
+  competitor anti-patterns as **recommendations**, explicitly **not** rejected
+  decisions; `rejected-approaches-log.md` notes they route through architecture
+  review before any formal rejection.
+- **New technical debt:** none (no code). Blocked sources are research gaps, not
+  debt (noted in `technical-debt-register.md`).
+- **Architecture concerns:** competitor evidence now **informs** AR-002…AR-008 —
+  recorded as a **non-decision note** in `architecture-review-log.md` (GraphQL
+  convergence; webhooks+cron+queue with `queue_job` as a real data point; SKU/
+  email/ID-write-back binding; `@idempotent`+retry; multi-location; FulfillmentOrder).
+  **All rows stay "Not decided / Evidence pending."**
+- **Tests or review gates needed:** none active (research). For implementation
+  (gated): regression tests for duplicate orders, multi-location double-decrement,
+  missed-webhook reconciliation, idempotent refunds, timezone/paging — seeded in
+  the avoid-list (A-IMP-4) for the definition-of-done.
+- **Should future prompts change? Yes** — (1) for blocked/screenshot-free sources,
+  prompts should **mandate the capture→verify two-pass and the claim-class
+  symbols** (now encoded via DP-003); (2) competitor-research prompts should state
+  that the **branch reality is the harness-designated `claude/...` branch** while
+  the **PR targets `Shopify-connector`**, to avoid the Sprint C branch-name
+  ambiguity.
+
+### Sprint C revision (PR #51 review — 2026-07-01)
+
+ChatGPT review returned **REVISE** for two evidence-classification overstatements;
+corrected on the same branch (`docs: correct sprint c evidence classifications`):
+
+- **Correction 1 — Webkul multi-company.** The Webkul default **Company** field was
+  initially classified too strongly as **demonstrated multi-company support** (✅).
+  True multi-company support/isolation was **not demonstrated**; a visible config
+  field is not evidence of multi-company routing or record-rule handling. Downgraded
+  to `⬜/➖` in `competitor-deep-dives.md` and to `➖` in `competitor-feature-matrix.md`
+  (with an evidence note; EM/VT remain the demonstrated multi-company evidence).
+- **Correction 2 — "bidirectional core sync" common pattern.** The strongly-common
+  pattern claiming **bidirectional product/order/inventory/customer sync across all**
+  connectors was **narrowed**: broad core-object coverage is a common *market promise*,
+  but **directionality varies by object and evidence strength** (EC product export not
+  found; WK customer export not found; TQ listing-claim only; EM/VT strongest
+  directional evidence). Updated in `common-patterns.md`.
+- **Category:** unsupported assumption (#3) / weak research classification (#1) — logged
+  as **DP-004** in `defect-pattern-log.md`.
+- **Prevention rule:** configuration fields must **not** be treated as demonstrated
+  feature support unless the workflow/behaviour is shown; common-pattern wording must
+  distinguish a **market promise** from **demonstrated bidirectionality**.
+
+## What ChatGPT should review
+
+1. **Claim discipline** — spot-check that competitor claims are not presented as
+   facts, especially TQ (docs blocked) and EC (no screenshots), and that the
+   verifier's downgrades (R2→Blocked, EC→cron, SH multi-company→not-found) are
+   reflected everywhere.
+2. **Matrix evidence** — confirm the per-cell symbols + evidence notes are fair
+   and that 🟨/🔒 are used where evidence is listing-only/blocked.
+3. **Blocked-source handling** — endorse recording R2 docs as Blocked (with the
+   Apps-listing surrogate) and R5 as Blocked (= R6's setup guide); decide the
+   unblock path for each.
+4. **Gaps/opportunities & avoid-list** — confirm these stay **recommendations**
+   (no MVP/architecture lock-in) and which opportunities to prioritise for RB-13/
+   RB-14.
+5. **Branch-name discrepancy** — confirm working on the harness-designated branch
+   `claude/research-sprint-c-competitors-hgoo8t` (PR → `Shopify-connector`) is
+   acceptable, or instruct otherwise.
+6. **DP-003 + verification gate** — endorse making the capture→verify two-pass the
+   standing rule for competitor research.
+
+## Recommended next session
+
+With competitor evidence in place, proceed to **RB-12 (canonical feature
+taxonomy)** to normalize the matrix rows, then **RB-11 (product vision draft)** and
+**RB-13 (MVP scope implications — not finalized)**, feeding **RB-14 (architecture
+preparation)** against AR-002…AR-008 — all gated and ChatGPT-reviewed. In parallel,
+resolve the **R2/R5 unblocks** (browser-UA fetch decision for Teqstars 19.0 docs;
+owner access/export for the Google Doc) and optionally finish the **17 unread
+VentorTech Confluence** articles. Keep the no-code gate; one scoped objective per
+session.
+
+## Stop confirmation
+
+Stopped at the Sprint C boundary as instructed: five stage commits on the
+harness-designated working branch, **one draft PR** to be opened targeting
+**`Shopify-connector`**, **not merged**. **No** code, **no** Odoo module, **no**
+MVP scope, **no** architecture decisions, **no** ADRs. `main` and plain `dev`
+untouched. Blocked sources documented without bypass. Awaiting ChatGPT review.
+
+## Quality gate confirmation (Sprint C)
+
+- [x] Session handoff updated (this block).
+- [x] Quality feedback loop checked (this file + `../05-qa/` logs).
+- [x] New learning captured in the correct file (DP-003 in `defect-pattern-log.md`).
+- [x] Any rejected approach logged (none — avoid-list is recommendations, noted in `rejected-approaches-log.md`).
+- [x] Any accepted technical debt logged (none — noted in `technical-debt-register.md`).
+- [x] Any repeated issue pattern escalated per §4 (none at threshold; DP-003 1st occurrence).
+
+## Sprint C high-power research plan
+
+- **Why high-power mode is needed:** Eight user-provided competitor resources
+  (R1–R8) must be studied from **real evidence** — full documentation trees,
+  on-page screenshots, configuration/setup flows, feature claims, release notes,
+  pricing/support, and UX — so the connector is designed from knowledge, not
+  guesses. Several sources are multi-page (Emipro doc tree, VentorTech Confluence
+  hub with ~27 children) and two were previously gated (R2 Teqstars 403; R5
+  Google Doc login wall). Covering this breadth with verification in one pass
+  justifies a controlled parallel fan-out (per `CLAUDE.md` → High-power research
+  mode; the policy is a capability, not a cap).
+- **Workstreams / agents:** One **source-capture agent per resource** (R1 Webkul,
+  R2 Teqstars, R3 Emipro + sub-pages, R4 VentorTech Confluence hub + children, R5
+  Google Doc, R6 ecommerce_shopify, R7 VentorTech site, R8 sh_shopify_connector),
+  each returning **structured, cited, claim-classified evidence** (access status,
+  visible sections, feature claims, visuals/screenshots described, workflow steps,
+  version context). Then a **verification workstream** that re-checks the
+  highest-stakes claims (pricing, sync model, key features, access status) against
+  the captured evidence and flags anything unsupported. Synthesis into the
+  deliverable docs is performed by the worker (main thread) so governance
+  (citation + claim classification + no-MVP/no-architecture gate) is owned
+  centrally.
+- **Sources to inspect:** R1 https://webkul.com/blog/odoo-multichannel-shopify-connector/ ·
+  R2 https://docs.teqstars.com/19.0/applications/shopify/overview.html ·
+  R3 https://docs.emiprotechnologies.com/shopify-odoo-connector/v19/installation.html (+ tree) ·
+  R4 https://ventortech.atlassian.net/wiki/spaces/pd/pages/482639953/Shopify (+ children) ·
+  R5 https://docs.google.com/document/d/1zIwRxp7cvLYeyjl8P_mvsjC-v8Tsd_ugC1JbfTznHC8/edit ·
+  R6 https://apps.odoo.com/apps/modules/19.0/ecommerce_shopify ·
+  R7 https://ventor.tech/solutions/odoo-shopify-connector/ ·
+  R8 https://apps.odoo.com/apps/modules/19.0/sh_shopify_connector#features.
+  Tier-1 grounding only from the existing official Shopify/Odoo baselines (these
+  competitor sources are Tier 2–5 → **competitor claims**, not facts).
+- **Screenshots / UI evidence approach:** Primary evidence is the **screenshot
+  inventory markdown** (`competitor-screenshot-inventory.md` + per-vendor
+  `screenshots/*/README.md`) analysing what each visual/figure on the source
+  pages demonstrates (fields, buttons, tabs, workflow step, status/log surfaces,
+  UX). Actual binary image capture is **attempted only where practical and
+  high-value**; where impractical (JS-gated, heavy, or auth-gated) it is recorded
+  as "no file saved" with the reason — the analysis (not the file's existence) is
+  the deliverable. No authentication wall is bypassed to obtain any visual.
+- **Files to update:** (research) `competitor-deep-dives.md`,
+  `competitor-feature-matrix.md`, `ux-ui-benchmark.md`, `common-patterns.md`,
+  `best-in-class-observations.md`, `gaps-opportunities.md`, `avoid-list.md`,
+  `resource-inventory.md`, `research-handoff.md`; (source materials)
+  `competitor-source-notes.md`, `competitor-screenshot-inventory.md`,
+  `screenshots/README.md` + `screenshots/{webkul,teqstars,emipro,ventortech,odoo-apps}/README.md`;
+  (QA) `defect-pattern-log.md`, `architecture-review-log.md`,
+  `rejected-approaches-log.md`, `technical-debt-register.md`. **No other files.**
+- **Stop condition:** All accessible sources captured + verified; blocked sources
+  (R2/R5 if still gated, R4 gated children) documented without bypass; the nine
+  research deliverables + source/screenshot evidence written with every claim
+  cited and classified; QA logs and handoff updated; quality gate satisfied. Then
+  **stop** — no MVP scope, no architecture decisions, no code, no merge.
+- **Verification method:** Two-pass — topic capture, then an independent
+  verification agent (and worker spot-checks) re-reading the canonical source for
+  the highest-stakes claims; any figure/feature not literally supported on the
+  page is downgraded to **open question / vendor claim**, never asserted as fact
+  (reuses the DP-001 verification-pass gate).
+- **How unsupported claims will be prevented:** Strict claim classification on
+  every line (Fact / Competitor claim / Inference / Open question — `CLAUDE.md`
+  §8); vendor capability statements stay **competitor claims** unless a concrete
+  documented workflow/screenshot demonstrates them (then **visible demonstrated
+  workflow**); blocked/unknown is stated as such; no hidden-feature guessing; no
+  competitor claim is promoted to a Tier-1 fact (those come only from the existing
+  official baselines).
 
 ---
 
@@ -619,3 +1079,57 @@ ChatGPT review.
   `technical-debt-register.md` left unchanged (none warranted). Ran the
   end-of-session quality gate (all items satisfied). Next: push branch, open one
   draft PR targeting `Shopify-connector`, then stop.
+
+### Research Sprint C checkpoints
+
+- **Sprint C / Stage 1 — Setup + high-power plan (2026-06-30):** Started Research
+  Sprint C (research-only; no-code gate confirmed via `CLAUDE.md` §5; high-power
+  mode **explicitly authorized** in the prompt). Fetched remote branches and
+  verified preconditions: **PR #50 is merged into `Shopify-connector`** (the
+  branch tip `d6fbcdb` *is* the PR #50 merge commit), the working branch is based
+  on `Shopify-connector` (identical to it at start), and all seven required files
+  are present. **Branch-name note (flagged for ChatGPT):** the harness designated
+  the working branch **`claude/research-sprint-c-competitors-hgoo8t`** (already
+  checked out, based on `Shopify-connector`), whereas the Sprint C prompt body
+  named `research/sprint-c-competitor-deep-dives-ux-evidence`; per the
+  session's hard git rule ("never push to a different branch without explicit
+  permission") the work proceeds on the harness-designated branch and the **PR
+  still targets `Shopify-connector`** — `main`/`dev` untouched. Read the required
+  governance/research files (CLAUDE.md, this handoff, learning rules, methodology,
+  resource inventory, backlog, both official baselines, all QA logs). Wrote the
+  **Sprint C high-power research plan** (above) and committed it. Next: Stage 2
+  source + screenshot evidence capture (controlled parallel fan-out).
+- **Sprint C / Stage 2 — Source + screenshot evidence (2026-06-30):** Ran the
+  documented capture→verify fan-out (16 agents, 137 tool calls) over R1–R8;
+  verified each source adversarially. Wrote `competitor-source-notes.md`,
+  `competitor-screenshot-inventory.md`, and the `screenshots/` READMEs (root +
+  webkul/teqstars/emipro/ventortech/odoo-apps); updated `resource-inventory.md`
+  with Sprint C access changes (**R2 docs still 403-blocked but Teqstars Apps
+  listing accessible; R5 = R6's setup guide; pricing resolved**). No binaries saved
+  (proxy returns markdown/alt-text; sprint rule allows the fallback). No auth
+  bypassed. Commit `e1c5ec4`. Next: Stage 3 deep dives.
+- **Sprint C / Stage 3 — Competitor deep dives (2026-06-30):** Wrote
+  `competitor-deep-dives.md` — six competitors (Webkul, Teqstars, Emipro,
+  VentorTech, ecommerce_shopify, sh_shopify_connector) + a blocked-source record
+  for the Google Doc; each with feature classification, workflow reconstruction,
+  UX, reliability, maintenance, strengths/weaknesses, learn/do-better/avoid, open
+  questions; verifier downgrades reflected (R2→Blocked, EC→cron, SH multi-company→
+  not-found). Commit `1e027a0`. Next: Stage 4 matrix + UX benchmark.
+- **Sprint C / Stage 4 — Matrix + UX benchmark (2026-06-30):** Wrote
+  `competitor-feature-matrix.md` (grouped tables, per-cell ✅/🟨/⬜/🚫/🔒 symbols +
+  evidence notes + implications) and `ux-ui-benchmark.md` (evidence base, per-area
+  comparisons, best patterns, gaps, principles — benchmark only, no UI designed).
+  Commit `da93ba9`. Next: Stage 5 synthesis.
+- **Sprint C / Stage 5 — Patterns/best-in-class/gaps/avoid (2026-06-30):** Wrote
+  `common-patterns.md`, `best-in-class-observations.md`, `gaps-opportunities.md`
+  (candidate/later/unknown MVP relevance — not finalized), `avoid-list.md` (each
+  item with evidence/risk/prevention/arch-review flag). Updated QA logs:
+  **DP-003** + counter (`defect-pattern-log.md`); a non-decision competitor-
+  evidence note (`architecture-review-log.md`); avoid-list-is-not-rejection note
+  (`rejected-approaches-log.md`); Sprint C no-debt note
+  (`technical-debt-register.md`). Commit `890ce0b`. Next: Stage 6 handoff + PR.
+- **Sprint C / Stage 6 — Handoff + quality loop (2026-06-30):** Wrote the full
+  Sprint C handoff (above) with the learning feedback loop (DP-003; external
+  DP-001 confirmation; future-prompt updates) and the quality-gate confirmation
+  (all items satisfied). Ran final allowed/forbidden-file checks. Next: push the
+  working branch and open one draft PR targeting `Shopify-connector`, then stop.

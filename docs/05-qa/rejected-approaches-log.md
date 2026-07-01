@@ -24,5 +24,18 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | _RA-000_ | _YYYY-MM-DD_ | _Approach we will not use_ | _Core reason_ | _Concrete evidence/reasoning_ | _What would change our mind_ | _ADR link, if any_ |
 
-_No approaches rejected yet (Research Sprint A). Entries begin once design
-options are evaluated._
+_No approaches rejected yet (Research Sprints A–C). Entries begin once design
+options are evaluated and ChatGPT/architecture review formally rejects one._
+
+_**Research Sprint C note (2026-06-30):** the competitor research produced an
+**avoid-list** of competitor anti-patterns —
+[`../01-research/avoid-list.md`](../01-research/avoid-list.md). Those items are
+**recommendations/inferences, NOT rejected-approach decisions**: they describe
+mistakes **competitors** made (e.g. webhook-only/cron-only sync, `ir.cron`-as-a-
+queue, manual-only recovery, email-only errors, single-location inventory,
+"real-time" mislabelling, bot-blocked/gated docs). Per `CLAUDE.md` §10 and this
+log's rules, an approach is only entered here as **Rejected** after it is
+evaluated for **our** design and ChatGPT/architecture review rejects it. The
+avoid-list items tagged "Arch review: YES" are seeded against AR-002…AR-008
+(evidence-pending) and will route through the architecture-review log first. **No
+approach is rejected in this sprint.**_
