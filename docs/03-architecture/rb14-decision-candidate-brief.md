@@ -140,12 +140,16 @@ fits an unattended connector; **OAuth-vs-token stays open**.
 
 ### Why
 
-`[Official source-code fact]` `ir.cron` is the only core async primitive (`IrCron`/
-`IrCronTrigger`/`IrCronProgress`; `_trigger`, `_commit_progress`, coarse deactivation); a true
-queue is **community `queue_job`**. `[Official limitation]` webhooks are not guaranteed →
-reconciliation mandatory. `[Official limitation]` Odoo.sh staging crons are disabled (a testing
-constraint). The substrate is a real decision between **build-a-queue (Option 2)** and
-**adopt-a-queue (Option 3)**, both now on Odoo.sh/on-prem.
+`[Official source-code fact]` the reviewed source confirms `ir.cron` (`IrCron`/
+`IrCronTrigger`/`IrCronProgress`; `_trigger`, `_commit_progress`, coarse deactivation) and that
+**`with_delay` is absent** from the reviewed files; `[Inference]` a general async job queue was
+**not found** in the reviewed docs/source (`[Open question]` whole-repo absence; `[Community /
+not official]` OCA `queue_job`). Background execution on stock Odoo 19 therefore relies on the
+documented/source-verified `ir.cron`, and **a true async queue remains a community dependency
+unless further source evidence proves otherwise**. `[Official limitation]` webhooks are not
+guaranteed → reconciliation mandatory. `[Official limitation]` Odoo.sh staging crons are
+disabled (a testing constraint). The substrate is a real decision between **build-a-queue
+(Option 2)** and **adopt-a-queue (Option 3)**, both now on Odoo.sh/on-prem.
 
 ### Decision criteria (recommendation, not a decision)
 

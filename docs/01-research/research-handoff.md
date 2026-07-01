@@ -97,8 +97,10 @@ unchanged.**
   (protected-data access **"Always available"** for custom apps vs **"Requires review"** for
   public; compliance webhooks App-Store-scoped); RQ-002-3 (offline token model + 90-day rotating
   refresh).
-- **Re-confirmed open:** RQ-005-1 (GID permanence **not asserted**); RQ-003-2 (only `ir.cron` in
-  core; general async queue not found — stays inference).
+- **Re-confirmed open:** RQ-005-1 (GID permanence **not asserted**); RQ-003-2 (`[Official
+  source-code fact]` reviewed source confirms `ir.cron` + signatures/constants + `with_delay`
+  absent; `[Inference]` a general async queue was not found in the reviewed docs/source; `[Open
+  question]` whole-repo absence; OCA `queue_job` community).
 
 ## Questions still open (blocking a confident decision)
 

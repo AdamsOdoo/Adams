@@ -82,12 +82,15 @@
 >   question]` Odoo Online outbound-HTTPS/controllers/`server_wide_modules`/workers (moot but
 >   not literally stated); Odoo.sh/on-prem `server_wide_modules` + external jobrunner support.
 > - **RQ-003-2 (core async-queue availability) — Partially resolved (strengthened inference).**
->   `[Official source-code fact]` in `odoo/addons/base/models/ir_cron.py` the only cron/async
->   models are `IrCron` / `IrCronTrigger` / `IrCronProgress`; the symbol `with_delay` (OCA
->   `queue_job` dispatch) does **not** appear in `ir_cron.py` **or** `odoo/orm/models.py`.
->   `[Inference]` no general-purpose async job queue was found in reviewed docs/source — this
->   **remains an inference** (a negative cannot be proven from one file set); OCA `queue_job`
->   is **community, not core**.
+>   `[Official source-code fact]` the reviewed source (`odoo/addons/base/models/ir_cron.py`)
+>   confirms the cron models `IrCron` / `IrCronTrigger` / `IrCronProgress` plus the exact cron
+>   signatures and failure constants (RQ-003-3). `[Official source-code fact]` the symbol
+>   `with_delay` (OCA `queue_job` dispatch) was **not found** in the reviewed files `ir_cron.py`
+>   or `odoo/orm/models.py`. `[Inference]` a general-purpose async job queue was **not found**
+>   in the reviewed docs/source (the 19.0 docs document only `ir.cron`) — this **remains an
+>   inference** (a negative cannot be proven from the reviewed file set). `[Open question]`
+>   whole-repo proof that no async queue exists anywhere in Odoo 19 core remains open.
+>   `[Community / not official]` OCA `queue_job` remains **community, not Odoo core**.
 > - **RQ-003-3 (`ir.cron` signatures + failure model) — Resolved (from source).** `[Official
 >   source-code fact]` (`ir_cron.py`, 19.0): `_trigger(self, at: datetime | Iterable[datetime]
 >   | None = None)` ("executed soon independently of its `nextcall`"; delegates to

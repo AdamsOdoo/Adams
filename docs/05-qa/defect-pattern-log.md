@@ -254,3 +254,25 @@ opposite of over-claiming. **No architecture decision was made; no approach was 
 (weak/avoid-candidates stay out of `rejected-approaches-log.md` pending ChatGPT, `CLAUDE.md`
 §10); DEC-003 and MVP scope are unchanged; implementation stays blocked** (`CLAUDE.md` §4–§5;
 RB-14)._
+
+_**RB-14 Part 2 — PR #58 review note (2026-07-01): AR-003 classification cleaned; no new defect
+counter.** ChatGPT review of PR #58 returned **REVISE** for two AR-003 cleanups (substance
+accepted — questions reviewed; AR-002/003/005 refined-not-decided; DEC-003/MVP unchanged; no
+code; no implementation authorization). Cleaned, without changing any decision: (1) the
+**async-queue classification** was made precise — the reviewed source confirms `ir.cron` /
+`IrCronTrigger` / `IrCronProgress` + signatures + failure constants and that `with_delay` is
+**absent** from the reviewed files as **`[Official source-code fact]`**, while the **absence of a
+general-purpose async job queue** is kept **`[Inference]`**, the **whole-repo absence** an
+**`[Open question]`**, and **OCA `queue_job`** a **`[Community / not official]`** dependency —
+so no file classifies "`ir.cron` is the only core async primitive" or "no async queue exists in
+Odoo core" as an official/source-code fact; the architecture implication (stock-Odoo background
+execution relies on source-verified `ir.cron`; a true queue remains a community dependency) is
+**unchanged**; (2) the stale **AR-003 "Odoo-Online feasibility" required-evidence gate** was
+**superseded** — Odoo Online is incompatible with custom modules, so the custom connector module
+targets **Odoo.sh / on-premise**, and the remaining hosting evidence is re-listed
+(Odoo.sh/on-prem `server_wide_modules` + jobrunner support, `queue_job` turnkey,
+`--max-cron-threads=2` throughput, reconciliation cadence, ordering, Bulk-Ops interaction). This
+is a **classification/consistency correction, not a new defect occurrence** — an application of
+DP-001/DP-006 (classify precisely; keep inferences/open questions distinct from facts). **No new
+DP row; no counter change.** DEC-003 and MVP scope unchanged; AR-002/003/005 stay **[Not
+decided]**; implementation stays blocked._

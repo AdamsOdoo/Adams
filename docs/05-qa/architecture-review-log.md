@@ -295,8 +295,10 @@ incompatible with custom modules"** → substrate is Odoo.sh/on-prem (RQ-003-1),
 categorically forbidden from REST** with GraphQL the sole long-term API and no REST EOL (RQ-002-1),
 protected-data access **"Always available"** for custom apps vs **"Requires review"** for public
 with compliance webhooks App-Store-scoped (RQ-002-2), offline token model + 90-day rotating refresh
-(RQ-002-3); **re-confirmed open** — **GID permanence not asserted** (RQ-005-1), only `ir.cron` in
-core with a general async queue **not found** (stays an inference, RQ-003-2). **Still-open items
+(RQ-002-3); **re-confirmed open** — **GID permanence not asserted** (RQ-005-1); and for RQ-003-2
+the reviewed source confirms `ir.cron` (`[Official source-code fact]`) and that `with_delay` is
+absent, while a general async queue was **not found** in the reviewed docs/source (`[Inference]`;
+whole-repo absence `[Open question]`; OCA `queue_job` community). **Still-open items
 kept open** (custom-app compliance obligations — **not assumed absent**; `@idempotent` key
 uniqueness scope; bulk-op idempotency; Odoo.sh/on-prem jobrunner/`server_wide_modules` support;
 whole-repo async-queue absence). Candidate carry-forwards (inputs only): **AR-002** custom +

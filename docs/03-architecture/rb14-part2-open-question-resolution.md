@@ -103,9 +103,11 @@ genuinely-unsupported items open** — with **no architecture decision**:
     the Shopify App Store"** (RQ-002-2 — **narrowed**; custom-app webhook/obligation scope
     still open, **not assumed absent**).
 - **Confirmed unchanged (Part 1 findings re-verified):** **GID permanence is NOT asserted**
-  (RQ-005-1); **Odoo core documents/ships only `ir.cron`** as the async primitive, with a
-  general async job queue **not found** (RQ-003-2, stays an inference — a negative that
-  cannot be proven from one file set).
+  (RQ-005-1); the reviewed Odoo 19 source confirms `ir.cron` (models + signatures + failure
+  constants) and that **`with_delay` is absent** from the reviewed files, while a
+  general-purpose async job queue was **not found** in the reviewed docs/source (RQ-003-2 —
+  `[Inference]`; whole-repo absence remains an `[Open question]`; OCA `queue_job` stays
+  community).
 - **Still open (kept open — no official statement):** custom/private blanket GraphQL-mandate
   scope + REST EOL date; whether custom apps must implement the compliance webhooks and
   whether Level 1/2 obligations bind them; `@idempotent` **key-uniqueness scope**
@@ -126,7 +128,7 @@ genuinely-unsupported items open** — with **no architecture decision**:
 | RQ-002-2 | AR-002 | Custom/private privacy + compliance webhooks | **Partially resolved** | **Compliance webhooks required "for apps listed on the Shopify App Store"**; **protected-data access**: public "Requires review", custom/admin "Always available" (admin L2 "Varies by plan"); L1/L2 obligations attach to **data kind** `[Official fact]`/`[Official limitation]` | Whether **custom apps must implement** the 3 webhooks; whether L1/L2 **obligations bind** custom apps; general non-App-Store privacy duties `[Open question]` — **not assumed absent** | Custom distribution removes the **review gate** (no approval, access "Always available") but **cannot be documented as "no obligations"** | AR-002 distribution burden **clearer**; custom-app duty surface still open |
 | RQ-002-3 | AR-002 | Custom-app token/auth model | **Partially resolved** | Two acquisition paths (**token exchange** / **authorization-code grant**); **online** expire logout/24h; **offline** non-expiring (until uninstall/secret-revocation) **or** expiring (**1h access + 90-day rotating refresh**) `[Official fact]`/`[Official limitation]`; admin-created custom-app token `[Official fact — Part 1]` | Exact current dev-doc wording of "token installed on generation" on the access-tokens **index**; a cross-model **rotation/revocation** policy statement `[Open question]` (least-privilege is `[Official fact]` from Sprint B access-scopes) | An unattended connector maps to the **offline** token model; non-expiring vs expiring-with-rotation is a real setup/credential-storage trade-off | AR-002 auth options **well-characterised**; OAuth-vs-token **not decided** |
 | RQ-003-1 | AR-003 | Odoo Online feasibility | **Partially resolved (core resolved)** | **"Odoo Online is incompatible with custom modules or modules from the Odoo Apps Store"** `[Official limitation]`; Odoo.sh installs custom modules from branch, staging crons disabled; on-prem multi-worker + dedicated cron + reverse-proxy HTTPS `[Official fact]` | Odoo Online outbound-HTTPS / controllers / `server_wide_modules` / workers / jobrunner (moot but not literally stated); Odoo.sh jobrunner/`server_wide_modules` `[Open question]` | The custom connector module **cannot target Odoo Online**; substrate lives on **Odoo.sh / on-prem** | AR-003 hosting floor **resolved**; substrate still tied to Odoo.sh/on-prem capabilities |
-| RQ-003-2 | AR-003 | Core async-queue availability | **Partially resolved** | `ir.cron` (models `IrCron`/`IrCronTrigger`/`IrCronProgress`) is the **only** documented/shipped async primitive in base; **no `with_delay`** in `ir_cron.py` or `odoo/orm/models.py` `[Official source-code fact]` | Positive proof that **no** general async queue exists **anywhere** in 19.0 core (cannot prove a negative from one file set) `[Inference]`/`[Open question]` | Background sync on stock Odoo 19 rests on `ir.cron`; a true queue = **community** `queue_job` (non-core dependency) | AR-003 substrate question **sharpened**, still a real decision |
+| RQ-003-2 | AR-003 | Core async-queue availability | **Partially resolved** | `[Official source-code fact]` reviewed source confirms `ir.cron`/`IrCronTrigger`/`IrCronProgress` + signatures + failure constants, and **`with_delay` absent** from `ir_cron.py` + `odoo/orm/models.py`; `[Inference]` a general async queue was **not found** in the reviewed docs/source; `[Community / not official]` OCA `queue_job` | `[Open question]` whole-repo proof that **no** async queue exists **anywhere** in 19.0 core (a negative not provable from the reviewed file set) | Background sync on stock Odoo 19 relies on documented/source-verified `ir.cron`; a true queue remains a **community** dependency (`queue_job`) unless further source evidence proves otherwise | AR-003 substrate question **sharpened**, still a real decision |
 | RQ-003-3 | AR-003 | `ir.cron` signatures + failure model | **Resolved** | `_trigger(self, at=None)`, `method_direct_trigger`, `_commit_progress(self, processed=0, *, remaining=None, deactivate=False) -> float`; consts `3` (timeout→failure), `5` + `7 days` (deactivate) `[Official source-code fact]`; `--max-cron-threads` + Odoo.sh staging neutralization re-confirmed `[Official fact]` | — (fully sourced) | Connector orchestration must own **per-record retry/backoff + isolation**; use `_trigger`/batch/`_commit_progress`; expect coarse deactivation | AR-003 mechanics **decision-ready** as inputs |
 | RQ-005-1 | AR-005 | GID permanence / deletion | **Partially resolved (not asserted)** | GID = **"uniquely identifies an object"**; Node/Product id = **"A globally-unique ID"** `[Official fact]` | **No** statement of permanence / non-reuse / deleted-recreated behaviour `[Open question]` | Binding must **not assume GID permanence**; deleted/recreated handling is a design requirement | AR-005 confirms Part 1: **do not treat GID as immutable invariant** |
 | RQ-005-2 | AR-005 | General mutation idempotency | **Partially resolved** | **24-hour** key retention; **17-mutation** `@idempotent` list; `IDEMPOTENCY_CONCURRENT_REQUEST`; **no general mechanism / no `clientMutationId`** `[Official fact]`/`[Official limitation]` | Key **uniqueness scope** (per-shop/app/global); **bulk-op idempotency** `[Open question]` | Outbound write idempotency **outside the 17 mutations** and cross-request dedup beyond 24h are **connector-designed** | AR-005/AR-006 idempotency surface **much clearer** |
@@ -319,21 +321,22 @@ where jobrunner/`server_wide_modules` support is not yet officially confirmed. *
 
 **Status: Partially resolved (strengthened inference).**
 
-- `[Official source-code fact]` In `odoo/addons/base/models/ir_cron.py` (19.0) the only
-  cron/async models are **`IrCron`**, **`IrCronTrigger`**, **`IrCronProgress`**;
-  `ir.cron` is the documented scheduled/deferred-execution primitive (poll-based, minute
-  precision). — `github.com/odoo/odoo/blob/19.0/odoo/addons/base/models/ir_cron.py`.
-- `[Official source-code fact]` The symbol **`with_delay`** (the OCA `queue_job` dispatch
-  API) does **not** appear in `ir_cron.py` **or** in `odoo/orm/models.py` (19.0). —
-  `github.com/odoo/odoo/blob/19.0/odoo/orm/models.py`.
-- `[Official fact]` (Part 1/Sprint B, re-confirmed) Odoo 19.0 **docs** document only
-  `ir.cron` for background/scheduled work.
-- `[Inference]` No general-purpose async job queue (named jobs, priorities, retry/backoff,
-  dependency graphs) was found in the reviewed official docs/source. **This remains an
-  inference, not an official fact — a negative cannot be proven from one file set.**
-- `[Open question]` A whole-repo 19.0 confirmation that **no** internal queue/message-bus
-  exists anywhere in core (Community/Enterprise) would be needed to promote this beyond
-  inference. OCA `queue_job` remains **community, not core**.
+- `[Official source-code fact]` The reviewed Odoo 19 source (`odoo/addons/base/models/ir_cron.py`)
+  defines **`IrCron`**, **`IrCronTrigger`**, and **`IrCronProgress`** — the cron models — with
+  the exact cron signatures and failure constants recorded under RQ-003-3; `ir.cron` is the
+  documented scheduled/deferred-execution primitive (poll-based, minute precision). —
+  `github.com/odoo/odoo/blob/19.0/odoo/addons/base/models/ir_cron.py`.
+- `[Official source-code fact]` The symbol **`with_delay`** (the OCA `queue_job` dispatch API)
+  was **not found** in the reviewed source files **`ir_cron.py`** or **`odoo/orm/models.py`**
+  (19.0). — `github.com/odoo/odoo/blob/19.0/odoo/orm/models.py`.
+- `[Inference]` A general-purpose async job queue (named jobs, priorities, retry/backoff,
+  dependency graphs) was **not found** in the reviewed official docs/source (the Odoo 19.0 docs
+  document only `ir.cron` for background/scheduled work). **This remains an inference, not an
+  official fact — a negative cannot be proven from the reviewed file set.**
+- `[Open question]` Whole-repo proof that **no** async job queue exists **anywhere** in Odoo 19
+  core (Community/Enterprise) remains open — it would be needed to promote the above beyond
+  inference.
+- `[Community / not official]` OCA `queue_job` remains **community, not Odoo core**.
 
 **Architecture implication (input, not decision):** background sync on stock Odoo 19 rests on
 `ir.cron`; a true async queue is a **community dependency** (`queue_job`), which — per
@@ -565,8 +568,10 @@ and AR-005 (per-store binding isolation). **[Not decided].**
   App Store"); custom-app obligation not stated (RQ-002-2).
 - **Two token-acquisition paths** (token exchange / authorization-code grant); online 24h/
   logout; offline non-expiring vs expiring (1h + 90-day refresh) (RQ-002-3).
-- **Odoo core documents/ships only `ir.cron`** as the async primitive; a general async job
-  queue **not found** (stays an inference) (RQ-003-2).
+- The reviewed Odoo 19 source confirms **`ir.cron`** (models + signatures + failure constants)
+  and that **`with_delay` is absent** from the reviewed files; a general async job queue was
+  **not found** in the reviewed docs/source (`[Inference]`; whole-repo absence `[Open
+  question]`; OCA `queue_job` community) (RQ-003-2).
 - **Odoo.sh staging crons disabled**; **`--max-cron-threads` default 2** (RQ-003-3).
 
 ## Open questions still blocking a confident decision
