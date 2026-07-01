@@ -184,6 +184,31 @@ against 19.0 source if load-bearing)) were **re-verified current** on 2026-07-01
   since the distribution choice materially changes the API constraints (e.g. new
   public apps are GraphQL-only). Raised for ChatGPT; **not** resolved here.
 
+## 8. RB-14 Part 2 update (2026-07-01) — resolution + narrowing, no decisions
+
+Part 2 re-checked the high-risk open questions and **narrowed** AR-002/003/005 into decision
+candidates — **deciding none**. New evidence + narrowing:
+[`rb14-part2-open-question-resolution.md`](./rb14-part2-open-question-resolution.md),
+[`rb14-decision-candidate-brief.md`](./rb14-decision-candidate-brief.md).
+
+- **[Official limitation]** **Odoo Online cannot host a custom module** → the AR-003 substrate
+  is **Odoo.sh / on-premise** (a Part 1 open question, now resolved at its core).
+- **[Official fact]** **Idempotency-key dedup TTL = 24 hours** and the `@idempotent` set is a
+  **fixed 17 mutations**; **no general mutation idempotency / `clientMutationId`** (AR-005/006
+  input).
+- **[Official source-code fact]** `ir.model.data` has **`UniqueIndex('(module, name)')`** +
+  the field list (AR-005); **`sudo()` bypasses access rights and record rules** (AR-002/005);
+  `ir.cron` signatures/failure constants pinned (AR-003).
+- **[Official fact]** custom apps are **not categorically forbidden from REST** (GraphQL sole
+  long-term API; no REST EOL); protected-data access is **"Always available"** for custom apps
+  vs **"Requires review"** for public (AR-002).
+- **[Recommendation]** carry-forward candidates (inputs, not decisions): **AR-002** → custom +
+  GraphQL-first + offline token; **AR-003** → internal cron-queue or `queue_job`; **AR-005** →
+  dedicated per-domain or hybrid binding model. **Recommended next sprint: RB-14 Part 3 —
+  AR-002 decision sprint, only if ChatGPT accepts Part 2.**
+- **All AR rows remain [Not decided] / Evidence pending.** No REST/GraphQL, distribution,
+  OAuth/token, queue-framework, binding/data-model, or module-boundary choice is made.
+
 > **This document decides nothing.** It maps the AR rows, records their dependencies,
 > and recommends (not decides) a framing/decision order. AR-002, AR-003, and AR-005
 > are **framed** (see their companion docs); AR-004/006/007/008 remain **later**. All

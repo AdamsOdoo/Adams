@@ -287,6 +287,35 @@ and [`../01-research/gaps-opportunities.md`](../01-research/gaps-opportunities.m
 - **[Recommendation]** Keep keys **multi-store-safe even in the single-store MVP** so
   the future is not designed out (DEC-003 architecture-safe rule).
 
+## RB-14 Part 2 notes (2026-07-01) — narrowing, not deciding
+
+> Added by RB-14 Part 2. **Part 1 framing above is preserved.** Evidence:
+> [`rb14-part2-open-question-resolution.md`](./rb14-part2-open-question-resolution.md);
+> narrowing: [`rb14-decision-candidate-brief.md`](./rb14-decision-candidate-brief.md). All
+> narrowing is `[Recommendation]` / `[Decision candidate]`. **AR-005 stays [Not decided].**
+
+- **RQ-005-3 (`ir.model.data` — resolved from source):** `[Official source-code fact]` it has
+  **`UniqueIndex('(module, name)')`** + db-id-independence and a docstring that endorses
+  third-party data sync — so **not** the wrong tool *in principle* — **but** it has **no
+  per-store column, no binding-status/audit fields**, module-lifecycle `noupdate` semantics,
+  and `_allow_sudo_commands = False`. → **Option C (reuse `ir.model.data`) is a
+  weak/avoid-candidate** for the DEC-003 multi-store-safe + auditable binding store (**not
+  rejected** — needs ChatGPT, `CLAUDE.md` §10).
+- **RQ-005-4 (`sudo()` — resolved from source):** `[Official source-code fact]` `sudo()`
+  "simply bypasses access rights checks" and "could cause data access to **cross the
+  boundaries of record rules**" (multi-company isolation named). → per-store isolation must
+  **not** be routed through `sudo()`; an **explicit `store_id` + record rules** (Options A/E)
+  is safer than implicit framework isolation.
+- **RQ-005-1/2 (identity + idempotency):** `[Official fact]` **GID permanence is not
+  asserted** and `[Official limitation]` there is **no general mutation idempotency** (only 17
+  `@idempotent` mutations + **24h** dedup TTL). → the binding must be **authoritative over the
+  key**, **carry connector-designed idempotency keys**, and handle **deleted/recreated**
+  records — favouring a **dedicated model with status/audit** (Options A/E) over ID-on-record
+  (D) or `ir.model.data` (C).
+- **Decision-candidate summary (input):** carry **Option A (dedicated per-domain)** and
+  **Option E (hybrid)** as primary candidates; keep **Option B (generic table)** viable; treat
+  **Option C weak/avoid** and **Option D convenience-only**. All still **[Not decided]**.
+
 > **No decision is made in this document.** AR-005 remains **[Not decided] / Evidence
 > pending**. The options, edge cases, criteria, and open questions above are **inputs**
 > for a future ChatGPT-approved architecture-decision sprint (`CLAUDE.md` §4–§5;

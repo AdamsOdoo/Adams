@@ -284,6 +284,31 @@ and [`../01-research/gaps-opportunities.md`](../01-research/gaps-opportunities.m
 - **[Recommendation]** Do **not** treat `ir.cron` as a queue without a queue model
   around it (A-SYNC-3), and do **not** expose cron internals to users.
 
+## RB-14 Part 2 notes (2026-07-01) — narrowing, not deciding
+
+> Added by RB-14 Part 2. **Part 1 framing above is preserved.** Evidence:
+> [`rb14-part2-open-question-resolution.md`](./rb14-part2-open-question-resolution.md);
+> narrowing: [`rb14-decision-candidate-brief.md`](./rb14-decision-candidate-brief.md). All
+> narrowing is `[Recommendation]` / `[Decision candidate]`. **AR-003 stays [Not decided].**
+
+- **RQ-003-1 (hosting — core resolved):** `[Official limitation]` **"Odoo Online is
+  incompatible with custom modules"** → the connector's custom module **cannot run on Odoo
+  Online**; the substrate is **Odoo.sh or on-premise**. This **removes** the Part 1 "must
+  support Odoo Online" pressure. **Effect on options:** **Option 5 (per-tier hybrid) is
+  weakened** (the Online-vs-rest tier split largely collapses); **Option 3 (`queue_job`) is no
+  longer excluded by Odoo Online** — but `[Open question]` Odoo.sh/on-prem
+  `server_wide_modules` + jobrunner support keeps it **feasibility-gated**.
+- **RQ-003-2/3 (substrate — source facts):** `[Official source-code fact]` `ir.cron`
+  (`IrCron`/`IrCronTrigger`/`IrCronProgress`; `_trigger`, `_commit_progress`) is the only core
+  async primitive; failure/deactivation is coarse (`CONSECUTIVE_TIMEOUT_FOR_FAILURE = 3`;
+  deactivate only when `failure_count ≥ 5` **and** `≥ 7 days`). → the connector **must** own
+  per-record retry/backoff + savepoint isolation regardless of substrate; **Option 1
+  (cron-only) is a floor only** (never `ir.cron`-as-a-queue, A-SYNC-3).
+- **Decision-candidate summary (input):** carry **Option 2 (internal cron-queue)** and
+  **Option 3 (`queue_job`, made turnkey)** as the two primary candidates; **Option 1** as the
+  floor; **Options 4 (external worker) and 5 (per-tier hybrid) weakened**. All still **[Not
+  decided]**.
+
 > **No decision is made in this document.** AR-003 remains **[Not decided] / Evidence
 > pending**. The options, criteria, and open questions above are **inputs** for a
 > future ChatGPT-approved architecture-decision sprint (`CLAUDE.md` §4–§5; RB-14).
