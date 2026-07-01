@@ -5,8 +5,12 @@
 > [`../00-source-materials/competitor-screenshot-inventory.md`](../00-source-materials/competitor-screenshot-inventory.md)
 > and the deep dives. **Benchmark and principles only — this does NOT design our
 > final UI** (gated, `CLAUDE.md` §4–§5). Observations about a UI shown are facts
-> about that screen; UX judgements are labelled **inference**. Access date
-> **2026-06-30**.
+> about that screen; UX judgements are labelled **inference**. **Access dates:**
+> original UX benchmark evidence access date **2026-06-30**; **TeqStars UX evidence
+> was rebaselined in Sprint C2 on 2026-07-01** — the **TeqStars row and all
+> TeqStars-related UX notes use the 2026-07-01 evidence**, while **all other
+> competitor UX evidence (WK/EM/VT/EC/SH) remains based on the 2026-06-30 Sprint C
+> evidence unless otherwise noted**.
 
 ## Evidence base
 

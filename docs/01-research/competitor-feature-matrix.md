@@ -4,8 +4,12 @@
 > areas; columns = the six competitor connectors. Every non-empty cell is backed
 > by a citation in
 > [`competitor-deep-dives.md`](./competitor-deep-dives.md) /
-> [`../00-source-materials/competitor-source-notes.md`](../00-source-materials/competitor-source-notes.md)
-> (access date **2026-06-30**). This consolidates competitor evidence only; it
+> [`../00-source-materials/competitor-source-notes.md`](../00-source-materials/competitor-source-notes.md).
+> **Access dates:** original Sprint C competitor evidence access date **2026-06-30**;
+> **TeqStars (TQ) Sprint C2 rebaseline access date 2026-07-01** — the **TQ cells now
+> reflect the Sprint C2 page-classified evidence**, while **all other competitor
+> cells (WK/EM/VT/EC/SH) remain based on the 2026-06-30 Sprint C evidence unless
+> otherwise noted**. This consolidates competitor evidence only; it
 > **draws no MVP or architecture conclusions** (gated — `CLAUDE.md` §4–§5). The
 > canonical feature taxonomy (RB-12) will normalize these rows later.
 >
