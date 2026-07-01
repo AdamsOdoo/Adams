@@ -78,3 +78,28 @@ re-litigated here.** Avoid-list items tagged "Arch review: YES" are seeded again
 these rows and become formal `rejected-approaches-log.md` entries **only after
 ChatGPT review**. Evidence: `../01-research/competitor-deep-dives.md`,
 `../01-research/gaps-opportunities.md`, `../01-research/avoid-list.md`._
+
+_**Research/Product Sprint D non-decision note (2026-07-01) — NOT decisions; AR
+rows remain "Not decided / Evidence pending".** The Sprint D canonical feature
+taxonomy (`../02-product/feature-taxonomy.md`) and capability evidence map
+(`../02-product/capability-evidence-map.md`) now provide **capability-level
+inputs** to the open architecture questions. For the record only, each AR row has
+named dependent capabilities: **AR-002 (API/distribution/bulk)** — connection
+auth, product/variant/backfill sync, bulk ops, App-Store readiness (distribution
+public-vs-custom still open); **AR-003 (sync orchestration/queue)** — webhooks +
+reconciliation + scheduled + manual, queue with per-record isolation, auto-workflow,
+resumable jobs (`ir.cron` vs OCA `queue_job` still open); **AR-004 (module
+boundaries)** — domain-isolated config, mapping/metafield extensibility, feature
+flags, transport abstraction (**no module names/boundaries defined**); **AR-005
+(binding/dedup)** — Shopify-GID binding model, documented dedup keys, per-store
+keys, multi-key customer matching (`ir.model.data` reuse vs dedicated model, and
+deleted-binding handling, still open); **AR-006 (error/retry/idempotency)** — retry
+classification, automatic retry, idempotency keys, recovery-first error center,
+reconciliation; **AR-007 (inventory)** — quantity sync (write `available`/`on_hand`
+only), quantity-field choice, multi-location, auto-apply, BoM stock; **AR-008
+(fulfillment)** — FulfillmentOrder-based fulfillment, multi-package/location. The
+taxonomy classifies these as **inputs/candidates only** and routes them here; **no
+AR row is decided, accepted, proposed for active review, or re-litigated.** All
+remain "Not decided / Evidence pending" pending sufficient research + ChatGPT
+approval (`CLAUDE.md` §4–§5; RB-14). See also DP-005 (`defect-pattern-log.md`) — the
+prevention rule that a taxonomy classification is an input, not a decision._
