@@ -9,8 +9,33 @@
 > **Governance:** research/synthesis phase; **no-code gate in force**
 > (`CLAUDE.md` §4–§5). From Sprint G the **MVP *product scope* is accepted** (RB-13,
 > DEC-003); **architecture remains gated** (RB-14 / AR-002…AR-008) and **implementation
-> remains blocked**. Access date for competitor evidence: 2026-06-30; session date:
-> 2026-07-01.
+> remains blocked**. Access date for competitor evidence: 2026-06-30 (**except TeqStars,
+> rebaselined 2026-07-01 in Research Sprint C2**); session date: 2026-07-01.
+
+## Research Sprint C2 note (2026-07-01) — TeqStars rebaseline reinforces the accepted MVP baseline
+
+> **Product impact: none to scope; a reinforcing evidence upgrade only.** Research Sprint
+> C2 rebaselined the **TeqStars** competitor evidence after its docs (403-blocked in
+> Sprint C) became accessible — a **source-availability correction**, page-classified and
+> adversarially verified. Relevance to product:
+>
+> - **Reinforces DEC-003's controlled product import/export/update baseline.** TeqStars now
+>   **demonstrates** controlled, draft-safe product onboarding: SKU/Barcode/both match key
+>   ("Sync Listings Based On"), a Create-Odoo-Products guard, export with **Sales-Channels-
+>   optional = unpublished** ("Can I export a product with draft state? Yes"), Publish/
+>   Unpublish, and a per-listing **Allowed/Not-Allowed-Sync** switch — the exact controlled
+>   bidirectional-*product* pattern the accepted MVP describes.
+> - **Corroborates the "customer export = later" deferral.** TeqStars offers **no customer
+>   export** (customer is import-only; customer metafields import-only) — consistent with
+>   DEC-003, not a reason to move customer export into MVP.
+> - **Does not expand MVP.** TeqStars' asserted-but-unshown reliability items (explicit
+>   idempotency, automatic retry, first-class reconciliation, rate-limit throttling, HMAC)
+>   remain **not demonstrated** and are **not** MVP evidence.
+>
+> **No DEC-003 change, no MVP scope change, no customer-export move, no architecture.** No
+> serious contradiction to DEC-003 was found, so **no open review note for ChatGPT is
+> required**. Full evidence: `../01-research/competitor-deep-dives.md`,
+> `../01-research/research-handoff.md` (Sprint C2), `../05-qa/defect-pattern-log.md`.
 
 # Product Sprint G Handoff
 

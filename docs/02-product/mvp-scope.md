@@ -41,6 +41,24 @@
   (a specific competitor workflow/screenshot/dated release note), **[Competitor
   claim]**, **[Inference]**, **[Recommendation]**, **[Open question]**.
 
+> **Sprint C2 evidence note (2026-07-01) — reinforces the accepted baseline; no scope
+> change.** A later research sprint (**Research Sprint C2**) rebaselined the **TeqStars**
+> competitor evidence after its docs — 403-blocked in Sprint C — became accessible. The
+> now-demonstrated TeqStars docs **reinforce the already-accepted controlled product
+> import/export/update MVP baseline**: TeqStars shows **controlled, draft-safe product
+> onboarding** (SKU/Barcode/both match key, Create-Odoo-Products guard, export with
+> Sales-Channels-optional = unpublished, Publish/Unpublish, a per-listing Allowed/
+> Not-Allowed-Sync switch), and — consistent with DEC-003 — **customer export is not
+> offered (import-only)**, so the "customer export = later" deferral is corroborated,
+> **not** contradicted. This is a **[Demonstrated]** upgrade of a competitor whose
+> evidence was previously [Competitor claim]-only; **it changes no MVP inclusion and does
+> not amend DEC-003.** TeqStars' asserted-but-unshown reliability items (explicit
+> idempotency, automatic retry, first-class reconciliation, rate-limit throttling, HMAC)
+> remain **not demonstrated** (➖/⬜) and are **not** treated as MVP evidence. See
+> `../01-research/competitor-deep-dives.md` (TeqStars) and `../05-qa/defect-pattern-log.md`
+> (Sprint C2 note). **No serious contradiction to DEC-003 was found; no open review note
+> for ChatGPT is required.**
+
 ## ChatGPT RB-13 acceptance
 
 > **Accepted MVP scope baseline — ChatGPT, 2026-07-01 (DEC-003), revised same day after
