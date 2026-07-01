@@ -33,3 +33,11 @@ code, no module, no shortcuts. The blocked sources (R2 Teqstars docs 403, R5
 Google Doc) are **research gaps**, tracked in
 [`../01-research/resource-inventory.md`](../01-research/resource-inventory.md) and
 the handoff, **not** technical debt._
+
+_**Research/Product Sprint D note (2026-07-01):** none. Sprint D was
+synthesis-only (canonical feature taxonomy + capability evidence map + product
+handoff) — no code, no module, no implementation shortcuts. The weak/blocked
+competitor evidence (Teqstars docs 403, EC/R5 setup guide, 17 unread VT Confluence
+articles) and the open architecture/MVP questions are **research gaps / gated
+decisions**, tracked in the taxonomy's "Open questions", the handoffs, and
+`architecture-review-log.md` — **not** technical debt._

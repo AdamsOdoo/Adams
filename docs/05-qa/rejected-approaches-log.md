@@ -39,3 +39,13 @@ evaluated for **our** design and ChatGPT/architecture review rejects it. The
 avoid-list items tagged "Arch review: YES" are seeded against AR-002…AR-008
 (evidence-pending) and will route through the architecture-review log first. **No
 approach is rejected in this sprint.**_
+
+_**Research/Product Sprint D note (2026-07-01):** **none.** Sprint D was a
+product-synthesis sprint (canonical feature taxonomy + capability evidence map). It
+**evaluated no design option to rejection** — capability classifications
+(baseline / premium / advanced-later / optional add-on / unknown) and MVP-relevance
+tags are **inputs** for the gated RB-13 (MVP) and RB-14 (architecture) reviews, not
+rejections. The taxonomy's "Capabilities with weak or blocked evidence" section
+records competitor claims that are **not adopted as demonstrated** (e.g. Teqstars
+docs-403 claims, WK config-field-only multi-company) — these are **evidence
+downgrades under DP-003/DP-004, not rejected approaches**. No entry is added here._

@@ -1,9 +1,260 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint C)**
-> is immediately below; the **Sprint B** and **Sprint A** handoffs are retained
-> underneath as history. The running **Sprint checkpoint log** (one note per
-> stage, all sprints) is at the very bottom.
+> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint D)**
+> is immediately below; the **Sprint C**, **Sprint B**, and **Sprint A** handoffs
+> are retained underneath as history. The running **Sprint checkpoint log** (one
+> note per stage, all sprints) is at the very bottom. The **product-side** handoff
+> lives at
+> [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+# Research/Product Sprint D Handoff
+
+> **Research/Product Sprint D — Canonical Feature Taxonomy and Evidence-Based
+> Capability Model.** Research/synthesis-only; no-code gate in force (`CLAUDE.md`
+> §4–§5). High-power mode **not required** (focused synthesis of already-merged
+> Sprint C evidence — no new competitor crawling). Maps to backlog item **RB-12
+> (canonical feature taxonomy)**, feeding RB-11 (vision), RB-13 (MVP implications),
+> and RB-14 (architecture prep) — all gated.
+
+## Session summary
+
+Converted the Sprint C competitor research into a **canonical feature taxonomy**
+(`docs/02-product/feature-taxonomy.md`) and a **capability evidence map**
+(`docs/02-product/capability-evidence-map.md`) for the Odoo 19 ↔ Shopify Connector,
+and wrote the product-side handoff (`docs/02-product/product-research-handoff.md`).
+The taxonomy normalizes the messy competitor feature matrix into **20 canonical
+domains** and ≈90 **canonical capabilities**, each classified by evidence
+status/strength, capability type (product-UX / reliability / configuration /
+architecture), candidate class (baseline / premium / advanced-later / optional
+add-on / unknown), MVP relevance (candidate / later / unknown), and
+architecture-review dependency (AR-002…AR-008). Every classification is an
+**input**, not a decision. **No connector code, no Odoo module, no MVP
+finalization, no architecture decisions, no ADRs, no implementation plan, and no
+module boundaries** were produced. No new competitor sources were crawled — the
+sprint synthesises **already-merged repo evidence only**, preserving per-claim
+classification and DP-003/DP-004 discipline. Synthesis was **worker-owned** (main
+thread), not fanned out, so claim classification stayed centrally governed.
+
+### Sprint D revision (PR #52 review — 2026-07-01)
+
+ChatGPT review returned **REVISE** (small taxonomy precision patch); corrected on
+the same branch (`docs: correct sprint d taxonomy precision`), logged as **DP-006**:
+
+- **Removed the `SH` abbreviation collision** — `SH` = **only** sh_shopify_connector
+  / Softhealer; Shopify official docs are keyed **SHOPIFY-OFFICIAL** (Odoo official
+  = **ODOO-OFFICIAL**).
+- **OAuth-first (C-CONN-01) official-platform dependency made conditional** — strong
+  UX/security direction, competitor-demonstrated (VT), but a platform *requirement*
+  **only if public/App-Store distribution is chosen**; custom/private flows may use
+  token/custom-app access. AR-002 open; not a finalized decision. Evidence strength
+  `A` → `B / A-if-public`.
+- **Stock import (C-INV-04) reframed** as "Stock import with controlled apply/review"
+  — auto-apply is an **improvement/inference, not demonstrated**; AR-007 still applies.
+- **Webkul import-stock coverage corrected** to **⬜ (not found)** per matrix §3 (was
+  ✅); matrix-consistent coverage EM✅ VT✅ SH✅ TQ🟨 EC🟨 WK⬜.
+- **Escalation:** unsupported-assumption/weak-research reaches its **3rd occurrence**
+  (DP-003, DP-004, DP-006) → an **evidence-consistency gate** was recorded in
+  `defect-pattern-log.md` (implementation stays paused by the existing no-code gate;
+  no capability may enter MVP/architecture as a decision until its evidence strength,
+  conditionality, and competitor coverage are ChatGPT-reviewed). **No implementation
+  task is set.**
+
+## Branch and commits
+
+**Working branch:** `claude/feature-taxonomy-sprint-d-t8d2t0` (the
+harness-designated branch; based on `Shopify-connector` @ `e18ba8e`, the merged
+**PR #51** Sprint C baseline). **Branch-name note for ChatGPT (flagged):** the
+Sprint D prompt body named `product/sprint-d-feature-taxonomy`, but the session's
+hard git rule designated `claude/feature-taxonomy-sprint-d-t8d2t0` ("never push to
+a different branch without explicit permission"), so work proceeded on the
+harness-designated branch; **the PR still targets `Shopify-connector`**; `main` and
+plain `dev` untouched.
+
+| Hash | Message |
+| --- | --- |
+| `2e297ba` | docs: start sprint d feature taxonomy |
+| `70391b9` | docs: add canonical feature taxonomy |
+| `aa5d2c4` | docs: add capability evidence map |
+| _(this commit)_ | docs: finalize sprint d taxonomy handoff |
+
+## Files created or updated
+
+**Product (`docs/02-product/`)**
+- `feature-taxonomy.md` (new — main deliverable), `capability-evidence-map.md`
+  (new), `product-research-handoff.md` (new).
+
+**Research (`docs/01-research/`)**
+- `research-handoff.md` (this file — Sprint D section + checkpoints).
+
+**QA / quality memory (`docs/05-qa/`)**
+- `defect-pattern-log.md` (updated — DP-005 + counter), `architecture-review-log.md`
+  (updated — Sprint D non-decision note), `rejected-approaches-log.md` (updated —
+  Sprint D "nothing rejected" note), `technical-debt-register.md` (updated —
+  Sprint D "no debt" note).
+
+**No forbidden files touched** (no `*.py`/`*.xml`/`*.csv`/manifests/modules/CI/
+Docker; no `addons/**`; no `docs/03|04|07|08`; no `.claude/skills|agents`).
+
+## Taxonomy summary
+
+- **20 domains:** (1) connection/auth/setup, (2) dashboard/command center, (3)
+  product catalog, (4) variants/media, (5) pricing, (6) inventory/locations, (7)
+  customers/companies/addresses, (8) orders/lifecycle, (9) invoices/payments/
+  journals, (10) fulfillment/tracking, (11) refunds/returns/cancellations, (12)
+  payouts/reconciliation, (13) webhooks/scheduled/manual/reconciliation, (14)
+  queue/jobs/retries, (15) logs/errors/observability, (16) mapping/matching/dedup,
+  (17) multi-store/company/permissions, (18) advanced Shopify (Markets/B2B/POS/gift
+  cards/metafields), (19) reporting/analytics, (20) docs/support/demo.
+- **≈90 canonical capabilities**, each with the required attribute block; **8
+  cross-cutting groups** (idempotency-by-default, recovery-first ops, honesty/
+  transparency, safe-by-default destructive actions, progressive disclosure,
+  feature flags, modularity/extension points, multi-tenancy/permissions).
+- **Required canonical capabilities represented:** idempotency, duplicate
+  prevention, GID binding, HMAC verification, webhook-id dedup, fast-ack, scheduled
+  + manual reconciliation, retry classification, auto-retry, manual retry,
+  rate-limit/GraphQL-cost throttling, bulk ops, per-record isolation, resumable
+  jobs, reason-coded logs, audit trail, recovery-first error center; setup wizard,
+  OAuth-first, credential masking, test connection, scope/readiness check, health
+  indicators, named-cause diagnostics, command center, activity timeline, queue
+  status, failure counts, quick actions, dry-run/preview, guided mapping,
+  progressive disclosure, inline help, empty states, recovery actions, sync
+  freshness; feature flags, optional add-ons, domain-isolated/per-store config,
+  per-company isolation, role-based access, extension points, mapping/transport
+  extensibility (architecture inputs); payouts, advanced refunds, Markets, B2B, POS,
+  gift cards, metafields, abandoned-checkout→CRM, recommendations, Buy-with-Prime,
+  advanced analytics, app-store packaging, public demo/docs/changelog.
+
+## Evidence discipline
+
+- **DP-003 applied:** competitor claims stay claims; TQ (docs 403) and EC (no
+  screenshots) support is marked **claim-only / weak**; SH ✅ marks rest on captions
+  (medium-behaviour, low-trust).
+- **DP-004 applied:** WK multi-company kept as a **config field only (➖)**; SH
+  multi-company kept **not-found**; EC product export kept **not-found**; `✅`/
+  "demonstrated" used only with a specific demonstrated workflow/screenshot/dated
+  release note/explicit doc.
+- **Evidence strength scale (A–E)** in the evidence map: **A** official-platform
+  requirement (≈22 caps), **B** strong competitor demonstration (EM/VT-led, ≈45),
+  **C** mixed/partial (≈8), **E** whitespace/inference (freshness, empty states,
+  plus platform-required-but-undemonstrated items: reconciliation surface,
+  rate-limit throttling, webhook-id dedup).
+- **No competitor claim promoted to a Tier-1 fact; no on-page detail invented.**
+
+## MVP inputs, not decisions
+
+Capabilities tagged **MVP relevance: candidate** cluster around a **correct,
+observable core** (connect+prove; core object sync; sync+correctness engine;
+operator command center + recovery-first errors; role-based access). Advanced
+breadth (Domain 18), payouts, financial reporting, per-market pricing, custom-Python
+transforms, and multi-company are tagged **later**. **MVP is not finalized** — these
+are candidates for **RB-13** review only. Open MVP-shaping questions: single- vs
+multi-store; single- vs multi-company; core vs optional add-on grouping.
+
+## Architecture inputs, not decisions
+
+The taxonomy maps capabilities to **AR-002…AR-008** (API/distribution; sync
+orchestration/queue; module boundaries; binding/dedup; error/retry/idempotency;
+inventory; fulfillment) — **all remain "Not decided / Evidence pending."** No
+queue framework, REST/GraphQL choice, data model, or module boundary/name is
+decided. A **non-decision evidence note** was added to
+`architecture-review-log.md`.
+
+## Open questions
+
+Distribution model (public vs custom → AR-002); single/multi-store & single/multi-
+company at MVP (RB-13); reconciliation cadence/scope + per-object vs global
+freshness; error/retry taxonomy; binding model (`ir.model.data` vs dedicated;
+deleted-binding handling — AR-005); queue framework (`ir.cron` vs `queue_job`;
+Odoo-Online implications — AR-003); core vs optional add-on grouping; firming up
+weak/blocked evidence (Teqstars 403, EC/R5 setup guide, 17 unread VT Confluence);
+non-Shopify-Payments payout modelling; Odoo edition gating disclosure.
+
+## Learning feedback loop
+
+- **New issues discovered:** one — **DP-005** (premature-decision risk, category
+  #4 premature architecture): a feature taxonomy's *candidate / premium / later*
+  labels and *architecture-dependency* tags could be **misread as MVP or
+  architecture decisions**. **Prevented/Mitigated** by explicit "inputs, not
+  decisions" framing throughout, dedicated "MVP-candidate inputs, not decisions"
+  and "Capabilities requiring architecture review" sections, per-field gating
+  language, and closing "decides nothing" notes; MVP=RB-13 and architecture=RB-14/
+  AR-002…AR-008 remain gated.
+- **Repeated issue patterns:** DP-005 is the **1st** occurrence of category #4
+  (premature architecture) in the defect-pattern log — no 2×/3× escalation. The
+  existing unsupported-assumption/weak-research thread (DP-003, DP-004) was **not**
+  re-triggered: DP-004's prevention rule (config field ≠ demonstrated support;
+  market promise ≠ demonstrated bidirectionality) was **applied throughout** this
+  synthesis (WK multi-company ➖, SH multi-company not-found, EC export not-found,
+  TQ claim-only), which is the intended anti-repetition behaviour.
+- **Rules/checklists updated:** added **DP-005** + prevention rule to
+  `defect-pattern-log.md` (a normalized taxonomy must label every candidate/
+  classification as an **input**, not a decision; MVP and architecture stay gated).
+- **New rejected approaches:** none (synthesis-only; noted in
+  `rejected-approaches-log.md`).
+- **New technical debt:** none (no code; noted in `technical-debt-register.md`).
+- **Architecture concerns:** the taxonomy now supplies **capability-level inputs**
+  to AR-002…AR-008 — recorded as a **non-decision note** in
+  `architecture-review-log.md`. **All rows stay "Not decided / Evidence pending."**
+- **Tests or review gates needed:** none active (synthesis). For implementation
+  (gated), the regression-test set seeded in A-IMP-4 (duplicate orders,
+  multi-location double-decrement, missed-webhook reconciliation, idempotent
+  refunds, timezone/paging) now maps to specific capability IDs.
+- **Should future prompts change? Yes** — product-synthesis prompts should (1)
+  require every capability classification to be labelled an **input/candidate** with
+  MVP=RB-13 / architecture=RB-14 gating stated (now encoded via DP-005), and (2)
+  keep synthesis **worker-owned** (not fanned out) so claim classification stays
+  centrally governed. Branch reality remains the harness-designated `claude/...`
+  branch while the PR targets `Shopify-connector`.
+
+## What ChatGPT should review
+
+1. **Taxonomy completeness & naming** — are the 20 domains + ≈90 capabilities the
+   right canonical decomposition (nothing missing/duplicated/mis-placed)?
+2. **Evidence discipline** — spot-check DP-003/DP-004: no claim-as-fact; `✅` only
+   where demonstrated; WK multi-company ➖, SH multi-company not-found, EC export
+   not-found, TQ claim-only all reflected in both product files.
+3. **Classification calibration** — are baseline/premium/advanced-later/optional
+   and MVP candidate/later/unknown reasonable **as inputs**? Flag anything reading
+   like a premature decision (DP-005 guard).
+4. **Architecture routing** — confirm AR-002…AR-008 mapping is correct and that
+   **no architecture is decided** (no queue framework, no REST/GraphQL, no module
+   boundaries/names, no data models).
+5. **Whitespace priorities** — endorse/re-rank the correctness whitespace
+   (reconciliation, idempotency, rate-limit throttling, webhook-id dedup) and the
+   operator-UX whitespace (command center + recovery-first errors) as leading
+   differentiation inputs for RB-13/RB-14 — **without** locking MVP.
+6. **Branch-name discrepancy** — confirm working on `claude/feature-taxonomy-sprint-d-t8d2t0`
+   (PR → `Shopify-connector`) is acceptable.
+7. **Next-sprint sequencing** — confirm RB-11 (vision) / RB-13 (MVP implications) as
+   the next gated step, then RB-14 (architecture prep).
+
+## Recommended next session
+
+**RB-11 (product vision draft)** and/or **RB-13 (MVP scope implications — not
+finalized)**, consuming this taxonomy + evidence map, then feeding **RB-14
+(architecture preparation)** against AR-002…AR-008 — all gated and ChatGPT-reviewed.
+Optionally firm up weak/blocked evidence (Teqstars 403; EC/R5 setup guide; 17 unread
+VT Confluence) if ChatGPT wants firmer classification. Keep the no-code gate; one
+scoped objective per session.
+
+## Stop confirmation
+
+Stopped at the Sprint D boundary as instructed: four stage commits on the
+harness-designated working branch, **one draft PR** targeting **`Shopify-connector`**,
+**not merged**. **No** code, **no** Odoo module, **no** MVP finalization, **no**
+architecture decisions, **no** ADRs, **no** implementation plan, **no** module
+boundaries. `main` and plain `dev` untouched. Awaiting ChatGPT review.
+
+## Quality gate confirmation (Sprint D)
+
+- [x] Session handoff updated (this block + product-research-handoff.md).
+- [x] Quality feedback loop checked (this file + `../05-qa/` logs).
+- [x] New learning captured in the correct file (DP-005 in `defect-pattern-log.md`).
+- [x] Any rejected approach logged (none — noted in `rejected-approaches-log.md`).
+- [x] Any accepted technical debt logged (none — noted in `technical-debt-register.md`).
+- [x] Any repeated issue pattern escalated per §4 (none at threshold; DP-005 1st occurrence of #4; DP-004 prevention applied, not re-triggered).
 
 ---
 
@@ -1133,3 +1384,59 @@ ChatGPT review.
   DP-001 confirmation; future-prompt updates) and the quality-gate confirmation
   (all items satisfied). Ran final allowed/forbidden-file checks. Next: push the
   working branch and open one draft PR targeting `Shopify-connector`, then stop.
+
+### Research/Product Sprint D checkpoints
+
+- **Sprint D / Stage 1 — Setup + evidence read (2026-07-01):** Started
+  Research/Product Sprint D (canonical feature taxonomy + capability evidence
+  map). Research/synthesis-only; **no-code gate confirmed** (`CLAUDE.md` §4–§5);
+  high-power mode **not required** for this sprint (focused synthesis of
+  already-merged Sprint C evidence — no new competitor crawling). Fetched remote
+  branches and verified preconditions: **PR #51 is merged into `Shopify-connector`**
+  (branch tip `e18ba8e` *is* the PR #51 merge commit); the working branch is based
+  on `Shopify-connector` (identical to it at start); all required Sprint C outputs
+  present (`competitor-deep-dives.md`, `competitor-feature-matrix.md`,
+  `ux-ui-benchmark.md`, `common-patterns.md`, `best-in-class-observations.md`,
+  `gaps-opportunities.md`, `avoid-list.md`, `competitor-source-notes.md`,
+  `competitor-screenshot-inventory.md`). **Branch-name note (flagged for ChatGPT):**
+  the harness designated the working branch **`claude/feature-taxonomy-sprint-d-t8d2t0`**
+  (already checked out, based on `Shopify-connector`), whereas the Sprint D prompt
+  body named `product/sprint-d-feature-taxonomy`; per the session's hard git rule
+  ("never push to a different branch without explicit permission") the work
+  proceeds on the harness-designated branch and the **PR still targets
+  `Shopify-connector`** — `main`/plain `dev` untouched. Read the required
+  governance/research files (CLAUDE.md, README, this handoff, learning rules,
+  methodology, resource inventory, both official baselines, all Sprint C evidence,
+  all QA logs). Confirmed DP-003/DP-004 prevention rules (competitor claim ≠ fact;
+  configuration field ≠ demonstrated support; market promise ≠ demonstrated
+  bidirectionality; ✅ requires demonstrated workflow/explicit evidence). Next:
+  Stage 2 — draft the canonical feature taxonomy in `docs/02-product/feature-taxonomy.md`.
+- **Sprint D / Stage 2 — Canonical taxonomy (2026-07-01):** Wrote
+  `docs/02-product/feature-taxonomy.md` — the main deliverable: 20 canonical
+  domains, ≈90 canonical capabilities (each with the required attribute block:
+  ID/name/description/user-value/evidence-status/evidence-references/competitor-
+  examples/UX/reliability/config implications/architecture-dependency/candidate-
+  classification/MVP-relevance/notes), 8 cross-cutting groups, a classification
+  summary, MVP-candidate + later-phase inputs (not decisions), a capabilities-
+  requiring-architecture-review map to AR-002…AR-008, a weak/blocked-evidence
+  register, open questions, and ChatGPT review notes. DP-003/DP-004 discipline
+  applied throughout (claims stay claims; WK multi-company ➖; SH multi-company
+  not-found; EC export not-found; `✅` only where demonstrated). Synthesis was
+  worker-owned (no fan-out). Commit `70391b9`. Next: Stage 3 evidence map.
+- **Sprint D / Stage 3 — Capability evidence map (2026-07-01):** Wrote
+  `docs/02-product/capability-evidence-map.md` — compact per-capability
+  traceability with evidence strength (A official / B strong-competitor / C
+  mixed / D single-claim / E open-whitespace), strongest evidence, per-competitor
+  coverage (WK/TQ/EM/VT/EC/SH with ✅/🟨/⬜/🚫/🔒/➖), official-platform dependency,
+  architecture-review need (AR-002…AR-008), and MVP-review relevance. Grouped by
+  domain for readability (no giant unreadable table). Commit `aa5d2c4`. Next:
+  Stage 4 handoffs + QA loop.
+- **Sprint D / Stage 4 — Product handoff + QA loop (2026-07-01):** Wrote
+  `docs/02-product/product-research-handoff.md` (product-side handoff); wrote the
+  full Sprint D section of this rolling handoff (above) with the learning feedback
+  loop (DP-005 premature-decision risk, Mitigated) and the quality-gate
+  confirmation; updated QA logs (**DP-005** + counter in `defect-pattern-log.md`;
+  Sprint D non-decision note in `architecture-review-log.md`; nothing-rejected note
+  in `rejected-approaches-log.md`; no-debt note in `technical-debt-register.md`).
+  Ran final allowed/forbidden-file checks. Next: push the working branch and open
+  one draft PR targeting `Shopify-connector`, then stop.
