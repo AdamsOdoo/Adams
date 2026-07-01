@@ -228,3 +228,62 @@ a **classification/consistency correction, not a new defect occurrence** — the
 applications of DP-001/DP-003/DP-006 (cite/classify precisely; don't over-classify). **No new DP
 row; no counter change.** DEC-003 and MVP scope unchanged; architecture stays RB-14-gated;
 implementation stays blocked._
+
+_**RB-14 Architecture Preparation — Part 2 note (2026-07-01): no new defect pattern.** RB-14
+Part 2 re-checked the high-risk open questions against **official Shopify docs**, **official Odoo
+19.0 docs**, and **official Odoo 19.0 source code**, produced the open-question resolution +
+decision-candidate brief, and narrowed AR-002/003/005 — **adding no new defect occurrence to any
+category** (**no new DP row, no counter change**). The sprint **applied, not re-triggered**, the
+standing prevention rules: **DP-001 (re-read the source)** was applied to its strongest form —
+four load-bearing facts the docs left open were verified against **actual `odoo/odoo` 19.0
+source** (`ir_cron.py`, `ir_model.py`, `odoo/orm/models.py`) and labelled `[Official source-code
+fact]`, and a **6-verifier + 6-adversarial-cross-verifier** pass re-checked every load-bearing
+Shopify-doc quote (two minor quote-transcription slips were caught and fixed before commit —
+`inventorySetQuantities` "As of 2026-01" without "version"; bulk page "These errors …" not
+"timeouts"); **DP-003/DP-004** — competitor evidence was **excluded** from this official-only pass
+and nothing was promoted to official fact; **DP-005** — every candidate option and the suggested
+sprint sequence is **labelled an input/`[Recommendation]`/`[Decision candidate]`, never a
+decision**; **DP-006 evidence-consistency gate** — official facts, source-code facts, inferences,
+and open questions are kept distinct, and **conditional/absent items were kept conditional/open**
+rather than over-claimed: the custom-app compliance-webhook / L1-L2 obligation scope was left
+**[Open question] and explicitly not assumed absent**, and the **Odoo-core async-queue absence was
+kept an [Inference]** (a negative that cannot be proven from one file set), not promoted to fact.
+Where evidence **did** support it, open questions were resolved (24-hour idempotency TTL;
+`(module, name)` uniqueness; `sudo()` bypass; Odoo Online custom-module incompatibility) — the
+opposite of over-claiming. **No architecture decision was made; no approach was formally rejected
+(weak/avoid-candidates stay out of `rejected-approaches-log.md` pending ChatGPT, `CLAUDE.md`
+§10); DEC-003 and MVP scope are unchanged; implementation stays blocked** (`CLAUDE.md` §4–§5;
+RB-14)._
+
+_**RB-14 Part 2 — PR #58 review note (2026-07-01): AR-003 classification cleaned; no new defect
+counter.** ChatGPT review of PR #58 returned **REVISE** for two AR-003 cleanups (substance
+accepted — questions reviewed; AR-002/003/005 refined-not-decided; DEC-003/MVP unchanged; no
+code; no implementation authorization). Cleaned, without changing any decision: (1) the
+**async-queue classification** was made precise — the reviewed source confirms `ir.cron` /
+`IrCronTrigger` / `IrCronProgress` + signatures + failure constants and that `with_delay` is
+**absent** from the reviewed files as **`[Official source-code fact]`**, while the **absence of a
+general-purpose async job queue** is kept **`[Inference]`**, the **whole-repo absence** an
+**`[Open question]`**, and **OCA `queue_job`** a **`[Community / not official]`** dependency —
+so no file classifies "`ir.cron` is the only core async primitive" or "no async queue exists in
+Odoo core" as an official/source-code fact; the architecture implication (stock-Odoo background
+execution relies on source-verified `ir.cron`; a true queue remains a community dependency) is
+**unchanged**; (2) the stale **AR-003 "Odoo-Online feasibility" required-evidence gate** was
+**superseded** — Odoo Online is incompatible with custom modules, so the custom connector module
+targets **Odoo.sh / on-premise**, and the remaining hosting evidence is re-listed
+(Odoo.sh/on-prem `server_wide_modules` + jobrunner support, `queue_job` turnkey,
+`--max-cron-threads=2` throughput, reconciliation cadence, ordering, Bulk-Ops interaction). This
+is a **classification/consistency correction, not a new defect occurrence** — an application of
+DP-001/DP-006 (classify precisely; keep inferences/open questions distinct from facts). **No new
+DP row; no counter change.** DEC-003 and MVP scope unchanged; AR-002/003/005 stay **[Not
+decided]**; implementation stays blocked._
+
+_**RB-14 Part 2 — PR #58 final wording cleanup (2026-07-01):** a follow-up REVISE removed the last
+stale Odoo-Online AR-003 wording. The AR-003 **decision-criteria** bullet no longer says "if
+Odoo-Online support is required for MVP" — it now recommends deciding the substrate against the
+**confirmed Phase 1 hosting target (Odoo.sh / on-premise, not Odoo Online)**, verifying (before
+implementation) either `queue_job` turnkey + Odoo.sh/on-prem `server_wide_modules`/Jobrunner
+feasibility, or internal-cron-queue throughput under `--max-cron-threads=2`. The older Part 1
+Odoo-Online caveat in `../01-research/odoo-official-architecture-notes.md` is **kept as history but
+explicitly marked superseded** by the RB-14 Part 2 custom-module-feasibility resolution. **No
+architecture decision; AR-002/003/005 stay [Not decided]; DEC-003 and MVP scope unchanged; no new
+DP row; no counter change.**_

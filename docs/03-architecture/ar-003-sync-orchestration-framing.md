@@ -105,9 +105,12 @@ Citations in [`../01-research/odoo-official-architecture-notes.md`](../01-resear
   workers** deployment.
 - **[Official fact]** **Odoo.sh staging/development crons are disabled** (neutralized
   duplicates) — sync won't auto-run in non-prod; test plans must trigger manually.
-- **[Open question]** Whether **Odoo Online (SaaS)** permits `server_wide_modules`, a
-  Jobrunner, external workers, or the outbound HTTPS a given design needs — **hosting
-  feasibility is not finalized**; it materially constrains the substrate choice.
+- **[Open question → resolved in RB-14 Part 2 for custom-module feasibility]** **Odoo Online
+  custom-module feasibility is resolved:** `[Official limitation]` "Odoo Online is incompatible
+  with custom modules," so the custom connector module **does not target Odoo Online** (it
+  targets **Odoo.sh / on-premise**). What **remains open** is whether **Odoo.sh / on-prem**
+  permit `server_wide_modules`, an external Jobrunner, and the outbound HTTPS a given design
+  needs — see the RB-14 Part 2 notes and the Required-evidence update below.
 - **[Official fact]** Long syncs **must not** run in one HTTP request (worker
   time/memory limits recycle/kill workers) → chunked, out-of-band processing.
 
@@ -256,33 +259,74 @@ and [`../01-research/gaps-opportunities.md`](../01-research/gaps-opportunities.m
 
 ## Required evidence before an AR-003 decision
 
-- **[Open question]** **Odoo-Online feasibility:** can it run crons / `server_wide_
-  modules` / a Jobrunner / outbound HTTPS? (gates Options 1/2/3/5).
-- **[Open question]** MVP-scale **throughput** under `--max-cron-threads=2` for the
-  DEC-003 object set — does an internal cron-queue suffice, or is `queue_job` needed?
+> **RB-14 Part 2 update:** **Odoo Online custom-module feasibility is resolved for this
+> connector** — `[Official limitation]` "Odoo Online is incompatible with custom modules," so
+> the custom connector module **does not target Odoo Online** (it targets **Odoo.sh /
+> on-premise**). The Part 1 "Odoo-Online feasibility" item is therefore **superseded** and is
+> **no longer a live gate** for AR-003. The remaining hosting/substrate evidence is:
+
+- **[Open question]** **Odoo.sh / on-prem `server_wide_modules` support** (needed for a
+  Jobrunner-based option).
+- **[Open question]** **Odoo.sh / on-prem external jobrunner support** (gates OCA `queue_job`,
+  Option 3).
 - **[Open question]** Whether OCA `queue_job` can be made **turnkey** (no hand-edited
   `odoo.conf`) if adopted.
+- **[Open question]** MVP-scale **throughput** under `--max-cron-threads=2` for the
+  DEC-003 object set — does an internal cron-queue suffice, or is `queue_job` needed?
 - **[Open question]** **Reconciliation cadence/scope** (per-object vs global; how often)
   — jointly with AR-006.
-- **[Open question]** Whether **Bulk Operations** (AR-002) should back large backfills
-  within the orchestration model.
-- **[Open question]** Ordering guarantees needed (e.g. product-before-inventory) and
+- **[Open question]** **Ordering guarantees** needed (e.g. product-before-inventory) and
   how each substrate provides them.
+- **[Open question]** Whether **Bulk Operations** (AR-002) should back large backfills
+  within the orchestration model, if relevant.
 
 ## Recommended decision criteria (recommendation, not a decision)
 
 - **[Recommendation]** Require the layered model (webhooks + scheduled + manual +
   **first-class reconciliation**) regardless of substrate — this is the correctness
   floor Tier-1 mandates and the market whitespace.
-- **[Recommendation]** Decide the **substrate against the hosting target**: if
-  Odoo-Online support is required for MVP, favour a substrate that does **not** need a
-  Jobrunner; if Odoo.sh/on-prem only, `queue_job` becomes viable — but make any
-  non-core dependency **turnkey** (avoid VT's install friction).
+- **[Recommendation]** Decide the **substrate against the confirmed Phase 1 hosting
+  target — Odoo.sh / on-premise, not Odoo Online** (RB-14 Part 2 resolved that the custom
+  connector module is incompatible with Odoo Online): if **OCA `queue_job`** is chosen,
+  make its Jobrunner install **turnkey** and **verify Odoo.sh / on-prem
+  `server_wide_modules` + Jobrunner feasibility before implementation** (avoid VT's install
+  friction); if the **internal cron-queue** is chosen, **validate MVP-scale throughput under
+  `--max-cron-threads=2`.** (No substrate is chosen here — AR-003 stays **[Not decided]**.)
 - **[Recommendation]** Require **per-record isolation + safe manual retry + idempotent
   writes** in every option (AR-006/AR-005 hooks), and a **command center + recovery-
   first error center** over whichever substrate is chosen.
 - **[Recommendation]** Do **not** treat `ir.cron` as a queue without a queue model
   around it (A-SYNC-3), and do **not** expose cron internals to users.
+
+## RB-14 Part 2 notes (2026-07-01) — narrowing, not deciding
+
+> Added by RB-14 Part 2. **Part 1 framing above is preserved.** Evidence:
+> [`rb14-part2-open-question-resolution.md`](./rb14-part2-open-question-resolution.md);
+> narrowing: [`rb14-decision-candidate-brief.md`](./rb14-decision-candidate-brief.md). All
+> narrowing is `[Recommendation]` / `[Decision candidate]`. **AR-003 stays [Not decided].**
+
+- **RQ-003-1 (hosting — core resolved):** `[Official limitation]` **"Odoo Online is
+  incompatible with custom modules"** → the connector's custom module **cannot run on Odoo
+  Online**; the substrate is **Odoo.sh or on-premise**. This **removes** the Part 1 "must
+  support Odoo Online" pressure. **Effect on options:** **Option 5 (per-tier hybrid) is
+  weakened** (the Online-vs-rest tier split largely collapses); **Option 3 (`queue_job`) is no
+  longer excluded by Odoo Online** — but `[Open question]` Odoo.sh/on-prem
+  `server_wide_modules` + jobrunner support keeps it **feasibility-gated**.
+- **RQ-003-2/3 (substrate — source facts):** `[Official source-code fact]` the reviewed source
+  confirms `ir.cron` (`IrCron`/`IrCronTrigger`/`IrCronProgress`), the `_trigger`/
+  `_commit_progress` signatures, and the failure constants (`CONSECUTIVE_TIMEOUT_FOR_FAILURE =
+  3`; deactivate only when `failure_count ≥ 5` **and** `≥ 7 days`), and that **`with_delay` is
+  absent** from the reviewed files; `[Inference]` a general async job queue was **not found**
+  in the reviewed docs/source (`[Open question]` whole-repo absence; `[Community / not
+  official]` OCA `queue_job`). Background execution on stock Odoo 19 relies on the
+  source-verified `ir.cron`, and a true async queue **remains a community dependency unless
+  further source evidence proves otherwise**. → the connector **must** own per-record
+  retry/backoff + savepoint isolation regardless of substrate; **Option 1 (cron-only) is a
+  floor only** (never `ir.cron`-as-a-queue, A-SYNC-3).
+- **Decision-candidate summary (input):** carry **Option 2 (internal cron-queue)** and
+  **Option 3 (`queue_job`, made turnkey)** as the two primary candidates; **Option 1** as the
+  floor; **Options 4 (external worker) and 5 (per-tier hybrid) weakened**. All still **[Not
+  decided]**.
 
 > **No decision is made in this document.** AR-003 remains **[Not decided] / Evidence
 > pending**. The options, criteria, and open questions above are **inputs** for a

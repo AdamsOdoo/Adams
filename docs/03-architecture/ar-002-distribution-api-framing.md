@@ -307,6 +307,35 @@ and [`../01-research/gaps-opportunities.md`](../01-research/gaps-opportunities.m
 - **[Recommendation]** Treat **distribution** and **API strategy** as **two linked
   decisions**, deciding distribution first because it changes the API constraints.
 
+## RB-14 Part 2 notes (2026-07-01) — narrowing, not deciding
+
+> Added by RB-14 Part 2. **Part 1 framing above is preserved.** Evidence:
+> [`rb14-part2-open-question-resolution.md`](./rb14-part2-open-question-resolution.md);
+> narrowing: [`rb14-decision-candidate-brief.md`](./rb14-decision-candidate-brief.md). All
+> narrowing is `[Recommendation]` / `[Decision candidate]`. **AR-002 stays [Not decided].**
+
+- **RQ-002-1 (API):** `[Official fact]` custom apps are **not categorically forbidden from
+  REST** (a changelog permits REST product APIs <100 variants) but `[Official limitation]`
+  GraphQL is the "only supported … over the long term" with **no REST EOL date**. →
+  `[Recommendation]` **GraphQL-first** is the strong candidate on *direction + longevity +
+  the 2048-variant product model*, **not** a prohibition; **Option C (hybrid) weakened**;
+  **Option D (REST-heavy) avoid-candidate** (not rejected).
+- **RQ-002-2 (distribution burden):** `[Official fact]` a **custom app** has
+  protected-customer-data access **"Always available"** (no App-Store review gate) while a
+  public app "Requires review" + 3 compliance webhooks + TLS + Billing API. `[Open question]`
+  whether custom apps **must implement** the compliance webhooks / are bound by L1/L2
+  obligations is **not stated — not assumed absent**. → `[Decision candidate]` **Option B
+  (custom app)** is the lead MVP candidate; **Option A (public) is a later path**.
+- **RQ-002-3 (auth):** `[Official fact]` an unattended connector maps to the **offline** token
+  model; **non-expiring vs expiring (1h + 90-day rotating refresh)** is a real setup/
+  credential trade-off. → `[Recommendation]` prefer an **offline token stored behind Odoo
+  groups**, with an expiring-token/rotation path planned; **OAuth-vs-token stays [Not
+  decided]**.
+- **Decision-candidate summary (input):** carry **B (custom + GraphQL-first + offline token)**
+  as lead; **A** as later public path; **C** weak; **D** avoid-candidate. `[Recommendation]`
+  decide **distribution first** (it sets API + obligation constraints). All still **[Not
+  decided]**.
+
 > **No decision is made in this document.** AR-002 remains **[Not decided] / Evidence
 > pending**. The options, criteria, and open questions above are **inputs** for a
 > future ChatGPT-approved architecture-decision sprint (`CLAUDE.md` §4–§5; RB-14).

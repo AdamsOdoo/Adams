@@ -1,11 +1,196 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current sprint handoff (RB-14 Architecture
-> Preparation — Part 1)** is immediately below; the **Research Sprint C2**, **Product Sprint G**,
-> **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**, **Sprint B**, and **Sprint A** handoffs
-> are retained underneath as history. The running **Sprint checkpoint log** (one note per
-> stage, all sprints) is at the very bottom. The **product-side** handoff lives at
+> Preparation — Part 2)** is immediately below; the **RB-14 Part 1**, **Research Sprint C2**,
+> **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**, **Sprint B**, and
+> **Sprint A** handoffs are retained underneath as history. The running **Sprint checkpoint log**
+> (one note per stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+# RB-14 Architecture Preparation — Part 2 Handoff
+
+> **RB-14 Part 2 — High-risk open-question resolution and decision-candidate refinement.** The
+> architecture-preparation sprint after PR #57 (RB-14 Part 1) merged into `Shopify-connector`.
+> Re-checked **only** the high-risk open questions from Part 1 against **official Shopify docs**,
+> **official Odoo 19.0 docs**, and **official Odoo 19.0 source code** (`odoo/odoo` 19.0); resolved/
+> narrowed **only where official evidence supports it**; kept the rest open. Produced a **decision-
+> candidate brief** and narrowed **AR-002/AR-003/AR-005** — **deciding none**. No-code and
+> no-architecture-decision gates in force (`CLAUDE.md` §4–§5). Session date 2026-07-01.
+
+## Session summary
+
+Confirmed the pre-conditions (PR #55/#56/#57 merged into `Shopify-connector` — the branch is at
+`ec6f494`, the PR #57 merge; AR-002/003/005 framed-not-decided; DEC-003 unchanged; implementation
+unauthorized), then ran a **scoped, documented high-power verification** of the ten enumerated
+high-risk questions. **Four source-code / GID questions were verified directly** by reading the
+official `odoo/odoo` 19.0 source (`ir_cron.py`, `ir_model.py`, `odoo/orm/models.py`) and the
+Shopify GID page; **six official-doc questions were verified by a fan-out** (6 verifiers + 6
+adversarial cross-verifiers). **All six cross-verifiers confirmed their verifier's status** with
+no surviving overclaim (two minor quote fixes applied). **AR-002/AR-003/AR-005 are refined but
+NOT decided**; no REST/GraphQL, distribution, OAuth/token, queue-framework, binding/data-model,
+or module-boundary choice was made; DEC-003 and MVP scope unchanged.
+
+## Branch and commits
+
+**Working branch:** `claude/rb-14-architecture-part-2-ey2a69` (the harness-designated branch;
+based on `Shopify-connector` @ `ec6f494`, the merged **PR #57** tip). **Branch-name note for
+ChatGPT (flagged):** the RB-14 Part 2 prompt named
+`architecture/rb14-part2-risk-resolution-decision-candidates`, but the session's hard git rule
+designates the harness branch (`claude/rb-14-architecture-part-2-ey2a69`) and forbids pushing to
+a different branch without explicit permission, so work proceeded on the harness-designated
+branch; **the PR targets `Shopify-connector`**; `main` and plain `dev` untouched.
+
+| Hash | Message |
+| --- | --- |
+| `7e69111` | docs: resolve rb14 high-risk open questions |
+| `fb00082` | docs: refine rb14 decision candidates |
+| _(this commit)_ | docs: update rb14 part2 handoff and qa gates |
+
+## High-power research mode used
+
+**Yes — scoped to official-source / source-code verification only** (authorized by the prompt's
+capability instruction + `CLAUDE.md` high-power section). **Plan (documented before launch):**
+(a) **Why:** training cutoff is Jan 2026; the ten high-risk questions need live 2026-07-01
+verification, four against actual 19.0 source. (b) **Workstreams:** four source-code/GID reads
+done directly in the main loop; a 6-verifier + 6-adversarial-cross-verifier fan-out for the
+remaining official-doc questions, each fetching a fixed official page set and returning
+verbatim-quoted, claim-classified facts. (c) **Sources:** `shopify.dev` + official changelog;
+`odoo.com/documentation/19.0` + official 19.0 raw RST; official `odoo/odoo` 19.0 source. **No
+competitor/blog/forum.** (d) **Stop condition:** each question resolved only where official
+evidence literally supports it; else kept open. (e) **Synthesis/verification:** worker-owned
+classification + adversarial cross-verify (default to the more conservative status); source
+findings labelled `[Official source-code fact]`; two quote-transcription fixes applied. (f)
+**Unsupported-claim prevention:** absence ≠ opposite; negatives (e.g. "no async queue in core")
+stay inferences; nothing promoted to a decision. **Result:** all statuses upheld by cross-verify;
+~280k subagent tokens + the direct source reads.
+
+## Files created or updated
+
+**Architecture (`docs/03-architecture/`) — new:** `rb14-part2-open-question-resolution.md`,
+`rb14-decision-candidate-brief.md`. **Updated:** `architecture-decision-framing.md`,
+`ar-002-distribution-api-framing.md`, `ar-003-sync-orchestration-framing.md`,
+`ar-005-binding-dedup-framing.md` (RB-14 Part 2 notes; Part 1 preserved; rows stay `[Not
+decided]`).
+
+**Research (`docs/01-research/`) — updated:** `shopify-official-api-notes.md` (RB-14 Part 2
+section), `odoo-official-architecture-notes.md` (RB-14 Part 2 section incl. source-code facts),
+`research-handoff.md` (this file).
+
+**QA (`docs/05-qa/`) — updated:** `architecture-review-log.md` (RB-14 Part 2 non-decision note),
+`defect-pattern-log.md` (RB-14 Part 2 no-new-defect note; no counter change).
+
+**No forbidden files touched** (no `*.py`/`*.xml`/`*.csv`/manifests/modules/CI/Docker; no
+`addons/**`; no `docs/04|06|07|08`; no `.claude/**`). **DEC-003 not modified; MVP scope
+unchanged.**
+
+## Questions resolved / narrowed (official evidence)
+
+- **Resolved (from source):** RQ-003-3 (`ir.cron` signatures + failure constants 3/5/7d);
+  RQ-005-3 (`ir.model.data` fields + `UniqueIndex('(module, name)')`); RQ-005-4 (`sudo()`
+  bypasses access rights **and** record rules).
+- **Materially narrowed (Shopify docs):** RQ-005-2 (**24-hour** idempotency dedup TTL + fixed
+  **17-mutation** `@idempotent` set; no general mechanism / `clientMutationId`); RQ-003-1 (**Odoo
+  Online incompatible with custom modules** → substrate Odoo.sh/on-prem); RQ-002-1 (custom apps
+  **not categorically forbidden from REST**; GraphQL sole long-term API; no REST EOL); RQ-002-2
+  (protected-data access **"Always available"** for custom apps vs **"Requires review"** for
+  public; compliance webhooks App-Store-scoped); RQ-002-3 (offline token model + 90-day rotating
+  refresh).
+- **Re-confirmed open:** RQ-005-1 (GID permanence **not asserted**); RQ-003-2 (`[Official
+  source-code fact]` reviewed source confirms `ir.cron` + signatures/constants + `with_delay`
+  absent; `[Inference]` a general async queue was not found in the reviewed docs/source; `[Open
+  question]` whole-repo absence; OCA `queue_job` community).
+
+## Questions still open (blocking a confident decision)
+
+- **AR-002:** blanket custom/private GraphQL-mandate scope + REST EOL; whether custom apps **must
+  implement** the compliance webhooks / are bound by L1/L2 obligations (**not assumed absent**).
+- **AR-003:** Odoo.sh/on-prem `server_wide_modules` + jobrunner support (gates `queue_job`);
+  MVP-scale throughput under `--max-cron-threads=2`.
+- **AR-005:** `@idempotent` key-uniqueness scope; bulk-op idempotency; GID permanence/non-reuse;
+  the per-store binding data-model decision itself.
+
+## Candidate-narrowing summary (inputs, not decisions)
+
+- **AR-002 [Decision candidate]:** custom app + GraphQL-first + offline token (lead); public app
+  later; hybrid weak; REST-heavy avoid-candidate.
+- **AR-003 [Decision candidate]:** internal cron-queue **or** `queue_job` (turnkey) primary;
+  cron-only floor; external-worker + per-tier-hybrid weakened (Odoo Online excluded).
+- **AR-005 [Decision candidate]:** dedicated per-domain **or** hybrid binding model primary;
+  generic table viable; `ir.model.data` reuse weak/avoid; ID-on-record convenience-only.
+- **All labelled `[Recommendation]`/`[Decision candidate]`; every AR row stays `[Not decided]`.**
+
+## Learning feedback loop
+
+- **New issues discovered:** none. **No new defect pattern; no new DP row; no counter change**
+  (`../05-qa/defect-pattern-log.md` RB-14 Part 2 note). The sprint **applied** DP-001 (re-read the
+  source — went to actual 19.0 source), DP-003/DP-004 (competitor evidence excluded from this
+  official-only pass), DP-005 (options/candidates are inputs, not decisions), and the DP-006
+  evidence-consistency gate (official fact / source-code fact / inference / open question kept
+  distinct; conditional/absent items kept conditional/open, e.g. custom-app compliance obligations
+  **not assumed absent**; the async-queue absence **kept an inference**).
+- **Repeated issue patterns:** none at threshold.
+- **Rules/checklists updated:** none new; reinforced (a) **verify load-bearing facts against
+  actual source**, not just docs, when the docs are silent (four questions resolved this way);
+  (b) the **adversarial cross-verify** default-to-conservative rule caught nothing to downgrade
+  but confirmed no overclaim — a DP-003 application.
+- **New rejected approaches:** none (narrowing only; weak/avoid-candidates are **not** formal
+  rejections — `../05-qa/rejected-approaches-log.md` unchanged; formal rejection needs ChatGPT,
+  `CLAUDE.md` §10).
+- **New technical debt:** none (no code).
+- **Architecture concerns:** AR-002/003/005 refined-not-decided; AR-004/006/007/008 remain
+  later — non-decision note in `../05-qa/architecture-review-log.md`.
+- **Should future prompts change? Minor:** architecture-prep prompts should keep authorizing
+  **reading official source code** for load-bearing facts the docs don't state, and keep every
+  narrowing an **input/`[Recommendation]`/`[Decision candidate]`** (never a decision). Branch
+  reality remains the harness `claude/...` branch while the PR targets `Shopify-connector`.
+- **Quality gate:** satisfied — allowed-files-only; no forbidden files; official facts +
+  source-code facts cited + dated + classified; competitor evidence excluded from this pass;
+  every candidate `[Not decided]`; DEC-003 and MVP scope unchanged; handoff + learning loop
+  updated.
+
+## What ChatGPT should review
+
+1. **Open questions are resolved only where official evidence supports it** — spot-check the
+   verbatim quotes + URLs/source paths in `rb14-part2-open-question-resolution.md`.
+2. **Open questions remain open where evidence is missing** (custom-app compliance obligations;
+   `@idempotent` key scope; bulk-op idempotency; GID permanence; whole-repo async-queue absence).
+3. **Source-code facts are not turned into architecture decisions** — labelled `[Official
+   source-code fact]`, routed as inputs.
+4. **Decision candidates are not presented as decisions** — all `[Recommendation]`/`[Decision
+   candidate]`; every AR row `[Not decided]`.
+5. **No REST/GraphQL, queue, binding, data-model, module, or distribution choice is made.**
+6. **MVP scope and DEC-003 remain unchanged; implementation remains blocked.**
+7. **UX skill usage stays at the implications level** (no screens/wireframes).
+
+## Stop condition
+
+Stopped at the RB-14 Part 2 boundary: three stage commits on the harness-designated branch + one
+**draft** PR targeting **`Shopify-connector`**, **not merged**. **No** connector code, Odoo
+module, architecture decision, ADR, implementation plan, module boundary, or REST/GraphQL/
+queue-framework/data-model/distribution choice. **DEC-003 and MVP scope unchanged.** `main` and
+plain `dev` untouched; only RB-14 Part 2 allowed files changed. Awaiting ChatGPT review.
+
+## Recommended next session
+
+**RB-14 Part 3 — Architecture Decision Sprint for AR-002** (distribution + API + auth), **only if
+ChatGPT accepts Part 2.** AR-002 is the most narrowed (custom + GraphQL-first + offline-token lead
+candidate) and constrains AR-003 (hosting) and AR-005 (idempotency surface); then AR-003 + AR-005
+in parallel, then AR-006/007/008, with AR-004 last. Keep the no-code gate; one scoped objective
+per session. **The Part 3 prompt is not written here (not requested).**
+
+## Quality gate confirmation (RB-14 Part 2)
+
+- [x] Session handoff updated (this block).
+- [x] Quality feedback loop checked (this file + `../05-qa/` logs).
+- [x] New learning captured in the correct file (RB-14 Part 2 no-new-defect note in
+  `defect-pattern-log.md`; RB-14 Part 2 non-decision note in `architecture-review-log.md`).
+- [x] Any rejected approach logged (none — narrowing only; weak/avoid-candidates are not formal
+  rejections).
+- [x] Any accepted technical debt logged (none — no code).
+- [x] Any repeated issue pattern escalated per §4 (none at threshold; DP-001/003/004/005/006
+  applied, not re-triggered).
 
 ---
 
