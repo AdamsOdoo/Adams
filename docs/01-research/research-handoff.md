@@ -2018,3 +2018,18 @@ ChatGPT review.
   exclusions are recommendations-against-MVP), `technical-debt-register.md` (no debt). Ran
   final allowed/forbidden-file checks. Next: push the working branch and open one draft PR
   targeting `Shopify-connector`, then stop.
+- **Sprint G / Stage 1 — Setup & start handoff (2026-07-01):** Confirmed **PR #54 merged**
+  into `Shopify-connector` (merge commit `1d5e774`, merged 2026-07-01); confirmed the
+  latest `Shopify-connector` contains `docs/02-product/{mvp-scope,non-mvp-and-later-phases,
+  user-stories,product-research-handoff}.md` and the **DP-006 evidence-consistency gate** in
+  `docs/05-qa/defect-pattern-log.md`. Working branch is the **harness-designated**
+  `claude/sprint-g-mvp-scope-jxisgm` (the prompt requested `product/sprint-g-mvp-acceptance`;
+  branch-name discrepancy recorded here and in the Sprint G handoff), based on latest
+  `Shopify-connector` (HEAD `1d5e774`, clean base); **PR targets `Shopify-connector`**;
+  `main` and plain `dev` untouched. Read `CLAUDE.md`, the required research/product/QA files,
+  and the decision-record template; confirmed: current phase is still **no-code**; Sprint G
+  records **MVP acceptance only** (product scope, not architecture); architecture stays gated
+  (AR-002…AR-008 all Not decided / Evidence pending); implementation stays gated;
+  DP-003/004/005/006 prevention rules and the evidence-consistency gate understood; allowed/
+  forbidden files understood. Added this checkpoint. Next: Stage 2 — create
+  `docs/04-decisions/DEC-003-mvp-scope.md` recording ChatGPT's accepted RB-13 MVP baseline.
