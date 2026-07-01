@@ -276,3 +276,14 @@ is a **classification/consistency correction, not a new defect occurrence** — 
 DP-001/DP-006 (classify precisely; keep inferences/open questions distinct from facts). **No new
 DP row; no counter change.** DEC-003 and MVP scope unchanged; AR-002/003/005 stay **[Not
 decided]**; implementation stays blocked._
+
+_**RB-14 Part 2 — PR #58 final wording cleanup (2026-07-01):** a follow-up REVISE removed the last
+stale Odoo-Online AR-003 wording. The AR-003 **decision-criteria** bullet no longer says "if
+Odoo-Online support is required for MVP" — it now recommends deciding the substrate against the
+**confirmed Phase 1 hosting target (Odoo.sh / on-premise, not Odoo Online)**, verifying (before
+implementation) either `queue_job` turnkey + Odoo.sh/on-prem `server_wide_modules`/Jobrunner
+feasibility, or internal-cron-queue throughput under `--max-cron-threads=2`. The older Part 1
+Odoo-Online caveat in `../01-research/odoo-official-architecture-notes.md` is **kept as history but
+explicitly marked superseded** by the RB-14 Part 2 custom-module-feasibility resolution. **No
+architecture decision; AR-002/003/005 stay [Not decided]; DEC-003 and MVP scope unchanged; no new
+DP row; no counter change.**_

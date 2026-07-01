@@ -285,10 +285,13 @@ and [`../01-research/gaps-opportunities.md`](../01-research/gaps-opportunities.m
 - **[Recommendation]** Require the layered model (webhooks + scheduled + manual +
   **first-class reconciliation**) regardless of substrate — this is the correctness
   floor Tier-1 mandates and the market whitespace.
-- **[Recommendation]** Decide the **substrate against the hosting target**: if
-  Odoo-Online support is required for MVP, favour a substrate that does **not** need a
-  Jobrunner; if Odoo.sh/on-prem only, `queue_job` becomes viable — but make any
-  non-core dependency **turnkey** (avoid VT's install friction).
+- **[Recommendation]** Decide the **substrate against the confirmed Phase 1 hosting
+  target — Odoo.sh / on-premise, not Odoo Online** (RB-14 Part 2 resolved that the custom
+  connector module is incompatible with Odoo Online): if **OCA `queue_job`** is chosen,
+  make its Jobrunner install **turnkey** and **verify Odoo.sh / on-prem
+  `server_wide_modules` + Jobrunner feasibility before implementation** (avoid VT's install
+  friction); if the **internal cron-queue** is chosen, **validate MVP-scale throughput under
+  `--max-cron-threads=2`.** (No substrate is chosen here — AR-003 stays **[Not decided]**.)
 - **[Recommendation]** Require **per-record isolation + safe manual retry + idempotent
   writes** in every option (AR-006/AR-005 hooks), and a **command center + recovery-
   first error center** over whichever substrate is chosen.

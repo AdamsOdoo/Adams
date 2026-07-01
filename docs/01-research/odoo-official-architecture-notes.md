@@ -58,7 +58,11 @@
 >   docs) before a credential-security design relies on it. (3) **Odoo Online (SaaS)
 >   support for custom modules / `server_wide_modules` / external workers is NOT covered**
 >   by the on-prem/Odoo.sh pages — an **open question** that gates the AR-003 substrate;
->   hosting is **not finalized**.
+>   hosting is **not finalized**. **(Superseded by RB-14 Part 2 for the custom-module
+>   feasibility question: official Odoo 19 docs state Odoo Online is incompatible with custom
+>   modules, so the connector custom module does not target Odoo Online. Remaining hosting
+>   questions now concern Odoo.sh / on-prem `server_wide_modules` / Jobrunner support and
+>   throughput — see the RB-14 Part 2 resolution section below.)**
 > - **No decision made.** These route to AR-003/AR-005 framing only.
 
 ## RB-14 Part 2 resolution (2026-07-01)
