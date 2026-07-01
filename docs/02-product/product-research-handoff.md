@@ -27,6 +27,28 @@ logs/error/retry UX, permission design, test strategy, and implementation prompt
 will reuse. No new competitor sources were crawled (synthesis of already-merged
 repo evidence only).
 
+## Sprint D revision (PR #52 review — 2026-07-01)
+
+ChatGPT review returned **REVISE** (small taxonomy precision patch). Corrected on
+the same branch (`docs: correct sprint d taxonomy precision`); logged as **DP-006**:
+
+- **Removed the `SH` abbreviation collision** — `SH` now means **only**
+  sh_shopify_connector / Softhealer; Shopify official docs are keyed
+  **SHOPIFY-OFFICIAL** (Odoo official = **ODOO-OFFICIAL**).
+- **Made OAuth-first's official-platform dependency conditional** — C-CONN-01 is
+  a strong UX/security/product direction and competitor-demonstrated (VT), but is a
+  platform *requirement* **only if public/App-Store distribution is chosen**;
+  custom/private flows may use Admin API token / custom-app access. AR-002
+  (distribution) remains open; do **not** treat OAuth-first as a finalized
+  architecture decision. Evidence strength changed `A` → `B / A-if-public`.
+- **Reframed stock import (C-INV-04)** as "Stock import with controlled
+  apply/review": stock import is demonstrated, but **auto-apply is a recommended
+  improvement/inference, not demonstrated competitor evidence**; AR-007 still
+  applies.
+- **Corrected Webkul import-stock coverage** — WK is **⬜ (not found)** for import
+  stock per Sprint C matrix §3 (was incorrectly ✅); matrix-consistent coverage is
+  EM✅ VT✅ SH✅ TQ🟨 EC🟨 WK⬜.
+
 ## Files created or updated
 
 - `docs/02-product/feature-taxonomy.md` (**new**) — the canonical taxonomy (main

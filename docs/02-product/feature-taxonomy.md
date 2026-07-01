@@ -65,7 +65,10 @@ This taxonomy is built **only** from these already-merged Sprint B/C repo files
 
 **Competitor keys:** **WK** = Webkul (R1) · **TQ** = Teqstars (R2) · **EM** =
 Emipro (R3) · **VT** = VentorTech PRO (R4+R7) · **EC** = ecommerce_shopify (R6) ·
-**SH** = sh_shopify_connector (R8). **SH** platform key = Shopify official docs.
+**SH** = sh_shopify_connector / Softhealer (R8). **Official-platform key:**
+**SHOPIFY-OFFICIAL** = Shopify official docs (Tier-1), **ODOO-OFFICIAL** = Odoo
+official docs (Tier-1). **SH always means Softhealer's connector — never Shopify
+official docs.**
 
 **Evidence weighting (from Sprint C):** **EM** (≈29 real screenshots) and **VT**
 (dated, mechanism-level release notes) carry the most **demonstrated** evidence;
@@ -162,19 +165,25 @@ the single biggest onboarding drop-off point in the survey.
 - **Capability ID:** C-CONN-01
   - **Capability name:** OAuth-first store connection
   - **Description:** Connect and authorise the app via Shopify OAuth (no manual
-    token paste) to obtain an offline access token.
+    token paste) to obtain an offline access token. A strong UX/security/product
+    direction; **competitor-demonstrated by VentorTech**.
   - **User value:** Fewer credential errors; no long token/scope paste; secure by
     default.
-  - **Evidence status:** competitor demonstrated + official-platform requirement.
-  - **Evidence references:** best-in-class-observations.md (VT OAuth); shopify-official-api-notes.md (Auth & scopes: OAuth/token-exchange, offline tokens).
-  - **Competitor examples:** VT✅ ("OAuth — no manual API tokens"); WK✅/EM✅/SH✅ paste custom-app token; TQ🟨/EC🟨.
-  - **UX implications:** OAuth redirect + consent screen; hide token internals; App-Store apps must OAuth **before** any UI.
+  - **Evidence status:** competitor demonstrated + **conditional** official-platform
+    requirement **if public/App-Store distribution is chosen** (SHOPIFY-OFFICIAL:
+    new public apps must OAuth before any UI). It is **not** an unconditional
+    platform requirement — custom/private connector flows may authenticate with an
+    Admin API token / custom-app access instead, so this cannot be treated as a
+    finalized requirement until **AR-002 (distribution) resolves** (still open).
+  - **Evidence references:** best-in-class-observations.md (VT OAuth ✅ — demonstrated); shopify-official-api-notes.md (Auth & scopes: OAuth/token-exchange, offline tokens; App-Store requires OAuth-first — *conditional on public distribution*); architecture-review-log.md (AR-002, open).
+  - **Competitor examples:** VT✅ ("OAuth — no manual API tokens"); WK✅/EM✅/SH✅ paste custom-app token (demonstrated non-OAuth path); TQ🟨/EC🟨.
+  - **UX implications:** OAuth redirect + consent screen; hide token internals; **if** public/App-Store, apps must OAuth **before** any UI.
   - **Reliability/performance implications:** Offline token doesn't expire by default; token-exchange/refresh handling required if using the expiring variant.
-  - **Configuration implications:** App registration (client id/secret, redirect URL); scope declaration in app TOML.
-  - **Architecture dependency:** requires AR review (AR-002 API/distribution: public-app vs custom-app changes the auth model).
-  - **Candidate classification:** likely baseline.
+  - **Configuration implications:** App registration (client id/secret, redirect URL); scope declaration in app TOML — **only under the OAuth path**; a custom-app path pastes a token instead.
+  - **Architecture dependency:** requires AR review (**AR-002 API/distribution — open**: public-app vs custom-app decides whether OAuth is mandatory or optional).
+  - **Candidate classification:** likely baseline (**as a product/UX direction**; the *requirement* status is conditional).
   - **MVP relevance:** candidate.
-  - **Notes:** Custom-app token paste is the demonstrated market default; OAuth-first is VT's differentiator and the App-Store requirement.
+  - **Notes:** Custom-app token paste is the demonstrated market default; OAuth-first is VT's differentiator and a **strong** UX/security direction — but its official-platform *requirement* is **conditional on the (unresolved) public/App-Store distribution choice (AR-002)**. Do **not** treat OAuth-first as a finalized architecture decision.
 
 - **Capability ID:** C-CONN-02
   - **Capability name:** Credential storage and masking
@@ -658,21 +667,25 @@ table-stakes; single-location and manual post-import processing are anti-pattern
   - **Notes:** Table-stakes per Sprint C; single-location (WK) is the anti-pattern.
 
 - **Capability ID:** C-INV-04
-  - **Capability name:** Import stock (auto-applied)
-  - **Description:** Import Shopify stock into Odoo and **apply it automatically**
-    (no manual Inventory Adjustment step).
-  - **User value:** Stock is current without a hidden manual step; avoids
-    oversell.
-  - **Evidence status:** competitor demonstrated (as an anti-pattern to improve on) + inference.
-  - **Evidence references:** competitor-feature-matrix.md §3 (EM creates a manual Inventory Adjustment ✅ — friction); avoid-list.md (A-INV-1).
-  - **Competitor examples:** EM✅ (but manual-apply — friction); SH✅; VT✅ ("Export Inventory Now"); WK✅.
-  - **UX implications:** Auto-apply with optional review; don't require a manual adjustment.
-  - **Reliability/performance implications:** Inventory adjustment records must post to take effect.
-  - **Configuration implications:** Auto-apply vs review-first toggle.
-  - **Architecture dependency:** requires AR review (AR-007).
-  - **Candidate classification:** premium differentiator.
-  - **MVP relevance:** candidate.
-  - **Notes:** "Auto-apply imported stock" is a concrete do-better vs Emipro.
+  - **Capability name:** Stock import with controlled apply/review
+  - **Description:** Import Shopify stock into Odoo, with a **controlled
+    apply/review** step. **Stock import itself is demonstrated** by several
+    competitors (in different forms); **auto-apply** (removing the manual Inventory
+    Adjustment step) is a **recommended improvement/inference**, not a demonstrated
+    market capability.
+  - **User value:** Stock is imported and applied predictably; auto-apply (as an
+    improvement) would avoid a hidden manual step and reduce oversell risk.
+  - **Evidence status:** competitor demonstrated (stock import, various forms) +
+    **inference** (auto-apply is a recommended improvement, **not** demonstrated).
+  - **Evidence references:** competitor-feature-matrix.md §3 (Import stock: WK⬜, TQ🟨, **EM✅**, **VT✅**, EC🟨, **SH✅**; EM creates a manual **Inventory Adjustment to process manually** ✅ — a friction point / anti-pattern, A-INV-1); avoid-list.md (A-INV-1 — auto-apply is our do-better, not competitor evidence).
+  - **Competitor examples:** EM✅ (demonstrated, but **manual Inventory-Adjustment apply — friction**); VT✅; SH✅; TQ🟨 (claim); EC🟨 (claim); **WK⬜ (import stock not found)**.
+  - **UX implications:** Controlled apply with a review option; **auto-apply is the recommended improvement over EM's required manual Inventory Adjustment** (inference, not demonstrated).
+  - **Reliability/performance implications:** Imported quantities must post (as an Inventory Adjustment or equivalent) to take effect; stale un-applied stock risks oversell.
+  - **Configuration implications:** Apply mode (auto-apply vs review-first) — the auto-apply option is our proposed improvement.
+  - **Architecture dependency:** requires AR review (AR-007 inventory).
+  - **Candidate classification:** premium differentiator (the **auto-apply improvement** is the differentiator; basic stock import is baseline).
+  - **MVP relevance:** candidate (**input, not a decision**).
+  - **Notes:** DP-006 fix — "auto-apply" is an **improvement/inference**, not demonstrated competitor evidence; **Webkul is not marked demonstrated for import stock** (matrix §3 = ⬜). Emipro's manual Inventory-Adjustment step is the friction we propose to improve on.
 
 ---
 

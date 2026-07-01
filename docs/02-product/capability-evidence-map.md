@@ -67,7 +67,7 @@ ratings/changelog).
 
 | Capability ID | Capability name | Domain | Evidence strength | Strongest evidence | Competitor coverage | Official platform dependency | Architecture review needed | MVP review relevance | Notes |
 | --- | --- | :--: | :--: | --- | --- | --- | --- | :--: | --- |
-| C-CONN-01 | OAuth-first store connection | 1 | A | Shopify auth model + VT | VT✅ EM✅ WK✅ SH✅ TQ🟨 EC🟨 | Yes (OAuth/token) | AR-002 | candidate | Token-paste is the demonstrated default; OAuth-first is VT + App-Store req. |
+| C-CONN-01 | OAuth-first store connection | 1 | B / A-if-public | VT (demonstrated) + Shopify public-app requirement | VT✅ EM✅ WK✅ SH✅ TQ🟨 EC🟨 | Conditional — public/App-Store distribution | AR-002 (open) | candidate | Distribution is unresolved; do not treat OAuth-first as a finalized architecture decision. OAuth is mandatory only if public/App-Store; custom/private may use token/custom-app access. |
 | C-CONN-02 | Credential storage & masking | 1 | B | VT v2.1.3 | VT✅ TQ🟨 | No | No | candidate | Cheap, high-trust; pair with role-gating. |
 | C-CONN-03 | Guided setup wizard | 1 | B | WK/EM screenshots | WK✅ EM✅ VT🟨 TQ🟨 EC🔒 | No | No | candidate | EC guide is the blocked Google Doc (R5) — anti-pattern. |
 | C-CONN-04 | Test connection (pass/fail) | 1 | B | WK screenshots | WK✅ SH✅ VT🟨 EM➖ EC⬜ | No | No | candidate | Cheap high-value guardrail. |
@@ -119,7 +119,7 @@ ratings/changelog).
 | C-INV-01 | Stock quantity sync | 6 | A | Shopify (`committed` read-only, `@idempotent`) + EM/VT | EM✅ VT✅ WK✅ SH✅ TQ🟨 EC🟨 | Yes (inventory model) | AR-007 | candidate | Write `available`/`on_hand` only; idempotent. |
 | C-INV-02 | Quantity-field / source-quantity choice | 6 | B | EM formulas | EM✅ VT✅ WK✅ | No | AR-007 | candidate | Jargon needs inline help. |
 | C-INV-03 | Multi-location inventory mapping | 6 | A | Shopify InventoryLevel + EM/VT | EM✅ VT✅ TQ🟨 EC🟨 SH🟨 WK⬜ | Yes (per-location) | AR-007 | candidate | SKU-only writes double-decrement (A-INV-2). WK single-location. |
-| C-INV-04 | Import stock (auto-applied) | 6 | B | EM (manual — improve on) | EM✅ VT✅ SH✅ WK✅ | No | AR-007 | candidate | Auto-apply vs EM's manual adjustment. |
+| C-INV-04 | Stock import with controlled apply/review | 6 | C | EM (demonstrated; manual-apply friction) | EM✅ VT✅ SH✅ TQ🟨 EC🟨 WK⬜ | No | AR-007 | candidate | Stock import is demonstrated; **auto-apply is an improvement/inference, not demonstrated**. WK⬜ (import stock not found in matrix §3). |
 
 ### Domain 7 — Customers, companies, and addresses
 
@@ -253,10 +253,13 @@ ratings/changelog).
 
 ## Roll-up (inputs, not decisions)
 
-- **A (official platform requirement):** ~22 capabilities — the non-negotiable
-  correctness/compliance spine (OAuth, HMAC, webhook dedup/ack, reconciliation,
+- **A (official platform requirement):** ~21 capabilities — the non-negotiable
+  correctness/compliance spine (HMAC, webhook dedup/ack, reconciliation,
   idempotency, rate-limit/bulk awareness, inventory model, FulfillmentOrder,
   refund idempotency, 60-day gate, GID binding, record-rule security, App-Store).
+  *(OAuth-first, C-CONN-01, is **conditional** — `B / A-if-public` — mandatory
+  only if public/App-Store distribution is chosen; AR-002 open, so it is **not**
+  counted in the unconditional-A spine.)*
 - **B (strong competitor demonstration):** ~45 capabilities — the demonstrated
   market baseline + several premium bests (EM/VT-led).
 - **C (mixed/partial):** ~8 — syntheses no single competitor fully demonstrates

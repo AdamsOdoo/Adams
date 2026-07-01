@@ -37,6 +37,30 @@ sprint synthesises **already-merged repo evidence only**, preserving per-claim
 classification and DP-003/DP-004 discipline. Synthesis was **worker-owned** (main
 thread), not fanned out, so claim classification stayed centrally governed.
 
+### Sprint D revision (PR #52 review — 2026-07-01)
+
+ChatGPT review returned **REVISE** (small taxonomy precision patch); corrected on
+the same branch (`docs: correct sprint d taxonomy precision`), logged as **DP-006**:
+
+- **Removed the `SH` abbreviation collision** — `SH` = **only** sh_shopify_connector
+  / Softhealer; Shopify official docs are keyed **SHOPIFY-OFFICIAL** (Odoo official
+  = **ODOO-OFFICIAL**).
+- **OAuth-first (C-CONN-01) official-platform dependency made conditional** — strong
+  UX/security direction, competitor-demonstrated (VT), but a platform *requirement*
+  **only if public/App-Store distribution is chosen**; custom/private flows may use
+  token/custom-app access. AR-002 open; not a finalized decision. Evidence strength
+  `A` → `B / A-if-public`.
+- **Stock import (C-INV-04) reframed** as "Stock import with controlled apply/review"
+  — auto-apply is an **improvement/inference, not demonstrated**; AR-007 still applies.
+- **Webkul import-stock coverage corrected** to **⬜ (not found)** per matrix §3 (was
+  ✅); matrix-consistent coverage EM✅ VT✅ SH✅ TQ🟨 EC🟨 WK⬜.
+- **Escalation:** unsupported-assumption/weak-research reaches its **3rd occurrence**
+  (DP-003, DP-004, DP-006) → an **evidence-consistency gate** was recorded in
+  `defect-pattern-log.md` (implementation stays paused by the existing no-code gate;
+  no capability may enter MVP/architecture as a decision until its evidence strength,
+  conditionality, and competitor coverage are ChatGPT-reviewed). **No implementation
+  task is set.**
+
 ## Branch and commits
 
 **Working branch:** `claude/feature-taxonomy-sprint-d-t8d2t0` (the
