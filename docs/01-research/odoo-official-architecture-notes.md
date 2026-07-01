@@ -61,6 +61,72 @@
 >   hosting is **not finalized**.
 > - **No decision made.** These route to AR-003/AR-005 framing only.
 
+## RB-14 Part 2 resolution (2026-07-01)
+
+> **High-risk open-question resolution — official 19.0 docs + official 19.0 source code.**
+> For the **RB-14 Part 2** sprint, the high-risk Odoo open questions from Part 1 were
+> **resolved/narrowed** against official 19.0 docs and, where load-bearing, the **official
+> `odoo/odoo` 19.0 source** (`github.com/odoo/odoo`, branch `19.0`). Source findings are
+> `[Official source-code fact]` — file/line references + short quotes only; **no source is
+> copied into the repo** beyond short snippets. Full dated record:
+> [`../03-architecture/rb14-part2-open-question-resolution.md`](../03-architecture/rb14-part2-open-question-resolution.md).
+> **These are evidence facts, not architecture decisions.**
+>
+> - **RQ-003-1 (Odoo Online feasibility) — Partially resolved (core resolved).** `[Official
+>   limitation]` **"Odoo Online is incompatible with custom modules or modules from the Odoo
+>   Apps Store"** (`administration/odoo_online.html`; raw
+>   `content/administration/odoo_online.rst`) — a custom connector module **cannot run on Odoo
+>   Online**; the substrate is **Odoo.sh** (custom modules installed from branch; staging crons
+>   disabled) **or on-premise** (multi-worker `--workers`; dedicated cron process `--no-http` /
+>   `http_enable = False`; `max_cron_threads`; reverse-proxy HTTPS + proxy mode). `[Open
+>   question]` Odoo Online outbound-HTTPS/controllers/`server_wide_modules`/workers (moot but
+>   not literally stated); Odoo.sh/on-prem `server_wide_modules` + external jobrunner support.
+> - **RQ-003-2 (core async-queue availability) — Partially resolved (strengthened inference).**
+>   `[Official source-code fact]` in `odoo/addons/base/models/ir_cron.py` the only cron/async
+>   models are `IrCron` / `IrCronTrigger` / `IrCronProgress`; the symbol `with_delay` (OCA
+>   `queue_job` dispatch) does **not** appear in `ir_cron.py` **or** `odoo/orm/models.py`.
+>   `[Inference]` no general-purpose async job queue was found in reviewed docs/source — this
+>   **remains an inference** (a negative cannot be proven from one file set); OCA `queue_job`
+>   is **community, not core**.
+> - **RQ-003-3 (`ir.cron` signatures + failure model) — Resolved (from source).** `[Official
+>   source-code fact]` (`ir_cron.py`, 19.0): `_trigger(self, at: datetime | Iterable[datetime]
+>   | None = None)` ("executed soon independently of its `nextcall`"; delegates to
+>   `_trigger_list`); `method_direct_trigger` ("Run the CRON job in the current (HTTP) thread …
+>   a new cursor is used"); `_commit_progress(self, processed: int = 0, *, remaining: int |
+>   None = None, deactivate: bool = False) -> float` (returns "remaining time (seconds)";
+>   `float('inf')` outside a cron; backed by `ir.cron.progress`). Constants:
+>   `CONSECUTIVE_TIMEOUT_FOR_FAILURE = 3`, `MIN_FAILURE_COUNT_BEFORE_DEACTIVATION = 5`,
+>   `MIN_DELTA_BEFORE_DEACTIVATION = timedelta(days=7)`; `_update_failure_count` deactivates
+>   (`active = False`, notify DB admin) only when **failure_count ≥ 5 AND first_failure_date +
+>   7 days < now** (`failure_count` "reset on success"). **Confirms the Part 1 doc-level model
+>   at the source level.** `--max-cron-threads` default 2 + Odoo.sh staging neutralization
+>   re-confirmed.
+> - **RQ-005-3 (`ir.model.data` fields / uniqueness) — Resolved (from source).** `[Official
+>   source-code fact]` (`odoo/addons/base/models/ir_model.py`, class `IrModelData`, 19.0):
+>   fields `name` (External Identifier, required), `complete_name` (compute), `model`
+>   (required), `module` (`default=''`, required), `res_id` (`Many2oneReference`,
+>   `model_field='model'`), `noupdate` (Boolean), `reference` (compute, `store=False`);
+>   constraints `_name_nospaces` (CHECK no spaces), **`_module_name_uniq_index =
+>   models.UniqueIndex('(module, name)')`** (the `(module, name)` uniqueness Part 1 flagged),
+>   `_model_res_id_index = models.Index('(model, res_id)')`; `_order = 'module, model, name'`;
+>   **`_allow_sudo_commands = False`**. Docstring: "two main uses" — **third-party data
+>   integration/sync** ("records can be uniquely identified across multiple systems") **AND**
+>   tracking module-installed data origin. Suitability (fact, not decision): has `(module,
+>   name)` uniqueness + db-id-independence but **no per-store column, no binding-status/audit
+>   fields**, module-lifecycle `noupdate` semantics. **Not decided to use or reject** (formal
+>   rejection needs ChatGPT, `CLAUDE.md` §10).
+> - **RQ-005-4 (`sudo()` bypass) — Resolved (from source).** `[Official source-code fact]`
+>   (`odoo/orm/models.py`, `def sudo(self, flag: bool = True) -> Self`, 19.0): superuser mode
+>   "does not change the current user, and **simply bypasses access rights checks**"; warning:
+>   "Using `sudo` could cause data access to **cross the boundaries of record rules**, possibly
+>   mixing records that are meant to be isolated (e.g. records from different companies in
+>   multi-company environments)." **Resolves the Part 1 "not literally on `security.rst`"
+>   concern** — the bypass of **both access rights and record rules** is literal in the ORM
+>   source. `[Open question]` (minor) the precise field-level `groups` × superuser read/write
+>   interaction.
+>
+> **No architecture decision.** These route to AR-003/AR-005 framing as **inputs**.
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Odoo 19.0 documentation — the **Developer →

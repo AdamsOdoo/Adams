@@ -57,6 +57,60 @@
 >   `@idempotent`; `@idempotent` key-uniqueness scope + server dedup TTL unstated.
 >   These route to AR-002/AR-005 framing, not to a decision.
 
+## RB-14 Part 2 resolution (2026-07-01)
+
+> **High-risk open-question resolution.** For the **RB-14 Part 2** sprint, the high-risk
+> Shopify open questions from Part 1 were **re-checked against official `shopify.dev` pages
+> and the official changelog** (access date 2026-07-01), with an adversarial cross-verify
+> pass. Full dated record + verbatim quotes:
+> [`../03-architecture/rb14-part2-open-question-resolution.md`](../03-architecture/rb14-part2-open-question-resolution.md).
+> **Sprint B + Part 1 facts remain valid**; this records the **Part 2 resolutions/narrowings
+> only.** No architecture decision is made.
+>
+> - **RQ-002-1 (GraphQL-only mandate scope) — Partially resolved.** `[Official fact]` the
+>   binding "must" is scoped to **new public apps** only ("Starting April 1, 2025, all new
+>   public apps must be built exclusively with the GraphQL Admin API" — `/docs/api/admin-rest`).
+>   `[Official fact]` (new) custom apps are **not categorically forbidden from REST**: "Custom
+>   apps built on REST that do not need to support more than 100 variants can continue to use
+>   the deprecated REST product APIs" and `[Official limitation]` "Developers should expect that
+>   the GraphQL API will be the only supported API over the long term"
+>   (`/changelog/deprecation-timelines-related-to-new-graphql-product-apis`). `[Open question]`
+>   the **blanket** custom/private scope + any **REST EOL date** stay unstated.
+> - **RQ-002-2 (custom-app privacy / compliance) — Partially resolved.** `[Official fact]` the
+>   three mandatory compliance webhooks are "callback methods that Shopify requires for apps
+>   listed on the Shopify App Store" (`/docs/apps/build/compliance/privacy-law-compliance`).
+>   `[Official fact]` **protected-customer-data access matrix**: Level 1 — public "Requires
+>   review", custom "Always available", Admin-created custom "Always available"; Level 2 —
+>   public "Requires review", custom "Always available", Admin-created "Varies by plan"
+>   (`/docs/apps/launch/protected-customer-data`). `[Official fact]` L1/L2 **obligations attach
+>   to the data kind** ("If you're using only protected customer data, then you must meet the
+>   level 1 requirements"; name/address/phone/email → L1+L2). `[Open question]` whether custom
+>   apps **must implement** the compliance webhooks, and whether the L1/L2 **obligations bind**
+>   custom apps — **not stated; not assumed absent**.
+> - **RQ-002-3 (custom-app token model) — Partially resolved.** `[Official fact]` two
+>   acquisition paths (token exchange / authorization-code grant); online tokens expire
+>   logout/24h; offline tokens **non-expiring** ("grant permanent access … revoked through app
+>   uninstallation or secret revocation") **or expiring** (`expires_in: 3600` + a **90-day**
+>   `refresh_token_expires_in: 7776000` that rotates, previous refresh invalidated after use).
+>   `[Official fact — Part 1]` admin-created custom-app token installed on generation (Part 1
+>   cite); `[Official fact — Sprint B]` least-privilege (access-scopes). `[Open question]` a
+>   single cross-model rotation/revocation policy statement.
+> - **RQ-005-1 (GID permanence) — Partially resolved / re-confirmed.** `[Official fact]` a GID
+>   "uniquely identifies an object" and the Node/Product `id` is "A globally-unique ID"; `[Open
+>   question]` **no** permanence / non-reuse / deleted-recreated statement — permanence is **not
+>   asserted** (`/docs/api/usage/gids`, `/interfaces/Node`, `/objects/Product`).
+> - **RQ-005-2 (general mutation idempotency) — Partially resolved (materially narrowed).**
+>   `[Official fact]` (new) **"Shopify tracks idempotency keys for 24 hours from the original
+>   request"** — server dedup **TTL = 24h** (resolves the Part 1 open item); `[Official
+>   limitation]` the `@idempotent` directive "only applies to mutations that support the
+>   `@idempotent` directive" — a **fixed list of 17** (inventory/location + `refundCreate`);
+>   `[Official fact]` `IDEMPOTENCY_CONCURRENT_REQUEST` on concurrent duplicates; `[Official
+>   limitation]` **no general/all-mutation idempotency and no `clientMutationId`**
+>   (`/docs/api/usage/implementing-idempotency`, `/docs/api/usage/idempotent-requests`).
+>   `[Open question]` key **uniqueness scope** (per-shop/app/global) + **bulk-op idempotency**.
+>   *(Quote precision: `inventorySetQuantities` reads "As of 2026-01 …" without the word
+>   "version"; the bulk page reads "These errors might be intermittent …".)*
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Shopify developer documentation, `shopify.dev`
