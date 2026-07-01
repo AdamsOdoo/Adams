@@ -9,13 +9,19 @@
 
 ## Status
 
-> **Proposed for ChatGPT review — not final until accepted.**
+> **Aligned to the accepted MVP baseline (ChatGPT RB-13, DEC-003, 2026-07-01) —
+> architecture still gated.** Story MVP-relevance tags now reflect ChatGPT's accepted
+> scope (the Sprint F **open** direction forks are resolved). Authored in Sprint F;
+> aligned in Sprint G. See
+> [`../04-decisions/DEC-003-mvp-scope.md`](../04-decisions/DEC-003-mvp-scope.md).
 
-- **Sprint:** Product Sprint F (RB-13). **Phase:** MVP synthesis — **no-code gate in
-  force** (`CLAUDE.md` §4–§5). **Decides nothing.**
-- **Governance:** every story's MVP relevance is **proposed MVP / later / open** — an
-  **input**, not a decision. No architecture, ADR, module, data model, queue
-  framework, API strategy, or distribution model is decided.
+- **Sprint:** authored Product Sprint F (RB-13); **aligned** Product Sprint G (RB-13,
+  DEC-003). **Phase:** MVP scope only — **no-code gate in force** (`CLAUDE.md` §4–§5).
+- **Governance:** each story's MVP relevance is **MVP / later** per the accepted baseline
+  (former `open` forks resolved); every architecture-sensitive story still commits
+  *intent* only. **No architecture, no architecture ADR, no module, no data model, no
+  queue framework, no API strategy, and no distribution model is decided.** These are
+  **not** implementation tasks.
 - **Evidence discipline (DP-003/DP-004/DP-006):** stories trace to demonstrated
   evidence or Tier-1 facts; competitor claims stay claims; conditional items stay
   conditional; improvement inferences (command center, recovery-first, freshness,
@@ -41,12 +47,14 @@ Sprint C research (`O-…`/`A-…`), and Tier-1 facts.
 
 > **[Inference]** — personas are deduced from the evidence (the UX benchmark's admin
 > vs functional split; SH's access-gated setup; modularity/trust findings). Not
-> validated buyer research; **which persona is the primary MVP target is open (RB-13)**.
+> validated buyer research. **RB-13 accepted (DEC-003): P1 is the primary MVP persona;
+> P2 is secondary. P3/P4 remain important buyer/deployer personas, but MVP UX priority
+> serves P1 daily operation and P2 setup/configuration first.**
 
-- **P1 — Operations / e-commerce user (primary daily user).** Runs and monitors syncs,
-  reads logs, recovers from failures; often not a developer.
-- **P2 — Odoo administrator / implementation consultant (setup & config owner).**
-  Installs, connects, maps fields, sets permissions, tunes sync behaviour.
+- **P1 — Operations / e-commerce user (primary daily user; PRIMARY MVP persona).** Runs
+  and monitors syncs, reads logs, recovers from failures; often not a developer.
+- **P2 — Odoo administrator / implementation consultant (setup & config owner; SECONDARY
+  MVP persona).** Installs, connects, maps fields, sets permissions, tunes sync behaviour.
 - **P3 — Business owner / finance stakeholder (economic buyer).** Cares about
   correctness (no double refunds/oversell), trust/evaluability, total cost.
 - **P4 — Odoo partner / integrator (deployer & reseller).** Deploys for many clients;
@@ -61,7 +69,7 @@ Each story uses:
 - Persona:
 - Story: As a <persona>, I want <capability>, so that <outcome>.
 - Capability IDs:
-- MVP relevance: proposed MVP / later / open
+- MVP relevance: MVP / later   (accepted RB-13 baseline; former `open` forks resolved)
 - Evidence strength:
 - Acceptance notes:        (observable, product-level — not code)
 - Failure/recovery notes:
@@ -69,9 +77,9 @@ Each story uses:
 - Open questions:
 ```
 
-> All "proposed MVP" stories are **Proposed MVP inclusion — pending ChatGPT
-> acceptance.** Stories whose mechanism is gated are **Architecture-dependent — must
-> be resolved in RB-14 before implementation.**
+> Story MVP-relevance reflects the **accepted MVP baseline** (ChatGPT RB-13, DEC-003).
+> Stories whose *mechanism* is gated remain **Architecture-dependent — must be resolved
+> in RB-14 before implementation.**
 
 ---
 
@@ -214,13 +222,14 @@ Each story uses:
   drafts with a preview before any destructive apply, so that I can build catalogs in
   Odoo without risking data loss.
 - Capability IDs: C-PROD-02, C-PROD-03, C-PROD-05
-- MVP relevance: open (lean defer — Phase 2 "bidirectional catalog")
+- MVP relevance: **later** (RB-13: DEFERRED — Phase 2 "bidirectional catalog")
 - Evidence strength: B (VT/EM/SH/WK draft-export); C-PROD-05 safety A [Fact]
-- Acceptance notes (if in scope): export creates drafts; a dry-run/preview precedes any
+- Acceptance notes (later): export creates drafts; a dry-run/preview precedes any
   full-state write (**[Fact]** `productSet` delete-on-omit); channel control available.
 - Failure/recovery notes: partial lists are never sent to full-state mutations.
 - Architecture dependency: **AR-002, AR-005** — **Architecture-dependent**.
-- Open questions: is product export in MVP? (decides C-PROD-05 as mandatory).
+- Open questions: none for MVP (deferred). C-PROD-05 dry-run/preview becomes **mandatory**
+  the moment any destructive/full-state write enters scope.
 
 ---
 
@@ -272,12 +281,12 @@ Each story uses:
 - Story: As an administrator, I want to export/link Odoo customers to Shopify, so that
   Odoo-authored customers exist in the store.
 - Capability IDs: C-CUST-02
-- MVP relevance: open (lean defer — Phase 2)
+- MVP relevance: **later** (RB-13: DEFERRED — Phase 2)
 - Evidence strength: B (EM link-by-email [Demonstrated])
-- Acceptance notes (if in scope): customers are linked by email; no duplicate creation.
+- Acceptance notes (later): customers are linked by email; no duplicate creation.
 - Failure/recovery notes: ownership conflicts are surfaced, not silently overwritten.
 - Architecture dependency: **AR-005** — **Architecture-dependent**.
-- Open questions: is customer export in MVP?
+- Open questions: none for MVP (deferred).
 
 ---
 
@@ -307,9 +316,11 @@ Each story uses:
 - Acceptance notes: a backfill imports recent orders; the 60-day approval gate is
   surfaced honestly (not hidden); backfill is resumable.
 - Failure/recovery notes: an interrupted backfill resumes without duplicating (US-E7-04).
-- Architecture dependency: **AR-002** (scope/API); large volumes may need bulk
-  (C-JOB-06, open) — **Architecture-dependent**.
-- Open questions: backfill window/limits; bulk-ops need.
+- Architecture dependency: **AR-002** (scope/API) — **Architecture-dependent**. Large
+  volumes may require Shopify Bulk Operations **internally** (C-JOB-06), but bulk ops are
+  **not a user-facing MVP feature** (RB-13); internal need is an RB-14/AR-002 assessment.
+- Open questions: backfill window/limits; internal bulk-ops need (RB-14/AR-002, not a
+  product-scope item).
 
 ### US-E4-03
 - Persona: P1
@@ -338,35 +349,48 @@ Each story uses:
 - Open questions: how configurable the MVP workflow is.
 
 ### US-E4-05
-- Persona: P3
-- Story: As a finance stakeholder, I want the minimal payment/journal/invoice
-  representation the Odoo order flow needs, so that orders are financially actionable
-  without a full accounting integration.
+- Persona: P1, P3
+- Story: As an operator/finance stakeholder, I want the minimal Shopify financial
+  information preserved on the imported Odoo order, so that the order is understandable
+  and operationally actionable without a full accounting integration.
 - Capability IDs: C-PAY-01, C-PAY-02, C-PAY-03
-- MVP relevance: open (lean: minimal representation only; full accounting deferred)
+- MVP relevance: **proposed MVP — minimal financial evidence/representation only; no
+  accounting automation** (RB-13 accepted)
 - Evidence strength: B (VT/SH/EM [Demonstrated]); `OrderTransaction` [Fact]
-- Acceptance notes (if in scope): the minimal representation is idempotent (no
-  double-invoice on retry); full gateway/journal breadth is deferred.
+- Acceptance notes: the imported order preserves **Shopify financial status, payment
+  status, gateway/payment-method label, transaction reference(s) where available,
+  paid/unpaid/refunded flags (as source info only), order totals, taxes, shipping,
+  discounts, currency**, and **basic gateway/journal mapping as configuration input only
+  if needed for classification/routing**. **Excluded from MVP:** automatic posted
+  invoices/payments, bank/payout reconciliation, full accounting workflow,
+  gateway-specific accounting depth, automatic refund/payment posting. Any representation
+  is **idempotent** (no double-invoice/payment on retry). *Rule: MVP preserves financial
+  evidence and order actionability; it does not automate accounting.*
 - Failure/recovery notes: retries never create duplicate invoices/payments.
-- Architecture dependency: none decided; idempotency required (C-JOB-04).
-- Open questions: what is the **minimal** representation the order flow needs?
+- Architecture dependency: none decided; idempotency required (C-JOB-04). **Exception:**
+  if RB-14 finds a **draft** invoice/payment artifact is absolutely required for a valid
+  Odoo order flow, it is architecture-dependent and returns to ChatGPT before
+  implementation (no silent auto invoice/payment).
+- Open questions: none on the MVP boundary (evidence-only); the draft-artifact exception
+  is architecture-gated.
 
 ### US-E4-06
 - Persona: P1, P3
 - Story: As an operator, I want Shopify refunds and cancellations reflected in Odoo
   safely, so that finance stays consistent without double-refunding.
 - Capability IDs: C-RET-01, C-RET-03
-- MVP relevance: open (lean defer; **idempotency + irreversible-action warnings
-  mandatory if included**)
+- MVP relevance: **later** (RB-13: DEFERRED — refund sync, cancellation reflection, and
+  returns/RMA all deferred; **idempotency + irreversible-action warnings mandatory when
+  later included**)
 - Evidence strength: A ([Fact] `@idempotent` refunds 2026-04) / B (VT/EM [Demonstrated])
-- Acceptance notes (if in scope): a refund is never applied twice; a cancellation warns
+- Acceptance notes (later): a refund is never applied twice; a cancellation warns
   before irreversible effects and never silently creates a cancel order.
-- Failure/recovery notes: refund/cancel retries are idempotent. **The idempotent-refund
-  / no-double-refund regression applies only if refund handling is in MVP; if deferred,
-  it is carried forward as a mandatory acceptance principle for the first refund/
-  refund-sync sprint** (never dropped).
+- Failure/recovery notes: refund/cancel retries are idempotent. **Because refunds are
+  deferred from MVP, the idempotent-refund / no-double-refund regression is carried
+  forward as a mandatory acceptance principle for the first refund/refund-sync sprint**
+  (never dropped).
 - Architecture dependency: **AR-006** — **Architecture-dependent**.
-- Open questions: is basic refund/cancellation reflection in MVP? (ties Domain 9).
+- Open questions: none for MVP (deferred; ties Domain 9 when later included).
 
 ---
 
@@ -543,7 +567,8 @@ Each story uses:
 - Failure/recovery notes: throttling/backpressure is surfaced honestly, not failed
   opaquely.
 - Architecture dependency: **AR-002, AR-003, AR-006** — **Architecture-dependent**.
-- Open questions: bulk-ops need for large backfills (C-JOB-06).
+- Open questions: whether Shopify Bulk Operations are needed **internally** for large
+  backfills (C-JOB-06) — RB-14/AR-002 assessment; **not** a user-facing MVP feature.
 
 ### US-E7-05
 - Persona: P1, P3
@@ -717,16 +742,20 @@ Story-level detail deferred; scope in
 [`./non-mvp-and-later-phases.md`](./non-mvp-and-later-phases.md):
 
 - **Epic L1 — Bidirectional catalog & customers** (product/customer export, publish/
-  channel): C-PROD-02/03/05, C-CUST-02. MVP relevance: later/open.
-- **Epic L2 — Financial depth** (full payments/invoicing, refunds, cancellations,
-  returns/RMA): C-PAY-01/02/03, C-RET-01/02/03. MVP relevance: later/open.
+  channel): C-PROD-02/03/05, C-CUST-02. MVP relevance: **later** (RB-13 deferred).
+- **Epic L2 — Financial depth** (accounting automation, refunds, cancellations,
+  returns/RMA): C-PAY-01/02/03 (accounting-automation portion), C-RET-01/02/03. MVP
+  relevance: **later** (RB-13 deferred; MVP keeps **minimal financial evidence** only —
+  US-E4-05).
 - **Epic L3 — Payout reconciliation** (Shopify-Payments-gated): C-POUT-01/02. later.
 - **Epic L4 — Premium breadth (optional add-ons)** (Markets/B2B/POS/gift cards/
   metafields/extended): C-ADV-01…06, C-PRICE-02/03, C-VAR-03/04. later.
 - **Epic L5 — Multi-tenancy** (multi-store, multi-company, isolated config model):
   C-MULTI-01 (full), C-MULTI-02, C-MULTI-04. later.
-- **Epic L6 — Scale & analytics** (bulk ops, custom transforms, dedicated analytics/
-  reporting): C-JOB-06, C-MAP-03 (transforms), C-RPT-01/02. later/open.
+- **Epic L6 — Scale & analytics** (custom transforms, dedicated analytics/reporting):
+  C-MAP-03 (transforms), C-RPT-01/02. **later.** (Shopify Bulk Operations, C-JOB-06, are
+  **not a user-facing feature** — internal RB-14/AR-002 mechanism only, not a product
+  epic.)
 
 ## Acceptance principles
 
@@ -738,10 +767,10 @@ criteria):
    observable behaviour a reviewer can check, not code.
 2. **Correct under failure.** Stories that touch inventory/orders/fulfilment must hold
    under the classic-defect scenarios (A-IMP-4: duplicate orders, multi-location
-   double-decrement, missed-webhook reconciliation, timezone/paging). **The
-   idempotent-refund / no-double-refund scenario applies only if refund handling is
-   included in MVP (US-E4-06); if refunds are deferred, it is carried forward as a
-   mandatory acceptance principle for the first refund/refund-sync sprint.**
+   double-decrement, missed-webhook reconciliation, timezone/paging). **Refunds are
+   DEFERRED from MVP (RB-13, US-E4-06), so the idempotent-refund / no-double-refund
+   scenario is carried forward as a mandatory acceptance principle for the first
+   refund/refund-sync sprint** (never dropped).
 3. **Recoverable.** Every failure path names isolation + reason + retry (no dead ends).
 4. **Honest & observable.** Freshness is truthful; status answers "OK / what failed /
    what next".
@@ -751,17 +780,28 @@ criteria):
 
 ## Open questions
 
-1. **Primary MVP persona** (P1 operator vs P2 admin/consultant) to bias UX priority.
-2. **Direction** — are the "open" export stories (US-E2-05, US-E3-04) in MVP or Phase 2?
-3. **Domain 9 minimum** (US-E4-05) and **refunds/cancellations** (US-E4-06) — in MVP or
-   deferred?
-4. **Distribution (AR-002)** — fixes OAuth-mandatory (US-E1-01) and App-Store/demo
+**Resolved at RB-13 (DEC-003, 2026-07-01):**
+
+1. ~~**Primary MVP persona**~~ — **RESOLVED: P1 (operator) primary; P2 (admin/consultant)
+   secondary.**
+2. ~~**Direction / export stories**~~ (US-E2-05, US-E3-04) — **RESOLVED: Phase 2**
+   (deferred from MVP).
+3. ~~**Domain 9 minimum**~~ (US-E4-05) — **RESOLVED: minimal financial evidence only in
+   MVP; no accounting automation.**
+4. ~~**Refunds/cancellations**~~ (US-E4-06) — **RESOLVED: deferred.**
+5. ~~**Bulk ops for backfill**~~ (US-E4-02/US-E7-04, C-JOB-06) — **RESOLVED: not a
+   user-facing MVP feature;** internal RB-14/AR-002 assessment only.
+
+**Still open — routed to RB-14 architecture:**
+
+6. **Distribution (AR-002)** — fixes OAuth-mandatory (US-E1-01) and App-Store/demo
    packaging (US-E10-03).
-5. **Reconciliation cadence & freshness granularity** (US-E7-05, US-E5-05).
-6. **Error/retry taxonomy depth & auto-retry set** (US-E7-02/03).
-7. **Essential mappings & dedup/match keys** (US-E9-01/02, US-E3-02) → AR-005.
-8. **Readiness/self-test check set** (US-E1-04).
-9. **Bulk ops for backfill** (US-E4-02/US-E7-04) → C-JOB-06.
+7. **Reconciliation cadence & freshness granularity** (US-E7-05, US-E5-05).
+8. **Error/retry taxonomy depth & auto-retry set** (US-E7-02/03).
+9. **Essential mappings & dedup/match keys** (US-E9-01/02, US-E3-02) → AR-005.
+10. **Readiness/self-test check set** (US-E1-04).
+11. **Inventory apply mode** (US-E5-04, C-INV-04) — auto-apply vs review-then-apply →
+    AR-007 (auto-apply not accepted as default MVP behaviour).
 
 ## Review notes for ChatGPT
 
@@ -771,17 +811,21 @@ Please inspect carefully:
    recoverable single-store loop, import-first" experience without gaps or over-reach?
 2. **Story ≠ implementation task** — confirm stories stay product-level (no code-level
    acceptance criteria, no screens/modules).
-3. **MVP relevance tags** — confirm the **open** stories (US-E2-05, US-E3-04, US-E4-05,
-   US-E4-06) are the right scope forks left to you, and the **later** tags are correct.
+3. **MVP relevance tags (RB-13 aligned)** — confirm the resolved tags are correct: the
+   former open forks are now **later/deferred** (US-E2-05 product export, US-E3-04
+   customer export, US-E4-06 refunds/cancellations) and **MVP minimal-evidence-only**
+   (US-E4-05 Domain 9); bulk ops (US-E4-02/US-E7-04) is internal-only, not a user-facing
+   feature.
 4. **Evidence discipline** — confirm each story traces to demonstrated/Tier-1 evidence;
    inferences (command center, error center, freshness, auto-apply) stay inference; no
    claim is promoted to a fact.
 5. **Architecture-dependent tags** — confirm stories commit *intent*, and no story
    hard-codes a gated mechanism (queue, binding model, API, distribution).
-6. **Personas** — confirm P1–P4 usage is reasonable and "primary MVP persona" is
-   correctly left open.
+6. **Personas (RB-13 accepted)** — confirm P1–P4 usage is reasonable and the accepted
+   **P1-primary / P2-secondary** MVP priority is correctly reflected.
 
-> **This document decides nothing.** All stories, epics, and MVP-relevance tags are
-> **inputs** for the gated RB-13 (MVP) and RB-14 (architecture) reviews, subject to
-> ChatGPT approval (`CLAUDE.md` §4–§5, §8–§10). **Proposed for ChatGPT review — not
-> final until accepted.**
+> **Stories are aligned to the accepted MVP baseline** (ChatGPT RB-13, DEC-003). They
+> remain **product stories, not implementation tasks.** Every *mechanism* is still an
+> **input** for the gated RB-14 (architecture) review, subject to ChatGPT approval
+> (`CLAUDE.md` §4–§5, §8–§10). **MVP scope accepted; architecture still gated;
+> implementation blocked.**
