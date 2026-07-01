@@ -77,3 +77,20 @@ gate, `CLAUDE.md` §4–§5, remains in force). The gate also applies DP-006's
 specific checks: unconditional vs conditional platform requirements must be kept
 distinct, improvement opportunities must not be labelled demonstrated evidence,
 and abbreviations must be globally unique._
+
+_**Product Sprint E note (2026-07-01): none — DP-006 gate applied, not
+re-triggered.** Product Sprint E (product vision + setup/UX principles;
+`../02-product/product-vision.md`, `../02-product/setup-ux-principles.md`) **added no
+new defect occurrence** to any category. The **DP-006 evidence-consistency gate** was
+**applied throughout**: competitor claims stayed claims (EM/VT-demonstrated evidence
+weighted over SH/WK/EC/TQ), no capability entered MVP/architecture as a decision, and
+**conditional platform items stayed conditional/open** — OAuth-first (public/App-Store
+only), distribution model (AR-002), queue framework (AR-003), REST/GraphQL (AR-002),
+multi-company (config field ≠ support, DP-004), module boundaries/names (AR-004),
+payouts (Shopify-Payments-gated), and data models (AR-005). DP-003 (claim ≠ fact),
+DP-004 (config field ≠ demonstrated support; market promise ≠ demonstrated
+bidirectionality), and DP-005 (classification is an input, not a decision) were
+**applied, not re-triggered**. Improvement opportunities (auto-apply, unified command
+center, freshness indicators) were labelled **inference**, not demonstrated competitor
+capability. **No counter change; no new row.** MVP stays RB-13-gated; architecture
+stays RB-14 / AR-002…AR-008-gated._

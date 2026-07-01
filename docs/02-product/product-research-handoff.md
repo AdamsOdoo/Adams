@@ -12,6 +12,205 @@
 > RB-14 / AR-002…AR-008, both gated). Access date for competitor evidence:
 > 2026-06-30; session date: 2026-07-01.
 
+# Product Sprint E Handoff
+
+> **Product Sprint E — Product Vision, Quality Bar, UX Principles, and
+> Differentiation Strategy (RB-11).** Product strategy / synthesis only; **no-code
+> gate in force** (`CLAUDE.md` §4–§5). High-power mode **not required** (synthesis of
+> already-merged repo evidence — no new competitor crawling, no research fan-out).
+> Everything is an **input / thesis / principle / inference / recommendation** —
+> **no MVP scope and no architecture is decided** (MVP = RB-13, architecture = RB-14
+> / AR-002…AR-008, both gated). Session date 2026-07-01.
+
+## Session summary
+
+Created the **product vision** ([`./product-vision.md`](./product-vision.md)) and the
+**setup/UX principles** ([`./setup-ux-principles.md`](./setup-ux-principles.md)) for
+the Odoo 19 ↔ Shopify Connector, consuming the Sprint C research baseline and the
+Sprint D canonical feature taxonomy + capability evidence map. The vision positions
+the connector as **correctness-first, UX-first, recovery-first, observable, honest,
+modular/customizable, performance-aware, evidence-based, upgrade-safe, and premium
+but not bloated** — simple for normal users, powerful for advanced users. It states
+the product thesis, target personas (inference-level), core customer problems, ten
+product principles, a premium quality bar, a five-theme differentiation strategy,
+per-domain strategies (UX, reliability, modularity, performance, security, docs/trust),
+seven product non-negotiables, and explicit **MVP / later / architecture inputs (not
+decisions)**. The UX doc defines a UX north star and 12 principles plus per-area
+principle sets. **No connector code, no Odoo module, no MVP finalization, no
+architecture decisions, no ADRs, no implementation plan, no module boundaries** were
+produced. The **DP-006 evidence-consistency gate** was applied throughout: competitor
+claims stayed claims, conditional platform items (OAuth, distribution, queue,
+REST/GraphQL, multi-company, module boundaries, payouts, data models) stayed
+conditional/open, and improvement opportunities were labelled inference, not
+demonstrated competitor evidence. Synthesis was **worker-owned** (no fan-out).
+
+## Files created or updated
+
+- `docs/02-product/product-vision.md` (**new** — main deliverable).
+- `docs/02-product/setup-ux-principles.md` (**new** — UX principles/quality bar).
+- `docs/02-product/product-research-handoff.md` (**updated** — this Sprint E section).
+- `docs/01-research/research-handoff.md` (**updated** — Sprint E handoff + checkpoints).
+- `docs/05-qa/defect-pattern-log.md` (**updated** — Sprint E note: DP-006 gate applied,
+  not re-triggered; no new occurrence).
+- `docs/05-qa/architecture-review-log.md` (**updated** — Sprint E non-decision note:
+  vision/UX principles supply product-intent inputs to AR-002…AR-008; all still Not
+  decided / Evidence pending).
+- `docs/05-qa/rejected-approaches-log.md` (**updated** — Sprint E "nothing rejected"
+  note).
+- `docs/05-qa/technical-debt-register.md` (**updated** — Sprint E "no debt" note).
+
+## Product vision summary
+
+- **What:** a best-in-class, modular, reliable Odoo 19 ↔ Shopify connector — a
+  correct, observable sync core wrapped in an operator experience, delivered as an
+  isolated, upgrade-safe addon family.
+- **Positioning:** *correct by design, honest by default — and can prove both to the
+  operator.*
+- **Thesis:** breadth is table stakes; win on **demonstrated correctness** and the
+  **operator experience**, ship the demonstrated breadth as a clean baseline, and
+  offer premium breadth as **optional add-ons** on an honest, modular core.
+- **Premium quality bar** is defined by correctness/experience/trust, **not** feature
+  count; seven **non-negotiables** form the quality contract.
+- **Differentiation (inputs):** (1) demonstrated correctness (idempotency +
+  reconciliation + rate-limit awareness), (2) command center + recovery-first errors
+  together, (3) easy onboarding with real reliability, (4) honesty/transparency, (5)
+  premium breadth as clean add-ons.
+
+## UX principles summary
+
+- **North star:** the operator always knows *is everything OK / what failed and why /
+  what do I do next* and can act without reading source or filing a ticket.
+- **12 principles:** guided setup; prove readiness before sync; progressive
+  disclosure; honest status & freshness; command center over scattered menus;
+  recovery-first errors; safe-by-default actions; human-readable logs; guided
+  mappings; role-aware UX; modular feature visibility; documentation mirrors the
+  product — plus per-area principle sets (setup, config, dashboard, sync, logs/recovery,
+  mapping, multi-store/permissions, advanced). **No screens or menus are designed.**
+
+## Strong product implications
+
+Grounded in demonstrated (EM/VT) evidence + Tier-1 facts (weighted over SH/WK/EC/TQ
+claims):
+
+1. **Correctness is the spine and the headline** — idempotency + first-class
+   reconciliation + rate-limit/cost-aware throttling is the market's biggest
+   whitespace and Tier-1-mandated.
+2. **The operator experience is the second whitespace** — unify the command center
+   with a recovery-first error center, which no competitor combines.
+3. **Easy + reliable onboarding together** is a combination nobody has — guided
+   OAuth-style setup + readiness check without excluding Odoo Online.
+4. **Trust is cheap and rewarded** — honest latency/freshness, dated changelog, open
+   docs/demo, visible reconciliation/throttle status.
+5. **Premium = correct and well-run, not more toggles** — breadth ships as
+   feature-flagged optional add-ons on the core.
+
+## MVP inputs, not decisions
+
+> Candidates for **RB-13** review only; **not** selected/sequenced/committed.
+
+- **Candidate core (input):** connect+prove; core object sync at the demonstrated
+  baseline; the sync+correctness engine (webhooks + reconciliation + scheduled +
+  manual, idempotency, dedup/binding, retry/recovery); operator UX (command center +
+  recovery-first errors + honest freshness); role-based access.
+- **Explicitly later (input):** advanced breadth (Markets, B2B, POS, gift cards,
+  metafields, extended breadth), payouts, financial reporting, per-market pricing,
+  custom-Python transforms, multi-company.
+- **Open MVP-shaping questions:** single/multi-store; single/multi-company; core vs
+  optional add-on grouping (feature flags); **primary MVP persona (P1 operator vs P2
+  admin/consultant)**.
+
+## Architecture inputs, not decisions
+
+> Routed to **AR-002…AR-008**, all **Not decided / Evidence pending**. This vision
+> chooses none and re-litigates none (`CLAUDE.md` §10).
+
+- **AR-002:** distribution (public vs custom) **OPEN** — gates OAuth-mandatory,
+  GraphQL-only, billing/compliance webhooks. REST/GraphQL/hybrid **OPEN**.
+- **AR-003:** sync orchestration + queue framework (`ir.cron` vs OCA `queue_job`)
+  **OPEN**; Odoo-Online implications open.
+- **AR-004:** module boundaries/names **OPEN** (layered family is the direction only);
+  feature-flag mechanism open.
+- **AR-005:** binding/dedup data model **OPEN** (`ir.model.data` reuse vs dedicated).
+- **AR-006:** error/retry taxonomy + idempotency mechanism **OPEN**.
+- **AR-007/008:** inventory & fulfilment design **OPEN** (product intent is Tier-1
+  anchored: multi-location, write `available`/`on_hand` only, FulfillmentOrder-based).
+
+## Open questions
+
+Distribution model (AR-002); primary MVP persona + single/multi-store & company
+(RB-13); core vs add-on grouping / feature-flag model (RB-13/AR-004); reconciliation
+cadence + per-object vs global freshness (AR-003/006); error/retry taxonomy (AR-006);
+binding model + deleted-binding handling (AR-005); queue framework + Odoo-Online
+(AR-003); payout modelling for non-Shopify-Payments gateways; Odoo edition gating
+disclosure; whether firming up weak/blocked evidence (TQ 403, EC/R5, 17 unread VT
+Confluence) changes any product framing; demo/docs hosting + self-test scope.
+
+## Learning feedback loop
+
+- **New issues discovered:** none. No new defect pattern emerged. The **DP-006
+  evidence-consistency gate** (3rd-occurrence, ESCALATED) was **applied, not
+  re-triggered**: no product claim was promoted to a fact, no candidate to a decision,
+  and all conditional platform items stayed conditional/open. DP-003/DP-004
+  (competitor claim ≠ fact; config field ≠ demonstrated support; market promise ≠
+  demonstrated bidirectionality) and DP-005 (classification is an input, not a
+  decision) were applied throughout.
+- **Repeated issue patterns:** none at threshold this sprint (no new occurrence added
+  to any category). The escalation gates remain honoured by the no-code gate.
+- **Rules/checklists updated:** none required — existing rules were sufficient and
+  were applied. QA logs received non-decision / no-new-issue notes only.
+- **New rejected approaches:** none (product-strategy synthesis; nothing evaluated to
+  rejection). Noted in `rejected-approaches-log.md`.
+- **New technical debt:** none (no code). Noted in `technical-debt-register.md`.
+- **Architecture concerns:** the vision/UX principles now supply **product-intent
+  inputs** to AR-002…AR-008 — recorded as a **non-decision note** in
+  `architecture-review-log.md`. **All rows stay Not decided / Evidence pending.**
+- **Tests or review gates needed:** none active (synthesis). The DP-006
+  evidence-consistency gate remains the standing pre-MVP/architecture review gate.
+- **Should future prompts change? No** (beyond what Sprint D already encoded) —
+  product-synthesis prompts should keep requiring every principle/candidate to be an
+  **input** with MVP=RB-13 / architecture=RB-14 gating, keep synthesis worker-owned,
+  and keep conditional platform items conditional (DP-006). Branch reality remains the
+  harness-designated `claude/...` branch while the PR targets `Shopify-connector`.
+
+## What ChatGPT should review
+
+1. **Positioning & thesis** — is "correct by design, honest by default, prove both to
+   the operator" right, and are the five differentiation themes correctly prioritised
+   as inputs (correctness + operator UX + easy-reliable onboarding first; breadth
+   later)?
+2. **Evidence discipline (DP-003/004/006)** — no claim-as-fact; EM/VT-demonstrated
+   weighted over SH/WK/EC/TQ; WK multi-company config-field-only; conditional items
+   (OAuth, distribution, queue, REST/GraphQL, multi-company, module boundaries,
+   payouts, data models) stay conditional/open.
+3. **No premature MVP/architecture (DP-005 guard)** — confirm principles, quality bar,
+   differentiation, strategies, and UX principles read as **inputs**, not decisions or
+   final UI/menus; flag any hardening.
+4. **Personas** — are P1–P4 reasonable inference-level inputs, and is "primary MVP
+   persona" correctly left open?
+5. **Non-negotiables** — endorse/amend the seven-item quality contract without
+   implying a specific implementation.
+6. **Sequencing** — confirm RB-13 (MVP implications) next, then RB-14 (architecture
+   prep), both consuming this vision + UX principles.
+
+## Recommended next sprint
+
+**RB-13 (MVP scope implications — not finalized)** consuming this vision + UX
+principles + the Sprint D taxonomy/evidence map under the DP-006 evidence-consistency
+gate, then **RB-14 (architecture preparation)** against AR-002…AR-008 — all gated and
+ChatGPT-reviewed. Optionally firm up weak/blocked evidence (TQ 403; EC/R5; 17 unread
+VT Confluence) if ChatGPT wants firmer classification. Keep the no-code gate; one
+scoped objective per session.
+
+## Stop confirmation
+
+Stopped at the Sprint E boundary as instructed. **No** connector code, **no** Odoo
+module, **no** MVP finalization, **no** architecture decisions, **no** ADRs, **no**
+implementation plan, **no** module boundaries, **no** REST/GraphQL or queue-framework
+or data-model choices. `main` and plain `dev` untouched; only the Sprint E allowed
+files changed. Awaiting ChatGPT review.
+
+---
+
 ## Sprint D summary
 
 Sprint D converted the Sprint C competitor evidence into a **canonical feature

@@ -103,3 +103,29 @@ AR row is decided, accepted, proposed for active review, or re-litigated.** All
 remain "Not decided / Evidence pending" pending sufficient research + ChatGPT
 approval (`CLAUDE.md` §4–§5; RB-14). See also DP-005 (`defect-pattern-log.md`) — the
 prevention rule that a taxonomy classification is an input, not a decision._
+
+_**Product Sprint E non-decision note (2026-07-01) — NOT decisions; AR rows remain
+"Not decided / Evidence pending".** The Sprint E product vision
+(`../02-product/product-vision.md`) and setup/UX principles
+(`../02-product/setup-ux-principles.md`) now provide **product-intent inputs** to the
+open architecture questions — product direction only, never a design choice. For the
+record only: **AR-002 (API/distribution)** — the vision states OAuth-first as a strong
+but **conditional** direction (mandatory only if public/App-Store distribution is
+chosen) and keeps **distribution (public vs custom) and REST/GraphQL/hybrid OPEN**;
+**AR-003 (sync orchestration/queue)** — product intent requires webhooks + first-class
+reconciliation + scheduled + manual together with out-of-band, resumable processing,
+but the **`ir.cron` vs OCA `queue_job` choice and Odoo-Online feasibility stay OPEN**;
+**AR-004 (module boundaries)** — a layered, isolated addon family with feature flags
+is the direction, **no boundaries/names defined**; **AR-005 (binding/dedup)** —
+documented binding + dedup keys and deleted-binding handling are required, **the data
+model (`ir.model.data` reuse vs dedicated) stays OPEN**; **AR-006
+(error/retry/idempotency)** — idempotency-by-default + recovery-first error center +
+retry classification are product non-negotiables, **the error/retry taxonomy and
+mechanism stay OPEN**; **AR-007 (inventory)** — multi-location, write
+`available`/`on_hand` only, controlled apply (auto-apply is an improvement inference,
+DP-006), **design OPEN**; **AR-008 (fulfilment)** — FulfillmentOrder-based +
+multi-package/location, **design OPEN**. The vision routes these here as **inputs
+only** and re-litigates nothing; **no AR row is decided, accepted, proposed for active
+review, or re-litigated.** All remain "Not decided / Evidence pending" pending
+sufficient research + ChatGPT approval (`CLAUDE.md` §4–§5; RB-14). See DP-006's
+evidence-consistency gate in `defect-pattern-log.md`._
