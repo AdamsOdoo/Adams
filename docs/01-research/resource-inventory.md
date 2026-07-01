@@ -105,3 +105,31 @@ vs Sprint B, with full per-source evidence in
 - **On-page pricing facts captured this sprint (2026-06-30):** R1 **$170**,
   R2 **$326.20**, R6 **$195.56**, R7 **€499 / $569.16**, R8 **$168.81**; R3 price
   not shown in its docs.
+
+## Sprint C2 access change — R2 Teqstars docs now Accessible (2026-07-01)
+
+Research Sprint C2 rebaselined the **R2 Teqstars** source only. **This is a
+source-availability correction; the Sprint C blocked snapshot above is retained
+as audit trail and is not rewritten.**
+
+| ID | Sprint C status (2026-06-30) | Sprint C2 status (2026-07-01) | What changed |
+| --- | --- | --- | --- |
+| **R2 Teqstars 19.0 docs** | **Blocked (HTTP 403 bot-block)** | **Accessible (HTTP 200 with a browser UA)** | ChatGPT re-checked and found the Odoo 19.0 Shopify docs accessible. Re-access confirmed the 403 was a **user-agent bot-filter, not a login wall** (no auth bypassed; content is public). **31 Shopify doc pages** read in full (setup, product/customer/order management, collections/catalogs, metafields, payouts, FAQ, support policy) with **~98 embedded screenshots**. Evidence is now **page-classified** (demonstrated vs claim vs implied vs not-found) in `../00-source-materials/competitor-source-notes.md` (R2 "Sprint C2" subsections) and `competitor-deep-dives.md`. |
+
+- **Updated access summary (2026-07-01):** Accessible **6** (R1, R3, R6, R7, R8,
+  **and R2 Teqstars docs**), Partial **1** (R4 Confluence — 17 child articles
+  still unread), Blocked **1** (R5 Google Doc — login wall, unchanged; still
+  R6's setup guide). **No authentication wall was bypassed on any resource.**
+- **Method note:** the proxy fetcher's default user-agent is still 403-filtered
+  by `docs.teqstars.com`; a standard **browser user-agent** request returns
+  **HTTP 200**. This satisfies the Sprint C unblock path ("a browser-UA fetch of
+  the 19.0 docs — no auth to bypass"). It is **not** an authentication bypass.
+- **Standing lesson (reinforces DP-001 / DP-003 and the Sprint G revision note):**
+  *an important source recorded as **Blocked** should be re-checked before any
+  final scope/architecture decision depends on it* — access can change (WAF/bot
+  rules, vendor doc releases). The Sprint C discipline of **not** treating blocked
+  content as fact was correct; Sprint C2 simply consumed the evidence once it
+  became available.
+- **Remaining unblock asks for ChatGPT (unchanged):** (1) **R5** — owner
+  view-access or export for the Google Doc (R6's setup guide). (2) **R4** —
+  optionally fetch the remaining 17 Confluence child articles for full coverage.

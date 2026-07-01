@@ -5,7 +5,11 @@
 > analysis** — the analysis lives in
 > [`../01-research/competitor-deep-dives.md`](../01-research/competitor-deep-dives.md).
 >
-> - **Access date for every observation below:** **2026-06-30.**
+> - **Access date for every observation below:** **2026-06-30**, **except the
+>   Teqstars (R2) "Sprint C2" subsections, which are dated 2026-07-01** — the
+>   Teqstars docs became accessible on re-check and were rebaselined in Research
+>   Sprint C2 (source-availability correction; the Sprint C blocked record is
+>   retained as audit trail).
 > - **Rules honoured (`CLAUDE.md` §7–§8, `research-methodology.md`):** normal
 >   anonymous access only; **no authentication wall was bypassed**; gated content
 >   recorded as Blocked/Partial, never captured. Every observation carries an
@@ -68,15 +72,32 @@
 
 ## R2 — Teqstars: Shopify Connector for Odoo (docs 19.0 + Odoo Apps listing)
 
-### Access status
+> **Sprint C2 rebaseline (2026-07-01) — source-availability correction.** In
+> Sprint C (2026-06-30) the whole `docs.teqstars.com` host returned **HTTP 403**
+> to the proxy fetcher and was recorded **Blocked** (Apps-listing claims only).
+> ChatGPT re-checked on **2026-07-01** and found the docs **accessible**;
+> re-access confirmed the 403 was a **user-agent bot-filter, not a login wall** —
+> a browser-UA request returns **HTTP 200** (no authentication bypassed; the
+> content is public). The Odoo 19.0 Shopify docs were then read in full (**31
+> pages**). The Sprint C **Blocked** record is **retained below as audit trail**
+> and is **not** erased. This is a **source-availability change**, not a
+> criticism of the Sprint C method (which correctly refused to treat blocked
+> content as fact — DP-003).
+
+### Access status — Sprint C (historical, 2026-06-30)
 - **URL (prompt target):** https://docs.teqstars.com/19.0/applications/shopify/overview.html
 - **Date accessed:** 2026-06-30
-- **Access status:** **Blocked** for the docs (HTTP **403** bot-block on the whole `docs.teqstars.com` host, including the **16.0** mirror and `teqstars.com`); **a separate, accessible Teqstars source was found:** the Odoo Apps Store listing **https://apps.odoo.com/apps/modules/19.0/shopify** (HTTP 200). The verification pass **downgraded the docs from Partial→Blocked** (the prior "Partial" rested on search-index snippets, not direct page access).
-- **Pages/sections reached:** Odoo Apps Store 19.0 listing (price/license/version/author/reviews + vendor feature list and 17 screenshot captions).
-- **Pages/sections blocked:** All `docs.teqstars.com/19.0/...` and `/16.0/...` pages (403); `teqstars.com` blog (403).
-- **Notes on authentication/gating:** **There is no login wall — it is a WAF/bot-block (403).** No bypass was attempted. Indexed search snippets were used only as explicitly-labelled, non-equivalent fallback and are **not** treated as 19.0 facts.
+- **Access status (2026-06-30):** **Blocked** for the docs (HTTP **403** bot-block on the whole `docs.teqstars.com` host, including the **16.0** mirror and `teqstars.com`); the Odoo Apps Store listing **https://apps.odoo.com/apps/modules/19.0/shopify** (HTTP 200) was used as the accessible surrogate. The verification pass **downgraded the docs from Partial→Blocked** (the prior "Partial" rested on search-index snippets, not direct page access). **[Retained as history — do not delete.]**
+- **Pages/sections reached (2026-06-30):** Odoo Apps Store 19.0 listing (price/license/version/author/reviews + vendor feature list and 17 screenshot captions).
+- **Pages/sections blocked (2026-06-30):** All `docs.teqstars.com/19.0/...` and `/16.0/...` pages (403); `teqstars.com` blog (403).
+- **Notes on authentication/gating:** **There was no login wall — it was a WAF/bot-block (403).** No bypass was attempted. Indexed search snippets were used only as explicitly-labelled, non-equivalent fallback and were **not** treated as 19.0 facts.
 
-### Raw source observations
+### Access status — Sprint C2 correction (current, 2026-07-01)
+- **Access status (2026-07-01):** **Accessible.** The 31 Odoo 19.0 Shopify doc pages return **HTTP 200** with a browser user-agent (the proxy fetcher's default UA is still 403-filtered — a WAF/bot UA sniff, **no auth wall**, no bypass). Pages read via browser-UA fetch → HTML→text extraction; embedded screenshots are real `.jpg`/`.png` assets (**~98 content images** counted across the 31 pages; pixels not inspected).
+- **Pages reached (31):** `overview`; `setup/` (create_instance, generate_credentials, shopify_location, shopify_metafields); `product_management/` (product import/export/update, product/customer/order metafields, import/export price, import/export inventory, import/export/update collection, import/update catalog); `customer_management/` (customer_import, customer_metafield); `order_management/` (order_import, update_order_status, order_refund, cancel_order, order_return, mark_as_paid, payout_report); `shopify_faq`; `shopify_support_policy`.
+- **Still not found in the docs (⬜, not blocked):** a **customer export** page (customer is **import-only**); a dedicated **HMAC/webhook-signature** statement (HTTPS only); a **rate-limit / GraphQL-cost throttling** mechanism; a **metrics/chart monitoring dashboard** page; an explicit **`@idempotent`-style directive** or **automatic-retry/backoff** taxonomy.
+
+### Raw source observations — Sprint C Apps-listing (historical, 2026-06-30)
 - **Price $326.20**, **License OPL-1**, author **"TeqStars"**, **v 19.0**, **83 reviews / 5.0 stars**, ~28,630 LOC, technical name **"shopify"**. — apps.odoo.com — `on-page fact`. *(EUR 399.99 is a conversion, NOT literally on the page — do not cite as on-page fact.)*
 - "**GraphQL native (from v1)**" / "Built on Shopify's GraphQL API from v1". — apps.odoo.com — `on-page fact` (vendor positioning string is literally present) / `competitor claim` (as a technical guarantee).
 - **Dual sync model**: "Real-time push. Requires HTTPS." (webhooks) + "Cron-based automation." — apps.odoo.com — `competitor claim` (literal strings present).
@@ -88,17 +109,65 @@
 - Order import incl. **POS orders, gift cards, duties, tips, taxes**; refunds/partial refunds; cancellations; fulfillment + tracking export; metafields with conditions/transformations; Shopify Markets & B2B catalog pricing; fraud risk scoring; collections CRUD; Colorado special tax. — apps.odoo.com — `competitor claim`.
 - Localized into **10 languages**; depends on Sales, Discuss, Invoicing, Inventory + a "Base Marketplace" community app. — apps.odoo.com — `on-page fact`.
 
-### Important quotes or paraphrases
+### Raw source observations — Sprint C2 accessible docs (current, 2026-07-01)
+> Evidence symbols: **✅** demonstrated (screenshot-backed / explicit step-by-step
+> workflow or config) · **🟨** vendor claim (marketing / comparison table) · **➖**
+> implied / partial · **⬜** not found. Source pages are under
+> `https://docs.teqstars.com/19.0/applications/shopify/`. Adversarially verified
+> (17-item capture→verify pass; 3 proposed upgrades were **downgraded** — see the
+> reliability items below).
+- **Store connection & auth ✅** — step-by-step OAuth custom-app flow (create app → Admin API scopes → redirect URL → client id/secret → Generate Access Token → install → **Test Connection**), 7 screenshots; manual API-token and legacy app-password paths also documented. — `setup/generate_credentials`, `setup/create_instance` — `visible demonstrated workflow`.
+- **Instance configuration ✅** — 15-screenshot Create-Instance page: log level (ALL/SUCCESS/ERROR, default ERROR), Queue Batch Limit (100), and product / stock / order / payout / customer / metafield / workflow / webhook / automatic-jobs / notification config. — `setup/create_instance` — `visible demonstrated workflow`.
+- **Product matching "Sync Listings Based On" ✅** — instance config value **Barcode, SKU, or Barcode and SKU**; drives create/match on import (incl. during collection/order import). — `setup/create_instance`, `product_management/product_import` — `visible demonstrated workflow`.
+- **Duplicate prevention ✅** — customer dedup search (Name/City/State/Country/Zip/Street/Street2/Email/Parent Id → "avoid duplicating customer entries"); product **Create Odoo Products?** guard (creates "only when a matching product is not found … as configured in Sync Listings Based On", + a Tip against enabling it when Odoo already holds products); customer webhook "avoids creating a duplicate and links the existing record"; **Skip-Sync** (Allowed / Not-Allowed-Sync badge excludes a listing from all sync ops). — `visible demonstrated workflow`.
+- **Product import / export / update ✅** — import (2 shots; Create/Update-date filters, Update-Existing, Import-Draft-Only, ID list, auto-create-if-missing); export (5 shots; Add-to-Listings → Export Listings; sales channels optional — "If left empty … will not be published to any channel"); update (12 shots; four methods, Set Price? / Set Quantity?, Publish/Unpublish, Manage Sales Channels). — `visible demonstrated workflow`.
+- **Draft-safe / controlled export ✅** — FAQ: "Can I export a product with draft state? **Yes** … leave Sales Channels empty … not published … publish later via Update Listings." — `shopify_faq` — `visible demonstrated workflow` (documented behaviour).
+- **Listing / Listing Item model ✅** — product webhooks populate **Listings** (name/price/SKU/barcode/tags/variants/type/description/category/image) and **Listing Items** (name/price/SKU/barcode/image), linked to Odoo products/variants. — `setup/create_instance` — `visible demonstrated workflow`.
+- **Product webhooks create/update/delete ✅** — `product/create`, `product/updated`, `product/delete` (delete removes Listings/Listing Items, **not** the Odoo product); `orders/create`, `order/updated`; `customer/create`; **webhook processing runs in a background thread** (fast-ack). — `setup/create_instance` — `visible demonstrated workflow`.
+- **Price ✅** — import (into instance pricelist) + export (manual + Automatic Jobs + optional **Real-Time Price Sync** on Odoo change). — `product_management/import_price`, `export_price` — `visible demonstrated workflow`.
+- **Inventory ✅ / multi-location ✅** — import/export (manual + auto + optional **Real-Time Inventory Sync**); Stock-Based-On (Free-to-Use / On-Hand / Forecasted); location mapping (Import/Export Stock Location; **export combines multiple locations**); **external (third-party) location export excluded** (Shopify-limitation warning); lot/serial-tracked products skipped on import. — `setup/create_instance`, `setup/shopify_location`, `export_inventory` — `visible demonstrated workflow`.
+- **Customer import ✅ / customer export ⬜** — import (queue + multi-field dedup); **no customer export page exists**, and customer metafields are **import-only**. — `customer_management/customer_import` — `visible demonstrated workflow` (import) / **not found** (export).
+- **Orders ✅** — import (queue; workflow per **payment gateway + financial status**; fulfillment-status filter; stock-move if already fulfilled; tag/tracking update on existing orders); status/tracking write-back (10 shots; normal + **click & collect** Ready-for-Pickup / Picked-Up). — `order_management/order_import`, `update_order_status` — `visible demonstrated workflow`.
+- **Refunds ✅ / cancellations ✅ / returns ✅** — refund from posted credit note (full/partial; **amount-match guard**; GraphQL); cancel (reason/notify/restock/refund; conditional on Odoo-cancelled & not-fulfilled-in-Shopify); returns (import via webhook `returns/request|approve|decline|close|reopen|cancel` + scheduled + manual; create-from-Odoo; **Force Restock** with an on-hand-divergence warning; credit-note link). — `order_refund`, `cancel_order`, `order_return` — `visible demonstrated workflow`.
+- **Mark-as-paid ✅ / payouts ✅** — mark-as-paid (manual + auto, gated on financial status); payout report (**Shopify Payments only**; Auto/Manual Reconcile to invoices; per-line warnings: Order-not-found, Invoice-not-found, amount-mismatch). — `mark_as_paid`, `payout_report` — `visible demonstrated workflow`.
+- **Metafields ✅** — Product/Variant (**import + export**) and Customer/Order (**import-only**) mapped to Odoo fields; supported-type table; Ready/Missing/Not-Found/Inactive badges; wipe-on-missing; bulk falls back to per-field writes on error. — `setup/shopify_metafields` — `visible demonstrated workflow`.
+- **Collections ✅ / catalogs (Markets/B2B pricing) ✅** — collections import (smart + manual) / export / update (background job every 15 min, **retried in the next run**); catalogs import/update (Market / Company-Location / App; prices, quantity rules, volume pricing). — `import/export/update_collection`, `import/update_catalog` — `visible demonstrated workflow`.
+- **Queue + logs ✅** — Marketplaces ‣ Queues ‣ Logs; log levels; per-op queues (Product / Customer / Order / Return); **Activity-on-failure** (Responsible + due date); metafield errors tagged with record + Shopify message. *(Typed success/error logs + per-record error messages — **not** a formal reason-code taxonomy like Emipro's Log Book.)* — `setup/create_instance`, `setup/shopify_metafields` — `visible demonstrated workflow`.
+- **GraphQL Admin API** — docs state sync, webhooks, refunds, cancel and payouts use the **GraphQL Admin API**; FAQ lists deps **numpy, scipy, imagehash, PyWavelets** (substantiates the pHash image-logic claim at dependency level). — `overview`, `shopify_faq` — `on-page fact` (dependency list) / `competitor claim` (GraphQL wire behaviour, not independently verified).
+- **pHash image dedup 🟨** — overview "Full Feature Comparison": "Image sync + perceptual hashing — Avoids duplicate uploads via pHash — ✓ Yes Exclusive"; **no configured/executed workflow shown** (comparison-table checkmark + dependency only). — `overview`, `shopify_faq` — `competitor claim`.
+- **Idempotency ➖ / automatic-retry ⬜ / cross-object reconciliation ⬜ / rate-limit ⬜ / HMAC ⬜** — the accessible pages show **no** explicit `@idempotent`-style directive (only adjacent guards: refund amount-match, already-cancelled guard, dedup); **no** automatic-retry/backoff taxonomy (queue re-processing + manual re-run only); **no** missed-record cross-object reconciliation surface (incremental Last-Processed cursors + per-return **Resync** + **Fetch Webhook** config-reconcile only); **no** rate-limit/GraphQL-cost throttling (only "gap your schedules" operator guidance); **no** HMAC/webhook-signature statement (HTTPS required). **The Sprint C search-snippet idempotency claim is NOT confirmed on the accessible docs — it remains a competitor claim, not demonstrated.** — `not found` / `implied`.
+- **Dashboard / reporting 🟨 → ⬜** — an Overview/Operations launcher + Queues/Logs + Notification & Smart-Notification alerts exist (➖); the overview *claims* a "Centralized hub (channels, stores, queues)" and "Reporting and Analytics" (🟨); but **no metrics/chart monitoring dashboard is shown** (⬜ — the Sprint C "two dashboards" figure came from the Apps listing, not the docs). — `overview`, `setup/create_instance`.
+- **Permissions / security ➖** — full Admin API scope list documented; Salesperson "must have sufficient access rights"; HTTPS required for webhooks; OAuth token "securely stored". No dedicated Odoo access-group / record-rule model shown (⬜). — `setup/generate_credentials`, `setup/create_instance`.
+- **Support (on-page fact)** — support policy: **60 days free bug-fix** support, documented scope/exclusions, helpdesk + email, 24h business-day response target. — `shopify_support_policy` — `on-page fact`.
+
+### Pricing note (Sprint C2)
+- The Sprint C **Apps-listing** on-page fact — **$326.20 / OPL-1 / v19.0 / 83 reviews / 5.0** (2026-06-30) — was **not re-fetched** this sprint and stands as the dated Apps-listing fact. The overview's own comparison table states "**~$439**" as an **explicitly indicative** vendor positioning figure ("Figures such as price and lines of code are indicative … not a legal guarantee"), **not** the Apps-listing price — recorded as a `competitor claim`, not a new on-page fact.
+
+### Important quotes or paraphrases — Sprint C Apps-listing (historical, 2026-06-30)
 - "Odoo Shopify Connector (GraphQL Powered)" — https://apps.odoo.com/apps/modules/19.0/shopify
 - "$ 326.20" / "OPL-1" / "TeqStars" / "v 19.0" — same
 - "One bad record won't block 999 good ones" / "Avoids duplicate uploads via pHash" / "Unlimited stores. Each with own warehouse" — same
-- Indexed snippet (non-equivalent, docs 403): "idempotency directives for inventory and refund operations, preventing duplicate inventory changes and double refunds when retrying" — docs.teqstars.com (UNVERIFIABLE; competitor claim only).
+- Indexed snippet (non-equivalent, docs 403 at the time): "idempotency directives for inventory and refund operations, preventing duplicate inventory changes and double refunds when retrying" — docs.teqstars.com (**still UNVERIFIED on the now-accessible docs; competitor claim only**).
+
+### Important quotes — Sprint C2 accessible docs (verbatim, 2026-07-01)
+- "You have the option to choose between Barcode , SKU , or Barcode and SKU." — `.../setup/create_instance.html`
+- "Connector will search for existing customers in the Odoo based on specific search parameters such as Name, City, State, Country, Zip, Street, Street2, Email and Parent Id . This search helps avoid duplicating customer entries in the database." — `.../customer_management/customer_import.html`
+- "If left empty, the listing will still be exported to Shopify but will not be published to any channel." — `.../product_management/product_export.html`
+- "Can I export a product with draft state? … Yes." — `.../shopify_faq.html`
+- "Webhook processing runs in a background thread after Shopify calls your endpoint." — `.../setup/create_instance.html`
+- "Stock cannot be exported from Odoo to Shopify for external (third-party) locations." — `.../setup/shopify_location.html`
+- "Customer Metafields and Order Metafields support only import functionality. … Updating these metafield values from Odoo to Shopify is not supported." — `.../setup/shopify_metafields.html`
+- "The job runs automatically every 15 minutes until it is completed. … If the job is not completed, it will be retried in the next run." — `.../product_management/update_collection.html`
+- "This functionality exclusively applies to Shopify Payment services, meaning that it cannot be used to manage external or third-party payment service providers." — `.../order_management/payout_report.html`
+- "The Shopify module depends on Base Marketplace and declares Python packages including numpy , scipy , imagehash , and PyWavelets for image/feature logic used in the connector." — `.../shopify_faq.html`
 
 ### Update/release/patch notes captured
-- Listing access date 2026-06-30; current 19.0 edition rebuilt on Shopify GraphQL. **No directly-readable, dated 19.0 changelog** (docs 403). An indexed snippet claims a **2026-04 Shopify API** compliance update with idempotency directives — **unverifiable**, recorded as a competitor release claim only.
+- **Sprint C (2026-06-30):** listing access only; current 19.0 edition rebuilt on Shopify GraphQL; **no directly-readable dated 19.0 changelog** (docs 403).
+- **Sprint C2 (2026-07-01):** docs are now readable but carry **no dated changelog** on the pages read; the **support policy** documents a **60-day free bug-fix** window (helpdesk/email, 24h business-day target). The Apps-listing rating **83×5.0** is the only third-party signal and was **not re-fetched**. The Sprint C indexed idempotency snippet remains **unverified** (not present on the accessible pages).
 
-### Open questions from this source
-- The entire `docs.teqstars.com` host (19.0 and 16.0) is 403-blocked — exact 19.0 docs text, field labels, and rendered screenshots remain unverifiable. A "PRO" variant appeared in search (`integration_shopify` is **VentorTech**, not Teqstars — possible search confusion); do not attribute "PRO" detail to this module. Rate-limit handling, Odoo permission model, and multi-company (vs multi-store) not establishable.
+### Open questions from this source (updated Sprint C2)
+- **Resolved (source availability):** the docs are no longer blocked; workflow/screenshot evidence is now readable and page-classified.
+- **Still open:** Is the pHash dedup real at runtime (dependency declared, no workflow shown)? Does any `@idempotent`-style directive exist in code (not on the docs)? Is there a monitoring dashboard beyond the Operations launcher (none documented)? Multi-company vs multi-store (docs cover multi-store instances only)? HMAC / webhook-signature verification (not documented; HTTPS only)? A "PRO" variant appeared in Sprint C search (`integration_shopify` is **VentorTech**, not Teqstars) — do not attribute "PRO" detail to this module.
 
 ---
 
