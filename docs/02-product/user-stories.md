@@ -9,13 +9,24 @@
 
 ## Status
 
-> **Proposed for ChatGPT review — not final until accepted.**
+> **Aligned to the accepted MVP baseline (ChatGPT RB-13, DEC-003, 2026-07-01 —
+> PR #55-corrected) — architecture still gated.** Story MVP-relevance tags reflect
+> ChatGPT's accepted scope (the Sprint F **open** direction forks are resolved). Authored
+> in Sprint F; aligned in Sprint G. See
+> [`../04-decisions/DEC-003-mvp-scope.md`](../04-decisions/DEC-003-mvp-scope.md).
 
-- **Sprint:** Product Sprint F (RB-13). **Phase:** MVP synthesis — **no-code gate in
-  force** (`CLAUDE.md` §4–§5). **Decides nothing.**
-- **Governance:** every story's MVP relevance is **proposed MVP / later / open** — an
-  **input**, not a decision. No architecture, ADR, module, data model, queue
-  framework, API strategy, or distribution model is decided.
+> **PR #55 revision (2026-07-01).** Product export corrected **into** MVP as **controlled
+> product export/update** (US-E2-05) plus a **first-sync product-matching / duplicate-
+> prevention** story (US-E2-06). **Customer export (US-E3-04)** stays later; **unrestricted
+> autonomous bidirectional catalog ownership** stays later.
+
+- **Sprint:** authored Product Sprint F (RB-13); **aligned** Product Sprint G (RB-13,
+  DEC-003). **Phase:** MVP scope only — **no-code gate in force** (`CLAUDE.md` §4–§5).
+- **Governance:** each story's MVP relevance is **MVP / later** per the accepted baseline
+  (former `open` forks resolved); every architecture-sensitive story still commits
+  *intent* only. **No architecture, no architecture ADR, no module, no data model, no
+  queue framework, no API strategy, and no distribution model is decided.** These are
+  **not** implementation tasks.
 - **Evidence discipline (DP-003/DP-004/DP-006):** stories trace to demonstrated
   evidence or Tier-1 facts; competitor claims stay claims; conditional items stay
   conditional; improvement inferences (command center, recovery-first, freshness,
@@ -41,12 +52,14 @@ Sprint C research (`O-…`/`A-…`), and Tier-1 facts.
 
 > **[Inference]** — personas are deduced from the evidence (the UX benchmark's admin
 > vs functional split; SH's access-gated setup; modularity/trust findings). Not
-> validated buyer research; **which persona is the primary MVP target is open (RB-13)**.
+> validated buyer research. **RB-13 accepted (DEC-003): P1 is the primary MVP persona;
+> P2 is secondary. P3/P4 remain important buyer/deployer personas, but MVP UX priority
+> serves P1 daily operation and P2 setup/configuration first.**
 
-- **P1 — Operations / e-commerce user (primary daily user).** Runs and monitors syncs,
-  reads logs, recovers from failures; often not a developer.
-- **P2 — Odoo administrator / implementation consultant (setup & config owner).**
-  Installs, connects, maps fields, sets permissions, tunes sync behaviour.
+- **P1 — Operations / e-commerce user (primary daily user; PRIMARY MVP persona).** Runs
+  and monitors syncs, reads logs, recovers from failures; often not a developer.
+- **P2 — Odoo administrator / implementation consultant (setup & config owner; SECONDARY
+  MVP persona).** Installs, connects, maps fields, sets permissions, tunes sync behaviour.
 - **P3 — Business owner / finance stakeholder (economic buyer).** Cares about
   correctness (no double refunds/oversell), trust/evaluability, total cost.
 - **P4 — Odoo partner / integrator (deployer & reseller).** Deploys for many clients;
@@ -61,7 +74,7 @@ Each story uses:
 - Persona:
 - Story: As a <persona>, I want <capability>, so that <outcome>.
 - Capability IDs:
-- MVP relevance: proposed MVP / later / open
+- MVP relevance: MVP / later   (accepted RB-13 baseline; former `open` forks resolved)
 - Evidence strength:
 - Acceptance notes:        (observable, product-level — not code)
 - Failure/recovery notes:
@@ -69,9 +82,9 @@ Each story uses:
 - Open questions:
 ```
 
-> All "proposed MVP" stories are **Proposed MVP inclusion — pending ChatGPT
-> acceptance.** Stories whose mechanism is gated are **Architecture-dependent — must
-> be resolved in RB-14 before implementation.**
+> Story MVP-relevance reflects the **accepted MVP baseline** (ChatGPT RB-13, DEC-003).
+> Stories whose *mechanism* is gated remain **Architecture-dependent — must be resolved
+> in RB-14 before implementation.**
 
 ---
 
@@ -83,7 +96,7 @@ Each story uses:
   Shopify store securely, so that I reach a working connection without hand-editing
   server config or pasting long scope strings.
 - Capability IDs: C-CONN-01, C-CONN-03
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B / A-if-public (VT [Demonstrated]; Shopify public-app rule)
 - Acceptance notes: a step-by-step flow ends in a confirmed connection; no manual
   scope-string paste is the only path; the getting-started guide is never gated.
@@ -98,7 +111,7 @@ Each story uses:
 - Story: As an Odoo administrator, I want my Shopify credentials stored masked, so that
   secrets are never exposed in the UI or logs.
 - Capability IDs: C-CONN-02
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (VT [Demonstrated])
 - Acceptance notes: credentials display masked; secrets do not appear in logs or
   exports.
@@ -111,7 +124,7 @@ Each story uses:
 - Story: As an operator, I want a one-click "test connection", so that I get an
   unambiguous pass/fail before I rely on the store.
 - Capability IDs: C-CONN-04
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (WK/SH [Demonstrated])
 - Acceptance notes: a discrete action returns pass/fail with a reason on failure.
 - Failure/recovery notes: failure names the cause (bad token, wrong URL) and links to
@@ -125,7 +138,7 @@ Each story uses:
   checks known failure modes before the first sync, so that predictable problems are
   caught up front, not mid-sync.
 - Capability IDs: C-CONN-05, C-FUL-03, C-DOCS-03 (self-test)
-- MVP relevance: proposed MVP (MVP version)
+- MVP relevance: MVP (MVP version)
 - Evidence strength: C (VT scope-check + EM gotcha + [Inference]; partial whitespace)
 - Acceptance notes: a pass/fail readiness panel covers (candidate) scopes, HTTPS/
   `web.base.url`, webhook reachability, worker/queue presence, credential validity, and
@@ -141,7 +154,7 @@ Each story uses:
 - Story: As an operator, I want to reconnect, re-authorise, or disconnect a store, so
   that I can recover from a store-URL migration or a rotated credential.
 - Capability IDs: C-CONN-06
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (VT store-URL fix, dated [Demonstrated])
 - Acceptance notes: reconnect/disconnect actions exist and restore/clear a working
   connection.
@@ -159,7 +172,7 @@ Each story uses:
 - Story: As an operator, I want to import products from Shopify into Odoo, so that my
   catalog exists in Odoo for orders and inventory.
 - Capability IDs: C-PROD-01
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (EM/VT/SH [Demonstrated]) + Tier-1 API [Fact]
 - Acceptance notes: products import incrementally and can be filtered; re-running does
   not create duplicates (idempotent upsert).
@@ -174,7 +187,7 @@ Each story uses:
 - Story: As an operator, I want variants and their options synced, so that real
   multi-variant products are represented correctly.
 - Capability IDs: C-VAR-01
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: A ([Fact] variant model + EM/VT [Demonstrated])
 - Acceptance notes: variants sync within the current Shopify variant model (no 250-cap
   regression); options map correctly.
@@ -187,7 +200,7 @@ Each story uses:
 - Story: As an operator, I want product images and base price/compare-at synced, so
   that product records are complete and order values are correct.
 - Capability IDs: C-VAR-02, C-PRICE-01
-- MVP relevance: proposed MVP (basic image + base price; pHash dedup excluded)
+- MVP relevance: MVP (basic image + base price; pHash dedup excluded)
 - Evidence strength: B (EM/VT [Demonstrated]); pHash is [Competitor claim] (excluded)
 - Acceptance notes: basic images and base price/compare-at travel with the product;
   advanced media dedup (pHash) is out of MVP.
@@ -200,7 +213,7 @@ Each story uses:
 - Story: As an operator, I want to exclude selected products from sync, so that I can
   scope out discontinued or irrelevant items.
 - Capability IDs: C-PROD-04
-- MVP relevance: proposed MVP (basic)
+- MVP relevance: MVP (basic)
 - Evidence strength: B (SH/EM [Demonstrated])
 - Acceptance notes: an exclude flag keeps items out of sync; the exclusion reason is
   logged.
@@ -210,17 +223,53 @@ Each story uses:
 
 ### US-E2-05
 - Persona: P2
-- Story: As an administrator, I want to publish Odoo-authored products to Shopify as
-  drafts with a preview before any destructive apply, so that I can build catalogs in
-  Odoo without risking data loss.
+- Story: As an administrator, I want to export or update selected Odoo products to Shopify
+  through a previewed, draft/unpublished/channel-controlled flow, so that I can launch
+  products from Odoo without creating duplicates or publishing unsafe data.
 - Capability IDs: C-PROD-02, C-PROD-03, C-PROD-05
-- MVP relevance: open (lean defer — Phase 2 "bidirectional catalog")
-- Evidence strength: B (VT/EM/SH/WK draft-export); C-PROD-05 safety A [Fact]
-- Acceptance notes (if in scope): export creates drafts; a dry-run/preview precedes any
-  full-state write (**[Fact]** `productSet` delete-on-omit); channel control available.
-- Failure/recovery notes: partial lists are never sent to full-state mutations.
-- Architecture dependency: **AR-002, AR-005** — **Architecture-dependent**.
-- Open questions: is product export in MVP? (decides C-PROD-05 as mandatory).
+- MVP relevance: **MVP — controlled product export/update** (RB-13, PR #55
+  correction). *(Unrestricted autonomous bidirectional catalog management stays later.)*
+- Evidence strength: B (VT/EM/SH/WK draft-export [Demonstrated]); C-PROD-05 safety A
+  [Fact]; TeqStars export flows re-checked accessible 2026-07-01 (reinforcing)
+- Acceptance notes:
+  - **selected products only** (not a blanket push);
+  - **preview before creation/update/export** (no blind write);
+  - **draft/unpublished or explicit sales-channel control** (export without publishing
+    when no sales channel is selected);
+  - **no full-state destructive write without preview/dry-run** (**[Fact]** `productSet`
+    delete-on-omit);
+  - **binding created after confirmation**;
+  - **ambiguous matches require manual review**;
+  - **no name-only automatic matching**.
+- Failure/recovery notes: partial lists are never sent to full-state mutations; a failed
+  export/update is isolated, reason-coded, retryable.
+- Architecture dependency: **AR-002** (API/destructive-apply), **AR-005** (binding/match)
+  — **Architecture-dependent**.
+- Open questions: none on inclusion (controlled export/update accepted); mechanism →
+  RB-14. Advanced publish/channel campaign management is later.
+
+### US-E2-06
+- Persona: P2
+- Story: As an administrator, I want the first sync to classify products as matched /
+  only-in-Shopify / only-in-Odoo / duplicate-key / manual-review before creating records,
+  so that the connector does not duplicate products.
+- Capability IDs: C-PROD-01, C-PROD-02, C-MAP-01, C-MAP-02
+- MVP relevance: **MVP** (RB-13, PR #55 — product onboarding & duplicate
+  prevention)
+- Evidence strength: B (EM/VT/WK/SH product import/export [Demonstrated]) + [Fact]
+  Shopify GID binding
+- Acceptance notes: a **first-sync matching wizard** classifies each product/variant as
+  **matched by existing binding**, **matched by SKU/internal reference**, **matched by
+  barcode**, **only in Shopify**, **only in Odoo**, or **duplicate SKU/barcode conflict →
+  manual review**; an **explicit first-sync source strategy** (Shopify-source /
+  Odoo-source / both-match-first) is chosen; **no blind create**; **no name-only automatic
+  matching**; the binding is written only **after confirmation**.
+- Failure/recovery notes: ambiguous/duplicate matches are surfaced for manual review, not
+  silently merged or duplicated.
+- Architecture dependency: **AR-005** (binding/match-key data model + first-sync strategy)
+  — **Architecture-dependent — must be resolved in RB-14 before implementation**.
+- Open questions: MVP match-key set (SKU/internal-reference + barcode) and the binding
+  data model → AR-005.
 
 ---
 
@@ -231,7 +280,7 @@ Each story uses:
 - Story: As an operator, I want customers imported from Shopify, so that orders link to
   the right customer records.
 - Capability IDs: C-CUST-01
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (EM/VT/SH [Demonstrated]) + Shopify PII rules [Fact]
 - Acceptance notes: customers import; on no-PII plans a default-customer fallback
   applies; protected-data rules respected.
@@ -245,7 +294,7 @@ Each story uses:
 - Story: As an operator, I want incoming customers matched to existing Odoo records by
   email (and optionally name/phone), so that I do not create duplicate customers.
 - Capability IDs: C-CUST-03, C-MAP-02
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (VT normalized matching [Demonstrated])
 - Acceptance notes: a customer already in Odoo is matched, not duplicated; match keys
   are documented and explicit.
@@ -259,7 +308,7 @@ Each story uses:
 - Story: As an operator, I want billing and shipping addresses mapped onto the
   customer/order, so that orders are complete and shippable.
 - Capability IDs: C-CUST-04
-- MVP relevance: proposed MVP (basic address); deep multi-address/company later
+- MVP relevance: MVP (basic address); deep multi-address/company later
 - Evidence strength: C (EM/VT partial [Demonstrated])
 - Acceptance notes: basic billing/shipping addresses appear on the order; deep
   multi-address and company mapping are out of MVP.
@@ -272,12 +321,12 @@ Each story uses:
 - Story: As an administrator, I want to export/link Odoo customers to Shopify, so that
   Odoo-authored customers exist in the store.
 - Capability IDs: C-CUST-02
-- MVP relevance: open (lean defer — Phase 2)
+- MVP relevance: **later** (RB-13: DEFERRED — Phase 2)
 - Evidence strength: B (EM link-by-email [Demonstrated])
-- Acceptance notes (if in scope): customers are linked by email; no duplicate creation.
+- Acceptance notes (later): customers are linked by email; no duplicate creation.
 - Failure/recovery notes: ownership conflicts are surfaced, not silently overwritten.
 - Architecture dependency: **AR-005** — **Architecture-dependent**.
-- Open questions: is customer export in MVP?
+- Open questions: none for MVP (deferred).
 
 ---
 
@@ -288,7 +337,7 @@ Each story uses:
 - Story: As an operator, I want new Shopify orders imported into Odoo automatically, so
   that fulfilment and accounting can proceed in Odoo.
 - Capability IDs: C-ORD-01
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: A ([Fact] reconcile required + VT/EM/SH/WK [Demonstrated])
 - Acceptance notes: orders arrive via a layered path (webhook + scheduled +
   reconciliation + manual); the same order is never imported twice (idempotent).
@@ -302,21 +351,23 @@ Each story uses:
 - Story: As an operator, I want to backfill recent historical orders on first connect,
   so that Odoo is not empty on day one.
 - Capability IDs: C-ORD-02
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: A ([Fact] 60-day `read_all_orders` gate + EM/VT [Demonstrated])
 - Acceptance notes: a backfill imports recent orders; the 60-day approval gate is
   surfaced honestly (not hidden); backfill is resumable.
 - Failure/recovery notes: an interrupted backfill resumes without duplicating (US-E7-04).
-- Architecture dependency: **AR-002** (scope/API); large volumes may need bulk
-  (C-JOB-06, open) — **Architecture-dependent**.
-- Open questions: backfill window/limits; bulk-ops need.
+- Architecture dependency: **AR-002** (scope/API) — **Architecture-dependent**. Large
+  volumes may require Shopify Bulk Operations **internally** (C-JOB-06), but bulk ops are
+  **not a user-facing MVP feature** (RB-13); internal need is an RB-14/AR-002 assessment.
+- Open questions: backfill window/limits; internal bulk-ops need (RB-14/AR-002, not a
+  product-scope item).
 
 ### US-E4-03
 - Persona: P1
 - Story: As an operator, I want order, financial, and fulfilment status mapped into
   Odoo, so that imported orders carry a correct, meaningful state.
 - Capability IDs: C-ORD-03
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (SH matrix + VT [Demonstrated])
 - Acceptance notes: Shopify statuses map to a documented Odoo state baseline.
 - Failure/recovery notes: unmapped/unknown statuses are logged, not silently dropped.
@@ -328,7 +379,7 @@ Each story uses:
 - Story: As an operator, I want imported orders to move through a sensible Odoo order
   lifecycle, so that they become actionable (confirm, deliver) without manual re-keying.
 - Capability IDs: C-ORD-04
-- MVP relevance: proposed MVP (basic default; full configurability later)
+- MVP relevance: MVP (basic default; full configurability later)
 - Evidence strength: B (VT pipeline + SH [Demonstrated])
 - Acceptance notes: a basic, sane default workflow advances orders; each step is an
   isolated, retryable, idempotent job.
@@ -338,35 +389,48 @@ Each story uses:
 - Open questions: how configurable the MVP workflow is.
 
 ### US-E4-05
-- Persona: P3
-- Story: As a finance stakeholder, I want the minimal payment/journal/invoice
-  representation the Odoo order flow needs, so that orders are financially actionable
-  without a full accounting integration.
+- Persona: P1, P3
+- Story: As an operator/finance stakeholder, I want the minimal Shopify financial
+  information preserved on the imported Odoo order, so that the order is understandable
+  and operationally actionable without a full accounting integration.
 - Capability IDs: C-PAY-01, C-PAY-02, C-PAY-03
-- MVP relevance: open (lean: minimal representation only; full accounting deferred)
+- MVP relevance: **MVP — minimal financial evidence/representation only; no
+  accounting automation** (RB-13 accepted)
 - Evidence strength: B (VT/SH/EM [Demonstrated]); `OrderTransaction` [Fact]
-- Acceptance notes (if in scope): the minimal representation is idempotent (no
-  double-invoice on retry); full gateway/journal breadth is deferred.
+- Acceptance notes: the imported order preserves **Shopify financial status, payment
+  status, gateway/payment-method label, transaction reference(s) where available,
+  paid/unpaid/refunded flags (as source info only), order totals, taxes, shipping,
+  discounts, currency**, and **basic gateway/journal mapping as configuration input only
+  if needed for classification/routing**. **Excluded from MVP:** automatic posted
+  invoices/payments, bank/payout reconciliation, full accounting workflow,
+  gateway-specific accounting depth, automatic refund/payment posting. Any representation
+  is **idempotent** (no double-invoice/payment on retry). *Rule: MVP preserves financial
+  evidence and order actionability; it does not automate accounting.*
 - Failure/recovery notes: retries never create duplicate invoices/payments.
-- Architecture dependency: none decided; idempotency required (C-JOB-04).
-- Open questions: what is the **minimal** representation the order flow needs?
+- Architecture dependency: none decided; idempotency required (C-JOB-04). **Exception:**
+  if RB-14 finds a **draft** invoice/payment artifact is absolutely required for a valid
+  Odoo order flow, it is architecture-dependent and returns to ChatGPT before
+  implementation (no silent auto invoice/payment).
+- Open questions: none on the MVP boundary (evidence-only); the draft-artifact exception
+  is architecture-gated.
 
 ### US-E4-06
 - Persona: P1, P3
 - Story: As an operator, I want Shopify refunds and cancellations reflected in Odoo
   safely, so that finance stays consistent without double-refunding.
 - Capability IDs: C-RET-01, C-RET-03
-- MVP relevance: open (lean defer; **idempotency + irreversible-action warnings
-  mandatory if included**)
+- MVP relevance: **later** (RB-13: DEFERRED — refund sync, cancellation reflection, and
+  returns/RMA all deferred; **idempotency + irreversible-action warnings mandatory when
+  later included**)
 - Evidence strength: A ([Fact] `@idempotent` refunds 2026-04) / B (VT/EM [Demonstrated])
-- Acceptance notes (if in scope): a refund is never applied twice; a cancellation warns
+- Acceptance notes (later): a refund is never applied twice; a cancellation warns
   before irreversible effects and never silently creates a cancel order.
-- Failure/recovery notes: refund/cancel retries are idempotent. **The idempotent-refund
-  / no-double-refund regression applies only if refund handling is in MVP; if deferred,
-  it is carried forward as a mandatory acceptance principle for the first refund/
-  refund-sync sprint** (never dropped).
+- Failure/recovery notes: refund/cancel retries are idempotent. **Because refunds are
+  deferred from MVP, the idempotent-refund / no-double-refund regression is carried
+  forward as a mandatory acceptance principle for the first refund/refund-sync sprint**
+  (never dropped).
 - Architecture dependency: **AR-006** — **Architecture-dependent**.
-- Open questions: is basic refund/cancellation reflection in MVP? (ties Domain 9).
+- Open questions: none for MVP (deferred; ties Domain 9 when later included).
 
 ---
 
@@ -377,7 +441,7 @@ Each story uses:
 - Story: As an operator, I want Odoo stock levels written back to Shopify, so that the
   storefront does not oversell or undersell.
 - Capability IDs: C-INV-01
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: A ([Fact] `committed` read-only, `@idempotent` set/adjust + EM/VT)
 - Acceptance notes: only `available`/`on_hand` are written (never `committed`), and
   writes are idempotent (a repeated sync does not double-apply).
@@ -390,7 +454,7 @@ Each story uses:
 - Story: As an administrator, I want a clear default for which quantity field is pushed
   (with inline help), so that I ship the right number without deciphering jargon.
 - Capability IDs: C-INV-02
-- MVP relevance: proposed MVP (sensible default + inline help)
+- MVP relevance: MVP (sensible default + inline help)
 - Evidence strength: B (EM formulas [Demonstrated])
 - Acceptance notes: a default quantity field applies; inline help explains
   Forecast vs Free-to-Use.
@@ -403,7 +467,7 @@ Each story uses:
 - Story: As an operator, I want inventory mapped per location, so that multi-location
   stock is correct and never double-decremented.
 - Capability IDs: C-INV-03
-- MVP relevance: proposed MVP (location-aware; avoid a wrong single-location design)
+- MVP relevance: MVP (location-aware; avoid a wrong single-location design)
 - Evidence strength: A ([Fact] InventoryLevel per-location + EM/VT [Demonstrated])
 - Acceptance notes: stock maps to ≥1 Shopify location safely; SKU-only writes do not
   double-decrement across locations (A-INV-2).
@@ -416,7 +480,7 @@ Each story uses:
 - Story: As an operator, I want to import initial/Shopify stock into Odoo with a
   controlled apply, so that I can establish a correct starting stock position.
 - Capability IDs: C-INV-04
-- MVP relevance: proposed MVP (controlled apply); auto-apply **open**
+- MVP relevance: MVP (controlled apply); auto-apply **open**
 - Evidence strength: C (EM [Demonstrated]); **auto-apply is [Inference]** (DP-006)
 - Acceptance notes: stock imports with a controlled apply/review; **whether apply is
   automatic or reviewed is open** (auto-apply is an improvement inference, not a decided
@@ -430,7 +494,7 @@ Each story uses:
 - Story: As an operator, I want honest "last synced / last reconciled" freshness labels
   per data type, so that I trust what I see instead of assuming "real-time".
 - Capability IDs: C-SYNC-07
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: E ([Inference] + latency-honesty; competitors overstate real-time)
 - Acceptance notes: each data type shows a truthful freshness/latency label; no
   "real-time" claim over a scheduled path.
@@ -448,7 +512,7 @@ Each story uses:
   tracking pushed back to Shopify, so that the storefront and customer see accurate
   shipping status.
 - Capability IDs: C-FUL-01
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: A ([Fact] FulfillmentOrder + EM/VT/SH [Demonstrated])
 - Acceptance notes: fulfilment uses FulfillmentOrder-based mutations (not legacy
   endpoints); tracking number/URL is written back.
@@ -462,7 +526,7 @@ Each story uses:
 - Story: As an administrator, I want the connector to verify it has the fulfilment
   scope, so that fulfilment does not fail silently from a missing permission.
 - Capability IDs: C-FUL-03
-- MVP relevance: proposed MVP (folds into readiness, US-E1-04)
+- MVP relevance: MVP (folds into readiness, US-E1-04)
 - Evidence strength: A ([Fact] scopes + EM walkthrough [Demonstrated])
 - Acceptance notes: a missing fulfilment scope is flagged in the readiness check with a
   fix hint.
@@ -492,7 +556,7 @@ Each story uses:
   what synced and exactly why something failed — without reading a stack trace or an
   email.
 - Capability IDs: C-OBS-01, C-OBS-02
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (EM Log Book / Mismatch Log [Demonstrated])
 - Acceptance notes: each failure has a human-readable reason (e.g. "SKU not found");
   successes and failures are distinguishable; an audit trail records sync actions.
@@ -505,7 +569,7 @@ Each story uses:
 - Story: As an operator, I want each failure to show the record, the reason, a suggested
   fix, and a retry, so that errors are a recovery surface, not a dead end.
 - Capability IDs: C-OBS-03, C-DASH-04
-- MVP relevance: proposed MVP (MVP version of the error center)
+- MVP relevance: MVP (MVP version of the error center)
 - Evidence strength: C (synthesis EM+VT+SH; unified by none — [Inference])
 - Acceptance notes: an error entry links to its record, states a named cause + fix hint,
   and offers a retry.
@@ -520,7 +584,7 @@ Each story uses:
   for operations that are safe to repeat, so that transient failures recover without
   data loss.
 - Capability IDs: C-JOB-02, C-JOB-03, C-JOB-04
-- MVP relevance: proposed MVP (safe manual retry always; auto-retry conditional on
+- MVP relevance: MVP (safe manual retry always; auto-retry conditional on
   idempotency)
 - Evidence strength: A (idempotency [Fact]) / B (VT auto-retry [Demonstrated]) / C
   (classification [Inference])
@@ -535,7 +599,7 @@ Each story uses:
 - Story: As an operator, I want the connector to survive rate limits and long syncs, so
   that large catalogs/order volumes do not cause 429 storms or timeouts.
 - Capability IDs: C-JOB-05, C-JOB-07
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: A ([Fact] rate limits / worker limits; **no competitor** addresses
   throttling)
 - Acceptance notes: syncs pace against live throttle status and back off on 429; long
@@ -543,7 +607,8 @@ Each story uses:
 - Failure/recovery notes: throttling/backpressure is surfaced honestly, not failed
   opaquely.
 - Architecture dependency: **AR-002, AR-003, AR-006** — **Architecture-dependent**.
-- Open questions: bulk-ops need for large backfills (C-JOB-06).
+- Open questions: whether Shopify Bulk Operations are needed **internally** for large
+  backfills (C-JOB-06) — RB-14/AR-002 assessment; **not** a user-facing MVP feature.
 
 ### US-E7-05
 - Persona: P1, P3
@@ -551,7 +616,7 @@ Each story uses:
   repairs drift, so that missed webhooks or out-of-order events never leave the systems
   silently out of sync.
 - Capability IDs: C-SYNC-06, C-SYNC-02, C-SYNC-03
-- MVP relevance: proposed MVP (first-class, even if basic)
+- MVP relevance: MVP (first-class, even if basic)
 - Evidence strength: A ([Fact] delivery not guaranteed; HMAC; webhook-id dedup)
 - Acceptance notes: a deliberately dropped event is detected and repaired by
   reconciliation; webhooks are HMAC-verified and de-duplicated by id; "last reconciled"
@@ -569,7 +634,7 @@ Each story uses:
 - Story: As an operator, I want one command center that answers "is everything OK, what
   failed, and what do I do", so that I am not hunting through scattered menus.
 - Capability IDs: C-DASH-01, C-DASH-02
-- MVP relevance: proposed MVP (basic)
+- MVP relevance: MVP (basic)
 - Evidence strength: C (synthesis SH monitoring + VT diagnostics — [Inference])
 - Acceptance notes: a single home shows connection health (traffic-light) and the state
   of the sync loop at a glance.
@@ -582,7 +647,7 @@ Each story uses:
 - Story: As an operator, I want an activity timeline with queue and failure counts, so
   that I can see what has been happening and what needs attention.
 - Capability IDs: C-DASH-03
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (SH activity chart [Demonstrated])
 - Acceptance notes: recent activity, queued work, and failure counts are visible.
 - Failure/recovery notes: failure counts link through to the failing records.
@@ -594,7 +659,7 @@ Each story uses:
 - Story: As an operator, I want quick actions (sync now, reconcile, retry) from the
   command center, so that I can act immediately without navigating away.
 - Capability IDs: C-DASH-05
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (EM/SH/VT/WK [Demonstrated])
 - Acceptance notes: quick actions **enqueue** work (never run heavy sync inline, 5s ack).
 - Failure/recovery notes: an enqueued action reports back into the activity timeline.
@@ -606,7 +671,7 @@ Each story uses:
 - Story: As a new user, I want first-run/empty states that guide me to a first sync, so
   that a cold start is not confusing.
 - Capability IDs: C-DASH-06
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: E ([Inference] — UX best-practice; no competitor evidence)
 - Acceptance notes: empty states point to the next setup step.
 - Failure/recovery notes: n/a.
@@ -622,7 +687,7 @@ Each story uses:
 - Story: As an administrator, I want to map the essential fields directionally with a
   dry-run/preview, so that I never map blind or apply destructively by accident.
 - Capability IDs: C-MAP-03
-- MVP relevance: proposed MVP (essential fields only; custom transforms excluded)
+- MVP relevance: MVP (essential fields only; custom transforms excluded)
 - Evidence strength: B (VT direction+transforms+test [Demonstrated])
 - Acceptance notes: essential mappings are directional and previewable; custom Python
   transforms are out of MVP (advanced/later).
@@ -636,7 +701,7 @@ Each story uses:
 - Story: As an administrator, I want documented, explicit dedup/binding keys, so that
   the connector reliably matches records and prevents duplicates.
 - Capability IDs: C-MAP-01, C-MAP-02
-- MVP relevance: proposed MVP (documented keys; data model gated)
+- MVP relevance: MVP (documented keys; data model gated)
 - Evidence strength: A ([Fact] GID binding + EM/SH/VT [Demonstrated])
 - Acceptance notes: dedup keys per object are documented and applied; the Shopify-GID ↔
   Odoo binding is stable and multi-store-safe.
@@ -651,7 +716,7 @@ Each story uses:
 - Story: As an administrator, I want friendly scheduling language for background sync,
   so that I configure cadence without touching raw Odoo cron internals.
 - Capability IDs: C-SYNC-04, C-MAP-04
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: B (EM/VT/SH/WK/EC [Demonstrated])
 - Acceptance notes: schedule reads as "every N minutes" (not `nextcall`); deterministic
   location/gateway routing has a clean fallback; raw `ir.cron` internals are hidden
@@ -671,7 +736,7 @@ Each story uses:
 - Story: As an administrator/integrator, I want connector settings gated to authorised
   users, so that a functional user can operate day-to-day without admin rights.
 - Capability IDs: C-MULTI-03
-- MVP relevance: proposed MVP
+- MVP relevance: MVP
 - Evidence strength: A ([Fact] Odoo security + EM/SH [Demonstrated])
 - Acceptance notes: an admin surface (setup/creds/mappings/permissions) is separated
   from a functional surface (run/read/fix) by access rights; access is deny-by-default.
@@ -685,7 +750,7 @@ Each story uses:
 - Story: As an integrator, I want the single-store MVP built with multi-store-safe keys,
   so that adding stores later does not require re-architecting identity.
 - Capability IDs: C-MULTI-01
-- MVP relevance: proposed MVP (single-store; keys stay multi-store-safe) — full
+- MVP relevance: MVP (single-store; keys stay multi-store-safe) — full
   multi-store later
 - Evidence strength: B (VT [Demonstrated])
 - Acceptance notes: binding/config keys are per-store-scoped even though MVP runs one
@@ -700,7 +765,7 @@ Each story uses:
   changelog, and a built-in self-test, so that I can evaluate and trust the connector
   without a sales gate.
 - Capability IDs: C-DOCS-01, C-DOCS-02, C-DOCS-03 (self-test)
-- MVP relevance: proposed MVP (quality requirement) — public demo/marketplace later
+- MVP relevance: MVP (quality requirement) — public demo/marketplace later
 - Evidence strength: B (EM honest docs + VT dated release notes [Demonstrated])
 - Acceptance notes: docs are open (never gated), screenshot-rich; the changelog is
   dated and cites current platform figures (DP-001); the self-test is available.
@@ -716,17 +781,24 @@ Each story uses:
 Story-level detail deferred; scope in
 [`./non-mvp-and-later-phases.md`](./non-mvp-and-later-phases.md):
 
-- **Epic L1 — Bidirectional catalog & customers** (product/customer export, publish/
-  channel): C-PROD-02/03/05, C-CUST-02. MVP relevance: later/open.
-- **Epic L2 — Financial depth** (full payments/invoicing, refunds, cancellations,
-  returns/RMA): C-PAY-01/02/03, C-RET-01/02/03. MVP relevance: later/open.
+- **Epic L1 — Full autonomous bidirectional catalog + customer export** (unrestricted
+  two-way catalog ownership: all-field conflict resolution, field-ownership matrix,
+  advanced publish/channel campaign management; and customer export C-CUST-02). MVP
+  relevance: **later** (RB-13 deferred). *(**Controlled** product export/update
+  C-PROD-02/03/05 is **in MVP** — see US-E2-05/US-E2-06, not this later epic.)*
+- **Epic L2 — Financial depth** (accounting automation, refunds, cancellations,
+  returns/RMA): C-PAY-01/02/03 (accounting-automation portion), C-RET-01/02/03. MVP
+  relevance: **later** (RB-13 deferred; MVP keeps **minimal financial evidence** only —
+  US-E4-05).
 - **Epic L3 — Payout reconciliation** (Shopify-Payments-gated): C-POUT-01/02. later.
 - **Epic L4 — Premium breadth (optional add-ons)** (Markets/B2B/POS/gift cards/
   metafields/extended): C-ADV-01…06, C-PRICE-02/03, C-VAR-03/04. later.
 - **Epic L5 — Multi-tenancy** (multi-store, multi-company, isolated config model):
   C-MULTI-01 (full), C-MULTI-02, C-MULTI-04. later.
-- **Epic L6 — Scale & analytics** (bulk ops, custom transforms, dedicated analytics/
-  reporting): C-JOB-06, C-MAP-03 (transforms), C-RPT-01/02. later/open.
+- **Epic L6 — Scale & analytics** (custom transforms, dedicated analytics/reporting):
+  C-MAP-03 (transforms), C-RPT-01/02. **later.** (Shopify Bulk Operations, C-JOB-06, are
+  **not a user-facing feature** — internal RB-14/AR-002 mechanism only, not a product
+  epic.)
 
 ## Acceptance principles
 
@@ -738,10 +810,10 @@ criteria):
    observable behaviour a reviewer can check, not code.
 2. **Correct under failure.** Stories that touch inventory/orders/fulfilment must hold
    under the classic-defect scenarios (A-IMP-4: duplicate orders, multi-location
-   double-decrement, missed-webhook reconciliation, timezone/paging). **The
-   idempotent-refund / no-double-refund scenario applies only if refund handling is
-   included in MVP (US-E4-06); if refunds are deferred, it is carried forward as a
-   mandatory acceptance principle for the first refund/refund-sync sprint.**
+   double-decrement, missed-webhook reconciliation, timezone/paging). **Refunds are
+   DEFERRED from MVP (RB-13, US-E4-06), so the idempotent-refund / no-double-refund
+   scenario is carried forward as a mandatory acceptance principle for the first
+   refund/refund-sync sprint** (never dropped).
 3. **Recoverable.** Every failure path names isolation + reason + retry (no dead ends).
 4. **Honest & observable.** Freshness is truthful; status answers "OK / what failed /
    what next".
@@ -751,37 +823,55 @@ criteria):
 
 ## Open questions
 
-1. **Primary MVP persona** (P1 operator vs P2 admin/consultant) to bias UX priority.
-2. **Direction** — are the "open" export stories (US-E2-05, US-E3-04) in MVP or Phase 2?
-3. **Domain 9 minimum** (US-E4-05) and **refunds/cancellations** (US-E4-06) — in MVP or
-   deferred?
-4. **Distribution (AR-002)** — fixes OAuth-mandatory (US-E1-01) and App-Store/demo
+**Resolved at RB-13 (DEC-003, 2026-07-01):**
+
+1. ~~**Primary MVP persona**~~ — **RESOLVED: P1 (operator) primary; P2 (admin/consultant)
+   secondary.**
+2. ~~**Direction / export stories**~~ — **RESOLVED (PR #55): controlled product
+   export/update (US-E2-05) + first-sync matching (US-E2-06) are IN MVP**; **customer
+   export (US-E3-04)** stays Phase 2; **unrestricted autonomous bidirectional catalog
+   ownership** stays Phase 2+.
+3. ~~**Domain 9 minimum**~~ (US-E4-05) — **RESOLVED: minimal financial evidence only in
+   MVP; no accounting automation.**
+4. ~~**Refunds/cancellations**~~ (US-E4-06) — **RESOLVED: deferred.**
+5. ~~**Bulk ops for backfill**~~ (US-E4-02/US-E7-04, C-JOB-06) — **RESOLVED: not a
+   user-facing MVP feature;** internal RB-14/AR-002 assessment only.
+
+**Still open — routed to RB-14 architecture:**
+
+6. **Distribution (AR-002)** — fixes OAuth-mandatory (US-E1-01) and App-Store/demo
    packaging (US-E10-03).
-5. **Reconciliation cadence & freshness granularity** (US-E7-05, US-E5-05).
-6. **Error/retry taxonomy depth & auto-retry set** (US-E7-02/03).
-7. **Essential mappings & dedup/match keys** (US-E9-01/02, US-E3-02) → AR-005.
-8. **Readiness/self-test check set** (US-E1-04).
-9. **Bulk ops for backfill** (US-E4-02/US-E7-04) → C-JOB-06.
+7. **Reconciliation cadence & freshness granularity** (US-E7-05, US-E5-05).
+8. **Error/retry taxonomy depth & auto-retry set** (US-E7-02/03).
+9. **Essential mappings & dedup/match keys** (US-E9-01/02, US-E3-02) → AR-005.
+10. **Readiness/self-test check set** (US-E1-04).
+11. **Inventory apply mode** (US-E5-04, C-INV-04) — auto-apply vs review-then-apply →
+    AR-007 (auto-apply not accepted as default MVP behaviour).
 
 ## Review notes for ChatGPT
 
 Please inspect carefully:
 
-1. **Experience coverage** — do the 10 MVP epics fully express the "correct, observable,
-   recoverable single-store loop, import-first" experience without gaps or over-reach?
+1. **Experience coverage** — do the MVP epics fully express the "correct, observable,
+   recoverable single-store loop **with controlled bidirectional product onboarding**"
+   experience without gaps or over-reach?
 2. **Story ≠ implementation task** — confirm stories stay product-level (no code-level
    acceptance criteria, no screens/modules).
-3. **MVP relevance tags** — confirm the **open** stories (US-E2-05, US-E3-04, US-E4-05,
-   US-E4-06) are the right scope forks left to you, and the **later** tags are correct.
+3. **MVP relevance tags (RB-13 aligned, PR #55-corrected)** — confirm the resolved tags:
+   **controlled product export/update (US-E2-05) + first-sync matching (US-E2-06) are IN
+   MVP**; **customer export (US-E3-04)** and **refunds/cancellations (US-E4-06)** are
+   later/deferred; **US-E4-05 Domain 9** is MVP minimal-evidence-only; bulk ops
+   (US-E4-02/US-E7-04) is internal-only, not a user-facing feature.
 4. **Evidence discipline** — confirm each story traces to demonstrated/Tier-1 evidence;
    inferences (command center, error center, freshness, auto-apply) stay inference; no
    claim is promoted to a fact.
 5. **Architecture-dependent tags** — confirm stories commit *intent*, and no story
    hard-codes a gated mechanism (queue, binding model, API, distribution).
-6. **Personas** — confirm P1–P4 usage is reasonable and "primary MVP persona" is
-   correctly left open.
+6. **Personas (RB-13 accepted)** — confirm P1–P4 usage is reasonable and the accepted
+   **P1-primary / P2-secondary** MVP priority is correctly reflected.
 
-> **This document decides nothing.** All stories, epics, and MVP-relevance tags are
-> **inputs** for the gated RB-13 (MVP) and RB-14 (architecture) reviews, subject to
-> ChatGPT approval (`CLAUDE.md` §4–§5, §8–§10). **Proposed for ChatGPT review — not
-> final until accepted.**
+> **Stories are aligned to the accepted MVP baseline** (ChatGPT RB-13, DEC-003). They
+> remain **product stories, not implementation tasks.** Every *mechanism* is still an
+> **input** for the gated RB-14 (architecture) review, subject to ChatGPT approval
+> (`CLAUDE.md` §4–§5, §8–§10). **MVP scope accepted; architecture still gated;
+> implementation blocked.**

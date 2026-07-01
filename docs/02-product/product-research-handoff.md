@@ -7,10 +7,220 @@
 > [`../01-research/research-handoff.md`](../01-research/research-handoff.md).
 >
 > **Governance:** research/synthesis phase; **no-code gate in force**
-> (`CLAUDE.md` §4–§5). Everything here is an **input/inference/recommendation** —
-> **no MVP scope and no architecture is decided** (MVP = RB-13, architecture =
-> RB-14 / AR-002…AR-008, both gated). Access date for competitor evidence:
-> 2026-06-30; session date: 2026-07-01.
+> (`CLAUDE.md` §4–§5). From Sprint G the **MVP *product scope* is accepted** (RB-13,
+> DEC-003); **architecture remains gated** (RB-14 / AR-002…AR-008) and **implementation
+> remains blocked**. Access date for competitor evidence: 2026-06-30; session date:
+> 2026-07-01.
+
+# Product Sprint G Handoff
+
+> **Product Sprint G — MVP Scope Acceptance and Decision Baseline (RB-13).** Records
+> ChatGPT's accepted MVP scope decisions in GitHub and aligns the product documents to
+> that accepted baseline. **Documentation/decision-recording sprint only** — no new
+> sources crawled, no research agents, no architecture. **No-code gate in force**
+> (`CLAUDE.md` §4–§5). Session date 2026-07-01.
+
+## Sprint G revision (PR #55 review — 2026-07-01)
+
+ChatGPT reviewed PR #55 and returned **REVISE** — the first draft **over-deferred product
+export**. Corrected on the same branch (`docs: revise mvp baseline for controlled product
+export`), a **product-scope correction only** (no architecture, no code):
+
+- **Controlled product export/update is now IN MVP** — Shopify→Odoo product import **and**
+  Odoo→Shopify product export/update, with product/variant **matching**, **binding**,
+  **preview/dry-run**, **duplicate prevention**, and **draft/unpublished/channel-controlled**
+  export safety. This is **controlled bidirectional product onboarding**, not import-first.
+- **Full autonomous bidirectional catalog management remains later** — automatic all-field
+  two-way conflict resolution, complex field-ownership matrix, advanced publish/channel
+  campaign management, and catalog breadth (Markets/pricelists/metafields/SEO/custom
+  transforms/full-multi-store) stay Phase 2+.
+- **Customer export remains later.**
+- **Evidence:** product import/export/update is **market-baseline** — EM/VT/WK/SH
+  demonstrated in the already-merged matrix. **TeqStars docs**, recorded 403-blocked in
+  Sprint C (2026-06-30), were **re-checked by ChatGPT on 2026-07-01 and found accessible**
+  (product import/export/update flows documented); a **full TeqStars rebaseline is pending
+  a later research sprint** and was **not** performed here.
+- **No architecture finalized; no implementation authorized.** Binding/data model stays
+  **AR-005**; API/destructive-apply mechanics stay **AR-002**; destructive/full-state write
+  safety stays mandatory but architecture-gated.
+
+*(The Session summary and sections below were authored for the initial Sprint G recording;
+read them with the correction above applied — "import-first" is superseded by "controlled
+bidirectional product onboarding," and product export is in MVP.)*
+
+## Session summary
+
+ChatGPT made the **RB-13 MVP scope decisions**; this sprint recorded them as the accepted
+baseline. Created **`docs/04-decisions/DEC-003-mvp-scope.md`** (the accepted MVP
+**product-scope** decision record — Option A correctness-core **with controlled
+bidirectional product onboarding**; the accepted direction; the Domain 9
+minimal-financial-evidence decision; refunds/cancellations deferred; bulk ops not
+user-facing; single-store/single-company; P1-primary/P2-secondary; and an explicit "no
+architecture decided / implementation blocked" clause). Aligned the three product docs —
+**`mvp-scope.md`** (status → accepted baseline; new *ChatGPT RB-13 acceptance* + *Product
+onboarding and duplicate-prevention baseline* sections; every former `open` fork resolved
+inline; open-questions split into resolved vs still-open), **`non-mvp-and-later-phases.md`**
+(status → accepted boundary; **product export removed from non-MVP**; new *Full autonomous
+bidirectional catalog management* boundary; customer-export/refunds-cancellations/
+Domain-9-accounting/bulk-ops/App-Store/multi-store-company confirmed non-MVP with revisit
+conditions), and **`user-stories.md`** (US-E2-05 → controlled MVP export/update; new US-E2-06
+first-sync matching; customer-export/refund stories → later; Domain 9 story → MVP
+minimal-evidence-only; bulk ops → internal-only; persona → P1 primary/P2 secondary). Updated both handoffs and applied the
+**DP-006 evidence-consistency gate**. **No connector code, no Odoo module, no architecture
+doc, no architecture ADR, no implementation plan, no module boundary, no REST/GraphQL,
+queue-framework, data-model, or distribution decision** was produced.
+
+## Files created or updated
+
+- `docs/04-decisions/DEC-003-mvp-scope.md` (**new** — accepted MVP product-scope baseline).
+- `docs/02-product/mvp-scope.md` (**updated** — accepted; RB-13 acceptance section + inline
+  resolutions).
+- `docs/02-product/non-mvp-and-later-phases.md` (**updated** — accepted non-MVP boundary).
+- `docs/02-product/user-stories.md` (**updated** — MVP-relevance aligned to accepted scope).
+- `docs/02-product/product-research-handoff.md` (**updated** — this Sprint G section).
+- `docs/01-research/research-handoff.md` (**updated** — Sprint G section + checkpoints).
+- QA logs — non-decision notes only (see *Evidence-consistency gate* / *Learning feedback
+  loop*): `defect-pattern-log.md`, `architecture-review-log.md`,
+  `rejected-approaches-log.md`, `technical-debt-register.md`.
+
+## MVP acceptance summary
+
+The MVP is **accepted as Option A — a correct, observable, recoverable single-store sync
+loop across the core commerce objects, with controlled bidirectional product onboarding
+(product import **and** controlled export/update)**, plus inventory + fulfilment/tracking
+write-back — winning on depth of correctness and operator experience, **not** breadth
+(specifically **not** unrestricted autonomous bidirectional catalog ownership). This is a
+**product-scope** acceptance only; every *mechanism* stays gated (RB-14).
+
+## Accepted MVP decisions
+
+- **Option:** Option A (correctness core, with controlled bidirectional product onboarding —
+  PR #55 correction).
+- **Direction:** Shopify→Odoo import (products, variants/options, basic images, base
+  price/compare-at, customers + matching, orders, order status/lifecycle); **Odoo→Shopify
+  controlled product export/update** (product export/update, image/price update where
+  feasible — matched, bound, previewed, draft/channel-safe); Odoo→Shopify write-back
+  (inventory multi-location-aware/idempotent; fulfilment + tracking). **Deferred:** customer
+  export; unrestricted autonomous bidirectional catalog ownership.
+- **Domain 9:** minimal financial **evidence/representation only** (financial + payment
+  status, gateway/method label, transaction reference(s), paid/unpaid/refunded flags as
+  source info, totals/taxes/shipping/discounts/currency, basic gateway/journal mapping as
+  config input if needed) — **no accounting automation** (no auto invoices/payments, no
+  bank/payout reconciliation, no auto refund/payment posting). Rule: *preserve financial
+  evidence and order actionability; do not automate accounting.*
+- **Inventory:** write-back in MVP; multi-location-aware; **never write `committed`**;
+  write only allowed Shopify quantity fields; initial stock import controlled/reviewed;
+  **auto-apply not accepted as default (AR-007-dependent).**
+- **Reliability/observability:** layered sync (webhooks + scheduled + manual +
+  reconciliation); HMAC; webhook-ID dedup; fast ack; idempotency keys/writes; duplicate
+  prevention; per-record isolation; reason-coded logs; safe manual retry; retry
+  classification concept; rate-limit/cost awareness; resumable jobs; honest freshness.
+- **UX:** guided setup; credential masking; test connection; readiness/self-test; basic
+  command center (health + activity/failure counts); recovery-first error center (MVP
+  version); quick actions that enqueue; essential mappings only; role-based access (admin
+  vs functional); open docs + dated changelog + built-in self-test.
+- **Store/company:** single-store, single-company; no multi-store UI/logic, no
+  multi-company logic; **architecture-safe** (keys multi-store-safe; WK Company field ≠
+  multi-company evidence).
+- **Persona:** **P1 (operations/e-commerce user) primary; P2 (Odoo admin/consultant)
+  secondary;** P3/P4 remain important buyer/deployer personas.
+
+## Deferred scope
+
+**Unrestricted autonomous bidirectional catalog ownership** (automatic all-field two-way
+conflict resolution; complex field-ownership matrix; advanced publish/channel campaign
+management); **customer export**; refund sync; cancellation reflection; returns/RMA; full
+Domain 9 accounting automation; payout/bank reconciliation; multi-package fulfilment;
+complex tax engine; Shopify Markets/B2B/POS/gift cards/metafields/subscriptions/
+abandoned-checkout/recommendations/Buy-with-Prime; multi-store UI/logic + multi-company
+logic; custom Python transforms; advanced analytics/reporting; public App-Store + demo
+packaging + app billing/compliance webhooks (distribution-gated). **Bulk Operations are not
+a user-facing MVP feature** (RB-14/AR-002 may assess an internal mechanism only).
+*(**Controlled** product export/update — matched, bound, previewed, draft/channel-safe —
+**is in MVP**, not deferred.)* Each deferral carries a
+revisit condition in `non-mvp-and-later-phases.md`. **Mandatory future rule:** if refund
+handling is later included, the idempotent-refund / no-double-refund regression is
+mandatory.
+
+## Architecture dependencies still open
+
+All **Not decided / Evidence pending** (RB-14): AR-002 distribution/API strategy (+ any
+internal bulk-ops need); AR-003 sync orchestration/queue framework + Odoo-Online
+feasibility; AR-004 module boundaries/config model; AR-005 binding/dedup data model +
+per-store keys + deleted-binding handling; AR-006 error/retry taxonomy + idempotency
+mechanism + reconciliation cadence; AR-007 inventory design incl. apply mode (auto-apply);
+AR-008 fulfilment design. Also open: the **Domain 9 draft-artifact exception** (returns to
+ChatGPT if RB-14 finds a draft invoice/payment artifact is required). **DEC-003 feeds these
+rows; it decides none of them.**
+
+## Evidence-consistency gate
+
+**DP-006 evidence-consistency gate applied; no new issue discovered.** Recording the
+accepted scope introduced **no** claim→fact promotion: competitor claims stayed claims;
+weak/claim-only evidence stayed out of scope (pHash, TQ 403 breadth, EC/SH breadth); WK
+default-Company field stayed a config field (**not** multi-company evidence, DP-004);
+auto-apply stock stayed an **[Inference]** routed to AR-007 (DP-006); "real-time" was never
+asserted. Scope acceptance was kept strictly separate from any mechanism decision
+(architecture stays gated). **No new DP row; no counter change** — see the Sprint G note in
+`../05-qa/defect-pattern-log.md`.
+
+## No-code / no-architecture confirmation
+
+**No connector code**, no Odoo module, no `*.py`/`*.xml`/`*.csv`/manifest/controller/
+security/data/migration/test files, no CI/Docker, no architecture doc, no architecture
+ADR, no implementation-plan doc, no module boundary, and no REST/GraphQL, queue-framework,
+data-model, or distribution decision were created. Only the allowed docs were changed.
+**Implementation remains blocked** until RB-14 and later planning are approved.
+
+## Recommended next sprint
+
+**RB-14 Architecture Preparation — Part 1: Architecture decision framing and
+official-source refresh**, starting with **AR-002** (distribution/API strategy), **AR-003**
+(sync orchestration/queue), and **AR-005** (binding/dedup model). Keep the no-code gate;
+one scoped objective per session; route every proposal through the architecture-review log
+and (on acceptance) an ADR. **Do not start RB-14 in this sprint.**
+
+## Learning feedback loop
+
+- **New issues discovered:** **none.** DP-006 gate applied, not re-triggered; DP-003/004
+  (claim ≠ fact; config field ≠ demonstrated support) and DP-005 (classification/scope is
+  an input until accepted) held. This sprint *does* record an accepted **product-scope**
+  decision (DEC-003) — the first `04-decisions` record — which is the correct, gated way to
+  finalize scope (ChatGPT-approved), not a defect.
+- **Repeated issue patterns:** none at threshold (no new occurrence).
+- **Rules/checklists updated:** none required.
+- **New rejected approaches:** none — deferrals are **product-scope boundary decisions**
+  with revisit conditions, **not** rejected architecture approaches (`CLAUDE.md` §10).
+- **New technical debt:** none (no code).
+- **Architecture concerns:** DEC-003 supplies scope inputs to AR-002…AR-008 — recorded as a
+  non-decision note in `architecture-review-log.md`; all rows stay Not decided / Evidence
+  pending.
+- **Should future prompts change? No** — the acceptance flow worked: ChatGPT decides, Claude
+  records in a gated `04-decisions` record + aligns docs, architecture stays RB-14-gated.
+  Branch reality remains the harness-designated `claude/...` branch while the PR targets
+  `Shopify-connector`.
+
+## What ChatGPT should review
+
+1. **DEC-003** records only the accepted MVP **product scope**, not architecture.
+2. **Domain 9** is minimal financial evidence/order representation only; no accounting
+   automation (and the draft-artifact exception is architecture-gated).
+3. **Product/customer export** and **refunds/cancellations** are deferred; user stories +
+   boundaries agree.
+4. **Bulk ops** are not a user-facing MVP feature; RB-14 may assess internal need.
+5. **Single-store/single-company** baseline with future-safe keys.
+6. **No AR row is decided**; every mechanism stays gated.
+
+## Stop confirmation
+
+Stopped at the Sprint G boundary as instructed. **No** connector code, **no** Odoo module,
+**no** architecture decision, **no** architecture doc/ADR, **no** implementation plan,
+**no** module boundary, **no** REST/GraphQL/queue-framework/data-model/distribution choice.
+MVP **product scope is accepted** (DEC-003); architecture remains gated; implementation
+remains blocked. `main` and plain `dev` untouched; only Sprint G allowed files changed.
+Awaiting ChatGPT review.
+
+---
 
 # Product Sprint F Handoff
 
