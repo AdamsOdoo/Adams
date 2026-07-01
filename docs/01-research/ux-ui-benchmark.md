@@ -17,7 +17,7 @@
 | **sh_shopify_connector (R8)** | **Medium–High** | ~29 **captioned** walkthrough groups (pixels not inspected). |
 | **Webkul (R1)** | **Medium** | 21 inline guide screenshots (markdown-extracted captions/labels). |
 | **VentorTech (R7)** | **Low** | 4 marketing flow figures (alt-text only). |
-| **Teqstars (R2)** | **Very low** | 17 Apps-listing **captions only**; **docs screenshots 403-blocked**. |
+| **Teqstars (R2)** | **Medium–High** *(Sprint C2, 2026-07-01)* | **~98 real doc screenshots** inside step-by-step pages (create-instance ×15, product-update ×12, order-status ×10, returns ×6, OAuth ×7); docs no longer 403-blocked. |
 | **ecommerce_shopify (R6)** | **None** | **No UI screenshots or video** on the listing. |
 | **Google Doc (R5)** | **None** | Sign-in-gated; not bypassed. |
 
@@ -32,9 +32,17 @@
   error queue; tab-segmented config; **but exposes raw Odoo cron internals**
   (Model, Scheduler User, Next Execution Date) and manual multi-field credential
   entry. *Inference: competent but leaks Odoo plumbing.*
-- **Teqstars (R2):** caption-only — implies a credentials form, a match-by
-  selector, per-gateway workflow rows, a Queue Manager with retry, split
-  operational/analytics dashboards. **UX unverifiable** (docs blocked).
+- **Teqstars (R2):** *(now demonstrated, Sprint C2)* **screenshot-rich, step-by-step**
+  — OAuth-per-step + **Test Connection**; a **tabbed instance config** (Product/Stock/
+  Orders/Payout/Customer/Metafield/Workflow/Webhook/Automatic-Jobs) that is **powerful
+  but toggle-dense** (10+ order toggles, several dev-mode-gated); a green/red
+  **Allowed/Not-Allowed-Sync** badge on the listing form (clean exclude-from-sync);
+  Manage-Sales-Channels publish/unpublish; propagate-to-Shopify checkboxes on refund/
+  cancel/return; a two-step click&collect pickup flow; Force-Restock with a divergence
+  warning. **But: an Operations launcher + Queues/Logs, not a metrics/chart dashboard**
+  (the earlier "two dashboards" caption is not substantiated by the docs).
+  *Inference: comprehensive and honest-in-warnings, but config-dense and lacking a
+  unified monitoring surface.*
 - **Emipro (R3):** **operations-grade** — a consistent "Perform Operation" entry,
   **state-coloured Data Queues** with per-line **Log Lines**, a reason-coded **Log
   Book**, and docs that **state limitations and gotchas plainly**. *Inference:
@@ -57,7 +65,7 @@
 | Connector | Connect method | Validation up front | Step count (claimed/shown) | Notable |
 | --- | --- | --- | --- | --- |
 | Webkul | custom-app, **manual credential paste** | **Test Connection** button ✅ | ~5 Shopify + ~5 Odoo | clear screenshots; SAAS users must move to Odoo.sh |
-| Teqstars | custom-app token; "wizard checks API access" 🟨 | claimed | "guides from connection to working sync" | unverifiable |
+| Teqstars | **OAuth custom-app** + manual-token + legacy password ✅ | **Test Connection** step ✅ | 6-step credential flow + Confirm | now demonstrated (7 screenshots); full scope list with "enable all" warning |
 | Emipro | custom-app token (Path A/B) | warns **trailing-slash mismatch fails** ✅ | multi-step, paste full scope string | honest gotcha; **expert** |
 | **VentorTech** | **OAuth (no manual tokens)** ✅ | **auto scope-check + connection test** ✅ | Apps "8-step" / ecosystem "3-step" | **but technical install** (odoo.conf/queue_job/≥2 workers; not Odoo Online) |
 | ecommerce_shopify | OAuth/Self access 🟨 | ⬜ | guide is the **blocked Google Doc** | setup steps gated |
@@ -92,8 +100,11 @@ guide behind sign-in is an onboarding anti-pattern.
   dashboards with **draft/completed/failed counts**.
 - **Emipro (R3):** a Shopify Dashboard with a performance graph + a "Perform
   Operation" launcher and a Smart Dashboard for imported orders.
-- **Teqstars (R2):** claims **two** dashboards (Marketplace operational +
-  Analytics) — unverified.
+- **Teqstars (R2):** *(Sprint C2)* the docs show an **Operations launcher**
+  (Marketplaces ‣ Overview) + **Queues/Logs** + **Smart-Notification** alerts, but
+  **no metrics/chart monitoring dashboard** — the earlier "two dashboards" caption is
+  **not substantiated** by the accessible docs (a marketing claim, not a demonstrated
+  screen).
 - **VentorTech (R4/R7):** **no dedicated dashboard**; relies on an auto-workflow
   **"visual pipeline"** status and a status menu/Kanban.
 - **ecommerce_shopify (R6):** **none**.
@@ -151,8 +162,11 @@ guide behind sign-in is an onboarding anti-pattern.
   columns); metafield mapping with Sync Direction Import/Export/Both.
 - **sh_shopify_connector (R8):** directional metafield mapping (Sync Direction +
   Odoo Field Name) + a Payment Gateway Workflow Matrix.
-- **Teqstars (R2):** caption claims gateway→journal and metafield mapping with
-  conditions/transformations (unverified).
+- **Teqstars (R2):** *(now demonstrated)* gateway→journal workflow mapping (per
+  payment gateway + financial status), location→warehouse mapping, and a
+  **metafield→Odoo-field mapping list** with Ready/Missing/Not-Found/Inactive status
+  badges and wipe-on-missing — but **no test-against-live-data / dry-run** (VT still
+  leads on testable mappings).
 - **Inference:** the strongest mapping UX is **directional + testable + dry-run**;
   a CSV fallback (EM) helps non-SKU catalogs. Avoid forcing users to map blind
   with no preview.
@@ -184,9 +198,10 @@ guide behind sign-in is an onboarding anti-pattern.
   **pre-flight validation** pattern.
 - **WK Feeds error-feeds** is a good **stage-before-commit** concept (but the
   re-evaluate retry is described, not shown).
-- **Counter-examples:** EC has **no screenshots** (no UX proof); TQ screenshots
-  are **blocked**; raw cron internals (WK) and a long manual scope paste (EM)
-  are friction; "Force Done" (EM) is an irreversible footgun.
+- **Counter-examples:** EC has **no screenshots** (no UX proof); *(TQ screenshots
+  are now accessible — ~98 real doc screenshots, Sprint C2)*; raw cron internals
+  (WK) and a long manual scope paste (EM/TQ) are friction; "Force Done" (EM) is an
+  irreversible footgun; TQ's config form is **toggle-dense**.
 
 ## Best UX patterns observed (adopt-candidates, inference)
 
@@ -211,8 +226,9 @@ guide behind sign-in is an onboarding anti-pattern.
 - **Manual inventory-adjustment processing** required after stock import (EM).
 - **Irreversible "Force Done"** without a strong guard (EM).
 - **"Real-time" labelling** for cron/queue models (WK, EC, SH).
-- **No screenshots / no proof of UX** (EC); **blocked docs** (TQ).
-- **Toggle-dense config** with jargon and no inline help (EM, SH, WK).
+- **No screenshots / no proof of UX** (EC). *(TQ docs, blocked in Sprint C, are
+  now accessible — no longer a UX-evidence gap.)*
+- **Toggle-dense config** with jargon and no inline help (EM, SH, WK, **TQ**).
 - **Technical install** (hand-edited odoo.conf + queue_job + workers) as the only
   path (VT).
 - **Setup guide behind a sign-in wall** (EC → R5).
@@ -261,7 +277,9 @@ guide behind sign-in is an onboarding anti-pattern.
 ## Open questions
 
 - Do EM/SH/WK config screens have inline help/tooltips (not visible in
-  extraction)? Are TQ's two dashboards and Queue Manager retry real (docs
-  blocked)? What does EC's actual UI look like (no screenshots)? How do
+  extraction)? *(TQ's "two dashboards" and "Queue Manager retry" captions are now
+  **answered** by the accessible docs — **not** substantiated: an Operations launcher
+  + Queues/Logs, and queue re-processing + manual re-run, not a metrics dashboard or
+  per-record inline-retry control.)* What does EC's actual UI look like (no screenshots)? How do
   competitors surface Shopify **rate-limit/throttle** events to users (none found)?
   How do they present **reconciliation** runs to users (mostly implicit)?

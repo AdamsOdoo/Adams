@@ -154,10 +154,16 @@
 
 ## Avoid in documentation / support
 
-- **A-DOC-1 — Bot-blocking or sign-in-gating evaluation docs.** *Evidence:* TQ docs
-  403; EC setup guide behind a Google sign-in (R5). *Risk:* buyers can't evaluate;
-  lost trust/sales. *Prevention:* public, crawlable, screenshot-rich docs + open
-  demo. *Arch review:* no.
+- **A-DOC-1 — Bot-blocking or sign-in-gating evaluation docs.** *Evidence:* **TQ
+  docs were 403 bot-blocked in Sprint C (2026-06-30) — now accessible (Sprint C2,
+  2026-07-01), so this is no longer a *current* TQ item**; EC setup guide behind a
+  Google sign-in (R5) remains gated. *Risk:* buyers can't evaluate; lost
+  trust/sales — and a WAF/bot filter can also block our own research (the exact TQ
+  episode). *Prevention:* public, crawlable, screenshot-rich docs + open demo;
+  **do not bot-block evaluation docs.** *Lesson (kept even though TQ is resolved):*
+  **source availability can change — re-check an important Blocked source before a
+  final scope/architecture decision leans on it** (TQ's 403→200 is the worked
+  example; reinforces DP-001/DP-003). *Arch review:* no.
 - **A-DOC-2 — No (or stale) changelog.** *Evidence:* SH has none; EM's v19 changelog
   is stale (to Apr 2024). *Risk:* users can't tell currency/maintenance. *Prevention:*
   a dated changelog that discloses fixes (VT-style). *Arch review:* no.
