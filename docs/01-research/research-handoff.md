@@ -1440,3 +1440,35 @@ ChatGPT review.
   in `rejected-approaches-log.md`; no-debt note in `technical-debt-register.md`).
   Ran final allowed/forbidden-file checks. Next: push the working branch and open
   one draft PR targeting `Shopify-connector`, then stop.
+
+### Product Sprint E checkpoints
+
+- **Sprint E / Stage 1 — Setup + evidence read (2026-07-01):** Started **Product
+  Sprint E** (product vision, premium quality bar, differentiation strategy, and
+  setup/UX principles). Product strategy / synthesis only; **no-code gate confirmed**
+  (`CLAUDE.md` §4–§5); high-power mode **not required** (focused product synthesis of
+  already-merged repo evidence — no new competitor crawling, no research fan-out).
+  Fetched remote branches and verified preconditions: **PR #52 is merged into
+  `Shopify-connector`** (confirmed via GitHub API — `merged: true`, merged 2026-07-01;
+  branch tip `9a744f7` *is* the PR #52 merge commit); the working branch is based on
+  `Shopify-connector` (identical to it at start); all required Sprint D outputs present
+  (`feature-taxonomy.md`, `capability-evidence-map.md`, `product-research-handoff.md`);
+  the **DP-006 evidence-consistency gate** is present in `defect-pattern-log.md`.
+  **Branch-name note (flagged for ChatGPT):** the harness designated the working branch
+  **`claude/sprint-e-product-strategy-gd2kfs`** (already checked out, based on
+  `Shopify-connector`), whereas the Sprint E prompt body named
+  `product/sprint-e-product-vision-quality-bar`; per the session's hard git rule
+  ("never push to a different branch without explicit permission") the work proceeds on
+  the harness-designated branch and the **PR still targets `Shopify-connector`** —
+  `main`/plain `dev` untouched. Read the required governance/product/research files
+  (CLAUDE.md, README, this handoff, research methodology, both official baselines,
+  competitor deep dives + matrix, UX/UI benchmark, common patterns, best-in-class,
+  gaps/opportunities, avoid-list, feature taxonomy, capability evidence map, product
+  handoff, all QA logs, learning rules). Confirmed the phase is still **no-code**, that
+  Sprint E is **product vision / strategy only** (no MVP finalization, no architecture
+  finalization, no ADRs, no module boundaries), and the **DP-003/DP-004/DP-006**
+  prevention + evidence-consistency rules (competitor claim ≠ fact; config field ≠
+  demonstrated support; market promise ≠ demonstrated bidirectionality; conditional
+  platform requirements stay conditional; improvement opportunities are inference, not
+  demonstrated evidence; no capability enters MVP/architecture as a decision until
+  ChatGPT-reviewed). Next: Stage 2 — draft `docs/02-product/product-vision.md`.
