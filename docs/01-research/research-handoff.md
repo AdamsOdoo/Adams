@@ -1713,3 +1713,29 @@ ChatGPT review.
   (nothing rejected), `technical-debt-register.md` (no debt). Ran final allowed/
   forbidden-file checks. Next: push the working branch and open one draft PR targeting
   `Shopify-connector`, then stop.
+
+### Product Sprint F checkpoints
+
+- **Sprint F / Stage 1 — Setup + evidence read (2026-07-01):** Started **Product
+  Sprint F** (MVP scope proposal, non-MVP/later-phase boundaries, and user stories —
+  backlog item **RB-13**). MVP-proposal synthesis only; **no-code gate confirmed**
+  (`CLAUDE.md` §4–§5); high-power mode **not required** (focused product/MVP synthesis
+  of already-merged repo evidence — no new competitor crawling, no research fan-out).
+  Fetched remote branches and verified preconditions: **PR #53 is merged into
+  `Shopify-connector`** (confirmed via GitHub API — `merged: true`, merged 2026-07-01
+  10:17Z; branch tip `6e73f82` *is* the PR #53 merge commit); the working branch
+  `claude/mvp-scope-user-stories-dms7s8` is based on `Shopify-connector` (identical to
+  it at start, merge-base `6e73f82`). All required inputs present:
+  `feature-taxonomy.md`, `capability-evidence-map.md`, `product-vision.md`,
+  `setup-ux-principles.md`, `product-research-handoff.md`, and the **DP-006
+  evidence-consistency gate** in `defect-pattern-log.md`. **Branch-name note for
+  ChatGPT (flagged):** the Sprint F prompt body named
+  `product/sprint-f-mvp-scope-proposal`, but the session's hard git rule designated
+  the harness branch `claude/mvp-scope-user-stories-dms7s8` ("never push to a
+  different branch without explicit permission"), so work proceeds on the
+  harness-designated branch; **the PR still targets `Shopify-connector`**; `main` and
+  plain `dev` untouched. Read `CLAUDE.md`, the required research/product/QA files, and
+  confirmed: current phase is still no-code; Sprint F is MVP **proposal** only;
+  architecture stays gated (AR-002…AR-008 all Not decided / Evidence pending);
+  implementation stays gated; DP-003/004/005/006 prevention rules understood. Added
+  this checkpoint. Next: Stage 2 — draft `docs/02-product/mvp-scope.md`.
