@@ -80,9 +80,17 @@ Refreshed 2026-07-01 (see [`rb14-official-source-refresh.md`](./rb14-official-so
 
 Citations in [`../01-research/odoo-official-architecture-notes.md`](../01-research/odoo-official-architecture-notes.md).
 
-- **[Official fact]** Background/deferred execution in core is **`ir.cron`** only —
-  poll-based, minute-precision; `_trigger(at=None)` dispatches "soon"; cron functions
-  must **batch** and use `_commit_progress`, and **not reschedule themselves**.
+- **[Official fact]** Odoo 19 official docs document **`ir.cron`** for scheduled/
+  background execution — poll-based, minute-precision — including **batching**,
+  `_commit_progress`, `_trigger` (dispatches "soon"), the "**not reschedule
+  themselves**" rule, cron failure behavior, and cron-worker configuration.
+- **[Inference from official fact]** The official docs reviewed **do not document a
+  general-purpose async job queue in Odoo core** (absence of documentation, not a
+  positive statement).
+- **[Open question]** Confirm against the Odoo 19 source/codebase if this becomes
+  load-bearing for the substrate decision.
+- **[Community / not official]** OCA `queue_job` remains a **community dependency, not
+  Odoo core**.
 - **[Official limitation]** Cron **failure model is coarse**: **3 consecutive
   errors/timeouts → skip the run**; **5 consecutive failures over ≥ 7 days →
   deactivated + DB admin notified.** So the connector must implement **its own
