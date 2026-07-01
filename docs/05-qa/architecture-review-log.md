@@ -237,3 +237,38 @@ only** and re-litigates nothing; **no AR row is decided, accepted, proposed for 
 or re-litigated.** All remain "Not decided / Evidence pending" pending sufficient research +
 ChatGPT approval (`CLAUDE.md` §4–§5; RB-14). No architecture doc, ADR, or implementation plan
 was produced. See DP-006's evidence-consistency gate in `defect-pattern-log.md`._
+
+_**RB-14 Architecture Preparation — Part 1 non-decision note (2026-07-01) — NOT decisions; AR
+rows remain "Not decided / Evidence pending".** This sprint produced the **first architecture
+framing documents** under `../03-architecture/` — an
+[`architecture-decision-framing.md`](../03-architecture/architecture-decision-framing.md) map
+plus **deep framing** for **AR-002** (distribution/API), **AR-003** (sync orchestration/queue),
+and **AR-005** (binding/dedup/identity), backed by a current **official-source refresh**
+([`rb14-official-source-refresh.md`](../03-architecture/rb14-official-source-refresh.md), access
+date 2026-07-01, ~40 Tier-1 Shopify/Odoo pages re-verified). **These documents FRAME the
+decisions and DECIDE none of them.** Explicitly: **no** REST/GraphQL/hybrid choice, **no**
+public-vs-custom distribution choice, **no** OAuth-vs-token choice, **no** `ir.cron`-vs-`queue_job`-
+vs-external-worker choice, **no** binding data model, **no** module boundaries, **no** data model
+— every candidate option is labelled `[Not decided]` with evidence-for/against, risks, UX
+implications, and required-evidence-before-decision. **AR-002, AR-003, AR-005 are now FRAMED
+(not decided); AR-004, AR-006, AR-007, AR-008 remain NOT framed and NOT decided** (AR-006/007/008
+depend on AR-002/003/005; AR-004 module boundaries are recommended to wait until enough data-flow
+decisions are framed — a **recommendation, not a decision**). **Official-source refresh completed**
+and dated; the load-bearing facts were re-confirmed current with a few **version-sensitive deltas
+flagged** (GraphQL `latest` alias now `2026-07`; `@idempotent` on inventory set/adjust
+**required as of 2026-04**, optional from 2026-01; `productSet` delete-on-omit is **list-fields-
+only**; dual offline-token model). The **Odoo async-queue absence is classified as an [Inference
+from official fact]** — the official docs document **only `ir.cron`** for scheduled/background
+work and do **not** document a general-purpose async job queue (absence of documentation, not a
+positive Official fact; OCA `queue_job` is **community, not core**; confirm against 19.0 source if
+load-bearing). **New/sharpened open questions** surfaced for ChatGPT
+(custom-vs-public GraphQL mandate; **GID permanence not asserted**; **no general mutation
+idempotency** beyond `@idempotent`; `ir.model.data` `(module,name)` uniqueness unconfirmed;
+`sudo()` bypass not literally on `security.rst`; **Odoo Online feasibility open**). **DEC-003 and
+MVP scope are unchanged; competitor evidence was not promoted to official fact; implementation
+remains blocked.** The framing routes everything back here as **inputs**; **no AR row is decided,
+accepted, proposed for active review, or re-litigated.** All rows stay "Not decided / Evidence
+pending" pending sufficient research + ChatGPT approval (`CLAUDE.md` §4–§5; RB-14). Recommended
+decision order (a **recommendation**): decide **AR-002, AR-003, AR-005 before implementation
+planning**; **AR-006/007/008 depend on them**; **AR-004 waits**. See DP-006's evidence-
+consistency gate in `defect-pattern-log.md`._

@@ -184,3 +184,47 @@ must be re-checked before that decision is finalized — access can change (WAF/
 vendor doc releases).* This refines DP-001 (re-read the source) and DP-003 (blocked-source
 handling); it is not a new recurring pattern. **DEC-003 and the accepted MVP scope are
 unchanged**; architecture stays RB-14 / AR-002…AR-008-gated; implementation stays blocked._
+
+_**RB-14 Architecture Preparation — Part 1 note (2026-07-01): no new defect pattern.** RB-14
+Part 1 produced the first architecture **framing** docs (`../03-architecture/*`) + a current
+official-source refresh, and **added no new defect occurrence** to any category — **no new DP
+row, no counter change.** The sprint **applied, not re-triggered**, the standing prevention
+rules: **DP-001 (re-read the source)** was applied to the platform facts — a scoped
+official-source re-verification (2026-07-01, ~40 Tier-1 pages, verbatim quotes) that **surfaced
+version-sensitive deltas** (GraphQL `latest` alias `2026-04`→`2026-07`; `@idempotent` on
+inventory set/adjust **required as of 2026-04** with the 2026-01-optional detail; `productSet`
+delete-on-omit is **list-fields-only**; dual offline-token model) rather than trusting the
+one-day-old baseline, exactly the DP-001 discipline; **DP-003/DP-004** — competitor evidence
+was kept as evidence and **not promoted to official fact** in the framing docs (official facts
+and competitor demonstrations are separately labelled); **DP-005** — every candidate option and
+recommended decision order is **explicitly labelled an input/`[Not decided]`, never a decision**;
+**DP-006 evidence-consistency gate** — official facts, competitor evidence, inferences,
+recommendations, and open questions are kept distinct, and **conditional platform requirements
+stay conditional** (e.g. the GraphQL-only mandate is scoped to *new public apps*; the
+custom-app scope is left an **open question**, not asserted). A few facts were **conservatively
+downgraded to open questions** on re-verification (GID permanence not asserted; no general
+mutation idempotency beyond `@idempotent`; `ir.model.data` `(module,name)` uniqueness
+unconfirmed; `sudo()` bypass not literally on `security.rst`) — the opposite of over-claiming,
+consistent with DP-001/DP-003. **No architecture decision was made; DEC-003 and MVP scope are
+unchanged; implementation stays blocked** (`CLAUDE.md` §4–§5; RB-14)._
+
+_**RB-14 Part 1 — PR #57 revision note (2026-07-01): classification/date caveats cleaned; no new
+defect counter.** ChatGPT review of PR #57 returned **REVISE** for **source-classification and
+evidence-date consistency** (substance accepted directionally — AR-002/003/005 framed-not-decided;
+no code; no architecture decision; no implementation authorization). Cleaned, without changing
+architecture scope or any decision: (1) the Shopify/Odoo official-notes "Source hierarchy and
+access date" sections now distinguish the **Sprint B baseline (2026-06-30)** from the **RB-14
+refresh (2026-07-01)** and record that GraphQL `latest` moved `2026-04`→`2026-07`; (2) **"Odoo
+core has no async job queue"** was **downgraded from [Official fact] to [Inference from official
+fact]** (docs document only `ir.cron`; `queue_job` is community, not core; verify vs 19.0 source
+if load-bearing) consistently across the framing map, AR-003 framing, this log's RB-14 note, and
+the handoff; (3) **secret/config storage** (`ir.config_parameter`/config-model/encrypted-field)
+is no longer implied as an official recommendation — reclassified **[Open question] + [Inference]**;
+(4) the **`ir.model.data` column list + `(module,name)` uniqueness** stay **[Open question]** (not
+official-doc fact); (5) **custom-app compliance-webhook** wording made conservative — the
+App-Store *review gate* may not apply to a custom app, but **non-App-Store privacy/data-deletion
+obligations are left [Open question], not assumed absent** (removed the word "sidesteps"). This is
+a **classification/consistency correction, not a new defect occurrence** — the corrections are
+applications of DP-001/DP-003/DP-006 (cite/classify precisely; don't over-classify). **No new DP
+row; no counter change.** DEC-003 and MVP scope unchanged; architecture stays RB-14-gated;
+implementation stays blocked._
