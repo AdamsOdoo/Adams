@@ -50,3 +50,13 @@ the weak/blocked competitor evidence (Teqstars 403, EC/R5 setup guide, 17 unread
 Confluence articles) are **gated decisions / research gaps**, tracked in the product
 vision's "Open questions", the handoffs, and `architecture-review-log.md` — **not**
 technical debt._
+
+_**Product Sprint F note (2026-07-01): none.** Sprint F was an MVP-proposal /
+synthesis-only sprint (MVP scope proposal + non-MVP boundaries + user stories + handoffs)
+— **no code, no module, no implementation shortcuts.** The open MVP/architecture questions
+(direction/export, Domain 9 minimum, refunds/cancellations, distribution AR-002, queue
+framework AR-003, binding model AR-005, error/retry taxonomy AR-006, inventory/fulfilment
+AR-007/008, module boundaries AR-004, bulk ops, multi-store/company) and the weak/blocked
+competitor evidence (Teqstars 403, EC/R5 setup guide, 17 unread VT Confluence articles)
+are **gated decisions / research gaps**, tracked in `mvp-scope.md` "Open questions", the
+handoffs, and `architecture-review-log.md` — **not** technical debt._

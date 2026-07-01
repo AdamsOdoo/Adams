@@ -12,6 +12,237 @@
 > RB-14 / AR-002…AR-008, both gated). Access date for competitor evidence:
 > 2026-06-30; session date: 2026-07-01.
 
+# Product Sprint F Handoff
+
+> **Product Sprint F — MVP Scope Proposal, Non-MVP Boundaries, and User Stories
+> (RB-13).** MVP-proposal synthesis only; **no-code gate in force** (`CLAUDE.md`
+> §4–§5). High-power mode **not required** (focused MVP synthesis of already-merged
+> repo evidence — no new competitor crawling, no research fan-out). Everything is a
+> **proposal / input / inference / recommendation** — **no MVP scope is finalized**
+> (ChatGPT accepts at RB-13) and **no architecture is decided** (RB-14 / AR-002…AR-008,
+> all Not decided / Evidence pending). Session date 2026-07-01.
+
+## Sprint F revision (PR #54 review — 2026-07-01)
+
+ChatGPT review returned **REVISE** — a small consistency patch (no new research, no
+scope change). Corrected on the same branch (`docs: clarify refund acceptance principle
+in sprint f`):
+
+- **Refund sync remains open / lean defer** (C-RET-01, US-E4-06) — **not** turned into
+  MVP.
+- The **MVP acceptance principles** (`mvp-scope.md`) and the user-stories acceptance
+  principles now clarify that the **idempotent-refund / no-double-refund regression
+  scenario (A-IMP-4) applies only if refund handling is included in MVP; if refunds are
+  deferred, it is carried forward as a mandatory acceptance principle for the first
+  refund/refund-sync sprint** (never dropped).
+- **No MVP scope finalized; no architecture decision made.** Consistency correction only
+  (see the Sprint F revision note in `../05-qa/defect-pattern-log.md`; not a new defect
+  occurrence, no counter change). MVP remains **proposed, not final**.
+
+## Session summary
+
+Produced the **evidence-based MVP scope proposal** for the Odoo 19 ↔ Shopify
+Connector — `docs/02-product/mvp-scope.md` (the main deliverable),
+`docs/02-product/non-mvp-and-later-phases.md` (strict boundaries), and
+`docs/02-product/user-stories.md` (10 MVP epics + 6 later-phase epics) — consuming the
+Sprint D taxonomy/evidence map and the Sprint E vision + setup/UX principles. The
+proposal recommends **Option A — "correctness core, import-first"**: a **single-store**
+connector that **imports** products (variants + basic images + base price), customers
+(deduped), and orders (basic lifecycle + the minimal payment/journal representation the
+Odoo order flow needs), and **writes back** inventory (multi-location-aware, idempotent)
+and fulfilment/tracking, on a full **correctness engine** (layered webhooks + scheduled
++ first-class reconciliation + manual; idempotency; GID↔Odoo binding + documented dedup
+keys; per-record isolation; retry classification with safe manual retry; rate-limit
+awareness; resumable jobs) with an **operator experience** (guided setup + readiness
+self-test; command center; recovery-first error center; honest freshness) and
+**role-based access** + open docs. It **excludes/defers** product/customer export,
+refunds/returns lifecycle, payouts, Markets/B2B/POS/gift cards/metafields, multi-store &
+multi-company, pricelists/per-market, custom transforms, bulk-ops-as-a-feature, and
+advanced analytics. The **DP-006 evidence-consistency gate** (8 checks) was applied to
+every capability. **No connector code, no Odoo module, no MVP finalization, no
+architecture decisions, no ADRs, no implementation plan, no module boundaries, no
+queue/API/distribution/data-model choices** were produced. Synthesis was
+**worker-owned** (no fan-out).
+
+## Files created or updated
+
+- `docs/02-product/mvp-scope.md` (**new** — main deliverable).
+- `docs/02-product/non-mvp-and-later-phases.md` (**new**).
+- `docs/02-product/user-stories.md` (**new**).
+- `docs/02-product/product-research-handoff.md` (**updated** — this Sprint F section).
+- `docs/01-research/research-handoff.md` (**updated** — Sprint F handoff + checkpoints).
+- `docs/05-qa/defect-pattern-log.md` (**updated** — Sprint F note: DP-006 gate applied,
+  not re-triggered; no new occurrence).
+- `docs/05-qa/architecture-review-log.md` (**updated** — Sprint F non-decision note:
+  MVP proposal supplies capability-scope inputs to AR-002…AR-008; all still Not decided
+  / Evidence pending).
+- `docs/05-qa/rejected-approaches-log.md` (**updated** — Sprint F "nothing rejected"
+  note; MVP exclusions are recommendations-against-MVP, not rejected approaches).
+- `docs/05-qa/technical-debt-register.md` (**updated** — Sprint F "no debt" note).
+
+## MVP proposal summary
+
+- **Thesis:** *small but excellent = a correct, observable, recoverable single-store
+  sync loop across the core objects — proven, not just claimed — wrapped in an operator
+  experience a non-developer can run.* Win on **demonstrated correctness** +
+  **operator experience**, at the **demonstrated object baseline for one store** — not
+  on object-direction breadth or premium surfaces.
+- **Recommended option:** Option A (correctness core, import-first), chosen over
+  Option B (bidirectional catalog — doubles complexity, forces destructive-apply safety
+  + AR-002/005 early) and Option C (thin import-only pilot — violates the correctness
+  non-negotiables; small but not excellent).
+- **Quality bar:** correct-under-failure, recoverable, observable & honest, safe,
+  approachable-then-powerful, evidenced & documented, modular & upgrade-safe.
+
+## Recommended MVP scope
+
+**Proposed for ChatGPT review — not final until accepted.** Include: store connection
++ credential masking + guided setup + test-connection + readiness self-test
+(C-CONN-01…06, C-FUL-03); product/variant/basic-image/base-price import + exclude-from-
+sync (C-PROD-01/04, C-VAR-01/02, C-PRICE-01); customer import + multi-key matching +
+basic address (C-CUST-01/03/04); order import + backfill (60-day gate) + status map +
+basic workflow (C-ORD-01…04); inventory write-back (multi-location-aware, idempotent) +
+quantity-field default + controlled stock import (C-INV-01…04); fulfilment + tracking
+write-back (C-FUL-01/03); layered sync + reconciliation + HMAC + id-dedup + freshness
+(C-SYNC-01…07); queue/job concept + retry classification + safe retry + idempotency +
+rate-limit awareness + resumable jobs (C-JOB-01…05/07); reason-coded logs + audit +
+recovery-first error center + notifications (C-OBS-01…04); command center
+(C-DASH-01…06); essential mappings + binding/dedup keys + location/gateway routing
+(C-MAP-01…04); role-based access + multi-store-safe keys (C-MULTI-03, C-MULTI-01);
+open docs + changelog + built-in self-test (C-DOCS-01…03). **Open (ChatGPT direction
+call):** product/customer export (C-PROD-02/05, C-CUST-02), Domain 9 minimum
+(C-PAY-01/02/03), refunds/cancellations (C-RET-01/03), bulk ops (C-JOB-06).
+
+## Recommended exclusions
+
+Advanced refunds/returns lifecycle (C-RET-02), payouts (C-POUT-01/02), Markets/B2B/POS/
+gift cards/metafields/extended breadth (C-ADV-01…06), multi-company (C-MULTI-02),
+full multi-store (C-MULTI-01), pricelists/per-market (C-PRICE-02/03), SEO/taxonomy +
+BoM/kit (C-VAR-03/04), order risk (C-ORD-05), multi-package fulfilment (C-FUL-02),
+custom Python transforms (within C-MAP-03), dedicated analytics/financial reporting
+(C-RPT-01/02), App-Store/Built-for-Shopify + public demo packaging (C-DOCS-04, within
+C-DOCS-03 — distribution-gated). Full rationale + revisit conditions in
+`non-mvp-and-later-phases.md`.
+
+## User story summary
+
+10 MVP epics (store setup & readiness; product/catalog; customer import & matching;
+order import & lifecycle; inventory & freshness; fulfilment & tracking; logs/errors/
+retries/recovery; command center; mapping & configuration; permissions & roles) with
+persona-driven, testable, product-level stories (P1–P4), each traced to capability IDs,
+evidence strength, and AR gate; plus 6 later-phase epics (L1 bidirectional; L2 financial
+depth; L3 payouts; L4 premium breadth; L5 multi-tenancy; L6 scale & analytics).
+**Stories are not implementation tasks** (no code-level criteria, no screens/modules).
+
+## Evidence-consistency gate
+
+The **DP-006 evidence-consistency gate** was **applied, not re-triggered** (see
+`mvp-scope.md` "Evidence-consistency review", 8 checks): Tier-1 facts labelled
+**[Fact]**; EM/VT-demonstrated weighted over SH/WK/EC/TQ claims; competitor-claim-only
+items kept out or flagged (pHash image dedup, TQ breadth); improvement opportunities
+labelled **[Inference]** (unified command center, recovery-first error center, freshness,
+empty states, **auto-apply stock C-INV-04** → routed to AR-007, not decided); conditional
+items kept conditional (OAuth/distribution/queue/binding/taxonomy/inventory/fulfilment/
+module-boundaries); WK multi-company stays a config field (➖, DP-004), WK import-stock
+stays ⬜; "real-time" never asserted (C-SYNC-07 honesty). No claim was promoted to a
+fact and no capability entered MVP as a decision.
+
+## MVP inputs, not final decisions
+
+The MVP scope, the three options, the include/exclude/defer/open calls, the
+MVP-critical spine, and the acceptance principles are **inputs for RB-13 acceptance**,
+**not** commitments. Every inclusion is marked **"Proposed MVP inclusion — pending
+ChatGPT acceptance."** The document is banner-marked **proposed, not final**.
+
+## Architecture inputs, not decisions
+
+MVP commits **requirements/intent**, never mechanism. Architecture-dependent items are
+mapped to **AR-002…AR-008** (all Not decided / Evidence pending) in `mvp-scope.md`
+"Architecture-dependent MVP items": AR-002 (distribution/API/bulk/App-Store), AR-003
+(orchestration/queue framework), AR-004 (module boundaries/config model/feature flags),
+AR-005 (binding/dedup data model/keys), AR-006 (error-retry taxonomy/idempotency
+mechanism/reconciliation cadence), AR-007 (inventory design/apply mode), AR-008
+(fulfilment design). **No AR row is decided, proposed for active review, or
+re-litigated** — logged as a Sprint F non-decision note in `architecture-review-log.md`.
+
+## Open questions
+
+Primary MVP persona (P1 vs P2); **direction** (is export in MVP or Phase 2); **Domain 9
+minimum** (smallest payment/invoice/journal representation); **refunds/cancellations**
+(basic idempotent, or deferred); **distribution (AR-002)** (unblocks OAuth-mandatory,
+GraphQL-only, App-Store/demo packaging); single- vs multi-store/company at MVP
+(proposed: single-store, multi-store-safe keys); reconciliation cadence + per-object vs
+global freshness (AR-003/006); error/retry taxonomy depth + auto-retry set (AR-006);
+essential mappings + dedup/match key set (AR-005); bulk-ops need for backfill (C-JOB-06);
+readiness/self-test check set; Odoo edition/hosting (Odoo Online support? edition-gated
+reports disclosure).
+
+## Learning feedback loop
+
+- **New issues discovered:** none. No new defect pattern emerged. The **DP-006
+  evidence-consistency gate** (3rd-occurrence, ESCALATED) was **applied, not
+  re-triggered**: no competitor claim was promoted to a fact, no capability entered MVP
+  as a decision, weak/claim-only evidence was kept out of scope (not turned into scope),
+  and no architecture was finalized. DP-003/DP-004 (claim ≠ fact; config field ≠
+  demonstrated support; market promise ≠ demonstrated bidirectionality) and DP-005
+  (classification/scope is an input, not a decision) were applied throughout.
+- **Repeated issue patterns:** none at threshold this sprint (no new occurrence added to
+  any category).
+- **Rules/checklists updated:** none required — existing rules sufficed and were
+  applied. QA logs received non-decision / no-new-issue notes only.
+- **New rejected approaches:** none — MVP exclusions are **recommendations against MVP
+  inclusion only**, not rejected architecture approaches (`CLAUDE.md` §10); noted in
+  `rejected-approaches-log.md`.
+- **New technical debt:** none (no code). Noted in `technical-debt-register.md`.
+- **Architecture concerns:** the MVP proposal supplies **capability-scope inputs** to
+  AR-002…AR-008 — recorded as a **non-decision note** in `architecture-review-log.md`.
+  All rows stay Not decided / Evidence pending.
+- **Tests or review gates needed:** none active (synthesis). The DP-006
+  evidence-consistency gate remains the standing pre-MVP/architecture review gate; the
+  MVP acceptance principles reference the seeded regression scenarios (A-IMP-4).
+- **Should future prompts change? No** (beyond what Sprints D/E encoded) — MVP-synthesis
+  prompts should keep requiring every scope call to be an **input** with MVP=RB-13 /
+  architecture=RB-14 gating, keep synthesis worker-owned, keep conditional platform
+  items conditional (DP-006), and keep exclusions as recommendations-against-MVP (not
+  rejected approaches). Branch reality remains the harness-designated `claude/...`
+  branch while the PR targets `Shopify-connector`.
+
+## What ChatGPT should review
+
+1. **Thesis & option choice** — is "correct, observable, recoverable single-store loop,
+   import-first" the right MVP thesis, and is **Option A** right over B and C?
+2. **Evidence-consistency gate (DP-006)** — confirm the 8-check review holds and nothing
+   weak/claim-only became scope; auto-apply (C-INV-04) stays inference.
+3. **Include/exclude/defer/open** — especially the **open** direction forks
+   (export, Domain 9 minimum, refunds/cancellations, bulk ops).
+4. **Architecture-dependent table** — confirm MVP commits *intent* only; no AR row
+   decided.
+5. **MVP-critical spine + acceptance principles** — endorse/amend the reliability/UX/
+   config/security core and the (product-level, not code-level) acceptance principles.
+6. **Boundaries & stories** — confirm the non-MVP boundaries are strict enough and the
+   user stories are not implementation tasks.
+
+## Recommended next sprint
+
+Await ChatGPT's **RB-13 MVP acceptance/revision**. On acceptance, proceed to **RB-14
+(architecture preparation)** against AR-002…AR-008 — starting with the **distribution
+decision (AR-002)**, which unblocks the most conditionals (OAuth/GraphQL/App-Store), and
+the **queue-framework/orchestration (AR-003)** and **binding/dedup model (AR-005)** that
+the correctness core depends on — all gated and ChatGPT-reviewed. Optionally firm up
+weak/blocked evidence (TQ 403; EC/R5; 17 unread VT Confluence) if ChatGPT wants firmer
+classification. Keep the no-code gate; one scoped objective per session.
+
+## Stop confirmation
+
+Stopped at the Sprint F boundary as instructed. **No** connector code, **no** Odoo
+module, **no** MVP finalization, **no** architecture decisions, **no** ADRs, **no**
+implementation plan, **no** module boundaries, **no** REST/GraphQL, queue-framework,
+distribution, or data-model choices. MVP scope is marked **proposed, not final**.
+`main` and plain `dev` untouched; only the Sprint F allowed files changed. Awaiting
+ChatGPT review.
+
+---
+
 # Product Sprint E Handoff
 
 > **Product Sprint E — Product Vision, Quality Bar, UX Principles, and

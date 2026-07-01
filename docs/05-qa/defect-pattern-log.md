@@ -94,3 +94,36 @@ bidirectionality), and DP-005 (classification is an input, not a decision) were
 center, freshness indicators) were labelled **inference**, not demonstrated competitor
 capability. **No counter change; no new row.** MVP stays RB-13-gated; architecture
 stays RB-14 / AR-002…AR-008-gated._
+
+_**Product Sprint F note (2026-07-01): none — DP-006 gate applied, not re-triggered.**
+Product Sprint F (MVP scope proposal + non-MVP boundaries + user stories;
+`../02-product/mvp-scope.md`, `../02-product/non-mvp-and-later-phases.md`,
+`../02-product/user-stories.md`) **added no new defect occurrence** to any category. The
+**DP-006 evidence-consistency gate** was **applied throughout** as an explicit 8-check
+review in `mvp-scope.md`: no competitor claim was promoted to a fact; **weak/claim-only
+evidence was kept OUT of scope** (pHash image dedup, Teqstars 403 breadth, SH/EC breadth
+were not turned into MVP scope); improvement opportunities stayed **inference** (unified
+command center, recovery-first error center, freshness indicators, empty states, and
+**auto-apply stock C-INV-04 → routed to AR-007, not decided**); conditional platform
+items stayed conditional/open (OAuth-first public/App-Store-only, distribution AR-002,
+queue framework AR-003, REST/GraphQL AR-002, binding data model AR-005, error/retry
+taxonomy AR-006, inventory/fulfilment AR-007/008, module boundaries AR-004); WK
+multi-company stayed a config field (➖, DP-004) and WK import-stock stayed ⬜; "real-time"
+was never asserted (C-SYNC-07 honesty). The MVP proposal **did not finalize architecture**
+(every mechanism marked *Architecture-dependent — must be resolved in RB-14*) and **did
+not turn weak evidence into scope** — the two Sprint-F-specific risks the prompt asked to
+watch. DP-003/DP-004 and DP-005 (classification/scope is an input, not a decision) were
+**applied, not re-triggered**. **No counter change; no new row.** MVP stays RB-13-gated
+(proposed, not final); architecture stays RB-14 / AR-002…AR-008-gated._
+
+_**Product Sprint F revision (2026-07-01, PR #54 review — consistency patch):** ChatGPT
+review returned **REVISE** for a small wording consistency issue: the MVP acceptance
+principles referenced the seeded **idempotent-refund / no-double-refund** regression
+scenario (A-IMP-4) as if refunds were definitely in MVP, whereas refund sync is marked
+**open / lean defer** (C-RET-01). The wording in `../02-product/mvp-scope.md` and
+`../02-product/user-stories.md` was clarified: **the idempotent-refund / no-double-refund
+regression applies only if refund handling is included in MVP; if refunds are deferred it
+is carried forward as a mandatory acceptance principle for the first refund/refund-sync
+sprint** (never dropped). This was a **consistency correction, not a new defect
+occurrence** — **no new DP row, no counter change.** No MVP scope was finalized and no
+architecture decision was made; MVP remains **proposed, not final**._

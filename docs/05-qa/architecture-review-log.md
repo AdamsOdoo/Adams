@@ -129,3 +129,30 @@ only** and re-litigates nothing; **no AR row is decided, accepted, proposed for 
 review, or re-litigated.** All remain "Not decided / Evidence pending" pending
 sufficient research + ChatGPT approval (`CLAUDE.md` §4–§5; RB-14). See DP-006's
 evidence-consistency gate in `defect-pattern-log.md`._
+
+_**Product Sprint F non-decision note (2026-07-01) — NOT decisions; AR rows remain "Not
+decided / Evidence pending".** The Sprint F MVP scope proposal (`../02-product/mvp-scope.md`),
+non-MVP boundaries (`../02-product/non-mvp-and-later-phases.md`), and user stories
+(`../02-product/user-stories.md`) now provide **capability-scope inputs** to the open
+architecture questions — MVP *intent/requirements* only, never a design choice. The MVP
+proposal commits the **what**, not the **how**, and explicitly maps each
+architecture-sensitive capability to its AR row as *Architecture-dependent — must be
+resolved in RB-14 before implementation* (`mvp-scope.md` "Architecture-dependent MVP
+items"). For the record only: **AR-002 (API/distribution/bulk/App-Store)** — depends
+C-CONN-01 (auth style), C-PROD-01/02, C-VAR-01, C-ORD-02, C-JOB-05/06, C-DOCS-04
+(distribution public-vs-custom still open; REST/GraphQL/hybrid open); **AR-003 (sync
+orchestration/queue)** — depends C-SYNC-01/03/04/06, C-JOB-01/07, C-ORD-01/04, C-DASH
+enqueue (`ir.cron` vs OCA `queue_job` still open; Odoo-Online feasibility open); **AR-004
+(module boundaries/config/feature flags)** — depends C-MAP-03, C-MULTI-04, feature-flag
+visibility (**no module names/boundaries defined**); **AR-005 (binding/dedup)** — depends
+C-MAP-01/02, C-CUST-03, C-PROD-01, C-MULTI-01 multi-store-safe keys (`ir.model.data`
+reuse vs dedicated model, and deleted-binding handling, still open); **AR-006
+(error/retry/idempotency)** — depends C-JOB-02/03/04, C-OBS-03, C-DASH-04, C-SYNC-06
+(taxonomy, idempotency mechanism, reconciliation cadence open); **AR-007 (inventory)** —
+depends C-INV-01/02/03/04 (fields, multi-location, **auto-apply-vs-review** open — DP-006);
+**AR-008 (fulfilment)** — depends C-FUL-01/02 (FulfillmentOrder, multi-package/location
+open). The proposal routes these here as **inputs only** and re-litigates nothing; **no
+AR row is decided, accepted, proposed for active review, or re-litigated.** All remain
+"Not decided / Evidence pending" pending sufficient research + ChatGPT approval
+(`CLAUDE.md` §4–§5; RB-14). See DP-006's evidence-consistency gate in
+`defect-pattern-log.md`._

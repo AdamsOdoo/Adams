@@ -61,3 +61,18 @@ section and the UX doc's "Anti-patterns to avoid" restate the Sprint C **avoid-l
 for our design and ChatGPT/architecture review rejects them (the "Arch review: YES"
 items remain seeded against AR-002…AR-008, evidence-pending). No approach is rejected
 in this sprint; no entry is added here._
+
+_**Product Sprint F note (2026-07-01): none.** Sprint F was an MVP-proposal / synthesis
+sprint (MVP scope proposal + non-MVP boundaries + user stories). It **evaluated no design
+option to rejection.** Items placed outside the MVP in
+`../02-product/non-mvp-and-later-phases.md` (export, full payments/refunds/returns/
+cancellations, payouts, multi-package fulfilment, order risk, SEO/BoM/pricelists/
+per-market, Markets/B2B/POS/gift cards/metafields/extended breadth, multi-store/company,
+custom transforms, analytics, App-Store/demo packaging) are **recommendations against
+MVP inclusion only** — each carries a "what must be true before including" **revisit
+condition** and a later phase. Per `CLAUDE.md` §10 and this log's rules, an approach is
+entered here as **Rejected** only after it is evaluated for **our** design and
+ChatGPT/architecture review rejects it — which has not happened. The weak/blocked
+competitor evidence kept out of scope (pHash image dedup, Teqstars 403 breadth, EC/SH
+breadth, WK config-field-only multi-company) are **evidence down-weights under
+DP-003/DP-004, not rejected approaches**. No entry is added here._
