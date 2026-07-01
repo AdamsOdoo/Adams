@@ -272,3 +272,38 @@ pending" pending sufficient research + ChatGPT approval (`CLAUDE.md` §4–§5; 
 decision order (a **recommendation**): decide **AR-002, AR-003, AR-005 before implementation
 planning**; **AR-006/007/008 depend on them**; **AR-004 waits**. See DP-006's evidence-
 consistency gate in `defect-pattern-log.md`._
+
+_**RB-14 Architecture Preparation — Part 2 non-decision note (2026-07-01) — NOT decisions; AR
+rows remain "Not decided / Evidence pending".** This sprint re-checked **only** the high-risk
+open questions surfaced by RB-14 Part 1 against **official Shopify docs**, **official Odoo 19.0
+docs**, and **official Odoo 19.0 source code** (`odoo/odoo` 19.0), then **narrowed** AR-002/AR-003/
+AR-005 into **decision candidates** for ChatGPT — producing
+[`rb14-part2-open-question-resolution.md`](../03-architecture/rb14-part2-open-question-resolution.md)
+and [`rb14-decision-candidate-brief.md`](../03-architecture/rb14-decision-candidate-brief.md) and
+adding RB-14 Part 2 notes to the AR-002/003/005 framing docs + the framing map. **These documents
+RESOLVE/NARROW EVIDENCE and DECIDE nothing.** Explicitly: **no** REST/GraphQL/hybrid choice,
+**no** public-vs-custom distribution choice, **no** OAuth-vs-token choice, **no** `ir.cron`-vs-
+`queue_job`-vs-external-worker choice, **no** binding data model, **no** module boundaries — every
+narrowing is labelled `[Recommendation]` / `[Decision candidate]`; **AR-002, AR-003, AR-005 stay
+"Not decided / Evidence pending"; AR-004/006/007/008 remain later and not framed.** Evidence
+outcomes (facts, not decisions): **resolved from source** — `ir.cron` signatures + failure
+constants 3/5/7d (RQ-003-3), `ir.model.data` fields + **`UniqueIndex('(module, name)')`** with no
+per-store/audit fields (RQ-005-3), **`sudo()` bypasses access rights AND record rules** (RQ-005-4);
+**materially narrowed** — **24-hour** idempotency dedup TTL + fixed **17-mutation** `@idempotent`
+set + **no general mutation idempotency/`clientMutationId`** (RQ-005-2), **"Odoo Online is
+incompatible with custom modules"** → substrate is Odoo.sh/on-prem (RQ-003-1), custom apps **not
+categorically forbidden from REST** with GraphQL the sole long-term API and no REST EOL (RQ-002-1),
+protected-data access **"Always available"** for custom apps vs **"Requires review"** for public
+with compliance webhooks App-Store-scoped (RQ-002-2), offline token model + 90-day rotating refresh
+(RQ-002-3); **re-confirmed open** — **GID permanence not asserted** (RQ-005-1), only `ir.cron` in
+core with a general async queue **not found** (stays an inference, RQ-003-2). **Still-open items
+kept open** (custom-app compliance obligations — **not assumed absent**; `@idempotent` key
+uniqueness scope; bulk-op idempotency; Odoo.sh/on-prem jobrunner/`server_wide_modules` support;
+whole-repo async-queue absence). Candidate carry-forwards (inputs only): **AR-002** custom +
+GraphQL-first + offline token; **AR-003** internal cron-queue or `queue_job` (turnkey); **AR-005**
+dedicated per-domain or hybrid binding model. **Weak/avoid-candidates were noted but NOT entered in
+`rejected-approaches-log.md`** (formal rejection needs ChatGPT, `CLAUDE.md` §10). **DEC-003 and MVP
+scope unchanged; competitor evidence was excluded from this official-only pass; implementation
+remains blocked.** Recommended next: **RB-14 Part 3 — AR-002 decision sprint, only if ChatGPT
+accepts Part 2.** All rows stay "Not decided / Evidence pending" pending ChatGPT approval
+(`CLAUDE.md` §4–§5; RB-14). See DP-006's evidence-consistency gate in `defect-pattern-log.md`._
