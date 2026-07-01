@@ -28,9 +28,14 @@ and on what background-execution substrate?** Concretely:
 - **[Official fact]** Shopify **webhook delivery is not guaranteed**, so a correct
   sync **requires** a reconciliation path — orchestration is a **correctness**
   requirement, not a performance nicety.
-- **[Official fact]** Odoo **core has no async job queue** — only `ir.cron` (poll-based,
-  minute-precision, `--max-cron-threads` default 2). The substrate choice is therefore
-  a real architecture decision with a **community-dependency** dimension.
+- **[Official fact]** Odoo 19 official docs document **`ir.cron`** as the scheduled/
+  background execution mechanism (poll-based, minute-precision, `--max-cron-threads`
+  default 2). **[Inference from official fact]** The official docs reviewed **do not
+  document a general-purpose async job queue in Odoo core** (absence of documentation,
+  not a positive statement); **[Open question]** confirm against the Odoo 19 source if
+  this becomes load-bearing. **[Community / not official]** OCA `queue_job` is a
+  community dependency, **not Odoo core**. The substrate choice is therefore a real
+  architecture decision with a **community-dependency** dimension.
 - **[Inference]** AR-003 constrains AR-006 (retry/reconciliation cadence), AR-007
   (inventory apply), and AR-008 (fulfilment) — see
   [`architecture-decision-framing.md`](./architecture-decision-framing.md) §6.

@@ -117,11 +117,18 @@ Shopify / official Odoo), **access date** (2026-07-01), and **claim class** —
   mandatory compliance webhooks** — `customers/data_request`, `customers/redact`,
   `shop/redact` (the last "48 hours after a store owner uninstalls your app"); ack
   200-series and "Complete the action within 30 days." — `…/privacy-law-compliance`.
-- `[Inference from official fact]` A custom/Admin-created app gets its token in the
-  admin (no OAuth install flow) and therefore **sidesteps the App-Store OAuth-immediately
-  / GraphQL-only / compliance-webhook gates**, which are tied to App-Store distribution.
-  (Framing input for the public-vs-custom AR-002 fork; the custom-app exemption from
-  compliance webhooks is an inference, not a literal statement.)
+- `[Official fact]` Shopify's fetched privacy/App-Store docs state the **mandatory
+  compliance webhooks are required for apps listed/distributed through the Shopify App
+  Store**. — `…/privacy-law-compliance`, `…/app-store-requirements`.
+- `[Inference]` A custom/Admin-created app gets its token in the admin (no OAuth install
+  flow) and is **outside the App-Store review path**, so the **App-Store submission gate
+  itself** (OAuth-immediately / GraphQL-only / compliance-webhook *review* requirements)
+  may not apply to it — framing input for the public-vs-custom AR-002 fork.
+- `[Open question]` **Do not conclude that privacy / data-deletion obligations are absent
+  for custom/private apps.** Whether (and which) non-App-Store privacy/GDPR obligations
+  apply to a custom deployment is **unconfirmed** and must be verified before an AR-002
+  distribution decision — the App-Store *review* gate not applying is **not** the same as
+  privacy obligations being absent.
 
 ### AR-003 — webhooks, rate limits, bulk operations
 
@@ -288,8 +295,12 @@ Shopify / official Odoo), **access date** (2026-07-01), and **claim class** —
   field `groups` apply to the Superuser in `fields_get` but "not in read/write"). The
   Sprint B note asserted the bypass citing the security page — **treat the bypass as a
   to-re-verify item** (likely on the ORM/Environment `sudo` docs) rather than an
-  un-sourced fact. Also open: an official **credential/secret storage** recommendation
-  (e.g. `ir.config_parameter` vs encrypted field) is not on the security page.
+  un-sourced fact.
+- `[Open question]` **No official credential/secret storage recommendation** was found in
+  the fetched Odoo docs — `ir.config_parameter` vs a dedicated config model vs an
+  encrypted field is **not** presented as an official recommendation. `[Inference]` Any
+  credential-storage design must be protected by access rights / groups (field-level
+  `groups` on credential fields) and **verified before implementation**. — `.../backend/security.rst`.
 
 ---
 
@@ -346,7 +357,8 @@ Shopify / official Odoo), **access date** (2026-07-01), and **claim class** —
 - Orders 60-day window + `read_all_orders` approval; protected-customer-data Level 1/2.
 - GID format + REST↔GID mapping fields; webhook-ID dedup procedure.
 - Odoo: `ir.cron` failure model (3→skip; 5-over-7-days→deactivate+notify); batching +
-  `_commit_progress`; only `ir.cron` in core (no async queue); `--max-cron-threads`=2;
+  `_commit_progress`; only `ir.cron` documented in core (no general-purpose async queue
+  documented — an [Inference from official fact]; `queue_job` is community); `--max-cron-threads`=2;
   WSGI separate cron process; external IDs in `ir.model.data`; in-place `_inherit` vs
   discouraged `_inherits`; access-rights/record-rules semantics; Odoo.sh staging
   neutralization.
@@ -399,15 +411,19 @@ Shopify / official Odoo), **access date** (2026-07-01), and **claim class** —
   delete-on-omit (list fields) makes a **preview/dry-run + reliable binding** a
   correctness requirement for the controlled export path. Public distribution imports a
   heavy, dated obligation bundle (OAuth-immediately, TLS, GraphQL-only, Billing API, App
-  Bridge, 3 compliance webhooks, protected-data Level 2); a custom app sidesteps the
-  App-Store gates. See [`ar-002-distribution-api-framing.md`](./ar-002-distribution-api-framing.md).
+  Bridge, 3 compliance webhooks, protected-data Level 2); a custom app is **outside the
+  App-Store review path** so those *submission gates* may not apply — but **non-App-Store
+  privacy/data-deletion obligations for custom apps are an [Open question], not assumed
+  absent**. See [`ar-002-distribution-api-framing.md`](./ar-002-distribution-api-framing.md).
 - **AR-003 (orchestration/queue):** webhooks-not-guaranteed → **reconciliation is
   mandatory, not optional**; the 5s timeout → **fast-ack + out-of-band processing**; the
   8-consecutive-failure auto-delete (Admin-API subs) + Odoo cron auto-deactivation (5/7d)
   mean the connector needs its **own durable job/queue state + external observability**;
   Odoo core provides **only `ir.cron`** (queue is a community dependency), and **Odoo
-  Online feasibility is open** — so the substrate is a real, hosting-coupled decision. See
-  [`ar-003-sync-orchestration-framing.md`](./ar-003-sync-orchestration-framing.md).
+  Online feasibility is open** — so the substrate is a real, hosting-coupled decision.
+  (**[Inference from official fact]** the async-queue absence is inferred from the
+  documented scope — docs document only `ir.cron`; `queue_job` is community, not core.)
+  See [`ar-003-sync-orchestration-framing.md`](./ar-003-sync-orchestration-framing.md).
 - **AR-005 (binding/dedup/identity):** the **GID** is the natural canonical Shopify key
   (with REST↔GID mapping fields), **webhook-ID** is the per-delivery dedup key,
   **`@idempotent`** is now required on inventory writes, and **outbound write idempotency

@@ -101,8 +101,10 @@ and
 [`../01-research/odoo-official-architecture-notes.md`](../01-research/odoo-official-architecture-notes.md).
 The load-bearing facts (GraphQL-primary / REST-legacy; webhook delivery
 not-guaranteed → reconciliation; `@idempotent` on inventory/refund writes from
-2026-04; `productSet` delete-on-omit; Odoo core has only `ir.cron`, no async queue)
-were **re-verified current** on 2026-07-01.
+2026-04; `productSet` delete-on-omit; Odoo core documents only `ir.cron` — with **no
+general-purpose async job queue documented in core**, an **[Inference from official
+fact]** from the documented scope (OCA `queue_job` is community, not core; confirm
+against 19.0 source if load-bearing)) were **re-verified current** on 2026-07-01.
 
 ---
 

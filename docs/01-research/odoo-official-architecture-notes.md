@@ -66,7 +66,11 @@
 - **Tier 1 (used here):** official Odoo 19.0 documentation — the **Developer →
   Reference (backend)** pages, the **Server framework 101** tutorials, and the
   **Administration** (deploy / Odoo.sh / upgrade) pages.
-- **Access date for all claims:** **2026-06-30.**
+- **Access dates (two-stage):** the historical body below is the **Sprint B baseline,
+  access date 2026-06-30**; it **remains the Sprint B baseline unless refined by the
+  RB-14 refresh section above** (**RB-14 architecture refresh access date 2026-07-01**).
+  **Load-bearing AR-003/AR-005 facts should use the RB-14 refresh** where it supersedes
+  or sharpens Sprint B.
 - **Out of scope as Tier 1:** the OCA `queue_job` module and any Apps-Store
   module are **community**, not official Odoo — they are referenced only to mark
   what is *not* in core (see "Queue or async work").

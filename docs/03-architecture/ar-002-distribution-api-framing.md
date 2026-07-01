@@ -99,11 +99,17 @@ citations in [`../01-research/shopify-official-api-notes.md`](../01-research/sho
   (**Level 1** / **Level 2**) + Shopify approval; order access defaults to the **last
   60 days**, and all orders needs **`read_all_orders` + Shopify approval**.
   (shopify.dev/docs/apps/launch/protected-customer-data; …/usage/access-scopes)
-- **[Official limitation]** App Store apps must implement the **three mandatory
-  compliance webhooks** (`customers/data_request`, `customers/redact`, `shop/redact`),
-  authenticate **OAuth-first**, serve over **TLS**, and (new public apps) be
-  GraphQL-only + use the **Billing API**.
+- **[Official limitation]** Apps **listed/distributed through the Shopify App Store** must
+  implement the **three mandatory compliance webhooks** (`customers/data_request`,
+  `customers/redact`, `shop/redact`), authenticate **OAuth-first**, serve over **TLS**,
+  and (new public apps) be GraphQL-only + use the **Billing API**.
   (shopify.dev/docs/apps/launch/shopify-app-store/app-store-requirements)
+- **[Inference]** A custom/Admin-created app is **outside the App-Store review path**, so
+  the App-Store *submission gates* (incl. the compliance-webhook *review* requirement) may
+  not apply. **[Open question]** This is **not** a conclusion that privacy / data-deletion
+  obligations are **absent** for a custom/private app — non-App-Store privacy obligations
+  must be confirmed **before** the AR-002 distribution decision; do not treat custom
+  distribution as exempt from data-subject/deletion duties.
 - **[Official fact]** GraphQL uses a **calculated query-cost** model (points; single
   query ≤ 1,000 points; `extensions.cost` + `throttleStatus`); REST uses a
   **leaky-bucket** with **429 + `Retry-After`**. Large reads/writes can move to
@@ -122,9 +128,13 @@ Citations in [`../01-research/odoo-official-architecture-notes.md`](../01-resear
 - **[Official fact]** Odoo integrates external systems through standard addons that
   extend `sale`/`stock`/`product`/`account`/`delivery`; there is **no Shopify-specific
   transport in core** — the connector owns the HTTP/GraphQL client.
-- **[Official fact]** Secrets/config are typically stored as records (e.g.
-  `ir.config_parameter` or dedicated config models) behind **access rights / groups**;
-  field-level `groups` can restrict credential fields. (security.rst)
+- **[Official fact]** Odoo docs document **access rights, record rules, groups, and
+  field-level `groups`** for protecting data and fields (security.rst). **[Open
+  question]** Official guidance for connector **credential/secret storage** —
+  `ir.config_parameter` vs a dedicated config model vs an encrypted field — was **not
+  found** in the fetched Odoo docs, so none is an official recommendation. **[Inference]**
+  Any credential-storage design must be protected by **access rights / groups**
+  (field-level `groups` on credential fields) and **verified before implementation**.
 - **[Open question]** Whether **Odoo Online (SaaS)** permits the outbound HTTPS,
   external Python libraries, `server_wide_modules`, and long-running workers a given
   API/queue design needs — **hosting is not finalized here** and constrains AR-002 ↔

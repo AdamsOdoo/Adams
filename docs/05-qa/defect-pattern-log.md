@@ -207,3 +207,24 @@ mutation idempotency beyond `@idempotent`; `ir.model.data` `(module,name)` uniqu
 unconfirmed; `sudo()` bypass not literally on `security.rst`) — the opposite of over-claiming,
 consistent with DP-001/DP-003. **No architecture decision was made; DEC-003 and MVP scope are
 unchanged; implementation stays blocked** (`CLAUDE.md` §4–§5; RB-14)._
+
+_**RB-14 Part 1 — PR #57 revision note (2026-07-01): classification/date caveats cleaned; no new
+defect counter.** ChatGPT review of PR #57 returned **REVISE** for **source-classification and
+evidence-date consistency** (substance accepted directionally — AR-002/003/005 framed-not-decided;
+no code; no architecture decision; no implementation authorization). Cleaned, without changing
+architecture scope or any decision: (1) the Shopify/Odoo official-notes "Source hierarchy and
+access date" sections now distinguish the **Sprint B baseline (2026-06-30)** from the **RB-14
+refresh (2026-07-01)** and record that GraphQL `latest` moved `2026-04`→`2026-07`; (2) **"Odoo
+core has no async job queue"** was **downgraded from [Official fact] to [Inference from official
+fact]** (docs document only `ir.cron`; `queue_job` is community, not core; verify vs 19.0 source
+if load-bearing) consistently across the framing map, AR-003 framing, this log's RB-14 note, and
+the handoff; (3) **secret/config storage** (`ir.config_parameter`/config-model/encrypted-field)
+is no longer implied as an official recommendation — reclassified **[Open question] + [Inference]**;
+(4) the **`ir.model.data` column list + `(module,name)` uniqueness** stay **[Open question]** (not
+official-doc fact); (5) **custom-app compliance-webhook** wording made conservative — the
+App-Store *review gate* may not apply to a custom app, but **non-App-Store privacy/data-deletion
+obligations are left [Open question], not assumed absent** (removed the word "sidesteps"). This is
+a **classification/consistency correction, not a new defect occurrence** — the corrections are
+applications of DP-001/DP-003/DP-006 (cite/classify precisely; don't over-classify). **No new DP
+row; no counter change.** DEC-003 and MVP scope unchanged; architecture stays RB-14-gated;
+implementation stays blocked._

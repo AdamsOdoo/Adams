@@ -19,6 +19,26 @@
 > decisions; decides none.** No-code gate and no-architecture-decision gate in force
 > (`CLAUDE.md` §4–§5). Session date 2026-07-01.
 
+## PR #57 revision (2026-07-01, ChatGPT review — REVISE)
+
+ChatGPT reviewed PR #57 and returned **REVISE** for **source-classification and evidence-date
+consistency** (the framing substance was accepted directionally — AR-002/003/005 framed-not-decided;
+no code; no architecture decision; no implementation authorization). Corrected on the same branch
+(`docs: clean rb14 classification and date caveats`) **without changing architecture scope or any
+decision**: (1) the Shopify/Odoo official-notes "Source hierarchy and access date" sections now
+distinguish the **Sprint B baseline (2026-06-30)** from the **RB-14 refresh (2026-07-01)** and
+record GraphQL `latest` moving `2026-04`→`2026-07` (version-sensitive facts use the RB-14 refresh);
+(2) **"Odoo core has no async job queue"** downgraded from **[Official fact] → [Inference from
+official fact]** (docs document only `ir.cron`; `queue_job` community, not core; verify vs 19.0
+source if load-bearing); (3) **secret/config storage** (`ir.config_parameter`/config-model/
+encrypted-field) no longer implied as an official recommendation — **[Open question] + [Inference]**;
+(4) **`ir.model.data` column list + `(module,name)` uniqueness** kept **[Open question]**;
+(5) **custom-app compliance-webhook** wording made conservative — App-Store *review gate* may not
+apply, but **non-App-Store privacy/data-deletion obligations left [Open question], not assumed
+absent** (dropped "sidesteps"). **No architecture decision; DEC-003 and MVP scope unchanged; no
+code; implementation still blocked.** Logged as a no-new-defect note in
+`../05-qa/defect-pattern-log.md` (no counter change).
+
 ## Session summary
 
 Confirmed the pre-conditions (PR #55 + PR #56 merged into `Shopify-connector`; DEC-003 accepts
@@ -85,8 +105,10 @@ implementation blocked), `defect-pattern-log.md` (RB-14 no-new-defect note; no c
 
 Shopify: API strategy/versioning; products/`productSet`/variants; inventory + `@idempotent`;
 orders + protected customer data; webhooks + HMAC + reconciliation; rate limits + bulk ops; auth +
-distribution + compliance webhooks; GIDs/identity. Odoo: `ir.cron` reliability; queue absence +
-`--max-cron-threads`; ORM/external IDs/`ir.model.data`; security (access rights/record rules); Odoo.sh
+distribution + compliance webhooks; GIDs/identity. Odoo: `ir.cron` reliability; **async-queue
+absence as an [Inference from official fact]** (docs document only `ir.cron`; `queue_job` is
+community, not core); `--max-cron-threads`; ORM/external IDs/`ir.model.data`; security (access
+rights/record rules); Odoo.sh
 /on-prem hosting. **Confirmed unchanged** except the deltas below; full dated record in
 `docs/03-architecture/rb14-official-source-refresh.md`.
 

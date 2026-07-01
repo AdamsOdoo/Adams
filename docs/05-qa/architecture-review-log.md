@@ -257,7 +257,11 @@ decisions are framed — a **recommendation, not a decision**). **Official-sourc
 and dated; the load-bearing facts were re-confirmed current with a few **version-sensitive deltas
 flagged** (GraphQL `latest` alias now `2026-07`; `@idempotent` on inventory set/adjust
 **required as of 2026-04**, optional from 2026-01; `productSet` delete-on-omit is **list-fields-
-only**; dual offline-token model) and **new/sharpened open questions** surfaced for ChatGPT
+only**; dual offline-token model). The **Odoo async-queue absence is classified as an [Inference
+from official fact]** — the official docs document **only `ir.cron`** for scheduled/background
+work and do **not** document a general-purpose async job queue (absence of documentation, not a
+positive Official fact; OCA `queue_job` is **community, not core**; confirm against 19.0 source if
+load-bearing). **New/sharpened open questions** surfaced for ChatGPT
 (custom-vs-public GraphQL mandate; **GID permanence not asserted**; **no general mutation
 idempotency** beyond `@idempotent`; `ir.model.data` `(module,name)` uniqueness unconfirmed;
 `sudo()` bypass not literally on `security.rst`; **Odoo Online feasibility open**). **DEC-003 and

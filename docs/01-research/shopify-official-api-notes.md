@@ -62,12 +62,18 @@
 - **Tier 1 (used here):** official Shopify developer documentation, `shopify.dev`
   (API reference, usage guides, app-build/launch guides, and the developer
   changelog).
-- **Access date for all claims:** **2026-06-30.** Shopify policy/limits pages are
-  largely **version-independent** and can change without an API-version bump;
-  treat numeric values as "as of the access date."
-- **API version context:** GraphQL reference pages were read at the `latest`
-  alias, which resolved to the **2026-04** schema on the access date. Version-
-  specific facts note the version they apply from.
+- **Access dates (two-stage):** the historical body below is the **Sprint B baseline,
+  access date 2026-06-30**; it **remains the Sprint B baseline unless superseded by the
+  RB-14 refresh section above** (**RB-14 architecture refresh access date 2026-07-01**).
+  **Version-sensitive facts must use the latest dated refresh** (the RB-14 section), not
+  this Sprint B baseline. Shopify policy/limits pages are largely **version-independent**
+  and can change without an API-version bump; treat numeric values as "as of the stated
+  access date."
+- **API version context:** during **Sprint B (2026-06-30)** the GraphQL `latest` alias
+  resolved to the **2026-04** schema; it was **re-checked in the RB-14 refresh
+  (2026-07-01) and now resolves to `2026-07`** (see the RB-14 refresh section above).
+  Version-specific facts note the version they apply from; where this Sprint B body and
+  the RB-14 refresh differ, **the RB-14 refresh supersedes**.
 
 ---
 

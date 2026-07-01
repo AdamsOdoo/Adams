@@ -82,10 +82,14 @@ citations in [`../01-research/shopify-official-api-notes.md`](../01-research/sho
 
 Citations in [`../01-research/odoo-official-architecture-notes.md`](../01-research/odoo-official-architecture-notes.md).
 
-- **[Official fact]** An **external identifier (XML ID)** is stored in
-  **`ir.model.data`** as `module.name` and refers to a record **independent of its
-  database id**; `ir.model.data` stores name/module/model/`res_id`. This is a natural,
-  db-id-independent handle. (glossary; data.rst)
+- **[Official fact]** **External identifiers are stored in `ir.model.data`**; an external
+  ID is `module.name` and refers to a record **independent of its database id** — a
+  natural, db-id-independent handle. (glossary; data.rst)
+- **[Open question]** The detailed **`ir.model.data` column list** (`name/module/model/
+  res_id`) and the **`(module, name)` uniqueness constraint** were **not literally found**
+  in the official docs reviewed and must be **verified against Odoo 19 source** before
+  AR-005 decides whether to reuse `ir.model.data`. **[Inference]** Reusing `ir.model.data`
+  as a **runtime binding store remains risky and undecided**.
 - **[Official fact]** **`noupdate`** keeps a record from being overwritten on module
   update but still creates it if missing; **user-created data can be deleted by the
   user**, so binding code must be **defensive** about a binding resolving to a deleted
@@ -154,7 +158,8 @@ From Sprint C/C2 (evidence, not facts):
 ### Option B — Generic single binding table (Shopify GID ↔ model + res_id)
 
 - **Evidence for:** `[Inference]` one model, uniform API, easy to index and audit;
-  `[Official fact]` mirrors the `ir.model.data` `(model, res_id)` shape without its
+  `[Inference]` conceptually mirrors a `(model, res_id)`-style handle (the precise
+  `ir.model.data` column list is an **[Open question]**, see above) without the
   module-data semantics.
 - **Evidence against:** `[Inference]` a generic table can blur domain-specific keys
   (e.g. inventory needs `inventory_item_id`+`location_id`, not just a product GID);
