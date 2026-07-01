@@ -115,3 +115,15 @@ not turn weak evidence into scope** — the two Sprint-F-specific risks the prom
 watch. DP-003/DP-004 and DP-005 (classification/scope is an input, not a decision) were
 **applied, not re-triggered**. **No counter change; no new row.** MVP stays RB-13-gated
 (proposed, not final); architecture stays RB-14 / AR-002…AR-008-gated._
+
+_**Product Sprint F revision (2026-07-01, PR #54 review — consistency patch):** ChatGPT
+review returned **REVISE** for a small wording consistency issue: the MVP acceptance
+principles referenced the seeded **idempotent-refund / no-double-refund** regression
+scenario (A-IMP-4) as if refunds were definitely in MVP, whereas refund sync is marked
+**open / lean defer** (C-RET-01). The wording in `../02-product/mvp-scope.md` and
+`../02-product/user-stories.md` was clarified: **the idempotent-refund / no-double-refund
+regression applies only if refund handling is included in MVP; if refunds are deferred it
+is carried forward as a mandatory acceptance principle for the first refund/refund-sync
+sprint** (never dropped). This was a **consistency correction, not a new defect
+occurrence** — **no new DP row, no counter change.** No MVP scope was finalized and no
+architecture decision was made; MVP remains **proposed, not final**._

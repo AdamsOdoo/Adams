@@ -1418,10 +1418,14 @@ Observable conditions that would define **"MVP-ready"** (principles, **not** cod
 acceptance criteria — those come at implementation with tests):
 
 1. **Correct under failure.** In the seeded regression scenarios (A-IMP-4: duplicate
-   orders, multi-location double-decrement, missed-webhook reconciliation, idempotent
-   refunds, timezone/paging), the connector produces **no duplicates, no
-   double-decrement, no double-refund, no missed orders** — via idempotency +
-   reconciliation.
+   orders, multi-location double-decrement, missed-webhook reconciliation,
+   timezone/paging), the connector produces **no duplicates, no double-decrement, no
+   missed orders** — via idempotency + reconciliation. **Refund scope note:** refund
+   sync is **open / lean defer** in this proposal (C-RET-01, Domain 11) —
+   **if refund handling is included in MVP, the idempotent-refund / no-double-refund
+   regression scenario applies (mandatory); if refunds are deferred, this scenario is
+   carried forward as a mandatory acceptance principle for the first refund/refund-sync
+   sprint.** Either way it is never dropped.
 2. **Layered sync proven.** Webhook, scheduled, and manual paths each work, and
    reconciliation detects+repairs a deliberately dropped event (never one mechanism
    alone).

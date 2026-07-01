@@ -361,7 +361,10 @@ Each story uses:
 - Evidence strength: A ([Fact] `@idempotent` refunds 2026-04) / B (VT/EM [Demonstrated])
 - Acceptance notes (if in scope): a refund is never applied twice; a cancellation warns
   before irreversible effects and never silently creates a cancel order.
-- Failure/recovery notes: refund/cancel retries are idempotent.
+- Failure/recovery notes: refund/cancel retries are idempotent. **The idempotent-refund
+  / no-double-refund regression applies only if refund handling is in MVP; if deferred,
+  it is carried forward as a mandatory acceptance principle for the first refund/
+  refund-sync sprint** (never dropped).
 - Architecture dependency: **AR-006** — **Architecture-dependent**.
 - Open questions: is basic refund/cancellation reflection in MVP? (ties Domain 9).
 
@@ -733,10 +736,12 @@ criteria):
 
 1. **Testable behaviour, not implementation.** Each story's acceptance notes describe
    observable behaviour a reviewer can check, not code.
-2. **Correct under failure.** Stories that touch inventory/orders/refunds/fulfilment
-   must hold under the classic-defect scenarios (A-IMP-4: duplicate orders,
-   multi-location double-decrement, missed-webhook reconciliation, idempotent refunds,
-   timezone/paging).
+2. **Correct under failure.** Stories that touch inventory/orders/fulfilment must hold
+   under the classic-defect scenarios (A-IMP-4: duplicate orders, multi-location
+   double-decrement, missed-webhook reconciliation, timezone/paging). **The
+   idempotent-refund / no-double-refund scenario applies only if refund handling is
+   included in MVP (US-E4-06); if refunds are deferred, it is carried forward as a
+   mandatory acceptance principle for the first refund/refund-sync sprint.**
 3. **Recoverable.** Every failure path names isolation + reason + retry (no dead ends).
 4. **Honest & observable.** Freshness is truthful; status answers "OK / what failed /
    what next".

@@ -17,6 +17,23 @@
 > competitor crawling, no research fan-out). Maps to backlog item **RB-13 (MVP scope
 > implications — not finalized)**, feeding RB-14 (architecture prep) — all gated.
 
+## Sprint F revision (PR #54 review — 2026-07-01)
+
+ChatGPT review returned **REVISE** — a small consistency patch (no new research, no scope
+change). Corrected on the same branch (`docs: clarify refund acceptance principle in
+sprint f`):
+
+- **Refund sync remains open / lean defer** (C-RET-01, US-E4-06) — **not** turned into
+  MVP.
+- The **MVP acceptance principles** (`mvp-scope.md`) and the user-stories acceptance
+  principles now clarify that the **idempotent-refund / no-double-refund regression
+  scenario (A-IMP-4) applies only if refund handling is included in MVP; if refunds are
+  deferred, it is carried forward as a mandatory acceptance principle for the first
+  refund/refund-sync sprint** (never dropped).
+- **No MVP scope finalized; no architecture decision made.** Consistency correction only
+  (Sprint F revision note added to `../05-qa/defect-pattern-log.md`; not a new defect
+  occurrence, no counter change). MVP remains **proposed, not final**.
+
 ## Session summary
 
 Produced the **evidence-based MVP scope proposal**: `docs/02-product/mvp-scope.md` (main
