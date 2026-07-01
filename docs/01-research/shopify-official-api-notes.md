@@ -21,6 +21,42 @@
   was not literally on the page, the claim is downgraded to **Open question**
   rather than asserted.
 
+## RB-14 refresh (2026-07-01)
+
+> **Architecture-prep refresh.** For the **RB-14 Part 1** sprint, the load-bearing
+> facts below were **re-verified live on 2026-07-01** (one day after the Sprint B
+> baseline) across the AR-002/AR-003/AR-005 topics, with verbatim quotes. The full
+> dated delta lives in
+> [`../03-architecture/rb14-official-source-refresh.md`](../03-architecture/rb14-official-source-refresh.md).
+> **The Sprint B facts below remain valid** — this section records only the **status
+> and the version-sensitive deltas**; nothing below is erased.
+>
+> - **Confirmed unchanged (2026-07-01):** REST legacy (2024-10-01) + GraphQL-primary
+>   + new-public-apps-GraphQL-only (2025-04-01); versioning cadence/format/12-month-
+>   min/9-month-overlap/fall-forward; webhook delivery-not-guaranteed → reconciliation,
+>   1s/5s timeout, 8 retries/4h, auto-delete after 8 consecutive failures (Admin-API
+>   subs), HMAC-SHA256 raw body, `X-Shopify-Webhook-Id` dedup; GraphQL cost model +
+>   per-plan restore rates + 1,000-point single-query ceiling; REST leaky bucket +
+>   429/`Retry-After`; bulk-ops JSONL/100MB/24h-10d + up-to-5-of-each (2026-01);
+>   inventory quantity states + `on_hand` sum + `committed` read-only + compare-and-set
+>   + `@idempotent`-required-2026-04; orders 60-day + `read_all_orders` approval +
+>   protected-data Level 1/2; GID format + REST↔GID mapping.
+> - **Version-sensitive deltas to flag:** (1) the GraphQL **`latest` alias now resolves
+>   to `2026-07`** (Sprint B saw `2026-04`); the version table spans `2025-07`…`2027-01`.
+>   (2) `@idempotent` on `inventorySetQuantities`/`inventoryAdjustQuantities` was
+>   **optional as of 2026-01** and is **required as of 2026-04** (sharpens the Sprint B
+>   "required 2026-04" note). (3) `productSet` **delete-on-omit applies to list fields
+>   only** — "For all other field types … omitted fields will remain unchanged" (scalars
+>   are safe-update). (4) **Offline tokens are dual** — legacy non-expiring **and** new
+>   "Expiring offline tokens" (90-day refresh); "offline never expires" holds only for
+>   the legacy variant. (5) API-health navigation now via the **Dev Dashboard**
+>   (Apps → Monitoring → API health).
+> - **New/sharpened open questions (architecture-relevant):** custom/private-app scope of
+>   the GraphQL-only mandate (only "new public apps" stated); **GID permanence/non-reuse
+>   is NOT asserted**; **no client-mutation-id / general mutation idempotency** beyond
+>   `@idempotent`; `@idempotent` key-uniqueness scope + server dedup TTL unstated.
+>   These route to AR-002/AR-005 framing, not to a decision.
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Shopify developer documentation, `shopify.dev`

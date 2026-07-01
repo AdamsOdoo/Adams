@@ -25,6 +25,42 @@
   highest-stakes pages (manifest keys, security model) were re-read in an
   **independent verification pass**.
 
+## RB-14 refresh (2026-07-01)
+
+> **Architecture-prep refresh.** For the **RB-14 Part 1** sprint, the load-bearing Odoo
+> facts below were **re-verified on 2026-07-01** across the AR-003/AR-005 topics. Where
+> `odoo.com/documentation/19.0` HTML rendered navigation-only (the same JS-render caveat
+> flagged in Sprint B), facts were read from the **official `odoo/documentation` 19.0
+> raw RST source** (`raw.githubusercontent.com/odoo/documentation/19.0/content/...`) — no
+> content bypass; the sanctioned Sprint B fallback. Full dated delta:
+> [`../03-architecture/rb14-official-source-refresh.md`](../03-architecture/rb14-official-source-refresh.md).
+> **Sprint B facts remain valid**; this records status + deltas only.
+>
+> - **Confirmed unchanged (2026-07-01):** `ir.cron` failure model (3 consecutive →
+>   skip/failed; 5 over ≥7 days → deactivated + DB-admin notified; DB-level hard-limit
+>   kills the process); batching + `_commit_progress` + "do not reschedule yourself";
+>   `_trigger`/`method_direct_trigger`; **only `ir.cron` in core, no async job queue**
+>   (absence = inference; OCA `queue_job` is community); `--max-cron-threads` default 2;
+>   WSGI requires a separate `--no-http` cron process; external IDs in `ir.model.data`
+>   (`module.name`, db-id-independent) + `noupdate`/`forcecreate`; in-place `_inherit`
+>   vs discouraged `_inherits` (methods not inherited; chained "essentially not
+>   implemented"); access-rights (additive union, deny-by-default) + record rules
+>   (default-allow; **global=AND-intersect, group=OR-unify**; multiple-global-rule
+>   DANGER); field-level `groups`; `company_ids` in rule domains; Odoo.sh staging
+>   neutralization (crons/email/IAP/payment+shipping disabled).
+> - **Sharpened caveats to flag:** (1) **`ir.model.data` column list (`name/module/
+>   model/res_id`) and `(module,name)` uniqueness are NOT literally in the official docs**
+>   — verify against 19.0 `ir_model.py` source before any binding decision reuses
+>   `ir.model.data` (refines the Sprint B open question). (2) **`sudo()` bypassing access
+>   rights + record rules is NOT literally on `security.rst`** (only in code examples; a
+>   TODO notes field `groups` apply to the Superuser in `fields_get` but "not in
+>   read/write") — the Sprint B bypass assertion should be **re-sourced** (ORM/Environment
+>   docs) before a credential-security design relies on it. (3) **Odoo Online (SaaS)
+>   support for custom modules / `server_wide_modules` / external workers is NOT covered**
+>   by the on-prem/Odoo.sh pages — an **open question** that gates the AR-003 substrate;
+>   hosting is **not finalized**.
+> - **No decision made.** These route to AR-003/AR-005 framing only.
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Odoo 19.0 documentation — the **Developer →
