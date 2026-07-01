@@ -164,3 +164,23 @@ change** (no broader recurring defect pattern; the existing DP-001/DP-003 rules 
 the lesson and are reinforced here). A **full TeqStars evidence rebaseline is pending a later
 research sprint.** MVP scope stays a product-scope decision; architecture stays RB-14-gated;
 implementation stays blocked._
+
+_**Research Sprint C2 note (2026-07-01): source-availability correction — no new defect
+occurrence.** Sprint C2 executed the TeqStars rebaseline flagged by the Sprint G note above.
+The **R2 Teqstars docs**, recorded **403-blocked in Sprint C (2026-06-30)**, were re-checked
+and found **accessible** (HTTP 200 with a browser UA — a bot/UA filter, **not** a login wall;
+no auth bypassed). The 31 Odoo 19.0 Shopify doc pages were read and **page-classified**
+(demonstrated ✅ vs vendor claim 🟨 vs implied ➖ vs not-found ⬜) in
+`../00-source-materials/competitor-source-notes.md`, `competitor-deep-dives.md`, and the
+feature matrix. This is a **source-availability correction, not a defect** — the Sprint C
+method (refusing to treat blocked content as fact) was **correct** and is preserved as audit
+trail. The **DP-003 capture→verify discipline was applied to the new evidence**: a 17-item
+adversarial verification pass **downgraded 3 proposed upgrades** (automatic-retry/backoff,
+first-class cross-object reconciliation, and a metrics dashboard → **⬜ not found**), and the
+Sprint C idempotency search-snippet stayed **unverified**, so **no capability was
+over-upgraded** (DP-004 respected). **Reinforced standing rule (no new row, no counter
+change):** *a source recorded **Blocked** that is important to a scope/architecture decision
+must be re-checked before that decision is finalized — access can change (WAF/bot rules,
+vendor doc releases).* This refines DP-001 (re-read the source) and DP-003 (blocked-source
+handling); it is not a new recurring pattern. **DEC-003 and the accepted MVP scope are
+unchanged**; architecture stays RB-14 / AR-002…AR-008-gated; implementation stays blocked._

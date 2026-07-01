@@ -113,8 +113,21 @@
   current maintenance with a clear support SLA.
 - **ecommerce_shopify — fast recent dated cadence** (5 releases in ~1 month).
   *Bar:* responsiveness — though scope is small and adoption unproven.
-- **Teqstars — 83 reviews / 5.0 + claimed free install session + demo sandbox.**
-  *Bar (claim):* white-glove onboarding and strong social proof (unverified).
+- **Teqstars — 83 reviews / 5.0 (Apps listing) + claimed free install session; a
+  documented Support Policy** (60-day free bug-fix, scope/exclusions, 24h target).
+  *Bar:* strong social-proof claim **plus** (Sprint C2) a **now-demonstrated,
+  screenshot-rich doc set** with an explicit support policy — onboarding depth is
+  no longer purely claimed.
+- **Teqstars — controlled, draft-safe product onboarding (Sprint C2, now
+  demonstrated).** SKU/Barcode/both match key + Create-Odoo-Products guard +
+  **draft-safe export** (leave Sales Channels empty → unpublished) + Publish/
+  Unpublish + a per-listing **Allowed/Not-Allowed-Sync** switch. *Bar:* a clean,
+  safe bidirectional-*product* pattern (directly relevant to the accepted DEC-003
+  MVP baseline).
+- **Teqstars — click&collect order status + Force-Restock divergence warning +
+  Shopify-Payments payout reconciliation with reason-coded line warnings (Sprint
+  C2, demonstrated).** *Bar:* first-class pickup lifecycle and honest divergence
+  handling.
 
 ## Best ideas worth adapting (synthesis — gated recommendations)
 
@@ -160,13 +173,20 @@
 | Traffic-light webhook health (named cause) | VT | confluence pages/521928707 | ✅ demonstrated |
 | Activity chart + failure counts + re-export flag | SH | apps.odoo.com/.../sh_shopify_connector (V13, V21, V27) | ✅ demonstrated (caption) |
 | Idempotency directives (2026-04); auto-retry; silent-skip fixes | VT | ecosystem release notes 2.1.4/2.1.6/1.13.0/2.1.2 | ✅ demonstrated (dated) |
-| Payout reconciliation (Shopify Payments) | EM | docs…/shopify-payouts.html | ✅ demonstrated |
+| Payout reconciliation (Shopify Payments) | EM, **TQ** | EM docs…/shopify-payouts.html; **TQ .../order_management/payout_report.html** | ✅ demonstrated |
+| Controlled draft-safe product export (channels-optional) + per-listing sync toggle | **TQ** | **.../product_management/product_export.html, product_update.html, shopify_faq.html** | ✅ demonstrated |
+| Click&collect (Ready-for-Pickup / Picked-Up) + Force-Restock divergence warning | **TQ** | **.../order_management/update_order_status.html, order_return.html** | ✅ demonstrated |
 | Honest limitation disclosure | EM, VT | EM docs (multiple); VT confluence pages/866943004 (PII) | ✅ demonstrated |
 | Dated, transparent changelog | VT | ecosystem release-notes page | ✅ demonstrated |
 | Access-right-gated setup | SH | apps.odoo.com/.../sh_shopify_connector (V01) | ✅ demonstrated (caption) |
 | 83×5.0 reviews; install session/sandbox | TQ | apps.odoo.com/.../shopify | on-page fact / 🟨 claim |
 
-> **Caution (claim vs demonstrated):** TQ items are **listing claims** (docs
-> blocked); EC contributes no "best" (no screenshots); SH "✅" rest on captions.
-> The most robustly demonstrated bests come from **EM (screenshots)** and **VT
-> (dated release notes)** — weight adaptation accordingly.
+> **Caution (claim vs demonstrated):** *(Sprint C2)* **TQ docs are now accessible**,
+> so several TQ items above are **demonstrated** (draft-safe export, click&collect,
+> payout reconciliation) — but its **reliability depth stays partly claim/not-found**
+> (pHash 🟨; no explicit idempotency/auto-retry/reconciliation/rate-limit/HMAC — kept
+> ➖/⬜, not "best"). The **83×5.0 reviews / install-session** items remain **listing
+> claims**. EC contributes no "best" (no screenshots); SH "✅" rest on captions. The
+> most robustly demonstrated bests come from **EM (screenshots)**, **VT (dated release
+> notes)**, and **now TQ (step-by-step docs)** — weight adaptation accordingly, and
+> **do not adopt TQ's asserted-but-unshown reliability claims as demonstrated**.

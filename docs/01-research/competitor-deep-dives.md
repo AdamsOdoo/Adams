@@ -92,64 +92,75 @@
 
 ## Competitor: Teqstars — Shopify Connector for Odoo (R2)
 
-> **Access caveat (load-bearing).** The **Teqstars documentation host
-> (`docs.teqstars.com`, 19.0 and 16.0) is HTTP 403 bot-blocked** — no workflow/
-> screenshot evidence could be read, and **no auth was bypassed** (there is no
-> login wall; it is a WAF/bot block). The deep dive below is built from the
-> **accessible Odoo Apps Store listing** `apps.odoo.com/apps/modules/19.0/shopify`
-> (author "TeqStars"), so **almost everything is a `🟨 vendor claim`** with
-> on-page facts limited to price/license/version/author/reviews. Treat Teqstars
-> as **strong-on-paper but largely unverified**.
+> **Sprint C2 rebaseline (2026-07-01).** In Sprint C the Teqstars docs host was
+> **HTTP 403 bot-blocked**, so this deep dive was **listing-claim-only**. On
+> **2026-07-01** the docs became **accessible** (HTTP 200 with a browser UA; a
+> WAF/bot UA filter, **not** a login wall — no auth bypassed). This section is
+> **rebuilt from the 31 now-readable Odoo 19.0 Shopify doc pages** (~98
+> screenshots inside step-by-step procedures) and is **evidence-classified per
+> page**. Teqstars moves from "strong-on-paper, unverified" to **one of the most
+> demonstrated (breadth + step-by-step) connectors in the survey** — but several
+> reliability items remain **claim/not-found** (verified below), so evidence was
+> **not** over-upgraded. The Sprint C listing-claim record is preserved in
+> `../00-source-materials/competitor-source-notes.md` (R2 historical subsections).
 
 ### Evidence status
-- **Sources used:** Odoo Apps listing (accessible); docs host (Blocked 403); search-index snippets (non-equivalent, used only as labelled fallback).
-- **Date accessed:** 2026-06-30 · **Access status:** **Blocked (docs) / Accessible (Apps listing)**.
-- **Evidence strength:** Low–Medium — rich vendor marketing on the listing; **zero** directly-readable docs/screenshots; **83 reviews / 5.0 stars** is the only third-party signal (unverified).
-- **Claim classification note:** the listing's feature strings are literally present (so "the vendor claims X" is an on-page fact) but **X itself is a competitor claim**, never demonstrated here.
+- **Sources used (2026-07-01):** the 31 accessible `docs.teqstars.com/19.0/applications/shopify/` pages (setup, product/customer/order management, collections/catalogs, metafields, payouts, FAQ, support policy). Sprint C Apps-listing facts (price/license/reviews) retained as history (not re-fetched).
+- **Access status:** **Accessible** (was Blocked in Sprint C). Evidence read via browser-UA fetch → HTML→text; ~98 real `.jpg`/`.png` screenshots counted (pixels not inspected; alt-text + step text reliable).
+- **Evidence strength:** **High for demonstrated workflows** (screenshot-backed, step-by-step across the object model); **Low for a few reliability claims** (pHash, idempotency, dashboard) that the docs assert or omit rather than show — kept as 🟨/➖/⬜.
+- **Verification:** a 17-item adversarial capture→verify pass re-read the primary text and **downgraded 3 proposed upgrades** (automatic-retry/backoff, cross-object reconciliation, metrics dashboard → **⬜ not found**). DP-003/DP-004 respected: a comparison-table checkmark or a marketing sentence is **not** treated as demonstrated.
 
 ### Product positioning
-- **Sells:** "Odoo Shopify Connector **(GraphQL Powered)**" — a premium, GraphQL-native bidirectional connector. **Target:** multichannel Shopify merchants on Odoo CE/EE.
-- **Odoo version:** 19.0 listing (vendor states 13–19). **Shopify side:** Shopify GraphQL Admin API "from v1" + webhooks. **Hosting:** Odoo Online / Odoo.sh / On-Premise (listing).
-- **Pricing/license/support:** **$326.20**, **OPL-1**, author **TeqStars**; ~28,630 LOC; **83 reviews / 5.0**; vendor claims free 60–90 min install session, pre-installed demo sandbox, "AI-powered docs", 24h support. *(EUR 399.99 is a conversion, not on-page.)*
+- **Sells:** "Odoo Shopify Connector" — a premium, **GraphQL-native** bidirectional connector; docs state sync/webhooks/refunds/cancel/payouts all use the **Shopify GraphQL Admin API**. **Target:** multichannel Shopify merchants on Odoo CE/EE (Enterprise + Community + Odoo.sh stated).
+- **Odoo version:** 19.0 docs. **Sync model:** **webhooks + scheduled Automatic Jobs + manual operations** (+ optional Real-Time Price/Inventory Sync push on Odoo change).
+- **Pricing/license/support:** Apps-listing (Sprint C, 2026-06-30, not re-fetched) **$326.20 / OPL-1 / 83 reviews / 5.0**. The docs' own comparison table states an *indicative* "~$439" (vendor positioning, 🟨). **Support policy:** 60 days free bug-fix, helpdesk/email, 24h business-day target (on-page fact). Overview also claims a free 60–90 min install session (🟨).
 
-### Feature scope (almost all 🟨 vendor claim from the listing)
-- Store/instance connection 🟨 · Auth/credentials 🟨 (Admin API token, "auto-generated, securely stored" — snippet) · Setup wizard 🟨 ("guides you…checks API access") · Dashboards 🟨 (Marketplace + **Analytics** dashboards)
-- Product import/export 🟨 · Variants 🟨 · Images 🟨 + **pHash image dedup** 🟨 · Price lists 🟨 (volume + B2B pricing)
-- Inventory sync 🟨 · **Multi-location** 🟨 (locations→warehouses) · Customer import/export 🟨 · Address handling 🟨
-- Order import 🟨 (incl. **POS**, gift cards, duties, tips, taxes, tracking) · Order status / **auto order workflow** 🟨 (per payment gateway + financial status) · Invoice creation 🟨 · Payment handling 🟨 (gateway→journal) · **Payout reconciliation** 🟨 (import; "auto-reconciliation on Enterprise") · Refunds/partial refunds 🟨 · Cancellations 🟨 (reason/notify/restock — snippet) · Fulfillment/tracking 🟨 ("Update in Marketplace")
-- **Webhooks** 🟨 (real-time product/order/customer; per-event Webhook tab; HTTPS) · Scheduled/cron sync 🟨 · Manual sync 🟨 · **Queue Manager** 🟨 ("per-record error retry"; "one bad record won't block 999") · Error logs/retry 🟨 · Duplicate prevention 🟨 (**SKU/barcode "or both"** smart matching) · Mappings 🟨 (gateway→journal, location→warehouse, metafields)
-- Multi-store 🟨 ("unlimited stores, each with own warehouse") · Multi-company ⬜ (not distinguished from multi-store) · **Shopify Markets / B2B** 🟨 · Metafields 🟨 (auto type-casting; conditions/transformations) · Gift cards 🟨 · POS 🟨 · Permissions/security ⬜ (token "securely stored"; no access-model detail) · Reporting 🟨 (Analytics dashboard) · Collections 🟨 · Fraud/risk 🟨 · Updates/release notes 🟨 (2026-04 API/idempotency claim — **unverifiable**)
+### Feature scope (evidence-classified from the accessible docs)
+- **Setup/connection ✅** — OAuth custom-app + Admin-API-token + legacy app-password; full scope list; **Test Connection**; instance config (log level, Queue Batch Limit, per-domain tabs). **Auth/security ➖** (access-rights noted; token "securely stored"; **HMAC ⬜**).
+- **Product import ✅ / export ✅ / update ✅** — date-filtered import + auto-create-if-missing; Add-to-Listings → Export Listings (**sales-channels-optional = draft-safe**); four update methods incl. Set-Price/Set-Quantity + Publish/Unpublish; **Skip-Sync** (Allowed/Not-Allowed badge). **Matching ✅** ("Sync Listings Based On" = SKU/Barcode/both). **Listing/Listing-Item model ✅**.
+- **Variants/options ✅** (variants in Listings/Listing Items; HS Code/Country-of-Origin per-variant rules) · **Images ✅** (Sync Listing Images toggle; image on listing/item) + **pHash dedup 🟨** (comparison-table + `imagehash`/`PyWavelets` dependency; no workflow shown).
+- **Price import/export ✅** (pricelist + sale-price bypass; manual + Automatic Jobs + optional real-time) · **Inventory import/export ✅** (Stock-Based-On Free/On-Hand/Forecasted; manual + auto + optional real-time; lot/serial skipped) · **Multi-location ✅** (map locations; export combines multiple; **third-party location excluded**).
+- **Customer import ✅** (queue + multi-field dedup) · **Customer export ⬜** (no page; import-only; customer metafields import-only) · **Address handling ✅** (name/email/phone/address on import; dedup uses street/city/state/country/zip).
+- **Order import ✅** (queue; workflow per **payment gateway + financial status**; fulfillment-status filter; stock-move if fulfilled; POS/gift-card/duties/tips/custom line products; three tax systems incl. fiscal-position; Colorado special tax; fraud-analysis fetch) · **Order status/tracking write-back ✅** (normal + **click & collect** Ready-for-Pickup/Picked-Up) · **Invoice/payment ✅** (auto-workflow: confirm/invoice/validate/register) · **Mark-as-paid ✅**.
+- **Refunds/partial refunds ✅** (from credit note; amount-match guard; GraphQL) · **Cancellations ✅** (reason/notify/restock/refund; conditional button) · **Returns ✅** (import via `returns/*` webhooks + scheduled + manual; create-from-Odoo; **Force Restock** with divergence warning; credit-note link).
+- **Payout reconciliation ✅** (**Shopify Payments only**; Auto/Manual Reconcile; per-line warnings) · **Fulfillment/tracking ✅** (delivery validate → Update in Marketplace + tracking; import shipped orders → stock moves).
+- **Webhooks ✅** (order create/update, product create/update/delete, customer create, returns lifecycle; Fetch/Delete Webhook; **background-thread processing** = fast-ack; HTTPS required) · **Scheduled ✅** (Automatic Jobs per operation) · **Manual ✅** · **Queue + logs ✅** (Queues‣Logs; log levels; per-op queues; Activity-on-failure; per-record error messages — *not* a formal reason-code taxonomy).
+- **Metafields ✅** (Product/Variant import+export; Customer/Order import-only; type table; Ready/Missing/Not-Found/Inactive badges; wipe-on-missing; bulk→per-field fallback) · **Collections ✅** (smart+manual import/export/update; 15-min background job) · **Catalogs / Shopify Markets / B2B pricing ✅** (Market/Company-Location/App; quantity rules + volume pricing).
+- **Multi-store ✅** (one instance per store) · **Multi-company ⬜** (not distinguished from multi-store in docs) · **Reporting/dashboard 🟨→⬜** (Operations launcher + Queues/Logs + Smart-Notification alerts ➖; "Centralized hub" + "Reporting and Analytics" 🟨; **no metrics/chart dashboard shown** ⬜).
+- **Reliability (verified, conservative):** **Idempotency ➖** (adjacent guards: refund amount-match, already-cancelled guard, dedup; **no explicit `@idempotent` directive** on the docs) · **Automatic retry ⬜** (queue re-processing + collection "retried next run" + manual re-run only; **no backoff/classification taxonomy**) · **Cross-object reconciliation ⬜** (incremental Last-Processed cursors + per-return Resync + Fetch-Webhook config-reconcile; **no missed-record detection surface**) · **Rate-limit/throttle ⬜** (only "gap your schedules" guidance) · **HMAC ⬜**.
 
-### Workflow reconstruction (from listing captions + snippets — not directly observed)
-- **Connect instance:** install (deps: Sales/Discuss/Invoicing/Inventory/Base Marketplace) → create Shopify Instance → generate Admin API token via custom app → wizard "confirms everything is ready". *Error surfacing unknown (docs 403).*
-- **Webhooks:** Marketplace » Configuration » Instance » **Webhook tab** → add line (Name, Event Type, Active). **Order import + auto-workflow:** manual wizard or cron → per gateway+financial-status workflow confirms order, creates+validates invoice, registers payment; **failures land in Queue Manager** and can auto-create an Odoo Activity. **Refund/cancel from Odoo** with "refund to Shopify"/restock/notify checkboxes. **Fulfillment:** "Update in Marketplace" → Shopify Fulfilled + tracking.
+### Workflow reconstruction (now directly observed, screenshot-backed)
+- **Connect:** install (deps Sales/Discuss/Invoicing/Inventory/Base Marketplace) → create Instance → OAuth custom app (scopes → redirect URL → client id/secret → Generate Access Token → install) → **Test Connection** → **Confirm** (syncs locations, sales channels, product categories). *(7+15 screenshots.)*
+- **Products:** import (operation popup or single-listing "Sync to Odoo"; match by Sync-Listings-Based-On; auto-create missing during collection/order import) → export ("Add to Listings" → Export Listings; sales-channels-optional draft-safe) → update (four methods; Set-Price/Set-Quantity; Publish/Unpublish; Skip-Sync badge). *(2+5+12 screenshots.)*
+- **Orders:** import (queue; per gateway+financial-status workflow confirms order/creates+validates invoice/registers payment; fulfillment-status filter) → deliver in Odoo → **Update in Marketplace** (status + tracking; pickup path Ready-for-Pickup → Picked-Up) → refund/cancel/return from Odoo → mark-as-paid → payout import + reconcile. *(10+2+2+6+1+3 screenshots.)*
 
-### UX/UI analysis (caption-level only — **not verified**)
-- Captions imply: a single credentials form; a **match-by (SKU/Barcode/both) selector**; per-gateway workflow mapping rows; a line-based webhook table; **two dashboards** (operational + analytical); a **Queue Manager with a Retry control**; refund/cancel dialogs with propagate-to-Shopify checkboxes. **None visually inspected** — UX quality is unproven.
+### UX/UI analysis (now visually evidenced, alt-text + step level)
+- A **tabbed, config-rich instance form** (Product/Stock/Orders/Payout/Customer/Metafield/Workflow/Webhook/Automatic-Jobs/Notification) — powerful but **toggle-dense** (10+ order-config toggles, several dev-mode-gated). Consistent **operation-popup + listing-form** patterns; a green/red **Allowed/Not-Allowed-Sync badge** on the listing form (clean exclude-from-sync control); Manage-Sales-Channels publish/unpublish dialog; explicit propagate-to-Shopify checkboxes on refund/cancel/return; a two-step pickup lifecycle; Force-Restock with an on-hand-divergence warning. **No unified metrics dashboard** (Operations launcher + Queues/Logs only).
 
-### Reliability and robustness analysis (claims, unverified)
-- **Idempotency:** 🟨 (snippet) "idempotency directives…preventing duplicate inventory changes and double refunds when retrying" — aligns with the Tier-1 2026-04 `@idempotent` requirement but **unverifiable**. **Dedup:** 🟨 SKU/barcode smart matching + pHash image dedup. **Retry/queue:** 🟨 Queue Manager per-record retry + activity-on-failure. **Webhook reconciliation/rate-limit/permissions:** ⬜/🟨 not detailed. The **resilience story is the most marketing-complete of the survey but the least verifiable.**
+### Reliability and robustness analysis (verified — separated from breadth)
+- **Strong where demonstrated:** per-op **queues** with Batch Limit, **Activity-on-failure**, typed logs, dedup (customer multi-field + product match-key + webhook link-existing), amount-match refund guard, already-cancelled guard, collection background job that **retries next run**, incremental Last-Processed cursors, optional real-time push.
+- **Weak / not shown:** **no explicit idempotency directive** (only adjacent guards → ➖), **no automatic-retry/backoff taxonomy** (⬜), **no first-class cross-object reconciliation** for missed webhooks (⬜), **no rate-limit/GraphQL-cost throttling** (⬜), **no HMAC/webhook-signature** statement (HTTPS only, ⬜). **Breadth is now proven; deep reliability/idempotency remains partly unproven** — the two must be scored separately.
 
 ### Updates, release notes, and maintenance
-- **No directly-readable dated changelog** (docs 403). A snippet claims a 2026-04 Shopify-API/idempotency update — **unverified**. **83 reviews / 5.0** suggests adoption/satisfaction (unverified). Vendor support claims are strong (install session, sandbox).
+- Docs are readable but carry **no dated changelog** on the pages read. **Support policy = 60-day free bug-fix** window (helpdesk/email; 24h business-day target). Apps-listing **83×5.0** rating (Sprint C, not re-fetched) is the only third-party signal. The Sprint C indexed **idempotency snippet remains unverified** (not on the accessible pages).
 
-### Strengths (evidence-backed = on-page facts + the review count)
-- Strong **on-paper breadth** (Markets, B2B, payouts, metafields, POS, queue manager) at a mid price; **GraphQL-native** positioning; **83×5.0** reviews; explicit smart-matching and gateway→journal mapping in captions.
+### Strengths (evidence-backed — now demonstrated, not just claimed)
+- **Widest demonstrated breadth in the survey** with step-by-step docs: full product onboarding (import + controlled/draft-safe export + update + matching + Skip-Sync), price/inventory (manual+scheduled+real-time), multi-location with third-party exclusion, orders + click&collect + refunds/cancel/returns + mark-as-paid, **Shopify-Payments payout reconciliation**, Markets/Catalogs B2B pricing, bidirectional metafields, collections. Clean **draft-safe export** (sales-channels-optional) and a **per-listing sync toggle** are strong controlled-onboarding patterns.
 
 ### Weaknesses / gaps
-- **Docs entirely unreadable** (403) → the whole product is **unverified**; **no demonstrated workflow/screenshot**; multi-company vs multi-store unclear; permissions/security model absent; the idempotency/queue resilience is **claim-only**. Buyer due-diligence is hard.
+- **Reliability depth is partly unproven:** no explicit idempotency directive, no automatic-retry/backoff, no first-class reconciliation for missed webhooks, no rate-limit handling, no documented HMAC. **Config is toggle-dense** (progressive-disclosure risk). **No metrics/monitoring dashboard** (Operations launcher only). **Multi-company** not distinguished from multi-store. **Customer export not offered** (import-only). **pHash** is asserted (dependency-corroborated) but not shown as a workflow.
 
 ### What we can learn
-- The **vendor positioning checklist** to beat: GraphQL-native, dual real-time+cron, smart SKU/barcode matching, per-gateway workflow→journal mapping, a per-record queue with retry, payout reconciliation, Markets/B2B, metafields with transformations. Also: **"one bad record won't block 999"** is the resilience message customers respond to.
+- **Controlled product onboarding done well:** SKU/Barcode/both match key + Create-Odoo-Products guard + **draft-safe export** (leave channels empty) + Publish/Unpublish + a **per-listing Allowed/Not-Allowed-Sync** switch — a clean, safe bidirectional-product pattern (directly relevant to the accepted DEC-003 MVP baseline). Also: click&collect as first-class order status; Force-Restock divergence warning; Shopify-Payments payout reconciliation with reason-coded line warnings; bidirectional metafields with status badges + wipe-on-missing.
 
 ### What we can do better
-- **Actually demonstrate** these (readable docs, screenshots, an open demo) — Teqstars' biggest weakness is unverifiability. Make idempotency, queue retry, and reconciliation **observable**, not just claimed.
+- **Make reliability observable, not just breadth:** ship **explicit idempotency** (Tier-1 `@idempotent`), **automatic retry with a classified taxonomy**, a **first-class reconciliation surface** for missed webhooks (Teqstars has none), **rate-limit/GraphQL-cost throttling** (none), and **documented HMAC** verification. Replace the toggle-dense config with **progressive disclosure**, and add a **real monitoring dashboard** (Teqstars has an Operations launcher, not a metrics view).
 
 ### What to avoid
-- A **bot-blocked docs site** that defeats evaluation/trust; presenting idempotency/retry as marketing bullets with no demonstrable surface; conflating multi-store and multi-company.
+- A **toggle-dense single config form** without progressive disclosure; presenting **idempotency/retry as breadth** without a demonstrable reliability surface; **no rate-limit handling**; **no HMAC** in docs; **no missed-webhook reconciliation**; conflating multi-store with multi-company. *(Also, historically: bot-blocking evaluation docs — now resolved, but the trust cost of the earlier 403 is a lesson.)*
 
 ### Open questions
-- Does the docs host block evaluation deliberately? Are the queue-retry/idempotency claims real (no way to verify while 403)? Multi-company support? Is the 2026-04 idempotency update actually shipped? Is "smart matching" in this module or a "PRO" variant?
+- Is **pHash dedup** real at runtime (dependency declared, no workflow shown)? Does any **`@idempotent`-style directive** exist in code (not on the docs)? Is there a **monitoring dashboard** beyond the Operations launcher (none documented)? **Multi-company** vs multi-store? **HMAC / webhook signature** verification (not documented; HTTPS only)? How are **rate limits** handled at scale (no throttle documented)?
 
 ---
 
@@ -444,14 +455,14 @@
 | Competitor | Price (2026-06-30) | Sync model | Evidence quality | Standout strength | Biggest weakness |
 | --- | --- | --- | --- | --- | --- |
 | **Webkul** (R1) | $170 | cron import + event export; **no webhooks** | Med (1 guide) | Feeds staging + error queue | no webhooks/multi-location; gaps in variants/images/refunds |
-| **Teqstars** (R2) | $326.20 | **real-time webhooks + cron** (claimed) | **Low** (docs 403) | strong on-paper breadth; 83×5.0 | **unverifiable** (docs blocked) |
+| **Teqstars** (R2) | $326.20 (listing 2026-06-30) | **webhooks + scheduled + manual** (+ optional real-time push) | **High (behaviour, docs now accessible 2026-07-01)** | **widest demonstrated breadth**; controlled draft-safe product onboarding; payout reconciliation; Markets/B2B | **reliability depth partly unproven** (no explicit idempotency/auto-retry/reconciliation/rate-limit/HMAC); toggle-dense config; no metrics dashboard |
 | **Emipro** (R3) | n/a in docs | webhooks + cron + manual | **High (behaviour)** | best **observability** (queues + Log Book); finance-grade | **no auto-retry**; manual stock-adjust; stale v19 changelog |
 | **VentorTech** (R4+R7) | €499/yr · $569.16 | **webhooks (real-time) + scheduled**, queue_job | **High (dated notes)** | **real reliability eng.** (idempotency/retry/queue); best diagnostics | **technical install** (not Odoo Online); no payouts/POS/gift cards |
 | **ecommerce_shopify** (R6) | $195.56 | **cron 10-min; no webhooks** | Low (no shots/ratings) | fast recent cadence; lean | email-only errors; tiny scope; provenance/setup gated |
 | **sh_shopify_connector** (R8) | **$168.81** | queue/cron + webhook | Med–High breadth / Low trust | **widest features** + monitoring dashboard | **no ratings/changelog**; "real-time" overstated; idempotency unstated |
 
 **Headline inferences (gated):**
-1. **The reliability bar is set by VentorTech and Emipro** — a real **job queue**, **idempotency** (Shopify 2026-04), **reason-coded error logs**, **dry-run/validation**, and **traffic-light diagnostics**. Webhook-less, email-only designs (R6) and unverifiable claims (R2) are the floor.
+1. **The reliability bar is set by VentorTech and Emipro** — a real **job queue**, **idempotency** (Shopify 2026-04), **reason-coded error logs**, **dry-run/validation**, and **traffic-light diagnostics**. Webhook-less, email-only designs (R6) are the floor. *(Sprint C2: **Teqstars breadth is now demonstrated**, so it is no longer an evidence floor — but its **reliability depth stays partly unproven** (no explicit idempotency/auto-retry/reconciliation/rate-limit/HMAC in the docs), so it does not join VT/EM at the reliability bar.)*
 2. **Webhooks + reconciliation + idempotency** is the emerging table-stakes pattern — and aligns exactly with our Tier-1 Shopify findings (delivery-not-guaranteed → reconcile; `@idempotent` from 2026-04).
 3. **"Real-time" is routinely overstated**; most are queue/cron with optional webhooks. Our product should be **honest about latency** and **strong on reconciliation**.
 4. **Trust signals matter:** dated changelogs (R6/R7), ratings (R2/R7), readable docs+screenshots (R3), and a non-gated setup guide (counter-example: R5/R6) materially affect evaluability.

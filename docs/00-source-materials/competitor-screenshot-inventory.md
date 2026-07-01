@@ -8,7 +8,9 @@
 > [`competitor-source-notes.md`](./competitor-source-notes.md) and
 > [`screenshots/`](./screenshots/).
 >
-> **Access date for all visuals:** **2026-06-30.** **No auth wall was bypassed.**
+> **Access date for all visuals:** **2026-06-30**, **except the Teqstars (R2)
+> section, rebaselined 2026-07-01** (its docs became accessible — see the
+> Sprint C2 note in that section). **No auth wall was bypassed.**
 >
 > **On saved binary files — decision and rationale.** Pages were read through the
 > proxy fetcher, which returns **page→markdown / alt-text, not pixels**. For the
@@ -16,8 +18,10 @@
 > embedded as captioned images whose **captions and visible field labels are
 > reliable but whose pixel layout was not directly inspected**. Saving dozens of
 > third-party binary images would bloat the repo for little analytic gain over
-> the captions, and several sources (Teqstars docs, the Google Doc) are
-> unreachable. Per the sprint rule ("if screenshot binary files are too heavy or
+> the captions, and one source (the Google Doc) remains unreachable. *(The
+> Teqstars docs, unreachable in Sprint C, became accessible in Sprint C2 — their
+> ~98 real doc screenshots are now inventoried below by page and alt text, still
+> without saving binaries.)* Per the sprint rule ("if screenshot binary files are too heavy or
 > impractical, do not force it"), **no binary image files were saved**
 > (`Actual file saved: no` throughout); the **analysis below is the deliverable**.
 > Emipro is the exception worth noting: its screenshots are real, addressable
@@ -78,33 +82,73 @@
 
 ---
 
-## Teqstars (R2) — Odoo Apps listing captions (docs screenshots UNREACHABLE)
+## Teqstars (R2) — real documentation screenshots (Sprint C2 rebaseline, 2026-07-01)
 
+> **Sprint C2 correction.** In Sprint C the `docs.teqstars.com` screenshots were
+> **403-blocked** and only the 17 Apps-listing **captions** could be recorded (as
+> vendor claims). On **2026-07-01** the docs became accessible (HTTP 200 with a
+> browser UA; no auth bypassed). The 31 Odoo 19.0 Shopify doc pages carry
+> **~98 embedded content screenshots** (`.jpg`/`.png` under
+> `docs.teqstars.com/.../_images/`) inside **step-by-step procedures**. Per the
+> sprint rule, **no binary image files were saved** (`Actual file saved: no`
+> throughout) — the analysis below is the deliverable; image counts and alt-text
+> are recorded per page. The Sprint C caption block is retained as history at the
+> end of this section.
+
+### TQ-SETUP-INSTANCE — Create Instance configuration (15 screenshots) ✅
+- Source: `.../setup/create_instance.html` · Saved: no · Date: 2026-07-01
+- Images (alt/src): Last Processed On, Configurations, Product Configurations, Stock Configurations, Orders Configurations, Payout Configurations, Customer Configurations, Metafield Configurations, Workflow Configurations, Webhook Configurations, Automatic Jobs Configurations, Notification & Alerts (×2 incl. import-order issue/success), Instance Confirmation (`shopify_configuration.jpg`, `shopify_products.jpg`, `shopify_stock.jpg`, `shopify_order.jpg`, `shopify_webhook.jpg`, `shopify_automatic_jobs.jpg`, `shopify_notification_and_alerts.jpg`, …).
+- Workflow step: full instance configuration (log level, Queue Batch Limit, product/stock/order/payout/customer/metafield/workflow/webhook/automatic-jobs/notification config).
+- UX observations: a **single long configuration form segmented by tab** (Product/Stock/Orders/Payout/Customer/Metafield/Workflow/Webhook/Automatic Jobs), several fields dev-mode-gated — powerful but toggle-dense (10+ order-config toggles). "Sync Listings Based On" (Barcode/SKU/both) and "Create Odoo Products?" are the key dedup controls; Real-Time Price/Inventory Sync toggles are visible.
+- Reliability/logging: Activity-on-failure (Responsible + due date) and Smart Notification config are shown; Queues‣Logs is the review surface; log level ALL/SUCCESS/ERROR.
+- Screenshot confirms **workflow** (config procedure), not just UI presence.
+- What we can learn: expose match-key + create-guard + real-time toggles; surface an activity-on-failure. What to avoid: a very long, toggle-dense single config form without progressive disclosure.
+- Claim class: **visible demonstrated workflow** · Uncertainties: pixels not inspected (alt-text + step text reliable).
+
+### TQ-CREDENTIALS — OAuth custom-app token flow + Test Connection (7 screenshots) ✅
+- Source: `.../setup/generate_credentials.html` · Saved: no
+- Images: Create Custom App, Admin API Scopes Selection, Redirect URL (copy/paste), Client Secret (copy/paste), Generate Access Token (`shopify_create_shopify_app.png`, `shopify_admin_api_scopes.png`, `shopify_copy_redirect_url.png`, `shopify_generate_access_token.png`, …).
+- Workflow step: 6-step credential generation (create app → scopes → redirect URL → client id/secret → generate token → **Test Connection**).
+- UX observations: linear, screenshot-per-step OAuth flow with an explicit **Test Connection** validation step; full Admin API scope string shown with a warning to enable all scopes.
+- Screenshot confirms **workflow** (step-by-step auth), not just UI presence.
+- What we can learn: screenshot-per-step OAuth + an explicit connection test + a visible scope list with a "enable all" warning. Claim class: **visible demonstrated workflow**.
+
+### TQ-PRODUCT — import (2) / export (5) / update (12) / matching config ✅
+- Sources: `.../product_management/product_import.html`, `product_export.html`, `product_update.html` · Saved: no
+- Images: Product Import Screen, Sync to Odoo Button; Product Export Screen, View listings, Export Listing Button/Popup; Product Update Screen, Update listings Button/Popup, **Sync to Shopify** Button, Update to Marketplace Button, Update Listing Item Popup, **Manage Sales Channels** Button, Listing **Allowed Sync** / **Not Allowed Sync** status badges.
+- Workflow step: product import (filters, auto-create-if-missing), export (Add-to-Listings → Export Listings; sales-channels-optional = draft-safe), update (four methods; Set Price/Set Quantity; Publish/Unpublish), and **Skip-Sync** (green Allowed / red Not-Allowed badge excludes a listing from all sync ops).
+- UX observations: consistent operation-popup + listing-form patterns; a green/red **sync-state badge** on the listing form; a Manage-Sales-Channels publish/unpublish dialog.
+- Screenshot confirms **workflow** (import/export/update procedures + the sync-state badge), not just UI presence.
+- What we can learn: a per-listing Allowed/Not-Allowed-Sync toggle with a colour badge is a clean exclude-from-sync/duplicate-safety control; sales-channels-optional gives draft-safe export. Claim class: **visible demonstrated workflow**.
+
+### TQ-ORDERS — order status/tracking (10) / refund (2) / cancel (2) / returns (6) / payout (3) ✅
+- Sources: `.../order_management/update_order_status.html`, `order_refund.html`, `cancel_order.html`, `order_return.html`, `payout_report.html` · Saved: no
+- Images: Update Order Status (×10 incl. **Ready For Pick Up**, **Mark As Picked Up** success, before/after pickup); Refund in Shopify Button + Refund screen; Cancel In Shopify Button + Cancel Order screen; Import Returns Operation, Shopify Return form, Process-Return wizard, **Force Restock** button, Create-Return-in-Shopify Button + wizard; Payout Configuration, Payout Import Screen, Payout Record.
+- Workflow step: fulfillment/tracking write-back (normal + **click & collect** pickup lifecycle); refund from credit note (amount-match guard); cancel (reason/notify/restock/refund); returns (import + create-from-Odoo + Force Restock + credit-note link); payout import + reconcile (Shopify-Payments-only).
+- UX observations: dedicated buttons with propagate-to-Shopify options (Notify Customer / Restock / Refund); a two-path pickup flow (Ready-for-Pickup → Picked-Up); a Force-Restock button with an on-hand-divergence warning; payout list/form with Post/Auto-Reconcile/Reconcile actions and per-line warnings.
+- Screenshot confirms **workflow** (order lifecycle write-backs), not just UI presence.
+- What we can learn: pickup/click-and-collect as first-class order status; explicit propagate-to-marketplace checkboxes; a divergence-warning on force-restock; reason-coded payout-line warnings. Claim class: **visible demonstrated workflow**.
+
+### TQ-COLLECTIONS/CATALOGS/METAFIELDS — collections (2+3+5) / catalogs (2+5) / metafields (1) ✅
+- Sources: `.../product_management/import_collection.html`, `export_collection.html`, `update_collection.html`, `import_catalog.html`, `update_catalog.html`, `setup/shopify_metafields.html` · Saved: no
+- Images: Collection Import/Smart-Manual, Collection Export/Update screens + **Update collection job**, Manage Sales Channels (collection); Catalog Import + Sync-to-Odoo, Update Catalog + list/form Sync-to-Shopify + **Add Listings to Catalog** + **Edit Quantity Rules and Volume Pricing**; Metafield Mapping List.
+- Workflow step: collections (smart/manual import, export/update with publish control, background job every 15 min), catalogs (Market/Company-Location/App pricing incl. quantity rules + volume pricing), metafield mapping (Ready/Missing/Not-Found/Inactive badges).
+- Screenshot confirms **workflow** (Markets/B2B pricing + metafield mapping), not just UI presence.
+- What we can learn: Markets/Catalogs price tiers + quantity/volume rules in-Odoo; a status-badge-driven metafield mapping list. Claim class: **visible demonstrated workflow**.
+
+### TQ-CUSTOMER/PRICE/INVENTORY — customer import (1) / price (1+3) / inventory (3+3) ✅
+- Sources: `.../customer_management/customer_import.html`, `import_price.html`, `export_price.html`, `import_inventory.html`, `export_inventory.html`, `setup/shopify_location.html` · Saved: no
+- Images: Customer Import Screen; Price Import Screen; Export Price screen + **Price Automatic Export** schedule; Import/Export Inventory screens + schedule actions; Locations Setting.
+- Workflow step: customer import (multi-field dedup; **import-only** — no export screen exists); price/inventory import+export (manual + Automatic-Jobs + optional real-time); location mapping (multi-location combine + third-party exclusion).
+- Screenshot confirms **workflow** (import/export + scheduling + location mapping), not just UI presence.
+- What we can learn: per-operation manual + scheduled + real-time options; location mapping with a third-party-exclusion warning. Note the **absence** of any customer-export screen (import-only). Claim class: **visible demonstrated workflow** (import/export shown) / **not found** (customer export).
+
+### TQ (Sprint C historical) — Odoo Apps listing captions (docs were 403-blocked)
 > Source: https://apps.odoo.com/apps/modules/19.0/shopify (17 listing screenshot
-> **captions**; rendered images not visually inspected). **All
-> docs.teqstars.com screenshots are 403-blocked and could NOT be reviewed.**
-> Saved files: no. Class: **competitor claim** (vendor captions) throughout.
-
-### TQ-credentials / TQ-product-sync-config / TQ-order-config / TQ-workflow-config
-- Actual file saved: no · Date: 2026-06-30
-- What is visible (per captions): Credentials Setup (API Access Token, Shop URL); Product Sync Config (**SKU/Barcode matching** options); Order Config (fraud data + tax settings); Workflow Config (**payment-gateway → Odoo journal** mapping rows).
-- Workflow step: instance setup, product dedup config, order/payment routing
-- UX observations: implies a single credentials form, a match-by selector for dedup, and per-gateway workflow mapping rows — a configuration-rich model. **Not visually verified** (captions only).
-- What we can learn: per-gateway workflow mapping and explicit SKU/barcode match selectors. What to avoid: relying on captions — depth unverifiable while docs are blocked.
-- Claim class: competitor claim · Uncertainties: high (caption-only, no rendered image, docs 403).
-
-### TQ-webhook-config / TQ-import-export-wizard / TQ-queue-manager
-- Actual file saved: no
-- What is visible (captions): Webhook Config (Name / Event Type / Active rows); separate Import and Export wizards; **Queue Manager — "error logs with retry functionality"** ("One bad record won't block 999 good ones").
-- Reliability/logging observations: the Queue Manager caption is the centre of Teqstars' resilience story — a per-record error list with a **Retry** control — but it is a **caption, not a demonstrated screen**.
-- What we can learn: a per-record queue with inline retry is the expected resilience UI. What to avoid: treating a caption as proof of robust retry.
-- Claim class: competitor claim · Uncertainties: high.
-
-### TQ-payout / TQ-refund-cancel / TQ-fulfillment-tracking / TQ-dashboards
-- Actual file saved: no
-- What is visible (captions): Payout Report (Enterprise auto-reconciliation); Refund dialog ("refund to Shopify" checkbox) + Cancel popup (reason/restock/notify); Fulfillment ("Update in Marketplace" button → Shopify Fulfilled + tracking); **two dashboards** (Marketplace operational + Analytics sales/revenue/top-products).
-- UX observations: explicit checkboxes to control whether actions propagate to Shopify + restock; a single "Update in Marketplace" action for fulfillment+tracking; split operational/analytical dashboards.
-- Claim class: competitor claim · Uncertainties: high (captions only).
+> **captions**, 2026-06-30). Retained as audit trail; superseded by the
+> now-accessible docs screenshots above. Class then: **competitor claim**
+> throughout (caption-only; docs screenshots were 403-blocked).
+- Captions implied: Credentials Setup; Product Sync Config (SKU/Barcode matching); Order Config (fraud/tax); Workflow Config (gateway→journal rows); Webhook Config (Name/Event/Active); Import/Export wizards; **Queue Manager** ("one bad record won't block 999"); Payout (Enterprise auto-reconcile); Refund/Cancel dialogs; Fulfillment ("Update in Marketplace"); **two dashboards** (operational + Analytics). **The "two dashboards" and "Queue Manager retry" captions are NOT substantiated by the now-accessible docs** — the docs show an Operations launcher + Queues/Logs but no metrics/chart dashboard and no per-record inline-retry control (only queue re-processing + manual re-run). Claim class then: competitor claim · Uncertainties then: high (captions only, docs 403).
 
 ---
 
@@ -237,7 +281,7 @@
 | Source | Visuals reviewed | Real image URLs? | Binary saved | Strongest visual evidence |
 | --- | --- | --- | --- | --- |
 | Webkul (R1) | 21 (S1–S21) | markdown extraction | no | staging Feeds + filtered import wizards |
-| Teqstars (R2) | 17 captions | **no — docs 403** | no | Queue Manager caption (unverified) |
+| Teqstars (R2) | **~98 real doc screenshots (2026-07-01)** | **yes (docs now accessible)** | no | setup/product/order **step-by-step** flows (create-instance ×15, product-update ×12, order-status ×10, returns ×6) |
 | Emipro (R3) | ~29 (.png URLs) | **yes** | no | Data Queues + Log Book (real screens) |
 | VentorTech (R4) | 9 article shots | partial | no | **traffic-light webhook health**; Preview/Report dry-run |
 | VentorTech (R7) | 4 alt-text figures | no (alt only) | no | sync-direction flow diagrams |
@@ -245,4 +289,16 @@
 | sh_shopify_connector (R8) | ~29 caption groups | no (captions) | no | dashboard + daily activity chart + queues |
 | Google Doc (R5) | **0 (blocked)** | n/a | n/a | — (sign-in wall) |
 
-**Net:** the most demonstrative, verifiable UI evidence is **Emipro** (real screenshots of queues/logs/config) and **VentorTech R4** (traffic-light webhooks, External-Location mapping, Preview/Report dry-run). **Teqstars** has only unverifiable captions (docs blocked); **ecommerce_shopify** has **no** UI screenshots; **Softhealer** has the broadest caption walkthrough but no rendered-image verification and no ratings/changelog.
+**Net (updated Sprint C2):** the most demonstrative, verifiable UI evidence is now
+**Emipro**, **VentorTech R4**, **and Teqstars** — Teqstars moved from
+"unverifiable captions (docs blocked)" to **~98 real doc screenshots inside
+step-by-step procedures** (create-instance config ×15, product-update ×12,
+order-status/pickup ×10, returns ×6, OAuth credentials ×7). Emipro remains
+strongest for **queue/log observability**; VentorTech R4 for **traffic-light
+webhook health + Preview/Report dry-run**; Teqstars now covers the **widest
+demonstrated breadth** (setup, product/price/inventory, orders/refunds/cancel/
+returns/payouts, collections/catalogs, metafields). **ecommerce_shopify** still
+has **no** UI screenshots; **Softhealer** still has the broadest *caption*
+walkthrough but no rendered-image verification and no ratings/changelog. Two
+prior Teqstars caption claims are **not** substantiated by the docs (a
+metrics/chart dashboard, and a per-record inline-retry "Queue Manager").

@@ -80,20 +80,26 @@
   is not guaranteed → reconciliation required; `@idempotent` required on inventory/
   refund writes from 2026-04.** *Gap:* only VT mechanizes idempotency; **nobody
   exposes a first-class, scheduled, user-visible reconciliation** ("reconcile now /
-  last reconciled / drift found"). *Why:* correctness — webhook-only/no-idempotency
-  designs silently drift or double-act. *Direction:* persistent idempotency keys
-  on all writes + a scheduled + on-demand reconciliation job with a visible report.
-  *MVP:* **candidate (core correctness).** *Open Q:* reconciliation cadence/scope;
+  last reconciled / drift found"). ***(Sprint C2 reinforces this: TeqStars — now
+  fully readable — has only adjacent idempotency guards (no explicit `@idempotent`)
+  and NO missed-record reconciliation surface (incremental cursors + per-return
+  Resync + Fetch-Webhook config-reconcile only). The whitespace is confirmed, not
+  closed.)*** *Why:* correctness — webhook-only/no-idempotency designs silently
+  drift or double-act. *Direction:* persistent idempotency keys on all writes +
+  a scheduled + on-demand reconciliation job with a visible report. *MVP:*
+  **candidate (core correctness).** *Open Q:* reconciliation cadence/scope;
   AR-006/AR-003.
 - **O-REL-2 — Named rate-limit / GraphQL-cost-aware throttling.** *Evidence:*
-  **no competitor describes one**; Tier-1: leaky-bucket (REST) + calculated cost
-  (GraphQL), 429 + `Retry-After`, bulk-ops for big jobs. *Gap:* total whitespace.
+  **no competitor describes one** (**Sprint C2: TeqStars confirmed ⬜** — only
+  "gap your schedules" operator guidance); Tier-1: leaky-bucket (REST) + calculated
+  cost (GraphQL), 429 + `Retry-After`, bulk-ops for big jobs. *Gap:* total whitespace.
   *Why:* large catalogs/orders hit limits; naive retry causes 429 storms.
   *Direction:* a cost-aware client that paces off live `throttleStatus`, backs off
   on 429/`Retry-After`, and routes big reads/writes to Bulk Operations. *MVP:*
   **candidate (resilience).** *Open Q:* per-plan bucket sizes (Tier-1 open Q).
-- **O-REL-3 — Automatic retry of safe operations.** *Evidence:* only VT. *Gap:*
-  others manual. *Direction:* classify operations as idempotent-safe → auto-retry
+- **O-REL-3 — Automatic retry of safe operations.** *Evidence:* only VT
+  (**Sprint C2: TeqStars confirmed ⬜** — queue re-processing + manual re-run, no
+  automatic-retry/backoff taxonomy). *Gap:* others manual. *Direction:* classify operations as idempotent-safe → auto-retry
   with backoff; surface non-safe failures for human action. *MVP:* candidate.
 
 ## Duplicate-prevention opportunities
@@ -162,9 +168,13 @@
 
 - **O-DOC-1 — Readable, screenshot-rich, non-gated docs + a dated, honest
   changelog.** *Evidence:* EM (rich, honest) + VT (dated, discloses CRITICAL
-  fixes) lead; **TQ docs bot-blocked, EC no screenshots + gated setup guide, SH no
-  changelog/ratings.** *Gap:* documentation/transparency is uneven and sometimes
-  an evaluation blocker. *Why:* docs/changelog are trust + evaluability signals.
+  fixes) **and now TQ (~98 screenshots in step-by-step pages + a Support Policy)**
+  lead; **EC no screenshots + gated setup guide, SH no changelog/ratings**; **TQ
+  still lacks a dated changelog** (and was bot-blocked in Sprint C — a resolved but
+  instructive trust cost). *Gap:* documentation/transparency is uneven and
+  sometimes an evaluation blocker; even good docs can lack a **dated changelog**.
+  *Why:* docs/changelog are trust + evaluability signals — **and source access can
+  change (TQ's 403→200), so re-check important blocked sources before deciding**.
   *Direction:* public, screenshot-rich docs; a dated changelog that discloses
   fixes; never bot-block or sign-in-gate evaluation docs. *MVP:* candidate
   (parallel to build). *Open Q:* docs platform.
@@ -195,14 +205,18 @@
   first error center + named diagnostics + dry-runs. *Evidence:* split across
   SH/VT/EM. *MVP:* candidate.
 - **O-PREM-3 — Premium breadth as optional add-ons:** payout reconciliation
-  (EM-grade, demonstrated), gift cards (SH), B2B/VAT (VT), Markets (EM/VT),
+  (**EM- and now TQ-grade, both demonstrated but Shopify-Payments-only**), gift
+  cards (SH), B2B/VAT (VT; TQ shows B2B *pricing* via Catalogs), Markets (EM/VT/**TQ**),
   abandoned-checkout→CRM/recommendations (SH). *Evidence:* each exists in only
-  1–2 competitors. *MVP:* later / optional add-ons. *Open Q:* which are core vs
-  add-on (RB-13).
+  1–3 competitors (**Markets & payout reconciliation are now demonstrated by more
+  than one, incl. TQ**). *MVP:* later / optional add-ons. *Open Q:* which are core
+  vs add-on (RB-13).
 - **O-PREM-4 — Trust & transparency as a feature:** dated changelog disclosing
   fixes, open docs/demo, honest latency, visible reconciliation/throttle status.
   *Evidence:* VT's transparency is rewarded (300+ installs, 20 reviews); opacity
-  (TQ blocked, SH no changelog) is a weakness. *MVP:* candidate (cheap, high-trust).
+  (**TQ's earlier bot-blocked docs — now resolved**; SH no changelog) is a
+  weakness — even now, **TQ has no dated changelog** and asserts reliability
+  (idempotency/pHash) it does not show. *MVP:* candidate (cheap, high-trust).
 
 ## Summary — top differentiation themes (inference, gated)
 

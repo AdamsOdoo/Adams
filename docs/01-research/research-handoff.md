@@ -1,11 +1,268 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint G)**
-> is immediately below; the **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
-> **Sprint B**, and **Sprint A** handoffs are retained underneath as history. The running
-> **Sprint checkpoint log** (one note per stage, all sprints) is at the very bottom. The
-> **product-side** handoff lives at
+> Continuity lives in GitHub, not chat. The **current sprint handoff (Research Sprint
+> C2 — TeqStars rebaseline)** is immediately below; the **Product Sprint G**, **Sprint F**,
+> **Sprint E**, **Sprint D**, **Sprint C**, **Sprint B**, and **Sprint A** handoffs are
+> retained underneath as history. The running **Sprint checkpoint log** (one note per
+> stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+# Research Sprint C2 Handoff — TeqStars Rebaseline and Evidence Correction
+
+> **Research Sprint C2 — TeqStars rebaseline and evidence correction.** A scoped research
+> **correction** sprint after PR #55: the TeqStars competitor docs, recorded **403-blocked
+> in Sprint C (2026-06-30)**, were **re-checked accessible on 2026-07-01** and rebaselined.
+> Research/documentation only; **no-code gate in force** (`CLAUDE.md` §4–§5); **architecture
+> stays blocked**, **implementation stays blocked**. Focused high-power research (one
+> capture-already-done + a compact adversarial-verification workflow) used **only** for
+> TeqStars documentation review — no unrelated competitors crawled. Session date 2026-07-01.
+
+## Session summary
+
+Re-accessed the **TeqStars Odoo 19.0 Shopify documentation** (blocked in Sprint C by an
+HTTP-403 **bot/UA filter**, since found to return **HTTP 200 with a browser user-agent** —
+**no login wall, no auth bypassed, public content**) and read **all 31 Shopify doc pages**
+(~98 embedded screenshots) inside step-by-step procedures. Corrected the TeqStars source
+status from **blocked/claim-only → accessible, page-classified evidence**, and propagated the
+correction into the source notes, resource inventory, screenshot inventory, competitor deep
+dive, feature matrix, and the research synthesis (UX benchmark, common patterns,
+best-in-class, gaps/opportunities, avoid-list) **only where the new evidence materially
+changes conclusions**. Evidence was gathered with **evidence discipline preserved**
+(demonstrated ✅ vs vendor claim 🟨 vs implied ➖ vs not-found ⬜ vs blocked 🔒) and an
+**adversarial capture→verify pass** (17 high-stakes items) that **downgraded 3 proposed
+upgrades** (automatic-retry/backoff, first-class cross-object reconciliation, and a
+metrics/chart dashboard → **⬜ not found**), so **nothing was over-upgraded**. Product docs
+received a **reinforcing note only** (TeqStars now demonstrates the accepted controlled
+product import/export/update baseline and corroborates "customer export = later"); **DEC-003
+and the accepted MVP scope are unchanged**. QA logs received a source-availability note (no
+new defect row) and an architecture non-decision note (all AR rows stay Not decided). **No
+connector code, no Odoo module, no architecture doc/ADR, no implementation plan, no module
+boundary, no REST/GraphQL/queue-framework/data-model/distribution decision** was produced.
+
+## Branch and commits
+
+**Working branch:** `claude/teqstars-evidence-rebaseline-2nppgq` (the harness-designated
+branch; based on `Shopify-connector` @ `6d32412`, the merged **PR #55** MVP-scope baseline).
+**Branch-name note for ChatGPT (flagged):** the Sprint C2 prompt named
+`research/sprint-c2-teqstars-rebaseline`, but the session's hard git rule designated the
+harness branch `claude/teqstars-evidence-rebaseline-2nppgq` ("never push to a different
+branch without explicit permission"), so work proceeded on the harness-designated branch;
+**the PR targets `Shopify-connector`**; `main` and plain `dev` untouched.
+
+| Hash | Message |
+| --- | --- |
+| `0aad508` | docs: start teqstars rebaseline correction |
+| `f969df8` | docs: update teqstars competitor evidence |
+| `5f49395` | docs: align research synthesis with teqstars evidence |
+| _(this commit)_ | docs: finalize teqstars rebaseline handoff |
+
+## High-power research mode used
+
+**Yes — focused and scoped to TeqStars only** (per the prompt's token-control instruction:
+"focused high-power research only where useful for TeqStars documentation review; do not
+crawl unrelated competitors"). **Plan (documented before launch, `CLAUDE.md` high-power
+section):** (a) **Why:** 31 TeqStars doc pages + ~33 required evidence checks had to be read
+and classified from real primary-source evidence with over-upgrade the named hazard.
+(b) **Capture:** the worker fetched all 31 pages (browser-UA curl → HTML→text) and read them
+in full — capture stayed worker-owned so claim classification is centrally governed.
+(c) **Verify:** a compact `parallel()` workflow of **17 adversarial verifiers** (one per
+high-stakes/contested classification) re-read the local primary-source text and tried to
+**downgrade** each proposed symbol (default to the more conservative symbol when uncertain).
+(d) **Sources:** only `docs.teqstars.com/19.0/applications/shopify/*` (no other competitors).
+(e) **Stop condition:** all 31 pages classified + high-stakes items verified + allowed docs
+updated + handoff/QA updated. (f) **Unsupported-claim prevention:** strict claim symbols;
+a comparison-table checkmark or marketing sentence is **not** demonstrated; the Sprint C
+idempotency search-snippet stayed **unverified**. **Result:** 17/17 verified; **3 downgrades**
+(auto-retry, cross-object reconciliation, metrics dashboard → ⬜); all other upgrades
+confirmed by verbatim quote. **Reuses the DP-003 capture→verify discipline.**
+
+## Source status correction (audit trail preserved)
+
+- **Previous Sprint C status (2026-06-30):** TeqStars **docs 403-blocked** (whole
+  `docs.teqstars.com` host, 19.0 + 16.0); deep dive was **Apps-listing claim-only**.
+  **Retained as history** in `../00-source-materials/competitor-source-notes.md` (R2
+  "Sprint C historical" subsections), `resource-inventory.md`, and the screenshot inventory.
+- **Current re-check (2026-07-01):** **Accessible** — the 31 pages return **HTTP 200** with a
+  browser UA (the proxy fetcher's default UA is still 403-filtered — a WAF/bot UA sniff,
+  **not** a login wall; **no auth bypassed; public content**). This satisfies the Sprint C
+  unblock path ("a browser-UA fetch of the 19.0 docs — no auth to bypass").
+- **Framing:** a **source-availability correction**, **not** a criticism of Sprint C (whose
+  refusal to treat blocked content as fact was correct). The historical **Blocked** fact and
+  the 2026-06-30 Apps-listing facts are **not** erased.
+
+## Files created or updated
+
+**Source materials (`docs/00-source-materials/`)** — `competitor-source-notes.md`
+(R2 restructured: Sprint C historical + Sprint C2 accessible subsections + verbatim quotes),
+`competitor-screenshot-inventory.md` (TeqStars real per-page screenshot inventory; no
+binaries saved; Sprint C captions retained as history).
+
+**Research (`docs/01-research/`)** — `resource-inventory.md` (Sprint C2 access-change
+section), `competitor-deep-dives.md` (TeqStars section rebuilt + cross-competitor row +
+headline inference), `competitor-feature-matrix.md` (TQ column rebaselined + caveats),
+`ux-ui-benchmark.md`, `common-patterns.md`, `best-in-class-observations.md`,
+`gaps-opportunities.md`, `avoid-list.md` (synthesis aligned where TQ materially changes
+conclusions), `research-handoff.md` (this file).
+
+**Product (`docs/02-product/`)** — `mvp-scope.md` (Sprint C2 reinforcing evidence note),
+`product-research-handoff.md` (Sprint C2 note). **No DEC-003 change; no scope change.**
+
+**QA (`docs/05-qa/`)** — `defect-pattern-log.md` (Sprint C2 source-availability note; no new
+row, no counter change), `architecture-review-log.md` (Sprint C2 non-decision note; all AR
+rows stay Not decided).
+
+**No forbidden files touched** (no `*.py`/`*.xml`/`*.csv`/manifests/modules/CI/Docker; no
+`addons/**`; no `docs/03|04|07|08`; no `.claude/**`). **DEC-003 not modified.**
+
+## Key evidence corrections (page-classified)
+
+- **Now demonstrated (✅):** store connection + OAuth custom-app + **Test Connection**;
+  instance configuration (tabbed, toggle-dense); **product import/export/update**;
+  **product matching** ("Sync Listings Based On" = SKU/Barcode/both); **duplicate
+  prevention** (customer multi-field dedup + Create-Odoo guard + webhook link-existing +
+  Skip-Sync); Listing/Listing-Item binding; **product webhooks create/update/delete**
+  (fast-ack background thread); image sync; price import/export; inventory import/export;
+  **multi-location** (combine + third-party exclusion); customer import + address;
+  orders + workflow + **click&collect**; refunds; cancellations; **returns** (webhook
+  lifecycle + Force-Restock); mark-as-paid; **payouts** (Shopify-Payments-only);
+  metafields (Product/Variant bidirectional; Customer/Order import-only); collections;
+  **catalogs/Markets/B2B pricing**; queue + typed logs + activity-on-failure;
+  **controlled, draft-safe product export** (channels-optional = unpublished).
+- **Vendor claim only (🟨):** pHash image dedup (comparison-table + `imagehash`/`PyWavelets`
+  dependency; no workflow); "Centralized hub"/Reporting-Analytics (no metrics dashboard);
+  GraphQL wire behaviour (doc-stated, not independently verified).
+- **Implied (➖):** idempotency (adjacent guards only — no explicit `@idempotent`);
+  permissions/security (scopes + access-rights mentioned; no role/record-rule model).
+- **Not found (⬜):** **customer export** (import-only), **HMAC/webhook signature**,
+  **rate-limit/GraphQL-cost throttling**, **automatic-retry/backoff taxonomy**, **first-class
+  cross-object reconciliation**, **metrics/chart dashboard**, **multi-company** (vs
+  multi-store). *(The Sprint C idempotency search-snippet stays unverified.)*
+
+## Evidence discipline
+
+**No over-upgrade.** Breadth is now demonstrated, but **reliability depth is scored
+separately** and kept conservative: the 3 verifier downgrades (auto-retry, cross-object
+reconciliation, dashboard) were honored; pHash and GraphQL-wire stayed claims; idempotency
+stayed implied; rate-limit/HMAC/customer-export/multi-company stayed not-found. A page title
+or a comparison-table checkmark was **never** treated as a demonstrated workflow (DP-003/
+DP-004). The **whitespace claims are reinforced, not closed**: TeqStars **confirms** the
+idempotency + reconciliation + automatic-retry + rate-limit gaps; it **narrows only the
+payout-reconciliation** add-on (EM + TQ, both Shopify-Payments-only).
+
+## Product impact (reinforces the accepted baseline; no scope change)
+
+TeqStars now **demonstrates** the accepted **controlled product import/export/update** MVP
+baseline (match key + create-guard + draft-safe export + publish/unpublish + per-listing
+sync toggle) and **corroborates "customer export = later"** (no customer export; import-only).
+**DEC-003 unchanged; MVP scope unchanged; customer export not moved into MVP.** No serious
+contradiction to DEC-003 was found → **no open review note for ChatGPT required.**
+
+## Architecture inputs, not decisions
+
+The rebaseline adds **competitor inputs** to AR-002 (GraphQL doc-stated; controlled draft-safe
+export pattern; `productSet`/REST-vs-GraphQL still open), AR-003 (webhooks + scheduled + manual
++ **cron-processed per-op queues** — a data point alongside VT's `queue_job`; framework open),
+AR-005 (Listing/Listing-Item binding + SKU/Barcode match keys + create-guard; data model open),
+AR-006 (adjacent guards only — reinforces the idempotency/retry/reconciliation/throttle
+whitespace), AR-007 (multi-location + quantity-field choice + controlled apply), AR-008
+(Update-in-Marketplace + tracking + click&collect). **No AR row is decided** — see the Sprint
+C2 non-decision note in `../05-qa/architecture-review-log.md`.
+
+## Open questions
+
+Is TeqStars' **pHash** dedup real at runtime (dependency declared, no workflow)? Does any
+**`@idempotent`-style directive** exist in code (not on the docs)? Is there a **monitoring
+dashboard** beyond the Operations launcher (none documented)? **Multi-company** vs
+multi-store? **HMAC / webhook-signature** verification (HTTPS only)? How are **rate limits**
+handled at scale (no throttle documented)? (Unchanged field-wide whitespace: how competitors
+surface rate-limit + first-class reconciliation to users — still none, TeqStars included.)
+
+## Learning feedback loop
+
+- **New issues discovered:** none. **No new defect pattern**; **no new DP row; no counter
+  change.** Sprint C2 is a **source-availability correction**, logged as a note in
+  `../05-qa/defect-pattern-log.md`.
+- **Repeated issue patterns:** none at threshold. The **DP-003 capture→verify discipline was
+  applied** to the new evidence (17-item adversarial pass → 3 downgrades), and **DP-004** (a
+  config field / comparison checkmark ≠ demonstrated support) was **applied, not
+  re-triggered** — no capability was over-upgraded.
+- **Rules/checklists updated:** reinforced (not new) the standing rule that **an important
+  source recorded Blocked must be re-checked before a final scope/architecture decision
+  leans on it** — access can change (WAF/bot rules, vendor doc releases). Refines DP-001
+  (re-read the source) and DP-003 (blocked-source handling); noted in the defect log and the
+  resource inventory. The **browser-UA fetch** is now the recorded unblock method for
+  UA-filtered (non-auth) docs.
+- **New rejected approaches:** none (research-only).
+- **New technical debt:** none (no code).
+- **Architecture concerns:** TeqStars now **informs** AR-002…AR-008 (non-decision note in
+  `architecture-review-log.md`); **all rows stay Not decided / Evidence pending.**
+- **Tests or review gates needed:** none active (research). The DP-006 evidence-consistency
+  gate remains the standing pre-MVP/architecture review gate.
+- **Should future prompts change? Minor:** competitor-research prompts should state that a
+  **UA/bot 403 is not an auth wall** and a **browser-UA re-fetch** is the correct,
+  non-bypassing unblock for such sources; and that **blocked/weak sources important to a
+  decision should be re-checked before that decision is finalized** (now encoded in the
+  defect log + resource inventory + avoid-list). Branch reality remains the harness
+  `claude/...` branch while the PR targets `Shopify-connector`.
+- **Quality gate:** satisfied — allowed-files-only; no forbidden files; handoffs +
+  learning loop updated; evidence page-classified and adversarially verified; DEC-003 and
+  MVP scope unchanged; no architecture decided.
+
+## What ChatGPT should review
+
+1. **TeqStars is no longer globally blocked/claim-only** — the source-status correction is
+   a source-availability change with the Sprint C blocked record preserved as audit trail.
+2. **Evidence upgrades are justified by accessible page-level workflows/screenshots** — spot
+   check the verbatim quotes in `competitor-source-notes.md` (R2 Sprint C2).
+3. **Capabilities are not over-upgraded** — the 3 verifier downgrades (auto-retry,
+   reconciliation, dashboard → ⬜) and the kept 🟨/➖/⬜ items (pHash, idempotency, HMAC,
+   rate-limit, customer export, multi-company).
+4. **MVP scope and DEC-003 remain unchanged** (product docs carry a reinforcing note only).
+5. **No architecture row is decided** (Sprint C2 non-decision note; all AR rows Not decided).
+
+## Recommended next session
+
+Return to the gated **RB-14 architecture preparation** (AR-002 distribution/API, AR-003
+orchestration/queue, AR-005 binding/dedup) with the TeqStars evidence now firmed up. Keep the
+no-code gate; one scoped objective per session; **do not start RB-14 in this sprint.**
+
+### Exact next-session prompt
+
+> **Research Sprint (RB-14 framing — Part 1): Architecture decision framing and
+> official-source refresh — DO NOT DECIDE.** Read `CLAUDE.md`, the latest
+> `docs/01-research/research-handoff.md` (Sprint C2), and
+> `docs/05-qa/architecture-review-log.md`. Confirm the no-code gate and that all AR rows are
+> "Not decided / Evidence pending." Frame — **without deciding** — the evidence still needed
+> to resolve **AR-002** (distribution/API strategy), **AR-003** (sync orchestration/queue),
+> and **AR-005** (binding/dedup model), citing Tier-1 Shopify/Odoo facts and the now-complete
+> competitor evidence (incl. the TeqStars Sprint C2 rebaseline). Allowed files:
+> `docs/03-architecture/**` (framing docs only, if the folder is authorised) **or**
+> `docs/01-research/**` synthesis + `docs/05-qa/architecture-review-log.md` if not; update the
+> handoff. **Do not** write code, create modules, decide REST/GraphQL/queue/data-model/
+> distribution, or open a PR into `main`/`dev`. Branch from `Shopify-connector`; PR into
+> `Shopify-connector`. Stop after framing + handoff and await ChatGPT review.
+
+## Stop confirmation
+
+Stopped at the Sprint C2 boundary: four stage commits on the harness-designated branch + one
+draft PR targeting **`Shopify-connector`**, **not merged**. **No** connector code, Odoo
+module, architecture decision, architecture doc/ADR, implementation plan, module boundary, or
+REST/GraphQL/queue-framework/data-model/distribution choice. **DEC-003 and MVP scope
+unchanged.** `main` and plain `dev` untouched; only Sprint C2 allowed files changed. Awaiting
+ChatGPT review.
+
+## Quality gate confirmation (Sprint C2)
+
+- [x] Session handoff updated (this block + product-research-handoff.md Sprint C2 note).
+- [x] Quality feedback loop checked (this file + `../05-qa/` logs).
+- [x] New learning captured in the correct file (source-availability note in
+  `defect-pattern-log.md`; no new DP row / counter change).
+- [x] Any rejected approach logged (none — research-only).
+- [x] Any accepted technical debt logged (none — no code).
+- [x] Any repeated issue pattern escalated per §4 (none at threshold; DP-003/DP-004 applied,
+  not re-triggered; 3 over-upgrades caught and downgraded).
 
 ---
 

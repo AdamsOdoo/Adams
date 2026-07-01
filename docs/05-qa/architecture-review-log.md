@@ -197,3 +197,43 @@ field-ownership + conflict-resolution design must be reviewed and accepted befor
 "Not decided / Evidence pending" (`CLAUDE.md` §4–§5; RB-14). NB: **TeqStars** documentation,
 recorded 403-blocked in Sprint C, was **re-checked accessible on 2026-07-01**; a **full
 TeqStars rebaseline is pending a later research sprint** — it does not change any AR row here._
+
+_**Research Sprint C2 non-decision note (2026-07-01) — NOT decisions; AR rows remain "Not
+decided / Evidence pending".** The Sprint C2 TeqStars rebaseline (docs now accessible;
+`../01-research/competitor-deep-dives.md`, `competitor-feature-matrix.md`) upgraded TeqStars
+from listing-claim-only to **page-classified demonstrated evidence**, which now supplies
+**additional competitor inputs** (not resolutions) to several AR rows. For the record only:
+**AR-002 (API/distribution)** — the TeqStars docs **state the Shopify GraphQL Admin API** for
+sync/webhooks/refunds/cancel/payouts (a vendor doc statement corroborating GraphQL
+convergence), and demonstrate a **controlled, draft-safe product export** (Add-to-Listings →
+Export Listings with sales-channels-optional = unpublished, Publish/Unpublish, per-listing
+Skip-Sync) — a concrete competitor pattern for the DEC-003 controlled-onboarding path, but
+**REST/GraphQL/hybrid, distribution (public vs custom), and the `productSet` delete-on-omit /
+full-state-write mechanics stay OPEN**. **AR-003 (orchestration/queue)** — TeqStars runs
+**webhooks (background-thread fast-ack) + scheduled Automatic Jobs + manual + per-operation
+queues** (Product/Customer/Order/Return, Queue Batch Limit 100, **cron-processed — framework
+not named**) with a collection background job that "retries in the next run" — a real-world
+data point that a **cron-processed per-op queue** (not necessarily OCA `queue_job`) is viable,
+alongside VentorTech's `queue_job`; the **`ir.cron` vs `queue_job` choice and Odoo-Online
+feasibility stay OPEN**. **AR-005 (binding/dedup)** — TeqStars binds via **Listing / Listing
+Item** entities to Odoo products/variants, matches on **"Sync Listings Based On" = SKU /
+Barcode / both**, dedups customers on a **multi-field search**, and guards product creation
+(Create-Odoo-Products) — corroborating a **dedicated binding model + SKU/barcode match keys +
+first-sync guard**, but the `ir.model.data`-reuse-vs-dedicated model, per-store keys, and
+deleted-binding handling **stay OPEN**. **AR-006 (error/retry/idempotency)** — TeqStars shows
+**adjacent guards only** (refund amount-match, already-cancelled) + typed logs +
+Activity-on-failure, but **no explicit `@idempotent` directive, no automatic-retry/backoff
+taxonomy, no first-class cross-object reconciliation, and no rate-limit/GraphQL-cost
+throttling** (adversarially verified ⬜) — **reinforcing** (not closing) the idempotency +
+reconciliation + retry + throttle whitespace that AR-006 must resolve. **AR-007 (inventory)** —
+TeqStars demonstrates **multi-location** (export combines multiple locations; third-party
+location excluded), **quantity-field choice** (Free-to-Use / On-Hand / Forecasted), and
+**controlled apply** (Validate Inventory Adjustment; lot/serial skipped) — corroborating the
+AR-007 direction; design **stays OPEN**. **AR-008 (fulfilment)** — TeqStars demonstrates
+deliver → **Update in Marketplace** (status + tracking), **click & collect** pickup lifecycle,
+and shipped-order import → stock moves — corroborating FulfillmentOrder-era + tracking
+write-back; design **stays OPEN**. The rebaseline routes these here as **competitor inputs
+only** and re-litigates nothing; **no AR row is decided, accepted, proposed for active review,
+or re-litigated.** All remain "Not decided / Evidence pending" pending sufficient research +
+ChatGPT approval (`CLAUDE.md` §4–§5; RB-14). No architecture doc, ADR, or implementation plan
+was produced. See DP-006's evidence-consistency gate in `defect-pattern-log.md`._
