@@ -60,3 +60,13 @@ AR-007/008, module boundaries AR-004, bulk ops, multi-store/company) and the wea
 competitor evidence (Teqstars 403, EC/R5 setup guide, 17 unread VT Confluence articles)
 are **gated decisions / research gaps**, tracked in `mvp-scope.md` "Open questions", the
 handoffs, and `architecture-review-log.md` — **not** technical debt._
+
+_**Product Sprint G note (2026-07-01): none.** Sprint G was a decision-recording /
+documentation sprint (accepted MVP scope in `../04-decisions/DEC-003-mvp-scope.md` + product
+doc alignment + handoffs) — **no code, no module, no implementation shortcuts.** Scope
+**deferred** from MVP (export, refunds/cancellations, full Domain 9 accounting automation,
+payouts, multi-store/company, bulk-ops-as-a-feature, etc.) is a **planned product-scope
+boundary with revisit conditions**, **not** deferred hardening or a compromise — so it is
+**not** technical debt. The still-open MVP/architecture questions (AR-002…AR-008, the
+Domain 9 draft-artifact exception, internal bulk-ops need) are **gated decisions**, tracked
+in DEC-003, the handoffs, and `architecture-review-log.md` — **not** technical debt._

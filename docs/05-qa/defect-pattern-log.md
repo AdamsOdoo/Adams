@@ -127,3 +127,21 @@ is carried forward as a mandatory acceptance principle for the first refund/refu
 sprint** (never dropped). This was a **consistency correction, not a new defect
 occurrence** — **no new DP row, no counter change.** No MVP scope was finalized and no
 architecture decision was made; MVP remains **proposed, not final**._
+
+_**Product Sprint G note (2026-07-01): none — DP-006 gate applied, not re-triggered.**
+Product Sprint G recorded ChatGPT's **accepted MVP scope** in
+[`../04-decisions/DEC-003-mvp-scope.md`](../04-decisions/DEC-003-mvp-scope.md) and aligned
+the product docs (`../02-product/mvp-scope.md`, `../02-product/non-mvp-and-later-phases.md`,
+`../02-product/user-stories.md`) to that baseline. It **added no new defect occurrence** to
+any category. The **DP-006 evidence-consistency gate** was **applied throughout**: no
+competitor claim was promoted to a fact; weak/claim-only evidence stayed **out of scope**
+(pHash image dedup, Teqstars 403 breadth, EC/SH breadth); the Webkul default-Company field
+stayed a **config field**, not multi-company evidence (DP-004); **auto-apply stock (C-INV-04)
+stayed an [Inference] routed to AR-007**, explicitly **not accepted as default MVP
+behaviour** (DP-006); "real-time" was never asserted (C-SYNC-07). Critically, the sprint kept
+**product-scope acceptance strictly separate from any architecture decision** — DEC-003 is a
+**product-scope** record that **feeds AR-002…AR-008 but decides none** (premature-architecture
+category #4 **not** triggered). DP-003/DP-004 and DP-005 (a classification/scope is an input
+until ChatGPT accepts it — here it *was* accepted, via the correct gated `04-decisions`
+route) were **applied, not re-triggered**. **No counter change; no new row.** Architecture
+stays RB-14 / AR-002…AR-008-gated; implementation stays blocked._
