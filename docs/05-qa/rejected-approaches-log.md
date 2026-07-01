@@ -49,3 +49,15 @@ rejections. The taxonomy's "Capabilities with weak or blocked evidence" section
 records competitor claims that are **not adopted as demonstrated** (e.g. Teqstars
 docs-403 claims, WK config-field-only multi-company) — these are **evidence
 downgrades under DP-003/DP-004, not rejected approaches**. No entry is added here._
+
+_**Product Sprint E note (2026-07-01): none.** Sprint E was a product-strategy /
+synthesis sprint (product vision + setup/UX principles). It **evaluated no design
+option to rejection** — the product principles, premium quality bar, differentiation
+themes, non-negotiables, and UX principles are **inputs** for the gated RB-13 (MVP)
+and RB-14 (architecture) reviews, not rejections. The vision's "What we will avoid"
+section and the UX doc's "Anti-patterns to avoid" restate the Sprint C **avoid-list**
+(competitor anti-patterns) as **recommendations/inferences**, which — per `CLAUDE.md`
+§10 and this log's rules — become formal rejections **only after** they are evaluated
+for our design and ChatGPT/architecture review rejects them (the "Arch review: YES"
+items remain seeded against AR-002…AR-008, evidence-pending). No approach is rejected
+in this sprint; no entry is added here._

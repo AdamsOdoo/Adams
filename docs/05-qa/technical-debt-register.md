@@ -41,3 +41,12 @@ competitor evidence (Teqstars docs 403, EC/R5 setup guide, 17 unread VT Confluen
 articles) and the open architecture/MVP questions are **research gaps / gated
 decisions**, tracked in the taxonomy's "Open questions", the handoffs, and
 `architecture-review-log.md` — **not** technical debt._
+
+_**Product Sprint E note (2026-07-01): none.** Sprint E was product-strategy /
+synthesis-only (product vision + setup/UX principles + handoffs) — no code, no module,
+no implementation shortcuts. The open MVP/architecture questions (distribution, queue
+framework, binding model, module boundaries, multi-company, error/retry taxonomy) and
+the weak/blocked competitor evidence (Teqstars 403, EC/R5 setup guide, 17 unread VT
+Confluence articles) are **gated decisions / research gaps**, tracked in the product
+vision's "Open questions", the handoffs, and `architecture-review-log.md` — **not**
+technical debt._

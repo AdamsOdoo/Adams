@@ -1,11 +1,216 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint D)**
-> is immediately below; the **Sprint C**, **Sprint B**, and **Sprint A** handoffs
-> are retained underneath as history. The running **Sprint checkpoint log** (one
-> note per stage, all sprints) is at the very bottom. The **product-side** handoff
-> lives at
+> Continuity lives in GitHub, not chat. The **current sprint handoff (Sprint E)**
+> is immediately below; the **Sprint D**, **Sprint C**, **Sprint B**, and **Sprint
+> A** handoffs are retained underneath as history. The running **Sprint checkpoint
+> log** (one note per stage, all sprints) is at the very bottom. The **product-side**
+> handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+# Product Sprint E Handoff
+
+> **Product Sprint E — Product Vision, Quality Bar, UX Principles, and
+> Differentiation Strategy.** Product strategy / synthesis only; **no-code gate in
+> force** (`CLAUDE.md` §4–§5). High-power mode **not required** (synthesis of
+> already-merged repo evidence — no new competitor crawling, no research fan-out).
+> Maps to backlog item **RB-11 (product vision draft)**, feeding RB-13 (MVP
+> implications) and RB-14 (architecture prep) — all gated.
+
+## Session summary
+
+Created the **product vision** (`docs/02-product/product-vision.md`) and the
+**setup/UX principles** (`docs/02-product/setup-ux-principles.md`) for the Odoo 19 ↔
+Shopify Connector, consuming the Sprint C research baseline and the Sprint D
+canonical feature taxonomy + capability evidence map. The vision positions the
+connector as **correctness-first, UX-first, recovery-first, observable, honest,
+modular/customizable, performance-aware, evidence-based, upgrade-safe, and premium
+but not bloated** (simple for normal users, powerful for advanced users). It states
+the product thesis, target personas (inference-level P1–P4), core customer problems,
+ten product principles, a premium quality bar, a five-theme differentiation strategy,
+per-domain strategies (UX / reliability / modularity / performance / security /
+docs-trust), seven product non-negotiables, and explicit **MVP / later / architecture
+inputs (not decisions)**. The UX doc defines a UX north star and 12 principles plus
+per-area principle sets. **No connector code, no Odoo module, no MVP finalization, no
+architecture decisions, no ADRs, no implementation plan, and no module boundaries**
+were produced. Synthesis was **worker-owned** (no fan-out).
+
+## Branch and commits
+
+**Working branch:** `claude/sprint-e-product-strategy-gd2kfs` (the harness-designated
+branch; based on `Shopify-connector` @ `9a744f7`, the merged **PR #52** Sprint D
+baseline). **Branch-name note for ChatGPT (flagged):** the Sprint E prompt body named
+`product/sprint-e-product-vision-quality-bar`, but the session's hard git rule
+designated `claude/sprint-e-product-strategy-gd2kfs` ("never push to a different
+branch without explicit permission"), so work proceeded on the harness-designated
+branch; **the PR still targets `Shopify-connector`**; `main` and plain `dev`
+untouched.
+
+| Hash | Message |
+| --- | --- |
+| `ce36ffc` | docs: start sprint e product vision |
+| `d3da053` | docs: add product vision |
+| `5561db3` | docs: add setup ux principles |
+| _(this commit)_ | docs: finalize sprint e product handoff |
+
+## Files created or updated
+
+**Product (`docs/02-product/`)**
+- `product-vision.md` (new — main deliverable), `setup-ux-principles.md` (new),
+  `product-research-handoff.md` (updated — Sprint E section).
+
+**Research (`docs/01-research/`)**
+- `research-handoff.md` (this file — Sprint E section + checkpoints).
+
+**QA / quality memory (`docs/05-qa/`)**
+- `defect-pattern-log.md` (updated — Sprint E note: DP-006 gate applied, not
+  re-triggered; no new occurrence), `architecture-review-log.md` (updated — Sprint E
+  non-decision note), `rejected-approaches-log.md` (updated — nothing rejected),
+  `technical-debt-register.md` (updated — no debt).
+
+**No forbidden files touched** (no `*.py`/`*.xml`/`*.csv`/manifests/modules/CI/
+Docker; no `addons/**`; no `docs/03|04|07|08`; no `.claude/skills|agents`).
+
+## Product vision summary
+
+- **What:** a best-in-class, modular, reliable Odoo 19 ↔ Shopify connector — a
+  correct, observable sync core wrapped in an operator experience, delivered as an
+  isolated, upgrade-safe addon family.
+- **Positioning:** *correct by design, honest by default — and can prove both to the
+  operator.*
+- **Thesis:** breadth is table stakes; win on **demonstrated correctness** and the
+  **operator experience**, ship the demonstrated breadth as a clean baseline, and
+  offer premium breadth as **optional add-ons** on an honest, modular core.
+- **Premium quality bar** = correctness / experience / trust, **not** feature count;
+  seven **non-negotiables** form the quality contract.
+- **Differentiation (inputs):** (1) demonstrated correctness (idempotency +
+  reconciliation + rate-limit awareness), (2) command center + recovery-first errors
+  together, (3) easy onboarding with real reliability, (4) honesty/transparency, (5)
+  premium breadth as clean add-ons.
+
+## UX principles summary
+
+- **North star:** the operator always knows *is everything OK / what failed and why /
+  what do I do next* and can act without reading source or filing a ticket.
+- **12 principles:** guided setup; prove readiness before sync; progressive
+  disclosure; honest status & freshness; command center over scattered menus;
+  recovery-first errors; safe-by-default actions; human-readable logs; guided
+  mappings; role-aware UX; modular feature visibility; documentation mirrors the
+  product — plus per-area principle sets. **No screens or menus are designed.**
+
+## Evidence discipline
+
+- **DP-003 applied:** competitor UX/product statements stay claims; TQ (docs 403) and
+  EC (no screenshots) stay claim-only/weak; SH ✅ rest on captions; EM/VT-demonstrated
+  evidence is weighted highest.
+- **DP-004 applied:** WK multi-company kept **config-field-only (➖)**; market promises
+  not treated as demonstrated bidirectionality.
+- **DP-005 applied:** every principle/candidate is an **input**, not a decision;
+  MVP=RB-13 and architecture=RB-14/AR-002…AR-008 stay gated.
+- **DP-006 evidence-consistency gate applied:** conditional platform items (OAuth,
+  distribution, queue framework, REST/GraphQL, multi-company, module boundaries,
+  payouts, data models) stay conditional/open; improvement opportunities (auto-apply,
+  unified command center, freshness) labelled **inference**, not demonstrated
+  competitor capability. **No claim promoted to a fact; no on-page detail invented.**
+
+## MVP inputs, not decisions
+
+Candidate core (input): connect+prove; core object sync at the demonstrated baseline;
+the sync+correctness engine (webhooks + reconciliation + scheduled + manual,
+idempotency, dedup/binding, retry/recovery); operator UX (command center +
+recovery-first errors + honest freshness); role-based access. Explicitly later
+(input): advanced breadth, payouts, financial reporting, per-market pricing,
+custom-Python transforms, multi-company. **MVP is not finalized** — candidates for
+**RB-13** only. Open: single/multi-store; single/multi-company; core vs optional
+add-on grouping; **primary MVP persona (P1 vs P2)**.
+
+## Architecture inputs, not decisions
+
+The vision/UX principles supply **product-intent inputs** to **AR-002…AR-008** — all
+remain **"Not decided / Evidence pending."** No distribution model, OAuth mandate,
+REST/GraphQL choice, queue framework, binding data model, module boundary/name, or
+inventory/fulfilment design is decided. A **non-decision note** was added to
+`architecture-review-log.md`.
+
+## Open questions
+
+Distribution model (AR-002); primary MVP persona + single/multi-store & company
+(RB-13); core vs add-on grouping / feature-flag model (RB-13/AR-004); reconciliation
+cadence + per-object vs global freshness (AR-003/006); error/retry taxonomy (AR-006);
+binding model + deleted-binding handling (AR-005); queue framework + Odoo-Online
+(AR-003); non-Shopify-Payments payout modelling; Odoo edition gating disclosure;
+whether firming up weak/blocked evidence (TQ 403, EC/R5, 17 unread VT Confluence)
+changes any product framing; demo/docs hosting + self-test scope.
+
+## Learning feedback loop
+
+- **New issues discovered:** none. No new defect pattern emerged. The **DP-006
+  evidence-consistency gate** (3rd-occurrence, ESCALATED) was **applied, not
+  re-triggered**; DP-003/DP-004/DP-005 prevention rules were applied throughout (no
+  claim-as-fact; config field ≠ demonstrated support; classification = input, not
+  decision).
+- **Repeated issue patterns:** none at threshold; no new occurrence added to any
+  category. Escalation gates remain honoured by the no-code gate.
+- **Rules/checklists updated:** none required — existing rules were sufficient and
+  applied. QA logs received non-decision / no-new-issue notes only.
+- **New rejected approaches:** none (nothing evaluated to rejection; noted in
+  `rejected-approaches-log.md`).
+- **New technical debt:** none (no code; noted in `technical-debt-register.md`).
+- **Architecture concerns:** vision/UX principles now supply product-intent inputs to
+  AR-002…AR-008 — recorded as a **non-decision note** in `architecture-review-log.md`;
+  **all rows stay Not decided / Evidence pending.**
+- **Tests or review gates needed:** none active (synthesis). The DP-006
+  evidence-consistency gate remains the standing pre-MVP/architecture review gate.
+- **Should future prompts change? No** (beyond what Sprint D encoded) — keep every
+  principle/candidate an **input** with MVP=RB-13 / architecture=RB-14 gating, keep
+  synthesis worker-owned, keep conditional platform items conditional (DP-006). Branch
+  reality remains the harness-designated `claude/...` branch while the PR targets
+  `Shopify-connector`.
+
+## What ChatGPT should review
+
+1. **Positioning & thesis** — is "correct by design, honest by default, prove both to
+   the operator" right, and are the five differentiation themes correctly prioritised
+   as inputs?
+2. **Evidence discipline (DP-003/004/006)** — no claim-as-fact; EM/VT weighted over
+   SH/WK/EC/TQ; conditional items stay conditional/open.
+3. **No premature MVP/architecture (DP-005 guard)** — confirm nothing reads as a
+   decision or final UI/menus; flag any hardening.
+4. **Personas** — are P1–P4 reasonable inference-level inputs, with "primary MVP
+   persona" left open?
+5. **Non-negotiables** — endorse/amend the seven-item quality contract.
+6. **Sequencing** — confirm RB-13 next, then RB-14, consuming this vision + UX
+   principles.
+7. **Branch-name discrepancy** — confirm working on
+   `claude/sprint-e-product-strategy-gd2kfs` (PR → `Shopify-connector`) is acceptable.
+
+## Recommended next session
+
+**RB-13 (MVP scope implications — not finalized)** consuming this vision + UX
+principles + the Sprint D taxonomy/evidence map under the DP-006 evidence-consistency
+gate, then **RB-14 (architecture preparation)** against AR-002…AR-008 — all gated and
+ChatGPT-reviewed. Optionally firm up weak/blocked evidence (TQ 403; EC/R5; 17 unread
+VT Confluence). Keep the no-code gate; one scoped objective per session.
+
+## Stop confirmation
+
+Stopped at the Sprint E boundary as instructed: three stage commits on the
+harness-designated working branch plus this handoff commit, **one draft PR** targeting
+**`Shopify-connector`**, **not merged**. **No** code, **no** Odoo module, **no** MVP
+finalization, **no** architecture decisions, **no** ADRs, **no** implementation plan,
+**no** module boundaries. `main` and plain `dev` untouched. Awaiting ChatGPT review.
+
+## Quality gate confirmation (Sprint E)
+
+- [x] Session handoff updated (this block + product-research-handoff.md Sprint E).
+- [x] Quality feedback loop checked (this file + `../05-qa/` logs).
+- [x] New learning captured in the correct file (no new issue; DP-006 gate applied —
+  noted in `defect-pattern-log.md`).
+- [x] Any rejected approach logged (none — noted in `rejected-approaches-log.md`).
+- [x] Any accepted technical debt logged (none — noted in `technical-debt-register.md`).
+- [x] Any repeated issue pattern escalated per §4 (none at threshold; DP-006 gate
+  applied, not re-triggered).
 
 ---
 
@@ -1440,3 +1645,71 @@ ChatGPT review.
   in `rejected-approaches-log.md`; no-debt note in `technical-debt-register.md`).
   Ran final allowed/forbidden-file checks. Next: push the working branch and open
   one draft PR targeting `Shopify-connector`, then stop.
+
+### Product Sprint E checkpoints
+
+- **Sprint E / Stage 1 — Setup + evidence read (2026-07-01):** Started **Product
+  Sprint E** (product vision, premium quality bar, differentiation strategy, and
+  setup/UX principles). Product strategy / synthesis only; **no-code gate confirmed**
+  (`CLAUDE.md` §4–§5); high-power mode **not required** (focused product synthesis of
+  already-merged repo evidence — no new competitor crawling, no research fan-out).
+  Fetched remote branches and verified preconditions: **PR #52 is merged into
+  `Shopify-connector`** (confirmed via GitHub API — `merged: true`, merged 2026-07-01;
+  branch tip `9a744f7` *is* the PR #52 merge commit); the working branch is based on
+  `Shopify-connector` (identical to it at start); all required Sprint D outputs present
+  (`feature-taxonomy.md`, `capability-evidence-map.md`, `product-research-handoff.md`);
+  the **DP-006 evidence-consistency gate** is present in `defect-pattern-log.md`.
+  **Branch-name note (flagged for ChatGPT):** the harness designated the working branch
+  **`claude/sprint-e-product-strategy-gd2kfs`** (already checked out, based on
+  `Shopify-connector`), whereas the Sprint E prompt body named
+  `product/sprint-e-product-vision-quality-bar`; per the session's hard git rule
+  ("never push to a different branch without explicit permission") the work proceeds on
+  the harness-designated branch and the **PR still targets `Shopify-connector`** —
+  `main`/plain `dev` untouched. Read the required governance/product/research files
+  (CLAUDE.md, README, this handoff, research methodology, both official baselines,
+  competitor deep dives + matrix, UX/UI benchmark, common patterns, best-in-class,
+  gaps/opportunities, avoid-list, feature taxonomy, capability evidence map, product
+  handoff, all QA logs, learning rules). Confirmed the phase is still **no-code**, that
+  Sprint E is **product vision / strategy only** (no MVP finalization, no architecture
+  finalization, no ADRs, no module boundaries), and the **DP-003/DP-004/DP-006**
+  prevention + evidence-consistency rules (competitor claim ≠ fact; config field ≠
+  demonstrated support; market promise ≠ demonstrated bidirectionality; conditional
+  platform requirements stay conditional; improvement opportunities are inference, not
+  demonstrated evidence; no capability enters MVP/architecture as a decision until
+  ChatGPT-reviewed). Next: Stage 2 — draft `docs/02-product/product-vision.md`.
+- **Sprint E / Stage 2 — Product vision (2026-07-01):** Wrote
+  `docs/02-product/product-vision.md` — the main deliverable: status/purpose/evidence
+  base, what we are building, product thesis, target personas (P1–P4, inference-level),
+  core customer problems, ten product principles, premium quality bar, five-theme
+  differentiation strategy, per-domain strategies (UX / reliability & correctness /
+  modularity & customizability / performance / security & permissions / docs-support-
+  trust), what we do better than competitors, what we avoid, seven product
+  non-negotiables, and explicit **MVP / later / architecture inputs (not decisions)** +
+  open questions + ChatGPT review notes. Claim labels ([Fact]/[Competitor claim]/
+  [Demonstrated]/[Inference]/[Recommendation]/[Open question]) applied throughout;
+  competitor claims kept as claims (EM/VT-demonstrated weighted over SH/WK/EC/TQ);
+  conditional items (OAuth, distribution, queue, REST/GraphQL, multi-company, module
+  boundaries, payouts, data models) kept conditional/open (DP-006). Worker-owned (no
+  fan-out). Commit `d3da053`. Next: Stage 3 — setup/UX principles.
+- **Sprint E / Stage 3 — Setup & UX principles (2026-07-01):** Wrote
+  `docs/02-product/setup-ux-principles.md` — a UX north star + 12 principles (guided
+  setup; prove readiness; progressive disclosure; honest status & freshness; command
+  center over scattered menus; recovery-first errors; safe-by-default actions;
+  human-readable logs; guided mappings; role-aware UX; modular feature visibility;
+  docs mirror the product) + per-area principle sets (setup flow, config screens,
+  dashboard, sync operations, logs/retries/recovery, mapping screens,
+  multi-store/permissions, advanced features) + anti-patterns + open questions +
+  ChatGPT review notes. Grounded in Sprint C UX benchmark / best-in-class / avoid-list
+  + Sprint D taxonomy; DP-003/004/006 discipline applied; **no screens or menus
+  designed**. Commit `5561db3`. Next: Stage 4 — handoffs + QA loop.
+- **Sprint E / Stage 4 — Handoffs + QA loop (2026-07-01):** Wrote the Sprint E section
+  of `docs/02-product/product-research-handoff.md` and of this rolling handoff (above),
+  each with the learning feedback loop (no new issue; DP-006 gate applied, not
+  re-triggered) and, here, the quality-gate confirmation. Updated QA logs with
+  non-decision / no-new-issue notes: `defect-pattern-log.md` (Sprint E note — DP-006
+  gate applied, not re-triggered, no counter change), `architecture-review-log.md`
+  (Sprint E non-decision note — vision/UX principles supply product-intent inputs to
+  AR-002…AR-008, all still Not decided / Evidence pending), `rejected-approaches-log.md`
+  (nothing rejected), `technical-debt-register.md` (no debt). Ran final allowed/
+  forbidden-file checks. Next: push the working branch and open one draft PR targeting
+  `Shopify-connector`, then stop.
