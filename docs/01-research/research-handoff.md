@@ -1133,3 +1133,30 @@ ChatGPT review.
   DP-001 confirmation; future-prompt updates) and the quality-gate confirmation
   (all items satisfied). Ran final allowed/forbidden-file checks. Next: push the
   working branch and open one draft PR targeting `Shopify-connector`, then stop.
+
+### Research/Product Sprint D checkpoints
+
+- **Sprint D / Stage 1 — Setup + evidence read (2026-07-01):** Started
+  Research/Product Sprint D (canonical feature taxonomy + capability evidence
+  map). Research/synthesis-only; **no-code gate confirmed** (`CLAUDE.md` §4–§5);
+  high-power mode **not required** for this sprint (focused synthesis of
+  already-merged Sprint C evidence — no new competitor crawling). Fetched remote
+  branches and verified preconditions: **PR #51 is merged into `Shopify-connector`**
+  (branch tip `e18ba8e` *is* the PR #51 merge commit); the working branch is based
+  on `Shopify-connector` (identical to it at start); all required Sprint C outputs
+  present (`competitor-deep-dives.md`, `competitor-feature-matrix.md`,
+  `ux-ui-benchmark.md`, `common-patterns.md`, `best-in-class-observations.md`,
+  `gaps-opportunities.md`, `avoid-list.md`, `competitor-source-notes.md`,
+  `competitor-screenshot-inventory.md`). **Branch-name note (flagged for ChatGPT):**
+  the harness designated the working branch **`claude/feature-taxonomy-sprint-d-t8d2t0`**
+  (already checked out, based on `Shopify-connector`), whereas the Sprint D prompt
+  body named `product/sprint-d-feature-taxonomy`; per the session's hard git rule
+  ("never push to a different branch without explicit permission") the work
+  proceeds on the harness-designated branch and the **PR still targets
+  `Shopify-connector`** — `main`/plain `dev` untouched. Read the required
+  governance/research files (CLAUDE.md, README, this handoff, learning rules,
+  methodology, resource inventory, both official baselines, all Sprint C evidence,
+  all QA logs). Confirmed DP-003/DP-004 prevention rules (competitor claim ≠ fact;
+  configuration field ≠ demonstrated support; market promise ≠ demonstrated
+  bidirectionality; ✅ requires demonstrated workflow/explicit evidence). Next:
+  Stage 2 — draft the canonical feature taxonomy in `docs/02-product/feature-taxonomy.md`.
