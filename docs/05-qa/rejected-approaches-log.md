@@ -79,17 +79,25 @@ DP-003/DP-004, not rejected approaches**. No entry is added here._
 
 _**Product Sprint G note (2026-07-01): none.** Sprint G recorded ChatGPT's **accepted MVP
 scope** (`../04-decisions/DEC-003-mvp-scope.md`) and aligned the product docs. The items
-**deferred/excluded from MVP** (product export, customer export, publish/channel-control
-export, bidirectional catalog, refund sync, cancellation reflection, returns/RMA, full
-Domain 9 accounting automation, payout/bank reconciliation, multi-package fulfilment, complex
-tax, Markets/B2B/POS/gift cards/metafields/subscriptions/abandoned-checkout/recommendations/
-Buy-with-Prime, multi-store/multi-company logic, custom transforms, advanced analytics,
-public App-Store/demo packaging, and **bulk operations as a user-facing feature**) are
-**product-scope boundary decisions with revisit conditions** in
+**deferred/excluded from MVP** (**unrestricted autonomous bidirectional catalog ownership** —
+all-field two-way conflict resolution, field-ownership matrix, advanced publish/channel
+campaign management; **customer export**; refund sync, cancellation reflection, returns/RMA,
+full Domain 9 accounting automation, payout/bank reconciliation, multi-package fulfilment,
+complex tax, Markets/B2B/POS/gift cards/metafields/subscriptions/abandoned-checkout/
+recommendations/Buy-with-Prime, multi-store/multi-company logic, custom transforms, advanced
+analytics, public App-Store/demo packaging, and **bulk operations as a user-facing feature**)
+are **product-scope boundary decisions with revisit conditions** in
 `../02-product/non-mvp-and-later-phases.md` — **not** rejected architecture approaches. Per
 `CLAUDE.md` §10 and this log's rules, an approach is entered here as **Rejected** only after
 it is evaluated for **our** design and ChatGPT/architecture review rejects it — which has
 **not** happened (no AR row is decided). The weak/blocked competitor evidence kept out of
-scope (pHash, TQ 403 breadth, EC/SH breadth, WK config-field-only multi-company) are
-**evidence down-weights under DP-003/DP-004, not rejected approaches**. No entry is added
+scope (pHash, EC/SH breadth, WK config-field-only multi-company) are **evidence down-weights
+under DP-003/DP-004, not rejected approaches**. (TeqStars docs were 403-blocked in Sprint C
+but **re-checked accessible 2026-07-01**; a full rebaseline is pending.) No entry is added
 here._
+
+_**Product Sprint G revision note (2026-07-01, PR #55): still none.** ChatGPT's PR #55
+correction moved **controlled product export/update INTO MVP** (product export is **not**
+deferred) and kept **unrestricted autonomous bidirectional catalog ownership** and **customer
+export** later. This is a **product-scope correction** — **no approach was rejected**, so no
+entry is added here._

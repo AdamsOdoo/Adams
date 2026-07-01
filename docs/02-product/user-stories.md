@@ -9,11 +9,16 @@
 
 ## Status
 
-> **Aligned to the accepted MVP baseline (ChatGPT RB-13, DEC-003, 2026-07-01) —
-> architecture still gated.** Story MVP-relevance tags now reflect ChatGPT's accepted
-> scope (the Sprint F **open** direction forks are resolved). Authored in Sprint F;
-> aligned in Sprint G. See
+> **Aligned to the accepted MVP baseline (ChatGPT RB-13, DEC-003, 2026-07-01 —
+> PR #55-corrected) — architecture still gated.** Story MVP-relevance tags reflect
+> ChatGPT's accepted scope (the Sprint F **open** direction forks are resolved). Authored
+> in Sprint F; aligned in Sprint G. See
 > [`../04-decisions/DEC-003-mvp-scope.md`](../04-decisions/DEC-003-mvp-scope.md).
+
+> **PR #55 revision (2026-07-01).** Product export corrected **into** MVP as **controlled
+> product export/update** (US-E2-05) plus a **first-sync product-matching / duplicate-
+> prevention** story (US-E2-06). **Customer export (US-E3-04)** stays later; **unrestricted
+> autonomous bidirectional catalog ownership** stays later.
 
 - **Sprint:** authored Product Sprint F (RB-13); **aligned** Product Sprint G (RB-13,
   DEC-003). **Phase:** MVP scope only — **no-code gate in force** (`CLAUDE.md` §4–§5).
@@ -218,18 +223,53 @@ Each story uses:
 
 ### US-E2-05
 - Persona: P2
-- Story: As an administrator, I want to publish Odoo-authored products to Shopify as
-  drafts with a preview before any destructive apply, so that I can build catalogs in
-  Odoo without risking data loss.
+- Story: As an administrator, I want to export or update selected Odoo products to Shopify
+  through a previewed, draft/unpublished/channel-controlled flow, so that I can launch
+  products from Odoo without creating duplicates or publishing unsafe data.
 - Capability IDs: C-PROD-02, C-PROD-03, C-PROD-05
-- MVP relevance: **later** (RB-13: DEFERRED — Phase 2 "bidirectional catalog")
-- Evidence strength: B (VT/EM/SH/WK draft-export); C-PROD-05 safety A [Fact]
-- Acceptance notes (later): export creates drafts; a dry-run/preview precedes any
-  full-state write (**[Fact]** `productSet` delete-on-omit); channel control available.
-- Failure/recovery notes: partial lists are never sent to full-state mutations.
-- Architecture dependency: **AR-002, AR-005** — **Architecture-dependent**.
-- Open questions: none for MVP (deferred). C-PROD-05 dry-run/preview becomes **mandatory**
-  the moment any destructive/full-state write enters scope.
+- MVP relevance: **proposed MVP — controlled product export/update** (RB-13, PR #55
+  correction). *(Unrestricted autonomous bidirectional catalog management stays later.)*
+- Evidence strength: B (VT/EM/SH/WK draft-export [Demonstrated]); C-PROD-05 safety A
+  [Fact]; TeqStars export flows re-checked accessible 2026-07-01 (reinforcing)
+- Acceptance notes:
+  - **selected products only** (not a blanket push);
+  - **preview before creation/update/export** (no blind write);
+  - **draft/unpublished or explicit sales-channel control** (export without publishing
+    when no sales channel is selected);
+  - **no full-state destructive write without preview/dry-run** (**[Fact]** `productSet`
+    delete-on-omit);
+  - **binding created after confirmation**;
+  - **ambiguous matches require manual review**;
+  - **no name-only automatic matching**.
+- Failure/recovery notes: partial lists are never sent to full-state mutations; a failed
+  export/update is isolated, reason-coded, retryable.
+- Architecture dependency: **AR-002** (API/destructive-apply), **AR-005** (binding/match)
+  — **Architecture-dependent**.
+- Open questions: none on inclusion (controlled export/update accepted); mechanism →
+  RB-14. Advanced publish/channel campaign management is later.
+
+### US-E2-06
+- Persona: P2
+- Story: As an administrator, I want the first sync to classify products as matched /
+  only-in-Shopify / only-in-Odoo / duplicate-key / manual-review before creating records,
+  so that the connector does not duplicate products.
+- Capability IDs: C-PROD-01, C-PROD-02, C-MAP-01, C-MAP-02
+- MVP relevance: **proposed MVP** (RB-13, PR #55 — product onboarding & duplicate
+  prevention)
+- Evidence strength: B (EM/VT/WK/SH product import/export [Demonstrated]) + [Fact]
+  Shopify GID binding
+- Acceptance notes: a **first-sync matching wizard** classifies each product/variant as
+  **matched by existing binding**, **matched by SKU/internal reference**, **matched by
+  barcode**, **only in Shopify**, **only in Odoo**, or **duplicate SKU/barcode conflict →
+  manual review**; an **explicit first-sync source strategy** (Shopify-source /
+  Odoo-source / both-match-first) is chosen; **no blind create**; **no name-only automatic
+  matching**; the binding is written only **after confirmation**.
+- Failure/recovery notes: ambiguous/duplicate matches are surfaced for manual review, not
+  silently merged or duplicated.
+- Architecture dependency: **AR-005** (binding/match-key data model + first-sync strategy)
+  — **Architecture-dependent — must be resolved in RB-14 before implementation**.
+- Open questions: MVP match-key set (SKU/internal-reference + barcode) and the binding
+  data model → AR-005.
 
 ---
 
@@ -741,8 +781,11 @@ Each story uses:
 Story-level detail deferred; scope in
 [`./non-mvp-and-later-phases.md`](./non-mvp-and-later-phases.md):
 
-- **Epic L1 — Bidirectional catalog & customers** (product/customer export, publish/
-  channel): C-PROD-02/03/05, C-CUST-02. MVP relevance: **later** (RB-13 deferred).
+- **Epic L1 — Full autonomous bidirectional catalog + customer export** (unrestricted
+  two-way catalog ownership: all-field conflict resolution, field-ownership matrix,
+  advanced publish/channel campaign management; and customer export C-CUST-02). MVP
+  relevance: **later** (RB-13 deferred). *(**Controlled** product export/update
+  C-PROD-02/03/05 is **in MVP** — see US-E2-05/US-E2-06, not this later epic.)*
 - **Epic L2 — Financial depth** (accounting automation, refunds, cancellations,
   returns/RMA): C-PAY-01/02/03 (accounting-automation portion), C-RET-01/02/03. MVP
   relevance: **later** (RB-13 deferred; MVP keeps **minimal financial evidence** only —
@@ -784,8 +827,10 @@ criteria):
 
 1. ~~**Primary MVP persona**~~ — **RESOLVED: P1 (operator) primary; P2 (admin/consultant)
    secondary.**
-2. ~~**Direction / export stories**~~ (US-E2-05, US-E3-04) — **RESOLVED: Phase 2**
-   (deferred from MVP).
+2. ~~**Direction / export stories**~~ — **RESOLVED (PR #55): controlled product
+   export/update (US-E2-05) + first-sync matching (US-E2-06) are IN MVP**; **customer
+   export (US-E3-04)** stays Phase 2; **unrestricted autonomous bidirectional catalog
+   ownership** stays Phase 2+.
 3. ~~**Domain 9 minimum**~~ (US-E4-05) — **RESOLVED: minimal financial evidence only in
    MVP; no accounting automation.**
 4. ~~**Refunds/cancellations**~~ (US-E4-06) — **RESOLVED: deferred.**
@@ -807,15 +852,16 @@ criteria):
 
 Please inspect carefully:
 
-1. **Experience coverage** — do the 10 MVP epics fully express the "correct, observable,
-   recoverable single-store loop, import-first" experience without gaps or over-reach?
+1. **Experience coverage** — do the MVP epics fully express the "correct, observable,
+   recoverable single-store loop **with controlled bidirectional product onboarding**"
+   experience without gaps or over-reach?
 2. **Story ≠ implementation task** — confirm stories stay product-level (no code-level
    acceptance criteria, no screens/modules).
-3. **MVP relevance tags (RB-13 aligned)** — confirm the resolved tags are correct: the
-   former open forks are now **later/deferred** (US-E2-05 product export, US-E3-04
-   customer export, US-E4-06 refunds/cancellations) and **MVP minimal-evidence-only**
-   (US-E4-05 Domain 9); bulk ops (US-E4-02/US-E7-04) is internal-only, not a user-facing
-   feature.
+3. **MVP relevance tags (RB-13 aligned, PR #55-corrected)** — confirm the resolved tags:
+   **controlled product export/update (US-E2-05) + first-sync matching (US-E2-06) are IN
+   MVP**; **customer export (US-E3-04)** and **refunds/cancellations (US-E4-06)** are
+   later/deferred; **US-E4-05 Domain 9** is MVP minimal-evidence-only; bulk ops
+   (US-E4-02/US-E7-04) is internal-only, not a user-facing feature.
 4. **Evidence discipline** — confirm each story traces to demonstrated/Tier-1 evidence;
    inferences (command center, error center, freshness, auto-apply) stay inference; no
    claim is promoted to a fact.

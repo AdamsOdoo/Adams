@@ -43,29 +43,49 @@
 
 ## ChatGPT RB-13 acceptance
 
-> **Accepted MVP scope baseline — ChatGPT, 2026-07-01 (DEC-003).** These decisions
-> resolve the Sprint F **open** direction forks and are now the accepted **product
-> scope**. Architecture remains gated (RB-14 / AR-002…AR-008); every *mechanism* stays
-> **Architecture-dependent** (see *Architecture-dependent MVP items*). This section
-> governs where it clarifies a per-domain block below.
+> **Accepted MVP scope baseline — ChatGPT, 2026-07-01 (DEC-003), revised same day after
+> the PR #55 review.** These decisions resolve the Sprint F **open** direction forks and
+> are now the accepted **product scope**. Architecture remains gated (RB-14 /
+> AR-002…AR-008); every *mechanism* stays **Architecture-dependent** (see
+> *Architecture-dependent MVP items*). This section governs where it clarifies a
+> per-domain block below.
 
-**Accepted MVP option — Option A (correctness core, import-first).** A small but
-excellent MVP is a **correct, observable, recoverable single-store sync loop** across
-the core commerce objects — **not** a broad bidirectional connector.
+> **PR #55 revision (2026-07-01) — product direction correction.** The first draft
+> over-deferred product export. **Corrected:** MVP includes **controlled bidirectional
+> product onboarding and basic product sync** (product import **and** controlled product
+> export/update, with matching, binding, preview, and draft/unpublished/channel-controlled
+> safety). What stays deferred is **unrestricted autonomous bidirectional catalog
+> ownership**. **Customer export remains deferred.** Product import/export/update is a
+> **market-baseline** capability (EM/VT/WK/SH demonstrated), not a Phase-2 luxury.
+
+**Accepted MVP option — Option A (correctness core, with controlled bidirectional product
+onboarding).** A small but excellent MVP is a **correct, observable, recoverable
+single-store sync loop** across the core commerce objects, including **controlled
+bidirectional product onboarding** (safe product import **and** export/update) — **not
+unrestricted autonomous bidirectional catalog ownership**.
 
 **Accepted primary direction.**
 - **Shopify → Odoo (import):** product import; variant/options import; basic image/media
   import; base price / compare-at import; customer import and matching; order import;
   order status / basic lifecycle representation.
+- **Odoo → Shopify (controlled product export/update):** product export; product update;
+  basic image/media update/export (where feasible); base price / compare-at update/export
+  (where feasible) — with matching, binding, preview, and draft/unpublished/channel-
+  controlled safety (see *Product onboarding and duplicate-prevention baseline*).
 - **Odoo → Shopify (write-back):** inventory write-back (multi-location-aware,
   idempotent); fulfillment and tracking write-back.
-- **Deferred from MVP:** product export; customer export; publish/unpublish /
-  channel-control export; bidirectional catalog ownership.
+- **Deferred from MVP:** **unrestricted autonomous bidirectional catalog ownership**
+  (all-field two-way conflict resolution; complex field-ownership matrix; advanced
+  publish/channel campaign management; Markets/pricelists/metafields/SEO/custom-transforms/
+  full-multi-store catalog breadth); **customer export**.
 
 **Accepted resolutions of the Sprint F open items:**
-- **Product export (C-PROD-02/05)** — **deferred** (was open). Phase 2 "bidirectional
-  catalog"; destructive-apply safety (C-PROD-05) becomes mandatory only when export enters
-  scope.
+- **Product export/update (C-PROD-02/03/05)** — **controlled product export/update
+  ACCEPTED in MVP** (corrected from the first draft's defer). MVP exports/updates
+  **selected** products via a **previewed, draft/unpublished/channel-controlled** flow;
+  destructive-apply safety (C-PROD-05) is **mandatory** for this path; matching + binding
+  precede any create/update. **Unrestricted autonomous bidirectional catalog ownership**
+  stays deferred (Phase 2+).
 - **Customer export (C-CUST-02)** — **deferred** (was open). Phase 2.
 - **Domain 9 financial/payment (C-PAY-01/02/03)** — **include minimal financial
   representation only** (was open): preserve Shopify financial status, payment status,
@@ -111,6 +131,36 @@ orchestration/queue framework (AR-003), module boundaries/config model (AR-004),
 binding/dedup data model (AR-005), error/retry taxonomy (AR-006), inventory design incl.
 apply mode (AR-007), fulfilment design (AR-008), and any implementation plan.
 
+## Product onboarding and duplicate-prevention baseline
+
+> **Accepted MVP requirement (ChatGPT RB-13, DEC-003 — PR #55 correction).** Because MVP
+> now does **controlled bidirectional product onboarding** (import **and** export/update),
+> the product path must be **safe by construction**: it never blindly creates or
+> destructively writes. Every mechanism below is **product-level intent**; the *how*
+> (binding data model AR-005; API / destructive-apply mechanics AR-002) stays
+> **Architecture-dependent — must be resolved in RB-14 before implementation.**
+
+- **First-sync matching wizard** — before creating any records, classify each product/
+  variant as one of:
+  - **matched by existing binding** (Shopify ID ↔ Odoo record already linked),
+  - **matched by SKU / internal reference**,
+  - **matched by barcode**,
+  - **only in Shopify**,
+  - **only in Odoo**,
+  - **duplicate SKU/barcode conflict → manual review required**.
+- **Explicit first-sync source strategy** — the operator chooses: **Shopify is source**,
+  **Odoo is source**, or **both systems already have products → match first**.
+- **No blind create** — a **preview** precedes every create/update/export.
+- **No name-only automatic matching** — names are never a sole automatic match key;
+  ambiguous matches require **manual review**.
+- **Binding created after confirmation** — the Shopify product/variant ID ↔ Odoo
+  product/template/variant binding is written only once the match is confirmed.
+- **Draft / unpublished / channel-controlled export safety** — Odoo→Shopify export can
+  create **drafts** / stay unpublished / respect explicit sales-channel selection (export
+  without publishing when no sales channel is selected).
+- **Preview / dry-run before any destructive or full-state write** (**[Fact]** `productSet`
+  delete-on-omit, A-IMP-1) — mandatory guardrail; mechanism architecture-gated (AR-002).
+
 ## Purpose
 
 Convert the vision's "MVP inputs, not decisions"
@@ -148,9 +198,19 @@ Already-merged repo evidence only (no new research):
 
 **Evidence weighting (unchanged):** most robustly demonstrated evidence is **Emipro
 (EM, ~29 screenshots)** and **VentorTech (VT, dated release notes)**; **SH** is
-caption-level, **WK** guide-level, **EC** has no screenshots, **TQ** docs are
-403-blocked (claims only). Demonstrated (EM/VT) weighted over SH/WK/EC/TQ claims;
-Tier-1 platform facts outrank all vendor evidence.
+caption-level, **WK** guide-level, **EC** has no screenshots. Demonstrated (EM/VT)
+weighted over SH/WK/EC/TQ claims; Tier-1 platform facts outrank all vendor evidence.
+
+> **TeqStars (TQ) source-availability correction (2026-07-01).** Sprint C recorded the
+> TeqStars docs as **403-blocked on 2026-06-30** (claims only). ChatGPT **re-checked on
+> 2026-07-01 and found them accessible**
+> ([docs.teqstars.com](https://docs.teqstars.com/19.0/applications/shopify/overview.html)) —
+> the tree documents product import/export/update, price/inventory import/export,
+> collection/catalog, order import/status, refunds/cancellations/returns, mark-as-paid,
+> payouts, and metafields. A **full TeqStars evidence rebaseline is pending a later
+> research sprint** and is **not** performed here. The PR #55 product-direction correction
+> (controlled product export/update in MVP) is **already supported by existing EM/VT/WK/SH
+> product-export evidence** and only **reinforced** by this TQ re-check.
 
 ## Scope decision rule
 
@@ -175,12 +235,13 @@ Otherwise the capability is **exclude** (out of first release), **defer** (a nam
 later phase), or **open** (ChatGPT must decide direction/necessity). Every item below
 carries one of: `include` / `exclude` / `defer` / `open`.
 
-> **Direction assumption (Inference / Open question — RB-13).** To keep MVP coherent,
-> the proposal assumes a primary direction of **Shopify → Odoo for catalog, customers,
-> and orders (import)** and **Odoo → Shopify for inventory and fulfilment/tracking
-> (write-back)** — Shopify as the sales channel, Odoo as the back office. This mirrors
-> the demonstrated competitor baseline but is **not decided**; the second direction
-> (product/customer *export*) is left **open** for ChatGPT.
+> **Direction (RB-13 accepted, PR #55-corrected).** Primary direction: **Shopify → Odoo
+> for catalog, customers, and orders (import)** and **Odoo → Shopify for inventory and
+> fulfilment/tracking (write-back)** — Shopify as the sales channel, Odoo as the back
+> office. **In addition, the product catalog is controlled two-way:** Odoo → Shopify
+> **product export/update** is **in MVP** (controlled — matching, binding, preview,
+> draft/unpublished/channel-controlled), per the PR #55 correction. **Customer export**
+> is deferred; **unrestricted autonomous bidirectional catalog ownership** is deferred.
 
 ## MVP thesis
 
@@ -217,28 +278,31 @@ An MVP capability is "done to bar" (adapted from the vision's premium quality ba
 
 ## Recommended MVP scope — accepted baseline
 
-> **Accepted MVP baseline (ChatGPT RB-13, DEC-003).** The scope below is the accepted
-> product baseline; the Sprint F **open** direction forks are resolved in the
-> **ChatGPT RB-13 acceptance** section above (product/customer export → deferred;
-> Domain 9 → minimal financial evidence only; refunds/cancellations → deferred; bulk ops
-> → not user-facing, internal-only assessment; single-store/single-company accepted; P1
-> primary / P2 secondary). Items whose *mechanism* is gated remain **Architecture-
-> dependent — must be resolved in RB-14 before implementation.** Per-domain blocks below
-> retain their evidence and their original recommendation label for traceability; where a
-> block still reads `open`, the acceptance section above is authoritative.
+> **Accepted MVP baseline (ChatGPT RB-13, DEC-003 — PR #55-corrected).** The scope below
+> is the accepted product baseline; the Sprint F **open** direction forks are resolved in
+> the **ChatGPT RB-13 acceptance** section above (**controlled product export/update →
+> accepted in MVP**; customer export → deferred; Domain 9 → minimal financial evidence
+> only; refunds/cancellations → deferred; bulk ops → not user-facing, internal-only
+> assessment; single-store/single-company accepted; P1 primary / P2 secondary). Items whose
+> *mechanism* is gated remain **Architecture-dependent — must be resolved in RB-14 before
+> implementation.** Per-domain blocks below retain their evidence and their original
+> recommendation label for traceability; where a block still reads `open`, the acceptance
+> section above is authoritative.
 
 **In one paragraph:** a **single-store** connector that **imports** products (with
 variants + basic images and price), customers (deduplicated), and orders (with a
 basic order lifecycle and the minimal payment/journal representation the Odoo order
-flow needs), and **writes back** inventory (multi-location-aware, idempotent) and
-fulfilment/tracking — driven by a **layered sync model** (webhooks + scheduled +
-first-class reconciliation + manual) on a **correctness engine** (idempotency keys,
-GID↔Odoo binding + documented dedup keys, per-record failure isolation, retry
-classification with safe manual retry, rate-limit awareness, resumable jobs) — all
-surfaced through an **operator experience** (guided setup + readiness self-test,
-credential masking, a basic command center, a recovery-first error center with
-reason-coded logs, honest freshness labels) with **role-based access** and **open,
-honest docs**. It **excludes** product/customer export, refunds/returns lifecycle,
+flow needs); does **controlled product export/update back to Shopify** (selected
+products, previewed, matched + bound, draft/unpublished/channel-controlled); and
+**writes back** inventory (multi-location-aware, idempotent) and fulfilment/tracking —
+driven by a **layered sync model** (webhooks + scheduled + first-class reconciliation +
+manual) on a **correctness engine** (idempotency keys, GID↔Odoo binding + documented
+dedup keys, per-record failure isolation, retry classification with safe manual retry,
+rate-limit awareness, resumable jobs) — all surfaced through an **operator experience**
+(guided setup + readiness self-test, credential masking, a basic command center, a
+recovery-first error center with reason-coded logs, honest freshness labels) with
+**role-based access** and **open, honest docs**. It **excludes** customer export,
+**unrestricted autonomous bidirectional catalog ownership**, refunds/returns lifecycle,
 payouts, Markets/B2B/POS/gift cards/metafields, multi-store & multi-company, pricelist
 & per-market pricing, custom transforms, bulk-ops-as-a-feature, and advanced
 analytics (see [`./non-mvp-and-later-phases.md`](./non-mvp-and-later-phases.md)).
@@ -430,38 +494,50 @@ analytics (see [`./non-mvp-and-later-phases.md`](./non-mvp-and-later-phases.md))
 - MVP rationale: core object baseline, import direction (see direction assumption).
 - ChatGPT decision needed: confirm import as the MVP product direction.
 
-**C-PROD-02 — Product export (draft-first)**
-- Capability ID(s): C-PROD-02, C-PROD-05 (safety, conditional)
-- Recommendation: open (lean defer) — **RB-13 accepted: DEFERRED** (Phase 2 bidirectional
-  catalog; C-PROD-05 destructive-apply safety becomes mandatory only when export enters
-  scope)
+**C-PROD-02 — Product export/update (controlled, draft-first)**
+- Capability ID(s): C-PROD-02 (export), C-PROD-05 (safety, mandatory)
+- Recommendation: open (lean defer) — **RB-13 accepted (PR #55 correction): CONTROLLED
+  product export/update IN MVP** (previewed, matched, bound, draft/unpublished/channel-
+  controlled; C-PROD-05 safety mandatory)
 - Evidence strength: B (VT/EM/SH/WK [Demonstrated]); C-PROD-05 safety is A [Fact]
-- Evidence source: VT draft-export; **[Fact]** `productSet` delete-on-omit (A-IMP-1).
-- User value: push Odoo-authored products to Shopify (a second direction).
-- Risk if included: doubles direction/conflict complexity and **forces** the
-  destructive-apply safety (C-PROD-05, dry-run) + AR-002/AR-005 earlier; larger,
-  more fragile surface.
-- Risk if excluded: MVP cannot create Shopify products from Odoo (import-only).
-- Architecture dependency: AR-002, AR-005 — **Architecture-dependent.**
-- MVP rationale: the direction question is MVP-shaping; **recommend defer** to keep
-  MVP small unless ChatGPT prioritises Odoo-first catalogs. If included, C-PROD-05
-  (draft/preview before destructive apply) becomes **mandatory** (A-strength).
-- ChatGPT decision needed: is product **export** in MVP? (decides C-PROD-05 inclusion).
-- **RB-13 decision (DEC-003):** **DEFERRED from MVP.** Product export is Phase 2
-  (bidirectional catalog); MVP is import-first. C-PROD-05 dry-run/preview is carried
-  forward as **mandatory the moment any destructive/full-state write enters scope.**
+- Evidence source: VT/EM/WK/SH draft-export [Demonstrated]; **[Fact]** `productSet`
+  delete-on-omit (A-IMP-1); TeqStars docs re-checked accessible 2026-07-01 (reinforcing).
+- User value: launch/maintain Odoo-authored products on Shopify without duplicates or
+  unsafe publishes — a **market-baseline** capability, not a luxury.
+- Risk if included: adds the controlled export/update path; **requires** matching +
+  binding + preview + destructive-apply safety (C-PROD-05) — bounded by "controlled".
+- Risk if excluded: MVP could not create/update Shopify products from Odoo — below the
+  demonstrated market baseline (EM/VT/WK/SH).
+- Architecture dependency: AR-002 (API/destructive-apply), AR-005 (binding/match) —
+  **Architecture-dependent.**
+- MVP rationale: product import/export/update is demonstrated by four competitors; MVP
+  includes it in a **controlled, safe** form (matching/binding/preview/draft) and defers
+  only **unrestricted autonomous bidirectional catalog ownership**.
+- ChatGPT decision needed: resolved — controlled export/update accepted.
+- **RB-13 decision (DEC-003, PR #55):** **CONTROLLED product export/update ACCEPTED in
+  MVP.** Selected products only; preview before create/update/export; draft/unpublished or
+  explicit sales-channel control; binding after confirmation; ambiguous matches → manual
+  review; no name-only automatic matching; no destructive/full-state write without
+  preview/dry-run. **Unrestricted autonomous bidirectional catalog ownership** stays
+  deferred. See *Product onboarding and duplicate-prevention baseline*.
 
 **C-PROD-03 — Publish / unpublish & channel control**
 - Capability ID(s): C-PROD-03
-- Recommendation: defer
+- Recommendation: defer — **RB-13 accepted (PR #55): BASIC draft/unpublished/sales-channel
+  export control IN MVP (as export safety); ADVANCED publish/channel campaign management
+  DEFERRED**
 - Evidence strength: B (EM/SH [Demonstrated])
-- Evidence source: C-PROD-03; ties to POS/sell-OOS.
-- User value: control which products are live on which channel.
-- Risk if included: only meaningful once export is in scope; premature otherwise.
-- Risk if excluded: none for an import-first MVP.
-- Architecture dependency: none directly (follows export decision).
-- MVP rationale: dependent on the export decision; defer with C-PROD-02.
-- ChatGPT decision needed: none unless export is pulled into MVP.
+- Evidence source: C-PROD-03; ties to POS/sell-OOS; TeqStars export-without-publishing
+  (accessible 2026-07-01).
+- User value: export safely without publishing (draft / no-sales-channel), and control
+  which products go live — the safe minimum for controlled export.
+- Risk if included (basic): low — it is the safety layer for the controlled export path.
+- Risk if excluded: unsafe publishes on export; below the demonstrated baseline.
+- Architecture dependency: none directly (follows the controlled-export path).
+- MVP rationale: **basic** draft/unpublished/channel-controlled export safety is **in MVP**
+  (part of controlled export); **advanced publish/channel campaign management is deferred**
+  (unrestricted catalog ownership).
+- ChatGPT decision needed: resolved — basic export safety in MVP; advanced deferred.
 
 **C-PROD-04 — Exclude-from-sync**
 - Capability ID(s): C-PROD-04
@@ -479,17 +555,17 @@ analytics (see [`./non-mvp-and-later-phases.md`](./non-mvp-and-later-phases.md))
 **C-PROD-05 — Draft/preview before destructive apply**
 - Capability ID(s): C-PROD-05
 - Recommendation: open (mandatory **if** export/destructive apply is in MVP) — **RB-13
-  accepted: not in MVP** (export deferred), but **mandatory the moment any
-  destructive/full-state write enters scope** (carried-forward guardrail)
+  accepted (PR #55): MANDATORY in MVP** (the controlled product export/update path is in
+  MVP, so its destructive-write safety is mandatory)
 - Evidence strength: A ([Fact] `productSet` delete-on-omit + VT dry-run [Demonstrated])
 - Evidence source: **[Fact]** A-IMP-1; VT Preview/Report; UX Principle 7.
 - User value: prevents silent data loss on full-state mutations.
-- Risk if included: adds a preview surface (only needed with destructive writes).
+- Risk if included: adds a preview surface (required by the controlled export path).
 - Risk if excluded (while doing destructive writes): **data loss** — non-negotiable #1.
 - Architecture dependency: AR-002 — **Architecture-dependent.**
-- MVP rationale: not a standalone MVP feature; it is a **guardrail that is mandatory
-  the moment C-PROD-02 (or any full-state write) enters MVP.**
-- ChatGPT decision needed: tied to C-PROD-02.
+- MVP rationale: it is the **mandatory guardrail** for the controlled export/update path
+  (C-PROD-02) that MVP now includes — no full-state write without preview/dry-run.
+- ChatGPT decision needed: resolved — mandatory in MVP with controlled export.
 
 ### Domain 4 — Variants, options, images, and media
 
@@ -1433,30 +1509,36 @@ Kept **minimal and safe** (progressive disclosure; inline help on jargon):
 
 Three coherent options were weighed against the scope decision rule:
 
-**Option A — Correctness core, import-first (RECOMMENDED).**
+**Option A — Correctness core, with controlled bidirectional product onboarding
+(ACCEPTED, PR #55-corrected).**
 Single-store. Import products (variants + basic images + base price), customers
 (deduped), orders (basic lifecycle + minimal payment/journal representation as needed);
-write back inventory (multi-location-aware, idempotent) and fulfilment/tracking. Full
-correctness engine (layered sync + reconciliation + idempotency + binding/dedup +
-isolation + safe retry + rate-limit awareness + resumable jobs). Operator UX (guided
-setup + readiness self-test + command center + recovery-first error center + honest
-freshness). Role-based access. Open docs + self-test. Excludes export, refunds/returns
-lifecycle, payouts, Markets/B2B/POS/gift cards/metafields, multi-store/company,
-pricelists/per-market, custom transforms, bulk-ops-as-a-feature, advanced analytics.
-- *Why:* maximises **demonstrated correctness + operator UX** (the two differentiation
-  whitespaces) on a bounded surface; every included item is A/B evidenced or a
-  correctness-neutral E; second directions and breadth defer cleanly.
-- *Risk:* the minimal payment/invoice representation (Domain 9) and refund/cancellation
-  reflection need a ChatGPT direction call.
+**controlled product export/update back to Shopify** (selected products, previewed,
+matched + bound, draft/unpublished/channel-controlled); write back inventory
+(multi-location-aware, idempotent) and fulfilment/tracking. Full correctness engine
+(layered sync + reconciliation + idempotency + binding/dedup + isolation + safe retry +
+rate-limit awareness + resumable jobs). Operator UX (guided setup + readiness self-test +
+command center + recovery-first error center + honest freshness). Role-based access. Open
+docs + self-test. Excludes **customer export**, **unrestricted autonomous bidirectional
+catalog ownership**, refunds/returns lifecycle, payouts, Markets/B2B/POS/gift cards/
+metafields, multi-store/company, pricelists/per-market, custom transforms,
+bulk-ops-as-a-feature, advanced analytics.
+- *Why:* maximises **demonstrated correctness + operator UX** on a bounded surface while
+  including the **market-baseline** product path (import + controlled export/update,
+  EM/VT/WK/SH-demonstrated); every included item is A/B evidenced or a correctness-neutral
+  E; unrestricted catalog ownership and other breadth defer cleanly.
+- *Note (PR #55):* the first draft over-deferred product export; ChatGPT corrected it to
+  **controlled product export/update in MVP** (safe by construction).
 
-**Option B — Bidirectional catalog (BROADER).**
-Option A **plus** product/customer export (draft-first), publish/channel control, and
-pricelist mapping.
-- *Why not (for MVP):* doubles direction/conflict complexity, **forces** C-PROD-05
-  destructive-apply safety (**[Fact]** `productSet` delete-on-omit) and pulls AR-002/
-  AR-005 decisions forward, enlarges the surface, and raises fragility — trading
-  MVP *correctness depth* for *coverage breadth*, against the thesis. Kept as the
-  natural **Phase-2** direction.
+**Option B — Unrestricted autonomous bidirectional catalog (BROADER).**
+Option A **plus** automatic all-field two-way conflict resolution, a complex
+field-ownership matrix, advanced publish/channel campaign management, customer export, and
+catalog breadth (Markets/pricelists/metafields/SEO).
+- *Why not (for MVP):* it multiplies conflict/ownership complexity well beyond the
+  controlled onboarding MVP needs and enlarges/fragilises the surface — trading MVP
+  *correctness depth* for *coverage breadth*, against the thesis. Kept as the natural
+  **Phase-2+** direction. (Controlled product export/update — with matching/binding/
+  preview/draft — **is** in MVP under Option A.)
 
 **Option C — Thin import-only pilot (NARROWER).**
 Products + orders import + manual sync only; no webhooks, no reconciliation, no
@@ -1468,22 +1550,26 @@ write-back.
 
 ## Recommended MVP option
 
-**Option A — Correctness core, import-first.** It is the only option that satisfies
-all three scope-rule tests: it is built from core-loop-essential/platform-required
-capabilities, keeps every gated decision behind the layered design (marked
-Architecture-dependent, not decided), and stays small while meeting the excellence
-bar (correct under failure, recoverable, observable, honest, safe). **Accepted by
-ChatGPT (RB-13, DEC-003) on 2026-07-01 as the MVP product-scope baseline — architecture
-still gated.**
+**Option A — Correctness core, with controlled bidirectional product onboarding.** It is
+the only option that satisfies all three scope-rule tests: it is built from
+core-loop-essential/platform-required and **market-baseline** (product import/export/
+update) capabilities, keeps every gated decision behind the layered design (marked
+Architecture-dependent, not decided), and stays small while meeting the excellence bar
+(correct under failure, recoverable, observable, honest, safe). **Accepted by ChatGPT
+(RB-13, DEC-003) on 2026-07-01, corrected the same day after the PR #55 review to include
+controlled product export/update in MVP — architecture still gated.**
 
 ## Capabilities excluded from MVP
 
 Summarised here; treated in full in
 [`./non-mvp-and-later-phases.md`](./non-mvp-and-later-phases.md):
 
-- **Second sync direction (RB-13 deferred):** product export C-PROD-02 + safety
-  C-PROD-05, publish/channel C-PROD-03, customer export C-CUST-02 (Phase 2 bidirectional
-  catalog).
+- **Catalog second direction (RB-13, PR #55-corrected):** **controlled product
+  export/update (C-PROD-02) + mandatory safety (C-PROD-05) + basic draft/channel export
+  control (C-PROD-03) are IN MVP.** Deferred: **customer export C-CUST-02** and
+  **unrestricted autonomous bidirectional catalog ownership** (all-field two-way conflict
+  resolution, complex field-ownership matrix, advanced publish/channel campaign
+  management) — Phase 2+.
 - **Financial depth (RB-13 resolved):** Domain 9 keeps **only the minimal financial
   representation** (C-PAY-01/02/03 — status/labels/references/totals/tax/shipping/
   discount/currency as source info; no accounting automation); **deferred:** refund sync
@@ -1512,10 +1598,10 @@ Summarised here; treated in full in
 
 | AR row | Open decision (not made here) | MVP capabilities that depend on it |
 | --- | --- | --- |
-| **AR-002** | Distribution (public vs custom); REST/GraphQL/hybrid; bulk; App-Store | C-CONN-01 (auth style), C-PROD-01/02, C-VAR-01, C-ORD-02, C-JOB-05/06, C-DOCS-04 |
+| **AR-002** | Distribution (public vs custom); REST/GraphQL/hybrid; bulk; App-Store; **destructive-apply (`productSet`) mechanics** | C-CONN-01 (auth style), C-PROD-01/02/03/05 (**controlled export/update + destructive-write safety**), C-VAR-01, C-ORD-02, C-JOB-05/06, C-DOCS-04 |
 | **AR-003** | Sync orchestration + **queue framework** (`ir.cron` vs `queue_job`) | C-SYNC-01/03/04/06, C-JOB-01/07, C-ORD-01/04, C-DASH-01/03/05 (enqueue) |
 | **AR-004** | Module boundaries/names; feature-flag + config model | C-MAP-03, C-MULTI-04, (feature-flag visibility) |
-| **AR-005** | Binding/dedup **data model**; per-store keys; deleted-binding handling | C-MAP-01/02, C-CUST-03, C-PROD-01, C-MULTI-01 (safe keys) |
+| **AR-005** | Binding/dedup **data model**; per-store keys; deleted-binding handling; **product match keys (SKU/barcode) + first-sync source strategy** | C-MAP-01/02, C-CUST-03, C-PROD-01/02 (**export/import matching + binding**), C-MULTI-01 (safe keys) |
 | **AR-006** | Error/retry **taxonomy**; idempotency mechanism; reconciliation cadence | C-JOB-02/03/04, C-OBS-03, C-DASH-04, C-SYNC-06 |
 | **AR-007** | Inventory design (fields, multi-location, apply mode) | C-INV-01/02/03/04 |
 | **AR-008** | Fulfilment design (FulfillmentOrder, multi-package/location) | C-FUL-01/02 |
@@ -1532,10 +1618,15 @@ Applying the **DP-006 evidence-consistency gate** (8 checks) to this proposal:
    labelled as facts, not vendor claims.
 2. **Demonstrated competitor evidence?** Object/UX baselines (C-PROD-01, C-CUST-01/03,
    C-DASH-*, C-OBS-01) rest on **EM/VT-demonstrated** evidence, weighted over
-   SH/WK/EC/TQ claims.
+   SH/WK/EC/TQ claims. **Controlled product export/update (C-PROD-02/03/05)** is a
+   **market-baseline** capability **demonstrated by EM/VT/WK/SH** — its MVP inclusion rests
+   on that demonstrated evidence, not on a claim.
 3. **Competitor claim-only?** Kept **out of MVP** or clearly flagged: pHash image
-   dedup (TQ claim → excluded), TQ breadth (403 → not adopted), SH-only/VT-only
-   breadth (Domain 18 → later).
+   dedup (TQ claim → excluded), SH-only/VT-only breadth (Domain 18 → later). **TeqStars
+   breadth:** docs were 403-blocked in Sprint C but **re-checked accessible on 2026-07-01**;
+   a **full TQ rebaseline is pending a later sprint** and is **not adopted here** (the
+   product-export correction stands on EM/VT/WK/SH-demonstrated evidence; TQ only
+   reinforces).
 4. **Inference / recommendation?** Improvement opportunities are labelled
    **[Inference]**, never demonstrated capability: unified command center (C-DASH-01),
    recovery-first error center (C-OBS-03), freshness indicators (C-SYNC-07),
@@ -1599,8 +1690,11 @@ acceptance criteria — those come at implementation with tests):
 
 **Resolved at RB-13 (DEC-003, 2026-07-01):**
 
-1. ~~**Direction**~~ — **RESOLVED: import-first** with inventory + fulfilment write-back;
-   product/customer export deferred (Phase 2).
+1. ~~**Direction**~~ — **RESOLVED (PR #55-corrected): controlled bidirectional product
+   onboarding** — product import **and** controlled product export/update (matched, bound,
+   previewed, draft/unpublished/channel-controlled), plus inventory + fulfilment
+   write-back. **Customer export deferred** (Phase 2); **unrestricted autonomous
+   bidirectional catalog ownership deferred**.
 2. ~~**Domain 9 minimum**~~ — **RESOLVED: minimal financial evidence/representation
    only** (status/labels/references/totals/tax/shipping/discount/currency as source info;
    basic gateway/journal mapping as config input if needed); **no accounting automation.**
@@ -1633,16 +1727,20 @@ acceptance criteria — those come at implementation with tests):
 Please inspect carefully:
 
 1. **Thesis & option choice** — is "small but excellent = a correct, observable,
-   recoverable single-store loop, import-first" the right MVP thesis, and is
-   **Option A** the right recommendation over B (bidirectional) and C (thin pilot)?
+   recoverable single-store loop with **controlled bidirectional product onboarding**" the
+   right MVP thesis, and is **Option A** the right choice over B (unrestricted autonomous
+   bidirectional catalog) and C (thin pilot)? *(PR #55: product export corrected into MVP,
+   controlled.)*
 2. **Evidence-consistency gate (DP-006)** — confirm the 8-check review holds: no
-   claim→fact, config-field≠support (WK multi-company/import-stock), auto-apply stays
-   inference (C-INV-04), conditional items stay conditional (OAuth/distribution/queue/
-   binding/taxonomy/inventory/fulfilment/module-boundaries), and nothing reads as a
-   final decision.
-3. **The include/exclude/defer/open calls** — especially the **open** items (product/
-   customer export, Domain 9 minimum, refunds/cancellations, bulk ops) where a
-   direction decision is genuinely yours to make.
+   claim→fact (controlled product export/update rests on EM/VT/WK/SH-demonstrated
+   evidence; TQ re-check only reinforces, rebaseline pending), config-field≠support (WK
+   multi-company/import-stock), auto-apply stays inference (C-INV-04), conditional items
+   stay conditional (OAuth/distribution/queue/binding/taxonomy/inventory/fulfilment/
+   module-boundaries), and nothing reads as a final architecture decision.
+3. **The include/exclude/defer calls** — especially **controlled product export/update in
+   MVP** vs **unrestricted autonomous bidirectional catalog ownership deferred**, customer
+   export deferred, Domain 9 minimal-evidence-only, refunds/cancellations deferred, bulk
+   ops not user-facing.
 4. **Architecture-dependent table** — confirm MVP commits *intent* only and no AR row
    is decided; flag any wording that hardens a mechanism.
 5. **MVP-critical spine** — endorse or amend the reliability/UX/config/security

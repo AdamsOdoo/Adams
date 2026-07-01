@@ -145,3 +145,22 @@ category #4 **not** triggered). DP-003/DP-004 and DP-005 (a classification/scope
 until ChatGPT accepts it — here it *was* accepted, via the correct gated `04-decisions`
 route) were **applied, not re-triggered**. **No counter change; no new row.** Architecture
 stays RB-14 / AR-002…AR-008-gated; implementation stays blocked._
+
+_**Product Sprint G revision note (2026-07-01, PR #55 review — product-scope correction):**
+ChatGPT review of PR #55 returned **REVISE**: the first Sprint G recording **over-deferred
+product export** (framed the MVP as "import-first" and pushed product/customer export to
+Phase 2). Corrected to **controlled bidirectional product onboarding in MVP** (controlled
+product export/update with matching/binding/preview/draft-channel safety); **unrestricted
+autonomous bidirectional catalog ownership** and **customer export** stay later. **This is a
+product-scope correction, not an implementation defect** — no code exists — and **no
+architecture decision was made** (binding/data model → AR-005; API/destructive-apply →
+AR-002). **Reusable lesson (source availability can change):** the **TeqStars** docs recorded
+**403-blocked in Sprint C (2026-06-30)** were **re-checked accessible on 2026-07-01**;
+product export was already **market-baseline** (EM/VT/WK/SH demonstrated), so the correction
+does not depend on TQ, but the episode shows that **blocked/weak-evidence sources should be
+re-checked before a scope decision leans on their absence** (a refinement of DP-001's
+re-read-the-source rule and DP-003's blocked-source handling). **No new DP row and no counter
+change** (no broader recurring defect pattern; the existing DP-001/DP-003 rules already cover
+the lesson and are reinforced here). A **full TeqStars evidence rebaseline is pending a later
+research sprint.** MVP scope stays a product-scope decision; architecture stays RB-14-gated;
+implementation stays blocked._

@@ -161,7 +161,8 @@ _**Product Sprint G non-decision note (2026-07-01) — NOT an architecture decis
 remain "Not decided / Evidence pending".** ChatGPT accepted the **MVP product scope**
 baseline in [`../04-decisions/DEC-003-mvp-scope.md`](../04-decisions/DEC-003-mvp-scope.md)
 (RB-13). **DEC-003 is a product-scope decision, not an architecture decision:** it fixes the
-MVP *what* (Option A correctness-core/import-first; import + inventory/fulfilment write-back;
+MVP *what* (Option A correctness-core **with controlled bidirectional product onboarding**
+— product import **and** controlled export/update; import + inventory/fulfilment write-back;
 Domain 9 minimal financial **evidence** only, no accounting automation; refunds/cancellations
 deferred; bulk ops **not a user-facing feature**; single-store/single-company with
 multi-store-safe keys; P1-primary/P2-secondary) and **feeds AR-002…AR-008 as scope inputs**,
@@ -178,3 +179,21 @@ order flow) is **architecture-dependent** and must **return to ChatGPT before
 implementation** — no silent automatic invoice/payment creation. All rows remain "Not decided
 / Evidence pending" pending sufficient research + ChatGPT approval (`CLAUDE.md` §4–§5; RB-14).
 See DP-006's evidence-consistency gate in `defect-pattern-log.md`._
+
+_**Product Sprint G revision non-decision note (2026-07-01, PR #55 review) — NOT an
+architecture decision; AR rows remain "Not decided / Evidence pending".** ChatGPT corrected
+DEC-003 to include **controlled bidirectional product onboarding** in MVP (controlled product
+export/update, with matching, binding, preview/dry-run, and draft/unpublished/channel-controlled
+safety). This adds **product-scope inputs** to two AR rows without deciding them: **AR-002**
+now also carries the **destructive-apply / full-state-write mechanics** (`productSet`
+delete-on-omit) that the controlled export path must guard, plus the API-strategy dependency;
+**AR-005** now also carries **product export/import matching + binding + the first-sync source
+strategy** (Shopify-source / Odoo-source / both-match-first) and the **product match-key set**
+(SKU/internal-reference, barcode). **Full autonomous bidirectional catalog management** —
+automatic all-field two-way conflict resolution, a complex field-ownership matrix, and advanced
+publish/channel campaign management — **remains later and architecture-gated** (a future
+field-ownership + conflict-resolution design must be reviewed and accepted before inclusion).
+**No AR row is decided, accepted, proposed for active review, or re-litigated.** All remain
+"Not decided / Evidence pending" (`CLAUDE.md` §4–§5; RB-14). NB: **TeqStars** documentation,
+recorded 403-blocked in Sprint C, was **re-checked accessible on 2026-07-01**; a **full
+TeqStars rebaseline is pending a later research sprint** — it does not change any AR row here._

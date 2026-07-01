@@ -20,21 +20,52 @@
 > sources crawled, no research agents, no architecture. **No-code gate in force**
 > (`CLAUDE.md` §4–§5). Session date 2026-07-01.
 
+## Sprint G revision (PR #55 review — 2026-07-01)
+
+ChatGPT reviewed PR #55 and returned **REVISE** — the first draft **over-deferred product
+export**. Corrected on the same branch (`docs: revise mvp baseline for controlled product
+export`), a **product-scope correction only** (no architecture, no code):
+
+- **Controlled product export/update is now IN MVP** — Shopify→Odoo product import **and**
+  Odoo→Shopify product export/update, with product/variant **matching**, **binding**,
+  **preview/dry-run**, **duplicate prevention**, and **draft/unpublished/channel-controlled**
+  export safety. This is **controlled bidirectional product onboarding**, not import-first.
+- **Full autonomous bidirectional catalog management remains later** — automatic all-field
+  two-way conflict resolution, complex field-ownership matrix, advanced publish/channel
+  campaign management, and catalog breadth (Markets/pricelists/metafields/SEO/custom
+  transforms/full-multi-store) stay Phase 2+.
+- **Customer export remains later.**
+- **Evidence:** product import/export/update is **market-baseline** — EM/VT/WK/SH
+  demonstrated in the already-merged matrix. **TeqStars docs**, recorded 403-blocked in
+  Sprint C (2026-06-30), were **re-checked by ChatGPT on 2026-07-01 and found accessible**
+  (product import/export/update flows documented); a **full TeqStars rebaseline is pending
+  a later research sprint** and was **not** performed here.
+- **No architecture finalized; no implementation authorized.** Binding/data model stays
+  **AR-005**; API/destructive-apply mechanics stay **AR-002**; destructive/full-state write
+  safety stays mandatory but architecture-gated.
+
+*(The Session summary and sections below were authored for the initial Sprint G recording;
+read them with the correction above applied — "import-first" is superseded by "controlled
+bidirectional product onboarding," and product export is in MVP.)*
+
 ## Session summary
 
 ChatGPT made the **RB-13 MVP scope decisions**; this sprint recorded them as the accepted
 baseline. Created **`docs/04-decisions/DEC-003-mvp-scope.md`** (the accepted MVP
-**product-scope** decision record — Option A correctness-core/import-first; the accepted
-direction; the Domain 9 minimal-financial-evidence decision; refunds/cancellations
-deferred; bulk ops not user-facing; single-store/single-company; P1-primary/P2-secondary;
-and an explicit "no architecture decided / implementation blocked" clause). Aligned the
-three product docs — **`mvp-scope.md`** (status → accepted baseline; new *ChatGPT RB-13
-acceptance* section; every former `open` fork resolved inline; open-questions split into
-resolved vs still-open), **`non-mvp-and-later-phases.md`** (status → accepted boundary;
-export/customer-export/refunds-cancellations/Domain-9-accounting/bulk-ops/App-Store/
-multi-store-company confirmed non-MVP with revisit conditions), and **`user-stories.md`**
-(export/refund stories → later; Domain 9 story → MVP minimal-evidence-only; bulk ops →
-internal-only; persona → P1 primary/P2 secondary). Updated both handoffs and applied the
+**product-scope** decision record — Option A correctness-core **with controlled
+bidirectional product onboarding**; the accepted direction; the Domain 9
+minimal-financial-evidence decision; refunds/cancellations deferred; bulk ops not
+user-facing; single-store/single-company; P1-primary/P2-secondary; and an explicit "no
+architecture decided / implementation blocked" clause). Aligned the three product docs —
+**`mvp-scope.md`** (status → accepted baseline; new *ChatGPT RB-13 acceptance* + *Product
+onboarding and duplicate-prevention baseline* sections; every former `open` fork resolved
+inline; open-questions split into resolved vs still-open), **`non-mvp-and-later-phases.md`**
+(status → accepted boundary; **product export removed from non-MVP**; new *Full autonomous
+bidirectional catalog management* boundary; customer-export/refunds-cancellations/
+Domain-9-accounting/bulk-ops/App-Store/multi-store-company confirmed non-MVP with revisit
+conditions), and **`user-stories.md`** (US-E2-05 → controlled MVP export/update; new US-E2-06
+first-sync matching; customer-export/refund stories → later; Domain 9 story → MVP
+minimal-evidence-only; bulk ops → internal-only; persona → P1 primary/P2 secondary). Updated both handoffs and applied the
 **DP-006 evidence-consistency gate**. **No connector code, no Odoo module, no architecture
 doc, no architecture ADR, no implementation plan, no module boundary, no REST/GraphQL,
 queue-framework, data-model, or distribution decision** was produced.
@@ -55,16 +86,22 @@ queue-framework, data-model, or distribution decision** was produced.
 ## MVP acceptance summary
 
 The MVP is **accepted as Option A — a correct, observable, recoverable single-store sync
-loop across the core commerce objects (import-first), with inventory + fulfilment/tracking
-write-back** — winning on depth of correctness and operator experience, **not** breadth.
-This is a **product-scope** acceptance only; every *mechanism* stays gated (RB-14).
+loop across the core commerce objects, with controlled bidirectional product onboarding
+(product import **and** controlled export/update)**, plus inventory + fulfilment/tracking
+write-back — winning on depth of correctness and operator experience, **not** breadth
+(specifically **not** unrestricted autonomous bidirectional catalog ownership). This is a
+**product-scope** acceptance only; every *mechanism* stays gated (RB-14).
 
 ## Accepted MVP decisions
 
-- **Option:** Option A (correctness core, import-first).
+- **Option:** Option A (correctness core, with controlled bidirectional product onboarding —
+  PR #55 correction).
 - **Direction:** Shopify→Odoo import (products, variants/options, basic images, base
-  price/compare-at, customers + matching, orders, order status/lifecycle); Odoo→Shopify
-  write-back (inventory multi-location-aware/idempotent; fulfilment + tracking).
+  price/compare-at, customers + matching, orders, order status/lifecycle); **Odoo→Shopify
+  controlled product export/update** (product export/update, image/price update where
+  feasible — matched, bound, previewed, draft/channel-safe); Odoo→Shopify write-back
+  (inventory multi-location-aware/idempotent; fulfilment + tracking). **Deferred:** customer
+  export; unrestricted autonomous bidirectional catalog ownership.
 - **Domain 9:** minimal financial **evidence/representation only** (financial + payment
   status, gateway/method label, transaction reference(s), paid/unpaid/refunded flags as
   source info, totals/taxes/shipping/discounts/currency, basic gateway/journal mapping as
@@ -90,14 +127,17 @@ This is a **product-scope** acceptance only; every *mechanism* stays gated (RB-1
 
 ## Deferred scope
 
-Product export; customer export; publish/unpublish/channel-control export; bidirectional
-catalog ownership; refund sync; cancellation reflection; returns/RMA; full Domain 9
-accounting automation; payout/bank reconciliation; multi-package fulfilment; complex tax
-engine; Shopify Markets/B2B/POS/gift cards/metafields/subscriptions/abandoned-checkout/
-recommendations/Buy-with-Prime; multi-store UI/logic + multi-company logic; custom Python
-transforms; advanced analytics/reporting; public App-Store + demo packaging + app
-billing/compliance webhooks (distribution-gated). **Bulk Operations are not a user-facing
-MVP feature** (RB-14/AR-002 may assess an internal mechanism only). Each deferral carries a
+**Unrestricted autonomous bidirectional catalog ownership** (automatic all-field two-way
+conflict resolution; complex field-ownership matrix; advanced publish/channel campaign
+management); **customer export**; refund sync; cancellation reflection; returns/RMA; full
+Domain 9 accounting automation; payout/bank reconciliation; multi-package fulfilment;
+complex tax engine; Shopify Markets/B2B/POS/gift cards/metafields/subscriptions/
+abandoned-checkout/recommendations/Buy-with-Prime; multi-store UI/logic + multi-company
+logic; custom Python transforms; advanced analytics/reporting; public App-Store + demo
+packaging + app billing/compliance webhooks (distribution-gated). **Bulk Operations are not
+a user-facing MVP feature** (RB-14/AR-002 may assess an internal mechanism only).
+*(**Controlled** product export/update — matched, bound, previewed, draft/channel-safe —
+**is in MVP**, not deferred.)* Each deferral carries a
 revisit condition in `non-mvp-and-later-phases.md`. **Mandatory future rule:** if refund
 handling is later included, the idempotent-refund / no-double-refund regression is
 mandatory.

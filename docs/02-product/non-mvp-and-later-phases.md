@@ -7,11 +7,19 @@
 
 ## Status
 
-> **Accepted MVP boundary (ChatGPT RB-13, DEC-003, 2026-07-01) — architecture still
-> gated.** The MVP *product scope* is accepted; the items below are the **accepted
-> non-MVP boundary** (deferred/excluded from the first release), each with a revisit
-> condition. Authored in Sprint F; boundary confirmed in Sprint G. See
+> **Accepted MVP boundary (ChatGPT RB-13, DEC-003, 2026-07-01 — PR #55-corrected) —
+> architecture still gated.** The MVP *product scope* is accepted; the items below are the
+> **accepted non-MVP boundary** (deferred/excluded from the first release), each with a
+> revisit condition. Authored in Sprint F; boundary confirmed in Sprint G. See
 > [`../04-decisions/DEC-003-mvp-scope.md`](../04-decisions/DEC-003-mvp-scope.md).
+
+> **PR #55 revision (2026-07-01).** Product export is **no longer** in the non-MVP set:
+> **controlled product export/update is IN MVP** (matched, bound, previewed,
+> draft/unpublished/channel-controlled). What this document keeps out is **unrestricted
+> autonomous bidirectional catalog ownership** (all-field two-way conflict resolution,
+> field-ownership matrix, advanced publish/channel campaign management) and **customer
+> export**. TeqStars docs were re-checked accessible on 2026-07-01 (full rebaseline pending
+> a later sprint).
 
 - **Sprint:** authored Product Sprint F (RB-13); **boundary accepted** Product Sprint G
   (RB-13, DEC-003). **Phase:** MVP scope only — **no-code gate in force** (`CLAUDE.md`
@@ -31,9 +39,11 @@
 ## Purpose
 
 Make the MVP boundary **explicit and defensible**. A premium MVP fails not only by
-missing correctness, but by **over-scoping** — pulling in second sync directions,
-financial depth, premium breadth, and multi-tenancy that each multiply complexity and
-fragility. This document names those items, ties each to its evidence and its
+missing correctness, but by **over-scoping** — pulling in **unrestricted autonomous
+bidirectional catalog ownership**, financial depth, premium breadth, and multi-tenancy
+that each multiply complexity and fragility. (It equally fails by **under-scoping** the
+market-baseline product path — so **controlled** product export/update **is in MVP**.)
+This document names those items, ties each to its evidence and its
 architecture/distribution/edition gate, and states the **revisit condition** so later
 phases inherit a clean backlog instead of re-litigating scope.
 
@@ -50,9 +60,12 @@ Tier-1 facts; and the QA logs (DP-001…006, AR-002…008).
 
 An item is **kept out of MVP** if **any** of:
 
-1. **It is a second sync direction or a breadth surface** the correctness core does
-   not need (export, publish/channel, pricelists, Markets/B2B/POS/gift cards/
-   metafields, extended breadth).
+1. **It is an unneeded breadth surface or unrestricted second-direction complexity** the
+   correctness core does not need — **unrestricted autonomous bidirectional catalog
+   ownership** (all-field two-way conflict resolution, field-ownership matrix, advanced
+   publish/channel campaign management), customer export, pricelists, Markets/B2B/POS/gift
+   cards/metafields, extended breadth. *(**Controlled** product export/update — matched,
+   bound, previewed, draft/channel-safe — **is in MVP**, per DEC-003 / PR #55.)*
 2. **It rests on weak or single-vendor evidence** (D/claim-only, or one-vendor B) and
    is not platform-required.
 3. **It is gated by an unresolved decision** — architecture (AR-002…008), distribution
@@ -67,29 +80,40 @@ feature-flagged), **blocked (weak evidence)**, **blocked (distribution)**, **blo
 
 ## Explicitly non-MVP for first release
 
-**Product export (draft-first) + publish/channel control**
-- Capability ID(s): C-PROD-02, C-PROD-03, C-PROD-05 (safety, conditional)
-- Category: later / architecture-dependent — **RB-13: DEFERRED from MVP** (Phase 2
-  bidirectional catalog)
-- Why not MVP: a **second sync direction** doubles conflict/direction complexity and
-  **forces** the destructive-apply guardrail (**[Fact]** `productSet` delete-on-omit,
-  A-IMP-1) plus AR-002/AR-005 decisions.
-- Evidence: VT/EM/SH/WK draft-export [Demonstrated] (B); C-PROD-05 safety is A [Fact].
-- Risk of including too early: silent data loss on full-state writes; larger, more
-  fragile surface; premature architecture commitment.
-- What must be true before including: ChatGPT prioritises Odoo-first catalogs; AR-002
-  (API) + AR-005 (binding) resolved; C-PROD-05 dry-run/preview built as mandatory.
+**Full autonomous bidirectional catalog management**
+- Capability ID(s): C-PROD-02/03 (beyond controlled export), plus C-PRICE-02/03,
+  C-VAR-03, C-ADV-05 (metafields), C-MAP-03 (transforms)
+- Category: later / architecture-dependent
+- Why not MVP: **unrestricted, autonomous two-way catalog ownership** requires
+  **automatic all-field conflict resolution**, a **complex field-ownership matrix**,
+  **advanced publish/channel campaign management**, and catalog breadth
+  (Markets/pricelist/metafields/SEO) — plus hardened destructive-write safety at scale.
+  That multiplies complexity/fragility well beyond what a first excellent MVP needs.
+- **In MVP instead (controlled):** MVP includes only **controlled product export/update**
+  — **selected** products, **preview** before create/update/export, **matching + binding**
+  first, **draft/unpublished/explicit-sales-channel** safe publication, and **no
+  destructive/full-state write without preview/dry-run** (**[Fact]** `productSet`
+  delete-on-omit, A-IMP-1). See [`./mvp-scope.md`](./mvp-scope.md) *Product onboarding and
+  duplicate-prevention baseline*.
+- Evidence: product import/export/update is **market-baseline** — VT/EM/WK/SH
+  [Demonstrated] (B); TeqStars docs re-checked accessible 2026-07-01 (reinforcing, full
+  rebaseline pending).
+- Risk of including too early: two-way conflict/ownership edge cases, field-ownership
+  ambiguity, and destructive-apply blast radius before the controlled core is proven.
+- What must be true before including: controlled export/update shipped and proven; AR-002
+  (API/destructive-apply) + AR-005 (binding/conflict model) resolved; a field-ownership +
+  conflict-resolution design reviewed and accepted.
 
-**Customer export (email dedup, link)**
+**Customer export (Odoo → Shopify)**
 - Capability ID(s): C-CUST-02
 - Category: later / architecture-dependent — **RB-13: DEFERRED from MVP** (Phase 2)
-- Why not MVP: second direction; WK/EC are import-only (DP-004) — not demonstrated
-  export.
+- Why not MVP: a second-direction customer flow not required by the controlled
+  product-onboarding MVP; WK/EC are import-only (DP-004) — not demonstrated export.
 - Evidence: EM link-by-email [Demonstrated] (B).
-- Risk of including too early: duplicate/ownership conflicts across systems; binding
-  model pulled forward.
-- What must be true before including: AR-005 binding + dedup keys resolved; ChatGPT
-  wants Odoo-authored customers pushed to Shopify.
+- Risk of including too early: duplicate/ownership conflicts across systems; binding model
+  pulled forward.
+- What must be true before including: AR-005 binding + dedup keys resolved; ChatGPT wants
+  Odoo-authored customers pushed to Shopify.
 
 **Full payment / invoice / gateway accounting automation (beyond the minimal order-flow representation)**
 - Capability ID(s): C-PAY-01, C-PAY-02, C-PAY-03 (accounting-automation portion)
@@ -181,8 +205,11 @@ feature-flagged), **blocked (weak evidence)**, **blocked (distribution)**, **blo
 
 Natural **Phase-2+** work once the correctness core is shipped and accepted:
 
-- **Phase 2 — Bidirectional catalog & customers:** C-PROD-02/03/05, C-CUST-02 (the
-  "Option B" surface from [`./mvp-scope.md`](./mvp-scope.md)).
+- **Phase 2 — Full autonomous bidirectional catalog + customer export:** unrestricted
+  two-way catalog ownership (all-field conflict resolution, field-ownership matrix,
+  advanced publish/channel management, beyond controlled C-PROD-02/03), and customer
+  export C-CUST-02 (the "Option B" surface from [`./mvp-scope.md`](./mvp-scope.md)).
+  *(**Controlled** product export/update C-PROD-02/03/05 is **in MVP**, not Phase 2.)*
 - **Phase 2/3 — Financial depth:** full Domain 9 (C-PAY-01/02/03), refunds
   (C-RET-01), cancellations (C-RET-03), returns/RMA (C-RET-02).
 - **Phase 3 — Scale & config depth:** bulk operations (C-JOB-06), pricelists
@@ -309,8 +336,11 @@ Gated on **AR-002 distribution (public App-Store vs custom/private)** — unreso
 
 Guardrails against silent scope creep (each would quietly break "small but excellent"):
 
-1. **A second sync direction "for symmetry."** Import-first is deliberate; export
-   (C-PROD-02/C-CUST-02) is a Phase-2 decision, not a freebie.
+1. **Unrestricted two-way catalog ownership "for symmetry."** MVP does **controlled**
+   product export/update (matched, bound, previewed, draft/channel-safe); **automatic
+   all-field two-way conflict resolution, a field-ownership matrix, and advanced
+   publish/channel campaign management are Phase-2+**, not a freebie. **Customer export**
+   (C-CUST-02) is also Phase 2.
 2. **"Just add refunds/payments while we're in orders."** Domain 9/11 depth is gated;
    only the **minimal** order-flow representation is in scope, and refunds must be
    idempotent if ever added.
@@ -333,8 +363,9 @@ Guardrails against silent scope creep (each would quietly break "small but excel
 
 **Resolved at RB-13 (DEC-003, 2026-07-01):**
 
-1. ~~**Direction**~~ — **RESOLVED: import-first;** product/customer export is firmly
-   Phase 2 (deferred from MVP).
+1. ~~**Direction**~~ — **RESOLVED (PR #55): controlled bidirectional product onboarding
+   in MVP** (product import **and** controlled product export/update). **Customer export**
+   and **unrestricted autonomous bidirectional catalog ownership** are firmly Phase 2+.
 2. ~~**Domain 9 minimum**~~ — **RESOLVED: minimal financial evidence only** on the
    imported order; all accounting automation deferred.
 3. ~~**Refunds/cancellations**~~ — **RESOLVED: deferred** (idempotent-refund regression
@@ -357,11 +388,15 @@ Please inspect carefully:
 
 1. **Strictness** — is the boundary strict enough? Flag anything that should move from
    MVP (in [`./mvp-scope.md`](./mvp-scope.md)) to here, or vice-versa.
-2. **The "open" direction items** — product/customer export, Domain 9 minimum, refunds/
-   cancellations: these are the genuine scope forks for your call.
-3. **Evidence discipline** — confirm weak/single-vendor/claim-only items (pHash, TQ
-   breadth, SH/EC breadth, WK multi-company) are correctly **blocked/down-weighted**,
-   not rejected-approach decisions (`CLAUDE.md` §10).
+2. **The resolved direction (PR #55)** — confirm **controlled product export/update is IN
+   MVP** (matched, bound, previewed, draft/channel-safe) while **unrestricted autonomous
+   bidirectional catalog ownership** and **customer export** stay Phase 2+; Domain 9
+   minimal-evidence-only; refunds/cancellations deferred.
+3. **Evidence discipline** — confirm controlled product export/update rests on **EM/VT/WK/
+   SH-demonstrated** evidence (market-baseline); weak/single-vendor/claim-only items
+   (pHash, SH/EC breadth, WK multi-company) stay **blocked/down-weighted**; the **TeqStars
+   re-check (2026-07-01 accessible)** is noted but the **full rebaseline is pending a later
+   sprint** — not rejected-approach decisions (`CLAUDE.md` §10).
 4. **Gating** — confirm distribution-blocked (C-DOCS-04) and edition/hosting-blocked
    items are correctly conditional, and that no AR decision is implied.
 5. **"Don't pull into MVP" guardrails** — endorse them as the anti-bloat contract for

@@ -10,7 +10,7 @@
 
 ## Status
 
-**Accepted by ChatGPT on 2026-07-01.**
+**Accepted by ChatGPT on 2026-07-01 (revised same day after PR #55 review).**
 
 - **Sprint:** Product Sprint G (RB-13 — MVP scope acceptance).
 - **Supersedes:** nothing. It **accepts** and finalizes the Sprint F MVP scope
@@ -18,6 +18,26 @@
 - **Phase:** product/MVP scope only — the **no-code gate remains in force**
   (`CLAUDE.md` §4–§5). Architecture (RB-14 / AR-002…AR-008) and implementation remain
   **blocked**.
+
+> **Revision note (2026-07-01, PR #55 review — product direction correction).** ChatGPT
+> reviewed PR #55 and returned **REVISE**: the first draft **over-deferred product
+> export**. The corrected baseline is that **MVP includes controlled bidirectional
+> product onboarding and basic product sync** (Shopify→Odoo product import **and**
+> Odoo→Shopify product export/update, with matching, binding, preview/dry-run, and
+> draft/unpublished/channel-controlled safety). What stays deferred is **unrestricted
+> autonomous bidirectional catalog ownership** (two-way conflict resolution across all
+> fields, complex field-ownership matrix, advanced publish/channel campaign management,
+> Markets/pricelists/metafields/SEO breadth, full multi-store catalog ownership).
+> **Customer export remains deferred.** Product import/export/update is a **market-baseline
+> product capability** — demonstrated by Emipro, VentorTech, Webkul, and Softhealer in the
+> already-merged competitor matrix — **not** a Phase-2 luxury. TeqStars documentation,
+> recorded 403-blocked in Sprint C (2026-06-30), was **re-checked by ChatGPT on
+> 2026-07-01 and found accessible**
+> ([docs.teqstars.com](https://docs.teqstars.com/19.0/applications/shopify/overview.html));
+> a **full TeqStars evidence rebaseline is pending a later research sprint** and is **not**
+> performed here. This correction is a **product-scope decision only** — **no architecture
+> is decided** (binding/data model stays **AR-005**, API mechanism stays **AR-002**,
+> destructive/full-state write safety stays mandatory but architecture-gated).
 
 ## Decision type
 
@@ -39,8 +59,12 @@ mechanism, no distribution model, and no implementation plan (see
   cancellations, bulk operations, primary persona).
 - **Forces.** A premium MVP must beat existing connectors on **demonstrated
   correctness** and **operator experience**, not on breadth. It also fails if it
-  **over-scopes** — pulling in a second sync direction, full accounting, refunds/
-  returns depth, and multi-tenancy that each multiply complexity and fragility.
+  **over-scopes** — pulling in **unrestricted autonomous bidirectional catalog
+  ownership** (all-field two-way conflict resolution / field-ownership matrices), full
+  accounting, refunds/returns depth, and multi-tenancy that each multiply complexity and
+  fragility. Conversely, it fails if it **under-scopes the product catalog**: product
+  import/export/update is a **market-baseline** capability (EM/VT/WK/SH demonstrated), so
+  a **controlled** two-way product path belongs in MVP.
 - **Evidence discipline.** The **DP-006 evidence-consistency gate** (3rd-occurrence,
   ESCALATED — `../05-qa/defect-pattern-log.md`) governs this decision: no capability
   enters the baseline as a decision unless its evidence strength, conditionality, and
@@ -55,12 +79,18 @@ mechanism, no distribution model, and no implementation plan (see
 
 ## Decision
 
-ChatGPT accepts **Option A — Correctness core, import-first** as the MVP scope
-baseline: a **correct, observable, recoverable single-store sync loop** across the core
-commerce objects — proven, not merely claimed — wrapped in an operator experience a
-non-developer can run. The MVP wins on **depth of correctness** (idempotency +
-first-class reconciliation + rate-limit awareness + recovery-first operations), **not**
-on breadth of coverage, a second catalog direction, or financial/accounting depth.
+ChatGPT accepts **Option A — Correctness core, with controlled bidirectional product
+onboarding** as the MVP scope baseline: a **correct, observable, recoverable single-store
+sync loop** across the core commerce objects — proven, not merely claimed — wrapped in an
+operator experience a non-developer can run. The MVP wins on **depth of correctness**
+(idempotency + first-class reconciliation + rate-limit awareness + recovery-first
+operations), **not** on breadth of coverage or financial/accounting depth. The product
+catalog is **controlled two-way** in MVP (import **and** safe export/update with matching,
+binding, and preview); orders, customers, inventory, and fulfilment remain
+**single-direction** (import for orders/customers; write-back for inventory/fulfilment).
+What MVP does **not** take on is **unrestricted autonomous bidirectional catalog
+ownership** — automatic two-way conflict resolution across all fields, a complex
+field-ownership matrix, and advanced catalog breadth.
 
 The sections below record the accepted baseline precisely. Everything not listed as
 **in MVP** is **deferred** or **excluded** (see *Non-goals* and
@@ -68,17 +98,28 @@ The sections below record the accepted baseline precisely. Everything not listed
 
 ## Accepted MVP option
 
-**Option A — Correctness core, import-first (ACCEPTED).**
+**Option A — Correctness core, with controlled bidirectional product onboarding
+(ACCEPTED).**
 
 - **Meaning:** a small but excellent MVP is a **correct, observable, recoverable
-  single-store sync loop** across the core commerce objects — **not** a broad
-  bidirectional connector.
-- **Rejected for MVP (kept as later phases, not rejected approaches):**
-  - **Option B — Bidirectional catalog (broader):** Option A plus product/customer
-    export, publish/channel control, pricelist mapping. Deferred — it doubles
-    direction/conflict complexity, forces the destructive-apply safety (**[Fact]**
-    `productSet` delete-on-omit) and AR-002/AR-005 earlier, and trades correctness depth
-    for coverage breadth. Natural **Phase 2**.
+  single-store sync loop** across the core commerce objects, including **controlled
+  bidirectional product onboarding** (safe product import **and** export/update) — **not**
+  **unrestricted autonomous bidirectional catalog ownership**.
+- **In MVP:** the product catalog is controlled two-way (import + safe export/update with
+  matching, binding, preview, and draft/unpublished/channel-controlled safety). Orders and
+  customers are **import**; inventory and fulfilment are **write-back**.
+- **Deferred (kept as later phases, not rejected approaches):**
+  - **Unrestricted autonomous bidirectional catalog management (broader):** automatic
+    two-way conflict resolution across all product fields, a complex field-ownership
+    matrix beyond MVP essentials, advanced publish/channel campaign management, and
+    catalog breadth (Markets pricing, pricelists, metafields, SEO/taxonomy, custom
+    transforms, full multi-store catalog ownership). Deferred — it multiplies
+    conflict/ownership complexity beyond the controlled onboarding MVP needs. Natural
+    **Phase 2+**. (The destructive-apply safety — **[Fact]** `productSet` delete-on-omit —
+    is **mandatory in MVP** for the controlled export path, architecture-gated on
+    AR-002/AR-005.)
+  - **Customer export:** deferred (mirrors the product question but not required for the
+    controlled product-onboarding MVP).
   - **Option C — Thin import-only pilot (narrower):** import + manual sync only, no
     webhooks/reconciliation/write-back. Rejected — it violates the correctness
     non-negotiables (webhook-less/cron-only with no reconciliation is a demonstrated
@@ -96,9 +137,31 @@ The sections below record the accepted baseline precisely. Everything not listed
   - customer import and matching (deduplicated; email primary, multi-key allowed)
   - order import
   - order status / basic order lifecycle representation
+- **Odoo → Shopify (product export/update — controlled bidirectional onboarding):**
+  - product export (Odoo → Shopify)
+  - product update (Odoo → Shopify)
+  - basic image / media update/export, where feasible
+  - base price / compare-at update/export, where feasible
 - **Odoo → Shopify (write-back):**
   - inventory write-back (multi-location-aware; idempotent)
   - fulfillment and tracking write-back
+
+**Product onboarding & duplicate prevention (accepted, MVP scope).** The controlled
+two-way product path is safe by construction:
+
+- **Product/variant matching before first sync**, with an explicit **first-sync source
+  strategy:** *Shopify is source*, *Odoo is source*, or *both systems already have
+  products — match first*.
+- **Binding requirement** between Shopify product/variant IDs and Odoo
+  product/template/variant records.
+- **SKU / internal reference and barcode-based matching**; **ambiguous matches require
+  manual review**; **no automatic name-only matching**.
+- **Duplicate-prevention preview** before creating records (**no blind create**);
+  **binding created after confirmation**.
+- **Draft / unpublished / channel-controlled export safety** (export without publishing
+  when no sales channel is selected).
+- **Preview / dry-run before any destructive or full-state write** (**[Fact]**
+  `productSet` delete-on-omit — mandatory guardrail; mechanism architecture-gated).
 
 **Correctness / reliability / observability spine (accepted, MVP-critical).** The
 non-negotiable core of "small but excellent":
@@ -143,15 +206,57 @@ non-negotiable core of "small but excellent":
   configuration assumptions must not make future multi-store impossible; Webkul's
   default Company field is **not** treated as real multi-company evidence (DP-004).
 
+## Product direction decision
+
+**Accepted (in MVP): controlled bidirectional product onboarding and basic product sync.**
+
+- **Shopify → Odoo:** product import; variant/options import; basic image/media import;
+  base price / compare-at import.
+- **Odoo → Shopify:** product export; product update; basic image/media update/export
+  (where feasible); base price / compare-at update/export (where feasible).
+- **Safety & correctness (mandatory):** product/variant matching before first sync;
+  explicit first-sync source strategy (Shopify-source / Odoo-source / both-match-first);
+  binding between Shopify product/variant IDs and Odoo product/template/variant records;
+  SKU/internal-reference and barcode matching; ambiguous matches → manual review; **no
+  name-only automatic matching**; duplicate-prevention preview (no blind create); binding
+  created after confirmation; draft/unpublished/channel-controlled export safety;
+  preview/dry-run before any destructive/full-state write.
+
+**Deferred (later, architecture-dependent): unrestricted autonomous bidirectional catalog
+ownership.**
+
+- Automatic two-way conflict resolution across all product fields.
+- Complex field-ownership matrix beyond MVP essentials.
+- Advanced publish/channel campaign management.
+- Shopify Markets pricing; pricelists; metafields; SEO/taxonomy; custom transforms; full
+  multi-store catalog ownership.
+
+**Customer export remains deferred.**
+
+**Evidence & rationale.** Product import/export/update is a **market-baseline product
+capability** — demonstrated by **Emipro, VentorTech, Webkul, and Softhealer** in the
+already-merged competitor matrix — **not** a Phase-2 luxury. TeqStars documentation
+(recorded 403-blocked in Sprint C on 2026-06-30) was **re-checked by ChatGPT on
+2026-07-01 and found accessible** (product import/export/update flows documented); this
+**reinforces** the correction, but a **full TeqStars rebaseline is deferred to a later
+research sprint** and is **not** done here. **Mechanism stays gated:** binding/data model
+is **AR-005**; API strategy (incl. `productSet`/destructive-apply mechanics) is **AR-002**;
+destructive/full-state write safety is **mandatory but architecture-gated**. **No
+architecture decision is made here.**
+
 ## Deferred from MVP
 
 Deferred (recognised, planned for a later phase — **not** rejected, **not** technical
 debt):
 
-- Odoo → Shopify **product export**.
+- **Unrestricted autonomous bidirectional catalog ownership** — automatic two-way
+  conflict resolution across all product fields; a complex field-ownership matrix beyond
+  MVP essentials; **advanced publish/channel campaign management**. *(Controlled product
+  export/update with matching, binding, preview, and draft/unpublished/channel-controlled
+  safety **is in MVP** — see* Product direction decision*.)*
+- Catalog breadth: **Shopify Markets pricing**, **pricelists**, **metafields**,
+  **SEO/taxonomy**, **custom transforms**, **full multi-store catalog ownership**.
 - Odoo → Shopify **customer export**.
-- **Publish / unpublish / channel-control** export flows.
-- **Bidirectional catalog ownership.**
 - **Refund sync**, **cancellation reflection**, and the **returns / RMA lifecycle**
   (see *Refund/cancellation decision*).
 - **Bulk Operations as a user-facing feature** (see *Bulk operations decision*).
@@ -259,10 +364,10 @@ capability's **mechanism** remains gated and **Not decided / Evidence pending** 
 
 | AR row | Open decision (NOT made here) | MVP capabilities that depend on it |
 | --- | --- | --- |
-| **AR-002** | Distribution (public vs custom); REST/GraphQL/hybrid; bulk (internal); App-Store | store connection auth style, product/backfill import, bulk-internal assessment |
+| **AR-002** | Distribution (public vs custom); REST/GraphQL/hybrid; bulk (internal); App-Store; **destructive-apply (`productSet`) mechanics** | store connection auth style, product/backfill import, **product export/update + destructive-write safety**, bulk-internal assessment |
 | **AR-003** | Sync orchestration + **queue framework** (`ir.cron` vs `queue_job`); Odoo-Online feasibility | layered sync, resumable jobs, order workflow, enqueue actions |
 | **AR-004** | Module boundaries/names; feature-flag + config model | essential mappings, per-store config model, multi-store-safe structure |
-| **AR-005** | Binding/dedup **data model**; per-store keys; deleted-binding handling | product/customer binding, dedup/match keys, multi-store-safe keys |
+| **AR-005** | Binding/dedup **data model**; per-store keys; deleted-binding handling | **product export/import matching + binding + first-sync source strategy**, product/customer binding, dedup/match keys (SKU/barcode), multi-store-safe keys |
 | **AR-006** | Error/retry **taxonomy**; idempotency mechanism; reconciliation cadence | retry classification, idempotent writes, reconciliation |
 | **AR-007** | Inventory design (fields, multi-location, **apply mode / auto-apply**) | inventory write-back, quantity field, controlled stock import |
 | **AR-008** | Fulfilment design (FulfillmentOrder; multi-package/location) | fulfilment + tracking write-back |
@@ -306,8 +411,11 @@ record** (`CLAUDE.md` §10; DP-005/DP-006).
 
 **Negative / trade-offs (accepted).**
 
-- MVP is **import-first, single-direction for catalog/customers** — no Odoo-authored
-  product/customer export until Phase 2.
+- MVP does **controlled two-way products** (import + safe export/update with matching,
+  binding, preview) but **not unrestricted autonomous bidirectional catalog ownership**
+  (no automatic all-field two-way conflict resolution, no complex field-ownership matrix,
+  no advanced publish/channel campaign management) — that is a later phase. **Customer
+  export** is deferred to Phase 2.
 - MVP **does not reflect refunds or cancellations**; finance consistency for those
   events waits for a later phase (with mandatory idempotency).
 - MVP **does not automate accounting** — users get financial *evidence*, not posted
@@ -327,7 +435,10 @@ record** (`CLAUDE.md` §10; DP-005/DP-006).
 Explicitly **out of MVP** (deferred or excluded; full treatment + revisit conditions in
 [`../02-product/non-mvp-and-later-phases.md`](../02-product/non-mvp-and-later-phases.md)):
 
-- product export; customer export; full bidirectional catalog sync
+- **unrestricted autonomous bidirectional catalog ownership** (automatic all-field
+  two-way conflict resolution; complex field-ownership matrix; advanced publish/channel
+  campaign management) — *controlled product export/update **is** in MVP*; **customer
+  export** is deferred
 - advanced refunds; returns / RMA; cancellation processing
 - payout reconciliation; full invoices/payments/accounting automation; bank
   reconciliation
@@ -350,11 +461,15 @@ These remain **open and gated** (RB-14 / AR-002…AR-008, all Not decided / Evid
 pending) — DEC-003 supplies scope inputs to them but decides none:
 
 1. **Distribution model** (public App-Store vs custom/private) — AR-002; unblocks
-   OAuth-mandatory / GraphQL-only / App-Store readiness / internal bulk need.
+   OAuth-mandatory / GraphQL-only / App-Store readiness / internal bulk need. Also
+   **AR-002:** the **destructive-apply / full-state-write mechanics** (`productSet`
+   delete-on-omit) that the controlled product export/update path must guard.
 2. **Sync orchestration + queue framework** (`ir.cron` vs OCA `queue_job`) and
    **Odoo-Online feasibility** — AR-003.
 3. **Binding / dedup data model** (`ir.model.data` reuse vs dedicated per-store model)
-   and deleted-binding handling; MVP match-key set — AR-005.
+   and deleted-binding handling; MVP match-key set (SKU/internal-reference, barcode); the
+   **product export/import matching + first-sync source strategy** (Shopify-source /
+   Odoo-source / both-match-first) — AR-005.
 4. **Error/retry taxonomy** depth, idempotency mechanism, and reconciliation cadence —
    AR-006.
 5. **Inventory design** — quantity field default, minimum multi-location support, and
@@ -383,4 +498,6 @@ pending) — DEC-003 supplies scope inputs to them but decides none:
   a product doc.
 - **Related:** RB-13 (this acceptance); RB-14 (architecture prep, next); AR-002…AR-008
   (`../05-qa/architecture-review-log.md`, all Not decided / Evidence pending); PR #54
-  (the Sprint F proposal this record accepts).
+  (the Sprint F proposal this record accepts); **PR #55** (this acceptance record and its
+  ChatGPT-reviewed **product-direction correction** — controlled bidirectional product
+  onboarding into MVP).

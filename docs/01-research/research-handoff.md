@@ -18,11 +18,35 @@
 > item **RB-13 (MVP scope — now accepted as product scope)**, feeding RB-14 (architecture
 > prep) — still gated. Session date 2026-07-01.
 
+## Sprint G revision (PR #55 review — 2026-07-01)
+
+ChatGPT reviewed PR #55 and returned **REVISE** — the first draft **over-deferred product
+export**. Corrected on the same branch (`docs: revise mvp baseline for controlled product
+export`), a **product-scope correction only** (no architecture, no code):
+
+- **Controlled product export/update is now IN MVP** (Shopify→Odoo import **and**
+  Odoo→Shopify export/update, with matching, binding, preview/dry-run, duplicate
+  prevention, and draft/unpublished/channel-controlled safety) — **controlled bidirectional
+  product onboarding**, not import-first.
+- **Full autonomous bidirectional catalog management remains later**; **customer export
+  remains later.**
+- **Evidence:** product import/export/update is **market-baseline** (EM/VT/WK/SH
+  demonstrated). **TeqStars docs** (403-blocked in Sprint C on 2026-06-30) were **re-checked
+  by ChatGPT on 2026-07-01 and found accessible**; a **full TeqStars rebaseline is pending a
+  later research sprint** and was **not** done here.
+- **No architecture finalized; no implementation authorized.** Binding/data model → AR-005;
+  API/destructive-apply → AR-002.
+
+*(The Session summary and sections below were authored for the initial Sprint G recording;
+apply the correction above — "import-first" is superseded by "controlled bidirectional
+product onboarding," and product export is in MVP.)*
+
 ## Session summary
 
 Recorded ChatGPT's RB-13 MVP scope decisions as the accepted baseline. Created
 **`docs/04-decisions/DEC-003-mvp-scope.md`** (accepted MVP **product-scope** decision:
-Option A correctness-core/import-first; accepted import + write-back direction; Domain 9
+Option A correctness-core **with controlled bidirectional product onboarding**; product
+import **and** controlled export/update + write-back direction; Domain 9
 minimal-financial-evidence-only; refunds/cancellations deferred; bulk ops not user-facing;
 single-store/single-company; P1-primary/P2-secondary; explicit "no architecture decided /
 implementation blocked"). Aligned `mvp-scope.md`, `non-mvp-and-later-phases.md`, and
@@ -45,14 +69,19 @@ REST/GraphQL/queue-framework/data-model/distribution decision** was produced.
 ## MVP acceptance summary
 
 Accepted **Option A** — a correct, observable, recoverable **single-store** sync loop
-across the core commerce objects, **import-first**, with **inventory + fulfilment/tracking
-write-back**. Product-scope acceptance only; every *mechanism* stays gated (RB-14).
+across the core commerce objects with **controlled bidirectional product onboarding**
+(product import **and** controlled export/update), plus **inventory + fulfilment/tracking
+write-back**. **Not** unrestricted autonomous bidirectional catalog ownership.
+Product-scope acceptance only; every *mechanism* stays gated (RB-14).
 
 ## Accepted MVP decisions
 
 - **Direction:** Shopify→Odoo import (products, variants/options, basic images, base
-  price/compare-at, customers + matching, orders, order status/lifecycle); Odoo→Shopify
-  write-back (inventory multi-location-aware/idempotent; fulfilment + tracking).
+  price/compare-at, customers + matching, orders, order status/lifecycle); **Odoo→Shopify
+  controlled product export/update** (matched, bound, previewed, draft/channel-safe);
+  Odoo→Shopify write-back (inventory multi-location-aware/idempotent; fulfilment +
+  tracking). **Deferred:** customer export; unrestricted autonomous bidirectional catalog
+  ownership.
 - **Domain 9:** minimal financial **evidence** only (status/labels/references/flags-as-
   source-info/totals/tax/shipping/discount/currency + basic gateway-journal mapping as
   config input) — **no accounting automation.**
@@ -71,24 +100,30 @@ write-back**. Product-scope acceptance only; every *mechanism* stays gated (RB-1
 
 ## Deferred scope
 
-Product export; customer export; publish/channel-control export; bidirectional catalog;
-refund sync; cancellation reflection; returns/RMA; full Domain 9 accounting automation;
-payout/bank reconciliation; multi-package fulfilment; complex tax; Markets/B2B/POS/gift
-cards/metafields/subscriptions/abandoned-checkout/recommendations/Buy-with-Prime;
+**Unrestricted autonomous bidirectional catalog ownership** (all-field two-way conflict
+resolution; field-ownership matrix; advanced publish/channel campaign management);
+**customer export**; refund sync; cancellation reflection; returns/RMA; full Domain 9
+accounting automation; payout/bank reconciliation; multi-package fulfilment; complex tax;
+Markets/B2B/POS/gift cards/metafields/subscriptions/abandoned-checkout/recommendations/
+Buy-with-Prime;
 multi-store/multi-company logic; custom transforms; advanced analytics; public App-Store +
 demo packaging + billing/compliance webhooks. **Bulk Operations = not a user-facing MVP
-feature** (internal RB-14/AR-002 assessment only). Revisit conditions in
-`non-mvp-and-later-phases.md`. **Mandatory future rule:** idempotent-refund /
+feature** (internal RB-14/AR-002 assessment only). *(**Controlled** product export/update —
+matched, bound, previewed, draft/channel-safe — **is in MVP**, not deferred.)* Revisit
+conditions in `non-mvp-and-later-phases.md`. **Mandatory future rule:** idempotent-refund /
 no-double-refund regression is mandatory if refunds are later included.
 
 ## Architecture dependencies still open
 
-AR-002…AR-008 all **Not decided / Evidence pending** (distribution/API + internal bulk;
-orchestration/queue + Odoo-Online; module boundaries/config; binding/dedup data model;
-error/retry taxonomy + idempotency mechanism + reconciliation cadence; inventory design +
-apply mode; fulfilment design). Plus the **Domain 9 draft-artifact exception** (returns to
-ChatGPT if RB-14 finds a draft invoice/payment artifact is required). **DEC-003 feeds these;
-it decides none.**
+AR-002…AR-008 all **Not decided / Evidence pending** (distribution/API + **destructive-apply
+(`productSet`) mechanics** for controlled export + internal bulk; orchestration/queue +
+Odoo-Online; module boundaries/config; binding/dedup data model + **product match keys
+(SKU/barcode) + first-sync source strategy**; error/retry taxonomy + idempotency mechanism +
+reconciliation cadence; inventory design + apply mode; fulfilment design). Also **later &
+architecture-gated:** full autonomous bidirectional catalog management (all-field two-way
+conflict resolution + field-ownership matrix). Plus the **Domain 9 draft-artifact exception**
+(returns to ChatGPT if RB-14 finds a draft invoice/payment artifact is required). **DEC-003
+feeds these; it decides none.**
 
 ## Evidence-consistency gate
 
@@ -2194,3 +2229,26 @@ ChatGPT review.
   decisions, not rejected approaches), `technical-debt-register.md` (none — no code). Ran final
   allowed/forbidden-file checks. Next: push the working branch and open one draft PR targeting
   `Shopify-connector`, then stop.
+- **Sprint G / revision — controlled product export into MVP (PR #55 review, 2026-07-01):**
+  ChatGPT reviewed PR #55 and returned **REVISE**: the first draft **over-deferred product
+  export**. Corrected on the same branch/PR (no new PR, no merge). **Product-scope correction
+  only** — **controlled product export/update is now IN MVP** (Shopify→Odoo import **and**
+  Odoo→Shopify export/update, with first-sync matching, binding, preview/dry-run, duplicate
+  prevention, and draft/unpublished/channel-controlled safety = **controlled bidirectional
+  product onboarding**); **full autonomous bidirectional catalog management** and **customer
+  export** stay later. Updated only the 10 PR #55 files: `DEC-003-mvp-scope.md` (revised
+  Decision/Accepted-option/direction/Deferred/Non-goals + new **Product direction decision**
+  section + AR-002/005 rows + Status revision note), `mvp-scope.md` (RB-13 acceptance corrected
+  + new **Product onboarding and duplicate-prevention baseline** section + C-PROD-02/03/05
+  blocks + options + excluded + evidence-consistency + TeqStars accessibility correction),
+  `non-mvp-and-later-phases.md` (product export removed from non-MVP; new **Full autonomous
+  bidirectional catalog management** boundary; customer export kept later), `user-stories.md`
+  (US-E2-05 → controlled MVP export/update; new **US-E2-06** first-sync matching; customer
+  export later), both handoffs (this revision note), and QA logs (`defect-pattern-log.md`
+  Sprint G revision note — over-deferral corrected, TQ source availability changed, product-scope
+  correction not an implementation defect, no new DP row; `architecture-review-log.md` — controlled
+  product export/update now feeds AR-002/AR-005, full bidirectional conflict-resolution later, no
+  AR row decided). **TeqStars docs re-checked accessible 2026-07-01; full rebaseline pending a
+  later sprint.** No rejected approaches; no technical debt; no architecture decided; no
+  implementation authorized. Commit `docs: revise mvp baseline for controlled product export`.
+  Next: push the same branch/PR #55; do not merge; await ChatGPT re-review.
