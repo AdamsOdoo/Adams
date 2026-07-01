@@ -328,6 +328,29 @@ to users (none observed)? (Per-source lists in the deep dives.)
   the **PR targets `Shopify-connector`**, to avoid the Sprint C branch-name
   ambiguity.
 
+### Sprint C revision (PR #51 review — 2026-07-01)
+
+ChatGPT review returned **REVISE** for two evidence-classification overstatements;
+corrected on the same branch (`docs: correct sprint c evidence classifications`):
+
+- **Correction 1 — Webkul multi-company.** The Webkul default **Company** field was
+  initially classified too strongly as **demonstrated multi-company support** (✅).
+  True multi-company support/isolation was **not demonstrated**; a visible config
+  field is not evidence of multi-company routing or record-rule handling. Downgraded
+  to `⬜/➖` in `competitor-deep-dives.md` and to `➖` in `competitor-feature-matrix.md`
+  (with an evidence note; EM/VT remain the demonstrated multi-company evidence).
+- **Correction 2 — "bidirectional core sync" common pattern.** The strongly-common
+  pattern claiming **bidirectional product/order/inventory/customer sync across all**
+  connectors was **narrowed**: broad core-object coverage is a common *market promise*,
+  but **directionality varies by object and evidence strength** (EC product export not
+  found; WK customer export not found; TQ listing-claim only; EM/VT strongest
+  directional evidence). Updated in `common-patterns.md`.
+- **Category:** unsupported assumption (#3) / weak research classification (#1) — logged
+  as **DP-004** in `defect-pattern-log.md`.
+- **Prevention rule:** configuration fields must **not** be treated as demonstrated
+  feature support unless the workflow/behaviour is shown; common-pattern wording must
+  distinguish a **market promise** from **demonstrated bidirectionality**.
+
 ## What ChatGPT should review
 
 1. **Claim discipline** — spot-check that competitor claims are not presented as

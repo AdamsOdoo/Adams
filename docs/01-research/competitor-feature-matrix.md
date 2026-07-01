@@ -109,7 +109,7 @@
 | --- | :--: | :--: | :--: | :--: | :--: | :--: | --- |
 | Mappings (field / gateway / location) | ✅ | 🟨 | ✅ | ✅ | 🟨 | ✅ | **VT** = per-field directional + **custom Python transforms + test-against-live-data** (most advanced). *Impl.:* configurable, testable mappings. |
 | Multi-store | ⬜ | 🟨 | ➖ | ✅ | ⬜ | 🟨 | VT "as many stores as you want"; TQ "unlimited"; *Impl.:* multi-store with per-store config. |
-| Multi-company | ✅ | ⬜ | ✅ | ✅ | ⬜ | ⬜ | EM (via Markets per-market company), VT (multi-company inventory). **SH multi-company unverified.** *Impl.:* multi-company isolation via record rules. |
+| Multi-company | ➖ | ⬜ | ✅ | ✅ | ⬜ | ⬜ | **WK shows a default Company field only; true multi-company support is not demonstrated.** Demonstrated multi-company evidence = EM (via Markets per-market company) and VT (multi-company inventory). **SH multi-company unverified.** *Impl.:* multi-company isolation via record rules. |
 | Shopify Markets | ⬜ | 🟨 | ✅ | ✅ | ⬜ | ⬜ | **EM/VT** demonstrate Markets & Catalogs (per-market pricing/company). *Impl.:* Markets is a premium differentiator. |
 | Metafields | ⬜ | 🟨 | ✅ | ✅ | ⬜ | ✅ | EM/VT/SH = directional mapping; VT "30+ types". *Impl.:* directional metafield mapping. |
 | Gift cards | ⬜ | 🟨 | 🟨 | ⬜ | ⬜ | ✅ | **Only SH demonstrates** (import/export/disable-in-Shopify). *Impl.:* niche but a breadth differentiator. |

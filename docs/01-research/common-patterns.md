@@ -13,8 +13,14 @@
 1. **Custom Shopify app + token/OAuth connection.** All six connect via a custom
    app; credentials are entered/authorized in Odoo. (WK✅, EM✅, VT✅, SH✅;
    TQ🟨, EC🟨) — *grounded by Tier-1: OAuth/token-exchange is the Shopify model.*
-2. **Bidirectional product + order + inventory + customer sync** is the baseline
-   scope every product claims. (all)
+2. **Broad core-object sync is a common market promise, but directionality varies
+   by object and evidence strength.** Product/order/inventory/customer coverage is
+   commonly claimed; true bidirectionality is **not consistently demonstrated**
+   across all objects or all competitors. Examples: **ecommerce_shopify (EC)
+   product export is not found**; **Webkul (WK) customer export is not found**;
+   **Teqstars (TQ) is listing-claim only**; **Emipro (EM) and VentorTech (VT)
+   carry the strongest demonstrated directional evidence.** (all claim broad
+   coverage; per-object directionality varies)
 3. **Staging/queue before commit.** Inbound data is staged then processed:
    **EM Data Queues (125 products/50 orders)**, **SH Queue Dashboard**, **WK
    Feeds**, **VT background jobs**, **TQ Queue Manager** (claim). Only **EC** has
