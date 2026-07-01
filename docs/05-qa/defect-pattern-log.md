@@ -184,3 +184,26 @@ must be re-checked before that decision is finalized — access can change (WAF/
 vendor doc releases).* This refines DP-001 (re-read the source) and DP-003 (blocked-source
 handling); it is not a new recurring pattern. **DEC-003 and the accepted MVP scope are
 unchanged**; architecture stays RB-14 / AR-002…AR-008-gated; implementation stays blocked._
+
+_**RB-14 Architecture Preparation — Part 1 note (2026-07-01): no new defect pattern.** RB-14
+Part 1 produced the first architecture **framing** docs (`../03-architecture/*`) + a current
+official-source refresh, and **added no new defect occurrence** to any category — **no new DP
+row, no counter change.** The sprint **applied, not re-triggered**, the standing prevention
+rules: **DP-001 (re-read the source)** was applied to the platform facts — a scoped
+official-source re-verification (2026-07-01, ~40 Tier-1 pages, verbatim quotes) that **surfaced
+version-sensitive deltas** (GraphQL `latest` alias `2026-04`→`2026-07`; `@idempotent` on
+inventory set/adjust **required as of 2026-04** with the 2026-01-optional detail; `productSet`
+delete-on-omit is **list-fields-only**; dual offline-token model) rather than trusting the
+one-day-old baseline, exactly the DP-001 discipline; **DP-003/DP-004** — competitor evidence
+was kept as evidence and **not promoted to official fact** in the framing docs (official facts
+and competitor demonstrations are separately labelled); **DP-005** — every candidate option and
+recommended decision order is **explicitly labelled an input/`[Not decided]`, never a decision**;
+**DP-006 evidence-consistency gate** — official facts, competitor evidence, inferences,
+recommendations, and open questions are kept distinct, and **conditional platform requirements
+stay conditional** (e.g. the GraphQL-only mandate is scoped to *new public apps*; the
+custom-app scope is left an **open question**, not asserted). A few facts were **conservatively
+downgraded to open questions** on re-verification (GID permanence not asserted; no general
+mutation idempotency beyond `@idempotent`; `ir.model.data` `(module,name)` uniqueness
+unconfirmed; `sudo()` bypass not literally on `security.rst`) — the opposite of over-claiming,
+consistent with DP-001/DP-003. **No architecture decision was made; DEC-003 and MVP scope are
+unchanged; implementation stays blocked** (`CLAUDE.md` §4–§5; RB-14)._
