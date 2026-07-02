@@ -92,15 +92,27 @@ Phase 1 gate are proposed (see brief §2).
 
 ## Dependency rules
 
-Strict one-directional DAG: **`core` → `product` → {`sale`, `inventory`} →
-`fulfillment`.**
+Strict one-directional DAG. `core` → `product`; `sale` and `inventory` are
+**siblings** depending on `core` + `product`; `fulfillment` depends on
+`core` + `sale`, **not** on `inventory`:
+
+```
+core
+└── product
+    ├── sale
+    │   └── fulfillment
+    └── inventory
+```
 
 - `core` depends on no other connector module.
 - `product` depends only on `core`.
 - `sale` and `inventory` are siblings (both depend on `core` + `product`,
   not on each other) — each independently enableable/disableable.
 - `fulfillment` depends on `core` + `sale` and on Odoo's own `stock`/
-  `delivery` apps directly, **not** on `shopify_connector_inventory`.
+  `delivery` apps directly. **`fulfillment` does not depend on
+  `shopify_connector_inventory`** — the diagram's `fulfillment` branch
+  under `sale` is the only place `fulfillment` appears; it is not also a
+  child of `inventory`.
 - No module depends "upward"; same-tier modules never depend on each other
   directly.
 - No proposed module depends on `adams_base` — this record finds no

@@ -77,7 +77,7 @@ Full rationale, taxonomy tables, and evidence:
 `cancelled`, `blocked_manual_review` (full transition table in the brief
 §2).
 
-**Error classes (15):** Shopify throttling/rate-limit; Shopify temporary/
+**Error classes (16):** Shopify throttling/rate-limit; Shopify temporary/
 server/network; Shopify permission/scope/auth; Shopify userErrors/
 validation; Odoo validation/configuration; mapping missing; ambiguous
 match; binding conflict; duplicate risk; destructive-write guard blocked;

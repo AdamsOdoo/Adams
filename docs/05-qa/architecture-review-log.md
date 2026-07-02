@@ -428,7 +428,7 @@ and
 `product`/`sale`/`inventory`/`fulfillment` for Phase 1, strict dependency DAG, no
 `adams_base` dependency found justified) and
 [`../04-decisions/DEC-009-error-retry-idempotency-strategy.md`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md)
-(**AR-006** — a classified retry policy with a 6-job-source/10-state/15-error-class
+(**AR-006** — a classified retry policy with a 6-job-source/10-state/16-error-class
 taxonomy, layered idempotency spanning Shopify's `@idempotent` surface and
 connector-designed keys, and recovery-first log/audit requirements). **Each DEC file is
 explicitly `Status: Proposed for ChatGPT review`, not `Accepted` — this sprint does not

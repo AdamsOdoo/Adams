@@ -328,9 +328,20 @@ scheduled.
 ### 3. Dependency direction
 
 Strict one-directional DAG, enforced as a design rule (not a runtime
-check): **`shopify_connector_core` → `shopify_connector_product` →
-{`shopify_connector_sale`, `shopify_connector_inventory`} →
-`shopify_connector_fulfillment`.**
+check). `core` → `product`; `sale` and `inventory` are **siblings**
+depending on `core` + `product`; `fulfillment` depends on `core` + `sale`,
+**not** on `inventory`:
+
+```
+core
+└── product
+    ├── sale
+    │   └── fulfillment
+    └── inventory
+```
+
+**`fulfillment` does not depend on `shopify_connector_inventory`** — it
+appears only once in the diagram, under `sale`, not also under `inventory`.
 
 - `core` depends on no other connector module — it is domain-agnostic.
 - `product` depends only on `core`.

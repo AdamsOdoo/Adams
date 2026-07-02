@@ -45,13 +45,14 @@
   — options considered (one giant module, per-feature micro-module explosion,
   domain-per-Odoo-app mirroring, layered domain family with link modules), a recommended
   Phase 1 addon family (`shopify_connector_core`/`product`/`sale`/`inventory`/
-  `fulfillment`), a strict dependency DAG (`core` → `product` → {`sale`, `inventory`} →
-  `fulfillment`), a link-module strategy (none needed yet for Phase 1), and an evaluated
+  `fulfillment`), a strict dependency DAG (`core` → `product`; `sale` and `inventory` are
+  siblings depending on `core` + `product`; `fulfillment` depends on `core` + `sale`, not
+  on `inventory`), a link-module strategy (none needed yet for Phase 1), and an evaluated
   answer on customer/dashboard/payment-evidence placement (folded into `sale`/`core`/`sale`
   respectively for Phase 1, each with a revisit condition) — and
   [`ar006-error-retry-idempotency-decision-brief.md`](../03-architecture/ar006-error-retry-idempotency-decision-brief.md)
   — a classified retry policy (Option C: auto-retry only safe/transient error classes),
-  a 6-job-source taxonomy, a 10-job-state machine, a 15-error-class table with default
+  a 6-job-source taxonomy, a 10-job-state machine, a 16-error-class table with default
   retry behaviour, an 11-layer idempotency mapping (platform `@idempotent` surface +
   connector-designed keys), and user-facing log/audit requirements. Proposed
   [`DEC-008`](../04-decisions/DEC-008-module-boundary-strategy.md) (AR-004) and
@@ -92,6 +93,18 @@
   DEC-005/DEC-006/DEC-007 not edited; no code files changed; AR-004 and AR-006 are
   **proposed only, not accepted**; AR-007/AR-008 remain **not decided**; implementation
   still not authorized; `main` and plain `dev` untouched. Awaiting further instruction.
+
+**PR #64 minor revision (2026-07-02):**
+- ChatGPT reviewed PR #64 and requested minor cleanup before Fable review.
+- Corrected AR-006 taxonomy count from 15 to 16 error classes.
+- Clarified AR-004 dependency notation so fulfillment depends on core + sale, not inventory.
+- Normalized RA-011–RA-017 proposed formatting to keep stable RA IDs.
+- DEC-008/DEC-009 remain Proposed for ChatGPT review.
+- AR-004/AR-006 remain proposed only, not accepted.
+- AR-007/AR-008 remain not decided.
+- DEC-003/004/005/006/007 untouched.
+- No code files changed.
+- Implementation remains blocked.
 
 ---
 
