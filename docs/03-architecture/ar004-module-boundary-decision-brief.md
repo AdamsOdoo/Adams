@@ -182,9 +182,11 @@ binding/log substrate, and the UI live in a single module.
 the accepted product-vision modularity principle and `CLAUDE.md` §9;
 matches the named anti-pattern **A-MOD-1** (`[Competitor claim]`
 `avoid-list.md`: "poor isolation, hard maintenance, coupling risk").
-Structurally, it also fails DEC-003's "enableable/disableable" requirement
-— a merchant who wants product sync but not fulfilment write-back cannot
-selectively disable a single monolithic module without custom code. See
+Structurally, it also fails the accepted per-domain enable/disable
+requirement (`../02-product/product-vision.md` principle 6;
+`../02-product/feature-taxonomy.md` CC-6/CC-7) — a merchant who wants
+product sync but not fulfilment write-back cannot selectively disable a
+single monolithic module without custom code. See
 *Rejected or weakened alternatives* below for the corresponding
 rejected-approaches-log entry.
 
@@ -240,27 +242,48 @@ approach* below.
 
 | Addon | Owns | Depends on (connector) | Depends on (Odoo core) |
 | --- | --- | --- | --- |
-| `shopify_connector_core` | Store/connection config + credentials (DEC-004); GraphQL transport client + rate-limit-aware request pacing; webhook receiver controller + HMAC verification + `X-Shopify-Webhook-Id` dedup (DEC-005); the internal queue/job **abstraction** (abstract job model/mixin: source, state, retry count, error class placeholder, related-record reference — `phase1-domain-model-brief.md` Domain 8) and the `ir.cron` worker(s) that drain it; the connector binding **abstraction** (mixin: store scope, matched-by/at, source strategy, match key, status — DEC-006); the reason-coded error-class registry; the setup/readiness wizard; the recovery-first log/error-center dashboard | — | `base`, `web`, `mail` |
-| `shopify_connector_product` | Product/variant import + controlled export/update; product & variant binding tables (concrete, extending core's binding mixin); image/media and price/compare-at handling (DEC-007); product field-mapping configuration | `shopify_connector_core` | `product` |
-| `shopify_connector_sale` | Order import; order binding; customer import/matching + binding (Phase 1 — see *Customer* below); financial-evidence capture (tax/shipping/discount lines, conservative invoice/payment creation with the DEC-007 total-check guard); order-status sync | `shopify_connector_core`, `shopify_connector_product` | `sale` |
-| `shopify_connector_inventory` | Inventory quantity sync (`available`/`on_hand` only, never `committed` — DEC-007); Shopify-location↔Odoo-location mapping; inventory binding (`inventory_item_id` + `location_id`, per DEC-006); the first-inventory-push guard (DEC-007) | `shopify_connector_core`, `shopify_connector_product` | `stock` |
-| `shopify_connector_fulfillment` | Fulfilment/tracking write-back; fulfilment binding; the customer-notification visibility/control guard (DEC-007) | `shopify_connector_core`, `shopify_connector_sale` | `stock`, `delivery` |
+| `shopify_connector_core` | Store/connection config + credentials (DEC-004); GraphQL transport client + rate-limit-aware request pacing; webhook receiver controller + HMAC verification + `X-Shopify-Webhook-Id` dedup (DEC-005); the internal queue/job **abstraction** (abstract job model/mixin: source, state, retry count, error class placeholder, related-record reference — `phase1-domain-model-brief.md` Domain 8) and the `ir.cron` worker(s) that drain it; the connector binding **abstraction / shared contract** (store scope, matched-by/at, source strategy, match key, status — DEC-006; schema shape not decided here, see *Binding schema shape* below); the reason-coded error-class registry; the setup/readiness wizard; the recovery-first log/error-center dashboard | — | `base`, `web`, `mail` |
+| `shopify_connector_product` | Product/variant import + controlled export/update; product & variant binding **responsibility**, extending core's binding contract (schema shape open — see *Binding schema shape* below); image/media and price/compare-at handling (DEC-007); product field-mapping configuration | `shopify_connector_core` | `product` |
+| `shopify_connector_sale` | Order import; order binding **responsibility**; customer import/matching + binding **responsibility** (Phase 1 — see *Customer* below); financial-evidence capture (tax/shipping/discount lines, conservative invoice/payment creation with the DEC-007 total-check guard); order-status sync | `shopify_connector_core`, `shopify_connector_product` | `sale` |
+| `shopify_connector_inventory` | Inventory quantity sync (`available`/`on_hand` only, never `committed` — accepted DEC-003 inventory scope; Tier-1 Shopify inventory facts, `../01-research/shopify-official-api-notes.md`); Shopify-location↔Odoo-location mapping; inventory binding **responsibility** (`inventory_item_id` + `location_id` identity shape, per DEC-006); the first-inventory-push guard (DEC-007) | `shopify_connector_core`, `shopify_connector_product` | `stock` |
+| `shopify_connector_fulfillment` | Fulfilment/tracking write-back; fulfilment binding **responsibility**; the customer-notification visibility/control guard (DEC-007) | `shopify_connector_core`, `shopify_connector_sale` | `stock`, `delivery` |
+
+**Binding schema shape is not decided by this brief.** DEC-006 explicitly
+left open whether bindings are implemented as one polymorphic binding table
+or one table per domain — that fork is unchanged and not contradicted here.
+This proposal places binding *responsibility*, not table *shape*, with each
+module: `core` owns the shared binding contract (store-scoping principles,
+audit-field shape, uniqueness rules) every binding must satisfy; each
+domain module owns the binding *responsibility* for its own identity shape.
+If the Master Blueprint later chooses a **single polymorphic binding
+table**, it likely lives in `shopify_connector_core` with domain-specific
+reference fields/handlers contributed by each domain module; if it chooses
+**per-domain binding tables**, those concrete tables likely live in the
+owning domain module, extending core's shared contract. **This brief does
+not choose between the two shapes.**
 
 `[Recommendation]` **Customer, dashboard, and payment-evidence — evaluated,
 not split out in Phase 1:**
 
 - **`shopify_connector_customer`?** `[Recommendation]` Fold into
-  `shopify_connector_sale` for Phase 1. `[Inference]` DEC-003's MVP scope
-  imports customers only in the context of orders ("import for orders,
-  customers (deduped...), and order status"); no Phase 1 capability uses
-  customer sync independently of order import. Splitting it now would add a
-  manifest dependency for no independent activation value (A-MOD-2 risk).
-  DEC-006 already treats customer identity as a separately-shaped binding
-  (its own match-key set: email primary, multi-key allowed), so a future
-  split to a standalone module — if customer-only use cases emerge (e.g.
-  customer export as its own capability, marketing/segment sync) — is a
-  clean promotion, not a redesign. **Revisit condition:** a demonstrated
-  Phase 2+ need for customer sync independent of order import.
+  `shopify_connector_sale` for Phase 1. `[Accepted decision]` DEC-003
+  includes "customer import and matching (deduplicated; email primary,
+  multi-key allowed)" as accepted Phase 1 MVP scope, alongside order import.
+  `[Inference]` No Phase 1 capability in the corpus uses customer sync
+  independently of order import —
+  [`architecture-decision-framing.md`](./architecture-decision-framing.md)
+  groups them the same way ("Import for orders, customers... and order
+  status/lifecycle"), and this brief infers from that co-occurrence, not
+  from a DEC-003 instruction to co-locate the two modules, that folding
+  customer into `sale` for Phase 1 is the module-boundary choice. Splitting
+  it now would add a manifest dependency for no independent activation
+  value (A-MOD-2 risk). DEC-006 already treats customer identity as a
+  separately-shaped binding (its own match-key set: email primary,
+  multi-key allowed), so a future split to a standalone module — if
+  customer-only use cases emerge (e.g. customer export as its own
+  capability, marketing/segment sync) — is a clean promotion, not a
+  redesign. **Revisit condition:** a demonstrated Phase 2+ need for
+  customer sync independent of order import.
 - **`shopify_connector_dashboard`?** `[Recommendation]` Fold into
   `shopify_connector_core` for Phase 1. `[Inference]` The job/log/error
   model this brief places in core (`phase1-domain-model-brief.md` Domain 8)
@@ -352,7 +375,9 @@ appears only once in the diagram, under `sale`, not also under `inventory`.
   Shopify-direction data (order import doesn't need current stock levels;
   inventory sync doesn't need order history). Keeping them siblings lets a
   merchant install inventory sync without sale sync (or vice versa) and
-  satisfies DEC-003's "enableable/disableable" requirement per domain.
+  satisfies the accepted per-domain enable/disable requirement
+  (`../02-product/product-vision.md` principle 6;
+  `../02-product/feature-taxonomy.md` CC-6/CC-7) per domain.
 - `fulfillment` depends on `core` + `sale` (a fulfilment write-back is
   anchored to an order/fulfilment-order context) plus Odoo's own `stock`/
   `delivery` apps directly — **not** on `shopify_connector_inventory`.
@@ -389,14 +414,18 @@ appears only once in the diagram, under `sale`, not also under `inventory`.
    each side stays independently installable.
 6. **Queue/job/log/binding abstractions** — `[Recommendation]` live in
    `shopify_connector_core` as domain-agnostic abstract models/mixins;
-   concrete binding tables and concrete job types live in the domain module
-   that owns that shape (product binding in `product`, order/customer
-   binding in `sale`, inventory binding — needing
+   concrete job types, and binding *responsibility*, live in the domain
+   module that owns that concern (product binding in `product`, order/
+   customer binding in `sale`, inventory binding — needing
    `inventory_item_id`+`location_id` per DEC-006 — in `inventory`,
-   fulfilment binding — shape open, AR-008 — in `fulfillment`). `[Inference]`
-   This keeps DEC-006's "domain-specific handling where shapes differ"
-   without duplicating the shared audit/status/store-scoping fields DEC-006
-   requires on every binding — those live once, in core's mixin.
+   fulfilment binding — shape open, AR-008 — in `fulfillment`). **Whether
+   each domain's binding is a concrete table in that module or a
+   domain-specific slice of a single polymorphic table in `core` is the
+   DEC-006 schema-shape fork this brief does not decide** (see *Binding
+   schema shape* under §1). `[Inference]` Either way, this keeps DEC-006's
+   "domain-specific handling where shapes differ" without duplicating the
+   shared audit/status/store-scoping fields DEC-006 requires on every
+   binding — those live once, in core's shared contract.
 7. **Setup wizard / readiness / dashboard** — `[Recommendation]` core (see
    *Customer, dashboard, and payment-evidence* above).
 8. **Shopify API client / GraphQL transport** — `[Recommendation]` core.
@@ -460,7 +489,7 @@ module, per DEC-004).
 
 | Alternative | Disposition | Why |
 | --- | --- | --- |
-| **One giant `shopify_connector` module** (Option 1) | Rejected (proposed) | Contradicts the accepted product-vision modularity principle and `CLAUDE.md` §9; matches A-MOD-1; fails DEC-003's per-domain enable/disable requirement |
+| **One giant `shopify_connector` module** (Option 1) | Rejected (proposed) | Contradicts the accepted product-vision modularity principle and `CLAUDE.md` §9; matches A-MOD-1; fails the accepted per-domain enable/disable requirement (`../02-product/product-vision.md` principle 6; `../02-product/feature-taxonomy.md` CC-6/CC-7) |
 | **Per-feature micro-module explosion** (Option 2) | Rejected (proposed) | Matches A-MOD-2 (over-fragmentation); no operator-visible independent-activation value inside one domain |
 | **Queue/job/log/binding abstractions duplicated per domain module** (each domain reimplements its own job/log base classes instead of sharing core's) | Rejected (proposed) | Duplicated code; inconsistent error-class taxonomy across domains; breaks the single recovery-first error-center UX (DEC-003 non-negotiable); harder to maintain a consistent audit-field shape across bindings (DEC-006) |
 | **Domain-per-Odoo-app mirroring** (Option 3) | Weakened, not rejected | Not required by Odoo's own `depends` mechanism; scatters merchant-facing domains like "fulfilment" across app-aligned modules with no natural home for its binding/mapping logic; kept as a possible future link-module axis, not the primary organizing principle |
@@ -487,12 +516,17 @@ module, per DEC-004).
   question]` for the domain-model/Master Blueprint sprint if a genuine
   optional-pair need emerges (e.g. fulfilment reusing inventory's location
   mapping).
-- **Feature-flag mechanism's concrete implementation** (how a capability
-  group is enabled/disabled per store) — this brief proposes *where*
-  modules live, not the mechanism itself; `setup-ux-principles.md` already
-  flags the feature-flag model as "not decided (AR-004)" and this brief's
-  boundary proposal is a necessary input to, not a resolution of, that
-  mechanism.
+- **The feature-flag / per-store capability-configuration mechanism** (how
+  a capability group is enabled/disabled per store). DEC-003's AR-004 scope
+  names both "module boundaries/names" and "feature-flag + config model" —
+  this brief resolves only the former. The concrete mechanism is **not
+  decided or proposed-accepted by this brief**; `setup-ux-principles.md`
+  already flags the feature-flag model as "not decided (AR-004)," and this
+  brief's boundary proposal is a necessary input to, not a resolution of,
+  that mechanism. Explicitly routed to the **UX/operator-flow sprint**
+  (operator-facing enable/disable experience) and the **Master Blueprint /
+  implementation-planning gate** (technical mechanism) before any code is
+  written.
 - **Odoo.sh/on-prem installation packaging details** (e.g. whether all
   Phase 1 modules ship in one repository/app bundle for install
   convenience versus separate listings) — an implementation/deployment

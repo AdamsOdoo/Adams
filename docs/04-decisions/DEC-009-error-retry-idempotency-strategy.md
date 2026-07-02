@@ -72,10 +72,12 @@ Full rationale, taxonomy tables, and evidence:
 **Job sources:** `webhook`, `manual_sync`, `scheduled_sync`,
 `reconciliation`, `setup_readiness_check`, `export_preview_dry_run`.
 
-**Job states:** `draft` → `queued` → `running` → one of `succeeded`,
-`retry_waiting`, `failed_retryable`, `failed_final`, `skipped`,
-`cancelled`, `blocked_manual_review` (full transition table in the brief
-§2).
+**Job states:** `draft`, `queued`, and `running` are non-terminal entry
+states; `succeeded`, `failed_final`, `skipped`, and `cancelled` are
+terminal; `retry_waiting`, `failed_retryable`, and `blocked_manual_review`
+loop back to `queued` once their condition is resolved rather than
+terminating (full transition table, including the `cancelled` exit
+available from `draft`/`queued`/`retry_waiting`, in the brief §2).
 
 **Error classes (16):** Shopify throttling/rate-limit; Shopify temporary/
 server/network; Shopify permission/scope/auth; Shopify userErrors/
@@ -88,8 +90,21 @@ behaviour in the brief §3–4).
 
 ## Retry taxonomy
 
-- **Automatic retry:** Shopify throttling/rate-limit; Shopify temporary/
-  server/network; concurrency/race conflict.
+- **Automatic retry (reads and `@idempotent` writes):** Shopify throttling/
+  rate-limit; concurrency/race conflict; Shopify temporary/server/network
+  failures on **reads**, or on **writes using a Shopify `@idempotent`
+  mutation** (retried using the same persisted idempotency key within the
+  platform's 24-hour window).
+- **Ambiguous-outcome rule (no blind retry):** a Shopify temporary/server/
+  network failure on a **write outside Shopify's `@idempotent` surface**,
+  where the outcome is unknown after dispatch (e.g. a timeout or connection
+  loss after the request left the connector), is **not** auto-retried. The
+  job either performs a safe verification read of Shopify's current state
+  before any re-attempt, where one exists, or routes to
+  `blocked_manual_review` if the outcome cannot be safely verified. A
+  connector-internal job idempotency key prevents connector-side duplicate
+  *processing* but does **not** make it safe to re-send the mutation to
+  Shopify — see the brief §4a for the full rule.
 - **No automatic retry (manual fix then retry):** Shopify permission/
   scope/auth; Shopify userErrors/validation; Odoo validation/configuration;
   mapping missing; data shape/schema mismatch.
@@ -98,7 +113,8 @@ behaviour in the brief §3–4).
   inventory location missing; fulfillment notification confirmation
   missing.
 - **No automatic retry, conservative-by-default:** financial total
-  mismatch (DEC-007 §6 — never silently create a mismatched artifact).
+  mismatch — requires operator review or a configuration/data correction
+  before any retry is attempted; must never proceed silently (DEC-007 §6).
 - **Single safety-net auto-retry, then human** `[Implementation-planning
   default]`: unknown/system error.
 - **Skip and dead/final-failed are outcomes available from any class**, not
@@ -150,8 +166,13 @@ operations.
   to a domain-model/implementation sprint.
 - `@idempotent` key uniqueness scope and bulk-operation idempotency —
   `[Open question]`, unresolved since RB-14 Part 2.
-- Reconciliation cadence and scope — `[Open question]`, deferred to
-  implementation planning.
+- **Reconciliation cadence and scope** — DEC-005 originally routed detailed
+  reconciliation cadence to AR-006
+  (`../04-decisions/DEC-005-sync-orchestration-strategy.md` §"Performance
+  implications"). This record resolves the error/retry/idempotency
+  taxonomy but does not choose an exact cadence — cadence and scope remain
+  `[Open question]`, routed onward to Master Blueprint / implementation
+  planning before code, not silently dropped.
 - Exact user-facing copy/wording for error reasons and suggested fixes — a
   UX/operator-flow sprint concern.
 
@@ -164,12 +185,16 @@ operations.
    speculative; classes with no Phase 1 evidence were not added.
 2. **Risk:** classifying an error as auto-retryable when it is not actually
    safe would reproduce the double-acting failure mode this record exists
-   to prevent. **Mitigation:** only three classes (throttling, temporary/
-   network, concurrency) are auto-retryable, all three grounded in cited
-   Shopify facts about their transient, retry-intended nature; every class
-   touching a write with platform or connector-level correctness risk
-   (userErrors, validation, guards, financial totals) defaults to no
-   automatic retry.
+   to prevent. **Mitigation:** throttling/rate-limit and concurrency/race
+   conflict are auto-retryable and are grounded directly in cited Shopify
+   facts about their transient, retry-intended nature; temporary/server/
+   network auto-retry is grounded in general API-client resilience
+   practice (`[Inference]`, not a specific Shopify fact) and, per the
+   ambiguous-outcome rule above, is restricted to reads and `@idempotent`
+   writes — non-`@idempotent` writes are routed to a verification read or
+   `blocked_manual_review` instead of a blind retry; every class touching
+   a write with platform or connector-level correctness risk (userErrors,
+   validation, guards, financial totals) defaults to no automatic retry.
 3. **Risk:** without fixed backoff/retry-limit constants, implementation
    could under- or over-retry in practice. **Mitigation:** explicitly
    flagged `[Implementation-planning default]` rather than silently
@@ -185,8 +210,13 @@ operations.
    connector-designed mechanisms; a gap between them (an operation outside
    the 17-mutation list with no connector-designed key) would be a
    correctness hole. **Mitigation:** the "internal job idempotency key"
-   layer is explicitly proposed to cover every operation, not just the
-   17-mutation list, closing that gap by design.
+   layer prevents *connector-side* duplicate processing (re-running the
+   same job twice), but it does **not**, by itself, make it safe to
+   re-send a non-`@idempotent` mutation to Shopify after an
+   ambiguous-outcome failure — the ambiguous-outcome rule (verification
+   read before retry, or `blocked_manual_review` when the outcome cannot
+   be safely verified) closes the part of the gap the internal key alone
+   cannot, since Shopify does not treat those mutations as safe to replay.
 
 ## No implementation authorized
 

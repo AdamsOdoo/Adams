@@ -426,7 +426,12 @@ and
 [`../04-decisions/DEC-008-module-boundary-strategy.md`](../04-decisions/DEC-008-module-boundary-strategy.md)
 (**AR-004** — a layered, domain-aligned addon family: `shopify_connector_core`/
 `product`/`sale`/`inventory`/`fulfillment` for Phase 1, strict dependency DAG, no
-`adams_base` dependency found justified) and
+`adams_base` dependency found justified. **DEC-008 resolves module boundaries only —
+the feature-flag / per-store capability-configuration mechanism that AR-004's DEC-003
+scope also names is routed onward to the UX/operator-flow sprint and Master Blueprint /
+implementation planning, not decided here.** DEC-008 also does not choose between
+DEC-006's polymorphic-vs-per-domain binding-schema options — it places binding
+responsibility with modules, not table shape.) and
 [`../04-decisions/DEC-009-error-retry-idempotency-strategy.md`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md)
 (**AR-006** — a classified retry policy with a 6-job-source/10-state/16-error-class
 taxonomy, layered idempotency spanning Shopify's `@idempotent` surface and

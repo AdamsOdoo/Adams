@@ -106,6 +106,23 @@
 - No code files changed.
 - Implementation remains blocked.
 
+**PR #64 Fable revision (2026-07-02):**
+- Fable reviewed PR #64 and returned ACCEPT WITH MINOR CHANGES.
+- Added DEC-006 binding-shape reconciliation so DEC-008 does not foreclose polymorphic vs per-domain binding schema.
+- Added ambiguous-outcome non-idempotent-write retry rule to DEC-009 / AR-006.
+- Corrected evidence/citation attributions: enable/disable attribution; customer fold-in quote/source; `committed` attribution; temporary/server/network evidence wording.
+- Routed residual feature-flag/config-model scope to UX/operator-flow and Master Blueprint / implementation planning.
+- Acknowledged reconciliation cadence handoff from DEC-005 and routed exact cadence to implementation planning.
+- Cleaned small state-machine wording.
+- Tightened RA-014 revisit condition.
+- Added missing sprint checkpoint log line.
+- DEC-008/DEC-009 remain Proposed for ChatGPT review.
+- AR-004/AR-006 remain proposed only, not accepted.
+- AR-007/AR-008 remain not decided.
+- DEC-003/004/005/006/007 untouched.
+- No code files changed.
+- Implementation remains blocked.
+
 ---
 
 ### DEC-007 Acceptance Patch — compact handoff (2026-07-02)
@@ -3497,3 +3514,21 @@ ChatGPT review.
   RA-008/009/010 (tagged PROPOSED) to `rejected-approaches-log.md`. No code; no DEC-003/
   004/005/006 edit; no AR row decided. Next: push branch, open one draft PR into
   `Shopify-connector`, stop for ChatGPT/Fable review.
+- **AR-004 + AR-006 Decision Preparation (2026-07-02):** confirmed PR #63 merged into
+  `Shopify-connector` (merge commit `3ca0cde`) and DEC-003/004/005/006/007 Accepted /
+  RA-001–010 binding / AR-002/003/005 Accepted / AR-004/006/007/008 not decided before
+  editing. Authored `ar004-module-boundary-decision-brief.md` and
+  `ar006-error-retry-idempotency-decision-brief.md`; proposed `DEC-008-module-boundary-
+  strategy.md` and `DEC-009-error-retry-idempotency-strategy.md` (both
+  `Status: Proposed for ChatGPT review`), moving AR-004/AR-006 from "Not decided" to
+  "Proposed for ChatGPT review" in `architecture-review-log.md`. Added RA-011–017 (tagged
+  PROPOSED) to `rejected-approaches-log.md`. Opened draft PR #64 into `Shopify-connector`.
+  Two follow-up revision rounds on the same PR (not a new PR): a minor self-revision
+  (error-class count 15→16, DAG notation clarity, RA formatting), then a Fable
+  ACCEPT-WITH-MINOR-CHANGES round (DEC-006 binding-schema-fork reconciliation,
+  ambiguous-outcome non-idempotent-write retry rule, evidence-wording and citation-
+  attribution corrections, feature-flag/config-model scope routed onward, DEC-005
+  reconciliation-cadence handoff acknowledged, state-machine wording cleanup, RA-014
+  revisit condition tightened). No code; no DEC-003/004/005/006/007 edit; AR-007/AR-008
+  untouched. Next: push branch, keep PR #64 open (not merged), await ChatGPT/Fable
+  re-review.

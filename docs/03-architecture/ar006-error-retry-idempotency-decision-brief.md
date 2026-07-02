@@ -245,11 +245,11 @@ clarity; every state is either terminal or has a defined next-state set)
 
 | State | Meaning | Terminal? |
 | --- | --- | --- |
-| `draft` | Created (e.g. by a preview action or a not-yet-validated webhook) but not yet eligible to run | No — → `queued` or discarded |
+| `draft` | Created (e.g. by a preview action or a not-yet-validated webhook) but not yet eligible to run | No — → `queued`, or `cancelled` if discarded before enqueue |
 | `queued` | Validated, waiting for the next available `ir.cron` batch/worker slot | No — → `running` or `cancelled` |
 | `running` | Currently being processed inside a batch, under per-record isolation (savepoint) | No — → `succeeded`, `retry_waiting`, `failed_retryable`, `failed_final`, `skipped`, or `blocked_manual_review` |
 | `succeeded` | The write (or a deduped/already-applied no-op) completed | Yes |
-| `retry_waiting` | Failed with an auto-retryable error class; scheduled for a future attempt after a backoff interval | No — → `queued` (after backoff) or `failed_retryable`/`failed_final` (attempts exhausted) |
+| `retry_waiting` | Failed with an auto-retryable error class; scheduled for a future attempt after a backoff interval | No — → `queued` (after backoff), `failed_retryable`/`failed_final` (attempts exhausted), or `cancelled` (if a newer job for the same record supersedes it and this attempt is no longer needed) |
 | `failed_retryable` | Automatic attempts exhausted, or the error class needs a human fix first; visible in the error center with a "Retry" action | No — → `queued` (operator retries) or `skipped`/`cancelled`/`failed_final` |
 | `failed_final` | Dead-letter state; reached after `failed_retryable` exhausts a bounded number of manual retries, or the error class is non-retryable by nature | Yes (an operator may still start a **fresh** job — never a silent auto-requeue of this one) |
 | `skipped` | Intentionally not processed (e.g. operator chose "skip" on an ambiguous match, or reconciliation found no action needed) | Yes — not a failure |
@@ -290,7 +290,7 @@ a destructive-write guard), not a **retry** of the same operation.
 | Error class | Default behaviour | Rationale |
 | --- | --- | --- |
 | Shopify throttling/rate-limit | Automatic retry, backoff paced off `throttleStatus`/`Retry-After` | Transient by definition; retrying is the platform-intended response (facts 1–2) |
-| Shopify temporary/server/network | Automatic retry with backoff | Transient; likely self-healing |
+| Shopify temporary/server/network | Operation-type-dependent — see §4a below | Transient by nature, but retry safety depends on whether the failed operation was a read, an `@idempotent` write, or a non-`@idempotent` write with an ambiguous outcome |
 | Concurrency/race conflict | Automatic retry, short backoff | Safe once the concurrent operation clears (fact 8) |
 | Shopify permission/scope/auth | No automatic retry | Will not self-heal; needs an operator to fix scopes/reconnect |
 | Shopify userErrors/validation | No automatic retry → manual fix then retry | Same input produces the same rejection; needs a data/mapping fix |
@@ -302,7 +302,7 @@ a destructive-write guard), not a **retry** of the same operation.
 | Destructive-write guard blocked | Operator confirmation required | DEC-007 guard is a decision gate, not a retryable error |
 | Inventory location missing | Operator confirmation required (mapping) | DEC-007 first-push guard |
 | Fulfillment notification confirmation missing | Operator confirmation required, or falls back to the DEC-007 safe default (no notification) | DEC-007 |
-| Financial total mismatch | No automatic retry → operator confirmation required | DEC-007 conservative-by-default rule; never silently create a mismatched artifact |
+| Financial total mismatch | Conservative — no automatic retry; requires operator review or a configuration/data correction (e.g. a tax/shipping/discount mapping fix) before any retry is attempted; must never proceed silently | DEC-007 §6 conservative-by-default rule; never silently create a mismatched artifact |
 | Data shape/schema mismatch | No automatic retry | Same payload → same failure; likely needs a connector fix, not a retry |
 | Unknown/system error | No automatic retry (single safety-net auto-retry `[Implementation-planning default]`, then human) | Avoid retry storms on an unclassified failure; a human should see technical details before deciding |
 
@@ -311,6 +311,36 @@ defaults — any class can end in `skipped` (operator choice) or
 `failed_final` (attempts/manual-retries exhausted), per the state machine
 in §2.
 
+### 4a. Ambiguous-outcome rule for non-idempotent writes
+
+A Shopify temporary/server/network failure means something different
+depending on what was being attempted when it happened — this is a
+correctness-critical distinction, not just a retry-tuning detail:
+
+1. **Reads.** Automatic retry is always safe — a failed read has no side
+   effect to duplicate.
+2. **Writes using a Shopify `@idempotent` mutation.** Automatic retry is
+   safe **using the same persisted idempotency key**, within Shopify's
+   24-hour dedup window (facts 6, 7, 9) — a retried request with the same
+   key is deduplicated server-side, not double-applied.
+3. **Writes outside Shopify's `@idempotent` surface, where the outcome is
+   unknown after dispatch** (a timeout or connection loss *after* the
+   request left the connector, before a confirmed response). **No blind
+   retry.** Shopify may already have applied the mutation. The job must
+   either:
+   - perform a **safe verification read** of the current Shopify state
+     before any re-attempt, where one exists (e.g. re-fetch the target
+     object and compare it against the intended write), or
+   - route to **`blocked_manual_review`** if the outcome cannot be safely
+     verified this way.
+
+A connector-internal job idempotency key (§5) prevents the *connector* from
+re-processing the same job twice, but it does **not** make it safe to
+re-send the mutation to *Shopify* — Shopify only treats the fixed
+17-mutation `@idempotent` list as safe to replay with a reused key (fact
+7); every other mutation is only as safe to retry as the verification step
+above makes it.
+
 ### 5. Idempotency layers
 
 | Layer | Mechanism | Grounding |
@@ -318,7 +348,7 @@ in §2.
 | Webhook dedup | `X-Shopify-Webhook-Id` deduplication before enqueue | fact 5; DEC-005 |
 | Shopify object identity (GID) | Used as the external key, but **never assumed permanent** — deleted/recreated records are handled defensively | DEC-006; `[Open question]` GID permanence not asserted |
 | Store-scoped binding key | Per-store uniqueness on `(store, Shopify GID)` and `(store, Odoo model, Odoo record)` | DEC-006 |
-| Internal job idempotency key | A connector-designed key (e.g. derived from store + operation + target + payload version) so re-running the same job after a crash mid-batch does not double-write | `[Recommendation]`, grounded in DEC-006 "binding is the natural home for connector-designed idempotency keys... feeds AR-006" |
+| Internal job idempotency key | A connector-designed key (e.g. derived from store + operation + target + payload version) so re-running the same job after a crash mid-batch does not double-process it **on the connector side**. This key alone does **not** make it safe to re-send a non-`@idempotent` Shopify mutation after an ambiguous-outcome failure — see §4a | `[Recommendation]`, grounded in DEC-006 "binding is the natural home for connector-designed idempotency keys... feeds AR-006" |
 | Shopify `@idempotent` mutation key | A generated, persisted key attached to each of the 17 applicable mutations, reused on retry within the platform's 24-hour window | facts 6, 7, 9, 10 |
 | Reconciliation safety | Reconciliation reads, compares, and writes only on detected drift — safe by construction (convergent, not blindly re-applied) | DEC-005; fact 4 |
 | Manual retry safety | Operator-triggered retry reuses the same idempotency-key/binding path as automatic retry — no separate "manual" code path that skips guards | `[Recommendation]` |
@@ -426,7 +456,14 @@ guardrail-confirmation requirements:
   **bulk-operation idempotency** — `[Open question]`, unresolved since
   RB-14 Part 2, unchanged by this brief.
 - **Reconciliation cadence and scope** (per-object vs. global, exact
-  schedule) — `[Open question]`, deferred to implementation planning.
+  schedule) — `[Accepted decision — handoff]` DEC-005 explicitly routed
+  detailed reconciliation cadence to AR-006
+  (`../04-decisions/DEC-005-sync-orchestration-strategy.md` §"Performance
+  implications": "detailed cadence is AR-006, not decided here"). This
+  brief resolves the error/retry/idempotency taxonomy but does not choose
+  an exact cadence — cadence and scope remain `[Open question]`, routed
+  onward to Master Blueprint / implementation planning before code, not
+  silently dropped.
 - **Exact user-facing copy/wording for error reasons and suggested fixes**
   — a UX/operator-flow sprint concern, not decided here.
 

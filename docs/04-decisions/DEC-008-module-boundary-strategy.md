@@ -66,17 +66,35 @@ evidence: [`ar004-module-boundary-decision-brief.md`](../03-architecture/ar004-m
 
 | Addon | Owns |
 | --- | --- |
-| `shopify_connector_core` | Store/connection config + credentials; GraphQL transport client + rate-limit-aware pacing; webhook receiver + HMAC + `X-Shopify-Webhook-Id` dedup; queue/job **abstraction** + `ir.cron` worker(s); binding **abstraction** (store scope, audit/status fields); error-class registry; setup/readiness wizard; recovery-first log/error-center dashboard |
-| `shopify_connector_product` | Product/variant import + controlled export/update; concrete product/variant binding; image/media + price/compare-at handling (DEC-007); product field mapping |
-| `shopify_connector_sale` | Order import; order binding; **customer import/matching + binding** (Phase 1 — folded in, not split); financial-evidence capture with the DEC-007 total-check guard; order-status sync |
-| `shopify_connector_inventory` | Inventory quantity sync (`available`/`on_hand` only); location mapping; inventory binding (`inventory_item_id` + `location_id`); the first-inventory-push guard (DEC-007) |
-| `shopify_connector_fulfillment` | Fulfilment/tracking write-back; fulfilment binding; the customer-notification guard (DEC-007) |
+| `shopify_connector_core` | Store/connection config + credentials; GraphQL transport client + rate-limit-aware pacing; webhook receiver + HMAC + `X-Shopify-Webhook-Id` dedup; queue/job **abstraction** + `ir.cron` worker(s); binding **abstraction / shared contract** (store scope, audit/status fields, uniqueness principles — schema shape not decided here, see note below); error-class registry; setup/readiness wizard; recovery-first log/error-center dashboard |
+| `shopify_connector_product` | Product/variant import + controlled export/update; product/variant binding **responsibility** (schema shape open — see note below); image/media + price/compare-at handling (DEC-007); product field mapping |
+| `shopify_connector_sale` | Order import; order binding **responsibility**; **customer import/matching + binding responsibility** (Phase 1 — folded in, not split); financial-evidence capture with the DEC-007 total-check guard; order-status sync |
+| `shopify_connector_inventory` | Inventory quantity sync (`available`/`on_hand` only — DEC-003; never `committed`); location mapping; inventory binding **responsibility** (`inventory_item_id` + `location_id` identity shape); the first-inventory-push guard (DEC-007) |
+| `shopify_connector_fulfillment` | Fulfilment/tracking write-back; fulfilment binding **responsibility**; the customer-notification guard (DEC-007) |
 
 **Customer, dashboard, and payment-evidence are folded into a Phase 1 host
 module** (`sale`, `core`, and `sale` respectively) rather than split into
 their own addons — each has a documented revisit condition in the brief
 (§"Customer, dashboard, and payment-evidence"). None of the three is
 blocked from a later clean promotion to its own module.
+
+**Binding schema shape is not decided by this record.** DEC-006 explicitly
+left open whether bindings are implemented as one polymorphic binding table
+or one table per domain — that fork is unchanged and not contradicted here.
+This record places binding *responsibility*, not table *shape*, with each
+module: `core` owns the binding **abstraction/shared contract** that every
+binding must satisfy (store-scoping principles, audit-field shape,
+uniqueness rules); each domain module owns the binding **responsibility**
+for its own identity shape (product/variant, order/customer, inventory's
+`inventory_item_id`+`location_id`, fulfilment). Table cells above reading
+"binding responsibility" describe ownership of that domain's binding
+concern, not a committed table. If the Master Blueprint later chooses a
+**single polymorphic binding table**, that table likely lives in
+`shopify_connector_core`, with domain-specific reference fields/handlers
+contributed by each domain module. If it chooses **per-domain binding
+tables**, those concrete tables likely live in the owning domain module,
+extending core's shared contract. **DEC-008 does not choose between these
+two shapes.**
 
 ## Later addon family
 
@@ -135,10 +153,11 @@ question]`, not decided here.
 
 A single `shopify_connector` module would contradict the accepted
 product-vision modularity principle and `CLAUDE.md` §9, match the named
-anti-pattern A-MOD-1, and fail DEC-003's per-domain enable/disable
-requirement (a merchant could not selectively disable fulfilment
-write-back without custom code). See the brief's *Rejected or weakened
-alternatives* table.
+anti-pattern A-MOD-1, and fail the accepted per-domain enable/disable
+requirement (`../02-product/product-vision.md` principle 6;
+`../02-product/feature-taxonomy.md` CC-6/CC-7) — a merchant could not
+selectively disable fulfilment write-back without custom code. See the
+brief's *Rejected or weakened alternatives* table.
 
 ## Why this is not over-fragmented
 
@@ -156,6 +175,11 @@ independence value, not real modularity.
 
 - Exact manifest files, model/class names, field lists, and constraint DDL
   (implementation, separately gated).
+- **Binding schema shape** — single polymorphic table (likely in `core`) vs
+  one table per domain module — left open by DEC-006 and **not decided
+  here**; this record places binding *responsibility*, not table shape,
+  with each module (see the binding-schema note under *Phase 1 addon
+  family* above). DEC-006 is unchanged.
 - AR-007 inventory internal design (quantity fields, multi-location
   mechanism, apply-mode).
 - AR-008 fulfilment internal design (FulfillmentOrder orchestration,
@@ -164,8 +188,14 @@ independence value, not real modularity.
   multi-store, markets, metafield, POS, B2B, app-store).
 - Whether a link module is ever actually needed for Phase 1 (no current
   case found).
-- The feature-flag mechanism's concrete implementation (this record
-  proposes *where* modules live, not the enable/disable mechanism itself).
+- **The feature-flag / per-store capability-configuration mechanism.**
+  DEC-003's AR-004 scope names both "module boundaries/names" and
+  "feature-flag + config model"; this record resolves only the former. The
+  concrete feature-flag/config mechanism (how a capability group is turned
+  on/off per store) is **not decided or accepted by DEC-008** and is
+  explicitly routed to the **UX/operator-flow sprint** (operator-facing
+  enable/disable experience) and the **Master Blueprint / implementation-
+  planning gate** (technical mechanism) before any code is written.
 - Odoo.sh/on-prem packaging/installation convenience details.
 
 ## Risks and mitigations
