@@ -1,13 +1,15 @@
 # DEC-005 — Sync Orchestration / Queue Strategy (AR-003)
 
-> **Proposed decision record for ChatGPT review.** This is a **recommendation**, not an
-> acceptance. It does **not** self-authorize implementation and does **not** change
-> DEC-003. If accepted, it resolves **AR-003** in
-> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md).
+> **Accepted architecture decision record.** ChatGPT accepted this decision on
+> **2026-07-02**, after PR #60 review (Fable's minor-change pass applied and merged in
+> PR #60). It resolves **AR-003** in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md), but does
+> **not** by itself authorize implementation and does **not** change DEC-003.
 
 ## Status
 
-**Proposed for ChatGPT review.** Not accepted. Not implementation-authorizing.
+**Accepted by ChatGPT.** Acceptance date: **2026-07-02**. Not implementation-
+authorizing on its own — see *No implementation authorized* below.
 
 ## Date
 
@@ -227,7 +229,9 @@ targeted refresh,
 
 ## No implementation authorized
 
-**No implementation is authorized by this decision record until ChatGPT accepts it.**
-This record does not create code, an Odoo module, or any file outside
-`docs/03-architecture/**` and `docs/04-decisions/**`. The no-code gate
-(`CLAUDE.md` §4–§5) remains in force.
+**Acceptance of this architecture decision does not by itself authorize
+implementation.** This record does not create code, an Odoo module, or any file
+outside `docs/03-architecture/**` and `docs/04-decisions/**`. The no-code gate
+(`CLAUDE.md` §4–§5) remains in force until ChatGPT approves the Phase 1 research-phase
+exit (AR-002/003/005 acceptance is one of several required criteria —
+`../05-qa/quality-feedback-loop.md` §10) and opens a dedicated implementation gate.

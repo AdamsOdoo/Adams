@@ -15,20 +15,30 @@ Rejected alternatives must also be logged in
 
 **Current status:** Contains [`DEC-003-mvp-scope.md`](./DEC-003-mvp-scope.md) —
 the accepted **MVP product-scope** decision (ChatGPT, 2026-07-01, RB-13) — plus
-three **proposed, not-yet-accepted** architecture decision records added
-2026-07-02 (Evidence Refresh + Combined AR-002/003/005 Decision Preparation):
+three **accepted architecture decision records**, proposed 2026-07-02 (Evidence
+Refresh + Combined AR-002/003/005 Decision Preparation, PR #60) and **accepted by
+ChatGPT on 2026-07-02** after PR #60 merged into `Shopify-connector` and Fable's
+minor-change review was applied:
 [`DEC-004-distribution-api-auth-strategy.md`](./DEC-004-distribution-api-auth-strategy.md)
 (AR-002), [`DEC-005-sync-orchestration-strategy.md`](./DEC-005-sync-orchestration-strategy.md)
 (AR-003), and
 [`DEC-006-binding-dedup-identity-strategy.md`](./DEC-006-binding-dedup-identity-strategy.md)
-(AR-005). **Each is explicitly `Status: Proposed for ChatGPT review` — none is
-accepted, and none authorizes implementation.** No **accepted** architecture
-decision (ADR) exists yet; the first architecture ADR is created only after one
-of these (or a future AR-004/006/007/008 proposal) is reviewed and accepted by
-ChatGPT. *(Naming note: `DEC-003`/`DEC-004`/`DEC-005`/`DEC-006` **follow the
-existing `DEC-003` naming precedent** rather than the stated
-`ADR-NNNN-<slug>.md` convention above — they do not predate that convention,
-they deliberately continue the `DEC-003` numbering instead of introducing a
-second scheme mid-sprint; this numbering/naming inconsistency **remains
-flagged, not resolved**, in `../05-qa/documentation-residue-sweep.md` — do not
-invent missing entries or rename existing ones.)*
+(AR-005). **Each is now explicitly `Status: Accepted by ChatGPT`, acceptance date
+2026-07-02 — no longer proposed or not-yet-accepted.** These are the **first
+accepted architecture ADRs** in this repository, resolving AR-002/AR-003/AR-005 in
+`../05-qa/architecture-review-log.md`. **Acceptance of these architecture
+decisions does not, by itself, automatically authorize implementation** —
+per `../05-qa/quality-feedback-loop.md` §10, AR-002/AR-003/AR-005 acceptance is one
+of several Phase 1 research-phase-exit criteria (alongside Phase 1 domain-model
+briefs, a DEC-003 scope-hole amendment, and a UX/operator-flow sprint), and the
+no-code gate (`CLAUDE.md` §4–§5) remains in force until ChatGPT separately approves
+that full exit and opens a dedicated implementation/blueprint phase. AR-004/006/
+007/008 remain **not decided** — future architecture ADRs for those rows are
+created only after their own proposal is reviewed and accepted by ChatGPT.
+*(Naming note: `DEC-003`/`DEC-004`/`DEC-005`/`DEC-006` **follow the existing
+`DEC-003` naming precedent** rather than the stated `ADR-NNNN-<slug>.md`
+convention above — they do not predate that convention, they deliberately
+continue the `DEC-003` numbering instead of introducing a second scheme
+mid-sprint; this numbering/naming inconsistency **remains flagged, not
+resolved**, in `../05-qa/documentation-residue-sweep.md` — do not invent missing
+entries or rename existing ones.)*
