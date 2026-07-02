@@ -301,3 +301,17 @@ Odoo-Online caveat in `../01-research/odoo-official-architecture-notes.md` is **
 explicitly marked superseded** by the RB-14 Part 2 custom-module-feasibility resolution. **No
 architecture decision; AR-002/003/005 stay [Not decided]; DEC-003 and MVP scope unchanged; no new
 DP row; no counter change.**_
+
+_**Evidence Refresh + Combined AR-002/003/005 Decision Preparation (2026-07-02): no new defect
+pattern; DP-006 evidence-consistency gate applied, not re-triggered.** This sprint proposed
+DEC-004/005/006 (each `Status: Proposed for ChatGPT review`) and ran a narrow, targeted official
+Odoo.sh + community OCA `queue_job` refresh (`../03-architecture/ar002-ar003-ar005-evidence-refresh.md`).
+Evidence classes were kept distinct throughout: the Odoo.sh `server_wide_modules`/Jobrunner
+silence is recorded as **absence of documentation, not a documented denial** (an open question,
+not an inference of incompatibility); the OCA `queue_job` findings are labelled **community
+evidence**, never promoted to an Odoo official fact; the five proposed rejections
+(`rejected-approaches-log.md` RA-002–RA-006) are tagged **PROPOSED**, tied to the DEC files'
+`Status: Proposed for ChatGPT review`, not recorded as final. AR-002/AR-003/AR-005 move to
+**"Proposed for ChatGPT review"** in `architecture-review-log.md` — **not** "Accepted"; no
+decision is self-accepted. DEC-003 and MVP scope unchanged; AR-004/006/007/008 untouched;
+implementation stays blocked. **No new DP row; no counter change.**_

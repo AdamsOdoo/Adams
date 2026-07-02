@@ -1,14 +1,109 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Control-Room Reset
-> Sprint 1)** is immediately below, in the new **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **RB-14 Architecture
-> Preparation — Part 2**, **RB-14 Part 1**, **Research Sprint C2**, **Product
-> Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
-> **Sprint B**, and **Sprint A** handoffs are retained underneath as history.
-> The running **Sprint checkpoint log** (one note per stage, all sprints) is at
-> the very bottom. The **product-side** handoff lives at
+> Continuity lives in GitHub, not chat. The **current entry (Evidence Refresh +
+> Combined AR-002/003/005 Decision Preparation)** is immediately below, in the
+> **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Control-Room Reset Sprint 1**, **RB-14 Architecture Preparation — Part 2**,
+> **RB-14 Part 1**, **Research Sprint C2**, **Product Sprint G**, **Sprint F**,
+> **Sprint E**, **Sprint D**, **Sprint C**, **Sprint B**, and **Sprint A**
+> handoffs are retained underneath as history. The running **Sprint checkpoint
+> log** (one note per stage, all sprints) is at the very bottom. The
+> **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Evidence Refresh + Combined AR-002/003/005 Decision Preparation — compact handoff (2026-07-02)
+
+> **Decision-preparation sprint, not implementation.** Confirmed PR #59 merged into
+> `Shopify-connector` (tip `85a230a`) before editing; the harness-assigned branch
+> `claude/ar-decision-prep-p2wpo7` is based directly on that commit (the sprint's
+> preferred name, `architecture/ar002-ar003-ar005-decision-prep`, was not used — the hard
+> git rule designates the harness branch; flagged per instruction). Ran a **small,
+> targeted official-source refresh** (Odoo.sh docs + OCA `queue_job` community evidence
+> only — no broad web research, no competitor research redone) and produced **three
+> proposed** (not accepted) architecture decision records for AR-002, AR-003, and AR-005.
+
+- **Branch / PR:** `claude/ar-decision-prep-p2wpo7` (harness-assigned; preferred name
+  `architecture/ar002-ar003-ar005-decision-prep` not available — see branch-name
+  discrepancy note below) → draft PR into `Shopify-connector`, opened immediately after
+  this handoff commit, **not merged**.
+- **Files changed:** `docs/03-architecture/ar002-ar003-ar005-evidence-refresh.md` (new),
+  `docs/01-research/odoo-official-architecture-notes.md`,
+  `docs/04-decisions/DEC-004-distribution-api-auth-strategy.md` (new),
+  `docs/04-decisions/DEC-005-sync-orchestration-strategy.md` (new),
+  `docs/04-decisions/DEC-006-binding-dedup-identity-strategy.md` (new),
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/rejected-approaches-log.md`, `docs/05-qa/defect-pattern-log.md`,
+  `docs/01-research/research-handoff.md` (this file).
+  `docs/01-research/shopify-official-api-notes.md` was **not** edited — no new Shopify
+  fact needed re-verification (the RB-14 Part 1/2 refresh, 2026-07-01, remains current
+  one day later; re-fetching the same pages would be token waste, DP category 17).
+- **What changed / evidence refreshed:** targeted external check of **official Odoo.sh
+  docs** — `server_wide_modules`/external-Jobrunner support is **not addressed** in any
+  fetched page (absence of documentation, not a documented denial); production
+  scheduled actions run on a **"best effort," ≥5-minute-interval, execution-time-limited**
+  basis (new, sharper than the previously-known "staging crons disabled" fact); plus a
+  **community-tier** check of **OCA `queue_job`** (repo renamed `OCA/queue`) confirming a
+  19.0 PyPI release exists, its Jobrunner now runs as an Odoo **worker process** (not a
+  separate external daemon) but still needs `server_wide_modules` + `--workers > 0`. Full
+  record: `docs/03-architecture/ar002-ar003-ar005-evidence-refresh.md`.
+- **Proposed decisions created (each `Status: Proposed for ChatGPT review`, none
+  accepted, none implementation-authorizing):**
+  - **DEC-004** (AR-002) — custom/Admin-created Shopify app (Early Access, no App
+    Store), GraphQL Admin API primary/default, offline-token auth with masked
+    storage/least-privilege scopes; public App Store/OAuth/Billing deferred.
+  - **DEC-005** (AR-003) — HMAC-verified fast-ack webhook receiver + webhook-ID dedup →
+    internal Odoo queue/job model → `ir.cron`-driven batch processing, on **Odoo.sh or
+    on-premise** (not Odoo Online); manual sync + scheduled reconciliation always on;
+    per-record isolation + retry counters + dead/final-failed state; **OCA `queue_job`
+    deferred/optional, not the Phase 1 default** (Odoo.sh jobrunner feasibility
+    unconfirmed).
+  - **DEC-006** (AR-005) — dedicated/hybrid per-store connector binding model as the
+    source of truth (Shopify GID + Odoo model/record stored explicitly, per-store
+    uniqueness constraints); `ir.model.data` **rejected as the primary** mechanism (not
+    for all uses); match priority existing-binding → SKU/internal-reference → barcode →
+    email/customer keys → manual; **no name-only automatic matching**.
+- **Rejected/deferred approaches logged (all tagged PROPOSED, tied to the DEC files'
+  own "Proposed for ChatGPT review" status — not final rejections):** RA-002 REST-heavy
+  API strategy; RA-003 public App Store/OAuth/Billing as a Phase 1 architecture
+  requirement; RA-004 OCA `queue_job` as the Phase 1 **default** substrate (not rejecting
+  `queue_job` itself); RA-005 `ir.model.data` as the **primary** binding mechanism (not
+  rejecting all use of `ir.model.data`); RA-006 name-only automatic matching.
+- **Items deferred:** exact binding/queue-table schema and field design (a future
+  domain-model sprint); AR-006/007/008 (explicit non-goals this sprint); AR-004 module
+  boundaries; the OAuth-vs-plain-token and token-expiry-variant sub-choice within
+  DEC-004's offline-token model; MVP-scale throughput validation under
+  `--max-cron-threads=2`; Odoo.sh `server_wide_modules` confirmation (open — carried
+  forward as a DEC-005 revisit trigger).
+- **Branch-name discrepancy (flagged per instruction):** the sprint's preferred branch
+  name was `architecture/ar002-ar003-ar005-decision-prep`; per the session's hard git
+  rule (never push to a different branch without explicit permission), work proceeded
+  on the harness-assigned `claude/ar-decision-prep-p2wpo7`, which was confirmed based
+  exactly on `Shopify-connector`'s PR #59 merge tip (`85a230a...`) before any edit.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new — DP-006
+  (evidence-consistency gate) applied, not re-triggered (Odoo.sh silence kept as an
+  open question, not read as denial; OCA evidence kept community-tier, never promoted
+  to Odoo official fact). **New rejected approaches:** RA-002–RA-006 (see above),
+  explicitly tagged **PROPOSED** — see the framing note added to
+  `rejected-approaches-log.md` explaining why they precede full ChatGPT acceptance
+  (per this sprint's explicit instruction) rather than following the RA-001 precedent
+  of logging only after acceptance. **New technical debt:** none (no code). **Architecture
+  concerns:** AR-002/AR-003/AR-005 move to **"Proposed for ChatGPT review"** in
+  `architecture-review-log.md` — explicitly **not** "Accepted"; AR-004/006/007/008
+  untouched.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop checked ·
+  learning captured (DP-log note, no new row) · rejected approaches logged (RA-002–
+  RA-006, tagged PROPOSED) · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none at threshold) — all **YES**.
+- **Next recommended session:** **ChatGPT/Fable review of proposed DEC-004/005/006,
+  then Phase 1 Domain Model + DEC-003 Scope-Hole Closure sprint if accepted.**
+- **Stop condition:** stopped after three staged commits + one **draft** PR into
+  `Shopify-connector` (not merged). No connector code, no Odoo module, no forbidden
+  files touched. DEC-003 body not edited; MVP scope unchanged; AR-002/003/005 marked
+  **Proposed for ChatGPT review**, not Accepted; AR-004/006/007/008 not decided; `main`
+  and plain `dev` untouched. Awaiting ChatGPT/Fable review.
 
 ---
 
