@@ -102,6 +102,21 @@
   not authorized; `main` and plain `dev` untouched. Branch-name discrepancy flagged above.
   Awaiting ChatGPT/Fable review.
 
+#### PR #62 revision (2026-07-02, ChatGPT review — REVISE MINOR before Fable review)
+
+- ChatGPT reviewed PR #62 and requested minor wording cleanup before Fable review.
+- Fixed five-vs-six clarification wording in DEC-007 (six clarification sections covering
+  five known scope-hole themes; image/media and price split into separate sections).
+- Made DEC-007 "What this unlocks" conditional on ChatGPT acceptance.
+- Clarified that the phase-exit criterion is not satisfied until DEC-007 is accepted.
+- Reworded the domain brief's schema-design deferral to "Master Blueprint /
+  implementation-planning sprint."
+- **DEC-007 remains `Proposed for ChatGPT review`.** No implementation authorized.
+  DEC-003/004/005/006 untouched. No code files touched. Only
+  `DEC-007-phase1-scope-clarifications.md`, `phase1-domain-model-brief.md`, and this
+  handoff were edited — product docs, `architecture-review-log.md`, and
+  `rejected-approaches-log.md` were not touched in this revision.
+
 ---
 
 ### DEC-004/005/006 Acceptance Patch — compact handoff (2026-07-02)

@@ -18,7 +18,9 @@
 
 ## Scope
 
-**Five specific DEC-003 scope-hole clarifications only:**
+**Six clarification sections, covering the five known DEC-003 scope-hole themes. Image/
+media and price are split into separate sections because they need different
+boundaries.**
 
 1. Variant export/update inclusion and boundary.
 2. Image/media Phase 1 handling (replacing vague "where feasible" wording).
@@ -278,15 +280,21 @@ Unchanged from DEC-003 (this record does not alter any of these):
 
 ## What this unlocks
 
-- A **domain-model / Master Blueprint sprint** can now design the variant-export,
-  image/media, price-source-of-truth, first-inventory-push-guard, fulfilment-notification-
-  control, and financial-evidence-mapping concepts against **explicit, closed** scope
-  wording instead of "where feasible" ambiguity.
+> **Conditional on acceptance — nothing below is unlocked while DEC-007 stays `Proposed
+> for ChatGPT review`.**
+
+- **If accepted**, DEC-007 lets the **Master Blueprint / implementation-planning sprint**
+  design the variant-export, image/media, price-source-of-truth,
+  first-inventory-push-guard, fulfilment-notification-control, and
+  financial-evidence-mapping concepts against **explicit, closed** scope wording instead
+  of "where feasible" ambiguity.
 - The Phase 1 research-phase-exit criterion "a DEC-003 scope-hole amendment accepted"
-  (`../05-qa/quality-feedback-loop.md` §10) has a concrete, reviewable candidate.
-- Product-doc alignment (`mvp-scope.md`, `non-mvp-and-later-phases.md`, `user-stories.md`)
-  can point to a single, dated clarification record instead of leaving five separate
-  ambiguities implicit.
+  (`../05-qa/quality-feedback-loop.md` §10) **now has a concrete, reviewable candidate; it
+  is not satisfied until ChatGPT accepts this record.**
+- **If accepted**, product-doc alignment (`mvp-scope.md`, `non-mvp-and-later-phases.md`,
+  `user-stories.md`) can point to a single, dated clarification record instead of leaving
+  five separate ambiguities implicit — until then, those docs' existing pointer-only notes
+  (added in this same sprint) stand as written, not as accepted amendments.
 
 ## What remains blocked
 

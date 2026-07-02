@@ -25,7 +25,7 @@
   [DEC-007](../04-decisions/DEC-007-phase1-scope-clarifications.md) clarification applies.
   It does **not** define exact Odoo model names, field lists, database constraints, GraphQL
   operations, or an implementation sequence (those remain for a later, ChatGPT-gated
-  Master Blueprint / domain-model-implementation sprint).
+  Master Blueprint / implementation-planning sprint).
 - **This document must not become a code-level schema.** Any table below is a **concept
   map**, not a migration. Where a concrete field name is used for illustration, it is
   explicitly marked **[Illustrative — not a schema commitment]**.
@@ -162,7 +162,7 @@ identity, per the accepted DEC-006 binding/dedup/identity strategy.
 
 - The exact schema shape — one polymorphic binding table vs. one table per domain, precise
   column list, and constraint DDL — **[Open question — AR-005 implementation detail,
-  explicitly left to the domain-model/Master Blueprint sprint by DEC-006]**.
+  explicitly left to the Master Blueprint / implementation-planning sprint by DEC-006]**.
 - `AR-004` module placement of the binding model(s) — **[Not decided]**.
 
 ### Binding / identity implications
