@@ -20,8 +20,9 @@
 > `Shopify-connector` (merge commit `0d45d38bfe25d45a9d98bceb677fed2eab3c1e96`) before
 > editing; DEC-007 confirmed `Proposed for ChatGPT review`; RA-008/RA-009/RA-010 confirmed
 > `PROPOSED`; DEC-003/004/005/006 confirmed accepted/unchanged. Branch
-> `claude/accept-dec007-2pjo9b` (harness-assigned, matches this sprint's preferred name —
-> no discrepancy) was already based exactly on that merge commit. Recorded ChatGPT's formal
+> `claude/accept-dec007-2pjo9b` (harness-assigned; preferred branch name was
+> `product/accept-dec007`, so this branch-name discrepancy is recorded here per the session
+> rule) was already based exactly on that merge commit. Recorded ChatGPT's formal
 > acceptance of DEC-007.
 
 - **Branch / PR:** `claude/accept-dec007-2pjo9b` → draft PR into `Shopify-connector`,
