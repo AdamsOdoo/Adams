@@ -89,6 +89,17 @@
   DEC-008/DEC-009 not edited; no code files changed; implementation still not authorized;
   `main` and plain `dev` untouched. Awaiting further instruction.
 
+**PR #67 tiny fix (2026-07-02):**
+- ChatGPT reviewed PR #67 and requested tiny README cleanup before merge.
+- Fixed stale DEC-008/DEC-009 README wording that still described AR-007/AR-008 as
+  proposed/not accepted.
+- DEC-010/DEC-011 remain accepted.
+- AR-007/AR-008 remain accepted.
+- RA-018 through RA-023 remain finalized.
+- DEC-003/004/005/006/007/008/009 untouched.
+- No code files changed.
+- Implementation remains blocked.
+
 ---
 
 ### AR-007 + AR-008 Decision Preparation — compact handoff (2026-07-02)

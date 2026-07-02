@@ -80,10 +80,10 @@ layered, domain-aligned addon family — `shopify_connector_core`/`product`/`sal
 dependency found justified); DEC-009 resolves **AR-006 error/retry/idempotency strategy**
 (a classified error/retry taxonomy and layered idempotency strategy built on the accepted
 DEC-005/006 substrate). Neither decides AR-007 or AR-008 — both were **not yet decided at
-the time of this acceptance** (AR-007/AR-008 have since moved to **"Proposed for ChatGPT
-review"** via DEC-010/DEC-011 — see "Also present (not yet accepted)" below; **still not
-accepted**) — neither edits DEC-003/004/005/006/007 (all remain unchanged), and **neither
-authorizes implementation.** This acceptance makes **RA-011 through RA-017**
+the time of this acceptance** (AR-007/AR-008 were later proposed via DEC-010/DEC-011 and
+are **now accepted by ChatGPT on 2026-07-02** via DEC-010/DEC-011 — see the third "Also
+accepted" section below) — neither edits DEC-003/004/005/006/007 (all remain unchanged),
+and **neither authorizes implementation.** This acceptance makes **RA-011 through RA-017**
 (`../05-qa/rejected-approaches-log.md`) binding rejected approaches. See
 [`../03-architecture/ar004-module-boundary-decision-brief.md`](../03-architecture/ar004-module-boundary-decision-brief.md)
 and
