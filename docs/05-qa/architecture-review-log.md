@@ -369,7 +369,7 @@ Per `../05-qa/quality-feedback-loop.md` §10, AR-002/AR-003/AR-005 acceptance is
 Phase 1 research-phase-exit criteria (alongside Phase 1 domain-model briefs, a DEC-003 scope-hole
 amendment, and a UX/operator-flow sprint) — the implementation gate itself opens only after ChatGPT
 separately approves that full exit. Recommended next: **Phase 1 Domain Model + DEC-003 Scope-Hole
-Closure sprint.**
+Closure sprint.**_
 
 _**Phase 1 Domain Model + DEC-003 Scope-Hole Closure sprint (2026-07-02) — NOT an architecture
 decision; AR-006, AR-007, AR-008 remain "Not decided / Evidence pending."** This sprint produced
@@ -396,4 +396,4 @@ boundaries are untouched by this sprint. **No AR row changes status; AR-006/AR-0
 "Not decided / Evidence pending"; AR-002/AR-003/AR-005 remain "Accepted."** DEC-003 body was not
 edited; DEC-004/005/006 were not edited; implementation remains blocked. Recommended next (pending
 ChatGPT/Fable review of DEC-007 and the domain-model brief): **Master Blueprint sprint**, and/or a
-dedicated **AR-006/AR-007/AR-008 architecture-decision sprint**.__
+dedicated **AR-006/AR-007/AR-008 architecture-decision sprint**._

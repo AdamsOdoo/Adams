@@ -117,6 +117,24 @@
   handoff were edited — product docs, `architecture-review-log.md`, and
   `rejected-approaches-log.md` were not touched in this revision.
 
+#### PR #62 Fable fix-up (2026-07-02, ChatGPT + Fable review — ACCEPT WITH MINOR CHANGES)
+
+- Fable reviewed PR #62 and returned **ACCEPT WITH MINOR CHANGES**.
+- Applied small fix-up: fixed `architecture-review-log.md` markdown italics (missing
+  closing underscore on the DEC-004/005/006 acceptance-patch note; stray double
+  underscore on the PR #62 sprint note); corrected/qualified the `shippingLines` quote
+  (no longer presented as a complete verbatim quote) in DEC-007 and the domain-model
+  brief; indexed DEC-007 in `docs/04-decisions/README.md` as `Proposed for ChatGPT
+  review`, not accepted; added an open question for first-push-guard granularity
+  (per-store vs. per-binding vs. another AR-007 unit) to DEC-007 and the domain-model
+  brief; added an open question for how Shopify-computed tax is represented in Odoo
+  without recomputation to DEC-007 and the domain-model brief; clarified wording so
+  "AR-002 implementation planning" reads as "implementation planning under the accepted
+  DEC-004 / AR-002 decision" (AR-002 itself is accepted; only mechanics remain open).
+- **DEC-007 remains `Proposed for ChatGPT review`, not accepted.** DEC-003/004/005/006
+  untouched. `rejected-approaches-log.md` untouched. Product docs untouched. No code
+  files touched. No implementation authorized.
+
 ---
 
 ### DEC-004/005/006 Acceptance Patch — compact handoff (2026-07-02)

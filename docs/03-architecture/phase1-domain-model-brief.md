@@ -76,7 +76,8 @@ the accepted DEC-004 distribution/API/auth model and the DEC-003 single-store MV
 - **Scopes / readiness state** — a concept for "which scopes are granted" and "is the
   environment ready" (HTTPS/`web.base.url`, webhook reachability, worker/queue presence)
   **[Accepted decision — DEC-003 UX spine + C-CONN-05]**. Exact required-scope list is
-  **[Open question]** (routed to AR-002 implementation planning).
+  **[Open question]** (routed to implementation planning under the accepted DEC-004 /
+  AR-002 decision).
 - **Webhook readiness state** — a concept for "are the required webhook subscriptions
   registered and healthy," feeding the layered sync model **[Accepted decision — DEC-005]**.
 - **Last connection test result** — a concept for "pass/fail + timestamp + reason" from the
@@ -276,7 +277,7 @@ mutation) **[Accepted decision — DEC-003 / DEC-004]**.
 ### Open questions for later sprint
 
 - Exact `productSet`/mutation strategy and diff-rendering mechanism — **[Open question —
-  AR-002 implementation planning]**.
+  implementation planning under the accepted DEC-004 / AR-002 decision]**.
 - Whether `productSet`'s list-field delete-on-omit behaviour extends to product/variant
   media in the exact same way as variants/collections/metafields — **[Open question — must
   be verified before implementation]**.
@@ -364,9 +365,12 @@ financial-treatment clarification.
   (https://shopify.dev/docs/api/admin-graphql/latest/objects/Order — accessed 2026-07-02).
 - **Shipping line treatment** — **[Proposed clarification — DEC-007]**: Shopify
   **`shippingLines`/`shippingLine`** are preserved as evidence/lines on the imported order.
-  **[Official fact]** `shippingLines` = "The shipping methods applied to the order. Each
-  shipping line represents a shipping option chosen during checkout"
-  (same source, accessed 2026-07-02).
+  **[Official fact — paraphrase]** `shippingLines`/`shippingLine` represent the shipping
+  methods applied to the order, including checkout shipping option / carrier / service /
+  cost details (same source, accessed 2026-07-02); the exact complete field-description
+  wording is **[Open question — must be verified before implementation]** if a verbatim
+  quote is needed — the sprint's fetched excerpt was a partial summary, not confirmed
+  complete.
 - **Discount treatment** — **[Proposed clarification — DEC-007]**: Shopify
   **`discountApplications`/`cartDiscountAmountSet`/`currentCartDiscountAmountSet`** are
   preserved as evidence/amounts on the imported order. **[Official fact]**
@@ -427,6 +431,12 @@ partial/failed import can be retried without re-deriving totals.
   returns to ChatGPT before implementation if triggered.
 - Exact gateway → Odoo journal mapping configuration surface — **[Open question]**.
 - AR-006 idempotency-key taxonomy for order-import writes — **[Not decided]**.
+- The exact **mechanism** for representing Shopify-computed tax amounts on an Odoo sale
+  order without Odoo's own tax engine recomputing or overriding them, and how totals stay
+  reconcilable end-to-end — **[Open question — Master Blueprint / implementation
+  planning]**. DEC-007 decides **that** Shopify-computed amounts are preserved and not
+  silently recalculated; it does not decide **how**, and does not authorize a
+  tax-computation engine.
 
 ---
 
@@ -494,6 +504,11 @@ DEC-007]** — feeding Domain 8's audit trail.
   AR-007]**; the DEC-007 first-push guard applies specifically to the **first** write, not
   a decision about steady-state apply mode.
 - Full multi-location mapping mechanism — **[Not decided — AR-007]**.
+- The exact **granularity of "first"** for the DEC-007 first-push guard — first per store,
+  first per product/variant binding, first per variant/location binding, or another
+  AR-007-defined unit — **[Open question — AR-007 / Master Blueprint sprint]**. The guard
+  itself is not weakened by this open question; whichever unit is chosen, the guard still
+  applies before that unit's first write.
 
 ---
 
@@ -650,7 +665,10 @@ Please review specifically:
 3. **Scope-hole coverage** — do Domains 3 (product), 6 (inventory), 7 (fulfilment), and 5
    (order/sale) correctly carry the five known MVP-scope holes (variant export; image/media
    + price wording; first inventory push guard; fulfilment customer-notification default;
-   tax/shipping/discount/payment treatment) without silently deciding AR-002/006/007/008?
+   tax/shipping/discount/payment treatment) without silently deciding **AR-004/006/007/008**
+   (the still-undecided rows) — noting that **AR-002 is already accepted via DEC-004**, so
+   only its exact implementation mechanics (not the API/distribution/auth decision itself)
+   remain open where referenced above?
 4. **New Shopify facts** — the `taxLines`/`shippingLines`/`discountApplications` and
    `FulfillmentInput.notifyCustomer`/`fulfillmentTrackingInfoUpdate.notifyCustomer` facts
    are newly verified this sprint (2026-07-02) via a small, targeted official-source check

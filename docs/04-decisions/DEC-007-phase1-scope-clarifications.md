@@ -83,8 +83,11 @@ docs only (no competitor/vendor/forum source):
 
 - **[Official fact]** `Order.taxLines` = "A list of all tax lines applied to line items on
   the order, before returns"; `Order.currentTaxLines`, `Order.totalTaxSet`;
-  `Order.shippingLines`/`shippingLine` = "The shipping methods applied to the order. Each
-  shipping line represents a shipping option chosen during checkout";
+  `Order.shippingLines`/`shippingLine` represent the shipping methods applied to the
+  order, including checkout shipping option / carrier / service / cost details
+  (paraphrase — the fetched summary of this field was a partial excerpt, not confirmed as
+  the complete official field description; treat the exact full wording as **[Open
+  question — must be verified before implementation]** if a verbatim quote is needed);
   `Order.discountApplications` = "A list of discounts that are applied to the order,
   excluding order edits and refunds"; `cartDiscountAmountSet`/`currentCartDiscountAmountSet`.
   Source: `https://shopify.dev/docs/api/admin-graphql/latest/objects/Order`. Access status:
@@ -121,7 +124,10 @@ Variant export/update is **not optional** if product export/update is in MVP —
   2,048 variants) — no attempt to support a deprecated/legacy variant model.
 - The **exact `productSet`/mutation strategy** for writing variants (e.g. whether via
   `productSet`, `productVariantsBulkCreate`/`productVariantsBulkUpdate`, or a combination)
-  remains **implementation planning** — **[Open question]**, not decided here.
+  remains **implementation planning under the accepted DEC-004 / AR-002 decision**
+  (GraphQL-first, custom app, offline token are already decided by DEC-004; only the
+  specific mutation choice for variant writes is an **[Open question]**, not decided
+  here).
 - This clarification does **not** expand MVP scope — DEC-003 already listed "variant /
   options import" (Shopify → Odoo) and "product export; product update" (Odoo → Shopify);
   this closes the ambiguity about whether "product update" covers the variant level. It
@@ -206,6 +212,14 @@ facing storefront), which the Shopify → Odoo import direction does not.
 - **Scope boundary:** this guard applies specifically to the **first** write per
   store/binding; whether every subsequent write also requires preview/confirmation, or only
   the first, is an AR-007 apply-mode question, not decided here.
+- **[Open question]** The exact **granularity of "first"** is not decided by this
+  clarification — candidates include first **per store**, first **per product/variant
+  binding**, first **per variant/location binding**, or another AR-007-defined unit. This
+  clarification requires the guard to exist at **some** granularity no coarser than
+  per-store; it does **not** decide which unit, and it does **not** weaken the guard —
+  whichever unit is chosen, the guard still applies before that unit's first write. Routed
+  to **AR-007 / the Master Blueprint sprint**; it also does not decide ongoing (post-first-
+  push) inventory apply mode, which stays a separate AR-007 question (see above).
 
 ### 5. Fulfillment customer-notification clarification
 
@@ -263,6 +277,15 @@ tax, shipping, discount, and payment evidence **sufficiently to keep totals reco
   Odoo order flow, that remains architecture-dependent and returns to ChatGPT before
   implementation. This clarification does not pre-empt that guard; it only makes the
   **conservative-by-default rule** explicit for whichever mechanism is eventually chosen.
+- **[Open question]** This clarification decides **that** Shopify-computed tax amounts are
+  preserved as evidence/lines/amounts and are **not** silently recalculated by Odoo tax
+  rules — it does **not** decide **how**: the exact mechanism for representing
+  Shopify-computed tax on an Odoo sale order (e.g. how a tax line is held so Odoo's own
+  tax engine does not recompute or override the imported amount), how totals stay
+  reconcilable end-to-end, and how any Odoo-side recomputation is avoided or reconciled
+  against the imported total are all left to the **Master Blueprint / implementation
+  planning** sprint. This does **not** authorize a tax-computation engine or any
+  accounting automation.
 
 ## What remains deferred
 
@@ -311,7 +334,9 @@ Unchanged from DEC-003 (this record does not alter any of these):
 1. **Risk:** "Variant export/update is included" could be over-read as authorizing an
    unbounded write mechanism. **Mitigation:** the clarification explicitly bounds it to the
    same controlled-export rules as product-level export (preview, binding, no name-only
-   match) and explicitly leaves the mutation mechanism to AR-002 implementation planning.
+   match) and explicitly leaves the exact mutation mechanism to **implementation planning
+   under the accepted DEC-004 / AR-002 decision** (GraphQL-first is already decided; only
+   the specific variant-write mutation choice remains open).
 2. **Risk:** Removing "where feasible" wording could be read as widening image/media or
    price scope. **Mitigation:** each clarification explicitly restates the excluded/deferred
    items so the net capability boundary is unchanged from DEC-003's intent — only the
