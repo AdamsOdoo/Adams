@@ -1,16 +1,100 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (AR-004 + AR-006 Decision
-> Preparation)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **DEC-007 Acceptance Patch**, **Phase 1
-> Domain Model + DEC-003 Scope-Hole Closure**, **DEC-004/005/006 Acceptance Patch**,
-> **Evidence Refresh + Combined AR-002/003/005 Decision Preparation**, **Control-Room Reset
-> Sprint 1**, **RB-14 Architecture Preparation — Part 2**, **RB-14 Part 1**, **Research
-> Sprint C2**, **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
-> **Sprint B**, and **Sprint A** handoffs are retained underneath as history. The running
-> **Sprint checkpoint log** (one note per stage, all sprints) is at the very bottom. The
-> **product-side** handoff lives at
+> Continuity lives in GitHub, not chat. The **current entry (DEC-008/DEC-009 Acceptance
+> Patch)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **AR-004 + AR-006 Decision Preparation**,
+> **DEC-007 Acceptance Patch**, **Phase 1 Domain Model + DEC-003 Scope-Hole Closure**,
+> **DEC-004/005/006 Acceptance Patch**, **Evidence Refresh + Combined AR-002/003/005
+> Decision Preparation**, **Control-Room Reset Sprint 1**, **RB-14 Architecture Preparation
+> — Part 2**, **RB-14 Part 1**, **Research Sprint C2**, **Product Sprint G**, **Sprint F**,
+> **Sprint E**, **Sprint D**, **Sprint C**, **Sprint B**, and **Sprint A** handoffs are
+> retained underneath as history. The running **Sprint checkpoint log** (one note per
+> stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-008/DEC-009 Acceptance Patch — compact handoff (2026-07-02)
+
+> **Documentation acceptance patch, not implementation.** Confirmed PR #64 merged into
+> `Shopify-connector` (merge commit `e4c74abf0e3b4ad32e66413d27b40287ed4c5822`) before
+> editing; DEC-008 and DEC-009 confirmed `Proposed for ChatGPT review`; RA-011 through
+> RA-017 confirmed `PROPOSED`; AR-004 and AR-006 confirmed proposed only, not accepted;
+> AR-007 and AR-008 confirmed not decided; DEC-003/004/005/006/007 confirmed
+> accepted/unchanged; implementation confirmed still blocked. Branch
+> `claude/accept-dec008-dec009-4aca6v` (harness-assigned; the sprint's preferred name was
+> `architecture/accept-dec008-dec009`, so this branch-name discrepancy is recorded here per
+> the session rule) was already checked out based exactly on that merge commit — no
+> re-basing needed.
+
+- **Branch / PR:** `claude/accept-dec008-dec009-4aca6v` → draft PR into `Shopify-connector`,
+  opened immediately after this handoff commit, **not merged**.
+- **Files changed:** `docs/04-decisions/DEC-008-module-boundary-strategy.md`,
+  `docs/04-decisions/DEC-009-error-retry-idempotency-strategy.md`,
+  `docs/03-architecture/ar004-module-boundary-decision-brief.md`,
+  `docs/03-architecture/ar006-error-retry-idempotency-decision-brief.md`,
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/rejected-approaches-log.md`, `docs/01-research/research-handoff.md` (this
+  file).
+- **What changed:** DEC-008 Status changed from `Proposed for ChatGPT review` to
+  **`Accepted by ChatGPT`**, acceptance date **2026-07-02**; DEC-009 Status changed the
+  same way, same acceptance date. Both records got an acceptance note recording the PR #64
+  merge and the Fable **ACCEPT WITH MINOR CHANGES** review, while preserving every
+  documented caveat unchanged (DEC-008 does not decide AR-007/AR-008, concrete Odoo schema,
+  or the DEC-006 polymorphic-vs-per-domain binding-schema fork, and does not decide the
+  feature-flag/per-store capability-configuration mechanism; DEC-009 does not decide
+  AR-007/AR-008, exact retry/backoff constants, exact reconciliation cadence/scope, or
+  exact schema, and keeps the ambiguous-outcome non-`@idempotent` write rule as part of the
+  accepted decision). The AR-004 and AR-006 decision briefs were updated to state that
+  AR-004/AR-006 are now accepted through DEC-008/DEC-009, while remaining evidence-backed
+  briefs that authorize no implementation and leave AR-007/AR-008 not decided.
+  `docs/04-decisions/README.md`'s DEC-008/DEC-009 entry moved from "Also present (not yet
+  accepted)" to "Also accepted," citing the 2026-07-02 acceptance date and noting RA-011
+  through RA-017 are now binding. `architecture-review-log.md`'s AR-004 and AR-006 table
+  rows moved from "Proposed for ChatGPT review" to "Accepted by ChatGPT," and a compact
+  acceptance note was appended confirming AR-007/AR-008 remain not decided, DEC-003/004/
+  005/006/007 are unchanged, and implementation remains blocked. RA-011 through RA-017 in
+  `rejected-approaches-log.md` had the `PROPOSED:` prefix removed and their "Related
+  decision record" cells updated to cite DEC-008/DEC-009's `Accepted by ChatGPT,
+  2026-07-02` status — **these seven rows are now binding final rejected approaches**
+  (`CLAUDE.md` §10 applies in full).
+- **Items deferred:** AR-007 full inventory architecture; AR-008 full fulfilment
+  architecture; the feature-flag / per-store capability-configuration mechanism (routed to
+  UX/operator-flow and Master Blueprint / implementation planning); exact retry/backoff
+  constants and reconciliation cadence/scope (implementation-planning defaults); exact Odoo
+  model/field/constraint schema; the DEC-006 polymorphic-vs-per-domain binding-schema fork;
+  the Master Blueprint; all implementation.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new. **New rejected
+  approaches:** none new (RA-011–017 finalized, not created). **New technical debt:** none
+  (no code). **Architecture concerns:** AR-007/AR-008 remain **Not decided / Evidence
+  pending** — DEC-008/DEC-009 accept the module-boundary and error/retry/idempotency
+  strategies but decide neither AR-007 nor AR-008 internal design; AR-002/AR-003/AR-005
+  unchanged (**Accepted**); AR-004/AR-006 now **Accepted**.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop checked ·
+  learning captured (no new issues) · rejected approaches finalized (RA-011–017) ·
+  technical debt logged (none applicable — no code) · repeated-issue escalation applied
+  (none at threshold) — all **YES**.
+- **Next recommended session:** 1) **AR-007 + AR-008 decision sprint**; 2) **UX/operator-
+  flow sprint**; 3) **Master Blueprint**, after those gates; 4) **Implementation only after
+  a separate ChatGPT gate.**
+- **Stop condition:** stopped after one commit + one **draft** PR into `Shopify-connector`
+  (not merged). PR #64 merge confirmed first. DEC-003/DEC-004/DEC-005/DEC-006/DEC-007 not
+  edited; no code files changed; AR-007/AR-008 remain **not decided**; implementation still
+  not authorized; `main` and plain `dev` untouched. Awaiting further instruction.
+
+**PR #65 tiny revision (2026-07-02):**
+- ChatGPT reviewed PR #65 and requested tiny cleanup before merge.
+- Fixed decisions README current-status residue so AR-004/AR-006 are no longer described as
+  not decided.
+- Fixed AR-004/AR-006 brief classification wording so recommendation labels no longer imply
+  DEC-008/DEC-009 are still not decisions.
+- DEC-008/DEC-009 remain accepted.
+- AR-004/AR-006 remain accepted.
+- AR-007/AR-008 remain not decided.
+- DEC-003/004/005/006/007 untouched.
+- No code files changed.
+- Implementation remains blocked.
 
 ---
 
@@ -3532,3 +3616,17 @@ ChatGPT review.
   revisit condition tightened). No code; no DEC-003/004/005/006/007 edit; AR-007/AR-008
   untouched. Next: push branch, keep PR #64 open (not merged), await ChatGPT/Fable
   re-review.
+- **DEC-008/DEC-009 Acceptance Patch (2026-07-02):** confirmed PR #64 merged into
+  `Shopify-connector` (merge commit `e4c74abf0e3b4ad32e66413d27b40287ed4c5822`) and
+  DEC-003/004/005/006/007 Accepted / RA-001–010 binding / AR-002/003/005 Accepted /
+  DEC-008/DEC-009 Proposed / AR-004/AR-006 proposed-only / AR-007/AR-008 not decided before
+  editing. Changed DEC-008 and DEC-009 Status from `Proposed for ChatGPT review` to
+  `Accepted by ChatGPT`, acceptance date 2026-07-02, citing the PR #64 merge and Fable's
+  ACCEPT WITH MINOR CHANGES review while preserving every documented caveat. Updated the
+  AR-004 and AR-006 decision briefs, `04-decisions/README.md`, and
+  `architecture-review-log.md` (AR-004/AR-006 rows move to "Accepted by ChatGPT"; AR-007/
+  AR-008 untouched). Removed the `PROPOSED:` prefix from RA-011–017 and cited each DEC
+  file's accepted status — now binding final rejected approaches. No code; no
+  DEC-003/004/005/006/007 edit; AR-007/AR-008 remain not decided; implementation remains
+  blocked. Next: push branch, open one draft PR into `Shopify-connector`, stop for ChatGPT
+  review.

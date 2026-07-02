@@ -1,21 +1,33 @@
 # AR-006 Error / Retry / Idempotency Decision Brief
 
-> **AR-004 + AR-006 Decision Preparation sprint.** This brief prepares a
-> **proposed** decision for **AR-006** (error handling, retry, idempotency,
-> and failure taxonomy) in
-> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md).
-> It feeds [`../04-decisions/DEC-009-error-retry-idempotency-strategy.md`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md)
-> (`Status: Proposed for ChatGPT review`). **This brief does not decide
-> anything by itself** — AR-006 remains "Not decided" until ChatGPT accepts
-> DEC-009. It creates no Odoo module, no database DDL, no Python class, and
-> authorizes no implementation (`CLAUDE.md` §4–§5).
+> **AR-004 + AR-006 Decision Preparation sprint.** This brief prepared the
+> proposal for **AR-006** (error handling, retry, idempotency, and failure
+> taxonomy) in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md),
+> which fed [`../04-decisions/DEC-009-error-retry-idempotency-strategy.md`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md).
+> **DEC-009 is now `Status: Accepted by ChatGPT` (2026-07-02, after PR #64
+> merged into `Shopify-connector` and Fable's minor-change review was
+> applied), and AR-006 is now accepted through DEC-009.** This brief
+> remains the evidence-backed decision brief behind DEC-009 — **it does not
+> itself decide anything or authorize implementation**; acceptance flows
+> through DEC-009. AR-007 (inventory) and AR-008 (fulfillment) internal
+> design **remain not decided**. Exact retry/backoff constants and
+> reconciliation cadence/scope remain implementation-planning items, not
+> decided by this brief or by DEC-009. This brief creates no Odoo module,
+> no database DDL, no Python class, and authorizes no implementation
+> (`CLAUDE.md` §4–§5).
 
 ## Claim classification used in this document
 
 Per `CLAUDE.md` §8: `[Accepted decision]` · `[Official fact]` (Shopify
 `shopify.dev` or Odoo 19.0 official docs/source, cited with URL + access
 date) · `[Official limitation]` · `[Competitor claim]` · `[Inference]` ·
-`[Recommendation]` (this brief's proposal — not yet a decision) ·
+`[Recommendation]` (what this brief recommended during AR-006 decision
+preparation — historical label, kept as originally written; where a
+recommendation was carried into
+[`DEC-009`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md), it
+is now **accepted through DEC-009**, not through this brief by itself — this
+brief still authorizes no implementation) ·
 `[Implementation-planning default]` (a conceptual number/behaviour proposed
 for later implementation planning, explicitly **not** a verified constant)
 · `[Open question]`.
@@ -469,9 +481,9 @@ guardrail-confirmation requirements:
 
 ## No implementation authorized
 
-This brief proposes a conceptual taxonomy only. It creates no database DDL,
-no Python class, no Odoo module, and no code. The no-code gate
-(`CLAUDE.md` §4–§5) remains in force until ChatGPT accepts
-[`DEC-009`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md)
-**and** separately opens a dedicated implementation gate per
+This brief documents a conceptual taxonomy only. It creates no database
+DDL, no Python class, no Odoo module, and no code. Now that ChatGPT has
+accepted [`DEC-009`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md)
+(2026-07-02), the no-code gate (`CLAUDE.md` §4–§5) still remains in force
+until ChatGPT separately opens a dedicated implementation gate per
 `../05-qa/quality-feedback-loop.md` §10.
