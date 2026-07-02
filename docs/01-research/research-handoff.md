@@ -1,8 +1,9 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-010/DEC-011 Acceptance
-> Patch)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **AR-007 + AR-008 Decision Preparation**,
+> Continuity lives in GitHub, not chat. The **current entry (UX / Operator-Flow
+> Decision Preparation)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **DEC-010/DEC-011 Acceptance
+> Patch**, **AR-007 + AR-008 Decision Preparation**,
 > **DEC-008/DEC-009 Acceptance Patch**,
 > **AR-004 + AR-006 Decision Preparation**,
 > **DEC-007 Acceptance Patch**, **Phase 1 Domain Model + DEC-003 Scope-Hole Closure**,
@@ -13,6 +14,79 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### UX / Operator-Flow Decision Preparation — compact handoff (2026-07-02)
+
+> **Documentation / decision-preparation sprint, not implementation.** Confirmed PR
+> #67 merged into `Shopify-connector` (merge commit
+> `8798a2454924fd241c8052e2556ea8bca21a7c20`) before editing; DEC-003 through
+> DEC-011 confirmed **Accepted by ChatGPT**; AR-002 through AR-008 confirmed
+> **Accepted**; RA-001 through RA-023 confirmed **binding**; implementation
+> confirmed still blocked. Branch `claude/ux-operator-flow-prep-d12g04`
+> (harness-assigned; the sprint's preferred name was
+> `product/ux-operator-flow-decision-prep`, so this branch-name discrepancy is
+> recorded here per the session rule) was already checked out based exactly on
+> that merge commit — no re-basing needed.
+
+- **Branch / PR:** `claude/ux-operator-flow-prep-d12g04` → draft PR into
+  `Shopify-connector`, opened immediately after this handoff commit, **not merged**.
+- **Files changed:** `docs/02-product/ux-operator-flow.md` (new),
+  `docs/03-architecture/ux-operator-flow-architecture-bridge.md` (new),
+  `docs/04-decisions/DEC-012-ux-operator-flow-strategy.md` (new),
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/rejected-approaches-log.md`, `docs/01-research/research-handoff.md`
+  (this file), `docs/06-prompts/ux-operator-flow-decision-prep-prompt.md` (new,
+  archive).
+- **What changed:** authored
+  [`ux-operator-flow.md`](../02-product/ux-operator-flow.md) — the Phase 1
+  UX/operator-flow proposal covering ten operator flows (initial setup wizard,
+  store settings, dashboard/command center, sync center/job monitor, error
+  center/recovery, matching/duplicate-prevention, product import/export/update,
+  inventory, fulfillment, and a conceptual permissions/roles model), each labelled
+  **[Accepted]**/**[Proposed UX decision]**/**[Inference]**/**[Open question]** and
+  cited directly to the DEC-003 through DEC-011 "UX implications" sections and the
+  accepted `setup-ux-principles.md`/`product-vision.md` product inputs it builds
+  on. Authored
+  [`DEC-012-ux-operator-flow-strategy.md`](../04-decisions/DEC-012-ux-operator-flow-strategy.md)
+  (Status: **Proposed for ChatGPT review**) as the proposed decision record for
+  that strategy. Authored
+  [`ux-operator-flow-architecture-bridge.md`](../03-architecture/ux-operator-flow-architecture-bridge.md)
+  mapping each of the ten flows to its source DEC-003 through DEC-011 sections,
+  naming what routes to the Master Blueprint per flow, and naming what must not be
+  implemented yet. `docs/04-decisions/README.md` got a new "Also present (not yet
+  accepted)" entry indexing DEC-012 as Proposed. `architecture-review-log.md` got a
+  new **AR-009** row ("UX/operator-flow strategy," Status: Proposed for ChatGPT
+  review) plus a compact note. `rejected-approaches-log.md` got a note recording
+  that **no new RA rows were added** — every UX-facing anti-pattern the ten flows
+  guard against was checked against the existing log and is already covered by a
+  binding RA row (RA-006, RA-008, RA-009, RA-014 through RA-023) or an already-
+  accepted DEC guardrail; no near-duplicate was introduced.
+- **Items deferred:** exact Odoo views/menus/widgets/field names; exact security
+  groups/access CSVs; exact copy/wording; the feature-flag/per-store
+  capability-configuration mechanism (DEC-008, routed to Master Blueprint); all
+  other "What remains open" items listed in DEC-012 and the architecture bridge;
+  the Master Blueprint; all implementation.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new. **New
+  rejected approaches:** none (checked against the existing log; all UX-facing
+  anti-patterns already covered). **New technical debt:** none (no code).
+  **Architecture concerns:** none new — DEC-012/AR-009 synthesize already-accepted
+  DEC-003 through DEC-011 architecture into operator-facing UX; no new Tier-1
+  platform-fact claim was introduced.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (no new issues) · rejected approaches checked, none
+  added · technical debt logged (none applicable — no code) · repeated-issue
+  escalation applied (none at threshold) — all **YES**.
+- **Next recommended session:** 1) **ChatGPT review of DEC-012/AR-009**; 2) the
+  **Master Blueprint**, after that review; 3) **Implementation only after a
+  separate ChatGPT gate.**
+- **Stop condition:** stopped after two commits + one **draft** PR into
+  `Shopify-connector` (not merged). PR #67 merge confirmed first.
+  DEC-003/004/005/006/007/008/009/010/011 not edited; no code files changed;
+  implementation still not authorized; `main` and plain `dev` untouched. Awaiting
+  further instruction.
 
 ---
 
@@ -3925,3 +3999,22 @@ ChatGPT review.
   cited each DEC file's accepted status — now binding final rejected approaches. No code;
   no DEC-003/004/005/006/007/008/009 edit; implementation remains blocked. Next: push
   branch, open one draft PR into `Shopify-connector`, stop for ChatGPT review.
+- **UX / Operator-Flow Decision Preparation (2026-07-02):** confirmed PR #67 merged
+  into `Shopify-connector` (merge commit
+  `8798a2454924fd241c8052e2556ea8bca21a7c20`) and DEC-003 through DEC-011 Accepted /
+  AR-002 through AR-008 Accepted / RA-001–023 binding before editing. Authored
+  `ux-operator-flow.md` (ten operator flows: setup wizard, store settings,
+  dashboard, sync/job monitor, error center, matching/dedup, product
+  import/export/update, inventory, fulfillment, conceptual permissions/roles),
+  each cited to the DEC-003 through DEC-011 "UX implications" sections and the
+  accepted `setup-ux-principles.md`/`product-vision.md` inputs. Proposed
+  `DEC-012-ux-operator-flow-strategy.md` (`Status: Proposed for ChatGPT review`)
+  and authored `ux-operator-flow-architecture-bridge.md` mapping each flow to its
+  source decisions and to what routes to the Master Blueprint. Added AR-009
+  ("UX/operator-flow strategy," Proposed for ChatGPT review) to
+  `architecture-review-log.md`; indexed DEC-012 as Proposed in
+  `04-decisions/README.md`; checked `rejected-approaches-log.md` and added no new
+  RA row (every UX-facing anti-pattern already covered by RA-006/008/009/014–023).
+  No code; no DEC-003/004/005/006/007/008/009/010/011 edit; DEC-012/AR-009 are
+  proposed only, not accepted; implementation remains blocked. Next: push branch,
+  open one draft PR into `Shopify-connector`, stop for ChatGPT/Fable review.

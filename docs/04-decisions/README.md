@@ -127,3 +127,28 @@ for the small targeted Odoo-side official-source check performed to ground them.
 architecture decisions AR-002 through AR-008 are now accepted.** Recommended next: a
 **UX/operator-flow sprint**, then the **Master Blueprint**, then **implementation only
 after a separate ChatGPT gate**.
+
+**Also present (not yet accepted):**
+[`DEC-012-ux-operator-flow-strategy.md`](./DEC-012-ux-operator-flow-strategy.md) —
+proposed 2026-07-02 (UX / Operator-Flow Decision Preparation sprint, after PR #67
+merged into `Shopify-connector`). **Status: `Proposed for ChatGPT review` — not yet
+accepted.** DEC-012 proposes the Phase 1 **UX/operator-flow strategy**: ten operator
+flows (initial setup wizard, store settings, dashboard/command center, sync
+center/job monitor, error center/recovery, matching/duplicate-prevention, product
+import/export/update, inventory, fulfillment, and a conceptual permissions/roles
+model), each built directly on the already-accepted DEC-003 through DEC-011 "UX
+implications" sections. **Does not decide** exact Odoo views/menus/widgets, exact
+field names, exact security groups/access CSVs, exact copy/wording, or the
+feature-flag/per-store capability-configuration mechanism (DEC-008 routes the
+mechanism itself to the Master Blueprint; this record proposes only the
+operator-facing experience). **Does not modify DEC-003 through DEC-011.** **Does not
+authorize implementation.** See
+[`../02-product/ux-operator-flow.md`](../02-product/ux-operator-flow.md) for the
+full proposal and
+[`../03-architecture/ux-operator-flow-architecture-bridge.md`](../03-architecture/ux-operator-flow-architecture-bridge.md)
+for the traceability mapping to DEC-003 through DEC-011. This closes the last-named
+Phase 1 research-phase-exit criterion in
+`../05-qa/quality-feedback-loop.md` §10 ("a UX/operator-flow sprint accepted, or
+explicitly parallelized") **once accepted** — acceptance of DEC-012 alone does not
+open the implementation gate; the **Master Blueprint** and a separate ChatGPT
+implementation-gate approval remain the next steps.

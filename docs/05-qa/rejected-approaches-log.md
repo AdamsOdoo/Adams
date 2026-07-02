@@ -283,3 +283,29 @@ implementation; DEC-003/004/005/006/007/008/009 remain unchanged; AR-007 is acce
 through DEC-010 and AR-008 is accepted through DEC-011 (`architecture-review-log.md`); all
 architecture decisions AR-002 through AR-008 are now accepted; implementation remains
 blocked._
+
+_**UX / Operator-Flow Decision Preparation sprint (2026-07-02): no new rejected
+approaches added.** Prepared after PR #67 merged into `Shopify-connector` (merge
+commit `8798a2454924fd241c8052e2556ea8bca21a7c20`) and after AR-002 through AR-008
+were confirmed accepted. This sprint proposed
+[`DEC-012`](../04-decisions/DEC-012-ux-operator-flow-strategy.md) (UX/operator-flow
+strategy, ten operator flows) and AR-009
+(`architecture-review-log.md`, Proposed for ChatGPT review). It **evaluated no new
+design option to rejection** — every UX-facing anti-pattern the ten flows guard
+against is already a binding rejected approach or an already-accepted DEC guardrail,
+checked against this log before drafting: blind first inventory push (**RA-008**),
+hidden/default-on fulfilment notification (**RA-009**), retry-everything
+automatically (**RA-014**), never-retry/manual-only recovery (**RA-015**), raw stack
+trace as primary error UX (**RA-016**), binding-alone operation idempotency
+(**RA-017**), writing `committed` (**RA-018**), SKU-only inventory writes
+(**RA-019**), autonomous bidirectional inventory conflict resolution (**RA-020**),
+assumed quantity equivalence (**RA-021**), legacy fulfillment API (**RA-022**),
+fulfillment without FulfillmentOrder/line/quantity/location matching (**RA-023**),
+and name-only automatic matching (**RA-006** / DEC-006). No near-duplicate row was
+added for any of these — `ux-operator-flow.md` cites the existing RA row directly
+instead. Two UX-specific quality bars introduced by this sprint (dashboards must
+show only actionable, non-vanity metrics; retry must never be offered as a single
+undifferentiated button) are **restatements of already-accepted `setup-ux-principles.md`
+principles and the already-binding DEC-009 retry taxonomy**, not new rejected
+architecture options, so no RA row was added for them either. This entry does not
+itself finalize AR-009/DEC-012 — both remain **Proposed for ChatGPT review**._
