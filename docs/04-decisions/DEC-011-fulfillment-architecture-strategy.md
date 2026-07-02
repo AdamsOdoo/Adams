@@ -86,11 +86,24 @@ sit outside Shopify's 17-mutation `@idempotent` surface.
 - Location handling: a FulfillmentOrder is scoped to one Shopify Location;
   Phase 1 targets the single-fulfillment-location case; a mismatch or
   multi-location spread routes to manual review.
-- **Open issue, not decided here:** the same shared Shopify-Location-
-  reference-data question flagged in DEC-010 §"Location mapping posture" —
-  whether a minimal reference should live in `shopify_connector_core` so
-  `fulfillment` avoids depending on `inventory`. Routed to architecture
-  review for a possible later DEC-008 amendment.
+- **Clarified (not an open DEC-008 contradiction, not a DEC-008 amendment) —
+  mirrors DEC-010 §"Location mapping posture":** this record does **not**
+  decide the exact Odoo↔Shopify location-mapping schema and does **not**
+  change DEC-008's dependency direction. `shopify_connector_inventory`
+  remains the sole owner of the Odoo-location ↔ Shopify-Location *mapping*
+  used for inventory push decisions; `shopify_connector_fulfillment` must not
+  depend on `shopify_connector_inventory` and must not read that mapping
+  table. `shopify_connector_fulfillment` may instead use (a) Shopify
+  FulfillmentOrder `assignedLocation` data fetched live from Shopify, and/or
+  (b) a minimal Shopify Location *reference* (store, Shopify Location GID,
+  name, active/status where available, last-synced/seen metadata if later
+  needed — not a mapping) that may live in `shopify_connector_core` as shared
+  substrate, consistent with `core` owning cross-cutting reference data while
+  domain modules own business mappings (DEC-008). This is an
+  **interpretation** of the existing DEC-008 boundary, not an amendment, and
+  **not** a decision to create exact fields or models. The exact mechanism by
+  which fulfillment confirms a picking's source location against the Shopify
+  fulfillment location remains **open for the Master Blueprint**.
 
 ## Tracking update posture
 
@@ -121,9 +134,9 @@ sit outside Shopify's 17-mutation `@idempotent` surface.
   open line items blocks for manual review — never auto-guessed.
 - `shopify_connector_fulfillment` does not depend on
   `shopify_connector_inventory`'s location-mapping table (DEC-008,
-  unweakened); the open shared-reference-data question above is the only
-  place this record touches that boundary, and it is routed onward, not
-  decided.
+  unweakened); the clarification above (a possible `core`-owned Shopify
+  Location reference, distinct from inventory's mapping) is the only place
+  this record touches that boundary, and it changes no dependency direction.
 
 ## Partial/backorder posture
 
@@ -139,8 +152,24 @@ sit outside Shopify's 17-mutation `@idempotent` surface.
 ## Idempotency/retry posture
 
 - Binding key: `(store, Shopify FulfillmentOrder GID)` (and the Fulfillment
-  GID once created). Operation-level idempotency key:
-  `(store, Odoo picking ID)` — distinct from binding identity (RA-017).
+  GID once created).
+- **Operation-level idempotency key (conceptual; exact schema open for the
+  Master Blueprint):** `(store, Odoo picking ID)` alone is **too narrow** — a
+  single picking can be the subject of more than one distinct operation type
+  over time (fulfillment creation, a tracking update, a corrected tracking
+  update, a manual retry after verification). The operation-level key must
+  therefore also carry the **operation type**, the **Shopify target ID**
+  where known (FulfillmentOrder GID or Fulfillment GID), and a **payload
+  version/hash** (or equivalent intent fingerprint), so that two different
+  operations against the same picking are never treated as the same
+  operation. Conceptually:
+  - `(store, fulfillment_create, picking_id, fulfillment_order_gid, payload_hash)`
+  - `(store, tracking_update, picking_id, fulfillment_gid, payload_hash)`
+  This distinguishes a tracking update from fulfillment creation, and
+  supports a **safe corrected tracking update** (a different payload hash for
+  the same picking/Fulfillment) without bypassing the DEC-009
+  ambiguous-outcome rule below. This key is distinct from binding identity
+  (RA-017); exact field names/types remain open (see "What remains open").
 - `fulfillmentCreate` and `fulfillmentTrackingInfoUpdate` are **not** on
   Shopify's 17-mutation `@idempotent` list — any ambiguous-outcome failure
   (timeout/connection loss with unknown result) falls under DEC-009's case 3:
@@ -148,9 +177,10 @@ sit outside Shopify's 17-mutation `@idempotent` surface.
   Fulfillments/FulfillmentOrder status) before retry, or
   `blocked_manual_review` if inconclusive.
 - Both the operation-level idempotency key (prevents connector-side
-  re-processing) and the verification-read rule (prevents a Shopify-side
-  double fulfillment on ambiguous outcomes) are required together — neither
-  alone is sufficient.
+  re-processing of the *same* operation, while still distinguishing
+  different operation types on the same picking) and the verification-read
+  rule (prevents a Shopify-side double fulfillment on ambiguous outcomes) are
+  required together — neither alone is sufficient.
 
 ## User-facing log/audit requirements
 
@@ -174,8 +204,16 @@ the primary UX (extends DEC-009 §8, unchanged).
   own open fork, not resolved here.
 - Exact retry constants (backoff timing, max-attempt counts before
   `blocked_manual_review`).
-- The shared Shopify-Location-reference-data placement question (shared with
-  AR-007/DEC-010; routed for later architecture review).
+- Exact schema for the operation-level idempotency key (field names/types
+  for operation type, Shopify target ID, and payload version/hash) — the
+  **conceptual shape** is set above; the exact schema is a Master Blueprint
+  item.
+- The exact mechanism by which `shopify_connector_fulfillment` confirms a
+  picking's source location against the Shopify fulfillment location (core
+  Shopify-Location reference vs. live FulfillmentOrder `assignedLocation`
+  fetch, or both) — the **ownership principle** is clarified above (shared
+  with AR-007/DEC-010); the **exact confirmation mechanism** is a Master
+  Blueprint item.
 - The feature-flag/per-store capability-configuration mechanism (already
   routed to UX/operator-flow and Master Blueprint per DEC-008).
 
@@ -186,9 +224,10 @@ the primary UX (extends DEC-009 §8, unchanged).
 | Using the unsupported legacy fulfillment API | FulfillmentOrder-based mutations only, structurally (RA-022) |
 | Fulfilling the wrong order/lines/quantities | Matching required via FulfillmentOrder + `lineItemsByFulfillmentOrder`; unmatched pickings block for manual review (RA-023) |
 | Surprise customer notification emails | Default off unless explicitly enabled/confirmed (DEC-007), persisted per job at enqueue time |
-| Double fulfillment on a retried, ambiguous-outcome write | DEC-009 ambiguous-outcome rule (verification read or manual review) + operation-level idempotency key (RA-014, RA-017) |
-| Duplicate tracking updates from a blind resend | Same ambiguous-outcome rule applied to `fulfillmentTrackingInfoUpdate` |
-| Silently depending on `shopify_connector_inventory` for location data, contradicting DEC-008 | Location-reference-sharing question explicitly flagged as an open issue for architecture review, not silently resolved |
+| Double fulfillment on a retried, ambiguous-outcome write | DEC-009 ambiguous-outcome rule (verification read or manual review) + an operation-type-scoped idempotency key (RA-014, RA-017) |
+| A tracking update (or corrected tracking update) mistakenly treated as the same operation as fulfillment creation, or vice versa | Operation-level idempotency key includes operation type + Shopify target ID + payload version/hash, not just the picking ID |
+| Duplicate tracking updates from a blind resend | Same ambiguous-outcome rule applied to `fulfillmentTrackingInfoUpdate`, keyed separately from fulfillment creation |
+| Silently depending on `shopify_connector_inventory` for location data, contradicting DEC-008 | Clarified: `fulfillment` never depends on `inventory`'s mapping table; a minimal shared Shopify-Location reference may live in `core` instead — exact confirmation mechanism left open for the Master Blueprint, not silently resolved |
 | Over-scoping multi-package/multi-location automation into Phase 1 | Explicitly deferred per the existing DEC-003/C-FUL-02 boundary, not attempted here |
 
 ## No implementation authorized

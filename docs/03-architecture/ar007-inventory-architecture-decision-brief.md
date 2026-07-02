@@ -146,8 +146,10 @@ context.
 ### Recommended approach [Recommendation]
 
 - **Ongoing direction (ordinary operation):** Odoo is the source of truth;
-  the connector pushes Odoo quantities to Shopify (`available`/`on_hand`
-  only, never `committed` — fact #3). This matches the already-accepted
+  the connector pushes Odoo quantities to Shopify's **`available`** field as
+  the Phase 1 **default** target (never `committed` — fact #3). `on_hand` is
+  also a writable field (fact #4) but is **not** an equally-weighted default
+  — see §3's disposition of Option B. This matches the already-accepted
   DEC-003 "Odoo → Shopify (write-back): inventory write-back" primary
   direction.
 - **Controlled one-time / first-sync import (Shopify → Odoo):** where a store
@@ -228,27 +230,38 @@ context.
   #4) keeps the connector inside Shopify's writable-field surface (fact #3)
   without needing to reconstruct Shopify's own `on_hand` summation (fact #2)
   on the Odoo side.
-- **[Open question] — exact field/computation.** The **exact underlying
-  `stock.quant` field(s)/computation** behind "Free to Use" is **not**
-  confirmed (gap #9 above) — this brief proposes the **semantic concept**
-  only; the exact ORM field, and whether a configurable default (per C-INV-02,
-  US-E5-02) should offer Forecast/On-Hand/Free-to-Use as alternatives, remains
+- **[Open question] — exact implementation source, not just field/computation.**
+  This brief chooses the **semantic quantity concept only** ("Free to Use")
+  — it does **not** verify or decide the exact Odoo ORM/implementation
+  source behind it. Fact #7 verifies the **report-level UI concept**
+  ("Free to Use" as documented on Odoo's official Stock report page); it
+  does **not** verify that `stock.quant` is the underlying model, field, or
+  computation. Candidate implementation sources include `stock.quant`, a
+  product quantity helper method, the stock-report/ORM method itself, or
+  another Odoo-supported mechanism — **none of these is confirmed** (gap #9
+  above). The Master Blueprint must verify the exact source, model, and
+  field/formula against official Odoo 19.0 docs or source before any code is
+  written; whether a configurable default (per C-INV-02, US-E5-02) should
+  offer Forecast/On-Hand/Free-to-Use as alternatives is likewise
   **implementation-planning / Master Blueprint** work.
-- **[Recommendation]** Whether `stock.quant`, `product.product`, stock
-  location, warehouse, or picking data is the *conceptual* source: **`stock.quant`
-  at the relevant Odoo location(s)** is the conceptually correct source (it
-  is where Odoo's own reservation/on-hand bookkeeping lives per fact #7),
+- **[Recommendation, conceptual only]** Whether `product.product`, a stock
+  location/warehouse concept, or picking data is the *conceptual* source: a
+  **location-scoped Odoo quantity concept** (whatever its exact underlying
+  model turns out to be — see above) is the conceptually correct source,
   aggregated per the Odoo-location-to-Shopify-location mapping (§4) — not
   `product.product` alone (which has no location dimension) and not picking
   data directly (which represents movement events, not a point-in-time
-  quantity).
+  quantity). This is a statement about *which concept* is correct, not a
+  claim that `stock.quant` specifically has been verified as that concept's
+  Odoo implementation.
 - **Reserved/forecast/on-hand/available treatment [Recommendation]:**
   reserved and forecast quantities are **not** pushed to Shopify as separate
-  fields in Phase 1 (Shopify has no equivalent write target for them — only
-  `available`/`on_hand` are writable, fact #4); they remain **Odoo-internal
-  bookkeeping concepts** informing which single number is exported. Any
-  future need to surface reserved/forecast distinctly on the Shopify side is
-  out of scope for Phase 1.
+  fields in Phase 1 (Shopify has no equivalent write target for them);
+  `available` is the Phase 1 default write target, `on_hand` is allowed but
+  not default (see §1), and `committed` is never written (fact #4). Reserved/
+  forecast figures remain **Odoo-internal bookkeeping concepts** informing
+  which single number is exported. Any future need to surface reserved/
+  forecast distinctly on the Shopify side is out of scope for Phase 1.
 - **[Open question]** whether Odoo's "Free to Use" and Shopify's `available`
   are numerically equivalent in every edge case (e.g. Odoo reservations tied
   to manufacturing vs. Shopify's `committed`) is **not verified** — flagged
@@ -285,25 +298,30 @@ context.
   **ambiguous match**, routed to manual review (DEC-009 "ambiguous match"
   class) — never resolved by picking the first/default candidate silently.
 - **Interaction with fulfillment, without a forbidden dependency
-  [Recommendation, flagged open issue]:** `shopify_connector_fulfillment`
-  must **not** depend on `shopify_connector_inventory` (DEC-008). Fulfillment
-  also needs to know which Shopify Location a given Odoo delivery corresponds
-  to (AR-008 §5). DEC-008 itself already flags this exact shape of problem as
-  an **[Open question]**: "A link module becomes appropriate only if a later
-  capability needs two independently-optional modules to interoperate (e.g. a
-  possible future glue module letting `shopify_connector_fulfillment` reuse
-  `shopify_connector_inventory`'s location mapping)." This brief does **not**
-  silently resolve that question (per this sprint's instruction to prefer a
-  design that fits DEC-008 and route any identified contradiction onward). It
-  **recommends, as an open issue for a later DEC-008 amendment**: a **minimal
-  "Shopify Location reference"** (the store's known Shopify Location IDs/
-  names/active status — not the Odoo-warehouse-mapping business logic) could
-  live in `shopify_connector_core` as shared reference data both `inventory`
-  and `fulfillment` read, while the **mapping decision itself** (which Odoo
-  warehouse feeds which Shopify Location for inventory push) stays owned by
-  `shopify_connector_inventory`. This is a **recommendation for later
-  architecture review**, not a decision made here — see the matching note in
-  the AR-008 brief §5 and DEC-011 §10.
+  [Clarified — not an open DEC-008 contradiction, not a DEC-008 amendment]:**
+  `shopify_connector_fulfillment` must **not** depend on
+  `shopify_connector_inventory` (DEC-008, unchanged). This brief does **not**
+  decide the exact Odoo↔Shopify location-mapping schema and does **not**
+  change DEC-008's dependency direction.
+  `shopify_connector_inventory` **remains the sole owner** of the
+  Odoo-location ↔ Shopify-Location *mapping* used for inventory push
+  decisions — that ownership is unchanged by this clarification.
+  `shopify_connector_fulfillment` must not read that mapping table.
+  Instead, a **minimal Shopify Location *reference*** — not a mapping — may
+  live in `shopify_connector_core` as shared substrate: conceptually, the
+  store, the Shopify Location GID, the Shopify Location name, active/status
+  where available, and last-synced/seen metadata if later needed. This is
+  **not** a decision to create exact fields or models; it is an
+  **interpretation** consistent with the existing DEC-008 boundary (`core`
+  owns cross-cutting reference data; domain modules own business mappings),
+  not an amendment to DEC-008. `shopify_connector_fulfillment` may resolve
+  location identity from (a) Shopify FulfillmentOrder `assignedLocation` data
+  fetched live from Shopify, and/or (b) this core reference — it does **not**
+  need `shopify_connector_inventory`'s mapping table for either path. The
+  **exact mechanism** by which fulfillment confirms a picking's source
+  location against the Shopify fulfillment location remains **open for the
+  Master Blueprint** — see the matching clarification in the AR-008 brief
+  §2/§9 and DEC-010/DEC-011.
 
 ## 5. Sync direction and trigger
 
@@ -418,10 +436,10 @@ context.
   **abstraction/shared contract** (store-scoping, audit/status fields,
   uniqueness principles) that the inventory binding must satisfy; the
   error-class registry (including "inventory location missing"); the
-  recovery-first log/error-center dashboard. Per §4's flagged open issue,
-  `core` is also the **recommended** (not decided) home for a minimal shared
-  Shopify-Location reference, if that later proves necessary for
-  `fulfillment` to avoid depending on `inventory`.
+  recovery-first log/error-center dashboard. Per §4's clarification, `core`
+  is also where a minimal shared Shopify-Location *reference* (not a
+  mapping) may live so `fulfillment` never needs to depend on `inventory` —
+  exact fields/models remain open for the Master Blueprint.
 - **`shopify_connector_product` owns [Accepted decision — DEC-008]:**
   product/variant identity and its own binding — inventory keys off the
   variant's `inventory_item_id`, but `inventory_item_id`/`location_id`
@@ -439,9 +457,15 @@ context.
 
 - Exact Odoo model/field names (binding model(s), mapping model, log/audit
   fields).
-- Exact computed quantity field / formula (which `stock.quant`-derived value
-  feeds "Free to Use" in Odoo 19.0's ORM, and the exact default vs.
-  configurable quantity-field choice, C-INV-02).
+- The exact Odoo-side implementation source and field/formula behind "Free
+  to Use" (`stock.quant`, a product quantity helper, a stock-report/ORM
+  method, or another Odoo-supported mechanism — **not verified, not decided
+  here**; this brief chooses the semantic concept only), and the exact
+  default vs. configurable quantity-field choice, C-INV-02.
+- Whether `on_hand` is ever used as an alternative Phase 1 write target
+  instead of `available` — not decided here; `available` is the default and
+  an `on_hand` mapping requires explicit Master Blueprint justification
+  given its multi-state-sum semantics (fact #2).
 - Exact mutation choice per trigger type (`inventorySetQuantities` vs.
   `inventoryAdjustQuantities`) beyond the directional preference in §6.
 - Exact cron cadence for scheduled reconciliation.
@@ -460,9 +484,12 @@ context.
   17-mutation `@idempotent` list, `@idempotent` key-uniqueness scope, and the
   exact `stock.quant` field/tracking-reference gaps noted in
   `ar007-ar008-evidence-refresh.md`.
-- The shared Shopify-Location-reference-data placement question flagged in
-  §4 (possible future `core` reference data vs. a later link module) — routed
-  as an open issue for architecture review, not decided here.
+- The exact mechanism by which `shopify_connector_fulfillment` confirms a
+  picking's source location against the Shopify fulfillment location (core
+  Shopify-Location reference vs. live FulfillmentOrder `assignedLocation`
+  fetch, or both) — the **ownership principle** is clarified in §4/§9 (shared
+  with AR-008); the **exact confirmation mechanism and any exact
+  fields/models** remain a Master Blueprint item.
 
 ## Rejected or weakened alternatives
 

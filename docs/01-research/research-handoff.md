@@ -123,6 +123,30 @@
   AR-008 are **proposed only, not accepted**; implementation still not authorized; `main`
   and plain `dev` untouched. Awaiting further instruction.
 
+**PR #66 minor revision (2026-07-02):**
+- ChatGPT reviewed PR #66 and requested minor cleanup before Fable review.
+- Clarified shared Shopify Location reference ownership: `core` may own a
+  minimal Shopify Location reference/cache; `inventory` keeps owning the
+  Odoo↔Shopify inventory mapping; `fulfillment` must not depend on
+  `inventory`; the exact fulfillment location-confirmation mechanism remains
+  a Master Blueprint item.
+- Strengthened the fulfillment operation-level idempotency key (conceptually)
+  to include operation type, Shopify target ID, and a payload/version hash —
+  not just the picking ID.
+- De-overstated Odoo `stock.quant` wording — AR-007 chooses the semantic
+  quantity concept ("Free to Use"), not a verified Odoo ORM source; the exact
+  implementation source remains open.
+- Clarified Shopify `available` as the Phase 1 default inventory write target;
+  `on_hand` requires explicit Master Blueprint justification before use;
+  `committed` is never written.
+- Fixed the architecture-review-log wording ("Proposed for ChatGPT review").
+- DEC-010/DEC-011 remain `Proposed for ChatGPT review`, not accepted.
+- AR-007/AR-008 remain proposed only, not accepted.
+- RA-018 through RA-023 remain PROPOSED, not finalized.
+- DEC-003/004/005/006/007/008/009 untouched.
+- No code files changed.
+- Implementation remains blocked.
+
 ---
 
 ### DEC-008/DEC-009 Acceptance Patch — compact handoff (2026-07-02)

@@ -72,9 +72,15 @@ inventory-adjacent write outside the 17-mutation `@idempotent` surface.
 
 ## Inventory source-of-truth posture
 
-- **Ongoing:** Odoo is the source of truth; the connector pushes Odoo
-  quantities to Shopify's `available`/`on_hand` fields only (never
-  `committed`).
+- **Ongoing:** Odoo is the source of truth. The Phase 1 **default write
+  target is Shopify's `available` field**; `on_hand` is an allowed/writable
+  field (fact #4) but is **not** an equally-weighted default — using
+  `on_hand` instead requires the Master Blueprint to explicitly choose and
+  justify that mapping, because `on_hand` is a sum across multiple states
+  (`available + committed + reserved + damaged + safety_stock +
+  quality_control`, fact #2) with materially different semantics than a
+  single sellable-quantity figure. `committed` is **never** written, under
+  any circumstance.
 - **First-sync:** a controlled, reviewed one-time import from Shopify may
   establish the initial Odoo baseline (DEC-003), not a standing bidirectional
   sync.
@@ -83,8 +89,13 @@ inventory-adjacent write outside the 17-mutation `@idempotent` surface.
   DEC-003's exclusion of unrestricted autonomous bidirectional catalog
   ownership for the closely analogous product domain.
 - Odoo's **"Free to Use"** quantity concept is the directionally recommended
-  Phase 1 source, conceptually corresponding to Shopify's `available`; the
-  exact underlying `stock.quant` field/formula is **open** (Master Blueprint).
+  Phase 1 **semantic** source, conceptually corresponding to Shopify's
+  `available`. This decides the **quantity concept, not the exact Odoo ORM
+  source** — whether that concept is computed from `stock.quant`, a product
+  quantity helper method, a stock-report/ORM method, or another
+  Odoo-supported mechanism is **not verified and not decided here**; the
+  Master Blueprint must verify the exact implementation source (and exact
+  field/formula) before any code is written.
 
 ## Shopify/Odoo inventory mapping posture
 
@@ -105,11 +116,25 @@ inventory-adjacent write outside the 17-mutation `@idempotent` surface.
   name-based mapping.
 - No mapping → block, "inventory location missing" (DEC-009), never guessed.
 - Ambiguous multi-mapping candidates → "ambiguous match," manual review.
-- **Open issue, not decided here:** whether a minimal shared Shopify-Location
-  reference should live in `shopify_connector_core` so `fulfillment` can
-  avoid depending on `inventory` for location identity (DEC-008 already
-  flags this shape of question) — routed to architecture review for a
-  possible later DEC-008 amendment, not resolved by this record.
+- **Clarified (not an open DEC-008 contradiction, not a DEC-008 amendment):**
+  this record does **not** decide the exact Odoo↔Shopify location-mapping
+  schema, and does **not** change DEC-008's dependency direction.
+  `shopify_connector_inventory` remains the sole owner of the Odoo-location
+  ↔ Shopify-Location **mapping** used for inventory push decisions.
+  `shopify_connector_fulfillment` must not depend on
+  `shopify_connector_inventory` and must not read that mapping table. A
+  **minimal Shopify Location *reference*** (not a mapping) — the store's
+  Shopify Location GID(s), name(s), active/status where available, and
+  last-synced/seen metadata if later needed — may live in
+  `shopify_connector_core` as shared substrate, consistent with `core`
+  already owning cross-cutting reference data while domain modules own
+  business mappings (DEC-008). This is an **interpretation** of the existing
+  DEC-008 boundary, not an amendment to it, and **not** a decision to create
+  exact fields or models. See the matching clarification in
+  [`DEC-011`](./DEC-011-fulfillment-architecture-strategy.md#fulfillmentorder-posture)
+  and the AR-007 brief §4/§9 — the exact mechanism by which fulfillment
+  confirms a picking's source location against the Shopify fulfillment
+  location remains **open for the Master Blueprint**.
 
 ## First-push guard posture
 
@@ -170,11 +195,23 @@ failure carries a human-readable reason and a suggested fix (extends DEC-009
 - Whether ongoing syncs require preview/confirmation on every write or only
   the first (apply-mode, C-INV-04) — explicitly **not decided here**.
 - Verification of the Shopify inventory-webhook topic string(s), the literal
-  17-mutation list, `@idempotent` key-uniqueness scope, and the exact
-  `stock.quant` field names (see
+  17-mutation list, and `@idempotent` key-uniqueness scope (see
   [`ar007-ar008-evidence-refresh.md`](../03-architecture/ar007-ar008-evidence-refresh.md)).
-- The shared Shopify-Location-reference-data placement question (routed for
-  later architecture review, shared with AR-008/DEC-011).
+- The exact Odoo-side implementation source for the "Free to Use" quantity
+  concept (`stock.quant`, a product quantity helper, a stock-report/ORM
+  method, or another Odoo-supported mechanism) and its exact field/formula —
+  **not verified, not decided here**; this record decides the semantic
+  concept only.
+- Whether `on_hand` is ever used as an alternative Phase 1 write target
+  instead of `available` — **not decided here**; `available` is the default;
+  an `on_hand` mapping requires explicit Master Blueprint justification given
+  its multi-state-sum semantics.
+- The exact mechanism by which `shopify_connector_fulfillment` confirms an
+  Odoo picking's source location against the Shopify fulfillment location
+  (core Shopify-Location reference vs. live FulfillmentOrder
+  `assignedLocation` fetch, or both) — the **ownership principle** is
+  clarified above; the **exact confirmation mechanism** is a Master Blueprint
+  item, shared with AR-008/DEC-011.
 - The feature-flag/per-store capability-configuration mechanism (already
   routed to UX/operator-flow and Master Blueprint per DEC-008).
 
@@ -184,11 +221,12 @@ failure carries a human-readable reason and a suggested fix (extends DEC-009
 | --- | --- |
 | Overwriting live Shopify stock on the first write | DEC-007 first-push guard (mapped location + preview + confirmation + source-of-truth + skip option), unweakened here |
 | Double-decrementing multi-location SKUs | Inventory identity keyed on `(store, inventory_item_id, location_id)`, not SKU alone (RA-019) |
-| Writing the read-only `committed` field | Structurally never offered as a write target; only `available`/`on_hand` (RA-018) |
+| Writing the read-only `committed` field | Structurally never offered as a write target under any circumstance (RA-018) |
+| Treating `on_hand` as equally default to `available`, mis-mapping a multi-state sum | `available` is the Phase 1 default target; `on_hand` requires explicit Master Blueprint justification before use |
 | Silent duplicate/ambiguous writes on retry | DEC-009 ambiguous-outcome rule + compare-and-set + persisted idempotency key |
 | Guessing a location mapping that doesn't exist | Block + "inventory location missing" error class; never inferred from name |
 | Autonomous bidirectional conflict causing silent data loss | Rejected in Phase 1 (RA-020); ambiguous cases always route to manual review |
-| Fulfillment silently coupling to inventory's location data, contradicting DEC-008 | Location-reference-sharing question explicitly flagged as an open issue for architecture review, not silently resolved by either DEC-010 or DEC-011 |
+| Fulfillment silently depending on inventory's location-mapping table, contradicting DEC-008 | Clarified: `inventory` keeps mapping ownership, `fulfillment` never depends on `inventory`; a minimal shared Shopify-Location reference may live in `core` instead — exact confirmation mechanism left open for the Master Blueprint, not silently resolved |
 
 ## No implementation authorized
 

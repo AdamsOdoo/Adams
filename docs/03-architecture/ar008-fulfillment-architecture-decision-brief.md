@@ -164,28 +164,35 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   everything on the order." A picking that cannot be matched to a specific
   FulfillmentOrder/line-item set is **not** fulfilled — it is blocked for
   manual review (see **RA-023** below).
-- **Handling Shopify location [Recommendation, flagged open issue —
-  mirrors AR-007 §4]:** a FulfillmentOrder is scoped to one Shopify Location
-  (fact #1/#7). The connector must confirm the picking's source Odoo
-  location corresponds to the FulfillmentOrder's assigned Shopify Location
-  before fulfilling. Per DEC-008, `shopify_connector_fulfillment` must not
-  depend on `shopify_connector_inventory` (which owns the Odoo-warehouse↔
-  Shopify-Location *mapping* per the AR-007 brief §9). This brief recommends
-  — as an **open issue for later architecture review, not a decision made
-  here** — that a **minimal shared Shopify-Location reference** (the store's
-  known Shopify Location IDs, not the inventory mapping's business logic)
-  could live in `shopify_connector_core`, readable by both `inventory` and
-  `fulfillment` without either depending on the other; alternatively, for
-  Phase 1's single-location-per-fulfillment posture (§6), fulfillment can
-  resolve the correct FulfillmentOrder **directly from Shopify** (each
-  FulfillmentOrder already carries its own `assignedLocation`) and does not
-  strictly need a local Odoo-side mapping table to *select* the right
-  FulfillmentOrder — it only needs to confirm the picking's source location
-  is the one, unambiguous, expected fulfillment location for that store in
-  Phase 1's single-location-fulfillment scope. A mismatch or a genuinely
-  multi-location order is routed to manual review (§5), not guessed. The same
-  open issue is flagged in the AR-007 brief §4 and DEC-010 §10 — this is one
-  shared open item, not two independent ones.
+- **Handling Shopify location [Clarified — not an open DEC-008
+  contradiction, not a DEC-008 amendment — mirrors AR-007 §4]:** a
+  FulfillmentOrder is scoped to one Shopify Location (fact #1/#7). The
+  connector must confirm the picking's source Odoo location corresponds to
+  the FulfillmentOrder's assigned Shopify Location before fulfilling. This
+  brief does **not** decide the exact Odoo↔Shopify location-mapping schema
+  and does **not** change DEC-008's dependency direction: per DEC-008,
+  `shopify_connector_fulfillment` must not depend on
+  `shopify_connector_inventory`, and `shopify_connector_inventory` **remains
+  the sole owner** of the Odoo-warehouse ↔ Shopify-Location *mapping* used
+  for inventory push decisions (AR-007 brief §9) — `fulfillment` must not
+  read that mapping table. `shopify_connector_fulfillment` may instead
+  resolve location identity from (a) Shopify FulfillmentOrder
+  `assignedLocation` data **fetched live from Shopify** (each FulfillmentOrder
+  already carries its own assigned location, so no local Odoo-side mapping is
+  strictly required to *select* the right FulfillmentOrder), and/or (b) a
+  **minimal Shopify Location *reference*** (not a mapping) that may live in
+  `shopify_connector_core` — conceptually the store, Shopify Location GID,
+  name, active/status where available, and last-synced/seen metadata if
+  later needed. This is **not** a decision to create exact fields or models;
+  it is an **interpretation** consistent with `core` owning cross-cutting
+  reference data while domain modules own business mappings (DEC-008), not
+  an amendment to it. In Phase 1's single-location-fulfillment posture (§6),
+  fulfillment only needs to confirm the picking's source location is the
+  one, unambiguous, expected fulfillment location for that store; a mismatch
+  or a genuinely multi-location order is routed to manual review (§5), not
+  guessed. The **exact confirmation mechanism** remains **open for the
+  Master Blueprint** — the same clarification appears in the AR-007 brief §4
+  and DEC-010/DEC-011, as one shared item, not two independent ones.
 - **Avoiding legacy fulfillment APIs [Accepted decision]:** enforced
   structurally by using only FulfillmentOrder-based mutations (fact #1) — see
   **RA-022**.
@@ -260,14 +267,15 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   missing" and general "ambiguous match"/"binding conflict" already cover
   these cases).
 - **Avoiding a forbidden dependency on `shopify_connector_inventory`
-  [Recommendation, flagged open issue]:** see §2's location-handling
-  paragraph above — restated here as the specific §5 concern: Phase 1
-  fulfillment does not read `shopify_connector_inventory`'s Odoo-warehouse-
-  to-Shopify-Location mapping table; it either uses a `core`-owned minimal
-  Shopify-Location reference (recommended, open issue) or resolves location
-  identity directly against Shopify's own FulfillmentOrder data. Genuinely
-  multi-location orders remain deferred (C-FUL-02) regardless of which
-  option is eventually chosen.
+  [Clarified, not an open DEC-008 contradiction]:** see §2's location-
+  handling paragraph above — restated here as the specific §5 concern: Phase
+  1 fulfillment does **not** read `shopify_connector_inventory`'s
+  Odoo-warehouse-to-Shopify-Location mapping table under any circumstance;
+  it either uses a `core`-owned minimal Shopify-Location *reference* or
+  resolves location identity directly against Shopify's own FulfillmentOrder
+  `assignedLocation` data. Genuinely multi-location orders remain deferred
+  (C-FUL-02) regardless of which option is eventually chosen; the exact
+  confirmation mechanism is a Master Blueprint item, not decided here.
 
 ## 6. Partial / backorder / multi-package
 
@@ -297,13 +305,27 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
 
 ## 7. Idempotency and retry
 
-- **Binding or operation key [Recommendation]:** the fulfillment binding
-  keys on **`(store, Shopify FulfillmentOrder GID)`** (or, once created, the
-  Fulfillment GID) tied to the originating **Odoo `stock.picking` ID** — the
-  operation-level idempotency key for a `fulfillmentCreate` call is
-  **`(store, Odoo picking ID)`**, distinct from the binding identity itself,
-  consistent with DEC-009's point that the binding prevents *identity*
-  duplication but not *operation* duplication (RA-017).
+- **Binding key [Recommendation]:** the fulfillment binding keys on
+  **`(store, Shopify FulfillmentOrder GID)`** (or, once created, the
+  Fulfillment GID) tied to the originating **Odoo `stock.picking` ID**.
+- **Operation-level idempotency key [Recommendation, conceptual — exact
+  schema open]:** `(store, Odoo picking ID)` alone is **too narrow**, because
+  a single picking can be the subject of more than one distinct operation
+  type over time — fulfillment creation, a tracking update, a corrected
+  tracking update, and a manual retry after verification are all different
+  operations against the same picking. The operation-level key must
+  therefore also carry the **operation type**, the **Shopify target ID**
+  where known (FulfillmentOrder GID or Fulfillment GID), and a **payload
+  version/hash** (or equivalent intent fingerprint). Conceptually:
+  - `(store, fulfillment_create, picking_id, fulfillment_order_gid, payload_hash)`
+  - `(store, tracking_update, picking_id, fulfillment_gid, payload_hash)`
+  This prevents a tracking update from being treated as the same operation
+  as fulfillment creation, and supports a **safe corrected tracking update**
+  (a different payload hash for the same picking/Fulfillment) without
+  bypassing the ambiguous-outcome rule below. This key is distinct from
+  binding identity, consistent with DEC-009's point that the binding
+  prevents *identity* duplication but not *operation* duplication (RA-017).
+  Exact field names/types remain open for the Master Blueprint (§10).
 - **Handling ambiguous outcome after fulfillment mutation [Accepted decision
   — DEC-009, applied here per fact #6]:** because `fulfillmentCreate` and
   `fulfillmentTrackingInfoUpdate` are **not** on the 17-mutation
@@ -319,18 +341,25 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   intended line items/quantities already exists before re-issuing
   `fulfillmentCreate`. If verification is inconclusive, `blocked_manual_review`.
 - **Preventing double fulfillment [Recommendation]:** the combination of (a)
-  the operation-level idempotency key `(store, Odoo picking ID)` preventing
-  the *connector* from re-processing the same job twice, and (b) the
-  verification-read-before-retry rule preventing a *Shopify-side* double
-  fulfillment on an ambiguous outcome, together satisfy the "no double
-  fulfillment" requirement — neither alone is sufficient (RA-017).
+  the operation-type-scoped idempotency key (e.g.
+  `(store, fulfillment_create, picking_id, fulfillment_order_gid,
+  payload_hash)`) preventing the *connector* from re-processing the same
+  fulfillment-creation operation twice, and (b) the verification-read-
+  before-retry rule preventing a *Shopify-side* double fulfillment on an
+  ambiguous outcome, together satisfy the "no double fulfillment"
+  requirement — neither alone is sufficient (RA-017).
 - **Preventing duplicate tracking updates [Recommendation]:** tracking
   updates are naturally closer to idempotent in effect (repeating the same
   carrier/number is a no-op from the customer's perspective), but since
   `fulfillmentTrackingInfoUpdate` is still outside the `@idempotent` surface
   (fact #6), the same ambiguous-outcome rule applies on a timeout: verify
   the current tracking info before re-sending, or block for manual review,
-  rather than assuming a resend is harmless.
+  rather than assuming a resend is harmless. Because the operation-level key
+  is scoped by operation type (`tracking_update`, distinct from
+  `fulfillment_create`) and by payload hash, a **corrected** tracking update
+  (different carrier/number, hence a different payload hash) is correctly
+  treated as a new operation, not a duplicate of the prior tracking update or
+  of the original fulfillment creation.
 
 ## 8. User-facing fulfillment logs
 
@@ -361,25 +390,27 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
 - **`shopify_connector_core` owns [Accepted decision — DEC-008]:** transport,
   queue, webhook receiver, the binding abstraction/shared contract, the
   error-class registry (including "fulfillment notification confirmation
-  missing"), and — per the flagged open issue in §2/§5 — is the
-  **recommended, not decided**, home for a minimal shared Shopify-Location
-  reference if `fulfillment` and `inventory` are both later found to need
-  one without depending on each other.
-- **Link-module need discovered? [Recommendation → routed as open issue, not
-  decided here]:** yes, potentially — the location-reference-sharing question
-  in §2/§5 is exactly the shape of problem DEC-008 already flagged as
-  possibly requiring "a possible future glue module letting
+  missing"), and — per the clarification in §2/§5 — is where a minimal
+  shared Shopify-Location *reference* (not a mapping) may live so
+  `fulfillment` never needs to depend on `inventory`; exact fields/models
+  remain open for the Master Blueprint.
+- **Link-module need discovered? [Clarified — not needed]:** no. The
+  location-reference-sharing question in §2/§5 is the shape of problem
+  DEC-008 already anticipated ("a possible future glue module letting
   `shopify_connector_fulfillment` reuse `shopify_connector_inventory`'s
-  location mapping." This brief does **not** silently resolve it: it
-  proposes the `core`-shared-reference-data option as the *preferred*
-  direction (since it avoids a link module entirely and avoids either domain
-  depending on the other), but formally **routes the question to
-  architecture review / a later DEC-008 amendment** rather than deciding it
-  unilaterally here, per this sprint's explicit instruction.
-- **DEC-008 not silently changed:** the recommended dependency shape
-  (`fulfillment` → `core` + `sale`, not `inventory`) is preserved exactly as
-  DEC-008 states; only the *location-reference-data placement* question is
-  flagged as open, and only as a recommendation for later review.
+  location mapping"), but this brief resolves it **without** a link module
+  and **without** either domain depending on the other: `core` already owns
+  cross-cutting reference data under DEC-008, so a minimal Shopify-Location
+  reference fits there as an **interpretation** of the existing boundary, not
+  a new module and not a DEC-008 amendment.
+- **DEC-008 not changed:** the dependency shape (`fulfillment` → `core` +
+  `sale`, not `inventory`) is preserved exactly as DEC-008 states.
+  `shopify_connector_inventory` still owns the Odoo-location ↔
+  Shopify-Location *mapping* for inventory push decisions; only a minimal
+  Shopify-Location *reference* is clarified as fitting inside `core`'s
+  existing scope. The exact confirmation mechanism fulfillment uses remains
+  open for the Master Blueprint — this is a clarification of ownership, not
+  an amendment to DEC-008.
 
 ## 10. What remains open for Master Blueprint / implementation planning
 
@@ -394,9 +425,14 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   granularity — DEC-007's own open question, not resolved here).
 - Exact retry constants (backoff timing, max-attempt counts before
   `blocked_manual_review`).
-- The shared Shopify-Location-reference-data placement question (§2, §5, §9)
-  — routed as an open issue for later architecture review / DEC-008
-  amendment, not decided here.
+- Exact schema for the operation-level idempotency key (field names/types
+  for operation type, Shopify target ID, and payload version/hash — see §7's
+  conceptual shape).
+- The exact mechanism by which fulfillment confirms a picking's source
+  location against the Shopify fulfillment location (§2, §5, §9) — the
+  **ownership principle** is clarified (shared with AR-007/DEC-010); the
+  **exact confirmation mechanism and any exact fields/models** remain a
+  Master Blueprint item, not decided here.
 - Verification of the exact backorder-wizard behaviour for delivery orders
   and the exact Odoo tracking-reference field (`ar007-ar008-evidence-refresh.md`).
 
@@ -436,6 +472,7 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   (DEC-007's own open fork).
 - Does not authorize implementation.
 - Does not alter DEC-003/004/005/006/007/008/009.
-- Does not silently change DEC-008's module boundaries — the location-
-  reference-data question is flagged as an open issue for later review, not
-  decided here.
+- Does not change DEC-008's module boundaries — the shared Shopify-Location
+  reference is clarified as an interpretation fitting within `core`'s
+  existing scope, not an amendment; the exact confirmation mechanism and any
+  exact fields/models remain open for the Master Blueprint.
