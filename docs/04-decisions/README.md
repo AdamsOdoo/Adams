@@ -14,10 +14,19 @@ Rejected alternatives must also be logged in
 `../05-qa/rejected-approaches-log.md`.
 
 **Current status:** Contains [`DEC-003-mvp-scope.md`](./DEC-003-mvp-scope.md) —
-the accepted **MVP product-scope** decision (ChatGPT, 2026-07-01, RB-13). No
-**architecture** decision (ADR) exists yet; the first architecture ADR is
-created only after an AR-002…AR-008 proposal is reviewed and accepted
-(ChatGPT approval). *(Naming note: `DEC-003` predates the `ADR-NNNN-<slug>.md`
-convention stated above and there is no `DEC-001`/`DEC-002` in this repo; this
-numbering/naming inconsistency is flagged, not resolved, in
-`../05-qa/documentation-residue-sweep.md` — do not invent missing entries.)*
+the accepted **MVP product-scope** decision (ChatGPT, 2026-07-01, RB-13) — plus
+three **proposed, not-yet-accepted** architecture decision records added
+2026-07-02 (Evidence Refresh + Combined AR-002/003/005 Decision Preparation):
+[`DEC-004-distribution-api-auth-strategy.md`](./DEC-004-distribution-api-auth-strategy.md)
+(AR-002), [`DEC-005-sync-orchestration-strategy.md`](./DEC-005-sync-orchestration-strategy.md)
+(AR-003), and
+[`DEC-006-binding-dedup-identity-strategy.md`](./DEC-006-binding-dedup-identity-strategy.md)
+(AR-005). **Each is explicitly `Status: Proposed for ChatGPT review` — none is
+accepted, and none authorizes implementation.** No **accepted** architecture
+decision (ADR) exists yet; the first architecture ADR is created only after one
+of these (or a future AR-004/006/007/008 proposal) is reviewed and accepted by
+ChatGPT. *(Naming note: `DEC-003`/`DEC-004`/`DEC-005`/`DEC-006` predate the
+`ADR-NNNN-<slug>.md` convention stated above; this numbering/naming
+inconsistency is flagged, not resolved, in
+`../05-qa/documentation-residue-sweep.md` — do not invent missing entries or
+rename existing ones.)*
