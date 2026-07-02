@@ -1,21 +1,43 @@
 # DEC-009 — Error / Retry / Idempotency Strategy (AR-006)
 
-> **Proposed architecture decision record — NOT yet accepted.** This record
-> proposes a resolution for **AR-006** in
+> **Accepted architecture decision record.** This record resolves
+> **AR-006** in
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md),
 > prepared in the AR-004 + AR-006 Decision Preparation sprint (2026-07-02),
-> after DEC-004/005/006/007 acceptance. It requires **explicit ChatGPT
-> review and acceptance** before it resolves AR-006, and does **not** by
+> after DEC-004/005/006/007 acceptance. **ChatGPT accepted this record on
+> 2026-07-02** (see *Acceptance note* below). Acceptance does **not** by
 > itself authorize implementation or change DEC-003/004/005/006/007.
+
+## Acceptance note (2026-07-02)
+
+- **Accepted by ChatGPT** after PR #64 merged into `Shopify-connector`.
+- Acceptance followed Fable review: **ACCEPT WITH MINOR CHANGES**.
+- Fable's fix-up was applied before merge.
+- This accepts DEC-009 as the **AR-006 error/retry/idempotency strategy**.
+- **This does not authorize implementation.** Implementation remains
+  blocked until ChatGPT opens the implementation gate.
+- **Preserved caveats (unchanged by acceptance):**
+  - DEC-009 does not decide AR-007.
+  - DEC-009 does not decide AR-008.
+  - Exact retry/backoff constants remain implementation-planning defaults.
+  - Exact reconciliation cadence/scope remains routed to the Master
+    Blueprint / implementation planning.
+  - Exact model/field/constraint schema remains deferred.
+  - The ambiguous-outcome non-`@idempotent` write rule remains part of the
+    accepted decision.
 
 ## Status
 
-**Proposed for ChatGPT review.** Not accepted. Not implementation-
-authorizing.
+**Accepted by ChatGPT.** Not implementation-authorizing.
+
+## Acceptance date
+
+2026-07-02.
 
 ## Date
 
-2026-07-02.
+2026-07-02 (originally proposed; accepted the same day after PR #64 merge
+and Fable review).
 
 ## Scope
 
@@ -220,10 +242,9 @@ operations.
 
 ## No implementation authorized
 
-**Proposing (and any future acceptance of) this architecture decision does
-not by itself authorize implementation.** This record creates no code, no
-database DDL, no Python class, no Odoo module, and no file outside
-`docs/03-architecture/**` and `docs/04-decisions/**`. The no-code gate
-(`CLAUDE.md` §4–§5) remains in force until ChatGPT accepts this record
-**and** separately opens a dedicated implementation gate per
+**Acceptance of this architecture decision does not by itself authorize
+implementation.** This record creates no code, no database DDL, no Python
+class, no Odoo module, and no file outside `docs/03-architecture/**` and
+`docs/04-decisions/**`. The no-code gate (`CLAUDE.md` §4–§5) remains in
+force until ChatGPT separately opens a dedicated implementation gate per
 `../05-qa/quality-feedback-loop.md` §10.

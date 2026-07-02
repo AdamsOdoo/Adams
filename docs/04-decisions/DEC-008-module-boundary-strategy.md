@@ -1,21 +1,42 @@
 # DEC-008 — Module Boundary Strategy (AR-004)
 
-> **Proposed architecture decision record — NOT yet accepted.** This record
-> proposes a resolution for **AR-004** in
+> **Accepted architecture decision record.** This record resolves
+> **AR-004** in
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md),
 > prepared in the AR-004 + AR-006 Decision Preparation sprint (2026-07-02),
-> after DEC-004/005/006/007 acceptance. It requires **explicit ChatGPT
-> review and acceptance** before it resolves AR-004, and does **not** by
+> after DEC-004/005/006/007 acceptance. **ChatGPT accepted this record on
+> 2026-07-02** (see *Acceptance note* below). Acceptance does **not** by
 > itself authorize implementation or change DEC-003/004/005/006/007.
+
+## Acceptance note (2026-07-02)
+
+- **Accepted by ChatGPT** after PR #64 merged into `Shopify-connector`.
+- Acceptance followed Fable review: **ACCEPT WITH MINOR CHANGES**.
+- Fable's fix-up was applied before merge.
+- This accepts DEC-008 as the **AR-004 module-boundary strategy**.
+- **This does not authorize implementation.** Implementation remains
+  blocked until ChatGPT opens the implementation gate.
+- **Preserved caveats (unchanged by acceptance):**
+  - DEC-008 does not decide AR-007.
+  - DEC-008 does not decide AR-008.
+  - DEC-008 does not decide concrete Odoo schema.
+  - DEC-008 does not choose between DEC-006's polymorphic binding table and
+    per-domain binding table options.
+  - Feature-flag / per-store capability configuration remains routed to the
+    UX/operator-flow sprint and Master Blueprint / implementation planning.
 
 ## Status
 
-**Proposed for ChatGPT review.** Not accepted. Not implementation-
-authorizing.
+**Accepted by ChatGPT.** Not implementation-authorizing.
+
+## Acceptance date
+
+2026-07-02.
 
 ## Date
 
-2026-07-02.
+2026-07-02 (originally proposed; accepted the same day after PR #64 merge
+and Fable review).
 
 ## Scope
 
@@ -231,9 +252,8 @@ independence value, not real modularity.
 
 ## No implementation authorized
 
-**Proposing (and any future acceptance of) this architecture decision does
-not by itself authorize implementation.** This record creates no code, no
-Odoo module, and no file outside `docs/03-architecture/**` and
-`docs/04-decisions/**`. The no-code gate (`CLAUDE.md` §4–§5) remains in
-force until ChatGPT accepts this record **and** separately opens a
+**Acceptance of this architecture decision does not by itself authorize
+implementation.** This record creates no code, no Odoo module, and no file
+outside `docs/03-architecture/**` and `docs/04-decisions/**`. The no-code
+gate (`CLAUDE.md` §4–§5) remains in force until ChatGPT separately opens a
 dedicated implementation gate per `../05-qa/quality-feedback-loop.md` §10.

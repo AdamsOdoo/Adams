@@ -57,19 +57,23 @@ binding rejected approaches. Per `../05-qa/quality-feedback-loop.md` §10, this 
 satisfies one of several Phase 1 research-phase-exit criteria — it does not, by itself,
 open the implementation gate.
 
-**Also present (not yet accepted):**
+**Also accepted:**
 [`DEC-008-module-boundary-strategy.md`](./DEC-008-module-boundary-strategy.md) and
 [`DEC-009-error-retry-idempotency-strategy.md`](./DEC-009-error-retry-idempotency-strategy.md)
 — proposed 2026-07-02 (AR-004 + AR-006 Decision Preparation sprint, after PR #63 merged
-into `Shopify-connector`). **Both are `Status: Proposed for ChatGPT review`, not
-Accepted.** DEC-008 proposes a resolution for **AR-004** (a layered, domain-aligned addon
-family — `shopify_connector_core`/`product`/`sale`/`inventory`/`fulfillment` for Phase 1,
-with a strict dependency DAG and no `adams_base` dependency found justified); DEC-009
-proposes a resolution for **AR-006** (a classified error/retry taxonomy and layered
-idempotency strategy built on the accepted DEC-005/006 substrate). Neither decides AR-007
-or AR-008, neither edits DEC-003/004/005/006/007, and neither authorizes implementation.
-See
+into `Shopify-connector`) and **accepted by ChatGPT on 2026-07-02** after PR #64 merged
+into `Shopify-connector` and Fable's minor-change review (**ACCEPT WITH MINOR CHANGES**)
+was applied. **Both are now explicitly `Status: Accepted by ChatGPT`, acceptance date
+2026-07-02 — no longer proposed.** DEC-008 resolves **AR-004 module boundaries** (a
+layered, domain-aligned addon family — `shopify_connector_core`/`product`/`sale`/
+`inventory`/`fulfillment` for Phase 1, with a strict dependency DAG and no `adams_base`
+dependency found justified); DEC-009 resolves **AR-006 error/retry/idempotency strategy**
+(a classified error/retry taxonomy and layered idempotency strategy built on the accepted
+DEC-005/006 substrate). Neither decides AR-007 or AR-008 — both **remain not decided** —
+neither edits DEC-003/004/005/006/007 (all remain unchanged), and **neither authorizes
+implementation.** This acceptance makes **RA-011 through RA-017**
+(`../05-qa/rejected-approaches-log.md`) binding rejected approaches. See
 [`../03-architecture/ar004-module-boundary-decision-brief.md`](../03-architecture/ar004-module-boundary-decision-brief.md)
 and
 [`../03-architecture/ar006-error-retry-idempotency-decision-brief.md`](../03-architecture/ar006-error-retry-idempotency-decision-brief.md)
-for the evidence-backed briefs behind each proposal.
+for the evidence-backed briefs behind each decision.

@@ -1,15 +1,20 @@
 # AR-004 Module Boundary Decision Brief
 
-> **AR-004 + AR-006 Decision Preparation sprint.** This brief prepares a
-> **proposed** decision for **AR-004** (module boundaries / addon family
-> strategy) in
-> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md).
-> It feeds [`../04-decisions/DEC-008-module-boundary-strategy.md`](../04-decisions/DEC-008-module-boundary-strategy.md)
-> (`Status: Proposed for ChatGPT review`). **This brief does not decide
-> anything by itself** — AR-004 remains "Not decided" until ChatGPT accepts
-> DEC-008. It decides no AR-007 (inventory) or AR-008 (fulfillment) internal
-> design, creates no Odoo module, and authorizes no implementation
-> (`CLAUDE.md` §4–§5).
+> **AR-004 + AR-006 Decision Preparation sprint.** This brief prepared the
+> proposal for **AR-004** (module boundaries / addon family strategy) in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md),
+> which fed [`../04-decisions/DEC-008-module-boundary-strategy.md`](../04-decisions/DEC-008-module-boundary-strategy.md).
+> **DEC-008 is now `Status: Accepted by ChatGPT` (2026-07-02, after PR #64
+> merged into `Shopify-connector` and Fable's minor-change review was
+> applied), and AR-004 is now accepted through DEC-008.** This brief
+> remains the evidence-backed decision brief behind DEC-008 — **it does not
+> itself decide anything or authorize implementation**; acceptance flows
+> through DEC-008. This brief decides no AR-007 (inventory) or AR-008
+> (fulfillment) internal design — both **remain not decided** — creates no
+> Odoo module, and authorizes no implementation (`CLAUDE.md` §4–§5).
+> Feature-flag / per-store capability configuration is not decided by this
+> brief or by DEC-008 — it remains routed to the UX/operator-flow sprint
+> and Master Blueprint / implementation planning.
 
 ## Claim classification used in this document
 
@@ -534,9 +539,9 @@ module, per DEC-004).
 
 ## No implementation authorized
 
-This brief proposes an architecture direction only. It creates no Odoo
-module, no Python/XML/CSV/manifest file, and no code. The no-code gate
-(`CLAUDE.md` §4–§5) remains in force until ChatGPT accepts
-[`DEC-008`](../04-decisions/DEC-008-module-boundary-strategy.md) **and**
-separately opens a dedicated implementation gate per
+This brief documents an architecture direction only. It creates no Odoo
+module, no Python/XML/CSV/manifest file, and no code. Now that ChatGPT has
+accepted [`DEC-008`](../04-decisions/DEC-008-module-boundary-strategy.md)
+(2026-07-02), the no-code gate (`CLAUDE.md` §4–§5) still remains in force
+until ChatGPT separately opens a dedicated implementation gate per
 `../05-qa/quality-feedback-loop.md` §10.
