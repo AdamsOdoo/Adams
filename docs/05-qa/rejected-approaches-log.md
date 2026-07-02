@@ -25,8 +25,11 @@
 | _RA-000_ | _YYYY-MM-DD_ | _Approach we will not use_ | _Core reason_ | _Concrete evidence/reasoning_ | _What would change our mind_ | _ADR link, if any_ |
 | RA-001 | 2026-07-01 | **Option C — Thin import-only pilot** as the MVP scope (import + manual sync only; no webhooks/reconciliation/write-back) | Violates the correctness non-negotiables — a webhook-less/cron-only sync with no reconciliation is a demonstrated market anti-pattern (`../01-research/avoid-list.md`); removes the back-office value; "small but not excellent" | Evaluated as an MVP-scope option alongside Option A (accepted) during RB-13 and explicitly rejected by ChatGPT in the DEC-003 decision record | Would need a documented reason the correctness spine (webhooks + reconciliation + write-back) is infeasible for the MVP substrate — no such evidence exists today | [`../04-decisions/DEC-003-mvp-scope.md`](../04-decisions/DEC-003-mvp-scope.md) ("Accepted MVP option" section) |
 
-_No approaches rejected yet (Research Sprints A–C). Entries begin once design
-options are evaluated and ChatGPT/architecture review formally rejects one._
+_No approaches rejected yet, **as of Research Sprints A–C** — historical for
+that period only; **superseded for the log overall by RA-001** (added
+2026-07-02, Control-Room Reset Sprint 1, from DEC-003's Option C rejection;
+see the Log table above). Entries begin once design options are evaluated and
+ChatGPT/architecture review formally rejects one._
 
 _**Research Sprint C note (2026-06-30):** the competitor research produced an
 **avoid-list** of competitor anti-patterns —
@@ -90,12 +93,17 @@ analytics, public App-Store/demo packaging, and **bulk operations as a user-faci
 are **product-scope boundary decisions with revisit conditions** in
 `../02-product/non-mvp-and-later-phases.md` — **not** rejected architecture approaches. Per
 `CLAUDE.md` §10 and this log's rules, an approach is entered here as **Rejected** only after
-it is evaluated for **our** design and ChatGPT/architecture review rejects it — which has
-**not** happened (no AR row is decided). The weak/blocked competitor evidence kept out of
-scope (pHash, EC/SH breadth, WK config-field-only multi-company) are **evidence down-weights
-under DP-003/DP-004, not rejected approaches**. (TeqStars docs were 403-blocked in Sprint C
-but **re-checked accessible 2026-07-01**; a full rebaseline is pending.) No entry is added
-here._
+it is evaluated for **our** design and ChatGPT/architecture review rejects it — which had
+**not** happened *at Sprint G authoring time* (no AR row is decided). The weak/blocked
+competitor evidence kept out of scope (pHash, EC/SH breadth, WK config-field-only multi-company)
+are **evidence down-weights under DP-003/DP-004, not rejected approaches**. ~~(TeqStars docs
+were 403-blocked in Sprint C but re-checked accessible 2026-07-01; a full rebaseline is
+pending.)~~ **Superseded:** the full TeqStars rebaseline was completed the same day
+(Research Sprint C2, PR #56, 2026-07-01) — see `../01-research/competitor-feature-matrix.md`.
+No entry was added in Sprint G itself, but **DEC-003 — recorded in this same Sprint G —
+did explicitly reject an MVP-scope option ("Option C — Thin import-only pilot"); that
+rejection was later logged here as RA-001** in Control-Room Reset Sprint 1 (2026-07-02),
+after being found missing from this log during a residue sweep._
 
 _**Product Sprint G revision note (2026-07-01, PR #55): still none.** ChatGPT's PR #55
 correction moved **controlled product export/update INTO MVP** (product export is **not**

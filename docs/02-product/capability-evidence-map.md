@@ -56,10 +56,22 @@ full taxonomy. This is an **input map**, not a scope or a decision.
 | **D** | Single competitor claim only | One vendor states it, not demonstrated. |
 | **E** | Open question / blocked / whitespace | No competitor evidence; inference or blocked source only. |
 
-**Competitor keys:** WK Webkul (R1) · TQ Teqstars (R2, docs 403 → claims only) ·
+**Competitor keys:** WK Webkul (R1) · TQ Teqstars (R2 — **Sprint C originally
+403-blocked → docs claims only; superseded by Sprint C2, 2026-07-01, PR #56:
+rebaselined Accessible, mostly demonstrated** — see
+`../01-research/competitor-feature-matrix.md`; **TQ is no longer globally
+claims-only** — treat page-by-page, not as a uniformly weak/blocked source) ·
 EM Emipro (R3, strong) · VT VentorTech (R4+R7, strong/dated) · EC ecommerce_shopify
 (R6, no screenshots → weak) · SH sh_shopify_connector (R8, captions; no
 ratings/changelog).
+
+> **Note on TQ symbols below:** except for C-DOCS-01/02 (corrected below against
+> the already-merged Sprint C2 matrix), the per-capability **TQ** symbols in this
+> map were **not individually re-verified against Sprint C2** in this revision
+> pass — they remain as previously recorded. Do not treat an unrevised TQ🟨/🔒
+> cell as still-current without checking
+> `../01-research/competitor-feature-matrix.md` or
+> `../01-research/competitor-deep-dives.md` (Teqstars section) first.
 
 ## Capability map
 
@@ -244,8 +256,8 @@ ratings/changelog).
 
 | Capability ID | Capability name | Domain | Evidence strength | Strongest evidence | Competitor coverage | Official platform dependency | Architecture review needed | MVP review relevance | Notes |
 | --- | --- | :--: | :--: | --- | --- | --- | --- | :--: | --- |
-| C-DOCS-01 | Readable, screenshot-rich, non-gated docs | 20 | B | EM honest docs + VT KB | EM✅ VT✅ SH✅(captions) TQ🔒 EC🚫 | No | No | candidate | EC gated + TQ 403 = anti-patterns. |
-| C-DOCS-02 | Dated, honest changelog | 20 | B | VT dated release notes | VT✅ EC✅ EM(stale) SH⬜ TQ🔒 | No | No | candidate | Cite current platform figures (A-DOC-3/DP-001). |
+| C-DOCS-01 | Readable, screenshot-rich, non-gated docs | 20 | B | EM honest docs + VT KB; TQ Sprint C2 (31 pages, ~98 screenshots) | EM✅ VT✅ SH✅(captions) TQ✅(Sprint C2) EC🚫 | No | No | candidate | EC gated = anti-pattern. TQ was 403-blocked in Sprint C (docs claims only); **rebaselined Accessible + demonstrated in Sprint C2 (2026-07-01, PR #56)** — `../01-research/competitor-feature-matrix.md`. |
+| C-DOCS-02 | Dated, honest changelog | 20 | B | VT dated release notes | VT✅ EC✅ EM(stale) SH⬜ TQ⬜(Sprint C2) | No | No | candidate | Cite current platform figures (A-DOC-3/DP-001). TQ docs are readable since Sprint C2 but still carry **no dated changelog found** (support policy = 60-day free bug-fix) — not-found, not blocked. |
 | C-DOCS-03 | Support, public demo, self-test | 20 | C | WK/EM support + TQ demo claim | WK✅ EM✅ VT✅ TQ🟨 EC🔒 | No | No | candidate/later | Built-in self-test ties to C-CONN-05. |
 | C-DOCS-04 | App-Store / Built-for-Shopify readiness | 20 | A | Shopify App-Store reqs | none verified | Yes | AR-002 | unknown | Depends on distribution decision (open). |
 

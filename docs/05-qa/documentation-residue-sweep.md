@@ -13,6 +13,62 @@
 (RB-14 Part 2) is merged into `Shopify-connector`; the working branch is based
 on that merge tip.
 
+## PR #59 revision (2026-07-02, ChatGPT review — REVISE)
+
+ChatGPT reviewed PR #59 and returned **REVISE**: the sprint stayed in scope but
+**missed several current-truth stale residues in allowed files** — the first
+pass fixed the two most prominent TQ/MVP statements per file but did not
+grep exhaustively for every recurrence. Fixed on the same branch (commit
+`docs: fix missed reset residue`), within the revision's own allowed-files
+list only:
+
+- **TeqStars/TQ residue in `feature-taxonomy.md`:** the evidence-weighting
+  note and the "Capabilities with weak or blocked evidence" section still said
+  TQ docs are 403-blocked / all TQ support is claim-only. Corrected to note the
+  Sprint C2 (PR #56) rebaseline, with conservative routing language (not new
+  per-capability claims) to `competitor-feature-matrix.md` /
+  `competitor-deep-dives.md` for the ~40 unrevised per-cell TQ🟨/🔒 symbols in
+  the domain tables, which were **not** individually re-verified in this pass.
+- **TeqStars/TQ residue in `capability-evidence-map.md`:** the "Competitor
+  keys" line and the `C-DOCS-01`/`C-DOCS-02` rows still said TQ = docs
+  403/claims-only and "TQ 403 = anti-patterns." Corrected the two `C-DOCS-*`
+  rows against already-merged Sprint C2 evidence (`C-DOCS-01` TQ🔒→✅, screenshot-
+  rich docs now demonstrated; `C-DOCS-02` TQ🔒→⬜, docs readable but still no
+  dated changelog — not blocked, just not-found); all other TQ symbols left
+  unrevised with an explicit routing note, per the revision's "do not upgrade
+  individual capabilities beyond already-merged evidence" instruction.
+- **Single-store/multi-store MVP residue in `feature-taxonomy.md`:** three
+  locations (the "Open questions" list, the "MVP-candidate inputs" section
+  intro, and the C-MULTI-01 capability entry/permissions note) still called
+  single- vs multi-store "not decided" or "open." Corrected: DEC-003 (RB-13)
+  accepted single-store/single-company as the MVP product-scope baseline;
+  the architecture *mechanism* for future multi-store/multi-company stays
+  gated (AR-004/AR-005) — not reworded as an architecture decision.
+- **Odoo Online residue in `setup-ux-principles.md`:** two locations (a
+  Principle-1 evidence note and an "Open questions" item) still called Odoo
+  Online custom-module/queue compatibility open. Corrected: RB-14 Part 2
+  (PR #58) already established Odoo Online is incompatible with custom
+  modules as an `[Official fact]` — that substrate question is resolved;
+  what remains open (AR-003) is narrowed to Odoo.sh/on-prem `odoo.conf`/queue
+  feasibility.
+- **`rejected-approaches-log.md` contradiction:** RA-001 was added correctly
+  in the prior commit, but the historical Sprint A–C and Sprint G notes still
+  read as if no approach had ever been rejected / no entry would be added.
+  Added superseded markers (history preserved, not deleted) pointing to
+  RA-001, and marked the Sprint G note's "TeqStars rebaseline is pending"
+  clause superseded (Sprint C2 completed it the same day).
+- **`docs/03-architecture/README.md` phantom-file reference:** the "Current
+  status" line was corrected in the first pass, but the "What belongs here"
+  line still named `architecture-preparation.md` as if it existed. Corrected
+  to describe what belongs in the folder generically and point to the actual
+  RB-14 files, with a note that the originally planned filename was never
+  created.
+
+**No architecture decisions made. No implementation authorized. DEC-003 body
+untouched. MVP scope unchanged.** Logged as an addendum to DP-007 in
+`defect-pattern-log.md` (same category/root cause as the first pass, not a new
+occurrence — caught and fixed within the same review cycle).
+
 ## What was checked
 
 All files in the "Required pre-session read" list of the sprint prompt, plus a

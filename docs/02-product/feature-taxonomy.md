@@ -70,9 +70,18 @@ Emipro (R3) · **VT** = VentorTech PRO (R4+R7) · **EC** = ecommerce_shopify (R6
 official docs (Tier-1). **SH always means Softhealer's connector — never Shopify
 official docs.**
 
-**Evidence weighting (from Sprint C):** **EM** (≈29 real screenshots) and **VT**
-(dated, mechanism-level release notes) carry the most **demonstrated** evidence;
-**TQ** docs are **403-blocked** (Apps-listing claims only → weak); **EC** has **no
+**Evidence weighting (from Sprint C, 2026-06-30; TQ superseded by Sprint C2 —
+see below):** **EM** (≈29 real screenshots) and **VT** (dated, mechanism-level
+release notes) carry the most **demonstrated** evidence; **TQ** docs were
+**403-blocked** at Sprint C's authoring date (Apps-listing claims only → weak)
+— **superseded 2026-07-01 (Sprint C2, PR #56):** the TQ docs host is now
+**Accessible** (31 pages, ~98 screenshots) and most TQ capabilities moved to
+**demonstrated** in `../01-research/competitor-feature-matrix.md`. **TQ is no
+longer globally 403-blocked or globally claim-only** — treat TQ evidence
+**page-by-page** per the matrix and `../01-research/competitor-deep-dives.md`
+(Teqstars section); the per-capability TQ symbols in the domain tables below
+were **not individually re-verified against Sprint C2 in this pass** (see the
+"Capabilities with weak or blocked evidence" section). **EC** has **no
 screenshots** (listing claims only → weak); **SH** ✅ marks rest on a **captioned
 walkthrough** with **no ratings/changelog** (medium-for-behaviour, low-for-trust);
 **WK** is a single vendor guide (medium).
@@ -1507,8 +1516,13 @@ user). Multi-company is widely claimed but rarely demonstrated (EM/VT only).
   - **Configuration implications:** Per-store connection records.
   - **Architecture dependency:** requires AR review (AR-004/AR-005).
   - **Candidate classification:** likely baseline (single-store first is a common MVP framing).
-  - **MVP relevance:** candidate (question: single- vs multi-store at MVP — RB-13).
-  - **Notes:** Per-store config isolation is the requirement; MVP may start single-store.
+  - **MVP relevance:** **later** — DEC-003 (RB-13, 2026-07-01) accepted a
+    **single-store, single-company** MVP product-scope baseline; multi-store
+    is out of MVP Phase 1. The architecture mechanism (per-store keys/record
+    rules) stays gated (AR-004/AR-005).
+  - **Notes:** Per-store config isolation is the requirement; **MVP is
+    single-store (DEC-003)** — this capability is a later-phase input, not an
+    MVP Phase 1 item.
 
 - **Capability ID:** C-MULTI-02
   - **Capability name:** Multi-company isolation (record rules)
@@ -1728,15 +1742,17 @@ TQ/EC/SH penalized).
     disclosure — never bot-blocked or sign-in-gated.
   - **User value:** Buyers/users can evaluate and self-serve.
   - **Evidence status:** competitor demonstrated (EM best) + inference.
-  - **Evidence references:** gaps-opportunities.md (O-DOC-1); avoid-list.md (A-DOC-1); competitor-deep-dives.md (EM honest docs ✅; **TQ docs 403; EC no screenshots + gated guide; SH no changelog**).
-  - **Competitor examples:** EM✅ (rich, honest); VT✅ (Confluence KB); **TQ🔒 (403); EC🚫 (none + gated); SH✅(captions)**.
+  - **Evidence references:** gaps-opportunities.md (O-DOC-1); avoid-list.md (A-DOC-1); competitor-deep-dives.md (EM honest docs ✅; **TQ docs were 403 in Sprint C — superseded: Accessible + demonstrated in Sprint C2, 2026-07-01, PR #56 — see competitor-feature-matrix.md; EC no screenshots + gated guide; SH no changelog**).
+  - **Competitor examples:** EM✅ (rich, honest); VT✅ (Confluence KB); **TQ✅ (Sprint C2 — 31 pages, ~98 screenshots); EC🚫 (none + gated); SH✅(captions)**.
   - **UX implications:** Docs mirror in-app flows; disclosed limitations.
   - **Reliability/performance implications:** N/A (product surround).
   - **Configuration implications:** N/A.
   - **Architecture dependency:** none.
   - **Candidate classification:** likely baseline (parallel to build).
   - **MVP relevance:** candidate.
-  - **Notes:** EC's blocked setup guide (R5) and TQ's 403 docs are the anti-patterns.
+  - **Notes:** EC's blocked setup guide (R5) is the anti-pattern. **TQ's docs were
+    a 403 anti-pattern only in Sprint C** — Sprint C2 rebaselined them
+    Accessible; not an anti-pattern currently.
 
 - **Capability ID:** C-DOCS-02
   - **Capability name:** Dated, honest changelog (discloses fixes)
@@ -1744,8 +1760,8 @@ TQ/EC/SH penalized).
     (including CRITICAL ones), like VT's.
   - **User value:** Users can judge currency/maintenance and trust the vendor.
   - **Evidence status:** competitor demonstrated (VT best).
-  - **Evidence references:** best-in-class-observations.md (VT dated release notes disclosing CRITICAL fixes ✅); avoid-list.md (A-DOC-2/A-DOC-3); competitor-deep-dives.md (**SH none; EM stale on v19; TQ blocked**).
-  - **Competitor examples:** VT✅ (best); EC✅ (recent cadence); **EM stale on v19; SH none; TQ🔒**.
+  - **Evidence references:** best-in-class-observations.md (VT dated release notes disclosing CRITICAL fixes ✅); avoid-list.md (A-DOC-2/A-DOC-3); competitor-deep-dives.md (**SH none; EM stale on v19; TQ docs were blocked in Sprint C — superseded: Accessible since Sprint C2, but still no dated changelog found**).
+  - **Competitor examples:** VT✅ (best); EC✅ (recent cadence); **EM stale on v19; SH none; TQ⬜ (Sprint C2 — readable, no dated changelog found; not blocked)**.
   - **UX implications:** Changelog visible; cite current platform figures (avoid stale — DP-001/A-DOC-3).
   - **Reliability/performance implications:** N/A.
   - **Configuration implications:** N/A.
@@ -1849,8 +1865,15 @@ Counts are **inputs for review**, not scope. Full per-capability values are in
 
 ## MVP-candidate inputs, not decisions
 
-> **These are candidates for later MVP review (RB-13), not an MVP scope.** Nothing
-> here is selected, sequenced, or committed. MVP finalization is **gated**.
+> **These were candidates for MVP review (RB-13) at this document's authoring
+> date.** RB-13 MVP **product scope** is now **accepted**
+> ([`DEC-003`](../04-decisions/DEC-003-mvp-scope.md), 2026-07-01) — see
+> `../02-product/mvp-scope.md` for the accepted baseline. The per-capability
+> "MVP relevance: candidate/later" tags below were **not individually
+> reconciled against DEC-003** in this revision pass; do not treat any specific
+> tag here as the accepted scope without checking `mvp-scope.md`/DEC-003
+> directly. **No architecture is decided** — the mechanism for every
+> architecture-tagged item stays gated (RB-14 / AR-002…AR-008).
 
 Capabilities most frequently tagged **MVP relevance: candidate** cluster around a
 **correct, observable core**:
@@ -1863,8 +1886,8 @@ Capabilities most frequently tagged **MVP relevance: candidate** cluster around 
   **reconciliation**+freshness), C-JOB-01…05/07 (queue, retry classes, auto-retry,
   idempotency, throttling, resumable), C-MAP-01…04 (binding, dedup, mapping, routing).
 - **Operator UX:** C-DASH-01…05, C-OBS-01…04 (command center + recovery-first errors).
-- **Permissions:** C-MULTI-03 (role-based access); C-MULTI-01 (single-store first is
-  a plausible MVP framing — open).
+- **Permissions:** C-MULTI-03 (role-based access); C-MULTI-01 multi-store is
+  **later** — DEC-003 accepted a single-store MVP.
 
 **Explicitly NOT asserted as MVP:** advanced breadth (Domain 18), payouts (Domain
 12), financial reporting (C-RPT-02), per-market pricing (C-PRICE-03), custom-Python
@@ -1920,10 +1943,19 @@ require review under the security lens noted in the avoid-list (A-SYNC-6, A-IMP-
 Per DP-003/DP-004, capabilities resting on **weak** (claim-only / blocked / no-
 screenshot) evidence are flagged so they are **not overstated** downstream:
 
-- **Teqstars (TQ) — docs 403-blocked → all TQ support is claim-only (weak):**
-  idempotency/queue-retry (C-JOB-03/04), Markets/B2B (C-ADV-01/02), payout auto-
-  reconcile (C-POUT), pHash image dedup (C-VAR-02), smart matching (C-MAP-02) — all
-  **competitor claim only / unverifiable**.
+- **Teqstars (TQ) — Sprint C originally 403-blocked → all TQ support was treated
+  as claim-only; superseded by Sprint C2 (2026-07-01, PR #56):** the TQ docs
+  host is now **Accessible** and most TQ capabilities moved to **demonstrated**
+  in `../01-research/competitor-feature-matrix.md`. **TQ is no longer globally
+  claim-only or blocked.** A handful of reliability items stay weak/not-found
+  for TQ even after Sprint C2 (e.g. automatic-retry/backoff taxonomy,
+  first-class missed-record reconciliation, pHash image-dedup workflow) — do
+  not assume which ones from memory; check the current, page-classified
+  per-capability symbol in `competitor-feature-matrix.md` or
+  `competitor-deep-dives.md` (Teqstars section) before citing any specific TQ
+  capability as weak. **The per-capability TQ🟨/TQ🔒 symbols in the domain
+  tables above were not individually re-verified against Sprint C2 in this
+  pass** — treat them as provisional pending that per-capability check.
 - **ecommerce_shopify (EC) — no screenshots → weak:** all EC capabilities are
   listing claims (cron-based); **product export direction not found**; webhooks
   **explicitly absent**; error handling **email-only** (anti-pattern).
@@ -1946,8 +1978,13 @@ screenshot) evidence are flagged so they are **not overstated** downstream:
 
 1. **Distribution model** (public App-Store vs custom app) — decides GraphQL-only,
    billing, compliance-webhook obligations (AR-002; C-DOCS-04). **Unresolved.**
-2. **Single-store vs multi-store at MVP** and **single- vs multi-company** (C-MULTI-
-   01/02; RB-13). **Not decided.**
+2. **Single-store vs multi-store at MVP:** **resolved by DEC-003 (RB-13,
+   2026-07-01)** — the accepted MVP product-scope baseline is **single-store,
+   single-company** (C-MULTI-01/02 stay `later`/architecture-safe, not MVP
+   Phase 1 scope). This is a **product-scope** answer, not an architecture
+   decision: the **mechanism** for future multi-store/multi-company support
+   (per-store keys, record-rule isolation) remains **architecture-dependent and
+   not decided** (AR-004/AR-005).
 3. **Reconciliation cadence/scope** and **per-object vs global freshness** (C-SYNC-
    06/07). **Open.**
 4. **Error/retry taxonomy** — which errors are auto-retryable vs human-fixable
@@ -1958,8 +1995,11 @@ screenshot) evidence are flagged so they are **not overstated** downstream:
    Odoo-Online implications) (C-JOB-01; AR-003). **Open.**
 7. **Which capability groups are core vs optional add-ons** (feature flags, CC-6;
    Domain 18). **Open (RB-13).**
-8. **Blocked/weak evidence to firm up:** Teqstars docs (403), EC setup guide (R5),
-   17 unread VT Confluence articles — do these change any classification? **Open.**
+8. **Blocked/weak evidence to firm up:** ~~Teqstars docs (403)~~ — **superseded:**
+   TQ docs were rebaselined **Accessible** in Sprint C2 (2026-07-01, PR #56); see
+   `../01-research/competitor-feature-matrix.md`. Still open: EC setup guide
+   (R5, still Blocked), 17 unread VT Confluence articles — do these change any
+   classification? **Open.**
 9. **Payout modelling** for non-Shopify-Payments gateways (`OrderTransaction`
    ledger) (C-POUT; C-PAY-03). **Open.**
 10. **Odoo edition gating** (Enterprise-only reports like Net Profit) — how to
@@ -1974,7 +2014,12 @@ screenshot) evidence are flagged so they are **not overstated** downstream:
 - **Evidence discipline (DP-003/DP-004):** Spot-check that no competitor claim is
   presented as a fact; that `✅`/"demonstrated" is only used with specific evidence;
   that WK multi-company stays a **config field (➖)**, SH multi-company stays
-  **not-found**, EC export stays **not-found**, and TQ items stay **claim-only**.
+  **not-found**, EC export stays **not-found**; and — **since Sprint C2
+  (2026-07-01, PR #56) — that TQ is no longer treated as globally claim-only**:
+  most TQ capabilities are now demonstrated per
+  `../01-research/competitor-feature-matrix.md`, while a few specific
+  reliability items (e.g. automatic-retry/backoff, first-class reconciliation,
+  pHash dedup) remain genuinely claim-only/not-found per that same matrix.
 - **Classification calibration:** Are "likely baseline / premium / advanced-later /
   optional add-on" and "MVP candidate / later / unknown" reasonable **as inputs**?
   Flag anything that reads like a premature decision.

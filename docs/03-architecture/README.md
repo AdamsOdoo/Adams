@@ -3,9 +3,13 @@
 **Purpose:** architecture notes, diagrams, data models, and sync-design
 **drafts** for the connector.
 
-**What belongs here:** `architecture-preparation.md` and later draft designs
-(sync orchestration, mapping/idempotency, scheduling/queueing, modularity
-boundaries).
+**What belongs here:** architecture framing and decision-candidate briefs,
+future draft designs (sync orchestration, mapping/idempotency, scheduling/
+queueing, modularity boundaries), data-model sketches, and pre-ADR
+architecture notes. Current files include the RB-14 documents listed below —
+there is no `architecture-preparation.md` in this folder (an originally
+planned filename that was never created; see
+`../05-qa/documentation-residue-sweep.md`).
 
 **What does not belong here yet:** finalized decisions (those become ADRs in
 `../04-decisions/` after review) and any code. Architecture is **gated** until

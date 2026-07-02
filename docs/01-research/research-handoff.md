@@ -86,6 +86,45 @@
   DEC-003 body not edited; MVP scope unchanged; no AR row decided. `main` and
   plain `dev` untouched. Awaiting ChatGPT/Fable review.
 
+### Control-Room Reset Sprint 1 — PR #59 revision (2026-07-02, ChatGPT REVISE)
+
+> ChatGPT reviewed PR #59: **REVISE** — stayed in scope, but the first pass
+> missed several current-truth stale residues in allowed files. Full detail:
+> [`../05-qa/documentation-residue-sweep.md`](../05-qa/documentation-residue-sweep.md)
+> ("PR #59 revision" section).
+
+- **Files updated (this revision only):** `docs/02-product/feature-taxonomy.md`,
+  `docs/02-product/capability-evidence-map.md`,
+  `docs/02-product/setup-ux-principles.md`, `docs/03-architecture/README.md`,
+  `docs/05-qa/rejected-approaches-log.md`,
+  `docs/05-qa/documentation-residue-sweep.md`,
+  `docs/01-research/research-handoff.md` (this file),
+  `docs/05-qa/defect-pattern-log.md` (addendum note, no new row).
+- **Residue fixed:** missed TeqStars/TQ 403/claim-only wording in
+  `feature-taxonomy.md` (evidence-weighting + "weak or blocked evidence"
+  section, routing language, no new per-cell claims) and
+  `capability-evidence-map.md` (competitor-keys line + `C-DOCS-01/02` rows,
+  corrected against already-merged Sprint C2 evidence only); stale
+  single-store/multi-store "not decided" wording in `feature-taxonomy.md`
+  (3 locations) corrected against DEC-003; stale Odoo Online
+  compatibility "open question" in `setup-ux-principles.md` (2 locations)
+  corrected against RB-14 Part 2 (PR #58); `rejected-approaches-log.md`'s
+  historical notes still implying no rejection existed, now marked
+  superseded by RA-001; `docs/03-architecture/README.md`'s "What belongs
+  here" line still naming the phantom `architecture-preparation.md`.
+- **Learning feedback loop:** addendum to **DP-007** (`defect-pattern-log.md`)
+  — same category/root cause, not a new occurrence; reinforces that a residue
+  sweep must grep a pattern across *every* allowed file, not stop at the first
+  hit per file. No new rejected approach; no new technical debt; no AR row
+  touched.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (DP-007 addendum) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed — all **YES**.
+- **Stop condition:** stopped after pushing one commit to the same PR #59
+  branch (not merged, no new PR opened). DEC-003 body untouched; MVP scope
+  unchanged; no architecture decision made; `main`/plain `dev` untouched.
+  Awaiting ChatGPT/Fable re-review.
+
 ---
 
 # RB-14 Architecture Preparation — Part 2 Handoff
