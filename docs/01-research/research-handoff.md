@@ -154,6 +154,37 @@
 - No code files changed.
 - Implementation remains blocked.
 
+**PR #66 Fable revision (2026-07-02, ChatGPT + Fable review — ACCEPT WITH MINOR CHANGES):**
+- Fable reviewed PR #66 and returned ACCEPT WITH MINOR CHANGES.
+- Corrected DEC-008 attribution for the core Shopify Location reference: now
+  framed as a proposed clarification/extension of DEC-008's `core`-owns list,
+  ratified only if ChatGPT accepts DEC-010/DEC-011 — not something DEC-008
+  already explicitly decided.
+- Added dated official Shopify verification (access date 2026-07-02) for
+  `FulfillmentInput.lineItemsByFulfillmentOrder` and FulfillmentOrder
+  `assignedLocation`, recorded in `ar007-ar008-evidence-refresh.md`.
+- Corrected the false "17-mutation list not itemized in repo docs" claim —
+  the list is already itemized in `rb14-part2-open-question-resolution.md`
+  (RQ-005-2); narrowed the remaining open item to `@idempotent`
+  key-uniqueness scope and API-version-specific detail.
+- Aligned DEC-010's first-push guard granularity wording so it no longer
+  reads as deciding "per binding" — granularity remains open (per-store /
+  per-binding / per-variant-location binding), no coarser than per-store.
+- Added a fulfillment operation-serialization guard: a new/corrected
+  operation must not dispatch while a prior ambiguous operation against the
+  same `(store, picking, Shopify target)` is unresolved.
+- Added core Location-reference invariants: no Odoo-location IDs or mapping
+  decisions in the core reference; staleness/precedence vs. live
+  `assignedLocation` left to the Master Blueprint.
+- Cleaned small `04-decisions/README.md` residue, an RA-018 avoid-list
+  citation, and RA-021/RA-023 revisit-condition wording.
+- DEC-010/DEC-011 remain `Proposed for ChatGPT review`, not accepted.
+- AR-007/AR-008 remain proposed only, not accepted.
+- RA-018 through RA-023 remain PROPOSED, not finalized.
+- DEC-003/004/005/006/007/008/009 untouched.
+- No code files changed.
+- Implementation remains blocked.
+
 ---
 
 ### DEC-008/DEC-009 Acceptance Patch — compact handoff (2026-07-02)

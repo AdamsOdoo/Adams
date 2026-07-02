@@ -126,23 +126,44 @@ inventory-adjacent write outside the 17-mutation `@idempotent` surface.
   **minimal Shopify Location *reference*** (not a mapping) — the store's
   Shopify Location GID(s), name(s), active/status where available, and
   last-synced/seen metadata if later needed — may live in
-  `shopify_connector_core` as shared substrate, consistent with `core`
-  already owning cross-cutting reference data while domain modules own
-  business mappings (DEC-008). This is an **interpretation** of the existing
-  DEC-008 boundary, not an amendment to it, and **not** a decision to create
-  exact fields or models. See the matching clarification in
+  `shopify_connector_core` as shared substrate. **Attribution corrected (PR
+  #66 Fable review):** `core` owning this reference is a **proposed
+  clarification/extension of DEC-008's `core`-owns list**, not something
+  DEC-008 already explicitly decided — DEC-008 names `core`'s cross-cutting
+  substrate (transport, queue, binding abstraction, error registry, setup
+  wizard, dashboard/log center) but does not itself say `core` owns
+  Shopify-object reference data. This clarification is **proposed by
+  DEC-010/DEC-011** and would be **ratified against DEC-008 only if ChatGPT
+  accepts DEC-010/DEC-011** — it does not change DEC-008's dependency
+  direction, does not create a new module, and does not require a full
+  DEC-008 amendment cycle. `shopify_connector_inventory` remains the sole
+  owner of Odoo-location ↔ Shopify-Location mapping for inventory push
+  decisions regardless. See the matching clarification in
   [`DEC-011`](./DEC-011-fulfillment-architecture-strategy.md#fulfillmentorder-posture)
   and the AR-007 brief §4/§9 — the exact mechanism by which fulfillment
   confirms a picking's source location against the Shopify fulfillment
   location remains **open for the Master Blueprint**.
+- **Core Location reference invariants / open questions [not a decision to
+  create fields/models]:** the proposed core Shopify Location reference is
+  **Shopify-side reference data only** — it must **never** store
+  Odoo-location IDs or any Odoo↔Shopify mapping decision, or it becomes a
+  second, competing mapping table; Odoo↔Shopify mapping remains
+  inventory-owned. Exact stale-cache handling, precedence between the cache
+  and a live Shopify FulfillmentOrder `assignedLocation` read, and refresh
+  cadence remain **open for the Master Blueprint**; for a specific
+  fulfillment operation, a live `assignedLocation` read should be treated as
+  authoritative unless the Master Blueprint proves otherwise.
 
 ## First-push guard posture
 
 - The DEC-007 guard applies in full, unweakened: mapped location, preview of
   SKU/variant/location quantities, explicit operator confirmation, a
   recorded source-of-truth decision, and the ability to skip or manually
-  match ambiguous items — required before the first Odoo→Shopify write per
-  binding, at a granularity no coarser than per-store.
+  match ambiguous items — required before the first Odoo→Shopify write at
+  the configured first-push granularity. **Wording corrected (PR #66 Fable
+  review):** DEC-007 requires this granularity no coarser than per-store;
+  this record does **not** decide the exact granularity (per-store /
+  per-binding / per-variant-location binding remain open, not decided here).
 - **Open:** the exact granularity of "first" (per-store / per-binding /
   per-variant-location-binding) and whether ongoing (post-first-push) writes
   also require preview/confirmation (apply-mode: auto-apply vs.
@@ -194,9 +215,13 @@ failure carries a human-readable reason and a suggested fix (extends DEC-009
 - Exact granularity of "first" for the DEC-007 guard.
 - Whether ongoing syncs require preview/confirmation on every write or only
   the first (apply-mode, C-INV-04) — explicitly **not decided here**.
-- Verification of the Shopify inventory-webhook topic string(s), the literal
-  17-mutation list, and `@idempotent` key-uniqueness scope (see
+- Verification of the Shopify inventory-webhook topic string(s) (see
   [`ar007-ar008-evidence-refresh.md`](../03-architecture/ar007-ar008-evidence-refresh.md)).
+  **Corrected (PR #66 Fable review):** the literal 17-mutation list is
+  already itemized in `rb14-part2-open-question-resolution.md` (RQ-005-2) —
+  not an open item here; only `@idempotent` key-uniqueness scope (per-shop/
+  app/global) and any API-version-specific implementation detail remain
+  open.
 - The exact Odoo-side implementation source for the "Free to Use" quantity
   concept (`stock.quant`, a product quantity helper, a stock-report/ORM
   method, or another Odoo-supported mechanism) and its exact field/formula —

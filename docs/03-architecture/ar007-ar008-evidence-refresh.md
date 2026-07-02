@@ -96,6 +96,35 @@ tracking. Access date for everything below: **2026-07-02**. Access status:
   receipts), and whether/how a resulting backorder picking is linked back to
   the original for fulfilment-write-back purposes.
 
+## Fulfillment field verification (2026-07-02 targeted check)
+
+Fable's PR #66 review flagged that AR-008 asserts `lineItemsByFulfillmentOrder`
+and FulfillmentOrder `assignedLocation` as official facts without a dated
+repo-recorded verification. This small, targeted official Shopify check closes
+that gap (no broader browsing performed; no competitor research added).
+
+- **[Official fact]** `FulfillmentInput.lineItemsByFulfillmentOrder` — type
+  `[FulfillmentOrderLineItemsInput!]!`. Official description: "Pairs of
+  `fulfillment_order_id` and `fulfillment_order_line_items` that represent the
+  fulfillment order line items that have to be fulfilled for each fulfillment
+  order." If the line items are omitted for a given pair, all items associated
+  with that fulfillment order are fulfilled. This confirms the field is used
+  to specify fulfillment-order line items **and quantities** for fulfillment
+  creation (via the nested `fulfillment_order_line_items` quantities), exactly
+  as relied upon in the AR-008 brief/DEC-011.
+  Source: `shopify.dev/docs/api/admin-graphql/latest/input-objects/FulfillmentInput`,
+  access date **2026-07-02**.
+- **[Official fact]** `FulfillmentOrder.assignedLocation` — type
+  `FulfillmentOrderAssignedLocation!` (non-null). Official description: "The
+  fulfillment order's assigned location. This is the location where the
+  fulfillment is expected to happen." The same page notes this can change
+  while the fulfillment order is `OPEN`/`SCHEDULED`/`ON_HOLD` and location
+  properties are edited in the Shopify admin — confirming `assignedLocation`
+  is the exact official field name for the assigned-location concept AR-007/
+  AR-008 reference (not an unverified/approximated name).
+  Source: `shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder`,
+  access date **2026-07-02**.
+
 ## Gaps that remain open (must be verified before implementation)
 
 These were **not** resolved by this small check and are carried into the
@@ -115,9 +144,25 @@ AR-008 brief as explicit open questions rather than asserted as fact:
    `fulfillment_orders/*`) — not found in
    `../01-research/shopify-official-api-notes.md` (see the AR-007/AR-008
    briefs' own gap notes; Shopify-side, not part of this Odoo-focused check).
-5. The literal enumeration of Shopify's 17 `@idempotent`-eligible mutations
-   (only the count and category — "inventory/location + `refundCreate`" — are
-   documented in the repo today).
+5. **Corrected (PR #66 Fable review):** the literal 17-mutation
+   `@idempotent`-eligible list is **already itemized** in repo docs — see
+   [`rb14-part2-open-question-resolution.md`](./rb14-part2-open-question-resolution.md)
+   RQ-005-2 (the fixed list of `inventoryActivate, inventoryAdjustQuantities,
+   inventoryMoveQuantities, inventorySetOnHandQuantities,
+   inventorySetQuantities, inventorySetScheduledChanges,
+   inventoryShipmentAddItems, inventoryShipmentCreate,
+   inventoryShipmentCreateInTransit, inventoryShipmentReceive,
+   inventoryTransferCreate, inventoryTransferCreateAsReadyToShip,
+   inventoryTransferDuplicate, inventoryTransferSetItems, locationActivate,
+   locationDeactivate, refundCreate`). The prior "not itemized in repo docs"
+   wording in the AR-007 brief and DEC-010 was a false repo-evidence claim and
+   has been corrected. What genuinely **remains open** is narrower: (a)
+   `@idempotent` key-uniqueness scope (per-shop / per-app / global) — not yet
+   verified; and (b) any API-version-specific implementation detail that must
+   be rechecked before code is written. The design conclusion is unchanged:
+   inventory mutations (`inventorySetQuantities`/`inventoryAdjustQuantities`)
+   are on the `@idempotent` list and fulfillment mutations
+   (`fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`) are not.
 
 ## What this refresh does and does not do
 

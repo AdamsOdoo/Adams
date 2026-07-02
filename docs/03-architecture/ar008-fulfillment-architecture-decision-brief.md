@@ -74,6 +74,16 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
    if none specified; supports `lineItemsByFulfillmentOrder` for partial
    quantities) and can carry tracking at creation time. Source:
    `shopify.dev/docs/api/admin-graphql/latest/mutations/fulfillmentcreate`.
+   **[Dated verification added, PR #66 Fable review]:** the
+   `FulfillmentInput.lineItemsByFulfillmentOrder` field itself (type
+   `[FulfillmentOrderLineItemsInput!]!`) is separately verified — "Pairs of
+   `fulfillment_order_id` and `fulfillment_order_line_items` that represent
+   the fulfillment order line items that have to be fulfilled for each
+   fulfillment order," confirming it specifies fulfillment-order line items
+   **and quantities** for fulfillment creation. Source:
+   `shopify.dev/docs/api/admin-graphql/latest/input-objects/FulfillmentInput`,
+   access date **2026-07-02** — full record in
+   [`ar007-ar008-evidence-refresh.md`](./ar007-ar008-evidence-refresh.md).
 3. **[Official fact]** `fulfillmentTrackingInfoUpdate` updates carrier/
    numbers/URLs after creation; a supported carrier name auto-generates a
    tracking URL. Tracking can be set at creation or later. Source:
@@ -179,20 +189,46 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   resolve location identity from (a) Shopify FulfillmentOrder
   `assignedLocation` data **fetched live from Shopify** (each FulfillmentOrder
   already carries its own assigned location, so no local Odoo-side mapping is
-  strictly required to *select* the right FulfillmentOrder), and/or (b) a
-  **minimal Shopify Location *reference*** (not a mapping) that may live in
-  `shopify_connector_core` — conceptually the store, Shopify Location GID,
-  name, active/status where available, and last-synced/seen metadata if
-  later needed. This is **not** a decision to create exact fields or models;
-  it is an **interpretation** consistent with `core` owning cross-cutting
-  reference data while domain modules own business mappings (DEC-008), not
-  an amendment to it. In Phase 1's single-location-fulfillment posture (§6),
-  fulfillment only needs to confirm the picking's source location is the
-  one, unambiguous, expected fulfillment location for that store; a mismatch
-  or a genuinely multi-location order is routed to manual review (§5), not
-  guessed. The **exact confirmation mechanism** remains **open for the
-  Master Blueprint** — the same clarification appears in the AR-007 brief §4
-  and DEC-010/DEC-011, as one shared item, not two independent ones.
+  strictly required to *select* the right FulfillmentOrder) — **[Official
+  fact, dated verification added, PR #66 Fable review]:** `assignedLocation`
+  (type `FulfillmentOrderAssignedLocation!`) is the exact official field:
+  "The fulfillment order's assigned location. This is the location where the
+  fulfillment is expected to happen." Source:
+  `shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder`,
+  access date **2026-07-02**, full record in
+  [`ar007-ar008-evidence-refresh.md`](./ar007-ar008-evidence-refresh.md) —
+  and/or (b) a **minimal Shopify Location *reference*** (not a mapping) that
+  may live in `shopify_connector_core` — conceptually the store, Shopify
+  Location GID, name, active/status where available, and last-synced/seen
+  metadata if later needed. This is **not** a decision to create exact
+  fields or models; it is a **proposed clarification/extension of DEC-008's
+  `core`-owns list** — DEC-008 names `core`'s cross-cutting substrate
+  (transport, queue, binding abstraction, error registry, setup wizard,
+  dashboard/log center) but does not itself say `core` owns Shopify-object
+  reference data, so this is not something DEC-008 already explicitly
+  decided. The clarification is proposed by DEC-010/DEC-011 and would be
+  **ratified against DEC-008 only if ChatGPT accepts DEC-010/DEC-011** — it
+  does not change DEC-008's dependency direction and does not require a full
+  DEC-008 amendment cycle. In Phase 1's single-location-fulfillment posture
+  (§6), fulfillment only needs to confirm the picking's source location is
+  the one, unambiguous, expected fulfillment location for that store; a
+  mismatch or a genuinely multi-location order is routed to manual review
+  (§5), not guessed. The **exact confirmation mechanism** remains **open for
+  the Master Blueprint** — the same clarification appears in the AR-007
+  brief §4 and DEC-010/DEC-011, as one shared item, not two independent
+  ones.
+- **Core Location reference invariants / open questions
+  [Recommendation, guards against future traps]:** the proposed core
+  Shopify Location reference is **Shopify-side reference data only** — it
+  must **never** store Odoo-location IDs or any Odoo↔Shopify mapping
+  decision (otherwise it becomes a second, competing mapping table); the
+  Odoo-location ↔ Shopify-Location **mapping** remains exclusively
+  `shopify_connector_inventory`'s. Exact staleness handling for the core
+  cache/reference, the precedence between that cache and a live
+  `assignedLocation` read, and the refresh cadence remain **open for the
+  Master Blueprint** — for a specific fulfillment operation, the live
+  FulfillmentOrder `assignedLocation` read should be treated as the
+  authoritative source unless the Master Blueprint proves otherwise.
 - **Avoiding legacy fulfillment APIs [Accepted decision]:** enforced
   structurally by using only FulfillmentOrder-based mutations (fact #1) — see
   **RA-022**.
@@ -360,6 +396,25 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   (different carrier/number, hence a different payload hash) is correctly
   treated as a new operation, not a duplicate of the prior tracking update or
   of the original fulfillment creation.
+- **Serialization guard for unresolved ambiguous operations
+  [Recommendation, conceptual guard]:** a payload-changing Odoo edit
+  produces a new payload hash and is therefore, by the operation-level key
+  above, formally a *new* operation — but it must not be allowed to dispatch
+  while a **prior operation against the same `(store, picking, Shopify
+  target)` remains unresolved** (i.e. still `blocked_manual_review` or
+  awaiting a verification read after an ambiguous outcome). Operations
+  against the same `(store, picking, Shopify target)` must be **serialized**:
+  a corrected tracking update or a new fulfillment operation must not
+  blindly dispatch while an earlier ambiguous operation against that same
+  target is unresolved — it must either first verify/match current Shopify
+  state (the same verification-read rule as above) or remain
+  blocked/manual-review until the earlier operation resolves. This closes an
+  edge case the payload-hash-scoped key alone does not cover: distinct
+  payload hashes are correctly treated as distinct operations, but distinct
+  operations against the same target still cannot be allowed to race each
+  other. Exact implementation (queue-level lock, DB constraint, or job-state
+  check) remains a Master Blueprint item — no implementation fields are
+  decided here.
 
 ## 8. User-facing fulfillment logs
 
@@ -388,29 +443,38 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
   order binding `sale` already owns — fulfillment does not duplicate order
   identity, only extends it with FulfillmentOrder/Fulfillment identity.
 - **`shopify_connector_core` owns [Accepted decision — DEC-008]:** transport,
-  queue, webhook receiver, the binding abstraction/shared contract, the
+  queue, webhook receiver, the binding abstraction/shared contract, and the
   error-class registry (including "fulfillment notification confirmation
-  missing"), and — per the clarification in §2/§5 — is where a minimal
-  shared Shopify-Location *reference* (not a mapping) may live so
-  `fulfillment` never needs to depend on `inventory`; exact fields/models
-  remain open for the Master Blueprint.
+  missing").
+- **`shopify_connector_core` may additionally hold a minimal shared
+  Shopify-Location reference [Recommendation / proposed clarification —
+  DEC-010/DEC-011, not an existing DEC-008 decision]:** per the clarification
+  in §2/§5, a minimal shared Shopify-Location *reference* (not a mapping) may
+  live in `core` so `fulfillment` never needs to depend on `inventory` — this
+  is a **proposed clarification/extension of DEC-008's `core`-owns list**,
+  not something DEC-008 already explicitly decided (DEC-008 names `core`'s
+  substrate — transport, queue, binding abstraction, error registry, setup
+  wizard, dashboard/log center — not Shopify-object reference data). Proposed
+  by DEC-010/DEC-011; ratified against DEC-008 only if ChatGPT accepts them.
+  Exact fields/models remain open for the Master Blueprint.
 - **Link-module need discovered? [Clarified — not needed]:** no. The
   location-reference-sharing question in §2/§5 is the shape of problem
   DEC-008 already anticipated ("a possible future glue module letting
   `shopify_connector_fulfillment` reuse `shopify_connector_inventory`'s
   location mapping"), but this brief resolves it **without** a link module
-  and **without** either domain depending on the other: `core` already owns
-  cross-cutting reference data under DEC-008, so a minimal Shopify-Location
-  reference fits there as an **interpretation** of the existing boundary, not
-  a new module and not a DEC-008 amendment.
+  and **without** either domain depending on the other: a minimal
+  Shopify-Location reference fits as a **proposed clarification/extension**
+  of `core`'s DEC-008 scope (see above), not a new module and not a full
+  DEC-008 amendment cycle — pending ChatGPT acceptance of DEC-010/DEC-011.
 - **DEC-008 not changed:** the dependency shape (`fulfillment` → `core` +
   `sale`, not `inventory`) is preserved exactly as DEC-008 states.
   `shopify_connector_inventory` still owns the Odoo-location ↔
   Shopify-Location *mapping* for inventory push decisions; only a minimal
-  Shopify-Location *reference* is clarified as fitting inside `core`'s
-  existing scope. The exact confirmation mechanism fulfillment uses remains
-  open for the Master Blueprint — this is a clarification of ownership, not
-  an amendment to DEC-008.
+  Shopify-Location *reference* is **proposed** as fitting inside `core`'s
+  scope, pending ChatGPT acceptance of DEC-010/DEC-011. The exact
+  confirmation mechanism fulfillment uses remains open for the Master
+  Blueprint — this is a proposed clarification/extension of ownership, not
+  an existing DEC-008 decision and not a full amendment cycle.
 
 ## 10. What remains open for Master Blueprint / implementation planning
 
@@ -473,6 +537,8 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
 - Does not authorize implementation.
 - Does not alter DEC-003/004/005/006/007/008/009.
 - Does not change DEC-008's module boundaries — the shared Shopify-Location
-  reference is clarified as an interpretation fitting within `core`'s
-  existing scope, not an amendment; the exact confirmation mechanism and any
+  reference is a **proposed clarification/extension of DEC-008's `core`-owns
+  list**, not something DEC-008 already explicitly decided, and would be
+  ratified against DEC-008 only if ChatGPT accepts DEC-010/DEC-011; not a
+  full DEC-008 amendment cycle. The exact confirmation mechanism and any
   exact fields/models remain open for the Master Blueprint.

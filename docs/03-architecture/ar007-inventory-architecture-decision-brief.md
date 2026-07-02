@@ -43,11 +43,14 @@ context.
   controlled/reviewed; auto-apply is **not** accepted as default MVP
   behaviour (explicitly routed to AR-007, an [Inference], DP-006).
 - **[Accepted clarification — DEC-007]** A **first-inventory-push guard**
-  applies before the first Odoo→Shopify inventory write per binding, at a
-  granularity no coarser than per-store: a mapped Shopify location, a preview
-  of SKU/variant/location quantities, explicit operator confirmation, a
-  recorded source-of-truth decision, and the ability to skip or manually
-  match ambiguous items. This brief may decide the quantity-field default,
+  applies before the first Odoo→Shopify inventory write at the configured
+  first-push granularity, required no coarser than per-store: a mapped
+  Shopify location, a preview of SKU/variant/location quantities, explicit
+  operator confirmation, a recorded source-of-truth decision, and the ability
+  to skip or manually match ambiguous items. The **exact** granularity
+  (per-store / per-binding / per-variant-location binding) is **not decided**
+  by DEC-007 and is not decided here either. This brief may decide the
+  quantity-field default,
   the multi-location mapping mechanism, ongoing apply-mode, and the exact
   granularity of "first" — but must not weaken any of the five required
   guard elements.
@@ -108,9 +111,20 @@ context.
    duplicates; there is **no general/all-mutation idempotency** and no
    `clientMutationId`. Source: `/docs/api/usage/implementing-idempotency`,
    `/docs/api/usage/idempotent-requests`, access date 2026-07-01 (RB-14 Part
-   2). **[Open question]** the literal 17-mutation list is not itemized in
-   repo docs, and `@idempotent` key uniqueness scope (per-shop/app/global)
-   remains open.
+   2). **Corrected (PR #66 Fable review):** the literal 17-mutation list is
+   **already itemized in repo docs** — see
+   [`rb14-part2-open-question-resolution.md`](./rb14-part2-open-question-resolution.md)
+   RQ-005-2 (`inventoryActivate, inventoryAdjustQuantities,
+   inventoryMoveQuantities, inventorySetOnHandQuantities,
+   inventorySetQuantities, inventorySetScheduledChanges,
+   inventoryShipmentAddItems, inventoryShipmentCreate,
+   inventoryShipmentCreateInTransit, inventoryShipmentReceive,
+   inventoryTransferCreate, inventoryTransferCreateAsReadyToShip,
+   inventoryTransferDuplicate, inventoryTransferSetItems, locationActivate,
+   locationDeactivate, refundCreate`). **[Open question]** narrowed to:
+   `@idempotent` key uniqueness scope (per-shop/app/global), not yet verified;
+   and any API-version-specific implementation detail requiring a recheck
+   before code is written.
 
 ## Official facts (Odoo side — grounded in the small evidence refresh, `ar007-ar008-evidence-refresh.md`)
 
@@ -227,9 +241,12 @@ context.
   Phase 1 candidate**, because it conceptually corresponds to what Shopify's
   `available` is meant to represent (sellable stock, excluding what is
   already committed elsewhere) — writing it to Shopify's `available` (fact
-  #4) keeps the connector inside Shopify's writable-field surface (fact #3)
-  without needing to reconstruct Shopify's own `on_hand` summation (fact #2)
-  on the Odoo side.
+  #4) keeps the connector inside Shopify's writable-field surface, bounded on
+  one side by fact #3 (`committed` is read-only, must never be written) and
+  on the other by fact #4 (`available`/`on_hand` are writable) **[citation
+  corrected, PR #66 Fable review — cites both bounding facts, not fact #3
+  alone]**, without needing to reconstruct Shopify's own `on_hand` summation
+  (fact #2) on the Odoo side.
 - **[Open question] — exact implementation source, not just field/computation.**
   This brief chooses the **semantic quantity concept only** ("Free to Use")
   — it does **not** verify or decide the exact Odoo ORM/implementation
@@ -282,10 +299,11 @@ context.
   single-location design" (DEC-003) without requiring every Phase 1 merchant
   to configure multiple locations.
 - **Odoo warehouse/location → Shopify location mapping [Recommendation]:** an
-  explicit mapping record (Odoo `stock.location`/warehouse identifier ↔
-  Shopify `Location` GID), owned by `shopify_connector_inventory` (§9), never
-  inferred from name similarity (consistent with DEC-006's "no name-only
-  automatic matching, ever").
+  explicit mapping record (a conceptual Odoo location/warehouse identifier —
+  e.g. `stock.location`, cited as an **illustrative example, not a verified
+  ORM source** — ↔ Shopify `Location` GID), owned by
+  `shopify_connector_inventory` (§9), never inferred from name similarity
+  (consistent with DEC-006's "no name-only automatic matching, ever").
 - **If no mapping exists [Recommendation]:** the write is **blocked**, not
   guessed — routed to the DEC-009 `blocked_manual_review` state under the
   already-named **"inventory location missing"** error class. This is also
@@ -311,17 +329,34 @@ context.
   live in `shopify_connector_core` as shared substrate: conceptually, the
   store, the Shopify Location GID, the Shopify Location name, active/status
   where available, and last-synced/seen metadata if later needed. This is
-  **not** a decision to create exact fields or models; it is an
-  **interpretation** consistent with the existing DEC-008 boundary (`core`
-  owns cross-cutting reference data; domain modules own business mappings),
-  not an amendment to DEC-008. `shopify_connector_fulfillment` may resolve
-  location identity from (a) Shopify FulfillmentOrder `assignedLocation` data
-  fetched live from Shopify, and/or (b) this core reference — it does **not**
-  need `shopify_connector_inventory`'s mapping table for either path. The
-  **exact mechanism** by which fulfillment confirms a picking's source
-  location against the Shopify fulfillment location remains **open for the
-  Master Blueprint** — see the matching clarification in the AR-008 brief
-  §2/§9 and DEC-010/DEC-011.
+  **not** a decision to create exact fields or models; it is a **proposed
+  clarification/extension of DEC-008's `core`-owns list** — DEC-008 names
+  `core`'s cross-cutting substrate (transport, queue, binding abstraction,
+  error registry, setup wizard, dashboard/log center) but does not itself say
+  `core` owns Shopify-object reference data, so this is not something DEC-008
+  already explicitly decided. The clarification is proposed by DEC-010/
+  DEC-011 and would be **ratified against DEC-008 only if ChatGPT accepts
+  DEC-010/DEC-011** — it does not change DEC-008's dependency direction and
+  does not require a full DEC-008 amendment cycle. `shopify_connector_fulfillment`
+  may resolve location identity from (a) Shopify FulfillmentOrder
+  `assignedLocation` data fetched live from Shopify, and/or (b) this core
+  reference — it does **not** need `shopify_connector_inventory`'s mapping
+  table for either path. The **exact mechanism** by which fulfillment
+  confirms a picking's source location against the Shopify fulfillment
+  location remains **open for the Master Blueprint** — see the matching
+  clarification in the AR-008 brief §2/§9 and DEC-010/DEC-011.
+- **Core Location reference invariants / open questions
+  [Recommendation, guards against future traps]:** the proposed
+  `shopify_connector_core` Shopify Location reference is **Shopify-side
+  reference data only** — it must **never** store Odoo-location IDs or any
+  Odoo↔Shopify mapping decision, or it becomes a second, competing mapping
+  table; the Odoo-location ↔ Shopify-Location **mapping** remains
+  exclusively `shopify_connector_inventory`'s. The exact staleness handling
+  for the core cache/reference, the precedence between that cache and a live
+  Shopify FulfillmentOrder `assignedLocation` read, and the refresh cadence
+  all remain **open for the Master Blueprint** — for a specific fulfillment
+  operation, a live `assignedLocation` read should be treated as the
+  authoritative source unless the Master Blueprint proves otherwise.
 
 ## 5. Sync direction and trigger
 
@@ -337,11 +372,13 @@ context.
   action, enqueued (never run inline), reusing the same write path and guard
   logic as scheduled sync.
 - **Event-driven enqueue [Recommendation]:** relevant Odoo stock changes
-  (e.g. a `stock.move` affecting a mapped location's quantity) enqueue a
-  targeted sync job for the affected `(inventory_item_id, location_id)` pair,
-  rather than waiting for the next scheduled run — safe because it flows
-  through the same guarded write path (first-push guard, idempotency,
-  ambiguous-outcome rule) as any other trigger.
+  (e.g. a conceptual Odoo stock-movement event — such as `stock.move`, cited
+  as an **illustrative example, not a verified ORM source** — affecting a
+  mapped location's quantity) enqueue a targeted sync job for the affected
+  `(inventory_item_id, location_id)` pair, rather than waiting for the next
+  scheduled run — safe because it flows through the same guarded write path
+  (first-push guard, idempotency, ambiguous-outcome rule) as any other
+  trigger.
 - **Shopify webhook-driven inventory import [Open question]:** an
   `inventory_levels/update`-style Shopify webhook (if it exists — **not**
   confirmed in repo docs, see gap #9/evidence-refresh) could import
@@ -436,10 +473,21 @@ context.
   **abstraction/shared contract** (store-scoping, audit/status fields,
   uniqueness principles) that the inventory binding must satisfy; the
   error-class registry (including "inventory location missing"); the
-  recovery-first log/error-center dashboard. Per §4's clarification, `core`
-  is also where a minimal shared Shopify-Location *reference* (not a
-  mapping) may live so `fulfillment` never needs to depend on `inventory` —
-  exact fields/models remain open for the Master Blueprint.
+  recovery-first log/error-center dashboard.
+- **`shopify_connector_core` may additionally hold a minimal shared
+  Shopify-Location *reference* [Recommendation / proposed clarification —
+  DEC-010/DEC-011, not an existing DEC-008 decision]:** per §4's
+  clarification, a minimal Shopify Location *reference* (not a mapping) so
+  `fulfillment` never needs to depend on `inventory` is a **proposed
+  clarification/extension of DEC-008's `core`-owns list**, not something
+  DEC-008 already explicitly decided — DEC-008 names `core`'s cross-cutting
+  substrate (transport, queue, binding abstraction, error registry, setup
+  wizard, dashboard/log center) but does not itself say `core` owns
+  Shopify-object reference data. This clarification is proposed by DEC-010/
+  DEC-011 and would be **ratified against DEC-008 only if ChatGPT accepts
+  DEC-010/DEC-011** — it does not change DEC-008's dependency direction and
+  does not create a new module. Exact fields/models remain open for the
+  Master Blueprint.
 - **`shopify_connector_product` owns [Accepted decision — DEC-008]:**
   product/variant identity and its own binding — inventory keys off the
   variant's `inventory_item_id`, but `inventory_item_id`/`location_id`
@@ -480,10 +528,13 @@ context.
   every write or only the first (apply-mode: auto-apply vs. review-then-apply,
   C-INV-04) — an explicit **[Open question]**, not decided by this brief
   (see DEC-010 §"What remains open").
-- Verification of the Shopify inventory-webhook topic string(s), the literal
-  17-mutation `@idempotent` list, `@idempotent` key-uniqueness scope, and the
+- Verification of the Shopify inventory-webhook topic string(s) and the
   exact `stock.quant` field/tracking-reference gaps noted in
-  `ar007-ar008-evidence-refresh.md`.
+  `ar007-ar008-evidence-refresh.md`. **Corrected (PR #66 Fable review):** the
+  literal 17-mutation `@idempotent` list is already itemized in
+  `rb14-part2-open-question-resolution.md` (RQ-005-2) — it is no longer an
+  open item here; only `@idempotent` key-uniqueness scope (per-shop/app/
+  global) and any API-version-specific implementation detail remain open.
 - The exact mechanism by which `shopify_connector_fulfillment` confirms a
   picking's source location against the Shopify fulfillment location (core
   Shopify-Location reference vs. live FulfillmentOrder `assignedLocation`

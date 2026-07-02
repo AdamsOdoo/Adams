@@ -531,3 +531,34 @@ this sprint. DEC-003/004/005/006/007/008/009 were not edited; no code, Odoo modu
 implementation plan was produced. Recommended next (pending this review):
 **ChatGPT/Fable review of DEC-010/DEC-011, then a UX/operator-flow sprint and/or the
 Master Blueprint sprint if accepted.**_
+
+_**PR #66 Fable review — DEC-008 clarification note (2026-07-02) — NOT an architecture
+decision; AR-007/AR-008 remain "Proposed for ChatGPT review," not accepted.** Fable
+reviewed PR #66 and returned **ACCEPT WITH MINOR CHANGES**, including a correction to how
+DEC-010/DEC-011 attribute the proposed shared Shopify-Location reference to DEC-008. For
+the record: **DEC-010/DEC-011 propose a clarification/extension of DEC-008's `core`-owns
+list** — a minimal Shopify Location reference/cache/list may live in
+`shopify_connector_core`; `shopify_connector_inventory` keeps sole ownership of the
+Odoo↔Shopify location **mapping**; `shopify_connector_fulfillment` never depends on
+`shopify_connector_inventory`. This is **not** something DEC-008 already explicitly
+decided — DEC-008 names `core`'s cross-cutting substrate (transport, queue, binding
+abstraction, error registry, setup wizard, dashboard/log center), not Shopify-object
+reference data — so the prior wording (attributing the reference to `core` "already
+owning cross-cutting reference data" under DEC-008) has been corrected in DEC-010,
+DEC-011, and the AR-007/AR-008 briefs to read as a **proposed** clarification. This
+clarification **dissolves the potential DEC-008 link-module question for Phase 1**
+(a possible future glue module letting `fulfillment` reuse `inventory`'s location
+mapping) **without changing DEC-008's dependency direction** and without creating a new
+module. **If DEC-010/DEC-011 are later accepted, the acceptance patch must explicitly
+record this clarification against DEC-008** (mirroring how the DEC-008/DEC-009
+acceptance patch above records its own caveats) — it is not silently folded into DEC-008
+by this note. **DEC-010/DEC-011 remain "Proposed for ChatGPT review," not accepted; AR-007
+and AR-008 remain "Proposed for ChatGPT review," not accepted.** This PR also corrected a
+false repo-evidence claim (the literal 17-mutation `@idempotent` list, already itemized in
+`rb14-part2-open-question-resolution.md`, was previously described as "not itemized in
+repo docs"), added a dated official verification for `FulfillmentInput.lineItemsByFulfillmentOrder`
+and FulfillmentOrder `assignedLocation` (`ar007-ar008-evidence-refresh.md`, access date
+2026-07-02), added a fulfillment operation-serialization guard for unresolved ambiguous
+operations, and added core-Location-reference invariants (no Odoo-location IDs, no mapping
+decisions in the core reference). DEC-003/004/005/006/007/008/009 were not edited; no
+code files changed; implementation remains blocked._

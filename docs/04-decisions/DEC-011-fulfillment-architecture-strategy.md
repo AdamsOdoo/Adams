@@ -94,16 +94,37 @@ sit outside Shopify's 17-mutation `@idempotent` surface.
   used for inventory push decisions; `shopify_connector_fulfillment` must not
   depend on `shopify_connector_inventory` and must not read that mapping
   table. `shopify_connector_fulfillment` may instead use (a) Shopify
-  FulfillmentOrder `assignedLocation` data fetched live from Shopify, and/or
-  (b) a minimal Shopify Location *reference* (store, Shopify Location GID,
-  name, active/status where available, last-synced/seen metadata if later
-  needed — not a mapping) that may live in `shopify_connector_core` as shared
-  substrate, consistent with `core` owning cross-cutting reference data while
-  domain modules own business mappings (DEC-008). This is an
-  **interpretation** of the existing DEC-008 boundary, not an amendment, and
-  **not** a decision to create exact fields or models. The exact mechanism by
-  which fulfillment confirms a picking's source location against the Shopify
-  fulfillment location remains **open for the Master Blueprint**.
+  FulfillmentOrder `assignedLocation` data fetched live from Shopify —
+  **[Official fact, dated verification, PR #66 Fable review]:**
+  `assignedLocation` (type `FulfillmentOrderAssignedLocation!`): "The
+  fulfillment order's assigned location. This is the location where the
+  fulfillment is expected to happen." Source:
+  `shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder`,
+  access date **2026-07-02**, full record in
+  [`ar007-ar008-evidence-refresh.md`](../03-architecture/ar007-ar008-evidence-refresh.md)
+  — and/or (b) a minimal Shopify Location *reference* (store, Shopify
+  Location GID, name, active/status where available, last-synced/seen
+  metadata if later needed — not a mapping) that may live in
+  `shopify_connector_core` as shared substrate. **Attribution corrected (PR
+  #66 Fable review):** this is a **proposed clarification/extension of
+  DEC-008's `core`-owns list** — DEC-008 names `core`'s cross-cutting
+  substrate (transport, queue, binding abstraction, error registry, setup
+  wizard, dashboard/log center) but does not itself say `core` owns
+  Shopify-object reference data, so this is not something DEC-008 already
+  explicitly decided. Proposed by DEC-010/DEC-011; ratified against DEC-008
+  only if ChatGPT accepts DEC-010/DEC-011 — not a full DEC-008 amendment
+  cycle, and no new module. The exact mechanism by which fulfillment
+  confirms a picking's source location against the Shopify fulfillment
+  location remains **open for the Master Blueprint**.
+- **Core Location reference invariants / open questions:** the proposed core
+  Shopify Location reference is **Shopify-side reference data only** — it
+  must **never** store Odoo-location IDs or any Odoo↔Shopify mapping
+  decision, or it becomes a second, competing mapping table; Odoo↔Shopify
+  mapping remains inventory-owned. Exact stale-cache handling, precedence
+  between the cache and a live `assignedLocation` read, and refresh cadence
+  remain **open for the Master Blueprint**; for a specific fulfillment
+  operation, the live FulfillmentOrder `assignedLocation` read should be
+  treated as authoritative unless the Master Blueprint proves otherwise.
 
 ## Tracking update posture
 
@@ -181,6 +202,19 @@ sit outside Shopify's 17-mutation `@idempotent` surface.
   different operation types on the same picking) and the verification-read
   rule (prevents a Shopify-side double fulfillment on ambiguous outcomes) are
   required together — neither alone is sufficient.
+- **Serialization guard for unresolved ambiguous operations [conceptual
+  guard, no implementation fields decided]:** a payload-changing Odoo edit
+  produces a new payload hash and is therefore, by the operation-level key
+  above, formally a *new* operation — but operations against the same
+  `(store, picking, Shopify target)` must be **serialized** while a prior
+  operation against that same target is unresolved (still
+  `blocked_manual_review` or awaiting a verification read). A corrected
+  tracking update or a new fulfillment operation must **not** dispatch
+  blindly while an earlier ambiguous operation against the same target is
+  unresolved — it must first verify/match current Shopify state (the same
+  verification-read rule above) or remain blocked/manual-review until the
+  earlier operation resolves. Exact implementation (queue-level lock, DB
+  constraint, or job-state check) remains a Master Blueprint item.
 
 ## User-facing log/audit requirements
 
@@ -227,6 +261,7 @@ the primary UX (extends DEC-009 §8, unchanged).
 | Double fulfillment on a retried, ambiguous-outcome write | DEC-009 ambiguous-outcome rule (verification read or manual review) + an operation-type-scoped idempotency key (RA-014, RA-017) |
 | A tracking update (or corrected tracking update) mistakenly treated as the same operation as fulfillment creation, or vice versa | Operation-level idempotency key includes operation type + Shopify target ID + payload version/hash, not just the picking ID |
 | Duplicate tracking updates from a blind resend | Same ambiguous-outcome rule applied to `fulfillmentTrackingInfoUpdate`, keyed separately from fulfillment creation |
+| A new/corrected operation dispatching against the same target while a prior ambiguous operation is still unresolved | Serialization guard: operations against the same `(store, picking, Shopify target)` are serialized — a new/corrected operation must verify/match current Shopify state or stay blocked/manual-review until the earlier operation resolves |
 | Silently depending on `shopify_connector_inventory` for location data, contradicting DEC-008 | Clarified: `fulfillment` never depends on `inventory`'s mapping table; a minimal shared Shopify-Location reference may live in `core` instead — exact confirmation mechanism left open for the Master Blueprint, not silently resolved |
 | Over-scoping multi-package/multi-location automation into Phase 1 | Explicitly deferred per the existing DEC-003/C-FUL-02 boundary, not attempted here |
 
