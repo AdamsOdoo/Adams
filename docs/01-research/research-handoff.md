@@ -45,8 +45,10 @@
   Shopify inventory-object mapping (`(store, inventory_item_id, location_id)` binding
   identity), the Odoo quantity concept (Odoo's "Free to Use" as the directional Phase 1
   candidate, exact field open), location architecture (explicit non-inferred mapping;
-  block on missing/ambiguous mapping; a flagged open issue on sharing Shopify-Location
-  reference data with fulfillment without violating DEC-008), sync trigger (layered:
+  block on missing/ambiguous mapping; a clarified ownership principle — `core` may hold
+  a minimal Shopify Location reference, `inventory` keeps owning the Odoo↔Shopify
+  location mapping, `fulfillment` never depends on `inventory` — not a DEC-008
+  amendment), sync trigger (layered:
   scheduled + manual + event-driven enqueue; webhook import flagged unverified), inventory
   operation style (`inventorySetQuantities` compare-and-set preferred, DEC-009 idempotency/
   ambiguous-outcome rules applied), conflict handling, user-facing log requirements, and
@@ -58,8 +60,9 @@
   the setting persisted per job at enqueue time, single-fulfillment-location Phase 1
   posture with multi-package/multi-location deferred (existing C-FUL-02 boundary, not a new
   rejection), the DEC-009 ambiguous-outcome rule applied to both fulfillment mutations
-  (neither is on Shopify's 17-mutation `@idempotent` list), and the same flagged
-  shared-location-reference-data open issue mirrored from the AR-007 brief. Ran a **small,
+  (neither is on Shopify's 17-mutation `@idempotent` list), and the same clarified
+  shared-Shopify-Location-reference ownership principle mirrored from the AR-007 brief
+  (not a DEC-008 amendment). Ran a **small,
   targeted official-source check** (`ar007-ar008-evidence-refresh.md`, access date
   2026-07-02) against official Odoo 19.0 documentation for inventory-quantity report
   concepts (On Hand / Free to Use / Forecasted), warehouse/location types, and third-party
@@ -96,27 +99,31 @@
   cadence; exact feature-flag/config-model mechanism (already routed to UX/operator-flow
   and Master Blueprint per DEC-008); exact fulfillment mutation parameters; exact tracking
   field source; exact notification-UI granularity (DEC-007's own open fork); exact retry
-  constants; the shared Shopify-Location-reference-data placement question (flagged as an
-  open issue for a possible later DEC-008 amendment, not decided by either DEC-010 or
-  DEC-011); the Master Blueprint; all implementation.
+  constants; the exact fulfillment location-confirmation mechanism (the ownership
+  principle — `core` may hold a minimal Shopify Location reference, `inventory` keeps
+  the mapping, `fulfillment` never depends on `inventory` — is clarified in DEC-010/
+  DEC-011 as an interpretation consistent with DEC-008, not a DEC-008 amendment; only
+  the exact mechanism/fields/models remain open); the Master Blueprint; all
+  implementation.
 - **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
   patterns:** none at threshold. **Rules/checklists updated:** none new. **New rejected
   approaches:** RA-018 through RA-023 added (PROPOSED, non-binding). **New technical
   debt:** none (no code). **Architecture concerns:** AR-007 and AR-008 move to "Proposed
   for ChatGPT review" (not yet accepted); AR-002/AR-003/AR-004/AR-005/AR-006 unchanged
-  ("Accepted"). A module-boundary open issue was surfaced (shared Shopify-Location
-  reference data for `inventory`/`fulfillment` without violating DEC-008's no-inventory-
-  dependency rule) and routed to architecture review rather than resolved unilaterally,
-  consistent with the sprint's instruction to prefer a design that fits DEC-008 and flag
-  any identified contradiction for a later amendment.
+  ("Accepted"). A module-boundary ownership question was clarified (a minimal shared
+  Shopify-Location reference may live in `core`; `inventory` keeps owning the Odoo↔
+  Shopify location mapping; `fulfillment` never depends on `inventory`) as an
+  **interpretation consistent with DEC-008**, not a DEC-008 amendment and not a
+  contradiction — only the exact fulfillment location-confirmation mechanism remains
+  open for the Master Blueprint.
 - **Quality gate confirmation:** handoff updated (this note) · feedback loop checked ·
   learning captured (no new issues) · rejected approaches logged (RA-018–023, PROPOSED) ·
   technical debt logged (none applicable — no code) · repeated-issue escalation applied
   (none at threshold) — all **YES**.
 - **Next recommended session:** 1) **ChatGPT/Fable review of DEC-010/DEC-011** (including
-  the flagged shared-location-reference-data open issue); 2) **UX/operator-flow sprint**;
-  3) **Master Blueprint**, after those gates; 4) **Implementation only after a separate
-  ChatGPT gate.**
+  verifying the clarified shared-Shopify-Location-reference ownership interpretation);
+  2) **UX/operator-flow sprint**; 3) **Master Blueprint**, after those gates;
+  4) **Implementation only after a separate ChatGPT gate.**
 - **Stop condition:** stopped after three focused commits + one **draft** PR into
   `Shopify-connector` (not merged). PR #65 merge confirmed first. DEC-003/DEC-004/
   DEC-005/DEC-006/DEC-007/DEC-008/DEC-009 not edited; no code files changed; AR-007 and
