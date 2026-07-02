@@ -1,15 +1,67 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Evidence Refresh +
-> Combined AR-002/003/005 Decision Preparation)** is immediately below, in the
-> **compact handoff format** (`../06-prompts/session-handoff-template.md`);
-> **Control-Room Reset Sprint 1**, **RB-14 Architecture Preparation — Part 2**,
-> **RB-14 Part 1**, **Research Sprint C2**, **Product Sprint G**, **Sprint F**,
-> **Sprint E**, **Sprint D**, **Sprint C**, **Sprint B**, and **Sprint A**
-> handoffs are retained underneath as history. The running **Sprint checkpoint
-> log** (one note per stage, all sprints) is at the very bottom. The
-> **product-side** handoff lives at
+> Continuity lives in GitHub, not chat. The **current entry (DEC-004/005/006
+> Acceptance Patch)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **Evidence Refresh + Combined
+> AR-002/003/005 Decision Preparation**, **Control-Room Reset Sprint 1**, **RB-14
+> Architecture Preparation — Part 2**, **RB-14 Part 1**, **Research Sprint C2**,
+> **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
+> **Sprint B**, and **Sprint A** handoffs are retained underneath as history. The
+> running **Sprint checkpoint log** (one note per stage, all sprints) is at the
+> very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-004/005/006 Acceptance Patch — compact handoff (2026-07-02)
+
+> **Architecture acceptance patch, not implementation.** Confirmed PR #60 merged into
+> `Shopify-connector` (merge commit `7eb875e4ca29b80c4745bd8f5354450aa1e4d37b`) before
+> editing. Branch created from latest `Shopify-connector` using the preferred name
+> `architecture/accept-dec004-dec005-dec006` (no harness override observed this
+> session). Recorded ChatGPT's formal acceptance of DEC-004, DEC-005, and DEC-006.
+
+- **Branch / PR:** `architecture/accept-dec004-dec005-dec006` → draft PR into
+  `Shopify-connector`, opened immediately after this handoff commit, **not merged**.
+- **Files changed:** `docs/04-decisions/DEC-004-distribution-api-auth-strategy.md`,
+  `docs/04-decisions/DEC-005-sync-orchestration-strategy.md`,
+  `docs/04-decisions/DEC-006-binding-dedup-identity-strategy.md`,
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/rejected-approaches-log.md`,
+  `docs/01-research/research-handoff.md` (this file).
+- **What changed:** DEC-004/005/006 Status changed from `Proposed for ChatGPT review`
+  to **`Accepted by ChatGPT`**, acceptance date **2026-07-02**; opening notes reworded
+  from "proposal, not an acceptance" to "accepted architecture decision record";
+  no-implementation clauses kept but reworded (acceptance ≠ automatic implementation
+  authorization — the separate Phase 1 research-phase-exit + implementation gate
+  still applies, `../05-qa/quality-feedback-loop.md` §10). AR-002/AR-003/AR-005 Review
+  decision + Status cells in `architecture-review-log.md` changed to **"Accepted by
+  ChatGPT"** / **"Accepted"**, linked to the now-accepted DEC files. RA-002 through
+  RA-007 in `rejected-approaches-log.md` had the `PROPOSED:` prefix removed and their
+  "Related decision record" cells updated to cite each DEC file's `Accepted by
+  ChatGPT` status — **these six rows are now binding final rejected approaches**
+  (`CLAUDE.md` §10 applies in full); the prior "non-binding until acceptance"
+  governance note is superseded, not deleted. `docs/04-decisions/README.md` now
+  describes DEC-004/005/006 as accepted (the first accepted architecture ADRs in the
+  repo), keeps the DEC-vs-ADR-NNNN naming note, and states implementation is not
+  automatically authorized until the next implementation-gate/blueprint phase.
+- **Items deferred:** none new this patch (decision-substance unchanged; only
+  status/acceptance wording updated, per this sprint's explicit scope).
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new.
+  **New rejected approaches:** none new (RA-002–RA-007 finalized, not created).
+  **New technical debt:** none (no code). **Architecture concerns:** AR-002/AR-003/
+  AR-005 now **Accepted**; AR-004/AR-006/AR-007/AR-008 **still not decided**.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop checked
+  · learning captured (no new issues) · rejected approaches finalized (RA-002–RA-007)
+  · technical debt logged (none applicable — no code) · repeated-issue escalation
+  applied (none at threshold) — all **YES**.
+- **Next recommended session:** **Phase 1 Domain Model + DEC-003 Scope-Hole
+  Closure.**
+- **Stop condition:** stopped after one commit + one **draft** PR into
+  `Shopify-connector` (not merged). PR #60 merge confirmed first. DEC-003 untouched;
+  no code files changed; AR-004/006/007/008 not decided; implementation still not
+  authorized; `main` and plain `dev` untouched. Awaiting further instruction.
 
 ---
 
