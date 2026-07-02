@@ -49,7 +49,11 @@
       decision.
 - [ ] **Access issues recorded** — blocked/auth-walled sources noted; no bypass
       attempted.
-- [ ] **No premature architecture / no MVP finalization.**
+- [ ] **No premature architecture decision** (AR-002…AR-008 stay "Not decided"
+      until ChatGPT accepts a candidate). **No unauthorized MVP scope change**
+      beyond the accepted baseline in `../04-decisions/DEC-003-mvp-scope.md`
+      (DEC-003 itself is finalized — re-proposing/re-deciding MVP scope from
+      scratch is not required or expected).
 - [ ] **GitHub updated** — output is committed files, not just chat.
 - [ ] **Handoff updated** — including the Learning feedback loop section.
 - [ ] **Token discipline** — no redundant re-fetching / re-derivation.

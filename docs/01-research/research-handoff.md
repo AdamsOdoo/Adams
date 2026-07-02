@@ -1,11 +1,129 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current sprint handoff (RB-14 Architecture
-> Preparation — Part 2)** is immediately below; the **RB-14 Part 1**, **Research Sprint C2**,
-> **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**, **Sprint B**, and
-> **Sprint A** handoffs are retained underneath as history. The running **Sprint checkpoint log**
-> (one note per stage, all sprints) is at the very bottom. The **product-side** handoff lives at
+> Continuity lives in GitHub, not chat. The **current entry (Control-Room Reset
+> Sprint 1)** is immediately below, in the new **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **RB-14 Architecture
+> Preparation — Part 2**, **RB-14 Part 1**, **Research Sprint C2**, **Product
+> Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
+> **Sprint B**, and **Sprint A** handoffs are retained underneath as history.
+> The running **Sprint checkpoint log** (one note per stage, all sprints) is at
+> the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Control-Room Reset Sprint 1 — compact handoff (2026-07-02)
+
+> **Documentation residue sweep, convergence gates, and anti-bloat maintenance
+> rule.** A mechanical cleanup/convergence sprint (not research) run after PR #58
+> (RB-14 Part 2) merged into `Shopify-connector`. No high-power mode used (repo-
+> local reading/grep only). Full detail:
+> [`../05-qa/documentation-residue-sweep.md`](../05-qa/documentation-residue-sweep.md).
+
+- **Branch / PR:** `claude/ready-check-nb2y99` (harness-assigned) → draft PR
+  into `Shopify-connector`, **not merged**.
+- **Files changed:** `docs/04-decisions/README.md`, `docs/03-architecture/README.md`,
+  `docs/05-qa/pr-review-checklist.md`, `docs/02-product/mvp-scope.md`,
+  `docs/02-product/feature-taxonomy.md`, `docs/02-product/product-vision.md`,
+  `docs/02-product/setup-ux-principles.md`,
+  `docs/00-source-materials/screenshots/teqstars/README.md`,
+  `docs/00-source-materials/source-access-notes.md`,
+  `docs/01-research/research-backlog.md`,
+  `docs/05-qa/rejected-approaches-log.md`,
+  `docs/05-qa/documentation-residue-sweep.md` (new),
+  `docs/05-qa/quality-feedback-loop.md`, `CLAUDE.md`,
+  `docs/06-prompts/session-handoff-template.md`,
+  `docs/01-research/research-handoff.md` (this file),
+  `docs/05-qa/architecture-review-log.md`, `docs/05-qa/defect-pattern-log.md`.
+- **What changed / residue fixed:** stale "MVP not finalized" / "Proposed —
+  pending ChatGPT acceptance" statements corrected against the accepted
+  DEC-003 baseline (`mvp-scope.md`, `feature-taxonomy.md`, `product-vision.md`,
+  `setup-ux-principles.md`); TeqStars/TQ 403-blocked residue corrected against
+  the Sprint C2 rebaseline (teqstars screenshot README, `source-access-notes.md`);
+  `docs/04-decisions/README.md` and `docs/03-architecture/README.md` "Empty"
+  claims corrected; `pr-review-checklist.md`'s MVP-finalization checkbox
+  reworded (still blocks unauthorized architecture/implementation);
+  `research-backlog.md`'s "Not started"/"Blocked" statuses corrected to `Done`
+  for completed items (R5 / RB-02.6 correctly stays `Blocked`); DEC-003's
+  Option C rejection logged as **RA-001** in `rejected-approaches-log.md`;
+  added phase-exit criteria + a documentation-maintenance rule
+  (`quality-feedback-loop.md` §10–§11, `[Recommendation — becomes binding when
+  merged by ChatGPT]`, pointed to from `CLAUDE.md`); aligned
+  `session-handoff-template.md` to a compact default (this entry uses it).
+- **Items deferred:** off-allowed-list files with likely-already-fixed
+  TeqStars residue (`ux-ui-benchmark.md`, `common-patterns.md`,
+  `best-in-class-observations.md`, `avoid-list.md`, `competitor-deep-dives.md`,
+  `competitor-screenshot-inventory.md` — not verified or edited this sprint);
+  two stale TeqStars references inside **DEC-003 itself** (read-only this
+  sprint — flagged for a future dated post-decision note, not added here); the
+  `DEC-003` vs `ADR-NNNN-<slug>.md` naming/numbering inconsistency (flagged for
+  ChatGPT, not resolved/invented).
+- **Learning feedback loop:** new issue — **documentation residue: stale
+  current-truth statements not updated when a later decision supersedes them,
+  plus append-only handoff growth** — logged as **DP-007**
+  (`defect-pattern-log.md`, category: unclear handoff #16, 1st occurrence;
+  prevention = this sprint's phase-exit + documentation-maintenance rules).
+  No repeated pattern at threshold. Rules updated:
+  `quality-feedback-loop.md` §10–§11 (new). New rejected approach: RA-001
+  (Option C, sourced from the existing DEC-003 decision, not newly rejected
+  this sprint). No new technical debt (no code). Architecture concerns: none —
+  no AR row touched; all stay "Not decided / Evidence pending" (non-decision
+  note added to `architecture-review-log.md`). Should future prompts change?
+  **Yes, minor** — future research/product sprints should correct a
+  Status/Governance line **at the time** a later decision supersedes it,
+  rather than leaving it for a dedicated cleanup sprint.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (DP-007) · rejected approach logged (RA-001) ·
+  technical debt logged (none applicable — no code) · repeated-issue
+  escalation applied (none at threshold) — all **YES**.
+- **Compact handoff deviation:** authorized by this sprint's prompt
+  (Control-Room Reset Sprint 1, "Compact handoff authorization"); recorded per
+  that authorization.
+- **Next recommended sprint:** **Evidence Refresh + Combined AR-002/003/005
+  Decision Preparation**, after ChatGPT/Fable review of this PR.
+- **Stop condition:** stopped after one draft PR into `Shopify-connector`
+  (not merged). No connector code, no Odoo module, no forbidden files touched.
+  DEC-003 body not edited; MVP scope unchanged; no AR row decided. `main` and
+  plain `dev` untouched. Awaiting ChatGPT/Fable review.
+
+### Control-Room Reset Sprint 1 — PR #59 revision (2026-07-02, ChatGPT REVISE)
+
+> ChatGPT reviewed PR #59: **REVISE** — stayed in scope, but the first pass
+> missed several current-truth stale residues in allowed files. Full detail:
+> [`../05-qa/documentation-residue-sweep.md`](../05-qa/documentation-residue-sweep.md)
+> ("PR #59 revision" section).
+
+- **Files updated (this revision only):** `docs/02-product/feature-taxonomy.md`,
+  `docs/02-product/capability-evidence-map.md`,
+  `docs/02-product/setup-ux-principles.md`, `docs/03-architecture/README.md`,
+  `docs/05-qa/rejected-approaches-log.md`,
+  `docs/05-qa/documentation-residue-sweep.md`,
+  `docs/01-research/research-handoff.md` (this file),
+  `docs/05-qa/defect-pattern-log.md` (addendum note, no new row).
+- **Residue fixed:** missed TeqStars/TQ 403/claim-only wording in
+  `feature-taxonomy.md` (evidence-weighting + "weak or blocked evidence"
+  section, routing language, no new per-cell claims) and
+  `capability-evidence-map.md` (competitor-keys line + `C-DOCS-01/02` rows,
+  corrected against already-merged Sprint C2 evidence only); stale
+  single-store/multi-store "not decided" wording in `feature-taxonomy.md`
+  (3 locations) corrected against DEC-003; stale Odoo Online
+  compatibility "open question" in `setup-ux-principles.md` (2 locations)
+  corrected against RB-14 Part 2 (PR #58); `rejected-approaches-log.md`'s
+  historical notes still implying no rejection existed, now marked
+  superseded by RA-001; `docs/03-architecture/README.md`'s "What belongs
+  here" line still naming the phantom `architecture-preparation.md`.
+- **Learning feedback loop:** addendum to **DP-007** (`defect-pattern-log.md`)
+  — same category/root cause, not a new occurrence; reinforces that a residue
+  sweep must grep a pattern across *every* allowed file, not stop at the first
+  hit per file. No new rejected approach; no new technical debt; no AR row
+  touched.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (DP-007 addendum) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed — all **YES**.
+- **Stop condition:** stopped after pushing one commit to the same PR #59
+  branch (not merged, no new PR opened). DEC-003 body untouched; MVP scope
+  unchanged; no architecture decision made; `main`/plain `dev` untouched.
+  Awaiting ChatGPT/Fable re-review.
 
 ---
 

@@ -11,9 +11,13 @@
 - **Sprint:** Product Sprint E (RB-11). **Phase:** product strategy / synthesis —
   **no-code gate in force** (`CLAUDE.md` §4–§5). **Decides nothing.**
 - **Governance:** every principle is a **product recommendation / inference /
-  input**. **No MVP scope, no architecture, no ADRs, no module boundaries, no data
-  models, no final UI** are decided here (MVP = RB-13, architecture = RB-14 /
-  AR-002…AR-008, both gated).
+  input**. **The MVP scope is now accepted** (RB-13, Product Sprint G,
+  [`DEC-003`](../04-decisions/DEC-003-mvp-scope.md), 2026-07-01 — later than this
+  document's Sprint E authoring date); these UX principles were not rewritten
+  against that later baseline, so read them as directional principles, not a
+  scope statement. **No architecture, no ADRs, no module boundaries, no data
+  models, no final UI** are decided here (architecture = RB-14 / AR-002…AR-008,
+  gated).
 - **Evidence discipline (DP-003 / DP-004 / DP-006):** competitor UX observations
   stay **claims / demonstrated-on-a-specific-screen**, never elevated to facts;
   improvement ideas are **inference**, not demonstrated competitor capability;
@@ -24,8 +28,11 @@
 - **Evidence weighting:** demonstrated UX evidence is strongest for **Emipro (EM,
   real screenshots)** and **VentorTech (VT, dated release notes + KB screenshots)**;
   **sh_shopify_connector (SH)** is caption-level; **Webkul (WK)** guide-level; **EC**
-  has **no UI screenshots**; **Teqstars (TQ)** docs are 403-blocked → UX
-  unverifiable (`../01-research/ux-ui-benchmark.md` evidence base).
+  has **no UI screenshots**; **Teqstars (TQ)** docs were 403-blocked at this
+  document's Sprint E authoring date — **superseded**: Research Sprint C2
+  (2026-07-01) rebaselined TQ as **Accessible**, reading 31 doc pages with ~98
+  embedded screenshots (`../01-research/ux-ui-benchmark.md` evidence base; this
+  UX-principles document itself was not rewritten against that later evidence).
 - **Dates:** competitor evidence access **2026-06-30**; session **2026-07-01**.
 
 ## Purpose
@@ -85,8 +92,15 @@ or pasting long scope strings.
 - *Conditional (DP-006):* **OAuth-first is a strong direction but conditional** —
   mandatory only if public/App-Store distribution is chosen; custom/private flows
   may use token/custom-app access. Distribution is **open (AR-002)** and not decided
-  here. Whether the queue layer can avoid mandatory `odoo.conf` edits / work on Odoo
-  Online is an **[Open question]** (AR-003).
+  here. **Resolved by RB-14 Part 2 (PR #58, 2026-07-01):** the custom connector
+  module does **not** target **Odoo Online** — Odoo Online is **incompatible
+  with custom modules** ([Official fact], `../01-research/odoo-official-architecture-notes.md`),
+  so this is a substrate exclusion, not an open question. **Still open (AR-003):**
+  whether **Odoo.sh / on-prem** setup can avoid mandatory `odoo.conf` edits
+  (`server_wide_modules`, `queue_job` channels, ≥2 workers), whether `ir.cron` /
+  an internal queue is sufficient, and whether any optional later queue
+  dependency (e.g. OCA `queue_job`) requires server configuration beyond
+  `ir.cron`.
 
 ## Principle 2 — Prove readiness before sync
 
@@ -241,9 +255,12 @@ In-product help and external docs reflect the **actual** screens, jargon, and
 limitations the user sees — open, screenshot-rich, honest, and current.
 
 - *Evidence:* EM's rich, screenshot-heavy, honest docs (states limitations plainly)
-  and VT's dated release notes lead (**[Demonstrated]**); **TQ docs 403-blocked, EC
-  no screenshots + gated setup guide, SH no changelog** are anti-patterns; EM's
-  docs also cite a **stale** Shopify figure (O-DOC-1, A-DOC-1/2/3, C-DOCS-01/02).
+  and VT's dated release notes lead (**[Demonstrated]**); **EC no screenshots +
+  gated setup guide, SH no changelog** are anti-patterns; **TQ docs were
+  403-blocked in Sprint C (an anti-pattern at that time) — superseded: Sprint C2
+  (2026-07-01, PR #56) rebaselined TQ docs as Accessible and mostly demonstrated,
+  no longer an anti-pattern**; EM's docs also cite a **stale** Shopify figure
+  (O-DOC-1, A-DOC-1/2/3, C-DOCS-01/02).
 - *Principle:* open, non-gated, screenshot-rich docs; inline help anchored to real
   fields; a dated changelog that discloses fixes and cites **current** platform
   figures (ties to DP-001); honest limitation disclosure.
@@ -374,13 +391,20 @@ anti-patterns; recommendations, not rejected-approach decisions per `CLAUDE.md` 
 3. Per-object vs global **freshness** indicators (Principle 4)?
 4. The auto-retry-vs-human **error taxonomy** and retry mechanism (Principle 6 →
    AR-006)?
-5. Can the setup avoid mandatory `odoo.conf`/queue prerequisites and work on Odoo
-   Online (Principle 1 → AR-003)?
-6. Single- vs multi-store / single- vs multi-company at MVP, and the **feature-flag**
-   model for modular visibility (Principles 10/11 → RB-13 / AR-004)?
+5. ~~Can the setup ... work on Odoo Online?~~ **Resolved (RB-14 Part 2, PR #58):**
+   no — Odoo Online is incompatible with custom modules, so the substrate is
+   Odoo.sh/on-prem. **Still open (AR-003):** can Odoo.sh/on-prem setup avoid
+   mandatory `odoo.conf`/queue prerequisites (Principle 1)?
+6. **Resolved by DEC-003 (RB-13, 2026-07-01):** MVP is **single-store,
+   single-company**; multi-store/multi-company is later. **Still open:** the
+   **feature-flag** model for modular visibility (Principles 10/11 → AR-004),
+   and the architecture mechanism for future multi-store/multi-company
+   (AR-004/AR-005).
 7. Do EM/SH/WK config screens actually have inline help/tooltips (not visible in
-   Sprint C extraction)? Does firming up TQ (403) / EC (no screenshots) change any UX
-   principle?
+   Sprint C extraction)? **TQ was firmed up in Sprint C2 (Accessible, mostly
+   demonstrated) and did not change any UX principle in this document** (not
+   re-derived here — see `../01-research/ux-ui-benchmark.md`). Does EC (no
+   screenshots, still Blocked) change any UX principle?
 8. Demo/docs hosting and built-in self-test scope (Principle 12; O-TEST-1)?
 
 ## Review notes for ChatGPT

@@ -12,9 +12,13 @@
 - **Sprint:** Product Sprint E (RB-11). **Phase:** product strategy / synthesis —
   **no-code gate in force** (`CLAUDE.md` §4–§5). This document **decides nothing**.
 - **Governance:** everything here is a **product thesis / principle / inference /
-  recommendation / input**. **No MVP scope is finalized** (that is RB-13, gated),
-  **no architecture is decided** (RB-14 / AR-002…AR-008, all "Not decided /
-  Evidence pending"), **no ADRs, no module boundaries or names, no data models**.
+  recommendation / input**. **The MVP scope is now accepted** (RB-13, Product
+  Sprint G, [`DEC-003`](../04-decisions/DEC-003-mvp-scope.md), 2026-07-01 —
+  later than this document's Sprint E authoring date); this vision document was
+  not rewritten against that later baseline, so read it as directional strategy,
+  not a scope statement. **No architecture is decided** (RB-14 / AR-002…AR-008,
+  all "Not decided / Evidence pending"), **no ADRs, no module boundaries or
+  names, no data models**.
 - **Evidence discipline (DP-003 / DP-004 / DP-006):** competitor claims stay
   **claims**; a configuration field is **not** demonstrated support; a market
   promise is **not** demonstrated bidirectionality; conditional platform
