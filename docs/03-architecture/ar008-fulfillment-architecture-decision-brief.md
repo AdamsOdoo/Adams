@@ -3,12 +3,19 @@
 > Evidence-backed decision brief prepared for **AR-008** (fulfillment
 > architecture) during the **AR-007 + AR-008 Decision Preparation** sprint
 > (2026-07-02), after DEC-008/DEC-009 acceptance (PR #65 merged into
-> `Shopify-connector`). This brief **proposes** a Phase 1 fulfillment
-> architecture for ChatGPT/Fable review — it does **not** itself accept a
-> decision. The corresponding proposed decision record is
+> `Shopify-connector`). This brief **proposed** a Phase 1 fulfillment
+> architecture for ChatGPT/Fable review. **DEC-011 is now `Status: Accepted
+> by ChatGPT` (2026-07-02, after PR #66 merged into `Shopify-connector` and
+> Fable's minor-change review was applied), and AR-008 is now accepted
+> through DEC-011.** This brief remains the evidence-backed decision brief
+> behind
 > [`../04-decisions/DEC-011-fulfillment-architecture-strategy.md`](../04-decisions/DEC-011-fulfillment-architecture-strategy.md)
-> (`Status: Proposed for ChatGPT review`). **No implementation is authorized
-> by this brief.**
+> — it does **not** itself decide anything or authorize implementation;
+> acceptance flows through DEC-011. Exact schema, fields, tracking source,
+> backorder linkage, notification UI granularity, retry constants,
+> location-confirmation mechanism, operation-key schema, and other Master
+> Blueprint items remain open (§10). **No implementation is authorized by
+> this brief.**
 
 ## Claim classification (used throughout this brief)
 
@@ -528,7 +535,9 @@ does **not** revisit DEC-003/004/005/006/007/008/009.
 
 ## What this brief does not decide
 
-- Does not accept DEC-011.
+- Does not itself decide anything or authorize implementation — acceptance
+  of AR-008 flows through DEC-011, now `Status: Accepted by ChatGPT`
+  (2026-07-02).
 - Does not decide exact model fields, database constraints, or Python/ORM
   design.
 - Does not create Odoo modules, code, or tests.
