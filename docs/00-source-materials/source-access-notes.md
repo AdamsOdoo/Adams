@@ -22,6 +22,10 @@
 
 ## Access summary (2026-06-30)
 
+> **Superseded for R2 only, 2026-07-01:** see "R2 status correction — Sprint
+> C2" below the R2 section. R2 is now **Accessible**; this dated table is
+> retained as the original Sprint B snapshot.
+
 | Status | Count | Resources | Deep-dive ready? |
 | --- | --- | --- | --- |
 | **Accessible** | 5 | R1 Webkul, R3 Emipro, R6 ecommerce_shopify, R7 VentorTech site, R8 sh_shopify_connector | Yes |
@@ -79,6 +83,21 @@
 - **Ready for deep dive:** **No / blocked** (RB-02.2 stays Blocked). The deep
   dive needs an alternate fetch path for the 19.0 docs, or an explicit ChatGPT
   decision to accept the 16.0 mirror as a non-equivalent fallback.
+
+### R2 status correction — Sprint C2 (2026-07-01, current)
+
+**The Blocked snapshot above is retained as audit trail and is not rewritten.**
+Research Sprint C2 (2026-07-01) re-checked R2 and found it **Accessible**: the
+recommended unblock action above (an alternate/browser user-agent fetch) was
+executed and returned **HTTP 200** — confirming the 403 was a **bot/UA filter,
+not a login wall** (no authentication bypassed). **31 Odoo 19.0 Shopify doc
+pages** were read in full (setup, product/customer/order management,
+collections/catalogs, metafields, payouts, FAQ, support policy; ~98 embedded
+screenshots). **Ready for deep dive: Yes** (RB-02.2 is now **Done**, not
+Blocked) — see `../01-research/competitor-deep-dives.md` (Teqstars section)
+and `competitor-source-notes.md` (R2 "Sprint C2" subsections) for the
+page-classified evidence. Full detail:
+`../01-research/resource-inventory.md` ("Sprint C2 access change" section).
 
 ## R3 — Emipro: Shopify Odoo Connector docs v19 (installation)
 

@@ -11,9 +11,13 @@
 - **Sprint:** Product Sprint E (RB-11). **Phase:** product strategy / synthesis —
   **no-code gate in force** (`CLAUDE.md` §4–§5). **Decides nothing.**
 - **Governance:** every principle is a **product recommendation / inference /
-  input**. **No MVP scope, no architecture, no ADRs, no module boundaries, no data
-  models, no final UI** are decided here (MVP = RB-13, architecture = RB-14 /
-  AR-002…AR-008, both gated).
+  input**. **The MVP scope is now accepted** (RB-13, Product Sprint G,
+  [`DEC-003`](../04-decisions/DEC-003-mvp-scope.md), 2026-07-01 — later than this
+  document's Sprint E authoring date); these UX principles were not rewritten
+  against that later baseline, so read them as directional principles, not a
+  scope statement. **No architecture, no ADRs, no module boundaries, no data
+  models, no final UI** are decided here (architecture = RB-14 / AR-002…AR-008,
+  gated).
 - **Evidence discipline (DP-003 / DP-004 / DP-006):** competitor UX observations
   stay **claims / demonstrated-on-a-specific-screen**, never elevated to facts;
   improvement ideas are **inference**, not demonstrated competitor capability;
@@ -24,8 +28,11 @@
 - **Evidence weighting:** demonstrated UX evidence is strongest for **Emipro (EM,
   real screenshots)** and **VentorTech (VT, dated release notes + KB screenshots)**;
   **sh_shopify_connector (SH)** is caption-level; **Webkul (WK)** guide-level; **EC**
-  has **no UI screenshots**; **Teqstars (TQ)** docs are 403-blocked → UX
-  unverifiable (`../01-research/ux-ui-benchmark.md` evidence base).
+  has **no UI screenshots**; **Teqstars (TQ)** docs were 403-blocked at this
+  document's Sprint E authoring date — **superseded**: Research Sprint C2
+  (2026-07-01) rebaselined TQ as **Accessible**, reading 31 doc pages with ~98
+  embedded screenshots (`../01-research/ux-ui-benchmark.md` evidence base; this
+  UX-principles document itself was not rewritten against that later evidence).
 - **Dates:** competitor evidence access **2026-06-30**; session **2026-07-01**.
 
 ## Purpose

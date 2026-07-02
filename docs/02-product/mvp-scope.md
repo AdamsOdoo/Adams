@@ -1478,9 +1478,10 @@ These make "small but excellent" mean *correct under failure*, not *thin*:
   (multi-location, avoid double-decrement).
 - **Fulfilment correctness** — C-FUL-01 (FulfillmentOrder, not legacy).
 
-> All correctness items above are **Proposed MVP inclusion — pending ChatGPT
-> acceptance**; the ones tagged with an AR row are **Architecture-dependent — must be
-> resolved in RB-14 before implementation** (mechanism only; the requirement stands).
+> All correctness items above are **accepted MVP inclusions** (DEC-003, RB-13,
+> 2026-07-01); the ones tagged with an AR row are **Architecture-dependent — the
+> mechanism must still be resolved in RB-14 before implementation** (the
+> requirement itself is accepted; only *how* it is built is not decided).
 
 ## MVP-critical UX capabilities
 

@@ -1989,6 +1989,8 @@ screenshot) evidence are flagged so they are **not overstated** downstream:
   (architecture prep) as the next gated steps, consuming this taxonomy + the
   evidence map.
 
-> **Nothing in this document is a decision.** MVP scope (RB-13), architecture
-> (RB-14 / AR-002…AR-008), and module boundaries remain **gated** pending ChatGPT
-> review (`CLAUDE.md` §4–§5, §9–§10).
+> **Nothing in this document is an architecture decision.** MVP scope (RB-13) is
+> **accepted** — see [`DEC-003`](../04-decisions/DEC-003-mvp-scope.md) — but
+> **architecture** (RB-14 / AR-002…AR-008) and **module boundaries** remain
+> **gated** pending ChatGPT review (`CLAUDE.md` §4–§5, §9–§10). Capability
+> classifications below are inputs to those still-gated reviews, not decisions.
