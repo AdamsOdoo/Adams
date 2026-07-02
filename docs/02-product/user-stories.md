@@ -33,15 +33,16 @@
   auto-apply) are labelled inference.
 - **Dates:** competitor evidence access **2026-06-30**; session **2026-07-01**.
 
-> **DEC-007 proposed addition note (2026-07-02) — proposed, not accepted.** The proposed
+> **DEC-007 accepted addition note (2026-07-02) — accepted by ChatGPT.**
 > [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
-> (`Status: Proposed for ChatGPT review`) motivated five new stories added this sprint:
+> (`Status: Accepted by ChatGPT`, acceptance date 2026-07-02) motivated five stories added
+> in the sprint that proposed it, now **accepted Phase 1 scope-clarification stories**:
 > **US-E2-07** (variant export/update), **US-E2-08** (product/variant export
 > preview/dry-run), **US-E5-06** (first inventory push guard), **US-E6-04** (fulfilment
 > customer-notification control), and **US-E4-07** (financial evidence mapping). Each is
-> tagged `MVP` because it clarifies an existing DEC-003 MVP capability, not because it adds
-> a new one. **Until ChatGPT accepts DEC-007, treat these five stories as proposed
-> clarifications of the existing MVP epics, not as accepted additions.**
+> tagged `MVP` because it clarifies an existing DEC-003 MVP capability that this
+> acceptance now confirms, not because it introduces an unrelated new epic. Implementation
+> remains blocked.
 
 ## Purpose
 
@@ -288,7 +289,7 @@ Each story uses:
   updated from Odoo are complete on Shopify, not template-only.
 - Capability IDs: C-VAR-01, C-PROD-02, C-PROD-05
 - MVP relevance: **MVP — variant export/update is included, not optional, wherever
-  product export/update is in MVP** (proposed DEC-007 clarification)
+  product export/update is in MVP** (accepted DEC-007 clarification)
 - Evidence strength: A ([Fact] Shopify 2,048-variant model) / B (VT/EM draft-export
   [Demonstrated])
 - Acceptance notes: exporting or updating a product also exports/updates its variants
@@ -492,7 +493,7 @@ Each story uses:
   order, so that order totals are reconcilable without a full accounting integration.
 - Capability IDs: C-PAY-01, C-PAY-02, C-PAY-03, C-ORD-03
 - MVP relevance: **MVP — evidence preservation only; no tax-computation engine, no
-  automatic invoice/payment by default** (proposed DEC-007 clarification of US-E4-05)
+  automatic invoice/payment by default** (accepted DEC-007 clarification of US-E4-05)
 - Evidence strength: A ([Fact] Shopify `taxLines`/`shippingLines`/`discountApplications`/
   `OrderTransaction`)
 - Acceptance notes: the imported order preserves Shopify tax lines, shipping lines,
@@ -585,7 +586,7 @@ Each story uses:
   require a mapped location, a preview of quantities, and my explicit confirmation, so that
   I never accidentally overwrite live Shopify stock.
 - Capability IDs: C-INV-01, C-INV-03, C-INV-04
-- MVP relevance: **MVP — mandatory first-push guard** (proposed DEC-007 clarification)
+- MVP relevance: **MVP — mandatory first-push guard** (accepted DEC-007 clarification)
 - Evidence strength: A ([Fact] `inventorySetQuantities`/`inventoryAdjustQuantities`
   `@idempotent` requirement) / C (EM controlled-apply pattern [Demonstrated])
 - Acceptance notes: before the **first** Odoo→Shopify inventory write for a given
@@ -651,7 +652,7 @@ Each story uses:
   surprised by an unintended email and the connector's default is safe.
 - Capability IDs: C-FUL-01
 - MVP relevance: **MVP — notification visibility/control required; safe default is no
-  notification unless explicitly enabled or confirmed** (proposed DEC-007 clarification)
+  notification unless explicitly enabled or confirmed** (accepted DEC-007 clarification)
 - Evidence strength: A ([Fact] `FulfillmentInput.notifyCustomer` defaults to `false`;
   `fulfillmentTrackingInfoUpdate`'s `notifyCustomer` defaults to no notification)
 - Acceptance notes: every fulfilment/tracking write-back records whether a customer

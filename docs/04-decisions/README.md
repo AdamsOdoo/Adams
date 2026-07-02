@@ -43,12 +43,16 @@ mid-sprint; this numbering/naming inconsistency **remains flagged, not
 resolved**, in `../05-qa/documentation-residue-sweep.md` — do not invent missing
 entries or rename existing ones.)*
 
-**Also present (not yet accepted):**
+**Also accepted:**
 [`DEC-007-phase1-scope-clarifications.md`](./DEC-007-phase1-scope-clarifications.md) —
-`Status: Proposed for ChatGPT review`, **not Accepted**. DEC-007 **clarifies** five
-DEC-003 scope-hole wordings (variant export/update; image/media and price/compare-at
-handling; a first-inventory-push guard; a fulfilment customer-notification default; and
+**accepted by ChatGPT on 2026-07-02** after PR #62 merged into `Shopify-connector` and
+Fable's minor-change review (**ACCEPT WITH MINOR CHANGES**) was applied. DEC-007 is the
+**Phase 1 scope-clarification addendum to DEC-003**: it **clarifies** five DEC-003
+scope-hole wordings (variant export/update; image/media and price/compare-at handling; a
+first-inventory-push guard; a fulfilment customer-notification default; and
 tax/shipping/discount/payment-evidence treatment) — it does **not** rewrite DEC-003 and
 does **not** authorize implementation. DEC-003/DEC-004/DEC-005/DEC-006 remain unchanged.
-If accepted, DEC-007 becomes the Phase 1 scope-clarification addendum to DEC-003; if not
-accepted, DEC-003 remains the only accepted MVP scope record.
+This acceptance makes **RA-008/RA-009/RA-010** (`../05-qa/rejected-approaches-log.md`)
+binding rejected approaches. Per `../05-qa/quality-feedback-loop.md` §10, this acceptance
+satisfies one of several Phase 1 research-phase-exit criteria — it does not, by itself,
+open the implementation gate.

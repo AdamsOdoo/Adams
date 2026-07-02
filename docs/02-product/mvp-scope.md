@@ -59,21 +59,24 @@
 > (Sprint C2 note). **No serious contradiction to DEC-003 was found; no open review note
 > for ChatGPT is required.**
 
-> **DEC-007 proposed scope-hole clarification note (2026-07-02) — proposed, not accepted;
-> no scope change yet.** A later sprint (**Phase 1 Domain Model + DEC-003 Scope-Hole
-> Closure**) proposed
+> **DEC-007 accepted scope-hole clarification note (2026-07-02) — accepted by ChatGPT; the
+> "where feasible" wording below is now clarified, not the accepted scope changed.** A
+> later sprint (**Phase 1 Domain Model + DEC-003 Scope-Hole Closure**) proposed, and
+> ChatGPT has since **accepted**,
 > [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
-> (`Status: Proposed for ChatGPT review`) to close five practical wording gaps left open by
-> this baseline: (1) whether "product export/update" below includes variant-level
-> export/update, (2) the vague **"where feasible"** qualifier on image/media and price
-> update/export (see below), (3) a first-inventory-push guard for the Odoo→Shopify
+> (`Status: Accepted by ChatGPT`, acceptance date 2026-07-02) closing five practical
+> wording gaps left open by this baseline: (1) "product export/update" below **includes**
+> variant-level export/update, (2) the previously vague **"where feasible"** qualifier on
+> image/media and price update/export (see below) is now replaced with an explicit
+> included/excluded/deferred split, (3) a first-inventory-push guard for the Odoo→Shopify
 > direction, (4) whether fulfilment/tracking write-back triggers a Shopify customer
 > notification and who controls that, and (5) the tax/shipping/discount/payment-evidence/
 > invoice-policy treatment implied by the Domain 9 minimal-financial-evidence rule below.
-> **DEC-007 does not change this document's accepted scope** — every clarification is
-> framed as removing ambiguity, not adding or removing a capability. **Until ChatGPT
-> accepts DEC-007, this document's existing wording (including "where feasible") remains
-> the accepted baseline as written**; DEC-007 is not treated as accepted here.
+> **DEC-007 clarifies this document's accepted scope; it does not rewrite it** — every
+> clarification removes ambiguity rather than adding or removing a capability. **DEC-007
+> does not authorize implementation** — implementation remains blocked. See DEC-007 for the
+> full accepted clarification text, including the **price source-of-truth requirement** and
+> the **first-inventory-push guard**, both accepted as Phase 1 safety guardrails.
 
 ## ChatGPT RB-13 acceptance
 
