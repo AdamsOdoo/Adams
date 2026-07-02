@@ -1,8 +1,9 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-008/DEC-009 Acceptance
-> Patch)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **AR-004 + AR-006 Decision Preparation**,
+> Continuity lives in GitHub, not chat. The **current entry (AR-007 + AR-008 Decision
+> Preparation)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **DEC-008/DEC-009 Acceptance Patch**,
+> **AR-004 + AR-006 Decision Preparation**,
 > **DEC-007 Acceptance Patch**, **Phase 1 Domain Model + DEC-003 Scope-Hole Closure**,
 > **DEC-004/005/006 Acceptance Patch**, **Evidence Refresh + Combined AR-002/003/005
 > Decision Preparation**, **Control-Room Reset Sprint 1**, **RB-14 Architecture Preparation
@@ -11,6 +12,116 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### AR-007 + AR-008 Decision Preparation — compact handoff (2026-07-02)
+
+> **Documentation / decision-preparation sprint, not implementation.** Confirmed PR #65
+> merged into `Shopify-connector` (merge commit
+> `dfb0199c9588ae600216ef549d160d0ced15034f`) before editing; DEC-003/004/005/006/007/008/009
+> confirmed **Accepted by ChatGPT**; RA-001 through RA-017 confirmed **binding**;
+> AR-002/AR-003/AR-004/AR-005/AR-006 confirmed **Accepted**; AR-007/AR-008 confirmed **Not
+> decided**; implementation confirmed still blocked. Branch
+> `claude/ar007-ar008-decision-prep-5tdwfv` (harness-assigned; the sprint's preferred name
+> was `architecture/ar007-ar008-decision-prep`, so this branch-name discrepancy is recorded
+> here per the session rule) was already checked out based exactly on that merge commit — no
+> re-basing needed.
+
+- **Branch / PR:** `claude/ar007-ar008-decision-prep-5tdwfv` → draft PR into
+  `Shopify-connector`, opened immediately after this handoff commit, **not merged**.
+- **Files changed:** `docs/03-architecture/ar007-inventory-architecture-decision-brief.md`
+  (new), `docs/03-architecture/ar008-fulfillment-architecture-decision-brief.md` (new),
+  `docs/03-architecture/ar007-ar008-evidence-refresh.md` (new),
+  `docs/04-decisions/DEC-010-inventory-architecture-strategy.md` (new),
+  `docs/04-decisions/DEC-011-fulfillment-architecture-strategy.md` (new),
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/rejected-approaches-log.md`, `docs/01-research/research-handoff.md` (this
+  file), `docs/06-prompts/ar007-ar008-decision-prep-prompt.md` (new, archive).
+- **What changed:** authored
+  [`ar007-inventory-architecture-decision-brief.md`](../03-architecture/ar007-inventory-architecture-decision-brief.md)
+  — Phase 1 inventory source-of-truth posture (Odoo as ongoing source, controlled
+  first-sync import from Shopify, no autonomous bidirectional conflict resolution),
+  Shopify inventory-object mapping (`(store, inventory_item_id, location_id)` binding
+  identity), the Odoo quantity concept (Odoo's "Free to Use" as the directional Phase 1
+  candidate, exact field open), location architecture (explicit non-inferred mapping;
+  block on missing/ambiguous mapping; a flagged open issue on sharing Shopify-Location
+  reference data with fulfillment without violating DEC-008), sync trigger (layered:
+  scheduled + manual + event-driven enqueue; webhook import flagged unverified), inventory
+  operation style (`inventorySetQuantities` compare-and-set preferred, DEC-009 idempotency/
+  ambiguous-outcome rules applied), conflict handling, user-facing log requirements, and
+  module boundaries — and
+  [`ar008-fulfillment-architecture-decision-brief.md`](../03-architecture/ar008-fulfillment-architecture-decision-brief.md)
+  — validated `stock.picking` as the fulfillment trigger, FulfillmentOrder-based mutations
+  only (`fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`), matching via
+  `lineItemsByFulfillmentOrder`, the DEC-007 no-notification-by-default guard applied with
+  the setting persisted per job at enqueue time, single-fulfillment-location Phase 1
+  posture with multi-package/multi-location deferred (existing C-FUL-02 boundary, not a new
+  rejection), the DEC-009 ambiguous-outcome rule applied to both fulfillment mutations
+  (neither is on Shopify's 17-mutation `@idempotent` list), and the same flagged
+  shared-location-reference-data open issue mirrored from the AR-007 brief. Ran a **small,
+  targeted official-source check** (`ar007-ar008-evidence-refresh.md`, access date
+  2026-07-02) against official Odoo 19.0 documentation for inventory-quantity report
+  concepts (On Hand / Free to Use / Forecasted), warehouse/location types, and third-party
+  carrier tracking — needed because a repo-local extraction pass found
+  `../01-research/odoo-official-architecture-notes.md` had **zero coverage** of
+  `stock.quant`/`stock.picking`/delivery-carrier models; several gaps (exact `stock.quant`
+  field names, exact tracking-reference field name, exact delivery-order backorder-wizard
+  text, Shopify inventory/fulfillment webhook topic strings, the literal 17-mutation
+  `@idempotent` list) remain **explicitly marked "Open question / must be verified before
+  implementation"** rather than asserted. Proposed
+  [`DEC-010`](../04-decisions/DEC-010-inventory-architecture-strategy.md) (AR-007) and
+  [`DEC-011`](../04-decisions/DEC-011-fulfillment-architecture-strategy.md) (AR-008), both
+  `Status: Proposed for ChatGPT review`. Updated `architecture-review-log.md`: AR-007 and
+  AR-008 rows move from "Not decided / Evidence pending" to "Proposed for ChatGPT review,"
+  with a compact note confirming AR-002–AR-006 are unchanged and implementation remains
+  blocked. Updated `rejected-approaches-log.md`: added **RA-018** (writing Shopify's
+  read-only `committed` quantity), **RA-019** (single-location-only/SKU-only inventory
+  writes without per-location binding identity), **RA-020** (autonomous bidirectional
+  inventory conflict resolution in Phase 1), **RA-021** (treating Shopify/Odoo inventory
+  quantities as equivalent without an explicit source-of-truth) tied to DEC-010, and
+  **RA-022** (legacy fulfillment API flow), **RA-023** (fulfillment creation without
+  FulfillmentOrder/line/quantity/location matching) tied to DEC-011 — all six tagged
+  **PROPOSED**, non-binding until DEC-010/DEC-011 are accepted (checked against RA-001–017
+  first; blind first inventory push, hidden/default-on notification, blind-retry-everything,
+  and binding-alone idempotency were **not** re-logged — already RA-008/RA-009/RA-014/
+  RA-017 respectively; multi-package/multi-location fulfillment automation was **not**
+  logged — it is an existing deferral, not a rejection, under DEC-003/C-FUL-02).
+  Updated `../04-decisions/README.md` to index DEC-010/DEC-011 as "Also present (not yet
+  accepted)" and corrected the stale "AR-007 and AR-008 remain not decided" current-status
+  line. Archived this sprint's prompt to `../06-prompts/ar007-ar008-decision-prep-prompt.md`.
+- **Items deferred:** exact Odoo model/field/constraint design for inventory and
+  fulfillment bindings/mappings/logs; exact computed quantity field/formula; exact
+  `inventorySetQuantities`-vs-`inventoryAdjustQuantities` choice per trigger; exact cron
+  cadence; exact feature-flag/config-model mechanism (already routed to UX/operator-flow
+  and Master Blueprint per DEC-008); exact fulfillment mutation parameters; exact tracking
+  field source; exact notification-UI granularity (DEC-007's own open fork); exact retry
+  constants; the shared Shopify-Location-reference-data placement question (flagged as an
+  open issue for a possible later DEC-008 amendment, not decided by either DEC-010 or
+  DEC-011); the Master Blueprint; all implementation.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new. **New rejected
+  approaches:** RA-018 through RA-023 added (PROPOSED, non-binding). **New technical
+  debt:** none (no code). **Architecture concerns:** AR-007 and AR-008 move to "Proposed
+  for ChatGPT review" (not yet accepted); AR-002/AR-003/AR-004/AR-005/AR-006 unchanged
+  ("Accepted"). A module-boundary open issue was surfaced (shared Shopify-Location
+  reference data for `inventory`/`fulfillment` without violating DEC-008's no-inventory-
+  dependency rule) and routed to architecture review rather than resolved unilaterally,
+  consistent with the sprint's instruction to prefer a design that fits DEC-008 and flag
+  any identified contradiction for a later amendment.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop checked ·
+  learning captured (no new issues) · rejected approaches logged (RA-018–023, PROPOSED) ·
+  technical debt logged (none applicable — no code) · repeated-issue escalation applied
+  (none at threshold) — all **YES**.
+- **Next recommended session:** 1) **ChatGPT/Fable review of DEC-010/DEC-011** (including
+  the flagged shared-location-reference-data open issue); 2) **UX/operator-flow sprint**;
+  3) **Master Blueprint**, after those gates; 4) **Implementation only after a separate
+  ChatGPT gate.**
+- **Stop condition:** stopped after three focused commits + one **draft** PR into
+  `Shopify-connector` (not merged). PR #65 merge confirmed first. DEC-003/DEC-004/
+  DEC-005/DEC-006/DEC-007/DEC-008/DEC-009 not edited; no code files changed; AR-007 and
+  AR-008 are **proposed only, not accepted**; implementation still not authorized; `main`
+  and plain `dev` untouched. Awaiting further instruction.
 
 ---
 
@@ -3630,3 +3741,24 @@ ChatGPT review.
   DEC-003/004/005/006/007 edit; AR-007/AR-008 remain not decided; implementation remains
   blocked. Next: push branch, open one draft PR into `Shopify-connector`, stop for ChatGPT
   review.
+- **AR-007 + AR-008 Decision Preparation (2026-07-02):** confirmed PR #65 merged into
+  `Shopify-connector` (merge commit `dfb0199c9588ae600216ef549d160d0ced15034f`) and
+  DEC-003/004/005/006/007/008/009 Accepted / RA-001–017 binding / AR-002/003/004/005/006
+  Accepted / AR-007/AR-008 not decided before editing. Authored
+  `ar007-inventory-architecture-decision-brief.md` and
+  `ar008-fulfillment-architecture-decision-brief.md`; ran a small, targeted official-source
+  check (`ar007-ar008-evidence-refresh.md`) against Odoo 19.0 docs (On Hand/Free to Use/
+  Forecasted, location types, carrier tracking) since the existing Odoo research notes had
+  zero coverage of `stock.quant`/`stock.picking`/delivery-carrier models; proposed
+  `DEC-010-inventory-architecture-strategy.md` and
+  `DEC-011-fulfillment-architecture-strategy.md` (both `Status: Proposed for ChatGPT
+  review`), moving AR-007/AR-008 from "Not decided" to "Proposed for ChatGPT review" in
+  `architecture-review-log.md`. Added RA-018–023 (tagged PROPOSED) to
+  `rejected-approaches-log.md`; checked against RA-001–017 first, referenced RA-008/009/
+  014/017 instead of duplicating, and treated multi-package/multi-location fulfillment as
+  an existing deferral (not a rejection). Flagged one open architecture issue (a shared
+  Shopify-Location reference for `inventory`/`fulfillment` without violating DEC-008's
+  no-inventory-dependency rule for `fulfillment`) and routed it to architecture review
+  rather than deciding it unilaterally. No code; no DEC-003/004/005/006/007/008/009 edit;
+  AR-007/AR-008 are proposed only, not accepted; implementation remains blocked. Next: push
+  branch, open one draft PR into `Shopify-connector`, stop for ChatGPT/Fable review.

@@ -36,8 +36,8 @@
 | AR-004 | 2026-06-30 | Module boundaries (addon family) | **Accepted by ChatGPT** (2026-07-02, via DEC-008) — layered domain-aligned addon family (`shopify_connector_core`/`product`/`sale`/`inventory`/`fulfillment` for Phase 1), strict dependency DAG, cross-cutting substrate concentrated in `core` | **Accepted by ChatGPT** (2026-07-02 — see note below) | Odoo docs favour link modules; exact boundaries decided against the accepted AR-002/003/005 baseline | See [`../03-architecture/ar004-module-boundary-decision-brief.md`](../03-architecture/ar004-module-boundary-decision-brief.md) for options considered and evidence | One-giant-module (A-MOD-1) and over-fragmentation (A-MOD-2) both evaluated and avoided; dependency coupling | RB-14 → **accepted** [`../04-decisions/DEC-008-module-boundary-strategy.md`](../04-decisions/DEC-008-module-boundary-strategy.md) (Accepted by ChatGPT, 2026-07-02) | **Accepted** |
 | AR-005 | 2026-06-30 | Mapping & duplicate prevention | To be researched / evidence pending — candidates: reuse `ir.model.data` external IDs vs a dedicated per-store binding model (Shopify GID ↔ Odoo `res_id`) | **Accepted by ChatGPT** (2026-07-02 — see note below) | External IDs give an idempotent, db-id-independent handle, but users can delete them and multi-store needs per-store keys (`../01-research/odoo-official-architecture-notes.md`) | `ir.model.data` `(module,name)` uniqueness (open question); Shopify GID stability; competitor dedup approaches | Duplicate records / double-decrement if keys are wrong (cf. `quality-feedback-loop.md` §5); bound-record deletion | RB-14 → **accepted** [`../04-decisions/DEC-006-binding-dedup-identity-strategy.md`](../04-decisions/DEC-006-binding-dedup-identity-strategy.md) (Accepted by ChatGPT, 2026-07-02) | **Accepted** |
 | AR-006 | 2026-06-30 | Error handling & retries | **Accepted by ChatGPT** (2026-07-02, via DEC-009) — classified retry policy (auto-retry only safe/transient classes), job-source/state/error-class taxonomy, layered idempotency (platform + connector-designed keys), recovery-first logs/audit | **Accepted by ChatGPT** (2026-07-02 — see note below) | `ir.cron` auto-deactivates after repeated failures; Shopify returns 429/throttle and requires `@idempotent` on some mutations (2026-04) | See [`../03-architecture/ar006-error-retry-idempotency-decision-brief.md`](../03-architecture/ar006-error-retry-idempotency-decision-brief.md) for taxonomy tables and evidence | Missing retry → lost syncs; naive retry → duplicates / rate-limit storms — both evaluated and avoided via error-class taxonomy | RB-14 → **accepted** [`../04-decisions/DEC-009-error-retry-idempotency-strategy.md`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md) (Accepted by ChatGPT, 2026-07-02) | **Accepted** |
-| AR-007 | 2026-06-30 | Inventory architecture | To be researched / evidence pending — map Odoo stock (product / location / quants) ↔ Shopify InventoryItem / InventoryLevel / Location; write only `available`/`on_hand` | **Not decided** | Tier-1: Shopify `committed` is API-read-only (order-driven), `on_hand` is a sum, set/adjust need `@idempotent` (2026-04), multi-location mapping required | Odoo multi-warehouse/location → Shopify location mapping; sync direction & conflict policy; competitor inventory handling | Double-decrement of multi-location SKUs; attempting to write `committed`; over/under-sell on drift | RB-14; future Odoo `stock` deep dive | **Evidence pending** |
-| AR-008 | 2026-06-30 | Fulfillment architecture | To be researched / evidence pending — drive fulfillment via FulfillmentOrder-based mutations; map Odoo delivery/`stock.picking` → Shopify fulfillment + tracking | **Not decided** | Tier-1: legacy Order/Fulfillment workflow unsupported since 2022-07; one fulfillment per order + location; tracking via `fulfillmentTrackingInfoUpdate` | Odoo delivery/carrier tracking model; per-location fulfillment split; whether the connector acts as a fulfillment service; competitor tracking write-back | Using legacy fulfillment endpoints; multi-location mismatch; tracking-URL generation | RB-14 | **Evidence pending** |
+| AR-007 | 2026-06-30 | Inventory architecture | **Proposed by ChatGPT-pending review (2026-07-02 — see note below)** — Odoo as ongoing source of truth for Shopify inventory write-back; controlled first-sync import; inventory identity keyed on `(store, inventory_item_id, location_id)`; explicit non-inferred location mapping; DEC-007 first-push guard honored in full; layered sync trigger; write only `available`/`on_hand` | **Proposed for ChatGPT review** (2026-07-02 — see note below) | Tier-1: Shopify `committed` is API-read-only (order-driven), `on_hand` is a sum, set/adjust need `@idempotent` (2026-04), multi-location mapping required; Odoo 19.0 official "On Hand"/"Free to Use"/"Forecasted" report concepts newly verified 2026-07-02 | Exact `stock.quant` field/formula; exact quantity-field default; exact cron cadence; shared Shopify-Location-reference-data placement vs. `shopify_connector_fulfillment` | Double-decrement of multi-location SKUs; attempting to write `committed`; over/under-sell on drift | RB-14 → **proposed** [`../04-decisions/DEC-010-inventory-architecture-strategy.md`](../04-decisions/DEC-010-inventory-architecture-strategy.md) (Proposed for ChatGPT review, 2026-07-02) | **Proposed for ChatGPT review** |
+| AR-008 | 2026-06-30 | Fulfillment architecture | **Proposed by ChatGPT-pending review (2026-07-02 — see note below)** — validated `stock.picking` as trigger; FulfillmentOrder-based mutations only; matched order/FulfillmentOrder/line/quantity via `lineItemsByFulfillmentOrder`; DEC-007 no-notification-by-default guard honored in full; single-fulfillment-location Phase 1 posture, multi-package/multi-location deferred | **Proposed for ChatGPT review** (2026-07-02 — see note below) | Tier-1: legacy Order/Fulfillment workflow unsupported since 2022-07; one fulfillment per order + location; tracking via `fulfillmentTrackingInfoUpdate`; neither fulfillment mutation is on Shopify's 17-mutation `@idempotent` list | Exact tracking-reference field name; exact backorder-to-picking linkage; exact notification-UI granularity; shared Shopify-Location-reference-data placement vs. `shopify_connector_inventory` | Using legacy fulfillment endpoints; multi-location mismatch; double fulfillment on ambiguous retry; hidden customer notification | RB-14 → **proposed** [`../04-decisions/DEC-011-fulfillment-architecture-strategy.md`](../04-decisions/DEC-011-fulfillment-architecture-strategy.md) (Proposed for ChatGPT review, 2026-07-02) | **Proposed for ChatGPT review** |
 
 _AR-001 is a governance/process decision (not a product-architecture choice);
 it is recorded here because it concerns the canonical foundation all later
@@ -484,3 +484,50 @@ next work:
 - **UX/operator-flow sprint.**
 - **Master Blueprint.**
 - **Implementation only after a separate ChatGPT gate.**_
+
+_**AR-007 + AR-008 Decision Preparation (2026-07-02) — AR-007 and AR-008 move from
+"Not decided / Evidence pending" to "Proposed for ChatGPT review"; still NOT accepted.**
+After PR #65 merged into `Shopify-connector` (merge commit
+`dfb0199c9588ae600216ef549d160d0ced15034f`) and DEC-003/004/005/006/007/008/009 acceptance
+confirmed, this sprint produced two evidence-backed decision briefs —
+[`../03-architecture/ar007-inventory-architecture-decision-brief.md`](../03-architecture/ar007-inventory-architecture-decision-brief.md)
+and
+[`../03-architecture/ar008-fulfillment-architecture-decision-brief.md`](../03-architecture/ar008-fulfillment-architecture-decision-brief.md)
+— plus a small, targeted Odoo-side official-source check
+([`../03-architecture/ar007-ar008-evidence-refresh.md`](../03-architecture/ar007-ar008-evidence-refresh.md),
+access date 2026-07-02, since the existing Odoo research notes had zero coverage of
+`stock.quant`/`stock.picking`/delivery-carrier models) — and two proposed decision
+records:
+[`../04-decisions/DEC-010-inventory-architecture-strategy.md`](../04-decisions/DEC-010-inventory-architecture-strategy.md)
+(**AR-007** — Odoo as ongoing source of truth for Shopify inventory write-back, a
+controlled first-sync import, inventory identity keyed on `(store, inventory_item_id,
+location_id)`, an explicit non-inferred location mapping, the DEC-007 first-push guard
+honored in full, layered sync, and the DEC-009 ambiguous-outcome retry rule applied to
+inventory writes) and
+[`../04-decisions/DEC-011-fulfillment-architecture-strategy.md`](../04-decisions/DEC-011-fulfillment-architecture-strategy.md)
+(**AR-008** — validated `stock.picking` as the fulfillment trigger, FulfillmentOrder-based
+mutations only, matched order/FulfillmentOrder/line/quantity, the DEC-007
+no-notification-by-default guard honored in full, single-fulfillment-location Phase 1
+posture with multi-package/multi-location deferred, and the DEC-009 ambiguous-outcome
+retry rule applied to fulfillment writes). **Each DEC file is explicitly `Status:
+Proposed for ChatGPT review`, not `Accepted` — this sprint does not self-accept any
+decision.** The Review decision and Status cells for AR-007/AR-008 above are updated to
+**"Proposed for ChatGPT review"** accordingly. A small number of options were explicitly
+proposed-rejected as part of these DEC files (writing Shopify's read-only `committed`
+quantity; single-location-only/SKU-only inventory writes without per-location binding
+identity; autonomous bidirectional inventory conflict resolution in Phase 1; treating
+Shopify/Odoo inventory quantities as equivalent without an explicit source-of-truth;
+legacy fulfillment API flow instead of FulfillmentOrder-based flow; fulfillment creation
+without FulfillmentOrder/line/quantity/location matching) — logged in
+`rejected-approaches-log.md` as **PROPOSED** (RA-018 through RA-023), pending the same
+ChatGPT review as the DEC files themselves (not yet final rejections); blind first
+inventory push, hidden/default-on notification, blind retry-everything, and binding-alone
+idempotency were **not** re-logged (already covered by the binding RA-008, RA-009,
+RA-014, and RA-017 respectively). **DEC-010/DEC-011 do not authorize implementation** —
+implementation remains blocked pending ChatGPT acceptance of these proposals **and** a
+separate implementation-gate opening (`../05-qa/quality-feedback-loop.md` §10; `CLAUDE.md`
+§5). **UX/operator-flow and the Master Blueprint remain future steps**, not started by
+this sprint. DEC-003/004/005/006/007/008/009 were not edited; no code, Odoo module, or
+implementation plan was produced. Recommended next (pending this review):
+**ChatGPT/Fable review of DEC-010/DEC-011, then a UX/operator-flow sprint and/or the
+Master Blueprint sprint if accepted.**_
