@@ -35,10 +35,11 @@ no-code gate (`CLAUDE.md` §4–§5) remains in force until ChatGPT separately a
 that full exit and opens a dedicated implementation/blueprint phase. **AR-002,
 AR-003, AR-004, AR-005, and AR-006 are now all accepted** (AR-004 via DEC-008
 and AR-006 via DEC-009, below — see the second "Also accepted" section).
-**AR-007 and AR-008 remain not decided** — future architecture ADRs for those
-rows are created only after their own proposal is reviewed and accepted by
-ChatGPT. **Implementation remains blocked; DEC-008 and DEC-009 do not
-authorize implementation.**
+**AR-007 and AR-008 are now proposed for ChatGPT review** via DEC-010 and
+DEC-011 respectively (below — see "Also present (not yet accepted)") —
+**neither is accepted yet**; both stay "Proposed for ChatGPT review" until
+ChatGPT formally accepts them. **Implementation remains blocked; DEC-008,
+DEC-009, DEC-010, and DEC-011 do not authorize implementation.**
 *(Naming note: `DEC-003`/`DEC-004`/`DEC-005`/`DEC-006` **follow the existing
 `DEC-003` naming precedent** rather than the stated `ADR-NNNN-<slug>.md`
 convention above — they do not predate that convention, they deliberately
@@ -73,11 +74,41 @@ layered, domain-aligned addon family — `shopify_connector_core`/`product`/`sal
 `inventory`/`fulfillment` for Phase 1, with a strict dependency DAG and no `adams_base`
 dependency found justified); DEC-009 resolves **AR-006 error/retry/idempotency strategy**
 (a classified error/retry taxonomy and layered idempotency strategy built on the accepted
-DEC-005/006 substrate). Neither decides AR-007 or AR-008 — both **remain not decided** —
-neither edits DEC-003/004/005/006/007 (all remain unchanged), and **neither authorizes
-implementation.** This acceptance makes **RA-011 through RA-017**
+DEC-005/006 substrate). Neither decides AR-007 or AR-008 — both were **not yet decided at
+the time of this acceptance** (AR-007/AR-008 have since moved to **"Proposed for ChatGPT
+review"** via DEC-010/DEC-011 — see "Also present (not yet accepted)" below; **still not
+accepted**) — neither edits DEC-003/004/005/006/007 (all remain unchanged), and **neither
+authorizes implementation.** This acceptance makes **RA-011 through RA-017**
 (`../05-qa/rejected-approaches-log.md`) binding rejected approaches. See
 [`../03-architecture/ar004-module-boundary-decision-brief.md`](../03-architecture/ar004-module-boundary-decision-brief.md)
 and
 [`../03-architecture/ar006-error-retry-idempotency-decision-brief.md`](../03-architecture/ar006-error-retry-idempotency-decision-brief.md)
 for the evidence-backed briefs behind each decision.
+
+**Also present (not yet accepted):**
+[`DEC-010-inventory-architecture-strategy.md`](./DEC-010-inventory-architecture-strategy.md)
+and
+[`DEC-011-fulfillment-architecture-strategy.md`](./DEC-011-fulfillment-architecture-strategy.md)
+— proposed 2026-07-02 (AR-007 + AR-008 Decision Preparation sprint, after DEC-008/DEC-009
+acceptance, PR #65 merged into `Shopify-connector`). **Each is explicitly `Status:
+Proposed for ChatGPT review` — not accepted.** DEC-010 proposes **AR-007 inventory
+architecture** (Odoo as ongoing source of truth for Shopify inventory write-back, a
+controlled first-sync import, inventory identity keyed on `(store, inventory_item_id,
+location_id)`, an explicit non-inferred location mapping, the DEC-007 first-push guard
+honored in full, layered sync, and the DEC-009 ambiguous-outcome retry rule applied to
+inventory writes); DEC-011 proposes **AR-008 fulfillment architecture** (validated
+`stock.picking` as the trigger, FulfillmentOrder-based mutations only, matched order/
+FulfillmentOrder/line/quantity, the DEC-007 no-notification-by-default guard honored in
+full, single-fulfillment-location Phase 1 posture with multi-package/multi-location
+deferred, and the DEC-009 ambiguous-outcome retry rule applied to fulfillment writes).
+**Neither decides implementation details, neither edits DEC-003/004/005/006/007/008/009,
+and neither authorizes implementation.** A small number of options were explicitly
+proposed-rejected as part of these DEC files — logged in `rejected-approaches-log.md` as
+**PROPOSED** (RA-018 through RA-023), pending the same ChatGPT review as the DEC files
+themselves. See
+[`../03-architecture/ar007-inventory-architecture-decision-brief.md`](../03-architecture/ar007-inventory-architecture-decision-brief.md)
+and
+[`../03-architecture/ar008-fulfillment-architecture-decision-brief.md`](../03-architecture/ar008-fulfillment-architecture-decision-brief.md)
+for the evidence-backed briefs behind each proposal, and
+[`../03-architecture/ar007-ar008-evidence-refresh.md`](../03-architecture/ar007-ar008-evidence-refresh.md)
+for the small targeted Odoo-side official-source check performed to ground them.
