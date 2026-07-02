@@ -309,3 +309,17 @@ scope unchanged; competitor evidence was excluded from this official-only pass; 
 remains blocked.** Recommended next: **RB-14 Part 3 — AR-002 decision sprint, only if ChatGPT
 accepts Part 2.** All rows stay "Not decided / Evidence pending" pending ChatGPT approval
 (`CLAUDE.md` §4–§5; RB-14). See DP-006's evidence-consistency gate in `defect-pattern-log.md`._
+
+_**Control-Room Reset Sprint 1 note (2026-07-02): no AR-row change; non-decision confirmed.** A
+mechanical documentation-residue sweep (`../05-qa/documentation-residue-sweep.md`) ran after PR #58
+(RB-14 Part 2) merged — **no research, no fan-out, no new evidence gathered.** It corrected stale
+current-truth statements (MVP-not-finalized wording superseded by DEC-003; TeqStars/TQ 403-blocked
+wording superseded by the Sprint C2 rebaseline; "Empty" claims in the `04-decisions/` and
+`03-architecture/` READMEs) and logged DEC-003's already-decided Option C rejection into
+`rejected-approaches-log.md` (RA-001) — **it did not evaluate or reject any new approach.** It also
+added (as `[Recommendation — becomes binding when merged by ChatGPT]`) phase-exit criteria and a
+documentation-maintenance rule to `quality-feedback-loop.md` §10–§11. **AR-002, AR-003, AR-005 stay
+"Not decided / Evidence pending"; AR-004/006/007/008 remain not framed. No AR row changed status.
+DEC-003 body untouched; MVP scope unchanged; implementation remains blocked.** Recommended next
+(unchanged from the RB-14 Part 2 note above, pending ChatGPT/Fable review of this sweep): **RB-14
+Part 3 / Evidence Refresh + Combined AR-002/003/005 Decision Preparation.**_
