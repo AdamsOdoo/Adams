@@ -204,6 +204,10 @@ feedback loop** section, and by running the end-of-session learning review
 (`/docs/05-qa/quality-feedback-loop.md`). Provide the exact next-session prompt.
 A session is **not complete** until the quality gate is satisfied.
 
+See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
+§11 (documentation maintenance rule) — both currently
+`[Recommendation — becomes binding when merged by ChatGPT]`.
+
 ---
 
 ### Quick start for any session

@@ -129,3 +129,52 @@ ChatGPT approval gate (`CLAUDE.md` §5).
 | A finalized, accepted decision | `../04-decisions/` (ADR) |
 | A new recurring rule for Claude | `../06-prompts/claude-learning-rules.md` |
 | A new review check | `pr-review-checklist.md` |
+
+## 10. Phase-exit criteria
+
+`[Recommendation — becomes binding when this PR is merged by ChatGPT]`
+
+**Research phase exit for Phase 1** requires all of:
+
+1. DEC-003 accepted. *(Done — 2026-07-01.)*
+2. AR-002 / AR-003 / AR-005 accepted (not just framed/narrowed).
+3. Phase 1 domain-model briefs accepted.
+4. A DEC-003 scope-hole amendment accepted (covering any gap DEC-003 itself or
+   later review identifies).
+5. A UX/operator-flow sprint accepted, or explicitly parallelized with the
+   above rather than silently skipped.
+
+The **implementation gate** opens only after ChatGPT approval of that exit —
+Phase-1-exit criteria being met is necessary but is itself still a ChatGPT
+decision, not a self-executing trigger. Once open, every implementation task
+must specify (per `CLAUDE.md` §9): allowed files, forbidden files, acceptance
+criteria, tests, rollback notes, and definition of done.
+
+**Fable's review is advisory input; ChatGPT is the final decision-maker** on
+every phase transition, architecture acceptance, and MVP-scope change (see
+`CLAUDE.md` §2).
+
+## 11. Documentation maintenance rule
+
+`[Recommendation — becomes binding when this PR is merged by ChatGPT]`
+
+To keep the repo reviewable as it grows:
+
+- Prefer a **current-state summary + dated changelog** over restating the same
+  status in many places.
+- Do **not** keep appending long, repeated sections that say the same thing a
+  slightly different way each sprint — a short dated note pointing at what
+  changed is enough.
+- A statement that is no longer current must be marked **superseded** (or
+  replaced) at the point a later decision contradicts it — not left to imply
+  it is still true.
+- Session handoffs should stay short: current sprint summary, key decisions,
+  open blockers, next recommended session. See
+  `../06-prompts/session-handoff-template.md` for the compact format.
+- **Archive, don't delete.** Move old detail into a clearly labelled historical
+  section (or a dated archive doc) instead of forcing every future session to
+  read thousands of lines to find the current state. Audit history must be
+  preserved, not erased.
+- Don't restate policy text (branch rules, phase gates, citation rules, etc.)
+  across many docs — link to the canonical source (`CLAUDE.md`, this file)
+  instead of copying it.
