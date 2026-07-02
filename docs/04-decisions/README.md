@@ -42,3 +42,13 @@ continue the `DEC-003` numbering instead of introducing a second scheme
 mid-sprint; this numbering/naming inconsistency **remains flagged, not
 resolved**, in `../05-qa/documentation-residue-sweep.md` — do not invent missing
 entries or rename existing ones.)*
+
+**Also present (not yet accepted):**
+[`DEC-007-phase1-scope-clarifications.md`](./DEC-007-phase1-scope-clarifications.md) —
+`Status: Proposed for ChatGPT review`, **not Accepted**. DEC-007 **clarifies** five
+DEC-003 scope-hole wordings (variant export/update; image/media and price/compare-at
+handling; a first-inventory-push guard; a fulfilment customer-notification default; and
+tax/shipping/discount/payment-evidence treatment) — it does **not** rewrite DEC-003 and
+does **not** authorize implementation. DEC-003/DEC-004/DEC-005/DEC-006 remain unchanged.
+If accepted, DEC-007 becomes the Phase 1 scope-clarification addendum to DEC-003; if not
+accepted, DEC-003 remains the only accepted MVP scope record.

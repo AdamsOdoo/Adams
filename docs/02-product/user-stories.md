@@ -33,6 +33,16 @@
   auto-apply) are labelled inference.
 - **Dates:** competitor evidence access **2026-06-30**; session **2026-07-01**.
 
+> **DEC-007 proposed addition note (2026-07-02) — proposed, not accepted.** The proposed
+> [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
+> (`Status: Proposed for ChatGPT review`) motivated five new stories added this sprint:
+> **US-E2-07** (variant export/update), **US-E2-08** (product/variant export
+> preview/dry-run), **US-E5-06** (first inventory push guard), **US-E6-04** (fulfilment
+> customer-notification control), and **US-E4-07** (financial evidence mapping). Each is
+> tagged `MVP` because it clarifies an existing DEC-003 MVP capability, not because it adds
+> a new one. **Until ChatGPT accepts DEC-007, treat these five stories as proposed
+> clarifications of the existing MVP epics, not as accepted additions.**
+
 ## Purpose
 
 Turn the MVP scope proposal into the **lived experience** of the four personas, so
@@ -271,6 +281,49 @@ Each story uses:
 - Open questions: MVP match-key set (SKU/internal-reference + barcode) and the binding
   data model → AR-005.
 
+### US-E2-07
+- Persona: P2
+- Story: As an administrator, I want variant-level export/update included in the
+  controlled product export/update flow, so that multi-variant products launched or
+  updated from Odoo are complete on Shopify, not template-only.
+- Capability IDs: C-VAR-01, C-PROD-02, C-PROD-05
+- MVP relevance: **MVP — variant export/update is included, not optional, wherever
+  product export/update is in MVP** (proposed DEC-007 clarification)
+- Evidence strength: A ([Fact] Shopify 2,048-variant model) / B (VT/EM draft-export
+  [Demonstrated])
+- Acceptance notes: exporting or updating a product also exports/updates its variants
+  within the current Shopify variant model; the same preview/binding/no-blind-create rules
+  as US-E2-05 apply at the variant level; variant-level changes are visible in the same
+  preview a reviewer sees for the template.
+- Failure/recovery notes: a variant-level failure is isolated and reason-coded; it does not
+  silently drop the variant from a partial write to a full-state mutation.
+- Architecture dependency: **AR-002** (exact `productSet`/bulk-variant mutation strategy),
+  **AR-005** (variant binding) — **Architecture-dependent**.
+- Open questions: exact mutation strategy for variant writes (`productSet` vs.
+  `productVariantsBulkCreate`/`productVariantsBulkUpdate`) → AR-002 implementation
+  planning; whether `productSet` delete-on-omit applies to variant-level media the same way
+  it applies to the variant list itself.
+
+### US-E2-08
+- Persona: P2
+- Story: As an administrator, I want to see an explicit preview/dry-run of every
+  create/update/delete a product or variant export would perform before it is sent, so
+  that I never discover a destructive `productSet` write after the fact.
+- Capability IDs: C-PROD-05
+- MVP relevance: MVP (mandatory guardrail, already required by US-E2-05; this story makes
+  the preview surface itself an explicit, testable product-level requirement)
+- Evidence strength: A ([Fact] `productSet` delete-on-omit) / B (VT Preview/Report
+  [Demonstrated])
+- Acceptance notes: before any product/variant create, update, or full-state write, the
+  operator sees what will be created, updated, and — for any list field reconciled by
+  `productSet` — what will be **deleted by omission**; the write proceeds only after
+  explicit confirmation.
+- Failure/recovery notes: a rejected/cancelled preview performs no write.
+- Architecture dependency: **AR-002** — **Architecture-dependent** (exact diff-rendering
+  mechanism).
+- Open questions: none on inclusion (already mandatory per DEC-003/DEC-004); rendering
+  mechanism → AR-002 implementation planning.
+
 ---
 
 ## Epic 3 — Customer import and matching
@@ -432,6 +485,30 @@ Each story uses:
 - Architecture dependency: **AR-006** — **Architecture-dependent**.
 - Open questions: none for MVP (deferred; ties Domain 9 when later included).
 
+### US-E4-07
+- Persona: P1, P3
+- Story: As an operator/finance stakeholder, I want Shopify tax lines, shipping lines,
+  discount applications, and payment/transaction evidence preserved on the imported Odoo
+  order, so that order totals are reconcilable without a full accounting integration.
+- Capability IDs: C-PAY-01, C-PAY-02, C-PAY-03, C-ORD-03
+- MVP relevance: **MVP — evidence preservation only; no tax-computation engine, no
+  automatic invoice/payment by default** (proposed DEC-007 clarification of US-E4-05)
+- Evidence strength: A ([Fact] Shopify `taxLines`/`shippingLines`/`discountApplications`/
+  `OrderTransaction`)
+- Acceptance notes: the imported order preserves Shopify tax lines, shipping lines,
+  discount applications/amounts, and payment/transaction evidence as lines/amounts
+  sufficient to keep the Odoo order total reconcilable against the Shopify order total; tax
+  amounts are imported as Shopify computed them, not recalculated by Odoo tax rules; any
+  invoice/payment draft-artifact creation is either off by default or opt-in behind
+  explicit configuration and a total-check guard.
+- Failure/recovery notes: a totals mismatch is surfaced, not silently accepted or silently
+  corrected.
+- Architecture dependency: none decided; ties to the existing US-E4-05 Domain 9 boundary
+  and idempotency (C-JOB-04). **Exception:** the existing DEC-003 draft-artifact guard
+  (return to ChatGPT if a draft invoice/payment is found absolutely required) is unchanged.
+- Open questions: exact gateway → Odoo journal mapping configuration surface (unchanged
+  open item from US-E4-05).
+
 ---
 
 ## Epic 5 — Inventory sync and freshness
@@ -502,6 +579,27 @@ Each story uses:
 - Architecture dependency: none.
 - Open questions: per-object vs global freshness.
 
+### US-E5-06
+- Persona: P1, P2
+- Story: As an administrator, I want the first Odoo→Shopify inventory write for a store to
+  require a mapped location, a preview of quantities, and my explicit confirmation, so that
+  I never accidentally overwrite live Shopify stock.
+- Capability IDs: C-INV-01, C-INV-03, C-INV-04
+- MVP relevance: **MVP — mandatory first-push guard** (proposed DEC-007 clarification)
+- Evidence strength: A ([Fact] `inventorySetQuantities`/`inventoryAdjustQuantities`
+  `@idempotent` requirement) / C (EM controlled-apply pattern [Demonstrated])
+- Acceptance notes: before the **first** Odoo→Shopify inventory write for a given
+  store/binding, the operator sees a preview of the SKU/variant/location quantities that
+  will be written, confirms a recorded source-of-truth, and can skip or manually match any
+  ambiguous (unmapped) item; the write does not proceed without confirmation and without a
+  mapped Shopify location.
+- Failure/recovery notes: an unconfirmed or unmapped item is skipped, not guessed; the
+  guard does not block subsequent, already-confirmed items in the same preview.
+- Architecture dependency: **AR-007** — **Architecture-dependent** (exact location-mapping
+  mechanism; ongoing apply-mode after the first push).
+- Open questions: default quantity field; multi-location mapping mechanism; auto-apply vs.
+  review-then-apply for syncs after the first push (all AR-007).
+
 ---
 
 ## Epic 6 — Fulfillment and tracking
@@ -545,6 +643,26 @@ Each story uses:
 - Failure/recovery notes: n/a (later).
 - Architecture dependency: AR-008.
 - Open questions: none (later).
+
+### US-E6-04
+- Persona: P1, P2
+- Story: As an operator, I want to see and control whether a fulfilment/tracking
+  write-back to Shopify sends the customer a notification, so that customers are not
+  surprised by an unintended email and the connector's default is safe.
+- Capability IDs: C-FUL-01
+- MVP relevance: **MVP — notification visibility/control required; safe default is no
+  notification unless explicitly enabled or confirmed** (proposed DEC-007 clarification)
+- Evidence strength: A ([Fact] `FulfillmentInput.notifyCustomer` defaults to `false`;
+  `fulfillmentTrackingInfoUpdate`'s `notifyCustomer` defaults to no notification)
+- Acceptance notes: every fulfilment/tracking write-back records whether a customer
+  notification was requested; the default is **no notification** unless the operator has
+  explicitly enabled or confirmed it; the setting is visible on the write-back's log entry.
+- Failure/recovery notes: a failed write-back that never reached Shopify never sends a
+  notification.
+- Architecture dependency: **AR-008** — **Architecture-dependent** (exact configuration
+  granularity: global default vs. per-store vs. per-order).
+- Open questions: configuration granularity for the notification default → AR-008 /
+  Master Blueprint sprint.
 
 ---
 

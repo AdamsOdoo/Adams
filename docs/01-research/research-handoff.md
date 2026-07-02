@@ -1,15 +1,139 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-004/005/006
-> Acceptance Patch)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **Evidence Refresh + Combined
-> AR-002/003/005 Decision Preparation**, **Control-Room Reset Sprint 1**, **RB-14
-> Architecture Preparation — Part 2**, **RB-14 Part 1**, **Research Sprint C2**,
-> **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
-> **Sprint B**, and **Sprint A** handoffs are retained underneath as history. The
-> running **Sprint checkpoint log** (one note per stage, all sprints) is at the
-> very bottom. The **product-side** handoff lives at
+> Continuity lives in GitHub, not chat. The **current entry (Phase 1 Domain Model +
+> DEC-003 Scope-Hole Closure)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **DEC-004/005/006 Acceptance Patch**,
+> **Evidence Refresh + Combined AR-002/003/005 Decision Preparation**, **Control-Room
+> Reset Sprint 1**, **RB-14 Architecture Preparation — Part 2**, **RB-14 Part 1**,
+> **Research Sprint C2**, **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**,
+> **Sprint C**, **Sprint B**, and **Sprint A** handoffs are retained underneath as
+> history. The running **Sprint checkpoint log** (one note per stage, all sprints) is at
+> the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Phase 1 Domain Model + DEC-003 Scope-Hole Closure — compact handoff (2026-07-02)
+
+> **Documentation / decision-preparation sprint, not implementation.** Confirmed PR #61
+> merged into `Shopify-connector` (merge commit
+> `26dc30109530e2566755fd93bd974284083c3922`) before editing; DEC-004/DEC-005/DEC-006
+> confirmed **Accepted by ChatGPT**; AR-002/AR-003/AR-005 confirmed **Accepted**;
+> AR-004/AR-006/AR-007/AR-008 confirmed **not decided**. Branch created from that exact
+> commit (verified via `git merge-base`). Produced a Phase 1 domain-model brief and a
+> proposed DEC-007 scope-clarification addendum closing five known DEC-003 scope holes.
+
+- **Branch / PR:** `claude/domain-model-scope-closure-nv8ah9` (harness-assigned; the
+  sprint's preferred name `product/domain-model-scope-closure` was not used — per the
+  session's hard git rule, work proceeded on the harness-assigned branch, confirmed based
+  exactly on `Shopify-connector`'s PR #61 merge commit before any edit; flagged as the
+  branch-name discrepancy) → draft PR into `Shopify-connector`, opened immediately after
+  this handoff commit, **not merged**.
+- **Files changed:** `docs/03-architecture/phase1-domain-model-brief.md` (new),
+  `docs/04-decisions/DEC-007-phase1-scope-clarifications.md` (new),
+  `docs/02-product/mvp-scope.md`, `docs/02-product/non-mvp-and-later-phases.md`,
+  `docs/02-product/user-stories.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/rejected-approaches-log.md`, `docs/01-research/research-handoff.md` (this
+  file).
+- **What changed:** authored
+  [`phase1-domain-model-brief.md`](../03-architecture/phase1-domain-model-brief.md) — a
+  documentation-level (not schema-level) Phase 1 concept map across eight domains (store/
+  connection, binding/identity, product, customer, order/sale, inventory, fulfilment,
+  queue/log/error), each statement labelled accepted decision / proposed clarification /
+  inference / open question. Proposed
+  [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
+  (`Status: Proposed for ChatGPT review`) closing five DEC-003 scope-hole wordings: (1)
+  variant export/update is included, not optional, wherever product export/update is in
+  MVP; (2) image/media "where feasible" replaced with an explicit
+  included/excluded/deferred split (basic image sync in; advanced dedup/alt-text/CDN/
+  media-governance out); (3) price/compare-at "where feasible" replaced the same way, plus
+  an explicit price source-of-truth requirement; (4) a **first-inventory-push guard**
+  (mapped location + preview + operator confirmation + recorded source-of-truth + skip/
+  manual-match option) before any first Odoo→Shopify inventory write; (5) a **fulfilment
+  customer-notification default** of "no notification unless explicitly enabled," grounded
+  in newly verified Shopify API defaults; (6) a tax/shipping/discount/payment-evidence
+  clarification requiring evidence preservation sufficient for reconcilable totals, with
+  conservative-by-default invoice/payment creation (no silent accounting automation). Ran a
+  **small, targeted official-source check** (per the sprint's external-research rule, since
+  the tax-line/shipping-line/discount-line fields and the fulfilment notification defaults
+  were not already grounded in repo docs): verified `Order.taxLines`/`shippingLines`/
+  `discountApplications` and `FulfillmentInput.notifyCustomer` (defaults `false`) /
+  `fulfillmentTrackingInfoUpdate`'s `notifyCustomer` (defaults to no notification) against
+  `shopify.dev` official pages, access date 2026-07-02 — cited with URL in DEC-007 and the
+  domain-model brief; **not** propagated into `../01-research/shopify-official-api-notes.md`
+  (outside this sprint's allowed-files list — flagged as a follow-up). Added five new Phase
+  1 user stories tied to the clarifications (`US-E2-07` variant export/update, `US-E2-08`
+  product/variant export preview/dry-run, `US-E4-07` financial evidence mapping, `US-E5-06`
+  first inventory push guard, `US-E6-04` fulfilment notification control) to
+  `user-stories.md`. Added pointer notes (not rewrites, not acceptance claims) to
+  `mvp-scope.md` and `non-mvp-and-later-phases.md` referencing the proposed DEC-007.
+  Added a non-decision note to `architecture-review-log.md` confirming AR-006/AR-007/
+  AR-008 stay "Not decided / Evidence pending" and are **fed, not decided**, by this
+  sprint's guardrail-level clarifications; AR-002/AR-003/AR-005 remain **Accepted**,
+  untouched. Added **RA-008** (blind first inventory push), **RA-009** (hidden/default-on
+  fulfilment notification), and **RA-010** (automatic full accounting/payment
+  reconciliation by default) to `rejected-approaches-log.md`, each tagged **PROPOSED**
+  (non-binding until DEC-007 is accepted, mirroring the RA-002–RA-007 precedent);
+  automatic name-only matching was **not** re-logged (already covered by the binding
+  RA-006).
+- **Items deferred:** AR-004/AR-006/AR-007/AR-008 full architecture decisions; exact Odoo
+  model/field/constraint design; exact GraphQL mutation strategy for variant writes; the
+  Master Blueprint; propagating the two newly verified Shopify facts into
+  `shopify-official-api-notes.md`; all implementation.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new. **New rejected
+  approaches:** RA-008/RA-009/RA-010, tagged **PROPOSED** (see
+  `rejected-approaches-log.md`). **New technical debt:** none (no code). **Architecture
+  concerns:** AR-006/AR-007/AR-008 remain **Not decided / Evidence pending** — this
+  sprint's first-inventory-push guard and fulfilment-notification default are explicitly
+  **scope-level guardrail statements**, not AR-007/AR-008 mechanism decisions; AR-002/
+  AR-003/AR-005 unchanged (**Accepted**).
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop checked ·
+  learning captured (no new issues) · rejected approaches logged (RA-008–RA-010, tagged
+  PROPOSED) · technical debt logged (none applicable — no code) · repeated-issue
+  escalation applied (none at threshold) — all **YES**.
+- **Next recommended session:** **ChatGPT/Fable review of DEC-007 and the Phase 1
+  domain-model brief; if DEC-007 is accepted, a Master Blueprint sprint** (and/or a
+  dedicated AR-006/AR-007/AR-008 architecture-decision sprint) **can follow.**
+- **Stop condition:** stopped after three staged commits + one **draft** PR into
+  `Shopify-connector` (not merged). PR #61 merge confirmed first. DEC-003/DEC-004/
+  DEC-005/DEC-006 not edited; no code files changed; AR-002/AR-003/AR-005 remain
+  **Accepted**; AR-004/AR-006/AR-007/AR-008 remain **not decided**; implementation still
+  not authorized; `main` and plain `dev` untouched. Branch-name discrepancy flagged above.
+  Awaiting ChatGPT/Fable review.
+
+#### PR #62 revision (2026-07-02, ChatGPT review — REVISE MINOR before Fable review)
+
+- ChatGPT reviewed PR #62 and requested minor wording cleanup before Fable review.
+- Fixed five-vs-six clarification wording in DEC-007 (six clarification sections covering
+  five known scope-hole themes; image/media and price split into separate sections).
+- Made DEC-007 "What this unlocks" conditional on ChatGPT acceptance.
+- Clarified that the phase-exit criterion is not satisfied until DEC-007 is accepted.
+- Reworded the domain brief's schema-design deferral to "Master Blueprint /
+  implementation-planning sprint."
+- **DEC-007 remains `Proposed for ChatGPT review`.** No implementation authorized.
+  DEC-003/004/005/006 untouched. No code files touched. Only
+  `DEC-007-phase1-scope-clarifications.md`, `phase1-domain-model-brief.md`, and this
+  handoff were edited — product docs, `architecture-review-log.md`, and
+  `rejected-approaches-log.md` were not touched in this revision.
+
+#### PR #62 Fable fix-up (2026-07-02, ChatGPT + Fable review — ACCEPT WITH MINOR CHANGES)
+
+- Fable reviewed PR #62 and returned **ACCEPT WITH MINOR CHANGES**.
+- Applied small fix-up: fixed `architecture-review-log.md` markdown italics (missing
+  closing underscore on the DEC-004/005/006 acceptance-patch note; stray double
+  underscore on the PR #62 sprint note); corrected/qualified the `shippingLines` quote
+  (no longer presented as a complete verbatim quote) in DEC-007 and the domain-model
+  brief; indexed DEC-007 in `docs/04-decisions/README.md` as `Proposed for ChatGPT
+  review`, not accepted; added an open question for first-push-guard granularity
+  (per-store vs. per-binding vs. another AR-007 unit) to DEC-007 and the domain-model
+  brief; added an open question for how Shopify-computed tax is represented in Odoo
+  without recomputation to DEC-007 and the domain-model brief; clarified wording so
+  "AR-002 implementation planning" reads as "implementation planning under the accepted
+  DEC-004 / AR-002 decision" (AR-002 itself is accepted; only mechanics remain open).
+- **DEC-007 remains `Proposed for ChatGPT review`, not accepted.** DEC-003/004/005/006
+  untouched. `rejected-approaches-log.md` untouched. Product docs untouched. No code
+  files touched. No implementation authorized.
 
 ---
 
@@ -3192,3 +3316,19 @@ ChatGPT review.
   later sprint.** No rejected approaches; no technical debt; no architecture decided; no
   implementation authorized. Commit `docs: revise mvp baseline for controlled product export`.
   Next: push the same branch/PR #55; do not merge; await ChatGPT re-review.
+- **Phase 1 Domain Model + DEC-003 Scope-Hole Closure (2026-07-02):** confirmed PR #61
+  merged into `Shopify-connector` (merge commit `26dc30109530e2566755fd93bd974284083c3922`)
+  and DEC-004/005/006 Accepted / AR-002/003/005 Accepted / AR-004/006/007/008 not decided
+  before editing. Authored `phase1-domain-model-brief.md` (eight Phase 1 domains, concept
+  level only) and proposed `DEC-007-phase1-scope-clarifications.md`
+  (`Status: Proposed for ChatGPT review`) closing five DEC-003 scope holes: variant
+  export/update, image/media + price "where feasible" wording, a first-inventory-push
+  guard, a fulfilment customer-notification default (grounded in a small, targeted
+  official-source check of `FulfillmentInput.notifyCustomer`/
+  `fulfillmentTrackingInfoUpdate`, both defaulting to no notification), and
+  tax/shipping/discount/payment-evidence treatment. Added five new user stories and
+  pointer-only notes to `mvp-scope.md`/`non-mvp-and-later-phases.md`; added a non-decision
+  note to `architecture-review-log.md` (AR-006/007/008 fed, not decided); added
+  RA-008/009/010 (tagged PROPOSED) to `rejected-approaches-log.md`. No code; no DEC-003/
+  004/005/006 edit; no AR row decided. Next: push branch, open one draft PR into
+  `Shopify-connector`, stop for ChatGPT/Fable review.
