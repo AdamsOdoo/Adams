@@ -1,20 +1,60 @@
-# DEC-011 — Fulfillment Architecture Strategy
+# DEC-011 — Fulfillment Architecture Strategy (AR-008)
 
-> Proposed **architecture** decision record for **AR-008** (fulfillment
-> architecture), for the premium Odoo 19 ↔ Shopify Connector. Companion
-> evidence-backed brief:
+> **Accepted architecture decision record.** This record resolves
+> **AR-008** in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md),
+> for the premium Odoo 19 ↔ Shopify Connector. Companion evidence-backed
+> brief:
 > [`../03-architecture/ar008-fulfillment-architecture-decision-brief.md`](../03-architecture/ar008-fulfillment-architecture-decision-brief.md).
+> **ChatGPT accepted this record on 2026-07-02** (see *Acceptance note*
+> below). Acceptance does **not** by itself authorize implementation or
+> change DEC-003/004/005/006/007/008/009.
+
+## Acceptance note (2026-07-02)
+
+- Accepted by ChatGPT after PR #66 merged into `Shopify-connector`.
+- Acceptance followed Fable review: ACCEPT WITH MINOR CHANGES.
+- Fable fix-up was applied before merge.
+- This accepts DEC-011 as the AR-008 fulfillment architecture strategy.
+- This does not authorize implementation.
+- Implementation remains blocked until ChatGPT opens the implementation gate.
+- **Preserved caveats (unchanged by acceptance):**
+  - Exact Odoo tracking field source remains Master Blueprint /
+    implementation-planning work.
+  - Exact backorder / partial fulfillment field linkage remains Master
+    Blueprint work.
+  - Exact notification UI granularity remains open from DEC-007.
+  - Exact retry constants remain implementation planning.
+  - Exact fulfillment location-confirmation mechanism remains Master
+    Blueprint.
+  - Exact operation-level idempotency key schema remains Master Blueprint.
+  - Multi-package / multi-location fulfillment automation remains deferred.
+  - Implementation remains blocked.
+- **Shared Shopify Location reference clarification — ratified against
+  DEC-008:** ChatGPT's acceptance of DEC-010/DEC-011 also ratifies the
+  shared Shopify Location reference clarification against DEC-008.
+  `shopify_connector_core` may own a minimal Shopify-side Location
+  reference/cache/list; that reference must not store Odoo-location IDs or
+  Odoo↔Shopify mapping decisions; `shopify_connector_inventory` keeps
+  owning Odoo↔Shopify mapping; `shopify_connector_fulfillment` must not
+  depend on inventory. This does not change DEC-008's dependency direction,
+  does not create a new module, and does not authorize implementation.
+  Exact fields/models and the exact confirmation mechanism remain Master
+  Blueprint items.
 
 ## Status
 
-**Proposed for ChatGPT review.**
+**Accepted by ChatGPT.** Not implementation-authorizing.
 
-- **Sprint:** AR-007 + AR-008 Decision Preparation (after DEC-008/DEC-009
-  acceptance, PR #65 merged into `Shopify-connector`).
-- **Date:** 2026-07-02.
-- **This record does not self-accept.** It becomes an accepted architecture
-  decision only after ChatGPT (with Fable's advisory review) formally accepts
-  it, mirroring the DEC-004/005/006/007/008/009 acceptance pattern.
+## Acceptance date
+
+2026-07-02.
+
+## Date
+
+2026-07-02 (originally proposed after DEC-008/DEC-009 acceptance, PR #65
+merged into `Shopify-connector`; accepted the same day after PR #66 merged
+into `Shopify-connector` and Fable review).
 
 ## Scope
 
@@ -278,7 +318,7 @@ this record alone does not open that gate.
 
 ## Review / change control
 
-- **This record proposes AR-008 architecture only.** No API strategy,
+- **This record decides AR-008 architecture only.** No API strategy,
   binding-schema-shape, module-boundary, or MVP-scope decision is
   re-litigated (all already decided by DEC-003/004/005/006/007/008).
 - **Related:** AR-008 (`../05-qa/architecture-review-log.md`); the companion
@@ -287,7 +327,7 @@ this record alone does not open that gate.
   the small evidence refresh
   (`../03-architecture/ar007-ar008-evidence-refresh.md`); DEC-006/007/008/009
   (accepted context, unmodified).
-- **Changes** to this proposal require ChatGPT review; if accepted, a future
-  acceptance-patch note updates this Status field and the linked RA rows
-  (RA-022, RA-023), mirroring the DEC-004/005/006/007/008/009 acceptance
-  pattern.
+- **Changes** to this accepted record require ChatGPT review, mirroring the
+  DEC-004/005/006/007/008/009 change-control pattern. This acceptance patch
+  updated the Status field and removed the `PROPOSED:` prefix from the
+  linked RA rows (RA-022, RA-023).

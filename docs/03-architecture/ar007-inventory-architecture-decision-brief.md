@@ -3,12 +3,18 @@
 > Evidence-backed decision brief prepared for **AR-007** (inventory
 > architecture) during the **AR-007 + AR-008 Decision Preparation** sprint
 > (2026-07-02), after DEC-008/DEC-009 acceptance (PR #65 merged into
-> `Shopify-connector`). This brief **proposes** a Phase 1 inventory
-> architecture for ChatGPT/Fable review — it does **not** itself accept a
-> decision. The corresponding proposed decision record is
+> `Shopify-connector`). This brief **proposed** a Phase 1 inventory
+> architecture for ChatGPT/Fable review. **DEC-010 is now `Status: Accepted
+> by ChatGPT` (2026-07-02, after PR #66 merged into `Shopify-connector` and
+> Fable's minor-change review was applied), and AR-007 is now accepted
+> through DEC-010.** This brief remains the evidence-backed decision brief
+> behind
 > [`../04-decisions/DEC-010-inventory-architecture-strategy.md`](../04-decisions/DEC-010-inventory-architecture-strategy.md)
-> (`Status: Proposed for ChatGPT review`). **No implementation is authorized
-> by this brief.**
+> — it does **not** itself decide anything or authorize implementation;
+> acceptance flows through DEC-010. Exact schema, fields, quantity source,
+> first-push granularity, webhook strings, feature-flag UI, and other
+> Master Blueprint items remain open (§10). **No implementation is
+> authorized by this brief.**
 
 ## Claim classification (used throughout this brief)
 
@@ -576,7 +582,9 @@ context.
 
 ## What this brief does not decide
 
-- Does not accept DEC-010.
+- Does not itself decide anything or authorize implementation — acceptance
+  of AR-007 flows through DEC-010, now `Status: Accepted by ChatGPT`
+  (2026-07-02).
 - Does not decide exact model fields, database constraints, or Python/ORM
   design.
 - Does not create Odoo modules, code, or tests.
