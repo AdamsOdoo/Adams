@@ -1,16 +1,127 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-007 Acceptance Patch)** is
-> immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **Phase 1 Domain Model + DEC-003
-> Scope-Hole Closure**, **DEC-004/005/006 Acceptance Patch**, **Evidence Refresh +
-> Combined AR-002/003/005 Decision Preparation**, **Control-Room Reset Sprint 1**,
-> **RB-14 Architecture Preparation — Part 2**, **RB-14 Part 1**, **Research Sprint C2**,
-> **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
+> Continuity lives in GitHub, not chat. The **current entry (AR-004 + AR-006 Decision
+> Preparation)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **DEC-007 Acceptance Patch**, **Phase 1
+> Domain Model + DEC-003 Scope-Hole Closure**, **DEC-004/005/006 Acceptance Patch**,
+> **Evidence Refresh + Combined AR-002/003/005 Decision Preparation**, **Control-Room Reset
+> Sprint 1**, **RB-14 Architecture Preparation — Part 2**, **RB-14 Part 1**, **Research
+> Sprint C2**, **Product Sprint G**, **Sprint F**, **Sprint E**, **Sprint D**, **Sprint C**,
 > **Sprint B**, and **Sprint A** handoffs are retained underneath as history. The running
 > **Sprint checkpoint log** (one note per stage, all sprints) is at the very bottom. The
 > **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### AR-004 + AR-006 Decision Preparation — compact handoff (2026-07-02)
+
+> **Documentation / decision-preparation sprint, not implementation.** Confirmed PR #63
+> merged into `Shopify-connector` (merge commit `3ca0cdec168b60cae6c4b1004fa6f7532333a0f9`
+> per the session prompt; verified as commit `3ca0cde` present in `origin/Shopify-connector`
+> history) before editing; DEC-003/DEC-004/DEC-005/DEC-006/DEC-007 confirmed **Accepted by
+> ChatGPT**; RA-001 through RA-010 confirmed **binding**; AR-002/AR-003/AR-005 confirmed
+> **Accepted**; AR-004/AR-006/AR-007/AR-008 confirmed **Not decided**; implementation
+> confirmed still blocked. Branch `claude/ar004-ar006-decision-prep-y9t8j2`
+> (harness-assigned; the sprint's preferred name was
+> `architecture/ar004-ar006-decision-prep`, so this branch-name discrepancy is recorded here
+> per the session rule) was already checked out based exactly on that merge commit — no
+> re-basing needed.
+
+- **Branch / PR:** `claude/ar004-ar006-decision-prep-y9t8j2` → draft PR into
+  `Shopify-connector`, opened immediately after this handoff commit, **not merged**.
+- **Files changed:** `docs/03-architecture/ar004-module-boundary-decision-brief.md` (new),
+  `docs/03-architecture/ar006-error-retry-idempotency-decision-brief.md` (new),
+  `docs/04-decisions/DEC-008-module-boundary-strategy.md` (new),
+  `docs/04-decisions/DEC-009-error-retry-idempotency-strategy.md` (new),
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/rejected-approaches-log.md`, `docs/01-research/research-handoff.md` (this
+  file), `docs/06-prompts/ar004-ar006-decision-prep-prompt.md` (new, archive). No
+  `docs/03-architecture/ar004-ar006-evidence-refresh.md` was created — repo-local evidence
+  (already-cited Tier-1 Shopify/Odoo facts) was sufficient for every AR-004/AR-006 claim;
+  no fresh external fetch was performed.
+- **What changed:** authored
+  [`ar004-module-boundary-decision-brief.md`](../03-architecture/ar004-module-boundary-decision-brief.md)
+  — options considered (one giant module, per-feature micro-module explosion,
+  domain-per-Odoo-app mirroring, layered domain family with link modules), a recommended
+  Phase 1 addon family (`shopify_connector_core`/`product`/`sale`/`inventory`/
+  `fulfillment`), a strict dependency DAG (`core` → `product`; `sale` and `inventory` are
+  siblings depending on `core` + `product`; `fulfillment` depends on `core` + `sale`, not
+  on `inventory`), a link-module strategy (none needed yet for Phase 1), and an evaluated
+  answer on customer/dashboard/payment-evidence placement (folded into `sale`/`core`/`sale`
+  respectively for Phase 1, each with a revisit condition) — and
+  [`ar006-error-retry-idempotency-decision-brief.md`](../03-architecture/ar006-error-retry-idempotency-decision-brief.md)
+  — a classified retry policy (Option C: auto-retry only safe/transient error classes),
+  a 6-job-source taxonomy, a 10-job-state machine, a 16-error-class table with default
+  retry behaviour, an 11-layer idempotency mapping (platform `@idempotent` surface +
+  connector-designed keys), and user-facing log/audit requirements. Proposed
+  [`DEC-008`](../04-decisions/DEC-008-module-boundary-strategy.md) (AR-004) and
+  [`DEC-009`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md) (AR-006), both
+  `Status: Proposed for ChatGPT review`. Updated `architecture-review-log.md`: AR-004 and
+  AR-006 rows move from "Not decided / Evidence pending" to "Proposed for ChatGPT review,"
+  with a compact note confirming AR-007/AR-008 are untouched and implementation remains
+  blocked. Updated `rejected-approaches-log.md`: added **RA-011** (one giant module),
+  **RA-012** (per-feature micro-module explosion), **RA-013** (duplicated queue/job/log/
+  binding abstractions per domain) tied to DEC-008, and **RA-014** (retry-everything
+  automatically), **RA-015** (never-retry-automatically/manual-only recovery), **RA-016**
+  (user-facing stack traces as primary error UX), **RA-017** (no connector-designed
+  idempotency key / binding-alone retry strategy) tied to DEC-009 — all seven tagged
+  **PROPOSED**, non-binding until DEC-008/DEC-009 are accepted (checked against RA-001–010
+  first; no duplicates). Updated `../04-decisions/README.md` to index DEC-008/DEC-009 as
+  "Also present (not yet accepted)." Archived this sprint's prompt to
+  `../06-prompts/ar004-ar006-decision-prep-prompt.md`.
+- **Items deferred:** AR-007 full inventory architecture; AR-008 full fulfilment
+  architecture; exact Odoo model/field/constraint design for jobs/bindings/mappings; exact
+  later-module names/boundaries (accounting/refund/payout/multi-store/markets/metafield/
+  POS/B2B/app-store); exact retry-count/backoff constants (flagged
+  `[Implementation-planning default]`); the Master Blueprint; all implementation.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new. **New rejected
+  approaches:** RA-011 through RA-017 added (PROPOSED, non-binding). **New technical
+  debt:** none (no code). **Architecture concerns:** AR-004 and AR-006 move to "Proposed
+  for ChatGPT review" (not yet accepted); AR-007/AR-008 unchanged ("Not decided"); AR-002/
+  AR-003/AR-005 unchanged ("Accepted").
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop checked ·
+  learning captured (no new issues) · rejected approaches logged (RA-011–017, PROPOSED) ·
+  technical debt logged (none applicable — no code) · repeated-issue escalation applied
+  (none at threshold) — all **YES**.
+- **Next recommended session:** 1) **ChatGPT/Fable review of DEC-008/DEC-009**; 2) **AR-007
+  + AR-008 decision sprint**, once AR-004/AR-006 are reviewed; 3) **UX/operator-flow
+  sprint**; 4) **Master Blueprint**, after those gates.
+- **Stop condition:** stopped after three focused commits + one **draft** PR into
+  `Shopify-connector` (not merged). PR #63 merge confirmed first. DEC-003/DEC-004/
+  DEC-005/DEC-006/DEC-007 not edited; no code files changed; AR-004 and AR-006 are
+  **proposed only, not accepted**; AR-007/AR-008 remain **not decided**; implementation
+  still not authorized; `main` and plain `dev` untouched. Awaiting further instruction.
+
+**PR #64 minor revision (2026-07-02):**
+- ChatGPT reviewed PR #64 and requested minor cleanup before Fable review.
+- Corrected AR-006 taxonomy count from 15 to 16 error classes.
+- Clarified AR-004 dependency notation so fulfillment depends on core + sale, not inventory.
+- Normalized RA-011–RA-017 proposed formatting to keep stable RA IDs.
+- DEC-008/DEC-009 remain Proposed for ChatGPT review.
+- AR-004/AR-006 remain proposed only, not accepted.
+- AR-007/AR-008 remain not decided.
+- DEC-003/004/005/006/007 untouched.
+- No code files changed.
+- Implementation remains blocked.
+
+**PR #64 Fable revision (2026-07-02):**
+- Fable reviewed PR #64 and returned ACCEPT WITH MINOR CHANGES.
+- Added DEC-006 binding-shape reconciliation so DEC-008 does not foreclose polymorphic vs per-domain binding schema.
+- Added ambiguous-outcome non-idempotent-write retry rule to DEC-009 / AR-006.
+- Corrected evidence/citation attributions: enable/disable attribution; customer fold-in quote/source; `committed` attribution; temporary/server/network evidence wording.
+- Routed residual feature-flag/config-model scope to UX/operator-flow and Master Blueprint / implementation planning.
+- Acknowledged reconciliation cadence handoff from DEC-005 and routed exact cadence to implementation planning.
+- Cleaned small state-machine wording.
+- Tightened RA-014 revisit condition.
+- Added missing sprint checkpoint log line.
+- DEC-008/DEC-009 remain Proposed for ChatGPT review.
+- AR-004/AR-006 remain proposed only, not accepted.
+- AR-007/AR-008 remain not decided.
+- DEC-003/004/005/006/007 untouched.
+- No code files changed.
+- Implementation remains blocked.
 
 ---
 
@@ -3403,3 +3514,21 @@ ChatGPT review.
   RA-008/009/010 (tagged PROPOSED) to `rejected-approaches-log.md`. No code; no DEC-003/
   004/005/006 edit; no AR row decided. Next: push branch, open one draft PR into
   `Shopify-connector`, stop for ChatGPT/Fable review.
+- **AR-004 + AR-006 Decision Preparation (2026-07-02):** confirmed PR #63 merged into
+  `Shopify-connector` (merge commit `3ca0cde`) and DEC-003/004/005/006/007 Accepted /
+  RA-001–010 binding / AR-002/003/005 Accepted / AR-004/006/007/008 not decided before
+  editing. Authored `ar004-module-boundary-decision-brief.md` and
+  `ar006-error-retry-idempotency-decision-brief.md`; proposed `DEC-008-module-boundary-
+  strategy.md` and `DEC-009-error-retry-idempotency-strategy.md` (both
+  `Status: Proposed for ChatGPT review`), moving AR-004/AR-006 from "Not decided" to
+  "Proposed for ChatGPT review" in `architecture-review-log.md`. Added RA-011–017 (tagged
+  PROPOSED) to `rejected-approaches-log.md`. Opened draft PR #64 into `Shopify-connector`.
+  Two follow-up revision rounds on the same PR (not a new PR): a minor self-revision
+  (error-class count 15→16, DAG notation clarity, RA formatting), then a Fable
+  ACCEPT-WITH-MINOR-CHANGES round (DEC-006 binding-schema-fork reconciliation,
+  ambiguous-outcome non-idempotent-write retry rule, evidence-wording and citation-
+  attribution corrections, feature-flag/config-model scope routed onward, DEC-005
+  reconciliation-cadence handoff acknowledged, state-machine wording cleanup, RA-014
+  revisit condition tightened). No code; no DEC-003/004/005/006/007 edit; AR-007/AR-008
+  untouched. Next: push branch, keep PR #64 open (not merged), await ChatGPT/Fable
+  re-review.
