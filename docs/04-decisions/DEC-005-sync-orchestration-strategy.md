@@ -73,7 +73,7 @@ and the RB-14 Part 2 narrowing).
 | **1 — `ir.cron`-only (no queue model)** | **Kept only as an implicit floor inside Option 2**, never as a standalone design | `ir.cron`-as-a-queue is a demonstrated market anti-pattern (webhook-less/cron-only designs are the reliability floor, not the target); Option 2 already includes `ir.cron` as the processing loop, so Option 1 alone is not separately viable |
 | **3 — OCA `queue_job` as the Phase 1 DEFAULT substrate** | **Deferred as default; kept as an optional, later/on-prem accelerator** (proposed; see `rejected-approaches-log.md`) | Non-core dependency; **Odoo.sh `server_wide_modules`/Jobrunner support is not confirmed by official docs** (2026-07-02 refresh); competitor evidence (VentorTech) shows real install friction; DEC-003's effortless-onboarding intent argues against depending on an unconfirmed hosting capability as the *default* |
 | **4 — External worker (out-of-Odoo processor)** | **Rejected for Phase 1** (proposed; see `rejected-approaches-log.md`) | Heaviest operational surface (a separate service to deploy/secure/monitor); no competitor demonstrates it; contradicts the DEC-003 install-and-go intent for a single-store MVP |
-| **5 — Hybrid substrate by hosting tier** | **Rejected/weakened** (Odoo Online exclusion collapses the tier split) | With Odoo Online out of scope, Odoo.sh and on-prem are close enough in capability that maintaining two substrates has little payoff for Phase 1 |
+| **5 — Hybrid substrate by hosting tier** | **Weakened** (Odoo Online exclusion collapses the tier split; no RA row — not formally rejected) | With Odoo Online out of scope, Odoo.sh and on-prem are close enough in capability that maintaining two substrates has little payoff for Phase 1 |
 
 ## Evidence used
 

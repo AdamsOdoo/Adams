@@ -25,8 +25,10 @@ three **proposed, not-yet-accepted** architecture decision records added
 accepted, and none authorizes implementation.** No **accepted** architecture
 decision (ADR) exists yet; the first architecture ADR is created only after one
 of these (or a future AR-004/006/007/008 proposal) is reviewed and accepted by
-ChatGPT. *(Naming note: `DEC-003`/`DEC-004`/`DEC-005`/`DEC-006` predate the
-`ADR-NNNN-<slug>.md` convention stated above; this numbering/naming
-inconsistency is flagged, not resolved, in
-`../05-qa/documentation-residue-sweep.md` — do not invent missing entries or
-rename existing ones.)*
+ChatGPT. *(Naming note: `DEC-003`/`DEC-004`/`DEC-005`/`DEC-006` **follow the
+existing `DEC-003` naming precedent** rather than the stated
+`ADR-NNNN-<slug>.md` convention above — they do not predate that convention,
+they deliberately continue the `DEC-003` numbering instead of introducing a
+second scheme mid-sprint; this numbering/naming inconsistency **remains
+flagged, not resolved**, in `../05-qa/documentation-residue-sweep.md` — do not
+invent missing entries or rename existing ones.)*

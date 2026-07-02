@@ -105,6 +105,23 @@
   **Proposed for ChatGPT review**, not Accepted; AR-004/006/007/008 not decided; `main`
   and plain `dev` untouched. Awaiting ChatGPT/Fable review.
 
+#### PR #60 revision (2026-07-02, ChatGPT + Fable review — ACCEPT WITH MINOR CHANGES)
+
+- Fable reviewed PR #60 and returned **ACCEPT WITH MINOR CHANGES**.
+- Applied the required fixes and nits: added **RA-007** for external worker as the
+  Phase 1 substrate (fixing DEC-005's dangling rejected-approaches pointer);
+  reconciled DEC-004's non-public custom-app / app-creation-surface /
+  token-acquisition wording (creation surface + token mechanics left to
+  implementation planning, not hard-fixed); clarified RA-002–RA-007 are
+  non-binding until the linked DEC is accepted (`rejected-approaches-log.md`
+  governance clarifier); fixed the `04-decisions/README.md` naming wording
+  (DEC-004/005/006 **follow** the DEC-003 precedent, do not **predate** the
+  ADR-NNNN convention); changed DEC-005 Option 5's disposition to **"Weakened"**
+  (no RA row exists for it).
+- **DEC-004/005/006 remain `Proposed for ChatGPT review`** — not accepted by this
+  revision.
+- **No implementation authorized. DEC-003 untouched. No code files touched.**
+
 ---
 
 ### Control-Room Reset Sprint 1 — compact handoff (2026-07-02)

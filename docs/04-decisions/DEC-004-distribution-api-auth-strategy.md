@@ -23,13 +23,17 @@ boundaries), AR-006 (retry/idempotency taxonomy), AR-007 (inventory design), or 
 
 ## Decision summary
 
-Phase 1 / Early Access uses a **custom (merchant-Admin-created) Shopify app** — not a
-public App Store listing — as the installation path; the **Shopify Admin GraphQL API**
-as the primary/default API surface; and a **token-based custom-app authentication
-model** (offline access token) with **masked storage, least-privilege scopes, and an
-inline test-connection/readiness check** in the Odoo setup wizard. Public App Store
-distribution, the OAuth authorization flow required for public apps, and the Billing
-API are **deferred**, not designed against, for Phase 1.
+Phase 1 / Early Access uses **non-public custom-app / Early Access distribution** — not
+a public App Store listing — as the installation path; the **Shopify Admin GraphQL
+API** as the primary/default API surface; and an **unattended/background (offline)
+access model** with **masked storage, least-privilege scopes, and an inline
+test-connection/readiness check** in the Odoo setup wizard. The **exact custom-app
+creation surface** — a merchant Admin-created custom app, or a Partner/Dev-Dashboard
+custom-distribution app — and its corresponding **token-acquisition mechanics** (an
+Admin-generated token for the former; OAuth/token-exchange-style mechanics for the
+latter) are an **implementation-planning sub-choice**, not fixed by this record. Public
+App Store distribution, the public-app OAuth flow, and the Billing API are
+**deferred**, not designed against, for Phase 1.
 
 ## Recommended option
 
@@ -38,11 +42,14 @@ API are **deferred**, not designed against, for Phase 1.
 and the RB-14 Part 2 narrowing in
 [`rb14-decision-candidate-brief.md`](../03-architecture/rb14-decision-candidate-brief.md)).
 
-- **Distribution:** a **custom app created by the merchant in the Shopify Admin**
-  (Early Access installation), installed to one store (single-store MVP, per
-  DEC-003). `[Official fact]` custom/Admin-created apps get protected-customer-data
-  access **"Always available"** — no App-Store review gate, no approval wait
-  (`rb14-part2-open-question-resolution.md`, RQ-002-2).
+- **Distribution:** **non-public custom-app / Early Access distribution**, installed
+  to one store (single-store MVP, per DEC-003) — not a public App Store listing. The
+  specific **creation surface** (a merchant Admin-created custom app, or a
+  Partner/Dev-Dashboard custom-distribution app) is left to implementation planning —
+  both are non-public and both satisfy this decision. `[Official fact]` custom/
+  Admin-created apps get protected-customer-data access **"Always available"** — no
+  App-Store review gate, no approval wait (`rb14-part2-open-question-resolution.md`,
+  RQ-002-2).
 - **API surface:** **GraphQL Admin API as the primary/default**, because `[Official
   fact]` REST is "legacy as of October 1, 2024" and `[Official limitation]` GraphQL is
   signalled as **"the only supported API over the long term"** — a **direction +
@@ -51,13 +58,17 @@ and the RB-14 Part 2 narrowing in
   basis here). GraphQL is required regardless for the `productSet` full-state
   export/update path, the new 2,048-variant product model, and the 17-mutation
   `@idempotent` surface that DEC-003's correctness spine depends on.
-- **Auth/token model:** the **offline token** model (unattended/service-to-service),
+- **Auth/token model:** the **offline (unattended/service-to-service) access model**,
   stored **masked** behind Odoo access rights and **field-level `groups`** on the
   credential field(s), with **least-privilege scope selection** surfaced in the setup
-  wizard. **OAuth-vs-plain-admin-token and non-expiring-vs-expiring-with-90-day-
-  rotation stay open sub-choices for implementation planning** — this record fixes the
-  **offline-token model and masked/least-privilege storage**, not the exact
-  acquisition mechanics.
+  wizard. The **token-acquisition mechanics follow whichever custom-app creation
+  surface implementation planning selects**: an **Admin-generated token, installed on
+  generation**, for a merchant Admin-created custom app; or **OAuth/token-exchange-
+  style mechanics** if the Partner/Dev-Dashboard custom-distribution path is chosen
+  instead — both stay within the offline/unattended model this record fixes, including
+  any non-expiring-vs-expiring-with-90-day-rotation sub-choice. **AR-002 fixes the
+  offline/unattended access model and masked/least-privilege storage; it does not need
+  to decide the exact token-acquisition mechanics yet.**
 - **Bulk Operations:** used only as an **internal mechanism** (never user-facing, per
   DEC-003) for safe/resumable large backfills where a single GraphQL request would
   exceed practical size/time limits; exact triggering thresholds are left to
@@ -205,8 +216,11 @@ re-fetched this sprint (see
 - **Whether custom apps must implement the compliance webhooks / are bound by Level
   1/2 obligations** — open; must be resolved or conservatively handled before any
   compliance-relevant code is written.
-- **Exact OAuth-vs-plain-admin-token and token-expiry-variant choice** — left to
-  implementation planning within the offline-token model this record fixes.
+- **Exact custom-app creation surface** (merchant Admin-created vs. Partner/
+  Dev-Dashboard custom-distribution) **and its corresponding token-acquisition
+  mechanics** (Admin-generated token vs. OAuth/token-exchange-style, and any
+  non-expiring-vs-expiring-with-rotation variant) — left to implementation planning
+  within the non-public/offline access model this record fixes.
 - **Module boundaries (AR-004), binding data model (AR-005/DEC-006), orchestration
   substrate (AR-003/DEC-005), and retry/idempotency taxonomy (AR-006)** — separate
   decisions.
