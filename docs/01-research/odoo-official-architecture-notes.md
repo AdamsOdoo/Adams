@@ -342,6 +342,17 @@
   or its documentation** (it requires its own Jobrunner deployment).
   (https://apps.odoo.com/apps/modules/19.0/queue_job — Apps Store listing, not
   official docs)
+- **Evidence Refresh Sprint (2026-07-02) — community evidence, not official fact —**
+  the OCA module (repository renamed **`OCA/queue`**) has a published **19.0** PyPI
+  release (`odoo-addon-queue-job` 19.0.2.0.2.2, `requires_dist: odoo==19.0.*`,
+  development status "Mature"). Its README states the Jobrunner **now runs as an Odoo
+  worker process** ("Run jobrunner as a worker process instead of a thread in the main
+  process, when running with `--workers` > 0") rather than a separate external daemon
+  binary, but it still requires **`server_wide_modules = ...,queue_job`** in
+  `odoo.conf` (or `--load=web,queue_job`) and `--workers` > 0.
+  (`github.com/OCA/queue/tree/19.0`; `raw.githubusercontent.com/OCA/queue/19.0/queue_job/README.rst`;
+  `pypi.org/pypi/odoo-addon-queue-job/json` — community tier, see
+  `../03-architecture/ar002-ar003-ar005-evidence-refresh.md`.)
 
 ### External IDs and mapping
 
@@ -483,6 +494,25 @@
   mail catcher.
   (https://www.odoo.com/documentation/19.0/administration/odoo_sh/getting_started/branches.html;
   https://www.odoo.com/documentation/19.0/administration/odoo_sh/getting_started/builds.html)
+- **Evidence Refresh Sprint (2026-07-02) — new fact, production scope.** Odoo.sh
+  scheduled actions (`ir.cron`) run on a **"best effort"** basis even in
+  **production**, not just staging: *"we cannot guarantee an exact running time for
+  scheduled actions"*; *"Do not expect any scheduled action to be run more often than
+  every 5 min"*; *"Odoo.sh always limits the execution time of scheduled actions (aka
+  crons)."* Odoo.sh's own guidance is to run crons in **small batches, commit after
+  each batch, and be idempotent**. The only Odoo.sh-managed background services named
+  are **`http`** and **`cron`**.
+  (https://www.odoo.com/documentation/19.0/administration/odoo_sh/advanced/frequent_technical_questions.html;
+  https://www.odoo.com/documentation/19.0/administration/odoo_sh/getting_started/branches.html)
+- **Open question (re-checked 2026-07-02, still open) —** whether Odoo.sh's managed
+  `odoo.conf`/build pipeline supports **`server_wide_modules`** or a custom
+  long-running background worker/Jobrunner **alongside** its `http`/`cron` services is
+  **not addressed** in any fetched Odoo.sh page (getting-started, create-module,
+  settings, advanced/containers, advanced/frequent-technical-questions, branches);
+  **absence of documentation, not a documented denial.** No page states anything about
+  OCA `queue_job` by name. This is the decision-blocking gate for AR-003 Option 3 —
+  see `../03-architecture/ar002-ar003-ar005-evidence-refresh.md` and
+  `../04-decisions/DEC-005-sync-orchestration-strategy.md`.
 
 ---
 
