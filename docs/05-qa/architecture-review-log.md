@@ -369,4 +369,31 @@ Per `../05-qa/quality-feedback-loop.md` §10, AR-002/AR-003/AR-005 acceptance is
 Phase 1 research-phase-exit criteria (alongside Phase 1 domain-model briefs, a DEC-003 scope-hole
 amendment, and a UX/operator-flow sprint) — the implementation gate itself opens only after ChatGPT
 separately approves that full exit. Recommended next: **Phase 1 Domain Model + DEC-003 Scope-Hole
-Closure sprint.**_
+Closure sprint.**
+
+_**Phase 1 Domain Model + DEC-003 Scope-Hole Closure sprint (2026-07-02) — NOT an architecture
+decision; AR-006, AR-007, AR-008 remain "Not decided / Evidence pending."** This sprint produced
+[`../03-architecture/phase1-domain-model-brief.md`](../03-architecture/phase1-domain-model-brief.md)
+(a documentation-level Phase 1 domain-model brief covering store/connection, binding/identity,
+product, customer, order/sale, inventory, fulfilment, and queue/log/error concepts) and proposed
+[`../04-decisions/DEC-007-phase1-scope-clarifications.md`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
+(`Status: Proposed for ChatGPT review`) closing five DEC-003 scope-hole wordings (variant
+export/update; image/media and price "where feasible" wording; a first-inventory-push guard;
+fulfilment customer-notification default; tax/shipping/discount/payment/order-accounting
+treatment). **For the record only, this sprint feeds — and explicitly does not decide — three AR
+rows:** **AR-006** (error/retry/idempotency taxonomy) — the domain-model brief names a minimum
+job/log concept (source, state, retry count, error class placeholder) per the already-accepted
+DEC-005 substrate, but the **full taxonomy stays AR-006, not decided here**; **AR-007** (inventory
+architecture) — the proposed first-inventory-push guard is a **scope-level guardrail statement**
+(preview + confirmation + mapped location + recorded source-of-truth before the first
+Odoo→Shopify write), **not** a quantity-field default, multi-location mechanism, or apply-mode
+decision, all of which **stay AR-007, not decided here**; **AR-008** (fulfilment architecture) —
+the proposed fulfilment customer-notification default (no notification unless explicitly enabled,
+grounded in Shopify's own `FulfillmentInput.notifyCustomer`/`fulfillmentTrackingInfoUpdate`
+defaults) is a **scope-level default statement**, **not** a FulfillmentOrder-orchestration or
+multi-package/location design, which **stay AR-008, not decided here**. **AR-004** module
+boundaries are untouched by this sprint. **No AR row changes status; AR-006/AR-007/AR-008 remain
+"Not decided / Evidence pending"; AR-002/AR-003/AR-005 remain "Accepted."** DEC-003 body was not
+edited; DEC-004/005/006 were not edited; implementation remains blocked. Recommended next (pending
+ChatGPT/Fable review of DEC-007 and the domain-model brief): **Master Blueprint sprint**, and/or a
+dedicated **AR-006/AR-007/AR-008 architecture-decision sprint**.__

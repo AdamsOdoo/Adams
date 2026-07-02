@@ -59,6 +59,22 @@
 > (Sprint C2 note). **No serious contradiction to DEC-003 was found; no open review note
 > for ChatGPT is required.**
 
+> **DEC-007 proposed scope-hole clarification note (2026-07-02) — proposed, not accepted;
+> no scope change yet.** A later sprint (**Phase 1 Domain Model + DEC-003 Scope-Hole
+> Closure**) proposed
+> [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
+> (`Status: Proposed for ChatGPT review`) to close five practical wording gaps left open by
+> this baseline: (1) whether "product export/update" below includes variant-level
+> export/update, (2) the vague **"where feasible"** qualifier on image/media and price
+> update/export (see below), (3) a first-inventory-push guard for the Odoo→Shopify
+> direction, (4) whether fulfilment/tracking write-back triggers a Shopify customer
+> notification and who controls that, and (5) the tax/shipping/discount/payment-evidence/
+> invoice-policy treatment implied by the Domain 9 minimal-financial-evidence rule below.
+> **DEC-007 does not change this document's accepted scope** — every clarification is
+> framed as removing ambiguity, not adding or removing a capability. **Until ChatGPT
+> accepts DEC-007, this document's existing wording (including "where feasible") remains
+> the accepted baseline as written**; DEC-007 is not treated as accepted here.
+
 ## ChatGPT RB-13 acceptance
 
 > **Accepted MVP scope baseline — ChatGPT, 2026-07-01 (DEC-003), revised same day after
