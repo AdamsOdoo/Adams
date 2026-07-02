@@ -21,8 +21,12 @@
 Per `CLAUDE.md` §8: `[Accepted decision]` (already accepted in DEC-003/004/
 005/006/007) · `[Official fact]` (Odoo 19.0 official docs or source, cited
 with URL + access date) · `[Competitor claim]` · `[Inference]` (our
-reasoning from cited evidence) · `[Recommendation]` (this brief's proposed
-direction — not yet a decision) · `[Open question]`.
+reasoning from cited evidence) · `[Recommendation]` (what this brief
+recommended during AR-004 decision preparation — historical label, kept
+as originally written; where a recommendation was carried into
+[`DEC-008`](../04-decisions/DEC-008-module-boundary-strategy.md), it is now
+**accepted through DEC-008**, not through this brief by itself — this brief
+still authorizes no implementation) · `[Open question]`.
 
 ## Purpose
 

@@ -32,9 +32,13 @@ per `../05-qa/quality-feedback-loop.md` §10, AR-002/AR-003/AR-005 acceptance is
 of several Phase 1 research-phase-exit criteria (alongside Phase 1 domain-model
 briefs, a DEC-003 scope-hole amendment, and a UX/operator-flow sprint), and the
 no-code gate (`CLAUDE.md` §4–§5) remains in force until ChatGPT separately approves
-that full exit and opens a dedicated implementation/blueprint phase. AR-004/006/
-007/008 remain **not decided** — future architecture ADRs for those rows are
-created only after their own proposal is reviewed and accepted by ChatGPT.
+that full exit and opens a dedicated implementation/blueprint phase. **AR-002,
+AR-003, AR-004, AR-005, and AR-006 are now all accepted** (AR-004 via DEC-008
+and AR-006 via DEC-009, below — see the second "Also accepted" section).
+**AR-007 and AR-008 remain not decided** — future architecture ADRs for those
+rows are created only after their own proposal is reviewed and accepted by
+ChatGPT. **Implementation remains blocked; DEC-008 and DEC-009 do not
+authorize implementation.**
 *(Naming note: `DEC-003`/`DEC-004`/`DEC-005`/`DEC-006` **follow the existing
 `DEC-003` naming precedent** rather than the stated `ADR-NNNN-<slug>.md`
 convention above — they do not predate that convention, they deliberately

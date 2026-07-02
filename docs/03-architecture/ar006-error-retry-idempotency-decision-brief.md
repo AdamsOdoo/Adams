@@ -22,7 +22,12 @@
 Per `CLAUDE.md` §8: `[Accepted decision]` · `[Official fact]` (Shopify
 `shopify.dev` or Odoo 19.0 official docs/source, cited with URL + access
 date) · `[Official limitation]` · `[Competitor claim]` · `[Inference]` ·
-`[Recommendation]` (this brief's proposal — not yet a decision) ·
+`[Recommendation]` (what this brief recommended during AR-006 decision
+preparation — historical label, kept as originally written; where a
+recommendation was carried into
+[`DEC-009`](../04-decisions/DEC-009-error-retry-idempotency-strategy.md), it
+is now **accepted through DEC-009**, not through this brief by itself — this
+brief still authorizes no implementation) ·
 `[Implementation-planning default]` (a conceptual number/behaviour proposed
 for later implementation planning, explicitly **not** a verified constant)
 · `[Open question]`.

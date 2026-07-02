@@ -83,6 +83,19 @@
   edited; no code files changed; AR-007/AR-008 remain **not decided**; implementation still
   not authorized; `main` and plain `dev` untouched. Awaiting further instruction.
 
+**PR #65 tiny revision (2026-07-02):**
+- ChatGPT reviewed PR #65 and requested tiny cleanup before merge.
+- Fixed decisions README current-status residue so AR-004/AR-006 are no longer described as
+  not decided.
+- Fixed AR-004/AR-006 brief classification wording so recommendation labels no longer imply
+  DEC-008/DEC-009 are still not decisions.
+- DEC-008/DEC-009 remain accepted.
+- AR-004/AR-006 remain accepted.
+- AR-007/AR-008 remain not decided.
+- DEC-003/004/005/006/007 untouched.
+- No code files changed.
+- Implementation remains blocked.
+
 ---
 
 ### AR-004 + AR-006 Decision Preparation — compact handoff (2026-07-02)
