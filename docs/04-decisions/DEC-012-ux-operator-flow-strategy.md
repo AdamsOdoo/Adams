@@ -227,6 +227,14 @@ respectively. Full flow:
 - Admin vs. functional-user dashboard/settings split — one role-gated
   surface, or two (dashboard §3; unchanged open question from
   setup-ux-principles.md).
+- **Order-import operator touchpoints** — whether order-import operator
+  touchpoints are fully covered by the error center/manual-review flow (UX
+  doc §5), especially financial evidence mismatch and total-check issues
+  (DEC-007 §6), or whether a separate order-import operator flow is needed
+  (raised in Fable's review of PR #68).
+- **Store disconnect data-retention posture** — what happens to bindings,
+  logs, jobs, and audit records after a store is disconnected (UX doc §2)
+  (raised in Fable's review of PR #68).
 
 ## Risks and mitigations
 

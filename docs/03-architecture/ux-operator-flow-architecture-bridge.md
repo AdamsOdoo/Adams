@@ -249,6 +249,13 @@ implementation gate.
   `inventorySetQuantities` vs. `inventoryAdjustQuantities`), cron cadence,
   and retry/backoff constants.
 - Exact notification-UI and feature-flag-UI granularity.
+- Whether order-import operator touchpoints (§7 in the companion UX doc's
+  numbering context, error center §5) need a dedicated flow beyond the error
+  center/manual-review flow, or are fully covered by it — raised in Fable's
+  review of PR #68, not decided here.
+- The store disconnect data-retention posture for bindings, logs, jobs, and
+  audit records (store settings §2) — raised in Fable's review of PR #68,
+  not decided here.
 
 ## Review checklist for ChatGPT / Fable
 

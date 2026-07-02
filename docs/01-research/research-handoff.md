@@ -88,6 +88,23 @@
   implementation still not authorized; `main` and plain `dev` untouched. Awaiting
   further instruction.
 
+**PR #68 Fable revision (2026-07-02):**
+- Fable reviewed PR #68 and returned **ACCEPT WITH MINOR CHANGES**.
+- Clarified that readiness/test-connection/preview jobs
+  (`setup_readiness_check`, `export_preview_dry_run`) may run during setup
+  and are not business sync runs.
+- Reworded scope-list UX to avoid implying the wizard grants Shopify scopes.
+- Added a customer email/customer-key matching step (binding → email/
+  customer keys → manual, name advisory only), distinct from product/variant
+  matching (binding → SKU/internal reference → barcode → manual).
+- Added two Master Blueprint open questions: order-import operator
+  touchpoints, and store-disconnect data-retention posture.
+- DEC-012 remains **Proposed for ChatGPT review**.
+- AR-009 remains proposed only, not accepted.
+- DEC-003 through DEC-011 untouched.
+- No code files changed.
+- Implementation remains blocked.
+
 ---
 
 ### DEC-010/DEC-011 Acceptance Patch — compact handoff (2026-07-02)

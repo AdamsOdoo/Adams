@@ -143,13 +143,20 @@ and ready to sync" without editing server config or reading source code
    language, why (non-public/Early Access distribution, "Always available"
    protected-data access, no App-Store review wait) so the operator
    understands the friction is wizard steps, not approval latency
-   **[Accepted — DEC-004 §"UX implications"]**. Least-privilege scopes are
-   pre-selected by the wizard (not freely typed by the operator) with a
-   visible list of what each scope grants **[Proposed UX decision]**.
+   **[Accepted — DEC-004 §"UX implications"]**. The wizard presents the
+   minimal required scope list, never as arbitrary free-text input, and
+   verifies the granted scopes during the test-connection/readiness step —
+   the wizard does not itself mechanically grant Shopify scopes; the operator
+   still grants them on the Shopify side when creating/authorising the custom
+   app. **Exact Shopify custom-app scope-grant mechanics remain a Master
+   Blueprint / implementation-planning item** **[Proposed UX decision; Open
+   question / must be verified before implementation]**.
 4. **Test connection** — a discrete, explicit "Test Connection" action
    (WK-style floor) that reports pass/fail with a reason, not a silent
    spinner **[Accepted — DEC-004 UX implications; setup-ux-principles.md
-   Principle 2]**.
+   Principle 2]**. This action, and the readiness checks in the next step,
+   are **not** "sync runs" — see "Readiness/test/preview jobs are not
+   business sync runs" below.
 5. **Readiness checks** — before the store is marked connected, an explicit
    pass/fail readiness surface checks (candidate list, not final): scope
    grants, HTTPS/`web.base.url` reachability, webhook reachability,
@@ -201,9 +208,32 @@ and ready to sync" without editing server config or reading source code
     sync that does not depend on it **[Inference — DEC-007 §4 scopes the
     guard to inventory only]**.
 
+### Readiness/test/preview jobs are not business sync runs
+
+The setup-gate statement below ("no sync of any kind runs before setup is
+marked complete") refers to **business sync/write jobs** — it does not block
+the wizard's own readiness/test/preview mechanics, which must be able to run
+**during** setup for the wizard to function at all:
+
+- **Readiness checks and test-connection actions** (DEC-009 job source
+  `setup_readiness_check`) and **preview/dry-run jobs** (DEC-009 job source
+  `export_preview_dry_run`) are **not** treated as "sync runs"
+  **[Proposed UX decision, clarifying DEC-009's job-source taxonomy for this
+  document]**.
+- They **may run during setup**, before the store is marked connected/ready.
+- They **must not create or update any Shopify or Odoo business record** —
+  they are structurally read-only or preview-only, never a write path.
+- **Business sync/write jobs** (product/order/inventory/fulfillment sync,
+  first-push writes, etc.) remain blocked until setup is marked complete,
+  unchanged from the safe default below.
+
 ### Safe defaults
 
-- No sync of any kind runs before setup is marked complete.
+- No **business sync/write job** runs before setup is marked complete;
+  readiness checks, test-connection actions, and preview/dry-run jobs
+  (`setup_readiness_check`, `export_preview_dry_run`) are not business sync
+  runs and may run during setup, provided they stay read-only/preview-only
+  and never create or update a Shopify or Odoo business record.
 - Fulfilment customer notification defaults to **off**.
 - Inventory Odoo→Shopify write-back is blocked until the first-push guard is
   satisfied.
@@ -526,23 +556,36 @@ Prevent duplicate records and silent mis-matches by making every match
 ### Proposed flow / contents
 
 1. **Binding-first match** — the connector always checks for an existing
-   binding before evaluating any other key **[Accepted — DEC-006 match-key
-   priority]**.
-2. **SKU/internal reference** — second-priority automatic match key
-   **[Accepted — DEC-006]**.
-3. **Barcode** — third-priority automatic match key **[Accepted — DEC-006]**.
-4. **Manual match** — available whenever automatic matching cannot resolve
-   confidently; the operator picks the correct counterpart record, and the
-   match is recorded with full audit detail **[Accepted — DEC-006 UX
-   implications]**.
-5. **Name advisory only** — a name/title similarity may be shown as a hint
-   during manual match, but is never used to auto-bind
-   **[Accepted — DEC-006; RA-006]**.
-6. **Preview before create/export** — a duplicate-prevention preview/diff
+   binding before evaluating any other key, for every matchable record type
+   (product, variant, customer) **[Accepted — DEC-006 match-key priority]**.
+2. **SKU/internal reference** — second-priority automatic match key **for
+   product/variant matching** **[Accepted — DEC-006]**.
+3. **Barcode** — third-priority automatic match key **for product/variant
+   matching** **[Accepted — DEC-006]**.
+4. **Customer email / customer-key matching** — **for customer records
+   only**, after the binding-first check, the connector matches on
+   email/customer keys before falling back to manual match; name is
+   advisory only here too, never automatic. Product/variant matching does
+   **not** use this step — it follows SKU/internal reference → barcode as
+   above. **Customer matching order: binding → email/customer keys →
+   manual, name advisory only. Product/variant matching order: binding →
+   SKU/internal reference → barcode → manual, name advisory only.** Neither
+   order weakens DEC-006 — both are the same accepted match-key priority
+   applied to the two record shapes DEC-006 already distinguishes
+   **[Accepted — DEC-006 "Decision summary" ("email/customer keys
+   (customers)")]**.
+5. **Manual match** — available whenever automatic matching cannot resolve
+   confidently (either record type); the operator picks the correct
+   counterpart record, and the match is recorded with full audit detail
+   **[Accepted — DEC-006 UX implications]**.
+6. **Name advisory only** — a name/title similarity may be shown as a hint
+   during manual match, for both product/variant and customer matching, but
+   is never used to auto-bind **[Accepted — DEC-006; RA-006]**.
+7. **Preview before create/export** — a duplicate-prevention preview/diff
    ("will create N, link M, N ambiguous") is shown before any create/bind
    action; there is no blind create **[Accepted — DEC-006 UX implications;
    DEC-004 UX implications ("mandatory preview/dry-run diff")]**.
-7. **Unmatched / ambiguous / duplicate states** — each is a distinct,
+8. **Unmatched / ambiguous / duplicate states** — each is a distinct,
    labelled state (not folded into one generic "needs attention"):
    - **Unmatched** — no candidate found; offer create (subject to the
      relevant domain's own guard, e.g. first-push) or manual match.
@@ -551,16 +594,16 @@ Prevent duplicate records and silent mis-matches by making every match
    - **Duplicate risk** — a create would likely produce a duplicate; blocked
      pending operator confirmation **[Accepted — DEC-009 error taxonomy
      ("duplicate risk")]**.
-8. **Operator approval for manual binding** — every manual match is an
+9. **Operator approval for manual binding** — every manual match is an
    explicit operator action, recorded with who/when/which key
    **[Accepted — DEC-006 UX implications ("manual match override with a
    visible audit trail")]**.
-9. **Audit trail** — matched-by, matched-at, source strategy, match key used,
-   and status (active/stale/manually-overridden) are visible per binding
-   **[Accepted — DEC-006 "Mitigations" #2]**. Stale/recreated bindings surface
-   as review items, not silent duplicates **[Accepted — DEC-006 UX
-   implications]**.
-10. **Store-scoped uniqueness** — the UI reflects that a binding is unique
+10. **Audit trail** — matched-by, matched-at, source strategy, match key used,
+    and status (active/stale/manually-overridden) are visible per binding
+    **[Accepted — DEC-006 "Mitigations" #2]**. Stale/recreated bindings surface
+    as review items, not silent duplicates **[Accepted — DEC-006 UX
+    implications]**.
+11. **Store-scoped uniqueness** — the UI reflects that a binding is unique
     per store, so a future multi-store expansion does not silently collide
     with Phase 1's single-store bindings **[Accepted — DEC-006]**.
 
@@ -923,7 +966,7 @@ proposes/reaffirms across all ten flows:
 
 | Situation | Safe default / blocked state | Source |
 | --- | --- | --- |
-| Setup not fully complete | No sync of any kind runs | §1; DEC-003 UX spine |
+| Setup not fully complete | No **business sync/write job** runs; readiness/test-connection/preview jobs (`setup_readiness_check`, `export_preview_dry_run`) are not business sync runs and may run read-only/preview-only during setup | §1; DEC-003 UX spine; DEC-009 job sources |
 | Fulfilment notification | Off, unless explicitly enabled/confirmed | DEC-007 §5; RA-009 |
 | First Odoo→Shopify inventory write | Blocked until mapped location + preview + confirmation + recorded source-of-truth | DEC-007 §4; RA-008 |
 | Shopify `committed` | Never a write target, structurally | DEC-010; RA-018 |
@@ -936,6 +979,24 @@ proposes/reaffirms across all ten flows:
 
 ---
 
+## Additional open questions (Fable review, PR #68)
+
+Two open questions surfaced during Fable's review of this document. Neither
+is decided here — both are routed to the Master Blueprint:
+
+- **Order-import operator touchpoints** — confirm in the Master Blueprint
+  whether order-import operator touchpoints are fully covered by the error
+  center/manual-review flow (§5), especially financial evidence mismatch and
+  total-check issues (DEC-007 §6), or whether a separate order-import
+  operator flow is needed **[Open question / must be verified before
+  implementation]**.
+- **Store disconnect data-retention posture** — confirm in the Master
+  Blueprint what happens to bindings, logs, jobs, and audit records after a
+  store is disconnected (§2 "Store settings") **[Open question / must be
+  verified before implementation]**.
+
+---
+
 ## What this document does not decide
 
 - Exact Odoo views, menus, wizards, widgets, or field names.
@@ -943,6 +1004,10 @@ proposes/reaffirms across all ten flows:
 - Exact copy/wording for any screen, error message, or confirmation dialog.
 - Exact feature-flag/per-store capability-configuration mechanism (DEC-008,
   routed to Master Blueprint).
+- Whether order-import operator touchpoints need a dedicated flow beyond the
+  error center/manual-review flow (see "Additional open questions" above).
+- What happens to bindings/logs/jobs/audit records after store disconnect
+  (see "Additional open questions" above).
 - Any of the "Open question" items listed under each flow above.
 
 All of the above remain **Master Blueprint / implementation-planning** items,
