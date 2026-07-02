@@ -1,20 +1,45 @@
 # DEC-007 — Phase 1 Scope Clarifications
 
-> **Proposed decision record for ChatGPT review.** This record **clarifies** five known
-> scope-level gaps left after [DEC-003](./DEC-003-mvp-scope.md) (accepted MVP product
-> scope) and the accepted [DEC-004](./DEC-004-distribution-api-auth-strategy.md) /
+> **Accepted decision record — the Phase 1 scope-clarification addendum to DEC-003.** This
+> record **clarifies** five known scope-level gaps left after
+> [DEC-003](./DEC-003-mvp-scope.md) (accepted MVP product scope) and the accepted
+> [DEC-004](./DEC-004-distribution-api-auth-strategy.md) /
 > [DEC-005](./DEC-005-sync-orchestration-strategy.md) /
 > [DEC-006](./DEC-006-binding-dedup-identity-strategy.md) architecture decisions. It does
 > **not** rewrite DEC-003, and it does **not** authorize implementation. Companion:
 > [`../03-architecture/phase1-domain-model-brief.md`](../03-architecture/phase1-domain-model-brief.md).
 
+## Acceptance note (2026-07-02)
+
+- **Accepted by ChatGPT** after PR #62 merged into `Shopify-connector`.
+- Acceptance followed Fable review: **ACCEPT WITH MINOR CHANGES**.
+- Fable's fix-up was applied before merge.
+- This accepts DEC-007 as the **Phase 1 scope-clarification addendum** to DEC-003.
+- **This does not rewrite DEC-003.**
+- **This does not authorize implementation.** Implementation remains blocked until the
+  full phase-exit / implementation gate is opened by ChatGPT
+  (`../05-qa/quality-feedback-loop.md` §10; `CLAUDE.md` §4–§5).
+- **Acceptance caveat:** DEC-007 is mainly a **scope clarification** of DEC-003, but it
+  also explicitly accepts **three safety-positive requirements** as Phase 1 guardrails,
+  not as pure wording cleanup:
+  1. **price source-of-truth** must be explicit before any price export/update;
+  2. a **first Odoo→Shopify inventory push guard** (mapped location + preview + operator
+     confirmation + recorded source-of-truth) before the first inventory write;
+  3. **fulfillment customer-notification visibility/control** (safe default: no
+     notification unless explicitly enabled or confirmed).
+
 ## Status
 
-**Proposed for ChatGPT review.**
+**Accepted by ChatGPT.**
+
+## Acceptance date
+
+2026-07-02.
 
 ## Date
 
-2026-07-02.
+2026-07-02 (originally proposed; accepted the same day after PR #62 merge and Fable
+review).
 
 ## Scope
 
@@ -40,10 +65,11 @@ DEC-003's, DEC-004's, DEC-005's, or DEC-006's own text.
 
 - **This record clarifies DEC-003. It does not rewrite DEC-003.**
 - **It does not authorize implementation.**
-- **If accepted**, it becomes the **scope-clarification addendum** for Phase 1 — read
-  alongside DEC-003, not in place of it.
-- **If not accepted**, DEC-003 remains the **only accepted MVP scope record**, and the five
-  gaps below remain open exactly as DEC-003 left them.
+- **Accepted by ChatGPT (2026-07-02)**, it is now the **scope-clarification addendum** for
+  Phase 1 — read alongside DEC-003, not in place of it.
+- Before acceptance, DEC-003 stood alone as the only accepted MVP scope record with the
+  five gaps below left open exactly as DEC-003 left them; that historical state is
+  superseded by this acceptance.
 
 ## Context
 
@@ -66,8 +92,8 @@ several practical wording gaps that this record closes:
 
 Per `../05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria, `[Recommendation —
 becomes binding when merged by ChatGPT]`), a "DEC-003 scope-hole amendment accepted" is one
-of the criteria for the Phase 1 research-phase exit. This record is that amendment,
-proposed for review.
+of the criteria for the Phase 1 research-phase exit. This record is that amendment, now
+**accepted by ChatGPT**.
 
 **Evidence basis.** DEC-003/004/005/006 (all accepted); the Shopify official-API facts
 already recorded in `../01-research/shopify-official-api-notes.md`; a **small, targeted**
@@ -103,16 +129,16 @@ docs only (no competitor/vendor/forum source):
   `https://shopify.dev/docs/api/admin-graphql/latest/mutations/fulfillmentTrackingInfoUpdate`.
   Access status: **Accessible**. Access date: **2026-07-02**.
 
-Per this sprint's allowed-files list, these facts are cited here and in the domain-model
-brief only; propagating them into `../01-research/shopify-official-api-notes.md` is **not**
-done in this sprint (that file is outside the allowed-files list) and is flagged as a
-follow-up in the handoff.
+These facts were cited here and in the domain-model brief only when this record was first
+proposed; they have since been **propagated into
+`../01-research/shopify-official-api-notes.md`** as part of the DEC-007 Acceptance Patch
+(2026-07-02), per that sprint's allowed-files list.
 
-## Clarifications proposed for review
+## Clarifications accepted by ChatGPT
 
 ### 1. Variant export/update clarification
 
-**Proposed:** Phase 1 controlled product export/update **includes variant export/update**.
+**Accepted:** Phase 1 controlled product export/update **includes variant export/update**.
 Variant export/update is **not optional** if product export/update is in MVP — DEC-003's
 "product export/update" is not read as template-only.
 
@@ -135,7 +161,7 @@ Variant export/update is **not optional** if product export/update is in MVP —
 
 ### 2. Image / media clarification
 
-**Proposed:** Phase 1 supports **basic product image import/export/update** at
+**Accepted:** Phase 1 supports **basic product image import/export/update** at
 product/variant level, **where Shopify's and Odoo's standard image/media fields support
 it**. Explicitly:
 
@@ -162,7 +188,7 @@ it**. Explicitly:
 
 ### 3. Price / compare-at price clarification
 
-**Proposed:** Phase 1 supports **core price sync and compare-at price** where available on
+**Accepted:** Phase 1 supports **core price sync and compare-at price** where available on
 both systems. Explicitly:
 
 - **Included:** base selling price and compare-at (strike-through) price, both directions
@@ -184,7 +210,7 @@ both systems. Explicitly:
 
 ### 4. First inventory push guard
 
-**Proposed:** Phase 1 must **not** perform a **blind first inventory push** from Odoo to
+**Accepted — Phase 1 safety guardrail:** Phase 1 must **not** perform a **blind first inventory push** from Odoo to
 Shopify. Before Odoo writes inventory quantities to Shopify for the **first time** for a
 given store/binding, the connector requires **all** of:
 
@@ -223,7 +249,7 @@ facing storefront), which the Shopify → Odoo import direction does not.
 
 ### 5. Fulfillment customer-notification clarification
 
-**Proposed:** Phase 1 fulfilment/tracking write-back to Shopify **is** in MVP (as DEC-003
+**Accepted — Phase 1 safety guardrail:** Phase 1 fulfilment/tracking write-back to Shopify **is** in MVP (as DEC-003
 already states), and the **customer-notification side effect must be visible and
 operator-controllable**. The **default-safe behaviour is: no customer notification unless
 explicitly enabled or confirmed by the operator.**
@@ -231,7 +257,7 @@ explicitly enabled or confirmed by the operator.**
 - This default is **grounded in, and consistent with, Shopify's own API default**:
   `FulfillmentInput.notifyCustomer` defaults to `false`, and
   `fulfillmentTrackingInfoUpdate`'s `notifyCustomer` argument sends no notification if left
-  blank (see *Newly verified facts* above). The proposed Phase 1 default does **not**
+  blank (see *Newly verified facts* above). The accepted Phase 1 default does **not**
   deviate from platform behaviour — it makes explicit, at the product-scope level, a
   default that Shopify's own API already applies, so the connector does not need to
   override the platform default to be safe.
@@ -245,7 +271,7 @@ explicitly enabled or confirmed by the operator.**
 
 ### 6. Tax / shipping / discount / payment / order-accounting clarification
 
-**Proposed:** Phase 1 order import creates an Odoo sale order with lines, and **preserves**
+**Accepted:** Phase 1 order import creates an Odoo sale order with lines, and **preserves**
 tax, shipping, discount, and payment evidence **sufficiently to keep totals reconcilable**
 — it does **not** silently imply full accounting automation. Explicitly:
 
@@ -303,21 +329,21 @@ Unchanged from DEC-003 (this record does not alter any of these):
 
 ## What this unlocks
 
-> **Conditional on acceptance — nothing below is unlocked while DEC-007 stays `Proposed
-> for ChatGPT review`.**
+> **Unlocked by acceptance (2026-07-02).** DEC-007 is now `Accepted by ChatGPT`; the items
+> below are unlocked, subject to the separate implementation gate (`CLAUDE.md` §4–§5).
 
-- **If accepted**, DEC-007 lets the **Master Blueprint / implementation-planning sprint**
-  design the variant-export, image/media, price-source-of-truth,
-  first-inventory-push-guard, fulfilment-notification-control, and
-  financial-evidence-mapping concepts against **explicit, closed** scope wording instead
-  of "where feasible" ambiguity.
+- DEC-007 lets the **Master Blueprint / implementation-planning sprint** design the
+  variant-export, image/media, price-source-of-truth, first-inventory-push-guard,
+  fulfilment-notification-control, and financial-evidence-mapping concepts against
+  **explicit, closed** scope wording instead of "where feasible" ambiguity.
 - The Phase 1 research-phase-exit criterion "a DEC-003 scope-hole amendment accepted"
-  (`../05-qa/quality-feedback-loop.md` §10) **now has a concrete, reviewable candidate; it
-  is not satisfied until ChatGPT accepts this record.**
-- **If accepted**, product-doc alignment (`mvp-scope.md`, `non-mvp-and-later-phases.md`,
-  `user-stories.md`) can point to a single, dated clarification record instead of leaving
-  five separate ambiguities implicit — until then, those docs' existing pointer-only notes
-  (added in this same sprint) stand as written, not as accepted amendments.
+  (`../05-qa/quality-feedback-loop.md` §10) **is now satisfied by this acceptance** (one of
+  several Phase 1 research-phase-exit criteria — the full exit and the implementation gate
+  itself still require a separate ChatGPT approval).
+- Product-doc alignment (`mvp-scope.md`, `non-mvp-and-later-phases.md`, `user-stories.md`)
+  now points to this accepted, dated clarification record instead of leaving five separate
+  ambiguities implicit — those docs have been updated in the DEC-007 Acceptance Patch
+  (2026-07-02) to reflect DEC-007's accepted status.
 
 ## What remains blocked
 
@@ -358,21 +384,21 @@ Unchanged from DEC-003 (this record does not alter any of these):
 
 **This record does not authorize implementation.** It creates no code, no Odoo module, and
 no file outside `docs/03-architecture/**`, `docs/04-decisions/**`, and the other
-documentation files listed in this sprint's allowed-files list. The no-code gate
-(`CLAUDE.md` §4–§5) remains in force. If this record is accepted by ChatGPT, it becomes the
-Phase 1 scope-clarification addendum to DEC-003 — implementation still requires the
-separate Phase 1 research-phase-exit approval and a dedicated implementation gate
-(`../05-qa/quality-feedback-loop.md` §10).
+documentation files listed in the allowed-files lists of the sprints that touched it. The
+no-code gate (`CLAUDE.md` §4–§5) remains in force. Now that this record is **accepted by
+ChatGPT**, it is the Phase 1 scope-clarification addendum to DEC-003 — implementation still
+requires the separate Phase 1 research-phase-exit approval and a dedicated implementation
+gate (`../05-qa/quality-feedback-loop.md` §10).
 
 ## Review / change control
 
 - **This record clarifies DEC-003's product scope wording only.** It does not decide
   architecture, does not decide AR-004/006/007/008, and does not authorize implementation.
-- **If accepted:** it becomes the scope-clarification addendum for Phase 1, read alongside
-  DEC-003.
-- **If not accepted:** DEC-003 remains the only accepted MVP scope record, and the five
-  scope holes remain exactly as DEC-003 left them (i.e. this record is withdrawn, not
-  partially adopted, unless ChatGPT explicitly accepts specific sections).
+- **Accepted (2026-07-02):** it is the scope-clarification addendum for Phase 1, read
+  alongside DEC-003.
+- Historical note: before acceptance, DEC-003 stood alone as the only accepted MVP scope
+  record, with the five scope holes open exactly as DEC-003 left them; that state is
+  superseded by this acceptance.
 - **Related:** [`DEC-003`](./DEC-003-mvp-scope.md) (the record this clarifies);
   [`DEC-004`](./DEC-004-distribution-api-auth-strategy.md) /
   [`DEC-005`](./DEC-005-sync-orchestration-strategy.md) /

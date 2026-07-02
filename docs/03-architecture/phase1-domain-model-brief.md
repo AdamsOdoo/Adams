@@ -3,7 +3,7 @@
 > **Documentation-level domain-model brief, not a schema.** Produced for the **Phase 1
 > Domain Model + DEC-003 Scope-Hole Closure** sprint, after PR #61 merged DEC-004/005/006
 > (accepted architecture decisions for AR-002/AR-003/AR-005) into `Shopify-connector`. It
-> is a companion to the proposed
+> is a companion to the accepted
 > [`../04-decisions/DEC-007-phase1-scope-clarifications.md`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
 > and to the accepted
 > [`DEC-003`](../04-decisions/DEC-003-mvp-scope.md) /
@@ -19,9 +19,16 @@
   commit `26dc30109530e2566755fd93bd974284083c3922`; DEC-004/DEC-005/DEC-006 are **Accepted
   by ChatGPT** (2026-07-02); AR-002/AR-003/AR-005 are **Accepted**;
   AR-004/AR-006/AR-007/AR-008 remain **Not decided / Evidence pending**.
+- **DEC-007 acceptance update (2026-07-02, DEC-007 Acceptance Patch):**
+  [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md) is now **accepted by
+  ChatGPT** as the Phase 1 scope-clarification addendum to DEC-003 (after PR #62 merged
+  into `Shopify-connector` and Fable's minor-change review was applied). Every clarification
+  this brief flags below is now an **[Accepted clarification — DEC-007]**, not a proposed
+  one. This acceptance does **not** decide AR-004/006/007/008 and does **not** authorize
+  implementation.
 - **This document decides nothing** and **is not itself a decision record.** It is a
   **domain-model brief at the concept level** — it names the Phase 1 concepts, ties each to
-  the accepted decisions that already govern it, and flags where the proposed
+  the accepted decisions that already govern it, and flags where the accepted
   [DEC-007](../04-decisions/DEC-007-phase1-scope-clarifications.md) clarification applies.
   It does **not** define exact Odoo model names, field lists, database constraints, GraphQL
   operations, or an implementation sequence (those remain for a later, ChatGPT-gated
@@ -37,7 +44,7 @@ Per `CLAUDE.md` §8, every substantive statement below is one of:
 | Label | Meaning |
 | --- | --- |
 | **[Accepted decision]** | Already decided by DEC-003/004/005/006, cited by section — not restated in full, not re-litigated. |
-| **[Proposed clarification]** | New in this sprint, carried by the proposed [DEC-007](../04-decisions/DEC-007-phase1-scope-clarifications.md) — **not yet accepted**. |
+| **[Accepted clarification]** | Carried by the accepted [DEC-007](../04-decisions/DEC-007-phase1-scope-clarifications.md) (Accepted by ChatGPT, 2026-07-02) — the Phase 1 scope-clarification addendum to DEC-003. |
 | **[Inference]** | Our reasoning drawn from an accepted decision or cited evidence — not itself a decision. |
 | **[Official fact]** | A verified Shopify/Odoo platform fact, cited with a URL and access date. |
 | **[Open question]** | Unresolved; routed to a later AR row or the Master Blueprint sprint — **must be verified before implementation** if unverified. |
@@ -202,7 +209,7 @@ review queue, never a silent auto-match.
 
 Represent the Phase 1 controlled bidirectional product-onboarding path — product import
 **and** controlled export/update — safely, per the accepted DEC-003 product direction and
-the proposed DEC-007 variant/image/price clarifications.
+the accepted DEC-007 variant/image/price clarifications.
 
 ### Phase 1 included concepts
 
@@ -210,7 +217,7 @@ the proposed DEC-007 variant/image/price clarifications.
   binding applies).
 - **Variant** — the Shopify product variant ↔ Odoo product variant concept, **included in
   both import and controlled export/update** —
-  **[Proposed clarification — DEC-007]**: variant export/update is **not optional** if
+  **[Accepted clarification — DEC-007]**: variant export/update is **not optional** if
   product export/update is in MVP; see the DEC-007 variant clarification for the full
   statement.
 - **Option / option value** — Shopify product options/values ↔ Odoo attribute/attribute
@@ -219,13 +226,13 @@ the proposed DEC-007 variant/image/price clarifications.
 - **SKU / barcode / internal reference** — the MVP match-key set for product/variant
   matching (SKU/internal-reference first, then barcode; ambiguous → manual review)
   **[Accepted decision — DEC-003 / DEC-006]**.
-- **Image / media MVP handling** — **[Proposed clarification — DEC-007]**: Phase 1 supports
+- **Image / media MVP handling** — **[Accepted clarification — DEC-007]**: Phase 1 supports
   basic product image import/export/update at product/variant level where Shopify/Odoo
   standard fields support it; no advanced dedup/transformation/alt-text
   enrichment/CDN-optimization/media governance; preview required before destructive
   replacement/removal. Replaces the DEC-003/mvp-scope.md "where feasible" wording with an
   explicit included/excluded/deferred split — see the DEC-007 image/media clarification.
-- **Price / compare-at price MVP handling** — **[Proposed clarification — DEC-007]**: Phase
+- **Price / compare-at price MVP handling** — **[Accepted clarification — DEC-007]**: Phase
   1 supports core price sync and compare-at price where available; no advanced
   pricelist/Markets/customer-specific/B2B pricing; the source-of-truth (Odoo-authoritative
   vs. Shopify-authoritative per product) must be explicit before export/update. Replaces
@@ -249,7 +256,7 @@ the proposed DEC-007 variant/image/price clarifications.
 - Shopify Markets pricing, pricelists, per-market/customer-specific/B2B pricing, SEO/
   taxonomy, custom transforms **[Accepted decision — DEC-003, deferred]**.
 - Advanced media dedup (e.g. perceptual-hash), automated alt-text enrichment, CDN/media
-  optimization, media governance workflows — **[Proposed clarification — DEC-007]**,
+  optimization, media governance workflows — **[Accepted clarification — DEC-007]**,
   explicitly out of Phase 1 (weak/claim-only evidence per
   [`../02-product/non-mvp-and-later-phases.md`](../02-product/non-mvp-and-later-phases.md)).
 
@@ -272,7 +279,7 @@ mutation) **[Accepted decision — DEC-003 / DEC-004]**.
 - Draft/unpublished/explicit-channel safety on every export.
 - Image/media replacement or removal that could be destructive (e.g. omitting an existing
   image from a list-field write) requires the same preview treatment as any other
-  full-state write — **[Proposed clarification — DEC-007]**.
+  full-state write — **[Accepted clarification — DEC-007]**.
 
 ### Open questions for later sprint
 
@@ -346,7 +353,7 @@ via matching, so one bad customer record does not block order import
 
 Import Shopify orders into Odoo sale orders as a correct, actionable representation —
 preserving enough financial evidence to be useful — without silently implying full
-accounting automation, per the accepted DEC-003 Domain 9 decision and the proposed DEC-007
+accounting automation, per the accepted DEC-003 Domain 9 decision and the accepted DEC-007
 financial-treatment clarification.
 
 ### Phase 1 included concepts
@@ -356,14 +363,14 @@ financial-treatment clarification.
   **[Accepted decision — DEC-003 / DEC-005]**.
 - **Order line mapping** — Shopify order line items map to Odoo sale-order lines
   **[Accepted decision — DEC-003]**.
-- **Tax line treatment** — **[Proposed clarification — DEC-007]**: Shopify order
+- **Tax line treatment** — **[Accepted clarification — DEC-007]**: Shopify order
   **`taxLines`/`currentTaxLines`/`totalTaxSet`** are preserved as evidence/lines on the
   imported order (sufficient to keep totals reconcilable); Phase 1 does **not** implement a
   general tax-computation/reconciliation engine. **[Official fact]** Shopify exposes
   `taxLines` ("A list of all tax lines applied to line items on the order, before
   returns"), `currentTaxLines`, and `totalTaxSet` on `Order`
   (https://shopify.dev/docs/api/admin-graphql/latest/objects/Order — accessed 2026-07-02).
-- **Shipping line treatment** — **[Proposed clarification — DEC-007]**: Shopify
+- **Shipping line treatment** — **[Accepted clarification — DEC-007]**: Shopify
   **`shippingLines`/`shippingLine`** are preserved as evidence/lines on the imported order.
   **[Official fact — paraphrase]** `shippingLines`/`shippingLine` represent the shipping
   methods applied to the order, including checkout shipping option / carrier / service /
@@ -371,7 +378,7 @@ financial-treatment clarification.
   wording is **[Open question — must be verified before implementation]** if a verbatim
   quote is needed — the sprint's fetched excerpt was a partial summary, not confirmed
   complete.
-- **Discount treatment** — **[Proposed clarification — DEC-007]**: Shopify
+- **Discount treatment** — **[Accepted clarification — DEC-007]**: Shopify
   **`discountApplications`/`cartDiscountAmountSet`/`currentCartDiscountAmountSet`** are
   preserved as evidence/amounts on the imported order. **[Official fact]**
   `discountApplications` = "A list of discounts that are applied to the order, excluding
@@ -381,7 +388,7 @@ financial-treatment clarification.
   preserved as source information only **[Accepted decision — DEC-003 Domain 9]**.
   **[Official fact]** `OrderTransaction` is gateway-agnostic (exists for all gateways)
   (`../01-research/shopify-official-api-notes.md`).
-- **Invoice policy / payment creation boundary** — **[Proposed clarification — DEC-007]**:
+- **Invoice policy / payment creation boundary** — **[Accepted clarification — DEC-007]**:
   no automatic posted invoice or payment by default; if any draft-artifact creation is
   offered at all, it is opt-in, behind explicit configuration, and behind a total-check
   guard — see the DEC-007 financial-treatment clarification. This reaffirms, and does not
@@ -397,7 +404,7 @@ financial-treatment clarification.
 - Refund sync, cancellation reflection, returns/RMA lifecycle
   **[Accepted decision — DEC-003, deferred; idempotent-refund regression carried forward
   as a mandatory principle for the first refund/refund-sync sprint]**.
-- Any general/automatic tax-computation engine — **[Proposed clarification — DEC-007]**,
+- Any general/automatic tax-computation engine — **[Accepted clarification — DEC-007]**,
   explicit non-goal.
 
 ### Binding / identity implications
@@ -419,10 +426,10 @@ partial/failed import can be retried without re-deriving totals.
   double-creates an order **[Accepted decision — DEC-003]**.
 - Any invoice/payment creation (if ever enabled) must be **idempotent** (no double-invoice/
   double-payment on retry) and **conservative-by-default**
-  **[Proposed clarification — DEC-007]**.
+  **[Accepted clarification — DEC-007]**.
 - Totals-preservation is a correctness requirement: taxes + shipping + discounts + line
   totals must reconcile against the Shopify order total on import
-  **[Proposed clarification — DEC-007]**.
+  **[Accepted clarification — DEC-007]**.
 
 ### Open questions for later sprint
 
@@ -446,7 +453,7 @@ partial/failed import can be retried without re-deriving totals.
 
 Write back Odoo stock levels to Shopify safely — including a guard against the very first
 write ever overwriting live Shopify stock — per the accepted DEC-003 inventory scope and
-the proposed DEC-007 first-push-guard clarification. Full inventory architecture stays
+the accepted DEC-007 first-push-guard clarification. Full inventory architecture stays
 AR-007, not decided here.
 
 ### Phase 1 included concepts
@@ -457,7 +464,7 @@ AR-007, not decided here.
 - **Direction and safety boundaries** — Odoo → Shopify write-back is the primary direction;
   Shopify → Odoo initial stock **import** is controlled/reviewed, not blind
   **[Accepted decision — DEC-003]**.
-- **First-push guard** — **[Proposed clarification — DEC-007]**: before Odoo writes
+- **First-push guard** — **[Accepted clarification — DEC-007]**: before Odoo writes
   inventory to Shopify for the **first time** for a given binding, the connector requires a
   **mapped Shopify location**, a **preview of SKU/variant/location quantities**, **explicit
   operator confirmation**, a **recorded source-of-truth**, and the **ability to skip or
@@ -483,13 +490,13 @@ to AR-007 **[Accepted decision — DEC-006]**.
 ### Queue / log implications
 
 The first-push guard's preview/confirmation step is itself a logged, user-visible action
-(who confirmed, when, against what source-of-truth) — **[Proposed clarification —
+(who confirmed, when, against what source-of-truth) — **[Accepted clarification —
 DEC-007]** — feeding Domain 8's audit trail.
 
 ### Data safety guardrails
 
 - **No blind first inventory push** — the guard above is mandatory before any first write
-  **[Proposed clarification — DEC-007]**.
+  **[Accepted clarification — DEC-007]**.
 - **`committed` must never be written**; only allowed Shopify quantity fields
   **[Accepted decision — DEC-003]**.
 - Writes must be idempotent (compare-and-set / `@idempotent`-aware) per the 2026-04
@@ -518,7 +525,7 @@ DEC-007]** — feeding Domain 8's audit trail.
 
 Write fulfilment/tracking updates from Odoo back to Shopify, with the customer-facing
 notification side effect visible and controllable by the operator, per the accepted
-DEC-003 fulfilment scope and the proposed DEC-007 notification clarification. Full
+DEC-003 fulfilment scope and the accepted DEC-007 notification clarification. Full
 fulfilment architecture stays AR-008, not decided here.
 
 ### Phase 1 included concepts
@@ -528,7 +535,7 @@ fulfilment architecture stays AR-008, not decided here.
 - **Tracking number / carrier / URL concept** — written via
   `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`
   **[Official fact — `../01-research/shopify-official-api-notes.md`]**.
-- **Customer-notification side effect** — **[Proposed clarification — DEC-007]**: Phase 1
+- **Customer-notification side effect** — **[Accepted clarification — DEC-007]**: Phase 1
   fulfilment/tracking write-back to Shopify is in scope; the customer-notification side
   effect must be **visible and operator-controllable**; the **safe default is no customer
   notification unless explicitly enabled or confirmed**. This is grounded in
@@ -540,7 +547,7 @@ fulfilment architecture stays AR-008, not decided here.
   "If this field is left blank, then notifications won't be sent to the customer when the
   fulfillment is updated" — also defaults to no notification
   (https://shopify.dev/docs/api/admin-graphql/latest/mutations/fulfillmentTrackingInfoUpdate
-  — accessed 2026-07-02). The proposed Phase 1 default (no notification unless explicit)
+  — accessed 2026-07-02). The accepted Phase 1 default (no notification unless explicit)
   **matches** Shopify's own API default — it is a conservative default, not a deviation
   from platform behaviour.
 
@@ -560,16 +567,16 @@ identity) is **[Open question — AR-008]**.
 ### Queue / log implications
 
 Every fulfilment write-back job records **whether customer notification was requested**
-(true/false) as a first-class, user-visible field on the job/log entry — **[Proposed
+(true/false) as a first-class, user-visible field on the job/log entry — **[Accepted
 clarification — DEC-007]** — so the operator can see and audit what was sent, not just
 that a write succeeded.
 
 ### Data safety guardrails
 
 - **Safe default: no customer notification unless explicitly enabled or confirmed**
-  **[Proposed clarification — DEC-007]**.
+  **[Accepted clarification — DEC-007]**.
 - The operator must be able to see and control the notification setting per write-back (or
-  per a documented default-configuration surface) — **[Proposed clarification — DEC-007]**;
+  per a documented default-configuration surface) — **[Accepted clarification — DEC-007]**;
   exact configuration granularity (global default vs. per-store vs. per-order override) is
   **[Open question — Master Blueprint sprint / AR-008]**.
 - Fulfilment writes must be idempotent — no duplicate fulfilment record from a retried
@@ -653,6 +660,12 @@ it rather than restating it.
 
 ## Review notes for ChatGPT / Fable
 
+> **Reviewed and resolved (2026-07-02, DEC-007 Acceptance Patch).** ChatGPT and Fable
+> reviewed this brief alongside DEC-007; Fable returned **ACCEPT WITH MINOR CHANGES**,
+> confirming DEC-007 clarifies DEC-003 without rewriting it and that AR-004/006/007/008
+> remain not decided. DEC-007 is now **Accepted by ChatGPT**. The review items below are
+> retained as the historical review checklist.
+
 Please review specifically:
 
 1. **Altitude** — does each domain section stay at the documentation/concept level, or does
@@ -670,11 +683,11 @@ Please review specifically:
    only its exact implementation mechanics (not the API/distribution/auth decision itself)
    remain open where referenced above?
 4. **New Shopify facts** — the `taxLines`/`shippingLines`/`discountApplications` and
-   `FulfillmentInput.notifyCustomer`/`fulfillmentTrackingInfoUpdate.notifyCustomer` facts
-   are newly verified this sprint (2026-07-02) via a small, targeted official-source check
-   (per the sprint's external-research rule) and are **not yet propagated** into
-   `../01-research/shopify-official-api-notes.md` (out of this sprint's allowed-files
-   list) — confirm whether a future sprint should do that propagation.
+   `FulfillmentInput.notifyCustomer`/`fulfillmentTrackingInfoUpdate.notifyCustomer` facts,
+   originally verified in this sprint (2026-07-02) via a small, targeted official-source
+   check (per the sprint's external-research rule), have since been **propagated into
+   `../01-research/shopify-official-api-notes.md`** as part of the DEC-007 Acceptance Patch
+   (2026-07-02).
 5. **No AR-004/006/007/008 decision** — confirm nothing above reads as deciding module
    boundaries, the full retry taxonomy, the full inventory architecture, or the full
    fulfilment architecture.

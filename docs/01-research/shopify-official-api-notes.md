@@ -111,6 +111,38 @@
 >   *(Quote precision: `inventorySetQuantities` reads "As of 2026-01 …" without the word
 >   "version"; the bulk page reads "These errors might be intermittent …".)*
 
+## DEC-007 propagated facts (2026-07-02)
+
+> **Propagation, not new research.** These facts were originally verified during the Phase 1
+> Domain Model + DEC-003 Scope-Hole Closure sprint (2026-07-02) as part of
+> [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md) (now **Accepted by
+> ChatGPT**) and are propagated here, unchanged, per the DEC-007 Acceptance Patch
+> (2026-07-02). No new external research was performed for this propagation. Access date for
+> all facts below: **2026-07-02**.
+
+- **Fact —** `Order.taxLines` = "A list of all tax lines applied to line items on the order,
+  before returns." `Order.currentTaxLines` and `Order.totalTaxSet` are also exposed on
+  `Order`.
+  (https://shopify.dev/docs/api/admin-graphql/latest/objects/Order)
+- **Fact (paraphrase) —** `Order.shippingLines`/`shippingLine` represent the shipping
+  methods applied to the order, including checkout shipping option / carrier / service /
+  cost details. The fetched summary of this field was a **partial excerpt, not confirmed as
+  the complete official field description** — treat the exact full wording as **[Open
+  question — must be verified before implementation]** if a verbatim quote is needed.
+  (https://shopify.dev/docs/api/admin-graphql/latest/objects/Order)
+- **Fact —** `Order.discountApplications` = "A list of discounts that are applied to the
+  order, excluding order edits and refunds." `cartDiscountAmountSet` and
+  `currentCartDiscountAmountSet` are also exposed on `Order`.
+  (https://shopify.dev/docs/api/admin-graphql/latest/objects/Order)
+- **Fact —** `FulfillmentInput.notifyCustomer` — "Whether the customer is notified. If
+  `true`, then a notification is sent when the fulfillment is created." — **defaults to
+  `false`**.
+  (https://shopify.dev/docs/api/admin-graphql/latest/input-objects/FulfillmentInput)
+- **Fact —** `fulfillmentTrackingInfoUpdate`'s `notifyCustomer` argument — "If this field is
+  left blank, then notifications won't be sent to the customer when the fulfillment is
+  updated."
+  (https://shopify.dev/docs/api/admin-graphql/latest/mutations/fulfillmentTrackingInfoUpdate)
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Shopify developer documentation, `shopify.dev`
@@ -679,5 +711,10 @@ All accessed **2026-06-30**, all `shopify.dev` (Tier 1):
   `/…/objects/ShopifyPaymentsDispute`
 - App review: `/docs/apps/launch/shopify-app-store/app-store-requirements`,
   `/docs/apps/launch/built-for-shopify/requirements`
+
+**DEC-007 propagated facts, accessed 2026-07-02** (see that section above):
+`/docs/api/admin-graphql/latest/objects/Order` (tax/shipping/discount fields),
+`/docs/api/admin-graphql/latest/input-objects/FulfillmentInput`,
+`/docs/api/admin-graphql/latest/mutations/fulfillmentTrackingInfoUpdate`.
 
 Captured excerpts: [`../00-source-materials/shopify-official.md`](../00-source-materials/shopify-official.md).

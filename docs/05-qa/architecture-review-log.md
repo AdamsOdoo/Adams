@@ -397,3 +397,20 @@ boundaries are untouched by this sprint. **No AR row changes status; AR-006/AR-0
 edited; DEC-004/005/006 were not edited; implementation remains blocked. Recommended next (pending
 ChatGPT/Fable review of DEC-007 and the domain-model brief): **Master Blueprint sprint**, and/or a
 dedicated **AR-006/AR-007/AR-008 architecture-decision sprint**._
+
+_**DEC-007 Acceptance Patch (2026-07-02) — NOT an architecture decision; AR-004/AR-006/AR-007/
+AR-008 remain "Not decided / Evidence pending."** DEC-007 accepted by ChatGPT on 2026-07-02 after
+PR #62 merged into `Shopify-connector` and Fable's review (**ACCEPT WITH MINOR CHANGES**) was
+applied. DEC-007 is a **scope-clarification addendum** to DEC-003, not an AR-004/006/007/008
+architecture decision — it **feeds AR-006, AR-007, and AR-008** (the retry/error taxonomy, the
+inventory first-push-guard scope statement, and the fulfilment notification-default scope
+statement, respectively) **but does not decide any of them**. **AR-004 remains untouched** by this
+patch. **AR-004/AR-006/AR-007/AR-008 remain "Not decided / Evidence pending"; AR-002/AR-003/AR-005
+remain "Accepted."** This acceptance makes RA-008/RA-009/RA-010 (`rejected-approaches-log.md`)
+binding final rejected approaches — see that log's own acceptance note. DEC-003/004/005/006 remain
+unchanged; no code, Odoo module, or implementation plan was produced; implementation remains
+blocked. Recommended next work:
+- **AR-004 + AR-006 decision sprint.**
+- **AR-007 + AR-008 decision sprint.**
+- **UX/operator-flow sprint.**
+- **Master Blueprint**, after those gates._

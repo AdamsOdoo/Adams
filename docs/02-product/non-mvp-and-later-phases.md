@@ -36,22 +36,22 @@
 - **Dates:** competitor evidence access **2026-06-30**; session **2026-07-01**. No new
   sources crawled.
 
-> **DEC-007 proposed alignment note (2026-07-02) — proposed, not accepted; no boundary
-> change yet.** The proposed
+> **DEC-007 accepted alignment note (2026-07-02) — accepted by ChatGPT; confirms this
+> boundary, no boundary change.**
 > [`DEC-007`](../04-decisions/DEC-007-phase1-scope-clarifications.md)
-> (`Status: Proposed for ChatGPT review`) names, at the clarification level, the same
-> non-MVP items already recorded here — it does not add a new deferral or contradict
-> DEC-003: advanced image deduplication/alt-text enrichment/CDN transformation/media
-> governance stay out (already covered below under "pHash image dedup" and the broader
-> catalog-ownership deferral); advanced pricelist/Markets/customer-specific/B2B pricing
-> stay out (already covered below under "SEO/taxonomy, BoM/kit stock, pricelists,
-> per-market pricing"); a general tax-computation engine, payout reconciliation, and bank
-> reconciliation stay out (already covered below under "Full payment / invoice / gateway
-> accounting automation" and "Payout import + bank reconciliation"). DEC-007 also proposes
-> a **first-inventory-push guard** and a **fulfilment customer-notification default** as
-> Phase 1 **guardrails** (not deferrals) — they do not remove or add an item to this
-> boundary list. **Until ChatGPT accepts DEC-007, this document's existing boundary stands
-> as written.**
+> (`Status: Accepted by ChatGPT`, acceptance date 2026-07-02) names, at the clarification
+> level, the same non-MVP items already recorded here — it does not add a new deferral or
+> contradict DEC-003: advanced image deduplication/alt-text enrichment/CDN
+> transformation/media governance stay out (already covered below under "pHash image
+> dedup" and the broader catalog-ownership deferral); advanced pricelist/Markets/
+> customer-specific/B2B pricing stay out (already covered below under "SEO/taxonomy,
+> BoM/kit stock, pricelists, per-market pricing"); a general tax-computation engine, payout
+> reconciliation, and bank reconciliation stay out (already covered below under "Full
+> payment / invoice / gateway accounting automation" and "Payout import + bank
+> reconciliation"). DEC-007 also adds an accepted **first-inventory-push guard** and an
+> accepted **fulfilment customer-notification default** as Phase 1 **safety guardrails**
+> (not deferrals) — they do not remove or add an item to this boundary list. This
+> acceptance confirms this document's existing boundary as written; it does not expand it.
 
 ## Purpose
 
