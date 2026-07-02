@@ -56,3 +56,20 @@ This acceptance makes **RA-008/RA-009/RA-010** (`../05-qa/rejected-approaches-lo
 binding rejected approaches. Per `../05-qa/quality-feedback-loop.md` §10, this acceptance
 satisfies one of several Phase 1 research-phase-exit criteria — it does not, by itself,
 open the implementation gate.
+
+**Also present (not yet accepted):**
+[`DEC-008-module-boundary-strategy.md`](./DEC-008-module-boundary-strategy.md) and
+[`DEC-009-error-retry-idempotency-strategy.md`](./DEC-009-error-retry-idempotency-strategy.md)
+— proposed 2026-07-02 (AR-004 + AR-006 Decision Preparation sprint, after PR #63 merged
+into `Shopify-connector`). **Both are `Status: Proposed for ChatGPT review`, not
+Accepted.** DEC-008 proposes a resolution for **AR-004** (a layered, domain-aligned addon
+family — `shopify_connector_core`/`product`/`sale`/`inventory`/`fulfillment` for Phase 1,
+with a strict dependency DAG and no `adams_base` dependency found justified); DEC-009
+proposes a resolution for **AR-006** (a classified error/retry taxonomy and layered
+idempotency strategy built on the accepted DEC-005/006 substrate). Neither decides AR-007
+or AR-008, neither edits DEC-003/004/005/006/007, and neither authorizes implementation.
+See
+[`../03-architecture/ar004-module-boundary-decision-brief.md`](../03-architecture/ar004-module-boundary-decision-brief.md)
+and
+[`../03-architecture/ar006-error-retry-idempotency-decision-brief.md`](../03-architecture/ar006-error-retry-idempotency-decision-brief.md)
+for the evidence-backed briefs behind each proposal.
