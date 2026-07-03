@@ -9,15 +9,19 @@
 > [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md).
 > Companion decision record:
 > [`../04-decisions/DEC-013-master-blueprint-core-substrate.md`](../04-decisions/DEC-013-master-blueprint-core-substrate.md)
-> (Status: **Proposed for ChatGPT review**).
+> (Status: **Accepted by ChatGPT**, 2026-07-03).
 
 ## Status
 
-**Proposed for ChatGPT review.** Date: **2026-07-03.** Documentation only —
-the no-code gate (`CLAUDE.md` §4–§5) is in force. **This blueprint does not
-authorize implementation**, and its acceptance would not open the
-implementation gate (that remains a separate ChatGPT approval per
-`../05-qa/quality-feedback-loop.md` §10).
+**Accepted through DEC-013.** Acceptance date: **2026-07-03.**
+Documentation only — the no-code gate (`CLAUDE.md` §4–§5) is in force.
+**This blueprint does not authorize implementation**, and its acceptance
+does not open the implementation gate (that remains a separate ChatGPT
+approval per `../05-qa/quality-feedback-loop.md` §10). Blueprint
+proposals accepted by DEC-013 are now **[Accepted — DEC-013]**; open
+questions this record raised remain open per
+[`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
+(notably MBQ-04, MBQ-08, MBQ-53, MBQ-54).
 
 ## Claim labels used throughout
 
@@ -389,11 +393,11 @@ mechanism (**RA-005**, binding final) **[Accepted — DEC-006]**. This
 blueprint does not revisit that rejection; its revisit condition is not
 met.
 
-### C.8 How domain modules extend/reuse the binding — proposed shape
+### C.8 How domain modules extend/reuse the binding — accepted shape
 
-**[Blueprint proposal — for ChatGPT review; this resolves, at blueprint
+**[Accepted — DEC-013, resolving MBQ-11]** — this resolves, at blueprint
 level, the schema-shape fork DEC-006/DEC-008 explicitly left to the Master
-Blueprint]:**
+Blueprint:
 
 - `core` defines an **abstract binding contract** (conceptually an
   abstract model/mixin): store reference, Shopify GID field(s), Odoo
@@ -413,11 +417,11 @@ Blueprint]:**
   consistent audit/status shape (RA-013 is not violated: the *abstraction*
   is shared, only the concrete tables are per-domain).
 - The **single polymorphic table** option (DEC-006 Option B) is **not
-  chosen** at blueprint level but is **not entered as a rejected
-  approach** — if ChatGPT prefers it during DEC-013 review, the table would
-  live in `core` per DEC-008's note, and this section would be revised
-  before any implementation planning. Final confirmation:
-  **[Open question — MBQ-11]** (resolved by ChatGPT's DEC-013 review).
+  chosen**, per DEC-013's acceptance, but remains **not entered as a
+  rejected approach** — a future architecture review could still revisit
+  it if warranted; per-domain concrete tables extending one core
+  abstract contract are the accepted direction. **MBQ-11 is resolved by
+  DEC-013's acceptance** of this direction.
 - **Cross-domain enumeration / registration seam** — because core-level
   operations (e.g. store-disconnect data-retention review, store history
   preservation, a global binding/search view, or a cross-domain audit
@@ -857,10 +861,10 @@ a dedicated order-import flow is needed is
 
 ## I. Configuration / feature-flag mechanism blueprint
 
-DEC-008 routed the mechanism itself here. This section proposes the
-blueprint-level mechanism; the exact technical implementation remains
-**[Open question — MBQ-07]** if ChatGPT does not confirm the direction at
-DEC-013 review.
+DEC-008 routed the mechanism itself here. **[Accepted — DEC-013,
+resolving MBQ-07 at blueprint-direction level]** — the blueprint-level
+mechanism below is accepted; the exact technical implementation detail
+remains **[Open question — MBQ-07]** for implementation planning.
 
 ### I.1 Per-store enabled domains
 
@@ -879,10 +883,11 @@ notification default, §B.7). Flags configure **within** accepted scope —
 a flag can never enable a capability outside DEC-003/DEC-007 scope
 **[Blueprint proposal]**.
 
-### I.3 Preferred technical direction
+### I.3 Accepted technical direction
 
-**[Blueprint proposal — preferred direction, exact mechanism may remain
-open]:** a **store-scoped connector settings record owned by `core`**
+**[Accepted — DEC-013]** — exact implementation detail may remain
+**[Open question — MBQ-07]**: a **store-scoped connector settings record
+owned by `core`**
 (conceptually one settings record per store, referenced from §B.1), with
 domain modules **extending** it with their own flag fields — rather than:
 
@@ -952,11 +957,13 @@ not committed XML IDs**.
 | Connector Reviewer / Manual Review Owner | `group_shopify_connector_reviewer` | narrower cut of P1/P2 |
 | Read-only Auditor | `group_shopify_connector_auditor` | P3 |
 
-**[Blueprint proposal]** — hierarchy: Administrator implies Operator and
-Reviewer rights; Operator and Reviewer are siblings (neither implies the
-other); Auditor is implied by all (everyone who can act can also view).
-Whether the four roles map 1:1 to Odoo groups or to finer-grained
-combinations remains **[Open question — MBQ-45]**.
+**[Accepted — DEC-013, partially resolving MBQ-45]** — hierarchy:
+Administrator implies Operator and Reviewer rights; Operator and Reviewer
+are siblings (neither implies the other); Auditor is implied by all
+(everyone who can act can also view). The hierarchy above is accepted at
+blueprint level; whether the four roles map 1:1 to Odoo groups or to
+finer-grained combinations, and the admin-vs-functional-user screen
+split, remain **[Open question — MBQ-45]** for implementation planning.
 
 ### J.2 Capability matrix (blueprint level)
 
@@ -1056,10 +1063,12 @@ Headline items raised or carried by this Part A blueprint:
   implementation planning (constants); exact **cron cadence and throughput
   limits** (MBQ-18) — implementation planning, with MVP-scale validation
   under `--max-cron-threads=2`.
-- Exact **technical feature-flag implementation** (MBQ-07) — §I.3 proposes
-  the preferred direction; confirm or refine at DEC-013 review.
-- **Binding schema-shape confirmation** (MBQ-11) — §C.8 proposes per-domain
-  concrete models on a core abstract contract; confirm at DEC-013 review.
+- Exact **technical feature-flag implementation** (MBQ-07) — §I.3's
+  direction is **accepted via DEC-013**; exact implementation detail
+  remains for implementation planning.
+- **Binding schema-shape confirmation** (MBQ-11) — §C.8's per-domain
+  concrete models on a core abstract contract are **accepted via
+  DEC-013**.
 - **Order-import operator touchpoints** (MBQ-26) — routed to Sprint B.
 - **Store-disconnect data-retention posture** (MBQ-08) — ChatGPT decision.
 - Operation-level idempotency **key schema** (MBQ-20) and serialization
@@ -1078,10 +1087,12 @@ Headline items raised or carried by this Part A blueprint:
 
 ## No implementation authorized
 
-**This blueprint does not authorize implementation.** It creates no code,
-no Odoo module, no model, no view, no security file, and no file outside
-`docs/**`. The no-code gate (`CLAUDE.md` §4–§5) remains in force.
-Implementation of any part of this blueprint remains blocked until ChatGPT
-(1) accepts DEC-013 (or a revised version) and the remaining Master
-Blueprint parts as required, and (2) separately opens the implementation
-gate per `../05-qa/quality-feedback-loop.md` §10 and `CLAUDE.md` §5.
+**This blueprint's acceptance via DEC-013 does not authorize
+implementation.** It creates no code, no Odoo module, no model, no view,
+no security file, and no file outside `docs/**`. The no-code gate
+(`CLAUDE.md` §4–§5) remains in force. Implementation of any part of this
+blueprint remains blocked until ChatGPT (1) accepts the remaining Master
+Blueprint parts as required (including, for operator-facing screens, the
+accepted Part D — UI/UX Screen Design Blueprint), and (2) separately
+opens the implementation gate per `../05-qa/quality-feedback-loop.md` §10
+and `CLAUDE.md` §5.

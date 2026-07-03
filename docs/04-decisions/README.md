@@ -157,24 +157,35 @@ explicitly parallelized") — acceptance of DEC-012 alone does **not** open the
 implementation gate; the **Master Blueprint** is next, and a separate ChatGPT
 implementation-gate approval remains required before any implementation.
 
-**Also present (not yet accepted):**
+**Also accepted:**
 [`DEC-013-master-blueprint-core-substrate.md`](./DEC-013-master-blueprint-core-substrate.md) —
-**Status: Proposed for ChatGPT review** (2026-07-03, Master Blueprint Sprint A,
-prepared after PR #69 merged into `Shopify-connector`, merge commit
-`305f396bcbd2656a4282ed18c5983540503b5502`). Proposes acceptance of the
-**Master Blueprint index** and the **core/common substrate blueprint (Part A)**:
+proposed 2026-07-03 (Master Blueprint Sprint A, prepared after PR #69 merged
+into `Shopify-connector`, merge commit
+`305f396bcbd2656a4282ed18c5983540503b5502`) and **accepted by ChatGPT on
+2026-07-03** after PR #70 merged into `Shopify-connector` (merge commit
+`5c44971d1df84d5657da0164bf874b1125aee64f`), following Fable's review
+(**ACCEPT WITH MINOR CHANGES**) and the Fable revision + tiny consistency fix
+applied before merge. **Status: Accepted by ChatGPT, acceptance date
+2026-07-03 — no longer proposed.** Accepts the **Master Blueprint index**
+and the **core/common substrate blueprint (Part A)**:
 [`../03-architecture/master-blueprint.md`](../03-architecture/master-blueprint.md),
 [`../03-architecture/master-blueprint-core-substrate.md`](../03-architecture/master-blueprint-core-substrate.md),
 and the central open-questions register
 [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
-(MBQ-01–MBQ-52). Covers the `shopify_connector_core` module boundary, core
-configuration-object concepts, the binding abstraction (with a proposed
-per-domain-concrete-on-core-contract schema-shape direction, per the fork
-DEC-006/DEC-008 explicitly routed to the Master Blueprint), the
+(MBQ-01–MBQ-54). Covers the `shopify_connector_core` module boundary, core
+configuration-object concepts, the binding abstraction (accepting the
+per-domain-concrete-on-core-contract schema-shape direction, resolving the
+fork DEC-006/DEC-008 explicitly routed to the Master Blueprint — MBQ-11), the
 job/log/error/retry abstraction, setup-wizard/dashboard/sync-center/
-error-center blueprints, the DEC-008-routed feature-flag mechanism direction,
-a blueprint-level four-role access design (no CSVs, proposed names only), and
-cross-module extension rules. **Not accepted; would resolve AR-010 if
-accepted; does not authorize implementation under any outcome; does not start
-any product/customer/sale/inventory/fulfillment domain blueprint (routed to
-Master Blueprint Sprints B/C); DEC-003 through DEC-012 are unchanged.**
+error-center blueprints, the DEC-008-routed feature-flag mechanism direction
+(resolving MBQ-07 at blueprint-direction level), a blueprint-level four-role
+access design (no CSVs, proposed names only; role hierarchy accepted,
+resolving MBQ-45 partially and MBQ-47 fully), and cross-module extension
+rules. This acceptance also confirms that **Part D — UI/UX Screen Design
+Blueprint — remains required before implementation of any operator-facing
+screen** (MBQ-53 stays open). **Resolves AR-010** in
+`../05-qa/architecture-review-log.md`. **Does not authorize implementation
+under any outcome; does not start any product/customer/sale/inventory/
+fulfillment domain blueprint (routed to Master Blueprint Sprint B, next
+recommended but not started); DEC-003 through DEC-012 are unchanged.**
+MBQ-04, MBQ-08, MBQ-53, and MBQ-54 remain open.
