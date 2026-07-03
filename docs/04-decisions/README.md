@@ -189,3 +189,25 @@ under any outcome; does not start any product/customer/sale/inventory/
 fulfillment domain blueprint (routed to Master Blueprint Sprint B, next
 recommended but not started); DEC-003 through DEC-012 are unchanged.**
 MBQ-04, MBQ-08, MBQ-53, and MBQ-54 remain open.
+
+**Also present (not yet accepted):**
+[`DEC-014-master-blueprint-product-customer-sale.md`](./DEC-014-master-blueprint-product-customer-sale.md) —
+proposed 2026-07-03 (Master Blueprint Sprint B, prepared after PR #71
+merged into `Shopify-connector`, merge commit
+`283a38f26ef90fca2a53c18ff6faf4775da4a2ee`). **Status: Proposed for
+ChatGPT review — not accepted.** Proposes accepting the **Part B —
+Product, Customer, and Sale/Order Domain Blueprint**
+(`../03-architecture/master-blueprint-product-customer-sale.md`):
+product import/export/update (variant-mutation-strategy direction,
+draft/publish mechanism, media/price handling); customer import/matching
+(default-customer-fallback direction, proposed email-only match-key
+recommendation); order import (whole-order-hold rule for unmatched
+products, total-check guard definition, proposed order-import
+operator-touchpoint recommendation, gateway→journal mapping concept).
+Proposes resolutions/partial resolutions for **MBQ-23/25/29/30**,
+recommendations for **MBQ-26/31** (both ChatGPT-decision-owner rows), and
+carries forward **MBQ-24/27/28** unresolved; adds **MBQ-55 through
+MBQ-58**. **Does not authorize implementation; does not start Sprint C;
+does not start the UI/UX Screen Design Blueprint; DEC-003 through DEC-013
+are unchanged.** MBQ-04, MBQ-08, MBQ-53, and MBQ-54 remain open,
+untouched by this proposal.
