@@ -78,10 +78,13 @@ namely:
 1. **Inventory domain** — inventory-level binding ownership under
    `shopify_connector_inventory` (§A.1); Shopify Location reference /
    Odoo location-mapping posture (§A.2); the ongoing Odoo-source-of-truth
-   posture with a controlled one-time baseline import (§A.3); the
-   **proposed quantity-source resolution** (`product.product.free_qty` /
-   `stock.quant.available_quantity`, both newly cited against official
-   Odoo 19.0 source, §A.4, partially resolving **MBQ-32**); the
+   posture with a controlled one-time baseline import (§A.3); **two
+   verified but non-equivalent candidate quantity sources**
+   (`product.product.free_qty` and `stock.quant.available_quantity`,
+   both newly cited against official Odoo 19.0 source, §A.4, proposing to
+   partially resolve **MBQ-32** — Fable finding C1 corrected the earlier
+   draft's over-claim that the two sources were equivalent; the source
+   choice is substantive and not decided by this record); the
    first-push guard and confirmation-record concept, including a
    **proposed granularity recommendation** for ChatGPT's decision on
    **MBQ-33** and a **proposed confirmation-record concept** partially
@@ -90,7 +93,7 @@ namely:
    scheduled/event-driven sync posture (§A.7); idempotency/retry posture
    applying Part A's job/log/error abstraction (§A.8); mapping-failure
    handling, including the **newly verified `INVENTORY_LEVELS_UPDATE`
-   webhook topic**, resolving **MBQ-37** (§A.9); multi-location/
+   webhook topic**, proposing to resolve **MBQ-37** (§A.9); multi-location/
    multi-warehouse posture (§A.10); the product/variant binding
    dependency (§A.11); the consolidated safety-guard statement (§A.12);
    inventory job types (§A.13); and the error/retry mapping (§A.14,
@@ -103,8 +106,8 @@ namely:
    line/quantity matching via `lineItemsByFulfillmentOrder` (§B.4); the
    **proposed tracking-field resolution** (`stock.picking.
    carrier_tracking_ref`/`carrier_tracking_url`/`carrier_id`, newly cited
-   against official Odoo 19.0 source, §B.5, resolving **MBQ-39** and
-   surfacing new open question **MBQ-60**); the customer-notification
+   against official Odoo 19.0 source, §B.5, proposing to resolve
+   **MBQ-39** and surfacing new open question **MBQ-60**); the customer-notification
    posture restated from DEC-007/DEC-011, with a **proposed
    recommendation** for ChatGPT's decision on **MBQ-41** (§B.6); the
    partial/backorder/cancellation/return/refund/multi-package posture,
@@ -130,22 +133,37 @@ namely:
    notification confirmation missing") that Part A/B could only name, not
    instantiate, until this sprint.
 5. **The open-questions register updates** — MBQ-32 through MBQ-43
-   updated with resolved/partially resolved/carried-forward status
-   (Part C §G); two new rows added, MBQ-60 and MBQ-61.
+   updated with proposed-resolved/proposed-partially-resolved/carried-
+   forward status (Part C §G); four new rows added, MBQ-60 through
+   MBQ-63 (MBQ-62/MBQ-63 added in a Fable-review revision, point M
+   below).
 
 ## Explicit acceptance points (for ChatGPT's review)
 
-**A. Quantity-source direction (MBQ-32) — proposed partially resolved, pending this record's acceptance.** Proposes that the exact Odoo
-ORM source behind DEC-010's "Free to Use" semantic concept is
-`product.product.free_qty` (context-scoped by location/warehouse) or,
-equivalently at the per-location level, `stock.quant.available_quantity`
-(`quantity − reserved_quantity`) — both grounded in official Odoo 19.0
-source code (`github.com/odoo/odoo`, `19.0` branch, accessed
-2026-07-03). This is the first time this sprint (or any prior sprint) has
-cited the exact field/formula; DEC-010 had left it as a semantic concept
-only. Exact aggregation mechanism (context-based vs. direct quant
-iteration) and whether a configurable Forecast/On-Hand/Free-to-Use
-default is offered remain open for implementation planning.
+**A. Quantity-source direction (MBQ-32) — proposed partially resolved,
+pending this record's acceptance.** **Fable finding C1, corrected:** an
+earlier draft of this point over-claimed that `product.product.free_qty`
+and `stock.quant.available_quantity` were equivalent ("or, equivalently
+at the per-location level..."). They are not. Proposes that the two
+candidate Odoo ORM sources behind DEC-010's "Free to Use" semantic
+concept are `product.product.free_qty` (context-scoped by
+location/warehouse; compute `product.uom_id.round(qty_available −
+reserved_quantity − expired_unreserved_qty)`, i.e. it also nets out
+expired unreserved stock and applies UoM rounding) and, at the
+per-location level, `stock.quant.available_quantity` (`quantity −
+reserved_quantity`, with neither the expired-unreserved netting nor a
+shown UoM-rounding step) — both grounded in official Odoo 19.0 source
+code (`github.com/odoo/odoo`, `19.0` branch, accessed 2026-07-03). **The
+two diverge whenever expired unreserved stock exists**, so the choice
+between them is **substantive, not cosmetic**; this record does not
+choose a final implementation source. This is the first time this
+sprint (or any prior sprint) has cited the exact field/formula for
+either candidate; DEC-010 had left the concept semantic only. Exact
+source-selection/aggregation mechanism (context-based `free_qty` vs.
+direct quant iteration, and how the latter would need to net out
+expired-unreserved stock to match `free_qty`'s semantics if chosen) and
+whether a configurable Forecast/On-Hand/Free-to-Use default is offered
+remain open for implementation planning.
 
 **B. First-push guard granularity (MBQ-33) — a recommendation for
 ChatGPT's direct decision, not a self-accepted resolution.** Proposes
@@ -214,9 +232,21 @@ Proposes: a
 live Shopify FulfillmentOrder `assignedLocation` read is treated as
 authoritative for a specific fulfillment operation; the core Shopify
 Location reference (Part A §B.4) is used only for naming/display and
-mismatch-detection, never as an override authority. A location mismatch
-routes to the existing `ambiguous match` class — no new error class is
-added.
+mismatch-detection, never as an override authority. **Fable minor finding
+2 — made explicit:** AR-006/DEC-009's accepted registry (Part A §D.4),
+together with DEC-006's matching context, defines `ambiguous match` as
+**multiple plausible matching candidates**. A fulfillment-location
+mismatch is a **different**, deterministic scenario (exactly one
+determined answer that disagrees with expectation, not multiple
+candidates). This record proposes **reusing/widening `ambiguous match`**
+for that scenario anyway, because the **operator outcome is identical**
+(confirmation-required, routed to manual review) — this widening of an
+already-accepted class's applicability is **part of what ChatGPT would be
+accepting by accepting this record**, not an already-settled reading of
+AR-006/DEC-009. No 17th top-level error class is added either way. If
+ChatGPT judges this widening unsafe, the alternative is a dedicated new
+open question for a location-mismatch sub-reason instead of reusing
+`ambiguous match` — not adopted here, but named so it is not foreclosed.
 
 **K. Core Location reference cache policy (MBQ-43) — proposed partially
 resolved, pending this record's acceptance.** Proposes the precedence rule (live read always wins over the
@@ -231,6 +261,23 @@ lifecycle events, newly confirmed as real webhook topics this sprint) are
 proposed as new register rows — both genuinely new questions this
 sprint's official-doc verification surfaced, neither previously
 considered by DEC-010 or DEC-011.
+
+**M. New open questions from Fable review (MBQ-62, MBQ-63) — added in a
+Fable-review revision on the same PR, not part of the original
+proposal.** **MBQ-62 (Fable finding C2):** the original draft of §A.7/
+§A.13/§B.12/§C item 7 silently listed "event-driven enqueue" as if it
+were a Part A §D.2 job-source enum value; DEC-010 accepted the Odoo-side
+event trigger only as a **sync-trigger layer**, and this record does
+**not** extend Part A's fixed job-source vocabulary. Which existing
+source (if any) an Odoo-event-triggered inventory push or fulfillment
+creation should record — or whether a DEC-level vocabulary extension is
+needed — is routed to MBQ-62, new and open. **MBQ-63 (Fable minor
+finding 4):** MBQ-37's verification covered only the
+`INVENTORY_LEVELS_UPDATE` topic **string**; the webhook's payload shape,
+subscription mechanics, and whether webhook-driven inventory import is
+implemented in Phase 1 at all (versus left as a drift-detection
+candidate only) remain a separate, broader open question, routed to
+MBQ-63, new and open.
 
 **What this acceptance (if granted) would NOT do:**
 
@@ -296,8 +343,10 @@ concept — proposed partially resolved), **MBQ-39** (tracking field source —
 proposed resolved), **MBQ-40** (backorder linkage — proposed partially resolved), **MBQ-41**
 (notification-UI granularity — recommendation, ChatGPT decision),
 **MBQ-42** (location-confirmation mechanism — proposed partially resolved,
-pending acceptance), **MBQ-43** (Location reference cache policy —
-proposed partially resolved), **MBQ-60** and **MBQ-61** (new rows, both open).
+pending acceptance, including a proposed widening of `ambiguous match`,
+Fable minor finding 2), **MBQ-43** (Location reference cache policy —
+proposed partially resolved), **MBQ-60** through **MBQ-63** (new rows,
+all open — MBQ-62/MBQ-63 added in a Fable-review revision, point M).
 
 ## Risks and mitigations
 
@@ -309,12 +358,19 @@ proposed partially resolved), **MBQ-60** and **MBQ-61** (new rows, both open).
    pages describe only reporting-level concepts, not ORM field names;
    each citation names the exact file path, branch (`19.0`), and access
    date.
-2. **Risk:** the quantity-source finding (MBQ-32) could be over-read as
-   fixing a specific implementation mechanism (context-based vs. direct
-   quant aggregation). **Mitigation:** explicitly labelled
-   `[Blueprint proposal]`/"partially resolved," with the residual
-   aggregation-mechanism question named and routed to implementation
-   planning, not silently decided.
+2. **Risk (confirmed and fixed — Fable finding C1):** an earlier draft
+   of the quantity-source finding (MBQ-32) over-claimed that
+   `product.product.free_qty` and `stock.quant.available_quantity` were
+   equivalent ("or, equivalently at the per-location level..."). Fable
+   flagged this — they are not equivalent; `free_qty` additionally nets
+   out `expired_unreserved_qty` and applies UoM rounding, so the two
+   diverge whenever expired unreserved stock exists. **Mitigation
+   (applied):** Part C §A.4, the §G table, the register, and point A
+   above were all corrected to state the exact relationship, quote the
+   formulas exactly (including the UoM-rounding wrapper), and state
+   explicitly that the source choice is substantive, not cosmetic; MBQ-32
+   remains "proposed partially resolved," not fully resolved, and this
+   record does not choose a final implementation source.
 3. **Risk:** the `stock_delivery` module-dependency finding (MBQ-60)
    could be silently absorbed into the fulfillment blueprint as an assumed
    dependency without surfacing it as a genuinely new question.
@@ -340,6 +396,35 @@ proposed partially resolved), **MBQ-60** and **MBQ-61** (new rows, both open).
    Shopify read — never `inventory`'s Odoo-location mapping table — and
    Part C §C.1 restates and checks the never-depends-on-inventory rule
    explicitly against DEC-008/DEC-010/DEC-011.
+7. **Risk (confirmed and fixed — Fable finding C2):** an earlier draft
+   silently listed "event-driven enqueue" in §A.7/§A.13/§B.12/§C item 7
+   as if it were a value in Part A §D.2's fixed job-source enum, which
+   Fable flagged as an unauthorized, silent vocabulary extension — DEC-010
+   accepted the Odoo-side event trigger only as a sync-trigger layer, and
+   fulfillment creation's own trigger (a `stock.picking` Validate action)
+   had no stated Part A source classification at all. **Mitigation
+   (applied):** all four sections now explicitly distinguish the
+   sync-trigger layer from the Part A job-source value recorded on the
+   job; no job-source vocabulary extension is asserted; the classification
+   question is routed to new, open **MBQ-62**, not silently resolved.
+8. **Risk (confirmed and fixed — Fable minor finding 2):** §B.8's
+   proposed location-mismatch mechanism reused the accepted `ambiguous
+   match` class for a fulfillment-location mismatch without stating that
+   this **widens** the class's accepted meaning (AR-006/DEC-009:
+   multiple plausible matching candidates) to a different, deterministic
+   scenario (one determined answer disagreeing with expectation).
+   **Mitigation (applied):** §B.8 and point J above now state the
+   accepted definition explicitly, name the widening as a widening (on
+   operator-outcome-parity grounds), and make clear ChatGPT would be
+   accepting that widening specifically by accepting this record — not
+   that it is already an accepted reading.
+9. **Risk:** MBQ-37/MBQ-39's "Blocks implementation" register cells read
+   as overly optimistic ("No... resolved") before this record is
+   accepted, and MBQ-37's payload-shape/subscription-mechanics residual
+   (beyond the topic string) was not separately captured. **Mitigation
+   (applied):** both cells restored to conservative, Yes-leading wording
+   pending DEC-015 acceptance; the broader MBQ-37 residual routed to new,
+   open **MBQ-63**.
 
 ## No implementation authorized
 

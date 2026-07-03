@@ -73,13 +73,20 @@
   pending DEC-015 acceptance; MBQ-37/39
   marked **proposed resolved**, pending DEC-015 acceptance; MBQ-33/34/41 kept **carried forward, open**, each
   with a named **recommendation** for ChatGPT's direct decision (not
-  self-accepted); MBQ-35 kept **carried forward, open, unchanged**; two
+  self-accepted); MBQ-35 kept **carried forward, open, unchanged**; four
   new rows added, **MBQ-60** (whether `shopify_connector_fulfillment`
   requires the Odoo `stock_delivery`/`delivery` module) and **MBQ-61**
   (whether/how the connector reacts to Shopify FulfillmentOrder
   hold/cancellation-request/merge/split/reschedule lifecycle events,
   newly confirmed as real webhook topics this sprint but not discussed by
-  DEC-011). Every MBQ-32/36/37/38/39/40/42/43 row remains formally
+  DEC-011), plus **MBQ-62** and **MBQ-63**, added in a later Fable-review
+  revision on this same PR (see the follow-up checkpoint note below) —
+  **MBQ-62** (exact Part A job-source classification for Odoo-event-
+  triggered inventory push and fulfillment creation; "event-driven
+  enqueue" is a sync-trigger-layer description, not a Part A §D.2 job-
+  source value) and **MBQ-63** (the broader Shopify inventory-webhook
+  payload-shape/subscription-mechanics/Phase-1-implementation-scope
+  residual MBQ-37 did not cover). Every MBQ-32/36/37/38/39/40/42/43 row remains formally
   **open** in the register — the "proposed resolved"/"proposed partially
   resolved" labels describe this sprint's proposal only and become final
   only if/when ChatGPT accepts DEC-015. No existing MBQ ID or question
@@ -5028,3 +5035,46 @@ ChatGPT review.
   files changed; implementation remains blocked; Part D/E remain not
   started. Same branch/PR (#74) — no new PR, no merge. Next: stop for
   ChatGPT review.
+- **Sprint C Fable review fixes (2026-07-03):** Fable reviewed PR #74 and
+  returned **REVISE — no redesign** (architecture sound; two substantive
+  findings plus several wording/status fixes required before ChatGPT
+  acceptance review). **C1 (over-claim):** an earlier draft claimed
+  `product.product.free_qty` and `stock.quant.available_quantity` were
+  equivalent quantity sources; corrected in
+  `master-blueprint-inventory-fulfillment.md` §A.4/§G, the register's
+  MBQ-32 row, and DEC-015 point A to state the exact, non-equivalent
+  relationship (`free_qty` additionally nets out `expired_unreserved_qty`
+  and applies UoM rounding via `product.uom_id.round(...)`, quoted
+  exactly) and that the source choice is substantive, not decided by this
+  sprint; MBQ-32 stays "proposed partially resolved." **C2 (job-source
+  vocabulary):** an earlier draft silently listed `event-driven enqueue`
+  in §A.7/§A.13/§B.12/§C item 7 as if it were a Part A §D.2 job-source
+  enum value, and fulfillment creation's own source classification was
+  unstated; corrected to distinguish the sync-trigger layer from Part A's
+  fixed job-source vocabulary throughout, with no vocabulary extension
+  asserted; new open question **MBQ-62** added (Odoo-event-triggered job
+  source classification, covering both inventory push and fulfillment
+  creation). **Minor fixes:** §A.14's destructive-write-guard bullet
+  collapsed to a direct `destructive-write guard blocked` mapping citing
+  AR-006/DEC-009 (minor finding 1); §B.8/DEC-015 point J now state
+  explicitly that AR-006/DEC-009 defined `ambiguous match` as multiple
+  candidates and that Sprint C proposes *widening* that class for a
+  deterministic location mismatch, framed as part of what DEC-015
+  acceptance would decide (minor finding 2); MBQ-37/MBQ-39's
+  "Blocks implementation" register cells restored to conservative,
+  Yes-leading wording pending DEC-015 acceptance (minor finding 3); new
+  open question **MBQ-63** added (Shopify inventory-webhook payload
+  shape/subscription mechanics/Phase-1-implementation-scope residual,
+  minor finding 4); the MBQ-34 review-then-apply recommendation sentence
+  added directly to §A.7, where §A.15/§G already referenced it (minor
+  finding 5); a truncated `FULFILLMENTS_CREATE`/`FULFILLMENTS_UPDATE`
+  Shopify-topic quote marked as an excerpt (minor finding 6); the two
+  remaining "resolving MBQ-37"/"resolving MBQ-39" instances in DEC-015's
+  Proposed-decision items and in AR-012 changed to "proposing to resolve"
+  (minor finding 7). DEC-015 and AR-012 updated to reference MBQ-62/63 as
+  new/open; this handoff updated to match. No technical conclusion
+  outside the C1/C2 corrections changed; no MBQ ID renumbered; DEC-003
+  through DEC-014 untouched; no code files changed; implementation
+  remains blocked; Part D/E remain not started; DEC-015 and AR-012 remain
+  Proposed for ChatGPT review, not accepted. Same branch/PR (#74) — no
+  new PR, no merge. Next: stop for ChatGPT acceptance review.
