@@ -131,6 +131,27 @@
   authorized; `main` and plain `dev` untouched. Awaiting further
   instruction.
 
+**PR #71 tiny acceptance-label cleanup (2026-07-03):**
+- ChatGPT reviewed PR #71 and requested one tiny acceptance-state cleanup
+  before merge.
+- Open Questions Register status updated to accepted-through-DEC-013 while
+  preserving every unresolved MBQ row.
+- Claim-label definition (`[Blueprint proposal]`) updated to reflect that
+  design details remain proposed unless explicitly accepted by DEC-013 or
+  a later accepted decision.
+- Accepted DEC-013 items relabeled `[Accepted — DEC-013]` where needed in
+  the core-substrate blueprint (§C.8 cross-domain enumeration seam and
+  binding-granularity bound; §I.3 feature-flag execution-time re-check
+  scoping; §J.2 no-read-back credential connector-surface guarantee).
+- MBQ-04, MBQ-08, MBQ-53, and MBQ-54 remain open.
+- DEC-013 remains accepted.
+- AR-010 remains accepted.
+- DEC-003 through DEC-012 untouched.
+- No code files changed.
+- Implementation remains blocked.
+- Sprint B not started.
+- Same branch/PR — no new PR opened, no merge.
+
 ---
 
 ### Master Blueprint Sprint A — Core/Common Substrate — compact handoff (2026-07-03)
@@ -4436,3 +4457,16 @@ ChatGPT review.
   DEC-003 through DEC-012 edit; implementation remains blocked; Sprint B not
   started. Next: push branch, open one draft PR into `Shopify-connector`,
   stop for ChatGPT review.
+- **PR #71 tiny acceptance-label cleanup (2026-07-03):** ChatGPT requested
+  one tiny cleanup before merge — the open-questions register status still
+  said `Proposed for ChatGPT review`, and several DEC-013-accepted design
+  details in the core-substrate blueprint still carried the stale
+  `[Blueprint proposal]` tag. Updated the register status to
+  accepted-through-DEC-013 (unresolved MBQ rows, incl. MBQ-04/08/53/54,
+  preserved); refined the `[Blueprint proposal]` claim-label definition;
+  relabeled §C.8's enumeration seam and granularity bound, §I.3's
+  execution-time re-check scoping, and §J.2's no-read-back connector-surface
+  guarantee to `[Accepted — DEC-013]`. DEC-013 and AR-010 remain accepted;
+  DEC-003 through DEC-012 untouched; no code files changed; implementation
+  remains blocked; Sprint B not started. Same branch/PR — no new PR opened,
+  no merge.

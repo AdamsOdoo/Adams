@@ -9,10 +9,15 @@
 
 ## Status
 
-**Proposed for ChatGPT review** (2026-07-03). Documentation only; the
-no-code gate (`CLAUDE.md` §4–§5) is in force. Registering a question here
-does **not** decide it. Every row follows `CLAUDE.md` §7/§8: unverified
-items are **open questions**, never asserted.
+**Accepted as the central register through DEC-013**, acceptance date
+**2026-07-03**. Documentation only; the no-code gate (`CLAUDE.md` §4–§5)
+is in force. **Register acceptance does not resolve every question** —
+each MBQ row remains open unless the row itself says **Resolved** or
+**Partially resolved**; notably **MBQ-04, MBQ-08, MBQ-53, and MBQ-54
+remain open**. Registering (or accepting the register containing) a
+question does **not** decide it and does **not** authorize
+implementation. Every row follows `CLAUDE.md` §7/§8: unverified items
+are **open questions**, never asserted.
 
 ## How to read
 

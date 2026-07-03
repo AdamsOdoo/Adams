@@ -29,7 +29,11 @@ questions this record raised remain open per
   Not re-litigated here.
 - **[Blueprint proposal]** — a blueprint-level design detail introduced by
   this sprint, converting accepted decisions into implementable shape.
-  Binding only if ChatGPT accepts DEC-013.
+  **Remains proposed** unless explicitly accepted by DEC-013 or a later
+  accepted decision. Design details DEC-013 explicitly accepted are marked
+  **[Accepted — DEC-013]** instead (see §C.8, §I.3, §J.2 below).
+- **[Accepted — DEC-013]** — a design detail from this document that
+  DEC-013 explicitly accepted; binding at blueprint level.
 - **[Inference]** — reasoning from cited accepted decisions/evidence.
 - **[Open question — MBQ-nn]** — unresolved; carried in
   [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
@@ -435,14 +439,18 @@ Blueprint:
   reintroduce a single polymorphic binding table — it gives `core` a
   read-only, domain-agnostic way to ask "what bindings exist for this
   store," which the per-domain-table shape above would otherwise lack
-  **[Blueprint proposal]**.
+  **[Accepted — DEC-013, part of the binding schema shape acceptance;
+  MBQ-11 remains resolved]**.
 - **Binding-model granularity bound** — to avoid binding-model explosion,
   the default is **one concrete binding model per synchronized root
   entity** (product template, product variant, customer, order, inventory
   level, FulfillmentOrder/Fulfillment — as listed above). Any **additional
   sub-entity** binding model (a finer-grained identity below one of these
   roots) requires **explicit architecture review** before being added, not
-  an ad hoc addition during implementation **[Blueprint proposal]**.
+  an ad hoc addition during implementation **[Accepted — DEC-013, part of
+  the binding schema shape acceptance; additional sub-entity binding
+  models still require explicit architecture review before being
+  added]**.
 - Convenience reference fields on business records (e.g. a Shopify-ID field
   on the product form) remain **read-only caches updated from the binding,
   never written independently** **[Accepted — DEC-006]**.
@@ -909,7 +917,8 @@ enqueue time. In particular, the execution-time re-check must **never**
 re-read or change the fulfillment notification flag persisted per job
 under DEC-011 (§D.13), must **never** re-read or change a source-of-truth
 decision persisted for the relevant job/guard (§D.13), and must **not
-bypass any safety guard** (§I.5) **[Blueprint proposal]**.
+bypass any safety guard** (§I.5) **[Accepted — DEC-013, part of the
+feature-flag mechanism direction acceptance]**.
 
 ### I.4 Safe enable/disable behaviour
 
@@ -989,11 +998,12 @@ requirement that confirmations record who acted.]** Notes:
   an absolute database-level claim**: no connector UI or API surface
   exposes the stored secret after entry, for any role including
   Administrator (§B.2) — every role sees masked status only after save
-  **[Blueprint proposal, extending DEC-004's masked-storage rule]**. This
-  does **not** claim a database superuser or direct database access cannot
-  reach raw stored contents — the **at-rest protection and storage
-  mechanism** (encryption vs. Odoo field-level `groups` protection alone)
-  remain **[Open question — MBQ-04]**, unresolved by this rule.
+  **[Accepted — DEC-013, as a connector UI/API surface guarantee,
+  extending DEC-004's masked-storage rule]**. This does **not** claim a
+  database superuser or direct database access cannot reach raw stored
+  contents — the **at-rest protection and storage mechanism** (encryption
+  vs. Odoo field-level `groups` protection alone) remain **[Open
+  question — MBQ-04]**, unresolved by this rule.
 - Reviewer approvals are the auditable act DEC-009 requires — approving a
   manual-review item records who/when and releases the job through the
   normal queue path, never a side channel **[Accepted — DEC-009]**.
