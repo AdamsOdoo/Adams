@@ -1,8 +1,10 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-015
-> Acceptance Patch)** is immediately below, in the **compact
+> Continuity lives in GitHub, not chat. The **current entry (Master
+> Blueprint Sprint D — UI/UX Screen Design Blueprint, Proposed)** is
+> immediately below, in the **compact
 > handoff format** (`../06-prompts/session-handoff-template.md`);
+> **DEC-015 Acceptance Patch**,
 > **Master Blueprint Sprint C (proposal history)**,
 > **DEC-014 Acceptance Patch**, **Master
 > Blueprint Sprint B (proposal history)**, **DEC-013
@@ -23,6 +25,109 @@
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
 
 ---
+
+### Master Blueprint Sprint D — UI/UX Screen Design Blueprint (Proposed) — compact handoff (2026-07-03)
+
+> **Documentation-only proposal, not implementation and not accepted.**
+> Confirmed before editing: repo HEAD at the **starting base commit
+> `b6199f78064ae4e1934bccee630a14b3d7eef438`** (PR #74 "Accept Master
+> Blueprint Sprint C … (DEC-015)" merged into `Shopify-connector`); Master
+> Blueprint Part D confirmed **Not started**; DEC-016/AR-013 confirmed
+> non-existent before this sprint; DEC-003 through DEC-015 confirmed
+> **Accepted by ChatGPT** and left unedited; implementation confirmed still
+> **blocked**; Part E confirmed **Not started**; MBQ-53 confirmed **open**.
+> Branch `claude/master-blueprint-sprint-d-ui-ux-screen-design`.
+
+- **Branch / PR:** `claude/master-blueprint-sprint-d-ui-ux-screen-design`
+  → draft PR into `Shopify-connector`, **not merged** (opened as a draft;
+  stop after opening).
+- **Files changed:**
+  `docs/03-architecture/master-blueprint-ui-ux-screen-design.md` (**new**,
+  Part D blueprint),
+  `docs/04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md`
+  (**new**, Proposed for ChatGPT review),
+  `docs/03-architecture/master-blueprint.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/04-decisions/README.md`,
+  `docs/01-research/research-handoff.md` (this file). **No code files
+  changed** — all changes are Markdown docs under `docs/**`.
+- **What changed:** drafted **Master Blueprint Part D — UI/UX Screen Design
+  Blueprint** (screen inventory §0; app-entry/navigation & information
+  architecture §1; setup wizard §2; store settings §3; dashboard/command
+  center §4; sync center/job monitor §5; error center/recovery §6;
+  matching/duplicate-prevention center §7; product §8; customer §9; order §10
+  — no dedicated screen, MBQ-26; inventory §11; fulfillment §12;
+  permissions/roles visibility §13; states & microcopy patterns §14;
+  cross-screen consistency §15; and a 12-point premium UI/UX acceptance
+  checklist), converting the ten accepted DEC-012 operator flows and the
+  accepted Part A/B/C substrate/domain contracts into fourteen operator-facing
+  surfaces (S1–S14) under the single-shared-surface rule (one dashboard/
+  sync-center/error-center; DEC-008 §K rule 2 / RA-013). Every screen names
+  purpose, primary users, entry points, key information, primary actions,
+  blocked states, links, accepted-decision dependencies, and open-MBQ
+  dependencies. Companion **DEC-016** authored as **Proposed for ChatGPT
+  review** (states Part D is documentation-only, no implementation authorized,
+  Part E not started, MBQ-53 proposed partially resolved, and lists every MBQ
+  that remains open; accepts nothing on ChatGPT's behalf).
+  `master-blueprint.md` moved Part D to **Proposed for ChatGPT review via
+  DEC-016** (Part E preserved as Not started; implementation-blocked language
+  preserved). `master-blueprint-open-questions.md` gained a Sprint D note and
+  marked **MBQ-53 "Proposed partially resolved" (remains open until DEC-016 is
+  accepted)** with original question text preserved; **no other row changed**.
+  `architecture-review-log.md` gained **AR-013** (Proposed for ChatGPT review)
+  + a Sprint D proposal note; AR-001 through AR-012 untouched.
+  `docs/04-decisions/README.md` gained a **Proposed (not accepted)** DEC-016
+  entry; DEC-003 through DEC-015 entries untouched.
+- **MBQ-53 disposition:** **Proposed partially resolved** — the screen-design
+  layer is proposed complete, while exact user-facing copy (**MBQ-22**), exact
+  Odoo identifiers (**MBQ-01/02/03/44**), the admin-vs-functional surface split
+  (**MBQ-45**), and pixel wireframe artwork remain out of scope / open. It
+  **remains open** until DEC-016 is accepted.
+- **Items deferred / not decided:** MBQ-33, MBQ-34, MBQ-41 (shown as
+  recommendations only — not decided); MBQ-60, MBQ-61, MBQ-62, MBQ-63 (shown as
+  residuals — not decided; no fabricated seventh job source for MBQ-62);
+  MBQ-22, MBQ-01/02/03/44, MBQ-45, and all other open rows (carried forward
+  untouched); Part E (implementation-planning bridge, Not started); all
+  implementation. **DEC-016 and AR-013 are Proposed — ChatGPT acceptance is
+  pending; nothing is accepted on ChatGPT's behalf.**
+- **Learning feedback loop:** **New issues discovered:** none material — a
+  parallel-agent context-extraction pass (Part A/B/C, ux-operator-flow,
+  setup-ux-principles, product-vision, DEC-012) plus a completeness critic was
+  used to ground the blueprint; the critic caught three Accepted-vs-Recommendation
+  attribution slips (setup-wizard enqueue/execution defense-in-depth; the
+  product five-state preview list; the four-role capability matrix), all
+  corrected to the accepted label before commit. **Repeated issue patterns:**
+  none at threshold. **Rules/checklists updated:** none new (the premium UI/UX
+  acceptance checklist is a Part D deliverable, proposed, not a governance
+  rule). **New rejected approaches:** none — `rejected-approaches-log.md`
+  checked; RA-013 (no per-domain dashboards) reinforced, none reintroduced.
+  **New technical debt:** none (no code). **New open questions:** none added —
+  the sprint's residuals map onto existing MBQ rows (MBQ-22/45/03/44 etc.), so
+  no new MBQ ID was created (avoids duplicating MBQ-45/03/22). **Architecture
+  concerns:** AR-013 is **Proposed for ChatGPT review** — Part D is proposed at
+  screen-blueprint level; MBQ-53 proposed partially resolved; Part E remains
+  the next candidate alongside a later implementation gate, per ChatGPT.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (attribution-slip corrections) · rejected
+  approaches checked, none added · technical debt logged (none — no code) ·
+  repeated-issue escalation applied (none at threshold) — all **YES**.
+- **Next recommended session (exact prompt for ChatGPT / next Claude session):**
+  **"Review Master Blueprint Sprint D — UI/UX Screen Design Blueprint (Part D,
+  `docs/03-architecture/master-blueprint-ui-ux-screen-design.md`; companion
+  DEC-016, Proposed; AR-013, Proposed). Confirm it decides nothing beyond the
+  proposed partial resolution of MBQ-53, invents no exact Odoo/connector
+  identifier, introduces no new error class / job source / guard, and preserves
+  every accepted guard; confirm MBQ-33/34/41 and MBQ-60/61/62/63 remain shown
+  as recommendations/residuals only. Then either (a) accept DEC-016 (promote
+  AR-013 to Accepted, move Part D to Accepted, drop MBQ-53's `Proposed`
+  qualifier) and choose Part E vs the implementation gate; or (b) return
+  REVISE/REJECT with findings. Implementation remains blocked until a separate
+  ChatGPT gate."**
+- **Stop condition:** stopped at documentation-only Part D **proposal**; a
+  single draft PR into `Shopify-connector`, not merged. **No code, no
+  architecture-decision change, no merge** — DEC-003 through DEC-015 unedited;
+  implementation remains blocked; Part E not started; awaiting ChatGPT review.
 
 ### DEC-015 Acceptance Patch — compact handoff (2026-07-03)
 

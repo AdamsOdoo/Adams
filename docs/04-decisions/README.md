@@ -272,3 +272,34 @@ unchanged.** MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-33, MBQ-34,
 MBQ-41, MBQ-53 through MBQ-58, and MBQ-60 through MBQ-63 remain open,
 untouched or newly added but not resolved by this acceptance.
 **Resolves AR-012** in `../05-qa/architecture-review-log.md`.
+
+**Proposed (not accepted — under ChatGPT review):**
+[`DEC-016-master-blueprint-ui-ux-screen-design.md`](./DEC-016-master-blueprint-ui-ux-screen-design.md) —
+proposed 2026-07-03 (Master Blueprint Sprint D, prepared on base commit
+`b6199f78064ae4e1934bccee630a14b3d7eef438`, the PR #74 / DEC-015 merge into
+`Shopify-connector`). **Status: Proposed for ChatGPT review — NOT accepted.**
+Proposes the **Part D — UI/UX Screen Design Blueprint**
+(`../03-architecture/master-blueprint-ui-ux-screen-design.md`): a screen-level
+design blueprint (screen inventory; app-entry/navigation & information
+architecture; the 11-step setup wizard; a domain-segmented store-settings
+surface; the nine-card dashboard; the sync center over the fixed 6 sources /
+10 states / 16 error classes; the nine-element error center + manual-review
+queue; a matching/duplicate-prevention center; product/customer/order/inventory/
+fulfillment screens; a conceptual four-role permissions-visibility model;
+shared states-&-microcopy patterns and cross-screen-consistency rules; and a
+premium UI/UX acceptance checklist) built on the accepted DEC-003 through
+DEC-015 and the accepted product/UX inputs. **Proposes to partially resolve
+MBQ-53 only** (screen-design layer proposed complete; exact copy MBQ-22,
+identifiers MBQ-01/02/03/44, and the admin-vs-functional surface split MBQ-45
+remain open); **decides no other open question** — MBQ-33/34/41 shown as
+recommendations, MBQ-60/61/62/63 as residuals, none decided. **Does not
+authorize implementation; does not start Part E (implementation-planning
+bridge); DEC-003 through DEC-015 are unchanged.** Companion review-log entry
+**AR-013** (`../05-qa/architecture-review-log.md`, Proposed for ChatGPT
+review). *(This entry sits in `04-decisions/` as the companion to the drafted
+Part D pending ChatGPT review, mirroring how DEC-013/014/015 were first
+authored as `Proposed for ChatGPT review` before their acceptance patches; per
+this README's own rule, an unaccepted proposal's live status is tracked in the
+architecture-review log until accepted. On acceptance, this entry moves to an
+"Also accepted: DEC-016" block, AR-013 is promoted to Accepted, and MBQ-53's
+`Proposed partially resolved` label drops its `Proposed` qualifier.)*

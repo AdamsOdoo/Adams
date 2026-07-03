@@ -16,7 +16,13 @@
 > (Status: **Accepted by ChatGPT**, 2026-07-03), and
 > [`../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md`](../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md)
 > (Status: **Accepted by ChatGPT**, 2026-07-03 — MBQ-33, MBQ-34, MBQ-41,
-> and MBQ-60 through MBQ-63 remain open).
+> and MBQ-60 through MBQ-63 remain open). **Part D (UI/UX Screen Design
+> Blueprint) is now Proposed for ChatGPT review** via
+> [`../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md)
+> (Status: **Proposed for ChatGPT review**, 2026-07-03 — proposes to
+> partially resolve MBQ-53; not accepted, authorizes no implementation) —
+> [`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md).
+> **Part E remains Not started.**
 
 ## Status
 
@@ -34,8 +40,11 @@ decided by this acceptance. Documentation only — the no-code gate
 (`CLAUDE.md` §4–§5) is in force. **The Master Blueprint does not authorize
 code**, and acceptance of Part A, Part B, or Part C does not by itself
 open the implementation gate (see *Implementation gate criteria*
-below). **Part D remains Not started. Part E
-remains Not started.**
+below). **Part D — UI/UX Screen Design Blueprint — is now Proposed for
+ChatGPT review** (Master Blueprint Sprint D; companion
+[`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md),
+Proposed; proposes to partially resolve MBQ-53; not accepted; authorizes no
+implementation). **Part E remains Not started.**
 
 ## Relation to accepted decisions
 
@@ -90,7 +99,7 @@ tickets, or retry/cadence constants.
 | **Open-questions register** | Sprint A (rolling) | [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md): every unresolved item, grouped, with owner and blocking status | **Accepted by ChatGPT via DEC-013** (2026-07-03); updated by every later part |
 | **Part B — Product, Customer, Sale/Order domain blueprints** | Sprint B | [`master-blueprint-product-customer-sale.md`](./master-blueprint-product-customer-sale.md): product import/export/update blueprint (variants, images, price, preview/diff, draft-first); customer import/matching blueprint; order import + financial-evidence blueprint (incl. order-import operator touchpoints, MBQ-26) | **Accepted by ChatGPT via DEC-014** (2026-07-03) |
 | **Part C — Inventory and Fulfillment domain blueprints** | Sprint C | [`master-blueprint-inventory-fulfillment.md`](./master-blueprint-inventory-fulfillment.md): inventory blueprint (location mapping, first-push guard granularity, apply mode, quantity source); fulfillment blueprint (FulfillmentOrder matching, tracking, notification granularity, location confirmation) | **Accepted by ChatGPT via DEC-015** (2026-07-03); MBQ-33/34/41 and MBQ-60–63 remain open |
-| **Part D — UI/UX Screen Design Blueprint** | Sprint D | Screen-level design blueprint required before implementation of operator-facing screens (see *UI/UX Screen Design Blueprint* below); resolves MBQ-53 | **Not started** |
+| **Part D — UI/UX Screen Design Blueprint** | Sprint D | [`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md): screen-level design blueprint required before implementation of operator-facing screens (see *UI/UX Screen Design Blueprint* below); proposes to partially resolve MBQ-53 | **Proposed for ChatGPT review via DEC-016** (2026-07-03) |
 | **Part E — Implementation-planning bridge** | Sprint E | Consolidated verification pass; resolution/acceptance of implementation-blocking open questions; sequencing input for `docs/07-implementation-plan` | **Not started** |
 
 *The Part B/C/D/E split is a **proposed structure**, accepted as the
@@ -100,7 +109,15 @@ blueprint and does not create any screen layout or wireframe.*
 
 ## UI/UX Screen Design Blueprint (Part D — required before operator-facing implementation)
 
-**Not started by Sprint A.** DEC-012 accepted ten operator flows and
+**Now Proposed for ChatGPT review (Master Blueprint Sprint D, 2026-07-03) —
+drafted as
+[`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md),
+companion [`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md)
+(Proposed). It proposes to partially resolve MBQ-53; it is not accepted and
+authorizes no implementation.** The coverage this part must (and, as
+proposed, does) provide is unchanged from the criteria first stated in
+Sprint A, restated below for reference. DEC-012 accepted ten operator flows
+and
 promised a later, dedicated UI-design pass for exact copy/wording and
 screen-level detail (`../02-product/ux-operator-flow.md` §5 "Open
 questions"; DEC-012 "What remains open"). Sprint A's Part A blueprint
@@ -132,8 +149,12 @@ screen is implemented. It must cover:
 This part is tracked as **MBQ-53** in
 [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
 and **blocks implementation of operator-facing screens** until it exists
-and is accepted. It does **not** block Part B/C domain-blueprint authoring,
-which is concept/contract-level work, not screen design.
+and is accepted. **Sprint D has now drafted it and proposes to partially
+resolve MBQ-53** (screen-design layer proposed complete; exact user-facing
+copy remains MBQ-22, exact identifiers remain MBQ-01/02/03/44, and the
+admin-vs-functional surface split remains MBQ-45); **MBQ-53 stays open until
+DEC-016 is accepted.** It does **not** block Part B/C domain-blueprint
+authoring, which is concept/contract-level work, not screen design.
 
 ## Module family overview
 
@@ -211,8 +232,9 @@ resolved by this acceptance. **MBQ-33 (first-push guard granularity),
 MBQ-34 (ongoing apply-mode), and MBQ-41 (notification-UI granularity)
 also remain open** — each carries a recommendation not adopted as a
 decision by this acceptance.
-**Part D (UI/UX Screen Design Blueprint) and Part E
-(implementation-planning bridge) remain Not started.** Open questions
+**Part D (UI/UX Screen Design Blueprint) is now Proposed for ChatGPT review
+(Sprint D, DEC-016 — not accepted). Part E (implementation-planning bridge)
+remains Not started.** Open questions
 routed to Part B/C are grouped in
 [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md).
 
