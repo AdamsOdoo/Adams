@@ -35,7 +35,7 @@ labels used throughout"):
   accepted.
 - **[Accepted — DEC-014]** — a design detail this document introduced that
   DEC-014 explicitly accepted (blueprint level or blueprint-policy level,
-  as stated); see DEC-014 "Accepted decision" points A–J for the full
+  as stated); see DEC-014 "Accepted decision" points A–K for the full
   list. **[Blueprint proposal]** items not explicitly named in DEC-014's
   accepted package (item 1–6) or explicit acceptance points remain design
   detail this document introduces at blueprint level, accepted as part of
@@ -1346,7 +1346,7 @@ no new MBQ row is added for this caveat.
 Full register: [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
 §4. **Accepted by ChatGPT via DEC-014 on 2026-07-03** — see the
 claim-label note at the top of this document and DEC-014's "Accepted
-decision" section for the full explicit acceptance points (A–J).
+decision" section for the full explicit acceptance points (A–K).
 "Partially resolved" means direction accepted, exact detail still open;
 "accepted at blueprint level"/"accepted at blueprint-policy level" means
 ChatGPT's decision is final at that level, with any named residual detail

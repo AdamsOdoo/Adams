@@ -55,8 +55,8 @@
   PR #72 ChatGPT-requested revision and the PR #72 Fable-requested B1/B2/
   B3 revision. DEC-014 got a new *Accepted decision* section recording
   the accepted Master Blueprint Sprint B product/customer/sale-order
-  domain blueprint package (items 1–6) and ten explicit acceptance
-  points **A–J**: **(A)** MBQ-23 partially resolved (variant-mutation-
+  domain blueprint package (items 1–6) and eleven explicit acceptance
+  points **A–K**: **(A)** MBQ-23 partially resolved (variant-mutation-
   strategy direction); **(B)** MBQ-25 partially resolved (draft/publish
   mechanism); **(C)** MBQ-26 **accepted at blueprint level** (existing
   error-center/sync-center surfaces sufficient for Phase 1 order-import
