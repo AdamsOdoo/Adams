@@ -69,11 +69,49 @@ tickets, or retry/cadence constants.
 | **Open-questions register** | Sprint A (rolling) | [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md): every unresolved item, grouped, with owner and blocking status | **Proposed for ChatGPT review**; updated by every later part |
 | **Part B — Product, Customer, Sale/Order domain blueprints** | Sprint B (recommended next) | Product import/export/update blueprint (variants, images, price, preview/diff, draft-first); customer import/matching blueprint; order import + financial-evidence blueprint (incl. order-import operator touchpoints, MBQ-26) | **Not started** |
 | **Part C — Inventory and Fulfillment domain blueprints** | Sprint C | Inventory blueprint (location mapping, first-push guard granularity, apply mode, quantity source); fulfillment blueprint (FulfillmentOrder matching, tracking, notification granularity, location confirmation) | **Not started** |
-| **Part D — Implementation-planning bridge** | Sprint D | Consolidated verification pass; resolution/acceptance of implementation-blocking open questions; sequencing input for `docs/07-implementation-plan` | **Not started** |
+| **Part D — UI/UX Screen Design Blueprint** | Sprint D | Screen-level design blueprint required before implementation of operator-facing screens (see *UI/UX Screen Design Blueprint* below); resolves MBQ-53 | **Not started** |
+| **Part E — Implementation-planning bridge** | Sprint E | Consolidated verification pass; resolution/acceptance of implementation-blocking open questions; sequencing input for `docs/07-implementation-plan` | **Not started** |
 
-*The Part B/C/D split is a **proposed structure** — ChatGPT may re-cut it
+*The Part B/C/D/E split is a **proposed structure** — ChatGPT may re-cut it
 at DEC-013 review. Sprint A deliberately does not start any domain
-blueprint.*
+blueprint and does not create any screen layout or wireframe.*
+
+## UI/UX Screen Design Blueprint (Part D — required before operator-facing implementation)
+
+**Not started by Sprint A.** DEC-012 accepted ten operator flows and
+promised a later, dedicated UI-design pass for exact copy/wording and
+screen-level detail (`../02-product/ux-operator-flow.md` §5 "Open
+questions"; DEC-012 "What remains open"). Sprint A's Part A blueprint
+converts those flows into substrate/contract detail but does **not**
+produce screen layouts, wireframes, or navigation design. A dedicated
+**UI/UX Screen Design Blueprint** is required as its own Master Blueprint
+part, after the domain blueprints (Parts B/C) and before any operator-facing
+screen is implemented. It must cover:
+
+- Screen inventory (every operator-facing screen implied by the ten
+  DEC-012 flows and the Part A/B/C blueprints).
+- Navigation / information architecture (menu structure, how screens
+  relate, role-gated visibility per §J).
+- Odoo-native interaction patterns (which Odoo widget/view conventions the
+  connector reuses vs. where it needs a custom pattern, and why).
+- Screen-level wireframe specs for: dashboard layout; setup wizard layout;
+  store settings layout; sync center layout; error center layout; matching
+  center layout; preview/review screens (product diff, inventory
+  first-push, duplicate-prevention).
+- Empty / loading / success / error / manual-review states for every
+  screen above — no screen may be designed with only its "happy path"
+  state.
+- UX copy guidelines and error-message style (the copy DEC-009/DEC-012
+  left as "not decided here, a UX/operator-flow-sprint concern").
+- A premium UI/UX acceptance checklist — the bar this connector's
+  operator-facing surfaces must clear before implementation, consistent
+  with the product's premium-quality-bar intent (`../02-product/product-vision.md`).
+
+This part is tracked as **MBQ-53** in
+[`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
+and **blocks implementation of operator-facing screens** until it exists
+and is accepted. It does **not** block Part B/C domain-blueprint authoring,
+which is concept/contract-level work, not screen design.
 
 ## Module family overview
 
@@ -145,7 +183,11 @@ Implementation may be considered — never self-triggered — only after
 1. **ChatGPT accepts the required Master Blueprint parts** — at minimum
    Part A (DEC-013) and the domain blueprint part(s) covering whatever is
    to be implemented first; acceptance of Part A alone does not permit
-   domain implementation whose blueprint part is unwritten.
+   domain implementation whose blueprint part is unwritten. **Where the
+   affected implementation includes any operator-facing screen, view, or
+   UI flow, the accepted UI/UX Screen Design Blueprint (Part D, above) is
+   also required** — accepted domain/substrate blueprints alone do not
+   authorize screen-level implementation.
 2. **Implementation-blocking open questions are resolved or consciously
    accepted** — every register row marked "Blocks implementation: Yes" for
    the affected scope is either resolved (with evidence, per `CLAUDE.md`

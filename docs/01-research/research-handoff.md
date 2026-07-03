@@ -109,6 +109,30 @@
   still not authorized; `main` and plain `dev` untouched. Awaiting ChatGPT
   review.
 
+**PR #70 Fable revision (2026-07-03):**
+- Fable reviewed PR #70 and returned **ACCEPT WITH MINOR CHANGES**.
+- Required revisions applied:
+  - UI/UX Screen Design Blueprint added to Master Blueprint sequence and
+    gate criteria (new Part D, `master-blueprint.md`).
+  - MBQ-53 added for screen-level UI/UX design.
+  - MBQ-54 added for module-uninstall / disable data lifecycle.
+  - Feature-flag execution-time re-check scoped to enablement gating only
+    (never alters enqueue-time notification/source-of-truth decisions).
+  - Binding enumeration seam and binding granularity bound added (§C.8).
+  - Claim labels corrected (§C.4, §D.13; also added §D.5's `skipped`/
+    `failed_final` any-class-outcome rule).
+  - `ir.cron` wording clarified (§D.1).
+  - Credential no-read-back wording clarified as a connector-surface
+    guarantee, not a database-level claim (§J.2).
+  - Webhook-topic registration seam added (§A.5).
+- DEC-013 remains **Proposed for ChatGPT review**, not accepted.
+- AR-010 remains proposed only, not accepted.
+- DEC-003 through DEC-012 untouched.
+- No code files changed.
+- Implementation remains blocked.
+- Sprint B not started.
+- Same branch/PR — no new PR opened, no merge.
+
 ---
 
 ### DEC-012 Acceptance Patch — compact handoff (2026-07-03)
@@ -4219,3 +4243,40 @@ ChatGPT review.
   010/011 edit; implementation remains blocked; Master Blueprint not started.
   Next: push branch, open one draft PR into `Shopify-connector`, stop for
   ChatGPT review.
+- **Master Blueprint Sprint A — Core/Common Substrate (2026-07-03):**
+  confirmed PR #69 merged into `Shopify-connector` (merge commit
+  `305f396bcbd2656a4282ed18c5983540503b5502`) and DEC-003 through DEC-012 /
+  AR-002 through AR-009 all Accepted before editing. Created the first
+  Master Blueprint package: `master-blueprint.md` (index), the Part A
+  `master-blueprint-core-substrate.md`, and
+  `master-blueprint-open-questions.md` (MBQ-01–MBQ-52). Proposed
+  `DEC-013-master-blueprint-core-substrate.md` (`Status: Proposed for
+  ChatGPT review`) and added AR-010 (Proposed) to
+  `architecture-review-log.md`; indexed DEC-013 as Proposed in
+  `04-decisions/README.md`. PR #70 opened as draft into `Shopify-connector`,
+  branch `claude/master-blueprint-core-substrate-azhp4s`. No code; no
+  DEC-003 through DEC-012 edit; DEC-013/AR-010 proposed only, not accepted;
+  implementation remains blocked; Sprint B not started. Next: ChatGPT/Fable
+  review of PR #70.
+- **PR #70 Fable revision (2026-07-03):** Fable reviewed PR #70 and returned
+  **ACCEPT WITH MINOR CHANGES**. Applied within the same PR/branch (no new
+  PR): added Master Blueprint Part D — UI/UX Screen Design Blueprint — to
+  `master-blueprint.md`'s sequence and to implementation-gate criterion 1;
+  added MBQ-53 (screen-level UI/UX design) and MBQ-54 (domain-module
+  uninstall/disable data lifecycle) to `master-blueprint-open-questions.md`;
+  scoped the §I.3 feature-flag execution-time re-check to fail-safe
+  enablement gating only (never altering enqueue-time notification/
+  source-of-truth decisions); reworded §I.4 to use only accepted DEC-009
+  job-state vocabulary (no new `held` state); added a cross-domain
+  binding-enumeration seam and a binding-granularity bound to §C.8; added a
+  webhook-topic registration seam to §A.5; corrected two claim labels
+  (§C.4 manual-override extension, §D.13 source-of-truth-persistence
+  generalization) and added §D.5's `skipped`/`failed_final`
+  any-class-outcome rule; clarified `ir.cron` wording (§D.1) and the
+  credential no-read-back rule as a connector-surface guarantee, not a
+  database-level claim (§J.2); minimal consistency updates to DEC-013 (MBQ count,
+  Part D/E sequence, no-exhaustive-list caveat). DEC-013 remains Proposed
+  for ChatGPT review, not accepted; AR-010 remains proposed only; DEC-003
+  through DEC-012 untouched; no code files changed; implementation remains
+  blocked; Sprint B not started. Next: push the same branch, no new PR,
+  stop for further ChatGPT/Fable review.

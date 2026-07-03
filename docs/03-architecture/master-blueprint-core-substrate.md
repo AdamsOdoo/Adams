@@ -133,6 +133,12 @@ seams, never by patching core internals:
 6. **Setup-wizard step contribution** — contribute domain-specific setup
    steps/guards (e.g. inventory first-push scheduling) into the core wizard
    flow (§E), not separate per-domain wizards.
+7. **Webhook-topic registration** — `core` owns the webhook
+   receiver/HMAC-verification/dedup/enqueue substrate (§D.1); domain modules
+   **register their supported webhook topics** and map each to a domain job
+   type (seam 2, above) — `core` does not interpret the domain semantics of
+   any webhook payload, and no domain module implements a parallel webhook
+   receiver **[Blueprint proposal]**.
 
 ---
 
@@ -342,10 +348,11 @@ deleted/recreated counterparts defensively (§C.6)
 - **Match key used:** recorded per binding — which key produced the match
   (existing binding / SKU-internal reference / barcode / email-customer key
   / manual) **[Accepted — DEC-006]**.
-- **Manual override fields:** who overrode, when, and what the automatic
-  candidate was before override — manual match is an explicit operator
+- **Manual override fields:** who overrode and when — an explicit operator
   action with a visible audit trail **[Accepted — DEC-006 UX
-  implications]**.
+  implications]**. Recording **what the automatic candidate was before
+  override** is a blueprint extension of that accepted requirement, not
+  itself DEC-006 text **[Blueprint proposal]**.
 - **Audit fields:** matched-by, matched-at, source strategy (the first-sync
   source-of-truth in force), match key used, status
   **[Accepted — DEC-006 "Mitigations" #2]**.
@@ -411,6 +418,27 @@ Blueprint]:**
   live in `core` per DEC-008's note, and this section would be revised
   before any implementation planning. Final confirmation:
   **[Open question — MBQ-11]** (resolved by ChatGPT's DEC-013 review).
+- **Cross-domain enumeration / registration seam** — because core-level
+  operations (e.g. store-disconnect data-retention review, store history
+  preservation, a global binding/search view, or a cross-domain audit
+  surface) may need to enumerate bindings **across** domains without
+  owning their concrete tables, the core binding contract must include an
+  **enumeration/registration seam**: each domain binding model registers
+  its binding type with `core` and exposes a common minimal read interface
+  (at least: count, list-by-store, and status-by-store) that `core` calls
+  without importing the domain model directly. This does **not** mean
+  `core` owns concrete domain binding tables, and it does **not**
+  reintroduce a single polymorphic binding table — it gives `core` a
+  read-only, domain-agnostic way to ask "what bindings exist for this
+  store," which the per-domain-table shape above would otherwise lack
+  **[Blueprint proposal]**.
+- **Binding-model granularity bound** — to avoid binding-model explosion,
+  the default is **one concrete binding model per synchronized root
+  entity** (product template, product variant, customer, order, inventory
+  level, FulfillmentOrder/Fulfillment — as listed above). Any **additional
+  sub-entity** binding model (a finer-grained identity below one of these
+  roots) requires **explicit architecture review** before being added, not
+  an ad hoc addition during implementation **[Blueprint proposal]**.
 - Convenience reference fields on business records (e.g. a Shopify-ID field
   on the product form) remain **read-only caches updated from the binding,
   never written independently** **[Accepted — DEC-006]**.
@@ -427,9 +455,13 @@ DEC-008]**:
 - Webhook receiver verifies HMAC-SHA256 of the raw body, acknowledges
   fast, dedupes on `X-Shopify-Webhook-Id`, and **enqueues** — heavy work
   never runs inline in an HTTP request **[Accepted — DEC-005]**.
-- `ir.cron` worker(s) drain the queue in batches with per-record isolation
-  (savepoints) and partial-batch commits; `ir.cron`'s own deactivation math
-  is **not** the connector's retry mechanism **[Accepted — DEC-005]**.
+- **An `ir.cron` job, or a small number of `ir.cron` jobs**, drains the
+  queue in batches with per-record isolation (savepoints) and partial-batch
+  commits; `ir.cron`'s own deactivation math is **not** the connector's
+  retry mechanism **[Accepted — DEC-005]**. (Wording follows DEC-005's own
+  "`ir.cron` job (or a small number of them)" phrasing — this is an Odoo
+  scheduled-action drain loop, not an HTTP worker process and not OCA
+  `queue_job`'s Jobrunner.)
 - Manual sync triggers and scheduled reconciliation are first-class,
   always-on layers — never webhook-only **[Accepted — DEC-005]**.
 - OCA `queue_job` remains a documented optional later/on-prem accelerator,
@@ -484,6 +516,12 @@ Per DEC-009's classified retry policy **[Accepted — DEC-009]**:
 5. **Conservative, never silent** — financial total mismatch (DEC-007 §6).
 6. **Single safety-net auto-retry, then human** — unknown/system error
    `[Implementation-planning default]`.
+
+**`skipped` and `failed_final` are outcomes available from any error
+class, not per-class defaults** — `skipped` is reached by operator choice,
+`failed_final` by exhausted attempts or manual retries; neither is a
+per-class default in the list above **[Accepted — DEC-009 error taxonomy;
+DEC-009's job states, restated at D.3]**.
 
 Exact retry ceilings/backoff constants remain
 **[Open question — MBQ-16]**.
@@ -575,8 +613,15 @@ action — secondary, never the primary display
   **[Blueprint proposal, from DEC-007/009 guard semantics; see §I.5]**.
 - Retry of an `@idempotent` write reuses the **same persisted key** within
   the platform TTL **[Accepted — DEC-009/DEC-010]**.
-- Retry preserves enqueue-time decisions (notification flag, recorded
-  source-of-truth) **[Accepted — DEC-011]**.
+- Retry preserves the enqueue-time **notification flag** decision — a
+  fulfillment job's retry never re-reads a since-changed notification
+  default **[Accepted — DEC-011 "Customer notification posture"]**. Retry
+  also preserves any **recorded source-of-truth** decision persisted on the
+  relevant job/guard record (e.g. the first-push source-of-truth, the price
+  source-of-truth) — generalizing this rule beyond fulfillment notification
+  to every enqueue-time decision the job/guard record carries
+  **[Blueprint proposal, extending DEC-006/DEC-007/DEC-009's
+  recorded-decision requirements]**.
 
 ---
 
@@ -851,14 +896,27 @@ domain modules **extending** it with their own flag fields — rather than:
   RA-013-adjacent).
 
 Flags are read at enqueue time **and** re-checked at execution time
-(defense in depth, matching §E.5) **[Blueprint proposal]**.
+(defense in depth, matching §E.5) — **scoped to fail-safe enablement
+gating only**: the execution-time re-check may **stop, hold, cancel, or
+block** a job from running when the domain/capability it belongs to has
+since been disabled, but it must never **alter** any decision persisted at
+enqueue time. In particular, the execution-time re-check must **never**
+re-read or change the fulfillment notification flag persisted per job
+under DEC-011 (§D.13), must **never** re-read or change a source-of-truth
+decision persisted for the relevant job/guard (§D.13), and must **not
+bypass any safety guard** (§I.5) **[Blueprint proposal]**.
 
 ### I.4 Safe enable/disable behaviour
 
-- **Disabling a domain stops new sync activity** for that domain; queued
-  jobs for it are cancelled or held visibly (never silently dropped —
-  exact choice is implementation planning) **[Blueprint proposal,
-  extending DEC-012 store settings §4]**.
+- **Disabling a domain stops new sync activity** for that domain: new jobs
+  for it are blocked from enqueue/execution (§I.3). Existing
+  `queued`/`retry_waiting` jobs for the disabled domain are either
+  **cancelled** (with an audit reason, per the accepted `cancelled` job
+  state, §D.3/§D.9) or **kept in an accepted blocked state** such as
+  `blocked_manual_review`, depending on implementation planning — **no new
+  top-level job state is introduced by this rule**; jobs are never silently
+  dropped **[Blueprint proposal, extending DEC-012 store settings §4;
+  exact behaviour remains implementation planning / open question]**.
 - **Disabling must not delete history** — bindings, jobs, logs, and audit
   records are preserved **[Accepted — DEC-012 store settings §4]**.
 - **Re-enabling a domain re-enters that domain's own guard** — e.g.
@@ -908,7 +966,7 @@ combinations remains **[Open question — MBQ-45]**.
 | View store settings & connection status | Yes | Yes (read-only) | Yes (read-only) | Yes (read-only) |
 | Configure (settings, domains, source-of-truth, notification default) | Yes | No | No | No |
 | Enter/replace/rotate credential | Yes | No | No | No |
-| See credential secret value | **No — masked status only (no role can read it back after entry)** | No — masked status only | No — masked status only | No — masked status only |
+| See credential secret value | **No — masked status only, on every connector UI/API surface** | No — masked status only | No — masked status only | No — masked status only |
 | Run setup wizard | Yes | No | No | No |
 | Trigger manual sync / reconcile-now | Yes | Yes | No | No |
 | Retry safe jobs (state/class-conditional, §G.4) | Yes | Yes | No | No |
@@ -920,9 +978,15 @@ combinations remains **[Open question — MBQ-45]**.
 **[Blueprint proposal throughout; grounded in DEC-012 §10 and DEC-009's
 requirement that confirmations record who acted.]** Notes:
 
-- The **no-read-back credential rule** applies to every role including
-  Administrator (§B.2) — secrets are write/replace-only after entry
-  **[Blueprint proposal, extending DEC-004's masked-storage rule]**.
+- The **no-read-back credential rule is a connector surface guarantee, not
+  an absolute database-level claim**: no connector UI or API surface
+  exposes the stored secret after entry, for any role including
+  Administrator (§B.2) — every role sees masked status only after save
+  **[Blueprint proposal, extending DEC-004's masked-storage rule]**. This
+  does **not** claim a database superuser or direct database access cannot
+  reach raw stored contents — the **at-rest protection and storage
+  mechanism** (encryption vs. Odoo field-level `groups` protection alone)
+  remain **[Open question — MBQ-04]**, unresolved by this rule.
 - Reviewer approvals are the auditable act DEC-009 requires — approving a
   manual-review item records who/when and releases the job through the
   normal queue path, never a side channel **[Accepted — DEC-009]**.
@@ -1002,6 +1066,13 @@ Headline items raised or carried by this Part A blueprint:
   guard mechanism (MBQ-21) — implementation planning.
 - Readiness-check essential-vs-nice list (MBQ-06); roles→groups mapping
   (MBQ-45); API-version pinning policy (MBQ-52).
+- **Screen-level UI/UX design blueprint** (MBQ-53) — routed to a later
+  Master Blueprint Part D (UI/UX Screen Design Blueprint); blocks
+  implementation of operator-facing screens, not Part B/C domain-blueprint
+  authoring.
+- **Domain-module uninstall/disable data lifecycle** (MBQ-54) — whether
+  disabling or uninstalling a domain module can ever lose bindings, jobs,
+  logs, or audit history; ChatGPT + implementation planning.
 
 ---
 

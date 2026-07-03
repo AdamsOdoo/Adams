@@ -17,6 +17,24 @@
 **Proposed for ChatGPT review.** Not accepted. Not
 implementation-authorizing under any outcome.
 
+> **PR #70 Fable revision (2026-07-03).** Fable reviewed PR #70 and
+> returned **ACCEPT WITH MINOR CHANGES**. Applied: a UI/UX Screen Design
+> Blueprint (Part D) added to the Master Blueprint sequence and to
+> implementation-gate criterion 1 for operator-facing implementation;
+> MBQ-53 (screen-level UI/UX design) and MBQ-54 (domain-module
+> uninstall/disable data lifecycle) added to the open-questions register;
+> the feature-flag execution-time re-check scoped to fail-safe enablement
+> gating only (never altering enqueue-time notification/source-of-truth
+> decisions); a cross-domain binding-enumeration seam and a binding
+> granularity bound added to §C.8; several claim labels corrected
+> (§C.4 manual-override extension, §D.13 source-of-truth persistence
+> generalization); `ir.cron` wording clarified; credential no-read-back
+> wording scoped to a connector-surface guarantee (MBQ-04 unchanged);
+> a webhook-topic registration seam added to §A.5. **This record remains
+> Proposed for ChatGPT review — not accepted.** No accepted DEC-003 through
+> DEC-012 content changed; no code files changed; implementation remains
+> blocked; Sprint B not started.
+
 ## Date
 
 2026-07-03.
@@ -62,8 +80,9 @@ blueprint** as the blueprint-level design for `shopify_connector_core`,
 namely:
 
 1. **Module boundary** — `shopify_connector_core`'s owns / must-not-own
-   lists and six extension seams (Part A §A), applying DEC-008 without
-   change.
+   lists and seven extension seams (Part A §A, including the webhook-topic
+   registration seam added per Fable's PR #70 review), applying DEC-008
+   without change.
 2. **Core configuration objects** — blueprint-level concepts for
    store/connection, secure credential posture (masked, no-read-back,
    never logged), API version/health, the minimal Shopify Location
@@ -105,16 +124,21 @@ namely:
    all later domain blueprints (Part A §K).
 9. **The open-questions register** as the single routing surface for every
    unresolved Master Blueprint / implementation-planning question
-   (`master-blueprint-open-questions.md`, MBQ-01–MBQ-52).
+   (`master-blueprint-open-questions.md`, MBQ-01–MBQ-54).
 10. **The blueprint sprint structure** — Part B (product/customer/
-    sale-order), Part C (inventory/fulfillment), Part D
-    (implementation-planning bridge) as the proposed sequence.
+    sale-order), Part C (inventory/fulfillment), **Part D (UI/UX Screen
+    Design Blueprint — required before implementation of any
+    operator-facing screen, per Fable's PR #70 review)**, Part E
+    (implementation-planning bridge) as the proposed sequence. **This is
+    not an exhaustive list of every future Master Blueprint part** — later
+    review may add, split, or re-cut parts as needed; DEC-013 does not
+    foreclose that.
 
 ## What this decides
 
 - The blueprint-level design of the core/common substrate (items 1–8
-  above) as the binding basis for Sprint B/C domain blueprints and — after
-  the separate gate — implementation planning.
+  above) as the binding basis for Sprint B/C/D domain and UI/UX blueprints
+  and — after the separate gate — implementation planning.
 - The two blueprint-level directions explicitly routed here by earlier
   decisions: the **binding schema shape** (per-domain concrete on a core
   abstract contract) and the **feature-flag mechanism direction**
@@ -143,14 +167,16 @@ namely:
 
 Centralized in
 [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
-(MBQ-01 through MBQ-52), grouped by core/setup/config, binding/dedup,
+(MBQ-01 through MBQ-54), grouped by core/setup/config, binding/dedup,
 job/log/error/retry, product/customer/order, inventory, fulfillment,
-permissions/security, and deployment/operations — each with a source,
-decision owner, and implementation-blocking status. Headline rows for this
-record's review: MBQ-04 (credential storage mechanism), MBQ-07
+permissions/security, deployment/operations, and UI/UX design — each with a
+source, decision owner, and implementation-blocking status. Headline rows
+for this record's review: MBQ-04 (credential storage mechanism), MBQ-07
 (feature-flag mechanism confirmation), MBQ-08 (disconnect data retention),
 MBQ-11 (binding schema-shape confirmation), MBQ-45 (roles→groups mapping),
-MBQ-47 (Reviewer boundary).
+MBQ-47 (Reviewer boundary), MBQ-53 (screen-level UI/UX design blueprint —
+added per Fable's PR #70 review), MBQ-54 (domain-module uninstall/disable
+data lifecycle — added per Fable's PR #70 review).
 
 ## Risks and mitigations
 
@@ -200,9 +226,11 @@ research-phase-exit criteria (`../05-qa/quality-feedback-loop.md` §10) and
 Blueprint** (Part B): convert DEC-003/006/007 (+ DEC-012 flows §6–§7) into
 the product import/export/update, customer import/matching, and order
 import + financial-evidence blueprints, resolving or routing MBQ-23 through
-MBQ-31 — after ChatGPT reviews this record. Sprint C
-(inventory/fulfillment) and Sprint D (implementation-planning bridge)
-follow per the index.
+MBQ-31 — after ChatGPT reviews this record. Sprint C (inventory/
+fulfillment), Sprint D (UI/UX Screen Design Blueprint, resolving MBQ-53),
+and Sprint E (implementation-planning bridge) follow per the index — this
+is the currently proposed order, not an exhaustive or final list of every
+future part.
 
 ## Review / change control
 

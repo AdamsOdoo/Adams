@@ -45,6 +45,7 @@ items are **open questions**, never asserted.
 | MBQ-08 | **Store-disconnect data-retention posture** — what happens to bindings, jobs, logs, audit records after disconnect | DEC-012 (Fable, PR #68); Part A §B.1 | Wrong posture destroys audit history or leaks stale credentials; affects disconnect UX and re-connect matching | ChatGPT | Yes (disconnect flow) |
 | MBQ-09 | Whether **custom apps must implement Shopify's compliance webhooks / are bound by Level 1/2 protected-data obligations** regardless of distribution | DEC-004 (open since RB-14 Part 2) | If yes, compliance endpoints/duties enter Phase 1 scope; DEC-004 mandates conservative handling until resolved | Official-doc verification | Yes (any compliance-relevant code); conservative posture applies meanwhile |
 | MBQ-10 | Whether Odoo.sh/on-prem setup can avoid mandatory **`odoo.conf`/queue prerequisites** (turnkey install path) | DEC-005; DEC-012 §1 open questions | Affects install docs and wizard prerequisites step; not a design blocker | Implementation planning + Official-doc verification | No |
+| MBQ-54 | **Domain-module uninstall / disable data lifecycle** — if domain modules extend core settings (§I) or own concrete binding tables (§C.8), uninstall/disable behaviour must not silently lose bindings, logs, flags, or audit history | Part A §I feature-flag mechanism; Part A §C binding shape | A merchant disabling or uninstalling a domain module must not silently destroy binding/audit/log history — this is the module-lifecycle counterpart to the already-accepted "disabling must not delete history" rule (DEC-012 store settings §4; Part A §I.4), extended to the harder case of a full module **uninstall** | ChatGPT + Implementation planning | Yes for uninstall/disable lifecycle; No for normal MVP sync if uninstall is explicitly unsupported/guarded in Phase 1 |
 
 ## 2. Binding / dedup
 
@@ -123,11 +124,17 @@ items are **open questions**, never asserted.
 | MBQ-51 | Exact **GraphQL cost/throttle-aware pacing parameters** (cost budgeting, backpressure thresholds feeding the health state) | DEC-004; Part A §B.3 | Rate-limit awareness is DEC-003-mandatory; parameters unfixed | Implementation planning | Yes (transport client) |
 | MBQ-52 | **Shopify API-version pinning/upgrade policy** (which version pinned per store; upgrade cadence; deprecation watch) | DEC-004; Part A §B.3 | Version drift silently changes mutation semantics (e.g. `@idempotent` requirements are version-dated) | ChatGPT (policy) + Implementation planning | Yes (transport client) |
 
+## 9. UI/UX design
+
+| ID | Open question | Source | Why it matters | Decision owner | Blocks implementation |
+| --- | --- | --- | --- | --- | --- |
+| MBQ-53 | **Screen-level UI/UX design blueprint** — screen inventory, navigation/information architecture, Odoo-native interaction patterns, screen-level wireframe specs (dashboard, setup wizard, store settings, sync center, error center, matching center, preview/review screens), empty/loading/success/error/manual-review states per screen, UX copy guidelines, error-message style, and a premium UI/UX acceptance checklist | DEC-012 (promised a later UI-design pass; "exact copy/wording... a later UI-design pass" — `ux-operator-flow.md` §5, DEC-012 "What remains open"); standing user/ChatGPT rule that premium UI/UX is a product pillar; Master Blueprint Sprint A review | The ten accepted operator flows (DEC-012) fix *behaviour*, not *screens* — premium UI/UX is a named differentiation pillar (`../02-product/product-vision.md`) and is not achieved by behavioural rules alone; without screen-level design, wireframes/specs, Odoo-native interaction rules, and explicit screen states, implementation would have to invent screen design ad hoc, risking an inconsistent or non-premium operator experience | ChatGPT + a later **UI/UX Screen Design Blueprint sprint** (Master Blueprint Part D, see `master-blueprint.md`) | Yes, for implementation of any operator-facing screen/view/UI flow; No for Part B/C domain-blueprint authoring (concept/contract level, not screen design) |
+
 ---
 
 ## Maintenance rule
 
-Every later blueprint part (B/C/D) must: (1) resolve or re-route its
+Every later blueprint part (B/C/D/E) must: (1) resolve or re-route its
 assigned rows, marking resolved rows **Resolved (date, by, where)** rather
 than deleting them; (2) add newly discovered questions here with the next
 free ID; (3) never let a "Blocks implementation: Yes" row be silently
