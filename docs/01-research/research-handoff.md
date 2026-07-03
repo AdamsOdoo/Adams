@@ -1,8 +1,9 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-015
-> Acceptance Patch)** is immediately below, in the **compact
-> handoff format** (`../06-prompts/session-handoff-template.md`);
+> Continuity lives in GitHub, not chat. The **current entry (Competitor
+> Evidence & Blueprint Reconciliation Sprint)** is immediately below, in the
+> **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> the **DEC-015 Acceptance Patch**,
 > **Master Blueprint Sprint C (proposal history)**,
 > **DEC-014 Acceptance Patch**, **Master
 > Blueprint Sprint B (proposal history)**, **DEC-013
@@ -21,6 +22,93 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Competitor Evidence & Blueprint Reconciliation Sprint — compact handoff (2026-07-03)
+
+> **Documentation-only research sprint, not implementation.** A controlled
+> evidence-and-gap-analysis sprint run **before** Part D (UI/UX Screen Design)
+> to deeply analyse the already-captured competitor documentation and reconcile
+> it against the accepted blueprint. No accepted decision was modified; the
+> no-code / research-first gate (`CLAUDE.md` §4–§5) stayed in force.
+
+- **Branch / PR:** `claude/competitor-evidence-blueprint-reconciliation-8di6tr`
+  → **draft** PR into `Shopify-connector`, **not merged**.
+- **Base commit:** `b6199f78064ae4e1934bccee630a14b3d7eef438` (PR #74 merge —
+  DEC-015 acceptance).
+- **Files changed (all Markdown under `docs/**`; no code files):**
+  `docs/01-research/competitor-evidence-reconciliation.md` (new),
+  `docs/01-research/competitor-feature-screen-map.md` (new),
+  `docs/01-research/competitor-gap-analysis-against-blueprint.md` (new),
+  `docs/03-architecture/blueprint-amendment-candidates.md` (new),
+  `docs/01-research/research-handoff.md` (this file).
+- **Method:** repo-first — reconciled the **already-saved** competitor evidence
+  (`../00-source-materials/competitor-source-notes.md`,
+  `competitor-screenshot-inventory.md`, `source-access-notes.md`,
+  `competitor-feature-matrix.md`) against the accepted blueprint. A controlled,
+  reviewable high-power extraction fan-out (8 read-only extractor agents over
+  DEC-003/007/010–015, the four master-blueprints, DEC-012 UX flows, the
+  existing analysis docs, and RA-001…RA-023) produced structured digests; the
+  five deliverables were authored by hand for citation discipline. No new
+  external fetch was performed.
+- **Sources reviewed (6 competitor connectors + 1 internal + 1 blocked):**
+  R1 Webkul, R2 Teqstars, R3 Emipro, R4 VentorTech (Confluence), R6
+  ecommerce_shopify, R7 VentorTech PRO, R8 sh_shopify_connector; plus the
+  internal R5 Google Doc (blocked).
+- **Inaccessible sources:** **R5** Project Google Doc ("E-commerce user
+  documentation") — Google **sign-in wall** (owner access/export needed; likely
+  R6's setup guide per the redirect inference). Partial: **R4** VentorTech
+  Confluence (17 of 28 child articles unread). "Documented but UI not observed"
+  flags: R6 (no screenshots), R7 product UI (marketing alt-text only), R2 pHash
+  dedup / "two dashboards" / per-record retry, R8 (captions only).
+- **Main gaps / opportunities:** the accepted blueprint already **absorbs the
+  competitor evidence at the behaviour/architecture level** (dashboard, error
+  center, retry, idempotency, reconciliation, rate-limit, multi-location,
+  dry-run, FulfillmentOrder, honest freshness). The **genuine residual gaps are
+  screen-level → Part D / MBQ-53**, plus confirmed market whitespace we already
+  out-cover (first-push safety, reconciliation visibility, throttle honesty,
+  automatic retry, `@idempotent`). Two non-MVP candidates (CSV/XLSX match
+  fallback; click-and-collect status) and one dashboard nuance (activity trend).
+- **Amendment candidates:** **12** (`BAC-001…BAC-012`) — **0 require a DEC
+  amendment, 0 an AR change, 0 an MBQ resolution**; predominant action **"Part D
+  input only"**; two "future MBQ" notes and one confirmed-deferral record.
+- **Confirmation — no accepted decisions changed:** DEC-003 through DEC-015 were
+  **not modified**; no accepted architecture decision (AR-002…AR-012) changed;
+  no MBQ row resolved or renumbered; no rejected approach (RA-001…RA-023)
+  re-proposed (checked; guardrail note in `blueprint-amendment-candidates.md`).
+- **Confirmation — Part D not started:** no
+  `master-blueprint-ui-ux-screen-design.md` created; no screen-level wireframes/
+  specs authored; MBQ-53 remains open. **No DEC-016, no AR-013** created.
+- **Confirmation — implementation remains blocked:** documentation-only; no
+  `*.py`/`*.xml`/`*.csv`/manifest/model/view/security/test/CI file created; the
+  `CLAUDE.md` §4–§5 gate is in force; Part E (implementation-planning bridge)
+  remains not started.
+- **Recommended next step:** ChatGPT reviews this evidence pack. **Recommendation
+  (inference): proceed to Part D (UI/UX Screen Design Blueprint) after review —
+  no accepted work needs revision first.** If the R5 Google Doc is wanted as
+  evidence, the owner grants view access or exports it before Part D leans on it.
+- **Learning feedback loop:** **New issues discovered:** none — the evidence was
+  already captured; this sprint reconciled it. **Repeated issue patterns:** the
+  "documented but UI not observed" distinction (R6/R7/R2/R8) recurred and was
+  labelled per source, honouring `CLAUDE.md` §7 (no invented UI). **Rules/
+  checklists updated:** none new. **New rejected approaches:** none. **New
+  technical debt:** none (no code). **New open questions:** none registered by
+  this sprint; BAC-003/BAC-004 propose *future* MBQ rows for a later sprint to
+  register (not registered here). **Architecture concerns:** none — the evidence
+  validates the accepted blueprint; the only residual is Part D screen design
+  (MBQ-53) plus later-phase breadth (already deferred by DEC-003).
+- **Next-session prompt:**
+  > "Review the Competitor Evidence & Blueprint Reconciliation pack on branch
+  > `claude/competitor-evidence-blueprint-reconciliation-8di6tr` (draft PR into
+  > `Shopify-connector`): `competitor-evidence-reconciliation.md`,
+  > `competitor-feature-screen-map.md`,
+  > `competitor-gap-analysis-against-blueprint.md`, and
+  > `blueprint-amendment-candidates.md`. Confirm no accepted decision needs
+  > revision, then either (a) authorise Master Blueprint **Part D — UI/UX Screen
+  > Design Blueprint** (resolving MBQ-53), feeding it BAC-005/006/007/008/009/011/012
+  > as screen inputs, or (b) direct further research (e.g. unblock the R5 Google
+  > Doc). Keep the no-code gate in force; do not start implementation or Part E."
 
 ---
 
