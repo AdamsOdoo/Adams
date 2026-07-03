@@ -133,6 +133,19 @@
 - Sprint B not started.
 - Same branch/PR — no new PR opened, no merge.
 
+**PR #70 tiny consistency fix (2026-07-03):**
+- ChatGPT reviewed the Fable revision and requested one tiny consistency
+  cleanup.
+- Updated AR-010 to reference MBQ-01–MBQ-54 after MBQ-53 and MBQ-54 were
+  added.
+- AR-010 remains Proposed for ChatGPT review.
+- DEC-013 remains Proposed for ChatGPT review.
+- DEC-003 through DEC-012 untouched.
+- No code files changed.
+- Implementation remains blocked.
+- Sprint B not started.
+- Same branch/PR — no new PR opened, no merge.
+
 ---
 
 ### DEC-012 Acceptance Patch — compact handoff (2026-07-03)
@@ -4280,3 +4293,13 @@ ChatGPT review.
   through DEC-012 untouched; no code files changed; implementation remains
   blocked; Sprint B not started. Next: push the same branch, no new PR,
   stop for further ChatGPT/Fable review.
+- **PR #70 tiny consistency fix (2026-07-03):** ChatGPT requested one tiny
+  cleanup after the Fable revision — the AR-010 row in
+  `architecture-review-log.md` still cited `MBQ-01–MBQ-52`, stale since the
+  Fable revision added MBQ-53/MBQ-54. Updated AR-010's open-questions
+  reference to `MBQ-01–MBQ-54` and added MBQ-53/MBQ-54 to its headline
+  review items; MBQ-53/MBQ-54 themselves unchanged. AR-010 remains
+  Proposed for ChatGPT review, not accepted; DEC-013 remains Proposed;
+  DEC-003 through DEC-012 untouched; no code files changed; implementation
+  remains blocked; Sprint B not started. Same branch/PR — no new PR opened,
+  no merge. Next: stop for further ChatGPT/Fable review.
