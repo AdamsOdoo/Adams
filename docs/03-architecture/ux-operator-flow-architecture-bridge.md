@@ -5,17 +5,21 @@
 > the accepted **DEC-003 through DEC-011** architecture/product decisions
 > they draw on, names what each flow **routes to the Master Blueprint**
 > rather than deciding, and names what **must not be implemented yet**.
-> Companion proposed decision:
+> Companion decision record:
 > [`../04-decisions/DEC-012-ux-operator-flow-strategy.md`](../04-decisions/DEC-012-ux-operator-flow-strategy.md)
-> (status: **Proposed for ChatGPT review**). This bridge decides nothing by
-> itself — it is a traceability aid for reviewing DEC-012.
+> (status: **Accepted by ChatGPT, 2026-07-03**, after PR #68 merged into
+> `Shopify-connector`; resolves **AR-009** in
+> [`architecture-review-log.md`](../05-qa/architecture-review-log.md)). This
+> bridge remains traceability support only — it decides nothing by itself.
 
 ## Status
 
 **Documentation-only, no-code gate in force** (`CLAUDE.md` §4–§5). This
 document does not itself carry a Status field for acceptance — it exists to
-make DEC-012 independently checkable against DEC-003 through DEC-011 and is
-reviewed alongside DEC-012.
+make DEC-012 independently checkable against DEC-003 through DEC-011, and
+remains traceability support now that DEC-012 is accepted. It does not
+authorize implementation, and it was reviewed alongside DEC-012 before that
+acceptance.
 
 ## Purpose
 

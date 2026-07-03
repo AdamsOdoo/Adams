@@ -142,7 +142,12 @@ ChatGPT approval gate (`CLAUDE.md` §5).
 4. A DEC-003 scope-hole amendment accepted (covering any gap DEC-003 itself or
    later review identifies).
 5. A UX/operator-flow sprint accepted, or explicitly parallelized with the
-   above rather than silently skipped.
+   above rather than silently skipped. *(Done — 2026-07-03, via
+   [`DEC-012`](../04-decisions/DEC-012-ux-operator-flow-strategy.md), after
+   PR #68 merged into `Shopify-connector` and Fable's minor-change review was
+   applied. This satisfies criterion 5 only — it does not by itself open the
+   implementation gate; the **Master Blueprint** and a separate ChatGPT
+   implementation-gate approval remain required.)*
 
 The **implementation gate** opens only after ChatGPT approval of that exit —
 Phase-1-exit criteria being met is necessary but is itself still a ChatGPT

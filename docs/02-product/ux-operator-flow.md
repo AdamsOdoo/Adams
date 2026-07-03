@@ -1,11 +1,15 @@
 # UX / Operator-Flow Proposal
 
-> **Phase 1 UX/operator-flow decision-preparation package**, for the premium
+> **Phase 1 UX/operator-flow strategy evidence base**, for the premium
 > **Odoo 19 ↔ Shopify Connector**, prepared after all of **AR-002 through
 > AR-008** were accepted (via DEC-004 through DEC-011) and **DEC-003 through
-> DEC-011** were accepted by ChatGPT. Companion decision record:
+> DEC-011** were accepted by ChatGPT. This document remains the
+> evidence-backed UX/operator-flow proposal behind the companion decision
+> record:
 > [`../04-decisions/DEC-012-ux-operator-flow-strategy.md`](../04-decisions/DEC-012-ux-operator-flow-strategy.md)
-> (status: **Proposed for ChatGPT review**). Companion architecture bridge:
+> (status: **Accepted by ChatGPT, 2026-07-03**, after PR #68 merged into
+> `Shopify-connector` — see DEC-012's *Acceptance note*). Companion
+> architecture bridge:
 > [`../03-architecture/ux-operator-flow-architecture-bridge.md`](../03-architecture/ux-operator-flow-architecture-bridge.md).
 
 ## Status
@@ -18,7 +22,11 @@
 - **Phase:** documentation-only, **no-code gate in force** (`CLAUDE.md` §4–§5).
   **This document decides nothing by itself** — it is the evidence base for
   [`DEC-012`](../04-decisions/DEC-012-ux-operator-flow-strategy.md), which is
-  itself **Proposed for ChatGPT review**, not accepted.
+  now **Accepted by ChatGPT** (acceptance date 2026-07-03, after PR #68
+  merged into `Shopify-connector` and Fable's **ACCEPT WITH MINOR CHANGES**
+  review was applied). This document itself still does not authorize
+  implementation — the **Master Blueprint** remains the next step, gated by
+  a separate ChatGPT implementation-gate approval.
 - **Governance:** every statement below is labelled exactly one of:
   - **[Accepted]** — restates an already-accepted DEC-003 through DEC-011 (or
     `CLAUDE.md`/`quality-feedback-loop.md`) decision, cited by file. Not
@@ -92,17 +100,17 @@ re-deriving UX judgement calls per domain. This closes the last Phase
 
 ## No implementation authorized
 
-**This document does not authorize implementation.** It proposes operator-flow
-UX for ChatGPT (and Fable's advisory) review only, feeding
+**This document does not authorize implementation.** It remains the
+evidence-backed operator-flow UX proposal behind
 [`DEC-012`](../04-decisions/DEC-012-ux-operator-flow-strategy.md) (status:
-**Proposed for ChatGPT review**). No Odoo module, model, view, controller,
-security file, or code of any kind is created by this document or by DEC-012.
-Implementation of any part of these flows remains blocked until: (1) ChatGPT
-accepts DEC-012 (or a revised version of it), and (2) ChatGPT separately opens
-the implementation gate per the Phase 1 research-phase-exit criteria
-(`../05-qa/quality-feedback-loop.md` §10) and `CLAUDE.md` §5. Acceptance of
-DEC-012 alone does not open that gate — exact screens, menus, widgets, fields,
-and security groups are Master Blueprint work.
+**Accepted by ChatGPT**, acceptance date 2026-07-03). No Odoo module, model,
+view, controller, security file, or code of any kind is created by this
+document or by DEC-012. Implementation of any part of these flows remains
+blocked until ChatGPT separately opens the implementation gate per the
+Phase 1 research-phase-exit criteria (`../05-qa/quality-feedback-loop.md`
+§10) and `CLAUDE.md` §5. Acceptance of DEC-012 alone did not open that gate
+— exact screens, menus, widgets, fields, and security groups remain
+**Master Blueprint** work, which is the next step, not started here.
 
 ---
 
