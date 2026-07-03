@@ -196,8 +196,13 @@ implementation and does not start Part D or Part E.** Their prior
 accepted architectural direction (DEC-003/006/007/010/011) is converted
 into blueprint-level detail (per-domain flows, concepts, and
 open-question resolution) by this proposal; several inventory/fulfillment
-open questions are proposed as resolved/partially resolved, and two new
-questions (MBQ-60, MBQ-61) are proposed, all pending ChatGPT review.
+open questions are proposed as resolved/partially resolved, and four new
+questions (MBQ-60 through MBQ-63 — MBQ-60 the `stock_delivery`/`delivery`
+dependency question, MBQ-61 FulfillmentOrder lifecycle events, MBQ-62 the
+Odoo-event-triggered job-source classification added in a Fable-review
+revision, and MBQ-63 the inventory-webhook payload/subscription/Phase-1-
+scope residual also added in that revision) are proposed, all pending
+ChatGPT review.
 **Part D (UI/UX Screen Design Blueprint) and Part E
 (implementation-planning bridge) remain Not started.** Open questions
 routed to Part B/C are grouped in

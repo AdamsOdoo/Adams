@@ -1325,7 +1325,11 @@ DEC-015 acceptance patch) — **not satisfied, this document and DEC-015
 are Proposed, not accepted**; (2) resolution or conscious acceptance of
 every "Blocks implementation: Yes" row this sprint touches — **not
 satisfied**, several such rows remain open (MBQ-04, MBQ-08, MBQ-33,
-MBQ-34, MBQ-38 detail, MBQ-41, MBQ-53–59 unchanged, MBQ-60); (3) a
+MBQ-34, MBQ-38 detail, MBQ-41, MBQ-42, MBQ-43, MBQ-53–59 unchanged,
+MBQ-60, MBQ-62 for Odoo-event-triggered inventory push and fulfillment
+creation specifically, MBQ-63 for webhook-driven inventory import
+specifically — **MBQ-61 does not block MVP correctness-core fulfillment
+creation** per its own row, only a future dedicated hold-aware UX); (3) a
 separate, explicit ChatGPT implementation-gate approval — **not
 satisfied**; (4) every implementation task written to the `CLAUDE.md` §9
 template — **not applicable, no implementation task written**; (5) no

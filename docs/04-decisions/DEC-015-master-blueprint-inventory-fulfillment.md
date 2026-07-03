@@ -307,7 +307,9 @@ MBQ-63, new and open.
   level, exact residual detail still open where stated).
 - The proposed recommendations for MBQ-33, MBQ-34, and MBQ-41 (all three
   explicitly ChatGPT-decision-owner rows).
-- The two new open questions MBQ-60 and MBQ-61.
+- The four new open questions MBQ-60 through MBQ-63 (MBQ-60 and MBQ-61
+  from the original proposal, point L; MBQ-62 and MBQ-63 added in the
+  Fable-review revision, point M).
 
 ## What this does NOT decide
 

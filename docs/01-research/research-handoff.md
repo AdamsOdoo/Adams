@@ -97,7 +97,7 @@
 - **Items deferred:** every MBQ row not explicitly proposed-resolved/proposed-
   partially-resolved above, all of which remain formally open pending
   DEC-015 acceptance (notably MBQ-04, MBQ-08, MBQ-33, MBQ-34, MBQ-41,
-  MBQ-53–59 unchanged, MBQ-60, MBQ-61); the Part D UI/UX Screen Design
+  MBQ-53–59 unchanged, MBQ-60 through MBQ-63); the Part D UI/UX Screen Design
   Blueprint sprint (MBQ-53, still not started); Part E
   (implementation-planning bridge); all implementation.
 - **Learning feedback loop:** **New issues discovered:** ChatGPT review of
@@ -120,9 +120,12 @@
   approaches:** none — this sprint checked `rejected-approaches-log.md`
   before drafting and reintroduces nothing from it; no new approach was
   evaluated to rejection. **New technical debt:** none (no code). **New
-  open questions:** MBQ-60, MBQ-61 (both genuinely new, surfaced by this
-  sprint's official-doc verification, not previously considered by
-  DEC-008/DEC-010/DEC-011). **Architecture concerns:** AR-012 is
+  open questions:** MBQ-60 through MBQ-63 — MBQ-60 and MBQ-61 surfaced by
+  this sprint's original official-doc verification, not previously
+  considered by DEC-008/DEC-010/DEC-011; MBQ-62 and MBQ-63 added in a
+  later Fable-review revision on the same PR (job-source classification
+  for Odoo-event-triggered jobs, and the inventory-webhook payload/
+  subscription/Phase-1-scope residual, respectively). **Architecture concerns:** AR-012 is
   **Proposed for ChatGPT review** — Master Blueprint Part C is proposed
   at blueprint level; Part D (UI/UX Screen Design Blueprint) remains the
   next recommended sprint after ChatGPT review, alongside Part E
@@ -137,7 +140,8 @@
   proposal and DEC-015** — in particular the three ChatGPT-decision-owner
   recommendations (MBQ-33 first-push granularity, MBQ-34 apply-mode,
   MBQ-41 notification-UI granularity), the proposed location-confirmation
-  mechanism (MBQ-42), and the two new open questions (MBQ-60, MBQ-61); 2)
+  mechanism (MBQ-42), and the four new open questions (MBQ-60 through
+  MBQ-63); 2)
   if accepted, **Master Blueprint Part D — UI/UX Screen Design Blueprint**
   (resolving MBQ-53) or **Part E — implementation-planning bridge**, per
   ChatGPT's preference; 3) **Implementation only after a separate ChatGPT
