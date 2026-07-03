@@ -135,7 +135,7 @@ namely:
 
 ## Explicit acceptance points (for ChatGPT's review)
 
-**A. Quantity-source direction (MBQ-32) — partially resolved.** Proposes that the exact Odoo
+**A. Quantity-source direction (MBQ-32) — proposed partially resolved, pending this record's acceptance.** Proposes that the exact Odoo
 ORM source behind DEC-010's "Free to Use" semantic concept is
 `product.product.free_qty` (context-scoped by location/warehouse) or,
 equivalently at the per-location level, `stock.quant.available_quantity`
@@ -161,37 +161,42 @@ the Phase 1 default for ongoing (post-first-push) inventory writes,
 consistent with DEC-003's "auto-apply not accepted as default MVP
 behaviour."
 
-**D. Mutation choice per trigger (MBQ-36) — partially resolved.**
+**D. Mutation choice per trigger (MBQ-36) — proposed partially resolved, pending this record's acceptance.**
 Proposes `inventorySetQuantities` (compare-and-set) as the default
 mutation for all trigger types, given its concurrency-safety properties;
 `inventoryAdjustQuantities` remains a candidate for narrower single-delta
 event-driven pushes, not decided here.
 
-**E. Shopify inventory webhook topic (MBQ-37) — resolved.** Confirms
+**E. Shopify inventory webhook topic (MBQ-37) — proposed resolved, pending this record's acceptance.** Confirms
 `INVENTORY_LEVELS_UPDATE` (plus `INVENTORY_LEVELS_CONNECT`/
 `INVENTORY_LEVELS_DISCONNECT`) as the exact Shopify
 `WebhookSubscriptionTopic` enum values for inventory-level changes,
 grounded in official Shopify documentation (accessed 2026-07-03). This
-was previously "unverified in repo docs."
+was previously "unverified in repo docs." The underlying fact is
+verified regardless of this record's outcome; the row itself formally
+closes only if/when this record is accepted.
 
-**F. First-push confirmation record concept (MBQ-38) — partially
-resolved.** Proposes a blueprint-level confirmation-record concept
+**F. First-push confirmation record concept (MBQ-38) — proposed
+partially resolved, pending this record's acceptance.** Proposes a
+blueprint-level confirmation-record concept
 extending Part A's guard/audit record shape (preview snapshot, confirming
 operator + timestamp, recorded source-of-truth, scope). Exact schema/
 field names remain open for implementation planning.
 
-**G. Tracking-field source (MBQ-39) — resolved.** Confirms
+**G. Tracking-field source (MBQ-39) — proposed resolved, pending this record's acceptance.** Confirms
 `stock.picking.carrier_tracking_ref` (Char), `carrier_tracking_url`
 (computed Char, via `carrier_id.get_tracking_link(picking)`), and
 `carrier_id` (Many2one to `delivery.carrier`) as the exact Odoo 19.0
 fields, defined in the `stock_delivery` module, grounded in official Odoo
 19.0 source code (accessed 2026-07-03). This was previously unconfirmed
-in repo docs (only a "no field name confirmed" open item existed).
+in repo docs (only a "no field name confirmed" open item existed). The
+underlying fact is verified regardless of this record's outcome; the row
+itself formally closes only if/when this record is accepted.
 **Surfaces a new question (MBQ-60):** whether `shopify_connector_
 fulfillment` requires `stock_delivery` (or `delivery`) as an Odoo
 dependency, not previously considered by DEC-008 or DEC-011.
 
-**H. Backorder-to-picking linkage (MBQ-40) — partially resolved.**
+**H. Backorder-to-picking linkage (MBQ-40) — proposed partially resolved, pending this record's acceptance.**
 Confirms `stock.picking.backorder_id`/`backorder_ids` as the exact Odoo
 19.0 linkage fields, grounded in official Odoo 19.0 source code (accessed
 2026-07-03). The delivery-specific backorder-wizard UX/copy nuance
@@ -203,8 +208,9 @@ ChatGPT's direct decision, not a self-accepted resolution.** Proposes
 that a global/per-store notification default is sufficient for Phase 1
 MVP, with a per-order override deferred to a later phase.
 
-**J. Fulfillment location-confirmation mechanism (MBQ-42) — partially
-resolved, mechanism proposed pending ChatGPT acceptance.** Proposes: a
+**J. Fulfillment location-confirmation mechanism (MBQ-42) — proposed
+partially resolved, mechanism pending ChatGPT acceptance of this record.**
+Proposes: a
 live Shopify FulfillmentOrder `assignedLocation` read is treated as
 authoritative for a specific fulfillment operation; the core Shopify
 Location reference (Part A §B.4) is used only for naming/display and
@@ -212,8 +218,8 @@ mismatch-detection, never as an override authority. A location mismatch
 routes to the existing `ambiguous match` class — no new error class is
 added.
 
-**K. Core Location reference cache policy (MBQ-43) — partially
-resolved.** Proposes the precedence rule (live read always wins over the
+**K. Core Location reference cache policy (MBQ-43) — proposed partially
+resolved, pending this record's acceptance.** Proposes the precedence rule (live read always wins over the
 cache for a specific operation) as fixed; exact refresh cadence/mechanism
 remains open for implementation planning.
 
@@ -278,17 +284,20 @@ considered by DEC-010 or DEC-011.
 
 Centralized in
 [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
-Headline rows for this record's review: **MBQ-32** (quantity source —
-partially resolved), **MBQ-33** (first-push granularity — recommendation, ChatGPT
+Headline rows for this record's review — **every "proposed
+resolved"/"proposed partially resolved" outcome below is pending this
+record's acceptance and remains formally `open` until then:**
+**MBQ-32** (quantity source —
+proposed partially resolved), **MBQ-33** (first-push granularity — recommendation, ChatGPT
 decision), **MBQ-34** (ongoing apply-mode — recommendation, ChatGPT
-decision), **MBQ-36** (mutation choice — partially resolved), **MBQ-37**
-(inventory webhook topic — resolved), **MBQ-38** (confirmation-record
-concept — partially resolved), **MBQ-39** (tracking field source —
-resolved), **MBQ-40** (backorder linkage — partially resolved), **MBQ-41**
+decision), **MBQ-36** (mutation choice — proposed partially resolved), **MBQ-37**
+(inventory webhook topic — proposed resolved), **MBQ-38** (confirmation-record
+concept — proposed partially resolved), **MBQ-39** (tracking field source —
+proposed resolved), **MBQ-40** (backorder linkage — proposed partially resolved), **MBQ-41**
 (notification-UI granularity — recommendation, ChatGPT decision),
-**MBQ-42** (location-confirmation mechanism — partially resolved,
+**MBQ-42** (location-confirmation mechanism — proposed partially resolved,
 pending acceptance), **MBQ-43** (Location reference cache policy —
-partially resolved), **MBQ-60** and **MBQ-61** (new rows, both open).
+proposed partially resolved), **MBQ-60** and **MBQ-61** (new rows, both open).
 
 ## Risks and mitigations
 
