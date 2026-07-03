@@ -1,8 +1,9 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Master
-> Blueprint Sprint C — proposal)** is immediately below, in the **compact
+> Continuity lives in GitHub, not chat. The **current entry (DEC-015
+> Acceptance Patch)** is immediately below, in the **compact
 > handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Master Blueprint Sprint C (proposal history)**,
 > **DEC-014 Acceptance Patch**, **Master
 > Blueprint Sprint B (proposal history)**, **DEC-013
 > Acceptance Patch**, **Master Blueprint Sprint A**,
@@ -20,6 +21,123 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-015 Acceptance Patch — compact handoff (2026-07-03)
+
+> **Documentation acceptance patch, not implementation.** Confirmed
+> before editing: PR #74 head at commit
+> `d7f7eca4bd5de36aca7d9a513cfbb4e0c1a676cf` (Sprint C proposal, Fable
+> review fixes, and a consistency patch, all on the same branch/PR);
+> DEC-015 confirmed `Proposed for ChatGPT review`; AR-012 confirmed
+> `Proposed for ChatGPT review`; Master Blueprint Part C (Inventory and
+> Fulfillment Domain Blueprint) confirmed present, revised twice on PR
+> #74 (Fable-review fix, then a consistency patch); DEC-003 through
+> DEC-014 confirmed still **Accepted by ChatGPT** and unedited;
+> implementation confirmed still blocked; UI/UX Screen Design Blueprint
+> (Part D) confirmed not started; Part E confirmed not started. Branch
+> `claude/master-blueprint-sprint-c-inventory-fulfillment`.
+
+- **Branch / PR:** `claude/master-blueprint-sprint-c-inventory-fulfillment`
+  → draft PR #74 into `Shopify-connector`, **not merged**.
+- **Files changed:**
+  `docs/04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/03-architecture/master-blueprint.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/04-decisions/README.md`,
+  `docs/01-research/research-handoff.md` (this file). **No code files
+  changed.**
+- **What changed:** **DEC-015 accepted by ChatGPT**, acceptance date
+  **2026-07-03**, after PR #74's Fable review (**REVISE**, no redesign —
+  finding C1 corrected the earlier over-claim that
+  `product.product.free_qty` and `stock.quant.available_quantity` are
+  equivalent; finding C2 corrected the earlier silent treatment of
+  "event-driven enqueue" as a Part A job-source value; seven minor
+  findings fixed) and a same-PR consistency patch aligning the new-MBQ
+  summary wording, both already applied to this branch before this
+  acceptance patch. DEC-015 got a new *Accepted decision* section
+  recording the accepted Master Blueprint Sprint C inventory and
+  fulfillment domain blueprint package (items 1–5) and eleven explicit
+  acceptance points **A–M**: **(A)** MBQ-32 partially resolved (quantity-
+  source direction — the two candidate sources accepted as verified but
+  **not equivalent**, per Fable finding C1); **(B)** MBQ-33 **still
+  open** — first-push guard granularity recommendation noted, not
+  decided; **(C)** MBQ-34 **still open** — ongoing apply-mode
+  recommendation noted, not decided; **(D)** MBQ-36 partially resolved
+  (mutation-choice-per-trigger direction); **(E)** MBQ-37 **resolved at
+  fact-verification level** (inventory webhook topic); **(F)** MBQ-38
+  partially resolved (first-push confirmation-record concept); **(G)**
+  MBQ-39 **resolved at fact-verification level** (tracking-field source);
+  **(H)** MBQ-40 partially resolved (backorder-to-picking linkage);
+  **(I)** MBQ-41 **still open** — notification-UI granularity
+  recommendation noted, not decided; **(J)** MBQ-42 partially resolved
+  (fulfillment location-confirmation mechanism), **including an accepted
+  widening of the `ambiguous match` class** (AR-006/DEC-009: multiple
+  candidates) to also cover a deterministic fulfillment-location
+  mismatch, per Fable minor finding 2, accepted at blueprint level only;
+  **(K)** MBQ-43 partially resolved (Location reference cache policy);
+  **(L)** MBQ-60/MBQ-61 confirmed new and open; **(M)** MBQ-62/MBQ-63
+  (added in the Fable-review revision) confirmed new and open. **No
+  implementation and Part D/E-not-started language preserved
+  throughout.** `architecture-review-log.md`'s AR-012 table row moved
+  from "Proposed for ChatGPT review" to "Accepted by ChatGPT," with a
+  compact acceptance-patch note appended; AR-002 through AR-011 rows
+  untouched. `docs/04-decisions/README.md` gained a new "Also accepted:
+  DEC-015" entry; DEC-003 through DEC-014 entries untouched.
+  `master-blueprint-open-questions.md` updated: its Sprint C note
+  superseded by a DEC-015 acceptance note; MBQ-37/MBQ-39 rows marked
+  **resolved by DEC-015 acceptance**; MBQ-32/MBQ-36/MBQ-38/MBQ-40/
+  MBQ-42/MBQ-43 rows marked **partially resolved by DEC-015 acceptance**;
+  MBQ-33/MBQ-34/MBQ-41 rows marked **carried forward, open — DEC-015
+  acceptance does not itself decide this row**; MBQ-35 and MBQ-60
+  through MBQ-63 left untouched (carried forward unchanged / new and
+  open respectively); MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-53
+  through MBQ-58 untouched, no question deleted. `master-blueprint.md`'s
+  status moved to accepted-through-DEC-015 wording (Part C table row now
+  reads "Accepted by ChatGPT via DEC-015"); Part D/E preserved as "Not
+  started."
+- **Items deferred:** MBQ-33, MBQ-34, MBQ-41 (recommendations noted, not
+  decided by this acceptance); MBQ-60 through MBQ-63 (new, open, not
+  resolved by this acceptance); MBQ-04, MBQ-08, MBQ-53 through MBQ-58
+  (untouched, open); the Part D UI/UX Screen Design Blueprint sprint
+  (MBQ-53, still not started); Part E (implementation-planning bridge);
+  all implementation.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  patch mechanically applied ChatGPT's explicit, itemized acceptance
+  scope; no ambiguity required a judgment call beyond what the task
+  specified. **Repeated issue patterns:** none at threshold. **Rules/
+  checklists updated:** none new. **New rejected approaches:** none —
+  `rejected-approaches-log.md` checked, nothing reintroduced. **New
+  technical debt:** none (no code). **New open questions:** none — this
+  patch resolves/partially resolves existing rows and confirms MBQ-60
+  through MBQ-63 remain new/open; it adds no new MBQ row. **Architecture
+  concerns:** AR-012 is now **Accepted by ChatGPT** — Master Blueprint
+  Part C is accepted at blueprint level, with MBQ-33/34/41 and MBQ-60
+  through MBQ-63 explicitly still open; Part D (UI/UX Screen Design
+  Blueprint) remains the next recommended sprint, alongside Part E
+  (implementation-planning bridge), per ChatGPT's preference; neither is
+  started.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new this patch) · rejected
+  approaches checked, none added · technical debt logged (none
+  applicable — no code) · repeated-issue escalation applied (none at
+  threshold) — all **YES**.
+- **Next recommended session:** 1) **Master Blueprint Part D — UI/UX
+  Screen Design Blueprint** (resolving MBQ-53) or **Part E —
+  implementation-planning bridge**, per ChatGPT's preference; 2) a
+  future, separate ChatGPT decision on MBQ-33 (first-push granularity),
+  MBQ-34 (apply-mode), and MBQ-41 (notification-UI granularity), each
+  still open with a recommendation only; 3) **Implementation only after
+  a separate ChatGPT gate**, and, for any operator-facing screen, only
+  after the Part D UI/UX Screen Design Blueprint is also accepted.
+- **Stop condition:** stopped after one commit on the existing **draft**
+  PR #74 into `Shopify-connector` (not merged, not marked ready for
+  review). DEC-003 through DEC-014 not edited; no code files changed;
+  Part D (UI/UX Screen Design Blueprint) not started; Part E not
+  started; implementation still not authorized; `main` and plain `dev`
+  untouched. Awaiting further instruction.
 
 ---
 
