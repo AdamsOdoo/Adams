@@ -309,3 +309,13 @@ undifferentiated button) are **restatements of already-accepted `setup-ux-princi
 principles and the already-binding DEC-009 retry taxonomy**, not new rejected
 architecture options, so no RA row was added for them either. This entry does not
 itself finalize AR-009/DEC-012 — both remain **Proposed for ChatGPT review**._
+
+_**DEC-012 Acceptance Patch (2026-07-03): no new rejected approaches finalized.**
+ChatGPT formally accepted
+[`DEC-012`](../04-decisions/DEC-012-ux-operator-flow-strategy.md) on **2026-07-03**
+(after PR #68 merged into `Shopify-connector`, merge commit
+`7d01617fdd0fd70d6a1d83d57918b045296550ac`, following Fable's ACCEPT WITH MINOR
+CHANGES review). No row in this log was added or changed by that acceptance —
+the UX/operator-flow sprint added no RA row (see the note above), so there is no
+`PROPOSED:` row for this sprint to finalize. RA-001 through RA-023 remain
+unchanged._

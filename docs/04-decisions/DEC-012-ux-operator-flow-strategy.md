@@ -1,23 +1,53 @@
 # DEC-012 — UX / Operator-Flow Strategy
 
-> **Proposed decision record.** This record proposes the Phase 1
-> **UX/operator-flow strategy** for the premium Odoo 19 ↔ Shopify Connector,
-> prepared after **AR-002 through AR-008** were all accepted (via DEC-004
-> through DEC-011) and **DEC-003 through DEC-011** were accepted by ChatGPT.
-> Companion evidence-backed proposal:
+> **Accepted decision record.** This record resolves **AR-009** in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+> for the premium Odoo 19 ↔ Shopify Connector, prepared after **AR-002
+> through AR-008** were all accepted (via DEC-004 through DEC-011) and
+> **DEC-003 through DEC-011** were accepted by ChatGPT. Companion
+> evidence-backed proposal:
 > [`../02-product/ux-operator-flow.md`](../02-product/ux-operator-flow.md).
 > Companion architecture bridge:
 > [`../03-architecture/ux-operator-flow-architecture-bridge.md`](../03-architecture/ux-operator-flow-architecture-bridge.md).
-> **This record does not authorize implementation and does not change
-> DEC-003 through DEC-011.**
+> **ChatGPT accepted this record on 2026-07-03** (see *Acceptance note*
+> below). Acceptance does **not** by itself authorize implementation and does
+> **not** change DEC-003 through DEC-011.
+
+## Acceptance note (2026-07-03)
+
+- **Accepted by ChatGPT** after PR #68 merged into `Shopify-connector`
+  (merge commit `7d01617fdd0fd70d6a1d83d57918b045296550ac`).
+- Acceptance followed Fable review: **ACCEPT WITH MINOR CHANGES**.
+- Fable's fix-up (readiness/test/preview-job clarification, reworded
+  scope-list wording, customer email/customer-key matching step, two new
+  Master Blueprint open questions) was applied before merge.
+- This accepts DEC-012 as the **Phase 1 UX/operator-flow strategy**.
+- **This does not authorize implementation.** Implementation remains
+  blocked until ChatGPT separately opens a dedicated implementation gate.
+- **Next step is the Master Blueprint** — not opened by this acceptance.
+- **Preserved open questions (unchanged by acceptance):** exact Odoo views,
+  menus, wizards, widgets, and field names; exact security groups/access
+  CSVs; exact copy/wording; the feature-flag/per-store capability
+  configuration mechanism; readiness-check details; first-push guard
+  granularity; notification-UI granularity; whether `on_hand` is ever
+  exposed as a Phase 1 UI choice; the draft/publish mechanism for
+  draft-first export; order-import operator touchpoints; and the
+  store-disconnect data-retention posture — none of these is decided by
+  this acceptance, all remain Master Blueprint items (see *What remains
+  open* below).
 
 ## Status
 
-**Proposed for ChatGPT review.**
+**Accepted by ChatGPT.** Not implementation-authorizing.
+
+## Acceptance date
+
+2026-07-03.
 
 ## Date
 
-2026-07-02.
+2026-07-02 (originally proposed; accepted 2026-07-03 after PR #68 merge and
+Fable review).
 
 ## Scope
 
@@ -97,7 +127,7 @@ research-phase-exit criterion in
   consultant), P3 (business owner/finance stakeholder), P4 (Odoo
   partner/integrator).
 
-## Decision proposed
+## Accepted decision
 
 Adopt the ten operator-flow proposals set out in
 [`ux-operator-flow.md`](../02-product/ux-operator-flow.md) as the Phase 1
@@ -274,18 +304,17 @@ respectively. Full flow:
 
 ## No implementation authorized
 
-**This record does not authorize implementation.** It proposes a
-UX/operator-flow strategy for ChatGPT (and Fable's advisory) review only.
+**Acceptance of this record does not by itself authorize implementation.**
 This record creates no code, no Odoo module, no view, no model, no security
 file, and no file outside `docs/02-product/**`, `docs/03-architecture/**`,
 `docs/04-decisions/**`, `docs/05-qa/**`, `docs/01-research/**`, and
 `docs/06-prompts/**`. The no-code gate (`CLAUDE.md` §4–§5) remains in force.
-Implementation of any part of these flows remains blocked until: (1) ChatGPT
-accepts this record (or a revised version of it), and (2) ChatGPT separately
-opens the implementation gate per the Phase 1 research-phase-exit criteria
-(`../05-qa/quality-feedback-loop.md` §10) and `CLAUDE.md` §5. Acceptance of
-this record alone does not open that gate, and does not itself constitute
-the Master Blueprint.
+Implementation of any part of these flows remains blocked until ChatGPT
+separately opens the implementation gate per the Phase 1 research-phase-exit
+criteria (`../05-qa/quality-feedback-loop.md` §10) and `CLAUDE.md` §5.
+Acceptance of this record alone does not open that gate, and does not
+itself constitute the Master Blueprint — the Master Blueprint is the next
+step, not opened here.
 
 ## Review / change control
 
@@ -300,6 +329,8 @@ the Master Blueprint.
   DEC-003 through DEC-011 (accepted context, unmodified);
   `../05-qa/quality-feedback-loop.md` §10 (the phase-exit criterion this
   record targets).
-- **Changes** to this proposed record before acceptance are expected through
-  normal review; once accepted, changes require ChatGPT review, mirroring the
-  DEC-004 through DEC-011 change-control pattern.
+- **Changes** to this accepted record require ChatGPT review, mirroring the
+  DEC-004 through DEC-011 change-control pattern. This acceptance patch
+  updated the Status field and removed the "Proposed for ChatGPT review"
+  status without altering the substance of the ten operator flows or the
+  "What remains open" list.

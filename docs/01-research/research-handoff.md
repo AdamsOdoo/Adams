@@ -1,8 +1,9 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (UX / Operator-Flow
-> Decision Preparation)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **DEC-010/DEC-011 Acceptance
+> Continuity lives in GitHub, not chat. The **current entry (DEC-012 Acceptance
+> Patch)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **UX / Operator-Flow Decision
+> Preparation**, **DEC-010/DEC-011 Acceptance
 > Patch**, **AR-007 + AR-008 Decision Preparation**,
 > **DEC-008/DEC-009 Acceptance Patch**,
 > **AR-004 + AR-006 Decision Preparation**,
@@ -14,6 +15,82 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-012 Acceptance Patch — compact handoff (2026-07-03)
+
+> **Documentation acceptance patch, not implementation.** Confirmed PR #68 merged
+> into `Shopify-connector` (merge commit
+> `7d01617fdd0fd70d6a1d83d57918b045296550ac`) before editing; DEC-003 through
+> DEC-011 confirmed **Accepted by ChatGPT**; DEC-012 confirmed `Proposed for
+> ChatGPT review`; AR-009 confirmed proposed only, not accepted; implementation
+> confirmed still blocked. Branch `product/accept-dec012-ux-operator-flow` was
+> already checked out based exactly on that merge commit — no re-basing needed.
+
+- **Branch / PR:** `product/accept-dec012-ux-operator-flow` → draft PR into
+  `Shopify-connector`, opened immediately after this handoff commit, **not merged**.
+- **Files changed:** `docs/04-decisions/DEC-012-ux-operator-flow-strategy.md`,
+  `docs/02-product/ux-operator-flow.md`,
+  `docs/03-architecture/ux-operator-flow-architecture-bridge.md`,
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/quality-feedback-loop.md`, `docs/01-research/research-handoff.md`
+  (this file).
+- **What changed:** DEC-012 Status changed from `Proposed for ChatGPT review` to
+  **`Accepted by ChatGPT`**, acceptance date **2026-07-03**; the record got an
+  acceptance note recording the PR #68 merge (merge commit
+  `7d01617fdd0fd70d6a1d83d57918b045296550ac`) and Fable's **ACCEPT WITH MINOR
+  CHANGES** review, while preserving every documented open question unchanged
+  (exact Odoo views/menus/wizards/widgets/field names; exact security
+  groups/access CSVs; exact copy/wording; the feature-flag/per-store capability
+  mechanism; readiness-check details; first-push guard granularity;
+  notification-UI granularity; whether `on_hand` is ever exposed as a Phase 1 UI
+  choice; the draft/publish mechanism; order-import operator touchpoints; and the
+  store-disconnect data-retention posture). `ux-operator-flow.md` and the
+  architecture bridge had their "DEC-012 is Proposed, not accepted" wording
+  updated to reflect the accepted status, without rewriting any of the ten
+  operator flows. `docs/04-decisions/README.md`'s DEC-012 entry moved from "Also
+  present (not yet accepted)" to "Also accepted," citing the 2026-07-03
+  acceptance date. `architecture-review-log.md`'s AR-009 table row moved from
+  "Proposed for ChatGPT review" to "Accepted by ChatGPT," with a compact
+  acceptance note appended; AR-002 through AR-008 rows were not touched.
+  `quality-feedback-loop.md` §10 criterion 5 ("A UX/operator-flow sprint
+  accepted...") was marked `(Done — 2026-07-03, via DEC-012...)`, consistent with
+  criterion 1's existing pattern; no other QA content was rewritten.
+- **Items deferred:** every open question preserved in DEC-012's *Acceptance
+  note* above; the Master Blueprint; all implementation.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated issue
+  patterns:** none at threshold. **Rules/checklists updated:** none new. **New
+  rejected approaches:** none (DEC-012 finalizes no new RA row). **New technical
+  debt:** none (no code). **Architecture concerns:** AR-009 now **Accepted** (via
+  DEC-012) — all Phase 1 research-phase-exit criteria in
+  `quality-feedback-loop.md` §10 are now satisfied; the Master Blueprint is the
+  next step, still gated by a separate ChatGPT implementation-gate approval.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (no new issues) · rejected approaches checked,
+  none added · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none at threshold) — all **YES**.
+- **Next recommended session:** 1) **Master Blueprint**, now that all Phase 1
+  research-phase-exit criteria are satisfied; 2) **Implementation only after a
+  separate ChatGPT gate.**
+- **Stop condition:** stopped after one commit + one **draft** PR into
+  `Shopify-connector` (not merged). PR #68 merge confirmed first.
+  DEC-003/004/005/006/007/008/009/010/011 not edited; no code files changed;
+  implementation still not authorized; Master Blueprint not started; `main` and
+  plain `dev` untouched. Awaiting further instruction.
+
+**PR #69 tiny fix (2026-07-03):**
+- ChatGPT reviewed PR #69 and requested tiny accepted-status wording cleanup
+  before merge.
+- Updated `ux-operator-flow.md` so `[Proposed UX decision]` is no longer
+  described as "not yet binding" after DEC-012 acceptance.
+- Renamed DEC-012 "Decision proposed" section to "Accepted decision."
+- DEC-012 remains accepted.
+- AR-009 remains accepted.
+- DEC-003 through DEC-011 untouched.
+- No code files changed.
+- Implementation remains blocked.
+- Master Blueprint not started.
 
 ---
 
@@ -4035,3 +4112,17 @@ ChatGPT review.
   No code; no DEC-003/004/005/006/007/008/009/010/011 edit; DEC-012/AR-009 are
   proposed only, not accepted; implementation remains blocked. Next: push branch,
   open one draft PR into `Shopify-connector`, stop for ChatGPT/Fable review.
+- **DEC-012 Acceptance Patch (2026-07-03):** confirmed PR #68 merged into
+  `Shopify-connector` (merge commit
+  `7d01617fdd0fd70d6a1d83d57918b045296550ac`) and DEC-003 through DEC-011
+  Accepted / DEC-012 Proposed / AR-009 proposed-only before editing. Changed
+  DEC-012 Status from `Proposed for ChatGPT review` to `Accepted by ChatGPT`,
+  acceptance date 2026-07-03, citing the PR #68 merge and Fable's ACCEPT WITH
+  MINOR CHANGES review, while preserving every open question unchanged. Updated
+  `ux-operator-flow.md`, the architecture bridge, `04-decisions/README.md`, and
+  `architecture-review-log.md` (AR-009 row moves to "Accepted by ChatGPT";
+  AR-002 through AR-008 untouched); marked `quality-feedback-loop.md` §10
+  criterion 5 done via DEC-012. No code; no DEC-003/004/005/006/007/008/009/
+  010/011 edit; implementation remains blocked; Master Blueprint not started.
+  Next: push branch, open one draft PR into `Shopify-connector`, stop for
+  ChatGPT review.
