@@ -2,16 +2,20 @@
 
 > Top-level index for the **Master Blueprint** of the premium **Odoo 19 ↔
 > Shopify Connector**. The Master Blueprint converts the accepted decision
-> records (DEC-003 through DEC-012) into detailed, implementation-ready
+> records (DEC-003 through DEC-014) into detailed, implementation-ready
 > **blueprints** — still documentation only. Started in **Master Blueprint
 > Sprint A**; **Part A accepted via DEC-013**. **Part B accepted via
 > DEC-014** —
 > [`master-blueprint-product-customer-sale.md`](./master-blueprint-product-customer-sale.md).
+> **Part C proposed (not yet accepted) via DEC-015** —
+> [`master-blueprint-inventory-fulfillment.md`](./master-blueprint-inventory-fulfillment.md).
 > Companion decision records:
 > [`../04-decisions/DEC-013-master-blueprint-core-substrate.md`](../04-decisions/DEC-013-master-blueprint-core-substrate.md)
-> (Status: **Accepted by ChatGPT**, 2026-07-03) and
+> (Status: **Accepted by ChatGPT**, 2026-07-03),
 > [`../04-decisions/DEC-014-master-blueprint-product-customer-sale.md`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md)
-> (Status: **Accepted by ChatGPT**, 2026-07-03).
+> (Status: **Accepted by ChatGPT**, 2026-07-03), and
+> [`../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md`](../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md)
+> (Status: **Proposed for ChatGPT review**, not accepted).
 
 ## Status
 
@@ -20,11 +24,15 @@ Product, Customer, and Sale/Order Domain Blueprint).** Acceptance date
 for Part A: **2026-07-03** (DEC-013). Acceptance date for Part B:
 **2026-07-03** (DEC-014; companion decision record
 [`DEC-014`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md)).
-Documentation only — the no-code gate (`CLAUDE.md` §4–§5) is in force.
-**The Master Blueprint does not authorize code**, and acceptance of Part A
-or Part B does not by itself open the implementation gate (see
-*Implementation gate criteria* below). **Parts C, D, and E remain Not
-started.**
+**Part C — Inventory and Fulfillment Domain Blueprint — is now Proposed
+for ChatGPT review via DEC-015** (2026-07-03; companion decision record
+[`DEC-015`](../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md));
+**Part C is not yet accepted.** Documentation only — the no-code gate
+(`CLAUDE.md` §4–§5) is in force. **The Master Blueprint does not authorize
+code**, and acceptance of Part A or Part B does not by itself open the
+implementation gate (see *Implementation gate criteria* below); Part C's
+mere proposal certainly does not. **Part D remains Not started. Part E
+remains Not started.**
 
 ## Relation to accepted decisions
 
@@ -78,7 +86,7 @@ tickets, or retry/cadence constants.
 | **Part A — Core/common substrate** | Sprint A | [`master-blueprint-core-substrate.md`](./master-blueprint-core-substrate.md): `shopify_connector_core` boundary; store/credential/API-health/Location-reference/settings concepts; binding abstraction; job/log/error/retry abstraction; setup wizard; dashboard; sync center; error center; feature-flag mechanism; access blueprint; cross-module rules | **Accepted by ChatGPT via DEC-013** (2026-07-03) |
 | **Open-questions register** | Sprint A (rolling) | [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md): every unresolved item, grouped, with owner and blocking status | **Accepted by ChatGPT via DEC-013** (2026-07-03); updated by every later part |
 | **Part B — Product, Customer, Sale/Order domain blueprints** | Sprint B | [`master-blueprint-product-customer-sale.md`](./master-blueprint-product-customer-sale.md): product import/export/update blueprint (variants, images, price, preview/diff, draft-first); customer import/matching blueprint; order import + financial-evidence blueprint (incl. order-import operator touchpoints, MBQ-26) | **Accepted by ChatGPT via DEC-014** (2026-07-03) |
-| **Part C — Inventory and Fulfillment domain blueprints** | Sprint C | Inventory blueprint (location mapping, first-push guard granularity, apply mode, quantity source); fulfillment blueprint (FulfillmentOrder matching, tracking, notification granularity, location confirmation) | **Not started** |
+| **Part C — Inventory and Fulfillment domain blueprints** | Sprint C | [`master-blueprint-inventory-fulfillment.md`](./master-blueprint-inventory-fulfillment.md): inventory blueprint (location mapping, first-push guard granularity, apply mode, quantity source); fulfillment blueprint (FulfillmentOrder matching, tracking, notification granularity, location confirmation) | **Proposed for ChatGPT review via DEC-015** (2026-07-03); **not accepted** |
 | **Part D — UI/UX Screen Design Blueprint** | Sprint D | Screen-level design blueprint required before implementation of operator-facing screens (see *UI/UX Screen Design Blueprint* below); resolves MBQ-53 | **Not started** |
 | **Part E — Implementation-planning bridge** | Sprint E | Consolidated verification pass; resolution/acceptance of implementation-blocking open questions; sequencing input for `docs/07-implementation-plan` | **Not started** |
 
@@ -176,13 +184,23 @@ ChatGPT via DEC-014** (2026-07-03, Master Blueprint Sprint B):
 [`master-blueprint-product-customer-sale.md`](./master-blueprint-product-customer-sale.md),
 companion decision record
 [`DEC-014`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md).
-**This acceptance does not authorize implementation and does not start
-Sprint C.** **Inventory and fulfillment detailed domain blueprints
-(Part C) remain Not started.** Their accepted architectural direction
-already exists (DEC-003/006/007/010/011); the blueprint-level detail
-(per-domain flows, concepts, and open-question resolution) for inventory/
-fulfillment is Sprint C work — the next recommended sprint, not started.
-Open questions already routed to Part B/C are grouped in
+**This acceptance does not authorize implementation.**
+
+**Part C — inventory and fulfillment — is now Proposed for ChatGPT review
+via DEC-015** (2026-07-03, Master Blueprint Sprint C):
+[`master-blueprint-inventory-fulfillment.md`](./master-blueprint-inventory-fulfillment.md),
+companion decision record
+[`DEC-015`](../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md).
+**Part C is not yet accepted, and this proposal does not authorize
+implementation and does not start Part D or Part E.** Their prior
+accepted architectural direction (DEC-003/006/007/010/011) is converted
+into blueprint-level detail (per-domain flows, concepts, and
+open-question resolution) by this proposal; several inventory/fulfillment
+open questions are proposed as resolved/partially resolved, and two new
+questions (MBQ-60, MBQ-61) are proposed, all pending ChatGPT review.
+**Part D (UI/UX Screen Design Blueprint) and Part E
+(implementation-planning bridge) remain Not started.** Open questions
+routed to Part B/C are grouped in
 [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md).
 
 ## Implementation remains blocked
