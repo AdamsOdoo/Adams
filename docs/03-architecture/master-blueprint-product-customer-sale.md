@@ -159,22 +159,42 @@ Odoo model/field names: **[Open question — MBQ-01/02/55]**.
   import behaves when Odoo already has a product that could match — this
   is a **setup-time** decision, not decided per-import
   **[Accepted — DEC-003; DEC-006; Part A §B.6]**.
-- **Automated creation is not a "blind create":** DEC-003/DEC-006's
-  "duplicate-prevention preview... precedes every create/bind action; no
-  blind create" is satisfied, for a **confident, unambiguous** automated
-  import match/create, by the retrospective, always-visible sync-center/
-  dashboard surface (Part A §F/§G) — every created/linked/skipped record is
-  logged, filterable, and auditable there. A **synchronous, blocking,
-  per-record** operator confirmation is reserved for the states DEC-009
-  already names as confirmation-required: **ambiguous match**, **binding
-  conflict**, **duplicate risk** (§A.9; §D.5.4 of Part A)
-  **[Blueprint proposal — this clarification applies identically to
-  Customer §B.2 and is stated once here, cross-referenced there]**. Without
-  this reading, layered/webhook-driven import (DEC-005) could not run
-  unattended at all, which would contradict DEC-005's accepted automation
-  model; this clarification does not weaken DEC-003/006's guard, it locates
-  where the guard's visibility requirement is satisfied for the
-  non-ambiguous case.
+- **Automated create/bind policy — proposed, pending DEC-014 (partially
+  resolves MBQ-59):** retrospective sync-center/dashboard visibility
+  (Part A §F/§G) is **audit/log visibility only** — it is not a preview,
+  and it does **not** by itself satisfy DEC-003/DEC-006's "duplicate-
+  prevention preview... precedes every create/bind action; no blind
+  create" requirement. This document's earlier wording read retrospective
+  visibility as satisfying that requirement; that reading is withdrawn.
+  Instead, for an automated (webhook/scheduled/reconciliation-triggered)
+  import, the connector runs a **pre-create duplicate check** (the
+  ordinary match-key sequence, §A.6) *before* creating or binding
+  anything, and may auto-create/auto-bind **only when all of the
+  following hold**:
+  1. store setup is complete (Part A §E.4/§E.5);
+  2. the product domain is enabled for the store (Part A §I.1);
+  3. the recorded first-sync source strategy permits import-side creation
+     for this record (Part A §B.6);
+  4. the match candidate is confident and unambiguous (no second
+     plausible candidate);
+  5. no `duplicate risk`, `binding conflict`, or `destructive-write guard
+     blocked` condition is triggered (Part A §D.4);
+  6. the create/bind action is logged with full before/after/audit detail
+     (matched-by, matched-at, source strategy, match key used — Part A
+     §D.10) at the moment it happens.
+
+  If **any** condition fails, the job routes to `blocked_manual_review`
+  instead of creating — it never falls back to a blind create. This
+  **pre-create check** — not the sync-center's later display of the
+  outcome — is what satisfies "no blind create" for the automated path.
+  **[Blueprint proposal, pending DEC-014 acceptance — not an already-
+  accepted interpretation of DEC-003/DEC-006; new open question
+  MBQ-59]**. This policy applies identically to Customer §B.2, stated
+  once here and cross-referenced there. **Interactive/batch import and
+  export (a manual matching session, a bulk catalog-onboarding pass, or
+  any operator-triggered export/update, §A.3/§A.9) are unaffected — they
+  still require a blocking, synchronous preview before the operator
+  confirms any create/bind/write.**
 
 ### A.3 Product export (Odoo → Shopify)
 
@@ -200,10 +220,23 @@ Odoo model/field names: **[Open question — MBQ-01/02/55]**.
 
 ### A.4 Product update flow after first binding
 
-- Once a product/variant is bound, subsequent Odoo-side changes queue an
-  **update** job (not a re-create); the update job renders a diff (what
-  will change: fields, images, price) before writing, keyed off the
-  binding **[Accepted — DEC-004 UX implications; DEC-012 §7.3]**.
+- A bound product/variant becomes **eligible** for an update job only
+  after an **explicit operator action** — the same manual export/update
+  trigger as §A.3 — or, if a later sprint/implementation-planning phase
+  accepts a specific controlled trigger mechanism (e.g. an explicit
+  per-product "keep in sync" opt-in checked at Odoo-side save — still an
+  **[Open question — implementation planning, not decided here]**, see
+  §A.3), that accepted mechanism. **Ordinary Odoo record writes do not,
+  by themselves, queue a Shopify update job** — this section does not
+  imply autonomous Odoo-write-triggered pushing, and this wording
+  corrects any earlier reading of this section that it did
+  **[Inference — DEC-003's "controlled," never "autonomous," product-
+  export scope, restated from §A.3; the trigger table in §D.7 is
+  unaffected and already states product export/update is manual-only]**.
+- Once an update job is triggered (by whichever mechanism above applies),
+  it renders a diff (what will change: fields, images, price) before
+  writing, keyed off the binding **[Accepted — DEC-004 UX implications;
+  DEC-012 §7.3]**.
 - **Mutation choice for updates** follows the same strategy fork as export
   (§A.5.2) — a template/list-field-only change may use a narrower mutation
   than a full resync; both remain gated by the same preview
@@ -239,14 +272,24 @@ Odoo model/field names: **[Open question — MBQ-01/02/55]**.
      the exact risk DEC-004's "Data-safety implications" already treats as
      load-bearing for the mandatory preview guard.
    - **[Official fact]** `productVariantsBulkCreate` "creates multiple
-     product variants for a single product in one operation";
-     `productVariantsBulkUpdate` "updates multiple product variants for a
-     single product in one operation." Neither mutation's reference page
-     states a list-field/delete-on-omit reconciliation behaviour.
+     product variants for a single product in one operation"
      (`https://shopify.dev/docs/api/admin-graphql/latest/mutations/productVariantsBulkCreate`,
-     accessed 2026-07-03.) **Absence of a stated behaviour is not a
+     accessed 2026-07-03). **[Official fact]** `productVariantsBulkUpdate`
+     "updates multiple product variants for a single product in one
+     operation," and can run "directly or as part of a bulk operation for
+     large-scale catalog updates"; it also exposes an `allowPartialUpdates`
+     argument (default `false`) governing per-variant error tolerance
+     ("valid variant changes may be persisted even if some of the
+     variants updated have invalid data") — an error-handling behaviour,
+     not a field-reconciliation or idempotency behaviour
+     (`https://shopify.dev/docs/api/admin-graphql/latest/mutations/productVariantsBulkUpdate`,
+     accessed 2026-07-03). **Neither mutation's reference page states a
+     list-field/delete-on-omit reconciliation behaviour, and neither
+     states an idempotency guarantee** — both pages were checked and are
+     silent on both topics. **Absence of a stated behaviour is not a
      confirmed absence of the behaviour** — this is not asserted as "safe
-     from delete-on-omit," only as "not documented to have it."
+     from delete-on-omit" or "idempotent," only as "not documented to
+     have either."
    - **[Blueprint proposal — direction only, not implementation-final]:**
      prefer `productVariantsBulkCreate`/`productVariantsBulkUpdate` for
      **variant-only** additions/updates after first export (narrower
@@ -293,13 +336,18 @@ duplicates product-matching logic (Part A §K.9) **[Accepted — DEC-008]**.
 
 ### A.9 Duplicate-prevention preview
 
-A preview ("will create N, link M, N ambiguous") precedes every batch
-create/bind action visible to the operator (e.g. first-sync review,
-manual matching session); for individual automated creates during layered
-import, the equivalent visibility is the always-auditable sync-center/
-dashboard surface (§A.2's clarification) **[Accepted — DEC-003; DEC-006;
-Blueprint proposal for the automated-vs-interactive distinction]**. No
-blind create, under either path.
+An interactive or batch create/bind action (e.g. first-sync review, a
+manual matching session, a bulk catalog-onboarding pass) always shows a
+**blocking preview** ("will create N, link M, N ambiguous") *before* the
+operator confirms the create/bind — this is unweakened DEC-003/DEC-006
+behaviour **[Accepted — DEC-003; DEC-006]**. For an **automated**
+(webhook/scheduled/reconciliation-triggered) create/bind, the §A.2
+pre-create policy (the six-condition check) is the mechanism that
+satisfies "no blind create" — **not** the sync-center/dashboard's later
+display of the job's outcome, which is **audit/log visibility only**,
+shown *after* the action, and is never a substitute for a preview
+**[Blueprint proposal, pending DEC-014 — see §A.2 for the full policy and
+new open question MBQ-59]**. No blind create, under either path.
 
 ### A.10 Draft-first export safety
 
@@ -473,7 +521,8 @@ See §J for the consolidated resolved/partially-resolved/carried-forward
 table. Headline: **MBQ-23** (variant-write mutation strategy) — partially
 resolved, direction proposed. **MBQ-24** (media delete-on-omit) — carried
 forward, safety posture unaffected. **MBQ-25** (draft/publish mechanism) —
-partially resolved, mechanism identified and cited.
+partially resolved, mechanism identified and cited. **MBQ-59** (automated
+import create/bind policy, §A.2) — new, proposed, pending DEC-014.
 
 ---
 
@@ -503,14 +552,16 @@ its own concrete **customer binding** model (Shopify Customer ↔ Odoo
   dedicated customer sync/reconciliation pass) — both paths use the same
   matching logic below **[Inference — DEC-003 lists customer import as a
   Shopify → Odoo capability independent of order import scope]**.
-- **Automated creation is not a "blind create":** see §A.2's clarification
-  — the same reasoning applies identically to customer import: a
-  confident, unambiguous new-customer create during automated/webhook-
-  driven order import is the accepted "customer import" capability
-  operating normally, auditable via the sync-center/dashboard; **only**
-  ambiguous-match, binding-conflict, or duplicate-risk states require
-  synchronous operator confirmation **[Blueprint proposal, applying §A.2's
-  clarification to the customer domain]**.
+- **Automated create/bind policy:** applies identically to §A.2's
+  proposed policy, substituting the customer domain — a **pre-create
+  duplicate check** (the §B.3 match-key sequence) runs *before* any
+  automated customer create/bind, and auto-create/auto-bind proceeds only
+  when the same six conditions (§A.2, with §B.3 as the relevant matching
+  step) all hold; if any fails, the job routes to `blocked_manual_review`.
+  Retrospective sync-center/dashboard visibility is **audit/log
+  visibility only** — it does not by itself satisfy "no blind create"
+  **[Blueprint proposal, pending DEC-014 acceptance; new open question
+  MBQ-59 — see §A.2 for the full policy]**.
 
 ### B.3 Matching priority
 
@@ -593,12 +644,15 @@ statement, since customers have no product-domain counterpart]**.
 
 ### B.9 Duplicate-prevention preview for customers
 
-Same structural requirement as products (§A.9): a batch/interactive
-matching session shows "will create N, link M, N ambiguous" before any
-bind action; automated per-order creates are satisfied by sync-center/
-dashboard auditability for the confident, unambiguous case (§B.2)
-**[Accepted — DEC-006; DEC-012 §6.7; Blueprint proposal for the
-automated-vs-interactive distinction, per §A.2]**.
+Same structural requirement as products (§A.9): an interactive/batch
+matching session always shows a **blocking** "will create N, link M, N
+ambiguous" preview *before* any create/bind action **[Accepted — DEC-006;
+DEC-012 §6.7]**. For automated per-order customer creation, the §A.2/§B.2
+pre-create policy (six-condition check) is what satisfies "no blind
+create" — retrospective sync-center/dashboard visibility is **audit/log
+visibility only**, never a preview substitute **[Blueprint proposal,
+pending DEC-014 — see §A.2 for the full policy and new open question
+MBQ-59]**.
 
 ### B.10 Customer privacy and protected-data minimization
 
@@ -641,7 +695,8 @@ non-no-PII store, which is a data-quality signal, not a no-PII case).
 
 See §J. Headline: **MBQ-29** (default-customer fallback) — partially
 resolved, direction proposed, granularity open. **MBQ-31** (final
-match-key set) — proposed resolution below.
+match-key set) — proposed resolution below. **MBQ-59** (automated import
+create/bind policy, §B.2) — new, proposed, pending DEC-014.
 
 **Proposed resolution for MBQ-31 (final customer match-key set):**
 **[Blueprint proposal — recommendation to ChatGPT, MBQ-31's decision owner
@@ -1060,7 +1115,7 @@ registry — **no new error class is added**:
 | --- | --- | --- | --- | --- |
 | Shopify throttling/rate-limit | Any product mutation/query | Any customer mutation/query | Any order mutation/query | Auto-retry with backoff |
 | Shopify temporary/server/network | Transient product API failure | Transient customer API failure | Transient order API failure | Auto-retry (reads/`@idempotent`); ambiguous-outcome rule otherwise |
-| Shopify permission/scope/auth | Missing product-write scope | Missing protected-customer-data approval (§B.6) | Missing `read_all_orders`/order scope | Manual fix then retry |
+| Shopify permission/scope/auth | Missing product-write scope | Missing protected-customer-data approval (§B.6) | Missing required order read scope / protected-customer-data approval | Manual fix then retry |
 | Shopify userErrors/validation | Invalid SKU/option/price payload | Invalid partner-field payload | Invalid order-line payload | Manual fix then retry |
 | Odoo validation/configuration | Odoo-side product validation failure | Odoo-side partner validation failure | Odoo-side sale-order validation failure | Manual fix then retry |
 | Mapping missing | Stale export-target binding | — | Unmatched product on an order line (§C.5) | Manual fix then retry |
@@ -1074,6 +1129,16 @@ registry — **no new error class is added**:
 | Data shape/schema mismatch | Malformed product payload | Malformed customer payload | Malformed order payload | Manual fix then retry |
 | Concurrency/race conflict | Two concurrent writes to same binding | Two concurrent writes to same binding | Two concurrent writes to same binding | Auto-retry with backoff |
 | Unknown/system error | Any unclassified failure | Any unclassified failure | Any unclassified failure | Single safety-net auto-retry, then human |
+
+**Scope-name caveat (Shopify permission/scope/auth row):** the exact
+Shopify access-scope names required for product, customer/protected-data,
+and order reads/writes are **not decided or verified by this sprint** —
+the table above names the *class* of failure, not a committed scope
+string. Exact scope names remain implementation planning / official-doc
+verification, already covered by the existing register rows **MBQ-06**
+(readiness-check list, explicitly including "scopes") and **MBQ-09**
+(whether custom apps are bound by Level 1/2 protected-data obligations) —
+no new MBQ row is added for this caveat.
 
 ---
 
@@ -1096,16 +1161,20 @@ a self-accepted decision.
 | MBQ-29 | **Proposed partially resolved** — single shared fallback-partner direction proposed; per-order-vs-shared granularity stays open | §B.7 |
 | MBQ-30 | **Proposed partially resolved** — gateway→journal config-surface concept proposed; exact schema stays open | §C.10 |
 | MBQ-31 | **Proposed resolution** — email-only automatic match key recommended; phone/name stay advisory | §B.13 |
+| MBQ-59 | **New (revision).** **Proposed, pending DEC-014** — automated (webhook/scheduled/reconciliation) import create/bind policy: a pre-create duplicate check plus a six-condition auto-create gate (setup complete, domain enabled, source strategy permits creation, confident/unambiguous match, no guard triggered, fully logged); retrospective sync-center/dashboard visibility is audit only, not preview | §A.2/§B.2 |
 
 **New rows added (next available number after MBQ-54):** MBQ-55 through
-MBQ-58 — see [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
+MBQ-59 — see [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
 §4 for the full entries. Summary: MBQ-55 (exact Odoo model/field names for
 the four new binding models this sprint defines conceptually — product-
 template, product-variant, customer, order), MBQ-56 (exact total-check
 guard tolerance/comparison mechanism, §C.8), MBQ-57 (whether an unmatched-
 product order-line should ever have an alternative to the whole-order-hold
 rule in §C.5, for future reconsideration), MBQ-58 (Shopify order-identity
-stability nuances beyond general GID-non-permanence, §C.3).
+stability nuances beyond general GID-non-permanence, §C.3), **MBQ-59**
+(automated import create/bind policy and preview semantics — added in
+this revision, replacing the withdrawn "retrospective visibility
+satisfies preview" reading in §A.2/§A.9/§B.2/§B.9).
 
 **MBQ-04, MBQ-08, MBQ-53, and MBQ-54 are unchanged and remain open** — not
 addressed, not resolved, not touched by this sprint.

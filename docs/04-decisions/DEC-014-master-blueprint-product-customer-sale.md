@@ -17,6 +17,29 @@
 **Proposed for ChatGPT review.** Not accepted. Not implementation-
 authorizing under any outcome — see *No implementation authorized* below.
 
+> **Revision note (2026-07-03, PR #72 review — REVISE before Fable
+> review).** ChatGPT reviewed PR #72 and requested revision before
+> routing to Fable. Fixed: (1) withdrew the reading that retrospective
+> sync-center/dashboard visibility satisfies the "no blind create" /
+> preview requirement for automated product/customer imports — replaced
+> with an explicit, proposed **pre-create duplicate check + six-condition
+> auto-create gate** policy (Part B §A.2/§A.9/§B.2/§B.9), tracked as new
+> row **MBQ-59**; interactive/batch create-bind/write is unaffected and
+> still requires a blocking preview. (2) Corrected §A.4's wording so it no
+> longer implies ordinary Odoo record writes autonomously queue Shopify
+> update jobs — an update job requires an explicit operator action (or a
+> later accepted controlled trigger, still open). (3) Generalized the
+> §I error-mapping table's order-domain "Shopify permission/scope/auth"
+> cell — replaced the specific `read_all_orders` claim with generalized
+> wording, since exact scope requirements were not verified this sprint
+> (already covered by MBQ-06/MBQ-09; no new row added). (4) Verified
+> `productVariantsBulkUpdate` against its official reference page
+> (accessed 2026-07-03) and cited it directly, replacing the earlier
+> under-cited claim. This revision does **not** change DEC-014's status —
+> still **Proposed for ChatGPT review**, not accepted — and does not
+> change DEC-003 through DEC-013, start Sprint C, or start the UI/UX
+> Screen Design Blueprint.
+
 ## Date
 
 2026-07-03.
@@ -29,7 +52,8 @@ options, media, price, preview/diff, draft-first, publish mechanism);
 customer import/matching (no export); order import + financial-evidence
 capture + the total-check guard; cross-domain sequencing; and the
 Sprint-B-owned open-questions register rows (MBQ-23 through MBQ-31, plus
-four newly added rows MBQ-55 through MBQ-58). Does **not** cover
+five newly added rows MBQ-55 through MBQ-59 — MBQ-59 added in the PR #72
+revision). Does **not** cover
 inventory or fulfillment (Sprint C, not started), the UI/UX Screen Design
 Blueprint (Part D, not started), exact GraphQL operation bodies beyond
 what is explicitly cited and verified, exact Python method design, Odoo
@@ -74,28 +98,36 @@ domains, namely:
 
 1. **Product domain** — product-template and product-variant binding
    ownership under `shopify_connector_product` (Part B §A.1/§A.8); the
-   import/export/update flow structure (§A.2–§A.4); variant/option
-   handling bounded to DEC-007 §1 (§A.5), including the **proposed
-   mutation-strategy direction** (prefer `productVariantsBulkCreate`/
-   `Update` for variant-only updates, `productSet` for first-time
-   combined export/full resync, §A.5.2); SKU/barcode matching (§A.6);
-   template-vs-variant identity separation (§A.7); duplicate-prevention
-   preview, including the **automated-vs-interactive visibility
-   clarification** (§A.9, extended to Customer §B.2/§B.9); the **proposed
-   draft/publish mechanism** (`Product.status` + unpublished-by-default
-   `productCreate` + `publishablePublish`, §A.10); the destructive-write
-   guard (§A.11); source-of-truth choices (§A.12); media (§A.13) and
-   price/compare-at (§A.14) handling per DEC-007 §2/§3; publish/draft
-   safety (§A.15); preview/review states (§A.16); product job types
-   (§A.17); and the error/retry mapping (§A.18, consolidated in §I).
+   import/export/update flow structure (§A.2–§A.4), including the
+   corrected §A.4 wording that an update job requires an explicit
+   operator action (or a later accepted controlled trigger), never an
+   ordinary Odoo write alone; variant/option handling bounded to DEC-007
+   §1 (§A.5), including the **proposed mutation-strategy direction**
+   (prefer `productVariantsBulkCreate`/`productVariantsBulkUpdate` for
+   variant-only updates, `productSet` for first-time combined export/full
+   resync, §A.5.2, both mutations now cited against their official
+   reference pages); SKU/barcode matching (§A.6); template-vs-variant
+   identity separation (§A.7); duplicate-prevention preview, including
+   the **proposed automated import create/bind policy** (§A.2/§A.9,
+   extended to Customer §B.2/§B.9 — a pre-create duplicate check plus a
+   six-condition auto-create gate, new open question **MBQ-59**,
+   explicitly **not** an already-accepted interpretation of DEC-003/
+   DEC-006); the **proposed draft/publish mechanism** (`Product.status` +
+   unpublished-by-default `productCreate` + `publishablePublish`, §A.10);
+   the destructive-write guard (§A.11); source-of-truth choices (§A.12);
+   media (§A.13) and price/compare-at (§A.14) handling per DEC-007 §2/§3;
+   publish/draft safety (§A.15); preview/review states (§A.16); product
+   job types (§A.17); and the error/retry mapping (§A.18, consolidated in
+   §I).
 2. **Customer domain** — customer import/matching folded into
-   `shopify_connector_sale` (§B.1/§B.8); import flow and the
-   automated-creation clarification (§B.2); the customer-specific
-   match-key ordering restated from DEC-006/DEC-012 (§B.3); the unchanged
-   no-export and no-name-only-matching deferrals (§B.4/§B.5); the
-   no-PII/missing-email posture (§B.6); the **proposed default-customer
-   fallback direction** (single flagged fallback partner per store,
-   §B.7); duplicate-prevention preview (§B.9); privacy/protected-data
+   `shopify_connector_sale` (§B.1/§B.8); import flow and the **proposed
+   automated import create/bind policy** applied to the customer domain
+   (§B.2, mirroring §A.2, MBQ-59); the customer-specific match-key
+   ordering restated from DEC-006/DEC-012 (§B.3); the unchanged no-export
+   and no-name-only-matching deferrals (§B.4/§B.5); the no-PII/missing-
+   email posture (§B.6); the **proposed default-customer fallback
+   direction** (single flagged fallback partner per store, §B.7);
+   duplicate-prevention preview (§B.9); privacy/protected-data
    minimization (§B.10); customer job types (§B.12); and the **proposed
    MBQ-31 resolution recommendation** (email-only automatic match key,
    §B.13).
@@ -125,7 +157,8 @@ domains, namely:
    product/customer/order failure mode maps into an existing class.
 6. **The open-questions register updates** — MBQ-23 through MBQ-31
    updated with proposed resolutions/partial resolutions/carried-forward
-   status (Part B §J); four new rows added, MBQ-55 through MBQ-58.
+   status (Part B §J); five new rows added, MBQ-55 through MBQ-59
+   (MBQ-59 added in the PR #72 revision).
 
 ## Explicit acceptance points (for ChatGPT's review)
 
@@ -175,14 +208,35 @@ any mismatch to the already-accepted `financial total mismatch` error
 class (Part A §D.4/§D.5.5, "conservative, never silent"). Exact tolerance
 and exact Shopify total field remain open (new row **MBQ-56**).
 
-**G. Still open.** This proposal does not resolve every MBQ. Kept open
+**H. Automated import create/bind policy (MBQ-59 — added in the PR #72
+revision, an open decision, not an already-accepted interpretation).**
+Proposes that for automated (webhook/scheduled/reconciliation-triggered)
+product/customer import, "no blind create" is satisfied by a **pre-create
+duplicate check** plus a **six-condition auto-create gate** (setup
+complete; domain enabled; source strategy permits import-side creation;
+confident, unambiguous match; no duplicate-risk/binding-conflict/
+destructive-write-guard condition triggered; fully logged before/after/
+audit detail) — never by the sync-center/dashboard's later, retrospective
+display of the outcome, which is audit/log visibility only. This
+explicitly **withdraws** this document's earlier wording, which had read
+retrospective visibility as satisfying the preview requirement. Interactive/
+batch create-bind/write (a manual matching session, a bulk onboarding
+pass, or any operator-triggered export/update) is unaffected and still
+requires a blocking, synchronous preview before the operator confirms.
+This is a **proposed policy, pending ChatGPT's acceptance at this DEC-014
+review** — not a self-decided resolution of the underlying DEC-003/
+DEC-006 "no blind create" tension with DEC-005's layered automation model
+(**MBQ-59 stays open, not resolved, by this proposal alone**).
+
+**I. Still open.** This proposal does not resolve every MBQ. Kept open
 where appropriate: **MBQ-04, MBQ-08, MBQ-53, MBQ-54** (unchanged, not
 addressed by this sprint), **MBQ-24** (media delete-on-omit — checked,
 not resolved), **MBQ-27** (Odoo-side tax-representation mechanism —
 official-doc check attempted, inconclusive), **MBQ-28** (Domain 9
 draft-artifact guard — not triggered), **MBQ-30** (gateway→journal
-mapping — concept proposed, exact schema open), and the four new rows
-**MBQ-55 through MBQ-58**.
+mapping — concept proposed, exact schema open), **MBQ-59** (automated
+import create/bind policy — proposed, not resolved, see point H), and the
+five new rows **MBQ-55 through MBQ-59**.
 
 **What this acceptance (if granted) would NOT do:**
 
@@ -196,6 +250,9 @@ mapping — concept proposed, exact schema open), and the four new rows
 - Does **not change** DEC-003 through DEC-013.
 - Does **not** finalize MBQ-26 or MBQ-31 beyond what ChatGPT explicitly
   confirms — both are recommendations, named as such throughout.
+- Does **not** finalize MBQ-59 (automated import create/bind policy) —
+  it is a proposed policy pending this review, not a self-decided
+  resolution.
 
 ## What this decides (if accepted)
 
@@ -206,6 +263,8 @@ mapping — concept proposed, exact schema open), and the four new rows
   MBQ-29, and MBQ-30 (direction-level, exact detail still open).
 - The proposed recommendations for MBQ-26 and MBQ-31 (both explicitly
   ChatGPT-decision-owner rows).
+- The proposed automated import create/bind policy (MBQ-59) — open,
+  pending this review, not self-decided (see Explicit acceptance point H).
 
 ## What this does NOT decide
 
@@ -236,8 +295,9 @@ resolution, ChatGPT decision), **MBQ-27** (tax representation — carried
 forward), **MBQ-28** (Domain 9 guard — not triggered), **MBQ-29**
 (default-customer fallback — partially resolved), **MBQ-30**
 (gateway→journal mapping — partially resolved), **MBQ-31** (customer
-match-key set — proposed resolution, ChatGPT decision), **MBQ-55 through
-MBQ-58** (new rows, all open).
+match-key set — proposed resolution, ChatGPT decision), **MBQ-59**
+(automated import create/bind policy — proposed, open, added in the PR
+#72 revision), **MBQ-55 through MBQ-59** (new rows, all open).
 
 ## Risks and mitigations
 
@@ -255,15 +315,21 @@ MBQ-58** (new rows, all open).
    duplicate total-check path; **MBQ-57** is added so this rule can be
    revisited in a future review if evidence emerges that it is too
    conservative in practice.
-3. **Risk:** the automated-vs-interactive duplicate-prevention-preview
-   clarification (§A.2/§B.2) could be read as weakening DEC-003/DEC-006's
-   "no blind create" rule. **Mitigation:** the clarification only
-   relocates *where* the preview requirement is satisfied for the
-   confident, unambiguous case (retrospective sync-center/dashboard
-   auditability) — it does not remove the requirement, and it explicitly
-   preserves synchronous confirmation for every ambiguous/binding-
-   conflict/duplicate-risk state, which is where DEC-009 already requires
-   it.
+3. **Risk (confirmed and fixed in the PR #72 revision):** an earlier draft
+   of §A.2/§B.2 read retrospective sync-center/dashboard visibility as
+   satisfying the "no blind create" / preview requirement for confident,
+   automated creates — ChatGPT correctly flagged this as weakening
+   DEC-003/DEC-006's guard, since retrospective visibility is audit, not
+   preview. **Mitigation (applied):** that reading is explicitly
+   withdrawn; §A.2/§A.9/§B.2/§B.9 now require a **pre-create** duplicate
+   check plus a six-condition auto-create gate before any automated
+   create/bind, with `blocked_manual_review` as the fallback for any
+   failed condition — tracked as new open question **MBQ-59**, labelled
+   `[Blueprint proposal, pending DEC-014]` throughout, not an
+   already-accepted interpretation. Synchronous confirmation for every
+   ambiguous/binding-conflict/duplicate-risk state (DEC-009) is
+   unchanged and unweakened; interactive/batch create-bind/write
+   continues to require a blocking preview.
 4. **Risk:** MBQ-26 and MBQ-31 recommendations could be mistaken for
    already-decided outcomes since they appear inside an otherwise
    detailed blueprint. **Mitigation:** both are labelled

@@ -134,6 +134,38 @@
   started; implementation still not authorized; `main` and plain `dev`
   untouched. Awaiting further instruction.
 
+**PR #72 revision (2026-07-03) — REVISE before Fable review.** ChatGPT
+reviewed PR #72 and requested revision before Fable review. Fixed on the
+same branch/PR (no new PR opened): (1) automated create/preview semantics
+— withdrew the reading that retrospective sync-center/dashboard
+visibility satisfies the "no blind create"/preview requirement for
+confident automated product/customer imports; replaced with an explicit,
+proposed pre-create duplicate check + six-condition auto-create gate
+policy (Part B §A.2/§A.9/§B.2/§B.9), tracked as new open question
+**MBQ-59**; interactive/batch create-bind/write is unaffected and still
+requires a blocking preview. (2) Product export/update trigger wording
+corrected (§A.4) so it no longer implies ordinary Odoo record writes
+autonomously queue Shopify update jobs — an update job now requires an
+explicit operator action (or a later accepted controlled trigger,
+still open). (3) Order-scope wording in the §I error-class table
+generalized — replaced the specific `read_all_orders` claim with
+"missing required order read scope / protected-customer-data approval"
+since exact scope requirements were not verified this sprint; already
+covered by MBQ-06/MBQ-09, no new row added for this item. (4)
+`productVariantsBulkUpdate` claim verified against its official reference
+page (accessed 2026-07-03) and cited directly (§A.5.2), replacing the
+earlier under-cited claim. MBQ-59 added to the register (§4); DEC-014 and
+AR-011 updated to reference MBQ-55 through MBQ-59 and to call out the
+automated import create/bind policy as a proposed, open decision, not an
+already-accepted interpretation. **DEC-014 remains Proposed for ChatGPT
+review — not accepted. AR-011 remains Proposed for ChatGPT review — not
+accepted.** DEC-003 through DEC-013 untouched; no code files changed;
+implementation remains blocked; Sprint C not started; UI/UX Screen Design
+Blueprint not started; MBQ-04/08/53/54 remain open, untouched. Same
+branch (`claude/master-blueprint-sprint-b-7zrvji`), same PR (#72) —
+pushed as a new commit, no new PR opened, no merge. Next: stop for
+Fable review.
+
 ---
 
 ### DEC-013 Acceptance Patch — compact handoff (2026-07-03)
@@ -4613,3 +4645,19 @@ ChatGPT review.
   `architecture/master-blueprint-product-customer-sale`). Next: push
   branch, open one draft PR into `Shopify-connector`, stop for ChatGPT/
   Fable review.
+- **Master Blueprint Sprint B — PR #72 revision (2026-07-03):** ChatGPT
+  requested REVISE before Fable review. Fixed automated create/preview
+  semantics (retrospective sync-center/dashboard audit no longer treated
+  as satisfying "no blind create"; replaced with an explicit pre-create
+  duplicate check + six-condition auto-create gate, new MBQ-59);
+  corrected §A.4 so product export/update no longer implies autonomous
+  Odoo-write-triggered Shopify pushes; generalized unverified
+  `read_all_orders` wording in the error-class table; verified and cited
+  `productVariantsBulkUpdate` against its official reference page. MBQ-59
+  added; DEC-014/AR-011 updated to MBQ-55–59 and to call out the
+  automated-import policy as proposed/open, not accepted. DEC-014 and
+  AR-011 remain Proposed for ChatGPT review, not accepted; DEC-003
+  through DEC-013 untouched; no code files changed; implementation
+  remains blocked; Sprint C not started; UI/UX Screen Design Blueprint
+  not started. Same branch/PR (#72) — no new PR, no merge. Next: stop
+  for Fable review.

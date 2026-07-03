@@ -19,16 +19,18 @@ question does **not** decide it and does **not** authorize
 implementation. Every row follows `CLAUDE.md` §7/§8: unverified items
 are **open questions**, never asserted.
 
-> **Master Blueprint Sprint B note (2026-07-03).** Sprint B
+> **Master Blueprint Sprint B note (2026-07-03, revised after PR #72
+> review).** Sprint B
 > ([`master-blueprint-product-customer-sale.md`](./master-blueprint-product-customer-sale.md),
 > companion
 > [`DEC-014`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md))
 > has **proposed** updates to the product/customer/order rows below
-> (MBQ-23 through MBQ-31) and added MBQ-55 through MBQ-58. **These are
-> proposed resolutions/partial resolutions only, pending DEC-014
-> acceptance by ChatGPT** — none is final yet; the register's
-> accepted-through-DEC-013 status is otherwise unchanged, and MBQ-04,
-> MBQ-08, MBQ-53, and MBQ-54 remain untouched and open.
+> (MBQ-23 through MBQ-31) and added MBQ-55 through MBQ-59 (MBQ-59 added
+> in the PR #72 revision — see MBQ-59's own row). **These are proposed
+> resolutions/partial resolutions only, pending DEC-014 acceptance by
+> ChatGPT** — none is final yet; the register's accepted-through-DEC-013
+> status is otherwise unchanged, and MBQ-04, MBQ-08, MBQ-53, and MBQ-54
+> remain untouched and open.
 
 ## How to read
 
@@ -102,6 +104,7 @@ are **open questions**, never asserted.
 | MBQ-56 | Exact **total-check guard tolerance/comparison mechanism** — the exact Shopify total field(s) used, currency-rounding tolerance, and which evidence components are summed | Sprint B (`master-blueprint-product-customer-sale.md` §C.8) | The total-check guard is mandatory and permanent; its exact comparison logic is not yet fixed | Implementation planning | Yes (order import) |
 | MBQ-57 | Whether the **whole-order-hold rule** for an unmatched product line (§C.5) should ever have an alternative (e.g. partial-line placeholder) for a future phase | Sprint B (`master-blueprint-product-customer-sale.md` §C.5) | Recorded for future reconsideration; the current guard-consistent rule is not weakened by leaving this open | ChatGPT (future, only if revisited) | No (current rule stands unless revisited) |
 | MBQ-58 | **Shopify order-identity stability nuances** beyond general GID-non-permanence (e.g. test-mode orders, draft orders later converted) | Sprint B (`master-blueprint-product-customer-sale.md` §C.3) | The existing binding-based defensive design (Part A §C.6) already covers the general case; this refines it, not a blocker | Official-doc verification | No (defensive design already stands) |
+| MBQ-59 | **Added in PR #72 revision.** **Proposed, pending DEC-014:** exact **automated (webhook/scheduled/reconciliation) import create/bind policy and preview semantics** — a pre-create duplicate check plus a six-condition auto-create gate (setup complete, domain enabled, source strategy permits creation, confident/unambiguous match, no duplicate-risk/binding-conflict/destructive-write-guard condition triggered, fully logged); retrospective sync-center/dashboard visibility is audit only, never a preview substitute (`master-blueprint-product-customer-sale.md` §A.2/§A.9/§B.2/§B.9). Replaces this document's withdrawn earlier reading that retrospective visibility satisfied the preview requirement. | Sprint B revision (§A.2/§B.2); tension between DEC-003/DEC-006 "no blind create" and DEC-005 layered automation | Prevents weakening the accepted no-blind-create rule while still allowing webhook/scheduled import to operate without a synchronous per-record human click for every confident, unambiguous create | ChatGPT (at DEC-014 review) + Implementation planning | Yes (automated product/customer create-bind flows) |
 
 ## 5. Inventory (routed to Sprint C)
 
