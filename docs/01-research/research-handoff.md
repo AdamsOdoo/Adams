@@ -65,17 +65,20 @@
   §C.14); **(D)** MBQ-29 partially resolved (default-customer fallback
   direction); **(E)** MBQ-31 **accepted at blueprint level** (email is
   the sole automatic customer match key); **(F)** the total-check guard
-  definition accepted (MBQ-56 stays open, tolerance TBD); **(G)** MBQ-59
-  **accepted at blueprint-policy level** (automated import create/bind
-  policy — pre-create duplicate check + two-tier eligibility/match-
-  quality gate, routed via accepted Part A per-class mechanisms; exact
-  implementation detail remains open); **(H)** the **Fable B1 route
-  accepted** — accepted Part A per-class routing throughout, Part A
-  §D.8's `blocked_manual_review` vocabulary **not widened**; **(I)** the
+  definition accepted (MBQ-56 stays open, tolerance TBD); **(G)** MBQ-30
+  partially resolved (gateway → Odoo journal mapping concept accepted —
+  classification/routing input only, no accounting automation/invoice/
+  payment/payout write authorized; exact schema/fields remain open);
+  **(H)** MBQ-59 **accepted at blueprint-policy level** (automated import
+  create/bind policy — pre-create duplicate check + two-tier eligibility/
+  match-quality gate, routed via accepted Part A per-class mechanisms;
+  exact implementation detail remains open); **(I)** the **Fable B1
+  route accepted** — accepted Part A per-class routing throughout, Part A
+  §D.8's `blocked_manual_review` vocabulary **not widened**; **(J)** the
   **Fable B2 route accepted** — `ORDERS_UPDATED`/order-edit handling is
   **evidence-refresh only**, no silent Odoo sale-order line/price/tax/
   shipping/discount/payment/refund/fulfillment update under any trigger;
-  **(J)** still-open confirmation — MBQ-04/08/24/27/28/53/54/55/56/57/58
+  **(K)** still-open confirmation — MBQ-04/08/24/27/28/53/54/55/56/57/58
   unaffected, remain open. No-implementation and Sprint-C/UI-UX-Blueprint-
   not-started language preserved throughout.
   `architecture-review-log.md`'s AR-011 table row moved from "Proposed
@@ -94,7 +97,7 @@
   Parts C/D/E preserved as "Not started." `master-blueprint-product-
   customer-sale.md`'s status moved to accepted-via-DEC-014 wording, with
   the specific paragraphs corresponding to acceptance points A/B/C/D/E/G/
-  H/I (§A.2, §A.5.2, §A.9, §A.10, §A.19, §B.2, §B.7, §B.9, §B.13, §C.6,
+  H/I/J (§A.2, §A.5.2, §A.9, §A.10, §A.19, §B.2, §B.7, §B.9, §B.13, §C.6,
   §C.10, §C.12, §C.13, §C.14, §J) re-labelled `[Accepted — DEC-014]` —
   the rest of the ~1,400-line document was deliberately **not**
   mechanically rewritten, mirroring the DEC-013 acceptance-patch

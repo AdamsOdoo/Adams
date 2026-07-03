@@ -999,7 +999,7 @@ structure, **not re-decided:**
 
 ### C.10 Gateway → Odoo journal mapping (partially resolves MBQ-30)
 
-**[Accepted — DEC-014, partially resolving MBQ-30]** — a per-store
+**[Accepted — DEC-014, point G, partially resolving MBQ-30]** — a per-store
 configuration concept: a mapping from Shopify's free-text gateway/payment-
 method label (e.g. `"shopify_payments"`, `"manual"`, `"bogus"`) to an Odoo
 `account.journal` **reference**, contributed via the core §I settings-
@@ -1029,7 +1029,7 @@ cancellation/refund/return-processing handling, and does not narrow that
 deferral to only "processing workflows" while quietly allowing the
 underlying sale order to change.
 
-**[Accepted — DEC-014, point I — the Fable B2 route, narrowed in the PR
+**[Accepted — DEC-014, point J — the Fable B2 route, narrowed in the PR
 #72 Fable revision and accepted as final]:** for an already-imported
 order, an `ORDERS_UPDATED` webhook (or the equivalent
 reconciliation-detected change) may **refresh Shopify-side evidence/audit
@@ -1059,7 +1059,7 @@ totals, or fulfillment state.
 without ever touching sale-order lines (e.g. a separate evidence-snapshot
 record vs. an evidence-only field group on the existing evidence capture,
 §C.7) is an **[Open question — implementation planning]**, not decided
-here. This narrowed wording is accepted as DEC-014 point I (the Fable B2
+here. This narrowed wording is accepted as DEC-014 point J (the Fable B2
 route) and does not expand what DEC-014 accepts beyond the existing
 deferred posture already named in its "Proposed decision" item 3.
 
@@ -1069,7 +1069,7 @@ this note.
 
 ### C.13 Manual review triggers
 
-**[Accepted — DEC-014, point H — the Fable B1 route, corrected in the PR
+**[Accepted — DEC-014, point I — the Fable B1 route, corrected in the PR
 #72 Fable revision and accepted as final]:** every trigger below maps to
 an existing Part A §D.4 error class — no new class is introduced (Part A
 §A.5.3: domain modules map into the fixed registry, they do not fork

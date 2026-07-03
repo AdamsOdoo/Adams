@@ -184,7 +184,24 @@ Shopify order total), routing any mismatch to the already-accepted
 "conservative, never silent"). Exact tolerance and exact Shopify total
 field remain open (**MBQ-56**, unchanged, open).
 
-**G. Automated import create/bind policy (MBQ-59) — accepted at
+**G. Gateway → Odoo journal mapping (MBQ-30) — accepted, partially
+resolved.** Accepts the concept proposed in Part B §C.10: a per-store
+configuration mapping Shopify's free-text gateway/payment-method label
+(e.g. `"shopify_payments"`, `"manual"`, `"bogus"`) to an Odoo
+`account.journal` **reference**, contributed via the core §I
+settings-extension seam (Part A §A.5.4). This mapping is
+**classification/routing input only** — it pre-populates/suggests a
+journal classification on the imported order's financial-evidence record
+(§C.7/§C.9) for later human/accounting workflows and triggers **no**
+automatic journal entry, posting, or reconciliation of any kind. It does
+**not** authorize accounting automation, automatic invoice creation,
+automatic payment posting, payout reconciliation, or any other silent
+financial write — unchanged from the accepted DEC-003/DEC-007 §6
+no-invoice/payment-automation posture (§C.11). **MBQ-30 stays partially
+resolved** — exact schema/fields remain open for implementation
+planning.
+
+**H. Automated import create/bind policy (MBQ-59) — accepted at
 blueprint-policy level.** Accepts the policy proposed in Part B
 §A.2/§A.9/§B.2/§B.9 (added in the PR #72 ChatGPT-requested revision,
 corrected in the PR #72 Fable-requested revision): for automated
@@ -225,7 +242,7 @@ longer "proposed, open" but is not closed either: it carries forward as
 **accepted at blueprint-policy level, implementation detail open** (see
 the register).
 
-**H. Fable B1 route — accepted: accepted Part A per-class routing, no
+**I. Fable B1 route — accepted: accepted Part A per-class routing, no
 `blocked_manual_review` widening.** Accepts the Fable-requested B1
 correction as the permanent routing rule for this domain: `mapping
 missing` and `data shape/schema mismatch` route to Part A §D.5.3's
@@ -238,11 +255,11 @@ which are relevant to this sprint's domains). **Part A §D.8's
 confirmation-required sub-reason vocabulary is not widened by this
 acceptance** — every routing in Part B §A.2/§C.5/§C.8/§C.13/§G/§I uses
 an existing, already-accepted class and state. This governs the MBQ-59
-gate (point G above), the whole-order-hold rule for unmatched products
+gate (point H above), the whole-order-hold rule for unmatched products
 (§C.5), the total-check guard (§C.8/point F above), and the manual-
 review trigger table (§C.13).
 
-**I. Fable B2 route — accepted: `ORDERS_UPDATED`/order-edit handling is
+**J. Fable B2 route — accepted: `ORDERS_UPDATED`/order-edit handling is
 evidence-refresh only.** Accepts the Fable-requested B2 narrowing of
 Part B §C.12 as final for this domain: an `ORDERS_UPDATED` webhook (or
 the equivalent reconciliation-detected change) for an already-imported
@@ -257,14 +274,16 @@ path and the reconciliation path behave identically — neither
 auto-applies. Order edits, cancellations, refunds, and returns remain
 fully deferred, unchanged from DEC-003.
 
-**J. Still open.** This acceptance does not resolve every MBQ. Kept open,
+**K. Still open.** This acceptance does not resolve every MBQ. Kept open,
 unaffected by this acceptance: **MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28,
 MBQ-53, MBQ-54** (unchanged), **MBQ-55, MBQ-56, MBQ-57, MBQ-58** (new
-rows added this sprint, all open). **MBQ-23, MBQ-25, MBQ-29, MBQ-30**
-are **partially resolved** (points A/B/D/F above) — direction accepted,
-exact detail open. **MBQ-59** is **accepted at blueprint-policy level**
-(point G above) — the policy is accepted, exact implementation detail
-remains open.
+rows added this sprint, all open). **MBQ-23, MBQ-25, and MBQ-29** are
+**partially resolved** (points A/B/D above) — direction accepted, exact
+detail open. **MBQ-30** is **partially resolved** (point G above) — the
+gateway→journal mapping concept is accepted, exact schema/fields remain
+open. **MBQ-59** is **accepted at blueprint-policy level** (point H
+above) — the policy is accepted, exact implementation detail remains
+open.
 
 **What this acceptance does NOT do:**
 
@@ -277,10 +296,13 @@ remains open.
   stays open).
 - Does **not change** DEC-003 through DEC-013.
 - Does **not** widen Part A §D.8's confirmation-required sub-reason
-  vocabulary (point H above).
+  vocabulary (point I above).
 - Does **not** authorize any silent Odoo sale order line, price, tax,
   shipping, discount, payment, refund, or fulfillment update from an
-  `ORDERS_UPDATED` webhook or reconciliation pass (point I above).
+  `ORDERS_UPDATED` webhook or reconciliation pass (point J above).
+- Does **not** authorize any accounting automation, automatic invoice
+  creation, automatic payment posting, or payout reconciliation from the
+  gateway→journal mapping concept (point G above).
 
 ## Scope
 
