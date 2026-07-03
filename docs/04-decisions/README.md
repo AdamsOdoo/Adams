@@ -227,3 +227,48 @@ Design Blueprint; DEC-003 through DEC-013 are unchanged.** MBQ-04,
 MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-53, MBQ-54, MBQ-55, MBQ-56, MBQ-57,
 and MBQ-58 remain open, untouched by this acceptance. **Resolves AR-011**
 in `../05-qa/architecture-review-log.md`.
+
+**Also accepted:**
+[`DEC-015-master-blueprint-inventory-fulfillment.md`](./DEC-015-master-blueprint-inventory-fulfillment.md) —
+proposed 2026-07-03 (Master Blueprint Sprint C, prepared after PR #73
+merged into `Shopify-connector`, merge commit
+`09829a804eef9c4099960f5604729f3a775793d1`; revised on PR #74 after
+Fable review returned **REVISE** — findings C1/C2 plus seven minor
+findings, all fixed — then a same-PR consistency patch) and **accepted
+by ChatGPT on 2026-07-03** on the same PR #74. **Status: Accepted by
+ChatGPT, acceptance date 2026-07-03 — no longer proposed.** Accepts the
+**Part C — Inventory and Fulfillment Domain Blueprint**
+(`../03-architecture/master-blueprint-inventory-fulfillment.md`):
+inventory-level binding under `shopify_connector_inventory`; the ongoing
+Odoo-source-of-truth posture with a controlled one-time baseline import;
+two verified, **non-equivalent** candidate quantity sources
+(`product.product.free_qty` / `stock.quant.available_quantity`, **Fable
+finding C1 corrected** — MBQ-32 stays partially resolved, source choice
+remains open); update-direction, sync-posture, idempotency/retry,
+mapping-failure, multi-location, and safety-guard sections; FulfillmentOrder/
+Fulfillment binding under `shopify_connector_fulfillment`, never depending
+on `inventory`; order/FulfillmentOrder/line/quantity matching; a resolved
+tracking-field source (`stock.picking.carrier_tracking_ref`/
+`carrier_tracking_url`/`carrier_id`); partial/backorder/cancellation/
+return/refund/multi-package posture; a partially resolved
+location-mismatch-guard mechanism **accepting a widening of the
+`ambiguous match` class** (AR-006/DEC-009) to also cover a deterministic
+fulfillment-location mismatch, at blueprint level only; and the
+Odoo-event-triggered job-source classification left undecided **(Fable
+finding C2 corrected)**, routed to new MBQ-62 rather than treating
+"event-driven enqueue" as a Part A job-source value. Resolves at
+fact-verification level: **MBQ-37, MBQ-39**. Resolves, partially:
+**MBQ-32, MBQ-36, MBQ-38, MBQ-40, MBQ-42, MBQ-43** (direction/fact
+accepted, exact residual detail open). **Does not decide** — remain
+open, recommendation noted only: **MBQ-33, MBQ-34, MBQ-41**. Adds
+**MBQ-60 through MBQ-63**, all new and open (MBQ-60 `stock_delivery`/
+`delivery` dependency; MBQ-61 FulfillmentOrder lifecycle events; MBQ-62
+Odoo-event-triggered job-source classification; MBQ-63 inventory-webhook
+payload/subscription/Phase-1-scope residual — MBQ-62/63 added in the
+Fable-review revision). **Does not authorize implementation; does not
+start the UI/UX Screen Design Blueprint (Part D) or Part E
+(implementation-planning bridge); DEC-003 through DEC-014 are
+unchanged.** MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-33, MBQ-34,
+MBQ-41, MBQ-53 through MBQ-58, and MBQ-60 through MBQ-63 remain open,
+untouched or newly added but not resolved by this acceptance.
+**Resolves AR-012** in `../05-qa/architecture-review-log.md`.

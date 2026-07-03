@@ -1,8 +1,10 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-014
-> Acceptance Patch)** is immediately below, in the **compact handoff
-> format** (`../06-prompts/session-handoff-template.md`); **Master
+> Continuity lives in GitHub, not chat. The **current entry (DEC-015
+> Acceptance Patch)** is immediately below, in the **compact
+> handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Master Blueprint Sprint C (proposal history)**,
+> **DEC-014 Acceptance Patch**, **Master
 > Blueprint Sprint B (proposal history)**, **DEC-013
 > Acceptance Patch**, **Master Blueprint Sprint A**,
 > **DEC-012 Acceptance Patch**,
@@ -19,6 +21,256 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-015 Acceptance Patch — compact handoff (2026-07-03)
+
+> **Documentation acceptance patch, not implementation.** Confirmed
+> before editing: PR #74 head at commit
+> `d7f7eca4bd5de36aca7d9a513cfbb4e0c1a676cf` (Sprint C proposal, Fable
+> review fixes, and a consistency patch, all on the same branch/PR);
+> DEC-015 confirmed `Proposed for ChatGPT review`; AR-012 confirmed
+> `Proposed for ChatGPT review`; Master Blueprint Part C (Inventory and
+> Fulfillment Domain Blueprint) confirmed present, revised twice on PR
+> #74 (Fable-review fix, then a consistency patch); DEC-003 through
+> DEC-014 confirmed still **Accepted by ChatGPT** and unedited;
+> implementation confirmed still blocked; UI/UX Screen Design Blueprint
+> (Part D) confirmed not started; Part E confirmed not started. Branch
+> `claude/master-blueprint-sprint-c-inventory-fulfillment`.
+
+- **Branch / PR:** `claude/master-blueprint-sprint-c-inventory-fulfillment`
+  → draft PR #74 into `Shopify-connector`, **not merged**.
+- **Files changed:**
+  `docs/04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/03-architecture/master-blueprint.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/04-decisions/README.md`,
+  `docs/01-research/research-handoff.md` (this file). **No code files
+  changed.**
+- **What changed:** **DEC-015 accepted by ChatGPT**, acceptance date
+  **2026-07-03**, after PR #74's Fable review (**REVISE**, no redesign —
+  finding C1 corrected the earlier over-claim that
+  `product.product.free_qty` and `stock.quant.available_quantity` are
+  equivalent; finding C2 corrected the earlier silent treatment of
+  "event-driven enqueue" as a Part A job-source value; seven minor
+  findings fixed) and a same-PR consistency patch aligning the new-MBQ
+  summary wording, both already applied to this branch before this
+  acceptance patch. DEC-015 got a new *Accepted decision* section
+  recording the accepted Master Blueprint Sprint C inventory and
+  fulfillment domain blueprint package (items 1–5) and eleven explicit
+  acceptance points **A–M**: **(A)** MBQ-32 partially resolved (quantity-
+  source direction — the two candidate sources accepted as verified but
+  **not equivalent**, per Fable finding C1); **(B)** MBQ-33 **still
+  open** — first-push guard granularity recommendation noted, not
+  decided; **(C)** MBQ-34 **still open** — ongoing apply-mode
+  recommendation noted, not decided; **(D)** MBQ-36 partially resolved
+  (mutation-choice-per-trigger direction); **(E)** MBQ-37 **resolved at
+  fact-verification level** (inventory webhook topic); **(F)** MBQ-38
+  partially resolved (first-push confirmation-record concept); **(G)**
+  MBQ-39 **resolved at fact-verification level** (tracking-field source);
+  **(H)** MBQ-40 partially resolved (backorder-to-picking linkage);
+  **(I)** MBQ-41 **still open** — notification-UI granularity
+  recommendation noted, not decided; **(J)** MBQ-42 partially resolved
+  (fulfillment location-confirmation mechanism), **including an accepted
+  widening of the `ambiguous match` class** (AR-006/DEC-009: multiple
+  candidates) to also cover a deterministic fulfillment-location
+  mismatch, per Fable minor finding 2, accepted at blueprint level only;
+  **(K)** MBQ-43 partially resolved (Location reference cache policy);
+  **(L)** MBQ-60/MBQ-61 confirmed new and open; **(M)** MBQ-62/MBQ-63
+  (added in the Fable-review revision) confirmed new and open. **No
+  implementation and Part D/E-not-started language preserved
+  throughout.** `architecture-review-log.md`'s AR-012 table row moved
+  from "Proposed for ChatGPT review" to "Accepted by ChatGPT," with a
+  compact acceptance-patch note appended; AR-002 through AR-011 rows
+  untouched. `docs/04-decisions/README.md` gained a new "Also accepted:
+  DEC-015" entry; DEC-003 through DEC-014 entries untouched.
+  `master-blueprint-open-questions.md` updated: its Sprint C note
+  superseded by a DEC-015 acceptance note; MBQ-37/MBQ-39 rows marked
+  **resolved by DEC-015 acceptance**; MBQ-32/MBQ-36/MBQ-38/MBQ-40/
+  MBQ-42/MBQ-43 rows marked **partially resolved by DEC-015 acceptance**;
+  MBQ-33/MBQ-34/MBQ-41 rows marked **carried forward, open — DEC-015
+  acceptance does not itself decide this row**; MBQ-35 and MBQ-60
+  through MBQ-63 left untouched (carried forward unchanged / new and
+  open respectively); MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-53
+  through MBQ-58 untouched, no question deleted. `master-blueprint.md`'s
+  status moved to accepted-through-DEC-015 wording (Part C table row now
+  reads "Accepted by ChatGPT via DEC-015"); Part D/E preserved as "Not
+  started."
+- **Items deferred:** MBQ-33, MBQ-34, MBQ-41 (recommendations noted, not
+  decided by this acceptance); MBQ-60 through MBQ-63 (new, open, not
+  resolved by this acceptance); MBQ-04, MBQ-08, MBQ-53 through MBQ-58
+  (untouched, open); the Part D UI/UX Screen Design Blueprint sprint
+  (MBQ-53, still not started); Part E (implementation-planning bridge);
+  all implementation.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  patch mechanically applied ChatGPT's explicit, itemized acceptance
+  scope; no ambiguity required a judgment call beyond what the task
+  specified. **Repeated issue patterns:** none at threshold. **Rules/
+  checklists updated:** none new. **New rejected approaches:** none —
+  `rejected-approaches-log.md` checked, nothing reintroduced. **New
+  technical debt:** none (no code). **New open questions:** none — this
+  patch resolves/partially resolves existing rows and confirms MBQ-60
+  through MBQ-63 remain new/open; it adds no new MBQ row. **Architecture
+  concerns:** AR-012 is now **Accepted by ChatGPT** — Master Blueprint
+  Part C is accepted at blueprint level, with MBQ-33/34/41 and MBQ-60
+  through MBQ-63 explicitly still open; Part D (UI/UX Screen Design
+  Blueprint) remains the next recommended sprint, alongside Part E
+  (implementation-planning bridge), per ChatGPT's preference; neither is
+  started.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new this patch) · rejected
+  approaches checked, none added · technical debt logged (none
+  applicable — no code) · repeated-issue escalation applied (none at
+  threshold) — all **YES**.
+- **Next recommended session:** 1) **Master Blueprint Part D — UI/UX
+  Screen Design Blueprint** (resolving MBQ-53) or **Part E —
+  implementation-planning bridge**, per ChatGPT's preference; 2) a
+  future, separate ChatGPT decision on MBQ-33 (first-push granularity),
+  MBQ-34 (apply-mode), and MBQ-41 (notification-UI granularity), each
+  still open with a recommendation only; 3) **Implementation only after
+  a separate ChatGPT gate**, and, for any operator-facing screen, only
+  after the Part D UI/UX Screen Design Blueprint is also accepted.
+- **Stop condition:** stopped after one commit on the existing **draft**
+  PR #74 into `Shopify-connector` (not merged, not marked ready for
+  review). DEC-003 through DEC-014 not edited; no code files changed;
+  Part D (UI/UX Screen Design Blueprint) not started; Part E not
+  started; implementation still not authorized; `main` and plain `dev`
+  untouched. Awaiting further instruction.
+
+---
+
+### Master Blueprint Sprint C — compact handoff (2026-07-03)
+
+> **Documentation-only proposal sprint, not implementation.** Confirmed
+> before editing: PR #73 merged into `Shopify-connector` (merge commit
+> `09829a804eef9c4099960f5604729f3a775793d1`); DEC-003 through DEC-014
+> confirmed still **Accepted by ChatGPT** and unedited; Master Blueprint
+> Part C confirmed **Not started** before this sprint; implementation
+> confirmed still blocked; UI/UX Screen Design Blueprint (Part D)
+> confirmed not started; `rejected-approaches-log.md` checked, no rejected
+> approach reintroduced. Branch
+> `claude/master-blueprint-sprint-c-inventory-fulfillment`.
+
+- **Branch / PR:** `claude/master-blueprint-sprint-c-inventory-fulfillment`
+  → draft PR into `Shopify-connector`, opened immediately after this
+  handoff commit, **not merged**.
+- **Files changed:**
+  `docs/03-architecture/master-blueprint-inventory-fulfillment.md` (new),
+  `docs/04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md`
+  (new), `docs/03-architecture/master-blueprint.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/01-research/research-handoff.md` (this file). **No code files
+  changed.**
+- **What changed:** Proposed **Master Blueprint Part C — Inventory and
+  Fulfillment Domain Blueprint** via new companion decision record
+  **DEC-015** (Status: Proposed for ChatGPT review, not accepted) and
+  review-log entry **AR-012** (Status: Proposed for ChatGPT review, not
+  accepted). The new blueprint document converts the **accepted** DEC-010
+  (inventory) and DEC-011 (fulfillment) architecture into domain-level
+  blueprint detail, reusing the accepted Part A core substrate (DEC-013)
+  and Part B product/order binding posture (DEC-014) without
+  modification. Six small, targeted official-doc checks were performed
+  (all accessed 2026-07-03): the Shopify `WebhookSubscriptionTopic` enum
+  (confirming `INVENTORY_LEVELS_UPDATE` and the full
+  `FULFILLMENT_ORDERS_*`/`FULFILLMENTS_*` topic family), and Odoo 19.0
+  official source code (`github.com/odoo/odoo`, `19.0` branch) for
+  `product.product.free_qty`, `stock.quant.available_quantity`,
+  `stock.picking.backorder_id`/`backorder_ids`, and the `stock_delivery`
+  module's `stock.picking.carrier_tracking_ref`/`carrier_tracking_url`/
+  `carrier_id`. No fact was found inconclusive; no source was
+  inaccessible. `master-blueprint.md` updated: Part C moved from "Not
+  started" to "Proposed for ChatGPT review via DEC-015, not accepted";
+  Part D (UI/UX Screen Design Blueprint) and Part E
+  (implementation-planning bridge) explicitly preserved as "Not started."
+  `master-blueprint-open-questions.md` updated: a new Sprint C note added
+  (superseding nothing, additive to the existing DEC-014 acceptance
+  note); MBQ-32/36/38/40/42/43 marked **proposed partially resolved**,
+  pending DEC-015 acceptance; MBQ-37/39
+  marked **proposed resolved**, pending DEC-015 acceptance; MBQ-33/34/41 kept **carried forward, open**, each
+  with a named **recommendation** for ChatGPT's direct decision (not
+  self-accepted); MBQ-35 kept **carried forward, open, unchanged**; four
+  new rows added, **MBQ-60** (whether `shopify_connector_fulfillment`
+  requires the Odoo `stock_delivery`/`delivery` module) and **MBQ-61**
+  (whether/how the connector reacts to Shopify FulfillmentOrder
+  hold/cancellation-request/merge/split/reschedule lifecycle events,
+  newly confirmed as real webhook topics this sprint but not discussed by
+  DEC-011), plus **MBQ-62** and **MBQ-63**, added in a later Fable-review
+  revision on this same PR (see the follow-up checkpoint note below) —
+  **MBQ-62** (exact Part A job-source classification for Odoo-event-
+  triggered inventory push and fulfillment creation; "event-driven
+  enqueue" is a sync-trigger-layer description, not a Part A §D.2 job-
+  source value) and **MBQ-63** (the broader Shopify inventory-webhook
+  payload-shape/subscription-mechanics/Phase-1-implementation-scope
+  residual MBQ-37 did not cover). Every MBQ-32/36/37/38/39/40/42/43 row remains formally
+  **open** in the register — the "proposed resolved"/"proposed partially
+  resolved" labels describe this sprint's proposal only and become final
+  only if/when ChatGPT accepts DEC-015. No existing MBQ ID or question
+  text was deleted or altered beyond its proposed-resolution-status note.
+  `architecture-review-log.md`:
+  AR-012 added, Status **Proposed for ChatGPT review**, not accepted;
+  AR-002 through AR-011 rows untouched.
+- **Items deferred:** every MBQ row not explicitly proposed-resolved/proposed-
+  partially-resolved above, all of which remain formally open pending
+  DEC-015 acceptance (notably MBQ-04, MBQ-08, MBQ-33, MBQ-34, MBQ-41,
+  MBQ-53–59 unchanged, MBQ-60 through MBQ-63); the Part D UI/UX Screen Design
+  Blueprint sprint (MBQ-53, still not started); Part E
+  (implementation-planning bridge); all implementation.
+- **Learning feedback loop:** **New issues discovered:** ChatGPT review of
+  PR #74 correctly flagged that this handoff (and the companion register/
+  blueprint/DEC-015/AR-012 wording) used accepted-sounding labels
+  ("Resolved by Sprint C," "Partially resolved by Sprint C") before
+  DEC-015 acceptance — corrected in a follow-up commit on this same PR to
+  "Proposed resolved"/"Proposed partially resolved" throughout, with every
+  affected row/section stating explicitly that it remains open pending
+  DEC-015's acceptance. This session's own pre-commit check confirmed no
+  DEC-003–014 edits, no
+  RA-row reintroduction, no code files touched, and no MBQ row marked
+  fully "Resolved" where a genuine residual sub-question remained (MBQ-32
+  corrected from an initial over-claim to "partially resolved," then
+  further corrected to "proposed partially resolved" per the ChatGPT
+  review above, once the compound nature of its question text
+  was re-checked against Sprint B's own "partially resolved" precedent
+  for similarly compound rows). **Repeated issue patterns:** none at
+  threshold. **Rules/checklists updated:** none new. **New rejected
+  approaches:** none — this sprint checked `rejected-approaches-log.md`
+  before drafting and reintroduces nothing from it; no new approach was
+  evaluated to rejection. **New technical debt:** none (no code). **New
+  open questions:** MBQ-60 through MBQ-63 — MBQ-60 and MBQ-61 surfaced by
+  this sprint's original official-doc verification, not previously
+  considered by DEC-008/DEC-010/DEC-011; MBQ-62 and MBQ-63 added in a
+  later Fable-review revision on the same PR (job-source classification
+  for Odoo-event-triggered jobs, and the inventory-webhook payload/
+  subscription/Phase-1-scope residual, respectively). **Architecture concerns:** AR-012 is
+  **Proposed for ChatGPT review** — Master Blueprint Part C is proposed
+  at blueprint level; Part D (UI/UX Screen Design Blueprint) remains the
+  next recommended sprint after ChatGPT review, alongside Part E
+  (implementation-planning bridge), per ChatGPT's preference; neither is
+  started.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (the status-language correction noted
+  above, applied) · rejected approaches checked, none added
+  · technical debt logged (none applicable — no code) · repeated-issue
+  escalation applied (none at threshold) — all **YES**.
+- **Next recommended session:** 1) **ChatGPT/Fable review of this Part C
+  proposal and DEC-015** — in particular the three ChatGPT-decision-owner
+  recommendations (MBQ-33 first-push granularity, MBQ-34 apply-mode,
+  MBQ-41 notification-UI granularity), the proposed location-confirmation
+  mechanism (MBQ-42), and the four new open questions (MBQ-60 through
+  MBQ-63); 2)
+  if accepted, **Master Blueprint Part D — UI/UX Screen Design Blueprint**
+  (resolving MBQ-53) or **Part E — implementation-planning bridge**, per
+  ChatGPT's preference; 3) **Implementation only after a separate ChatGPT
+  gate**, and, for any operator-facing screen, only after the Part D
+  UI/UX Screen Design Blueprint is also accepted.
+- **Stop condition:** stopped after one commit + one **draft** PR into
+  `Shopify-connector` (not merged). PR #73 merge confirmed first.
+  DEC-003 through DEC-014 not edited; no code files changed; Part D
+  (UI/UX Screen Design Blueprint) not started; Part E not started;
+  implementation still not authorized; `main` and plain `dev` untouched.
+  Awaiting further instruction.
 
 ---
 
@@ -4861,3 +5113,115 @@ ChatGPT review.
   `claude/dec-014-acceptance-patch-5bml33` (harness-assigned). Next: push
   branch, open one draft PR into `Shopify-connector`, stop for ChatGPT
   review.
+- **Master Blueprint Sprint C (2026-07-03):** after PR #73 merged into
+  `Shopify-connector` (merge commit
+  `09829a804eef9c4099960f5604729f3a775793d1`), proposed Master Blueprint
+  Part C — Inventory and Fulfillment Domain Blueprint
+  (`master-blueprint-inventory-fulfillment.md`) and companion **DEC-015**
+  (Proposed for ChatGPT review, not accepted) and **AR-012** (Proposed
+  for ChatGPT review, not accepted). Converted accepted DEC-010/DEC-011
+  into blueprint-level detail, reusing Part A (DEC-013) and Part B
+  (DEC-014) unmodified. Six targeted official-doc checks performed
+  (accessed 2026-07-03): Shopify `WebhookSubscriptionTopic` enum
+  (`INVENTORY_LEVELS_UPDATE`, `FULFILLMENT_ORDERS_*`/`FULFILLMENTS_*`);
+  Odoo 19.0 official source (`product.product.free_qty`,
+  `stock.quant.available_quantity`, `stock.picking.backorder_id`/
+  `backorder_ids`, `stock_delivery`'s `carrier_tracking_ref`/
+  `carrier_tracking_url`/`carrier_id`). Proposed resolved MBQ-37/39;
+  proposed partially resolved MBQ-32/36/38/40/42/43 — all pending DEC-015
+  acceptance, remaining formally open until then; proposed recommendations (not
+  self-accepted) for the three ChatGPT-decision-owner rows MBQ-33/34/41;
+  added two new rows MBQ-60 (`stock_delivery` module dependency) and
+  MBQ-61 (FulfillmentOrder lifecycle webhook events). `master-blueprint.md`
+  Part C moved to "Proposed for ChatGPT review via DEC-015"; Part D/E
+  preserved as "Not started." DEC-003 through DEC-014 unedited; no code
+  files changed; implementation remains blocked; UI/UX Screen Design
+  Blueprint not started. Branch
+  `claude/master-blueprint-sprint-c-inventory-fulfillment`. Next: push
+  branch, open one draft PR into `Shopify-connector`, stop for ChatGPT
+  review.
+- **Sprint C status-language correction (2026-07-03):** ChatGPT reviewed
+  PR #74 and flagged that the MBQ register and related handoff/summary
+  wording used accepted-sounding labels ("Resolved by Sprint C,"
+  "Partially resolved by Sprint C") before DEC-015 acceptance. Corrected
+  `master-blueprint-open-questions.md`, `master-blueprint-inventory-
+  fulfillment.md` (§A.4/§A.9/§A.13/§A.15/§B.5/§B.7/§B.8/§B.14/§G),
+  `DEC-015-master-blueprint-inventory-fulfillment.md` (Explicit acceptance
+  points A/D/E/F/G/H/J/K, Open questions headline), and
+  `architecture-review-log.md` (AR-012) to use "Proposed resolved"/
+  "Proposed partially resolved" throughout, each explicitly stating the
+  row remains formally `open` pending DEC-015 acceptance. No substantive
+  technical conclusion, MBQ ID, or MBQ-60/61 content changed; no
+  recommendation status changed (MBQ-33/34/41 remain recommendations for
+  ChatGPT's direct decision); DEC-003 through DEC-014 untouched; no code
+  files changed; implementation remains blocked; Part D/E remain not
+  started. Same branch/PR (#74) — no new PR, no merge. Next: stop for
+  ChatGPT review.
+- **Sprint C Fable review fixes (2026-07-03):** Fable reviewed PR #74 and
+  returned **REVISE — no redesign** (architecture sound; two substantive
+  findings plus several wording/status fixes required before ChatGPT
+  acceptance review). **C1 (over-claim):** an earlier draft claimed
+  `product.product.free_qty` and `stock.quant.available_quantity` were
+  equivalent quantity sources; corrected in
+  `master-blueprint-inventory-fulfillment.md` §A.4/§G, the register's
+  MBQ-32 row, and DEC-015 point A to state the exact, non-equivalent
+  relationship (`free_qty` additionally nets out `expired_unreserved_qty`
+  and applies UoM rounding via `product.uom_id.round(...)`, quoted
+  exactly) and that the source choice is substantive, not decided by this
+  sprint; MBQ-32 stays "proposed partially resolved." **C2 (job-source
+  vocabulary):** an earlier draft silently listed `event-driven enqueue`
+  in §A.7/§A.13/§B.12/§C item 7 as if it were a Part A §D.2 job-source
+  enum value, and fulfillment creation's own source classification was
+  unstated; corrected to distinguish the sync-trigger layer from Part A's
+  fixed job-source vocabulary throughout, with no vocabulary extension
+  asserted; new open question **MBQ-62** added (Odoo-event-triggered job
+  source classification, covering both inventory push and fulfillment
+  creation). **Minor fixes:** §A.14's destructive-write-guard bullet
+  collapsed to a direct `destructive-write guard blocked` mapping citing
+  AR-006/DEC-009 (minor finding 1); §B.8/DEC-015 point J now state
+  explicitly that AR-006/DEC-009 defined `ambiguous match` as multiple
+  candidates and that Sprint C proposes *widening* that class for a
+  deterministic location mismatch, framed as part of what DEC-015
+  acceptance would decide (minor finding 2); MBQ-37/MBQ-39's
+  "Blocks implementation" register cells restored to conservative,
+  Yes-leading wording pending DEC-015 acceptance (minor finding 3); new
+  open question **MBQ-63** added (Shopify inventory-webhook payload
+  shape/subscription mechanics/Phase-1-implementation-scope residual,
+  minor finding 4); the MBQ-34 review-then-apply recommendation sentence
+  added directly to §A.7, where §A.15/§G already referenced it (minor
+  finding 5); a truncated `FULFILLMENTS_CREATE`/`FULFILLMENTS_UPDATE`
+  Shopify-topic quote marked as an excerpt (minor finding 6); the two
+  remaining "resolving MBQ-37"/"resolving MBQ-39" instances in DEC-015's
+  Proposed-decision items and in AR-012 changed to "proposing to resolve"
+  (minor finding 7). DEC-015 and AR-012 updated to reference MBQ-62/63 as
+  new/open; this handoff updated to match. No technical conclusion
+  outside the C1/C2 corrections changed; no MBQ ID renumbered; DEC-003
+  through DEC-014 untouched; no code files changed; implementation
+  remains blocked; Part D/E remain not started; DEC-015 and AR-012 remain
+  Proposed for ChatGPT review, not accepted. Same branch/PR (#74) — no
+  new PR, no merge. Next: stop for ChatGPT acceptance review.
+
+### DEC-015 Acceptance Patch — Part C blueprint document alignment (2026-07-03)
+
+ChatGPT review of PR #74 found that the earlier DEC-015 acceptance-patch
+commit correctly updated DEC-015, AR-012, `master-blueprint.md`, the MBQ
+register, the decisions README, and the handoff, but left the primary
+Part C blueprint document (`master-blueprint-inventory-fulfillment.md`)
+itself still using proposal-era status wording ("Proposed for ChatGPT
+review, not accepted," "proposed resolved"/"proposed partially
+resolved," "pending DEC-015 acceptance") throughout its header, Status
+section, claim-label section, §A.15, §B.14, §G, §H, and §I. Corrected in
+a follow-up commit: the companion-DEC line and Status section now read
+"Accepted by ChatGPT via DEC-015, 2026-07-03"; the claim-label section no
+longer says the whole document is pending review; MBQ-37/MBQ-39 now read
+"resolved at fact-verification level," MBQ-32/36/38/40/42/43 now read
+"partially resolved" (MBQ-42 including the accepted, blueprint-level-only
+widening of `ambiguous match`), and MBQ-33/34/41/35/60–63 remain
+explicitly open, unchanged in substance; §I's implementation-blocked
+statement now correctly shows condition (1) — ChatGPT acceptance of
+Part C — as satisfied at blueprint level, while conditions (2)–(4)
+remain unsatisfied, so implementation stays blocked overall. No
+architecture substance changed; no MBQ row added, deleted, or
+renumbered; DEC-003 through DEC-014 untouched; no code files changed.
+Same branch/PR (#74) — no new PR, no merge, PR stays draft. Next: stop
+for ChatGPT's next direction (Part D or Part E).
