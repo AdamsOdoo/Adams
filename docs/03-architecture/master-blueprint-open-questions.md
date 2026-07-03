@@ -91,6 +91,26 @@ resolved** labels.
 > **MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-53, MBQ-54, MBQ-55,
 > MBQ-56, MBQ-57, and MBQ-58 remain untouched and open.**
 
+> **Master Blueprint Sprint D note (2026-07-03) — Proposed, not accepted.**
+> Sprint D
+> ([`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md),
+> companion
+> [`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md),
+> Status: **Proposed for ChatGPT review**) proposes the UI/UX Screen Design
+> Blueprint (Part D) and updates only the **MBQ-53** row above to **Proposed
+> partially resolved** — MBQ-53 stays **open** until DEC-016 is accepted.
+> **No other MBQ row is changed, and no new MBQ row is added** — the screen
+> design consumes existing open questions rather than surfacing new ones.
+> Part D **proposes a direction** for, but does **not** decide, the
+> screen-relevant open rows **MBQ-45** (admin-vs-functional surface split /
+> roles→groups), **MBQ-06** (readiness split), **MBQ-33/MBQ-34/MBQ-41**
+> (first-push granularity / apply-mode / per-order notification override), and
+> **MBQ-35/MBQ-32** (`on_hand` UI exposure / quantity source) — its screens are
+> designed to accommodate either resolution. **MBQ-03/MBQ-22/MBQ-44**
+> (exact XML IDs / copy / groups) and **MBQ-60 through MBQ-63** remain open and
+> untouched. Registering this proposal decides nothing and authorizes no
+> implementation.
+
 ## How to read
 
 - **Decision owner:** **ChatGPT** (a control-room decision), **Implementation
@@ -214,7 +234,7 @@ resolved** labels.
 
 | ID | Open question | Source | Why it matters | Decision owner | Blocks implementation |
 | --- | --- | --- | --- | --- | --- |
-| MBQ-53 | **Screen-level UI/UX design blueprint** — screen inventory, navigation/information architecture, Odoo-native interaction patterns, screen-level wireframe specs (dashboard, setup wizard, store settings, sync center, error center, matching center, preview/review screens), empty/loading/success/error/manual-review states per screen, UX copy guidelines, error-message style, and a premium UI/UX acceptance checklist | DEC-012 (promised a later UI-design pass; "exact copy/wording... a later UI-design pass" — `ux-operator-flow.md` §5, DEC-012 "What remains open"); standing user/ChatGPT rule that premium UI/UX is a product pillar; Master Blueprint Sprint A review | The ten accepted operator flows (DEC-012) fix *behaviour*, not *screens* — premium UI/UX is a named differentiation pillar (`../02-product/product-vision.md`) and is not achieved by behavioural rules alone; without screen-level design, wireframes/specs, Odoo-native interaction rules, and explicit screen states, implementation would have to invent screen design ad hoc, risking an inconsistent or non-premium operator experience | ChatGPT + a later **UI/UX Screen Design Blueprint sprint** (Master Blueprint Part D, see `master-blueprint.md`) | Yes, for implementation of any operator-facing screen/view/UI flow; No for Part B/C domain-blueprint authoring (concept/contract level, not screen design) |
+| MBQ-53 | **Screen-level UI/UX design blueprint** — screen inventory, navigation/information architecture, Odoo-native interaction patterns, screen-level wireframe specs (dashboard, setup wizard, store settings, sync center, error center, matching center, preview/review screens), empty/loading/success/error/manual-review states per screen, UX copy guidelines, error-message style, and a premium UI/UX acceptance checklist. **Proposed partially resolved by DEC-016 (Master Blueprint Sprint D, 2026-07-03) — remains OPEN until DEC-016 is accepted:** the screen-design blueprint layer is proposed complete ([`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md), companion [`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md), Status: Proposed for ChatGPT review), but MBQ-53's full closure additionally depends on its still-open sibling rows — **MBQ-03** (exact view/menu/action XML IDs), **MBQ-22** (exact copy/wording), **MBQ-44** (exact security groups/CSVs), **MBQ-45** (admin-vs-functional surface split), **MBQ-06** (readiness essential-vs-nice-to-have split) — which Part D **accommodates but does not decide**; and the still-open screen-relevant recommendations MBQ-33/34/41/35/32 are likewise accommodated, not decided. See the Sprint D note below. | DEC-012 (promised a later UI-design pass; "exact copy/wording... a later UI-design pass" — `ux-operator-flow.md` §5, DEC-012 "What remains open"); standing user/ChatGPT rule that premium UI/UX is a product pillar; Master Blueprint Sprint A review | The ten accepted operator flows (DEC-012) fix *behaviour*, not *screens* — premium UI/UX is a named differentiation pillar (`../02-product/product-vision.md`) and is not achieved by behavioural rules alone; without screen-level design, wireframes/specs, Odoo-native interaction rules, and explicit screen states, implementation would have to invent screen design ad hoc, risking an inconsistent or non-premium operator experience | ChatGPT + a later **UI/UX Screen Design Blueprint sprint** (Master Blueprint Part D, see `master-blueprint.md`) | Yes, for implementation of any operator-facing screen/view/UI flow; No for Part B/C domain-blueprint authoring (concept/contract level, not screen design) |
 
 ---
 
