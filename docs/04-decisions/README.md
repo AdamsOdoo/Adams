@@ -190,30 +190,40 @@ fulfillment domain blueprint (routed to Master Blueprint Sprint B, next
 recommended but not started); DEC-003 through DEC-012 are unchanged.**
 MBQ-04, MBQ-08, MBQ-53, and MBQ-54 remain open.
 
-**Also present (not yet accepted):**
+**Also accepted:**
 [`DEC-014-master-blueprint-product-customer-sale.md`](./DEC-014-master-blueprint-product-customer-sale.md) —
 proposed 2026-07-03 (Master Blueprint Sprint B, prepared after PR #71
 merged into `Shopify-connector`, merge commit
 `283a38f26ef90fca2a53c18ff6faf4775da4a2ee`; revised twice on PR #72 — once
-after ChatGPT review, once after Fable review returned REVISE). **Status:
-Proposed for ChatGPT review — not accepted.** Proposes accepting the
+after ChatGPT review, once after Fable review returned REVISE) and
+**accepted by ChatGPT on 2026-07-03** after PR #72 merged into
+`Shopify-connector` (merge commit
+`e27c21f328436bc734539dd9169a95d79deaadd1`). **Status: Accepted by
+ChatGPT, acceptance date 2026-07-03 — no longer proposed.** Accepts the
 **Part B — Product, Customer, and Sale/Order Domain Blueprint**
 (`../03-architecture/master-blueprint-product-customer-sale.md`):
 product import/export/update (variant-mutation-strategy direction citing
 both `productVariantsBulkCreate` and `productVariantsBulkUpdate` official
 docs, draft/publish mechanism, media/price handling); customer import/
-matching (default-customer-fallback direction, proposed email-only
-match-key recommendation); order import (whole-order-hold rule for
-unmatched products, total-check guard definition, proposed order-import
-operator-touchpoint recommendation, gateway→journal mapping concept,
-narrowed order-edit/`ORDERS_UPDATED` posture); and the **proposed
-automated import create/bind policy** (MBQ-59, routed via accepted Part A
-per-class mechanisms — not a single collapsed `blocked_manual_review`
-state). Proposes resolutions/partial resolutions for **MBQ-23/25/29/30**,
-recommendations for **MBQ-26/31** (both ChatGPT-decision-owner rows), and
-carries forward **MBQ-24/27/28/59** unresolved (MBQ-59 remains fully
-open, not partially resolved, not accepted); adds **MBQ-55 through
-MBQ-59**. **Does not authorize implementation; does not start Sprint C;
-does not start the UI/UX Screen Design Blueprint; DEC-003 through DEC-013
-are unchanged.** MBQ-04, MBQ-08, MBQ-53, and MBQ-54 remain open,
-untouched by this proposal.
+matching (default-customer-fallback direction, email-only match-key
+recommendation now **accepted at blueprint level**, MBQ-31); order
+import (whole-order-hold rule for unmatched products, total-check guard
+definition, order-import operator-touchpoint recommendation now
+**accepted at blueprint level** with inline financial-evidence breakdown
+and direct matching-flow links, MBQ-26; gateway→journal mapping concept;
+narrowed order-edit/`ORDERS_UPDATED` posture — **Fable B2 route,
+accepted**: evidence-refresh only, no silent Odoo sale-order line/price/
+tax/shipping/discount/payment/refund/fulfillment update under any
+trigger); and the **automated import create/bind policy** (MBQ-59,
+routed via accepted Part A per-class mechanisms — not a single collapsed
+`blocked_manual_review` state — now **accepted at blueprint-policy
+level**, exact implementation detail remains open). **Fable B1 route,
+accepted** — accepted Part A per-class routing throughout, **Part A
+§D.8's `blocked_manual_review` vocabulary not widened**. Resolves,
+partially: **MBQ-23, MBQ-25, MBQ-29, and MBQ-30** (direction accepted,
+exact detail open); adds **MBQ-55 through MBQ-59**. **Does not authorize
+implementation; does not start Sprint C; does not start the UI/UX Screen
+Design Blueprint; DEC-003 through DEC-013 are unchanged.** MBQ-04,
+MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-53, MBQ-54, MBQ-55, MBQ-56, MBQ-57,
+and MBQ-58 remain open, untouched by this acceptance. **Resolves AR-011**
+in `../05-qa/architecture-review-log.md`.

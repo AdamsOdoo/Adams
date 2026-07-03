@@ -1,8 +1,9 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Master
-> Blueprint Sprint B)** is immediately below, in the **compact handoff
-> format** (`../06-prompts/session-handoff-template.md`); **DEC-013
+> Continuity lives in GitHub, not chat. The **current entry (DEC-014
+> Acceptance Patch)** is immediately below, in the **compact handoff
+> format** (`../06-prompts/session-handoff-template.md`); **Master
+> Blueprint Sprint B (proposal history)**, **DEC-013
 > Acceptance Patch**, **Master Blueprint Sprint A**,
 > **DEC-012 Acceptance Patch**,
 > **UX / Operator-Flow Decision
@@ -18,6 +19,125 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-014 Acceptance Patch — compact handoff (2026-07-03)
+
+> **Documentation acceptance patch, not implementation.** Confirmed
+> before editing: PR #72 merged into `Shopify-connector` (merge commit
+> `e27c21f328436bc734539dd9169a95d79deaadd1`); DEC-014 confirmed
+> `Proposed for ChatGPT review`; AR-011 confirmed `Proposed for ChatGPT
+> review`; Master Blueprint Part B (Product, Customer, and Sale/Order
+> Domain Blueprint) confirmed present, revised twice on PR #72; DEC-003
+> through DEC-013 confirmed still **Accepted by ChatGPT** and unedited;
+> implementation confirmed still blocked; Sprint C confirmed not
+> started; UI/UX Screen Design Blueprint confirmed not started. Branch
+> `claude/dec-014-acceptance-patch-5bml33` (harness-assigned; preferred
+> branch name per the task prompt was `claude/dec-014-acceptance-patch`
+> — discrepancy recorded here per the session rule; the harness-assigned
+> branch was based exactly on the PR #72 merge commit, so it was used
+> as-is, no re-basing needed).
+
+- **Branch / PR:** `claude/dec-014-acceptance-patch-5bml33` → draft PR
+  into `Shopify-connector`, opened immediately after this handoff
+  commit, **not merged**.
+- **Files changed:**
+  `docs/04-decisions/DEC-014-master-blueprint-product-customer-sale.md`,
+  `docs/05-qa/architecture-review-log.md`, `docs/04-decisions/README.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/03-architecture/master-blueprint.md`,
+  `docs/03-architecture/master-blueprint-product-customer-sale.md`,
+  `docs/01-research/research-handoff.md` (this file).
+- **What changed:** **DEC-014 accepted by ChatGPT**, acceptance date
+  **2026-07-03**, after PR #72 merged into `Shopify-connector` (merge
+  commit `e27c21f328436bc734539dd9169a95d79deaadd1`), carrying both the
+  PR #72 ChatGPT-requested revision and the PR #72 Fable-requested B1/B2/
+  B3 revision. DEC-014 got a new *Accepted decision* section recording
+  the accepted Master Blueprint Sprint B product/customer/sale-order
+  domain blueprint package (items 1–6) and ten explicit acceptance
+  points **A–J**: **(A)** MBQ-23 partially resolved (variant-mutation-
+  strategy direction); **(B)** MBQ-25 partially resolved (draft/publish
+  mechanism); **(C)** MBQ-26 **accepted at blueprint level** (existing
+  error-center/sync-center surfaces sufficient for Phase 1 order-import
+  operator touchpoints, conditioned on the inline financial-evidence
+  breakdown and direct matching-flow links already specified in Part B
+  §C.14); **(D)** MBQ-29 partially resolved (default-customer fallback
+  direction); **(E)** MBQ-31 **accepted at blueprint level** (email is
+  the sole automatic customer match key); **(F)** the total-check guard
+  definition accepted (MBQ-56 stays open, tolerance TBD); **(G)** MBQ-59
+  **accepted at blueprint-policy level** (automated import create/bind
+  policy — pre-create duplicate check + two-tier eligibility/match-
+  quality gate, routed via accepted Part A per-class mechanisms; exact
+  implementation detail remains open); **(H)** the **Fable B1 route
+  accepted** — accepted Part A per-class routing throughout, Part A
+  §D.8's `blocked_manual_review` vocabulary **not widened**; **(I)** the
+  **Fable B2 route accepted** — `ORDERS_UPDATED`/order-edit handling is
+  **evidence-refresh only**, no silent Odoo sale-order line/price/tax/
+  shipping/discount/payment/refund/fulfillment update under any trigger;
+  **(J)** still-open confirmation — MBQ-04/08/24/27/28/53/54/55/56/57/58
+  unaffected, remain open. No-implementation and Sprint-C/UI-UX-Blueprint-
+  not-started language preserved throughout.
+  `architecture-review-log.md`'s AR-011 table row moved from "Proposed
+  for ChatGPT review" to "Accepted by ChatGPT," with a compact
+  acceptance note appended; AR-002 through AR-010 rows untouched.
+  `docs/04-decisions/README.md`'s DEC-014 entry moved from "Also present
+  (not yet accepted)" to "Also accepted," citing the 2026-07-03
+  acceptance date and PR #72 merge commit; DEC-003 through DEC-013
+  entries untouched. `master-blueprint-open-questions.md` updated: its
+  Sprint B note superseded by a DEC-014 acceptance note; MBQ-23/25/29/30
+  rows marked **partially resolved by DEC-014**; MBQ-26/31/59 rows marked
+  **accepted at blueprint(-policy) level by DEC-014**; MBQ-04/08/24/27/
+  28/53/54/55/56/57/58 rows left untouched, no question deleted.
+  `master-blueprint.md`'s status moved to accepted-through-DEC-014
+  wording (Part B table row now reads "Accepted by ChatGPT via DEC-014");
+  Parts C/D/E preserved as "Not started." `master-blueprint-product-
+  customer-sale.md`'s status moved to accepted-via-DEC-014 wording, with
+  the specific paragraphs corresponding to acceptance points A/B/C/D/E/G/
+  H/I (§A.2, §A.5.2, §A.9, §A.10, §A.19, §B.2, §B.7, §B.9, §B.13, §C.6,
+  §C.10, §C.12, §C.13, §C.14, §J) re-labelled `[Accepted — DEC-014]` —
+  the rest of the ~1,400-line document was deliberately **not**
+  mechanically rewritten, mirroring the DEC-013 acceptance-patch
+  precedent for Part A.
+- **Items deferred:** every MBQ row not explicitly resolved/partially
+  resolved/accepted above (notably MBQ-04, MBQ-08, MBQ-24, MBQ-27,
+  MBQ-28, MBQ-53, MBQ-54, MBQ-55, MBQ-56, MBQ-57, MBQ-58); Master
+  Blueprint Sprint C — Inventory and Fulfillment Domain Blueprint; the
+  Part D UI/UX Screen Design Blueprint sprint; Sprint E
+  (implementation-planning bridge); all implementation.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session's own pre-commit check confirmed no DEC-003–013 edits, no
+  RA-row reintroduction, no code files touched, and no MBQ row marked
+  fully "Resolved" outside the explicitly authorized blueprint(-policy)-
+  level acceptances (MBQ-26/31/59, all explicitly scoped as "accepted at
+  blueprint(-policy) level," not "fully resolved," with any named
+  residual detail left open). **Repeated issue patterns:** none at
+  threshold. **Rules/checklists updated:** none new. **New rejected
+  approaches:** none — this patch finalizes no new RA row; DEC-014's
+  acceptance reintroduces nothing from `rejected-approaches-log.md`
+  (checked before editing). **New technical debt:** none (no code).
+  **Architecture concerns:** AR-011 now **Accepted by ChatGPT** — Master
+  Blueprint Part B is accepted at blueprint level; Sprint C is the next
+  recommended step, still gated by a separate ChatGPT implementation-gate
+  approval and, for operator-facing screens, the not-yet-started Part D
+  UI/UX Screen Design Blueprint.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (no new issues) · rejected approaches
+  checked, none added · technical debt logged (none applicable — no
+  code) · repeated-issue escalation applied (none at threshold) — all
+  **YES**.
+- **Next recommended session:** 1) **Master Blueprint Sprint C —
+  Inventory and Fulfillment Domain Blueprint** (convert DEC-010/DEC-011
+  into the inventory and fulfillment domain blueprints); 2)
+  **Implementation only after a separate ChatGPT gate**, and, for any
+  operator-facing screen, only after the Part D UI/UX Screen Design
+  Blueprint is also accepted.
+- **Stop condition:** stopped after one commit + one **draft** PR into
+  `Shopify-connector` (not merged). PR #72 merge confirmed first.
+  DEC-003 through DEC-013 not edited; no code files changed; Master
+  Blueprint Sprint C not started; UI/UX Screen Design Blueprint not
+  started; implementation still not authorized; `main` and plain `dev`
+  untouched. Awaiting further instruction.
 
 ---
 
@@ -4720,3 +4840,21 @@ ChatGPT review.
   changed; implementation remains blocked; Sprint C not started; UI/UX
   Screen Design Blueprint not started. Same branch/PR (#72) — no new PR,
   no merge. Next: stop for Fable re-review.
+- **DEC-014 Acceptance Patch (2026-07-03):** after PR #72 merged into
+  `Shopify-connector` (merge commit
+  `e27c21f328436bc734539dd9169a95d79deaadd1`), ChatGPT formally accepted
+  DEC-014. Accepted Master Blueprint Part B in full; accepted the Fable
+  B1 route (Part A per-class routing, §D.8 vocabulary not widened) and
+  the Fable B2 route (`ORDERS_UPDATED` evidence-refresh only, no silent
+  Odoo writes) as final; accepted MBQ-59 (automated import create/bind
+  policy) at blueprint-policy level; accepted MBQ-26 (order-import
+  operator touchpoints, with inline financial-evidence breakdown and
+  direct matching-flow links) and MBQ-31 (email-only customer match key)
+  at blueprint level; partially resolved MBQ-23/25/29/30. MBQ-04/08/24/
+  27/28/53/54/55/56/57/58 remain open, untouched. AR-011 moved to
+  Accepted. DEC-003 through DEC-013 unedited; no code files changed;
+  implementation remains blocked; Sprint C not started; UI/UX Screen
+  Design Blueprint not started. Branch
+  `claude/dec-014-acceptance-patch-5bml33` (harness-assigned). Next: push
+  branch, open one draft PR into `Shopify-connector`, stop for ChatGPT
+  review.
