@@ -166,6 +166,45 @@ branch (`claude/master-blueprint-sprint-b-7zrvji`), same PR (#72) —
 pushed as a new commit, no new PR opened, no merge. Next: stop for
 Fable review.
 
+**PR #72 Fable review — REVISE (2026-07-03):** Fable reviewed PR #72 at
+head `e4146b948e3177878cb86b554e8a354c2edada0a` and returned **REVISE**.
+Governance was clean and Sprint B's substance did not require redesign.
+Revision applied B1/B2/B3 per ChatGPT's routing decisions: **B1** —
+corrected Part A/Part B routing semantics so `mapping missing`,
+`financial total mismatch`, `data shape/schema mismatch`, and MBQ-59 gate
+failures use **accepted Part A per-class routing** instead of collapsing
+into `blocked_manual_review` (§A.2/§B.2/§C.5/§C.8/§C.13/§G/§I) — Part A
+§D.8's confirmation-required sub-reason vocabulary was **not widened**.
+**B2** — narrowed §C.12: `ORDERS_UPDATED`/order-edit handling now only
+refreshes Shopify-side evidence, never silently applies to Odoo sale
+order line quantities/prices/taxes/shipping/discounts/invoices/payments/
+refunds/fulfillment state; any divergence routes through the total-check
+guard; webhook and reconciliation paths behave identically. **B3** —
+fixed MBQ-59 acceptance-status labels (§A.2 Flow bullet/heading, §C.6.2)
+so the accepted import capability is separated from the proposed,
+pending-DEC-014 automated create/bind mechanism; MBQ-59 remains fully
+open, never resolved or partially resolved. Also applied Fable's twelve
+minor issues (README MBQ-55–59 range; DEC-014 acceptance-point lettering
+A–H, no more gap; §B.10 MBQ-02/55 typo; §A.13 MBQ-24 "carried forward,
+open" wording; §B.6 attribution + §B.7 fallback "proposed, not accepted"
+wording; product-webhook-topic citation softened; customer-import webhook
+wording no longer implies an unverified standalone topic; §C.6 "three
+distinct paths" + ambiguous-customer reconciled with the domain-brief
+"one bad customer record does not block order import" posture;
+MBQ-59 gate condition 4 restated to cover confident-match and
+confident-no-match-creation; gate condition 6 citation split between Part
+A §D.10 and §C.4; `productVariantsBulkUpdate` citation consistency in
+DEC-014/register; original MBQ question text restored for
+MBQ-23–27/29–31/59; DEC-014's MBQ-59 point now names the DEC-003/006 vs.
+DEC-005 vs. Part A/DEC-013 tension and the Part A §I.5 no-bypass rule).
+**DEC-014 remains Proposed for ChatGPT review — not accepted. AR-011
+remains Proposed for ChatGPT review — not accepted. MBQ-59 remains
+proposed/open pending DEC-014.** DEC-003 through DEC-013 untouched; no
+code files changed; implementation remains blocked; Sprint C not started;
+UI/UX Screen Design Blueprint not started. Same branch
+(`claude/master-blueprint-sprint-b-7zrvji`), same PR (#72) — pushed as a
+new commit, no new PR opened, no merge. Next: stop for Fable re-review.
+
 ---
 
 ### DEC-013 Acceptance Patch — compact handoff (2026-07-03)
@@ -4661,3 +4700,23 @@ ChatGPT review.
   remains blocked; Sprint C not started; UI/UX Screen Design Blueprint
   not started. Same branch/PR (#72) — no new PR, no merge. Next: stop
   for Fable review.
+- **Master Blueprint Sprint B — PR #72 Fable revision (2026-07-03):**
+  Fable returned REVISE (no redesign needed). Applied B1 (Part A
+  per-class routing — `mapping missing`/`data shape mismatch` →
+  `failed_retryable`, `financial total mismatch` → its own §D.5.5
+  posture, only the four Sprint-B-relevant confirmation-required classes
+  → `blocked_manual_review`; Part A §D.8 vocabulary not widened), B2
+  (§C.12 narrowed — `ORDERS_UPDATED` refreshes evidence only, never
+  silently writes sale-order lines/totals/fulfillment state, divergence
+  routed to the total-check guard, webhook/reconciliation consistent),
+  and B3 (MBQ-59 labels fixed — accepted import capability separated
+  from the proposed, pending-DEC-014 automated mechanism; MBQ-59 stays
+  fully open). Applied 12 minor issues (README range, DEC-014 lettering,
+  MBQ typos, §B.6/§B.7 attribution, webhook-topic citations, §C.6
+  three-path reconciliation, gate-condition precision, citation
+  consistency, original MBQ question text restored). DEC-014 and AR-011
+  remain Proposed for ChatGPT review, not accepted; MBQ-59 remains
+  proposed/open; DEC-003 through DEC-013 untouched; no code files
+  changed; implementation remains blocked; Sprint C not started; UI/UX
+  Screen Design Blueprint not started. Same branch/PR (#72) — no new PR,
+  no merge. Next: stop for Fable re-review.

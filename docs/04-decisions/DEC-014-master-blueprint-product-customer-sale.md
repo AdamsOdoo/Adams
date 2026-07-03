@@ -17,8 +17,8 @@
 **Proposed for ChatGPT review.** Not accepted. Not implementation-
 authorizing under any outcome — see *No implementation authorized* below.
 
-> **Revision note (2026-07-03, PR #72 review — REVISE before Fable
-> review).** ChatGPT reviewed PR #72 and requested revision before
+> **Revision note (2026-07-03, PR #72 ChatGPT review — REVISE before
+> Fable review).** ChatGPT reviewed PR #72 and requested revision before
 > routing to Fable. Fixed: (1) withdrew the reading that retrospective
 > sync-center/dashboard visibility satisfies the "no blind create" /
 > preview requirement for automated product/customer imports — replaced
@@ -35,10 +35,50 @@ authorizing under any outcome — see *No implementation authorized* below.
 > (already covered by MBQ-06/MBQ-09; no new row added). (4) Verified
 > `productVariantsBulkUpdate` against its official reference page
 > (accessed 2026-07-03) and cited it directly, replacing the earlier
-> under-cited claim. This revision does **not** change DEC-014's status —
-> still **Proposed for ChatGPT review**, not accepted — and does not
-> change DEC-003 through DEC-013, start Sprint C, or start the UI/UX
-> Screen Design Blueprint.
+> under-cited claim.
+>
+> **Second revision note (2026-07-03, PR #72 Fable review — REVISE, no
+> redesign needed).** Fable reviewed PR #72 at head
+> `e4146b948e3177878cb86b554e8a354c2edada0a` and returned **REVISE**:
+> governance was clean and Sprint B's substance did not require redesign,
+> but three findings (B1/B2/B3) plus twelve minor issues needed a
+> focused fix. Per ChatGPT's routing decisions: **B1 (routing/state
+> semantics)** — the six-condition MBQ-59 gate, §C.5's unmatched-product
+> handling, §C.8's total-check guard, §C.13's manual-review triggers, §G,
+> and §I were corrected to use **accepted Part A per-class routing**
+> instead of collapsing `mapping missing`, `financial total mismatch`,
+> `data shape/schema mismatch`, and every MBQ-59 gate failure into
+> `blocked_manual_review` — Part A §D.8's confirmation-required
+> sub-reason vocabulary is **not widened** in this revision; `mapping
+> missing`/`data shape mismatch` now correctly sit in Part A §D.5.3's
+> "manual fix then retry" (`failed_retryable`), `financial total
+> mismatch` in Part A §D.5.5's own "conservative, never silent" posture,
+> and only the four Sprint-B-relevant confirmation-required classes
+> (ambiguous match, binding conflict, duplicate risk, destructive-write
+> guard blocked) route to `blocked_manual_review`. **B2 (order-edit /
+> `ORDERS_UPDATED` scope)** — §C.12 narrowed: `ORDERS_UPDATED` may
+> refresh Shopify-side evidence/audit data only, never silently update
+> Odoo sale-order line quantities/prices/taxes/shipping/discounts/
+> invoices/payments/refunds/fulfillment state; any divergence routes
+> through the total-check guard/human-review posture; webhook and
+> reconciliation paths behave identically (neither auto-applies). **B3
+> (MBQ-59 acceptance-status labels)** — §A.2's Flow bullet, heading, and
+> §C.6.2 corrected so the accepted product/customer-import **capability**
+> is clearly separated from the proposed, pending-DEC-014 **automated
+> create/bind mechanism** — MBQ-59 remains proposed/open throughout, never
+> labelled resolved, partially resolved, or already-accepted. Twelve
+> minor issues also applied (README MBQ range; acceptance-point
+> lettering; §B.10/§A.13 MBQ mislabels; §B.6 attribution + fallback
+> over-label; product-webhook-topic citation; customer-import webhook
+> wording; §C.6 path count + ambiguous-customer reconciliation with the
+> domain-brief "one bad customer record does not block order import"
+> posture; MBQ-59 gate-condition precision and citation split (§D.10 vs.
+> §C.4); `productVariantsBulkUpdate` citation consistency; original MBQ
+> question text restored for MBQ-23–27/29–31/59; and this point's own
+> tension/no-bypass framing, see point G below). This second revision
+> does **not** change DEC-014's status — still **Proposed for ChatGPT
+> review**, not accepted — and does not change DEC-003 through DEC-013,
+> start Sprint C, or start the UI/UX Screen Design Blueprint.
 
 ## Date
 
@@ -110,9 +150,11 @@ domains, namely:
    identity separation (§A.7); duplicate-prevention preview, including
    the **proposed automated import create/bind policy** (§A.2/§A.9,
    extended to Customer §B.2/§B.9 — a pre-create duplicate check plus a
-   six-condition auto-create gate, new open question **MBQ-59**,
-   explicitly **not** an already-accepted interpretation of DEC-003/
-   DEC-006); the **proposed draft/publish mechanism** (`Product.status` +
+   two-tier eligibility/match-quality gate, routed using accepted Part A
+   per-class mechanisms rather than a single collapsed
+   `blocked_manual_review` state, open question **MBQ-59**, explicitly
+   **not** an already-accepted interpretation of DEC-003/DEC-006); the
+   **proposed draft/publish mechanism** (`Product.status` +
    unpublished-by-default `productCreate` + `publishablePublish`, §A.10);
    the destructive-write guard (§A.11); source-of-truth choices (§A.12);
    media (§A.13) and price/compare-at (§A.14) handling per DEC-007 §2/§3;
@@ -134,19 +176,27 @@ domains, namely:
 3. **Sale/order domain** — order binding ownership under
    `shopify_connector_sale` (§C.1); the layered order-import flow (§C.2);
    order identity/duplicate prevention (§C.3); order line mapping (§C.4);
-   the **proposed whole-order-hold rule** for an unmatched product line
-   (§C.5); the **proposed two-path customer-resolution rule** for order
-   import (§C.6); financial-evidence capture (§C.7); the **proposed
-   total-check guard definition** (computed evidence sum vs. Shopify
-   order total, tolerance TBD, routed to the existing `financial total
-   mismatch` error class, §C.8); tax/shipping/discount/payment evidence
-   handling per DEC-007 §6 (§C.9); the **proposed gateway → journal
-   mapping concept** (§C.10); the unchanged no-invoice/payment-automation
-   and deferred-refund/cancellation postures (§C.11/§C.12); manual-review
-   trigger mapping (§C.13); the **proposed MBQ-26 resolution
-   recommendation** (existing error/sync-center surfaces, extended, no
-   dedicated screen, §C.14); order job types (§C.15); and the
-   error/retry mapping (§C.16, consolidated in §I).
+   the **proposed whole-order-hold rule**, correctly routed via Part A's
+   `failed_retryable`/"manual fix then retry" posture (not
+   `blocked_manual_review`), for an unmatched product line (§C.5); the
+   **proposed three-path customer-resolution rule** for order import
+   (§C.6), reconciled with the accepted domain-brief posture that one bad
+   customer record does not block order import; financial-evidence
+   capture (§C.7); the **proposed total-check guard definition** (computed
+   evidence sum vs. Shopify order total, tolerance TBD, classified
+   `financial total mismatch` — Part A §D.5.5's own "conservative, never
+   silent" posture, not `blocked_manual_review`, §C.8); tax/shipping/
+   discount/payment evidence handling per DEC-007 §6 (§C.9); the
+   **proposed gateway → journal mapping concept** (§C.10); the unchanged
+   no-invoice/payment-automation posture (§C.11) and the **narrowed
+   §C.12 order-edit/`ORDERS_UPDATED` posture** (evidence-refresh only,
+   never silent sale-order-line writes, divergence routed to the
+   total-check guard, webhook/reconciliation consistency); manual-review
+   trigger mapping, now with explicit per-class routing (§C.13); the
+   **proposed MBQ-26 resolution recommendation** (existing error/
+   sync-center surfaces, extended, no dedicated screen, §C.14); order job
+   types (§C.15); and the error/retry mapping (§C.16, consolidated in
+   §I).
 4. **Cross-domain sequencing** — product-binding-before-order-line,
    customer-binding-before-order-assignment, total-check-guard-before-
    finalize, uniform manual-review routing, shared reconciliation
@@ -167,9 +217,10 @@ domains, namely:
 updates after first export, and `productSet` for first-time combined
 product+variant export or an explicit full-state resync — both gated by
 the same destructive-write preview regardless of which is chosen. Grounded
-in official `productSet`/`productVariantsBulkCreate` documentation
-(accessed 2026-07-03). Exact implementation choice remains open
-(**MBQ-23 stays partially resolved, not fully resolved**).
+in official `productSet`, `productVariantsBulkCreate`, **and
+`productVariantsBulkUpdate`** documentation (all three reference pages
+verified and cited, accessed 2026-07-03). Exact implementation choice
+remains open (**MBQ-23 stays partially resolved, not fully resolved**).
 
 **B. Draft/publish mechanism (MBQ-25).** Proposes `Product.status`
 (`DRAFT`) plus withholding `publishablePublish` as the two composable
@@ -208,34 +259,79 @@ any mismatch to the already-accepted `financial total mismatch` error
 class (Part A §D.4/§D.5.5, "conservative, never silent"). Exact tolerance
 and exact Shopify total field remain open (new row **MBQ-56**).
 
-**H. Automated import create/bind policy (MBQ-59 — added in the PR #72
-revision, an open decision, not an already-accepted interpretation).**
+**G. Automated import create/bind policy (MBQ-59 — added in the PR #72
+ChatGPT-requested revision, revised again in the PR #72 Fable-requested
+revision; an open decision, not an already-accepted interpretation).**
 Proposes that for automated (webhook/scheduled/reconciliation-triggered)
 product/customer import, "no blind create" is satisfied by a **pre-create
-duplicate check** plus a **six-condition auto-create gate** (setup
-complete; domain enabled; source strategy permits import-side creation;
-confident, unambiguous match; no duplicate-risk/binding-conflict/
-destructive-write-guard condition triggered; fully logged before/after/
-audit detail) — never by the sync-center/dashboard's later, retrospective
-display of the outcome, which is audit/log visibility only. This
-explicitly **withdraws** this document's earlier wording, which had read
-retrospective visibility as satisfying the preview requirement. Interactive/
-batch create-bind/write (a manual matching session, a bulk onboarding
-pass, or any operator-triggered export/update) is unaffected and still
-requires a blocking, synchronous preview before the operator confirms.
+duplicate check** plus a **two-tier gate**, using **accepted Part A
+per-class routing** rather than a single collapsed state:
+
+- **Eligibility conditions** (setup complete; domain enabled; source
+  strategy permits import-side creation) — governed by Part A's
+  already-accepted enqueue-time/execution-time gating (§E.4/§E.5,
+  §I.3/§I.4): a failed condition means the job is not enqueued, or an
+  already-queued job is cancelled with an audit reason or held per the
+  accepted domain-disable mechanics — never presented as a
+  `blocked_manual_review` confirmation case.
+- **Match-quality conditions** (a confident match to an existing record,
+  or a confident no-match creation candidate after the duplicate check;
+  no `ambiguous match`/`binding conflict`/`duplicate risk`/`destructive-
+  write guard blocked` condition triggered) — governed by Part A's
+  already-accepted confirmation-required classes (§D.5.4/§D.8, four of
+  the six sub-classes relevant to this sprint's domains): a failed
+  condition routes to `blocked_manual_review` with its specific
+  sub-reason, unchanged from the already-accepted taxonomy.
+- The create/bind action, once it proceeds, is **fully logged** — job/log
+  audit detail (Part A §D.10) and binding audit fields (matched-by,
+  matched-at, source strategy, match key used, status — Part A §C.4).
+
+This gate is never satisfied by the sync-center/dashboard's later,
+retrospective display of the outcome, which is audit/log visibility
+only — this explicitly **withdraws** this document's earlier wording,
+which had read retrospective visibility as satisfying the preview
+requirement. Interactive/batch create-bind/write (a manual matching
+session, a bulk onboarding pass, or any operator-triggered export/
+update) is unaffected and still requires a blocking, synchronous preview
+before the operator confirms.
+
+**The tension this proposal navigates, named explicitly:** DEC-003's and
+DEC-006's "duplicate-prevention preview... precedes every create/bind
+action; no blind create" wording, read literally as a synchronous
+per-record human confirmation, would be incompatible with **DEC-005's**
+accepted layered-automation model (webhook + cron + manual +
+reconciliation, expected to run largely unattended) and with the
+**equivalent accepted Part A/DEC-013 wording** that already distinguishes
+enqueue-time/execution-time gating (§E.5, §I.3/§I.4) from confirmation-
+required manual review (§D.5.4/§D.8) as two **different** accepted
+mechanisms, neither of which is "retrospective audit." This proposal's
+gate resolves that tension using only already-accepted Part A mechanisms,
+composed for the automated-import case — it does not invent a new
+mechanism, but composing them this way for this purpose is itself the
+**proposed, not yet accepted**, part.
+
+**The gate itself is subject to Part A §I.5's no-bypass rule:** no
+feature flag, setting, or configuration combination may allow an
+automated import to skip the pre-create duplicate check or the
+match-quality gate — §I.5 already names "the duplicate-prevention
+preview" among the guards no flag may bypass, and this gate is this
+sprint's proposed mechanism for satisfying that preview requirement in
+the automated case, so the same no-bypass rule applies to it by
+construction, not as a new guard.
+
 This is a **proposed policy, pending ChatGPT's acceptance at this DEC-014
 review** — not a self-decided resolution of the underlying DEC-003/
 DEC-006 "no blind create" tension with DEC-005's layered automation model
 (**MBQ-59 stays open, not resolved, by this proposal alone**).
 
-**I. Still open.** This proposal does not resolve every MBQ. Kept open
+**H. Still open.** This proposal does not resolve every MBQ. Kept open
 where appropriate: **MBQ-04, MBQ-08, MBQ-53, MBQ-54** (unchanged, not
 addressed by this sprint), **MBQ-24** (media delete-on-omit — checked,
 not resolved), **MBQ-27** (Odoo-side tax-representation mechanism —
 official-doc check attempted, inconclusive), **MBQ-28** (Domain 9
 draft-artifact guard — not triggered), **MBQ-30** (gateway→journal
 mapping — concept proposed, exact schema open), **MBQ-59** (automated
-import create/bind policy — proposed, not resolved, see point H), and the
+import create/bind policy — proposed, not resolved, see point G), and the
 five new rows **MBQ-55 through MBQ-59**.
 
 **What this acceptance (if granted) would NOT do:**
@@ -264,7 +360,7 @@ five new rows **MBQ-55 through MBQ-59**.
 - The proposed recommendations for MBQ-26 and MBQ-31 (both explicitly
   ChatGPT-decision-owner rows).
 - The proposed automated import create/bind policy (MBQ-59) — open,
-  pending this review, not self-decided (see Explicit acceptance point H).
+  pending this review, not self-decided (see Explicit acceptance point G).
 
 ## What this does NOT decide
 
@@ -315,21 +411,22 @@ match-key set — proposed resolution, ChatGPT decision), **MBQ-59**
    duplicate total-check path; **MBQ-57** is added so this rule can be
    revisited in a future review if evidence emerges that it is too
    conservative in practice.
-3. **Risk (confirmed and fixed in the PR #72 revision):** an earlier draft
-   of §A.2/§B.2 read retrospective sync-center/dashboard visibility as
-   satisfying the "no blind create" / preview requirement for confident,
-   automated creates — ChatGPT correctly flagged this as weakening
-   DEC-003/DEC-006's guard, since retrospective visibility is audit, not
-   preview. **Mitigation (applied):** that reading is explicitly
-   withdrawn; §A.2/§A.9/§B.2/§B.9 now require a **pre-create** duplicate
-   check plus a six-condition auto-create gate before any automated
-   create/bind, with `blocked_manual_review` as the fallback for any
-   failed condition — tracked as new open question **MBQ-59**, labelled
-   `[Blueprint proposal, pending DEC-014]` throughout, not an
+3. **Risk (confirmed and fixed in the PR #72 ChatGPT-requested
+   revision):** an earlier draft of §A.2/§B.2 read retrospective
+   sync-center/dashboard visibility as satisfying the "no blind create" /
+   preview requirement for confident, automated creates — ChatGPT
+   correctly flagged this as weakening DEC-003/DEC-006's guard, since
+   retrospective visibility is audit, not preview. **Mitigation
+   (applied):** that reading is explicitly withdrawn; §A.2/§A.9/§B.2/§B.9
+   now require a **pre-create** duplicate check plus a gate before any
+   automated create/bind — tracked as new open question **MBQ-59**,
+   labelled `[Blueprint proposal, pending DEC-014]` throughout, not an
    already-accepted interpretation. Synchronous confirmation for every
    ambiguous/binding-conflict/duplicate-risk state (DEC-009) is
    unchanged and unweakened; interactive/batch create-bind/write
-   continues to require a blocking preview.
+   continues to require a blocking preview. (The gate's **exact routing**
+   on failure was itself corrected in the subsequent Fable-review
+   revision — see risk 6.)
 4. **Risk:** MBQ-26 and MBQ-31 recommendations could be mistaken for
    already-decided outcomes since they appear inside an otherwise
    detailed blueprint. **Mitigation:** both are labelled
@@ -343,6 +440,40 @@ match-key set — proposed resolution, ChatGPT decision), **MBQ-59**
    explicitly recorded as "carried forward, open" in the register and in
    Part B, with the exact check performed and its inconclusive result
    stated, per `CLAUDE.md` §7's "no unsupported claims" rule.
+6. **Risk (confirmed and fixed in the PR #72 Fable-review revision — B1):**
+   the ChatGPT-revision draft of the MBQ-59 gate, §C.5, §C.8, §C.13, and
+   §G described `mapping missing`, `financial total mismatch`, `data
+   shape/schema mismatch`, and every MBQ-59 gate failure as routing to
+   `blocked_manual_review` — silently amending accepted DEC-013 state
+   semantics, since Part A §D.8 ties `blocked_manual_review` to only its
+   six confirmation-required sub-classes (§D.5.4), and `mapping
+   missing`/`data shape mismatch` are §D.5.3's "manual fix then retry"
+   classes while `financial total mismatch` is §D.5.5's own posture.
+   **Mitigation (applied):** all five sections corrected to use accepted
+   Part A per-class routing — eligibility-gate failures are not
+   enqueued/are cancelled with an audit reason (§E.5/§I.3/§I.4);
+   `mapping missing`/`data shape mismatch` sit in `failed_retryable`
+   (§D.3/§D.5.3); `financial total mismatch` is its own "conservative,
+   never silent" posture (§D.5.5); only `ambiguous match`/`binding
+   conflict`/`duplicate risk`/`destructive-write guard blocked` route to
+   `blocked_manual_review`. Part A §D.8's sub-reason vocabulary is **not
+   widened**. Operator visibility/safety outcome is unchanged — only the
+   state/class label is corrected.
+7. **Risk (confirmed and fixed in the PR #72 Fable-review revision — B2):**
+   §C.12 read an `ORDERS_UPDATED` webhook for an already-imported order as
+   updating existing Odoo sale-order line quantities/evidence fields
+   through the normal update path — silently un-deferring order-edit
+   handling and risking a silent write to an already-confirmed or
+   already-fulfilled sale order. **Mitigation (applied):** §C.12 narrowed
+   — `ORDERS_UPDATED` may refresh Shopify-side evidence/audit data only;
+   it must not update sale-order lines, prices, taxes, shipping,
+   discounts, invoices, payments, refunds, or fulfillment state under any
+   trigger; any divergence between refreshed evidence and the existing
+   Odoo representation routes through the total-check guard/`financial
+   total mismatch`/human-review posture (§C.8); the webhook path and the
+   reconciliation path behave identically (neither auto-applies). Order
+   edits/cancellations/refunds/returns remain fully deferred, unchanged
+   from DEC-003.
 
 ## No implementation authorized
 
