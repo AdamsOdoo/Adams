@@ -5200,3 +5200,28 @@ ChatGPT review.
   remains blocked; Part D/E remain not started; DEC-015 and AR-012 remain
   Proposed for ChatGPT review, not accepted. Same branch/PR (#74) — no
   new PR, no merge. Next: stop for ChatGPT acceptance review.
+
+### DEC-015 Acceptance Patch — Part C blueprint document alignment (2026-07-03)
+
+ChatGPT review of PR #74 found that the earlier DEC-015 acceptance-patch
+commit correctly updated DEC-015, AR-012, `master-blueprint.md`, the MBQ
+register, the decisions README, and the handoff, but left the primary
+Part C blueprint document (`master-blueprint-inventory-fulfillment.md`)
+itself still using proposal-era status wording ("Proposed for ChatGPT
+review, not accepted," "proposed resolved"/"proposed partially
+resolved," "pending DEC-015 acceptance") throughout its header, Status
+section, claim-label section, §A.15, §B.14, §G, §H, and §I. Corrected in
+a follow-up commit: the companion-DEC line and Status section now read
+"Accepted by ChatGPT via DEC-015, 2026-07-03"; the claim-label section no
+longer says the whole document is pending review; MBQ-37/MBQ-39 now read
+"resolved at fact-verification level," MBQ-32/36/38/40/42/43 now read
+"partially resolved" (MBQ-42 including the accepted, blueprint-level-only
+widening of `ambiguous match`), and MBQ-33/34/41/35/60–63 remain
+explicitly open, unchanged in substance; §I's implementation-blocked
+statement now correctly shows condition (1) — ChatGPT acceptance of
+Part C — as satisfied at blueprint level, while conditions (2)–(4)
+remain unsatisfied, so implementation stays blocked overall. No
+architecture substance changed; no MBQ row added, deleted, or
+renumbered; DEC-003 through DEC-014 untouched; no code files changed.
+Same branch/PR (#74) — no new PR, no merge, PR stays draft. Next: stop
+for ChatGPT's next direction (Part D or Part E).

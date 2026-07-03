@@ -12,20 +12,23 @@
 > [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md).
 > Companion decision record:
 > [`../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md`](../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md)
-> (Status: **Proposed for ChatGPT review**, not accepted).
+> (Status: **Accepted by ChatGPT, 2026-07-03**).
 
 ## Status
 
-**Proposed for ChatGPT review. Not accepted.** Documentation only — the
+**Accepted by ChatGPT via DEC-015, 2026-07-03.** Documentation only — the
 no-code gate (`CLAUDE.md` §4–§5) is in force. **This document does not
 authorize implementation** under any outcome. Starting point for this
 sprint: PR #73 merge commit `09829a804eef9c4099960f5604729f3a775793d1`
 (Accept DEC-014 Master Blueprint Sprint B), confirmed as the base before
-editing. Part A (core substrate, DEC-013) and Part B (product/customer/
-sale-order, DEC-014) remain **Accepted by ChatGPT** and are reused,
-unmodified, throughout this document. **Part D (UI/UX Screen Design
-Blueprint) and Part E (implementation-planning bridge) remain Not
-started.** Implementation remains blocked.
+editing; accepted on the same PR #74 after Fable review (REVISE, no
+redesign) and a consistency patch were applied. Part A (core substrate,
+DEC-013) and Part B (product/customer/sale-order, DEC-014) remain
+**Accepted by ChatGPT** and are reused, unmodified, throughout this
+document. **Part D (UI/UX Screen Design Blueprint) and Part E
+(implementation-planning bridge) remain Not started.** **MBQ-33, MBQ-34,
+MBQ-41, and MBQ-60 through MBQ-63 remain open**, not decided by this
+acceptance. Implementation remains blocked.
 
 ## Claim labels used throughout
 
@@ -36,8 +39,11 @@ Same discipline as Part A/Part B (see
   Not re-litigated here.
 - **[Blueprint proposal]** — a design detail this sprint introduces,
   converting the accepted DEC-010/DEC-011 architecture into blueprint-level
-  detail. **Proposed, not yet accepted** — this whole document is pending
-  ChatGPT review via DEC-015.
+  detail. **Accepted at blueprint level via DEC-015** (2026-07-03) — this
+  label is retained for traceability to identify sprint-introduced detail,
+  not to imply the document remains pending; exact implementation-level
+  detail remains open where a row (e.g. MBQ-33/34/41, MBQ-60 through
+  MBQ-63) is separately marked open below.
 - **[Official fact]** — a verified Shopify/Odoo platform fact, cited with a
   URL and access date. New facts verified for this sprint are dated
   **2026-07-03**.
@@ -293,10 +299,10 @@ model/field names: **[Open question — MBQ-01/02]**.
   stock the way `free_qty` does — a gap an implementation would need to
   close explicitly if `stock.quant.available_quantity` is chosen instead),
   and whether a configurable Forecast/On-Hand/Free-to-Use default is
-  offered to the operator, remain **[Open question — MBQ-32, proposed
-  partially resolved, pending DEC-015 — see the register]**. The two
-  candidate sources' field/formula facts are proposed verified by the
-  official-fact citations above (pending DEC-015 acceptance); the
+  offered to the operator, remain **[Open question — MBQ-32, partially
+  resolved — see the register]**. The two
+  candidate sources' field/formula facts are accepted as verified by the
+  official-fact citations above; the
   source-selection/aggregation mechanism and the configurable-default
   question remain open, and this document does not resolve which
   candidate (or combination) is authoritative.
@@ -326,15 +332,15 @@ model/field names: **[Open question — MBQ-01/02]**.
   for ChatGPT's direct decision**, not a self-accepted resolution; DEC-007
   requires no coarser than per-store, and this proposal satisfies that
   floor.
-- **First-push confirmation record (MBQ-38 — proposed partially resolved,
-  pending DEC-015) [Blueprint proposal]:** the confirmation record extends
+- **First-push confirmation record (MBQ-38 — partially resolved)
+  [Blueprint proposal]:** the confirmation record extends
   the Part A guard/audit shape (§D.10) with: the preview snapshot
   (SKU/variant/location/quantity rows shown), the confirming operator +
   timestamp, the recorded source-of-truth decision in force at
   confirmation time, and the scope (which mapped location pair(s) this
   confirmation covers, per the granularity above). Exact field
-  names/schema remain **[Open question — MBQ-38, proposed partially
-  resolved, pending DEC-015 — concept fixed, schema open]**.
+  names/schema remain **[Open question — MBQ-38, partially
+  resolved — concept accepted, schema open]**.
 - **Skip/manual-match:** an ambiguous SKU/variant/location combination at
   first push is skipped or manually matched, never guessed — consistent
   with the ordinary product-matching flow (Part B §A.6) applied to the
@@ -446,7 +452,7 @@ model/field names: **[Open question — MBQ-01/02]**.
   **[Accepted — DEC-009; DEC-010]**.
 - **Ambiguous mapping candidates → `ambiguous match`**, same routing
   **[Accepted — DEC-010]**.
-- **[Official fact, proposing to resolve MBQ-37, pending DEC-015]** Shopify's
+- **[Official fact, resolving MBQ-37 at fact-verification level]** Shopify's
   `WebhookSubscriptionTopic` enum includes `INVENTORY_LEVELS_UPDATE`
   ("Occurs whenever an inventory level is updated. Requires the
   `read_inventory` scope."), plus `INVENTORY_LEVELS_CONNECT` and
@@ -556,9 +562,9 @@ blueprint level **[Blueprint proposal]**:
   `reconciliation`, or `webhook` (for the `INVENTORY_LEVELS_UPDATE`
   drift-detection candidate) where applicable — **[Fable finding C2]**
   the Odoo-event-triggered case's exact Part A job-source classification
-  is **not decided by this sprint** and is **not** a new
+  is **not decided by this acceptance** and is **not** a new
   `event-driven enqueue` source value; see **[Open question — MBQ-62,
-  new]** (§A.7).
+  new/open]** (§A.7).
 - `inventory_baseline_import` — the one-time, controlled Shopify → Odoo
   baseline import (§A.6), source `manual_sync` or `setup_readiness_check`-
   adjacent (exact source classification: **[Open question —
@@ -606,30 +612,32 @@ RA-013). Headline touchpoints, consolidated in §D below:
 
 ### A.15 Inventory-specific open questions
 
-See §G for the consolidated proposed-resolved/proposed-partially-resolved/
-carried-forward table — **all outcomes below are proposed, pending
-DEC-015 acceptance, not final.** Headline: **MBQ-32** (quantity
-source/formula) — **proposed partially resolved** this sprint: both
+See §G for the consolidated resolved/partially-resolved/carried-forward
+table — **outcomes below are accepted via DEC-015 (2026-07-03) except
+where a row is explicitly named still open.** Headline: **MBQ-32**
+(quantity source/formula) — **partially resolved**: both
 candidate source fields/formulas are now cited against official Odoo
 19.0 source (§A.4), but **Fable finding C1** corrected an earlier draft's
 over-claim that they were equivalent — they are not, and the
 source-selection/aggregation-mechanism/configurable-default sub-questions
-stay open, with the row itself staying open until DEC-015 is accepted.
+stay open for implementation planning.
 **MBQ-33** (first-push granularity) — ChatGPT decision, **recommendation
-proposed** (§A.5), not resolved. **MBQ-34** (ongoing apply-mode) —
-ChatGPT decision, **recommendation proposed**, now stated directly in
-§A.7 (§A.7/§G), not resolved. **MBQ-36** (mutation choice per trigger) —
-**proposed partially
-resolved**, default direction proposed (§A.13/§G), pending DEC-015.
-**MBQ-37** (Shopify inventory webhook topic) — **proposed resolved** this
-sprint (§A.9), pending DEC-015 acceptance; the broader payload-shape/
-subscription-mechanics/Phase-1-scope residual is separately tracked as
-**MBQ-63, new**. **MBQ-38** (first-push
-confirmation record schema) — **proposed partially resolved**, concept
-fixed (§A.5), pending DEC-015. **MBQ-62, new (Fable finding C2)** — the
+noted, still open**, not decided by this acceptance (§A.5). **MBQ-34**
+(ongoing apply-mode) —
+ChatGPT decision, **recommendation noted, still open**, not decided by
+this acceptance, stated directly in
+§A.7 (§A.7/§G). **MBQ-36** (mutation choice per trigger) —
+**partially
+resolved**, default direction accepted (§A.13/§G). **MBQ-37** (Shopify
+inventory webhook topic) — **resolved at fact-verification level**
+(§A.9); the broader payload-shape/
+subscription-mechanics/Phase-1-scope residual remains open, separately tracked as
+**MBQ-63, new/open**. **MBQ-38** (first-push
+confirmation record schema) — **partially resolved**, concept
+accepted (§A.5). **MBQ-62, new/open (Fable finding C2)** — the
 Odoo-side event-triggered job-source classification for inventory push
 (§A.7/§A.13) and fulfillment creation (§B.3/§B.12) is not decided by this
-sprint; "event-driven enqueue" is a sync-trigger-layer description, not a
+acceptance; "event-driven enqueue" is a sync-trigger-layer description, not a
 Part A §D.2 job-source value.
 
 ---
@@ -716,9 +724,9 @@ the Fulfillment GID once created) **[Accepted — DEC-006; DEC-011; Part A
   unmatched-product-line rule, applied here to the fulfillment side
   **[Blueprint proposal, extending Part B §C.5's routing pattern]**.
 
-### B.5 Tracking number/carrier/url handling (proposing to resolve MBQ-39)
+### B.5 Tracking number/carrier/url handling (resolving MBQ-39)
 
-- **[Official fact — proposing to resolve MBQ-39, pending DEC-015, accessed 2026-07-03]** Odoo
+- **[Official fact — resolving MBQ-39 at fact-verification level, accessed 2026-07-03]** Odoo
   19.0's `stock_delivery` module (Inventory Delivery Management) defines,
   on `stock.picking`:
 
@@ -796,7 +804,7 @@ the Fulfillment GID once created) **[Accepted — DEC-006; DEC-011; Part A
   resulting backorder picking is handled as **two independent, sequential
   fulfillment events** — Shopify's FulfillmentOrder model natively
   supports this.
-- **[Official fact — proposing to partially resolve MBQ-40, pending DEC-015, accessed 2026-07-03]** Odoo
+- **[Official fact — partially resolving MBQ-40, accessed 2026-07-03]** Odoo
   19.0's `stock.picking` model defines a `backorder_id` field linking a
   split picking back to its origin, plus a reverse `backorder_ids` field:
 
@@ -848,7 +856,7 @@ the Fulfillment GID once created) **[Accepted — DEC-006; DEC-011; Part A
   (C-FUL-02), remain deferred to a later phase — an existing accepted
   deferral, not a new rejection.
 
-### B.8 Multi-location / fulfillment-location mismatch guard (proposing a direction for MBQ-42/MBQ-43)
+### B.8 Multi-location / fulfillment-location mismatch guard (partially resolving MBQ-42/MBQ-43)
 
 - **Ownership principle [Accepted — DEC-008/DEC-010/DEC-011]:**
   `shopify_connector_fulfillment` never depends on `inventory`'s
@@ -863,7 +871,7 @@ the Fulfillment GID once created) **[Accepted — DEC-006; DEC-011; Part A
   `OPEN`/`SCHEDULED`/`ON_HOLD`. Source:
   `shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder`,
   access date **2026-07-02**.
-- **[Blueprint proposal, proposing to partially resolve MBQ-42, pending DEC-015]** the blueprint-level
+- **[Blueprint proposal, partially resolving MBQ-42, accepted via DEC-015]** the blueprint-level
   mechanism: at the time a fulfillment operation is about to be created, a
   **live** `assignedLocation` read is fetched and treated as
   **authoritative** for that specific operation. The core Shopify Location
@@ -881,30 +889,26 @@ the Fulfillment GID once created) **[Accepted — DEC-006; DEC-011; Part A
   manual review"). A fulfillment-location mismatch is a **different**
   scenario: there is exactly **one** determined answer (the live
   `assignedLocation`), and it simply disagrees with the picking's
-  expected location — not "more than one candidate." **This sprint
-  proposes reusing the `ambiguous match` class for this deterministic-
+  expected location — not "more than one candidate." **This document
+  accepts reusing the `ambiguous match` class for this deterministic-
   mismatch case anyway**, on the grounds that the **operator-facing
   outcome is the same in both scenarios** — the job blocks, confirmation-
   required, until an operator reviews and resolves it (Part A §D.5.4/
   §D.8) — not because the two situations are the same kind of ambiguity.
-  **This is a proposed widening of an already-accepted class's scope,
-  not an already-accepted interpretation** — it is explicitly one of the
-  things ChatGPT would be accepting by accepting DEC-015, not a
-  self-accepted reading of AR-006/DEC-009. No new top-level error class
+  **This is an accepted widening of an already-accepted class's scope,
+  not an already-settled prior interpretation** — it is one of the
+  things ChatGPT accepted by accepting DEC-015, at blueprint level only,
+  not a self-accepted reading of AR-006/DEC-009. No new top-level error class
   is introduced either way — Part A §D.4's fixed registry is not
   widened in the sense of adding a 17th class; only the **applicability**
-  of the existing `ambiguous match` class is proposed to extend to this
-  new scenario. If ChatGPT judges that widening `ambiguous match` this
-  way is unsafe or confusing (e.g. because it conflates two structurally
-  different failure modes under one label), the alternative is a
+  of the existing `ambiguous match` class is extended to this
+  new scenario. The alternative considered — a
   dedicated new open question for a location-mismatch-specific
-  sub-reason, rather than reusing `ambiguous match` — that alternative is
-  not adopted by this document, but is named here so it is not silently
-  foreclosed. This direction is **proposed, pending ChatGPT acceptance**,
-  not self-accepted — MBQ-42 stays open at the "ChatGPT accepts this
-  mechanism" level even though the mechanism itself is now proposed in
-  detail.
-- **[Blueprint proposal, proposing to partially resolve MBQ-43, pending DEC-015]** core Location
+  sub-reason, rather than reusing `ambiguous match` — was
+  not adopted. **MBQ-42 is partially resolved by DEC-015 acceptance at
+  blueprint level; exact implementation-level detail (e.g. sub-reason
+  tagging) remains open** for implementation planning.
+- **[Blueprint proposal, partially resolving MBQ-43, accepted via DEC-015]** core Location
   reference cache policy: refreshed on setup-readiness checks and on the
   same reconciliation cadence shared with other domains (MBQ-17); for any
   **specific** fulfillment operation, the live `assignedLocation` read
@@ -912,8 +916,8 @@ the Fulfillment GID once created) **[Accepted — DEC-006; DEC-011; Part A
   authoritative for an in-flight operation, only for naming/display
   between operations. Exact refresh cadence/mechanism (push-based via
   webhook vs. pull-based on a schedule): **[Open question — MBQ-43,
-  proposed partially resolved, pending DEC-015 — precedence rule
-  proposed; cadence/mechanism open]**.
+  partially resolved — precedence rule
+  accepted; cadence/mechanism open]**.
 - **Phase 1 scope:** single-fulfillment-location matching; genuinely
   multi-location fulfillment (more than one Shopify Location fulfilling
   one order) is deferred (C-FUL-02, DEC-003) **[Accepted — DEC-011]**.
@@ -1018,8 +1022,8 @@ blueprint level **[Blueprint proposal]**:
   — an Odoo-side event, structurally the same open question as inventory's
   event-triggered pushes (§A.7). Which Part A §D.2 job source this job
   records (or whether the fixed vocabulary needs a DEC-level extension)
-  is **not decided by this sprint**; this document does not assert a
-  source value for it. See **[Open question — MBQ-62, new]**.
+  is **not decided by this acceptance**; this document does not assert a
+  source value for it. See **[Open question — MBQ-62, new/open]**.
 - `fulfillment_tracking_update` — a tracking-only update to an existing
   Fulfillment (`fulfillmentTrackingInfoUpdate`), including a corrected
   tracking update. Source: `manual_sync` for an explicit operator action;
@@ -1046,27 +1050,31 @@ action; no raw stack trace as the primary UX.
 
 ### B.14 Fulfillment-specific open questions
 
-See §G for the consolidated table — **all outcomes below are proposed,
-pending DEC-015 acceptance, not final.** Headline: **MBQ-39** (tracking
-field source) — **proposed resolved** this sprint via official Odoo 19.0
-source citation (§B.5), pending DEC-015 acceptance; new residual question
-surfaced (MBQ-60, `stock_delivery` module dependency). **MBQ-40**
-(backorder linkage) — **proposed partially resolved** (field-level
-linkage cited; wizard-level delivery-specific behavior/copy stays open),
-pending DEC-015. **MBQ-41** (notification-UI granularity) — ChatGPT
-decision, **recommendation proposed** (§B.6), not resolved. **MBQ-42**
-(location-confirmation mechanism) — **proposed partially resolved**,
-mechanism proposed (§B.8), pending ChatGPT acceptance of DEC-015.
-**MBQ-43** (Location reference cache policy) — **proposed partially
-resolved**, precedence rule proposed (§B.8), cadence open, pending
-DEC-015. **MBQ-42's proposed mechanism (Fable minor finding 2)** also
-proposes **widening** the accepted `ambiguous match` class (AR-006/
+See §G for the consolidated table — **outcomes below are accepted via
+DEC-015 (2026-07-03) except where a row is explicitly named still
+open.** Headline: **MBQ-39** (tracking
+field source) — **resolved at fact-verification level** via official Odoo 19.0
+source citation (§B.5); new residual question
+remains open (MBQ-60, `stock_delivery` module dependency). **MBQ-40**
+(backorder linkage) — **partially resolved** (field-level
+linkage cited; wizard-level delivery-specific behavior/copy stays open).
+**MBQ-41** (notification-UI granularity) — ChatGPT
+decision, **recommendation noted, still open**, not decided by this
+acceptance (§B.6). **MBQ-42**
+(location-confirmation mechanism) — **partially resolved**,
+mechanism accepted (§B.8), including the accepted blueprint-level
+widening of `ambiguous match` described below; exact implementation-level
+detail remains open.
+**MBQ-43** (Location reference cache policy) — **partially
+resolved**, precedence rule accepted (§B.8), cadence/mechanism remains
+open. **MBQ-42's accepted mechanism (Fable minor finding 2)** also
+**widens** the accepted `ambiguous match` class (AR-006/
 DEC-009: multiple plausible candidates) to cover a deterministic
-location-mismatch case, on operator-outcome-parity grounds — explicitly
-one of the things ChatGPT would be accepting via DEC-015, not an
-already-settled reading. **MBQ-62, new (Fable finding C2)** — fulfillment
+location-mismatch case, on operator-outcome-parity grounds — accepted at
+blueprint level only by DEC-015, not an
+already-settled prior reading. **MBQ-62, new/open (Fable finding C2)** — fulfillment
 creation's Odoo-side event-trigger job-source classification is not
-decided (§B.3/§B.12).
+decided by this acceptance (§B.3/§B.12).
 
 ---
 
@@ -1240,29 +1248,29 @@ inconclusive; where a related question remains genuinely open (e.g. the
 backorder-wizard copy), it is routed to the open-question register (§G)
 rather than asserted.
 
-## G. Open questions: proposed resolved / proposed partially resolved / carried forward / new
+## G. Open questions: resolved / partially resolved / carried forward / new
 
 Full register:
 [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
-§5 (inventory) / §6 (fulfillment). **This sprint's outcomes are proposed
-only, pending ChatGPT's review and acceptance of DEC-015 — no row below
-is final, and every row remains formally `open` in the register until
-DEC-015 is accepted:**
+§5 (inventory) / §6 (fulfillment). **DEC-015 was accepted by ChatGPT on
+2026-07-03. The outcomes below are final except where a row is
+explicitly named still open (MBQ-33, MBQ-34, MBQ-35, MBQ-41, and MBQ-60
+through MBQ-63):**
 
-| MBQ | Sprint C outcome (proposed, pending DEC-015 acceptance) | Where |
+| MBQ | Sprint C outcome (accepted via DEC-015, 2026-07-03) | Where |
 | --- | --- | --- |
-| MBQ-32 | **Proposed partially resolved** — both candidate Odoo ORM sources identified and cited (`product.product.free_qty` = `qty_available − reserved_quantity − expired_unreserved_qty`, UoM-rounded; `stock.quant.available_quantity` = `quantity − reserved_quantity`) — **verified, but not equivalent** (Fable finding C1): they diverge whenever expired unreserved stock exists, since only `free_qty` nets that term out. Which source (or a reconciling combination) is authoritative is a substantive choice, not decided by this sprint; the aggregation-mechanism and configurable-default sub-questions remain implementation planning | §A.4 |
-| MBQ-33 | **Carried forward, open** — ChatGPT decision; Sprint C proposes a recommendation (guard fires per mapped Odoo-location↔Shopify-Location pair) | §A.5 |
-| MBQ-34 | **Carried forward, open** — ChatGPT decision; Sprint C proposes a recommendation (review-then-apply by default for Phase 1, consistent with DEC-003's "auto-apply not accepted as default") | §A.7 |
+| MBQ-32 | **Partially resolved** — both candidate Odoo ORM sources identified and cited (`product.product.free_qty` = `qty_available − reserved_quantity − expired_unreserved_qty`, UoM-rounded; `stock.quant.available_quantity` = `quantity − reserved_quantity`) — **verified, but not equivalent** (Fable finding C1): they diverge whenever expired unreserved stock exists, since only `free_qty` nets that term out. Which source (or a reconciling combination) is authoritative is a substantive choice, not decided by this acceptance; the aggregation-mechanism and configurable-default sub-questions remain implementation planning | §A.4 |
+| MBQ-33 | **Carried forward, open** — ChatGPT decision; a recommendation is noted (guard fires per mapped Odoo-location↔Shopify-Location pair), but not decided by this acceptance | §A.5 |
+| MBQ-34 | **Carried forward, open** — ChatGPT decision; a recommendation is noted (review-then-apply by default for Phase 1, consistent with DEC-003's "auto-apply not accepted as default"), but not decided by this acceptance | §A.7 |
 | MBQ-35 | **Carried forward, open, unchanged** — no new evidence this sprint changes the existing `available`-default / `on_hand`-needs-justification / `committed`-never posture | §A.4/§A.12 |
-| MBQ-36 | **Proposed partially resolved** — direction proposed: `inventorySetQuantities` (compare-and-set) as the default for all trigger types; exact per-trigger choice/batching/error handling remains implementation planning | §A.13 |
-| MBQ-37 | **Proposed resolved** — exact Shopify webhook topic confirmed and cited (`INVENTORY_LEVELS_UPDATE`, plus `INVENTORY_LEVELS_CONNECT`/`DISCONNECT`); fact verification is complete, but the row formally closes only on DEC-015 acceptance | §A.9 |
-| MBQ-38 | **Proposed partially resolved** — blueprint-level confirmation-record concept fixed (extends Part A guard/audit shape); exact schema/fields remain implementation planning | §A.5 |
-| MBQ-39 | **Proposed resolved** — exact Odoo tracking field source confirmed and cited (`stock.picking.carrier_tracking_ref`/`carrier_tracking_url`/`carrier_id`, `stock_delivery` module); fact verification is complete, but the row formally closes only on DEC-015 acceptance | §B.5 |
-| MBQ-40 | **Proposed partially resolved** — exact backorder-linkage field confirmed and cited (`stock.picking.backorder_id`/`backorder_ids`); delivery-specific wizard UX/copy remains open (carried from `ar007-ar008-evidence-refresh.md`) | §B.7 |
-| MBQ-41 | **Carried forward, open** — ChatGPT decision; Sprint C proposes a recommendation (global/per-store default sufficient for Phase 1 MVP; per-order override deferred) | §B.6 |
-| MBQ-42 | **Proposed partially resolved** — blueprint-level mechanism proposed (live `assignedLocation` read authoritative per-operation; core Location reference for naming/mismatch-detection only), **including a proposed widening of the accepted `ambiguous match` class (AR-006/DEC-009: multiple candidates) to also cover a deterministic location mismatch (Fable minor finding 2)**; pending ChatGPT acceptance of the mechanism and the widening itself | §B.8 |
-| MBQ-43 | **Proposed partially resolved** — precedence rule proposed (live read always wins over cache for a specific operation); exact refresh cadence/mechanism remains open | §B.8 |
+| MBQ-36 | **Partially resolved** — direction accepted: `inventorySetQuantities` (compare-and-set) as the default for all trigger types; exact per-trigger choice/batching/error handling remains implementation planning | §A.13 |
+| MBQ-37 | **Resolved at fact-verification level** — exact Shopify webhook topic confirmed and cited (`INVENTORY_LEVELS_UPDATE`, plus `INVENTORY_LEVELS_CONNECT`/`DISCONNECT`); the broader payload-shape/subscription-mechanics/Phase-1-scope residual remains open, tracked as MBQ-63 | §A.9 |
+| MBQ-38 | **Partially resolved** — blueprint-level confirmation-record concept accepted (extends Part A guard/audit shape); exact schema/fields remain implementation planning | §A.5 |
+| MBQ-39 | **Resolved at fact-verification level** — exact Odoo tracking field source confirmed and cited (`stock.picking.carrier_tracking_ref`/`carrier_tracking_url`/`carrier_id`, `stock_delivery` module); the module-dependency residual remains open, tracked as MBQ-60 | §B.5 |
+| MBQ-40 | **Partially resolved** — exact backorder-linkage field confirmed and cited (`stock.picking.backorder_id`/`backorder_ids`); delivery-specific wizard UX/copy remains open (carried from `ar007-ar008-evidence-refresh.md`) | §B.7 |
+| MBQ-41 | **Carried forward, open** — ChatGPT decision; a recommendation is noted (global/per-store default sufficient for Phase 1 MVP; per-order override deferred), but not decided by this acceptance | §B.6 |
+| MBQ-42 | **Partially resolved** — blueprint-level mechanism accepted (live `assignedLocation` read authoritative per-operation; core Location reference for naming/mismatch-detection only), **including an accepted widening of the accepted `ambiguous match` class (AR-006/DEC-009: multiple candidates) to also cover a deterministic location mismatch (Fable minor finding 2), at blueprint level only**; exact implementation-level detail remains open | §B.8 |
+| MBQ-43 | **Partially resolved** — precedence rule accepted (live read always wins over cache for a specific operation); exact refresh cadence/mechanism remains open | §B.8 |
 
 **New rows added (next available number after MBQ-59; MBQ-62/MBQ-63
 added in a Fable-review revision on the same PR):**
@@ -1274,14 +1282,15 @@ added in a Fable-review revision on the same PR):**
 | MBQ-62 | **Fable finding C2.** Exact Part A §D.2 job-source classification for Odoo-side event-triggered jobs — an inventory push enqueued by a relevant Odoo stock change (§A.7/§A.13), and a fulfillment creation triggered by a validated `stock.picking` (§B.3/§B.12). "Event-driven enqueue" is a sync-trigger-layer description, not a Part A job-source enum value; this sprint's own first draft silently treated it as one, which Fable flagged | Sprint C (§A.7/§A.13/§B.12/§C item 7), Fable review of PR #74 | Every job must record an accepted Part A job source for dashboard/retry-policy purposes; two genuinely common triggers were left without a defined classification | ChatGPT (existing-source mapping vs. DEC-level vocabulary extension) + Implementation planning | Yes for Odoo-event-triggered inventory push and fulfillment creation; No for manual/scheduled/reconciliation-triggered actions, which already have an accepted source |
 | MBQ-63 | **Fable minor finding 4.** Exact Shopify inventory webhook payload shape and subscription mechanics for `INVENTORY_LEVELS_UPDATE`/`CONNECT`/`DISCONNECT`, and whether webhook-driven inventory import is implemented in Phase 1 or left as a drift-detection candidate only | Sprint C (§A.7/§A.9), Fable review of PR #74 — MBQ-37 verified only the topic string, not this residual | Building on an unverified payload/subscription shape risks silent breakage; Phase-1-scope affects what implementation planning designs for | Implementation planning + official-doc verification | Yes, only for webhook-driven inventory import; No for the layered scheduled/manual/event-driven/reconciliation mechanisms |
 
-**MBQ-33, MBQ-34, MBQ-35, MBQ-41 remain open** — ChatGPT-decision-owner
-rows; this sprint's proposals are recommendations, not self-accepted
-resolutions. **MBQ-32, MBQ-36, MBQ-37, MBQ-38, MBQ-39, MBQ-40, MBQ-42,
-and MBQ-43 also remain formally `open`** in the register — their
-"proposed resolved"/"proposed partially resolved" labels above describe
-this sprint's proposal, not a final outcome; each becomes final only
-if/when ChatGPT accepts DEC-015. **MBQ-60 through MBQ-63 are new,
-open.** No
+**MBQ-33, MBQ-34, MBQ-35, and MBQ-41 remain open** — MBQ-33/34/41 are
+ChatGPT-decision-owner rows, each carrying a recommendation only, **not
+decided by this acceptance**; MBQ-35 is carried forward unchanged.
+**MBQ-32, MBQ-36, MBQ-38, MBQ-40, MBQ-42, and MBQ-43 are final as
+partially resolved, and MBQ-37 and MBQ-39 are final as resolved at
+fact-verification level**, per DEC-015's acceptance (2026-07-03) — exact
+residual detail remains open for implementation planning where stated
+above. **MBQ-60 through MBQ-63 remain new and
+open**, not resolved by this acceptance. No
 MBQ row from any other section (§1–§4, §7–§9) is touched by this sprint.
 
 ---
@@ -1296,13 +1305,15 @@ MBQ row from any other section (§1–§4, §7–§9) is touched by this sprint.
   names, and do not resolve those rows.
 - No final GraphQL mutation body or exact batching/error-handling detail
   for inventory writes or fulfillment creation beyond what is explicitly
-  cited and verified this sprint (**MBQ-36**, direction proposed only).
+  cited and verified this sprint (**MBQ-36**, direction accepted only).
 - No screen-level UI/UX design, wireframe, or navigation structure (Part
   D, **MBQ-53**, unchanged, not started).
-- No resolution of the four ChatGPT-decision-owner rows this sprint
-  touches (**MBQ-33, MBQ-34, MBQ-41**) beyond a named recommendation, and
-  no resolution of **MBQ-42**'s mechanism-acceptance question beyond a
-  proposed mechanism.
+- No resolution of the three ChatGPT-decision-owner rows this document
+  touches (**MBQ-33, MBQ-34, MBQ-41**) beyond a named recommendation —
+  each stays open, not decided by this acceptance.
+- No resolution of **MBQ-42**'s exact implementation-level detail (e.g.
+  sub-reason tagging) beyond the accepted blueprint-level mechanism and
+  the accepted widening of `ambiguous match`.
 - No new Odoo module dependency is authorized (**MBQ-60** is routed as an
   open question, not decided as "required").
 - No subscription to, or handling logic for, any `FULFILLMENT_ORDERS_*`
@@ -1314,27 +1325,32 @@ MBQ row from any other section (§1–§4, §7–§9) is touched by this sprint.
 
 ## I. Implementation remains blocked
 
-**This document's proposal status does not authorize implementation
-under any outcome.** No code, Odoo module, model, view, controller,
-security file, manifest, test, or CI file is created or permitted by this
-document. The no-code gate (`CLAUDE.md` §4–§5) remains in force. Per
-`master-blueprint.md`'s "Criteria for when implementation may later be
-opened," implementation of the inventory/fulfillment domains additionally
-requires: (1) ChatGPT acceptance of this Part C blueprint (via a future
-DEC-015 acceptance patch) — **not satisfied, this document and DEC-015
-are Proposed, not accepted**; (2) resolution or conscious acceptance of
-every "Blocks implementation: Yes" row this sprint touches — **not
-satisfied**, several such rows remain open (MBQ-04, MBQ-08, MBQ-33,
-MBQ-34, MBQ-38 detail, MBQ-41, MBQ-42, MBQ-43, MBQ-53–59 unchanged,
-MBQ-60, MBQ-62 for Odoo-event-triggered inventory push and fulfillment
-creation specifically, MBQ-63 for webhook-driven inventory import
-specifically — **MBQ-61 does not block MVP correctness-core fulfillment
-creation** per its own row, only a future dedicated hold-aware UX); (3) a
-separate, explicit ChatGPT implementation-gate approval — **not
-satisfied**; (4) every implementation task written to the `CLAUDE.md` §9
-template — **not applicable, no implementation task written**; (5) no
-open quality-gate escalation. **None of conditions (1)–(5) is satisfied
-by this document alone.**
+**This document being accepted at blueprint level does not authorize
+implementation under any outcome.** No code, Odoo module, model, view,
+controller, security file, manifest, test, or CI file is created or
+permitted by this document. The no-code gate (`CLAUDE.md` §4–§5) remains
+in force. Per `master-blueprint.md`'s "Criteria for when implementation
+may later be opened," implementation of the inventory/fulfillment
+domains additionally requires: (1) ChatGPT acceptance of this Part C
+blueprint — **now satisfied at blueprint level: Part C is Accepted by
+ChatGPT via DEC-015 (2026-07-03)**; (2) resolution or conscious
+acceptance of every "Blocks implementation: Yes" row this document
+touches — **not satisfied**, several such rows remain open (MBQ-04,
+MBQ-08, MBQ-33, MBQ-34, MBQ-38 detail, MBQ-41, MBQ-42 implementation-level
+detail, MBQ-43 cadence/mechanism detail, MBQ-53–59 unchanged, MBQ-60,
+MBQ-62 for Odoo-event-triggered inventory push and fulfillment creation
+specifically, MBQ-63 for webhook-driven inventory import specifically —
+**MBQ-61 does not block MVP correctness-core fulfillment creation** per
+its own row, only a future dedicated hold-aware UX); (3) a separate,
+explicit ChatGPT implementation-gate approval — **not satisfied, the gate
+has not been opened**; (4) every implementation task written to the
+`CLAUDE.md` §9 template — **not applicable, no implementation task
+written**; (5) no open quality-gate escalation. **Condition (1) is now
+satisfied at blueprint level; conditions (2)–(4) are not yet satisfied,
+so implementation remains blocked overall.** Part D (UI/UX Screen Design
+Blueprint) also remains not accepted — required in addition, for any
+operator-facing screen, before implementation of that screen — and Part
+E (implementation-planning bridge) remains not started.
 
 ## Next recommended sprint after ChatGPT review
 
