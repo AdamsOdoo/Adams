@@ -9,10 +9,15 @@
 
 ## Status
 
-**Proposed for ChatGPT review** (2026-07-03). Documentation only; the
-no-code gate (`CLAUDE.md` §4–§5) is in force. Registering a question here
-does **not** decide it. Every row follows `CLAUDE.md` §7/§8: unverified
-items are **open questions**, never asserted.
+**Accepted as the central register through DEC-013**, acceptance date
+**2026-07-03**. Documentation only; the no-code gate (`CLAUDE.md` §4–§5)
+is in force. **Register acceptance does not resolve every question** —
+each MBQ row remains open unless the row itself says **Resolved** or
+**Partially resolved**; notably **MBQ-04, MBQ-08, MBQ-53, and MBQ-54
+remain open**. Registering (or accepting the register containing) a
+question does **not** decide it and does **not** authorize
+implementation. Every row follows `CLAUDE.md` §7/§8: unverified items
+are **open questions**, never asserted.
 
 ## How to read
 
@@ -41,7 +46,7 @@ items are **open questions**, never asserted.
 | MBQ-04 | Exact **credential encryption/storage-at-rest mechanism** (Odoo field-level `groups` protection alone vs additional encryption; storage location) | DEC-004; Part A §B.2 | A long-lived offline token is a credential-leak risk if storage is wrong; DEC-004 fixed masking/least-privilege but not the storage mechanism | ChatGPT + Official-doc verification (Odoo capability check) | Yes |
 | MBQ-05 | Exact **custom-app creation surface** (merchant Admin-created vs Partner/Dev-Dashboard custom-distribution) and its **token-acquisition mechanics** (incl. non-expiring vs 90-day-rotation variant) | DEC-004 "What remains blocked" | Determines wizard step content and reconnect/rotation flow | Implementation planning (within DEC-004's fixed offline/unattended model) | Yes (setup wizard) |
 | MBQ-06 | **Readiness-check list**: which checks are essential vs nice-to-have (scopes, HTTPS/`web.base.url`, webhook reachability, worker/queue presence, credential validity) | setup-ux-principles P2; DEC-012 §1; Part A §E.6 | Fixes the wizard's pass/fail gate and the "connected" definition | ChatGPT (at Part A/B review) or Implementation planning | Yes (setup wizard) |
-| MBQ-07 | Exact **technical feature-flag implementation** (Part A §I.3 proposes: store-scoped core settings record, domain-extended; not `ir.config_parameter`, not `res.config.settings`-as-storage) | DEC-008 "What remains open"; Part A §I | DEC-008 routed the mechanism to the Master Blueprint; flags gate every domain's behaviour | ChatGPT (confirm/refine direction at DEC-013 review), then Implementation planning | Yes |
+| MBQ-07 | **Resolved at blueprint-direction level by DEC-013 acceptance (2026-07-03):** store-scoped core settings record, domain-extended (Part A §I.3) — not `ir.config_parameter`, not `res.config.settings`-as-storage, not per-domain ad hoc settings models. Exact **technical feature-flag implementation** (field names, model shape) remains open | DEC-008 "What remains open"; Part A §I; DEC-013 | DEC-008 routed the mechanism to the Master Blueprint; flags gate every domain's behaviour | Implementation planning (direction confirmed; detail remains) | Yes |
 | MBQ-08 | **Store-disconnect data-retention posture** — what happens to bindings, jobs, logs, audit records after disconnect | DEC-012 (Fable, PR #68); Part A §B.1 | Wrong posture destroys audit history or leaks stale credentials; affects disconnect UX and re-connect matching | ChatGPT | Yes (disconnect flow) |
 | MBQ-09 | Whether **custom apps must implement Shopify's compliance webhooks / are bound by Level 1/2 protected-data obligations** regardless of distribution | DEC-004 (open since RB-14 Part 2) | If yes, compliance endpoints/duties enter Phase 1 scope; DEC-004 mandates conservative handling until resolved | Official-doc verification | Yes (any compliance-relevant code); conservative posture applies meanwhile |
 | MBQ-10 | Whether Odoo.sh/on-prem setup can avoid mandatory **`odoo.conf`/queue prerequisites** (turnkey install path) | DEC-005; DEC-012 §1 open questions | Affects install docs and wizard prerequisites step; not a design blocker | Implementation planning + Official-doc verification | No |
@@ -51,7 +56,7 @@ items are **open questions**, never asserted.
 
 | ID | Open question | Source | Why it matters | Decision owner | Blocks implementation |
 | --- | --- | --- | --- | --- | --- |
-| MBQ-11 | **Binding schema-shape confirmation** — Part A §C.8 proposes per-domain concrete binding models extending a core abstract contract (vs one polymorphic table in `core`) | DEC-006 (fork left open); DEC-008 (binding-schema note); Part A §C.8 | Fixes where tables live, index/constraint design, and reconciliation-scale query shape | ChatGPT (at DEC-013 review) | Yes |
+| MBQ-11 | **Resolved by DEC-013 acceptance (2026-07-03):** per-domain concrete binding models extending a core abstract contract, with a cross-domain enumeration/registration seam and a binding-model granularity bound (Part A §C.8); the single polymorphic table option is not chosen | DEC-006 (fork left open); DEC-008 (binding-schema note); Part A §C.8; DEC-013 | Fixes where tables live, index/constraint design, and reconciliation-scale query shape | Resolved — ChatGPT via DEC-013 | No |
 | MBQ-12 | **Shopify GID permanence/non-reuse** — not asserted by Shopify | DEC-006; RB-14 Part 2 (RQ-005-1) | Already handled defensively (stale/review, no silent recreate); official assertion would simplify, not change, the design | Official-doc verification (may remain unresolved) | No (defensive design stands) |
 | MBQ-13 | Exact **stale/recreated-binding review flow detail** (fields shown, resolution actions, re-bind semantics) | DEC-006; Part A §C.6 | Operator resolution of stale/hijack cases must be auditable and safe | Implementation planning | No (behavioural rules fixed; detail refinable) |
 | MBQ-14 | **`@idempotent` key uniqueness scope** (per-shop / per-app / global) and any API-version-specific behaviour | RB-14 Part 2 (RQ-005-2); DEC-009/DEC-010 | Determines how persisted idempotency keys are namespaced for safe retry | Official-doc verification | Yes (inventory/refund write code) |
@@ -110,9 +115,9 @@ items are **open questions**, never asserted.
 | ID | Open question | Source | Why it matters | Decision owner | Blocks implementation |
 | --- | --- | --- | --- | --- | --- |
 | MBQ-44 | Exact **Odoo security groups, `ir.model.access` rows, access CSVs, and record rules** for the four roles | DEC-012 §10; Part A §J | `ir.model.access` is deny-by-default; nothing works without these — but they are code artifacts, gated | Implementation planning (from the accepted §J matrix) | Yes |
-| MBQ-45 | **Roles→groups mapping** — 1:1 vs finer-grained composition; confirmation of the proposed hierarchy (Admin ⊃ Operator/Reviewer ⊃ Auditor); admin-vs-functional-user dashboard/settings surface split (one role-gated surface or two) | DEC-012 §10; setup-ux-principles P10; Part A §J.1/§F.5 | Fixes group design before CSVs are written | ChatGPT | Yes |
+| MBQ-45 | **Partially resolved by DEC-013 acceptance (2026-07-03):** the proposed role hierarchy is accepted (Admin ⊃ Operator/Reviewer ⊃ Auditor). Still open: exact **roles→groups mapping** — 1:1 vs finer-grained composition; admin-vs-functional-user dashboard/settings surface split (one role-gated surface or two) | DEC-012 §10; setup-ux-principles P10; Part A §J.1/§F.5; DEC-013 | Fixes group design before CSVs are written | Implementation planning (hierarchy confirmed; group/surface detail remains) | Yes |
 | MBQ-46 | **Multi-company / multi-store permission isolation** beyond the single-store MVP's record-rule scoping | setup-ux-principles; DEC-003 | Later-phase concern; Phase 1 keys/rules must merely not preclude it | ChatGPT (later phase) | No |
-| MBQ-47 | **Reviewer role boundary confirmation** — approval-only (as proposed) vs including general retry/trigger rights | Part A §J.2 (Blueprint proposal) | Keeps manual-review approval a distinct, auditable act | ChatGPT (at DEC-013 review) | No (blueprint proposes a default) |
+| MBQ-47 | **Resolved by DEC-013 acceptance (2026-07-03):** Reviewer remains approval/manual-review focused — not a general retry/trigger role | Part A §J.2; DEC-013 | Keeps manual-review approval a distinct, auditable act | Resolved — ChatGPT via DEC-013 | No |
 
 ## 8. Deployment / operations
 

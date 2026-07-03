@@ -1,21 +1,23 @@
 # DEC-013 — Master Blueprint Sprint A: Core / Common Substrate
 
-> **Proposed decision record** for the premium **Odoo 19 ↔ Shopify
+> **Accepted decision record** for the premium **Odoo 19 ↔ Shopify
 > Connector**, prepared in **Master Blueprint Sprint A** after DEC-012
 > acceptance (2026-07-03) closed the last Phase 1 research-phase-exit
-> criterion. Proposes acceptance of the **Master Blueprint index** and the
-> **core/common substrate blueprint (Part A)**. Companion documents:
+> criterion. Accepts the **Master Blueprint index** and the **core/common
+> substrate blueprint (Part A)**. Companion documents:
 > [`../03-architecture/master-blueprint.md`](../03-architecture/master-blueprint.md),
 > [`../03-architecture/master-blueprint-core-substrate.md`](../03-architecture/master-blueprint-core-substrate.md),
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
 > Resolves **AR-010** in
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
-> if accepted.
+> — see [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+> for AR-010's acceptance entry.
 
 ## Status
 
-**Proposed for ChatGPT review.** Not accepted. Not
-implementation-authorizing under any outcome.
+**Accepted by ChatGPT.** Acceptance date: **2026-07-03**. Not
+implementation-authorizing under any outcome — see *Accepted decision*
+below.
 
 > **PR #70 Fable revision (2026-07-03).** Fable reviewed PR #70 and
 > returned **ACCEPT WITH MINOR CHANGES**. Applied: a UI/UX Screen Design
@@ -30,14 +32,106 @@ implementation-authorizing under any outcome.
 > (§C.4 manual-override extension, §D.13 source-of-truth persistence
 > generalization); `ir.cron` wording clarified; credential no-read-back
 > wording scoped to a connector-surface guarantee (MBQ-04 unchanged);
-> a webhook-topic registration seam added to §A.5. **This record remains
-> Proposed for ChatGPT review — not accepted.** No accepted DEC-003 through
-> DEC-012 content changed; no code files changed; implementation remains
-> blocked; Sprint B not started.
+> a webhook-topic registration seam added to §A.5. This revision was
+> applied before merge; a tiny consistency fix (AR-010's MBQ range) was
+> also applied before merge.
+
+> **DEC-013 Acceptance Patch (2026-07-03).** After **PR #70 merged into
+> `Shopify-connector`** (merge commit
+> `5c44971d1df84d5657da0164bf874b1125aee64f`) — carrying the Fable
+> revision and the tiny consistency fix above — **ChatGPT formally
+> accepts this record.** See *Accepted decision* below for the accepted
+> package and the explicit acceptance points. **This acceptance does not
+> open the implementation gate.** No accepted DEC-003 through DEC-012
+> content changed; no code files changed; implementation remains
+> blocked; **Master Blueprint Sprint B** (Product, Customer, and
+> Sale/Order Domain Blueprint) is the next recommended sprint but has
+> **not started**; **Part D — UI/UX Screen Design Blueprint — remains
+> required before implementation of any operator-facing screen**
+> (MBQ-53 stays open until that dedicated sprint is completed and
+> accepted).
 
 ## Date
 
 2026-07-03.
+
+## Accepted decision
+
+**ChatGPT accepts DEC-013** as the accepted Master Blueprint Sprint A
+core/common substrate package.
+
+**Accepted package** (the *Proposed decision* items below are now
+accepted as the blueprint-level design):
+
+1. Master Blueprint index and sprint structure.
+2. Part A core/common substrate blueprint.
+3. `shopify_connector_core` module boundary and extension seams.
+4. Core configuration-object concepts.
+5. Binding abstraction.
+6. Job/log/error/retry abstraction.
+7. Setup wizard, dashboard, sync center, and error center blueprints.
+8. Configuration / feature-flag mechanism direction.
+9. Permissions/access blueprint at blueprint level.
+10. Cross-module extension rules.
+11. Open-questions register MBQ-01 through MBQ-54.
+12. UI/UX Screen Design Blueprint (Part D) requirement before
+    operator-facing screen implementation.
+
+**Explicit acceptance points:**
+
+**A. Binding schema shape.** Accepts the Part A §C.8 direction:
+per-domain concrete binding models extending a core abstract binding
+contract; a cross-domain enumeration/registration seam; a
+binding-model granularity bound; the single polymorphic table option
+remains **not chosen**. This does not reintroduce **RA-005** or
+**RA-013**. Resolves **MBQ-11**.
+
+**B. Feature-flag mechanism.** Accepts the Part A §I.3 direction: a
+store-scoped core settings record, extended by domain modules with
+their own flags — not global `ir.config_parameter` storage, not
+transient-only `res.config.settings` storage, not per-domain ad hoc
+settings models. The execution-time re-check remains scoped to
+fail-safe enablement gating only (§I.3); **no flag bypasses a safety
+guard** (§I.5). Resolves **MBQ-07** at blueprint-direction level; exact
+technical implementation detail remains open for implementation
+planning.
+
+**C. Roles / access blueprint.** Accepts the Part A §J proposed
+hierarchy at blueprint level: Administrator implies Operator and
+Reviewer rights; Operator and Reviewer are siblings; Auditor is
+implied by all; Reviewer remains approval/manual-review focused
+(resolves **MBQ-47**). No access CSVs or exact XML IDs are decided
+(**MBQ-44** remains open). No connector UI/API surface exposes the
+stored credential secret after entry (§J.2); the credential at-rest
+mechanism remains **MBQ-04**, open.
+
+**D. UI/UX.** Accepts that **Part D — UI/UX Screen Design Blueprint —
+is required before implementation of operator-facing screens**.
+**MBQ-53 remains open** until that dedicated sprint is completed and
+accepted.
+
+**E. Still open.** This acceptance does not resolve every MBQ. Kept
+open where appropriate, especially: **MBQ-04** (credential
+storage/encryption mechanism), **MBQ-08** (store-disconnect
+data-retention posture), **MBQ-53** (screen-level UI/UX design
+blueprint), **MBQ-54** (domain-module uninstall/disable data
+lifecycle), exact model/field/view/security identifiers,
+implementation-planning details, and domain blueprint questions routed
+to Sprint B/C. **MBQ-45** is **partially resolved**: the proposed role
+hierarchy is accepted; exact group decomposition, XML IDs, and the
+admin-vs-functional-user screen split remain open.
+
+**What this acceptance does NOT do:**
+
+- Does **not authorize implementation** under any circumstance (see
+  *No implementation authorized* below).
+- Does **not start Sprint B** — Master Blueprint Sprint B (Product,
+  Customer, and Sale/Order Domain Blueprint) is the next recommended
+  sprint, not started.
+- Does **not waive** the requirement that Part D — UI/UX Screen Design
+  Blueprint — be completed and accepted before any operator-facing
+  screen implementation.
+- Does **not change** DEC-003 through DEC-012.
 
 ## Scope
 
@@ -211,14 +305,17 @@ data lifecycle — added per Fable's PR #70 review).
 
 ## No implementation authorized
 
-**This record does not authorize implementation.** It proposes a
-documentation-level blueprint for ChatGPT review only. No code, Odoo
-module, model, view, controller, security file, manifest, test, or CI
-change is created or permitted by this record, and none may be created
-until ChatGPT (1) accepts this record (or a revised version), and (2)
-separately opens the implementation gate per the Phase 1
-research-phase-exit criteria (`../05-qa/quality-feedback-loop.md` §10) and
-`CLAUDE.md` §5. Acceptance of this record alone does not open that gate.
+**This record does not authorize implementation.** Acceptance is a
+documentation-level blueprint acceptance only. No code, Odoo module,
+model, view, controller, security file, manifest, test, or CI change is
+created or permitted by this record, and none may be created until
+ChatGPT separately opens the implementation gate per the Phase 1
+research-phase-exit criteria (`../05-qa/quality-feedback-loop.md` §10)
+and `CLAUDE.md` §5 — **and, for any operator-facing screen/view/UI flow,
+the accepted Part D — UI/UX Screen Design Blueprint** (see
+`../03-architecture/master-blueprint.md` "Criteria for when
+implementation may later be opened"). **Acceptance of this record alone
+does not open that gate.**
 
 ## Next sprint recommendation
 
@@ -226,18 +323,19 @@ research-phase-exit criteria (`../05-qa/quality-feedback-loop.md` §10) and
 Blueprint** (Part B): convert DEC-003/006/007 (+ DEC-012 flows §6–§7) into
 the product import/export/update, customer import/matching, and order
 import + financial-evidence blueprints, resolving or routing MBQ-23 through
-MBQ-31 — after ChatGPT reviews this record. Sprint C (inventory/
-fulfillment), Sprint D (UI/UX Screen Design Blueprint, resolving MBQ-53),
-and Sprint E (implementation-planning bridge) follow per the index — this
-is the currently proposed order, not an exhaustive or final list of every
-future part.
+MBQ-31. **This is the next recommended sprint now that DEC-013 is
+accepted — it has not started.** Sprint C (inventory/fulfillment), Sprint D
+(UI/UX Screen Design Blueprint, resolving MBQ-53), and Sprint E
+(implementation-planning bridge) follow per the index — this is the
+currently proposed order, not an exhaustive or final list of every future
+part.
 
 ## Review / change control
 
-- **This record proposes Master Blueprint Part A only.** No accepted
+- **This record accepts Master Blueprint Part A only.** No accepted
   decision is re-litigated; no rejected approach is reintroduced.
-- **Related:** AR-010 (`../05-qa/architecture-review-log.md`, Proposed);
-  the three companion blueprint documents above; DEC-003 through DEC-012
-  (accepted context, unmodified).
-- **Changes** to this record after acceptance would require ChatGPT review,
+- **Related:** AR-010 (`../05-qa/architecture-review-log.md`, **Accepted by
+  ChatGPT via DEC-013**); the three companion blueprint documents above;
+  DEC-003 through DEC-012 (accepted context, unmodified).
+- **Changes** to this record after acceptance require ChatGPT review,
   mirroring the DEC-004 through DEC-012 change-control pattern.
