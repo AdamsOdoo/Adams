@@ -1,8 +1,9 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-012 Acceptance
-> Patch)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **UX / Operator-Flow Decision
+> Continuity lives in GitHub, not chat. The **current entry (Master Blueprint
+> Sprint A)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **DEC-012 Acceptance Patch**,
+> **UX / Operator-Flow Decision
 > Preparation**, **DEC-010/DEC-011 Acceptance
 > Patch**, **AR-007 + AR-008 Decision Preparation**,
 > **DEC-008/DEC-009 Acceptance Patch**,
@@ -15,6 +16,135 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Master Blueprint Sprint A — Core/Common Substrate — compact handoff (2026-07-03)
+
+> **Documentation / blueprint sprint, not implementation.** Confirmed before
+> editing: PR #69 merged into `Shopify-connector` (merge commit
+> `305f396bcbd2656a4282ed18c5983540503b5502`); DEC-003 through DEC-012 all
+> **Accepted by ChatGPT** (DEC-012 accepted 2026-07-03; AR-009 accepted);
+> AR-002 through AR-009 all **Accepted**; RA-001 through RA-023 binding;
+> implementation still blocked; Master Blueprint not previously started.
+> Branch `claude/master-blueprint-core-substrate-azhp4s` (harness-assigned;
+> the sprint's preferred name was
+> `architecture/master-blueprint-core-substrate`, so this branch-name
+> discrepancy is recorded here per the session rule) was already checked out
+> based exactly on that merge commit — no re-basing needed.
+
+- **Branch / PR:** `claude/master-blueprint-core-substrate-azhp4s` → draft PR
+  into `Shopify-connector`, opened immediately after this handoff commit,
+  **not merged**.
+- **Files changed:** `docs/03-architecture/master-blueprint.md` (new),
+  `docs/03-architecture/master-blueprint-core-substrate.md` (new),
+  `docs/03-architecture/master-blueprint-open-questions.md` (new),
+  `docs/04-decisions/DEC-013-master-blueprint-core-substrate.md` (new),
+  `docs/04-decisions/README.md`, `docs/05-qa/architecture-review-log.md`,
+  `docs/01-research/research-handoff.md` (this file),
+  `docs/06-prompts/master-blueprint-core-substrate-prompt.md` (new, archive).
+- **What changed:** **Master Blueprint Sprint A started** — created the first
+  Master Blueprint package for the connector's **core/common substrate**:
+  the top-level index (blueprint scope, part/sprint structure A–D, module
+  family overview, implementation-gate criteria); the Part A core-substrate
+  blueprint (`shopify_connector_core` boundary + six extension seams; seven
+  core configuration-object concepts incl. credential no-read-back posture
+  and the DEC-010/011 core Shopify Location reference invariants; the
+  binding abstraction with a **proposed** per-domain-concrete-on-core-
+  contract schema-shape direction (MBQ-11, the fork DEC-006/DEC-008 routed
+  here); the job/log/error/retry abstraction (6 sources / 10 states /
+  16-class core-owned registry, generalized operation-level idempotency key
+  + serialization guard); setup-wizard/dashboard/sync-center/error-center
+  blueprints applying DEC-012; the DEC-008-routed feature-flag mechanism
+  with a **proposed** store-scoped, domain-extended direction (MBQ-07) and
+  the structural "no flag bypasses a safety guard" rule; a blueprint-level
+  four-role access matrix (no CSVs, proposed names only); ten cross-module
+  extension rules); and the central open-questions register (**MBQ-01
+  through MBQ-52**, grouped, each with source/owner/blocking status).
+  Proposed **DEC-013** (`Status: Proposed for ChatGPT review`) and added
+  **AR-010** (Proposed for ChatGPT review) to the architecture review log.
+  `docs/04-decisions/README.md` got an "Also present (not yet accepted)"
+  entry indexing DEC-013 as Proposed.
+- **Items deferred:** product/customer/sale-order domain blueprints (Sprint
+  B); inventory/fulfillment domain blueprints (Sprint C); the
+  implementation-planning bridge (Sprint D); every MBQ row (notably
+  MBQ-04 credential storage, MBQ-07 feature-flag confirmation, MBQ-08
+  disconnect retention, MBQ-11 binding-shape confirmation, MBQ-26
+  order-import touchpoints, MBQ-45/47 roles mapping); all implementation.
+- **Learning feedback loop:** **New issues discovered:** three minor
+  claim-label precision issues, caught by this session's own pre-commit
+  adversarial verification pass and **fixed before commit** (two
+  [Accepted]-over-labels in Part A — an illustrative health-state
+  vocabulary and an Inference-sourced setup rule — and one open-question
+  owner/summary drift in §L vs MBQ-17); no reviewer-found defect, so no
+  `defect-pattern-log.md` row was added (that file is also outside this
+  sprint's allowed files). The verification pass otherwise confirmed: no
+  status errors, no DEC-003–012 contradictions, no RA-001–023
+  reintroduction, exact DEC-009/008/006 taxonomy fidelity, no broken
+  links. **Repeated issue patterns:** none at threshold.
+  **Rules/checklists updated:** none
+  new. **New rejected approaches:** none (checked RA-001–RA-023 before
+  drafting; the polymorphic-binding-table option is *not chosen* at
+  blueprint level but deliberately **not** entered as a rejected approach —
+  DEC-006 kept it viable and ChatGPT may still select it at DEC-013
+  review). **New technical debt:** none (no code). **Architecture
+  concerns:** AR-010 added (Proposed); one residue observation — the
+  `docs/03-architecture/README.md` status paragraph still describes the
+  pre-DEC-004/005/006 state ("AR-002/003/005 … still Not decided") and
+  predates the AR/DEC/blueprint files added since; it was **not** edited
+  because it is outside this sprint's allowed-files list — flagged for a
+  future residue sweep.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (no new issues) · rejected approaches checked,
+  none added · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none at threshold) — all **YES**.
+- **Next recommended session:** 1) **ChatGPT/Fable review of
+  DEC-013/AR-010** (headline items MBQ-04/07/08/11/45/47); 2) if accepted,
+  **Master Blueprint Sprint B — Product, Customer, and Sale/Order Domain
+  Blueprint**; 3) **implementation only after a separate ChatGPT gate**.
+- **Stop condition:** stopped after one commit + one **draft** PR into
+  `Shopify-connector` (not merged). PR #69 merge confirmed first. DEC-003
+  through DEC-012 not edited; no code files changed; no domain blueprint
+  started; DEC-013 and AR-010 proposed only, not accepted; implementation
+  still not authorized; `main` and plain `dev` untouched. Awaiting ChatGPT
+  review.
+
+**PR #70 Fable revision (2026-07-03):**
+- Fable reviewed PR #70 and returned **ACCEPT WITH MINOR CHANGES**.
+- Required revisions applied:
+  - UI/UX Screen Design Blueprint added to Master Blueprint sequence and
+    gate criteria (new Part D, `master-blueprint.md`).
+  - MBQ-53 added for screen-level UI/UX design.
+  - MBQ-54 added for module-uninstall / disable data lifecycle.
+  - Feature-flag execution-time re-check scoped to enablement gating only
+    (never alters enqueue-time notification/source-of-truth decisions).
+  - Binding enumeration seam and binding granularity bound added (§C.8).
+  - Claim labels corrected (§C.4, §D.13; also added §D.5's `skipped`/
+    `failed_final` any-class-outcome rule).
+  - `ir.cron` wording clarified (§D.1).
+  - Credential no-read-back wording clarified as a connector-surface
+    guarantee, not a database-level claim (§J.2).
+  - Webhook-topic registration seam added (§A.5).
+- DEC-013 remains **Proposed for ChatGPT review**, not accepted.
+- AR-010 remains proposed only, not accepted.
+- DEC-003 through DEC-012 untouched.
+- No code files changed.
+- Implementation remains blocked.
+- Sprint B not started.
+- Same branch/PR — no new PR opened, no merge.
+
+**PR #70 tiny consistency fix (2026-07-03):**
+- ChatGPT reviewed the Fable revision and requested one tiny consistency
+  cleanup.
+- Updated AR-010 to reference MBQ-01–MBQ-54 after MBQ-53 and MBQ-54 were
+  added.
+- AR-010 remains Proposed for ChatGPT review.
+- DEC-013 remains Proposed for ChatGPT review.
+- DEC-003 through DEC-012 untouched.
+- No code files changed.
+- Implementation remains blocked.
+- Sprint B not started.
+- Same branch/PR — no new PR opened, no merge.
 
 ---
 
@@ -4126,3 +4256,50 @@ ChatGPT review.
   010/011 edit; implementation remains blocked; Master Blueprint not started.
   Next: push branch, open one draft PR into `Shopify-connector`, stop for
   ChatGPT review.
+- **Master Blueprint Sprint A — Core/Common Substrate (2026-07-03):**
+  confirmed PR #69 merged into `Shopify-connector` (merge commit
+  `305f396bcbd2656a4282ed18c5983540503b5502`) and DEC-003 through DEC-012 /
+  AR-002 through AR-009 all Accepted before editing. Created the first
+  Master Blueprint package: `master-blueprint.md` (index), the Part A
+  `master-blueprint-core-substrate.md`, and
+  `master-blueprint-open-questions.md` (MBQ-01–MBQ-52). Proposed
+  `DEC-013-master-blueprint-core-substrate.md` (`Status: Proposed for
+  ChatGPT review`) and added AR-010 (Proposed) to
+  `architecture-review-log.md`; indexed DEC-013 as Proposed in
+  `04-decisions/README.md`. PR #70 opened as draft into `Shopify-connector`,
+  branch `claude/master-blueprint-core-substrate-azhp4s`. No code; no
+  DEC-003 through DEC-012 edit; DEC-013/AR-010 proposed only, not accepted;
+  implementation remains blocked; Sprint B not started. Next: ChatGPT/Fable
+  review of PR #70.
+- **PR #70 Fable revision (2026-07-03):** Fable reviewed PR #70 and returned
+  **ACCEPT WITH MINOR CHANGES**. Applied within the same PR/branch (no new
+  PR): added Master Blueprint Part D — UI/UX Screen Design Blueprint — to
+  `master-blueprint.md`'s sequence and to implementation-gate criterion 1;
+  added MBQ-53 (screen-level UI/UX design) and MBQ-54 (domain-module
+  uninstall/disable data lifecycle) to `master-blueprint-open-questions.md`;
+  scoped the §I.3 feature-flag execution-time re-check to fail-safe
+  enablement gating only (never altering enqueue-time notification/
+  source-of-truth decisions); reworded §I.4 to use only accepted DEC-009
+  job-state vocabulary (no new `held` state); added a cross-domain
+  binding-enumeration seam and a binding-granularity bound to §C.8; added a
+  webhook-topic registration seam to §A.5; corrected two claim labels
+  (§C.4 manual-override extension, §D.13 source-of-truth-persistence
+  generalization) and added §D.5's `skipped`/`failed_final`
+  any-class-outcome rule; clarified `ir.cron` wording (§D.1) and the
+  credential no-read-back rule as a connector-surface guarantee, not a
+  database-level claim (§J.2); minimal consistency updates to DEC-013 (MBQ count,
+  Part D/E sequence, no-exhaustive-list caveat). DEC-013 remains Proposed
+  for ChatGPT review, not accepted; AR-010 remains proposed only; DEC-003
+  through DEC-012 untouched; no code files changed; implementation remains
+  blocked; Sprint B not started. Next: push the same branch, no new PR,
+  stop for further ChatGPT/Fable review.
+- **PR #70 tiny consistency fix (2026-07-03):** ChatGPT requested one tiny
+  cleanup after the Fable revision — the AR-010 row in
+  `architecture-review-log.md` still cited `MBQ-01–MBQ-52`, stale since the
+  Fable revision added MBQ-53/MBQ-54. Updated AR-010's open-questions
+  reference to `MBQ-01–MBQ-54` and added MBQ-53/MBQ-54 to its headline
+  review items; MBQ-53/MBQ-54 themselves unchanged. AR-010 remains
+  Proposed for ChatGPT review, not accepted; DEC-013 remains Proposed;
+  DEC-003 through DEC-012 untouched; no code files changed; implementation
+  remains blocked; Sprint B not started. Same branch/PR — no new PR opened,
+  no merge. Next: stop for further ChatGPT/Fable review.

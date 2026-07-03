@@ -156,3 +156,25 @@ last-named Phase 1 research-phase-exit criterion in
 explicitly parallelized") — acceptance of DEC-012 alone does **not** open the
 implementation gate; the **Master Blueprint** is next, and a separate ChatGPT
 implementation-gate approval remains required before any implementation.
+
+**Also present (not yet accepted):**
+[`DEC-013-master-blueprint-core-substrate.md`](./DEC-013-master-blueprint-core-substrate.md) —
+**Status: Proposed for ChatGPT review** (2026-07-03, Master Blueprint Sprint A,
+prepared after PR #69 merged into `Shopify-connector`, merge commit
+`305f396bcbd2656a4282ed18c5983540503b5502`). Proposes acceptance of the
+**Master Blueprint index** and the **core/common substrate blueprint (Part A)**:
+[`../03-architecture/master-blueprint.md`](../03-architecture/master-blueprint.md),
+[`../03-architecture/master-blueprint-core-substrate.md`](../03-architecture/master-blueprint-core-substrate.md),
+and the central open-questions register
+[`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
+(MBQ-01–MBQ-52). Covers the `shopify_connector_core` module boundary, core
+configuration-object concepts, the binding abstraction (with a proposed
+per-domain-concrete-on-core-contract schema-shape direction, per the fork
+DEC-006/DEC-008 explicitly routed to the Master Blueprint), the
+job/log/error/retry abstraction, setup-wizard/dashboard/sync-center/
+error-center blueprints, the DEC-008-routed feature-flag mechanism direction,
+a blueprint-level four-role access design (no CSVs, proposed names only), and
+cross-module extension rules. **Not accepted; would resolve AR-010 if
+accepted; does not authorize implementation under any outcome; does not start
+any product/customer/sale/inventory/fulfillment domain blueprint (routed to
+Master Blueprint Sprints B/C); DEC-003 through DEC-012 are unchanged.**
