@@ -31,8 +31,13 @@
   - **[Accepted]** — restates an already-accepted DEC-003 through DEC-011 (or
     `CLAUDE.md`/`quality-feedback-loop.md`) decision, cited by file. Not
     re-litigated here.
-  - **[Proposed UX decision]** — a new operator-flow proposal this document
-    introduces, carried into DEC-012 for ChatGPT review. Not yet binding.
+  - **[Proposed UX decision]** — the label used during PR #68 decision
+    preparation for a new operator-flow proposal this document introduces,
+    rather than a direct restatement of DEC-003 through DEC-011. It is
+    retained as-is to show provenance; now that DEC-012 is **Accepted by
+    ChatGPT**, statements carrying this label are accepted through DEC-012
+    like the rest of this document — the label no longer means "not yet
+    binding," only "introduced by this sprint."
   - **[Inference]** — reasoning drawn from cited evidence (the accepted
     architecture decisions, `setup-ux-principles.md`, `product-vision.md`,
     the domain-model brief, or competitor evidence already in the repo), not

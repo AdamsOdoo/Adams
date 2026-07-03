@@ -79,6 +79,19 @@
   implementation still not authorized; Master Blueprint not started; `main` and
   plain `dev` untouched. Awaiting further instruction.
 
+**PR #69 tiny fix (2026-07-03):**
+- ChatGPT reviewed PR #69 and requested tiny accepted-status wording cleanup
+  before merge.
+- Updated `ux-operator-flow.md` so `[Proposed UX decision]` is no longer
+  described as "not yet binding" after DEC-012 acceptance.
+- Renamed DEC-012 "Decision proposed" section to "Accepted decision."
+- DEC-012 remains accepted.
+- AR-009 remains accepted.
+- DEC-003 through DEC-011 untouched.
+- No code files changed.
+- Implementation remains blocked.
+- Master Blueprint not started.
+
 ---
 
 ### UX / Operator-Flow Decision Preparation — compact handoff (2026-07-02)

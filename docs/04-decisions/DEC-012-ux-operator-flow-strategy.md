@@ -127,7 +127,7 @@ research-phase-exit criterion in
   consultant), P3 (business owner/finance stakeholder), P4 (Odoo
   partner/integrator).
 
-## Decision proposed
+## Accepted decision
 
 Adopt the ten operator-flow proposals set out in
 [`ux-operator-flow.md`](../02-product/ux-operator-flow.md) as the Phase 1
