@@ -10,16 +10,19 @@
 > [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md).
 > Companion decision record:
 > [`../04-decisions/DEC-014-master-blueprint-product-customer-sale.md`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md)
-> (Status: **Proposed for ChatGPT review**).
+> (Status: **Accepted by ChatGPT**, 2026-07-03).
 
 ## Status
 
-**Proposed for ChatGPT review.** Documentation only — the no-code gate
-(`CLAUDE.md` §4–§5) is in force. **This blueprint does not authorize
-implementation.** It builds on the **accepted** Part A core/common
-substrate (DEC-013) and the **accepted** DEC-003, DEC-006, DEC-007, DEC-012
-decisions. Nothing in this document is binding until ChatGPT reviews and
-accepts [`DEC-014`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md).
+**Accepted by ChatGPT via DEC-014.** Acceptance date: **2026-07-03**.
+Documentation only — the no-code gate (`CLAUDE.md` §4–§5) is in force.
+**This blueprint does not authorize implementation.** It builds on the
+**accepted** Part A core/common substrate (DEC-013) and the **accepted**
+DEC-003, DEC-006, DEC-007, DEC-012 decisions. See
+[`DEC-014`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md)
+"Accepted decision" for the accepted package and the explicit acceptance
+points (including the Fable B1/B2 routes and the MBQ-23/25/26/29/30/31/59
+outcomes, §J below).
 
 ## Claim labels used throughout
 
@@ -30,13 +33,19 @@ labels used throughout"):
   Not re-litigated here.
 - **[Accepted — DEC-013]** — restates a Part A design point DEC-013 already
   accepted.
-- **[Blueprint proposal]** — a design detail this sprint introduces.
-  **Remains proposed, not binding**, unless and until ChatGPT accepts
-  [`DEC-014`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md).
-  This document does **not** pre-label anything `[Accepted — DEC-014]` —
-  that relabeling, if it happens, is a future acceptance patch, mirroring
-  how Part A's `[Blueprint proposal]` items were relabeled `[Accepted —
-  DEC-013]` only after DEC-013's acceptance.
+- **[Accepted — DEC-014]** — a design detail this document introduced that
+  DEC-014 explicitly accepted (blueprint level or blueprint-policy level,
+  as stated); see DEC-014 "Accepted decision" points A–K for the full
+  list. **[Blueprint proposal]** items not explicitly named in DEC-014's
+  accepted package (item 1–6) or explicit acceptance points remain design
+  detail this document introduces at blueprint level, accepted as part of
+  the whole-document acceptance but with no exact implementation choice
+  fixed — MBQ/implementation-planning open questions cited alongside each
+  remain open regardless of label.
+- **[Blueprint proposal]** — a design detail this sprint introduces, now
+  part of the accepted Part B blueprint (DEC-014), unless a specific
+  paragraph is explicitly still open (an **[Open question — MBQ-nn]**
+  tag) or is one of DEC-014's "still open" items (§J below).
 - **[Official fact]** — a verified Shopify/Odoo platform fact, cited with a
   URL and access date. New facts verified for this sprint are dated
   **2026-07-03**.
@@ -168,9 +177,10 @@ Odoo model/field names: **[Open question — MBQ-01/02/55]**.
   import behaves when Odoo already has a product that could match — this
   is a **setup-time** decision, not decided per-import
   **[Accepted — DEC-003; DEC-006; Part A §B.6]**.
-- **Automated create/bind policy — proposed policy, tracked as MBQ-59,
-  pending DEC-014:** retrospective sync-center/dashboard visibility
-  (Part A §F/§G) is **audit/log visibility only** — it is not a preview,
+- **Automated create/bind policy — accepted at blueprint-policy level by
+  DEC-014, tracked as MBQ-59:** retrospective sync-center/dashboard
+  visibility (Part A §F/§G) is **audit/log visibility only** — it is not
+  a preview,
   and it does **not** by itself satisfy DEC-003/DEC-006's "duplicate-
   prevention preview... precedes every create/bind action; no blind
   create" requirement. This document's earlier wording read retrospective
@@ -233,13 +243,14 @@ Odoo model/field names: **[Open question — MBQ-01/02/55]**.
 
   This **pre-create check**, gated and routed as above — not the
   sync-center's later display of the outcome — is what satisfies "no
-  blind create" for the automated path. **[Blueprint proposal, pending
-  DEC-014 acceptance — not an already-accepted interpretation of
-  DEC-003/DEC-006; tracked as open question MBQ-59]**. This policy
-  applies identically to Customer §B.2, stated once here and
-  cross-referenced there. **Interactive/batch import and export (a
-  manual matching session, a bulk catalog-onboarding pass, or any
-  operator-triggered export/update, §A.3/§A.9) are unaffected — they
+  blind create" for the automated path. **[Accepted — DEC-014, at
+  blueprint-policy level; MBQ-59 — the gate mechanism and its Part A
+  per-class routing are accepted; exact eligibility-check/match-
+  confidence implementation detail remains open for implementation
+  planning]**. This policy applies identically to Customer §B.2, stated
+  once here and cross-referenced there. **Interactive/batch import and
+  export (a manual matching session, a bulk catalog-onboarding pass, or
+  any operator-triggered export/update, §A.3/§A.9) are unaffected — they
   still require a blocking, synchronous preview before the operator
   confirms any create/bind/write.**
 
@@ -337,7 +348,8 @@ Odoo model/field names: **[Open question — MBQ-01/02/55]**.
      confirmed absence of the behaviour** — this is not asserted as "safe
      from delete-on-omit" or "idempotent," only as "not documented to
      have either."
-   - **[Blueprint proposal — direction only, not implementation-final]:**
+   - **[Accepted — DEC-014, partially resolving MBQ-23 — direction only,
+     not implementation-final]:**
      prefer `productVariantsBulkCreate`/`productVariantsBulkUpdate` for
      **variant-only** additions/updates after first export (narrower
      blast radius than a whole-product `productSet` write); use
@@ -394,9 +406,8 @@ Part A's accepted per-class mechanisms — not a single collapsed state) is
 the mechanism that satisfies "no blind create" — **not** the sync-center/
 dashboard's later display of the job's outcome, which is **audit/log
 visibility only**, shown *after* the action, and is never a substitute
-for a preview **[Blueprint proposal, pending DEC-014 — see §A.2 for the
-full policy and open question MBQ-59]**. No blind create, under either
-path.
+for a preview **[Accepted — DEC-014, at blueprint-policy level — see
+§A.2 for the full policy; MBQ-59]**. No blind create, under either path.
 
 ### A.10 Draft-first export safety
 
@@ -421,7 +432,8 @@ path.
     customers," tied to the `publishedAt` field and the product's
     `resourcePublications` (the list of sales-channel publications a
     product is published to). (Same source, accessed 2026-07-03.)
-  - **[Blueprint proposal, resolving MBQ-25 at blueprint-direction level]:**
+  - **[Accepted — DEC-014, partially resolving MBQ-25 at
+    blueprint-direction level]:**
     a first-time controlled export creates the product with **`status:
     DRAFT`** (or relies on `productCreate`'s unpublished-by-default
     behaviour) and **does not** call `publishablePublish` — the product
@@ -568,10 +580,11 @@ the full product-relevant mapping; headline touchpoints:
 
 See §J for the consolidated resolved/partially-resolved/carried-forward
 table. Headline: **MBQ-23** (variant-write mutation strategy) — partially
-resolved, direction proposed. **MBQ-24** (media delete-on-omit) — carried
-forward, safety posture unaffected. **MBQ-25** (draft/publish mechanism) —
-partially resolved, mechanism identified and cited. **MBQ-59** (automated
-import create/bind policy, §A.2) — new, proposed, pending DEC-014.
+resolved by DEC-014, direction accepted. **MBQ-24** (media delete-on-omit) —
+carried forward, safety posture unaffected. **MBQ-25** (draft/publish
+mechanism) — partially resolved by DEC-014, mechanism identified, cited,
+and accepted. **MBQ-59** (automated import create/bind policy, §A.2) —
+accepted at blueprint-policy level by DEC-014.
 
 ---
 
@@ -601,9 +614,10 @@ its own concrete **customer binding** model (Shopify Customer ↔ Odoo
   dedicated customer sync/reconciliation pass) — both paths use the same
   matching logic below **[Inference — DEC-003 lists customer import as a
   Shopify → Odoo capability independent of order import scope]**.
-- **Automated create/bind policy — proposed policy, tracked as MBQ-59,
-  pending DEC-014:** applies identically to §A.2's proposed policy,
-  substituting the customer domain — a **pre-create duplicate check**
+- **Automated create/bind policy — accepted at blueprint-policy level by
+  DEC-014, tracked as MBQ-59:** applies identically to §A.2's accepted
+  policy, substituting the customer domain — a **pre-create duplicate
+  check**
   (the §B.3 match-key sequence) runs *before* any automated customer
   create/bind, gated by the same two condition groups as §A.2:
   **eligibility conditions** (setup complete, customer/sale domain
@@ -617,9 +631,8 @@ its own concrete **customer binding** model (Shopify Customer ↔ Odoo
   condition fails). **This document does not widen Part A §D.8's
   confirmation-required sub-reason vocabulary.** Retrospective
   sync-center/dashboard visibility is **audit/log visibility only** — it
-  does not by itself satisfy "no blind create" **[Blueprint proposal,
-  pending DEC-014 acceptance; open question MBQ-59 — see §A.2 for the
-  full policy]**.
+  does not by itself satisfy "no blind create" **[Accepted — DEC-014, at
+  blueprint-policy level; MBQ-59 — see §A.2 for the full policy]**.
 
 ### B.3 Matching priority
 
@@ -672,13 +685,13 @@ for products (§A.6).
   domain-brief quote.)
 - **Do not invent PII (repeated for emphasis, per this sprint's explicit
   instruction):** no field is ever synthesized, guessed, or defaulted to a
-  plausible-looking value. See §B.7 for the **proposed** fallback
-  mechanism when data is genuinely absent — a fallback proposal pending
-  DEC-014, not an already-accepted mechanism.
+  plausible-looking value. See §B.7 for the fallback mechanism when data
+  is genuinely absent — accepted by DEC-014 at direction level, MBQ-29
+  partially resolved (exact granularity remains open).
 
 ### B.7 Default customer fallback posture (partially resolves MBQ-29)
 
-- **[Blueprint proposal, partially resolving MBQ-29]:** a single,
+- **[Accepted — DEC-014, partially resolving MBQ-29]:** a single,
   deliberately-created, clearly-flagged **fallback partner per store**
   (proposed name direction: a "Shopify — No Customer Data" partner record)
   is used **only** when Shopify genuinely withholds all customer PII for
@@ -715,8 +728,8 @@ DEC-012 §6.7]**. For automated per-order customer creation, the §A.2/§B.2
 pre-create policy (eligibility + match-quality gate, per-class routed) is
 what satisfies "no blind create" — retrospective sync-center/dashboard
 visibility is **audit/log visibility only**, never a preview substitute
-**[Blueprint proposal, pending DEC-014 — see §A.2 for the full policy and
-open question MBQ-59]**.
+**[Accepted — DEC-014, at blueprint-policy level — see §A.2 for the full
+policy; MBQ-59]**.
 
 ### B.10 Customer privacy and protected-data minimization
 
@@ -758,27 +771,27 @@ non-no-PII store, which is a data-quality signal, not a no-PII case).
 ### B.13 Customer-specific open questions
 
 See §J. Headline: **MBQ-29** (default-customer fallback) — partially
-resolved, direction proposed, granularity open. **MBQ-31** (final
-match-key set) — proposed resolution below. **MBQ-59** (automated import
-create/bind policy, §B.2) — new, proposed, pending DEC-014.
+resolved, direction accepted, granularity open. **MBQ-31** (final
+match-key set) — accepted at blueprint level below. **MBQ-59** (automated
+import create/bind policy, §B.2) — accepted at blueprint-policy level by
+DEC-014.
 
-**Proposed resolution for MBQ-31 (final customer match-key set):**
-**[Blueprint proposal — recommendation to ChatGPT, MBQ-31's decision owner
-is "ChatGPT (Sprint B)"]** — **email is the sole automatic match key**
-(beyond an existing binding) for Phase 1; phone and name stay advisory/
-manual-only, never automatic. Rationale: DEC-006's existing evidence base
-shows competitor multi-key matching (VentorTech: email/name/phone) but
-also shows **name** is structurally excluded everywhere in this connector
-(RA-006) and **phone** reliability/availability is itself gated by the
-same protected-customer-data approval as email (§B.6) with no
-demonstrated additional dedup value cited in the existing evidence base —
-adding phone as a second automatic key would introduce a second point of
-match-key drift (a changed phone number silently breaking or double-
-matching) without a cited, demonstrated safety benefit over email alone,
-which the DP-006 evidence-consistency gate (`../05-qa/defect-pattern-log.md`)
-requires before accepting a capability as decided. This is a
-**recommendation**, not a self-accepted decision — it requires ChatGPT
-acceptance via DEC-014 to become binding.
+**Accepted resolution for MBQ-31 (final customer match-key set):**
+**[Accepted — DEC-014, at blueprint level — ChatGPT's direct decision as
+MBQ-31's named decision owner, "ChatGPT (Sprint B)"]** — **email is the
+sole automatic match key** (beyond an existing binding) for Phase 1;
+phone and name stay advisory/manual-only, never automatic. Rationale:
+DEC-006's existing evidence base shows competitor multi-key matching
+(VentorTech: email/name/phone) but also shows **name** is structurally
+excluded everywhere in this connector (RA-006) and **phone**
+reliability/availability is itself gated by the same protected-customer-
+data approval as email (§B.6) with no demonstrated additional dedup value
+cited in the existing evidence base — adding phone as a second automatic
+key would introduce a second point of match-key drift (a changed phone
+number silently breaking or double-matching) without a cited,
+demonstrated safety benefit over email alone, which the DP-006
+evidence-consistency gate (`../05-qa/defect-pattern-log.md`) required
+before accepting this capability as decided.
 
 ---
 
@@ -873,15 +886,15 @@ label is corrected to match Part A's accepted taxonomy.
 **Three** distinct paths, not conflated **[Blueprint proposal]**:
 
 1. **Genuinely no PII available (§B.6)** — the recorded fallback partner
-   (§B.7, a proposed mechanism pending DEC-014, not yet accepted) is
-   used; the order imports normally, flagged.
+   (§B.7, accepted by DEC-014 at direction level, MBQ-29 partially
+   resolved) is used; the order imports normally, flagged.
 2. **PII available, no confident automatic match, not ambiguous** — that
    customer import creates/matches a new Odoo partner in this situation
    at all is the **accepted "customer import" capability** (§B.2,
    DEC-003) — this is **not** a "fallback" or an error state. **Whether
    that create/bind happens automatically, without a synchronous
    per-record preview, is governed by the §A.2/§B.2 MBQ-59 gate —
-   proposed, pending DEC-014, not itself already accepted.** If the
+   accepted at blueprint-policy level by DEC-014.** If the
    MBQ-59 gate's conditions hold, the partner is created and bound as
    part of the order-import job; if a match-quality condition fails, the
    create does not proceed automatically and the relevant Part A
@@ -986,7 +999,7 @@ structure, **not re-decided:**
 
 ### C.10 Gateway → Odoo journal mapping (partially resolves MBQ-30)
 
-**[Blueprint proposal, partially resolving MBQ-30]** — a per-store
+**[Accepted — DEC-014, point G, partially resolving MBQ-30]** — a per-store
 configuration concept: a mapping from Shopify's free-text gateway/payment-
 method label (e.g. `"shopify_payments"`, `"manual"`, `"bogus"`) to an Odoo
 `account.journal` **reference**, contributed via the core §I settings-
@@ -1016,8 +1029,9 @@ cancellation/refund/return-processing handling, and does not narrow that
 deferral to only "processing workflows" while quietly allowing the
 underlying sale order to change.
 
-**[Blueprint proposal, pending DEC-014 — narrowed in this revision]:** for
-an already-imported order, an `ORDERS_UPDATED` webhook (or the equivalent
+**[Accepted — DEC-014, point J — the Fable B2 route, narrowed in the PR
+#72 Fable revision and accepted as final]:** for an already-imported
+order, an `ORDERS_UPDATED` webhook (or the equivalent
 reconciliation-detected change) may **refresh Shopify-side evidence/audit
 data only** — the raw financial-evidence fields captured at import
 (§C.7/§C.9) and their audit trail. It must **not** silently update the
@@ -1045,9 +1059,9 @@ totals, or fulfillment state.
 without ever touching sale-order lines (e.g. a separate evidence-snapshot
 record vs. an evidence-only field group on the existing evidence capture,
 §C.7) is an **[Open question — implementation planning]**, not decided
-here. Narrowing this wording does not create a new DEC-014 acceptance
-point and does not expand what DEC-014 proposes to accept beyond the
-existing deferred posture already named in its "Proposed decision" item 3.
+here. This narrowed wording is accepted as DEC-014 point J (the Fable B2
+route) and does not expand what DEC-014 accepts beyond the existing
+deferred posture already named in its "Proposed decision" item 3.
 
 The mandatory idempotent-refund regression principle (DEC-003) remains
 carried forward for the first refund/refund-sync sprint, unaffected by
@@ -1055,15 +1069,18 @@ this note.
 
 ### C.13 Manual review triggers
 
-Every trigger below maps to an existing Part A §D.4 error class — no new
-class is introduced (Part A §A.5.3: domain modules map into the fixed
-registry, they do not fork it). **Not every trigger is a
-`blocked_manual_review` confirmation-required case** — Part A's per-class
-routing (§D.5) distinguishes "manual fix then retry" (§D.5.3,
-`failed_retryable`), "operator confirmation required" (§D.5.4,
-`blocked_manual_review`, six sub-classes only), and "conservative, never
-silent" (§D.5.5, its own posture) — this table uses that accepted
-routing, not a single collapsed state:
+**[Accepted — DEC-014, point I — the Fable B1 route, corrected in the PR
+#72 Fable revision and accepted as final]:** every trigger below maps to
+an existing Part A §D.4 error class — no new class is introduced (Part A
+§A.5.3: domain modules map into the fixed registry, they do not fork
+it). **Not every trigger is a `blocked_manual_review` confirmation-
+required case** — Part A's per-class routing (§D.5) distinguishes
+"manual fix then retry" (§D.5.3, `failed_retryable`), "operator
+confirmation required" (§D.5.4, `blocked_manual_review`, six sub-classes
+only), and "conservative, never silent" (§D.5.5, its own posture) — this
+table uses that accepted routing, not a single collapsed state. **Part A
+§D.8's confirmation-required sub-reason vocabulary is not widened** by
+this table or by any routing in §A.2/§C.5/§C.8/§G/§I:
 
 | Trigger | Error class (Part A §D.4) | Routing (Part A §D.5) |
 | --- | --- | --- |
@@ -1074,10 +1091,10 @@ routing, not a single collapsed state:
 | Unsupported data shape (malformed/unexpected order payload) | `data shape/schema mismatch` | Manual fix then retry (§D.5.3) — `failed_retryable`, **not** `blocked_manual_review` |
 | Missing mapping (a required field's mapping configuration absent, e.g. no gateway→journal mapping and one is required for a downstream step) | `mapping missing` | Manual fix then retry (§D.5.3) — `failed_retryable`, **not** `blocked_manual_review` |
 
-### C.14 Order-import operator touchpoints (proposed resolution for MBQ-26)
+### C.14 Order-import operator touchpoints (accepted at blueprint level, MBQ-26)
 
-**[Blueprint proposal — recommendation to ChatGPT, MBQ-26's decision owner
-is "ChatGPT (Sprint B)"]:**
+**[Accepted — DEC-014, at blueprint level — ChatGPT's direct decision as
+MBQ-26's named decision owner, "ChatGPT (Sprint B)"]:**
 
 The core error center + manual-review flow (Part A §H) is **sufficient**
 for Phase 1 order-import operator touchpoints, **provided** it carries two
@@ -1095,12 +1112,14 @@ generic 'needs review'"), not a new surface:
    relevant matching flow (§A.6/§B.3) so resolving the underlying binding
    and retrying the order is a two-click path, not a manual hunt.
 
-**A separate, dedicated order-import screen is not proposed** — the
-existing sync-center (Part A §G, filterable by domain) and error-center
-(Part A §H) surfaces, extended as above, are recommended as sufficient.
-This is a **recommendation for ChatGPT's acceptance** via DEC-014, not a
-self-decided resolution — MBQ-26 stays technically open until DEC-014 is
-accepted (see §J).
+**A separate, dedicated order-import screen is not authorized or
+required** — the existing sync-center (Part A §G, filterable by domain)
+and error-center (Part A §H) surfaces, extended as above, are accepted as
+sufficient. This acceptance is conditioned on, and requires, the two
+order-specific extensions above (inline financial-evidence breakdown;
+direct matching-flow links) — both are accepted as part of this same
+DEC-014 acceptance, not deferred to a separate future requirement (see
+§J).
 
 ### C.15 Order-specific job types
 
@@ -1325,23 +1344,26 @@ no new MBQ row is added for this caveat.
 ## J. Open questions: resolved / partially resolved / carried forward
 
 Full register: [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
-§4. **Nothing below is final until ChatGPT accepts DEC-014** — see the
-claim-label note at the top of this document. "Proposed resolved"/
-"proposed partially resolved" describes this sprint's recommendation, not
-a self-accepted decision.
+§4. **Accepted by ChatGPT via DEC-014 on 2026-07-03** — see the
+claim-label note at the top of this document and DEC-014's "Accepted
+decision" section for the full explicit acceptance points (A–K).
+"Partially resolved" means direction accepted, exact detail still open;
+"accepted at blueprint level"/"accepted at blueprint-policy level" means
+ChatGPT's decision is final at that level, with any named residual detail
+still open as stated.
 
 | MBQ | Sprint B outcome | Where |
 | --- | --- | --- |
-| MBQ-23 | **Proposed partially resolved** — mutation-strategy direction proposed (bulk-variant mutations for variant-only updates; `productSet` for first export/full resync); exact implementation choice stays open | §A.5.2 |
+| MBQ-23 | **Partially resolved by DEC-014** — mutation-strategy direction accepted (bulk-variant mutations for variant-only updates; `productSet` for first export/full resync); exact implementation choice stays open | §A.5.2 |
 | MBQ-24 | **Carried forward, open** — official docs checked; media not confirmed either way; safety posture (preview) already covers the risk regardless | §A.13 |
-| MBQ-25 | **Proposed partially resolved** — mechanism identified and cited (`status` enum + unpublished-by-default `productCreate` + `publishablePublish`); exact channel-selection UX stays open | §A.10 |
-| MBQ-26 | **Proposed resolution** — existing error/sync-center surfaces, extended with two order-specific details, recommended sufficient; no dedicated screen proposed | §C.14 |
+| MBQ-25 | **Partially resolved by DEC-014** — mechanism identified, cited, and accepted (`status` enum + unpublished-by-default `productCreate` + `publishablePublish`); exact channel-selection UX stays open | §A.10 |
+| MBQ-26 | **Accepted at blueprint level by DEC-014** — existing error/sync-center surfaces, extended with two order-specific details (inline financial-evidence breakdown; direct matching-flow links), accepted as sufficient; no dedicated screen authorized or required | §C.14 |
 | MBQ-27 | **Carried forward, open** — official-doc check attempted (Odoo tax docs), inconclusive; mechanism unresolved | §C.17 |
 | MBQ-28 | **Carried forward, unchanged** — not triggered by this sprint | §C.11/§C.17 |
-| MBQ-29 | **Proposed partially resolved** — single shared fallback-partner direction proposed; per-order-vs-shared granularity stays open | §B.7 |
-| MBQ-30 | **Proposed partially resolved** — gateway→journal config-surface concept proposed; exact schema stays open | §C.10 |
-| MBQ-31 | **Proposed resolution** — email-only automatic match key recommended; phone/name stay advisory | §B.13 |
-| MBQ-59 | **Added in PR #72 revision; revised again in the Fable-review revision. Proposed, pending DEC-014** — automated (webhook/scheduled/reconciliation) import create/bind policy: a pre-create duplicate check plus a two-tier gate (eligibility conditions — setup complete, domain enabled, source strategy permits creation — routed via Part A's accepted enqueue/cancel mechanisms, never `blocked_manual_review`; match-quality conditions — confident match or confident no-match-creation candidate, no ambiguous-match/binding-conflict/duplicate-risk/destructive-write-guard condition — routed via Part A's accepted confirmation-required classes when failed; fully logged per Part A §D.10/§C.4); retrospective sync-center/dashboard visibility is audit only, not preview. **Not** partially resolved — remains fully open, not accepted, not labelled as already-accepted DEC-003/DEC-006 behaviour | §A.2/§B.2/§C.6 |
+| MBQ-29 | **Partially resolved by DEC-014** — single shared fallback-partner direction accepted; per-order-vs-shared granularity stays open | §B.7 |
+| MBQ-30 | **Partially resolved by DEC-014** — gateway→journal config-surface concept accepted; exact schema stays open | §C.10 |
+| MBQ-31 | **Accepted at blueprint level by DEC-014** — email-only automatic match key accepted; phone/name stay advisory | §B.13 |
+| MBQ-59 | **Added in PR #72 revision; revised again in the Fable-review revision; accepted at blueprint-policy level by DEC-014** — automated (webhook/scheduled/reconciliation) import create/bind policy: a pre-create duplicate check plus a two-tier gate (eligibility conditions — setup complete, domain enabled, source strategy permits creation — routed via Part A's accepted enqueue/cancel mechanisms, never `blocked_manual_review`; match-quality conditions — confident match or confident no-match-creation candidate, no ambiguous-match/binding-conflict/duplicate-risk/destructive-write-guard condition — routed via Part A's accepted confirmation-required classes when failed; fully logged per Part A §D.10/§C.4); retrospective sync-center/dashboard visibility is audit only, not preview. The policy itself is accepted; exact eligibility-check/match-confidence implementation detail remains open for implementation planning | §A.2/§B.2/§C.6 |
 
 **New rows added (next available number after MBQ-54):** MBQ-55 through
 MBQ-59 — see [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
@@ -1356,11 +1378,15 @@ stability nuances beyond general GID-non-permanence, §C.3), **MBQ-59**
 the PR #72 revision, replacing the withdrawn "retrospective visibility
 satisfies preview" reading in §A.2/§A.9/§B.2/§B.9; revised again in the
 Fable-review revision to use accepted Part A per-class routing instead of
-collapsing every gate failure into `blocked_manual_review` — remains
-proposed/open, not partially resolved, not accepted).
+collapsing every gate failure into `blocked_manual_review` — **accepted
+at blueprint-policy level by DEC-014**; exact implementation detail
+remains open).
 
-**MBQ-04, MBQ-08, MBQ-53, and MBQ-54 are unchanged and remain open** — not
-addressed, not resolved, not touched by this sprint.
+**MBQ-24, MBQ-27, MBQ-28, MBQ-55, MBQ-56, MBQ-57, and MBQ-58 remain
+open** — carried forward or added this sprint, not resolved. **MBQ-04,
+MBQ-08, MBQ-53, and MBQ-54 are unchanged and remain open** — not
+addressed, not resolved, not touched by this sprint or by DEC-014's
+acceptance.
 
 ## K. What this does not decide
 
@@ -1381,19 +1407,23 @@ addressed, not resolved, not touched by this sprint.
 
 ## L. Implementation remains blocked
 
-**This blueprint's proposal, and its later acceptance (if any) via
-DEC-014, does not authorize implementation.** No code, Odoo module, model,
-view, controller, security file, manifest, test, or CI file is created or
-permitted by this document. The no-code gate (`CLAUDE.md` §4–§5) remains
-in force. Per `master-blueprint.md`'s "Criteria for when implementation may
-later be opened," implementation of the product/customer/order domains
+**This blueprint's acceptance via DEC-014 does not authorize
+implementation.** No code, Odoo module, model, view, controller, security
+file, manifest, test, or CI file is created or permitted by this
+document. The no-code gate (`CLAUDE.md` §4–§5) remains in force. Per
+`master-blueprint.md`'s "Criteria for when implementation may later be
+opened," implementation of the product/customer/order domains
 additionally requires: (1) ChatGPT acceptance of this Part B blueprint
-(via DEC-014); (2) resolution or conscious acceptance of every
-"Blocks implementation: Yes" row this sprint touches; (3) a separate,
-explicit ChatGPT implementation-gate approval; (4) every implementation
-task written to the `CLAUDE.md` §9 template; (5) no open quality-gate
-escalation. **None of these five conditions is satisfied by this
-document.**
+(via DEC-014) — **satisfied, 2026-07-03**; (2) resolution or conscious
+acceptance of every "Blocks implementation: Yes" row this sprint
+touches — **not satisfied**, several such rows remain open (MBQ-04,
+MBQ-08, MBQ-23–25 detail, MBQ-27, MBQ-29–30 detail, MBQ-53–59); (3) a
+separate, explicit ChatGPT implementation-gate approval — **not
+satisfied**; (4) every implementation task written to the `CLAUDE.md` §9
+template — **not applicable, no implementation task written**; (5) no
+open quality-gate escalation. **Condition (1) alone is satisfied by this
+acceptance; conditions (2)–(5) are not, so implementation remains
+blocked.**
 
 ## Next recommended sprint after ChatGPT review
 
