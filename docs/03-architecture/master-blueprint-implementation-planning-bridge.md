@@ -59,6 +59,11 @@
   **the implementation gate remains closed, implementation remains
   blocked, and no implementation task has been created** by this
   acceptance.
+- **DEC-019 proposed note (2026-07-04).** A dedicated MBQ-62 follow-up —
+  [`DEC-019`](../04-decisions/DEC-019-mbq-62-odoo-event-job-source.md) —
+  has been prepared for ChatGPT review. **Not accepted.** **The
+  implementation gate remains closed. Implementation remains blocked.**
+  **§4's decision plan table below is unchanged** by this note.
 
 ## 1. Purpose of Part E
 
