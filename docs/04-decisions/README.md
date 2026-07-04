@@ -314,3 +314,35 @@ AR-013** in `../05-qa/architecture-review-log.md`. **Part E
 next: **Part E**, or a separate ChatGPT decision on the open
 recommendations MBQ-33/34/41/45/06/35, then **implementation only after
 a separate ChatGPT gate**.
+
+**Also accepted:**
+[`DEC-017-master-blueprint-implementation-planning-bridge.md`](./DEC-017-master-blueprint-implementation-planning-bridge.md) —
+proposed 2026-07-04 (Master Blueprint Part E, prepared after PR #79
+merged into `Shopify-connector`, merge commit
+`77ee511036a98db36262bdbc9b4ae4371a2d85f8`, PR #80) and **accepted by
+ChatGPT on 2026-07-04**. **Status: Accepted by ChatGPT, acceptance date
+2026-07-04 — no longer proposed.** Accepts **Master Blueprint Part E —
+Implementation-Planning Bridge**
+(`../03-architecture/master-blueprint-implementation-planning-bridge.md`)
+as a **documentation-only** implementation-planning bridge: an MBQ
+decision plan routing every implementation-blocking open question
+(MBQ-01–MBQ-63) to a decision owner/type/timing, accepted **as a
+routing/sequencing plan only**, not as any individual MBQ decision; a
+proposed module-by-module implementation sequence and first-safe-
+implementation-slice recommendation, both accepted **as planning
+guidance only**; test/rollback strategy at planning level; and a
+no-code-to-code gate checklist. Accepts, **at fact-verification level
+only**, the official-doc findings behind new register rows **MBQ-64**
+(Shopify `MoneyBag`/`shopMoney`/`presentmentMoney` order-money model vs.
+Odoo's single computed `sale.order.currency_id`) and **MBQ-65** (Shopify
+product webhook topics `PRODUCTS_CREATE`/`PRODUCTS_UPDATE`/
+`PRODUCTS_DELETE`) — **neither row's residual (MBQ-64's design/selection
+mechanism; MBQ-65's payload/subscription/scope) is resolved by this
+acceptance**, and no ChatGPT-batch MBQ (MBQ-06/08/17/33/34/41/45/52/54/
+60/62) is decided. **Does not authorize implementation; does not open
+the implementation gate; does not create any implementation task;
+DEC-003 through DEC-016 are unchanged; no accepted Part A–D status is
+weakened.** **Resolves AR-014** in
+`../05-qa/architecture-review-log.md`. Recommended next: the MBQ
+decision plan's own ChatGPT-batch decisions, then a separate, explicit
+ChatGPT implementation-gate-opening act.

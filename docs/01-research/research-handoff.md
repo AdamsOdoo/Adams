@@ -1,9 +1,12 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Part D
-> Blueprint Status Alignment — residue cleanup after PR #78)** is
+> Continuity lives in GitHub, not chat. The **current entry (DEC-017
+> Acceptance Patch — Master Blueprint Part E accepted)** is
 > immediately below, in the **compact
 > handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Master Blueprint Part E — Implementation-Planning Bridge (proposal
+> history)**,
+> **Part D Blueprint Status Alignment**,
 > **Master Blueprint Integrity & Competitor Advantage Audit**,
 > **DEC-016 Acceptance Patch**,
 > **Master Blueprint Sprint D (proposal history)**,
@@ -28,6 +31,178 @@
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
 
 ---
+
+### DEC-017 Acceptance Patch — Master Blueprint Part E accepted — compact handoff (2026-07-04)
+
+> **Documentation-only acceptance patch, not implementation, not an
+> implementation-gate opening.** Confirmed before editing: PR #80 head
+> commit `e4e1fd5b2d2c4fafdaa57c4b025d5234611b44b6` (branch
+> `claude/master-blueprint-part-e-ia05hx`, based on `Shopify-connector` at
+> PR #79 merge commit `77ee511036a98db36262bdbc9b4ae4371a2d85f8`); DEC-003
+> through DEC-016 confirmed Accepted by ChatGPT and unedited; Part E
+> confirmed previously Proposed for ChatGPT review, not accepted;
+> implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/master-blueprint-part-e-ia05hx` → PR #80 into
+  `Shopify-connector` (not merged).
+- **Files changed:** `docs/04-decisions/DEC-017-master-blueprint-implementation-planning-bridge.md`
+  (new), `docs/04-decisions/README.md`,
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`,
+  `docs/03-architecture/master-blueprint.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/01-research/research-handoff.md` (this file). **No DEC-003 through
+  DEC-016 file changed. No code file changed. No Python/XML/manifest/
+  security/test/CI file changed. No `shopify-official-api-notes.md` or
+  `odoo-official-architecture-notes.md` change (facts already cited;
+  acceptance touches status/cross-reference wording only, in the allowed
+  files).**
+- **What changed / residue fixed:** ChatGPT reviewed PR #80 and accepted its
+  substance via new decision record **DEC-017**. This patch carries that
+  acceptance into the repository: **Master Blueprint Part E** is now
+  **Accepted by ChatGPT via DEC-017**, as a **documentation-only
+  implementation-planning bridge** — the MBQ decision plan, proposed
+  implementation sequence, first-safe-implementation-slice recommendation,
+  and test/rollback strategy are accepted **as planning guidance only**,
+  not as decisions or authorizations. **AR-014** moves to **Accepted by
+  ChatGPT**. **MBQ-64** is now **partially resolved at fact-verification
+  level** — Shopify's `MoneyBag`/`shopMoney`/`presentmentMoney` order-money
+  model and Odoo's single computed `sale.order.currency_id` are accepted as
+  verified facts; the design/selection mechanism (which money field is
+  compared against `currency_id`, and how a mismatch is classified/guarded)
+  **remains open**. **MBQ-65**'s topic strings (`PRODUCTS_CREATE`/
+  `PRODUCTS_UPDATE`/`PRODUCTS_DELETE`) are now **resolved at
+  fact-verification level only** — the payload-shape/subscription-scope/
+  Phase-1-implementation-scope residual **remains open**, mirroring MBQ-63.
+  **No ChatGPT-batch MBQ item (MBQ-06/08/17/33/34/41/45/52/54/60/62) is
+  decided by this acceptance.** `master-blueprint.md`'s Part E references
+  (Status section, sprint-structure table row, "Domain blueprints still
+  pending" section, DEC/AR range mentions) all moved from "Proposed for
+  ChatGPT review — NOT accepted" to "Accepted by ChatGPT via DEC-017" —
+  **no accepted Part A–D status was touched or weakened.**
+  `docs/04-decisions/README.md` gained a DEC-017 entry in the decision
+  index.
+- **Items deferred:** the MBQ decision plan's own ChatGPT-batch decisions
+  (MBQ-06/08/17/33/34/41/45/52/54/60/62, roughly) — a dedicated decision
+  session is the recommended next step; MBQ-64's design/selection
+  mechanism; MBQ-65's payload/subscription/scope residual; a separate,
+  explicit ChatGPT implementation-gate-opening act; all implementation; all
+  implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session mechanically applied ChatGPT's acceptance decision to the
+  repository, with no new judgment calls beyond precisely scoping what the
+  acceptance does and does not cover. **Repeated issue patterns:** none
+  newly triggered. **Rules/checklists updated:** none this session (out of
+  allowed-files scope). **New rejected approaches:** none — no new
+  architecture proposed or reopened. **New technical debt:** none (no
+  code; nothing to compromise). **New open questions:** none added — only
+  MBQ-64/MBQ-65's existing status wording updated to reflect DEC-017's
+  fact-verification-level acceptance; both remain open for their own
+  residual questions. **Architecture concerns:** none — no accepted DEC
+  (DEC-003–016), AR (AR-002–013), or Part A–D design content was changed;
+  only Part E's own acceptance status and the two new MBQ rows' status
+  wording were updated.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new) · rejected approaches
+  checked, none added · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** the **MBQ decision plan's ChatGPT-batch
+  decisions** (Part E document §4) — the largest remaining lever before the
+  implementation gate can meaningfully be considered for opening. Not
+  implementation code.
+- **Stop condition:** stopped after committing and pushing this acceptance
+  patch to the existing PR #80 branch (not merged). DEC-003 through
+  DEC-016 not edited; no existing MBQ row (other than MBQ-64/65's own
+  status wording) modified; no code files changed; Part E is now
+  **Accepted by ChatGPT via DEC-017**, documentation-only; implementation
+  remains **blocked**; the implementation gate remains **closed**; `main`
+  and plain `dev` untouched. Awaiting further instruction.
+
+### Master Blueprint Part E — Implementation-Planning Bridge — compact handoff (2026-07-04)
+
+> **Documentation-only planning bridge, not implementation, not an
+> implementation-gate opening.** Confirmed before editing: branch
+> `claude/master-blueprint-part-e-ia05hx` based on `Shopify-connector` at
+> merge commit `77ee511036a98db36262bdbc9b4ae4371a2d85f8` (PR #79, Part D/
+> `master-blueprint.md` residue-alignment cleanup); DEC-003 through DEC-016
+> confirmed Accepted by ChatGPT and unedited; Part E confirmed previously
+> Not started; implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/master-blueprint-part-e-ia05hx` → draft PR into
+  `Shopify-connector` (not merged).
+- **Files changed:** `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`
+  (new), `docs/03-architecture/master-blueprint.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/01-research/shopify-official-api-notes.md`,
+  `docs/01-research/odoo-official-architecture-notes.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/01-research/research-handoff.md` (this file). **No DEC file changed.
+  No code file changed. No Python/XML/manifest/security/test/CI file
+  changed.**
+- **What changed / residue fixed:** opened the first Part E session,
+  directly executing the PR #78 audit's own §10 "Required Part E focus
+  areas" as scoped work — (1) an **MBQ decision plan** in the new Part E
+  document routing every "Blocks implementation: Yes" row (MBQ-01 through
+  MBQ-63) to a decision owner, decision type, and recommended timing, none
+  resolved or closed by the table itself; (2) **official-doc research**
+  closing two of the three currently-untracked gaps the PR #78 audit
+  flagged: Shopify's `MoneyBag`/presentment-currency order-money model
+  (`shopMoney`/`presentmentMoney`, verified against `shopify.dev`) and
+  Odoo's single computed `sale.order.currency_id` (verified against
+  official 19.0 source), both added to the research notes and folded into
+  new register row **MBQ-64** (a design/selection question, not resolved);
+  Shopify's product-domain webhook topic strings (`PRODUCTS_CREATE`/
+  `PRODUCTS_UPDATE`/`PRODUCTS_DELETE`, verified against the official
+  `WebhookSubscriptionTopic` enum) folded into new register row **MBQ-65**
+  (topic strings **proposed resolved at fact-verification level only**,
+  pending ChatGPT acceptance; payload/subscription/scope residual stays
+  open, mirroring MBQ-63); (3) a **proposed module-by-module implementation
+  sequence** following the already-accepted DEC-008 dependency DAG; (4) a
+  **first-safe-implementation-slice recommendation** (the job/log/error
+  abstraction skeleton, MBQ-19/20/21 — not authorized); (5) test-strategy
+  and rollback-strategy notes at planning level; (6) a restated no-code-to-
+  code gate checklist confirming **2 of 5 criteria currently satisfied**.
+  `master-blueprint.md` was updated with a minimal Part E status
+  reference only (Proposed for ChatGPT review, not accepted; implementation
+  remains blocked) — no accepted Part A–D status was touched.
+  `master-blueprint-open-questions.md` gained the two new rows above plus a
+  compact Sprint E note; **no existing MBQ row was modified, resolved, or
+  silently changed.** `architecture-review-log.md` gained **AR-014**,
+  logged **Proposed for ChatGPT review**, not accepted.
+- **Items deferred:** the ~45 implementation-blocking MBQ rows themselves
+  (routed, not resolved, by the decision plan); the actual ChatGPT-batch
+  decisions the plan recommends (MBQ-06/08/17/33/34/41/45/52/54/60/62,
+  roughly); the separate, explicit ChatGPT implementation-gate-opening act;
+  all implementation; all implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session applied the PR #78 audit's own recommended scope without new
+  judgment calls beyond the two official-doc checks it specified.
+  **Repeated issue patterns:** none newly triggered. **Rules/checklists
+  updated:** none this session (out of allowed-files scope). **New rejected
+  approaches:** none — no new architecture proposed, only a planning/
+  sequencing bridge over already-accepted architecture. **New technical
+  debt:** none (no code; nothing to compromise). **New open questions:**
+  MBQ-64 (currency) and MBQ-65 (product webhook topics), both logged
+  Proposed/Open per `CLAUDE.md` §7/§8. **Architecture concerns:** none — no
+  accepted decision, MBQ resolution, or Part A–D design content was
+  changed; only planning/sequencing/research content was added.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (MBQ-64/65 logged) · rejected approaches
+  checked, none added · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** the **MBQ decision plan's ChatGPT-batch
+  decisions** (Part E document §4) — a cheap, high-leverage next step since
+  those rows already carry a recommendation and only need ChatGPT's actual
+  decision, not new research — followed by, only once ChatGPT is ready, a
+  separate, explicit implementation-gate-opening act. Not implementation
+  code.
+- **Stop condition:** stopped after opening one draft PR into
+  `Shopify-connector` (not merged, not marked ready for review). DEC-003
+  through DEC-016 not edited; no existing MBQ row modified/resolved; no
+  code files changed; Part E remains **Proposed for ChatGPT review, not
+  accepted**; implementation remains **blocked**; the implementation gate
+  remains **closed**; `main` and plain `dev` untouched. Awaiting further
+  instruction.
 
 ### Part D Blueprint Status Alignment — compact handoff (2026-07-04)
 

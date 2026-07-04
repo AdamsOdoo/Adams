@@ -143,6 +143,83 @@
   updated."
   (https://shopify.dev/docs/api/admin-graphql/latest/mutations/fulfillmentTrackingInfoUpdate)
 
+## Part E pre-implementation research patch (2026-07-04)
+
+> **Master Blueprint Part E — implementation-planning bridge, documentation-only
+> research patch.** These facts were verified to close two of the three
+> currently-untracked gaps the PR #78 audit
+> ([`../05-qa/master-blueprint-integrity-competitor-advantage-audit.md`](../05-qa/master-blueprint-integrity-competitor-advantage-audit.md)
+> §6) flagged as missing from this corpus: Shopify's multi-currency/
+> presentment-currency order model, and the product-domain webhook topic
+> strings. Access date for every fact below: **2026-07-04**. **No architecture
+> decision is made here** — see
+> [`../03-architecture/master-blueprint-implementation-planning-bridge.md`](../03-architecture/master-blueprint-implementation-planning-bridge.md)
+> §5/§6 for how these facts route to the open-questions register (new rows
+> MBQ-64/MBQ-65, both logged **Proposed / Open**, not resolved).
+
+### MoneyBag / presentment currency (Order money model)
+
+- **Fact —** `MoneyBag` is the type Shopify uses for order-money fields; it
+  has exactly two non-null fields: **`shopMoney`** ("Amount in shop
+  currency.") and **`presentmentMoney`** ("Amount in presentment currency."),
+  both typed `MoneyV2`.
+  (https://shopify.dev/docs/api/admin-graphql/latest/objects/MoneyBag)
+- **Fact —** `Order.currencyCode` = "The shop currency when the order was
+  placed. For example, 'USD' or 'CAD'." `Order.presentmentCurrencyCode` =
+  "The currency used by the customer when placing the order. For example,
+  'USD', 'EUR', or 'CAD'."
+  (https://shopify.dev/docs/api/admin-graphql/latest/objects/Order)
+- **Fact —** Every order total/adjustment field is `MoneyBag`-typed and
+  therefore carries **both** currencies simultaneously — confirmed for
+  `totalPriceSet` ("The total price of the order, before returns, in shop and
+  presentment currencies."), `currentTotalPriceSet`, `originalTotalPriceSet`,
+  `totalOutstandingSet`, `totalDiscountsSet`, `totalTaxSet`,
+  `totalShippingPriceSet`, `totalReceivedSet`, `totalRefundedSet`,
+  `totalCapturableSet`, `totalTipReceivedSet`, `cartDiscountAmountSet`, and
+  their `current*Set` equivalents — each is described as "...in shop and
+  presentment currencies" (or the equivalent "after returns..." phrasing for
+  the `current*` variants).
+  (https://shopify.dev/docs/api/admin-graphql/latest/objects/Order)
+- **Inference —** A store's orders expose both `shopMoney` and
+  `presentmentMoney` on every money field unconditionally — the fetched
+  `Order`/`MoneyBag` pages do not state that `presentmentMoney` only
+  populates (or only diverges from `shopMoney`) when Shopify Markets/
+  multi-currency selling is explicitly enabled. Comparing an Odoo total
+  (single document currency — see the Odoo notes below) against the wrong
+  Shopify money field would silently mis-total whenever the two diverge.
+- **Open question —** Whether `presentmentMoney` can ever diverge from
+  `shopMoney` for a store that has not explicitly enabled Shopify Markets/
+  multi-currency selling is **not stated** on the fetched `Order`/`MoneyBag`
+  pages — routed to **MBQ-64** (`../03-architecture/master-blueprint-open-questions.md`)
+  rather than assumed either way.
+
+### Product-domain webhook topics
+
+- **Fact —** `WebhookSubscriptionTopic` includes **`PRODUCTS_CREATE`**
+  ("Occurs whenever a product is created. Requires the `read_products`
+  scope."), **`PRODUCTS_UPDATE`** ("Occurs whenever a product is updated,
+  ordered, or variants are added, removed or updated." Requires
+  `read_products`), and **`PRODUCTS_DELETE`** ("Occurs whenever a product is
+  deleted. Requires the `read_products` scope.") — the direct product-domain
+  analogs of the already-verified `ORDERS_CREATE`/`INVENTORY_LEVELS_UPDATE`
+  topics (MBQ-37).
+  (https://shopify.dev/docs/api/admin-graphql/latest/enums/WebhookSubscriptionTopic)
+- **Fact —** The same enum also carries **`PRODUCT_LISTINGS_ADD`/`_REMOVE`/
+  `_UPDATE`** (channel-listing events, `read_product_listings` scope),
+  **`PRODUCT_PUBLICATIONS_CREATE`/`_DELETE`/`_UPDATE`** (publication events,
+  `read_publications` scope), and **`SCHEDULED_PRODUCT_LISTINGS_ADD`/`_REMOVE`/
+  `_UPDATE`** — none of these were previously verified in this corpus and none
+  is required for Phase 1's product import/export scope (DEC-003; DEC-007
+  §1); logged here for completeness, not as an implementation requirement.
+  (https://shopify.dev/docs/api/admin-graphql/latest/enums/WebhookSubscriptionTopic)
+- **Open question —** As with the inventory-topic analog (MBQ-37/MBQ-63), only
+  the **topic strings** were verified this session — the exact webhook
+  **payload shape**, required subscription scopes beyond `read_products`, and
+  whether webhook-driven product import is implemented in Phase 1 at all (vs.
+  scheduled/manual/reconciliation-only, mirroring the already-accepted
+  layered-sync posture for inventory) remain unverified — routed to
+  **MBQ-65** (`../03-architecture/master-blueprint-open-questions.md`).
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Shopify developer documentation, `shopify.dev`
@@ -716,5 +793,11 @@ All accessed **2026-06-30**, all `shopify.dev` (Tier 1):
 `/docs/api/admin-graphql/latest/objects/Order` (tax/shipping/discount fields),
 `/docs/api/admin-graphql/latest/input-objects/FulfillmentInput`,
 `/docs/api/admin-graphql/latest/mutations/fulfillmentTrackingInfoUpdate`.
+
+**Part E pre-implementation research patch, accessed 2026-07-04** (see that
+section above): `/docs/api/admin-graphql/latest/objects/MoneyBag`,
+`/docs/api/admin-graphql/latest/objects/Order` (currency/money fields),
+`/docs/api/admin-graphql/latest/enums/WebhookSubscriptionTopic`
+(product-domain topics).
 
 Captured excerpts: [`../00-source-materials/shopify-official.md`](../00-source-materials/shopify-official.md).
