@@ -312,7 +312,7 @@ view types/XML are **MBQ-03**; the config/data-model backing them is
   (§8/§9), reusing the fixed §4.1 vocabularies as labels — so triage does not
   require a bespoke screen.
 
-**Binding interaction rules (all [Accepted]):**
+**Binding interaction rules (labelled per bullet):**
 
 - **Never expose raw platform internals** (no `ir.cron` `nextcall`/model/
   scheduler fields to end users; friendly scheduling language "every N
@@ -475,7 +475,9 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
      connection-state vocabulary a blueprint proposal; DEC-012 §2 presents this
      wording as its store-settings UX). What is **[Accepted — DEC-004; DEC-012
      §2]** is that connection status is a single glanceable state conveyed by
-     text — **never** a raw HTTP code and never colour alone.
+     text and **never** a raw HTTP code. **[Screen blueprint proposal]** The
+     status must also never rely on colour alone; colour/icon may reinforce the
+     label but must not be the only signal.
   2. **API health** — an **honest, named** health indicator **[Accepted —
      DEC-004]** with a plain-language explanation when not normal. The specific
      three-state set (`Normal / Throttled / Degraded`) is a **[Screen blueprint
