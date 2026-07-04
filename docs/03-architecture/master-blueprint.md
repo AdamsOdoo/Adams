@@ -2,7 +2,7 @@
 
 > Top-level index for the **Master Blueprint** of the premium **Odoo 19 ↔
 > Shopify Connector**. The Master Blueprint converts the accepted decision
-> records (DEC-003 through DEC-015) into detailed, implementation-ready
+> records (DEC-003 through DEC-016) into detailed, implementation-ready
 > **blueprints** — still documentation only. Started in **Master Blueprint
 > Sprint A**; **Part A accepted via DEC-013**. **Part B accepted via
 > DEC-014** —
@@ -69,7 +69,7 @@ contradict, weaken, or re-litigate — the accepted records:
 | [DEC-011](../04-decisions/DEC-011-fulfillment-architecture-strategy.md) | FulfillmentOrder-based fulfillment, notification posture, operation-level idempotency | Fulfillment domain blueprint (Sprint C) + core operation-key concept |
 | [DEC-012](../04-decisions/DEC-012-ux-operator-flow-strategy.md) | Ten operator flows; conceptual four-role permissions model | Wizard/dashboard/sync-center/error-center/access blueprints |
 
-AR-002 through AR-012 are all **Accepted**
+AR-002 through AR-013 are all **Accepted**
 ([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md));
 RA-001 through RA-023 are **binding rejected approaches**
 ([`../05-qa/rejected-approaches-log.md`](../05-qa/rejected-approaches-log.md))

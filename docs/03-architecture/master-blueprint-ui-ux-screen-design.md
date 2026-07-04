@@ -5,31 +5,51 @@
 > accepted **Part A/B/C** blueprints into screen inventory, navigation /
 > information architecture, Odoo-native interaction patterns, blueprint-level
 > screen specs, per-screen states, a UX-copy/error-message style guide, and a
-> premium UI/UX acceptance checklist. **Proposes to partially resolve
-> MBQ-53** at screen-design level (MBQ-53 stays open until DEC-016 is
-> accepted). Companion index: [`master-blueprint.md`](./master-blueprint.md).
-> Companion decision record (this sprint):
-> [`../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md).
+> premium UI/UX acceptance checklist. **Partially resolves MBQ-53** at
+> screen-design blueprint level only (MBQ-53 remains open/partial pending
+> its sibling rows). Companion index: [`master-blueprint.md`](./master-blueprint.md).
+> Companion decision record:
+> [`../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md)
+> (Status: **Accepted by ChatGPT, 2026-07-04**).
 
 ## Status
 
-**Proposed for ChatGPT review — NOT accepted.** Prepared as **Master
-Blueprint Sprint D** on **2026-07-03**, on top of the base commit that
-accepted DEC-015 (Part C). Documentation only; the no-code gate
-(`CLAUDE.md` §4–§5) is in force. **This blueprint does not authorize code**,
-does not create or permit any Odoo module/model/view/menu/security file, and
-does not open the implementation gate. It is a **screen-design blueprint**,
-not an implementation of any screen.
+**Accepted by ChatGPT via DEC-016.** Acceptance date: **2026-07-04**.
+**Accepted at screen-design blueprint level only** — this acceptance is
+**not implementation-authorizing** under any outcome and is **not a final
+pixel-level UI approval**; pixel-level visual design / final wireframe
+polish remains explicitly **not accepted here**, deferred to a later
+pixel-design pass. Prepared as **Master Blueprint Sprint D**, originally
+proposed on **2026-07-03**, on top of the base commit that accepted DEC-015
+(Part C). Documentation only; the no-code gate (`CLAUDE.md` §4–§5) is in
+force. **This blueprint does not authorize code**, does not create or
+permit any Odoo module/model/view/menu/security file, and does not open the
+implementation gate. It is a **screen-design blueprint**, not an
+implementation of any screen.
 
 - **Part A** (core substrate, DEC-013), **Part B** (product/customer/order,
   DEC-014), and **Part C** (inventory/fulfillment, DEC-015) remain **Accepted
   by ChatGPT** and are treated here as binding, unmodified inputs.
 - **DEC-012** (ten operator flows) remains **Accepted by ChatGPT** and is the
   behavioural spine this part gives screens to.
+- **MBQ-53 is partially resolved at screen-design blueprint level only** —
+  its sibling/detail rows **MBQ-03** (exact XML/view/menu IDs), **MBQ-22**
+  (exact copy), **MBQ-44** (exact groups/security), **MBQ-45**
+  (admin-vs-functional surface split), and **MBQ-06** (readiness split) all
+  **remain open**. **MBQ-33, MBQ-34, MBQ-41, MBQ-35, and MBQ-32 remain open
+  recommendations**, not decided by this acceptance. **MBQ-60 through
+  MBQ-63 remain open.**
+- The `sh_shopify_connector` "Daily Queue Activity Tracking" chart idea
+  surfaced during the competitor screenshot audit **remains a deferred
+  premium visualization candidate for a later pixel-design pass — not
+  adopted into the accepted dashboard card set.**
 - **Part E** (implementation-planning bridge) remains **Not started**.
-- Acceptance of this part, if it comes, is a **screen-design acceptance**; it
-  still does not by itself authorize implementation (see
-  `master-blueprint.md` *Criteria for when implementation may later be opened*).
+- **Implementation remains blocked** — even after this acceptance,
+  implementation of any operator-facing screen additionally requires a
+  **separate, explicit** ChatGPT implementation-gate approval (see
+  `master-blueprint.md` *Criteria for when implementation may later be
+  opened*). This acceptance is a **screen-design acceptance only**; it does
+  not by itself authorize implementation.
 
 ## Claim labels used throughout
 
@@ -39,7 +59,7 @@ Every substantive statement carries exactly one label. This preserves the
 | Label | Meaning |
 | --- | --- |
 | **[Accepted — DEC-0XX]** | Already accepted by ChatGPT (a decision record or an accepted blueprint part). Binding; restated here, never re-litigated. |
-| **[Screen blueprint proposal]** | A screen-design proposal introduced by this sprint. **Not binding** unless/until DEC-016 is accepted. |
+| **[Screen blueprint proposal]** | A screen-design blueprint requirement, accepted by ChatGPT via DEC-016 at screen-design blueprint level. It remains **not** a code-level implementation detail, **not** final copy, **not** final Odoo view XML, **not** final security groups, **not** final model/field names, and **not** a pixel-level UI approval unless explicitly stated elsewhere. It does **not** resolve any open MBQ beyond what DEC-016 explicitly states. |
 | **[Recommendation — open, MBQ-nn]** | A still-open decision (ChatGPT- or implementation-planning-owned) for which the accepted inputs carry a recommendation. This part **designs screens to accommodate either resolution** and does **not** decide the row. |
 | **[Open question — MBQ-nn]** | An unresolved item routed to its owner; not asserted. |
 | **[Inference]** | Our interpretation from cited evidence. |
@@ -1130,10 +1150,12 @@ maps to setup-ux Principles 8/10 and §17 rules 8–10):**
 
 ## §20. Open questions this part carries or surfaces
 
-This part **proposes to partially resolve MBQ-53 at screen-design level**
-(MBQ-53 stays open until DEC-016 is accepted) and **routes**, without deciding,
-the following screen-relevant open rows to their existing owners. **It adds no new MBQ row** — the screen design consumes existing
-questions rather than surfacing genuinely new ones.
+This part **partially resolves MBQ-53 at screen-design blueprint level
+only** — MBQ-53 remains open/partial until its sibling/detail rows below
+are resolved — and **routes**, without deciding, the following
+screen-relevant open rows to their existing owners. **It adds no new MBQ
+row** — the screen design consumes existing questions rather than
+surfacing genuinely new ones.
 
 | Row | Why it constrains screens | Owner / status |
 | --- | --- | --- |
@@ -1166,10 +1188,12 @@ questions rather than surfacing genuinely new ones.
 ## §22. Implementation remains blocked
 
 **The Master Blueprint does not authorize code.** No part of this document —
-proposed or, if later accepted, accepted — creates or permits any Odoo module,
-model, view, menu, controller, security file, manifest, test, CI workflow, or
-dependency change. The no-code gate (`CLAUDE.md` §4–§5) remains in force.
-Per `master-blueprint.md` *Criteria for when implementation may later be
+now accepted via DEC-016 — creates or permits any Odoo module, model, view,
+menu, controller, security file, manifest, test, CI workflow, or dependency
+change. The no-code gate (`CLAUDE.md` §4–§5) remains in force. Per
+`master-blueprint.md` *Criteria for when implementation may later be
 opened*, implementation of any operator-facing screen additionally requires
-**this Part D to be accepted by ChatGPT** — and even then, a **separate**
-explicit implementation-gate approval is still required.
+**this Part D's acceptance** (now satisfied at screen-design blueprint
+level) — and even then, implementation remains blocked pending a
+**separate, explicit** ChatGPT implementation-gate approval, which this
+acceptance does **not** grant.

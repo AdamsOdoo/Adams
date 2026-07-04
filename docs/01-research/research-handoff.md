@@ -1,9 +1,10 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Master Blueprint
-> Integrity & Competitor Advantage Audit — pre-Part-E quality gate)** is
+> Continuity lives in GitHub, not chat. The **current entry (Part D
+> Blueprint Status Alignment — residue cleanup after PR #78)** is
 > immediately below, in the **compact
 > handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Master Blueprint Integrity & Competitor Advantage Audit**,
 > **DEC-016 Acceptance Patch**,
 > **Master Blueprint Sprint D (proposal history)**,
 > **DEC-015 Acceptance Patch**,
@@ -27,6 +28,84 @@
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
 
 ---
+
+### Part D Blueprint Status Alignment — compact handoff (2026-07-04)
+
+> **Documentation-only residue cleanup, not implementation, not Part E.**
+> Confirmed before editing: `Shopify-connector` at merge commit
+> `b3e2274ff4c3f70a61664a3b12753e5e69b9bf6b` (PR #78, Master Blueprint
+> Integrity & Competitor Advantage Audit); DEC-003 through DEC-016
+> confirmed Accepted by ChatGPT and unedited; Part E confirmed Not started;
+> implementation confirmed still blocked. This session applies exactly the
+> cleanup PR #78's audit identified as required before Part E: the Part D
+> blueprint document's own stale status residue, and two one-line stale
+> DEC/AR ranges in `master-blueprint.md` itself.
+
+- **Branch / PR:** `claude/part-d-blueprint-status-alignment` → draft PR
+  into `Shopify-connector` (not merged).
+- **Files changed:** `docs/03-architecture/master-blueprint-ui-ux-screen-design.md`,
+  `docs/03-architecture/master-blueprint.md`, `docs/01-research/research-handoff.md`
+  (this file). **No DEC file changed. No MBQ register row changed. No code
+  file changed.**
+- **What changed / residue fixed:**
+  - `master-blueprint-ui-ux-screen-design.md` (Part D): its own `## Status`
+    section, top summary blockquote, claim-label legend, §20 open-questions
+    intro, and §22 "Implementation remains blocked" section all still read
+    "Proposed for ChatGPT review — NOT accepted" (or equivalent
+    "unless/until DEC-016 is accepted" / "if later accepted, accepted"
+    phrasing), even though its companion DEC-016 was accepted by ChatGPT on
+    2026-07-04. All five spots corrected to state: Part D is **Accepted by
+    ChatGPT via DEC-016**, acceptance date 2026-07-04, **accepted at
+    screen-design blueprint level only**, not implementation-authorizing,
+    not a pixel-level UI/final-wireframe approval; MBQ-53 is **partially
+    resolved at screen-design blueprint level only**, with sibling rows
+    MBQ-03/MBQ-22/MBQ-44/MBQ-45/MBQ-06 and open recommendations
+    MBQ-33/MBQ-34/MBQ-41/MBQ-35/MBQ-32 and MBQ-60 through MBQ-63 all
+    explicitly still open; the `sh_shopify_connector` "Daily Queue Activity
+    Tracking" chart idea remains an explicitly deferred, not-adopted
+    candidate; Part E remains Not started; implementation remains blocked
+    pending a separate, explicit ChatGPT implementation-gate approval. No
+    screen-design content (specs, tables, checklists) was changed — only
+    status/label wording.
+  - `master-blueprint.md`: fixed the two one-line staleness spots the PR
+    #78 audit identified — the intro blockquote's "converts the accepted
+    decision records (DEC-003 through DEC-015)" corrected to "DEC-003
+    through DEC-016," and "AR-002 through AR-012 are all Accepted"
+    corrected to "AR-002 through AR-013 are all Accepted." No other line in
+    this file was touched.
+- **Items deferred:** the ~45 implementation-blocking open MBQs (unchanged,
+  none resolved by this cleanup); the two small currency-research items and
+  the product-webhook-topic MBQ row the PR #78 audit recommended (§10);
+  Part E (implementation-planning bridge); all implementation.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session mechanically applied the exact residue fixes PR #78's audit
+  specified, with no new judgment calls. **Repeated issue patterns:** the
+  Part D status-residue defect is now fixed at its source; no further
+  occurrence expected unless a future acceptance patch repeats the pattern
+  of not touching the blueprint document's own Status header. **Rules/
+  checklists updated:** none this session (out of allowed-files scope).
+  **New rejected approaches:** none — no design content changed. **New
+  technical debt:** none (no code; this was a documentation-residue fix,
+  not a compromise). **New open questions:** none — no MBQ row added,
+  resolved, or modified. **Architecture concerns:** none — no accepted
+  decision, MBQ resolution, or design content changed; only status/label
+  wording was aligned to already-accepted fact.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new) · rejected approaches
+  checked, none added · technical debt logged (none applicable — no code)
+  · repeated-issue escalation applied (defect fixed at source) — all
+  **YES**.
+- **Next recommended session:** **Master Blueprint Part E —
+  implementation-planning bridge**, starting with the MBQ decision plan and
+  the two small currency-research/product-webhook-topic items (PR #78
+  audit §10) — not implementation code; implementation only after a
+  separate, explicit ChatGPT gate.
+- **Stop condition:** stopped after one commit on a new draft PR into
+  `Shopify-connector` (not merged, not marked ready for review). DEC-003
+  through DEC-016 not edited; `master-blueprint-open-questions.md` not
+  edited; no code files changed; Part E remains **Not started**;
+  implementation remains **blocked**; `main` and plain `dev` untouched.
+  Awaiting further instruction.
 
 ### Master Blueprint Integrity & Competitor Advantage Audit — compact handoff (2026-07-04)
 
