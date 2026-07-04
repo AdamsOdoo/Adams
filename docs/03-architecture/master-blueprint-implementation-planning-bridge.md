@@ -71,6 +71,19 @@
   **remain implementation planning.** **The implementation gate remains
   closed. Implementation remains blocked. No implementation task has been
   created.** **§4's decision plan table below is unchanged** by this note.
+- **DEC-020 proposed (2026-07-04, not yet accepted).**
+  [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
+  proposes the dedicated MBQ-64/MBQ-65 currency/webhook residual decision
+  this document's own §5/§6 routed both rows to. **Not accepted.** **The
+  implementation gate remains closed. Implementation remains blocked.** No
+  implementation task has been created. §4's decision plan table below
+  remains unchanged by this note — it still reflects the register state as
+  of this document's own DEC-017 acceptance, restated only by the one
+  optional consistency note already added above: **MBQ-62 was accepted by
+  DEC-019** (2026-07-04, decision/semantic-classification level) **after**
+  this table was originally written; the table below remains historical
+  planning context, not re-edited row by row for every later MBQ
+  acceptance.
 
 ## 1. Purpose of Part E
 

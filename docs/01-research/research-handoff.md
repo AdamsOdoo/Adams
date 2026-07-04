@@ -1,9 +1,11 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-019
-> Acceptance Patch — MBQ-62 resolved at semantic-classification level)** is
-> immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`);
+> Continuity lives in GitHub, not chat. The **current entry (Proposed
+> MBQ-64/MBQ-65 Currency and Product-Webhook Residual Decisions — DEC-020,
+> not yet accepted)** is immediately below, in the **compact handoff
+> format** (`../06-prompts/session-handoff-template.md`);
+> **DEC-019 Acceptance Patch — MBQ-62 resolved at semantic-classification
+> level**,
 > **MBQ-62 Decision Proposal (proposal history)**,
 > **DEC-018 Acceptance Patch — MBQ Decision Batch 1 accepted except MBQ-62**,
 > **Proposed MBQ Decision Batch 1 (proposal history)**,
@@ -33,6 +35,138 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Proposed MBQ-64/MBQ-65 Currency and Product-Webhook Residual Decisions — DEC-020, not yet accepted — compact handoff (2026-07-04)
+
+> **Decision-preparation session, NOT implementation, NOT an
+> implementation-gate opening, NOT a MBQ resolution.** Confirmed before
+> editing: PR #82 head commit `94e3458e9ff6511f34f9abfe8944b4e0660c02b2`
+> (branch `claude/mbq-64-65-decision-ux352n`, based on `Shopify-connector`
+> at the same PR #82 merge commit — PR #82 accepted DEC-019); DEC-003
+> through DEC-019 confirmed Accepted by ChatGPT and unedited; MBQ-64 and
+> MBQ-65 confirmed still open, excluded from DEC-018/DEC-019 per DEC-018 §6;
+> implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/mbq-64-65-decision-ux352n` → draft PR into
+  `Shopify-connector` (not merged).
+- **Files changed:**
+  `docs/04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md` (new),
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/01-research/shopify-official-api-notes.md`,
+  `docs/01-research/odoo-official-architecture-notes.md`,
+  `docs/01-research/research-handoff.md` (this file). **No DEC-003 through
+  DEC-019 file changed. No `docs/04-decisions/README.md` change. No MBQ row
+  other than MBQ-64/MBQ-65 edited (and those two only by an unapplied,
+  drafted note — see below). No code file changed. No
+  Python/XML/manifest/security/test/CI file changed.**
+- **DEC-020 proposed, not accepted.** Prepared the dedicated
+  currency/webhook residual decision sprint DEC-017 anticipated and
+  DEC-018 §6 explicitly routed MBQ-64/MBQ-65 to. Reviewed the existing
+  repository corpus in full (Part E bridge document, open-questions
+  register, `master-blueprint-product-customer-sale.md` §A.4/§A.14/§C.7–
+  §C.9, DEC-007 §3, DEC-017/018/019, AR-014–016, `rejected-approaches-log.md`
+  RA-001–023), then performed targeted fresh official-doc research: Shopify's
+  "About Shopify Markets" page (presentment currency named the checkout/
+  refund/order-edit "source of truth"; shop currency described as a
+  back-converted analytics reference that "might not sum perfectly to
+  totals" whenever the two diverge); the `Order` object's
+  `presentmentCurrencyCode` field, re-verified against raw page source to
+  include a sentence not previously cited in this corpus ("This may differ
+  from the shop's base currency when serving international customers or
+  using multi-currency pricing"); the official `odoo/odoo` 19.0
+  `sale_order.py` source, newly confirming `currency_id` is compute-only
+  (reachable only via `pricelist_id`/`company_id`, not directly settable)
+  and that `amount_untaxed`/`amount_tax`/`amount_total` are computed via
+  `AccountTax._get_tax_totals_summary` in exactly the order's one currency;
+  and Shopify's "About webhooks" page (delivery not guaranteed, cross-topic
+  ordering not guaranteed, "your app shouldn't rely on receiving data from
+  Shopify webhooks," reconciliation jobs recommended, `X-Shopify-Webhook-Id`
+  dedup, `X-Shopify-Triggered-At`/`updated_at` staleness ordering). One
+  claimed fact (per-product variant-count webhook payload truncation) could
+  **not** be confirmed against a primary `shopify.dev` page fetched this
+  session and is logged as inconclusive, not asserted.
+  **Proposes, for MBQ-64:** Shopify shop currency drives
+  `sale.order.currency_id` in Phase 1 (Option A); both `shopMoney`/
+  `presentmentMoney` amounts and `presentmentCurrencyCode` are captured as
+  audit/reconciliation evidence only, never as the Odoo order currency; a
+  shop/presentment divergence is never silently accepted — the total-check
+  guard runs as normal and any resulting discrepancy is classified under
+  the existing `financial total mismatch` class (Part A §D.5.5), reusing
+  vocabulary rather than inventing it (Option C, as a companion guard, not
+  standalone); presentment-currency-denominated Odoo orders (Option B) are
+  explicitly non-MVP, consistent with DEC-007 §3's existing Markets/
+  currency-specific-pricing exclusion (Option D, as the scope statement).
+  **Proposes, for MBQ-65:** `PRODUCTS_CREATE`/`PRODUCTS_UPDATE`/
+  `PRODUCTS_DELETE` are implemented in Phase 1 as enqueue-only triggers
+  (Option A) — never a direct write — each job performing a follow-up
+  authoritative read before any create/update/delete is applied to Odoo,
+  with DEC-005 reconciliation as the required backstop; a `PRODUCTS_DELETE`
+  webhook never directly deletes/archives the bound Odoo product, routing
+  ambiguous cases to manual review via existing error-class vocabulary.
+  MBQ-64 Option B and MBQ-65 Option D (direct webhook-driven product
+  mutation) are both evaluated and explicitly rejected for Phase 1, for the
+  same root reason RA-008/RA-020 already reject elsewhere in this project:
+  writing/committing without a confirming read or guard. **No MBQ row is
+  resolved.** Draft (not applied) register-impact wording for MBQ-64 and
+  MBQ-65 is recorded in DEC-020 §9, to be applied only by a future,
+  separate ChatGPT acceptance patch. Added **AR-017** to
+  `architecture-review-log.md` (Proposed for ChatGPT review, not accepted)
+  and compact, non-resolving notes to `master-blueprint-open-questions.md`
+  and `master-blueprint-implementation-planning-bridge.md` stating DEC-020
+  is proposed and neither MBQ-64 nor MBQ-65 is resolved until ChatGPT
+  accepts it.
+- **Items deferred:** ChatGPT's acceptance/change/rejection/deferral
+  decision on DEC-020 itself; applying DEC-020 §9's drafted register-impact
+  wording to MBQ-64/MBQ-65's own rows (only happens after acceptance);
+  logging MBQ-64 Option B / MBQ-65 Option D in `rejected-approaches-log.md`
+  (recommended as a future follow-up in DEC-020 §9, not performed — that
+  file is outside this sprint's allowed-files scope); independently
+  verifying the unconfirmed variant-count payload-truncation claim against
+  a primary source; the implementation-gate-opening act; all
+  implementation; all implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session performed the scoped, dedicated technical-treatment research
+  DEC-018 §6 explicitly called for, without reopening or weakening any
+  accepted DEC/AR/Part A–E content. **Repeated issue patterns:** none newly
+  triggered; the discipline of reusing an existing accepted error-class
+  vocabulary (`financial total mismatch`) rather than inventing a new one
+  for the MBQ-64 divergence guard continues the same pattern DEC-018/019
+  already applied for MBQ-62. **Rules/checklists updated:** none this
+  session (out of allowed-files scope). **New rejected approaches:** none
+  formally logged this session (`rejected-approaches-log.md` is out of
+  scope) — MBQ-64 Option B and MBQ-65 Option D are rejected within DEC-020
+  itself, with a recommendation to log them formally after acceptance.
+  **New technical debt:** none (no code; nothing to compromise). **New open
+  questions:** none added to the register by this session — MBQ-64 and
+  MBQ-65 remain the only rows touched, and only by an unapplied draft note;
+  two narrower sub-questions were resolved by fresh research (presentment
+  currency can diverge without an explicit "Markets" toggle;
+  `currency_id` is compute-only, reachable only via `pricelist_id`), and one
+  new narrower sub-question was logged inconclusive (variant-count payload
+  truncation, not confirmed). **Architecture concerns:** none — no accepted
+  DEC (DEC-003–019), AR (AR-002–016), or Part A–E design content was
+  changed; only a new DEC-020 (proposed) and AR-017 (proposed) were added.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new; one inconclusive fact logged,
+  not asserted) · rejected approaches checked in full, none reintroduced,
+  two candidates named for future logging · technical debt logged (none
+  applicable — no code) · repeated-issue escalation applied (none
+  triggered) — all **YES**.
+- **Next recommended session:** ChatGPT's review of DEC-020 — accept as
+  proposed, accept with change, reject and revise, or defer one or both
+  decisions (DEC-020 §11). Not implementation.
+- **Stop condition:** stopped after committing and pushing this proposal to
+  a new branch and opening one **draft** PR into `Shopify-connector` (not
+  merged, not marked ready for review). DEC-003 through DEC-019 not edited;
+  `docs/04-decisions/README.md` not edited; no MBQ row resolved (MBQ-64 and
+  MBQ-65 remain formally open); no code files changed; DEC-020 and AR-017
+  are **Proposed for ChatGPT review — NOT accepted**; implementation
+  remains **blocked**; the implementation gate remains **closed**; `main`
+  and plain `dev` untouched. Awaiting ChatGPT review.
 
 ---
 

@@ -247,6 +247,25 @@ qualified "at screen-design blueprint level," not a full resolution).
 > next: the separate MBQ-64/MBQ-65 currency/webhook residual decision
 > sprint — not implementation.
 
+> **DEC-020 proposed (2026-07-04) — MBQ-64/MBQ-65 residual decision
+> prepared for ChatGPT review, not accepted.**
+> [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
+> proposes a dedicated design/selection answer for **MBQ-64** (Shopify shop
+> currency drives `sale.order.currency_id` in Phase 1; presentment-currency
+> evidence captured for audit only; a shop/presentment divergence routed
+> through the existing `financial total mismatch` class, never silent) and
+> for **MBQ-65** (product create/update/delete webhooks implemented in
+> Phase 1 as enqueue-only triggers with a mandatory follow-up authoritative
+> read, never a direct write). **MBQ-64 is not resolved until ChatGPT
+> accepts DEC-020. MBQ-65 is not resolved until ChatGPT accepts DEC-020.**
+> Their own rows below are **unchanged by this note** — the draft
+> register-impact wording lives in DEC-020 §9 and is only applied by a
+> future acceptance patch, if and when ChatGPT accepts. **No other MBQ row
+> is changed by this note.** Per `CLAUDE.md` §10, this note **does not
+> authorize implementation**; DEC-003 through DEC-019 remain unchanged;
+> **implementation remains blocked; the implementation gate remains
+> closed.**
+
 ## How to read
 
 - **Decision owner:** **ChatGPT** (a control-room decision), **Implementation

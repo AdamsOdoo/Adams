@@ -205,6 +205,78 @@
   complements MBQ-56's existing tolerance-mechanism residual rather than
   duplicating it.
 
+## MBQ-64 residual research patch (2026-07-04)
+
+> **Proposed [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
+> residual research, documentation-only.** These facts extend the Part E
+> patch above with the sale-order currency **selection** mechanics DEC-020
+> needed — specifically, whether `currency_id` can be directly set to a
+> presentment currency, and how the order's tax/total fields relate to that
+> currency. Read against the official `odoo/odoo` 19.0 source
+> (`github.com/odoo/odoo`, branch `19.0`), the same sanctioned
+> source-reading method as the Part E patch above. Access date: **2026-07-04**.
+> **No architecture decision is made here** — see `DEC-020` §4–§5 for how
+> these facts route to a proposed (not accepted) MBQ-64 design decision.
+
+- **Fact (official source, near-verbatim) —** `sale.order.currency_id` is
+  declared `compute='_compute_currency_id', store=True, precompute=True`
+  with **no `readonly=False`** — unlike `sale.order.pricelist_id`, which is
+  explicitly `store=True, readonly=False, precompute=True`. This means
+  `currency_id` is **not directly settable**: it can only be changed by
+  changing `pricelist_id` (to a pricelist whose own `currency_id` differs)
+  or `company_id`. `_compute_currency_id`'s body is exactly: `order.currency_id
+  = order.pricelist_id.currency_id or order.company_id.currency_id`.
+  (`addons/sale/models/sale_order.py`,
+  https://raw.githubusercontent.com/odoo/odoo/19.0/addons/sale/models/sale_order.py)
+- **Fact (official source, near-verbatim) —** `sale.order.currency_rate` is
+  a computed `Float` field (`compute='_compute_currency_rate', store=True,
+  precompute=True`) whose body calls
+  `self.env['res.currency']._get_conversion_rate(from_currency=order.company_id.currency_id,
+  to_currency=order.currency_id, company=order.company_id,
+  date=order.date_order)` — i.e. Odoo natively computes a company-currency
+  ↔ order-currency exchange rate, dated to the order date, whenever an
+  order's `currency_id` differs from its `company_id.currency_id`. This
+  confirms Odoo's core sale-order model already has a built-in mechanism
+  for a foreign-currency (non-company-currency) sale order — the
+  capability is not hypothetical — but it is **reached only via
+  `pricelist_id`**, per the fact above, not by writing `currency_id`
+  directly.
+  (`addons/sale/models/sale_order.py`,
+  https://raw.githubusercontent.com/odoo/odoo/19.0/addons/sale/models/sale_order.py)
+- **Fact (official source, near-verbatim) —** `amount_untaxed`,
+  `amount_tax`, and `amount_total` are all `Monetary` fields, `store=True`,
+  computed by a single method `_compute_amounts`
+  (`@api.depends('order_line.price_subtotal', 'currency_id', 'company_id',
+  'payment_term_id')`). That method calls
+  `AccountTax._get_tax_totals_summary(..., currency=order.currency_id or
+  order.company_id.currency_id, ...)` and reads
+  `tax_totals['base_amount_currency']`, `tax_totals['tax_amount_currency']`,
+  and `tax_totals['total_amount_currency']` into `amount_untaxed`,
+  `amount_tax`, and `amount_total` respectively. This confirms every
+  order-level total is computed in exactly the order's **one** `currency_id`
+  (falling back to company currency only if `currency_id` is somehow unset)
+  — there is no code path that computes or stores an order total in a
+  second currency alongside it.
+  (`addons/sale/models/sale_order.py`,
+  https://raw.githubusercontent.com/odoo/odoo/19.0/addons/sale/models/sale_order.py)
+- **Inference —** Because `currency_id` is reachable only through
+  `pricelist_id` (or `company_id`), using Shopify's presentment currency as
+  the Odoo order currency (MBQ-64 Option B) is not a matter of writing one
+  field — it requires provisioning a pricelist whose own currency matches
+  each presentment currency the connector might encounter, before that
+  order could be imported. This is additional master-data/setup surface
+  DEC-007 §3 did not scope for Phase 1 (which already excludes "advanced
+  pricelist mapping" and "Shopify Markets pricing"). This inference does
+  not itself choose a mechanism — see `DEC-020` §5.
+- **Open question, not resolved this session —** whether a single Odoo
+  company can safely hold multiple concurrent non-company-currency
+  pricelists for a single connector store without a pre-existing accounting
+  configuration (multi-currency accounting must be enabled per company)
+  was not verified against official Odoo accounting documentation this
+  session — out of scope for `DEC-020`'s proposed Option A (shop currency
+  only), logged here only because it would need verification before any
+  future MBQ-64 Option B revisit.
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Odoo 19.0 documentation — the **Developer →
