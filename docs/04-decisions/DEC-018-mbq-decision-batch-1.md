@@ -1,23 +1,30 @@
-# DEC-018 — Proposed MBQ Decision Batch 1
+# DEC-018 — MBQ Decision Batch 1
 
-> **Proposed decision record** for the premium **Odoo 19 ↔ Shopify
+> **Accepted decision record** for the premium **Odoo 19 ↔ Shopify
 > Connector**, prepared after ChatGPT accepted
 > [`DEC-017`](./DEC-017-master-blueprint-implementation-planning-bridge.md)
 > (Master Blueprint Part E — Implementation-Planning Bridge) on
-> **2026-07-04**. This record proposes the first controlled batch of the
-> Part E MBQ decision plan's "ChatGPT batch" items for ChatGPT's review.
-> Companion documents:
+> **2026-07-04**, and itself **accepted by ChatGPT on 2026-07-04** — Batch 1
+> **except MBQ-62**, which ChatGPT explicitly split into its own dedicated
+> follow-up decision record rather than deciding here. Companion documents:
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md),
 > [`../03-architecture/master-blueprint-implementation-planning-bridge.md`](../03-architecture/master-blueprint-implementation-planning-bridge.md).
 > Companion review-log entry:
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
-> (**AR-015**, Proposed for ChatGPT review).
+> (**AR-015**, Accepted by ChatGPT via DEC-018).
 
 ## Status
 
-- **Proposed for ChatGPT review — NOT accepted.**
-- **Documentation-only.**
-- **Decision-preparation only.**
+- **Accepted by ChatGPT on 2026-07-04.**
+- **Accepted Batch 1 except MBQ-62** — ten of the eleven in-scope rows
+  (MBQ-06, MBQ-08, MBQ-17 posture, MBQ-33, MBQ-34, MBQ-41, MBQ-45
+  mapping/surface split, MBQ-52 policy, MBQ-54 posture, MBQ-60) are now
+  **Decisions**, not recommendations; **MBQ-62 is explicitly not decided**,
+  routed to its own dedicated follow-up DEC per §4's strict analysis and §8's
+  recommendation, which ChatGPT accepted.
+- **Documentation-only.** This acceptance creates or modifies no Odoo
+  module, model, view, controller, security file, manifest, test,
+  migration, or CI file.
 - **Does not authorize implementation.**
 - **Does not open the implementation gate.**
 - **Does not create implementation tasks.**
@@ -25,10 +32,68 @@
 - **Built after DEC-017 acceptance** (2026-07-04), starting point PR #80
   merge commit `403d17fc16c6854b0bd9f3ce3161ff61cc0e1570` into
   `Shopify-connector`.
-- This record does **not** itself resolve any MBQ row in
-  `master-blueprint-open-questions.md` — it proposes wording that would be
-  inserted **only if and when ChatGPT accepts this record**. Until then,
-  every MBQ named below remains exactly as open as it is today.
+- This acceptance patch **does** apply the ten accepted rows' register
+  wording to `master-blueprint-open-questions.md` (§5 below, every prior
+  undated placeholder now reads the actual acceptance date, **2026-07-04**).
+  **MBQ-62, MBQ-64, and MBQ-65 are unaffected** — MBQ-62 remains open with
+  only a split-note added; MBQ-64/MBQ-65 are untouched.
+
+## Acceptance
+
+**ChatGPT accepted Batch 1 except MBQ-62 on 2026-07-04.**
+
+**Accepted decisions:**
+
+1. **MBQ-06** — readiness-check essential-vs-warning split accepted.
+2. **MBQ-08** — disconnect revokes/removes credentials and disables
+   sync/webhook enqueue, while preserving store, bindings, jobs, logs, audit
+   records, mapping history, and error history; reconnect is explicit and
+   audited.
+3. **MBQ-17** — reconciliation posture accepted: per-store/per-domain with a
+   configurable conservative default; exact intervals/batch sizes remain
+   implementation planning.
+4. **MBQ-33** — first-push guard granularity accepted: no coarser than store
+   + mapped Odoo Location ↔ Shopify Location pair + product/variant binding;
+   batched UI allowed only if each unit is individually recorded.
+5. **MBQ-34** — review-then-apply accepted as the Phase 1 default for
+   ongoing inventory writes; auto-apply deferred behind a future explicit
+   decision/feature flag.
+6. **MBQ-41** — global/per-store notification default accepted for Phase 1,
+   default off; per-order override deferred unless already exposed by
+   standard Odoo without added connector UI.
+7. **MBQ-45** — the four accepted roles map 1:1 to four Odoo groups in Phase
+   1; one shared, role-gated surface accepted; exact access rows/XML IDs
+   remain implementation planning.
+8. **MBQ-52** — stable Shopify GraphQL Admin API version pinning policy
+   accepted; pin per connector release/store config, surface API
+   health/deprecation warnings, periodic review; exact upgrade mechanics
+   remain implementation planning.
+9. **MBQ-54** — disable-not-uninstall posture accepted; destructive
+   domain-module uninstall is not a normal merchant-facing Phase 1
+   operation; exact guard/disclosure remains implementation planning.
+10. **MBQ-60** — fulfillment tracking dependency posture accepted;
+    `stock_delivery`/`delivery` dependency required for tracking write-back;
+    if absent, tracking write-back is readiness-blocked/disabled, not
+    silently degraded.
+
+**Explicitly not accepted as decided:**
+
+- **MBQ-62** — split to a dedicated follow-up DEC, per §4's strict analysis
+  and §8's recommendation, both accepted by ChatGPT.
+- **MBQ-64** — excluded (separate currency/webhook residual decision
+  sprint).
+- **MBQ-65** — excluded (separate currency/webhook residual decision
+  sprint).
+- **Any other MBQ not named above** — unchanged, exactly as open as before
+  this acceptance.
+
+**What this acceptance does NOT authorize:** no implementation; no code; no
+Odoo modules; no implementation-gate opening (a separate, explicit ChatGPT
+act per
+[`../05-qa/quality-feedback-loop.md`](../05-qa/quality-feedback-loop.md)
+§10, not performed here); no implementation-task creation; no change to
+DEC-003 through DEC-017; no weakening of accepted Master Blueprint Parts
+A–E.
 
 ## 1. Purpose
 
@@ -43,18 +108,21 @@ single largest lever") is that deciding this batch costs ChatGPT one review
 pass, not new research, and unblocks the first `core`/`inventory`/
 `fulfillment` implementation tasks once the gate itself is separately opened.
 
-This document turns that plan into a **small, controlled, evidence-linked
-decision packet**: for each of the eleven MBQs above, it states the evidence
+This document turned that plan into a **small, controlled, evidence-linked
+decision packet**: for each of the eleven MBQs above, it stated the evidence
 already on record, the options the evidence supports, a recommended decision,
-the risk of getting it wrong, and the exact register wording that would be
-inserted **if and only if** ChatGPT accepts. It resolves nothing itself. It
-does not widen MVP scope beyond DEC-003/DEC-007, does not touch DEC-003
-through DEC-017, and does not open or approximate the implementation gate —
-that remains a separate, explicit ChatGPT act per
+and the risk of getting it wrong. **ChatGPT has now accepted ten of those
+eleven rows as Decisions** (§"Acceptance" above; §5's register wording is
+applied, not merely drafted) — **MBQ-62 remains a recommendation, not a
+decision**, per the strict analysis in §4 and the explicit split ChatGPT
+accepted in §8. This acceptance does not widen MVP scope beyond
+DEC-003/DEC-007, does not touch DEC-003 through DEC-017, and does not open
+or approximate the implementation gate — that remains a separate, explicit
+ChatGPT act per
 [`../05-qa/quality-feedback-loop.md`](../05-qa/quality-feedback-loop.md) §10,
 unaffected by this document under any outcome.
 
-MBQ-64 and MBQ-65 are explicitly **out of scope** for this batch (§6).
+MBQ-64 and MBQ-65 remain explicitly **out of scope** for this batch (§6).
 
 ## 2. Sources reviewed
 
@@ -189,64 +257,67 @@ consequences for the dashboard filter (§G.1) and retry-policy lookup
 (MBQ-16) design that deserve a dedicated session, not a same-batch bundling
 alongside ten lower-risk posture calls.
 
-## 5. Proposed register-impact wording
+## 5. Register-impact wording (applied)
 
-The wording below is **drafted only** — it is not applied to
-`master-blueprint-open-questions.md` by this document, and will only be
-inserted into that register if and when ChatGPT accepts DEC-018.
+**ChatGPT accepted DEC-018 on 2026-07-04.** The wording below for MBQ-06,
+MBQ-08, MBQ-17, MBQ-33, MBQ-34, MBQ-41, MBQ-45, MBQ-52, MBQ-54, and MBQ-60
+has now been **applied** to `master-blueprint-open-questions.md` (this is
+the record of exactly what was inserted, dated **2026-07-04**). MBQ-62's own
+row is **unaffected in substance** — only a short split-note citation was
+added, per its own bullet below.
 
-- **MBQ-06:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX): essential
+- **MBQ-06:** *"Accepted by ChatGPT via DEC-018 (2026-07-04): essential
   readiness checks are credential validity/test-connection, required scopes,
   API-version health, store identity, `web.base.url` reachability, webhook
   HMAC secret (if webhooks enabled), cron/queue health, at least one mapped
   Location with an enabled domain, and intentional domain-flag enablement;
   all other candidate checks warn, never block. Exact copy/XML IDs remain
   open for implementation planning."*
-- **MBQ-08:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX): disconnect
+- **MBQ-08:** *"Accepted by ChatGPT via DEC-018 (2026-07-04): disconnect
   revokes credentials and disables sync/webhook enqueue but preserves
   bindings, jobs, logs, audit records, and mapping/error history; reconnect
   is explicit, audited, and re-runs readiness checks (MBQ-06)."*
-- **MBQ-17:** *"Posture accepted by ChatGPT via DEC-018 (2026-07-XX):
+- **MBQ-17:** *"Posture accepted by ChatGPT via DEC-018 (2026-07-04):
   reconciliation is per-store, per-domain, never a single global job;
   cadence is configurable per store/domain with a conservative default.
   Exact interval/batch-size constants remain implementation planning."*
-- **MBQ-33:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX): the first-push
+- **MBQ-33:** *"Accepted by ChatGPT via DEC-018 (2026-07-04): the first-push
   guard fires no coarser than per (store + mapped Odoo-Location ↔
   Shopify-Location pair) + product/variant binding; batched review UI is
   permitted if each pair is individually recorded."*
-- **MBQ-34:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX): review-then-
+- **MBQ-34:** *"Accepted by ChatGPT via DEC-018 (2026-07-04): review-then-
   apply is the Phase 1 default for all ongoing inventory writes; auto-apply
   is not a Phase 1 default and requires a future, separately-decided feature
   flag."*
-- **MBQ-41:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX): a global/
+- **MBQ-41:** *"Accepted by ChatGPT via DEC-018 (2026-07-04): a global/
   per-store notification default (off) is sufficient for Phase 1; per-order
   override is explicitly deferred, not built in Phase 1 unless already
   exposed by standard Odoo without added connector UI."*
 - **MBQ-45:** *"Partially resolved [roles→groups mapping / surface split] by
-  DEC-018 (2026-07-XX): the four DEC-013 roles map 1:1 to four Odoo security
+  DEC-018 (2026-07-04): the four DEC-013 roles map 1:1 to four Odoo security
   groups; one shared, role-gated application surface is used, not a forked
   admin/functional pair. Exact `ir.model.access` rows and XML IDs remain
   implementation planning (MBQ-44)."*
-- **MBQ-52:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX), policy only:
+- **MBQ-52:** *"Accepted by ChatGPT via DEC-018 (2026-07-04), policy only:
   one stable Shopify GraphQL Admin API version is pinned per connector
   release, with a planned periodic review/upgrade window and surfaced
   deprecation warnings. Exact upgrade mechanics remain implementation
   planning."*
-- **MBQ-54:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX), posture only:
+- **MBQ-54:** *"Accepted by ChatGPT via DEC-018 (2026-07-04), posture only:
   Phase 1 does not support merchant-facing domain-module uninstall;
   disabling via the accepted feature-flag mechanism (which already preserves
   history) is the supported path. Exact technical uninstall-guard mechanism
   or disclosure remains implementation planning."*
-- **MBQ-60:** *"Accepted by ChatGPT via DEC-018 (2026-07-XX):
+- **MBQ-60:** *"Accepted by ChatGPT via DEC-018 (2026-07-04):
   `shopify_connector_fulfillment` requires Odoo's `stock_delivery` (or
   `delivery`) module for tracking write-back; absent that module, tracking
   write-back is disabled and readiness-blocked (MBQ-06), never silently
   degraded."*
-- **MBQ-62:** *No register wording change proposed.* If ChatGPT accepts
-  DEC-018's recommendation to split this row, the only register change would
-  be an added citation noting DEC-018 evaluated MBQ-62 and routed it to a
-  dedicated follow-up decision record rather than deciding it in Batch 1 —
-  the row's own open status and text are otherwise unchanged.
+- **MBQ-62:** *No register wording change to the row's substance.* ChatGPT
+  accepted DEC-018's recommendation to split this row: the only register
+  change is an added citation noting DEC-018 evaluated MBQ-62 and routed it
+  to a dedicated follow-up decision record rather than deciding it in Batch
+  1 — the row's own open status and text are otherwise unchanged.
 
 ## 6. Items intentionally excluded from Batch 1
 
@@ -273,31 +344,32 @@ inserted into that register if and when ChatGPT accepts DEC-018.
 
 ## 7. Implementation gate impact
 
-- **Even if DEC-018 is later accepted, the implementation gate remains
+- **Even though DEC-018 is now accepted, the implementation gate remains
   closed** unless ChatGPT explicitly opens it via a separate, dedicated act
   per `master-blueprint.md`'s gate criteria and
   [`../05-qa/quality-feedback-loop.md`](../05-qa/quality-feedback-loop.md)
-  §10. Accepting this batch would move criterion 2 ("blocking MBQs resolved
-  or consciously accepted as risk") closer to satisfied for ten specific
-  rows — it does not by itself satisfy criterion 2 in full (roughly 35 other
+  §10. Accepting this batch moves criterion 2 ("blocking MBQs resolved or
+  consciously accepted as risk") closer to satisfied for ten specific rows —
+  it does not by itself satisfy criterion 2 in full (roughly 35 other
   "Blocks implementation: Yes" rows remain, per the PR #78 audit's count),
   and it does not touch criterion 3 (explicit gate-opening act) at all.
-- **This batch may reduce blockers but does not create implementation
+- **This batch reduces blockers but does not create implementation
   tasks.** No file matching CLAUDE.md §9 /
   `../06-prompts/implementation-task-template.md` is written by this
-  document or would be written by its acceptance.
-- **No code follows directly from this PR.** Accepting DEC-018 changes
+  document or by its acceptance.
+- **No code follows directly from this PR.** DEC-018's acceptance changes
   documentation status only; it authorizes no Odoo module, model, view,
   controller, security file, manifest, test, migration, or CI file.
 
-## 8. Recommendation to ChatGPT
+## 8. Recommendation to ChatGPT — accepted
 
 **Accept Batch 1 except MBQ-62** — accept MBQ-06, MBQ-08, MBQ-17 (posture),
 MBQ-33, MBQ-34, MBQ-41, MBQ-45 (mapping/surface split), MBQ-52, MBQ-54, and
 MBQ-60 exactly as proposed in §4, and route MBQ-62 to its own dedicated
 follow-up decision record rather than deciding it here (the mechanism §4's
 strict analysis recommends, functionally equivalent to "split weak rows into
-a follow-up batch" applied to this one row only).
+a follow-up batch" applied to this one row only). **ChatGPT accepted this
+recommendation on 2026-07-04** (see "Acceptance" above).
 
 **Justification:** the ten accepted rows each adopt a direction an already-
 accepted Master Blueprint part (mostly DEC-013/DEC-015) already placed on the
@@ -308,7 +380,7 @@ re-introduces a binding rejected approach (checked against
 Part A §D.2 job-source value is a poor semantic fit for an Odoo-side event
 trigger, and forcing one in under batch-review time pressure risks repeating
 the exact defect (Fable finding C2) this project has already caught and
-corrected once. Treating nine-tenths of the batch as decidable now and
+corrected once. Treating ten of eleven in-scope rows as decidable now and
 carving out the one row that is not is a more defensible outcome than either
 forcing all eleven or deferring the whole batch over one weak row.
 

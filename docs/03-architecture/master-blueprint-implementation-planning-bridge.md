@@ -45,11 +45,20 @@
 - **No ChatGPT-batch MBQ decision plan item is decided by this acceptance.**
   DEC-017 accepts the plan's routing (§4), not the decisions the plan
   recommends ChatGPT make.
-- **DEC-018 note (2026-07-04).** The first controlled batch of this
-  document's own §4 "ChatGPT batch" has been prepared as
-  [`DEC-018`](../04-decisions/DEC-018-mbq-decision-batch-1.md) — **proposed
-  for ChatGPT review, not accepted.** §4's decision plan table below is
-  **unchanged**; no MBQ is marked decided by this note.
+- **DEC-018 Acceptance Patch note (2026-07-04).** The first controlled batch
+  of this document's own §4 "ChatGPT batch" was proposed and then
+  **accepted by ChatGPT** as
+  [`DEC-018`](../04-decisions/DEC-018-mbq-decision-batch-1.md) — **Batch 1
+  accepted except MBQ-62.** Ten rows are now decided: **MBQ-06, MBQ-08,
+  MBQ-17 (posture only), MBQ-33, MBQ-34, MBQ-41, MBQ-45 (mapping/surface
+  split), MBQ-52 (policy only), MBQ-54 (posture only), MBQ-60** — see
+  `master-blueprint-open-questions.md` for each row's applied wording and
+  remaining implementation-planning residual. **MBQ-62 is explicitly split
+  to its own dedicated follow-up DEC**, not decided here. **§4's decision
+  plan table below is unchanged** — this note does not edit that table;
+  **the implementation gate remains closed, implementation remains
+  blocked, and no implementation task has been created** by this
+  acceptance.
 
 ## 1. Purpose of Part E
 
