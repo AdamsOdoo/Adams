@@ -39,13 +39,24 @@
 > approach reintroduced. Branch
 > `claude/master-blueprint-sprint-d-screen-3jmyd0`.
 >
-> **Note on branch name.** The session's designated development branch is
-> `claude/master-blueprint-sprint-d-screen-3jmyd0` (used here). An earlier
-> in-session narrative referred to a `…-ui-ux-screen-design` branch and a
-> merged PR #75; those did **not** exist in the repository (verified: clean
-> tree at the DEC-015 base, no such branch, no DEC-016/blueprint file), so
-> this sprint was authored fresh on the designated branch. Flagged for
-> ChatGPT.
+> **Note on duplicate-PR reconciliation.** A duplicate Sprint D proposal did
+> exist on a separate branch, `claude/master-blueprint-sprint-d-ui-ux-screen-design`
+> (head `27d521e`), opened as **PR #75** — open, draft, unmerged, based on the
+> same DEC-015 base (`b6199f7`). PR #75 was superseded because this branch's
+> PR #77 was confirmed canonical after ChatGPT-directed status cleanup and the
+> capability-audit strengthening described below. A small salvage audit then
+> compared PR #75 against PR #77; four safe, additive completeness items
+> found only in PR #75 (a persistent connection-health indicator note in the
+> navigation section, an operation-key/MBQ-20/21 citation on the sync-center
+> operation-reference field, a missing Open-MBQ-deps bullet on the
+> order-import touchpoints screen, and an MBQ-09 citation on the customer
+> screen) were salvaged into PR #77 in commit `17912cd6`. PR #75 was then
+> **closed as superseded by PR #77, not merged**. PR #77 remains
+> **canonical, open, draft, not merged**; DEC-016 / AR-013 / Part D remain
+> Proposed, not accepted; Part E remains Not started; implementation remains
+> blocked. (This corrects an earlier version of this handoff, which
+> incorrectly stated that PR #75, its branch, and its head commit did not
+> exist.) Flagged for ChatGPT.
 
 - **Branch / PR:** `claude/master-blueprint-sprint-d-screen-3jmyd0`
   → **draft PR #77** into `Shopify-connector`, **not merged**, **not** marked
@@ -118,12 +129,18 @@
   55/56/60/61/62/63 (screen-relevant, owned elsewhere, routed not decided);
   primary MVP persona (RB-13); Part E (implementation-planning bridge); all
   implementation.
-- **Learning feedback loop:** **New issues discovered:** an in-session narrative
-  claimed this sprint was already complete (commit `27d521e`, merged PR #75);
-  verification against the actual repo (clean tree at the DEC-015 base, no such
-  branch/commit/PR, no DEC-016/blueprint file) showed it had **not** happened,
-  so the work was authored fresh and reported faithfully — reinforces
-  `CLAUDE.md` §3 "if it is not in GitHub it does not exist." **Repeated issue
+- **Learning feedback loop:** **New issues discovered:** a duplicate Sprint D
+  proposal existed unreconciled for a time — **PR #75** (branch
+  `claude/master-blueprint-sprint-d-ui-ux-screen-design`, head `27d521e`,
+  open/draft/unmerged) alongside this **PR #77**, both proposing the same
+  Part D content; an earlier version of this handoff incorrectly stated that
+  PR #75, its branch, and its head commit did not exist. Corrected: PR #75
+  **did** exist; it was reconciled via a small salvage audit (four safe,
+  additive completeness items merged into PR #77 at commit `17912cd6`) and
+  then **closed as superseded by PR #77, not merged**; PR #77 remains
+  canonical, open, draft, not merged — reinforces `CLAUDE.md` §3 "if it is
+  not in GitHub it does not exist" by verifying actual GitHub PR/branch
+  state rather than relying on an in-session assumption. **Repeated issue
   patterns:** the Accepted-vs-Recommendation over-attribution risk (Fable
   findings B3/C1/C2 in Sprints B/C) recurred as a latent drafting risk; mitigated
   proactively via the completeness-critic pass and strict per-statement labels.
