@@ -391,7 +391,6 @@ E to weigh, not a defect or a call to cut scope:
 None of the above indicates the blueprint contradicts its own no-code/no-
 redesign gate — each is a density/scope observation for Part E to weigh
 against the "premium, not bloated" principle, not a governance violation.
-confirm no implementation step flattens that grouping away.
 
 ### sh_shopify_connector Daily Queue Activity Tracking chart status
 
@@ -603,7 +602,7 @@ Part E and a separate ChatGPT gate-opening act.
 
 ## 9. Required pre-Part-E cleanup
 
-**One blocking-severity item, plus three minor/moderate cross-check-addendum
+**One blocking-severity item, plus two minor/moderate cross-check-addendum
 items** found:
 
 - **(Blocking) `docs/03-architecture/master-blueprint-ui-ux-screen-design.md`'s
