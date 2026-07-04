@@ -2,33 +2,49 @@
 
 ## Status
 
-- **Proposed for ChatGPT review — NOT accepted.**
-- **Documentation-only.** No code, Odoo module, model, view, controller,
-  security file, manifest, test, migration, or CI file was created or
-  modified to produce this document.
-- **Part E planning only.** This is the first Part E planning-bridge session,
-  opened after PR #79 merged into `Shopify-connector` (merge commit
-  `77ee511036a98db36262bdbc9b4ae4371a2d85f8`).
+- **Accepted by ChatGPT via [`DEC-017`](../04-decisions/DEC-017-master-blueprint-implementation-planning-bridge.md).**
+  Acceptance date: **2026-07-04**.
+- **Accepted as a documentation-only implementation-planning bridge.** This
+  acceptance is **not implementation-authorizing**: no code, Odoo module,
+  model, view, controller, security file, manifest, test, migration, or CI
+  file was created or modified to produce this document, and none is
+  authorized by its acceptance.
+- **Part E planning only.** This was the first Part E planning-bridge
+  session, opened after PR #79 merged into `Shopify-connector` (merge commit
+  `77ee511036a98db36262bdbc9b4ae4371a2d85f8`), proposed via PR #80, and
+  accepted via DEC-017.
 - **Does not authorize code.** Nothing in this document creates or permits an
   Odoo module, model, view, controller, security file, manifest, test, CI
   workflow, or dependency change.
-- **Does not open the implementation gate.** Opening the gate is a separate,
-  explicit ChatGPT act per `master-blueprint.md`'s "Criteria for when
-  implementation may later be opened" and
+- **Does not open the implementation gate.** Opening the gate remains a
+  separate, explicit ChatGPT act per `master-blueprint.md`'s "Criteria for
+  when implementation may later be opened" and
   [`../05-qa/quality-feedback-loop.md`](../05-qa/quality-feedback-loop.md) §10
-  — this document does not perform that act and is not written as if it does.
-- **Implementation remains blocked.** No implementation task has been written
+  — DEC-017 does not perform that act and this document is not written as if
+  it does.
+- **No implementation task exists.** No implementation task has been written
   to the CLAUDE.md §9 / `../06-prompts/implementation-task-template.md`
-  template; none is authorized by this document.
-- **Built on accepted DEC-003 through DEC-016 and Master Blueprint Parts A–D.**
-  This document re-decides nothing DEC-003–016 or AR-002–013 already fixed; it
-  does not reopen Part A, B, C, or D.
+  template; none is authorized by this document or by its acceptance.
+- **Implementation remains blocked.** Acceptance of this planning bridge is
+  necessary but not sufficient to open the gate — see §3 below, unchanged by
+  this acceptance except that "Parts A–D accepted" now also reads Part E's
+  planning content as accepted.
+- **Built on accepted DEC-003 through DEC-017 and Master Blueprint Parts A–D.**
+  This document re-decides nothing DEC-003–016 already fixed; it does not
+  reopen Part A, B, C, or D.
 - **Created after the PR #78 Master Blueprint Integrity & Competitor Advantage
   Audit** (verdict: **READY FOR PART E WITH CONDITIONS**) and the PR #79
   Part D/`master-blueprint.md` residue-alignment cleanup that satisfied those
-  conditions. This document executes the audit's own §10 "Required Part E
+  conditions. This document executed the audit's own §10 "Required Part E
   focus areas" as its work plan — it does not re-litigate the audit's
   findings.
+- **MBQ-64 and MBQ-65 are accepted at fact-verification level only** (per
+  DEC-017) — their respective design/selection mechanism (MBQ-64) and
+  payload/subscription/scope residual (MBQ-65) remain open; see §4/§5 below,
+  unchanged in substance by this acceptance.
+- **No ChatGPT-batch MBQ decision plan item is decided by this acceptance.**
+  DEC-017 accepts the plan's routing (§4), not the decisions the plan
+  recommends ChatGPT make.
 
 ## 1. Purpose of Part E
 
@@ -139,7 +155,9 @@ implementation may later be opened," with current status:
 to make tractable (§4, §7, §11) — this document advances all three toward
 readiness without itself satisfying any of them, since criteria 2 and 3 are
 explicit ChatGPT acts and criterion 4 requires an actual implementation task
-to exist.
+to exist. **DEC-017's acceptance of this document does not change this
+table** — accepting the planning bridge is not the same act as satisfying
+criteria 2–4; the count remains 2 of 5 after acceptance.
 
 ## 4. MBQ decision plan
 
@@ -220,8 +238,11 @@ The PR #78 audit (§6 cross-check addendum) identified three untracked gaps.
 After this session's official-doc research (§6 below), two were confirmed
 real and are added to
 [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
-as **MBQ-64** and **MBQ-65** — both logged **Proposed / Open**, continuing the
-register's numbering after MBQ-63, not resolved, not decided:
+as **MBQ-64** and **MBQ-65**, continuing the register's numbering after
+MBQ-63. **Per DEC-017 (2026-07-04), the underlying platform facts for both
+rows are now accepted at fact-verification level** — each row's own
+design/selection mechanism (MBQ-64) or payload/subscription/scope residual
+(MBQ-65) remains **open, not resolved, not decided**:
 
 1. **Shopify multi-currency / presentment-currency order model → MBQ-64.**
    Confirmed real: Shopify's order-money fields are `MoneyBag`-typed
@@ -254,11 +275,10 @@ register's numbering after MBQ-63, not resolved, not decided:
    these as "not verified/cited this sprint," and no MBQ row tracked the
    gap (unlike its inventory analog, MBQ-37/MBQ-63). `PRODUCTS_CREATE`,
    `PRODUCTS_UPDATE`, and `PRODUCTS_DELETE` are now confirmed against the
-   official `WebhookSubscriptionTopic` enum (2026-07-04) — **proposed
-   resolved at fact-verification level only**, pending ChatGPT acceptance
-   of this Part E session, mirroring MBQ-37's treatment. The broader
-   payload-shape/subscription-scope/Phase-1-implementation-scope residual
-   remains open, mirroring MBQ-63.
+   official `WebhookSubscriptionTopic` enum (2026-07-04) — **accepted at
+   fact-verification level only by DEC-017**, mirroring MBQ-37's treatment.
+   The broader payload-shape/subscription-scope/Phase-1-implementation-scope
+   residual remains open, mirroring MBQ-63.
 
 **Why each blocks or does not block implementation:**
 
@@ -516,18 +536,22 @@ implementation planning proceeds:
   deferred `sh_shopify_connector` "Daily Queue Activity Tracking" chart idea
   remains unadopted, not forgotten.
 
-## 13. Recommendation to ChatGPT
+## 13. Recommendation to ChatGPT (as accepted)
 
-**Part E ready for ChatGPT review after this PR.**
+**Accepted by ChatGPT via DEC-017 (2026-07-04).**
 
 This session executed the PR #78 audit's own §10 priority list items 1
 (MBQ decision plan, §4), 11 (currency research, §5/§6), and 12 (product-
-webhook MBQ row, §5/§6) as its scoped work. It does not claim implementation
-is ready — only that this Part E planning-bridge document, the two new MBQ
-rows (MBQ-64/65), and the two research-notes updates are ready for ChatGPT's
-review, acceptance, and — separately — the MBQ decision plan's own ChatGPT-
-batch decisions (§4). Implementation itself remains blocked pending: (a)
-ChatGPT's review/acceptance of this document, (b) the MBQ decision plan's
-ChatGPT-batch items actually being decided, and (c) a separate, explicit
-ChatGPT implementation-gate-opening act (§3, criterion 3). None of those
-three has happened yet.
+webhook MBQ row, §5/§6) as its scoped work. ChatGPT accepted this Part E
+planning-bridge document, AR-014, and the two research-notes findings (at
+fact-verification level for MBQ-64/65) via
+[`DEC-017`](../04-decisions/DEC-017-master-blueprint-implementation-planning-bridge.md).
+**This acceptance did not thereby decide the MBQ decision plan's own
+ChatGPT-batch items, did not resolve MBQ-64's design/selection mechanism,
+and did not resolve MBQ-65's payload/subscription/scope residual** — see
+DEC-017's own "MBQ impact" section. Implementation itself remains blocked
+pending: (a) the MBQ decision plan's ChatGPT-batch items actually being
+decided, and (b) a separate, explicit ChatGPT implementation-gate-opening
+act (§3, criterion 3). Neither has happened yet. The recommended next
+session is the MBQ decision plan's own ChatGPT-batch decision session, not
+implementation.

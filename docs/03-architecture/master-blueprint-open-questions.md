@@ -140,29 +140,46 @@ qualified "at screen-design blueprint level," not a full resolution).
 > acceptance decides nothing beyond the explicit points above and
 > authorizes no implementation.
 
-> **Master Blueprint Part E note (2026-07-04) — Proposed for ChatGPT
-> review, NOT accepted.** Part E
+> **Master Blueprint Part E note (2026-07-04), superseded by the DEC-017
+> Acceptance Patch immediately below.** Part E
 > ([`master-blueprint-implementation-planning-bridge.md`](./master-blueprint-implementation-planning-bridge.md))
-> is proposed after PR #79 merged into `Shopify-connector` (merge commit
-> `77ee511036a98db36262bdbc9b4ae4371a2d85f8`), acting on the PR #78 Master
-> Blueprint Integrity & Competitor Advantage Audit's recommendation
+> was proposed after PR #79 merged into `Shopify-connector` (merge commit
+> `77ee511036a98db36262bdbc9b4ae4371a2d85f8`, PR #80), acting on the PR #78
+> Master Blueprint Integrity & Competitor Advantage Audit's recommendation
 > (§6/§10) to close two currently-untracked official-doc gaps before the
-> MBQ decision plan proceeds. This session **adds two new rows, MBQ-64 and
-> MBQ-65** (§4 below), both **Proposed / Open** — neither resolved, neither
-> decided. **MBQ-64** (Shopify `MoneyBag`/presentment-currency order-money
-> model vs. Odoo's single computed `currency_id` sale-order model — a
-> design/selection question, not a further research one, now that both
-> sides' official facts are verified) and **MBQ-65** (Shopify product-domain
-> webhook topic strings — `PRODUCTS_CREATE`/`PRODUCTS_UPDATE`/
-> `PRODUCTS_DELETE` **proposed resolved at fact-verification level only**,
-> pending ChatGPT acceptance of this Part E session, mirroring MBQ-37's
-> inventory-topic treatment; the payload/subscription/Phase-1-scope residual
-> stays open, mirroring MBQ-63). **No existing MBQ row is modified,
-> resolved, re-routed, or silently changed by this note** — every row listed
-> as open in the DEC-016 acceptance note above remains exactly as open as
-> stated there. Part E itself is **Proposed for ChatGPT review, not
-> accepted**; implementation remains blocked; registering MBQ-64/MBQ-65
-> here decides nothing and authorizes no implementation.
+> MBQ decision plan proceeds. That session added two new rows, **MBQ-64**
+> and **MBQ-65** (§4 below).
+
+> **DEC-017 Acceptance Patch (2026-07-04) — accepted as the register's
+> update through Part E.** After ChatGPT reviewed PR #80, ChatGPT formally
+> accepted
+> [`DEC-017`](../04-decisions/DEC-017-master-blueprint-implementation-planning-bridge.md)
+> on **2026-07-04**. This acceptance is **documentation-only** and accepts
+> Part E **as an implementation-planning bridge** (MBQ decision plan,
+> proposed implementation sequence, first-safe-slice recommendation,
+> test/rollback strategy — all accepted **as planning guidance only**, not
+> as decisions or authorizations). **MBQ-64 is now partially resolved by
+> DEC-017 at fact-verification level** — Shopify's `MoneyBag`
+> (`shopMoney`/`presentmentMoney`) order-money model and Odoo's single
+> computed `sale.order.currency_id` are accepted as verified facts; **the
+> design/selection mechanism (which money field is compared against
+> `currency_id`, and how a mismatch is classified/guarded) remains open**,
+> not decided by this acceptance. **MBQ-65's topic strings
+> (`PRODUCTS_CREATE`/`PRODUCTS_UPDATE`/`PRODUCTS_DELETE`) are now resolved
+> by DEC-017 at fact-verification level only**, mirroring MBQ-37's
+> treatment — **the payload-shape/subscription-scope/Phase-1-
+> implementation-scope residual remains open**, mirroring MBQ-63. **No
+> ChatGPT-batch MBQ is decided by this acceptance** — MBQ-06, MBQ-08,
+> MBQ-17 (posture), MBQ-33, MBQ-34, MBQ-41, MBQ-45 (surface split),
+> MBQ-52, MBQ-54, MBQ-60, and MBQ-62 all remain exactly as open as stated
+> in the DEC-013 through DEC-016 acceptance notes above. **No other MBQ
+> row is modified, resolved, re-routed, or silently changed by this
+> acceptance.** Per `CLAUDE.md` §10, this acceptance **does not authorize
+> implementation**; DEC-003 through DEC-016 remain unchanged;
+> **implementation remains blocked; the implementation gate remains
+> closed.** Recommended next: the MBQ decision plan's own ChatGPT-batch
+> decisions, then a separate, explicit ChatGPT implementation-gate-opening
+> act.
 
 ## How to read
 
@@ -237,8 +254,8 @@ qualified "at screen-design blueprint level," not a full resolution).
 | MBQ-57 | Whether the **whole-order-hold rule** for an unmatched product line (§C.5) should ever have an alternative (e.g. partial-line placeholder) for a future phase | Sprint B (`master-blueprint-product-customer-sale.md` §C.5) | Recorded for future reconsideration; the current guard-consistent rule is not weakened by leaving this open | ChatGPT (future, only if revisited) | No (current rule stands unless revisited) |
 | MBQ-58 | **Shopify order-identity stability nuances** beyond general GID-non-permanence (e.g. test-mode orders, draft orders later converted) | Sprint B (`master-blueprint-product-customer-sale.md` §C.3) | The existing binding-based defensive design (Part A §C.6) already covers the general case; this refines it, not a blocker | Official-doc verification | No (defensive design already stands) |
 | MBQ-59 | Exact **automated (webhook/scheduled/reconciliation) import create/bind policy and preview semantics** — whether/how an automated product/customer create satisfies the accepted "no blind create" rule. **Added in PR #72 revision; revised again in the Fable-review revision; accepted at blueprint-policy level by DEC-014 (2026-07-03):** a pre-create duplicate check plus a two-tier gate — eligibility conditions (setup complete, domain enabled, source strategy permits creation) routed via Part A's accepted enqueue/cancel mechanisms (§E.5/§I.3/§I.4, never `blocked_manual_review`), and match-quality conditions (confident match or confident no-match-creation candidate; no ambiguous-match/binding-conflict/duplicate-risk/destructive-write-guard condition) routed via Part A's accepted confirmation-required `blocked_manual_review` classes (§D.5.4/§D.8) when failed — fully logged (§D.10/§C.4); retrospective sync-center/dashboard visibility is audit only, never a preview substitute (`master-blueprint-product-customer-sale.md` §A.2/§A.9/§B.2/§B.9/§C.6). Replaces this document's withdrawn earlier reading that retrospective visibility satisfied the preview requirement, and the earlier reading that every gate failure collapsed into `blocked_manual_review`. **The policy is accepted; exact eligibility-check/match-confidence implementation detail remains open for implementation planning.** | Sprint B revision (§A.2/§B.2); DEC-014; tension between DEC-003/DEC-006 "no blind create" and DEC-005 layered automation, resolved via the accepted Part A/DEC-013 per-class routing | Prevents weakening the accepted no-blind-create rule while still allowing webhook/scheduled import to operate without a synchronous per-record human click for every confident, unambiguous create, without misusing Part A's accepted state/class vocabulary | Resolved at blueprint-policy level — ChatGPT via DEC-014; exact implementation detail remains Implementation planning | Yes (exact eligibility-check/match-confidence implementation detail; policy itself no longer blocks) |
-| MBQ-64 | **New — added by the Part E pre-implementation research patch (2026-07-04), PR #78 audit cross-check addendum.** Exact **currency-comparison mechanism** for the total-check guard and the price source-of-truth mechanism. Shopify order-money fields are `MoneyBag`-typed (`shopMoney` + `presentmentMoney`, both non-null on every order-total field — verified 2026-07-04 against `shopify.dev`, see `shopify-official-api-notes.md` "Part E pre-implementation research patch"), while an Odoo `sale.order` carries exactly **one** computed `currency_id` (pricelist currency, else company currency — verified 2026-07-04 against official 19.0 source, see `odoo-official-architecture-notes.md` same section). **Which** Shopify money field (`shopMoney` vs `presentmentMoney`) the total-check guard and price sync compare against Odoo's single order currency, and how a shop-currency-vs-order-currency mismatch is itself classified/guarded, remain undecided — a **design/selection** question now that both platforms' official facts are verified, not further fact-finding. | PR #78 audit §6 cross-check addendum ("Shopify multi-currency/presentment-currency order model"; "Odoo multi-currency/pricelist ORM behavior"); complements **MBQ-56** (total-check guard tolerance/comparison mechanism, `master-blueprint-product-customer-sale.md` §C.8) and **DEC-007 §3** (price source-of-truth, which excludes "any currency-/market-specific pricing strategy" from Phase 1 scope without addressing shop-vs-presentment divergence) | The total-check guard (§C.8, "mandatory and permanent") and price source-of-truth mechanism both implicitly assumed single-currency comparison; an unexamined `shopMoney`/`presentmentMoney`/`currency_id` mismatch could silently misclassify a correct order as a `financial total mismatch`, silently pass a genuinely mismatched one, or export/import a price in the wrong currency | Official-doc verification (done this session, the underlying facts) + ChatGPT/Implementation planning (the selection/mechanism itself, complementing MBQ-56) | Yes (order-import total-check guard; product/price export) |
-| MBQ-65 | **New — added by the Part E pre-implementation research patch (2026-07-04), PR #78 audit cross-check addendum.** Exact **Shopify product-domain webhook topic strings** for webhook-driven product create/update/delete triggers. **Proposed resolved at fact-verification level (topic strings only), pending ChatGPT acceptance of this Part E session:** `PRODUCTS_CREATE`, `PRODUCTS_UPDATE`, and `PRODUCTS_DELETE` confirmed against the official `WebhookSubscriptionTopic` enum (verified 2026-07-04, see `shopify-official-api-notes.md` "Part E pre-implementation research patch") — the direct product-domain analog of **MBQ-37**'s inventory-topic resolution. The broader **payload shape, required subscription scopes beyond `read_products`, and whether webhook-driven product import is implemented in Phase 1 at all** (vs. scheduled/manual/reconciliation-only, mirroring the already-accepted layered-sync posture for inventory) remain unverified and open, mirroring **MBQ-63**'s inventory-webhook residual. | PR #78 audit §6 cross-check addendum ("Shopify product-domain webhook topic strings"); `master-blueprint-product-customer-sale.md` §A.2 (topic strings previously flagged "not verified/cited this sprint") | Webhook-driven product import cannot be built on an unverified topic string; the accepted layered sync (scheduled/manual/reconciliation) stands regardless, mirroring the accepted inventory posture (MBQ-37/MBQ-63) | Official-doc verification (topic-string fact proposed resolved this session, pending acceptance) + Implementation planning, with further official-doc verification (the payload/subscription/scope residual) | No for the topic-string fact itself (proposed resolved, not yet accepted); Yes, only for webhook-driven product import specifically, for the payload/subscription/scope residual — mirroring MBQ-63 |
+| MBQ-64 | **Partially resolved at fact-verification level by DEC-017 acceptance (2026-07-04)** (originally added by the Part E pre-implementation research patch, PR #78 audit cross-check addendum). Exact **currency-comparison mechanism** for the total-check guard and the price source-of-truth mechanism. **Accepted as verified fact:** Shopify order-money fields are `MoneyBag`-typed (`shopMoney` + `presentmentMoney`, both non-null on every order-total field — verified 2026-07-04 against `shopify.dev`, see `shopify-official-api-notes.md` "Part E pre-implementation research patch"), while an Odoo `sale.order` carries exactly **one** computed `currency_id` (pricelist currency, else company currency — verified 2026-07-04 against official 19.0 source, see `odoo-official-architecture-notes.md` same section). **Not decided by DEC-017 — remains open:** **which** Shopify money field (`shopMoney` vs `presentmentMoney`) the total-check guard and price sync compare against Odoo's single order currency, and how a shop-currency-vs-order-currency mismatch is itself classified/guarded — a **design/selection** question now that both platforms' official facts are accepted as verified, not further fact-finding. | PR #78 audit §6 cross-check addendum ("Shopify multi-currency/presentment-currency order model"; "Odoo multi-currency/pricelist ORM behavior"); DEC-017 (fact-verification acceptance); complements **MBQ-56** (total-check guard tolerance/comparison mechanism, `master-blueprint-product-customer-sale.md` §C.8) and **DEC-007 §3** (price source-of-truth, which excludes "any currency-/market-specific pricing strategy" from Phase 1 scope without addressing shop-vs-presentment divergence) | The total-check guard (§C.8, "mandatory and permanent") and price source-of-truth mechanism both implicitly assumed single-currency comparison; an unexamined `shopMoney`/`presentmentMoney`/`currency_id` mismatch could silently misclassify a correct order as a `financial total mismatch`, silently pass a genuinely mismatched one, or export/import a price in the wrong currency | Official-doc verification (accepted by DEC-017, the underlying facts) + ChatGPT/Implementation planning (the selection/mechanism itself, complementing MBQ-56, not decided by DEC-017) | Yes (order-import total-check guard; product/price export) |
+| MBQ-65 | **Resolved at fact-verification level (topic strings only) by DEC-017 acceptance (2026-07-04)** (originally added by the Part E pre-implementation research patch, PR #78 audit cross-check addendum). Exact **Shopify product-domain webhook topic strings** for webhook-driven product create/update/delete triggers. **Accepted as verified fact:** `PRODUCTS_CREATE`, `PRODUCTS_UPDATE`, and `PRODUCTS_DELETE` confirmed against the official `WebhookSubscriptionTopic` enum (verified 2026-07-04, see `shopify-official-api-notes.md` "Part E pre-implementation research patch") — the direct product-domain analog of **MBQ-37**'s inventory-topic resolution. **Not decided by DEC-017 — remains open:** the broader **payload shape, required subscription scopes beyond `read_products`, and whether webhook-driven product import is implemented in Phase 1 at all** (vs. scheduled/manual/reconciliation-only, mirroring the already-accepted layered-sync posture for inventory), mirroring **MBQ-63**'s inventory-webhook residual. | PR #78 audit §6 cross-check addendum ("Shopify product-domain webhook topic strings"); `master-blueprint-product-customer-sale.md` §A.2 (topic strings previously flagged "not verified/cited this sprint"); DEC-017 (fact-verification acceptance) | Webhook-driven product import cannot be built on an unverified topic string; the accepted layered sync (scheduled/manual/reconciliation) stands regardless, mirroring the accepted inventory posture (MBQ-37/MBQ-63) | Official-doc verification (topic-string fact resolved at fact-verification level by DEC-017) + Implementation planning, with further official-doc verification (the payload/subscription/scope residual, not decided by DEC-017) | No for the topic-string fact itself (resolved at fact-verification level by DEC-017); Yes, only for webhook-driven product import specifically, for the payload/subscription/scope residual — mirroring MBQ-63 |
 
 ## 5. Inventory (routed to Sprint C)
 
