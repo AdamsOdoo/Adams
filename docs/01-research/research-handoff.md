@@ -1,9 +1,10 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-016
-> Acceptance Patch — Part D accepted at screen-design blueprint level
-> only)** is immediately below, in the **compact
+> Continuity lives in GitHub, not chat. The **current entry (Master Blueprint
+> Integrity & Competitor Advantage Audit — pre-Part-E quality gate)** is
+> immediately below, in the **compact
 > handoff format** (`../06-prompts/session-handoff-template.md`);
+> **DEC-016 Acceptance Patch**,
 > **Master Blueprint Sprint D (proposal history)**,
 > **DEC-015 Acceptance Patch**,
 > **Master Blueprint Sprint C (proposal history)**,
@@ -24,6 +25,104 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Master Blueprint Integrity & Competitor Advantage Audit — compact handoff (2026-07-04)
+
+> **Documentation-only audit, not implementation, not Part E.** Confirmed
+> before editing: branch `claude/master-blueprint-audit-ngu1k9` based on
+> `Shopify-connector` at merge commit
+> `747bee86b4b1687afbbf1d150c6f808ece411670` (PR #77, DEC-016 acceptance);
+> DEC-003 through DEC-016 confirmed Accepted by ChatGPT and unedited; Part E
+> confirmed Not started; implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/master-blueprint-audit-ngu1k9` → draft PR into
+  `Shopify-connector` (not merged).
+- **Files changed:** `docs/05-qa/master-blueprint-integrity-competitor-advantage-audit.md`
+  (new), `docs/01-research/research-handoff.md` (this file). **No DEC, no
+  architecture blueprint, no code files changed.**
+- **What changed / residue fixed:** ran a strict pre-Part-E integrity audit
+  across accepted decisions (DEC-003–016), the MBQ open-questions register,
+  competitor research, and the rejected-approaches log. **Verdict: READY FOR
+  PART E WITH CONDITIONS.** No contradiction found between DEC-003 through
+  DEC-016; no accepted decision authorizes implementation or silently
+  resolves an MBQ that should stay open; DEC-016's screen-design-only scope
+  boundary for Part D is correctly and consistently stated everywhere it
+  appears. All 23 rejected approaches (RA-001–023) checked against Parts
+  A–D — none reintroduced, none drifting; the 9 named guardrail themes all
+  map cleanly to specific RA rows. Competitor advantage assessed:
+  idempotency + reconciliation + rate-limit-aware throttling, the unified
+  command-center + recovery-first error center, and per-location inventory
+  identity are confirmed accepted-architecture differentiators no competitor
+  combines; the `sh_shopify_connector` "Daily Queue Activity Tracking" chart
+  is confirmed **explicitly deferred, not adopted**; the pixel-level
+  screenshot-inspection limitation is confirmed and restated precisely (page→
+  markdown/caption/alt-text only, never pixel-rendered — a same-session
+  headless-browser attempt was abandoned rather than disable TLS
+  verification). **One documentation defect found and logged, not fixed
+  this session** (out of this audit's allowed-files scope):
+  `docs/03-architecture/master-blueprint-ui-ux-screen-design.md`'s own
+  `## Status` section and claim-label legend still read "Proposed for
+  ChatGPT review — NOT accepted" (dated 2026-07-03) even though its
+  companion DEC-016 was accepted 2026-07-04 and every other document in the
+  chain was correctly updated — the DEC-016 acceptance-patch commit's file
+  list never included this file. This is the same defect pattern already
+  caught and fixed once for Part C (see the "DEC-015 Acceptance Patch — Part
+  C blueprint document alignment" entry below); the identical alignment step
+  was never performed for Part D. Full findings, the MBQ routing table, and
+  the RA guardrail table are in the audit file itself.
+- **Items deferred:** all ~45 implementation-blocking open MBQs (per the
+  audit's §4 routing table); the Part D document-alignment fix (§9 of the
+  audit; requires a separate small session since the file is outside this
+  audit's allowed-files scope); a later pixel-level visual-design pass
+  (where the deferred `sh_shopify_connector` activity-chart idea can be
+  reconsidered); Part E (implementation-planning bridge); all
+  implementation.
+- **Learning feedback loop:** **New issues discovered:** the Part D status-
+  residue defect above (one instance — logged, not yet fixed). A planned
+  7-agent parallel research fan-out (Workflow tool) to independently cross-
+  check every audit dimension failed on an account-level session usage
+  limit on all 7 runs; a resume attempt after the limit reset still did not
+  return usable results within this session, so this audit rests on direct,
+  firsthand reads/greps of the primary governance documents instead (see
+  the audit file §1 and §11 for exactly what was read directly vs. via
+  secondary citation). **Repeated issue patterns:** the Part D status-
+  residue defect is a recurrence of the same "blueprint acceptance patch
+  doesn't always touch the blueprint document's own Status header" pattern
+  already seen once for Part C — worth a checklist addition (see below).
+  **Rules/checklists updated:** none this session (a checklist addition for
+  future acceptance patches — "verify the blueprint document's own Status
+  header, not just the DEC/index/register/log/handoff — was updated" — is
+  recommended but not applied here, since `pr-review-checklist.md` is
+  outside this audit's allowed-files scope). **New rejected approaches:**
+  none — `rejected-approaches-log.md` checked in full; nothing reintroduced.
+  **New technical debt:** none (no code; the Part D residue is a
+  documentation defect, not a deferred implementation compromise, so it is
+  not logged in `technical-debt-register.md`). **Architecture concerns:**
+  none new — no accepted decision, MBQ resolution, or rejected-approach
+  status was found to be wrong; the one defect found is cosmetic/status-
+  label only and does not change what is actually accepted (DEC-016 itself,
+  the MBQ register, the index, and the AR-log are all correct).
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured · rejected approaches checked, none added ·
+  technical debt logged (none applicable — no code, and the one defect found
+  is a documentation-label residue, not accepted technical debt) ·
+  repeated-issue escalation applied (noted as a first recurrence, below the
+  2nd-occurrence checklist-update threshold since the underlying documents
+  it would touch are outside this session's allowed files) — all **YES**.
+- **Next recommended session:** 1) a small, separate documentation-only
+  session to fix the Part D status-header/claim-label residue in
+  `master-blueprint-ui-ux-screen-design.md` (mirroring the Part C alignment
+  fix); 2) **Master Blueprint Part E — implementation-planning bridge**,
+  starting with the MBQ decision plan (audit §10), not implementation code;
+  3) implementation only after a separate, explicit ChatGPT gate.
+- **Stop condition:** stopped after committing the audit file and this
+  handoff entry on the audit branch, opening one draft PR into
+  `Shopify-connector` (not merged). DEC-003 through DEC-016 not edited; no
+  architecture blueprint file edited; no code files changed; no MBQ register
+  row modified; Part E remains **Not started**; implementation remains
+  **blocked**. Awaiting ChatGPT review.
 
 ---
 
