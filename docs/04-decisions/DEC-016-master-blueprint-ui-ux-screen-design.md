@@ -1,55 +1,80 @@
 # DEC-016 — Master Blueprint Sprint D: UI/UX Screen Design Blueprint
 
-> **Proposed decision record** for the premium **Odoo 19 ↔ Shopify
+> **Accepted decision record** for the premium **Odoo 19 ↔ Shopify
 > Connector**, prepared in **Master Blueprint Sprint D** after DEC-015
-> acceptance (2026-07-03) closed Master Blueprint Part C. Proposes
-> acceptance of the **UI/UX Screen Design Blueprint** (Part D), which
-> **proposes to partially resolve MBQ-53** at screen-design level. Companion
-> documents:
+> acceptance (2026-07-03) closed Master Blueprint Part C, and **accepted
+> by ChatGPT on 2026-07-04** — at **screen-design blueprint level only**
+> — after duplicate-PR reconciliation (PR #75 closed as superseded), a
+> competitor screenshot UX benchmark traceability audit, the Fable Sprint
+> D review fixes (F1–F7), and final ChatGPT verification were completed
+> on PR #77. Accepts the **UI/UX Screen Design Blueprint** (Part D),
+> which **partially resolves MBQ-53** at screen-design level, with the
+> sibling/detail rows still open (see *Accepted decision* below).
+> Companion documents:
 > [`../03-architecture/master-blueprint.md`](../03-architecture/master-blueprint.md),
 > [`../03-architecture/master-blueprint-ui-ux-screen-design.md`](../03-architecture/master-blueprint-ui-ux-screen-design.md),
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
 > Companion review-log entry:
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
-> (**AR-013**, Proposed for ChatGPT review).
+> (**AR-013**, Accepted by ChatGPT via DEC-016).
 
 ## Status
 
-**Proposed for ChatGPT review — NOT accepted.** This record proposes, it
-does not decide; ChatGPT is the acceptance authority. Not
-implementation-authorizing under any outcome — see *No implementation
-authorized* below. Starting point: PR #74 merged into `Shopify-connector`,
+**Accepted by ChatGPT.** Acceptance date: **2026-07-04**. **Accepted at
+screen-design blueprint level only** — this acceptance is **not
+implementation-authorizing** under any outcome (see *No implementation
+authorized* below) and is **not a final pixel-level UI approval**;
+pixel-level visual design / final wireframe polish is explicitly **not
+accepted here**. Starting point: PR #74 merged into `Shopify-connector`,
 merge commit `b6199f78064ae4e1934bccee630a14b3d7eef438` (Accept Master
-Blueprint Sprint C Inventory and Fulfillment — DEC-015), confirmed as the
-base before editing.
+Blueprint Sprint C Inventory and Fulfillment — DEC-015), with the Part D
+proposal then prepared and revised across six commits on PR #77 (the
+proposal commit; a pre-review strengthening commit; a duplicate-PR
+salvage-reconciliation commit; a duplicate-PR-history-correction commit;
+a competitor screenshot UX benchmark audit + Fable Sprint D review-fixes
+commit; and this acceptance-patch commit), confirmed as the base before
+editing. PR #77 head at commit `b1f1ac9da3893b0d62fb803f0e588f889f8c1ab5`
+confirmed before this acceptance patch was applied.
 
-> **Proposal note (2026-07-03).** Master Blueprint Part D (UI/UX Screen
-> Design Blueprint) was **Not started** before this sprint and is now
-> **proposed** as
-> [`../03-architecture/master-blueprint-ui-ux-screen-design.md`](../03-architecture/master-blueprint-ui-ux-screen-design.md).
-> It converts the ten accepted DEC-012 operator flows and the accepted
-> Part A/B/C blueprints into a screen inventory, navigation/information
-> architecture, Odoo-native interaction patterns, blueprint-level screen
-> specs, per-screen empty/loading/success/error/manual-review states, a
-> UX-copy/error-message style guide, and a premium UI/UX acceptance
-> checklist. **Pre-review strengthening (2026-07-04):** before this record
-> was routed for acceptance review, a capability audit plus a six-lens
-> expert-review pass (premium product design, Odoo-native UX, operator,
-> error-recovery, accessibility, and adversarial architecture governance)
-> refined the blueprint — documentation only; it corrected two
-> Accepted-vs-proposal attribution slips (the sync-center status grouping and
-> the connection-status band, now labelled Screen blueprint proposals),
-> tightened the MBQ-53 wording to "proposes to partially resolve," and added
-> accessibility/Odoo-native/recovery guidance. No architecture substance
-> changed; no open MBQ was decided. **Until ChatGPT accepts this record,
-> MBQ-53 remains open** and
-> operator-facing screen implementation remains blocked. **DEC-003 through
-> DEC-015 are unchanged. Part E (implementation-planning bridge) remains
-> not started. Implementation remains blocked.**
+> **Acceptance note (2026-07-04).** Accepted after: **(1) duplicate-PR
+> reconciliation** — a duplicate Sprint D proposal, PR #75 (branch
+> `claude/master-blueprint-sprint-d-ui-ux-screen-design`, head
+> `27d521ef322f76472cb69e71fa5e9302b829d0df`), was confirmed to exist; a
+> small salvage audit merged four safe, additive completeness items from
+> it into this PR (#77); PR #75 was then **closed as superseded by PR
+> #77, not merged**; **(2) a competitor screenshot UX benchmark
+> traceability audit** — re-verifying six of eight minimum-audit sources
+> and adding a direct "Screenshot-evidence lineage" citation to Part D,
+> resolving a ChatGPT concern that Part D's grounding in the competitor
+> screenshot evidence (`../01-research/ux-ui-benchmark.md`,
+> `../00-source-materials/competitor-screenshot-inventory.md`) was only
+> **transitive** (via `setup-ux-principles.md`/`product-vision.md`), not
+> directly cited; **(3) the Fable Sprint D review fixes (F1–F7)** — all
+> applied, documentation-only (governance-attribution and
+> cross-reference corrections; no architecture substance changed);
+> **(4) final ChatGPT verification** of the resulting PR #77 head commit
+> `b1f1ac9da3893b0d62fb803f0e588f889f8c1ab5`. **This acceptance is
+> screen-design-blueprint-level only.** **MBQ-53 is partially resolved
+> at screen-design level only** — its sibling/detail rows **MBQ-03**
+> (exact XML/view/menu IDs), **MBQ-22** (exact copy), **MBQ-44** (exact
+> groups/security), **MBQ-45** (admin-vs-functional surface split), and
+> **MBQ-06** (readiness split) all **remain open**. **MBQ-33, MBQ-34,
+> MBQ-41, MBQ-35, and MBQ-32 remain open recommendations**, not decided
+> by this acceptance. **MBQ-60 through MBQ-63 remain open.** **The
+> competitor screenshot audit is accepted as sufficient traceability for
+> blueprint-level acceptance — it is not a pixel-level visual-design
+> review.** Pixel-level visual design / final wireframe polish —
+> including the `sh_shopify_connector` "Daily Queue Activity Tracking"
+> chart idea flagged during the audit — **remain deferred to a later
+> pixel-design pass and are not adopted into the accepted
+> screen/dashboard-card set by this acceptance.** **Implementation
+> remains blocked; Part E (implementation-planning bridge) remains not
+> started.** See *Accepted decision* below for the full accepted package
+> and explicit acceptance points.
 
 ## Date
 
-2026-07-03.
+2026-07-04 (acceptance). Originally proposed 2026-07-03.
 
 ## Scope
 
@@ -67,8 +92,10 @@ and the conceptual permissions/roles visibility; a UX-copy/error-message
 **style guide** (not final copy); cross-screen consistency rules; and a
 premium UI/UX acceptance checklist. Does **not** cover Part E
 (implementation-planning bridge, not started), exact Odoo view/menu/action
-XML, exact model/field/group names, exact user-facing copy, tests, or
-implementation tickets. Does **not** modify DEC-003 through DEC-015.
+XML, exact model/field/group names, exact user-facing copy, tests,
+implementation tickets, or **pixel-level visual design / final wireframe
+polish** (explicitly out of scope for this acceptance). Does **not** modify
+DEC-003 through DEC-015.
 
 ## Accepted context (confirmed before editing)
 
@@ -89,101 +116,127 @@ implementation tickets. Does **not** modify DEC-003 through DEC-015.
 - **Master Blueprint Part D was Not started** before this sprint — confirmed
   before editing.
 - **MBQ-53 was open** and blocks operator-facing screen implementation —
-  this sprint proposes to resolve it at screen-design level; it stays open
-  until this record is accepted.
+  this sprint partially resolves it at screen-design level; its sibling
+  rows remain open (see acceptance note above).
 - **Implementation is still blocked** — confirmed before editing, unaffected
-  by this proposal.
+  by this acceptance.
 
-## Proposed decision
+## Accepted decision
 
-Propose that ChatGPT accept the **Master Blueprint UI/UX Screen Design
-Blueprint (Part D)** package:
+**ChatGPT accepts DEC-016** as the accepted **Master Blueprint UI/UX
+Screen Design Blueprint (Part D)** package, **at screen-design blueprint
+level only**:
 
 1. **The Part D blueprint document**
    ([`../03-architecture/master-blueprint-ui-ux-screen-design.md`](../03-architecture/master-blueprint-ui-ux-screen-design.md))
-   — all 22 sections, every statement labelled per `CLAUDE.md` §8.
-2. **The open-questions register update** — MBQ-53 marked **Proposed
-   partially resolved by DEC-016 (Sprint D)**; no other MBQ row decided; no
-   new MBQ row added.
+   — all 22 sections, every statement labelled per `CLAUDE.md` §8, is now
+   the **accepted screen-design contract** for the connector's
+   operator-facing surfaces.
+2. **The open-questions register update** — **MBQ-53 marked partially
+   resolved by DEC-016 at screen-design blueprint level**; its sibling
+   rows (MBQ-03, MBQ-22, MBQ-44, MBQ-45, MBQ-06) remain open; no other MBQ
+   row decided; no new MBQ row added.
 3. **The index update** — `master-blueprint.md` Part D row moved to
-   **Proposed via DEC-016**; Part E preserved as Not started; the
-   implementation-gate criteria unchanged.
-4. **AR-013** logged as **Proposed for ChatGPT review**.
+   **Accepted by ChatGPT via DEC-016**; Part E preserved as Not started;
+   the implementation-gate criteria unchanged.
+4. **AR-013** moved to **Accepted by ChatGPT**.
 
-Explicit proposal points (each **proposed**, not decided by this record):
+Explicit acceptance points (each accepted **at screen-design blueprint
+level only**, per this record):
 
-- **(A)** **Single-shared-surface screen inventory** — one role-gated
-  dashboard/sync-center/error-center/manual-review queue; domain modules
-  contribute, never fork (RA-013; DEC-008 §K rule 2). *Proposed.*
-- **(B)** **MBQ-53 proposed partially resolved** — the screen-design layer
-  is proposed complete, but MBQ-53's full closure additionally depends on
-  its still-open sibling rows (**MBQ-03** exact XML IDs, **MBQ-22** exact
-  copy, **MBQ-44** exact groups, **MBQ-45** surface split, **MBQ-06**
-  readiness split), which this part **accommodates but does not decide**;
-  and on this record's acceptance. Hence *partially*, not fully, resolved.
-- **(C)** **Order-import remains screen-less (MBQ-26, DEC-014)** — the
-  blueprint delivers the two required error-center extensions (inline
-  per-component financial-evidence breakdown; direct matching-flow links for
-  two-click resolve+retry) as extensions of the existing contract, not a new
-  surface. *Restated from DEC-014, not re-decided.*
-- **(D)** **Open recommendations left open** — **MBQ-33** (first-push guard
-  granularity), **MBQ-34** (ongoing apply-mode), **MBQ-41** (per-order
-  notification override), **MBQ-35/MBQ-32** (`on_hand` exposure / quantity
-  source), **MBQ-45** (surface split / roles→groups), **MBQ-06** (readiness
-  split): the screens are designed to **accommodate either resolution**;
-  **none is decided here.** *Proposed to remain open.*
-- **(E)** **No new MBQ row added** — the screen design consumes existing open
-  questions rather than surfacing new ones; MBQ-60 through MBQ-63 remain new
-  and open, unchanged. *Proposed.*
-- **(F)** **Premium acceptance checklist** grounded in `product-vision.md` /
-  `setup-ux-principles.md` as **recommendation-level inputs** (both "decide
-  nothing"; both predate DEC-003 and are reconciled against it). *Proposed as
-  the pre-implementation bar for ChatGPT to ratify or amend.* **Screenshot-audit
-  addendum (2026-07-04):** a pre-Fable audit found the Part D document itself
-  did not directly cite the screenshot evidence behind those two documents
+- **(A)** **Single-shared-surface screen inventory — accepted.** One
+  role-gated dashboard/sync-center/error-center/manual-review queue;
+  domain modules contribute, never fork (RA-013; DEC-008 §K rule 2).
+- **(B)** **MBQ-53 — accepted, partially resolved at screen-design level
+  only.** The screen-design layer is now accepted complete, but MBQ-53's
+  full closure additionally depends on its still-open sibling rows
+  (**MBQ-03** exact XML IDs, **MBQ-22** exact copy, **MBQ-44** exact
+  groups, **MBQ-45** surface split, **MBQ-06** readiness split), which
+  this part **accommodates but does not decide**. Hence *partially*, not
+  fully, resolved by this acceptance.
+- **(C)** **Order-import remains screen-less (MBQ-26, DEC-014) —
+  restated, not re-decided.** The blueprint delivers the two required
+  error-center extensions (inline per-component financial-evidence
+  breakdown; direct matching-flow links for two-click resolve+retry) as
+  extensions of the existing contract, not a new surface.
+- **(D)** **Open recommendations remain open — not decided by this
+  acceptance.** **MBQ-33** (first-push guard granularity), **MBQ-34**
+  (ongoing apply-mode), **MBQ-41** (per-order notification override),
+  **MBQ-35/MBQ-32** (`on_hand` exposure / quantity source), **MBQ-45**
+  (surface split / roles→groups), **MBQ-06** (readiness split): the
+  screens are designed to **accommodate either resolution**; **none is
+  decided by this acceptance.**
+- **(E)** **No new MBQ row added — confirmed.** The screen design
+  consumes existing open questions rather than surfacing new ones;
+  MBQ-60 through MBQ-63 remain new and open, unchanged.
+- **(F)** **Premium acceptance checklist — accepted as the
+  pre-implementation bar.** Grounded in `product-vision.md` /
+  `setup-ux-principles.md` as **recommendation-level inputs** (both
+  "decide nothing"; both predate DEC-003 and are reconciled against it).
+  **Screenshot-audit addendum, accepted:** a pre-acceptance audit found
+  the Part D document itself did not directly cite the screenshot
+  evidence behind those two documents
   ([`../01-research/ux-ui-benchmark.md`](../01-research/ux-ui-benchmark.md),
   [`../00-source-materials/competitor-screenshot-inventory.md`](../00-source-materials/competitor-screenshot-inventory.md)),
-  even though it inherited that grounding transitively. Part D now carries an
-  explicit "Screenshot-evidence lineage" traceability note citing both
-  directly. This is a **documentation-traceability correction**, not a new
-  decision — it changes no accepted content, decides no MBQ, and adds no new
-  proposal point.
+  even though it inherited that grounding transitively. Part D now carries
+  an explicit "Screenshot-evidence lineage" traceability note citing both
+  directly. **This acceptance treats the competitor screenshot audit as
+  sufficient traceability for blueprint-level acceptance** — it is a
+  documentation-traceability correction, not a pixel-level visual-design
+  review, and it changes no accepted architecture content.
+- **(G)** **Pixel-level visual design deferred — not accepted here.**
+  This acceptance is a **screen-design blueprint** acceptance only.
+  Pixel-level visual design and final wireframe polish are explicitly
+  **out of scope** and **not accepted** by this record. One specific gap
+  identified during the screenshot audit — `sh_shopify_connector`'s
+  demonstrated "Daily Queue Activity Tracking" chart, which has no
+  counterpart in Part D's nine-card dashboard — is **explicitly logged as
+  a deferred candidate premium visualization idea for a later pixel-design
+  pass (Part E)** and is **not adopted into the accepted dashboard
+  card set** by this acceptance.
 
 ## What remains open
 
-- **MBQ-53** stays **open** until ChatGPT accepts this record; even then, it
-  is only *partially* resolved, with the sibling rows above still open.
+- **MBQ-53** is **partially resolved** by this acceptance at
+  screen-design blueprint level only; the sibling rows below remain fully
+  open.
 - **MBQ-03/MBQ-22/MBQ-44/MBQ-45/MBQ-06** — exact XML IDs, copy, groups,
   surface split, readiness split — all **open**.
-- **MBQ-33/MBQ-34/MBQ-41/MBQ-35/MBQ-32** — open recommendations the screens
-  accommodate but do not decide.
+- **MBQ-33/MBQ-34/MBQ-41/MBQ-35/MBQ-32** — open recommendations the
+  screens accommodate but do not decide; **not decided by this
+  acceptance**.
 - **MBQ-04/MBQ-05/MBQ-07/MBQ-08/MBQ-13/MBQ-23/MBQ-24/MBQ-25/MBQ-54/MBQ-55/
   MBQ-56/MBQ-60/MBQ-61/MBQ-62/MBQ-63** — screen-relevant but owned elsewhere;
   routed, not decided.
 - **Primary MVP persona** (RB-13, `product-vision.md`) — open.
+- **Pixel-level visual design / final wireframe polish** — deferred, not
+  accepted here; recommended for a later pixel-design pass (Part E).
 - **Part E** (implementation-planning bridge) — not started.
 
 ## No implementation authorized
 
-This record, whether or not it is accepted, **does not authorize
-implementation.** It creates no Odoo module, model, view, menu, controller,
-security file, manifest, test, CI workflow, or dependency change. The
-no-code gate (`CLAUDE.md` §4–§5) remains in force. Per `master-blueprint.md`
-*Criteria for when implementation may later be opened*, implementation of any
-operator-facing screen requires **this Part D to be accepted** and, even
-then, a **separate** explicit ChatGPT implementation-gate approval.
+This record **does not authorize implementation.** It creates no Odoo
+module, model, view, menu, controller, security file, manifest, test, CI
+workflow, or dependency change. The no-code gate (`CLAUDE.md` §4–§5)
+remains in force. Per `master-blueprint.md` *Criteria for when
+implementation may later be opened*, implementation of any
+operator-facing screen requires **this Part D acceptance** (now
+satisfied at screen-design level) and, even then, a **separate** explicit
+ChatGPT implementation-gate approval, which this record does **not**
+grant.
 
 ## Consequences
 
-- **If accepted:** MBQ-53 becomes partially resolved; Part D becomes the
-  accepted screen-design contract every operator-facing implementation must
-  follow; the premium UI/UX acceptance checklist (§19) becomes the
-  pre-implementation bar; Part E becomes the next recommended sprint. AR-013
-  moves to Accepted. Implementation stays blocked pending a separate gate.
-- **If revised:** the blueprint is amended per ChatGPT/Fable findings on the
-  same branch/PR before acceptance, as with DEC-013/014/015.
-- **If rejected:** MBQ-53 stays fully open; no screen-design contract exists;
-  the file remains a proposal only.
+- **Now that this is accepted:** MBQ-53 is partially resolved at
+  screen-design level; Part D is the accepted screen-design contract
+  every operator-facing implementation must follow; the premium UI/UX
+  acceptance checklist (§19) is the pre-implementation bar; Part E
+  becomes the next recommended sprint. AR-013 moves to Accepted.
+  Implementation stays blocked pending a separate gate. Pixel-level
+  visual design remains a later, separate pass.
+- **If later revised:** any further blueprint amendment requires a new
+  ChatGPT review on a new decision record, per the DEC-013/014/015/016
+  change-control pattern.
 
 ## Alternatives considered
 
@@ -194,6 +247,22 @@ then, a **separate** explicit ChatGPT implementation-gate approval.
 - **Design a dedicated order-import screen** — rejected: MBQ-26 is already
   decided (DEC-014) as *no dedicated screen*, conditional on the two
   error-center extensions, which this part delivers instead.
-- **Decide the open recommendations (MBQ-33/34/41/45) to simplify the
+- **Decide the open recommendations (MBQ-33/34/41/45/06/35) to simplify the
   screens** — rejected: those are ChatGPT/implementation-planning decisions;
   the screens accommodate either resolution rather than pre-empting them.
+- **Adopt the `sh_shopify_connector` activity-chart idea into the accepted
+  dashboard card set now** — rejected: would change accepted architecture
+  substance (the nine-card dashboard) without a dedicated review; logged
+  instead as a deferred premium candidate for a later pixel-design pass.
+
+## Review / change control
+
+- **This record accepts Master Blueprint Part D at screen-design
+  blueprint level only.** No accepted decision is re-litigated; no
+  rejected approach is reintroduced; checked against
+  `rejected-approaches-log.md` before this patch.
+- **Related:** AR-013 (`../05-qa/architecture-review-log.md`, Accepted by
+  ChatGPT via DEC-016); the companion Part D blueprint document above;
+  DEC-003 through DEC-015 (accepted context, unmodified).
+- **Further changes** to this record require ChatGPT review, mirroring
+  the DEC-013/014/015 change-control pattern.

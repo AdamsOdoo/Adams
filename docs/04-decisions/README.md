@@ -272,3 +272,45 @@ unchanged.** MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-33, MBQ-34,
 MBQ-41, MBQ-53 through MBQ-58, and MBQ-60 through MBQ-63 remain open,
 untouched or newly added but not resolved by this acceptance.
 **Resolves AR-012** in `../05-qa/architecture-review-log.md`.
+
+**Also accepted:**
+[`DEC-016-master-blueprint-ui-ux-screen-design.md`](./DEC-016-master-blueprint-ui-ux-screen-design.md) —
+proposed 2026-07-03 (Master Blueprint Sprint D, prepared after PR #74
+merged into `Shopify-connector`, merge commit
+`b6199f78064ae4e1934bccee630a14b3d7eef438`) and **accepted by ChatGPT on
+2026-07-04** on PR #77, after duplicate-PR reconciliation (a duplicate
+Sprint D proposal, PR #75, was closed as superseded, not merged), a
+competitor screenshot UX benchmark traceability audit, and the Fable
+Sprint D review fixes (F1–F7) were applied. **Status: Accepted by
+ChatGPT, acceptance date 2026-07-04 — accepted at screen-design
+blueprint level only, no longer proposed.** Accepts the **Part D —
+UI/UX Screen Design Blueprint**
+(`../03-architecture/master-blueprint-ui-ux-screen-design.md`): a
+single-shared-surface screen inventory (one role-gated dashboard/
+sync-center/error-center/manual-review queue; domains contribute, never
+fork — RA-013); navigation/information architecture; Odoo-native
+interaction patterns; a global empty/loading/success/error/manual-review
+state model; blueprint-level screen specs for the setup wizard, store
+settings, dashboard, sync center, error center + manual-review queue,
+matching center, product diff, customer review, order-import touchpoints
+(no dedicated screen, restating DEC-014/MBQ-26), inventory, fulfillment,
+and conceptual permissions/roles; a UX-copy/error-message style guide
+(not final copy); cross-screen consistency rules; and a premium UI/UX
+acceptance checklist. **MBQ-53 is partially resolved at screen-design
+blueprint level only** — its sibling rows **MBQ-03, MBQ-22, MBQ-44,
+MBQ-45, and MBQ-06 remain open**. **MBQ-33, MBQ-34, MBQ-41, MBQ-35, and
+MBQ-32 remain open recommendations**, not decided by this acceptance.
+**MBQ-60 through MBQ-63 remain open.** **This acceptance is not a
+pixel-level visual-design or final-wireframe-polish approval** — the
+competitor screenshot UX benchmark audit is accepted as sufficient
+traceability for blueprint-level acceptance only; the
+`sh_shopify_connector` "Daily Queue Activity Tracking" chart idea
+surfaced by that audit **remains a deferred premium visualization
+candidate for a later pixel-design pass, not adopted into the accepted
+dashboard card set**. **Does not authorize implementation; DEC-003
+through DEC-015 remain unchanged; no new MBQ row added.** **Resolves
+AR-013** in `../05-qa/architecture-review-log.md`. **Part E
+(implementation-planning bridge) remains Not started**; recommended
+next: **Part E**, or a separate ChatGPT decision on the open
+recommendations MBQ-33/34/41/45/06/35, then **implementation only after
+a separate ChatGPT gate**.
