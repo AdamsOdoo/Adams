@@ -103,11 +103,13 @@
   residue defect above (one instance — logged, not yet fixed). A planned
   7-agent parallel research fan-out (Workflow tool) to independently cross-
   check every audit dimension failed on an account-level session usage
-  limit on all 7 runs; a resume attempt after the limit reset still did not
-  return usable results within this session, so this audit rests on direct,
-  firsthand reads/greps of the primary governance documents instead (see
-  the audit file §1 and §11 for exactly what was read directly vs. via
-  secondary citation). **Repeated issue patterns:** the Part D status-
+  limit on all 7 runs; a resume after the limit reset completed
+  successfully (7/7 agents, 0 errors), and its findings were read,
+  independently re-verified, and folded into the audit file as cross-check
+  addendum items (see the Update bullet above and the audit file §1, §3,
+  §5, §6, §7, §9, and §10). The audit still discloses that the largest
+  competitor-research files were spot-checked rather than read line-by-line
+  (see the audit file §11). **Repeated issue patterns:** the Part D status-
   residue defect is a recurrence of the same "blueprint acceptance patch
   doesn't always touch the blueprint document's own Status header" pattern
   already seen once for Part C — worth a checklist addition (see below).
