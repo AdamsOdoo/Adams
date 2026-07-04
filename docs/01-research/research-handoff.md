@@ -1,9 +1,11 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-018
-> Acceptance Patch — MBQ Decision Batch 1 accepted except MBQ-62)** is
-> immediately below, in the **compact
-> handoff format** (`../06-prompts/session-handoff-template.md`);
+> Continuity lives in GitHub, not chat. The **current entry (DEC-019
+> Acceptance Patch — MBQ-62 resolved at semantic-classification level)** is
+> immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`);
+> **MBQ-62 Decision Proposal (proposal history)**,
+> **DEC-018 Acceptance Patch — MBQ Decision Batch 1 accepted except MBQ-62**,
 > **Proposed MBQ Decision Batch 1 (proposal history)**,
 > **DEC-017 Acceptance Patch — Master Blueprint Part E accepted**,
 > **Master Blueprint Part E — Implementation-Planning Bridge (proposal
@@ -31,6 +33,195 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-019 Acceptance Patch — MBQ-62 resolved at semantic-classification level — compact handoff (2026-07-04)
+
+> **Documentation-only acceptance patch, not implementation, not an
+> implementation-gate opening.** Confirmed before editing: PR #82 head
+> commit `5a6ada7b6671844e75568b57b3b4fa7cef0bd31d` (branch
+> `claude/mbq-62-decision-proposal-o8l7pz`, based on `Shopify-connector` at
+> PR #81 merge commit `31d6732c9558c04bac49f4c84feba3bd5f90dec8`); DEC-003
+> through DEC-018 confirmed Accepted by ChatGPT and unedited; DEC-019
+> confirmed previously Proposed for ChatGPT review, not accepted (two prior
+> clarification patches applied on the same PR); implementation confirmed
+> still blocked.
+
+- **Branch / PR:** `claude/mbq-62-decision-proposal-o8l7pz` → PR #82 into
+  `Shopify-connector` (not merged).
+- **Files changed:**
+  `docs/04-decisions/DEC-019-mbq-62-odoo-event-job-source.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`,
+  `docs/01-research/research-handoff.md` (this file). **No DEC-003 through
+  DEC-018 file changed. No `docs/04-decisions/README.md` change. No MBQ row
+  other than MBQ-62 edited. No code file changed. No
+  Python/XML/manifest/security/test/CI file changed.**
+- **DEC-019 acceptance patch applied.** ChatGPT reviewed and **accepted
+  DEC-019 on 2026-07-04, at decision/semantic-classification level.**
+  **AR-016 is now Accepted by ChatGPT.** **MBQ-62 is resolved at
+  decision/semantic-classification level** — Part A §D.2's job-source
+  vocabulary is extended with a seventh accepted semantic value,
+  **`odoo_event`** (a job enqueued because an Odoo-side business event
+  occurred — not a webhook, not manual sync, not scheduled sync, not
+  reconciliation, not setup readiness, not export preview dry run). Every
+  `odoo_event` job must conceptually carry a trigger-origin
+  sub-classification — the accepted trigger-origin concepts for MBQ-62 are
+  **"inventory stock-change trigger"** and **"fulfillment
+  picking-validation trigger."** An inventory push enqueued by a relevant
+  Odoo stock change is classified as `job_source = odoo_event` +
+  "inventory stock-change trigger"; a fulfillment creation triggered by a
+  validated `stock.picking` is classified as `job_source = odoo_event` +
+  "fulfillment picking-validation trigger." **Exact implementation
+  mechanics remain implementation planning**: Odoo model names, field
+  names, Python constant names, XML IDs, storage/Selection-field
+  mechanics, trigger-origin field/model implementation, and MBQ-16
+  retry-count/backoff constants. **MBQ-64 and MBQ-65 are unchanged.** **No
+  other MBQ row touched. No implementation started.**
+- **Items deferred:** the separate MBQ-64/MBQ-65 currency/webhook residual
+  decision sprint; the implementation-gate-opening act; all implementation;
+  all implementation tasks; every exact implementation-mechanics item named
+  above (model/field/constant/XML-ID/storage/trigger-origin-field naming;
+  MBQ-16 constants).
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session mechanically applied ChatGPT's acceptance decision to the
+  repository, precisely scoping what was and was not decided (semantic
+  classification only; implementation mechanics explicitly excluded).
+  **Repeated issue patterns:** none newly triggered. **Rules/checklists
+  updated:** none this session (out of allowed-files scope). **New
+  rejected approaches:** none — no new architecture proposed or reopened.
+  **New technical debt:** none (no code; nothing to compromise). **New
+  open questions:** none added — MBQ-62 resolved at semantic-classification
+  level only; no other MBQ row changed; MBQ-64/MBQ-65 untouched.
+  **Architecture concerns:** none — no accepted DEC (DEC-003–018), AR
+  (AR-002–015), or Part A–E design content was changed; only DEC-019/AR-016's
+  own acceptance status and MBQ-62's own row were updated.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new) · rejected approaches
+  checked, none added · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** the separate **MBQ-64/MBQ-65
+  currency/webhook residual decision sprint**. Not implementation.
+- **Stop condition:** stopped after committing and pushing this acceptance
+  patch to the existing PR #82 branch (not merged). DEC-003 through DEC-018
+  not edited; no MBQ row other than MBQ-62 modified; no code files changed;
+  DEC-019 and AR-016 are now **Accepted by ChatGPT** (at
+  decision/semantic-classification level); implementation remains
+  **blocked**; the implementation gate remains **closed**; `main` and
+  plain `dev` untouched. Awaiting further instruction.
+
+---
+
+### MBQ-62 Decision Proposal — DEC-019 prepared, not accepted — compact handoff (2026-07-04)
+
+> **Decision-preparation session, NOT implementation, NOT an
+> implementation-gate opening, NOT a MBQ resolution.** Confirmed before
+> editing: current branch based on `Shopify-connector` at PR #81 merge
+> commit `31d6732c9558c04bac49f4c84feba3bd5f90dec8`; DEC-003 through DEC-018
+> confirmed Accepted by ChatGPT and unedited; implementation confirmed still
+> blocked.
+
+- **Branch / PR:** `claude/mbq-62-decision-proposal-o8l7pz` → draft PR into
+  `Shopify-connector` (not merged).
+- **Files changed:**
+  `docs/04-decisions/DEC-019-mbq-62-odoo-event-job-source.md` (new),
+  `docs/05-qa/architecture-review-log.md` (AR-016 added),
+  `docs/03-architecture/master-blueprint-open-questions.md` (compact note
+  near the top + a proposal-citation note added to MBQ-62's own row only),
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`
+  (compact note only), `docs/01-research/research-handoff.md` (this file).
+  **No DEC-003 through DEC-018 file changed. No `docs/04-decisions/README.md`
+  change. No MBQ row other than MBQ-62 edited. MBQ-62 not marked resolved.
+  No code file changed. No Python/XML/manifest/security/test/CI file
+  changed.**
+- **MBQ-62 decision proposal prepared.** DEC-019 evaluates MBQ-62's two named
+  Odoo-side event-trigger use cases (an inventory push enqueued by a
+  relevant Odoo stock change; a fulfillment creation triggered by a
+  validated `stock.picking`) against four options — add a seventh Part A
+  §D.2 job-source value; classify under an existing source plus
+  trigger-origin metadata; a separate trigger-origin dimension with no
+  seventh value; defer Odoo-side event triggers from Phase 1 — and
+  **proposes** extending the vocabulary with a seventh value, `odoo_event`,
+  paired with a required trigger-origin sub-classification naming the
+  specific Odoo event, rejecting a weak mapping onto any of the six existing
+  values (re-confirming DEC-018's own strict per-value analysis) and
+  rejecting deferral (incompatible with DEC-011's accepted fulfillment
+  trigger design). **DEC-019 is proposed, not accepted.** **AR-016 is
+  proposed, not accepted.** **MBQ-62 is not resolved** — only a short
+  proposal-citation note was added to its register row; its substance is
+  unchanged. **MBQ-64 and MBQ-65 are unchanged**, out of scope for this
+  session. **No implementation started.**
+- **Items deferred:** ChatGPT's actual review/acceptance of DEC-019/AR-016;
+  if accepted, the register-impact wording DEC-019 §6 pre-drafted (not
+  applied by this session) for MBQ-62's row; the separate MBQ-64/MBQ-65
+  currency/webhook residual decision sprint; the implementation-gate-opening
+  act; all implementation; all implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session's only judgment call was MBQ-62's own classification analysis,
+  performed with the same strictness DEC-018 applied, and transparently
+  documented in DEC-019 §4/§8 rather than asserted. **Repeated issue
+  patterns:** none newly triggered. **Rules/checklists updated:** none this
+  session (out of allowed-files scope). **New rejected approaches:** none —
+  no new architecture proposed; checked against `rejected-approaches-log.md`
+  in full before drafting DEC-019, confirmed no row addresses job-source
+  vocabulary and nothing is reintroduced. **New technical debt:** none (no
+  code; nothing to compromise). **New open questions:** none added — MBQ-62's
+  own text and status are unchanged; only a proposal-citation note was added
+  to its row, and a compact top-of-register note was added; no other MBQ row
+  touched. **Architecture concerns:** none — no accepted DEC (DEC-003–018),
+  AR (AR-002–015), or Part A–E design content was changed; DEC-019 proposes
+  a narrow vocabulary extension for ChatGPT's own review, not a self-accepted
+  resolution.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (none new) · rejected approaches checked, none
+  added · technical debt logged (none applicable — no code) · repeated-issue
+  escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** ChatGPT's review of DEC-019/AR-016. If
+  accepted: (1) apply DEC-019 §6's pre-drafted register-impact wording to
+  `master-blueprint-open-questions.md`'s MBQ-62 row as its own
+  acceptance-patch session (mirroring the DEC-013–018 pattern); (2) the
+  separate MBQ-64/MBQ-65 currency/webhook residual decision sprint. If
+  rejected or revised: rework DEC-019 per ChatGPT's specific feedback before
+  any register change. Neither path is implementation.
+- **Stop condition:** stopped after opening the draft PR for DEC-019/AR-016
+  against `Shopify-connector` (not merged). DEC-003 through DEC-018 not
+  edited; AR-002 through AR-015 not edited; no MBQ row other than MBQ-62
+  touched, and MBQ-62 not marked resolved; MBQ-64/MBQ-65 unchanged; no code
+  files changed; DEC-019 and AR-016 are both **Proposed for ChatGPT review —
+  NOT accepted**; implementation remains **blocked**; the implementation
+  gate remains **closed**; `main` and plain `dev` untouched. Awaiting
+  ChatGPT review.
+- **DEC-019 clarification patch (2026-07-04, same PR #82):** ChatGPT's
+  REVISE review flagged one ambiguity — DEC-019 proposed `odoo_event` as the
+  seventh job-source value but then said "the exact Selection-field/enum
+  identifier string remains implementation planning," which could be read
+  as leaving `odoo_event` itself unresolved. Clarified in DEC-019 §5/§6 and
+  in AR-016's risk/mitigation wording: `odoo_event` is the **proposed
+  semantic job-source value** (settled if DEC-019 is accepted, not an open
+  question), and only its Odoo **implementation mechanics** (model/field
+  names, Python constants, XML IDs, storage/Selection-field mechanics,
+  trigger-origin field/model implementation, MBQ-16 retry constants) remain
+  implementation planning. **DEC-019 is still Proposed for ChatGPT review —
+  NOT accepted; AR-016 unchanged in status; MBQ-62 not resolved; MBQ-64/65
+  unchanged; no code files changed; implementation remains blocked; the
+  implementation gate remains closed.**
+- **Final odoo_event ambiguity cleanup (2026-07-04, same PR #82):**
+  ChatGPT's follow-up REVISE flagged one leftover sentence in DEC-019 §3
+  ("Out of scope") still describing `odoo_event` as "a conceptual
+  vocabulary label, not a committed code identifier" — read together with
+  the earlier clarification, this could still be misread as leaving
+  `odoo_event` itself undecided. Corrected: `odoo_event` is **no longer
+  described as only a conceptual placeholder** — §3 now states plainly
+  that, if accepted, `odoo_event` is the accepted semantic Part A §D.2
+  job-source value, and only its Odoo implementation mechanics (model/field
+  placement, Python constant naming, XML IDs, storage/Selection-field
+  mechanics, trigger-origin field/model implementation, MBQ-16 retry
+  constants) remain implementation planning. **DEC-019 is still Proposed
+  for ChatGPT review — NOT accepted; MBQ-62 still unresolved; MBQ-64/65
+  unchanged; no MBQ row edited; no code files changed; implementation
+  remains blocked; the implementation gate remains closed.**
 
 ---
 
