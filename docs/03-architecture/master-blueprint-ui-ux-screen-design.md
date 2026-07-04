@@ -5,8 +5,9 @@
 > accepted **Part A/B/C** blueprints into screen inventory, navigation /
 > information architecture, Odoo-native interaction patterns, blueprint-level
 > screen specs, per-screen states, a UX-copy/error-message style guide, and a
-> premium UI/UX acceptance checklist. Resolves **MBQ-53** at screen-design
-> level. Companion index: [`master-blueprint.md`](./master-blueprint.md).
+> premium UI/UX acceptance checklist. **Proposes to partially resolve
+> MBQ-53** at screen-design level (MBQ-53 stays open until DEC-016 is
+> accepted). Companion index: [`master-blueprint.md`](./master-blueprint.md).
 > Companion decision record (this sprint):
 > [`../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md).
 
@@ -179,7 +180,10 @@ acceptable. From any job/error row the operator can **Open source record**
 (the related Odoo record) and **Open mapping** (the binding/mapping record).
 **[Accepted — Part B §C.14 (MBQ-26)].** Error-center order entries for
 `mapping missing` link **directly into the matching flow (S6)** so resolve +
-retry is a two-click path.
+retry is a two-click path. **[Screen blueprint proposal].** Routing is
+**bidirectional**: connector→Odoo via "Open source record", and Odoo→connector
+via **smart buttons** on the participating record (§3), so a record's sync
+state and last error are reachable without leaving the record.
 
 ```
 Dashboard (S3) ──count click──▶ Sync Center (S4, filtered) ──row──▶ Error Center (S5)
@@ -221,16 +225,37 @@ view types/XML are **MBQ-03**; the config/data-model backing them is
 
 | Surface | Proposed Odoo-native pattern | Custom where / why |
 | --- | --- | --- |
-| Setup wizard (S1) | Multi-step wizard (transient/wizard model + `statusbar` step indicator) | Custom **readiness/test-connection panel** with per-check pass/fail rows (no native equivalent) |
+| Setup wizard (S1) | Multi-step wizard: transient **step UI** + `statusbar`, but connection/readiness/source-of-truth choices **persist** on the durable store-configuration record so re-running **resumes**, not restarts | Custom **readiness/test-connection panel** with per-check pass/fail rows (no native equivalent) |
 | Store settings (S2) | Settings-style form with grouped notebook tabs; toggles as booleans with inline help | Custom **connection/health/token status band** (glanceable, read-only, no value read-back) |
 | Dashboard (S3) | Kanban/card layout of clickable count cards | Custom **command-center card grid** fusing health + counts + timeline + reconciliation + quick actions |
 | Sync center (S4) | List view with filters/group-by/sort; `statusbar`/`badge` for state | Custom **state/class-conditional row-action set** (retry only when the retry class permits) |
-| Error center (S5) | Form/detail with an expandable "technical details" notebook page; chatter/audit log | Custom **recovery panel** (reason + suggested fix + owner state + retry-policy explanation) |
+| Error center (S5) | Form/detail with an expandable "technical details" notebook page; **chatter** for discussion/assignment **plus a structured before/after audit trail** (§9 element 9) — distinct artifacts, not conflated | Custom **recovery panel** (reason + suggested fix + owner state + retry-policy explanation) |
 | Matching center (S6) | List of candidates + selection; preview dialog | Custom **"will create N, link M, N ambiguous" preview** dialog before commit |
 | Product diff (S7) | Form/diff dialog; `notebook` for fields/images/price/variants | Custom **destructive-write diff** highlighting delete-on-omit variants/images |
 | Inventory location mapping (S10) | Editable list (one row per Odoo location → one Shopify Location) with domain-filtered Many2one | Custom **internal-only location filter**; **no** free-text/name inference |
 | First-push guard (S11) | Wizard-style confirm dialog with a preview list | Custom **guard confirmation record** capture (preview snapshot + confirmer + source-of-truth + scope) |
 | Fulfillment (S13) | List/detail through the shared job/log surfaces | Reuses S4/S5; **no** parallel fulfillment monitor (RA-013) |
+| Everyday Odoo records (product / sale order / partner / picking) | **Odoo-native smart buttons** on the participating record → its binding, its related sync jobs, and its last error/exception count | Reverse of §2.2 "Open source record": a record's sync state is visible without leaving the record |
+
+**Odoo-native affordances reused (blueprint level) [Screen blueprint proposal]:**
+
+- **Smart buttons / bidirectional routing.** Operators live in the normal Odoo
+  screens, not only the connector menu. Everyday records that participate in
+  sync expose smart buttons to their connector artifacts (binding, related
+  jobs, last error) — the reverse of §2.2's connector→Odoo "Open source
+  record", making routing bidirectional. (No new model/action is committed —
+  MBQ-01/03.)
+- **Activities & chatter for manual-review routing.** A `blocked_manual_review`
+  item is assigned/routed to the Reviewer role using the Odoo-native
+  **activities** convention (with a due date) and its resolution discussion is
+  recorded in **chatter**; the structured before/after evidence stays in the §9
+  audit trail (a distinct artifact). This is the native answer to "how does a
+  blocked item reach the right person" and removes any role-gated dead end
+  (§9, §18 rule 3). Assignment is a convention to reuse, not an invented
+  activity type.
+- **Saved searches, favourites, and group-by** on the shared list surfaces
+  (§8/§9), reusing the fixed §4.1 vocabularies as labels — so triage does not
+  require a bespoke screen.
 
 **Binding interaction rules (all [Accepted]):**
 
@@ -278,11 +303,18 @@ screen.
 - **Job states (10):** `draft`, `queued`, `running`, `succeeded`,
   `failed_final`, `skipped`, `cancelled`, `retry_waiting`, `failed_retryable`,
   `blocked_manual_review`.
-- **Sync-center UI status filter (7, human-facing collapse):** `queued`,
-  `running`, `retry_waiting`, `blocked_manual_review`, `failed`, `done`,
-  `cancelled` — where `failed` = `failed_final` + `failed_retryable` and
-  `done` = `succeeded`. **[Accepted — DEC-012 §4]**; the 10→7 mapping is
-  preserved, not a contradiction.
+- **Sync-center state filter — accepted basis is the full 10-state §D.3
+  vocabulary** (Part A §G.1) **[Accepted — DEC-009; Part A §G.1]**. As a
+  **[Screen blueprint proposal]**, the on-screen status filter *may* present a
+  human-facing grouping (`queued`, `running`, `retry_waiting`,
+  `blocked_manual_review`, `failed`, `done`, `cancelled` — where `failed`
+  groups `failed_final` + `failed_retryable` and `done` = `succeeded`). This
+  grouping is **presentation only** and **must still expose every accepted
+  state, including `draft` and `skipped`** (as their own filter values or an
+  explicit "other/system" bucket) — it never narrows the accepted 10-state
+  filter. The grouping values are internal identifiers; the on-screen label
+  renders as natural-language words (the raw underscored token is never shown
+  to the operator; exact wording is **[Open question — MBQ-22]**).
 - **Error classes (16, fixed registry, in order):** (1) Shopify throttling/
   rate-limit; (2) Shopify temporary/server/network; (3) Shopify permission/
   scope/auth; (4) Shopify userErrors/validation; (5) Odoo validation/
@@ -335,6 +367,14 @@ strings.
   9. Notification default — **off**, never pre-checked "on"; explicit opt-in.
   10. Inventory first-push **scheduling only** (never executes the push here).
   11. Final readiness summary.
+- **Confidence-building [Screen blueprint proposal].** The wizard is where
+  merchant trust is first won, so it visibly applies the confidence loop
+  (setup-ux): each step closes with an explicit **"verified"** confirmation (a
+  proven moment, not a silent advance), and the **final readiness summary
+  (step 11) is a plain-language confidence statement** — it states, in the
+  operator's words, **what the connector will and will not do now** (which
+  domains sync, in which direction, notifications on/off, first-push pending) —
+  not merely a pass/fail grid. Exact wording is MBQ-22.
 - **Key information shown.** Per-step validity; the readiness pass/fail grid;
   what remains before "connected".
 - **Primary actions.** Enter/mask credential; Test Connection; run readiness;
@@ -373,11 +413,13 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
   band; from the wizard's finish.
 - **Key information & regions [Screen blueprint proposal over Accepted content
   — Part A §B/§I; DEC-012 §2]:**
-  1. **Connection status band** — a single glanceable state. *The named set*
-     `Connected / Setup incomplete / Disconnected / Reconnect needed` is
-     **[Accepted — DEC-012 §2 wording]**; the underlying vocabulary is a
-     **[Screen blueprint proposal]** at substrate level (Part A §B.1). Never a
-     raw HTTP code.
+  1. **Connection status band** — a single glanceable state. The named set
+     `Connected / Setup incomplete / Disconnected / Reconnect needed` is a
+     **[Screen blueprint proposal]** (Part A §B.1 marks the underlying
+     connection-state vocabulary a blueprint proposal; DEC-012 §2 presents this
+     wording as its store-settings UX). What is **[Accepted — DEC-004; DEC-012
+     §2]** is that connection status is a single glanceable state conveyed by
+     text — **never** a raw HTTP code and never colour alone.
   2. **API health** — an **honest, named** health indicator **[Accepted —
      DEC-004]** with a plain-language explanation when not normal. The specific
      three-state set (`Normal / Throttled / Degraded`) is a **[Screen blueprint
@@ -397,6 +439,10 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
   edit mappings.
 - **Blocked / guard states.** A destructive setting change (e.g. disconnect)
   shows consequences and requires confirmation (safe-by-default, Principle 7).
+  The disconnect confirmation **states the consequence for in-flight and queued
+  jobs and for history/log/binding retention** — the exact retention/lifecycle
+  posture is routed to **MBQ-08** (disconnect data-retention) and **MBQ-54**
+  (domain uninstall/disable lifecycle) and is **not decided here**.
 - **Cross-screen links.** To S1 (re-run wizard), S10/S12 (inventory), S9 config.
 - **Screen states.** *Empty:* pre-setup → routes to wizard. *Loading:* health/
   token re-validation. *Success:* setting saved (explicit confirmation).
@@ -417,11 +463,22 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
   Principle 5 / north star]**.
 - **Primary users.** Operator (P1) primarily; visible to all roles.
 - **Entry points.** Top-level `Shopify Connector → Dashboard` (the home).
+- **Primary answer — lead region [Screen blueprint proposal].** The dashboard
+  **leads with a single plain-language answer** to *"Is everything OK?"* (a
+  summary state such as "Healthy" or "N items need you"), positioned **above**
+  the count cards, so the north-star question is answered before the operator
+  counts anything. The nine cards elaborate that answer; they do not replace
+  it. This is a layout/primacy proposal only (exact wording is MBQ-22; the
+  admin-vs-functional split is MBQ-45).
 - **Nine proposed cards [Accepted card set — Part A §F.1 / DEC-012 §3; grid
   layout is a Screen blueprint proposal]:**
   1. **Connection health** (store state + API health).
   2. **Last successful sync per domain** (with the mechanism label webhook/
-     scheduled/manual).
+     scheduled/manual), shown as a **state, not just a timestamp**: a sync that
+     is **overdue/stalled** relative to its expected cadence surfaces as an
+     exception ("connected but no recent activity"), not a reassuring bare time.
+     The overdue threshold ties to reconciliation cadence and is **not decided
+     here** (**MBQ-17**).
   3. **Failed jobs by severity** — split into *needs manual review* / *system
      will auto-retry* / *permanently failed* (never a single undifferentiated
      "errors: N").
@@ -442,8 +499,10 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
 - **Blocked / guard states.** No vanity-only metrics (every number maps to a
   health signal or a clickable next action).
 - **Screen states.** *Empty/first-run:* a guided empty state ("connect a store
-  to begin") **[Inference]**. *Loading:* counts refreshing. *Success:* "all
-  green" health with last-sync freshness. *Error:* failed-by-severity card
+  to begin") **[Inference]**. *Loading:* counts refreshing. *Success:* an
+  explicitly **named** healthy state (e.g. "All systems normal") — conveyed by
+  text, never colour alone — with last-sync freshness; a zero-exception card
+  reads "0 — all clear", not a bare number. *Error:* failed-by-severity card
   routes to the error center. *Manual review:* the manual-review card routes to
   the S5 queue filtered by sub-reason.
 - **Accepted-decision deps.** DEC-005, DEC-009, DEC-012 §3, Part A §F.
@@ -460,8 +519,21 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
 - **Entry points.** Menu; every dashboard count.
 - **Filters (4) [Accepted — Part A §G.1 / DEC-012 §4]:** domain (product/order/
   inventory/fulfillment); **trigger/source** (the 6 job sources); **state** (the
-  10 job states, shown via the 7-value UI collapse); **error class** (the 16,
-  as human labels).
+  full 10-state §D.3 vocabulary — the 7-value human grouping in §4.1 is a
+  screen proposal that still exposes every state, incl. `draft`/`skipped`);
+  **error class** (the 16, as human labels).
+- **Triage affordances [Screen blueprint proposal, Odoo-native].** The sync
+  center reuses Odoo-native **saved searches / favourites** and **group-by**
+  (by domain / source / state / error class, reusing the §4.1 vocabularies as
+  labels) and opens on a **sensible default filter** — a "needs attention" view
+  (`failed_retryable` + `retry_waiting` + `blocked_manual_review`) — so an
+  operator is never dropped into an unfiltered, all-domain firehose. Exact
+  default wording is **MBQ-22**.
+- **Bulk recovery [Screen blueprint proposal].** List-view **multi-select bulk
+  actions** apply the *same* class-conditional retry logic (§4.1) to the
+  selection: only the safe subset is retried, ineligible rows are reported (not
+  forced) — so a systemic fix can be cleared at scale without weakening the
+  per-job retry guard (RA-014/RA-015 preserved).
 - **Row actions (5) [Accepted — Part A §G.3 / DEC-012 §4]:** *Retry when safe*;
   *Verify current state* (a safe verification read against Shopify, shown
   **before** any retry for ambiguous-outcome jobs); *Open source record*; *Open
@@ -471,7 +543,12 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
 - **Key information shown.** Per job: domain, source, state, error class (if
   any), operation reference (operation type + target + attempt), timestamps.
 - **Retry as 4 conditional cases (see §4.1)** — the retry affordance is
-  computed from the job's retry class, never a blanket button.
+  computed from the job's retry class, never a blanket button. A **terminal**
+  state (`succeeded`, `failed_final`, `skipped`, `cancelled` — Part A §D.3)
+  carries **no retry control**; recovery from `failed_final` is an explicit
+  **re-trigger** (a new job), not a retry, so an operator is never left unsure
+  what a terminal row's button does. **[Accepted — Part A §D.3 terminal states;
+  Screen blueprint proposal]** for the affordance.
 - **Screen states.** *Empty:* "no jobs yet" guiding text. *Loading:* live job
   progress (`queued`→`running`). *Success:* `done` rows with a completion
   signal. *Error:* `failed`/`retry_waiting` rows link to S5. *Manual review:*
@@ -507,9 +584,23 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
      who confirmed, with **before/after** values for destructive ops.
 - **Manual-review queue.** The `blocked_manual_review` items form a Reviewer
   work queue keyed off the 6 sub-reasons; resolution is a **Reviewer-role**
-  action (`customer_match_review` and the domain equivalents), auditable.
+  action (`customer_match_review` and the domain equivalents — proposed names
+  only), auditable.
+- **No dead end under role gates [Screen blueprint proposal].** When the viewing
+  role cannot resolve an item (e.g. an Operator on a confirmation-required
+  item — §16), the surface still shows a next action: it names **whose** action
+  it awaits and offers to **route/assign** it to that role, using the
+  Odoo-native activities/assignment convention (§3) — never a silent dead end
+  (§18 rule 3). This holds under either MBQ-45 resolution.
+- **Root-cause grouping & group-by [Screen blueprint proposal].** Entries
+  sharing one root cause are **grouped for visibility** so the operator sees the
+  cause once (e.g. "N orders blocked by 1 missing product mapping") rather than
+  N identical rows; operators may also **group by** sub-reason or owner/action
+  state. Resolution still follows the per-item retry/confirmation rules (§4.1);
+  grouping is presentation, not bulk auto-resolution, and one bad record never
+  blocks the batch.
 - **Order-import extensions (S9) — required, see §10.**
-- **Screen states.** *Empty:* "no errors — nice" guiding state. *Loading:*
+- **Screen states.** *Empty:* an affirmative "no open errors" state. *Loading:*
   re-checking an item's live state (Verify). *Success:* an item moves to
   *resolved* with its audit trail. *Error:* the entry itself (this is the error
   surface). *Manual review:* the sub-reason-keyed queue.
@@ -712,7 +803,8 @@ Shopify order edit.
 - **[Open question — MBQ-35 / MBQ-32].** Whether `on_hand` is exposed as a Phase-1
   UI choice **at all** is undecided; **if** shown it must carry the six-state-sum
   warning (`available + committed + reserved + damaged + safety_stock +
-  quality_control`) and explicit justification — the screen must **not** present
+  quality_control` — the composition cited as an official Odoo fact in **Part C
+  §A.4**) and explicit justification — the screen must **not** present
   it as a settled, equally-weighted option. The underlying Odoo quantity source
   (`product.product.free_qty` vs `stock.quant.available_quantity` — verified
   **non-equivalent**) is **not** decided (MBQ-32); the settings screen exposes a
@@ -797,8 +889,14 @@ location-mismatch review that routes through the error center.
 | **Connector Reviewer / Manual Review Owner** | Resolve `blocked_manual_review` items (the 6 sub-reasons) | Change settings; general retry/trigger (Reviewer is approval-focused — MBQ-47 accepted) |
 | **Read-only Auditor** (P3) | View everything | Trigger, retry, confirm, or change anything |
 
-- **Hierarchy [Accepted — DEC-013].** Admin implies Operator + Reviewer;
-  Operator and Reviewer are siblings; Auditor is implied by all (read-only).
+- **Reading this table [Screen blueprint proposal].** Capabilities are stated in
+  plain language for a non-technical reader; internal state names (e.g.
+  `blocked_manual_review`) appear only as parentheticals.
+- **Hierarchy [Accepted — DEC-013], in plain terms.** Every role also has the
+  Auditor's read-only visibility; the **Administrator** additionally has the
+  **Operator's** and **Reviewer's** actions; **Operator** and **Reviewer** are
+  peers with different action sets (an Operator runs and retries safe work; a
+  Reviewer confirms/resolves manual-review items).
 - **[Recommendation — open, MBQ-45].** Whether the four map **1:1** to Odoo
   groups, and whether the operator UI is one role-gated surface or an admin/
   functional split, is **not decided**. Persona **P4** (partner/integrator) is
@@ -836,6 +934,21 @@ DEC-012 §5 and setup-ux/vision all explicitly defer exact wording.
    error-center.
 7. **Confirmation copy states consequences** for destructive/irreversible
    actions (delete-on-omit variants, disconnect, publish-to-live).
+8. **Status is never colour (or icon) alone.** Every status, badge, chip, or
+   pill carries a **text label plus a severity/owner word** (e.g. "Failed",
+   "Needs review", "Healthy") that stays unambiguous with colour removed;
+   colour/icon is reinforcement only. Zero/healthy states are affirmatively
+   labelled ("0 — all clear"), never a bare number or a colour-only cue.
+9. **Primary label is plain, never a raw token or API term.** The human display
+   label for the 10 states, 16 error classes, and 6 sub-reasons must not surface
+   an internal token (`retry_waiting`) or a developer/API term ("userErrors",
+   "schema mismatch") as the **primary** operator-facing word; the technical
+   term may appear only in the expandable technical detail. (Exact labels are
+   MBQ-22.)
+10. **Voice is calm, plain, and reassuring** — professional, never jokey or
+    alarmist: success states reassure, error states stay factual and
+    non-blaming. (All examples in this guide are illustrative; exact copy is
+    MBQ-22.)
 
 ---
 
@@ -859,6 +972,13 @@ DEC-012 §5 and setup-ux/vision all explicitly defer exact wording.
    record) → log** is available on sync surfaces.
 7. **Role-gated affordances, shared visibility** — all roles see the surfaces;
    actions are gated.
+8. **Never colour alone; plain labels** — status is conveyed by text + a
+   severity/owner word, never colour or icon alone (§17 rule 8); primary labels
+   are plain language, never raw tokens or API terms (§17 rule 9).
+9. **Keyboard-friendly action order** — the primary **safe** action comes first
+   in tab/action order; **destructive/irreversible** actions come last and are
+   **never** the default keyboard focus; every actionable surface is operable by
+   keyboard with a visible focus state.
 
 ---
 
@@ -916,13 +1036,29 @@ checks — recommendations, not §10 rejections):**
       less errors; no irreversible "Force Done" without strong guards; no heavy
       work inside the webhook request.
 
+**H. Accessible & clear (premium is not premium if it is not accessible;
+maps to setup-ux Principles 8/10 and §17 rules 8–10):**
+- [ ] **No status is conveyed by colour or icon alone** — every badge/chip/pill
+      carries a text label + severity word, unambiguous with colour removed.
+- [ ] **Primary labels are plain language**, never raw state tokens or API/dev
+      terms; the technical term appears only behind the "technical detail"
+      expand.
+- [ ] **Every actionable surface is keyboard-operable** with a visible focus
+      state; the primary safe action precedes destructive actions in order, and
+      a destructive control is never the default focus.
+- [ ] **Every destructive/irreversible action** has an explicit, labelled
+      confirmation that states its consequences.
+- [ ] **Roles and their capabilities are legible to a non-technical reader**
+      (plain-language capability descriptions; internal state names only as
+      parentheticals).
+
 ---
 
 ## §20. Open questions this part carries or surfaces
 
-This part **resolves MBQ-53 at screen-design level (proposed)** and **routes**,
-without deciding, the following screen-relevant open rows to their existing
-owners. **It adds no new MBQ row** — the screen design consumes existing
+This part **proposes to partially resolve MBQ-53 at screen-design level**
+(MBQ-53 stays open until DEC-016 is accepted) and **routes**, without deciding,
+the following screen-relevant open rows to their existing owners. **It adds no new MBQ row** — the screen design consumes existing
 questions rather than surfacing genuinely new ones.
 
 | Row | Why it constrains screens | Owner / status |

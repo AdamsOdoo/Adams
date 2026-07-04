@@ -2,7 +2,7 @@
 
 > Top-level index for the **Master Blueprint** of the premium **Odoo 19 ↔
 > Shopify Connector**. The Master Blueprint converts the accepted decision
-> records (DEC-003 through DEC-014) into detailed, implementation-ready
+> records (DEC-003 through DEC-015) into detailed, implementation-ready
 > **blueprints** — still documentation only. Started in **Master Blueprint
 > Sprint A**; **Part A accepted via DEC-013**. **Part B accepted via
 > DEC-014** —
@@ -38,7 +38,8 @@ below). **Part D — UI/UX Screen Design Blueprint — is now Proposed via
 DEC-016** (2026-07-03, Master Blueprint Sprint D; companion decision record
 [`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md),
 Status: **Proposed for ChatGPT review — not accepted**); it proposes to
-resolve MBQ-53 at screen-design level and does not authorize implementation.
+**partially resolve** MBQ-53 at screen-design level and does not authorize
+implementation.
 **Part E remains Not started.**
 
 ## Relation to accepted decisions
@@ -59,7 +60,7 @@ contradict, weaken, or re-litigate — the accepted records:
 | [DEC-011](../04-decisions/DEC-011-fulfillment-architecture-strategy.md) | FulfillmentOrder-based fulfillment, notification posture, operation-level idempotency | Fulfillment domain blueprint (Sprint C) + core operation-key concept |
 | [DEC-012](../04-decisions/DEC-012-ux-operator-flow-strategy.md) | Ten operator flows; conceptual four-role permissions model | Wizard/dashboard/sync-center/error-center/access blueprints |
 
-AR-002 through AR-009 are all **Accepted**
+AR-002 through AR-012 are all **Accepted**
 ([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md));
 RA-001 through RA-023 are **binding rejected approaches**
 ([`../05-qa/rejected-approaches-log.md`](../05-qa/rejected-approaches-log.md))
@@ -94,7 +95,7 @@ tickets, or retry/cadence constants.
 | **Open-questions register** | Sprint A (rolling) | [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md): every unresolved item, grouped, with owner and blocking status | **Accepted by ChatGPT via DEC-013** (2026-07-03); updated by every later part |
 | **Part B — Product, Customer, Sale/Order domain blueprints** | Sprint B | [`master-blueprint-product-customer-sale.md`](./master-blueprint-product-customer-sale.md): product import/export/update blueprint (variants, images, price, preview/diff, draft-first); customer import/matching blueprint; order import + financial-evidence blueprint (incl. order-import operator touchpoints, MBQ-26) | **Accepted by ChatGPT via DEC-014** (2026-07-03) |
 | **Part C — Inventory and Fulfillment domain blueprints** | Sprint C | [`master-blueprint-inventory-fulfillment.md`](./master-blueprint-inventory-fulfillment.md): inventory blueprint (location mapping, first-push guard granularity, apply mode, quantity source); fulfillment blueprint (FulfillmentOrder matching, tracking, notification granularity, location confirmation) | **Accepted by ChatGPT via DEC-015** (2026-07-03); MBQ-33/34/41 and MBQ-60–63 remain open |
-| **Part D — UI/UX Screen Design Blueprint** | Sprint D | [`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md): screen inventory, navigation/IA, Odoo-native interaction patterns, blueprint-level screen specs, per-screen empty/loading/success/error/manual-review states, UX-copy/error-message style guide, premium acceptance checklist (see *UI/UX Screen Design Blueprint* below); proposes to resolve MBQ-53 | **Proposed via DEC-016** (2026-07-03, Sprint D); awaiting ChatGPT review |
+| **Part D — UI/UX Screen Design Blueprint** | Sprint D | [`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md): screen inventory, navigation/IA, Odoo-native interaction patterns, blueprint-level screen specs, per-screen empty/loading/success/error/manual-review states, UX-copy/error-message style guide, premium acceptance checklist (see *UI/UX Screen Design Blueprint* below); proposes to partially resolve MBQ-53 | **Proposed via DEC-016** (2026-07-03, Sprint D); awaiting ChatGPT review |
 | **Part E — Implementation-planning bridge** | Sprint E | Consolidated verification pass; resolution/acceptance of implementation-blocking open questions; sequencing input for `docs/07-implementation-plan` | **Not started** |
 
 *The Part B/C/D/E split is a **proposed structure**, accepted as the

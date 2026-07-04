@@ -48,8 +48,8 @@
 > ChatGPT.
 
 - **Branch / PR:** `claude/master-blueprint-sprint-d-screen-3jmyd0`
-  → draft PR into `Shopify-connector`, opened immediately after this handoff
-  commit, **not merged**.
+  → **draft PR #77** into `Shopify-connector`, **not merged**, **not** marked
+  ready for review (proposal commit + one pre-review strengthening commit).
 - **Files changed:**
   `docs/03-architecture/master-blueprint-ui-ux-screen-design.md` (new),
   `docs/04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md` (new),
@@ -89,6 +89,29 @@
   completeness critic; the critic caught and prevented three Accepted-vs-
   Recommendation attribution slips before drafting (order-import screen status,
   inventory apply-mode, `on_hand` exposure).
+- **Pre-review strengthening (2026-07-04, 2nd commit on the same draft PR #77):**
+  ran a **capability audit** (discovered the enabled `ui-ux-pro-max` / `design` /
+  `product-management` plugins — none docs-critique-applicable under the no-code
+  gate, being artifact/code-production oriented; used compensating **six-lens
+  expert-review agents** instead: premium design, Odoo-native UX, operator,
+  error-recovery, accessibility, adversarial governance) and applied
+  documentation-only improvements. Corrected **two Accepted-vs-proposal
+  attribution slips** (the sync-center 7-value status grouping §4.1 and the
+  connection-status band §6 — now labelled Screen blueprint proposals; the
+  grouping also fixed to expose `draft`/`skipped`, no longer narrowing the
+  accepted 10-state filter); tightened all MBQ-53 wording to **"proposes to
+  partially resolve"**; added **accessibility** rules (never-colour-alone,
+  plain-label-not-token, keyboard action order, new §19-H checklist);
+  **Odoo-native** affordances (smart buttons + bidirectional routing §3/§2.2;
+  activities-based manual-review routing removing the role-gated dead end);
+  **recovery/sync-center** strengthening (default "needs attention" filter,
+  class-conditional bulk recovery, root-cause grouping, terminal-state/
+  `failed_final` affordance); dashboard lead-answer, wizard confidence
+  statement, overdue-freshness signal, disconnect-consequence disclosure; and
+  **stale-range fixes** in `master-blueprint.md` (accepted range now DEC-003–
+  DEC-015 and AR-002–AR-012; AR-013 remains Proposed). **No architecture
+  substance changed; no open MBQ decided; no new MBQ added; DEC-016 / AR-013 /
+  Part D remain Proposed; Part E not started; implementation blocked.**
 - **Items deferred:** MBQ-53's full closure (awaits DEC-016 acceptance +
   sibling rows MBQ-03/22/44/45/06); the open recommendations MBQ-33/34/41/35/32
   (screens accommodate either resolution, none decided); MBQ-04/05/07/08/13/54/
@@ -120,7 +143,8 @@
   open recommendations MBQ-33/34/41/45/06/35/32; 4) **implementation only after a
   separate ChatGPT gate**, and for any operator-facing screen only after Part D
   is accepted.
-- **Stop condition:** stopping after one commit and opening a **draft** PR into
+- **Stop condition:** stopping after the proposal commit plus one pre-review
+  strengthening commit on the same **draft PR #77** into
   `Shopify-connector` (not merged, not marked ready for review). DEC-003 through
   DEC-015 not edited; `docs/04-decisions/README.md` not edited; no code files
   changed; Part D is **Proposed, not accepted**; Part E not started;

@@ -4,7 +4,8 @@
 > Connector**, prepared in **Master Blueprint Sprint D** after DEC-015
 > acceptance (2026-07-03) closed Master Blueprint Part C. Proposes
 > acceptance of the **UI/UX Screen Design Blueprint** (Part D), which
-> resolves **MBQ-53** at screen-design level. Companion documents:
+> **proposes to partially resolve MBQ-53** at screen-design level. Companion
+> documents:
 > [`../03-architecture/master-blueprint.md`](../03-architecture/master-blueprint.md),
 > [`../03-architecture/master-blueprint-ui-ux-screen-design.md`](../03-architecture/master-blueprint-ui-ux-screen-design.md),
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
@@ -31,7 +32,17 @@ base before editing.
 > architecture, Odoo-native interaction patterns, blueprint-level screen
 > specs, per-screen empty/loading/success/error/manual-review states, a
 > UX-copy/error-message style guide, and a premium UI/UX acceptance
-> checklist. **Until ChatGPT accepts this record, MBQ-53 remains open** and
+> checklist. **Pre-review strengthening (2026-07-04):** before this record
+> was routed for acceptance review, a capability audit plus a six-lens
+> expert-review pass (premium product design, Odoo-native UX, operator,
+> error-recovery, accessibility, and adversarial architecture governance)
+> refined the blueprint — documentation only; it corrected two
+> Accepted-vs-proposal attribution slips (the sync-center status grouping and
+> the connection-status band, now labelled Screen blueprint proposals),
+> tightened the MBQ-53 wording to "proposes to partially resolve," and added
+> accessibility/Odoo-native/recovery guidance. No architecture substance
+> changed; no open MBQ was decided. **Until ChatGPT accepts this record,
+> MBQ-53 remains open** and
 > operator-facing screen implementation remains blocked. **DEC-003 through
 > DEC-015 are unchanged. Part E (implementation-planning bridge) remains
 > not started. Implementation remains blocked.**
