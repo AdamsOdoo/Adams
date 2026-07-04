@@ -59,11 +59,18 @@
   **the implementation gate remains closed, implementation remains
   blocked, and no implementation task has been created** by this
   acceptance.
-- **DEC-019 proposed note (2026-07-04).** A dedicated MBQ-62 follow-up —
-  [`DEC-019`](../04-decisions/DEC-019-mbq-62-odoo-event-job-source.md) —
-  has been prepared for ChatGPT review. **Not accepted.** **The
-  implementation gate remains closed. Implementation remains blocked.**
-  **§4's decision plan table below is unchanged** by this note.
+- **DEC-019 Acceptance Patch note (2026-07-04).** The dedicated MBQ-62
+  follow-up — [`DEC-019`](../04-decisions/DEC-019-mbq-62-odoo-event-job-source.md)
+  — **is now accepted by ChatGPT.** **MBQ-62 is resolved at
+  decision/semantic-classification level**: Part A §D.2's job-source
+  vocabulary is extended with a seventh accepted semantic value,
+  `odoo_event`, plus a required (accepted, conceptual) trigger-origin
+  sub-classification. **Exact Odoo implementation mechanics** (model/field
+  names, Python constants, XML IDs, storage/Selection-field mechanics,
+  trigger-origin field/model implementation, MBQ-16 retry constants)
+  **remain implementation planning.** **The implementation gate remains
+  closed. Implementation remains blocked. No implementation task has been
+  created.** **§4's decision plan table below is unchanged** by this note.
 
 ## 1. Purpose of Part E
 

@@ -17,13 +17,17 @@ question** — each MBQ row remains open unless the row itself says
 level**; notably **MBQ-03, MBQ-04, MBQ-22, MBQ-24,
 MBQ-27, MBQ-28, MBQ-32, MBQ-35, MBQ-44,
 MBQ-53 (partially resolved at screen-design level only; sibling rows
-above still open), MBQ-55, MBQ-56, MBQ-57, MBQ-58, and
-MBQ-61 through MBQ-63 remain open**. Per the **DEC-018 acceptance patch
+above still open), MBQ-55, MBQ-56, MBQ-57, MBQ-58, MBQ-61, and
+MBQ-63 remain open**. Per the **DEC-018 acceptance patch
 (2026-07-04)**, **MBQ-06, MBQ-08, MBQ-17 (posture), MBQ-33, MBQ-34,
 MBQ-41, MBQ-45, MBQ-52, MBQ-54, and MBQ-60 are now Resolved/Partially
 resolved** (see each row; residual implementation-planning detail may
-remain) — **MBQ-62 remains open**, explicitly split to its own follow-up
-decision record rather than decided by DEC-018. Registering (or
+remain). Per the **DEC-019 acceptance patch (2026-07-04)**, **MBQ-62 is now
+Resolved at decision/semantic-classification level** — Part A §D.2's
+job-source vocabulary is extended with a seventh accepted semantic value,
+`odoo_event`, plus a required trigger-origin sub-classification; exact
+Odoo implementation mechanics remain implementation planning (see MBQ-62's
+own row). Registering (or
 accepting the register containing) a question does **not** decide it and
 does **not** authorize implementation. Every row follows `CLAUDE.md`
 §7/§8: unverified items are **open questions**, never asserted.
@@ -212,14 +216,36 @@ qualified "at screen-design blueprint level," not a full resolution).
 > neither is implementation.
 
 > **DEC-019 proposed (2026-07-04) — MBQ-62 decision proposal prepared for
-> ChatGPT review, not accepted.**
+> ChatGPT review, not accepted (history).**
 > [`DEC-019`](../04-decisions/DEC-019-mbq-62-odoo-event-job-source.md)
-> proposes a dedicated answer to MBQ-62 (extending Part A §D.2's job-source
+> proposed a dedicated answer to MBQ-62 (extending Part A §D.2's job-source
 > vocabulary with a seventh value, `odoo_event`, plus a required
-> trigger-origin sub-classification) — see MBQ-62's own row below for the
-> proposal citation. **MBQ-62 is not resolved until ChatGPT accepts
-> DEC-019.** No other MBQ row is changed by this note. Implementation
-> remains blocked; the implementation gate remains closed.
+> trigger-origin sub-classification). **Superseded by the acceptance note
+> below.**
+
+> **DEC-019 Acceptance Patch (2026-07-04) — MBQ-62 accepted at
+> decision/semantic-classification level.** ChatGPT reviewed
+> [`DEC-019`](../04-decisions/DEC-019-mbq-62-odoo-event-job-source.md) and
+> **formally accepted it on 2026-07-04.** **Part A §D.2's job-source
+> vocabulary is now extended with a seventh accepted semantic value,
+> `odoo_event`** — a job enqueued because an Odoo-side business event
+> occurred (not a webhook, not operator-initiated, not a timer, not a
+> reconciliation pass, not a preview run). **Every `odoo_event` job must
+> conceptually carry a trigger-origin sub-classification**; for MBQ-62 the
+> accepted trigger-origin concepts are **"inventory stock-change trigger"**
+> and **"fulfillment picking-validation trigger."** MBQ-62's own row below
+> now carries this acceptance wording. **Exact Odoo implementation
+> mechanics — model names, field names, Python constants, XML IDs,
+> storage/Selection-field mechanics, trigger-origin field/model
+> implementation, and MBQ-16 retry-count/backoff constants — remain
+> implementation planning**, not decided by this acceptance. **No other MBQ
+> row is changed by this acceptance; MBQ-64 and MBQ-65 remain untouched.**
+> Per `CLAUDE.md` §10, this acceptance **does not authorize
+> implementation**; DEC-003 through DEC-018 remain unchanged; no code,
+> Odoo module, or implementation plan was produced; **implementation
+> remains blocked; the implementation gate remains closed.** Recommended
+> next: the separate MBQ-64/MBQ-65 currency/webhook residual decision
+> sprint — not implementation.
 
 ## How to read
 
@@ -320,7 +346,7 @@ qualified "at screen-design blueprint level," not a full resolution).
 | MBQ-43 | **Core Location reference cache policy** — stale-cache handling, refresh cadence, precedence vs live reads. **Partially resolved by DEC-015 acceptance (2026-07-03):** precedence rule accepted — a live read always wins over the cache for a specific operation, cache refreshed on setup-readiness checks and the shared reconciliation cadence (`master-blueprint-inventory-fulfillment.md` §B.8). Exact refresh cadence/mechanism remains open for implementation planning. | DEC-010/DEC-011; Part A §B.4 | A stale cache must never override live Shopify state for a specific operation | Implementation planning — rule accepted by DEC-015; exact refresh cadence/mechanism remains open | Yes (fulfillment/inventory location checks) |
 | MBQ-60 | Whether `shopify_connector_fulfillment` requires the Odoo **`stock_delivery`** (or `delivery`) module as a dependency for the `carrier_tracking_ref`/`carrier_tracking_url`/`carrier_id` fields identified this sprint (§B.5), and what tracking write-back does if a merchant's database does not have that module installed. **Accepted by ChatGPT via DEC-018 (2026-07-04):** `shopify_connector_fulfillment` requires Odoo's `stock_delivery` (or the lighter `delivery`) module for tracking write-back; if a merchant's database lacks that module, tracking write-back is disabled and reported as a named, specific readiness/health blocker (MBQ-06), never a silent no-op or a degraded partial write. | Sprint C (`master-blueprint-inventory-fulfillment.md` §B.5), newly surfaced by this sprint's official-doc verification — not previously discussed by DEC-008's module family or DEC-011; DEC-018 | These fields live in an installable Odoo module distinct from core `stock`; if not installed, tracking write-back has no field to write to, and DEC-008's module family did not previously name any standard Odoo module dependency beyond core/base | Resolved — ChatGPT via DEC-018; manifest `depends` mechanics and exact readiness-check wording remain Implementation planning | Yes for exact manifest/readiness wording only; the dependency posture itself no longer blocks |
 | MBQ-61 | Whether/how the connector must react to Shopify-side **FulfillmentOrder lifecycle events beyond simple creation** — holds (`FULFILLMENT_ORDERS_PLACED_ON_HOLD`/`HOLD_RELEASED`), cancellation-request lifecycle, merges, splits, moves, reschedules — newly confirmed as real Shopify webhook topics this sprint (§B.11) but not discussed by DEC-011 at all | Sprint C (`master-blueprint-inventory-fulfillment.md` §B.11), newly surfaced by this sprint's official-doc verification of the full `WebhookSubscriptionTopic` enum | A FulfillmentOrder placed on hold by Shopify could silently reject or delay an Odoo-triggered `fulfillmentCreate` call if the connector has no visibility into hold state before attempting fulfillment; DEC-011 did not consider these lifecycle events at all | ChatGPT (whether/how to react) + Implementation planning | No for MVP correctness-core fulfillment creation (the existing ambiguous-outcome/manual-review handling already catches a rejected call); Yes if a dedicated hold-aware UX is later required |
-| MBQ-62 | **New, Fable finding C2.** Exact **Part A §D.2 job-source classification for Odoo-side event-triggered jobs** — specifically (a) an inventory push enqueued by a relevant Odoo stock change (§A.7), and (b) a fulfillment creation triggered by a validated `stock.picking` (§B.3/§B.12). DEC-010 accepted the Odoo-side event trigger as a **sync-trigger layer**, not as an addition to Part A §D.2's fixed job-source enum (`webhook`, `manual_sync`, `scheduled_sync`, `reconciliation`, `setup_readiness_check`, `export_preview_dry_run`); this sprint's own first draft silently listed `event-driven enqueue` as if it were one of those six values, which Fable flagged as unauthorized vocabulary extension. **DEC-018 note (2026-07-04):** DEC-018 reviewed this row against all six fixed job-source values, found none a defensible fit, and recommended splitting it into its own dedicated follow-up decision record rather than forcing a same-batch answer — ChatGPT accepted that recommendation. **This row remains open and undecided**; no mapping or vocabulary extension is adopted by DEC-018. **DEC-019 note (2026-07-04):** [`DEC-019`](../04-decisions/DEC-019-mbq-62-odoo-event-job-source.md) proposes a dedicated answer to this row (a seventh job-source value, `odoo_event`, plus a required trigger-origin sub-classification) — **Proposed for ChatGPT review, NOT accepted. This row remains open and undecided** until DEC-019 is accepted; no mapping or vocabulary extension is adopted by this note. | Sprint C (`master-blueprint-inventory-fulfillment.md` §A.7/§A.13/§B.12/§C item 7), Fable review of PR #74 — not previously decided by DEC-010, DEC-011, or Part A (DEC-013); reviewed, not decided, by DEC-018 | Every job must record a Part A job source for dashboard/sync-center display and retry-policy lookup (Part A §D.2/§F/§G); an undecided or silently-invented source value would leave these two genuinely common triggers (an Odoo stock change; a picking validation) without a defined, accepted classification | ChatGPT (whether to map to an existing source with a documented rule, or accept a DEC-level vocabulary extension) + Implementation planning — routed to its own follow-up DEC per DEC-018 | Yes for Odoo-event-triggered inventory push and fulfillment creation specifically; No for manual/scheduled/reconciliation-triggered inventory pushes or fulfillment reconciliation checks, which already have an accepted Part A source |
+| MBQ-62 | **New, Fable finding C2.** Exact **Part A §D.2 job-source classification for Odoo-side event-triggered jobs** — specifically (a) an inventory push enqueued by a relevant Odoo stock change (§A.7), and (b) a fulfillment creation triggered by a validated `stock.picking` (§B.3/§B.12). DEC-010 accepted the Odoo-side event trigger as a **sync-trigger layer**, not as an addition to Part A §D.2's fixed job-source enum (`webhook`, `manual_sync`, `scheduled_sync`, `reconciliation`, `setup_readiness_check`, `export_preview_dry_run`); this sprint's own first draft silently listed `event-driven enqueue` as if it were one of those six values, which Fable flagged as unauthorized vocabulary extension. **DEC-018 note (2026-07-04):** DEC-018 reviewed this row against all six fixed job-source values, found none a defensible fit, and recommended splitting it into its own dedicated follow-up decision record rather than forcing a same-batch answer — ChatGPT accepted that recommendation. **This row remains open and undecided**; no mapping or vocabulary extension is adopted by DEC-018. **Accepted by ChatGPT via DEC-019 (2026-07-04), at decision/semantic-classification level:** [`DEC-019`](../04-decisions/DEC-019-mbq-62-odoo-event-job-source.md) extends Part A §D.2's job-source vocabulary with a seventh accepted semantic value, `odoo_event` — a job enqueued because an Odoo-side business event occurred (not a webhook, not manual sync, not scheduled sync, not reconciliation, not setup readiness, not export preview dry run). Every `odoo_event` job must conceptually carry a trigger-origin sub-classification; the accepted trigger-origin concepts for this row are **"inventory stock-change trigger"** and **"fulfillment picking-validation trigger."** An inventory push enqueued by a relevant Odoo stock change is classified as `job_source = odoo_event`, trigger-origin = "inventory stock-change trigger"; a fulfillment creation triggered by a validated `stock.picking` is classified as `job_source = odoo_event`, trigger-origin = "fulfillment picking-validation trigger." **Exact Odoo implementation mechanics — model names, field names, Python constant names, XML IDs, storage/Selection-field mechanics, trigger-origin field/model implementation, and MBQ-16 retry-count/backoff constants — remain implementation planning**, not decided by this acceptance. | Sprint C (`master-blueprint-inventory-fulfillment.md` §A.7/§A.13/§B.12/§C item 7), Fable review of PR #74 — not previously decided by DEC-010, DEC-011, or Part A (DEC-013); reviewed, not decided, by DEC-018; resolved at decision/semantic-classification level by DEC-019 | Every job must record a Part A job source for dashboard/sync-center display and retry-policy lookup (Part A §D.2/§F/§G); an undecided or silently-invented source value would leave these two genuinely common triggers (an Odoo stock change; a picking validation) without a defined, accepted classification | Resolved (decision/semantic-classification level) — ChatGPT via DEC-019; exact model/field names, Python constants, XML IDs, storage/Selection-field mechanics, trigger-origin field/model implementation, and MBQ-16 retry-count/backoff constants remain Implementation planning | Yes for exact implementation mechanics (model/field names, Python constants, storage/Selection-field mechanics, trigger-origin field/model implementation, MBQ-16 retry constants) only; No for manual/scheduled/reconciliation-triggered inventory pushes or fulfillment reconciliation checks (already had an accepted Part A source); the semantic classification itself (`job_source = odoo_event` + trigger-origin) no longer blocks |
 | MBQ-63 | **New, Fable minor finding 4.** Exact **Shopify inventory webhook payload shape and subscription mechanics** for `INVENTORY_LEVELS_UPDATE`/`INVENTORY_LEVELS_CONNECT`/`INVENTORY_LEVELS_DISCONNECT` (payload fields, required subscription scopes beyond `read_inventory`, delivery/registration mechanics), and **whether webhook-driven inventory import is implemented in Phase 1 at all** or left purely as a drift-detection candidate (§A.7/§A.9 already treat it as "candidate... never the sole mechanism," but do not decide implementation-vs-candidate-only status) | Sprint C (`master-blueprint-inventory-fulfillment.md` §A.7/§A.9), Fable review of PR #74 — MBQ-37 verified only the topic **string**, not the payload/subscription/implementation-scope residual | Building a webhook-driven import path on an unverified payload shape or unconfirmed subscription mechanics risks silent breakage; whether Phase 1 implements it at all changes what implementation planning must design for this trigger | Implementation planning, with official-doc verification | Yes, only for webhook-driven inventory import specifically; No for the layered scheduled/manual/event-driven/reconciliation inventory-sync mechanisms, which do not depend on this row |
 
 ## 7. Permissions / security
