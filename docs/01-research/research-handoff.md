@@ -127,6 +127,21 @@
   NOT accepted; AR-016 unchanged in status; MBQ-62 not resolved; MBQ-64/65
   unchanged; no code files changed; implementation remains blocked; the
   implementation gate remains closed.**
+- **Final odoo_event ambiguity cleanup (2026-07-04, same PR #82):**
+  ChatGPT's follow-up REVISE flagged one leftover sentence in DEC-019 §3
+  ("Out of scope") still describing `odoo_event` as "a conceptual
+  vocabulary label, not a committed code identifier" — read together with
+  the earlier clarification, this could still be misread as leaving
+  `odoo_event` itself undecided. Corrected: `odoo_event` is **no longer
+  described as only a conceptual placeholder** — §3 now states plainly
+  that, if accepted, `odoo_event` is the accepted semantic Part A §D.2
+  job-source value, and only its Odoo implementation mechanics (model/field
+  placement, Python constant naming, XML IDs, storage/Selection-field
+  mechanics, trigger-origin field/model implementation, MBQ-16 retry
+  constants) remain implementation planning. **DEC-019 is still Proposed
+  for ChatGPT review — NOT accepted; MBQ-62 still unresolved; MBQ-64/65
+  unchanged; no MBQ row edited; no code files changed; implementation
+  remains blocked; the implementation gate remains closed.**
 
 ---
 

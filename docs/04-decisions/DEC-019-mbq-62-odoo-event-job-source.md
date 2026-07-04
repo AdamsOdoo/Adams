@@ -184,10 +184,14 @@ neither reopened by this record:
 - Export preview dry runs (`export_preview_dry_run` source, unchanged).
 - **MBQ-64/MBQ-65** (currency/webhook residual sprint) — untouched,
   unrelated to job-source classification.
-- **Implementation field/model names** — any exact Odoo Selection-field
-  value, model, or field identifier remains **[Open question —
-  MBQ-01/02]**-adjacent implementation planning; this record proposes a
-  **conceptual vocabulary label**, not a committed code identifier.
+- **Implementation field/model mechanics** — if accepted, `odoo_event` is
+  **the accepted semantic Part A §D.2 job-source value**, not a
+  placeholder, and the requirement that every `odoo_event` job carries a
+  trigger-origin sub-classification is accepted conceptually. What remains
+  implementation planning is the exact Odoo model/field placement, Python
+  constant naming, XML IDs if any, storage/Selection-field mechanics,
+  trigger-origin field/model implementation, and MBQ-16 retry constants
+  (**[Open question — MBQ-01/02]**-adjacent).
 
 ## 4. Options considered
 
