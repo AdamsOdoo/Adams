@@ -1,9 +1,10 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (DEC-017
-> Acceptance Patch — Master Blueprint Part E accepted)** is
+> Continuity lives in GitHub, not chat. The **current entry (Proposed MBQ
+> Decision Batch 1 — DEC-018 prepared, not accepted)** is
 > immediately below, in the **compact
 > handoff format** (`../06-prompts/session-handoff-template.md`);
+> **DEC-017 Acceptance Patch — Master Blueprint Part E accepted**,
 > **Master Blueprint Part E — Implementation-Planning Bridge (proposal
 > history)**,
 > **Part D Blueprint Status Alignment**,
@@ -29,6 +30,81 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Proposed MBQ Decision Batch 1 — DEC-018 prepared, not accepted — compact handoff (2026-07-04)
+
+> **Decision-preparation session, NOT implementation, NOT an
+> implementation-gate opening, NOT a MBQ resolution.** Confirmed before
+> editing: current branch based on `Shopify-connector` at PR #80 merge
+> commit `403d17fc16c6854b0bd9f3ce3161ff61cc0e1570`; DEC-003 through
+> DEC-017 confirmed Accepted by ChatGPT and unedited; AR-002 through AR-014
+> confirmed Accepted; implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/mbq-decision-batch-1-51hysj` → draft PR into
+  `Shopify-connector` (not merged).
+- **Files changed:**
+  `docs/04-decisions/DEC-018-mbq-decision-batch-1.md` (new),
+  `docs/05-qa/architecture-review-log.md` (AR-015 added),
+  `docs/03-architecture/master-blueprint-open-questions.md` (compact note
+  only), `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`
+  (compact note only), `docs/01-research/research-handoff.md` (this file).
+  **No DEC-003 through DEC-017 file changed. No `docs/04-decisions/README.md`
+  change. No MBQ row edited or marked resolved. No code file changed. No
+  Python/XML/manifest/security/test/CI file changed.**
+- **MBQ Decision Batch 1 prepared.** DEC-018 proposes recommended decisions,
+  with evidence/options/risk/register-impact wording, for **MBQ-06, MBQ-08,
+  MBQ-17 (posture), MBQ-33, MBQ-34, MBQ-41, MBQ-45 (mapping/surface split),
+  MBQ-52, MBQ-54, and MBQ-60** — each adopting a direction an already-
+  accepted Master Blueprint part (mostly DEC-013/DEC-015) already carried as
+  a ChatGPT-owned recommendation. **DEC-018 is proposed, not accepted.**
+  **AR-015 is proposed, not accepted.** **MBQ-62** is deliberately **not**
+  forced into this batch — checked against all six fixed Part A §D.2
+  job-source values, none found defensible, recommended for its own
+  follow-up DEC instead of repeating Fable's already-corrected finding-C2
+  failure mode. **MBQ-64 and MBQ-65 remain excluded**, reserved for a
+  separate currency/webhook residual decision sprint per this session's own
+  scope instruction. **No MBQ row is resolved.** **No implementation
+  started.**
+- **Items deferred:** ChatGPT's actual review/acceptance of DEC-018/AR-015;
+  if accepted, the register-impact wording drafted in DEC-018 §5 (not
+  applied by this session); MBQ-62's own follow-up DEC; the separate
+  MBQ-64/MBQ-65 currency/webhook residual sprint; the implementation-gate-
+  opening act; all implementation; all implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session's only judgment call was MBQ-62's strict mapping analysis, which
+  concluded (transparently, in DEC-018 §4) that no existing Part A job-source
+  value fits and recommended a split rather than asserting a weak answer.
+  **Repeated issue patterns:** none newly triggered. **Rules/checklists
+  updated:** none this session (out of allowed-files scope). **New rejected
+  approaches:** none — no new architecture proposed; checked against
+  `rejected-approaches-log.md` (RA-008, RA-009, full RA-001–023 list) before
+  drafting DEC-018, none reintroduced. **New technical debt:** none (no
+  code; nothing to compromise). **New open questions:** none added — no MBQ
+  row's own text or status was changed by this session; DEC-018 only
+  proposes wording that would apply if and when accepted. **Architecture
+  concerns:** none — no accepted DEC (DEC-003–017), AR (AR-002–014), or
+  Part A–E design content was changed; only a compact, non-substantive
+  cross-reference note was added to the open-questions register and to the
+  Part E bridge document.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (none new) · rejected approaches checked, none
+  added · technical debt logged (none applicable — no code) · repeated-issue
+  escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** ChatGPT's review of DEC-018/AR-015. If
+  accepted: (1) apply DEC-018 §5's drafted register-impact wording to
+  `master-blueprint-open-questions.md` as its own acceptance-patch session
+  (mirroring the DEC-013–017 pattern); (2) a dedicated follow-up DEC for
+  MBQ-62's job-source-vocabulary question; (3) a separate MBQ-64/MBQ-65
+  currency/webhook residual decision sprint. None of these is implementation.
+- **Stop condition:** stopped after opening the draft PR for DEC-018/AR-015
+  against `Shopify-connector` (not merged). DEC-003 through DEC-017 not
+  edited; AR-002 through AR-014 not edited; no existing MBQ row modified or
+  marked resolved; no code files changed; DEC-018 and AR-015 are both
+  **Proposed for ChatGPT review — NOT accepted**; implementation remains
+  **blocked**; the implementation gate remains **closed**; `main` and plain
+  `dev` untouched. Awaiting ChatGPT review.
 
 ---
 

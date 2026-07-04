@@ -45,6 +45,11 @@
 - **No ChatGPT-batch MBQ decision plan item is decided by this acceptance.**
   DEC-017 accepts the plan's routing (§4), not the decisions the plan
   recommends ChatGPT make.
+- **DEC-018 note (2026-07-04).** The first controlled batch of this
+  document's own §4 "ChatGPT batch" has been prepared as
+  [`DEC-018`](../04-decisions/DEC-018-mbq-decision-batch-1.md) — **proposed
+  for ChatGPT review, not accepted.** §4's decision plan table below is
+  **unchanged**; no MBQ is marked decided by this note.
 
 ## 1. Purpose of Part E
 

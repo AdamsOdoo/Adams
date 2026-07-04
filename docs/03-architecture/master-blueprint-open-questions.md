@@ -181,6 +181,12 @@ qualified "at screen-design blueprint level," not a full resolution).
 > decisions, then a separate, explicit ChatGPT implementation-gate-opening
 > act.
 
+> **DEC-018 note (2026-07-04).**
+> [`DEC-018`](../04-decisions/DEC-018-mbq-decision-batch-1.md) — proposed MBQ
+> Decision Batch 1 — has been **prepared for ChatGPT review**. **No MBQ row
+> below has been changed yet. No MBQ is resolved by this proposal until
+> ChatGPT accepts DEC-018.** Implementation remains blocked.
+
 ## How to read
 
 - **Decision owner:** **ChatGPT** (a control-room decision), **Implementation
