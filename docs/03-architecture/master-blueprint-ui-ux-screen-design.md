@@ -171,6 +171,15 @@ Shopify Connector
 scattered menus") and DEC-012 §3: the **Dashboard is the home**, and the other
 surfaces are reachable both from the menu and from clickable dashboard counts.
 
+**[Screen blueprint proposal].** A **persistent connection-health indicator**
+— combining the store connection state (Part A §B.1) and API health (Part A
+§B.3) into one glanceable, honest, named status — is visible from **every**
+region of the connector app, not only the Dashboard card (§7) and Store
+Settings band (§6), so an operator never has to leave their current task to
+check whether the connector is healthy. This is a navigation-chrome proposal
+only; it reuses the existing DEC-004/Part A §B.1/§B.3 status concepts and
+decides no new vocabulary (exact widget/XML remains **MBQ-03**).
+
 ### 2.2 Inter-screen routing (the "no dead end" contract)
 
 **[Accepted — Part A §F.3/§G.3; DEC-012 §3 items 10–11].** Every dashboard
@@ -541,7 +550,10 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
   — "supersede" is a **[Screen blueprint proposal]** variant; plain "cancel" is
   **[Accepted]**).
 - **Key information shown.** Per job: domain, source, state, error class (if
-  any), operation reference (operation type + target + attempt), timestamps.
+  any), operation reference (operation type + target + attempt — derived from
+  the accepted operation-level idempotency-key concept, Part A §D.6; exact key
+  schema is **MBQ-20**, the serialization guard is **MBQ-21**, both open),
+  timestamps.
 - **Retry as 4 conditional cases (see §4.1)** — the retry affordance is
   computed from the job's retry class, never a blanket button. A **terminal**
   state (`succeeded`, `failed_final`, `skipped`, `cancelled` — Part A §D.3)
@@ -556,7 +568,8 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
 - **Accepted-decision deps.** DEC-005, DEC-009, DEC-011, DEC-012 §4, Part A §G.
 - **Open-MBQ deps.** **MBQ-62** (Odoo-event-triggered source label for
   inventory-push/fulfillment-create rows); **MBQ-16/18** (retry/cron constants —
-  affect displayed "next attempt"); **MBQ-03**.
+  affect displayed "next attempt"); **MBQ-20/21** (operation-key schema /
+  serialization guard behind the operation-reference field); **MBQ-03**.
 
 ---
 
@@ -631,6 +644,11 @@ not new surfaces):
    order-blocked-on-product or order-blocked-on-customer-ambiguity links
    **directly into the matching flow (S6)** so *resolve the binding → retry the
    order* is a **two-click path**. **[Accepted — Part B §C.14 item 2]**.
+- **Open-MBQ deps.** **MBQ-56** (exact financial total-mismatch tolerance and
+  total field); **MBQ-27** (Odoo tax-representation mechanism feeding the
+  computed-total math); **MBQ-28** (draft-artifact guard — not triggered by
+  these touchpoints); **MBQ-57** (whole-order-hold alternative, future);
+  **MBQ-58** (order-identity nuances).
 
 **Routing precision (must not be flattened) [Accepted — Part B §C.13; DEC-014
 point I]:** an unmatched-product **whole-order hold** = `mapping missing` =
@@ -739,7 +757,8 @@ Shopify order edit.
   *Success:* matched/bound with audit. *Error:* data-shape issue → fix-then-retry.
   *Manual review:* ambiguous/duplicate → Reviewer confirmation.
 - **Open-MBQ deps.** **MBQ-29** (fallback granularity), **MBQ-31** detail,
-  **MBQ-55**, **MBQ-03**.
+  **MBQ-55**, **MBQ-09** (protected-data obligations — affects what customer
+  data may be shown), **MBQ-03**.
 
 ---
 
