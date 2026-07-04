@@ -134,6 +134,77 @@
 >
 > **No architecture decision.** These route to AR-003/AR-005 framing as **inputs**.
 
+## Part E pre-implementation research patch (2026-07-04)
+
+> **Master Blueprint Part E — implementation-planning bridge, documentation-only
+> research patch.** These facts were verified to close the Odoo half of the
+> currency gap the PR #78 audit
+> ([`../05-qa/master-blueprint-integrity-competitor-advantage-audit.md`](../05-qa/master-blueprint-integrity-competitor-advantage-audit.md)
+> §6) flagged as missing from this corpus: Odoo's multi-currency/pricelist/
+> rounding mechanics on the sale order, paired with the Shopify-side
+> `MoneyBag`/presentment-currency facts in
+> [`shopify-official-api-notes.md`](./shopify-official-api-notes.md). Access
+> date for every fact below: **2026-07-04**, read against the official
+> `odoo/odoo` 19.0 source (`github.com/odoo/odoo`, branch `19.0`), the same
+> sanctioned source-reading method already used for the Sprint C inventory/
+> fulfillment facts. **No architecture decision is made here** — see
+> [`../03-architecture/master-blueprint-implementation-planning-bridge.md`](../03-architecture/master-blueprint-implementation-planning-bridge.md)
+> §5/§6 for how these facts route to the open-questions register (new row
+> **MBQ-64**, logged **Proposed / Open**, not resolved).
+
+- **Fact (paraphrase of official source) —** `sale.order.currency_id` is a
+  computed, stored, precomputed `Many2one` to `res.currency`
+  (`ondelete='restrict'`), **not** a plain user-set field; its compute method
+  derives the order currency as **the pricelist's currency if a pricelist is
+  set, otherwise the order's company currency** — i.e. Odoo's sale order has
+  exactly **one** document currency, derived from `pricelist_id.currency_id`
+  or `company_id.currency_id`, never a dual shop/presentment pair.
+  (`addons/sale/models/sale_order.py`,
+  https://raw.githubusercontent.com/odoo/odoo/19.0/addons/sale/models/sale_order.py)
+- **Fact (paraphrase of official source) —** `sale.order.company_id` is a
+  required `Many2one` to `res.company`, defaulting to `self.env.company` — the
+  order's company (and therefore its fallback currency, absent a pricelist
+  currency) is fixed at the environment's active company, not inferred from
+  any Shopify-side value.
+  (`addons/sale/models/sale_order.py`,
+  https://raw.githubusercontent.com/odoo/odoo/19.0/addons/sale/models/sale_order.py)
+- **Fact (official source, near-verbatim) —** `res.currency.rounding` is a
+  `Float` field (`digits=(12, 6)`, default `0.01`) with help text "Amounts in
+  this currency are rounded off to the nearest multiple of the rounding
+  factor." `res.currency.round(amount)` returns
+  `tools.float_round(amount, precision_rounding=self.rounding)`.
+  (`odoo/addons/base/models/res_currency.py`,
+  https://raw.githubusercontent.com/odoo/odoo/19.0/odoo/addons/base/models/res_currency.py)
+- **Fact (official source, near-verbatim) —** `res.currency.compare_amounts(amount1, amount2)`
+  returns `tools.float_compare(amount1, amount2, precision_rounding=self.rounding)`
+  and its docstring explicitly warns: "An amount is considered lower/greater
+  than another amount if their rounded value is different. This is not the
+  same as having a non-zero difference! For example 1.432 and 1.431 are equal
+  at 2 digits precision... However 0.006 and 0.002 are considered different...
+  even though 0.006-0.002 = 0.004 which would be considered zero at 2 digits
+  precision." This is Odoo's own **currency-aware tolerance-comparison
+  primitive** — a candidate mechanism for the total-check guard's currency-
+  rounding tolerance (MBQ-56), not yet adopted as a decision here.
+  (`odoo/addons/base/models/res_currency.py`,
+  https://raw.githubusercontent.com/odoo/odoo/19.0/odoo/addons/base/models/res_currency.py)
+- **Inference —** Because Odoo's sale order carries exactly one currency
+  (derived from pricelist or company, per the facts above) while a Shopify
+  order's `MoneyBag` fields carry **two** (`shopMoney`/`presentmentMoney`,
+  see `shopify-official-api-notes.md`), the total-check guard (MBQ-56) and the
+  price source-of-truth mechanism (DEC-007 §3) both need an explicit choice of
+  **which** Shopify money field is compared against the Odoo order's single
+  `currency_id` total — a design/selection question, not a further fact-
+  finding one, now that both sides' single/dual-currency shapes are verified.
+  This inference does not itself choose a mechanism.
+- **Open question —** Whether/how Odoo's `res.currency.compare_amounts()` (or
+  an equivalent) should be the connector's chosen tolerance-comparison
+  mechanism for the total-check guard, and how a `shopMoney`/`currency_id`
+  mismatch (Shopify shop currency ≠ Odoo order currency) should itself be
+  classified/guarded against, remain open — routed to **MBQ-64**
+  (`../03-architecture/master-blueprint-open-questions.md`), which
+  complements MBQ-56's existing tolerance-mechanism residual rather than
+  duplicating it.
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Odoo 19.0 documentation — the **Developer →
@@ -650,5 +721,11 @@ All accessed **2026-06-30**, all `odoo.com/documentation/19.0` (Tier 1):
   `/administration/odoo_sh/advanced/frequent_technical_questions.html`
 - Community reference (NOT official; for contrast only):
   `apps.odoo.com/apps/modules/19.0/queue_job`
+- **Part E pre-implementation research patch, accessed 2026-07-04** (official
+  19.0 source, see that section above):
+  `github.com/odoo/odoo/blob/19.0/addons/sale/models/sale_order.py`
+  (`currency_id`/`company_id`),
+  `github.com/odoo/odoo/blob/19.0/odoo/addons/base/models/res_currency.py`
+  (`rounding`/`round()`/`compare_amounts()`).
 
 Captured excerpts: [`../00-source-materials/odoo-official.md`](../00-source-materials/odoo-official.md).

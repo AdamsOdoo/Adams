@@ -49,7 +49,10 @@ only**; not a pixel-level visual-design/final-wireframe-polish approval);
 it **partially resolves** MBQ-53 at screen-design level — sibling rows
 MBQ-03/MBQ-22/MBQ-44/MBQ-45/MBQ-06 remain open — and does not authorize
 implementation.
-**Part E remains Not started.**
+**Part E — implementation-planning bridge — is Proposed for ChatGPT
+review, NOT accepted** (2026-07-04, Master Blueprint Sprint E;
+[`master-blueprint-implementation-planning-bridge.md`](./master-blueprint-implementation-planning-bridge.md)).
+Implementation remains blocked.
 
 ## Relation to accepted decisions
 
@@ -105,7 +108,7 @@ tickets, or retry/cadence constants.
 | **Part B — Product, Customer, Sale/Order domain blueprints** | Sprint B | [`master-blueprint-product-customer-sale.md`](./master-blueprint-product-customer-sale.md): product import/export/update blueprint (variants, images, price, preview/diff, draft-first); customer import/matching blueprint; order import + financial-evidence blueprint (incl. order-import operator touchpoints, MBQ-26) | **Accepted by ChatGPT via DEC-014** (2026-07-03) |
 | **Part C — Inventory and Fulfillment domain blueprints** | Sprint C | [`master-blueprint-inventory-fulfillment.md`](./master-blueprint-inventory-fulfillment.md): inventory blueprint (location mapping, first-push guard granularity, apply mode, quantity source); fulfillment blueprint (FulfillmentOrder matching, tracking, notification granularity, location confirmation) | **Accepted by ChatGPT via DEC-015** (2026-07-03); MBQ-33/34/41 and MBQ-60–63 remain open |
 | **Part D — UI/UX Screen Design Blueprint** | Sprint D | [`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md): screen inventory, navigation/IA, Odoo-native interaction patterns, blueprint-level screen specs, per-screen empty/loading/success/error/manual-review states, UX-copy/error-message style guide, premium acceptance checklist (see *UI/UX Screen Design Blueprint* below); partially resolves MBQ-53 at screen-design level | **Accepted by ChatGPT via DEC-016** (2026-07-04); accepted at screen-design blueprint level only — MBQ-03/22/44/45/06 and MBQ-33/34/41/35/32 remain open |
-| **Part E — Implementation-planning bridge** | Sprint E | Consolidated verification pass; resolution/acceptance of implementation-blocking open questions; sequencing input for `docs/07-implementation-plan` | **Not started** |
+| **Part E — Implementation-planning bridge** | Sprint E | [`master-blueprint-implementation-planning-bridge.md`](./master-blueprint-implementation-planning-bridge.md): MBQ decision plan; official-doc gap closure (new MBQ-64/MBQ-65); proposed module-by-module implementation sequence; first safe implementation-slice recommendation; test/rollback strategy at planning level; no-code-to-code gate checklist | **Proposed for ChatGPT review — NOT accepted** (2026-07-04) |
 
 *The Part B/C/D/E split is a **proposed structure**, accepted as the
 proposed sequence by DEC-013 — ChatGPT may still re-cut it at a later
@@ -245,8 +248,10 @@ decision by this acceptance.
 DEC-016** (2026-07-04, Master Blueprint Sprint D; accepted at
 screen-design blueprint level only — see the Status note above); MBQ-53
 is partially resolved at that level, with sibling rows MBQ-03/22/44/45/06
-remaining open. **Part E (implementation-planning bridge) remains Not
-started.** Open
+remaining open. **Part E (implementation-planning bridge) is Proposed for
+ChatGPT review, NOT accepted** — see
+[`master-blueprint-implementation-planning-bridge.md`](./master-blueprint-implementation-planning-bridge.md);
+implementation remains blocked. Open
 questions
 routed to Part B/C are grouped in
 [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md).
