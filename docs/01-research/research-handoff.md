@@ -113,6 +113,20 @@
   NOT accepted**; implementation remains **blocked**; the implementation
   gate remains **closed**; `main` and plain `dev` untouched. Awaiting
   ChatGPT review.
+- **DEC-019 clarification patch (2026-07-04, same PR #82):** ChatGPT's
+  REVISE review flagged one ambiguity — DEC-019 proposed `odoo_event` as the
+  seventh job-source value but then said "the exact Selection-field/enum
+  identifier string remains implementation planning," which could be read
+  as leaving `odoo_event` itself unresolved. Clarified in DEC-019 §5/§6 and
+  in AR-016's risk/mitigation wording: `odoo_event` is the **proposed
+  semantic job-source value** (settled if DEC-019 is accepted, not an open
+  question), and only its Odoo **implementation mechanics** (model/field
+  names, Python constants, XML IDs, storage/Selection-field mechanics,
+  trigger-origin field/model implementation, MBQ-16 retry constants) remain
+  implementation planning. **DEC-019 is still Proposed for ChatGPT review —
+  NOT accepted; AR-016 unchanged in status; MBQ-62 not resolved; MBQ-64/65
+  unchanged; no code files changed; implementation remains blocked; the
+  implementation gate remains closed.**
 
 ---
 

@@ -209,6 +209,19 @@ because Option A alone loses per-trigger granularity and Option C alone
 Options B, C-as-literally-stated, and D are **not** adopted, for the reasons
 in §4.
 
+**Clarification (what is, and is not, open if DEC-019 is accepted):** if
+ChatGPT accepts this proposal, `odoo_event` becomes **the accepted seventh
+Part A §D.2 job-source value** — a settled semantic label, not a
+placeholder pending further naming review. What remains implementation
+planning is strictly the **mechanics** of encoding it: exact Odoo model
+names, exact field names, exact Python constant names, exact XML IDs (if
+any), exact storage/Selection-field implementation mechanics, exact
+trigger-origin field/model/identifier implementation, and the exact
+retry-count/backoff constants under MBQ-16. **The semantic value name
+`odoo_event`, its meaning, and the requirement that every `odoo_event` job
+carries a trigger-origin sub-classification do not remain open if
+accepted** — only how these are implemented in Odoo does.
+
 - **Proposed value name:** `odoo_event`. Evaluated against the task's other
   candidate examples and rejected in favor of `odoo_event`:
   - `odoo_side_event` — no clearer than `odoo_event`; the extra word adds
@@ -233,9 +246,12 @@ in §4.
   carries its specific sub-reason, never a generic label. For the two
   MBQ-62 use cases, the two trigger-origins are conceptually: **"inventory
   stock-change trigger"** and **"fulfillment picking-validation trigger."**
-  This is a vocabulary/concept proposal only — the exact field name, model
-  shape, or Selection-value identifier remains **[Open question —
-  MBQ-01/02]**-adjacent implementation planning, not decided here.
+  The requirement itself — that every `odoo_event` job carries a
+  trigger-origin sub-classification — is part of what this proposal asks
+  ChatGPT to accept, not an open question. Only the exact field name, model
+  shape, or Selection-value identifier used to implement it remains **[Open
+  question — MBQ-01/02]**-adjacent implementation planning, not decided
+  here.
 
 **How inventory stock-change-triggered pushes are classified:** `job_source
 = odoo_event`, trigger-origin = "inventory stock-change trigger" —
@@ -256,13 +272,19 @@ being enqueued/processed is itself auditable) — both are additions to the
 existing "what was attempted; what was actually written; who/what
 confirmed" audit record (Part A §D.10), not a new audit mechanism.
 
-**What remains implementation planning** (not decided by this proposal):
-the exact Selection-field/enum identifier string, exact model/field names
-(MBQ-01/02), whether trigger-origin is its own field or folded into the
-existing operator-safe operation reference (Part A §G.7), and the exact
-retry-count-ceiling/backoff constants for the `odoo_event` source (MBQ-16 —
-this record only establishes that `odoo_event` gives MBQ-16 an honest bucket
-to reason about; it does not set the constants themselves).
+**What remains implementation planning** (not decided by this proposal): the
+accepted semantic job-source value would be `odoo_event`; exact Odoo model
+names, exact field names, exact Python constant names, exact XML IDs (if
+any), exact storage/Selection-field implementation mechanics, exact
+trigger-origin field/model/identifier implementation, whether trigger-origin
+is its own field or folded into the existing operator-safe operation
+reference (Part A §G.7), and the exact retry-count-ceiling/backoff constants
+for the `odoo_event` source (MBQ-16 — this record only establishes that
+`odoo_event` gives MBQ-16 an honest bucket to reason about; it does not set
+the constants themselves) — all remain open. **What does not remain open if
+accepted:** the semantic job-source value name `odoo_event`, its meaning,
+and the requirement that every `odoo_event` job carries a trigger-origin
+sub-classification.
 
 ## 6. Register impact if accepted
 
@@ -273,14 +295,18 @@ exact wording to be confirmed at acceptance time, mirroring the DEC-013
 through DEC-018 acceptance-patch pattern):
 
 > **MBQ-62:** *"Accepted by ChatGPT via DEC-019 (accept-a-seventh-value):
-> Part A §D.2's job-source vocabulary is extended with a seventh value,
-> `odoo_event`, for jobs enqueued by an Odoo-side business event (not a
-> webhook, not operator-initiated, not a timer, not a reconciliation pass,
-> not a preview run). Every `odoo_event` job also carries a specific
-> trigger-origin naming the Odoo event that fired it — for the two named
-> use cases, 'inventory stock-change trigger' and 'fulfillment
-> picking-validation trigger', mirroring the accepted §D.8 manual-review
-> sub-reason pattern. Exact field/enum implementation identifiers and
+> Part A §D.2's job-source vocabulary is extended with a seventh **accepted
+> semantic value**, `odoo_event`, for jobs enqueued by an Odoo-side business
+> event (not a webhook, not operator-initiated, not a timer, not a
+> reconciliation pass, not a preview run). Every `odoo_event` job also
+> carries a specific trigger-origin naming the Odoo event that fired it —
+> for the two named use cases, 'inventory stock-change trigger' and
+> 'fulfillment picking-validation trigger', mirroring the accepted §D.8
+> manual-review sub-reason pattern; this trigger-origin requirement is
+> itself accepted conceptually, not open. The semantic value `odoo_event`
+> and its meaning are settled by this acceptance — exact Odoo model/field
+> names, Python constants, XML IDs (if any), storage/Selection-field
+> implementation mechanics, trigger-origin field/model implementation, and
 > retry-constant values (MBQ-16) remain implementation planning."*
 
 This wording is **not** written into the register by this record — it is
