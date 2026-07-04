@@ -9,13 +9,15 @@
 
 ## Status
 
-**Accepted as the central register through DEC-015**, latest acceptance
-date **2026-07-03**. Documentation only; the no-code gate (`CLAUDE.md`
+**Accepted as the central register through DEC-016**, latest acceptance
+date **2026-07-04**. Documentation only; the no-code gate (`CLAUDE.md`
 §4–§5) is in force. **Register acceptance does not resolve every
 question** — each MBQ row remains open unless the row itself says
 **Resolved**, **Partially resolved**, or **Accepted at blueprint(-policy)
-level**; notably **MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-33,
-MBQ-34, MBQ-41, MBQ-53, MBQ-54, MBQ-55, MBQ-56, MBQ-57, MBQ-58, and
+level**; notably **MBQ-03, MBQ-04, MBQ-06, MBQ-08, MBQ-22, MBQ-24,
+MBQ-27, MBQ-28, MBQ-32, MBQ-33, MBQ-34, MBQ-35, MBQ-41, MBQ-44, MBQ-45,
+MBQ-53 (partially resolved at screen-design level only; sibling rows
+above still open), MBQ-54, MBQ-55, MBQ-56, MBQ-57, MBQ-58, and
 MBQ-60 through MBQ-63 remain open**. Registering (or
 accepting the register containing) a question does **not** decide it and
 does **not** authorize implementation. Every row follows `CLAUDE.md`
@@ -26,9 +28,11 @@ already **accepted**. A row from a sprint whose companion decision record
 is still **Proposed for ChatGPT review** (not yet accepted) is labelled
 **Proposed resolved** / **Proposed partially resolved** instead — these
 rows remain **open** until that decision record is accepted; see the
-Sprint C / DEC-015 acceptance note immediately below — DEC-015 is now
-**accepted**, so its rows use the unqualified **Resolved**/**Partially
-resolved** labels.
+Sprint C / DEC-015 acceptance note and the Sprint D / DEC-016 acceptance
+note below — both DEC-015 and DEC-016 are now **accepted**, so their
+rows use the unqualified **Resolved**/**Partially resolved** labels
+(DEC-016's MBQ-53 label remains **partially resolved**, explicitly
+qualified "at screen-design blueprint level," not a full resolution).
 
 > **Master Blueprint Sprint B note (2026-07-03, revised after PR #72
 > ChatGPT review and again after PR #72 Fable review; superseded by the
@@ -90,6 +94,51 @@ resolved** labels.
 > accepted-through-DEC-015 status is otherwise unchanged, and
 > **MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-53, MBQ-54, MBQ-55,
 > MBQ-56, MBQ-57, and MBQ-58 remain untouched and open.**
+
+> **Master Blueprint Sprint D note (2026-07-03, superseded by the DEC-016
+> acceptance note immediately below).** Sprint D
+> ([`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md),
+> companion
+> [`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md))
+> proposed the UI/UX Screen Design Blueprint (Part D) and proposed updating
+> only the **MBQ-53** row above. **No other MBQ row was changed, and no new
+> MBQ row was added** — the screen design consumes existing open questions
+> rather than surfacing new ones. Part D **proposed a direction** for, but
+> did **not** decide, the screen-relevant open rows **MBQ-45**
+> (admin-vs-functional surface split / roles→groups), **MBQ-06** (readiness
+> split), **MBQ-33/MBQ-34/MBQ-41** (first-push granularity / apply-mode /
+> per-order notification override), and **MBQ-35/MBQ-32** (`on_hand` UI
+> exposure / quantity source) — its screens are designed to accommodate
+> either resolution. **MBQ-03/MBQ-22/MBQ-44** (exact XML IDs / copy /
+> groups) and **MBQ-60 through MBQ-63** remained open and untouched.
+>
+> **DEC-016 Acceptance Patch (2026-07-04) — accepted as the register's
+> update through Sprint D, at screen-design blueprint level only.** After
+> duplicate-PR reconciliation (PR #75 closed as superseded, not merged), a
+> competitor screenshot UX benchmark traceability audit, and the Fable
+> Sprint D review fixes (F1–F7) were applied on PR #77, ChatGPT accepted
+> [`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md)
+> on **2026-07-04**. **MBQ-53 is now partially resolved by DEC-016 at
+> screen-design blueprint level** — the screen-design blueprint layer
+> ([`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md))
+> is accepted, but MBQ-53's full closure still depends on its sibling rows
+> **MBQ-03** (exact XML IDs), **MBQ-22** (exact copy), **MBQ-44** (exact
+> groups), **MBQ-45** (surface split), and **MBQ-06** (readiness split), all
+> of which **remain open** — MBQ-53 itself therefore stays **open/partial**,
+> not fully resolved. **MBQ-33, MBQ-34, MBQ-41, MBQ-35, and MBQ-32 remain
+> open recommendations**, not decided by this acceptance. **MBQ-60 through
+> MBQ-63 remain open.** **No new MBQ row is added.** This acceptance is a
+> **screen-design blueprint** acceptance only — it is **not** a pixel-level
+> visual-design/final-wireframe-polish approval, and the competitor
+> screenshot audit is accepted only as sufficient traceability for
+> blueprint-level acceptance (the `sh_shopify_connector` "Daily Queue
+> Activity Tracking" chart idea it surfaced remains a deferred premium
+> candidate, not adopted into the accepted dashboard card set). The
+> register's accepted-through-DEC-016 status is otherwise unchanged, and
+> **MBQ-04, MBQ-08, MBQ-24, MBQ-27, MBQ-28, MBQ-54, MBQ-55, MBQ-56,
+> MBQ-57, and MBQ-58 remain untouched and open.** Registering this
+> acceptance decides nothing beyond the explicit points above and
+> authorizes no implementation.
 
 ## How to read
 
@@ -214,7 +263,7 @@ resolved** labels.
 
 | ID | Open question | Source | Why it matters | Decision owner | Blocks implementation |
 | --- | --- | --- | --- | --- | --- |
-| MBQ-53 | **Screen-level UI/UX design blueprint** — screen inventory, navigation/information architecture, Odoo-native interaction patterns, screen-level wireframe specs (dashboard, setup wizard, store settings, sync center, error center, matching center, preview/review screens), empty/loading/success/error/manual-review states per screen, UX copy guidelines, error-message style, and a premium UI/UX acceptance checklist | DEC-012 (promised a later UI-design pass; "exact copy/wording... a later UI-design pass" — `ux-operator-flow.md` §5, DEC-012 "What remains open"); standing user/ChatGPT rule that premium UI/UX is a product pillar; Master Blueprint Sprint A review | The ten accepted operator flows (DEC-012) fix *behaviour*, not *screens* — premium UI/UX is a named differentiation pillar (`../02-product/product-vision.md`) and is not achieved by behavioural rules alone; without screen-level design, wireframes/specs, Odoo-native interaction rules, and explicit screen states, implementation would have to invent screen design ad hoc, risking an inconsistent or non-premium operator experience | ChatGPT + a later **UI/UX Screen Design Blueprint sprint** (Master Blueprint Part D, see `master-blueprint.md`) | Yes, for implementation of any operator-facing screen/view/UI flow; No for Part B/C domain-blueprint authoring (concept/contract level, not screen design) |
+| MBQ-53 | **Screen-level UI/UX design blueprint** — screen inventory, navigation/information architecture, Odoo-native interaction patterns, screen-level wireframe specs (dashboard, setup wizard, store settings, sync center, error center, matching center, preview/review screens), empty/loading/success/error/manual-review states per screen, UX copy guidelines, error-message style, and a premium UI/UX acceptance checklist. **Partially resolved by DEC-016 at screen-design blueprint level (Master Blueprint Sprint D, accepted by ChatGPT 2026-07-04) — stays OPEN/partial, not fully resolved:** the screen-design blueprint layer is now accepted ([`master-blueprint-ui-ux-screen-design.md`](./master-blueprint-ui-ux-screen-design.md), companion [`DEC-016`](../04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md), Status: Accepted by ChatGPT — at screen-design blueprint level only, not a pixel-level visual-design/final-wireframe-polish approval), but MBQ-53's full closure additionally depends on its still-open sibling rows — **MBQ-03** (exact view/menu/action XML IDs), **MBQ-22** (exact copy/wording), **MBQ-44** (exact security groups/CSVs), **MBQ-45** (admin-vs-functional surface split), **MBQ-06** (readiness essential-vs-nice-to-have split) — which Part D **accommodates but does not decide**; and the still-open screen-relevant recommendations MBQ-33/34/41/35/32 are likewise accommodated, not decided. See the Sprint D / DEC-016 acceptance note above. | DEC-012 (promised a later UI-design pass; "exact copy/wording... a later UI-design pass" — `ux-operator-flow.md` §5, DEC-012 "What remains open"); standing user/ChatGPT rule that premium UI/UX is a product pillar; Master Blueprint Sprint A review | The ten accepted operator flows (DEC-012) fix *behaviour*, not *screens* — premium UI/UX is a named differentiation pillar (`../02-product/product-vision.md`) and is not achieved by behavioural rules alone; without screen-level design, wireframes/specs, Odoo-native interaction rules, and explicit screen states, implementation would have to invent screen design ad hoc, risking an inconsistent or non-premium operator experience | ChatGPT + a later **UI/UX Screen Design Blueprint sprint** (Master Blueprint Part D, see `master-blueprint.md`) | Yes, for implementation of any operator-facing screen/view/UI flow; No for Part B/C domain-blueprint authoring (concept/contract level, not screen design) |
 
 ---
 
