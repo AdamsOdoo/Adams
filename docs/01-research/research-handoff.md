@@ -72,6 +72,26 @@
   C blueprint document alignment" entry below); the identical alignment step
   was never performed for Part D. Full findings, the MBQ routing table, and
   the RA guardrail table are in the audit file itself.
+- **Update (same session, after the PR's first commit):** the parallel
+  7-agent Workflow cross-check mentioned above **completed successfully on
+  a resume** after the session limit reset (7/7 agents, 0 errors), and its
+  findings were read, verified, and folded into the audit file as a second
+  commit on the same PR before this note. It **independently corroborated
+  every finding** already in the audit (the Part D status-header defect was
+  independently found by 5 of the 7 agents without their reading each
+  other's output) and added a small number of new, independently-verified
+  items: two one-line staleness spots in `master-blueprint.md` itself (line
+  5's "DEC-003 through DEC-015," line 72's "AR-002 through AR-012," both
+  missing their DEC-016/AR-013 update); a procedural-ambiguity note that
+  `quality-feedback-loop.md` §10/§11 are still bracketed
+  "`[Recommendation — becomes binding when this PR is merged by ChatGPT]`"
+  even though `master-blueprint.md`'s gate-opening criterion 3 relies on
+  §10 as settled; two previously-untracked official-doc gaps (Shopify/Odoo
+  multi-currency handling, which underpins the "mandatory and permanent"
+  order total-check guard, with no MBQ row yet); and a missing MBQ row for
+  the product-domain webhook-topic-string gap. None of these changes the
+  verdict or reopens Parts A/B/C; all are folded into the audit file's §3,
+  §5, §6, §7, §9, and §10 as "cross-check addendum" items.
 - **Items deferred:** all ~45 implementation-blocking open MBQs (per the
   audit's §4 routing table); the Part D document-alignment fix (§9 of the
   audit; requires a separate small session since the file is outside this

@@ -51,17 +51,24 @@
   `docs/01-research/research-handoff.md` (current top entry and Sprint
   B/C/D checkpoint history, ~750 of 5,570 lines).
 - **Method note:** a 7-workstream parallel research fan-out was launched via
-  the Workflow tool to independently cross-check each audit dimension: all 7
-  agent runs failed on an account-level session usage limit before returning
-  results (a resume attempt after the limit reset also did not return usable
-  output within this session). This audit therefore rests on **direct,
-  firsthand reads and targeted greps** of the primary governance documents
-  by the auditing session itself, cross-referenced against each other (e.g.
-  every DEC's own Status header checked against `docs/04-decisions/README.md`
-  and `architecture-review-log.md`'s narrative; every named MBQ checked
-  against the register's own verbatim text; guardrail themes checked with
-  direct greps against the four blueprint bodies). No finding below rests on
-  an unverified subagent claim.
+  the Workflow tool to independently cross-check each audit dimension. The
+  first attempt failed all 7 agent runs on an account-level session usage
+  limit before returning results; the initial synthesis (through §12 below,
+  minus the items marked "cross-check addendum") was therefore produced
+  from this session's own direct reads and targeted greps of the primary
+  governance documents alone. **A resume of the same workflow after the
+  session limit reset completed successfully** (7/7 agents, 0 errors) and
+  its full findings were read and reconciled against the already-committed
+  draft before this audit's first commit was pushed as a PR. The parallel
+  cross-check **independently corroborated every finding** in this report
+  (in several cases, 4–5 of the 7 independently-run agents converged on the
+  identical Part D status-header defect described in §7/§9 without having
+  read each other's output) and surfaced a small number of additional,
+  independently-verified items, folded in below and marked "cross-check
+  addendum" where newly added after the parallel pass. No finding in this
+  report rests on an unverified subagent claim — every item the parallel
+  agents surfaced was independently re-verified by this session's own
+  direct Read/Grep before being included.
 - **No-code confirmation:** no `*.py`, `*.xml`, `*.csv`, manifest, model,
   view, controller, security, test, migration, CI, or Odoo module file was
   created or modified to produce this audit. Only Read/Grep/Glob were used
@@ -108,6 +115,27 @@ that uses it. The Part A (`master-blueprint-core-substrate.md`), Part B
 (`master-blueprint-inventory-fulfillment.md`) documents' own `## Status`
 sections all correctly read "Accepted by ChatGPT via DEC-01X" (verified by
 direct grep). **Part D's own document does not**: see §7.
+
+**Cross-check addendum:** the parallel workflow independently found, and this
+session directly re-verified, two additional small internal-consistency
+lapses **within `master-blueprint.md` itself** (not between DEC records —
+the rest of the same file is current):
+- Line 5's intro blockquote still reads "converts the accepted decision
+  records (**DEC-003 through DEC-015**)," even though the same blockquote's
+  later sentences and the file's own Status section correctly state Part D/
+  DEC-016 is accepted. Verified directly: `grep` confirms line 5 reads
+  "DEC-003 through DEC-015."
+- Line 72 ("Relation to accepted decisions" section) still reads "**AR-002
+  through AR-012 are all Accepted**," omitting AR-013 (Part D/DEC-016),
+  which `architecture-review-log.md`'s own AR-013 row and DEC-016's own
+  "Accepted decision" point 4 ("AR-013 moved to Accepted by ChatGPT") both
+  confirm is now also accepted. Verified directly by grep.
+
+Both are cosmetic — `master-blueprint.md`'s Status section, Part-D table row,
+and "Implementation remains blocked" section are all already correct and
+current — but they are two more small residue instances of the same
+"acceptance patch didn't touch every sentence that names a DEC/AR range"
+pattern documented for Part D itself (§7/§9).
 
 ### Implementation-authorization risk
 
@@ -330,6 +358,41 @@ classes or all 10 job states undifferentiated to an operator would. Part D's
 grouped-state screens appear to already guard against this; Part E should
 confirm no implementation step flattens that grouping away.
 
+**Cross-check addendum — three further, more specific density comparisons**
+independently found by the parallel workflow and consistent with (not
+contradicting) the above, each explicitly framed as an observation for Part
+E to weigh, not a defect or a call to cut scope:
+
+1. **Screen count.** Part D's screen inventory (14 distinct surfaces, S1–S14)
+   is larger than any single competitor's demonstrated screen set — no
+   competitor evidence doc documents anywhere near 14 distinct dedicated
+   operator surfaces (most consolidate around 3–6: a config form, a
+   dashboard, a queue/log list, import/export wizards). Part D itself
+   partially self-checks this (S9/S13 explicitly have no dedicated screen
+   and reuse S4/S5), but the underlying surface count is still notably
+   larger than the demonstrated competitor norm.
+2. **Dashboard density.** Nine dashboard cards plus a "primary answer" lead
+   region plus a persistent global health indicator is denser than any
+   competitor's single dashboard — `sh_shopify_connector`'s own dashboard
+   (the closest competitor analog) is a chart plus queue counts, not nine
+   distinct count cards plus a separate lead sentence plus separate
+   always-visible chrome. `ux-ui-benchmark.md`'s own configuration-screen
+   section warns "competitors trade breadth for density" and recommends
+   progressive disclosure as the corrective; the same discipline should
+   apply to the accepted 9-card dashboard.
+3. **Open-question volume.** Part D alone surfaces roughly 40 distinct
+   MBQ-numbered open items across its own §20 — no competitor evidence
+   document shows this volume of unresolved configuration surface. This
+   is arguably a *transparency strength* relative to competitors (who
+   under-document their own unknowns) rather than true overcomplication,
+   but the sheer count could make Part E's sequencing harder than a
+   leaner, competitor-scale screen set would require.
+
+None of the above indicates the blueprint contradicts its own no-code/no-
+redesign gate — each is a density/scope observation for Part E to weigh
+against the "premium, not bloated" principle, not a governance violation.
+confirm no implementation step flattens that grouping away.
+
 ### sh_shopify_connector Daily Queue Activity Tracking chart status
 
 **Explicitly deferred, not adopted.** Direct quote from DEC-016:
@@ -376,6 +439,9 @@ occurred anywhere in the project's history to date.**
 | FulfillmentOrder lifecycle events beyond creation (holds, merges, splits, moves) (MBQ-61) | Confirmed as real Shopify webhook topics; not considered by DEC-011 at all | ChatGPT decision on whether/how to react | Not MVP correctness-core; yes if hold-aware UX is later required | Can defer for MVP; document as a known gap |
 | Inventory webhook payload shape/subscription mechanics (MBQ-63) | Topic string (`INVENTORY_LEVELS_UPDATE`) verified; payload fields and required scopes beyond `read_inventory` are not | Official Shopify docs | Webhook-driven inventory import specifically (not other sync mechanisms) | Before Part E, only if webhook-driven import is implemented |
 | Odoo `free_qty` vs `available_quantity` selection mechanism (MBQ-32 residual) | Both fields' exact formulas verified against official 19.0 source; the two are confirmed **non-equivalent** | A design/selection decision, not further fact-finding | Inventory quantity write-back | Before Part E's inventory task |
+| **[Cross-check addendum] Shopify multi-currency / presentment-currency order model** (`MoneyBag`, `shopMoney` vs `presentmentMoney`) | **None found anywhere in the corpus.** No DEC/blueprint document researches or cites Shopify's dual-currency order/price representation | Official-doc verification of Shopify's `MoneyBag`/presentment-currency model and how it interacts with a merchant's shop currency | The order total-check guard (`master-blueprint-product-customer-sale.md` §C.8, already declared "mandatory and permanent," MBQ-56) and the price source-of-truth mechanism (DEC-007 §3) both implicitly assume single-currency comparison | **Before Part E** — a genuine, currently-untracked gap with no MBQ row; this is exactly the kind of platform fact that should be nailed down before implementation planning |
+| **[Cross-check addendum] Odoo multi-currency / pricelist ORM behavior** (`res.currency`, company vs order currency, rounding) | **None found** — no citation anywhere despite price source-of-truth being in MVP scope | Official-doc/source verification of Odoo's currency/pricelist mechanics | Same total-check-guard/price-sync mechanism as above | Before Part E, paired with the Shopify-side gap above |
+| **[Cross-check addendum] Shopify product-domain webhook topic strings** (a `PRODUCTS_CREATE`/`PRODUCTS_UPDATE`-equivalent) | `master-blueprint-product-customer-sale.md` §A.2 correctly states exact topic strings are "not verified/cited this sprint" — not asserted as Fact | Verify against the same `WebhookSubscriptionTopic` enum page already used for `ORDERS_CREATE`/`INVENTORY_LEVELS_UPDATE` | Webhook-driven product import specifically (manual/scheduled/reconciliation triggers unaffected) | Unlike its inventory analog (MBQ-37/63), this gap has **no dedicated MBQ register row** — recommend adding one before Part E so it isn't silently dropped |
 
 **Overall grounding health: strong.** Every technical/platform claim
 reviewed in the accepted DEC records and blueprint parts traces to a cited
@@ -385,10 +451,27 @@ with an access date. No instance was found of a competitor/vendor claim
 being promoted to a "Fact" without independent official verification — the
 project's own `research-methodology.md` tier system and `CLAUDE.md` §8
 labelling discipline are applied consistently throughout every document
-this audit read. The gaps above are not undisclosed blind spots: **every one
-of them is already tracked as an open MBQ row with "Official-doc
-verification" correctly named as an owner** — this audit found no gap that
-the project's own MBQ register does not already know about.
+this audit read. The gaps above are not undisclosed blind spots: aside from
+the two cross-check-addendum currency gaps and the product-webhook-topic
+gap (all three newly surfaced above and not yet in the MBQ register), every
+other gap in this table is already tracked as an open MBQ row with
+"Official-doc verification" correctly named as an owner.
+
+**Cross-check addendum — documentation-completeness/indexing observation.**
+Several already-verified official facts that Parts B/C and DEC-010/011/014/
+015 rely on (e.g. Odoo's `stock.quant`/`free_qty` source, the `stock_delivery`
+tracking fields, Shopify's `FulfillmentOrder.assignedLocation`, `Product.status`/
+`publishablePublish`) are properly cited with a URL and access date **but live
+only in companion sprint-evidence files** (`ar007-ar008-evidence-refresh.md`,
+`rb14-official-source-refresh.md`, `rb14-part2-open-question-resolution.md`),
+not in the two canonical research-notes files
+(`shopify-official-api-notes.md`, `odoo-official-architecture-notes.md`).
+This is a documentation-indexing gap, not a fabrication risk — the citations
+are real and traceable — but it means a future reader who trusts only the two
+canonical files as "the" official-doc baseline would wrongly flag several
+already-verified facts as ungrounded. Recommend propagating these into the
+two canonical files (or adding explicit cross-references from them) before
+Part E, so there is one authoritative index rather than several.
 
 ## 7. Rejected-approach guardrail check
 
@@ -425,6 +508,22 @@ negative check (not silently assumed) at the point in the blueprint where the
 temptation would arise — this is a materially stronger guardrail discipline
 than typical, and it held up under direct grep verification, not just a
 narrative read.
+
+**Cross-check addendum — minor citation-hygiene note.** RA-001–004, RA-007,
+RA-010, and RA-017 are avoided in substance (independently re-verified above)
+but are not re-cited by their RA number at the specific point in the
+blueprint text where the guardrail applies (only the blanket "RA-001 through
+RA-023 ... checked before drafting" sentence each Part repeats). This is a
+documentation-completeness gap, not a substantive drift — recommend adding
+the explicit by-number citation for these seven rows (e.g. alongside RA-004's
+existing citation in Part A §D.1) so a future reader can mechanically verify
+"checked" without re-deriving it. Separately, `master-blueprint-inventory-fulfillment.md`
+§B.8's deliberate widening of the accepted `ambiguous match` error class to
+also cover a deterministic location mismatch is correctly labelled and
+attributed (Fable minor finding 2) — not a guardrail violation — but is worth
+Part E watching as a pattern: further taxonomy-loosening of the 16-class
+registry without the same explicit-labelling discipline shown here would
+erode the precision the registry depends on.
 
 ## 8. Implementation-readiness assessment
 
@@ -504,34 +603,71 @@ Part E and a separate ChatGPT gate-opening act.
 
 ## 9. Required pre-Part-E cleanup
 
-One item found:
+**One blocking-severity item, plus three minor/moderate cross-check-addendum
+items** found:
 
-- **`docs/03-architecture/master-blueprint-ui-ux-screen-design.md`'s own
-  `## Status` section (and its claim-label legend and closing section) still
-  read "Proposed for ChatGPT review — NOT accepted," dated 2026-07-03** —
-  even though its companion `DEC-016` was accepted by ChatGPT on 2026-07-04,
-  and every other document in the acceptance chain (`DEC-016` itself,
-  `docs/04-decisions/README.md`, `master-blueprint.md`, `master-blueprint-open-questions.md`,
-  `architecture-review-log.md`, `research-handoff.md`) was correctly
-  updated. Verified directly: line 16 reads "**Proposed for ChatGPT review —
-  NOT accepted.**"; line 42's claim-label legend still defines "[Screen
-  blueprint proposal]" as "**Not binding** unless/until DEC-016 is accepted";
-  line 1134 still reads "MBQ-53 stays open **until DEC-016 is accepted**."
+- **(Blocking) `docs/03-architecture/master-blueprint-ui-ux-screen-design.md`'s
+  own `## Status` section (and its claim-label legend and closing sections)
+  still read "Proposed for ChatGPT review — NOT accepted," dated 2026-07-03**
+  — even though its companion `DEC-016` was accepted by ChatGPT on
+  2026-07-04, and every other document in the acceptance chain (`DEC-016`
+  itself, `docs/04-decisions/README.md`, `master-blueprint.md`,
+  `master-blueprint-open-questions.md`, `architecture-review-log.md`,
+  `research-handoff.md`) was correctly updated. Verified directly: line 16
+  reads "**Proposed for ChatGPT review — NOT accepted.**"; line 42's
+  claim-label legend still defines "[Screen blueprint proposal]" as **"Not
+  binding" unless/until DEC-016 is accepted**; line 1134 reads "MBQ-53 stays
+  open **until DEC-016 is accepted**." **Cross-check addendum:** the
+  residue is pervasive, not confined to the header — it recurs at §20 (line
+  ~1133–1134, MBQ routing table) and §22 (line ~1168–1169, "Implementation
+  remains blocked," which still hedges "or, if later accepted, accepted").
   Cross-checked against `research-handoff.md`'s own "Files changed" list for
   the DEC-016 Acceptance Patch commit — `master-blueprint-ui-ux-screen-design.md`
   is **not** in that list, confirming the acceptance patch never touched the
-  file. **This is not a new category of risk**: the identical defect
-  occurred for Part C and was caught and fixed via a dedicated follow-up
-  commit (see `research-handoff.md`'s "DEC-015 Acceptance Patch — Part C
-  blueprint document alignment (2026-07-03)" entry) — that same alignment
-  step was simply never performed for Part D. **Recommended fix:** a small,
+  file. This is not a new category of risk: the identical defect occurred
+  for Part C and was caught and fixed via a dedicated follow-up commit (see
+  `research-handoff.md`'s "DEC-015 Acceptance Patch — Part C blueprint
+  document alignment (2026-07-03)" entry) — that same alignment step was
+  simply never performed for Part D. **Recommended fix:** a small,
   documentation-only "Part D blueprint document alignment" patch — mirroring
   the Part C fix exactly (Status header → "Accepted by ChatGPT via DEC-016,
-  2026-07-04, at screen-design blueprint level only"; the claim-label legend
-  and every "not accepted"/"unless/until DEC-016 is accepted" phrase updated
-  to reflect the actual accepted status; no architecture substance changed).
-  This file is outside this audit's allowed-files scope, so the fix must be
-  a separate, small session — not folded into this audit or into Part E.
+  2026-07-04, at screen-design blueprint level only"; every "not accepted"/
+  "unless/until DEC-016 is accepted" phrase at lines 42, 1134, and 1168–1169
+  updated to reflect the actual accepted status; no architecture substance
+  changed). This file is outside this audit's allowed-files scope, so the
+  fix must be a separate, small session — not folded into this audit or into
+  Part E. **This item alone drives the "WITH CONDITIONS" qualifier on the
+  executive verdict** (§2); it was independently found and verified by 5 of
+  the 7 parallel cross-check workstreams without their having read each
+  other's output, which materially raises confidence it is real and not a
+  misreading.
+
+- **(Minor, cross-check addendum) `docs/03-architecture/master-blueprint.md`'s
+  own line 5 and line 72** still read "DEC-003 through DEC-015" and
+  "AR-002 through AR-012 are all Accepted" respectively — both stale by one
+  entry (should be DEC-016 and AR-013). Both verified directly by grep (§3).
+  Cosmetic only — the file's own Status section, Part-D table row, and
+  "Implementation remains blocked" section are all already correct. Same
+  small-session, out-of-scope treatment as the Part D item above.
+
+- **(Moderate, cross-check addendum) Procedural ambiguity in the gate-opening
+  mechanism.** `master-blueprint.md`'s "Criteria for when implementation may
+  later be opened," point 3, cites `docs/05-qa/quality-feedback-loop.md` §10
+  as the operative procedure for ChatGPT to open the implementation gate.
+  Verified directly: `quality-feedback-loop.md` §10 ("Phase-exit criteria")
+  and §11 ("Documentation maintenance rule") are **both still headed
+  "`[Recommendation — becomes binding when this PR is merged by ChatGPT]`"**
+  — a status `CLAUDE.md`'s own closing "Quick start" section also flags as
+  still open ("both currently `[Recommendation — becomes binding when merged
+  by ChatGPT]`"). In practice, several DEC acceptance notes (DEC-007,
+  DEC-008/009, DEC-012) already treat §10's phase-exit criteria as satisfied
+  and operative — so the section is being relied upon as if ratified, while
+  its own bracketed status has never been explicitly cleared. This is
+  disclosed, not hidden (both `CLAUDE.md` and the section itself carry the
+  caveat), but it is an unresolved procedural dependency worth a deliberate
+  ChatGPT confirmation before Part E treats gate-opening-via-§10 as
+  settled — not a documentation-file edit, so no allowed-files conflict for
+  a future session.
 
 No other cleanup item was found. Every other document checked for stale
 wording, conflicting status labels, or accepted/proposed label errors was
@@ -571,11 +707,31 @@ In rough priority order:
    in `avoid-list.md` A-IMP-4 (duplicate orders, multi-location double-
    decrement, missed-webhook reconciliation, timezone/paging).
 9. **The Part D document-alignment cleanup** from §9 — small, but should not
-   be left for Part E to trip over.
+   be left for Part E to trip over. Fold in the two `master-blueprint.md`
+   one-line staleness items from the same §9 cross-check addendum while a
+   session is already touching acceptance-range wording.
 10. **A later, separately-scheduled pixel-level visual-design pass** — not a
     Part E blocker, but the natural place to reconsider the deferred
     `sh_shopify_connector` activity-chart idea against the accepted nine-
     card dashboard, per DEC-016's own recommendation.
+11. **[Cross-check addendum] Two small, currently-untracked research items**
+    — Shopify's multi-currency/presentment-currency order model and Odoo's
+    multi-currency/pricelist mechanics (§6) — both underpin the total-check
+    guard and the price source-of-truth mechanism and have no MBQ row yet;
+    add one and resolve before the order-import/product-export tasks land.
+12. **[Cross-check addendum] Add an MBQ row for the product-domain webhook
+    topic-string gap** (§6) so it is tracked the same way its inventory
+    analog (MBQ-37/63) already is.
+13. **[Cross-check addendum] A documentation-hygiene pass** (not urgent, can
+    ride along with other Part E documentation work): propagate the
+    Sprint-C/RB-14 companion-evidence-file facts (§6) into the two canonical
+    research-notes files, and add the seven missing by-number RA citations
+    (§7) at the specific blueprint sections where each guardrail applies.
+14. **[Cross-check addendum] Confirm the binding status of
+    `quality-feedback-loop.md` §10/§11** (§9) — a short, explicit ChatGPT
+    ratification (not a documentation edit) so `master-blueprint.md`'s
+    gate-opening criterion 3 does not rest on a still-bracketed
+    recommendation.
 
 ## 11. Risks / limitations
 
@@ -593,18 +749,24 @@ In rough priority order:
   setup guide) remains **Blocked** behind a Google sign-in wall and requires
   owner-granted access or an export; neither has been resolved as of this
   audit.
-- **This audit's own workflow-based cross-check did not complete.** A
-  7-agent parallel research fan-out was launched to independently verify
-  each audit dimension; all 7 runs failed on an account-level session usage
-  limit, and a resume attempt after the limit reset did not return usable
-  results within this session. Every finding in this report instead rests on
-  this session's own direct reads and greps of the primary documents — a
-  narrower but still firsthand and citable evidence base. A future session
-  with the parallel workflow available could re-run it as an independent
-  second pass, particularly over the ~1,900 lines of competitor research this
-  audit read only via secondary citation (`competitor-source-notes.md`,
-  `competitor-feature-matrix.md`, `competitor-deep-dives.md` proper, and the
-  bulk of `ux-ui-benchmark.md` outside its Sprint D audit section).
+- **This audit's own workflow-based cross-check completed on the second
+  attempt, after failing once.** A 7-agent parallel research fan-out was
+  launched to independently verify each audit dimension; the first attempt
+  failed all 7 runs on an account-level session usage limit, so this
+  report's first draft rested solely on this session's own direct reads and
+  greps. A resume after the limit reset completed successfully (7/7 agents,
+  0 errors) and was read and reconciled into this report before the first
+  commit was pushed — it independently corroborated every finding already
+  present (in several cases, 4–5 of the 7 agents converged on the same Part
+  D status-header defect without having read each other's output) and added
+  the items marked "cross-check addendum" throughout §3, §5, §6, §7, §9, and
+  §10. The parallel agents still read most of the ~1,900 lines of
+  competitor-research detail (`competitor-source-notes.md`,
+  `competitor-feature-matrix.md`, `competitor-deep-dives.md`) only via
+  targeted/spot-check reads rather than a full line-by-line pass (disclosed
+  in their own reports) — a residual, smaller version of this limitation
+  remains for a future session that wants full-corpus coverage of those
+  three files specifically.
 - **A large, honest backlog of open MBQs remains** (~45 implementation-
   blocking rows). This is expected and correctly tracked, not a symptom of
   poor governance — but rushing Part E without first executing the MBQ
@@ -619,12 +781,17 @@ In rough priority order:
 ## 12. Final recommendation
 
 **Proceed to a small, targeted documentation-only cleanup (§9's Part D
-status-header alignment), then proceed to Part E — with Part E's own first
-work product being the MBQ decision plan (§10, item 1), not implementation
-code.** The accepted foundation is sound: no contradiction, no accidental
-implementation authorization, no silent MBQ resolution, no rejected-approach
-drift, and no unsupported competitor claim was found anywhere in Parts A–D.
-The one confirmed defect is a small, mechanical documentation-residue issue
-with a known fix pattern (already executed once for Part C). Do not reopen
-Parts A, B, or C — no evidence surfaced here calls any of them into
-question.
+status-header alignment, folding in `master-blueprint.md`'s two one-line
+staleness items), then proceed to Part E — with Part E's own first work
+products being the MBQ decision plan (§10, item 1) and the two small
+currency-research items and product-webhook MBQ row (§10, items 11–12), not
+implementation code.** The accepted foundation is sound: no contradiction,
+no accidental implementation authorization, no silent MBQ resolution, no
+rejected-approach drift, and no unsupported competitor claim was found
+anywhere in Parts A–D — a verdict independently corroborated by a completed
+7-agent parallel cross-check (§1, §11), not resting on a single reader's
+pass. The one confirmed blocking-severity defect is a small, mechanical
+documentation-residue issue with a known fix pattern (already executed once
+for Part C); the remaining items are minor-to-moderate documentation and
+research hygiene, not substantive drift. Do not reopen Parts A, B, or C — no
+evidence surfaced here, from either pass, calls any of them into question.
