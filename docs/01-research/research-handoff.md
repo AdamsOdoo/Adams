@@ -1,9 +1,11 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Proposed
-> MBQ-64/MBQ-65 Currency and Product-Webhook Residual Decisions — DEC-020,
-> not yet accepted)** is immediately below, in the **compact handoff
-> format** (`../06-prompts/session-handoff-template.md`);
+> Continuity lives in GitHub, not chat. The **current entry (DEC-020
+> Revision — MBQ-64 corrected after ChatGPT REVISE, still not accepted)**
+> is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`);
+> **Proposed MBQ-64/MBQ-65 Currency and Product-Webhook Residual Decisions
+> (proposal history, superseded in part — MBQ-64 only)**,
 > **DEC-019 Acceptance Patch — MBQ-62 resolved at semantic-classification
 > level**,
 > **MBQ-62 Decision Proposal (proposal history)**,
@@ -35,6 +37,120 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### DEC-020 Revision — MBQ-64 corrected after ChatGPT REVISE, still not accepted — compact handoff (2026-07-04)
+
+> **Revision session, NOT implementation, NOT an implementation-gate
+> opening, NOT a MBQ resolution.** Confirmed before editing: PR #83 head
+> commit `feb6d53ac7d67ca96073e62d8f20b7c81922288e` (branch
+> `claude/mbq-64-65-decision-ux352n`, based on `Shopify-connector` at PR
+> #82 merge commit); DEC-003 through DEC-019 confirmed Accepted by ChatGPT
+> and unedited; DEC-020/AR-017 confirmed previously Proposed for ChatGPT
+> review, not accepted; ChatGPT's review of `DEC-020` confirmed as
+> **REVISE for MBQ-64** (MBQ-65 found directionally acceptable,
+> unchanged); implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/mbq-64-65-decision-ux352n` → draft PR #83 into
+  `Shopify-connector` (not merged).
+- **Files changed:**
+  `docs/04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/01-research/research-handoff.md` (this file). **No DEC-003 through
+  DEC-019 file changed. No `docs/04-decisions/README.md` change. No MBQ
+  row resolved (MBQ-64 and MBQ-65 remain formally `open`). No other MBQ
+  row edited. No code file changed. No
+  Python/XML/manifest/security/test/CI file changed.**
+- **What changed — MBQ-64 corrected, not accepted.** ChatGPT's review
+  found the original MBQ-64 posture **not safe enough**: shop currency
+  drove `sale.order.currency_id` for every Phase 1 order, and a
+  shop/presentment divergence was caught only if the numeric total-check
+  guard happened to fail — but Shopify's own already-cited research shows
+  a divergent order's shop-currency total is itself a back-converted
+  approximation ("might not sum perfectly to totals"), so it could
+  reconcile within tolerance while still misrepresenting the
+  customer-facing order currency. `DEC-020` §4 (options table) and §5
+  (proposed decision) are corrected: **Phase 1 automatic order import is
+  now same-currency only** — for orders where
+  `Order.presentmentCurrencyCode == Order.currencyCode`,
+  `sale.order.currency_id` follows the connector's normal configured
+  pricelist/company currency, aligned to Shopify shop currency; for a
+  divergent order, the connector **never** silently creates a normal Odoo
+  sale order in shop currency, regardless of the total-check guard's
+  outcome — the job is blocked from automatic SO creation and routed to
+  manual review / treated as an explicit unsupported-scope case **before**
+  SO creation, independent of that guard. Both `shopMoney`/
+  `presentmentMoney` amounts and `Order.presentmentCurrencyCode` remain
+  captured as audit/reconciliation evidence in every case.
+  Presentment-currency-denominated Odoo orders (Option B) remain non-MVP
+  unless and until a later, explicit scope expansion designs
+  currency/pricelist provisioning. `financial total mismatch` is now
+  evaluated explicitly as a *candidate* classification for the blocked
+  case rather than forced onto it — §5 explains that forcing it without a
+  named, deliberate broadening would risk the same loose-routing pattern
+  DEC-014's Fable review (finding B1) already flagged once; the exact
+  final error-class/sub-reason mapping for a blocked divergent-currency
+  order **remains implementation planning**, while the decision posture
+  itself — **no silent SO creation for divergent currencies** — is fixed
+  now. **MBQ-56's total-check tolerance mechanics remain their own open
+  residual, unchanged, and are explicitly not relied upon as the (sole)
+  mechanism that catches a currency-model divergence.** §9's draft MBQ-64
+  register wording, AR-017's table row, and the compact status notes in
+  `master-blueprint-open-questions.md` were all updated to match — none of
+  them mark MBQ-64 resolved. **MBQ-65 is unchanged** — still Option A
+  (enqueue-only triggers, mandatory follow-up authoritative read, never a
+  direct write), found directionally acceptable by this same review.
+- **Items deferred:** ChatGPT's next review of the revised `DEC-020`;
+  applying §9's drafted register-impact wording to MBQ-64/MBQ-65's own
+  rows (only after acceptance); deciding the exact final error-class/
+  sub-reason mapping for a blocked divergent-currency order (explicitly
+  left to implementation planning); MBQ-56's own tolerance mechanics;
+  independently verifying the still-unconfirmed variant-count payload-
+  truncation claim; the implementation-gate-opening act; all
+  implementation.
+- **Learning feedback loop:** **New issues discovered:** one — the
+  original MBQ-64 proposal conflated "the numeric total-check guard
+  passed" with "the order is safe to import automatically," when Shopify's
+  own already-cited research shows the shop-currency total being compared
+  is itself an approximation whenever presentment diverges; corrected by
+  making the currency-equality check independent of, and prior to, the
+  total-check guard's outcome. **Repeated issue patterns:** none newly
+  triggered — the discipline of evaluating an existing error class's fit
+  explicitly rather than forcing it (per §5's `financial total mismatch`
+  discussion) continues the same rigor DEC-018/019 applied to MBQ-62.
+  **Rules/checklists updated:** none this session (out of allowed-files
+  scope). **New rejected approaches:** none formally logged
+  (`rejected-approaches-log.md` out of scope) — the original,
+  now-superseded MBQ-64 posture (shop-currency-only with guard-only
+  divergence handling) is not separately logged as a rejected approach
+  since it was corrected within the same still-unaccepted proposal, not
+  adopted and later reversed. **New technical debt:** none (no code).
+  **New open questions:** none added to the register — MBQ-64/MBQ-65
+  remain the only rows touched, only by an unapplied draft note; the
+  exact final error-class/sub-reason mapping for a blocked
+  divergent-currency order is named as a residual within `DEC-020` itself,
+  not a new MBQ row. **Architecture concerns:** none — no accepted DEC
+  (DEC-003–019) or AR (AR-002–016) was changed; only the still-proposed,
+  still-unaccepted DEC-020/AR-017 were revised.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (one issue found and corrected within
+  the same unaccepted proposal) · rejected approaches checked, none newly
+  logged (out of scope) · technical debt logged (none applicable — no
+  code) · repeated-issue escalation applied (none triggered) — all
+  **YES**.
+- **Next recommended session:** ChatGPT's re-review of the revised
+  `DEC-020` — accept as proposed, accept with change, reject and revise,
+  or defer one or both decisions (`DEC-020` §11). Not implementation.
+- **Stop condition:** stopped after committing and pushing this revision
+  to the existing PR #83 branch (not merged, still draft). DEC-003 through
+  DEC-019 not edited; `docs/04-decisions/README.md` not edited; no MBQ row
+  resolved (MBQ-64 and MBQ-65 remain formally open); no code files
+  changed; DEC-020 and AR-017 remain **Proposed for ChatGPT review — NOT
+  accepted**; implementation remains **blocked**; the implementation gate
+  remains **closed**; `main` and plain `dev` untouched. Awaiting ChatGPT
+  review.
 
 ---
 

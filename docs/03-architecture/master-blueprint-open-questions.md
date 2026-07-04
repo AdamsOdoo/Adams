@@ -250,21 +250,40 @@ qualified "at screen-design blueprint level," not a full resolution).
 > **DEC-020 proposed (2026-07-04) — MBQ-64/MBQ-65 residual decision
 > prepared for ChatGPT review, not accepted.**
 > [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
-> proposes a dedicated design/selection answer for **MBQ-64** (Shopify shop
-> currency drives `sale.order.currency_id` in Phase 1; presentment-currency
-> evidence captured for audit only; a shop/presentment divergence routed
-> through the existing `financial total mismatch` class, never silent) and
-> for **MBQ-65** (product create/update/delete webhooks implemented in
-> Phase 1 as enqueue-only triggers with a mandatory follow-up authoritative
-> read, never a direct write). **MBQ-64 is not resolved until ChatGPT
-> accepts DEC-020. MBQ-65 is not resolved until ChatGPT accepts DEC-020.**
-> Their own rows below are **unchanged by this note** — the draft
-> register-impact wording lives in DEC-020 §9 and is only applied by a
-> future acceptance patch, if and when ChatGPT accepts. **No other MBQ row
-> is changed by this note.** Per `CLAUDE.md` §10, this note **does not
-> authorize implementation**; DEC-003 through DEC-019 remain unchanged;
-> **implementation remains blocked; the implementation gate remains
-> closed.**
+> proposes a dedicated design/selection answer for **MBQ-64** and
+> **MBQ-65**. **MBQ-64 is not resolved until ChatGPT accepts DEC-020.
+> MBQ-65 is not resolved until ChatGPT accepts DEC-020.** Their own rows
+> below are **unchanged by this note** — the draft register-impact wording
+> lives in DEC-020 §9 and is only applied by a future acceptance patch, if
+> and when ChatGPT accepts. **No other MBQ row is changed by this note.**
+> Per `CLAUDE.md` §10, this note **does not authorize implementation**;
+> DEC-003 through DEC-019 remain unchanged; **implementation remains
+> blocked; the implementation gate remains closed.**
+
+> **DEC-020 revised (2026-07-04) — MBQ-64 corrected after ChatGPT REVISE;
+> still not accepted.** ChatGPT's first review of `DEC-020` returned
+> **REVISE for MBQ-64** (the original posture — shop currency for every
+> Phase 1 order, divergence caught only via the numeric total-check guard —
+> was not safe enough) and found **MBQ-65 directionally acceptable**,
+> unchanged. `DEC-020` §4/§5 now propose: **Phase 1 automatic order import
+> is same-currency only** (`Order.presentmentCurrencyCode ==
+> Order.currencyCode`); for a divergent order, the connector **never**
+> silently creates a normal Odoo sale order in shop currency, regardless of
+> the total-check guard's outcome — the job is blocked from automatic SO
+> creation and routed to manual review / treated as an explicit
+> unsupported-scope case **before** SO creation. Both `shopMoney`/
+> `presentmentMoney` and `presentmentCurrencyCode` remain captured as audit
+> evidence in every case; presentment-currency-denominated Odoo orders
+> remain non-MVP; MBQ-56's tolerance mechanics remain open and are not the
+> (sole) mechanism relied upon for catching the divergence; the exact final
+> error-class/sub-reason mapping for a blocked divergent-currency order
+> remains implementation planning. **MBQ-64 is still not resolved — this
+> revision does not change that.** MBQ-65 (enqueue-only triggers, mandatory
+> follow-up authoritative read, never a direct write) is **unchanged**. **No
+> other MBQ row is changed by this note.** Per `CLAUDE.md` §10, this note
+> **does not authorize implementation**; DEC-003 through DEC-019 remain
+> unchanged; **implementation remains blocked; the implementation gate
+> remains closed.**
 
 ## How to read
 

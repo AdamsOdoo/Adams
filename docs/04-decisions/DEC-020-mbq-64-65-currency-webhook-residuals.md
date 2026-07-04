@@ -47,6 +47,22 @@
   if any, is limited to a tiny consistency note in the Part E bridge
   document's bridge table, per this sprint's own scope instruction (see
   §9/§10 and the Part E document itself).
+- **Revised (2026-07-04) after ChatGPT's first review of this record
+  returned REVISE for MBQ-64.** ChatGPT found the original MBQ-64 posture
+  ("shop currency drives every Phase 1 order's `currency_id`; a
+  presentment/shop divergence is caught only if the numeric total-check
+  guard happens to fail") **not safe enough**: Shopify's own cited research
+  already states shop-currency values are back-converted approximations
+  whenever presentment differs, so a divergent order could pass the
+  numeric guard while still misrepresenting the customer-facing order
+  currency. §4/§5 below are corrected accordingly — **automatic Phase 1
+  order import is now scoped to same-currency orders only**
+  (`Order.presentmentCurrencyCode == Order.currencyCode`); a divergent
+  order is never silently imported in shop currency under any outcome of
+  the numeric total-check guard. **MBQ-65 (§6–§8) was found directionally
+  acceptable by that same review and is unchanged in substance** — the
+  enqueue-only, never-direct-write, follow-up-authoritative-read posture
+  stands as originally proposed.
 
 ## 1. Purpose
 
@@ -185,75 +201,132 @@ inputs for §5, not restatements of DEC-017.
 
 | Option | Description | Pros | Cons | Financial correctness impact | Odoo fit | MVP impact | Recommendation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **A** | Use Shopify **shop currency** (`Order.currencyCode`) as Odoo `sale.order.currency_id`; store `presentmentMoney`/`presentmentCurrencyCode` only for audit/display. | Single company-anchored currency matches Odoo's default posture with zero new pricelist/currency provisioning; aligns with DEC-007 §3's existing Markets/currency-specific-pricing exclusion; shop currency is the merchant's own "common reference... for Analytics," a natural fit for a single Odoo document currency. | Shop-currency totals are **back-converted from presentment** whenever the two diverge, and Shopify's own docs state such values "might not sum perfectly to totals" — a total-check guard compared only against shop-currency amounts inherits FX-rounding noise, not just Odoo currency rounding, for the subset of orders where presentment differs. | Good for the (expected-majority) same-currency case; needs a divergence-aware guard (Option C) for the minority case to avoid masking or misreading FX-rounding noise as a data error. | Very good — no new Odoo master data (pricelists/currencies) required. | Best — simplest, no per-currency setup. | **Adopt as the Phase 1 base**, paired with Option C's guard. |
-| **B** | Use Shopify **presentment currency** (`Order.presentmentCurrencyCode`) as Odoo `sale.order.currency_id` whenever it differs from shop currency. | Matches Shopify's own stated "source of truth" framing for what the customer actually agreed to pay; Odoo natively supports a non-company-currency sale order via `pricelist_id.currency_id`, with `currency_rate` auto-computed for company-currency accounting conversion — the mechanism exists in Odoo core, this is not a hypothetical capability. | `currency_id` is **compute-only, not directly settable** — this option requires provisioning (and maintaining) a currency-matched `pricelist_id` for every presentment currency a store's customers might use, before a single order in that currency could be imported; directly reopens the scope DEC-007 §3 already excluded ("any currency-/market-specific pricing strategy," "Shopify Markets pricing"); every downstream reporting/reconciliation view would need to handle N order currencies inside an MVP. | Best per-order fidelity to what was actually charged, but only if the pricelist-provisioning problem is solved first — undesigned today. | Technically supported by Odoo's ORM, but requires new master-data provisioning this sprint does not design. | Poor — reopens an already-closed MVP scope exclusion. | **Reject for Phase 1**; revisit only if ChatGPT explicitly reopens Markets/multi-currency-pricing scope (DEC-007 §3). |
-| **C** | Block/route to manual review any order where presentment currency differs from shop currency. | Zero silent-mismatch risk; reuses the **already-accepted** `financial total mismatch` error class (Part A §D.5.5, DEC-009) — no new vocabulary invented, matching the project's standing discipline (cf. DEC-018/DEC-019's refusal to force MBQ-62 into a weak existing-vocabulary mapping, applied here in the opposite direction — reusing an existing class rather than inventing one). | As a **standalone** posture (blocking every divergent order outright, before any total-check even runs), it is overly blunt — it would flag orders solely for having a populated, differing `presentmentCurrencyCode`, including ones whose shop-currency evidence is otherwise fully reconcilable. | Maximally safe; the right shape as a **guard**, not a blanket pre-import block. | Perfect fit — no new Odoo mechanism, reuses the existing conservative, "never silent, never auto-retried" error-class routing. | Good, if scoped as the divergence-handling companion to Option A rather than a replacement for it. | **Adopt as Option A's divergence-handling companion**, not standalone. |
-| **D** | Defer multi-currency/Shopify Markets orders from Phase 1 entirely; support same-currency orders only. | Cleanest match to DEC-007 §3's existing Markets exclusion; simplest to state as a scope boundary. | As a documentation-only exclusion with no runtime guard, it does not actually prevent a divergent order from being silently imported — Shopify's own docs confirm presentment can differ from shop currency "when serving international customers or using multi-currency pricing," which can occur even without a merchant consciously enabling "Shopify Markets" as a named feature; "same-currency orders only" needs Option C's runtime guard to be real, not just declared. | N/A on its own — needs a mechanism (Option C) to be enforceable, not merely asserted. | N/A on its own. | Matches the already-accepted MVP boundary (DEC-007 §3). | **Adopt as the explicit non-MVP scope statement**, implemented via A+C, not as an independent fourth mechanism. |
+| **A** | Use Shopify **shop currency** (`Order.currencyCode`) as Odoo `sale.order.currency_id` — **scoped to same-currency orders only**, i.e. only where `Order.presentmentCurrencyCode == Order.currencyCode`. Never used to automatically import a divergent-currency order in shop currency. | Single company-anchored currency matches Odoo's default posture with zero new pricelist/currency provisioning; aligns with DEC-007 §3's existing Markets/currency-specific-pricing exclusion; for the supported (same-currency) case, shop currency and presentment currency are, by definition, the same value, so there is no back-conversion imprecision to hide behind a numeric guard. | Only covers the same-currency subset — does **not** itself say what happens to a divergent order (that is Option C/D's job, below); must not be silently extended to cover divergent orders just because it is the simplest mechanism. | Good — restricting Option A to exactly the case where the two currencies are identical removes the FX-back-conversion risk the original (unrevised) proposal carried. | Very good — no new Odoo master data (pricelists/currencies) required for the supported subset. | Best — simplest, no per-currency setup, for the orders it actually covers. | **Adopt, but only for same-currency orders.** Does not apply to, and must not be stretched to cover, divergent orders — see Option C/D, now the **active** posture for that case. |
+| **B** | Use Shopify **presentment currency** (`Order.presentmentCurrencyCode`) as Odoo `sale.order.currency_id` whenever it differs from shop currency. | Matches Shopify's own stated "source of truth" framing for what the customer actually agreed to pay; Odoo natively supports a non-company-currency sale order via `pricelist_id.currency_id`, with `currency_rate` auto-computed for company-currency accounting conversion — the mechanism exists in Odoo core, this is not a hypothetical capability. | `currency_id` is **compute-only, not directly settable** — this option requires provisioning (and maintaining) a currency-matched `pricelist_id` for every presentment currency a store's customers might use, before a single order in that currency could be imported; directly reopens the scope DEC-007 §3 already excluded ("any currency-/market-specific pricing strategy," "Shopify Markets pricing"); every downstream reporting/reconciliation view would need to handle N order currencies inside an MVP. | Best per-order fidelity to what was actually charged, but only if the pricelist-provisioning problem is solved first — undesigned today. | Technically supported by Odoo's ORM, but requires new master-data provisioning this sprint does not design. | Poor — reopens an already-closed MVP scope exclusion. | **Reject for Phase 1**; revisit only if ChatGPT explicitly reopens Markets/multi-currency-pricing scope (DEC-007 §3). Rejected regardless of whether the order would otherwise pass a numeric total-check. |
+| **C** | Block automatic sale-order creation / route to manual review / treat as explicit unsupported-scope for **any** order where `Order.presentmentCurrencyCode != Order.currencyCode`, checked **before** SO creation and **independently of** whether the numeric total-check guard would otherwise pass. | Zero silent-mismatch risk — the currency-model divergence itself is the trigger, not a downstream numeric symptom that might happen not to fire; a divergent order can never slip through simply because its back-converted shop-currency total happened to reconcile within tolerance. | Blocks some orders whose shop-currency evidence might, in isolation, look numerically reconcilable — an accepted trade-off given Shopify's own guidance that presentment is the source of truth and a divergent order's shop-currency values are back-converted approximations, not independently verified facts, so "the numbers happen to match" is not a sufficient safety argument on its own. | Maximally safe — this is now the **primary**, not merely a companion, mechanism for the divergent-order case. | Good fit conceptually; **exact** error-class/sub-reason mapping (whether this reuses `financial total mismatch`, `blocked_manual_review`, or another existing Part A §D.8 shape) is evaluated in §5 and left as an explicit residual rather than forced. | Good — this is the enforcement mechanism for Option D's scope boundary, not an optional guard on top of Option A. | **Adopt as the active, primary posture for any divergent-currency order** — runs before SO creation, independent of the total-check guard's outcome. |
+| **D** | Defer multi-currency/Shopify Markets orders from Phase 1 entirely; automatic import supports same-currency orders only. | Cleanest match to DEC-007 §3's existing Markets exclusion; simplest to state as a scope boundary. | As a documentation-only exclusion with no runtime guard, it would not actually prevent a divergent order from being silently imported — Shopify's own docs confirm presentment can differ from shop currency "when serving international customers or using multi-currency pricing," which can occur even without a merchant consciously enabling "Shopify Markets" as a named feature; **this option is only real when paired with Option C's runtime mechanism**, not as a standalone documentation-only statement. | N/A on its own — needs Option C's mechanism to be enforceable, not merely asserted. | N/A on its own. | Matches the already-accepted MVP boundary (DEC-007 §3). | **Adopt as the explicit scope statement**, jointly with Option C as the enforcement mechanism — same-currency orders are the only Phase 1 automatic-import scope; divergent orders are explicitly out of that scope, enforced by Option C, not merely declared. |
 
 ## 5. Proposed MBQ-64 decision
 
-**Proposed decision: Option A (shop currency drives the Odoo order
-currency) + Option C (a divergence guard reusing the existing
-`financial total mismatch` class) + Option D (an explicit non-MVP scope
-statement) — combined as one coherent Phase 1 posture. Option B is
-rejected for Phase 1.**
+**Proposed decision: Option A, scoped to same-currency orders only + Option
+D (explicit non-MVP scope boundary) + Option C (the active, primary
+enforcement mechanism for any divergent-currency order, running before SO
+creation and independent of the total-check guard's outcome). Option B
+remains rejected for Phase 1.**
 
-- **Which currency drives `sale.order.currency_id` in Phase 1:** Shopify's
-  **shop currency** (`Order.currencyCode`). No new Odoo pricelist/currency
-  provisioning is required; the order's currency continues to derive from
-  the connector's existing pricelist/company-currency assignment exactly as
-  Odoo's `_compute_currency_id` already works.
-- **What must be persisted conceptually for audit/reconciliation, even
-  though it does not drive the order currency:** the order's
-  `presentmentCurrencyCode`, and — for at least the order-level total
-  fields the total-check guard and financial-evidence capture already cover
-  (§C.7–§C.9: `totalPriceSet`, `totalTaxSet`, `totalDiscountsSet`,
-  `totalShippingPriceSet`, and the rest) — **both** the `shopMoney` and
-  `presentmentMoney` amounts from each field's `MoneyBag`, not only
-  `shopMoney`. This travels with the order-import job payload alongside the
-  other financial-evidence fields already accepted in §C.7, so a divergent
-  order's full evidence is always reconstructable, never silently narrowed
-  to one currency.
-- **How a shop/presentment divergence is handled in Phase 1:** the
-  total-check guard (§C.8) continues to run using shop-currency
-  (`shopMoney`) amounts against the Odoo total, as it would for any order —
-  this decision does not invent a second guard path. When
-  `Order.presentmentCurrencyCode != Order.currencyCode`, that divergence is
-  itself a signal: because shop-currency values are back-converted from
-  presentment values whenever they differ (per §2's newly cited official
-  fact) and "might not sum perfectly to totals," any resulting guard
-  discrepancy for a divergent order must **not** be silently attributed to
-  ordinary Odoo currency rounding — it is classified under the already
-  accepted **`financial total mismatch`** class (Part A §D.5.5, DEC-009),
-  exactly as any other total-check failure would be, with no new error
-  class invented and no silent pass. The exact tolerance/comparison
-  mechanics (how large a discrepancy is acceptable before it is flagged)
-  remain **MBQ-56's** residual, now explicitly informed by the fact that a
-  divergent order's shop-currency total carries FX back-conversion noise on
-  top of ordinary rounding — this record does not itself set that
-  tolerance number.
+**Phase 1 automatic order import is same-currency only.** For orders where
+`Order.presentmentCurrencyCode == Order.currencyCode`, the connector
+proceeds as normal. For orders where `Order.presentmentCurrencyCode !=
+Order.currencyCode`, the connector **must not** silently create/import a
+normal Odoo sales order in shop currency — that case is out of Phase 1's
+automatic-import scope and is handled per the blocking rule below,
+regardless of what a numeric total-check would show.
+
+- **Which currency drives `sale.order.currency_id` for supported
+  same-currency orders:** Shopify's **shop currency** (`Order.currencyCode`)
+  — which, for these orders, is by definition identical to the presentment
+  currency. No new Odoo pricelist/currency provisioning is required; the
+  order's currency continues to derive from the connector's existing
+  pricelist/company-currency assignment exactly as Odoo's
+  `_compute_currency_id` already works.
+- **Divergent orders are not silently imported in shop currency:** when
+  `Order.presentmentCurrencyCode != Order.currencyCode`, the connector does
+  **not** proceed to create a normal Odoo sale order in shop currency under
+  any circumstance — not even if the shop-currency total would otherwise
+  reconcile against the Odoo total within MBQ-56's tolerance. The
+  divergence itself (a currency-model mismatch between what Shopify
+  recorded the order in and what Odoo would record it in) is the blocking
+  condition — **it is not inferred from, or contingent on, a numeric
+  total-check failure.** A back-converted shop-currency total that happens
+  to reconcile is not evidence the order is safe to import automatically;
+  per §2's cited official fact, such values are themselves approximations
+  ("might not sum perfectly to totals") whenever the two currencies
+  diverge, so "the numbers matched" is not a substitute for checking the
+  currencies matched.
+- **How a divergent order is handled before SO creation:** the job is
+  **blocked from automatic sale-order creation** and routed to manual
+  review / treated as an explicit unsupported-scope case — the connector
+  does not silently drop the order, but it also does not silently create a
+  normal Odoo sale order for it. The **exact** enforcement shape (a
+  dedicated manual-review queue entry the operator can act on vs. a harder
+  unsupported-scope block that requires a future, separately-designed
+  path) is not fixed by this record — see "what remains implementation
+  planning" below.
+- **Existing error-class fit, evaluated explicitly (not forced):** the
+  already-accepted **`financial total mismatch`** class (Part A §D.5.5,
+  DEC-009) is a plausible but **not automatically correct** home for this
+  case. In its favor: it is already conservative, "never silent, never
+  auto-retried," and requires explicit human review — the right posture
+  for this case. Against forcing it: `financial total mismatch`, as
+  defined in §C.8, is triggered by a **numeric** comparison ("the connector
+  computes the sum of imported line totals... and compares it against the
+  Shopify order's own reported total") — a currency-model divergence
+  blocked **before** SO creation is a different kind of failure, detected
+  before any Odoo total exists to compare, not a discovered numeric
+  discrepancy. Reusing the class as-is, without an explicit, named
+  broadening of its trigger condition (in the same spirit as DEC-015 point
+  J's accepted, explicit widening of `ambiguous match` to a new case,
+  rather than a silent stretch), would risk exactly the loose-routing
+  pattern DEC-014's Fable review (finding B1) already flagged and corrected
+  once in this project. **This record does not force that broadening
+  here.** Instead: **the accepted decision posture is that no automatic
+  sale order is created for a divergent-currency order, under any
+  circumstance** — the **exact final error-class/sub-reason mapping**
+  (whether that is a defensible, explicitly-named broadening of
+  `financial total mismatch`, a mapping onto an existing
+  `blocked_manual_review` sub-reason, or another Part A §D.8 shape)
+  **remains implementation planning**, to be decided with the same
+  strictness DEC-018/DEC-019 applied to MBQ-62 rather than assumed here.
+- **MBQ-56 is not the (sole) line of defense against divergence:** MBQ-56's
+  total-check tolerance/comparison mechanism keeps its existing scope — the
+  **numeric** guard for same-currency orders (and any other total-check
+  use already accepted) — and **remains open**, unchanged and undecided by
+  this record. It is explicitly **not** relied upon to catch a
+  shop/presentment divergence; that is caught by the dedicated,
+  independent currency-equality check above, which runs regardless of
+  what MBQ-56's eventual tolerance value would compute.
+- **What must be persisted conceptually for audit/reconciliation, in every
+  case (same-currency or divergent):** the order's `presentmentCurrencyCode`,
+  and — for at least the order-level total fields the total-check guard and
+  financial-evidence capture already cover (§C.7–§C.9: `totalPriceSet`,
+  `totalTaxSet`, `totalDiscountsSet`, `totalShippingPriceSet`, and the
+  rest) — **both** the `shopMoney` and `presentmentMoney` amounts from each
+  field's `MoneyBag`, not only `shopMoney`. This travels with the
+  job/error/audit payload alongside the other financial-evidence fields
+  already accepted in §C.7, so a divergent order's full evidence is always
+  captured and reconstructable for the manual reviewer or a future
+  reconciliation pass, even though no sale order is automatically created
+  for it.
 - **What is non-MVP:** Odoo sale orders denominated in a Shopify
-  presentment currency (Option B); per-market/per-currency Odoo pricelist
+  presentment currency (Option B), and any automatic-import path for a
+  divergent-currency order generally, **unless and until** a later,
+  explicit scope expansion designs the currency/pricelist provisioning
+  Option B would require; per-market/per-currency Odoo pricelist
   provisioning; any Shopify-Markets-specific pricing (already excluded by
   DEC-007 §3); any automatic FX gain/loss reconciliation beyond Odoo's own
   native accounting mechanism (`currency_rate`, already part of core Odoo,
   not a connector-built feature).
-- **What remains implementation planning:** MBQ-56's exact tolerance value
-  and exact Shopify total field(s) compared (unchanged, not decided here);
-  the exact mechanism for surfacing a shop/presentment divergence alongside
-  a `financial total mismatch` classification (e.g. a dedicated evidence
-  field vs. reusing the existing evidence payload); exact Odoo
-  model/field names for persisting `presentmentCurrencyCode` and the
-  `presentmentMoney` amounts (MBQ-01/02, the naming pass, unaffected by this
-  record).
-- **How this avoids silent financial mismatch:** the guard never treats a
-  divergent order's shop-currency total as more trustworthy than it is —
-  a discrepancy is always routed to the existing conservative,
-  human-review-required error class, never silently accepted, silently
-  corrected, or silently attributed to ordinary rounding; presentment
-  evidence is always captured, so an operator (or a future reconciliation
-  pass) can always see what the customer actually paid even though it is
-  not the Odoo order's currency of record.
+- **What remains implementation planning:** the exact final
+  error-class/sub-reason mapping for a blocked divergent-currency order
+  (see above — not decided here); whether the divergent-order path lands
+  in the existing manual-review queue or a distinct unsupported-scope
+  classification; MBQ-56's exact tolerance value and exact Shopify total
+  field(s) compared for same-currency orders (unchanged, not decided
+  here); exact Odoo model/field names for persisting
+  `presentmentCurrencyCode` and the `presentmentMoney` amounts (MBQ-01/02,
+  the naming pass, unaffected by this record).
+- **How this avoids silent financial mismatch:** no automatic sale order is
+  ever created for an order whose presentment currency differs from its
+  shop currency, regardless of whether a numeric total-check would have
+  passed — so a back-converted, approximate shop-currency total can never
+  be silently treated as sufficient evidence that a divergent order is
+  safe to import. Both money representations are always captured as
+  evidence, so an operator (or a future reconciliation pass) can always
+  see what the customer actually paid, and the exact blocking mechanism
+  being left as an implementation-planning residual does not weaken the
+  posture itself: **no silent SO creation for divergent currencies**, fixed
+  now, independent of how that posture is eventually wired into Part A's
+  job/error taxonomy.
 
 ## 6. MBQ-65 current accepted facts and unresolved question
 
@@ -356,21 +429,27 @@ wording to `master-blueprint-open-questions.md`'s MBQ-64 and MBQ-65 rows
 
 **MBQ-64 (draft register wording):** "Proposed resolved by
 [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
-(pending ChatGPT acceptance): Phase 1 `sale.order.currency_id` is driven by
-Shopify's **shop currency** (`Order.currencyCode`); presentment-currency
-amounts (`Order.presentmentCurrencyCode`, and both `shopMoney`/
-`presentmentMoney` from each covered `MoneyBag` total field) are captured as
-audit/reconciliation evidence only, never as the Odoo order currency. A
-presentment-vs-shop-currency divergence is not silently accepted: the
-total-check guard runs against shop-currency evidence as normal, and any
-resulting discrepancy for a divergent order is classified under the
-existing `financial total mismatch` class (Part A §D.5.5) — no new error
-vocabulary, never a silent pass. Presentment-currency-denominated Odoo
-orders (a Shopify Markets/multi-currency order-currency driver) are
-explicitly non-MVP, consistent with DEC-007 §3's existing Markets/
-currency-specific-pricing exclusion. Exact tolerance/comparison mechanics
-remain MBQ-56's own residual, unchanged by this row. Formally remains
-`open` until ChatGPT accepts DEC-020."
+(pending ChatGPT acceptance): Phase 1 **automatic order import is
+same-currency only** — for orders where `Order.presentmentCurrencyCode ==
+Order.currencyCode`, Odoo `sale.order.currency_id` is driven by the
+connector's normal configured Odoo pricelist/company currency, aligned to
+Shopify's shop currency (`Order.currencyCode`). For orders where
+`Order.presentmentCurrencyCode != Order.currencyCode`, the connector does
+**not** silently create/import a normal Odoo sales order in shop currency
+under any circumstance, including when a numeric total-check would
+otherwise reconcile — the job is blocked from automatic sale-order
+creation and routed to manual review / treated as an explicit
+unsupported-scope case before SO creation. Both `shopMoney` and
+`presentmentMoney` amounts, plus `Order.presentmentCurrencyCode`, are
+captured as audit/reconciliation evidence in every case, whether or not a
+sale order is created. Presentment-currency-denominated Odoo orders
+(Option B) remain non-MVP unless and until a later, explicit scope
+expansion designs currency/pricelist provisioning. MBQ-56's total-check
+tolerance/comparison mechanics remain its own open residual, unchanged and
+not relied upon as the (sole) mechanism for catching a currency-model
+divergence. The exact final error-class/sub-reason mapping for a blocked
+divergent-currency order remains implementation planning, not decided by
+this row. Formally remains `open` until ChatGPT accepts DEC-020."
 
 **MBQ-65 (draft register wording):** "Proposed resolved by
 [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
@@ -416,16 +495,22 @@ as a recommendation for a future session, not performed.
 
 ## 11. Recommendation to ChatGPT
 
-**Recommendation: Accept as proposed (§5 and §8), with two named residuals
-explicitly carried forward, not silently closed:** MBQ-56's own tolerance/
-field-selection mechanics (unaffected by this record, still open), and the
-unconfirmed variant-count payload-truncation claim (§2), which this record
-recommends a future implementation-planning session verify directly against
-primary `shopify.dev` payload/reference documentation before the product
-webhook follow-up-read logic is written — it does not block accepting the
-enqueue-only, never-direct-write posture either way, since that posture
-already treats the webhook payload as non-authoritative regardless of
-whether truncation is real.
+**Recommendation: Accept as proposed (§5 and §8, §5 as revised), with three
+named residuals explicitly carried forward, not silently closed:** MBQ-56's
+own tolerance/field-selection mechanics (unaffected by this record, still
+open, and explicitly not relied upon as the mechanism that catches a
+currency-model divergence); the exact final error-class/sub-reason mapping
+for a blocked divergent-currency MBQ-64 order (§5 evaluates
+`financial total mismatch`'s fit explicitly and declines to force it
+without a named, deliberate broadening — left to implementation planning);
+and the unconfirmed variant-count payload-truncation claim (§2), which this
+record recommends a future implementation-planning session verify directly
+against primary `shopify.dev` payload/reference documentation before the
+product webhook follow-up-read logic is written. None of these three block
+accepting the underlying postures either way: MBQ-64's "no silent SO
+creation for a divergent-currency order" and MBQ-65's enqueue-only,
+never-direct-write posture are both fixed regardless of how their
+respective residuals are eventually resolved.
 
 Both proposed decisions are deliberately the **more conservative** of the
 options considered — neither adopts the option this record's own research
@@ -433,9 +518,16 @@ found riskiest (MBQ-64 Option B's undesigned pricelist-provisioning
 requirement and MVP-scope reopening; MBQ-65 Option D's silent-write risk)
 even though each is technically the most "feature-rich" available option,
 consistent with this sprint's own instruction to prefer safety and
-auditability over feature scope. If ChatGPT prefers a different balance —
-for example, accepting MBQ-64 Option B as a deliberate, explicit Phase 1
-scope expansion, or MBQ-65 Option B/C instead of A — that is a **reject and
-revise** or **accept with change** outcome this record's tables (§4, §7)
-are structured to support without new research, since the evidence for
-every option is already presented above.
+auditability over feature scope. **MBQ-64's posture was itself made more
+conservative in this revision**, after ChatGPT's first review found the
+original proposal (shop currency for every Phase 1 order, divergence
+caught only via the numeric total-check guard) not safe enough — automatic
+import is now scoped to same-currency orders only, and a divergent order
+is blocked before SO creation independent of the total-check guard's
+outcome. If ChatGPT prefers a different balance — for example, accepting
+MBQ-64 Option B as a deliberate, explicit Phase 1 scope expansion, adopting
+a specific error-class mapping for the divergent-order block now rather
+than leaving it to implementation planning, or MBQ-65 Option B/C instead of
+A — that is a **reject and revise** or **accept with change** outcome this
+record's tables (§4, §7) are structured to support without new research,
+since the evidence for every option is already presented above.
