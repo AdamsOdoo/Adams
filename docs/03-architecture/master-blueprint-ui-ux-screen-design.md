@@ -97,10 +97,56 @@ behaviour; they add layout and interaction, never new behaviour.
 reintroduce):** RA-006 (name-only auto-match), RA-008 (blind first inventory
 push), RA-009 (hidden/default-on fulfilment notification), RA-013 (parallel
 per-domain dashboards/queues), RA-014 (retry-everything), RA-015 (never-retry),
-RA-016 (raw stack trace as primary error UX), RA-018 (writing `committed`),
+RA-016 (raw stack trace as primary error UX), RA-017 (relying on the binding
+alone with no operation-level idempotency key), RA-018 (writing `committed`),
 RA-019 (SKU-only inventory writes), RA-020 (autonomous bidirectional inventory
-conflict resolution), RA-022 (legacy fulfillment API), RA-023 (fulfillment
-without order/FulfillmentOrder/line/quantity/location matching).
+conflict resolution), RA-021 (treating Shopify/Odoo inventory quantities as
+directly equivalent without a recorded source-of-truth decision), RA-022
+(legacy fulfillment API), RA-023 (fulfillment without order/FulfillmentOrder/
+line/quantity/location matching).
+
+---
+
+### Screenshot-evidence lineage (traceability note, added in the pre-Fable screenshot audit, 2026-07-04)
+
+**[Inference — audit note, not a new decision].** Neither `setup-ux-principles.md`
+nor `product-vision.md` is itself competitor-screenshot evidence — both are
+**recommendation-level inputs** grounded in
+[`../01-research/ux-ui-benchmark.md`](../01-research/ux-ui-benchmark.md) (the
+screenshot-grounded UX benchmark) and
+[`../00-source-materials/competitor-screenshot-inventory.md`](../00-source-materials/competitor-screenshot-inventory.md)
+(the underlying screenshot/visual inventory, R1–R8). This part inherited that
+grounding **transitively** through the two recommendation-level docs but did
+not previously cite the screenshot evidence directly, which a pre-Fable audit
+(2026-07-04) found was not visible enough for review. This note makes the
+chain explicit without deciding anything new:
+
+| Part D rule/proposal | Traces to (competitor evidence) | Claim class |
+| --- | --- | --- |
+| §5 step 5 "Test Connection" (explicit pass/fail before proceeding) | Webkul (WK) S1–S7 explicit Test Connection button; Teqstars (TQ) 7-screenshot OAuth+Test Connection flow | Demonstrated in screenshot |
+| §6/§18 rule 8 "never colour (or icon) alone" | Generalises **and hardens** VentorTech (VT)'s green/yellow/red traffic-light webhook status — VT's pattern is colour-only; this part additionally requires a text label | Demonstrated in screenshot (VT pattern); the text-label hardening is [Inference] |
+| §9 error-center reason + suggested fix + owner state + audit trail | Emipro (EM) state-coloured Data Queues + per-line Log Lines + reason-coded Log Book | Demonstrated in screenshot |
+| §11/§14.2 preview-before-commit (matching center; first-push guard) | VentorTech (VT) Markets & Catalogs Preview/Report dry-run | Demonstrated in screenshot |
+| §14.2 first-push guard is reversible/confirm-first, never a silent one-way action | Avoids Emipro (EM)'s demonstrated "Force Done is irreversible" footgun | Demonstrated in screenshot (the weakness); the avoidance is [Inference] |
+| §17 rule 5 "never expose raw `ir.cron`/Odoo internals" | Avoids Webkul (WK)'s demonstrated exposure of raw cron fields (Model, Scheduler User, Next Execution Date) | Demonstrated in screenshot (the weakness); the avoidance is [Inference] |
+| §19.G anti-pattern checklist (raw cron exposure; toggle-dense config; blind mappings; email-only errors; irreversible Force Done; heavy work in the webhook request) | Synthesises `ux-ui-benchmark.md` "UX gaps and frustrations" (WK raw cron; EM/SH/WK/TQ toggle density; ecommerce_shopify (EC) email-only errors; EM Force Done) | Inference (synthesis of multiple demonstrated weaknesses) |
+
+**Gap identified, explicitly deferred (not adopted).** `sh_shopify_connector`
+(SH)'s demonstrated **"Daily Queue Activity Tracking"** time-series chart is
+the single best monitoring visual in the benchmark (`ux-ui-benchmark.md`
+"Dashboard / command center comparison"). The accepted nine-card dashboard set
+(§7, Part A §F.1 / DEC-012 §3) has no chart/graph counterpart — only count
+cards and a textual recent-activity timeline. This audit does **not** propose
+adding a tenth card or a chart to the accepted set (that would change accepted
+architecture substance outside this session's scope); it is logged here as a
+candidate **premium visualization idea for a later pixel-design pass** (Part E,
+or an implementation-design revision of Part D), not decided or adopted now.
+
+This note adds no new MBQ row, decides no open MBQ, and does not change any
+accepted card set, screen spec, or DEC. See
+[`../01-research/ux-ui-benchmark.md`](../01-research/ux-ui-benchmark.md)
+§"Sprint D pre-Fable screenshot audit (2026-07-04)" for the full
+re-verification and audit trail.
 
 ---
 
@@ -149,7 +195,7 @@ fully settled: whether S2/S3 are a **single role-gated surface** or an
 ### 2.1 Proposed top-level menu (blueprint level; XML IDs are MBQ-03)
 
 **[Screen blueprint proposal].** A single top-level connector menu, role-gated
-per §14, proposed as:
+per §16, proposed as:
 
 ```
 Shopify Connector
@@ -207,7 +253,7 @@ Dashboard (S3) ──count click──▶ Sync Center (S4, filtered) ──row�
 **[Accepted — Part A §J; DEC-012 §10].** All four roles see **one** dashboard/
 sync-center/error-center; **action affordances** (trigger, retry, confirm,
 resolve, edit settings) are role-gated, not the surfaces themselves. Read-only
-Auditor sees everything, acts on nothing. See §14 for the capability matrix.
+Auditor sees everything, acts on nothing. See §16 for the capability matrix.
 
 **[Recommendation — open, MBQ-45].** This IA is drawn as **one role-gated
 surface with role-gated sections** (setup-ux Open Q#2, option A), which the
@@ -293,8 +339,8 @@ thin in the accepted inputs).
 | State | Definition (shared across screens) | Basis |
 | --- | --- | --- |
 | **Empty / first-run** | A guiding empty state that tells a new operator the next concrete action (never a blank grid). | **[Inference]** setup-ux Dashboard principles (C-DASH-06) — no competitor evidence, UX best-practice. |
-| **Loading / in-progress** | Enqueued/`running` work shows honest progress ("queued", "running", last-updated), never a silent spinner and never a fake "real-time" claim. | **[Screen blueprint proposal]** on **[Accepted]** honest-freshness (DEC-012 §4; setup-ux Principle 4). |
-| **Success / done** | An explicit completion signal (e.g. a "processed" ribbon / done count), with a link to what changed. | **[Screen blueprint proposal]** on **[Accepted]** setup-ux Principle 8 completion signal. |
+| **Loading / in-progress** | Enqueued/`running` work shows honest progress ("queued", "running", last-updated), never a silent spinner and never a fake "real-time" claim. | **[Screen blueprint proposal]** on **[Accepted — DEC-012 §4]** honest-freshness; also reflected in setup-ux Principle 4 (recommendation-level input, not accepted). |
+| **Success / done** | An explicit completion signal (e.g. a "processed" ribbon / done count), with a link to what changed. | **[Screen blueprint proposal]**, grounded in setup-ux Principle 8's completion-signal recommendation (recommendation-level input, not accepted). |
 | **Error** | Plain-language reason primary; technical detail behind expand; one of the fixed **16 error classes** shown as a human label; suggested fix + owner state. | **[Accepted — DEC-009; Part A §H; RA-016]**. |
 | **Manual review** | Shown as one of the **6 confirmation-required sub-reasons** (never a generic "needs review"), with a resolution action gated to the Reviewer role. | **[Accepted — DEC-009; Part A §H.8; DEC-012 §5]**. |
 
@@ -354,7 +400,8 @@ strings.
 
 - **Purpose.** Take a merchant from nothing to a proven, safe connection
   without hand-editing server config or pasting long scope strings.
-  **[Accepted — DEC-012 §1; setup-ux Principle 1/2]**.
+  **[Accepted — DEC-012 §1]**; also reflected in setup-ux Principles 1/2
+  (recommendation-level input, not accepted).
 - **Primary users.** Connector Administrator (P2). **[Accepted — DEC-012 §10]**.
 - **Entry points.** First install; re-runnable from `Configuration → Setup
   Wizard`; a "finish setup" nudge on the dashboard when in `setup_incomplete`.
@@ -468,8 +515,9 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
 
 - **Purpose.** Answer, at a glance: **"Is everything OK? What failed and why?
   What do I do next?"** — the UX north star — and let the operator act without
-  reading source or filing a ticket. **[Accepted — DEC-012 §3; setup-ux
-  Principle 5 / north star]**.
+  reading source or filing a ticket. **[Accepted — DEC-012 §3]**; also framed
+  by setup-ux Principle 5 / the UX north star (recommendation-level input, not
+  accepted).
 - **Primary users.** Operator (P1) primarily; visible to all roles.
 - **Entry points.** Top-level `Shopify Connector → Dashboard` (the home).
 - **Primary answer — lead region [Screen blueprint proposal].** The dashboard
@@ -500,7 +548,8 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
   8. **Fulfillment exceptions** (unmatched-picking / ambiguous FulfillmentOrder
      line / notification-confirmation-missing).
   9. **Duplicate/matching exceptions** (ambiguous-match / binding-conflict).
-- **Fused elements [Accepted — setup-ux Dashboard principles].** The home fuses
+- **Fused elements [Screen blueprint proposal, grounded in setup-ux Dashboard
+  principles — recommendation-level input, not accepted].** The home fuses
   connection health + queue/failure counts + a recent-activity timeline +
   reconciliation status ("last synced / last reconciled") + quick actions.
 - **Primary actions.** Quick actions that **enqueue** work (never run heavy
@@ -576,7 +625,9 @@ first-push blocks **inventory** sync only, without blocking product/order sync.
 ## §9. Error center / recovery + manual-review queue (S5)
 
 - **Purpose.** Make **every failure a recovery surface, never a dead end.**
-  **[Accepted — DEC-012 §5; setup-ux Principle 6; vision non-negotiable #2]**.
+  **[Accepted — DEC-012 §5]**; also reflected in setup-ux Principle 6 and
+  product-vision non-negotiable #2 (both recommendation-level inputs, not
+  accepted).
 - **Primary users.** Operator (fixable/retryable); **Reviewer** (confirmation-
   required manual-review items); Auditor read-only.
 - **Entry points.** Menu; dashboard failure/exception cards; sync-center rows.
@@ -905,7 +956,7 @@ location-mismatch review that routes through the error center.
 | --- | --- | --- |
 | **Connector Administrator** (P2) | Setup wizard; store settings; masked credential status; enable/disable domains; source-of-truth & notification defaults; mappings | — |
 | **Connector Operator** (P1) | Manual syncs; dashboard/sync-center/error-center; retry **safe** jobs; open records; run previews | Change settings/credentials; resolve confirmation-required review |
-| **Connector Reviewer / Manual Review Owner** | Resolve `blocked_manual_review` items (the 6 sub-reasons) | Change settings; general retry/trigger (Reviewer is approval-focused — MBQ-47 accepted) |
+| **Connector Reviewer / Manual Review Owner** | Resolve items awaiting manual review (`blocked_manual_review`; the 6 sub-reasons) | Change settings; general retry/trigger (Reviewer is approval-focused — MBQ-47 accepted) |
 | **Read-only Auditor** (P3) | View everything | Trigger, retry, confirm, or change anything |
 
 - **Reading this table [Screen blueprint proposal].** Capabilities are stated in
@@ -933,7 +984,9 @@ reason, suggested fix, and confirmation dialog is **not decided here** — this 
 a **style guide**, and every quoted example is **illustrative, not mandated**.
 DEC-012 §5 and setup-ux/vision all explicitly defer exact wording.
 
-**Style rules [Accepted — DEC-009; DEC-012 §5; setup-ux Principle 8; RA-016]:**
+**Style rules [Accepted — DEC-009; DEC-012 §5; RA-016]; rule 8 below is also
+reflected in setup-ux Principle 8 as a recommendation-level input, not
+accepted:**
 
 1. **Plain-language reason first.** Every error's primary line is a plain
    sentence a non-developer understands (illustrative: "Shopify rejected this
@@ -953,7 +1006,7 @@ DEC-012 §5 and setup-ux/vision all explicitly defer exact wording.
    error-center.
 7. **Confirmation copy states consequences** for destructive/irreversible
    actions (delete-on-omit variants, disconnect, publish-to-live).
-8. **Status is never colour (or icon) alone.** Every status, badge, chip, or
+8. **[Screen blueprint proposal].** **Status is never colour (or icon) alone.** Every status, badge, chip, or
    pill carries a **text label plus a severity/owner word** (e.g. "Failed",
    "Needs review", "Healthy") that stays unambiguous with colour removed;
    colour/icon is reinforcement only. Zero/healthy states are affirmatively

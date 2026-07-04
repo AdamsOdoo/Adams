@@ -138,7 +138,16 @@ Explicit proposal points (each **proposed**, not decided by this record):
 - **(F)** **Premium acceptance checklist** grounded in `product-vision.md` /
   `setup-ux-principles.md` as **recommendation-level inputs** (both "decide
   nothing"; both predate DEC-003 and are reconciled against it). *Proposed as
-  the pre-implementation bar for ChatGPT to ratify or amend.*
+  the pre-implementation bar for ChatGPT to ratify or amend.* **Screenshot-audit
+  addendum (2026-07-04):** a pre-Fable audit found the Part D document itself
+  did not directly cite the screenshot evidence behind those two documents
+  ([`../01-research/ux-ui-benchmark.md`](../01-research/ux-ui-benchmark.md),
+  [`../00-source-materials/competitor-screenshot-inventory.md`](../00-source-materials/competitor-screenshot-inventory.md)),
+  even though it inherited that grounding transitively. Part D now carries an
+  explicit "Screenshot-evidence lineage" traceability note citing both
+  directly. This is a **documentation-traceability correction**, not a new
+  decision — it changes no accepted content, decides no MBQ, and adds no new
+  proposal point.
 
 ## What remains open
 

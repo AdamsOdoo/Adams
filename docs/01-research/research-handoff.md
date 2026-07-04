@@ -60,16 +60,23 @@
 
 - **Branch / PR:** `claude/master-blueprint-sprint-d-screen-3jmyd0`
   → **draft PR #77** into `Shopify-connector`, **not merged**, **not** marked
-  ready for review (proposal commit + one pre-review strengthening commit).
-- **Files changed:**
+  ready for review (five commits: the proposal commit, the pre-review
+  strengthening commit, the duplicate-PR salvage-reconciliation commit, the
+  duplicate-PR-history-correction commit, and this session's screenshot-audit +
+  Fable-fixes commit — corrects an earlier version of this bullet that was left
+  reading "proposal commit + one pre-review strengthening commit" after the
+  chain had already grown to four commits).
+- **Files changed (cumulative across all 5 commits):**
   `docs/03-architecture/master-blueprint-ui-ux-screen-design.md` (new),
   `docs/04-decisions/DEC-016-master-blueprint-ui-ux-screen-design.md` (new),
   `docs/03-architecture/master-blueprint.md`,
   `docs/03-architecture/master-blueprint-open-questions.md`,
   `docs/05-qa/architecture-review-log.md`,
-  `docs/01-research/research-handoff.md` (this file). **No code files
-  changed. `docs/04-decisions/README.md` deliberately not touched** — per the
-  established pattern, proposals do not get a README entry until acceptance.
+  `docs/01-research/research-handoff.md` (this file),
+  `docs/01-research/ux-ui-benchmark.md` (added this session — screenshot audit
+  section). **No code files changed. `docs/04-decisions/README.md`
+  deliberately not touched** — per the established pattern, proposals do not
+  get a README entry until acceptance.
 - **What changed:** proposed **Master Blueprint Part D — UI/UX Screen Design
   Blueprint** (`master-blueprint-ui-ux-screen-design.md`, 22 sections):
   screen inventory under the single-shared-surface rule (RA-013); navigation/
@@ -123,6 +130,60 @@
   DEC-015 and AR-002–AR-012; AR-013 remains Proposed). **No architecture
   substance changed; no open MBQ decided; no new MBQ added; DEC-016 / AR-013 /
   Part D remain Proposed; Part E not started; implementation blocked.**
+- **Screenshot UX benchmark audit + Fable Sprint D review fixes (2026-07-04,
+  5th commit on the same draft PR #77):** ChatGPT raised a concern that Part D
+  did not visibly show that competitor screenshots were inspected and used to
+  make the UI/UX better than public connectors. Ran a **focused competitor
+  screenshot UX benchmark audit** (not a full re-collection — the Sprint C/C2
+  evidence in `competitor-screenshot-inventory.md`/`ux-ui-benchmark.md` was
+  already extensive and dated 2026-06-30/07-01): re-verified six of the eight
+  minimum-audit sources today (Webkul, Emipro, VentorTech, `sh_shopify_connector`,
+  `ecommerce_shopify` reconfirmed consistent and current; Teqstars docs
+  reconfirmed still 403 to the default fetcher user-agent, unchanged); found
+  one new, previously-unrecorded detail (`ecommerce_shopify`'s "Live Preview"
+  external demo link, not followed — logged as an open item). **Finding:**
+  Part D is **transitively** grounded in the screenshot evidence (via
+  `setup-ux-principles.md`/`product-vision.md`, both of which are extensively
+  screenshot-cited) but carried **no direct citation** of the benchmark or any
+  competitor by name — the exact visibility gap ChatGPT flagged. **Decision:**
+  a targeted, documentation-only patch was warranted (not a redesign). Added a
+  dated audit section to `ux-ui-benchmark.md` (re-verification + a
+  rule-by-rule traceability mapping) and a new "Screenshot-evidence lineage"
+  note to `master-blueprint-ui-ux-screen-design.md` citing `ux-ui-benchmark.md`
+  and `competitor-screenshot-inventory.md` directly, plus a short DEC-016
+  addendum (§F) recording the citation as a documentation-traceability
+  correction, not a new decision. One gap was identified —
+  `sh_shopify_connector`'s demonstrated "Daily Queue Activity Tracking" chart
+  has no counterpart in Part D's accepted nine-card dashboard — and was
+  **explicitly logged as deferred to a later pixel-design pass (Part E)**, not
+  added to the accepted card set (would have changed accepted architecture
+  substance, out of scope). Then applied the seven Fable Sprint D review
+  findings (F1–F7): **F1** relabelled the "never colour/icon alone" rule (§17
+  rule 8) as a Screen blueprint proposal, not Accepted; **F2** corrected six
+  places where `setup-ux-principles.md`/`product-vision.md` citations were
+  bundled inside an `[Accepted — ...]` bracket (§4 table ×2, §5, §7 ×2, §9,
+  §17 header) — split so only the genuine DEC citation stays Accepted and the
+  setup-ux/vision reference is explicitly marked recommendation-level, not
+  accepted; **F3** corrected this handoff's stale "two commits" wording (the
+  **Branch/PR** and **Stop condition** bullets above) to the actual commit
+  chain; **F4** fixed `master-blueprint.md`'s stale "Part D ... remain Not
+  started" sentence (§"Domain blueprints still pending") to state Part D is
+  now Proposed via DEC-016, only Part E remains Not started; **F5** fixed two
+  `§2` cross-references that pointed to `§14` (Inventory screens) instead of
+  `§16` (Permissions/roles visibility); **F6** added the two missing rejected
+  approaches, **RA-017** (no connector-designed idempotency key / binding-alone
+  reliance) and **RA-021** (treating Shopify/Odoo quantities as directly
+  equivalent without a recorded source-of-truth decision), to the RA guardrail
+  list; **F7** reworded the Reviewer role's capability cell (§16) to lead with
+  plain language ("Resolve items awaiting manual review"), with
+  `blocked_manual_review` moved into a parenthetical, matching the doc's own
+  stated labelling rule. Optional Fable findings **N1–N4 were not applied** —
+  the screenshot audit did not independently prove any of them necessary as a
+  documentation-only addition. **No architecture substance changed; no open
+  MBQ decided; no MBQ row added or renumbered; DEC-016 / AR-013 / Part D
+  remain Proposed, not accepted; Part E not started; implementation blocked;
+  DEC-003 through DEC-015 untouched; `docs/04-decisions/README.md` untouched;
+  no code files changed.**
 - **Items deferred:** MBQ-53's full closure (awaits DEC-016 acceptance +
   sibling rows MBQ-03/22/44/45/06); the open recommendations MBQ-33/34/41/35/32
   (screens accommodate either resolution, none decided); MBQ-04/05/07/08/13/54/
@@ -150,23 +211,37 @@
   MBQ row; it consumes existing ones. **Architecture concerns:** Part D is a
   screen-design proposal only; MBQ-45 (surface split) and the open
   recommendations remain ChatGPT-owned and are accommodated, not decided.
+  **Screenshot-audit addendum (2026-07-04):** **new issue discovered:** a
+  document can be substantively grounded in cited evidence yet still read as
+  ungrounded to a reviewer if the citation chain is one hop removed (Part D
+  cited `setup-ux-principles.md`/`product-vision.md` but not the screenshot
+  benchmark behind them) — mitigated by adding a direct traceability note
+  rather than re-deriving the design. **Repeated issue pattern:** this is a
+  new instance of the same Accepted-vs-Recommendation labelling-discipline
+  family noted above, applied to evidence *citation depth* rather than
+  decision status. **New rejected approaches:** none. **New technical debt:**
+  none (no code). **New open questions:** none (the SH activity-chart idea
+  was logged as an explicitly deferred idea, not an MBQ row). **Architecture
+  concerns:** none new — no accepted card set, screen spec, or DEC changed.
 - **Quality gate confirmation:** handoff updated (this note) · feedback loop
   checked · learning captured · rejected approaches checked, none added ·
   technical debt logged (none applicable — no code) · repeated-issue escalation
-  applied (label-discipline mitigation) — all **YES**.
+  applied (label-discipline mitigation, twice) — all **YES**.
 - **Next recommended session:** 1) **ChatGPT review of DEC-016 / Part D** (accept,
   revise, or reject); 2) on acceptance, **Master Blueprint Part E —
   implementation-planning bridge**; 3) a future, separate ChatGPT decision on the
   open recommendations MBQ-33/34/41/45/06/35/32; 4) **implementation only after a
   separate ChatGPT gate**, and for any operator-facing screen only after Part D
   is accepted.
-- **Stop condition:** stopping after the proposal commit plus one pre-review
-  strengthening commit on the same **draft PR #77** into
-  `Shopify-connector` (not merged, not marked ready for review). DEC-003 through
-  DEC-015 not edited; `docs/04-decisions/README.md` not edited; no code files
-  changed; Part D is **Proposed, not accepted**; Part E not started;
-  implementation still not authorized; `main` and plain `dev` untouched. Awaiting
-  ChatGPT review.
+- **Stop condition:** stopping after the five-commit chain described in the
+  **Branch/PR** bullet above, on the same **draft PR #77** into
+  `Shopify-connector` (not merged, not marked ready for review). DEC-003
+  through DEC-015 not edited; `docs/04-decisions/README.md` not edited; no
+  code files changed; Part D is **Proposed, not accepted**; Part E not
+  started; implementation still not authorized; MBQ-53 remains Proposed
+  partially resolved / open pending DEC-016 acceptance; MBQ-60 through MBQ-63
+  remain open; PR #75 remains closed, not merged; `main` and plain `dev`
+  untouched. Awaiting ChatGPT review.
 
 ---
 

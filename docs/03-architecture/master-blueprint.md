@@ -227,8 +227,10 @@ resolved by this acceptance. **MBQ-33 (first-push guard granularity),
 MBQ-34 (ongoing apply-mode), and MBQ-41 (notification-UI granularity)
 also remain open** — each carries a recommendation not adopted as a
 decision by this acceptance.
-**Part D (UI/UX Screen Design Blueprint) and Part E
-(implementation-planning bridge) remain Not started.** Open questions
+**Part D (UI/UX Screen Design Blueprint) is now Proposed via DEC-016**
+(2026-07-03, Master Blueprint Sprint D; not yet accepted — see the Status note
+above); **Part E (implementation-planning bridge) remains Not started.** Open
+questions
 routed to Part B/C are grouped in
 [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md).
 

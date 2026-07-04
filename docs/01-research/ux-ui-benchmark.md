@@ -287,3 +287,81 @@ guide behind sign-in is an onboarding anti-pattern.
   per-record inline-retry control.)* What does EC's actual UI look like (no screenshots)? How do
   competitors surface Shopify **rate-limit/throttle** events to users (none found)?
   How do they present **reconciliation** runs to users (mostly implicit)?
+
+---
+
+## Sprint D pre-Fable screenshot audit (2026-07-04) — re-verification and Part D traceability
+
+> **Purpose.** Before applying Fable's Sprint D review fixes (F1–F7) to PR #77,
+> this audit checked whether the Master Blueprint **Part D — UI/UX Screen
+> Design Blueprint**
+> ([`../03-architecture/master-blueprint-ui-ux-screen-design.md`](../03-architecture/master-blueprint-ui-ux-screen-design.md))
+> is genuinely informed by the competitor screenshot evidence above, not just
+> by the recommendation-level `setup-ux-principles.md`/`product-vision.md`
+> documents that cite it. **Verdict: yes, transitively** — Part D inherits this
+> benchmark's findings through those two documents, which are themselves
+> extensively screenshot-cited — but Part D itself carried **no direct
+> citation** of this file or of any competitor by name (one exception: a single
+> "no competitor evidence" note in its §4 state-model table). That traceability
+> gap is corrected in Part D's new "Screenshot-evidence lineage" note (added
+> this session); see the table there for the rule-by-rule mapping. This section
+> records the audit's own re-verification pass and the one gap identified.
+
+### Re-verification (fresh spot-check, 2026-07-04)
+
+No new binary screenshots were saved (same sprint rule as Sprint C/C2). A
+targeted re-fetch (same proxy-fetcher method as Sprint C/C2 — page→markdown,
+pixels not directly rendered) was run **today** against six of the eight
+minimum-audit sources, to confirm the Sprint C/C2 evidence is still current
+before it is relied on for this decision. (A same-session attempt to drive a
+real headless browser for actual pixel rendering was abandoned when it could
+not be made to work through the session's TLS-inspecting proxy without
+disabling certificate verification, which is against this environment's
+policy; re-verification below used the same sanctioned page→markdown fetch
+tool as Sprint C/C2, not a new capability.)
+
+| Source | Re-checked today? | Result |
+| --- | --- | --- |
+| Webkul (R1) blog | Yes | HTTP 200; all 21 captioned screenshots (Test Connection, Feeds, cron fields, config tabs) confirmed present and consistent with the Sprint C notes above — no drift. |
+| Teqstars (R2) docs (`create_instance.html`) | Yes | Still **403** to the default fetcher user-agent — confirms the Sprint C2 finding that this is a WAF/bot-UA-sniff, not a new access change; not re-read today (no auth bypassed). |
+| Emipro (R3) queue page | Yes | HTTP 200; the 5 queue screenshots (draft/failed/cancelled/done states, Process Queue Manually, Log Lines, processed ribbon) confirmed present and consistent with the Sprint C notes. |
+| VentorTech (R4) webhooks page | Yes | Accessible (anonymous); green/yellow/red traffic-light status and the "callback URL mismatch — check `web.base.url`" yellow-state meaning confirmed verbatim; two dated screenshot filenames now visible (`image-20260327-165903.png`, `image-20260327-170032.png`) — consistent with the "partial/anonymous access" status already recorded. |
+| Odoo Apps `sh_shopify_connector` (R8) | Yes | HTTP 200; the "Daily Queue Activity Tracking" caption reconfirmed **verbatim**; dashboard/queue/access-rights screenshot groups consistent with the existing R8 walkthrough. |
+| Odoo Apps `ecommerce_shopify` (R6) | Yes | HTTP 200; reconfirmed **zero** interface screenshots (icon + 6 cross-promo banners only). **New, not previously recorded:** the listing also offers a **"Live Preview"** link to an external demo environment — not followed this session (out of scope; the demo is a live third-party environment, not a screenshot, and following it was not necessary to answer this session's traceability question). Logged as an **open item** for a future sprint if deeper `ecommerce_shopify` UI evidence is wanted. |
+
+No pixel-level (rendered image) inspection was performed this session — the
+same limitation recorded in Sprint C/C2 (`../00-source-materials/competitor-screenshot-inventory.md`
+lines 15–29) still applies; all evidence above is caption/alt-text/step-text
+based, re-confirmed current as of **2026-07-04**, not new pixel depth.
+
+### Part D traceability mapping (summary)
+
+The full rule-by-rule table lives in Part D's own new "Screenshot-evidence
+lineage" section (added this session, cited above); in summary, Part D's setup
+flow, error-center, matching-center, and anti-pattern checklist each trace to a
+specific demonstrated competitor pattern or a specific demonstrated competitor
+weakness this connector avoids — see that table rather than duplicating it
+here.
+
+### Gap identified, explicitly deferred (not adopted)
+
+`sh_shopify_connector` (SH)'s demonstrated **"Daily Queue Activity Tracking"**
+time-series chart is the single best monitoring visual in this benchmark (see
+"Dashboard / command center comparison" above). The accepted nine-card
+dashboard set (Part D §7; Part A §F.1 / DEC-012 §3) has no chart/graph
+counterpart — only count cards and a textual recent-activity timeline. This
+audit does **not** propose adding a tenth card or a chart to the accepted set
+(that would change accepted architecture substance, outside this session's
+scope); it is logged here as a candidate **premium visualization idea for a
+later pixel-design pass** (Part E, or a future implementation-design revision
+of Part D), not decided or adopted now.
+
+### Conclusion for the PR #77 decision
+
+Part D's design choices materially reflect this benchmark's findings (see the
+traceability table added to Part D). The one identified gap (above) is
+explicitly deferred, not silently dropped. No other material gap was found
+between this benchmark and Part D's blueprint-level proposals. **Decision:
+apply a documentation-only traceability patch to Part D (this file + the Part D
+document + a one-line DEC-016 note), then proceed to the Fable F1–F7 fixes** —
+no redesign, no MBQ decided, no accepted content changed.
