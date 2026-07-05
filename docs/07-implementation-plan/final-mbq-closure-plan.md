@@ -1,25 +1,27 @@
-# Final MBQ Closure Plan — Proposed
+# Final MBQ Closure Plan — Accepted
 
 > Final planning-closure package for the premium **Odoo 19 ↔ Shopify
 > Connector**. Prepared after PR #85 (core naming/schema planning, AR-019)
 > merged into `Shopify-connector` at merge commit
-> `2e6842b` on **2026-07-05**. Companion documents:
+> `2e6842b` on **2026-07-05**; **accepted by ChatGPT on 2026-07-05, at
+> planning-closure level only** (see "Acceptance" below). Companion
+> documents:
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
-> (the MBQ register this plan closes or scopes — **not edited by this PR**),
+> (the MBQ register — §7's wording **now applied** by the acceptance
+> patch),
 > [`../05-qa/implementation-gate-readiness-audit.md`](../05-qa/implementation-gate-readiness-audit.md)
 > (AR-018, accepted), [`core-naming-schema-planning.md`](./core-naming-schema-planning.md)
 > (AR-019, accepted),
 > [`../03-architecture/master-blueprint-implementation-planning-bridge.md`](../03-architecture/master-blueprint-implementation-planning-bridge.md)
 > (Part E). Companion review-log entry: **AR-020**
 > ([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)),
-> **Proposed for ChatGPT review**.
+> **Accepted by ChatGPT**.
 
 ## Status
 
-- **Proposed for ChatGPT review.** Nothing in this document is decided
-  until ChatGPT accepts it.
+- **Accepted by ChatGPT on 2026-07-05.**
+- **Accepted at planning-closure level only.**
 - **Documentation-only.**
-- **Planning-closure only.**
 - **Does not create code.** No Python, XML, manifest, security CSV, test,
   CI, or Odoo module file is created or modified.
 - **Does not create implementation tasks.** No file matching `CLAUDE.md`
@@ -27,16 +29,44 @@
 - **Does not open the implementation gate.** Opening the gate remains a
   separate, explicit ChatGPT act (`master-blueprint.md`, "Criteria for
   when implementation may later be opened", criterion 3).
-- **Does not edit the MBQ register.**
-  `master-blueprint-open-questions.md` is untouched by this PR; §7 below
-  provides the proposed replacement wording only, to be applied by a
-  future acceptance patch if and when ChatGPT accepts.
-- **Implementation remains blocked** until ChatGPT accepts this closure
-  package **and then separately opens the implementation gate.** Accepting
-  this package is necessary but not sufficient — it is not the gate act.
-- Every proposed decision below is a **[Recommendation]** per `CLAUDE.md`
-  §8 until accepted; verified platform facts are labelled **[Fact]** with
-  source and access date; deductions are labelled **[Inference]**.
+- **Implementation remains blocked until a separate, explicit
+  gate-opening act.** Accepting this package is necessary but not
+  sufficient — it is not the gate act.
+
+## Acceptance
+
+**ChatGPT accepted this closure package on 2026-07-05**, as the final MBQ
+planning-closure package before limited core implementation.
+
+- **Zero MBQ rows remain blocking a limited, core-only, zero-UI
+  implementation gate** (§6, class G empty — accepted reading).
+- **Acceptance does not open the gate.**
+- **Acceptance does not authorize implementation.** No code, Odoo module,
+  or scaffolding is authorized by it.
+- **Acceptance does not create a task.**
+- **The MBQ register wording (§7) has been applied by this acceptance
+  patch** to exactly the 50 reviewed rows in
+  `master-blueprint-open-questions.md`, plus its top acceptance-patch
+  note; no other row was touched.
+- Every "proposed" decision, default, and status in §3–§6 below is
+  **accepted as written** at planning-closure level; the section wording
+  is retained as the historical proposal-and-reasoning trail. No risk or
+  containment rule in §10 is weakened by this acceptance.
+- **A separate ChatGPT act is still required to:** (1) confirm AR-018's
+  criterion-5 reading (the DP-003/004/006 prevention-rule status), (2)
+  open the limited core gate (`shopify_connector_core` only, zero
+  operator-facing UI, no webhooks, no external API calls, no credential
+  persistence, no setup wizard, no test connection, no domain logic —
+  future gate scope limited to module skeleton, manifest/init files, the
+  six accepted core models, groups/access CSV, core constraints, core
+  tests), and (3) authorize the first implementation task written to the
+  `CLAUDE.md` §9 template. **None of those acts is performed by this
+  acceptance.**
+
+- Decisions below were proposed as **[Recommendation]** per `CLAUDE.md`
+  §8 and are now accepted (see Acceptance above); verified platform facts
+  are labelled **[Fact]** with source and access date; deductions are
+  labelled **[Inference]**.
 - **Research conducted this session (high-power mode, authorized by the
   session prompt):** five parallel evidence agents — two repo-extraction
   passes (Master Blueprint Parts B/C; DEC-003/004/005/008, decisions
@@ -168,9 +198,11 @@ containment.
 | 64 | Resolved (posture); residual mapping | Currency divergence mechanics | No | Yes — order-import task detail | No | TASK | DEC-020 | Partially resolved; residual = error-class/sub-reason mapping + enforcement mechanism in order-import task spec |
 | 65 | Resolved (posture); residual mechanics | Product webhook mechanics | No | Yes — product-webhook task detail | No | TASK | DEC-020 | Partially resolved; residual = controller/job/query/subscription mechanics in product-webhook task spec; truncation claim verified in-task |
 
-## 4. Proposed final MBQ decisions
+## 4. Final MBQ decisions — accepted
 
-Decision blocks for every row above. Blocks are grouped: §4.A gives the
+Decision blocks for every row above, **accepted as written by the
+2026-07-05 acceptance** (each block's "proposed" wording is retained as
+the historical proposal trail). Blocks are grouped: §4.A gives the
 full blocks for rows where this plan proposes **new substance** (evidence
 or a conservative default); §4.B gives compact blocks for rows whose
 closure is a **scope/routing classification** of already-accepted content
@@ -811,13 +843,15 @@ satisfies "a prevention rule in place", per AR-018 §3). Those are acts,
 not open questions — no MBQ row requires further research or decision to
 open a **limited, core-only, zero-UI** gate.
 
-## 7. Proposed MBQ register updates
+## 7. MBQ register updates — applied
 
-**Not applied by this PR.** Exact wording to be applied to
-`master-blueprint-open-questions.md` by a future acceptance patch, if and
-when ChatGPT accepts this package. Two forms are used, following the
+**Applied by the acceptance patch on 2026-07-05** (with DATE = 2026-07-05
+and "accepted by ChatGPT via AR-020" phrasing) to
+`master-blueprint-open-questions.md`, together with a top
+acceptance-patch note in the register. Two forms are used, following the
 register's own acceptance-patch pattern (append to the row's question
 cell; update Decision-owner / Blocks-implementation cells where stated).
+The wording below is retained as the applied source text.
 
 **7.1 Standard closure sentence** — append to the question cell of
 MBQ-06, 08, 13, 17, 23, 25, 30, 33, 34, 36, 38, 40, 41, 42, 43, 52, 59,
@@ -1020,11 +1054,12 @@ noted):
   Payload/subscription verification is a named precondition of any
   future implementation decision." Blocks cell → "No for Phase 1."
 
-## 8. Proposed implementation gate posture
+## 8. Implementation gate posture — accepted
 
-**Fable recommends: READY for a first limited core implementation gate
-after ChatGPT acceptance of this closure package** — strictly bounded as
-follows:
+**Accepted by ChatGPT (2026-07-05): READY for a first limited core
+implementation gate**, now that this closure package is accepted —
+strictly bounded as follows (the gate itself remains closed until the
+separate, explicit opening act):
 
 - **Scope of the recommended gate:** `shopify_connector_core` substrate
   only, zero operator-facing UI, no webhooks, no external API calls, no
@@ -1049,7 +1084,7 @@ follows:
   any of those acts.** No implementation task is created. The gate
   remains closed. Implementation remains blocked.
 
-## 9. Proposed first implementation sequence after closure
+## 9. First implementation sequence after closure — accepted as planning guidance
 
 Sequence only — no task files. MBQ dependencies listed per item are the
 rows that must be closed (or their task-spec residuals fixed in that
@@ -1138,7 +1173,12 @@ item's own spec) before that item starts.
     staleness items already flagged by AR-018 §2 (not fixed here; out of
     scope).
 
-## 11. Recommendation to ChatGPT
+## 11. Recommendation to ChatGPT — accepted
+
+**ChatGPT accepted this recommendation on 2026-07-05** (see "Acceptance"
+above): the closure package is accepted; steps (2)–(4) below remain
+pending as separate, explicit ChatGPT acts, none performed by the
+acceptance itself. Retained below as the reasoning trail.
 
 **Accept this closure package, then proceed to a separate, limited,
 core-only implementation-gate opening** (§8's bounded scope), in this
