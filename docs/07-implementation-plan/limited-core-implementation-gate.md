@@ -10,12 +10,32 @@
 > creates **no code, no module, no Python, no XML, no manifest, no security
 > CSV, no test, and no CI file.** It authorizes exactly one implementation
 > task — [Task 001](./task-001-core-module-scaffold.md) — and nothing
-> beyond it. **Proposed for ChatGPT review via this PR; the gate is only
-> genuinely open once ChatGPT accepts and merges this PR** (see [AR-021](../05-qa/architecture-review-log.md)).
+> beyond it. **Accepted by ChatGPT on 2026-07-05** (see [AR-021](../05-qa/architecture-review-log.md));
+> **the gate is opened only once this PR is merged into `Shopify-connector`
+> — this acceptance does not itself create code or start implementation.**
+
+## Acceptance
+
+- **Accepted by ChatGPT on 2026-07-05.**
+- Opens the limited core-only zero-UI gate **after this PR is merged.**
+- Confirms [AR-018](../05-qa/architecture-review-log.md) criterion 5
+  **only for the limited core gate** — see §2.
+- Authorizes exactly **one** implementation task: Task 001 (§6).
+- **Does not create code.**
+- **Does not start implementation in this PR.**
+- **Does not authorize credentials, external API calls, operator-facing
+  UI, or product/customer/order/inventory/fulfillment domain logic.**
+- **Does not apply project-wide to future gates** — every later gate
+  (product/customer/sale, inventory, fulfillment, UI, credentials/API)
+  requires its own separate, explicit ChatGPT gate-opening act.
+- Future tasks still require their own evidence, allowed files, forbidden
+  files, tests, rollback notes, and ChatGPT review — this acceptance
+  authorizes Task 001 only, not a standing implementation mandate.
 
 ## Status
 
-- Opened by ChatGPT gate act, pending ChatGPT review until this PR is accepted.
+- **Accepted by ChatGPT on 2026-07-05.** Gate opened only after this PR
+  is merged into `Shopify-connector`.
 - Gate scope is limited to `shopify_connector_core`.
 - Zero operator-facing UI.
 - No webhooks.
@@ -27,7 +47,7 @@
 - No dashboard.
 - No sync center.
 - No error-center UI.
-- No implementation beyond the approved first task.
+- No implementation beyond Task 001.
 
 ## 1. Basis for opening
 
@@ -62,7 +82,7 @@ marked `Mitigated`). The audit declined to resolve this ambiguity itself —
 out of its allowed-files scope and its own authority — and recommended
 ChatGPT confirm the reading directly.
 
-**Decision:**
+**Decision (accepted by ChatGPT on 2026-07-05):**
 
 ChatGPT confirms that DP-003/004/006 satisfy the prevention-rule
 requirement for this limited core gate because their recorded
@@ -134,7 +154,8 @@ Within `shopify_connector_core` only, the following is opened:
 
 ## 6. First task authorized
 
-Exactly one implementation task is authorized by this gate:
+Exactly one implementation task is authorized by this gate, **starting
+only after this PR is merged into `Shopify-connector`**:
 
 [`docs/07-implementation-plan/task-001-core-module-scaffold.md`](./task-001-core-module-scaffold.md)
 

@@ -10,8 +10,11 @@
 
 ## Status
 
-Authorized by limited core implementation gate, pending ChatGPT
-acceptance/merge of this PR.
+Authorized by the limited core implementation gate after PR #87 is
+accepted and merged. This document is the only implementation task
+authorized by the limited core gate. Task 001 may start only after PR #87
+is merged. **Still no code is created by this PR** — this remains a task
+specification only.
 
 ## Objective
 

@@ -153,6 +153,20 @@
   gate and its criterion-5 confirmation are only genuinely in effect once
   ChatGPT accepts and merges the proposing PR; until then this table
   (§3) and its criteria count are unchanged.
+- **Limited core implementation gate accepted by ChatGPT on 2026-07-05
+  (PR #87).** **[AR-021](../05-qa/architecture-review-log.md) is now
+  Accepted.** The limited, core-only, zero-UI gate proposed immediately
+  above is accepted and **opens once PR #87 is merged into
+  `Shopify-connector`** — not before. **Gate scope remains
+  `shopify_connector_core` only** — module scaffold, the six
+  AR-019-accepted core models, groups/access CSV, core
+  constraints/indexes, core tests. **No credentials, no external API
+  calls, no operator-facing UI, no domain logic** is authorized. **Task
+  001 (Core Module Scaffold) is authorized as the only implementation
+  task, starting only after PR #87 merges** — no second task is
+  authorized. **No code is created in this PR.** **Next step after
+  merge:** Task 001's own coding PR. Until PR #87 merges, this table
+  (§3) and its criteria count remain unchanged.
 
 ## 1. Purpose of Part E
 
