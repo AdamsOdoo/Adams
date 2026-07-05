@@ -56,6 +56,61 @@
 
 ---
 
+### Task 001 — F1 fix (operation_scope_key not cleared on supersede) — compact handoff (2026-07-05)
+
+> **Revision commit on PR #88, per ChatGPT REVISE review.** Confirmed
+> before editing: PR #88 head commit `811c168f8d4bbed1de5660b16272ee38c2712ffc`
+> (branch `claude/task-001-core-module-scaffold-coesxy`, based on
+> `Shopify-connector` at PR #87 merge commit
+> `dad9bfd6be5d1c7db939bb5132875ce6e8674368`).
+
+- **Branch / PR:** `claude/task-001-core-module-scaffold-coesxy` → PR #88
+  into `Shopify-connector` (**draft, not merged**).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_job.py`,
+  `docs/01-research/research-handoff.md` (this file). **No other file
+  touched. No DEC file changed. No `docs/04-decisions/README.md` change.
+  No `defect-pattern-log.md` change. No Task 002 started. No credential/
+  token/secret field, Shopify API/webhook/controller code, cron data, or
+  menu/action/view/wizard XML added.**
+- **What changed / residue fixed:** **F1** — ChatGPT's review found that
+  `_compute_operation_scope_key()` cleared `operation_scope_key` on
+  reaching a terminal state or on a missing `res_model`, but not when a
+  job is superseded (`superseded_by_job_id` set), contradicting the
+  accepted AR-019 §8 rule ("populated while the job is non-terminal...
+  set to NULL on reaching a terminal state **or being superseded**").
+  Fixed by adding `superseded_by_job_id` to the method's `@api.depends`
+  and to the clearing condition, so a superseded job's
+  `operation_scope_key` is set to `False`/NULL exactly like a terminal
+  job's, freeing the `(store_id, operation_scope_key)` unique constraint
+  for the superseding job. Terminal-state clearing and missing-`res_model`
+  clearing behavior are unchanged; the docstring comment was updated to
+  say "terminal state or being superseded."
+- **Items deferred:** none new — the two known limitations already noted
+  in the prior Task 001 entry (no live Odoo runtime in this environment;
+  `payload_hash`'s own hashing/normalization algorithm remains an open,
+  implementation-time detail) still stand.
+- **Learning feedback loop:** new issues: F1 (operation_scope_key not
+  cleared on supersede) was caught by ChatGPT review, not by this
+  session's own static checks, since no Odoo runtime exists here to
+  exercise the compute method against a live `superseded_by_job_id`
+  write — logged as a gap in what static verification alone can catch on
+  this repository. Repeated patterns: none. Rules updated: none.
+  Rejected approaches: none. Technical debt: none new. Architecture
+  concerns: none new. Tests/review gates needed: same as before — a
+  future session should add a real Odoo-runtime test for this exact
+  supersede-clears-scope-key behavior once a test framework/CI is
+  authorized. Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked
+  · learning captured · rejected approach logged (N/A) · technical debt
+  logged (N/A) · repeated-issue escalation applied (N/A) — all YES.
+- **Next recommended session:** ChatGPT re-review of PR #88 for F1
+  resolution. No Task 002 until this PR is accepted.
+- **Stop condition:** stopped after pushing the F1 fix commit and
+  refreshing the PR body/head SHA. No merge performed. PR #88 remains
+  draft.
+
+---
+
 ### Task 001 — Core Module Scaffold implemented — compact handoff (2026-07-05)
 
 > **First coding PR for this project.** Confirmed before editing: branch

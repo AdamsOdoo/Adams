@@ -177,14 +177,22 @@ class ShopifyConnectorJob(models.Model):
                 )
             )
 
-    @api.depends('state', 'store_id', 'res_model', 'res_id', 'shopify_target_gid')
+    @api.depends(
+        'state', 'store_id', 'res_model', 'res_id', 'shopify_target_gid',
+        'superseded_by_job_id',
+    )
     def _compute_operation_scope_key(self):
         # The DB-backed serialization guard key (§8): populated only
         # while the job is non-terminal and has a known target; cleared
-        # on reaching a terminal state so terminal jobs never collide
-        # under the (store_id, operation_scope_key) unique constraint.
+        # on reaching a terminal state or being superseded, so a
+        # terminal-or-superseded job never collides with a new job under
+        # the (store_id, operation_scope_key) unique constraint.
         for job in self:
-            if job.state in TERMINAL_JOB_STATES or not job.res_model:
+            if (
+                job.state in TERMINAL_JOB_STATES
+                or job.superseded_by_job_id
+                or not job.res_model
+            ):
                 job.operation_scope_key = False
             else:
                 job.operation_scope_key = '|'.join(
