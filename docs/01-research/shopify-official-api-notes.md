@@ -220,6 +220,120 @@
   layered-sync posture for inventory) remain unverified — routed to
   **MBQ-65** (`../03-architecture/master-blueprint-open-questions.md`).
 
+## MBQ-64/MBQ-65 residual research patch (2026-07-04)
+
+> **Proposed [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
+> residual research, documentation-only.** These facts close the two
+> narrower sub-questions the Part E patch above left explicitly open, not
+> asserted: whether Shopify presentment currency can diverge from shop
+> currency outside an explicitly-enabled Shopify Markets/multi-currency
+> setup (MBQ-64), and the product-webhook payload/subscription-mechanics
+> residual beyond the topic strings (MBQ-65). Access date for every fact
+> below: **2026-07-04**. **No architecture decision is made here** — see
+> `DEC-020` §4–§8 for how these facts route to a proposed (not accepted)
+> MBQ-64/MBQ-65 design decision.
+
+### Money/order-currency facts used (MBQ-64)
+
+- **Fact, verbatim (`https://shopify.dev/docs/apps/build/markets`, "About
+  Shopify Markets") —** "The presentment currency is what store visitors
+  see in checkout, what they agree to pay, and how their payment method is
+  charged. These values are the source of truth." Also: "Presentment
+  currency values are also displayed to the merchant as their source of
+  truth on the order details page. Refunds and order edits are always based
+  on the presentment currency. Shopify Functions are also provided monetary
+  input values in the presentment currency."
+- **Fact, verbatim (same page) —** "The shop currency is the merchant's
+  common reference for their business on Shopify. If an order is placed in
+  a different presentment currency, then shop currency values are
+  back-converted from presentment values using the live exchange rate...
+  Since the values are converted, intermediate shop currency values might
+  not sum perfectly to totals, and shop currency values of corresponding
+  transactions performed at different times (such as captures and refunds)
+  might not match."
+- **Fact, verbatim (same page) —** "The settlement currency is the currency
+  of the merchant's payout. It might equal the shop currency or the
+  presentment currency, but it's not guaranteed... These values are the
+  most appropriate for accounting purposes. When a merchant is not using
+  Shopify Payments, settlement currency values must be fetched and
+  reconciled directly from their payment gateways."
+- **Fact, verbatim (`https://shopify.dev/docs/api/admin-graphql/latest/objects/Order`,
+  re-verified against the page's raw source, not only a summarized fetch)
+  —** `presentmentCurrencyCode`: "The currency used by the customer when
+  placing the order. For example, "USD", "EUR", or "CAD". This may differ
+  from the shop's base currency when serving international customers or
+  using multi-currency pricing." This second sentence extends what the
+  Part E patch above cited (that patch quoted only the first sentence) —
+  re-fetched and confirmed verbatim this session, not previously cited in
+  this corpus.
+- **Resolved open question (was open in the Part E patch above) —**
+  presentment currency **can** diverge from shop currency without a
+  merchant necessarily framing it as "enabling Shopify Markets" as a named
+  feature — the `Order` object's own field description now names two
+  independent triggers ("serving international customers," "using
+  multi-currency pricing"), and "About Shopify Markets" confirms the
+  back-conversion mechanism is automatic whenever the two differ. This does
+  **not** mean every store diverges — same-currency stores still see
+  `shopMoney == presentmentMoney` — it means the connector cannot assume
+  divergence only occurs under an explicit "Markets" toggle.
+- **Open question, not resolved this session —** whether Shopify exposes a
+  single boolean/flag on the `Order` object stating "this order used
+  Markets/multi-currency selling" (distinct from comparing
+  `currencyCode`/`presentmentCurrencyCode` directly) was not searched for
+  or found on the fetched pages; not required for `DEC-020`'s proposed
+  mechanism (which compares the two currency codes directly), logged here
+  only for completeness.
+
+### Product webhook facts used (MBQ-65)
+
+- **Fact, verbatim (`https://shopify.dev/docs/apps/build/webhooks/subscribe`,
+  "Manage webhook subscriptions") —** two subscription mechanisms: an
+  **app-config** subscription, "Defined in `shopify.app.toml` and applied
+  uniformly across every shop that installs your app" (the page's
+  recommended default), and a **shop-specific** subscription "created using
+  GraphQL Admin API; configuration can differ per shop," via the
+  `webhookSubscriptionCreate` mutation. "Each topic you subscribe to
+  requires a corresponding access scope" — for the three product topics,
+  `read_products` (already verified by the Part E patch above).
+- **Fact, verbatim (`https://shopify.dev/docs/apps/build/webhooks`, "About
+  webhooks," confirmed against the page's raw source) —** "Shopify doesn't
+  guarantee ordering within a topic, or across different topics for the
+  same resource. For example, it's possible that a `products/update`
+  webhook might be delivered before a `products/create` webhook." Shopify
+  "recommends using timestamps provided in the header
+  (`X-Shopify-Triggered-At`) or in the payload itself (`updated_at`) to
+  organize webhooks."
+- **Fact, verbatim (same page) —** "Your app shouldn't rely on receiving
+  data from Shopify webhooks. Webhook delivery isn't always guaranteed, and
+  your app can miss or mishandle events for other reasons, such as handler
+  failures or downtime. For redundancy, use reconciliation jobs to
+  periodically fetch data from Shopify so that your app stays consistent
+  with Shopify's data."
+- **Fact, verbatim (same page) —** "Verify HMAC signatures and ignore
+  duplicate deliveries using `X-Shopify-Webhook-Id`." Delivery headers
+  confirmed to include `X-Shopify-Topic`, `X-Shopify-Webhook-Id`, and
+  `X-Shopify-Hmac-Sha256`.
+- **Fact (same page) —** the webhook payload is the **full resource by
+  default**; a `fields`/`include_fields` parameter can restrict which
+  fields are included ("If omitted, the full payload is sent.").
+- **Fact (same page) —** "Events" is named as Shopify's "next-generation
+  subscription mechanism, currently in developer preview for a subset of
+  topics," able to run side by side with webhooks in the same
+  `shopify.app.toml`. Not required for Phase 1 scope, logged for
+  completeness only.
+- **Inconclusive / not confirmed this session —** a claimed per-product
+  **variant-count payload-truncation** behavior (that very-high-variant
+  products' webhook payloads include full detail for only a subset of
+  variants, with a `variant_ids`/`truncated_fields`-style residual pointer
+  for the rest) was raised by third-party developer-aggregator sources
+  surfaced via web search, but could **not** be confirmed against a primary
+  `shopify.dev` page directly fetched this session. Two candidate pages
+  were fetched (`https://shopify.dev/docs/apps/build/webhooks` and
+  `https://shopify.dev/docs/apps/build/webhooks/customize/modify-payloads`)
+  and neither page's retrieved content contained this claim. Per
+  `CLAUDE.md` §7 rule 5, this is logged as an **open, unverified
+  question**, not asserted as fact.
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Shopify developer documentation, `shopify.dev`

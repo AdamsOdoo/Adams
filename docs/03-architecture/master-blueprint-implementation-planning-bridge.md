@@ -71,6 +71,27 @@
   **remain implementation planning.** **The implementation gate remains
   closed. Implementation remains blocked. No implementation task has been
   created.** **§4's decision plan table below is unchanged** by this note.
+- **DEC-020 Acceptance Patch (2026-07-04).**
+  [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
+  — the dedicated MBQ-64/MBQ-65 currency/webhook residual decision this
+  document's own §5/§6 routed both rows to — **is now accepted by ChatGPT**,
+  at decision/posture level for both rows. **MBQ-64 and MBQ-65 are
+  resolved at decision/posture level only** — exact implementation
+  mechanics (MBQ-56's tolerance mechanics; the exact error-class/
+  sub-reason mapping and enforcement mechanism for a blocked MBQ-64
+  divergent-currency order; MBQ-65's exact controller/job/query/
+  subscription mechanics) **remain implementation planning**, not decided
+  by this acceptance. **The implementation gate remains closed.
+  Implementation remains blocked.** No implementation task has been
+  created. §4's decision plan table below remains unchanged by this note
+  — it still reflects the register state as of this document's own
+  DEC-017 acceptance, restated only by the optional consistency notes
+  already added above: **MBQ-62 was accepted by DEC-019** (2026-07-04,
+  decision/semantic-classification level) and **MBQ-64/MBQ-65 were
+  accepted by DEC-020** (2026-07-04, decision/posture level), both **after**
+  this table was originally written; the table below remains historical
+  planning context, not re-edited row by row for every later MBQ
+  acceptance.
 
 ## 1. Purpose of Part E
 
