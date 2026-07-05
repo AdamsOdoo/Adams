@@ -1,11 +1,14 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Final MBQ
-> Closure Plan accepted — AR-020 accepted by ChatGPT at planning-closure
-> level, MBQ register updated for all 50 reviewed rows, zero rows still
-> blocking the limited core-only zero-UI gate, gate remains closed)** is
-> immediately below, in the
+> Continuity lives in GitHub, not chat. The **current entry (Limited Core
+> Implementation Gate accepted — AR-021 accepted by ChatGPT, AR-018
+> criterion-5 confirmed for this limited gate only, Task 001 authorized
+> to start after PR #87 merges, no code created, implementation not yet
+> started)** is immediately below, in the
 > **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Limited Core Implementation Gate proposed — AR-021 (proposal
+> history)**,
+> **Final MBQ Closure Plan accepted — AR-020 (history)**,
 > **Final MBQ Closure Plan proposed — AR-020 (proposal history)**,
 > **Core Naming and Schema Planning accepted — AR-019 (history)**,
 > **Core Naming and Schema Planning — revised after ChatGPT REVISE (history,
@@ -50,6 +53,143 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Limited Core Implementation Gate accepted — compact handoff (2026-07-05)
+
+> **Documentation-only acceptance patch — not implementation, not code.**
+> Confirmed before editing: PR #87 head commit
+> `a43b6cbe8ce479ecb08628022dd5fe9ea4fbe9b4` (branch
+> `claude/open-limited-core-gate-bidt3v`, based on `Shopify-connector` at
+> PR #86 merge commit `c9698a70374e5f735f51c1de623c079dc5fd8697`);
+> DEC-003 through DEC-020 confirmed Accepted and unedited; AR-021
+> confirmed previously Proposed for ChatGPT review.
+
+- **Branch / PR:** `claude/open-limited-core-gate-bidt3v` → PR #87 into
+  `Shopify-connector` (**draft, not merged** — kept draft per instruction).
+- **Files changed:**
+  `docs/07-implementation-plan/limited-core-implementation-gate.md`
+  (Status → Accepted; Acceptance section added; §2/§6 marked
+  accepted/merge-gated), `docs/07-implementation-plan/task-001-core-module-scaffold.md`
+  (Status → authorized after PR #87 merge, start gated on merge),
+  `docs/05-qa/architecture-review-log.md` (AR-021 row and note moved to
+  Accepted; AR-002 through AR-020 untouched),
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`
+  (compact note updated to accepted), `docs/01-research/research-handoff.md`
+  (this file). **No DEC-003 through DEC-020 file changed. No
+  `docs/04-decisions/README.md` change. No `defect-pattern-log.md`
+  change. No Python/XML/manifest/security CSV/test/CI file created or
+  changed. No Odoo module directory created. No second implementation
+  task created.**
+- **What changed:** **ChatGPT accepted the limited core implementation
+  gate substance on 2026-07-05. AR-021 is now Accepted.** The limited,
+  core-only, zero-UI implementation gate (scoped to
+  `shopify_connector_core` only) **opens once PR #87 is merged into
+  `Shopify-connector`** — it is not open before that merge. **AR-018's
+  criterion 5 is confirmed for this limited gate only**: the
+  `defect-pattern-log.md` DP-003/004/006 occurrence-counter row's
+  recorded evidence-consistency gate satisfies the prevention-rule
+  requirement for this gate; this does not apply project-wide and does
+  not waive evidence requirements for later gates (product/customer/sale,
+  inventory, fulfillment, UI, credentials/API). **Task 001 — Core Module
+  Scaffold — is authorized as the only implementation task, starting only
+  after PR #87 is merged.** No second task is authorized. **No code
+  created in this PR. Implementation itself is not started in this PR.**
+  No credentials, external API calls, operator-facing UI, or
+  product/customer/order/inventory/fulfillment domain logic is
+  authorized.
+- **Gate state:** accepted, opens on merge of PR #87 — not open yet.
+  No implementation task has started coding; no code, module, view,
+  controller, security file, manifest, test, or CI file exists.
+- **Learning feedback loop:** **New issues discovered:** none new this
+  session. **Repeated issue patterns:** none triggered. **Rules/checklists
+  updated:** none (out of allowed-files scope; `defect-pattern-log.md` is
+  not edited — its DP-003/004/006 row is cited, not relabeled). **New
+  rejected approaches:** none. **New technical debt:** none (no code).
+  **New open questions:** none — no MBQ row is touched by this session.
+  **Architecture concerns:** none — no accepted DEC/AR/blueprint design
+  content changed; this is a status/acceptance patch.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured · rejected approaches checked, none
+  added · technical debt logged (none applicable) · repeated-issue
+  escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** once PR #87 is merged, run Task 001's own
+  coding PR (the `shopify_connector_core` module scaffold implementation),
+  scoped exactly to `task-001-core-module-scaffold.md`'s allowed files,
+  forbidden files, acceptance criteria, and required tests. **Not
+  performed by this session; PR #87 remains open/draft/not merged.**
+- **Stop condition:** stopped after pushing this acceptance patch to the
+  existing PR #87 branch (kept draft, not merged). `main` and plain `dev`
+  untouched; only the five allowed files changed.
+
+---
+
+### Limited Core Implementation Gate proposed — compact handoff (2026-07-05)
+
+> **Documentation-only gate-opening proposal — not implementation, not
+> yet accepted.** Confirmed before editing: branch created from
+> `Shopify-connector` at PR #86 merge commit
+> `c9698a70374e5f735f51c1de623c079dc5fd8697`; DEC-003 through DEC-020
+> confirmed Accepted and unedited; AR-020 confirmed Accepted at
+> planning-closure level with zero MBQ rows blocking the limited
+> core-only zero-UI gate; implementation confirmed still blocked prior to
+> this session.
+
+- **Branch / PR:** `claude/open-limited-core-gate-bidt3v` → draft PR into
+  `Shopify-connector` (draft, not merged).
+- **Files changed:**
+  `docs/07-implementation-plan/limited-core-implementation-gate.md`
+  (new), `docs/07-implementation-plan/task-001-core-module-scaffold.md`
+  (new), `docs/05-qa/architecture-review-log.md` (AR-021 row + note
+  added; AR-001 through AR-020 untouched),
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`
+  (compact status note appended), `docs/01-research/research-handoff.md`
+  (this file). **No DEC-003 through DEC-020 file changed. No
+  `docs/04-decisions/README.md` change. No Python/XML/manifest/security
+  CSV/test/CI file created or changed. No Odoo module directory created.**
+- **What changed:** Limited core gate-opening proposal prepared. AR-021
+  proposed. Task 001 spec created. Proposes, pending ChatGPT review: (1)
+  confirming AR-018's criterion-5 ambiguity — the DP-003/004/006
+  `ESCALATED` occurrence-counter row's recorded evidence-consistency gate
+  is confirmed to satisfy the prevention-rule requirement, for this
+  limited core gate only; (2) opening a limited, core-only, zero-UI
+  implementation gate scoped to `shopify_connector_core` (module
+  scaffold, the six AR-019-accepted core models, groups/access CSV, core
+  constraints/indexes, core tests; no credentials, no external API calls,
+  no webhooks, no setup wizard, no test connection, no domain logic, no
+  dashboard/sync-center/error-center UI); (3) authorizing exactly one
+  implementation task, Task 001 (Core Module Scaffold), written to the
+  `CLAUDE.md` §9 template. **No code created. Implementation not started
+  in this PR.**
+- **Gate state:** proposed, pending ChatGPT review/merge of this PR — the
+  gate is only genuinely open once this PR is accepted. No implementation
+  task has been authorized to start coding yet; no code, module, view,
+  controller, security file, manifest, test, or CI file exists.
+- **Learning feedback loop:** **New issues discovered:** none new this
+  session. **Repeated issue patterns:** none triggered. **Rules/checklists
+  updated:** none (out of allowed-files scope; `defect-pattern-log.md` is
+  not touched by this session — its DP-003/004/006 row is read and cited,
+  not edited). **New rejected approaches:** none. **New technical debt:**
+  none (no code). **New open questions:** none — no MBQ row is touched by
+  this session (`master-blueprint-open-questions.md` is out of this
+  session's allowed-files scope). **Architecture concerns:** none — no
+  accepted DEC/AR/blueprint design content changed; this is a
+  gate-opening proposal plus one task specification.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured · rejected approaches checked, none
+  added · technical debt logged (none applicable) · repeated-issue
+  escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** after ChatGPT accepts/merges this PR, run
+  Task 001's own coding PR (the `shopify_connector_core` module scaffold
+  implementation), scoped exactly to
+  `task-001-core-module-scaffold.md`'s allowed files, forbidden files,
+  acceptance criteria, and required tests. **Not performed by this
+  session.**
+- **Stop condition:** stopped after opening this draft PR against
+  `Shopify-connector`. `main` and plain `dev` untouched; only the five
+  allowed files changed; awaiting ChatGPT's review/acceptance of the gate
+  proposal and AR-021.
 
 ---
 
