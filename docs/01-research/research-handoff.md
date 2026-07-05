@@ -56,6 +56,161 @@
 
 ---
 
+### Task 001 — F1 fix (operation_scope_key not cleared on supersede) — compact handoff (2026-07-05)
+
+> **Revision commit on PR #88, per ChatGPT REVISE review.** Confirmed
+> before editing: PR #88 head commit `811c168f8d4bbed1de5660b16272ee38c2712ffc`
+> (branch `claude/task-001-core-module-scaffold-coesxy`, based on
+> `Shopify-connector` at PR #87 merge commit
+> `dad9bfd6be5d1c7db939bb5132875ce6e8674368`).
+
+- **Branch / PR:** `claude/task-001-core-module-scaffold-coesxy` → PR #88
+  into `Shopify-connector` (**draft, not merged**).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_job.py`,
+  `docs/01-research/research-handoff.md` (this file). **No other file
+  touched. No DEC file changed. No `docs/04-decisions/README.md` change.
+  No `defect-pattern-log.md` change. No Task 002 started. No credential/
+  token/secret field, Shopify API/webhook/controller code, cron data, or
+  menu/action/view/wizard XML added.**
+- **What changed / residue fixed:** **F1** — ChatGPT's review found that
+  `_compute_operation_scope_key()` cleared `operation_scope_key` on
+  reaching a terminal state or on a missing `res_model`, but not when a
+  job is superseded (`superseded_by_job_id` set), contradicting the
+  accepted AR-019 §8 rule ("populated while the job is non-terminal...
+  set to NULL on reaching a terminal state **or being superseded**").
+  Fixed by adding `superseded_by_job_id` to the method's `@api.depends`
+  and to the clearing condition, so a superseded job's
+  `operation_scope_key` is set to `False`/NULL exactly like a terminal
+  job's, freeing the `(store_id, operation_scope_key)` unique constraint
+  for the superseding job. Terminal-state clearing and missing-`res_model`
+  clearing behavior are unchanged; the docstring comment was updated to
+  say "terminal state or being superseded."
+- **Items deferred:** none new — the two known limitations already noted
+  in the prior Task 001 entry (no live Odoo runtime in this environment;
+  `payload_hash`'s own hashing/normalization algorithm remains an open,
+  implementation-time detail) still stand.
+- **Learning feedback loop:** new issues: F1 (operation_scope_key not
+  cleared on supersede) was caught by ChatGPT review, not by this
+  session's own static checks, since no Odoo runtime exists here to
+  exercise the compute method against a live `superseded_by_job_id`
+  write — logged as a gap in what static verification alone can catch on
+  this repository. Repeated patterns: none. Rules updated: none.
+  Rejected approaches: none. Technical debt: none new. Architecture
+  concerns: none new. Tests/review gates needed: same as before — a
+  future session should add a real Odoo-runtime test for this exact
+  supersede-clears-scope-key behavior once a test framework/CI is
+  authorized. Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked
+  · learning captured · rejected approach logged (N/A) · technical debt
+  logged (N/A) · repeated-issue escalation applied (N/A) — all YES.
+- **Next recommended session:** ChatGPT re-review of PR #88 for F1
+  resolution. No Task 002 until this PR is accepted.
+- **Stop condition:** stopped after pushing the F1 fix commit and
+  refreshing the PR body/head SHA. No merge performed. PR #88 remains
+  draft.
+
+---
+
+### Task 001 — Core Module Scaffold implemented — compact handoff (2026-07-05)
+
+> **First coding PR for this project.** Confirmed before editing: branch
+> based on `Shopify-connector` at merge commit
+> `dad9bfd6be5d1c7db939bb5132875ce6e8674368` (PR #87, "Limited core
+> implementation gate — accepted"); limited core-only zero-UI gate open
+> for exactly Task 001
+> (`docs/07-implementation-plan/limited-core-implementation-gate.md`,
+> `docs/07-implementation-plan/task-001-core-module-scaffold.md`); schema
+> source of truth `docs/07-implementation-plan/core-naming-schema-planning.md`
+> (AR-019, accepted) and `docs/05-qa/architecture-review-log.md` (AR-019,
+> AR-021, both accepted). DEC-003 through DEC-020 confirmed unedited;
+> `docs/04-decisions/README.md` unedited.
+
+- **Branch / PR:** `claude/task-001-core-module-scaffold-coesxy` → PR #88
+  into `Shopify-connector` (**draft, not merged**).
+- **Files changed:** `addons/shopify_connector_core/__init__.py`,
+  `addons/shopify_connector_core/__manifest__.py`,
+  `addons/shopify_connector_core/models/__init__.py`,
+  `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/models/shopify_connector_store_settings.py`,
+  `addons/shopify_connector_core/models/shopify_connector_location.py`,
+  `addons/shopify_connector_core/models/shopify_connector_binding_mixin.py`,
+  `addons/shopify_connector_core/models/shopify_connector_job.py`,
+  `addons/shopify_connector_core/models/shopify_connector_job_log.py`,
+  `addons/shopify_connector_core/security/ir.model.access.csv`,
+  `addons/shopify_connector_core/security/shopify_connector_security.xml`,
+  `docs/01-research/research-handoff.md` (this file). **No DEC-003
+  through DEC-020 file changed. No `docs/04-decisions/README.md` change.
+  No `defect-pattern-log.md` change. No second implementation task
+  started. No credential/token/secret field, Shopify API/webhook/
+  controller code, cron data, or menu/action/view/wizard XML created.**
+- **What changed / residue fixed:** created the minimal installable
+  `shopify_connector_core` module scaffold with exactly the six
+  AR-019-accepted core models — `shopify.connector.store`,
+  `.store.settings`, `.location`, `.binding.mixin` (abstract), `.job`,
+  `.job.log` — implementing only the AR-019 §3/§4/§6/§7/§8/§12 field
+  schema, uniqueness/FK/selection constraints, and the four
+  `group_shopify_connector_*` access groups + `ir.model.access.csv` rows
+  from §10. `idempotency_key` and `operation_scope_key` are implemented
+  as distinct computed+stored fields (kept from colliding by design, per
+  §8). No views/menus/actions, no Shopify API/webhook/controller code, no
+  cron data, no credential field.
+- **Tests:** none added — this repository has no existing Odoo test
+  framework, CI, or runnable Odoo instance (`addons/adams_base` is an
+  empty scaffold with no `tests/` directory; no `odoo-bin`, no
+  `psycopg2`, no Odoo package installed in this environment), so per the
+  task's explicit instruction no test structure was invented. Manual
+  verification performed instead: `python3 -m py_compile` on every
+  `.py` file; `ast.literal_eval` parse of `__manifest__.py` confirming a
+  valid dict with `installable=True` and `depends=['base']`;
+  `xml.dom.minidom` well-formedness parse of the security XML plus a
+  cross-check that its four `res.groups` records match every
+  `group_id:id` referenced in `ir.model.access.csv`; a CSV structural
+  check confirming exactly 20 rows, one per (accepted model × group),
+  permission bits restricted to `0`/`1`, and every `model_id:id` matching
+  one of the five concrete accepted models (the abstract
+  `binding.mixin` correctly has no access row); a targeted grep sweep for
+  credential/token/secret/password/API-key patterns, HTTP/GraphQL/
+  webhook-controller code, `ir.cron`, and menu/action/view/wizard XML —
+  none found (the only hits are the `job_source` Selection value
+  `'webhook'` and the `webhook_ready` readiness boolean, both schema-only
+  labels, not implementation).
+- **Items deferred:** live `-i shopify_connector_core` install/ORM
+  smoke test (no Odoo runtime available in this environment); stricter
+  "immutable after first save" write-time enforcement for fields AR-019
+  marks "readonly after create" (implemented only as the Odoo field-level
+  `readonly=True` attribute, since AR-019 §12's explicit required-
+  constraints list names uniqueness/FK/selection-consistency only, not
+  immutability guards — flagged for a future architecture pass if
+  stricter enforcement is wanted); the exact `payload_hash`
+  hashing/normalization algorithm (AR-019 §8 leaves this an
+  implementation-time detail for whichever domain module first needs
+  it — `idempotency_key`/`operation_scope_key` themselves are
+  implemented as deterministic pipe-joined string composition per the
+  AR-019 §8 component tuples).
+- **Learning feedback loop:** new issues: none. Repeated patterns: none.
+  Rules updated: none. Rejected approaches: none newly logged (checked
+  `rejected-approaches-log.md`; RA-011/RA-012/RA-013 already cover the
+  module-boundary reasoning this scaffold follows). Technical debt: the
+  two deferred items above should be logged in
+  `technical-debt-register.md` if ChatGPT wants them tracked formally.
+  Architecture concerns: none new. Tests/review gates needed: a future
+  session should add real Odoo-runtime tests once a test framework/CI is
+  authorized. Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked
+  · learning captured · rejected approach logged (none new; N/A) ·
+  technical debt logged (not yet — flagged above for ChatGPT/next
+  session) · repeated-issue escalation applied (N/A) — all other items
+  YES.
+- **Next recommended session:** ChatGPT review of this PR against
+  `task-001-core-module-scaffold.md`'s acceptance criteria. No Task 002
+  (or any other task) may start until this review completes
+  (`limited-core-implementation-gate.md` §5).
+- **Stop condition:** stopped immediately after opening the draft PR, per
+  instruction. No merge performed. No second task started. No file
+  outside the allowed list touched.
+
+---
+
 ### Limited Core Implementation Gate accepted — compact handoff (2026-07-05)
 
 > **Documentation-only acceptance patch — not implementation, not code.**
