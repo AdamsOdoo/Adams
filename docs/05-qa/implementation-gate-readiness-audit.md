@@ -1,13 +1,15 @@
 # Implementation Gate Readiness Audit — Post DEC-020
 
-> **Proposed audit** for the premium **Odoo 19 ↔ Shopify Connector**,
+> **Accepted audit** for the premium **Odoo 19 ↔ Shopify Connector**,
 > prepared after ChatGPT accepted
 > [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
 > (MBQ-64/MBQ-65, decision/posture level) on **2026-07-04**, and after PR
 > #83 merged into `Shopify-connector` at merge commit
-> `b27f842425043e6320d8e168a1208345f6fcab12`. This is **not** the
-> implementation-gate-opening act itself — it is the readiness check that
-> must precede any proposal to perform that act. Companion documents:
+> `b27f842425043e6320d8e168a1208345f6fcab12`. Proposed via PR #84 and
+> **accepted by ChatGPT on 2026-07-05** (see "Acceptance" below). This is
+> **not** the implementation-gate-opening act itself — it is the readiness
+> check that had to precede any proposal to perform that act, and its
+> acceptance does not perform that act either. Companion documents:
 > [`../03-architecture/master-blueprint.md`](../03-architecture/master-blueprint.md)
 > ("Criteria for when implementation may later be opened"),
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
@@ -18,11 +20,11 @@
 > [`quality-feedback-loop.md`](./quality-feedback-loop.md) (§8, §10, §11).
 > Companion review-log entry:
 > [`architecture-review-log.md`](./architecture-review-log.md) (**AR-018**,
-> Proposed for ChatGPT review).
+> Accepted by ChatGPT).
 
 ## Status
 
-- **Proposed for ChatGPT review.**
+- **Accepted by ChatGPT on 2026-07-05.**
 - **Documentation-only.**
 - **Audit-only.**
 - **Does not open the implementation gate.**
@@ -31,14 +33,52 @@
 - **Implementation remains blocked.**
 - **Built after DEC-020 acceptance** (2026-07-04), starting point PR #83
   merge commit `b27f842425043e6320d8e168a1208345f6fcab12` into
-  `Shopify-connector`.
+  `Shopify-connector`; proposed via PR #84, accepted on the same PR.
 - **This audit does not modify DEC-003 through DEC-020, does not modify
   `../04-decisions/README.md`, and does not change any MBQ row's
   status** — every classification below is a **reading** of the register
   as it stands, not an edit to it. Where this audit's own reading differs
   from a stale restatement elsewhere in the repo (see §2's "documentation
   currency" note), it says so explicitly rather than silently correcting
-  the stale document.
+  the stale document. **This remains true after acceptance** — accepting
+  this audit's findings does not itself edit the register, DEC-003
+  through DEC-020, or `../04-decisions/README.md`.
+
+## Acceptance
+
+**ChatGPT accepted this audit on 2026-07-05.**
+
+- **Accepted verdict:** READY ONLY FOR A VERY LIMITED
+  IMPLEMENTATION-PLANNING SPRINT, NOT CODE — unchanged from §9 below.
+- **Audit acceptance does not open the implementation gate.**
+- **Audit acceptance does not authorize implementation.**
+- **Audit acceptance does not create implementation tasks.**
+- **Implementation remains blocked.**
+- **No MBQ row status is changed by this acceptance.**
+- **No DEC-003 through DEC-020 is changed by this acceptance.**
+- **Accepted next session:** a single, documentation-only
+  **naming/core-schema implementation-planning artifact** addressing
+  MBQ-01 (model names), MBQ-02 (field names/types), MBQ-04 (credential
+  storage decision or explicit slice-1 descope), MBQ-07 (feature-flag/
+  settings schema), MBQ-16 (retry-count/backoff constants), MBQ-19
+  (job/log model shape), MBQ-20 (operation-level idempotency key schema),
+  MBQ-21 (serialization-guard mechanism), MBQ-44 (core access CSV/
+  record-rule planning), MBQ-45's residual (group XML IDs), and MBQ-62's
+  residual (`odoo_event` trigger-origin implementation mechanics) — this
+  matches, without change, §6/§7's own recommendation below. **This next
+  session is not code and not the gate-opening act** — it produces
+  planning documentation only.
+- **On Criterion 1 (§3):** ChatGPT accepts this audit's strict, conservative
+  reading of Criterion 1 (blueprint parts accepted) as **non-blocking** —
+  the criterion passes for the core-substrate-only scope this audit and
+  the accepted next session both target, and its own UI-scoped partial-pass
+  caveat does not change what actually decides readiness here. The
+  **decisive** blockers remain Criterion 2 (implementation-blocking
+  open questions, eleven rows unresolved), Criterion 3 (the explicit
+  gate-opening act itself, not yet performed), and Criterion 4 (no
+  implementation task has yet been written to the CLAUDE.md §9 template).
+  Criterion 1's conservative framing is accepted as-is, not weakened, and
+  is simply not where the readiness gap actually lies.
 
 ## 1. Purpose
 
@@ -422,7 +462,7 @@ architecture phase. What remains is the **narrow, well-scoped, and now
 fully itemized** naming/schema/access work §6–§7 name — not further
 research, and not yet code.
 
-## 10. Recommendation to ChatGPT
+## 10. Recommendation to ChatGPT — accepted
 
 **Recommendation:** direct the next session to produce the
 implementation-planning artifact named in §7 (naming + core-schema pass
@@ -436,3 +476,18 @@ remain a **separate, later, explicit act** — taken only once the naming/
 schema pass exists and criterion 2's remaining rows are either resolved or
 consciously accepted as risks in writing, per `master-blueprint.md`'s own
 criteria.
+
+**ChatGPT accepted this recommendation, as proposed, on 2026-07-05** (see
+"Acceptance" above) — the next session is the documentation-only
+naming/core-schema implementation-planning pass named in §7, not code and
+not the gate-opening act; criterion 5's ambiguity remains open, to be
+confirmed independently and does not block that next session from
+starting.
+
+---
+
+**Change control:** further changes to this record require ChatGPT review,
+mirroring the DEC-013 through DEC-020 change-control pattern. This audit
+does not re-litigate DEC-003 through DEC-020, does not reopen accepted
+Master Blueprint Parts A–E, and does not reintroduce any row from
+`rejected-approaches-log.md`.

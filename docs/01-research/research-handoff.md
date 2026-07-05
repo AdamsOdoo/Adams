@@ -1,9 +1,11 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry (Implementation
-> Gate Readiness Audit — AR-018 proposed, verdict: limited
-> implementation-planning sprint only, not code)** is immediately below, in
-> the **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> Gate Readiness Audit Acceptance Patch — AR-018 accepted, verdict
+> accepted: limited implementation-planning sprint only, not code)** is
+> immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`);
+> **Implementation Gate Readiness Audit — AR-018 proposed (history)**,
 > **DEC-020 Acceptance Patch — MBQ-64/MBQ-65 resolved at decision/posture
 > level**,
 > **DEC-020 Revision — MBQ-64 corrected after ChatGPT REVISE (history)**,
@@ -40,6 +42,92 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Implementation Gate Readiness Audit Acceptance Patch — AR-018 accepted — compact handoff (2026-07-05)
+
+> **Documentation-only acceptance patch, not implementation, not an
+> implementation-gate opening.** Confirmed before editing: PR #84 head
+> commit `553a595cad0c9e18d3105850b3cd48f4535841eb` (branch
+> `claude/gate-readiness-audit-qz9x2k`, based on `Shopify-connector` at PR
+> #83 merge commit); DEC-003 through DEC-020 confirmed Accepted by
+> ChatGPT and unedited; the implementation-gate readiness audit and
+> AR-018 confirmed previously Proposed for ChatGPT review, not accepted;
+> implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/gate-readiness-audit-qz9x2k` → PR #84 into
+  `Shopify-connector` (not merged, still draft).
+- **Files changed:**
+  `docs/05-qa/implementation-gate-readiness-audit.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`,
+  `docs/01-research/research-handoff.md` (this file). **No DEC-003
+  through DEC-020 file changed. No `docs/04-decisions/README.md` change.
+  No MBQ row status changed. No code file changed. No
+  Python/XML/manifest/security/test/CI file changed. No implementation
+  task created. No module scaffolding created.**
+- **Audit acceptance patch applied.** ChatGPT reviewed the
+  implementation-gate readiness audit and **accepted it on 2026-07-05.**
+  **AR-018 is now Accepted by ChatGPT.** **Accepted verdict, unchanged:
+  READY ONLY FOR A VERY LIMITED IMPLEMENTATION-PLANNING SPRINT, NOT
+  CODE.** ChatGPT confirmed the audit's Criterion 2/3/4 findings (eleven
+  rows — MBQ-01/02/04/07/16/19/20/21/44/45/62 — still block even the
+  narrowest core-substrate-only first slice; the explicit gate-opening
+  act has not occurred; no implementation task has been written to the
+  CLAUDE.md §9 template) and accepted the audit's own strict,
+  conservative reading of **Criterion 1 as non-blocking** for this scope
+  — the decisive blockers remain Criteria 2, 3, and 4, not Criterion 1.
+  **Accepted next session:** a single, documentation-only naming/
+  core-schema implementation-planning artifact addressing MBQ-01 (model
+  names), MBQ-02 (field names/types), MBQ-04 (credential storage
+  decision or explicit slice-1 descope), MBQ-07 (feature-flag/settings
+  schema), MBQ-16 (retry-count/backoff constants), MBQ-19 (job/log model
+  shape), MBQ-20 (operation-level idempotency key schema), MBQ-21
+  (serialization-guard mechanism), MBQ-44 (core access CSV/record-rule
+  planning), MBQ-45's residual (group XML IDs), and MBQ-62's residual
+  (`odoo_event` trigger-origin implementation mechanics) — **this next
+  session is not code and not the gate-opening act.** **No MBQ row
+  status is changed by this acceptance. No implementation task is
+  created. No DEC-003 through DEC-020 is changed.**
+- **Items deferred:** the accepted next-session naming/core-schema
+  implementation-planning pass itself (not started); confirming or
+  re-labelling the DP-003/004/006 quality-gate escalation row (criterion
+  5's ambiguity, left open, does not block the next session); the
+  documentation-currency fixes to `master-blueprint.md`/
+  `master-blueprint-core-substrate.md` (still a named future
+  documentation-maintenance item, not performed); the
+  implementation-gate-opening act itself; all implementation; all
+  implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none — this
+  session mechanically applied ChatGPT's acceptance of the audit's
+  findings and verdict, precisely scoping what was and was not decided
+  (the audit's own reading is accepted; no MBQ row status changes; no
+  gate-opening act performed). **Repeated issue patterns:** none newly
+  triggered. **Rules/checklists updated:** none this session (out of
+  allowed-files scope). **New rejected approaches:** none. **New
+  technical debt:** none (no code). **New open questions:** none added —
+  no MBQ row was resolved or added by this acceptance. **Architecture
+  concerns:** none — no accepted DEC (DEC-003–020) or Part A–E content
+  was changed; only the audit's own and AR-018's acceptance status were
+  updated.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new) · rejected approaches
+  checked, none added · technical debt logged (none applicable — no
+  code) · repeated-issue escalation applied (none triggered) — all
+  **YES**.
+- **Next recommended session:** the accepted documentation-only
+  naming/core-schema implementation-planning pass for MBQ-01/02/04/07/
+  16/19/20/21/44/45(residual)/62(residual) — **not a coding session, and
+  not the gate-opening act.**
+- **Stop condition:** stopped after committing and pushing this
+  acceptance patch to the existing PR #84 branch (not merged, still
+  draft). DEC-003 through DEC-020 not edited; `docs/04-decisions/README.md`
+  not edited; no MBQ row status changed; no code files changed; no
+  implementation task or module scaffolding created; the audit and AR-018
+  are now **Accepted by ChatGPT**; implementation remains **blocked**; the
+  implementation gate remains **closed**; `main` and plain `dev`
+  untouched. Awaiting further instruction.
 
 ---
 
