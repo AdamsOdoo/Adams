@@ -136,6 +136,23 @@
   **The next step is a separate, explicit ChatGPT gate-opening act —
   not automatic implementation** (criterion-5 confirmation, then the
   limited core-only gate act, then the first `CLAUDE.md` §9 task).
+- **Limited core implementation gate proposal prepared (2026-07-05,
+  pending ChatGPT review).**
+  [`../07-implementation-plan/limited-core-implementation-gate.md`](../07-implementation-plan/limited-core-implementation-gate.md)
+  proposes the next step named immediately above: AR-018's criterion-5
+  confirmation (companion review-log entry
+  **[AR-021](../05-qa/architecture-review-log.md)**, Proposed for ChatGPT
+  review) and a limited, core-only, zero-UI gate-opening act. **Gate
+  scope is `shopify_connector_core` only** — module scaffold, the six
+  AR-019-accepted core models, groups/access CSV, core
+  constraints/indexes, core tests; **no credentials, no external API
+  calls, no operator-facing UI, no domain logic.**
+  [`../07-implementation-plan/task-001-core-module-scaffold.md`](../07-implementation-plan/task-001-core-module-scaffold.md)
+  (Task 001 spec) is created as the one implementation task this proposed
+  gate would authorize. **No code is created by this proposal.** The
+  gate and its criterion-5 confirmation are only genuinely in effect once
+  ChatGPT accepts and merges the proposing PR; until then this table
+  (§3) and its criteria count are unchanged.
 
 ## 1. Purpose of Part E
 
