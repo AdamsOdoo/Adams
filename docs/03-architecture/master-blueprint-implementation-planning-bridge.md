@@ -92,6 +92,18 @@
   this table was originally written; the table below remains historical
   planning context, not re-edited row by row for every later MBQ
   acceptance.
+- **Post-DEC-020 gate-readiness audit accepted (2026-07-05).**
+  [`implementation-gate-readiness-audit.md`](../05-qa/implementation-gate-readiness-audit.md)
+  — the row-by-row read of the **current** register against
+  `master-blueprint.md`'s five gate-opening criteria that this document's
+  own §3/§4 called for, updated for DEC-018/019/020 (this table below is
+  not re-edited for that update, per the note above) — **is now accepted
+  by ChatGPT.** **Accepted verdict: READY ONLY FOR A VERY LIMITED
+  IMPLEMENTATION-PLANNING SPRINT, NOT CODE.** **This acceptance is not a
+  gate-opening act.** **Implementation remains blocked.** No implementation
+  task has been created. **Accepted next session:** a documentation-only
+  naming/core-schema implementation-planning pass (MBQ-01/02/04/07/16/19/
+  20/21/44/45(residual)/62(residual)) — not code, not a gate-opening act.
 
 ## 1. Purpose of Part E
 
