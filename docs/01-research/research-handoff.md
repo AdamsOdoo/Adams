@@ -1,10 +1,10 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Implementation
-> Gate Readiness Audit Acceptance Patch — AR-018 accepted, verdict
-> accepted: limited implementation-planning sprint only, not code)** is
-> immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`);
+> Continuity lives in GitHub, not chat. The **current entry (Core Naming and
+> Schema Planning — AR-019 proposed, not yet accepted, documentation-only,
+> gate remains closed)** is immediately below, in the **compact handoff
+> format** (`../06-prompts/session-handoff-template.md`);
+> **Implementation Gate Readiness Audit Acceptance Patch — AR-018 accepted**,
 > **Implementation Gate Readiness Audit — AR-018 proposed (history)**,
 > **DEC-020 Acceptance Patch — MBQ-64/MBQ-65 resolved at decision/posture
 > level**,
@@ -42,6 +42,96 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Core Naming and Schema Planning — AR-019 proposed — compact handoff (2026-07-05)
+
+> **Documentation-only implementation-planning proposal, not implementation,
+> not an implementation-gate opening.** Confirmed before editing: PR #84
+> merge commit `4bf692dceec4190705f522bc2d32851af4c79e37` into
+> `Shopify-connector`; DEC-003 through DEC-020 confirmed Accepted by
+> ChatGPT and unedited; the implementation gate readiness audit and AR-018
+> confirmed previously Accepted by ChatGPT; the accepted next session
+> (a documentation-only naming/core-schema implementation-planning pass for
+> MBQ-01/02/04/07/16/19/20/21/44/45(residual)/62(residual)) confirmed not yet
+> started; implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/core-schema-naming-plan-actnaz` → PR into
+  `Shopify-connector` (draft, not merged).
+- **Files changed:** `docs/07-implementation-plan/core-naming-schema-planning.md`
+  (new), `docs/05-qa/architecture-review-log.md` (AR-019 added),
+  `docs/01-research/research-handoff.md` (this file). **No DEC-003 through
+  DEC-020 file changed. No `docs/04-decisions/README.md` change. No MBQ row
+  status changed in `master-blueprint-open-questions.md`. No code file
+  changed. No Python/XML/manifest/security/test/CI file changed. No
+  implementation task created. No module scaffolding created.**
+- **What changed / residue fixed:** prepared
+  `core-naming-schema-planning.md`, proposing (not deciding) exact Odoo
+  model names for a first core-only slice (`shopify.connector.store`,
+  `.store.settings`, `.store.credential`, `.location`, `.binding.mixin`
+  (abstract), `.job`, `.job.log`) and field schemas for each; a store-scoped
+  `store.settings` model as the MBQ-07 feature-flag/settings shape; a
+  job+log split resolving MBQ-19, with error/manual-review fields folded
+  onto the job model rather than a separate model; an operation-level
+  idempotency key schema (MBQ-20) and a query-time serialization guard
+  (MBQ-21), both owned by the job model, not separate models; retry-count
+  ceilings and a backoff schedule by error-class family (MBQ-16); four
+  proposed group XML IDs plus planned (not created) `ir.model.access.csv`
+  row shapes (MBQ-44, MBQ-45's residual); and the `odoo_event`
+  `job_source`/`trigger_origin` field mechanics resolving MBQ-62's residual.
+  For MBQ-04, adopted the explicit slice-1 descope (Option A) — no official
+  Odoo encryption-at-rest evidence was reviewed this session, so a
+  `store.credential` model is proposed for lifecycle metadata only, with no
+  field, type, or mechanism proposed for the actual secret/token value.
+  Added **AR-019** to `architecture-review-log.md`, Status **Proposed for
+  ChatGPT review — NOT YET ACCEPTED**, without altering AR-002 through
+  AR-018.
+- **Items deferred:** ChatGPT's actual review/acceptance of this document
+  and AR-019; if accepted, applying §14's drafted register-impact wording to
+  `master-blueprint-open-questions.md` for MBQ-01/02/04/07/16/19/20/21/44/
+  45(residual)/62(residual) (not performed by this session); the three
+  judgment calls the document itself flags for scrutiny (§16: the job+log
+  split, the generic `enqueue_decisions` JSON field, and creating
+  `store.credential` ahead of MBQ-04's real resolution); real credential
+  persistence (MBQ-04 remains open); the setup wizard/test-connection flow;
+  the transport/API client; every product/customer/order/inventory/
+  fulfillment domain model; webhooks; the explicit implementation-gate-
+  opening act; all implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated
+  issue patterns:** none newly triggered. **Rules/checklists updated:** none
+  this session (out of allowed-files scope). **New rejected approaches:**
+  none — `rejected-approaches-log.md` was checked in full before drafting;
+  no proposal here reintroduces a binding rejected approach (in particular,
+  no destructive uninstall/disable behavior, no blind first-write posture,
+  no bypass of the DEC-009 retry/idempotency taxonomy). **New technical
+  debt:** none (no code). **New open questions:** none added — no new MBQ
+  row was created; this session only proposes draft resolution wording for
+  eleven already-open rows, applied only upon a future acceptance.
+  **Architecture concerns:** none — no accepted DEC (DEC-003–020) or Part
+  A–E design content was changed; this document converts already-accepted
+  blueprint *directions* into exact names/schema without introducing new
+  architecture.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new) · rejected approaches
+  checked, none added · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** ChatGPT's review of this document and
+  AR-019 — accept as proposed, accept with changes (the document's own §16
+  names three specific candidates), request revision, or reject. If
+  accepted: apply §14's register-impact wording to the MBQ register, record
+  the acceptance in `architecture-review-log.md` and
+  `../04-decisions/README.md`, and update this handoff — not implementation,
+  and not the gate-opening act.
+- **Stop condition:** stopped after opening the draft PR for
+  `core-naming-schema-planning.md`/AR-019 against `Shopify-connector` (not
+  merged, still draft). DEC-003 through DEC-020 not edited;
+  `docs/04-decisions/README.md` not edited; no MBQ row status changed; no
+  code files changed; no implementation task or module scaffolding created;
+  this document and AR-019 are both **Proposed for ChatGPT review — NOT YET
+  ACCEPTED**; implementation remains **blocked**; the implementation gate
+  remains **closed**; `main` and plain `dev` untouched. Awaiting further
+  instruction.
 
 ---
 

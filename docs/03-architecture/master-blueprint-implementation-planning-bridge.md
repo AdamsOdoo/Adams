@@ -104,6 +104,16 @@
   task has been created. **Accepted next session:** a documentation-only
   naming/core-schema implementation-planning pass (MBQ-01/02/04/07/16/19/
   20/21/44/45(residual)/62(residual)) — not code, not a gate-opening act.
+- **Core naming/schema planning proposed (2026-07-05, not yet accepted).**
+  [`../07-implementation-plan/core-naming-schema-planning.md`](../07-implementation-plan/core-naming-schema-planning.md)
+  — the accepted next session named immediately above — has been
+  **prepared and proposed for ChatGPT review** (companion review-log entry
+  **AR-019**,
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)).
+  **This is not a gate-opening act.** No implementation task has been
+  created. **Implementation remains blocked**; this table (§3) and its
+  "2 of 5 criteria satisfied" count are unchanged by this note — a proposed,
+  unaccepted planning document does not itself move any gate criterion.
 
 ## 1. Purpose of Part E
 
