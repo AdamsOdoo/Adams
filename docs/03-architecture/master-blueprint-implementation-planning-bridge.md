@@ -118,6 +118,20 @@
   note — an accepted naming/schema planning document, at implementation-
   planning level only, does not itself satisfy or move any gate criterion.
   First code is still not authorized.
+- **Final MBQ closure plan proposed (2026-07-05) — AR-020, Proposed for
+  ChatGPT review, not accepted.**
+  [`../07-implementation-plan/final-mbq-closure-plan.md`](../07-implementation-plan/final-mbq-closure-plan.md)
+  reviews all 50 MBQ rows still not fully closed after AR-019 and
+  proposes one explicit final status per row (2 resolved, 27 partially
+  resolved with task-spec residuals, 17 descoped from MVP/first gate, 4
+  accepted-open with containment, 0 still gate-blocking), with fresh
+  official-doc verification for MBQ-09/14/24/27 cited in the plan.
+  **This is not a gate-opening act.** The MBQ register and this
+  document's §4 table are unchanged by this note; plan §7 holds the
+  proposed register wording for a future acceptance patch.
+  **Implementation remains blocked pending ChatGPT review**; the
+  implementation gate remains closed; no implementation task and no code
+  exist or are created by the proposal.
 
 ## 1. Purpose of Part E
 
