@@ -1,11 +1,16 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Limited Core
+> Continuity lives in GitHub, not chat. The **current entry (Task 001A —
+> Core Runtime Readiness & QA Closure: post-merge QA closure of Task 001,
+> static checks re-run, no test framework/CI/Odoo runtime available in this
+> environment, no automated tests added, manual Odoo 19 validation
+> checklist created, Task 001 recommended runtime-ready for the next gate,
+> Task 002 not started)** is immediately below, in the **compact handoff
+> format** (`../06-prompts/session-handoff-template.md`); **Task 001 — F1
+> fix (operation_scope_key not cleared on supersede) (history)**, **Task
+> 001 — Core Module Scaffold implemented (history)**, **Limited Core
 > Implementation Gate accepted — AR-021 accepted by ChatGPT, AR-018
-> criterion-5 confirmed for this limited gate only, Task 001 authorized
-> to start after PR #87 merges, no code created, implementation not yet
-> started)** is immediately below, in the
-> **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> criterion-5 confirmed for this limited gate only (history)**,
 > **Limited Core Implementation Gate proposed — AR-021 (proposal
 > history)**,
 > **Final MBQ Closure Plan accepted — AR-020 (history)**,
@@ -53,6 +58,78 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Task 001A — Core Runtime Readiness & QA Closure — compact handoff (2026-07-05)
+
+> **Post-merge QA closure of Task 001 — not Task 002, not new code.**
+> Confirmed before editing: branch `claude/task-001a-core-runtime-readiness`
+> created from `Shopify-connector` at merge commit
+> `b55490743fb1f5c9ea33831b94605b9ead4229c0` (PR #88, "Task 001: Add
+> Shopify connector core scaffold", merged). DEC-003 through DEC-020
+> confirmed unedited; `docs/04-decisions/README.md` and
+> `defect-pattern-log.md` confirmed unedited.
+
+- **Branch / PR:** `claude/task-001a-core-runtime-readiness` → draft PR into
+  `Shopify-connector` (not merged).
+- **Files changed:** `docs/05-qa/task-001-core-runtime-readiness.md` (new),
+  `docs/01-research/research-handoff.md` (this file). **No module file
+  under `addons/shopify_connector_core/` changed. No DEC file changed. No
+  `docs/04-decisions/README.md` change. No `defect-pattern-log.md` change.
+  No Task 002 started. No credential/token/secret field, Shopify API/
+  webhook/controller code, cron data, or menu/action/view/wizard XML
+  added.**
+- **What changed / residue fixed:** re-validated the merged
+  `shopify_connector_core` scaffold as a QA closure of Task 001: re-ran
+  Python compile, manifest `ast.literal_eval` parse, security-XML
+  well-formedness parse, and a CSV structural/referential check on
+  `ir.model.access.csv` (20 rows = 5 concrete models × 4 groups, all
+  resolving correctly, abstract `binding.mixin` correctly excluded); ran a
+  targeted grep sweep for credential/token/secret/API/webhook/controller/
+  cron/menu/view/wizard content — no matches beyond doc-string prose and
+  the pre-existing schema-only `job_source='webhook'` label and
+  `webhook_ready` boolean (both already accepted in the Task 001 entry
+  below). Confirmed no Odoo runtime, test framework, or CI exists anywhere
+  in this repository (no `odoo` package, no `psycopg2`, no `odoo-bin`, no
+  Docker/CI config, empty `addons/requirements.txt`) — unchanged from Task
+  001. Wrote `docs/05-qa/task-001-core-runtime-readiness.md` recording all
+  of the above plus a 20-step manual Odoo 19 validation checklist for a
+  reviewer with a live instance.
+- **Tests:** **none added.** No `tests/` directory or Odoo test convention
+  exists anywhere in this repo (checked `shopify_connector_core` and the
+  only other module, `adams_base`, which is an empty scaffold); no Odoo
+  runtime exists to execute a `TransactionCase` against; inventing a
+  non-Odoo test harness is explicitly out of scope. This matches the same
+  conclusion already recorded in the Task 001 entry below — nothing has
+  changed on the runtime/CI front since then.
+- **Items deferred:** live `-i shopify_connector_core` install and
+  ORM-level constraint verification (still blocked on no Odoo runtime in
+  this environment — same item already deferred at Task 001); the
+  write-time-immutability-vs-`readonly=True` gap (same item already
+  deferred at Task 001, unchanged).
+- **Learning feedback loop:** new issues: none. Repeated patterns: "no Odoo
+  runtime available in this environment" recurs for a second consecutive
+  session (Task 001, now Task 001A) — logged here as a repeated pattern
+  per `quality-feedback-loop.md` §4, but not escalated further since it is
+  an environment-provisioning gap outside this session's authority to fix,
+  not a defect in the work itself. Rules updated: none. Rejected
+  approaches: none (checked `rejected-approaches-log.md`; nothing in this
+  session's scope revisits a logged rejection). Technical debt: none new
+  beyond what Task 001 already flagged. Architecture concerns: none new.
+  Tests/review gates needed: same as Task 001 — real Odoo-runtime tests
+  once a test framework/CI is authorized and provisioned. Should future
+  prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (N/A) · technical debt
+  logged (N/A, none new) · repeated-issue escalation applied (noted, not
+  escalated — see above) — all YES.
+- **Next recommended session:** ChatGPT review of this QA closure and of
+  Task 001's runtime-readiness recommendation. No Task 002 until that
+  review completes.
+- **Stop condition:** stopped immediately after opening the draft PR, per
+  instruction. No merge performed. No second task started. No file outside
+  the allowed list touched.
 
 ---
 
