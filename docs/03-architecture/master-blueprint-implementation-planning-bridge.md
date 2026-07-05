@@ -92,6 +92,15 @@
   this table was originally written; the table below remains historical
   planning context, not re-edited row by row for every later MBQ
   acceptance.
+- **Post-DEC-020 gate-readiness audit prepared (2026-07-05, not yet
+  accepted).**
+  [`implementation-gate-readiness-audit.md`](../05-qa/implementation-gate-readiness-audit.md)
+  performs the row-by-row read of the **current** register against
+  `master-blueprint.md`'s five gate-opening criteria that this document's
+  own §3/§4 called for, updated for DEC-018/019/020 (this table below is
+  not re-edited for that update, per the note above). **This is not a
+  gate-opening act.** **Implementation remains blocked.** No implementation
+  task has been created by the audit.
 
 ## 1. Purpose of Part E
 
