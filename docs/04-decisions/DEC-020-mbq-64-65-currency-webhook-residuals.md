@@ -1,6 +1,6 @@
-# DEC-020 — Proposed MBQ-64/MBQ-65 Currency and Product-Webhook Residuals
+# DEC-020 — MBQ-64/MBQ-65 Currency and Product-Webhook Residuals
 
-> **Proposed decision record** for the premium **Odoo 19 ↔ Shopify
+> **Accepted decision record** for the premium **Odoo 19 ↔ Shopify
 > Connector**, prepared after ChatGPT accepted
 > [`DEC-019`](./DEC-019-mbq-62-odoo-event-job-source.md) (MBQ-62,
 > decision/semantic-classification level) on **2026-07-04**, and after PR #82
@@ -11,7 +11,10 @@
 > Decision Batch 1, routing both to "a separate, dedicated currency/webhook
 > residual decision sprint because they need tighter technical treatment than
 > a posture-level batch review can safely give them." **This record is that
-> dedicated sprint.** Companion documents:
+> dedicated sprint — proposed via PR #83, revised once after ChatGPT's first
+> review returned REVISE for MBQ-64 (§5's original posture was not safe
+> enough), and now accepted by ChatGPT on 2026-07-04 at decision/posture
+> level for both rows** — see "Acceptance" below. Companion documents:
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
 > (MBQ-64/MBQ-65 rows),
 > [`../03-architecture/master-blueprint-implementation-planning-bridge.md`](../03-architecture/master-blueprint-implementation-planning-bridge.md)
@@ -24,29 +27,38 @@
 > [`../01-research/odoo-official-architecture-notes.md`](../01-research/odoo-official-architecture-notes.md)
 > (this session's residual research patch). Companion review-log entry:
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
-> (**AR-017**, Proposed for ChatGPT review).
+> (**AR-017**, Accepted by ChatGPT via DEC-020).
 
 ## Status
 
-- **Proposed for ChatGPT review — NOT accepted.**
+- **Accepted by ChatGPT on 2026-07-04.**
 - **Documentation-only.**
-- **Decision-preparation only.**
+- **Resolves MBQ-64 at decision/posture level only** — the same-currency-
+  only automatic-import posture and the divergent-order block are decided;
+  the exact final error-class/sub-reason mapping, the exact enforcement
+  mechanism (manual-review queue vs. unsupported-scope classification), and
+  MBQ-56's own tolerance mechanics are **not** decided by this acceptance
+  and remain implementation planning.
+- **Resolves MBQ-65 at decision/posture level only** — the enqueue-only,
+  never-direct-write, follow-up-authoritative-read posture is decided; the
+  exact controller shape, follow-up-read query shape, subscription
+  mechanism, job-source classification, and the still-unconfirmed
+  variant-count payload-truncation handling are **not** decided by this
+  acceptance and remain implementation planning.
 - **Does not authorize implementation.**
 - **Does not open the implementation gate.**
 - **Does not create implementation tasks.**
 - **Implementation remains blocked.**
 - **Built after DEC-019 acceptance** (2026-07-04), starting point PR #82
   merge commit `94e3458e9ff6511f34f9abfe8944b4e0660c02b2` into
-  `Shopify-connector`.
-- **This record does not modify DEC-003 through DEC-019, does not modify
-  `../04-decisions/README.md`, and does not resolve MBQ-64 or MBQ-65** —
-  it only proposes wording (§9) that a future, separate ChatGPT acceptance
-  patch would apply, if and when ChatGPT accepts this record. **No other
-  MBQ row is touched.** MBQ-62's own accepted state (DEC-019) is not
-  reopened or weakened — the one MBQ-62-adjacent edit this record makes,
-  if any, is limited to a tiny consistency note in the Part E bridge
-  document's bridge table, per this sprint's own scope instruction (see
-  §9/§10 and the Part E document itself).
+  `Shopify-connector`; proposed via PR #83, revised once (below), then
+  accepted on the same PR #83.
+- **This acceptance does not modify DEC-003 through DEC-019 and does not
+  modify `../04-decisions/README.md`.** It **does** apply the previously
+  drafted MBQ-64/MBQ-65 register-impact wording (§9) to
+  `master-blueprint-open-questions.md` — **MBQ-64 and MBQ-65's own rows
+  only**; no other MBQ row is edited. MBQ-62's own accepted state
+  (DEC-019) is not reopened or weakened by this acceptance.
 - **Revised (2026-07-04) after ChatGPT's first review of this record
   returned REVISE for MBQ-64.** ChatGPT found the original MBQ-64 posture
   ("shop currency drives every Phase 1 order's `currency_id`; a
@@ -55,14 +67,90 @@
   already states shop-currency values are back-converted approximations
   whenever presentment differs, so a divergent order could pass the
   numeric guard while still misrepresenting the customer-facing order
-  currency. §4/§5 below are corrected accordingly — **automatic Phase 1
-  order import is now scoped to same-currency orders only**
+  currency. §4/§5 below were corrected accordingly — **automatic Phase 1
+  order import is scoped to same-currency orders only**
   (`Order.presentmentCurrencyCode == Order.currencyCode`); a divergent
   order is never silently imported in shop currency under any outcome of
   the numeric total-check guard. **MBQ-65 (§6–§8) was found directionally
-  acceptable by that same review and is unchanged in substance** — the
-  enqueue-only, never-direct-write, follow-up-authoritative-read posture
-  stands as originally proposed.
+  acceptable by that same review and was left unchanged in substance** —
+  the enqueue-only, never-direct-write, follow-up-authoritative-read
+  posture stands as originally proposed.
+- **Accepted (2026-07-04) after the above revision.** ChatGPT reviewed the
+  revised §4/§5 MBQ-64 posture and §6–§8 MBQ-65 posture and **accepted
+  both, at decision/posture level, per the "Acceptance" section below.**
+
+## Acceptance
+
+**ChatGPT accepted DEC-020 on 2026-07-04, at decision/posture level for
+both MBQ-64 and MBQ-65.**
+
+**Accepted for MBQ-64** (§4/§5, as revised):
+
+1. Phase 1 automatic order import is **same-currency only**.
+2. Same-currency means `Order.presentmentCurrencyCode ==
+   Order.currencyCode`.
+3. For same-currency orders, Odoo `sale.order.currency_id` follows the
+   connector's normal configured Odoo pricelist/company currency, aligned
+   to Shopify shop currency.
+4. For orders where `Order.presentmentCurrencyCode !=
+   Order.currencyCode`, the connector **must not** silently create/import
+   a normal Odoo sale order in shop currency.
+5. Divergent orders are **blocked from automatic SO creation** and routed
+   to manual review / treated as an explicit unsupported-scope case,
+   **before** SO creation.
+6. This block is **independent of the numeric total-check guard's
+   outcome** — a reconciling shop-currency total is not evidence a
+   divergent order is safe to import.
+7. Both `shopMoney` and `presentmentMoney` amounts, plus
+   `Order.presentmentCurrencyCode`, are captured as audit/reconciliation
+   evidence **in every case**, whether or not a sale order is created.
+8. Presentment-currency-denominated Odoo orders (Option B) remain
+   **non-MVP** unless and until a later, explicit scope expansion designs
+   currency/pricelist provisioning.
+9. **MBQ-56's total-check tolerance/comparison mechanics remain open**,
+   unchanged, and are explicitly **not** the (sole) mechanism relied upon
+   to catch a currency-model divergence.
+10. The **exact final error-class/sub-reason mapping** for a blocked
+    divergent-currency order (whether a named broadening of
+    `financial total mismatch`, a `blocked_manual_review` sub-reason, or
+    another Part A §D.8 shape) **remains implementation planning** — not
+    decided by this acceptance.
+
+**Accepted for MBQ-65** (§6–§8, unchanged by the revision):
+
+1. `PRODUCTS_CREATE`, `PRODUCTS_UPDATE`, and `PRODUCTS_DELETE` are
+   implemented in Phase 1 as **enqueue-only triggers**.
+2. Product webhooks **never write directly** to Odoo.
+3. Each product webhook job performs a **follow-up authoritative read**
+   before any create, update, or delete is applied to Odoo.
+4. The existing DEC-005 layered-sync reconciliation pass remains the
+   **required backstop**, regardless of webhook health.
+5. A `PRODUCTS_DELETE` webhook **never directly deletes/archives** the
+   bound Odoo product.
+6. Ambiguous or unconfirmable cases route to **manual review**, reusing
+   existing error/manual-review vocabulary — none invented.
+7. The exact subscription mechanism, controller shape, follow-up-read
+   query shape, job-source classification, and handling of the still-
+   unconfirmed variant-count payload-truncation claim all **remain
+   implementation planning** — not decided by this acceptance.
+
+**Explicitly not accepted / not decided by this acceptance:**
+
+- **MBQ-56** — untouched, remains its own open residual (total-check
+  tolerance/comparison mechanism).
+- **The exact final error-class/sub-reason mapping** for a blocked
+  MBQ-64 divergent-currency order — remains implementation planning.
+- **The exact MBQ-65 controller/job/query/subscription implementation
+  mechanics** — remain implementation planning.
+- **The unconfirmed variant-count payload-truncation claim** — remains
+  unverified; does not block or change the accepted enqueue-only posture
+  either way.
+- **Any other MBQ row** — unchanged, exactly as open as before this
+  acceptance. **MBQ-62's accepted state (DEC-019) is not reopened or
+  weakened.**
+- **The implementation gate** — remains closed; this acceptance is not a
+  gate-opening act.
+- **No implementation task** is created by this acceptance.
 
 ## 1. Purpose
 
@@ -420,16 +508,15 @@ truncation behavior could **not** be confirmed against a primary
   subscription mechanism (developer preview, a subset of topics only); direct
   webhook-driven mutation (Option D, rejected outright).
 
-## 9. Register impact if accepted
+## 9. Register impact (applied)
 
-**Draft only — not applied by this record.** If and only if ChatGPT accepts
-this proposal, a future acceptance-patch session would apply the following
-wording to `master-blueprint-open-questions.md`'s MBQ-64 and MBQ-65 rows
-(and only those two rows):
+**Applied by this acceptance patch.** The wording below has been applied to
+`master-blueprint-open-questions.md`'s MBQ-64 and MBQ-65 rows (and only
+those two rows):
 
-**MBQ-64 (draft register wording):** "Proposed resolved by
-[`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
-(pending ChatGPT acceptance): Phase 1 **automatic order import is
+**MBQ-64 (applied register wording):** "Resolved at decision/posture level
+by [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
+(Accepted by ChatGPT, 2026-07-04): Phase 1 **automatic order import is
 same-currency only** — for orders where `Order.presentmentCurrencyCode ==
 Order.currencyCode`, Odoo `sale.order.currency_id` is driven by the
 connector's normal configured Odoo pricelist/company currency, aligned to
@@ -439,61 +526,68 @@ Shopify's shop currency (`Order.currencyCode`). For orders where
 under any circumstance, including when a numeric total-check would
 otherwise reconcile — the job is blocked from automatic sale-order
 creation and routed to manual review / treated as an explicit
-unsupported-scope case before SO creation. Both `shopMoney` and
-`presentmentMoney` amounts, plus `Order.presentmentCurrencyCode`, are
-captured as audit/reconciliation evidence in every case, whether or not a
-sale order is created. Presentment-currency-denominated Odoo orders
-(Option B) remain non-MVP unless and until a later, explicit scope
-expansion designs currency/pricelist provisioning. MBQ-56's total-check
-tolerance/comparison mechanics remain its own open residual, unchanged and
-not relied upon as the (sole) mechanism for catching a currency-model
+unsupported-scope case before SO creation, independent of the total-check
+guard's outcome. Both `shopMoney` and `presentmentMoney` amounts, plus
+`Order.presentmentCurrencyCode`, are captured as audit/reconciliation
+evidence in every case, whether or not a sale order is created.
+Presentment-currency-denominated Odoo orders (Option B) remain non-MVP
+unless and until a later, explicit scope expansion designs
+currency/pricelist provisioning. **MBQ-56's total-check tolerance/
+comparison mechanics remain their own open residual**, unchanged and not
+relied upon as the (sole) mechanism for catching a currency-model
 divergence. The exact final error-class/sub-reason mapping for a blocked
-divergent-currency order remains implementation planning, not decided by
-this row. Formally remains `open` until ChatGPT accepts DEC-020."
+divergent-currency order **remains implementation planning**, not decided
+by this acceptance. **Blocks implementation** only for that exact
+error-class/sub-reason mapping and the exact enforcement mechanism —
+the decision posture itself is resolved."
 
-**MBQ-65 (draft register wording):** "Proposed resolved by
-[`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
-(pending ChatGPT acceptance): `PRODUCTS_CREATE`/`PRODUCTS_UPDATE`/
+**MBQ-65 (applied register wording):** "Resolved at decision/posture level
+by [`DEC-020`](../04-decisions/DEC-020-mbq-64-65-currency-webhook-residuals.md)
+(Accepted by ChatGPT, 2026-07-04): `PRODUCTS_CREATE`/`PRODUCTS_UPDATE`/
 `PRODUCTS_DELETE` are implemented in Phase 1 as **enqueue-only triggers** —
 never a direct write — each enqueued job performing a follow-up
 authoritative read before any create/update/delete is applied to Odoo, with
 the existing DEC-005 layered-sync reconciliation pass as the required
 backstop regardless of webhook health. A `PRODUCTS_DELETE` webhook never
-directly deletes/archives the bound Odoo product; ambiguous cases route to
-manual review via existing error-class vocabulary, none invented.
-Subscription-mechanism choice, full-payload-by-default behavior,
-`read_products` scope sufficiency, HMAC/`X-Shopify-Webhook-Id` dedup, and
-`X-Shopify-Triggered-At`/`updated_at` staleness-ordering guidance are
-verified. A variant-count payload-truncation claim remains unconfirmed and
-does not change this decision. Exact controller/job/query implementation
-mechanics remain implementation planning. Formally remains `open` until
-ChatGPT accepts DEC-020."
+directly deletes/archives the bound Odoo product; ambiguous or
+unconfirmable cases route to manual review via existing error-class
+vocabulary, none invented. Subscription-mechanism choice,
+full-payload-by-default behavior, `read_products` scope sufficiency,
+HMAC/`X-Shopify-Webhook-Id` dedup, and `X-Shopify-Triggered-At`/
+`updated_at` staleness-ordering guidance are verified. A variant-count
+payload-truncation claim remains unconfirmed and does not change this
+decision. **Exact controller/job/query implementation mechanics remain
+implementation planning**, not decided by this acceptance. **Blocks
+implementation** only for those exact mechanics — the decision posture
+itself is resolved."
 
-If accepted, a natural (separate, future) follow-up would be logging MBQ-65
-Option D (direct webhook-driven product mutation) and MBQ-64 Option B (as a
-Phase 1 mechanism) in `rejected-approaches-log.md` — that file is outside
-this record's allowed-files scope and is **not** edited here; this is noted
-as a recommendation for a future session, not performed.
+A natural (separate, future) follow-up would be logging MBQ-65 Option D
+(direct webhook-driven product mutation) and MBQ-64 Option B (as a Phase 1
+mechanism) in `rejected-approaches-log.md` — that file is outside this
+record's allowed-files scope and is **not** edited here; this remains a
+recommendation for a future session, not performed by this acceptance.
 
 ## 10. Implementation gate impact
 
-- **Even if DEC-020 is later accepted, the implementation gate remains
-  closed** unless ChatGPT explicitly performs the separate, dedicated
-  gate-opening act described in `master-blueprint.md`'s "Criteria for when
-  implementation may later be opened" and
+- **Now that DEC-020 is accepted, the implementation gate remains
+  closed** — acceptance of this currency/webhook design decision is not
+  the separate, dedicated gate-opening act described in
+  `master-blueprint.md`'s "Criteria for when implementation may later be
+  opened" and
   [`../05-qa/quality-feedback-loop.md`](../05-qa/quality-feedback-loop.md)
-  §10. Accepting a currency/webhook design decision is not that act.
-- **No implementation task is created** by this record or by its
-  acceptance, under any outcome.
-- **No code follows directly** from this record or from its acceptance.
+  §10. That act has not occurred.
+- **No implementation task is created** by this acceptance, under any
+  outcome.
+- **No code follows directly** from this acceptance.
 - **Exact implementation mechanics remain planning** in every case named
-  above (§5, §8): MBQ-56's tolerance value; exact Odoo field/model names
-  for presentment evidence (MBQ-01/02); the product-webhook controller's
-  exact shape, job-source classification, and follow-up-read query; and
-  the still-unconfirmed variant-truncation question, if it later proves
-  real.
+  above (§5, §8, "Acceptance"): MBQ-56's tolerance value; the exact final
+  error-class/sub-reason mapping and enforcement mechanism for a blocked
+  MBQ-64 divergent-currency order; exact Odoo field/model names for
+  presentment evidence (MBQ-01/02); the product-webhook controller's exact
+  shape, job-source classification, and follow-up-read query; and the
+  still-unconfirmed variant-truncation question, if it later proves real.
 
-## 11. Recommendation to ChatGPT
+## 11. Recommendation to ChatGPT — accepted
 
 **Recommendation: Accept as proposed (§5 and §8, §5 as revised), with three
 named residuals explicitly carried forward, not silently closed:** MBQ-56's
@@ -531,3 +625,19 @@ than leaving it to implementation planning, or MBQ-65 Option B/C instead of
 A — that is a **reject and revise** or **accept with change** outcome this
 record's tables (§4, §7) are structured to support without new research,
 since the evidence for every option is already presented above.
+
+**ChatGPT accepted this recommendation, as revised, on 2026-07-04** (see
+"Acceptance" above) — MBQ-64's revised same-currency-only posture and
+MBQ-65's unchanged enqueue-only posture are both accepted at decision/
+posture level; the named residuals (MBQ-56, the exact error-class mapping,
+the exact webhook-controller mechanics, the unconfirmed variant-truncation
+claim) remain implementation planning, exactly as this record recommended
+carrying them forward rather than silently closing them.
+
+---
+
+**Change control:** further changes to this record require ChatGPT review,
+mirroring the DEC-013 through DEC-019 change-control pattern. This record
+does not re-litigate DEC-003 through DEC-019, does not reopen accepted
+Master Blueprint Parts A–E, and does not reintroduce any row from
+`rejected-approaches-log.md`.
