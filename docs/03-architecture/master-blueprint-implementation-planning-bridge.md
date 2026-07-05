@@ -118,6 +118,24 @@
   note — an accepted naming/schema planning document, at implementation-
   planning level only, does not itself satisfy or move any gate criterion.
   First code is still not authorized.
+- **Final MBQ closure plan accepted (2026-07-05) — AR-020 Accepted by
+  ChatGPT, at planning-closure level only.**
+  [`../07-implementation-plan/final-mbq-closure-plan.md`](../07-implementation-plan/final-mbq-closure-plan.md)
+  reviews all 50 MBQ rows still not fully closed after AR-019, with one
+  explicit final status per row (2 resolved, 27 partially resolved with
+  task-spec residuals, 17 descoped from MVP/first gate, 4 accepted-open
+  with containment) and fresh official-doc verification for
+  MBQ-09/14/24/27 cited in the plan. The acceptance patch applied the
+  plan's §7 wording to `master-blueprint-open-questions.md` (the 50
+  reviewed rows + a top acceptance note). **Zero MBQ rows remain
+  blocking the limited, core-only, zero-UI implementation gate.**
+  **This acceptance is not a gate-opening act.** **The implementation
+  gate remains closed. Implementation remains blocked.** No
+  implementation task and no code exist or are created by it; this
+  document's §4 table remains historical planning context, unchanged.
+  **The next step is a separate, explicit ChatGPT gate-opening act —
+  not automatic implementation** (criterion-5 confirmation, then the
+  limited core-only gate act, then the first `CLAUDE.md` §9 task).
 
 ## 1. Purpose of Part E
 

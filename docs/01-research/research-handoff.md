@@ -1,10 +1,13 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (Core Naming and
-> Schema Planning accepted — AR-019 accepted by ChatGPT at
-> implementation-planning level only, MBQ-01/02/04/07/16/19/20/21/44/45/62
-> impacts applied, gate remains closed)** is immediately below, in the
+> Continuity lives in GitHub, not chat. The **current entry (Final MBQ
+> Closure Plan accepted — AR-020 accepted by ChatGPT at planning-closure
+> level, MBQ register updated for all 50 reviewed rows, zero rows still
+> blocking the limited core-only zero-UI gate, gate remains closed)** is
+> immediately below, in the
 > **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Final MBQ Closure Plan proposed — AR-020 (proposal history)**,
+> **Core Naming and Schema Planning accepted — AR-019 (history)**,
 > **Core Naming and Schema Planning — revised after ChatGPT REVISE (history,
 > superseded by the acceptance)**,
 > **Core Naming and Schema Planning — AR-019 proposed, original version
@@ -47,6 +50,160 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Final MBQ Closure Plan accepted — compact handoff (2026-07-05)
+
+> **Documentation-only acceptance patch — not implementation, not a
+> gate-opening act.** Confirmed before editing: PR #86 head commit
+> `4d0e1fddb36736e88281232d0f8b285c11b2dc3d` (branch
+> `claude/odoo-shopify-planning-closure-ri64vv`, based on
+> `Shopify-connector` at PR #85 merge commit `2e6842b`); DEC-003 through
+> DEC-020 confirmed Accepted and unedited; AR-020 confirmed previously
+> Proposed for ChatGPT review; implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/odoo-shopify-planning-closure-ri64vv` → PR #86
+  into `Shopify-connector` (draft, not merged).
+- **Files changed:**
+  `docs/07-implementation-plan/final-mbq-closure-plan.md` (Status →
+  Accepted; Acceptance section added; §4/§7/§8/§11 marked accepted/
+  applied), `docs/05-qa/architecture-review-log.md` (AR-020 row and note
+  moved to Accepted; AR-002 through AR-019 untouched),
+  `docs/03-architecture/master-blueprint-open-questions.md` (plan §7
+  wording applied to exactly the 50 reviewed rows + top acceptance-patch
+  note — **no other row touched**),
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`
+  (status note updated to accepted), `docs/01-research/research-handoff.md`
+  (this file). **No DEC-003 through DEC-020 file changed. No
+  `docs/04-decisions/README.md` change. No code/Python/XML/manifest/
+  security/test/CI file changed. No implementation task created. No
+  module scaffolding created.**
+- **What changed:** **ChatGPT accepted the Final MBQ Closure Plan on
+  2026-07-05, at planning-closure level only. AR-020 is now Accepted.**
+  The MBQ register is updated for all 50 reviewed rows: **2 Resolved**
+  (MBQ-29, MBQ-35), **27 Partially resolved** with named task-spec
+  residuals (MBQ-06/08/09/14/17/18/23/24/25/30/32/33/34/36/38/40/41/42/
+  43/44/52/53/54/59/60/64/65), **17 descoped from MVP / first gate**
+  (MBQ-03/04/05/10/13/15/22/27/46/48/49/51/55/56/57/61/63), **4
+  accepted-open risks with containment** (MBQ-12/28/50/58). **Zero MBQ
+  rows remain blocking the limited, core-only, zero-UI implementation
+  gate.**
+- **Gate state:** **the implementation gate remains closed;
+  implementation remains blocked; no code was created; no implementation
+  task was created; nothing is authorized by this acceptance.** Register
+  closure is planning closure, not a gate act.
+- **Learning feedback loop:** **New issues discovered:** none new this
+  session (the `/docs/00-source-materials` capture follow-up from the
+  proposal session remains logged, plan §10 risk 10 — still pending, now
+  assignable to any next documentation session). **Repeated issue
+  patterns:** none triggered. **Rules/checklists updated:** none (out of
+  allowed-files scope). **New rejected approaches:** none. **New
+  technical debt:** none (no code). **New open questions:** none — the
+  two MBQ-09 residuals were already recorded in the applied §7 wording.
+  **Architecture concerns:** none — no accepted DEC/AR/blueprint design
+  content changed; this is a status/acceptance patch.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured · rejected approaches checked, none
+  added · technical debt logged (none applicable) · repeated-issue
+  escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** the **separate, explicit ChatGPT acts**
+  the accepted plan names, in order: (1) confirm AR-018's criterion-5
+  reading (DP-003/004/006 prevention-rule status), (2) the limited
+  core-only, zero-UI gate-opening act (`shopify_connector_core` only —
+  module skeleton, manifest/init, the six accepted core models,
+  groups/access CSV, core constraints, core tests; no webhooks, no
+  external API calls, no credential persistence, no setup wizard, no
+  domain logic), (3) only then, the first implementation task written to
+  the `CLAUDE.md` §9 template. **None of these was performed this
+  session.**
+- **Stop condition:** stopped after pushing this acceptance patch to the
+  existing PR #86 branch (kept draft, not merged). `main` and plain `dev`
+  untouched; only the five allowed files changed; awaiting the separate
+  ChatGPT gate decision.
+
+---
+
+### Final MBQ Closure Plan proposed — compact handoff (2026-07-05)
+
+> **Documentation-only, planning-closure-only proposal — not
+> implementation, not a gate-opening act.** Confirmed before starting:
+> PR #85 merged into `Shopify-connector` at merge commit `2e6842b`;
+> DEC-003 through DEC-020 all Accepted and unedited; AR-018/AR-019
+> Accepted; implementation confirmed still blocked, gate confirmed still
+> closed.
+
+- **Branch / PR:** `claude/odoo-shopify-planning-closure-ri64vv` → draft
+  PR into `Shopify-connector` (not merged).
+- **Files changed:**
+  `docs/07-implementation-plan/final-mbq-closure-plan.md` (new — the
+  closure package, AR-020 companion),
+  `docs/05-qa/architecture-review-log.md` (AR-020 row + note added;
+  AR-002 through AR-019 untouched),
+  `docs/03-architecture/master-blueprint-implementation-planning-bridge.md`
+  (compact status note added),
+  `docs/01-research/research-handoff.md` (this entry). **The MBQ register
+  (`master-blueprint-open-questions.md`) is NOT edited. No DEC-003
+  through DEC-020 file changed. No `docs/04-decisions/README.md` change.
+  No code/Python/XML/manifest/security/test/CI file changed. No
+  implementation task created. No module scaffolding created.**
+- **What was done:** prepared the **Final MBQ Closure Plan** (AR-020,
+  Proposed for ChatGPT review). All **50** MBQ rows not fully closed
+  after AR-019 reviewed with one explicit proposed final status each:
+  **2 proposed resolved** (MBQ-29, MBQ-35), **27 proposed partially
+  resolved** with residuals reclassified as `CLAUDE.md` §9 task-spec
+  detail, **17 explicitly descoped from MVP / first gate** (incl.
+  MBQ-27 tax mechanism → blocks order-import task only; MBQ-63
+  webhook-driven inventory import → not in Phase 1; MBQ-24 automated
+  media overwrite → disabled in MVP), **4 accepted-open risks with
+  containment** (MBQ-12/28/50/58), **0 still blocking the limited core
+  gate**. Official-doc verification performed and cited (2026-07-05):
+  Shopify compliance-webhook mandate is App-Store-scoped +
+  protected-data levels for custom apps officially tabled (MBQ-09);
+  `@idempotent` required as of API 2026-04, 24h retention, scope
+  undocumented → UUID-per-operation default (MBQ-14); `productSet`
+  media omission still officially unconfirmed, documented
+  reference-vs-guide tension (MBQ-24); Odoo 19 has **no** documented
+  externally-computed-tax mechanism on `sale.order`; official Amazon
+  connector documents recompute + write-off (MBQ-27). High-power
+  research mode used as authorized: five parallel evidence agents (two
+  repo extraction, three official-doc verification), single-pass stop
+  condition, all claims cited or logged as open.
+- **Gate state:** **AR-020 is Proposed, not accepted. The MBQ register
+  is not edited (plan §7 holds the proposed wording for a future
+  acceptance patch). The implementation gate remains closed.
+  Implementation remains blocked. No code was created. No implementation
+  task was created.**
+- **Learning feedback loop:** **New issues discovered:** the
+  `/docs/00-source-materials` capture rule (CLAUDE.md §7.4) conflicts
+  with a strict allowed-files list when new official research happens in
+  a closure session — excerpts embedded in the plan; full-page capture
+  logged as follow-up (plan §10 risk 10). **Repeated issue patterns:**
+  none triggered; the evidence-consistency gate was applied (no
+  unsupported claim asserted; four unverifiable points logged as open).
+  **Rules/checklists updated:** none (out of allowed-files scope).
+  **New rejected approaches:** none — every proposed default is stricter
+  than the accepted baseline; RA-001–RA-023 checked, none reintroduced.
+  **New technical debt:** none (no code). **New open questions:** none
+  added as register rows; two narrow residuals recorded inside MBQ-09's
+  proposed wording (voluntary compliance-topic delivery; Level-2
+  "varies by plan" matrix). **Architecture concerns:** none — no
+  accepted DEC/AR/blueprint content changed.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured · rejected approaches checked, none
+  added · technical debt logged (none applicable) · repeated-issue
+  escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** ChatGPT reviews the closure package
+  (accept / accept with changes / revise / reject). On acceptance: a
+  small acceptance-patch session applies plan §7 to
+  `master-blueprint-open-questions.md`, flips AR-020 to Accepted, and
+  captures the cited official pages under `/docs/00-source-materials`;
+  then ChatGPT's criterion-5 confirmation and the **separate, explicit,
+  limited core-only gate-opening act** — none of which is performed by
+  this session.
+- **Stop condition:** stopped after opening the draft PR. `main` and
+  plain `dev` untouched; only the four allowed files changed; awaiting
+  ChatGPT review.
 
 ---
 
