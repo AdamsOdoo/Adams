@@ -1,9 +1,12 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry (Core Naming and
-> Schema Planning — AR-019 proposed, not yet accepted, documentation-only,
-> gate remains closed)** is immediately below, in the **compact handoff
-> format** (`../06-prompts/session-handoff-template.md`);
+> Schema Planning — revised after ChatGPT REVISE, AR-019 still Proposed, not
+> yet accepted, documentation-only, gate remains closed)** is immediately
+> below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`);
+> **Core Naming and Schema Planning — AR-019 proposed, original version
+> (history, superseded by the revision)**,
 > **Implementation Gate Readiness Audit Acceptance Patch — AR-018 accepted**,
 > **Implementation Gate Readiness Audit — AR-018 proposed (history)**,
 > **DEC-020 Acceptance Patch — MBQ-64/MBQ-65 resolved at decision/posture
@@ -42,6 +45,106 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Core Naming and Schema Planning — revised after ChatGPT REVISE — compact handoff (2026-07-05)
+
+> **Documentation-only revision, not implementation, not an
+> implementation-gate opening.** Confirmed before editing: PR #85 head
+> commit `938066d47f8f7fd3b4a1d54b50096c356f6fcee6` (branch
+> `claude/core-schema-naming-plan-actnaz`, based on `Shopify-connector` at PR
+> #84 merge commit `4bf692dceec4190705f522bc2d32851af4c79e37`); DEC-003
+> through DEC-020 confirmed Accepted by ChatGPT and unedited;
+> `master-blueprint-open-questions.md` confirmed unedited; ChatGPT's review
+> of the original PR #85 proposal confirmed as **REVISE**, not accepted;
+> implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/core-schema-naming-plan-actnaz` → PR #85 into
+  `Shopify-connector` (draft, not merged).
+- **Files changed:** `docs/07-implementation-plan/core-naming-schema-planning.md`
+  (revised), `docs/05-qa/architecture-review-log.md` (AR-019 row updated +
+  revision footnote added), `docs/01-research/research-handoff.md` (this
+  file). **No DEC-003 through DEC-020 file changed. No
+  `docs/04-decisions/README.md` change. No `master-blueprint-open-questions.md`
+  change — no MBQ row status changed. No code file changed. No
+  Python/XML/manifest/security/test/CI file changed. No implementation task
+  created. No module scaffolding created.**
+- **What changed / residue fixed:** applied all five corrections from
+  ChatGPT's REVISE review of the original proposal. (1) **Removed
+  `shopify.connector.store.credential` entirely** — no credential model,
+  credential metadata model, or secret field of any kind is proposed for the
+  first slice; MBQ-04 is now "proposed not resolved / explicitly, fully
+  descoped for slice 1," not "partially resolved." Proposed model count
+  moves from seven to **six**. (2) **Fixed the `store.settings_id`/One2many-
+  named-singular contradiction** by removing the reverse field from `store`
+  entirely; `shopify.connector.store.settings.store_id` is the sole,
+  authoritative link. (3) **Changed `shopify.connector.job.log.job_id` from
+  `ondelete='cascade'` to `ondelete='restrict'`**, so a job's log/audit
+  history can never be silently cascade-deleted through its parent — 
+  reconciled with the access plan (§10), which already grants no group
+  Unlink on either model. (4) **Gave `job_type` two core-owned starting
+  values** (`core_readiness_check`, `core_manual_maintenance`) so the
+  required Selection is never contradictorily empty before any domain
+  module installs, while remaining extensible via `selection_add`.
+  (5) **Made the serialization guard DB-backed and race-safe** — added
+  `operation_scope_key` (computed from `store_id`+`res_model`+`res_id`+
+  `shopify_target_gid`, populated only while a job is non-terminal, cleared
+  to `NULL` on reaching a terminal state) under a unique constraint on
+  `(store_id, operation_scope_key)`, explicitly kept distinct from
+  `idempotency_key` (which persists for the job's life and answers a
+  different question). (6) **Removed the `mail.thread`/tracking commitment**
+  for settings-change history, leaving that choice to a future
+  implementation task's own manifest dependency decision. Updated AR-019
+  (row text + a revision footnote) and this handoff accordingly; §13/§14/§16
+  of the planning document and the PR's model-count/MBQ-impact summaries
+  were all updated to match.
+- **Items deferred:** ChatGPT's actual re-review/acceptance of the revised
+  document and AR-019; if accepted, applying §14's drafted register-impact
+  wording to `master-blueprint-open-questions.md`; the two judgment calls
+  the document still flags for scrutiny (§16: the job+log split, the generic
+  `enqueue_decisions` JSON field — neither was named in the REVISE feedback);
+  real credential persistence and any credential-lifecycle schema (MBQ-04
+  remains fully open, not merely the secret value); the setup wizard/
+  test-connection flow; the transport/API client; every product/customer/
+  order/inventory/fulfillment domain model; webhooks; the explicit
+  implementation-gate-opening act; all implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none beyond what
+  ChatGPT's REVISE already named — this session corrected exactly those five
+  items, no additional defect found while doing so. **Repeated issue
+  patterns:** none newly triggered. **Rules/checklists updated:** none this
+  session (out of allowed-files scope). **New rejected approaches:** none —
+  `rejected-approaches-log.md` was not re-checked this session since no new
+  architecture direction was introduced, only schema corrections within the
+  existing proposal's own boundaries. **New technical debt:** none (no
+  code). **New open questions:** none added — no new MBQ row was created;
+  MBQ-04's draft wording was corrected from "partially resolved" to
+  "not resolved / explicitly descoped," applied only upon a future
+  acceptance, same as every other row here. **Architecture concerns:** none
+  — no accepted DEC (DEC-003–020) or Part A–E design content was changed;
+  this revision only corrects schema-level defects within the already-
+  proposed, not-yet-accepted planning document.
+- **Quality gate confirmation:** handoff updated (this note) · feedback
+  loop checked · learning captured (none new beyond the named REVISE items)
+  · rejected approaches checked, none added · technical debt logged (none
+  applicable — no code) · repeated-issue escalation applied (none
+  triggered) — all **YES**.
+- **Next recommended session:** ChatGPT's re-review of the revised document
+  and AR-019 — accept as revised, accept with changes (the document's own
+  §16 names two remaining candidates), request further revision, or reject.
+  If accepted: apply §14's register-impact wording to the MBQ register,
+  record the acceptance in `architecture-review-log.md` and
+  `../04-decisions/README.md`, and update this handoff — not implementation,
+  and not the gate-opening act.
+- **Stop condition:** stopped after pushing the revision to the existing
+  PR #85 branch (not merged, still draft). DEC-003 through DEC-020 not
+  edited; `docs/04-decisions/README.md` not edited;
+  `master-blueprint-open-questions.md` not edited; no MBQ row status
+  changed; no code files changed; no implementation task or module
+  scaffolding created; this document and AR-019 are both **Proposed for
+  ChatGPT review — NOT YET ACCEPTED**; implementation remains **blocked**;
+  the implementation gate remains **closed**; `main` and plain `dev`
+  untouched. Awaiting further instruction.
 
 ---
 
