@@ -70,8 +70,8 @@
 > AR-021, both accepted). DEC-003 through DEC-020 confirmed unedited;
 > `docs/04-decisions/README.md` unedited.
 
-- **Branch / PR:** `claude/task-001-core-module-scaffold-coesxy` → PR into
-  `Shopify-connector` (**draft, not merged**).
+- **Branch / PR:** `claude/task-001-core-module-scaffold-coesxy` → PR #88
+  into `Shopify-connector` (**draft, not merged**).
 - **Files changed:** `addons/shopify_connector_core/__init__.py`,
   `addons/shopify_connector_core/__manifest__.py`,
   `addons/shopify_connector_core/models/__init__.py`,
