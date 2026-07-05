@@ -1,4 +1,4 @@
-# Core Naming and Schema Planning — Proposed
+# Core Naming and Schema Planning — Accepted
 
 > **Documentation-only implementation-planning pass** for the premium **Odoo
 > 19 ↔ Shopify Connector**, prepared after ChatGPT accepted the
@@ -8,9 +8,9 @@
 > "accepted next session" the audit named: a single naming/core-schema
 > implementation-planning artifact for MBQ-01, MBQ-02, MBQ-04, MBQ-07,
 > MBQ-16, MBQ-19, MBQ-20, MBQ-21, MBQ-44, MBQ-45's residual, and MBQ-62's
-> residual. **Revised (2026-07-05) after ChatGPT's REVISE review of the
-> original proposal** — see the "Revision note" immediately below the
-> Status section. Companion documents:
+> residual. Revised on 2026-07-05 after ChatGPT's REVISE review of the
+> original proposal, then **accepted by ChatGPT on 2026-07-05** — see the
+> "Acceptance" section immediately below Status. Companion documents:
 > [`../03-architecture/master-blueprint-core-substrate.md`](../03-architecture/master-blueprint-core-substrate.md)
 > (Part A, the blueprint this pass converts into exact names/schema),
 > [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
@@ -20,24 +20,66 @@
 
 ## Status
 
-- **Proposed for ChatGPT review.**
+- **Accepted by ChatGPT on 2026-07-05.**
+- **Accepted at implementation-planning level only.**
 - **Documentation-only.**
 - **Implementation-planning only.**
-- **Does not open the implementation gate.**
-- **Does not authorize implementation.**
-- **Does not create implementation tasks.**
-- **Does not create code.**
+- **Acceptance does not open the implementation gate.**
+- **Acceptance does not authorize implementation.**
+- **Acceptance does not create implementation tasks.**
+- **Acceptance does not create code or module scaffolding.**
 - **Implementation remains blocked.**
 
-Every naming/schema proposal below becomes a **Decision** only if and when
-ChatGPT accepts this document (mirroring the DEC-013 through DEC-020
-acceptance pattern). Until then, every table and constant in this document is
-a **Recommendation**, per `CLAUDE.md` §8 — nothing here is asserted as
-already decided, and no row in `master-blueprint-open-questions.md` is
-edited by this pass itself (that edit happens only via a future acceptance
-patch, if and when ChatGPT accepts).
+## Acceptance
 
-**Revision note (2026-07-05):** ChatGPT reviewed the original proposal and
+**ChatGPT accepted this document on 2026-07-05, at implementation-planning
+level only** (mirroring the DEC-013 through DEC-020 acceptance pattern).
+Every naming/schema proposal in this document is now a **Decision** for the
+core-only first slice described in §2/§3 — not a Recommendation.
+
+- **Accepted at implementation-planning level only** — this is a
+  documentation-level, planning-level acceptance; it is not, and does not
+  approximate, the separate implementation-gate-opening act.
+- **Acceptance does not open the implementation gate.**
+- **Acceptance does not authorize implementation.**
+- **Acceptance does not create implementation tasks.**
+- **Acceptance does not create code or Odoo module scaffolding.**
+- **Implementation remains blocked.**
+- **Accepted core model list** (six models):
+  - `shopify.connector.store`
+  - `shopify.connector.store.settings`
+  - `shopify.connector.location`
+  - `shopify.connector.binding.mixin`
+  - `shopify.connector.job`
+  - `shopify.connector.job.log`
+- **No credential model, credential metadata model, or secret/token field is
+  accepted for slice 1.** MBQ-04 remains **open and fully descoped** for this
+  slice — not resolved, not partially resolved, by this or any prior
+  version of this document.
+- **Job+log split accepted** (§6, MBQ-19) — `shopify.connector.job` +
+  `shopify.connector.job.log`, with error/manual-review fields on `job` and
+  log/evidence payloads on `job.log`; `job.log.job_id` uses non-destructive
+  `ondelete='restrict'`.
+- **`idempotency_key` and `operation_scope_key` accepted as distinct
+  concepts** (§8) — `idempotency_key` prevents duplicate same-operation
+  processing; `operation_scope_key` provides the DB-backed, race-safe
+  serialization guard for non-terminal jobs against the same target.
+- **`enqueue_decisions` as serialized JSON accepted for now** (§4.5, §13),
+  **subject to future implementation review** to ensure it does not hide a
+  decision that should instead be a typed, indexed column.
+- **Retry constants (§9) accepted as adjustable implementation-planning
+  defaults only** — not final, tuned production values.
+- **MBQ register-impact wording (§14) is now applied** to
+  `master-blueprint-open-questions.md`, for exactly MBQ-01, MBQ-02, MBQ-04,
+  MBQ-07, MBQ-16, MBQ-19, MBQ-20, MBQ-21, MBQ-44, MBQ-45 (residual), and
+  MBQ-62 (residual) — **no other MBQ row is touched by this acceptance.**
+- **DEC-003 through DEC-020 are unchanged by this acceptance;
+  `../04-decisions/README.md` is unchanged.**
+- **Companion review-log entry:** AR-019, accepted the same day
+  ([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)).
+
+**Revision history (2026-07-05, before acceptance):** ChatGPT first reviewed
+the original proposal and
 returned **REVISE** — direction accepted, schema needed correction. This
 revision: (1) removes `shopify.connector.store.credential` entirely — MBQ-04
 is now a **full** slice-1 descope, not a partial resolution; (2) fixes the
@@ -745,73 +787,78 @@ Handling MBQ-04 per the task's explicit safe-default instruction —
   single-store — a later multi-store phase (MBQ-46) needs only new record
   rules (§10), not a schema rename or a retrofitted scoping column.
 
-## 14. MBQ impact if accepted
+## 14. MBQ impact — applied
 
-**Draft register wording only — not applied.** The wording below becomes the
-register's actual text only via a future acceptance patch, if and when
-ChatGPT accepts this document (mirroring the DEC-013 through DEC-020
-pattern). No MBQ row in `master-blueprint-open-questions.md` is edited by
-this pass itself.
+**Accepted and applied.** ChatGPT accepted this document on 2026-07-05; the
+wording below has now been **applied** to
+[`master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
+for exactly the eleven rows listed — **no other MBQ row is touched.**
 
-- **MBQ-01:** *Proposed resolved pending ChatGPT acceptance* — exact Odoo
-  model names for every core-substrate concept in scope for a first
-  core-only slice (`shopify.connector.store`, `.store.settings`,
+- **MBQ-01:** *Resolved by this acceptance, for core model names only* —
+  exact Odoo model names for every core-substrate concept in scope for a
+  first core-only slice (`shopify.connector.store`, `.store.settings`,
   `.location`, `.binding.mixin`, `.job`, `.job.log`) proposed in §3.
   Domain-specific binding model names (MBQ-55) and view/menu XML IDs
   (MBQ-03) remain out of scope and unresolved by this pass.
-- **MBQ-02:** *Proposed resolved pending ChatGPT acceptance* — field
-  names/types for the six models above proposed in §4, including
-  constraint/index design (§12).
-- **MBQ-04:** *Proposed not resolved for slice 1 — explicitly, fully
-  descoped (Option A).* No credential model, credential metadata model, or
-  secret field of any kind is proposed for the first core-only slice (§11).
-  Real credential persistence, and the credential lifecycle schema itself,
-  both remain fully open, blocked pending official Odoo evidence and a
-  separate ChatGPT decision. A future MBQ-04 session may propose a
-  credential model once that evidence exists; this document does not
-  pre-design one.
-- **MBQ-07:** *Proposed resolved pending ChatGPT acceptance* — exact
-  technical shape is a store-scoped `shopify.connector.store.settings`
+- **MBQ-02:** *Resolved by this acceptance, for core field names/types
+  only* — field names/types for the six models above proposed in §4,
+  including constraint/index design (§12).
+- **MBQ-04:** *Not resolved — explicitly, fully descoped for slice 1
+  (Option A), by this acceptance.* No credential model, credential metadata
+  model, or secret field of any kind is accepted for the first core-only
+  slice (§11). Real credential persistence, and the credential lifecycle
+  schema itself, both remain fully open, blocked pending official Odoo
+  evidence and a separate ChatGPT decision. A future MBQ-04 session may
+  propose a credential model once that evidence exists; this document does
+  not pre-design one.
+- **MBQ-07:** *Resolved by this acceptance, for the core store-scoped
+  settings model shape* — a store-scoped `shopify.connector.store.settings`
   model (§5), distinct from the store/connection model, extended by domain
-  modules via classic Odoo model inheritance, matching DEC-013's accepted
-  direction.
-- **MBQ-16:** *Proposed resolved pending ChatGPT acceptance* — retry
-  ceilings and backoff constants proposed in §9, by error-class family,
-  explicitly labelled as adjustable implementation-planning defaults.
-- **MBQ-19:** *Proposed resolved pending ChatGPT acceptance* — job+log
-  split (`shopify.connector.job` + `.job.log`), with error/manual-review
-  fields folded onto the job model rather than a separate model (§3/§6);
-  `job.log.job_id` uses `ondelete='restrict'` to protect log history (§12).
-- **MBQ-20:** *Proposed resolved pending ChatGPT acceptance* — operation-
-  level idempotency key schema proposed in §8 (`store_id` + `job_type` +
-  `res_model`/`res_id` + `shopify_target_gid` + `payload_hash`, composed
-  into a computed, uniquely-constrained `idempotency_key` field on `job`),
-  not a separate model, kept distinct from the serialization-guard key
+  modules via classic Odoo model inheritance (`_inherit`), matching
+  DEC-013's accepted direction. No feature flag may bypass a safety guard
+  (§5, unchanged).
+- **MBQ-16:** *Resolved by this acceptance, for retry/backoff planning
+  defaults* — retry ceilings and backoff constants proposed in §9, by
+  error-class family, **accepted as adjustable implementation-planning
+  defaults, not final production-tuned values.** Cron cadence/batch-size
+  (MBQ-18) is tracked separately and is not resolved by this row.
+- **MBQ-19:** *Resolved by this acceptance, for core job/log/error schema*
+  — job+log split (`shopify.connector.job` + `shopify.connector.job.log`),
+  with error/manual-review fields folded onto the job model and log/evidence
+  payloads on `job.log` (§3/§6); `job.log.job_id` uses non-destructive
+  `ondelete='restrict'` to protect log history (§12).
+- **MBQ-20:** *Resolved by this acceptance, for the idempotency key schema*
+  — `idempotency_key` on `shopify.connector.job` (§8): `store_id` +
+  `job_type` + `res_model`/`res_id` + `shopify_target_gid` + `payload_hash`,
+  composed into a computed, uniquely-constrained field; prevents duplicate
+  same-operation processing; kept distinct from the serialization-guard key
   (`operation_scope_key`, MBQ-21).
-- **MBQ-21:** *Proposed resolved pending ChatGPT acceptance* — the
-  serialization guard is proposed as a **DB-backed, race-safe** mechanism
-  owned by `shopify.connector.job` (§8): a system-managed
-  `operation_scope_key` field, populated only while a job is non-terminal
-  and cleared on reaching a terminal state, under a unique constraint on
-  `(store_id, operation_scope_key)` — not a query-time-only check, not a
-  separate model, and not a queue-level lock table.
-- **MBQ-44:** *Proposed partially resolved pending ChatGPT acceptance* —
-  planned `ir.model.access.csv` row shapes (which of the four groups get
-  read/write/create/unlink per core model) proposed in §10; no CSV file is
-  created, and record rules beyond store-scoping are explicitly deferred
-  (MBQ-46).
-- **MBQ-45 (residual only):** *Proposed resolved pending ChatGPT
-  acceptance* — `group_shopify_connector_admin`/`_operator`/`_reviewer`/
-  `_auditor` and a `module_category_shopify_connector` XML ID proposed in
-  §10. The 1:1 role-to-group mapping and single-shared-surface decision
-  themselves are unchanged, already resolved by DEC-018 — this pass adds
-  only the missing identifiers.
-- **MBQ-62 (residual only):** *Proposed resolved pending ChatGPT
-  acceptance* — the `job_source` Selection value `odoo_event` and the
-  `trigger_origin` Selection field/values proposed in §7, with a validation
-  rule making `trigger_origin` required only when `job_source = odoo_event`.
-  The semantic classification itself is unchanged, already resolved by
-  DEC-019 — this pass adds only the missing field/model mechanics.
+- **MBQ-21:** *Resolved by this acceptance, for the DB-backed serialization
+  guard schema* — `operation_scope_key` on `shopify.connector.job` (§8): a
+  system-managed field, populated only while a job is non-terminal and
+  cleared on reaching a terminal state, under a unique constraint on
+  `(store_id, operation_scope_key)`; prevents conflicting concurrent
+  operations against the same target; distinct from `idempotency_key` — not
+  a query-time-only check, not a separate model, and not a queue-level lock
+  table.
+- **MBQ-44:** *Partially resolved by this acceptance, for planned core
+  access CSV row shapes only* — which of the four groups get
+  read/write/create/unlink per core model, proposed in §10; **no actual CSV
+  file is created**, and record-rule details beyond Phase 1 (store-scoping
+  only) remain deferred (MBQ-46).
+- **MBQ-45 (residual only):** *Resolved by this acceptance, for exact group
+  XML IDs and module-category XML ID* —
+  `group_shopify_connector_auditor`/`_operator`/`_reviewer`/`_admin` and
+  `module_category_shopify_connector`, proposed in §10. The role hierarchy
+  itself remains as accepted by DEC-013/DEC-018 — this acceptance adds only
+  the missing identifiers.
+- **MBQ-62 (residual only):** *Resolved by this acceptance, for the
+  `odoo_event` mechanics* — the `job_source` Selection value `odoo_event`
+  and the `trigger_origin` Selection field/values
+  (`inventory_stock_change`/`fulfillment_picking_validation`), proposed in
+  §7, with a validation rule making `trigger_origin` required only when
+  `job_source = odoo_event`. The semantic classification itself remains
+  DEC-019 — this acceptance fixes only the mechanics.
 
 ## 15. What remains blocked after this planning pass
 
@@ -844,7 +891,15 @@ this pass itself.
   `implementation-task-template.md` is written by this pass or its
   eventual acceptance.
 
-## 16. Recommendation to ChatGPT
+## 16. Recommendation to ChatGPT — accepted
+
+**ChatGPT accepted this recommendation, as revised, on 2026-07-05** (see
+"Acceptance" above). The two judgment calls below were both **accepted as
+proposed**: the job+log split is accepted outright (§6, MBQ-19); the generic
+`enqueue_decisions` JSON field is accepted **for now**, explicitly subject to
+future implementation review to confirm it does not hide a decision that
+should instead be a typed, indexed column. Retained below for the
+reasoning trail.
 
 **Recommend: accept as revised.** This revision applies every correction
 from ChatGPT's REVISE review of the original proposal, as fixes rather than

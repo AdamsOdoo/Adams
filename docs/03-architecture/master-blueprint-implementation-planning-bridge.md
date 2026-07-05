@@ -104,16 +104,20 @@
   task has been created. **Accepted next session:** a documentation-only
   naming/core-schema implementation-planning pass (MBQ-01/02/04/07/16/19/
   20/21/44/45(residual)/62(residual)) — not code, not a gate-opening act.
-- **Core naming/schema planning proposed (2026-07-05, not yet accepted).**
+- **Core naming/schema planning accepted (2026-07-05, at
+  implementation-planning level only).**
   [`../07-implementation-plan/core-naming-schema-planning.md`](../07-implementation-plan/core-naming-schema-planning.md)
-  — the accepted next session named immediately above — has been
-  **prepared and proposed for ChatGPT review** (companion review-log entry
-  **AR-019**,
+  — the accepted next session named immediately above — was prepared,
+  revised once after a ChatGPT REVISE, and **accepted by ChatGPT on
+  2026-07-05** (companion review-log entry **AR-019**, also **Accepted**,
   [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)).
-  **This is not a gate-opening act.** No implementation task has been
-  created. **Implementation remains blocked**; this table (§3) and its
-  "2 of 5 criteria satisfied" count are unchanged by this note — a proposed,
-  unaccepted planning document does not itself move any gate criterion.
+  **This acceptance is not a gate-opening act.** No implementation task has
+  been created; no code, module, view, controller, security file, manifest,
+  test, or CI file is created. **Implementation remains blocked**; this
+  table (§3) and its "2 of 5 criteria satisfied" count are unchanged by this
+  note — an accepted naming/schema planning document, at implementation-
+  planning level only, does not itself satisfy or move any gate criterion.
+  First code is still not authorized.
 
 ## 1. Purpose of Part E
 

@@ -1,10 +1,12 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry (Core Naming and
-> Schema Planning — revised after ChatGPT REVISE, AR-019 still Proposed, not
-> yet accepted, documentation-only, gate remains closed)** is immediately
-> below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`);
+> Schema Planning accepted — AR-019 accepted by ChatGPT at
+> implementation-planning level only, MBQ-01/02/04/07/16/19/20/21/44/45/62
+> impacts applied, gate remains closed)** is immediately below, in the
+> **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Core Naming and Schema Planning — revised after ChatGPT REVISE (history,
+> superseded by the acceptance)**,
 > **Core Naming and Schema Planning — AR-019 proposed, original version
 > (history, superseded by the revision)**,
 > **Implementation Gate Readiness Audit Acceptance Patch — AR-018 accepted**,
@@ -45,6 +47,84 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Core Naming and Schema Planning accepted — compact handoff (2026-07-05)
+
+> **Documentation-only acceptance patch, not implementation, not an
+> implementation-gate opening.** Confirmed before editing: PR #85 head
+> commit `c3e5b68845fed2390b2de35f759e93b6b8ee0317` (branch
+> `claude/core-schema-naming-plan-actnaz`, based on `Shopify-connector` at PR
+> #84 merge commit `4bf692dceec4190705f522bc2d32851af4c79e37`); DEC-003
+> through DEC-020 confirmed Accepted by ChatGPT and unedited; the revised
+> `core-naming-schema-planning.md` and AR-019 confirmed previously Proposed
+> for ChatGPT review, not accepted; implementation confirmed still blocked.
+
+- **Branch / PR:** `claude/core-schema-naming-plan-actnaz` → PR #85 into
+  `Shopify-connector` (draft, not merged).
+- **Files changed:** `docs/07-implementation-plan/core-naming-schema-planning.md`
+  (Status → Accepted; Acceptance section added; §14/§16 updated to reflect
+  acceptance), `docs/05-qa/architecture-review-log.md` (AR-019 row and
+  footnote updated to Accepted), `docs/03-architecture/master-blueprint-open-questions.md`
+  (MBQ-01/02/04/07/16/19/20/21/44/45/62 rows updated; acceptance-patch note
+  added — **no other MBQ row touched**), `docs/01-research/research-handoff.md`
+  (this file). **No DEC-003 through DEC-020 file changed. No
+  `docs/04-decisions/README.md` change. No code file changed. No
+  Python/XML/manifest/security/test/CI file changed. No implementation task
+  created. No module scaffolding created.**
+- **What changed / residue fixed:** ChatGPT accepted the revised core
+  naming/schema planning document on 2026-07-05, **at implementation-planning
+  level only.** Accepted core model list (six models): `shopify.connector.store`,
+  `.store.settings`, `.location`, `.binding.mixin` (abstract), `.job`,
+  `.job.log`. Applied the document's §14 register-impact wording to
+  `master-blueprint-open-questions.md` for exactly eleven rows: **MBQ-01,
+  MBQ-02, MBQ-07, MBQ-16, MBQ-19, MBQ-20, MBQ-21, and the MBQ-45/MBQ-62
+  residuals — each now Resolved**; **MBQ-44 — Partially resolved** (planned
+  CSV row shapes only, no CSV file created); **MBQ-04 — confirmed NOT
+  resolved, explicitly and fully descoped from the first core-only slice**
+  (no credential model, credential metadata model, or secret/token field of
+  any kind is accepted; real credential persistence and the credential
+  lifecycle schema both remain fully open). Job+log split accepted;
+  `idempotency_key`/`operation_scope_key` accepted as distinct concepts;
+  retry constants accepted as adjustable planning defaults only;
+  `enqueue_decisions` as serialized JSON accepted for now, subject to future
+  implementation review. AR-019 moved from "Proposed for ChatGPT review —
+  NOT YET ACCEPTED" to **Accepted**, at implementation-planning level only.
+- **Items deferred:** the domain-scope MBQ rows this pass does not touch
+  (MBQ-03/05/09/14/23–43/46/48–61/63–65); real credential persistence and any
+  credential-lifecycle schema (MBQ-04 remains fully open); the setup wizard/
+  test-connection flow; the transport/API client; every product/customer/
+  order/inventory/fulfillment domain model; webhooks; the explicit
+  implementation-gate-opening act; all implementation tasks.
+- **Learning feedback loop:** **New issues discovered:** none. **Repeated
+  issue patterns:** none newly triggered. **Rules/checklists updated:** none
+  this session (out of allowed-files scope). **New rejected approaches:**
+  none — no new architecture direction was introduced by this acceptance.
+  **New technical debt:** none (no code). **New open questions:** none
+  added — no new MBQ row was created; eleven existing rows were updated with
+  the document's own pre-drafted register-impact wording, applied exactly as
+  written. **Architecture concerns:** none — no accepted DEC (DEC-003–020) or
+  Part A–E design content was changed; this acceptance is a documentation-
+  level, implementation-planning-level acceptance only.
+- **Quality gate confirmation:** handoff updated (this note) · feedback loop
+  checked · learning captured (none new) · rejected approaches checked, none
+  added · technical debt logged (none applicable — no code) ·
+  repeated-issue escalation applied (none triggered) — all **YES**.
+- **Next recommended session:** a separate, explicit ChatGPT
+  implementation-gate-opening act (not performed by this acceptance), or the
+  next domain-scope MBQ session (e.g. the ChatGPT-owned MBQ rows this pass
+  does not touch) — **not a coding session**, and not itself the
+  gate-opening act.
+- **Stop condition:** stopped after pushing this acceptance patch to the
+  existing PR #85 branch (not merged, still draft). DEC-003 through DEC-020
+  not edited; `docs/04-decisions/README.md` not edited; only the eleven named
+  MBQ rows changed in `master-blueprint-open-questions.md`; no code files
+  changed; no implementation task or module scaffolding created; this
+  document and AR-019 are both **Accepted by ChatGPT (2026-07-05), at
+  implementation-planning level only**; implementation remains **blocked**;
+  the implementation gate remains **closed**; `main` and plain `dev`
+  untouched. Awaiting further instruction.
 
 ---
 
