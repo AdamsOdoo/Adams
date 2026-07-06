@@ -2,15 +2,53 @@
 
 ## Status
 
-**Proposed for ChatGPT review. Not accepted. Not implemented.** This document
-proposes a recommended direction only; it creates no credential model, no
-credential field, no API client, no setup wizard, no test-connection
-mechanism, and does not itself change MBQ-04's recorded status in
-`../03-architecture/master-blueprint-open-questions.md` (out of this session's
-allowed-files scope). Any acceptance/register update is a separate future act.
-Grounded in
+**Accepted by ChatGPT on 2026-07-06, at posture level only. Not implemented.**
+This document's Option B direction is accepted as the Phase 1 / MVP credential
+persistence **posture** — it creates no credential model, no credential field,
+no API client, no setup wizard, no test-connection mechanism, and this
+acceptance is not itself a code-authorizing or gate-opening act. The
+corresponding register update has been applied to
+`../03-architecture/master-blueprint-open-questions.md` (MBQ-04 only, marked
+**Partially resolved**) as part of the same acceptance patch; see
+[AR-022](../05-qa/architecture-review-log.md). Grounded in
 [`../01-research/odoo-credential-storage-official-notes.md`](../01-research/odoo-credential-storage-official-notes.md)
 (access date 2026-07-05).
+
+## Acceptance
+
+- **Accepted by ChatGPT on 2026-07-06.**
+- **Option B is accepted at posture level only**: a dedicated Odoo-managed
+  credential field (or tightly coupled field set) using plain storage +
+  standard Odoo field/access controls (`groups=` restricted to a connector
+  admin-equivalent group), view-level password masking wherever the field is
+  exposed, and a mandatory no-logging/redaction rule — matching every real
+  official Odoo credential-field example reviewed, with no DEC-004 amendment
+  needed.
+- **No code is authorized by this document.** No credential model, field, API
+  client, setup wizard, test-connection mechanism, webhook, controller, cron,
+  UI, or domain-module code is created or authorized by this acceptance.
+- **Exact implementation detail remains open, not decided here**: model name,
+  field name/type, the exact access group(s), audit metadata, rotation/
+  revocation behavior, test-connection behavior, the redaction/no-logging
+  implementation, and rollback behavior are all future implementation-planning
+  items (see "Required follow-up before coding" below), each requiring its own
+  separate task written to the `CLAUDE.md` §9 template before any code starts.
+- **No field-level encryption claim may be made.** This acceptance does not
+  assert, and no future task may assert, that Option B constitutes
+  encryption-at-rest — it is access control (`groups=`) plus UI masking only,
+  per the research notes.
+- **Odoo Cloud/Odoo.sh/on-premise hosting-scope uncertainty remains.** This
+  acceptance does not resolve, and does not rely on resolving, whether Odoo's
+  corporate "Odoo Cloud" AES-256 infrastructure claim specifically covers
+  Odoo.sh, Odoo Online, both, or on-premise — that remains an open hosting-
+  scope question unless separately sourced, and must not be represented as a
+  confirmed guarantee in any future setup/security documentation.
+- **Options D/E (external secret manager / hybrid) are not rejected forever** —
+  they remain deferred as a possible future stronger-posture research/design
+  path, routed as their own follow-up architecture-review row if ChatGPT wants
+  them evaluated, not folded into this acceptance.
+- Does not open the implementation gate and does not start Task 002 — a
+  separate, explicit ChatGPT act, per `CLAUDE.md` §5.
 
 ## Problem
 
@@ -211,20 +249,27 @@ mechanism Option D would use.
 
 ## Recommended decision
 
-**Recommended (proposed only): Option B** — a dedicated credential field (or
-small field set) on the Odoo-managed core substrate, using the exact pattern
-every real official Odoo secret field uses today: plain storage,
-`groups='<admin-equivalent group>'` access control, the view-arch `password`
-attribute for UI masking, and a mandatory log-redaction rule for that field
-name. This is recommended because it is (a) the only option the evidence
-directly and repeatedly demonstrates as Odoo's own real-world practice, (b)
-already consistent with DEC-004's accepted posture with no amendment needed,
-and (c) immediately unblocks the setup wizard, test connection, API client,
-and sync execution work this MBQ-04 gap has been holding back since AR-019.
+**Accepted by ChatGPT on 2026-07-06, at posture level only: Option B** — a
+dedicated credential field (or small field set) on the Odoo-managed core
+substrate, using the exact pattern every real official Odoo secret field uses
+today: plain storage, `groups='<admin-equivalent group>'` access control, the
+view-arch `password` attribute for UI masking, and a mandatory log-redaction
+rule for that field name. This was recommended, and is now accepted at
+posture level, because it is (a) the only option the evidence directly and
+repeatedly demonstrates as Odoo's own real-world practice, (b) already
+consistent with DEC-004's accepted posture with no amendment needed, and (c)
+immediately unblocks the setup wizard, test connection, API client, and sync
+execution work this MBQ-04 gap has been holding back since AR-019. **This
+acceptance is posture-level only** — it does not itself pick the exact model
+name, field name/type, access group XML ID, audit-metadata shape,
+rotation/revocation mechanism, test-connection behavior, redaction
+implementation, or rollback behavior; each of those is a separate,
+future implementation-planning task (see "Required follow-up before coding").
 
-**Explicitly not recommended as the primary mechanism, but named for ChatGPT's
-own weighing:** Options D/E (external secret / hybrid) may be a stronger
-security posture for a security-conscious on-premise deployment, but they rest
+**Not adopted as the primary mechanism, but named for ChatGPT's own
+weighing, and not rejected forever:** Options D/E (external secret / hybrid)
+may be a stronger security posture for a security-conscious on-premise
+deployment, but they rest
 on an official-evidence gap this session did not close (no confirmed Odoo
 mechanism for reading a deployment-level secret at runtime) and would require
 revisiting DEC-004's "storage location" wording. If ChatGPT wants that
@@ -351,9 +396,9 @@ code is written:
 - **Rollback behavior** — how a failed/partial credential setup is safely
   undone (e.g. a store left in a "connecting" vs. "connected" state).
 
-## Proposed MBQ-04 classification
+## MBQ-04 classification (accepted)
 
-**Partially resolved.**
+**Partially resolved — accepted by ChatGPT on 2026-07-06.**
 
 Justification: the evidence gap that blocked MBQ-04 since AR-019/AR-020 — "no
 official Odoo encryption-at-rest evidence was reviewed" — is now closed **for
@@ -368,14 +413,18 @@ hosting-scope question not separately confirmed.** Enterprise-only modules,
 third-party modules, custom application-side encryption, and external secret
 managers remain outside this evidence base unless separately researched. That
 is a real, citable, but explicitly scoped resolution of the *evidence*
-question MBQ-04 asked. However, MBQ-04 also asks for a *decision* on "storage
-location," and this document only **proposes** Option B rather than deciding
-it — the exact model/field names, access groups, and rotation/audit design
-remain open follow-up items requiring ChatGPT's review of this proposal. It is
-therefore neither fully "resolved" (no decision has been accepted yet) nor
-still "explicitly descoped" (the evidence blocker AR-019/AR-020 cited is gone
-for the Community/core scope reviewed) nor "still open" in the same sense as
-before (a concrete, evidence-backed recommendation now exists). **Partially
-resolved** — the evidence blocker is resolved for the official Community/core
-Odoo 19 sources reviewed; mechanism selection remains pending ChatGPT
-acceptance of Option B (or a different option) from this proposal.
+question MBQ-04 asked. MBQ-04 also asks for a *decision* on "storage
+location," and **ChatGPT has now accepted Option B at posture level only** —
+the exact model/field names, access groups, audit metadata, rotation/
+revocation behavior, test-connection behavior, redaction implementation, and
+rollback behavior all remain open, future implementation-planning items (see
+"Required follow-up before coding" above and the Acceptance section above),
+each gated on its own separate task before any code starts. It is therefore
+neither fully "resolved" (no implementation-level decision has been made) nor
+still "explicitly descoped" (the evidence blocker is gone, and a posture-level
+direction is now accepted) nor "still open" in the pre-acceptance sense
+(Option B is now the accepted direction, not merely a recommendation).
+**Partially resolved** — the evidence blocker is resolved for the official
+Community/core Odoo 19 sources reviewed; Option B is accepted as the posture-
+level mechanism direction; exact implementation detail remains open pending
+future implementation-planning tasks.

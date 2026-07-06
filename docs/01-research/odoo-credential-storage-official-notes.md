@@ -1,5 +1,15 @@
 # Odoo Credential Storage Official Notes
 
+> **Acceptance note (2026-07-06):** ChatGPT accepted this research as
+> **sufficient evidence for the official Community/core Odoo 19 scope
+> reviewed** (see [AR-022](../05-qa/architecture-review-log.md), Accepted
+> 2026-07-06). This note records that acceptance only — the accepted
+> **mechanism direction (Option B)** and MBQ-04's **Partially resolved**
+> classification are recorded in
+> [`../03-architecture/mbq-04-credential-persistence-decision-proposal.md`](../03-architecture/mbq-04-credential-persistence-decision-proposal.md)
+> and in `../03-architecture/master-blueprint-open-questions.md` (MBQ-04),
+> not in this research document, which is left otherwise unchanged.
+
 ## Scope
 
 This document researches **MBQ-04 only** — the exact credential/secret/token

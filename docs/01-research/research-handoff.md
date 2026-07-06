@@ -1,15 +1,16 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (MBQ-04 —
-> Credential Persistence Research and Decision Proposal: official-evidence
-> research on Odoo 19 credential/secret storage — `password=True`/view-arch
-> masking, `ir.config_parameter`, access groups/ACLs, five real official
-> credential-field examples, and the infrastructure-vs-field-level
-> encryption-at-rest distinction — adversarially verified, with a decision
-> proposal recommending Option B, proposed MBQ-04 classification "Partially
-> resolved," no implementation, Task 002 not started)** is
-> immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **Task 001A — Core Runtime
+> Continuity lives in GitHub, not chat. The **current entry (MBQ-04
+> Acceptance Patch: PR #90 accepted by ChatGPT on 2026-07-06 — AR-022
+> Accepted; MBQ-04 now Partially resolved; Option B (dedicated Odoo-managed
+> credential field, plain storage + `groups=` access control + UI masking +
+> mandatory redaction) accepted at posture level only; no implementation;
+> exact model/field/access/rotation/test-connection/redaction/rollback
+> detail routed to a future implementation-planning task)** is immediately
+> below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **MBQ-04 — Credential
+> Persistence Research and Decision Proposal, including its PR #90 F1/F2
+> revision (history)**, **Task 001A — Core Runtime
 > Readiness & QA Closure (history)**, **Task 001 — F1
 > fix (operation_scope_key not cleared on supersede) (history)**, **Task
 > 001 — Core Module Scaffold implemented (history)**, **Limited Core
@@ -62,6 +63,86 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### MBQ-04 Acceptance Patch — compact handoff (2026-07-06)
+
+> **Applies ChatGPT's acceptance of PR #90 — not a new research session, not
+> Task 002.** Confirmed before editing: PR #90 branch
+> `claude/mbq-04-credential-persistence-research` head commit
+> `f8a353d8bc79954996ae31745a5f4b586352c1f0` (the F1/F2 REVISE-fix commit).
+> DEC-003 through DEC-020 confirmed unedited; `docs/04-decisions/README.md`
+> and `defect-pattern-log.md` confirmed unedited; only the MBQ-04 row (plus
+> one new dated acceptance-patch note, no other row) changed in
+> `master-blueprint-open-questions.md`.
+
+- **Branch / PR:** `claude/mbq-04-credential-persistence-research` → draft PR
+  #90 into `Shopify-connector` (not merged; remains draft).
+- **Files changed:** `docs/03-architecture/mbq-04-credential-persistence-decision-proposal.md`
+  (Status → Accepted; new "Acceptance" section; "Recommended decision" and
+  "MBQ-04 classification" sections updated to reflect acceptance),
+  `docs/05-qa/architecture-review-log.md` (AR-022 row → Accepted; new
+  "AR-022 Acceptance Patch" note appended), `docs/03-architecture/master-blueprint-open-questions.md`
+  (MBQ-04 row only, plus one new dated acceptance-patch note — no other MBQ
+  row touched), `docs/01-research/research-handoff.md` (this file). **No
+  addon/module/code file touched. No DEC file changed. No
+  `docs/04-decisions/README.md` change. No `defect-pattern-log.md` change.
+  No Task 002 started. No credential/token/secret field, credential model,
+  API client, setup wizard, test-connection code, webhook/controller/cron/
+  domain-module code created.**
+- **What changed:** applied ChatGPT's acceptance decision for PR #90 —
+  **AR-022 is now Accepted** (2026-07-06); **MBQ-04 is now Partially
+  resolved**: the official-evidence blocker is resolved for the official
+  Community/core Odoo 19 docs/source reviewed (no official Odoo 19
+  Community/core field-level or ORM encryption-at-rest mechanism was found;
+  every real official Odoo credential-field example uses plain storage with
+  `groups=` access control and no field-level encryption; UI masking and
+  access control are both confirmed not encryption; `sudo()`/superuser mode
+  bypasses field-level `groups`; Odoo's corporate "Odoo Cloud" AES-256
+  statement is infrastructure/platform-level, with its exact Odoo
+  Online/Odoo.sh/on-premise applicability remaining an unconfirmed
+  hosting-scope question); **Option B is accepted as the Phase 1/MVP
+  credential-persistence posture** — a dedicated Odoo-managed credential
+  field (or tightly coupled field set), plain storage + standard Odoo
+  field/access controls, connector admin-equivalent `groups=`, view-level
+  password masking, mandatory no-logging/redaction rule, no field-level
+  encryption claim, no confirmed Odoo.sh/on-premise infrastructure-parity
+  claim; Options D/E deferred, not rejected, as a possible future
+  stronger-posture path. **This acceptance is posture-level only — no code,
+  module, credential field, API client, setup wizard, or test-connection
+  mechanism is created or authorized.** Exact model name, field name/type,
+  access group, audit metadata, rotation/revocation behavior, test-connection
+  behavior, redaction implementation, and rollback behavior all remain open,
+  routed to a future implementation-planning task written to the
+  `CLAUDE.md` §9 template.
+- **Items deferred:** the future implementation-planning task itself (exact
+  credential model/field/access-group/redaction/rotation/test-connection/
+  rollback details) — not started this session; whether Odoo Enterprise/
+  third-party/custom-encryption/external-secret-manager options exist
+  (still out of scope, unchanged); whether Odoo's "Odoo Cloud" AES-256 claim
+  specifically covers Odoo Online/Odoo.sh (still an open hosting-scope
+  question, unchanged).
+- **Learning feedback loop:** new issues: none. Repeated patterns: none new.
+  Rules updated: none. Rejected approaches: none (checked
+  `rejected-approaches-log.md`; Options D/E are named deferred, not
+  rejected, so no new row logged). Technical debt: none new. Architecture
+  concerns: none new beyond what the decision proposal already names.
+  Tests/review gates needed: none (docs-only). Should future prompts
+  change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (N/A) · technical debt logged
+  (N/A, none new) · repeated-issue escalation applied (N/A) — all YES.
+- **Next recommended session:** a separate, scoped implementation-planning
+  task naming the exact credential model name, field name/type, access
+  group XML ID, audit metadata, rotation/revocation behavior, test-connection
+  behavior, and redaction implementation — written to the `CLAUDE.md` §9
+  template, ChatGPT-reviewed before any code starts. Not Task 002 in the
+  sense of coding; a planning-only session, same discipline as AR-019's
+  core-naming-schema-planning precedent.
+- **Stop condition:** stopped immediately after refreshing the PR body, per
+  instruction. No merge performed. No implementation task started. No file
+  outside the allowed list touched. PR #90 remains draft/open/not merged.
 
 ---
 
