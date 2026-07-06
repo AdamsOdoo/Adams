@@ -15,6 +15,16 @@
 > sequence, not a schedule; module areas repeat the accepted DEC-008 addon
 > family and AR-019 naming directions — not new commitments.
 
+## Status
+
+**Accepted by ChatGPT on 2026-07-06** (PR #91 acceptance patch;
+[`AR-023`](../05-qa/architecture-review-log.md)) as **planning guidance
+only**. **Does not create any implementation task. Does not open the UI
+implementation gate.** Every future task named below still requires its
+own separate `CLAUDE.md` §9 task spec (allowed/forbidden files,
+acceptance criteria, tests, rollback, definition of done) written and
+reviewed before any code.
+
 ## Global rules for every future UI task
 
 - **Prerequisites (all groups):** UI implementation gate opened by

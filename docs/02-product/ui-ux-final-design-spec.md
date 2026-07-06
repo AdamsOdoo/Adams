@@ -19,6 +19,37 @@
 > [`../05-qa/ui-ux-design-review-checklist.md`](../05-qa/ui-ux-design-review-checklist.md),
 > [`../07-implementation-plan/ui-ux-implementation-task-map.md`](../07-implementation-plan/ui-ux-implementation-task-map.md).
 
+## Acceptance
+
+- **Accepted by ChatGPT on 2026-07-06, at design-specification level**
+  (PR #91 acceptance patch; [`AR-023`](../05-qa/architecture-review-log.md)).
+- **The Premium Simplicity Standard (below) is accepted as the project's
+  UI/UX quality bar** — premium means clarity, confidence, polish,
+  guidance, and recovery; premium does not mean more screens, more
+  colors, more charts, or more complexity.
+- **The screen specs, screen inventory/navigation map, and MVP user
+  flows/state models are accepted as design-level guidance for future
+  implementation tasks** — not as the tasks themselves.
+- **No implementation is authorized by this acceptance.** No code,
+  Odoo module, view, menu, action, wizard, model, field, security file,
+  or credential/token/secret artifact is created or authorized.
+- **The UI implementation gate remains closed.** The only open gate
+  remains the limited, core-only, zero-UI gate (Task 001); every
+  operator-facing screen, wizard, and dashboard described here remains
+  blocked until ChatGPT separately opens a UI implementation gate and
+  each future task is written to the `CLAUDE.md` §9 template. Task 002
+  is not started by this acceptance.
+- **The 7±2 visible field budget, the one-primary-action discipline, and
+  the 10-second dashboard rule are accepted as design-review guidance
+  only** — proposal-level disciplines this acceptance does not promote
+  to hard, code-level validation rules. They remain **[Design proposal —
+  this spec]** unless and until a later, explicit ChatGPT act converts
+  them into implementation gates.
+- **Everything else in this document keeps its original label** (
+  **[Design proposal — this spec]** / **[Illustrative copy — MBQ-22
+  open]** / **[Open item]**) — this acceptance does not upgrade any
+  individual proposal or illustrative copy item to a Decision.
+
 ## Scope and status
 
 - **This document is docs-only.** It creates no code, no Odoo module, no

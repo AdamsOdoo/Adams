@@ -11,6 +11,16 @@
 > [`pr-review-checklist.md`](./pr-review-checklist.md). Docs-only;
 > authorizes nothing.
 
+## Status
+
+**Accepted by ChatGPT on 2026-07-06** (PR #91 acceptance patch;
+[`AR-023`](./architecture-review-log.md)) as the checklist for future
+UI/UX design and implementation review. **Does not replace** the
+accepted Part D §19 premium acceptance checklist or
+[`pr-review-checklist.md`](./pr-review-checklist.md). **Applies once a
+UI implementation gate is opened** — this acceptance does not itself
+open that gate.
+
 Usage: every item must be checked **Yes / No / N/A with a reason**. A
 "No" on any **[Gate]** item blocks acceptance of the design doc (or, later,
 the implementation PR).
