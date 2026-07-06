@@ -1,16 +1,19 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (PR #91
-> Acceptance Patch: applies ChatGPT's acceptance of PR #91 — AR-023
-> accepted; UI/UX Final Design Specification package accepted at
-> design-specification level; Premium Simplicity Standard accepted as the
-> UI/UX quality bar; screen inventory/navigation map and MVP flows/state
-> models accepted as design-level guidance; QA design-review checklist
-> accepted as the future UI review checklist; UI implementation task map
-> accepted as planning guidance only; no implementation, no UI
-> implementation gate opened, Task 002 not started)** is immediately
-> below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **UI/UX Final Design
+> Continuity lives in GitHub, not chat. The **current entry
+> (Credential/Connection/API Foundation Planning Sprint: proposed AR-024
+> implementation-planning package — credential storage, redaction,
+> connection lifecycle, test connection, readiness checks, API-client
+> boundary, plus proposed-not-authorized Task 002/003 specs and a
+> credential-security review checklist; fresh official Shopify/Odoo
+> verification 2026-07-06; docs-only, no code, no gate opened, Task 002
+> not started)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **PR #91 Acceptance
+> Patch — AR-023 accepted; UI/UX Final Design Specification package
+> accepted at design-specification level; Premium Simplicity Standard
+> accepted as the UI/UX quality bar; UI implementation task map accepted
+> as planning guidance only; no UI implementation gate opened
+> (history)**, **UI/UX Final Design
 > Sprint — docs-only implementation-ready UI/UX design specification
 > package created; Premium Simplicity Standard defined; screen-by-screen
 > specs, screen inventory/navigation map, MVP flows/state models, QA
@@ -73,6 +76,106 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Credential/Connection/API Foundation Planning Sprint — compact handoff (2026-07-06)
+
+> **Docs-only implementation-planning sprint for the credential /
+> connection / test-connection / API-client / readiness foundation — the
+> exact planning task AR-022 and the accepted UI/UX task map (Group 4)
+> named as the required precursor to any credential code. Not Task 002;
+> no code.** Confirmed before starting: PR #90 and PR #91 both merged;
+> latest `Shopify-connector` includes PR #91 merge commit
+> `143108585e802ee3e91d9f0c61f1828538734f47`; branch created from it.
+
+- **Branch / PR:** `claude/credential-connection-foundation-planning` →
+  draft PR into `Shopify-connector` (PR number/URL in the PR itself;
+  draft, not merged).
+- **Files changed:**
+  `docs/03-architecture/credential-connection-api-client-planning.md`
+  (new), `docs/07-implementation-plan/credential-connection-foundation-task-plan.md`
+  (new), `docs/07-implementation-plan/task-002-credential-storage-redaction-proposed.md`
+  (new), `docs/07-implementation-plan/task-003-api-client-test-connection-proposed.md`
+  (new), `docs/05-qa/credential-security-redaction-review-checklist.md`
+  (new), `docs/05-qa/architecture-review-log.md` (AR-024 row, Proposed),
+  `docs/01-research/research-handoff.md` (this entry). **No addon/code
+  file touched. No credential/token/secret field, model, API client,
+  setup wizard, or test-connection implementation created. No
+  webhook/controller/cron/domain module created. No gate opened. Task
+  002 not started. DEC-003 through DEC-020, `docs/04-decisions/README.md`,
+  `defect-pattern-log.md`, and `master-blueprint-open-questions.md` all
+  untouched.**
+- **What changed / produced:** (1) the architecture planning package —
+  five storage options evaluated inside the accepted MBQ-04 Option B
+  posture; **recommended (proposed only): a dedicated Admin-only
+  `shopify.connector.store.credential` model** with non-secret status
+  mirrors on `store`, no-read-back + masking rules, a
+  `SENSITIVE_KEYS`/`shpat_`-pattern redaction contract, lifecycle
+  semantics for the four store states, a read-only test-connection
+  contract (`shop` + `currentAppInstallation.accessScopes` in one
+  officially-cited GraphQL query), readiness mechanics for the accepted
+  MBQ-06 essential set, and the `core`-owned API-client boundary
+  (dual-path error normalization into the fixed 16 classes,
+  throttle-signal surfacing, no pacing policy); (2) the foundation task
+  plan (Tasks 002→005 sequenced, Task 006 wizard horizon behind the UI
+  gate); (3) proposed-not-authorized §9-style Task 002 and Task 003
+  specs; (4) the credential-security/redaction review checklist; (5)
+  AR-024 (Proposed).
+- **Official sources checked (access 2026-07-06, cited in the planning
+  doc):** shopify.dev — admin-graphql reference, usage/versioning,
+  usage/access-scopes, usage/limits, usage/response-codes,
+  access-tokens (admin custom apps / offline / client-credentials /
+  client-secret rotation), Dev Dashboard token guide,
+  `currentAppInstallation`/`appInstallation`/`shop`/`Shop`/`AppInstallation`/`AccessScope`
+  reference pages, and the 2020 missing-scope changelog; odoo.com 19.0
+  developer docs (orm, security, view_architectures,
+  restrict_data_access tutorial, on_premise/deploy) and odoo/odoo branch
+  19.0 source (orm/models.py, orm/fields.py, orm/fields_textual.py,
+  base/ir_ui_view.py, base/res_users.py). **Notable new facts:** Shopify
+  has deprecated creating new custom apps in the Shopify admin (existing
+  ones keep working; admin-created tokens rotate only by
+  uninstall/reinstall); Dev Dashboard apps use a client-credentials
+  grant with 24-hour tokens; the expiring-offline-token model explicitly
+  excludes custom apps — all routed to MBQ-05, not decided here. Every
+  unconfirmed behavior (THROTTLED body shape, invalid-token HTTP status,
+  missing-scope shape, `shop`/`currentAppInstallation` scope
+  requirements) is logged open, never asserted.
+- **Items deferred:** the named ChatGPT decision points (compute-blank
+  no-read-back variant; `token_variant` vocabulary vs MBQ-05;
+  scope-snapshot placement; `core_test_connection` job-type value;
+  `SHOP_INACTIVE`/402/423 class mapping); the store/settings
+  `perm_create` ACL gap (wizard-blocking, Task 005/MBQ-44 residual);
+  in-flight-job disposition at disconnect (Part A §I.4, unchanged);
+  MBQ-06 thresholds/copy; a `/docs/00-source-materials` capture pass for
+  this sprint's excerpts (outside allowed files).
+- **Learning feedback loop:** new issues — the merged Task 001 ACL
+  grants no `perm_create` on store/settings to any group (surfaced,
+  routed to MBQ-44 residual/Task 005; not a defect in Task 001's zero-UI
+  scope); repeated patterns — none new (evidence-consistency gate
+  honored: all platform facts cited or logged open); rules/checklists
+  updated — new credential-security/redaction checklist proposed; new
+  rejected approaches — none (options rejected here are proposal-level
+  evaluations recorded in the planning doc, not RA-log rejections);
+  technical debt — none created (docs-only); architecture concerns —
+  AR-024 filed (Proposed); tests/review gates needed — the checklist's
+  gates plus both task specs' test plans; future prompts — the next
+  session prompt below reflects ChatGPT's review outcome.
+- **Quality gate confirmation:** handoff updated YES · feedback loop
+  checked YES · learning captured YES · rejected approach logged n/a
+  (none) · technical debt logged n/a (none) · repeated-issue escalation
+  applied n/a (none) — all satisfied.
+- **Next recommended session:** ChatGPT review of PR (AR-024). If
+  accepted: an acceptance-patch session applying the proposed register
+  impact (MBQ-04 → implementation-planning level; MBQ-05 findings
+  recorded/decided; MBQ-44 credential row shape + `perm_create`
+  residual) and flipping AR-024 to Accepted; then, as a separate act, the
+  Task 002 gate-opening + final §9 task prompt. If revised: a patch
+  session on this branch.
+- **Stop condition:** stopped after opening the draft PR. No code, no
+  fields, no models, no views, no API client, no test connection, no
+  wizard, no webhook/controller/cron/domain module; no gate opened; Task
+  002/003 remain proposed-not-authorized; awaiting ChatGPT review.
 
 ---
 
