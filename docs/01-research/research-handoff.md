@@ -90,8 +90,8 @@
 > `143108585e802ee3e91d9f0c61f1828538734f47`; branch created from it.
 
 - **Branch / PR:** `claude/credential-connection-foundation-planning` →
-  draft PR into `Shopify-connector` (PR number/URL in the PR itself;
-  draft, not merged).
+  draft PR #92 into `Shopify-connector`
+  (https://github.com/AdamsOdoo/Adams/pull/92; draft, not merged).
 - **Files changed:**
   `docs/03-architecture/credential-connection-api-client-planning.md`
   (new), `docs/07-implementation-plan/credential-connection-foundation-task-plan.md`
