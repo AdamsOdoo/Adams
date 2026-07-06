@@ -100,9 +100,13 @@
   credential-field examples (`ir.mail_server.smtp_pass`;
   Stripe/Adyen/Authorize.Net payment-provider secret keys;
   `iap.account.account_token`) — all identical plain-`Char` +
-  `groups='base.group_system'`, no encryption; and encryption-at-rest (the
-  only official claim found is **infrastructure-level, AES-256, scoped
-  explicitly to hosted Odoo Cloud** — not on-premise, not field-level). Wrote
+  `groups='base.group_system'`, no encryption; and encryption-at-rest (**no
+  official Community/core Odoo 19 field-level mechanism found**; the only
+  claim found anywhere is **infrastructure-level, AES-256, scoped by Odoo's
+  corporate page to "Odoo Cloud"** — exact Odoo Online/Odoo.sh/on-premise
+  applicability not separately confirmed, not field-level; Enterprise-only/
+  third-party/custom-encryption/external-secret-manager options remain
+  outside this evidence base unless separately researched). Wrote
   the full findings to `odoo-credential-storage-official-notes.md`
   (Fact/Official-source-code-fact/Inference/Open-question labelled throughout,
   per `CLAUDE.md` §8) and a decision proposal
@@ -133,10 +137,12 @@
 - **Items deferred:** exact credential model/field names, access groups,
   rotation/revocation design, audit-metadata design, and test-connection
   behavior — all explicitly listed as "Required follow-up before coding" in
-  the decision proposal, not decided this session; whether Odoo Enterprise
-  offers any field-level encryption unavailable in Community (not checked,
-  out of scope); whether Odoo Cloud's AES-256 claim extends to on-premise
-  (not confirmed either way).
+  the decision proposal, not decided this session; whether Odoo Enterprise,
+  third-party modules, or custom application-side encryption offer any
+  field-level encryption unavailable in the official Community/core docs/
+  source reviewed (not checked, out of scope); whether Odoo's corporate "Odoo
+  Cloud" AES-256 claim specifically covers Odoo Online, Odoo.sh, both, or
+  on-premise (hosting-scope question, not confirmed either way).
 - **Learning feedback loop:** new issues: none. Repeated patterns: none new —
   this session was itself the corrective action for the "unsupported
   assumption / weak research" pattern (DP-003/004/006) as it specifically
@@ -165,6 +171,31 @@
 - **Stop condition:** stopped immediately after opening the draft PR, per
   instruction. No merge performed. No second task started. No file outside
   the allowed list touched.
+
+_**PR #90 Revision (2026-07-05) — ChatGPT returned REVISE, not Reject.** Two
+precision issues (F1, F2) were fixed in `odoo-credential-storage-official-notes.md`
+and `mbq-04-credential-persistence-decision-proposal.md` (and in this handoff
+entry, above): **F1** — narrowed every "Odoo 19 provides no built-in
+field-level encryption-at-rest" / "definitive answer" / "evidence resolved in
+full" style absolute claim to "no official Odoo 19 **Community/core**
+field-level or ORM encryption-at-rest mechanism was found in the official
+docs/source **reviewed**," with an explicit statement that Enterprise-only
+modules, third-party modules, custom application-side encryption, and
+external secret managers remain outside this evidence base unless separately
+researched (this gap was already named in "What is not confirmed"/Open
+questions but the headline conclusions did not consistently carry the same
+caveat — now fixed throughout). **F2** — removed every gloss asserting
+"Odoo Cloud (Odoo Online/Odoo.sh)" coverage or "Odoo.sh/Odoo Online get the
+AES-256 claim"; the corporate `odoo.com/security` page's own scope is the
+umbrella term "Odoo Cloud (the platform)," and the versioned Odoo.sh/Odoo
+Online administration docs checked contain **no** encryption-at-rest
+statement of their own — exact Odoo Online/Odoo.sh/on-premise applicability
+is now stated as an open hosting-scope question throughout, not asserted
+either way. **No scope/structure/evidence-base change** — ChatGPT explicitly
+did not reject the research; only these two wording precisions were applied.
+AR-022 remains `Proposed` (not changed to `Accepted`); `master-blueprint-
+open-questions.md` remains untouched; PR #90 remains draft. Commit: "docs:
+narrow MBQ-04 credential evidence claims."**_
 
 ---
 

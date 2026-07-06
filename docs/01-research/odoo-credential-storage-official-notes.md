@@ -285,13 +285,23 @@ database storage**:
   (https://www.odoo.com/documentation/19.0/administration/odoo_sh.html and
   subpages; https://www.odoo.com/documentation/19.0/administration/odoo_online.html)
 - **Fact (official first-party corporate page, *not* a versioned
-  `/documentation/19.0/` page) —** *"All customer data (database content and
-  stored files) is encrypted at rest, both in production and in backups with
-  AES-256"* — stated under a section explicitly headed **"Odoo Cloud (the
-  platform)."** This is a **whole-database/whole-filestore,
-  infrastructure/disk-level** encryption claim for Odoo's hosted platform (Odoo
-  Online/Odoo.sh) — it says nothing about on-premise deployments and nothing
-  about field-level/per-column encryption inside the ORM/database schema.
+  `/documentation/19.0/` page) —** Odoo's first-party security page states
+  that Odoo Cloud customer data is encrypted at rest with AES-256: *"All
+  customer data (database content and stored files) is encrypted at rest,
+  both in production and in backups with AES-256"* — stated under a section
+  explicitly headed **"Odoo Cloud (the platform)."** **This is
+  infrastructure/platform-level, not field-level ORM encryption** — it says
+  nothing about field-level/per-column encryption inside the ORM/database
+  schema. **Exact applicability across Odoo Online, Odoo.sh, and on-premise
+  remains a hosting-scope question, not separately sourced or confirmed
+  here:** the corporate page's own scope heading is the umbrella term "Odoo
+  Cloud (the platform)," not a named product; the versioned Odoo.sh
+  administration docs checked immediately above contain **no**
+  encryption-at-rest statement of their own, so this corporate-page claim
+  must **not** be read as confirming Odoo.sh coverage specifically (nor
+  Odoo Online coverage specifically), and it says nothing about on-premise
+  deployments at all. **Do not use this claim as a field-level or
+  connector-level security guarantee.**
   (https://www.odoo.com/security)
 - **Fact (same page) —** *"Customer passwords are protected with
   industry-standard PBKDF2+SHA512 encryption (salted + stretched for thousands
@@ -335,11 +345,21 @@ database storage**:
 - Whether any non-core/OCA or Odoo Enterprise-only module implements genuine
   field-level encryption-at-rest for arbitrary `Char`/`Text` fields — out of
   scope (community modules are excluded as evidence per this task's hard
-  rules; Enterprise-only source was not accessed this session).
-- Whether Odoo Online/Odoo.sh's AES-256 "encrypted at rest" claim extends in
-  practice to a customer's own on-premise deployment — the corporate page
-  scopes it explicitly to "Odoo Cloud (the platform)"; on-premise is not
-  addressed by that page or by the versioned administration docs checked.
+  rules; Enterprise-only source was not accessed this session). **This is a
+  material gap, not a footnote: this document's conclusions are scoped to
+  official Community/core Odoo 19 docs/source actually reviewed, and do not
+  extend to Enterprise-only modules, third-party modules, custom
+  application-side encryption, or external secret managers unless those are
+  separately researched.**
+- Whether Odoo's corporate "Odoo Cloud" AES-256 encrypted-at-rest claim maps
+  onto Odoo Online, Odoo.sh, both, or neither, in the way the versioned
+  administration docs would confirm — the corporate page's own scope is the
+  umbrella term "Odoo Cloud (the platform)," and the versioned Odoo.sh/Odoo
+  Online administration docs checked contain no encryption-at-rest statement
+  of their own, so this mapping is an **open hosting-scope question, not
+  confirmed either way for Odoo Online or Odoo.sh specifically**. The claim
+  also says nothing about on-premise deployments, which are not addressed by
+  that page or by the versioned administration docs checked.
 - Whether any Odoo core mechanism provides secret **rotation** or
   **revocation** tooling beyond manually overwriting an
   `ir.config_parameter`/model field value — not found in any source reviewed
@@ -372,10 +392,18 @@ database storage**:
   all five real secret-storing examples use the identical
   `groups='base.group_system'`-only pattern, none use `password=True`, none
   apply encryption.
-- **Official encryption-at-rest mechanism** — the only one found is
-  **infrastructure-level** (Odoo Cloud/Odoo.sh whole-disk/whole-DB/whole-backup
-  AES-256, per the corporate security page), not a field-level/ORM mechanism,
-  and not documented as covering on-premise deployments.
+- **Official encryption-at-rest mechanism** — **no official Odoo 19
+  Community/core field-level or ORM encryption-at-rest mechanism was found in
+  the official docs/source reviewed.** The only encryption-at-rest claim found
+  anywhere is **infrastructure/platform-level** (Odoo's corporate security
+  page: "Odoo Cloud" whole-disk/whole-DB/whole-backup AES-256), not a
+  field-level/ORM mechanism, not documented as covering on-premise
+  deployments, and not confirmed to specifically cover Odoo.sh or Odoo Online
+  by the versioned administration docs (which contain no encryption-at-rest
+  statement of their own). **Enterprise-only modules, third-party modules,
+  custom application-side encryption, and external secret managers remain
+  outside this evidence base unless separately researched** (not reviewed
+  this session).
 
 ## Security interpretation
 
@@ -395,14 +423,20 @@ database storage**:
   payment-provider secret field) is stored as a **plain, unencrypted
   PostgreSQL column value**. No transformation is applied before the
   `INSERT`/`UPDATE`.
-- **Encryption-at-rest** — Not found as a field-level/application-schema
-  mechanism anywhere in official Odoo 19.0 developer documentation or in any
-  core source file reviewed. The only genuine encryption-at-rest claim found is
-  **infrastructure-level** (whole-disk/whole-DB/whole-backup AES-256), made
-  only on Odoo's corporate security page, and scoped explicitly to the
-  **hosted Odoo Cloud platform** — not confirmed for on-premise, and not a
-  substitute for field-level protection of an individual secret value against
-  another user/process with database access.
+- **Encryption-at-rest** — **No official Odoo 19 Community/core field-level or
+  ORM encryption-at-rest mechanism was found in the official docs/source
+  reviewed** (developer documentation or core source files). The only
+  encryption-at-rest claim found anywhere is Odoo's first-party security page
+  stating that **Odoo Cloud** customer data is encrypted at rest with
+  AES-256 — this is **infrastructure/platform-level, not field-level ORM
+  encryption**, and its exact applicability across Odoo Online, Odoo.sh, and
+  on-premise is a hosting-scope question not separately confirmed here (see
+  "What is not confirmed"); it is not a substitute for field-level protection
+  of an individual secret value against another user/process with database
+  access, and must not be used as a field-level or connector-level security
+  guarantee. **Enterprise-only modules, third-party modules, custom
+  application-side encryption, and external secret managers remain outside
+  this evidence base unless separately researched.**
 - **Audit/logging exposure** — The one concrete mitigation found for this risk
   is the payment module's `SENSITIVE_KEYS` log-redaction set (extended
   per-provider) — a real, but narrow, precedent: Odoo's own core explicitly
@@ -413,10 +447,11 @@ database storage**:
   confirmed gap: because storage is plain-column and access control is
   bypassed by `sudo()`/superuser mode, **any code path or person with
   database-admin, backup-file, or superuser/`sudo()` access sees the raw
-  credential value**, regardless of field-level `groups`. Infrastructure-level
-  encryption at rest (where it applies — Odoo Cloud) mitigates *disk/backup-
-  theft* exposure but not *database-admin/superuser-context* exposure, which is
-  a separate threat model.
+  credential value**, regardless of field-level `groups`. Where Odoo's
+  corporate-page "Odoo Cloud" infrastructure-level encryption-at-rest claim
+  applies (hosting-scope not separately confirmed — see above), it mitigates
+  *disk/backup-theft* exposure but not *database-admin/superuser-context*
+  exposure, which is a separate threat model.
 
 ## Implications for Shopify connector
 
@@ -436,16 +471,22 @@ database storage**:
   (access control), which this research confirms are the accurate terms and
   the ceiling of what plain Odoo ORM mechanisms provide.
 - If genuine encryption-at-rest of the stored token value is required beyond
-  what infrastructure-level disk encryption provides (e.g. to protect against a
-  database-admin-level or backup-file-level actor, or for on-premise
-  deployments where no infrastructure encryption claim is documented at all),
-  **no official Odoo 19 ORM/field mechanism provides it.** The realistic
-  alternatives — relying on the hosting platform's own infrastructure
-  encryption (confirmed for Odoo Cloud only), a connector-designed
+  what infrastructure-level disk encryption may provide (e.g. to protect
+  against a database-admin-level or backup-file-level actor, or for
+  on-premise deployments where no infrastructure encryption claim is
+  documented at all), **no official Odoo 19 Community/core ORM/field
+  mechanism was found in the official docs/source reviewed that provides
+  it.** The realistic alternatives — relying on whichever hosting platform's
+  own infrastructure encryption applies (Odoo's corporate "Odoo Cloud"
+  AES-256 claim, whose exact Odoo Online/Odoo.sh/on-premise applicability is
+  a hosting-scope question not separately confirmed here — do not treat it
+  as a field-level or connector-level guarantee), a connector-designed
   application-side encryption layer (analogous to how `res.users.password`
   hashes rather than stores plaintext), or storing the secret outside Odoo
   entirely — are **design choices this document does not make**; see the
-  decision proposal.
+  decision proposal. **Evidence blocker is resolved for the official
+  Community/core Odoo 19 sources reviewed; mechanism selection remains
+  pending ChatGPT acceptance.**
 - `ir.config_parameter` is **not** a stronger or more secure alternative to a
   normal model field for this purpose — it has identical plain-storage
   characteristics, plus a single shared `group_system` ACL for the entire
@@ -458,15 +499,20 @@ database storage**:
 
 ## Open questions
 
-1. Whether Odoo Enterprise (not reviewed this session — out of scope) offers
-   any field-level encryption-at-rest mechanism unavailable in Community.
+1. Whether Odoo Enterprise, third-party modules, or a custom application-side
+   encryption layer (not reviewed this session — out of scope) offer any
+   field-level encryption-at-rest mechanism unavailable in the official
+   Community/core Odoo 19 docs/source reviewed here.
 2. The exact runtime semantics of `ir.config_parameter._allow_sudo_commands =
    False` and whether it has any confidentiality implication.
-3. Whether Odoo Cloud's documented AES-256 at-rest claim extends, in practice,
-   to a customer's own on-premise/Odoo.sh deployment, or is
-   Odoo-Online-hosting-specific only (the corporate page's own scoping heading
-   suggests the latter, but this was not independently confirmed against a
-   versioned technical doc).
+3. Whether Odoo's corporate "Odoo Cloud" AES-256 at-rest claim specifically
+   covers Odoo Online, Odoo.sh, both, or neither, and whether it extends in
+   practice to a customer's own on-premise deployment at all — the corporate
+   page's own scoping heading is the umbrella term "Odoo Cloud (the
+   platform)," not a named product, and this was not independently confirmed
+   against any versioned technical doc (the versioned Odoo.sh/Odoo Online
+   administration docs checked contain no encryption-at-rest statement of
+   their own).
 4. Whether a connector-designed application-side encryption/decryption layer
    (encrypting the token before writing to a `Char`/`Text` field, decrypting on
    use) should be evaluated as design material, given no official Odoo

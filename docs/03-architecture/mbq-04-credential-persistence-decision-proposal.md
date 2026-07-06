@@ -68,22 +68,33 @@ Headline findings:
   secret keys; `iap.account.account_token`) all follow the **identical
   pattern**: plain `Char`, `groups='base.group_system'`, no `password=True`, no
   encryption before storage.
-- **The only official encryption-at-rest claim found is infrastructure-level**
-  (Odoo's corporate security page: AES-256 whole-database/whole-backup
-  encryption), scoped explicitly to **"Odoo Cloud (the platform)"**
-  (Odoo Online/Odoo.sh) — not confirmed for on-premise, and not a field-level
-  ORM mechanism. No official 19.0 developer-reference page recommends any
-  Odoo-internal secret-storage mechanism; the one page that discusses API keys
-  directly says "store it securely" and points to an external OWASP cheat
-  sheet.
+- **The only encryption-at-rest claim found anywhere is infrastructure-level:**
+  Odoo's first-party security page states that Odoo Cloud customer data is
+  encrypted at rest with AES-256 (whole-database/whole-backup). **This is
+  infrastructure/platform-level, not field-level ORM encryption.** Exact
+  applicability across Odoo Online, Odoo.sh, and on-premise remains a
+  hosting-scope question, not separately sourced or confirmed here — the
+  versioned Odoo.sh/Odoo Online administration docs checked contain no
+  encryption-at-rest statement of their own, so this claim must not be used as
+  a field-level or connector-level security guarantee. No official 19.0
+  developer-reference page recommends any Odoo-internal secret-storage
+  mechanism; the one page that discusses API keys directly says "store it
+  securely" and points to an external OWASP cheat sheet.
 
-**Net evidence conclusion:** Odoo 19 provides **no built-in field-level
-encryption-at-rest** for any stored value, credential or otherwise. The
-strongest protection any official Odoo mechanism offers a stored secret is
-**access control** (`groups=` + `ir.model.access` + `ir.rule`), which every
-real official example uses, and which is itself bypassed by `sudo()`. Genuine
-encryption-at-rest exists only as an **infrastructure-level, Odoo-Cloud-only**
-claim, outside the ORM/schema layer entirely.
+**Net evidence conclusion:** **No official Odoo 19 Community/core field-level
+or ORM encryption-at-rest mechanism was found in the official docs/source
+reviewed.** The strongest protection any official Community/core Odoo
+mechanism offers a stored secret is **access control** (`groups=` +
+`ir.model.access` + `ir.rule`), which every real official example uses, and
+which is itself bypassed by `sudo()`. The only encryption-at-rest claim found
+anywhere is infrastructure/platform-level (Odoo's "Odoo Cloud" AES-256 claim,
+outside the ORM/schema layer entirely, with hosting-scope applicability not
+separately confirmed — see above). **Enterprise-only modules, third-party
+modules, custom application-side encryption, and external secret managers
+remain outside this evidence base unless separately researched** — this
+conclusion narrows the evidence gap for the official Community/core sources
+actually reviewed; it is not a claim that no such mechanism exists anywhere in
+Odoo's broader ecosystem.
 
 ## Options considered
 
@@ -243,14 +254,21 @@ decidable.
   `@api.model` service method that reads the token internally rather than
   exposing it to the triggering user) — a follow-up design detail, not decided
   here.
-- **Deployment assumptions:** the connector's security posture now honestly
-  differs by hosting choice — **Odoo Cloud (Odoo Online/Odoo.sh)** gets the
-  documented AES-256 infrastructure-level at-rest claim as a backstop;
-  **on-premise** gets no such documented backstop at all. This asymmetry should
-  be surfaced honestly in future setup/health UX and security documentation,
-  not glossed over. (Odoo Online itself remains out of scope for a custom
-  module per existing research, so this mainly concerns Odoo.sh vs.
-  on-premise.)
+- **Deployment assumptions:** Odoo's first-party security page states that
+  **Odoo Cloud** customer data is encrypted at rest with AES-256 — this is an
+  infrastructure/platform-level claim, not a field-level ORM guarantee, and
+  its exact applicability across Odoo Online, Odoo.sh, and on-premise remains
+  a hosting-scope question not separately sourced or confirmed this session
+  (the versioned Odoo.sh administration docs checked contain no
+  encryption-at-rest statement of their own). **On-premise deployments have no
+  documented infrastructure-encryption backstop of any kind found this
+  session.** This asymmetry — and the open question of exactly which hosting
+  tiers the corporate AES-256 claim covers — should be surfaced honestly in
+  future setup/health UX and security documentation, not glossed over or
+  assumed in the connector's favor. (Odoo Online itself remains out of scope
+  for a custom module per existing research, so this mainly concerns Odoo.sh
+  vs. on-premise — but the Odoo.sh half of that claim is itself unconfirmed,
+  not established.)
 - **App Store packaging later:** if distribution ever moves to the public App
   Store (currently deferred per DEC-004), the credential field's access
   control, masking, and log-redaction posture recommended here would need to
@@ -260,9 +278,12 @@ decidable.
 ## Security risks
 
 - **Database backup exposure:** a plain-column secret is present, unencrypted
-  at the application layer, in any database dump/backup; Odoo Cloud's
-  AES-256 claim covers the backup file at rest but not a restored/opened copy
-  of that backup elsewhere.
+  at the application layer, in any database dump/backup. Odoo's first-party
+  security page states Odoo Cloud's AES-256 claim covers backups at rest, but
+  that claim's exact applicability across Odoo Online/Odoo.sh/on-premise is a
+  hosting-scope question not separately confirmed here (see the research
+  notes), and in any case it does not cover a restored/opened copy of that
+  backup elsewhere, nor does it substitute for field-level protection.
 - **Admin/user access exposure:** anyone in the field's allowed `groups` can
   read the value through the ORM/API; anyone with `sudo()`/superuser context
   (confirmed to bypass field-`groups` too) or direct database access can read
@@ -287,11 +308,18 @@ decidable.
   selection at setup time; this document adds nothing new here beyond noting
   that scope metadata is a natural companion field to whatever credential
   mechanism is chosen.
-- **Odoo.sh vs. on-prem differences:** Odoo.sh/Odoo Online get the documented
-  AES-256 infrastructure claim; on-premise deployments get no equivalent
-  documented guarantee at all and are entirely dependent on the customer's own
-  disk/backup encryption practice — a materially different risk profile the
-  connector's documentation should state plainly rather than imply parity.
+- **Odoo.sh vs. on-prem differences:** Odoo's corporate security page states
+  that "Odoo Cloud" customer data is encrypted at rest with AES-256, but
+  whether that specifically covers Odoo.sh (as distinct from Odoo Online) is
+  a hosting-scope question **not confirmed** by the versioned Odoo.sh
+  administration docs, which contain no encryption-at-rest statement of their
+  own — this claim must not be asserted as confirmed Odoo.sh coverage.
+  On-premise deployments have **no documented infrastructure-encryption
+  guarantee found at all** and are entirely dependent on the customer's own
+  disk/backup encryption practice. Do not treat any of this as a field-level
+  or connector-level security guarantee for either hosting tier — the
+  connector's documentation should state the uncertainty plainly rather than
+  imply parity or confirmed coverage either way.
 
 ## Required follow-up before coding
 
@@ -328,19 +356,26 @@ code is written:
 **Partially resolved.**
 
 Justification: the evidence gap that blocked MBQ-04 since AR-019/AR-020 — "no
-official Odoo encryption-at-rest evidence was reviewed" — is now closed with a
-definitive, adversarially-verified answer: **no official Odoo 19 field-level
-encryption-at-rest mechanism exists; the strongest official mechanism is access
-control (`groups=`), which every real Odoo example uses and which `sudo()`
-bypasses; genuine encryption-at-rest is infrastructure-level and Odoo-Cloud-
-only.** That is a real, citable resolution of the *evidence* question MBQ-04
-asked. However, MBQ-04 also asks for a *decision* on "storage location," and
-this document only **proposes** Option B rather than deciding it — the exact
-model/field names, access groups, and rotation/audit design remain open
-follow-up items requiring ChatGPT's review of this proposal. It is therefore
-neither fully "resolved" (no decision has been accepted yet) nor still
-"explicitly descoped" (the evidence blocker AR-019/AR-020 cited is gone) nor
-"still open" in the same sense as before (a concrete, evidence-backed
-recommendation now exists). **Partially resolved** — evidence resolved in
-full; mechanism selection pending ChatGPT acceptance of Option B (or a
-different option) from this proposal.
+official Odoo encryption-at-rest evidence was reviewed" — is now closed **for
+the official Community/core Odoo 19 docs/source actually reviewed**, with an
+adversarially-verified answer: **no official Odoo 19 Community/core
+field-level or ORM encryption-at-rest mechanism was found; the strongest
+official Community/core mechanism is access control (`groups=`), which every
+real Odoo example uses and which `sudo()` bypasses; the only encryption-at-rest
+claim found anywhere is infrastructure/platform-level (Odoo's "Odoo Cloud"
+AES-256 claim), with its exact Odoo Online/Odoo.sh/on-premise applicability a
+hosting-scope question not separately confirmed.** Enterprise-only modules,
+third-party modules, custom application-side encryption, and external secret
+managers remain outside this evidence base unless separately researched. That
+is a real, citable, but explicitly scoped resolution of the *evidence*
+question MBQ-04 asked. However, MBQ-04 also asks for a *decision* on "storage
+location," and this document only **proposes** Option B rather than deciding
+it — the exact model/field names, access groups, and rotation/audit design
+remain open follow-up items requiring ChatGPT's review of this proposal. It is
+therefore neither fully "resolved" (no decision has been accepted yet) nor
+still "explicitly descoped" (the evidence blocker AR-019/AR-020 cited is gone
+for the Community/core scope reviewed) nor "still open" in the same sense as
+before (a concrete, evidence-backed recommendation now exists). **Partially
+resolved** — the evidence blocker is resolved for the official Community/core
+Odoo 19 sources reviewed; mechanism selection remains pending ChatGPT
+acceptance of Option B (or a different option) from this proposal.
