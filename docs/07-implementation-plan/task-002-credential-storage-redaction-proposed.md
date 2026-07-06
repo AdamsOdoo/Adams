@@ -101,8 +101,8 @@ system-written by the credential service only): `credential_present`
 ChatGPT overrules the proposed placement.)*
 
 **Service methods on the credential model** (names proposed):
-`action_set_token(store, value)` (create-or-update + stamps + mirrors +
-audit), `action_replace_token(store, value)` (same, stamps
+`action_set_token(store, value)` (create-or-update + stamps + mirrors),
+`action_replace_token(store, value)` (same, stamps
 `credential_last_replaced_at`, resets verification state),
 `action_clear_token(store)` (empties value, `credential_state='absent'`,
 mirrors; used by the future disconnect), and the internal-only
@@ -110,6 +110,13 @@ mirrors; used by the future disconnect), and the internal-only
 never returns the value to logs/exceptions/callers outside the future
 client). Test connection is **not** implemented here — verification
 stamps are written by Task 003 later; this task only creates the fields.
+**Audit in this task is stamps-based only** (standard
+`create_uid/write_uid/create_date/write_date` plus the explicit
+`credential_last_*` stamps): Task 002 writes **no `job.log` rows** — the
+merged ACL deliberately grants no group create on `job.log`
+(system-appended rows), and the system-append write path plus
+parent-job mechanics are a named Task 003 decision point in the
+architecture package.
 
 ## Exact security/access posture
 
@@ -162,10 +169,12 @@ Written as Odoo `TransactionCase` tests under
    (`credential_present=True`, `credential_state='present'`); replace →
    `credential_last_replaced_at` stamped, verification state reset;
    clear → value emptied, `absent`, `credential_present=False`; one row
-   per store enforced (duplicate create raises); audit trail exists for
-   each action and **contains no token value** (assert the dummy token
-   string is absent from every persisted char/text field except
-   `access_token` itself).
+   per store enforced (duplicate create raises); the stamps-based audit
+   trail (`create_uid`/`write_uid`/`write_date` + `credential_last_*`
+   stamps) reflects each action and **contains no token value** (assert
+   the dummy token string is absent from every persisted char/text field
+   except `access_token` itself). No `job.log` row is created by any
+   Task 002 code path (assert none exists after the service calls).
 5. **No-read-back (if compute-blank variant adopted):** ORM read of
    `access_token` returns empty for every user including Admin;
    `_get_access_token` still returns the stored value internally.

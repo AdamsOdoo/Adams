@@ -25,7 +25,10 @@ AR-022), UX decided at design level (AR-023), core substrate merged (Task
 — Group 4 (credentials) "must not start before" the MBQ-04
 implementation-planning task, and Group 4 "blocks Groups 3/5" (wizard,
 readiness). This plan turns that recorded dependency into small,
-reviewable coding tasks. It unlocks, in order:
+reviewable coding tasks — each still locked behind its own explicit
+ChatGPT gate act (see Gate requirements; nothing in this plan unlocks
+anything by itself). Once each gate is opened, the sequence proceeds, in
+order, through:
 
 - **credential code** (Task 002) — the storage/redaction substrate
   everything authenticated depends on;
@@ -65,7 +68,11 @@ stop at the objective; no second task before ChatGPT reviews the first
 - **Test requirements (summary):** access-denial matrix (4 roles × CRUD),
   redaction unit tests (keys, `shpat_`/`shprt_` patterns, exact-value
   scrub, nesting, idempotence), service-method behavior
-  (set/replace/clear, mirror consistency), no-value-in-audit tests.
+  (set/replace/clear, mirror consistency, audit stamps), and
+  dummy-token-absent-from-every-persisted-surface tests. (Task 002
+  writes **no** `job.log` rows — the merged ACL grants no group create
+  on `job.log`; the system-append write path is a Task 003 decision
+  point.)
 - **Rollback notes:** single-PR revert; no dependents yet; dropped tokens
   are re-enterable; no business data affected.
 - **Risks:** sudo misuse; accidental view exposure later (mitigated
@@ -90,8 +97,12 @@ stop at the objective; no second task before ChatGPT reviews the first
 - **Prerequisites:** Task 002 merged and reviewed; a gate-opening act that
   **for the first time authorizes outbound Shopify API calls** (AR-021
   explicitly forbade them — this is a real gate widening ChatGPT must
-  perform consciously); resolution of the `core_test_connection`
-  job-type vocabulary question; a final §9 prompt.
+  perform consciously); ChatGPT resolutions of: the
+  `core_test_connection` job-type vocabulary question, the job-log
+  system-append write path (sanctioned elevation vs. ACL widening), and
+  the per-run `payload_hash` nonce for target-less jobs (repeat-run
+  `idempotency_key` collision — touches accepted AR-019 key semantics);
+  a final §9 prompt.
 - **Acceptance criteria (summary):** client + test connection exist and
   are read-only; dual-path error normalization proven by fixtures; token
   never appears in any output; store mirrors update; empirical
@@ -176,8 +187,22 @@ stop at the objective; no second task before ChatGPT reviews the first
   schedules nor specifies it**; the accepted
   [`ui-ux-implementation-task-map.md`](./ui-ux-implementation-task-map.md)
   governs it.
-- Everything else about Task 006 is deliberately out of this plan's
-  scope.
+- **Allowed/forbidden files:** to be fixed by that future task's own §9
+  spec once the UI gate opens (its wizard XML/views are forbidden to
+  every task in this plan).
+- **Acceptance criteria / test requirements:** the accepted
+  [`../05-qa/ui-ux-design-review-checklist.md`](../05-qa/ui-ux-design-review-checklist.md)
+  gates plus the accepted task map Group 3 criteria (exit-and-resume at
+  every step; business sync provably blocked until completion; accurate
+  final summary).
+- **Rollback:** revert of that future PR; wizard is UI over Tasks
+  002–005 services, so no data migration.
+- **Risks:** first-run trust (task map: High); UI getting ahead of
+  foundation (contained: this plan's Tasks 002–005 must all be merged
+  first).
+- **Definition of done / must not include:** per its future §9 spec;
+  must not bypass any guard, pre-select decisions, or execute the
+  inventory first push (accepted task map Group 3 must-nots).
 
 ## Recommended next coding task
 
@@ -246,3 +271,5 @@ each task consumes only merged predecessors; no task reaches forward.
 | UI implementation getting ahead of foundation | Any time | UI gate explicitly closed; Task 006 listed as horizon-only with its own gate; core tasks contain zero views |
 | Invented platform behavior baked into code | Task 003 | Open questions (THROTTLED shape, 401 vs ACCESS_DENIED, missing-scope shape) carried as *configurable fixtures + empirical verification steps*, never asserted |
 | Task creep (mutations/webhooks/cron sneaking in) | Tasks 002–005 | Explicit exclusions per task; allowed-files lists; AR-021-style per-task gates |
+| Job-log write path unresolved (no group may create `job.log` rows) | Tasks 003–005 | Named ChatGPT decision point (sanctioned system-append elevation recommended over ACL widening); Task 002 avoids the dependency entirely (stamps-based audit) |
+| Latent `idempotency_key` collision on repeat target-less runs (readiness/test connection) | Tasks 003–004 | Named ChatGPT decision point (per-run `payload_hash` nonce proposed); job-accounting tests must cover a second run |

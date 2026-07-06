@@ -89,7 +89,10 @@ task and opens no gate.
 - [ ] **[Gate]** Every `sudo()` in credential/client/lifecycle code is
       individually justified in writing, minimal in scope, never crosses
       store/record-rule boundaries (DEC-004), and never leaks the value
-      outward; unsanctioned `sudo()` in the diff is a review failure.
+      outward; only the two named sanctioned elevations (the client's
+      internal credential read; the core job-log system-append writer,
+      per ChatGPT's write-path resolution) are permitted — any other
+      `sudo()` in the diff is a review failure.
 
 ## F. Lifecycle behavior
 

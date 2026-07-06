@@ -228,9 +228,10 @@ re-listed except where re-verified or changed.
    #6). Accessible.
    (https://shopify.dev/docs/api/admin-graphql/latest/queries/shop;
    https://shopify.dev/docs/api/admin-graphql/latest/objects/Shop)
-9. **Fact — GraphQL error behavior.** "The GraphQL Admin API can return a
-   200 OK response code in cases that would typically produce 4xx or 5xx
-   errors in REST." Errors appear in an `errors` array whose entries carry
+9. **Fact — GraphQL error behavior.** "The GraphQL API can return a 200
+   OK response code in cases that would typically produce 4xx or 5xx
+   errors in REST" (direct quote from the GraphQL Admin API reference).
+   Errors appear in an `errors` array whose entries carry
    `message` plus an `extensions` object including a `code`. Documented
    `extensions.code` values: `THROTTLED` ("similar to 429"),
    `ACCESS_DENIED` ("similar to 401"), `SHOP_INACTIVE`,
@@ -252,8 +253,12 @@ re-listed except where re-verified or changed.
     afterwards. Every response reports `extensions.cost` with
     `requestedQueryCost`, `actualQueryCost`, and `throttleStatus`
     (`maximumAvailable`, `currentlyAvailable`, `restoreRate` — verbatim
-    field names). Per-plan bucket size is **not** published — the docs say
-    to observe `throttleStatus.maximumAvailable` at runtime. The generic
+    field names). Default field costs: Scalar/Enum = 0, Object = 1,
+    Connection sized by its `first`/`last` arguments, Mutation = 10.
+    Per-plan bucket size is **not** published; the actual bucket size is
+    observable at runtime via the documented
+    `throttleStatus.maximumAvailable` field (**Recommendation:** the
+    client reads it at runtime and never hard-codes bucket sizes). The generic
     "Avoiding rate limit errors" guidance recommends waiting before
     retrying, with a recommended backoff time of one second (generic
     Shopify guidance, not labelled Admin-API-specific). Accessible.
@@ -378,7 +383,8 @@ re-listed except where re-verified or changed.
   per-query scope requirements remain Open question #6.)
 - **MBQ-05's landscape has materially changed:** new custom apps can no
   longer be created in the Shopify admin. Existing admin-created custom
-  apps (non-expiring `shpat_` token, pasteable once at creation) keep
+  apps (non-expiring `shpat_` token; the historical one-time-reveal
+  behavior is unverified — Open question #7) keep
   working, but a merchant starting fresh today creates a Dev Dashboard
   app whose tokens are obtained programmatically via the client
   credentials grant and **expire every 24 hours**. This does not break
@@ -520,28 +526,54 @@ by the same internal service that writes the credential.
 
 ### Option D — `ir.config_parameter`
 
-- Already evaluated by the accepted AR-022 research: identical
-  plain-storage characteristics to a dedicated field, **coarser** access
-  control (one `group_system`-only ACL for the whole table), no natural
-  place for lifecycle metadata, and no official documentation
-  characterizing it as secure secret storage. Nothing found on 2026-07-06
-  changes that. It is **not** secure secret storage and must not be
-  described as such.
+- **Pros:** None found that a dedicated field lacks (AR-022's own
+  conclusion, re-confirmed: no superiority on any axis checked).
+- **Cons:** Conflates the credential with unrelated system
+  configuration; no natural home for lifecycle metadata (a parallel
+  model would be needed anyway); Odoo's own core stores
+  `database.secret` there with no extra protection, so it sets no better
+  precedent.
+- **Security implications:** identical plain-`Text` storage and `sudo()`
+  bypass as any field; **not** secure secret storage and must not be
+  described as such (accepted AR-022 evidence; nothing found on
+  2026-07-06 changes it).
+- **UX implications:** none positive — status/mirror fields would still
+  have to live on a model.
+- **Access-control implications:** strictly **coarser** — one shared
+  `group_system`-only ACL for the entire system-parameters table, no
+  per-key granularity, and outside the connector's own group family.
+- **Testability:** poor — access tests would assert behavior of a shared
+  base-module table the connector does not own.
+- **Future extensibility:** poor — key-value strings cannot grow into
+  the MBQ-05 client-credentials shape cleanly.
 - **Verdict: rejected for this proposal, consistent with the accepted
   AR-022 evaluation** ("do not adopt as the primary mechanism").
 
 ### Option E — External secret manager / hybrid
 
-- AR-022's acceptance explicitly **deferred, did not reject**, Options
-  D/E (external secret manager / metadata-in-Odoo + secret-outside): they
-  rest on an official-evidence gap (no confirmed Odoo mechanism for
-  reading a deployment-level secret at runtime) and would require
-  revisiting DEC-004's storage-location wording. Re-opening them would
-  require its own follow-up architecture-review row and evidence pass.
-- **Verdict: remains deferred, unchanged.** Not designed further here.
-  The Option C model shape deliberately keeps a future migration path
-  open (the secret field could later hold a reference/handle instead of
-  the value without changing the model boundary).
+- **Pros:** Would remove the token from the Odoo database/backup
+  exposure surface (the strongest posture in principle); aligns with the
+  OWASP guidance Odoo's own External API doc points to.
+- **Cons:** Rests on the official-evidence gap AR-022 recorded (no
+  confirmed, supported Odoo mechanism for a module to read a
+  deployment-level secret at runtime); would require revisiting
+  DEC-004's storage-location wording; adds a second moving part
+  (Odoo metadata + external secret) beyond Phase 1's scope.
+- **Security implications:** unverifiable until the evidence pass
+  happens; no claim can honestly be made either way today.
+- **UX implications:** setup could no longer be completed inside Odoo
+  alone (deployment-level configuration step), which cuts against the
+  accepted calm, self-contained wizard.
+- **Access-control implications / testability:** undefined pending the
+  evidence pass — not designable now without inventing Odoo behavior.
+- **Future extensibility:** the Option C model shape deliberately keeps
+  this path open — the secret field could later hold a reference/handle
+  instead of the value without changing the model boundary.
+- **Verdict: remains deferred, unchanged** — AR-022's acceptance
+  explicitly deferred (did not reject) Options D/E as a possible future
+  stronger-posture path, routed as its own follow-up architecture-review
+  row with its own evidence pass if ChatGPT wants it evaluated. Not
+  designed further here.
 
 ## Recommended implementation-planning decision
 
@@ -561,7 +593,8 @@ point.
 - **Proposed helper/status fields:** on `store` —
   `credential_present`, `credential_last_verified_at`,
   `credential_last_replaced_at`, `credential_last_failure_reason`,
-  `granted_scopes` (all readonly, system-written; see table).
+  `granted_scopes`, `granted_scopes_checked_at` (all six readonly,
+  system-written; see table).
 - **Proposed access groups:** model ACL row **only** for
   `shopify_connector_core.group_shopify_connector_admin`
   (read/write/create, **no unlink**); no ACL row for auditor, operator,
@@ -602,12 +635,17 @@ point.
   flips `credential_present = False`, sets `store.state = 'disconnected'`;
   reconnect = re-enter value → test connection → readiness re-run →
   `connected` (§Connection lifecycle).
-- **Proposed audit metadata:** standard `create_uid/write_uid/
-  create_date/write_date` on the credential model plus explicit
-  `credential_last_replaced_at`/`..._verified_at` stamps and a
-  `shopify.connector.job.log` row (event_type `manual_action` or `note`)
-  for every entry/replacement/clear/verification — recording who/when/
-  outcome, **never the value**.
+- **Proposed audit metadata:** in Task 002 — standard
+  `create_uid/write_uid/create_date/write_date` on the credential model
+  plus the explicit `credential_last_replaced_at`/`..._verified_at`
+  stamps (who/when, **never the value**). Job-log-anchored credential
+  events (`shopify.connector.job.log` rows, event_type `manual_action`/
+  `note`) begin only once the core job-log writing choke point exists
+  (Task 003), because the merged ACL deliberately grants **no group
+  create on `job.log`** (system-appended rows, AR-019 §10) — the write
+  path for system-appended log rows is a named decision point (§Security
+  and permissions), and `job.log.job_id` is required, so credential
+  events also need parent-job mechanics fixed there.
 - **Proposed rollback behavior:** Task 002's rollback is a revert of its
   PR before anything depends on it (same single-module DAG position as
   Task 001); at data level, uninstalling/reverting drops the credential
@@ -827,8 +865,11 @@ accepted flows document.
   re-runnable at will. Never automatic/scheduled in this foundation (a
   scheduled credential health probe is a possible later readiness
   extension — open item).
-- **Required preconditions:** `shop_domain` set; `credential_present`;
-  `api_version` set (all exist after Task 002 + Task 001 fields).
+- **Required preconditions:** `credential_present` (the only
+  runtime-checkable precondition — `shop_domain` and `api_version` are
+  both `required=True` on the merged store model, so they are satisfied
+  by construction on any persisted store; the service still guards them
+  defensively).
 - **Official API call (candidate, Fact-based):** one GraphQL POST to
   `https://{shop_domain}/admin/api/{api_version}/graphql.json` with header
   `X-Shopify-Access-Token` (Facts #1, #7, #8):
@@ -878,12 +919,26 @@ accepted flows document.
 - **Does test connection create a job?** Yes — `job_source =
   'setup_readiness_check'` (the accepted, structurally read-only source),
   so every run is visible, logged, and auditable like everything else.
-  **Job type:** proposed new core-owned value `core_test_connection`
-  added via the accepted `selection_add` seam — flagged explicitly
-  because AR-019 accepted exactly two core `job_type` values; adding a
-  third is a vocabulary extension ChatGPT must accept with Task 003 (the
-  fallback, reusing `core_readiness_check` with a distinguishing log, is
-  workable but muddies the job list's honesty).
+  **Job type:** proposed new core-owned value `core_test_connection`,
+  added to the base `job_type` selection list in
+  `shopify_connector_core` itself (the `selection_add` seam remains the
+  extension mechanism for *domain modules*, not for core-owned values) —
+  flagged explicitly because AR-019 accepted exactly two core `job_type`
+  values; adding a third is a vocabulary extension ChatGPT must accept
+  with Task 003 (the fallback, reusing `core_readiness_check` with a
+  distinguishing log, is workable but muddies the job list's honesty).
+  **Repeat-run key collision (design point, flagged):** the merged job
+  model computes the required, `(store_id, …)`-unique `idempotency_key`
+  from `store_id|job_type|res_model|res_id|shopify_target_gid|
+  payload_hash`; a target-less test-connection/readiness job leaves the
+  last four components empty, so a **second run of the same job type on
+  the same store would collide with the unique constraint** as merged.
+  Proposed resolution (touches accepted AR-019 key semantics, so ChatGPT
+  must confirm it with Task 003): target-less interactive check jobs
+  populate `payload_hash` with a per-run nonce (e.g. a UUID), preserving
+  the key's uniqueness contract for real operations while making
+  re-runs first-class. This latent collision also affects the existing
+  `core_readiness_check` job type and is carried in §Open items.
 - **Does test connection write business data?** **No — never.** Read-only
   at Shopify (pure query, no mutation); Odoo-side it writes only: the
   job + job.log rows, the store status mirrors
@@ -951,7 +1006,9 @@ and copy remain that decision's residual (open).
   (`[{check, tier, result, reason}]`, redacted), with the summary
   mirrored to the existing `store.last_readiness_result/_at`. A dedicated
   per-check result model is named as a deferred option if the dashboard
-  later needs per-check querying at scale.
+  later needs per-check querying at scale. (Log rows are written through
+  the same system-append choke point as everything else — see the
+  job-log write-path decision point in §Security and permissions.)
 - **Dashboard impact:** feeds the existing accepted connection-health
   card and readiness surfaces; warnings are "carried to the dashboard"
   (accepted); no new card is proposed (the nine-card set is fixed).
@@ -1060,12 +1117,21 @@ The future transport layer (Task 003 shell; **no code now**). Blueprint
 - **Record-rule implications:** none for Phase 1 (single store, no record
   rules — AR-019 §10 unchanged); the credential model carries `store_id`
   so a future multi-store rule needs no schema change.
-- **Sudo risks (stated, minimized, justified):** exactly one sanctioned
-  elevation — the client's internal credential read (above). Everything
-  else runs as the acting user. `sudo()` bypasses ACLs, record rules,
-  *and* field `groups` (Fact #13), so every `sudo()` in the credential/
-  client/lifecycle code paths is a review-checklist item
-  (§credential-security checklist) requiring written justification.
+- **Sudo risks (stated, minimized, justified):** exactly **two**
+  sanctioned elevations are proposed, both landing in Task 003: (1) the
+  client's internal credential read (above); (2) the core job-log
+  writing choke point's **system-append write** — necessary because the
+  merged ACL deliberately grants no group create on `job.log` (rows are
+  "system-appended, not user-authored", AR-019 §10), so an Admin- or
+  operator-context action that must record log rows needs a narrow,
+  documented elevation inside the single log-writing helper (the
+  alternative — widening the `job.log` ACL — would let users author
+  audit rows and is **not** recommended; ChatGPT picks at review: this
+  is a named decision point). Everything else runs as the acting user.
+  `sudo()` bypasses ACLs, record rules, *and* field `groups` (Fact #13),
+  so every `sudo()` in the credential/client/lifecycle code paths is a
+  review-checklist item (§credential-security checklist) requiring
+  written justification.
 - **Least privilege:** Operator/Reviewer/Auditor have **zero** access to
   the credential model (not read, not `fields_get`); they see only the
   non-secret store mirrors. Scope requests to Shopify follow
@@ -1082,14 +1148,19 @@ The future transport layer (Task 003 shell; **no code now**). Blueprint
   operator never gains read access.
 - **Reviewer restrictions:** as operator (minus job create, plus
   manual-review resolution); no credential access.
-- **Pre-existing ACL gap surfaced (not fixed here):** the merged Task 001
-  CSV grants **no group `perm_create` on `shopify.connector.store` or
-  `shopify.connector.store.settings`** (Admin has `1,1,0,0`). Store
-  creation is currently impossible for any connector role — fine for the
-  zero-UI scaffold, but the future wizard requires a decided store/
-  settings creation posture (widen Admin ACL vs. a service-method
-  elevation). Routed to the MBQ-44 residual and Task 005 planning; **not
-  changed by Task 002.**
+- **Pre-existing ACL gaps surfaced (not fixed here):** the merged Task
+  001 CSV grants (1) **no group `perm_create` on
+  `shopify.connector.store` or `shopify.connector.store.settings`**
+  (Admin has `1,1,0,0`) — store creation is currently impossible for any
+  connector role; fine for the zero-UI scaffold, but the future wizard
+  requires a decided store/settings creation posture (widen Admin ACL
+  vs. a service-method elevation); and (2) **no group create on
+  `shopify.connector.job.log`** (all four groups `1,0,0,0`) — correct
+  for its system-appended design intent, but it means every log-writing
+  path (test connection, readiness, credential events, future syncs)
+  depends on the sanctioned system-append elevation above. Both gaps are
+  routed to the MBQ-44 residual (and Task 005 / Task 003 planning
+  respectively); **neither is changed by Task 002.**
 
 ## UX alignment
 
@@ -1141,6 +1212,16 @@ screens/colors/charts/complexity"):
    **empirical verification steps in Task 003's acceptance criteria.**
 7. Store/settings `perm_create` ACL gap (wizard-blocking; Task 005 /
    MBQ-44 residual).
+7a. Job-log write path for system-appended rows: sanctioned
+   system-append elevation in the core log choke point (recommended) vs.
+   `job.log` ACL widening (not recommended) — ChatGPT decision with Task
+   003; until it lands, Task 002's credential audit uses standard
+   fields + stamps only.
+7b. Latent `idempotency_key` collision for repeat runs of target-less
+   core jobs (`core_readiness_check` today; `core_test_connection`
+   proposed): per-run `payload_hash` nonce proposed — ChatGPT
+   confirmation required with Task 003 since it touches accepted AR-019
+   key semantics.
 8. Cron/queue-health and `web.base.url` check mechanics (Task 004
    detail); per-domain required-scope lists (domain naming passes).
 9. Exact readiness thresholds and all user-facing copy (MBQ-06 residual;

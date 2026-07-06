@@ -14,8 +14,11 @@ Admin API calls** (read-only) — the AR-021 gate explicitly forbids
 external API calls and test connection, so this is a conscious gate
 widening, not a formality; (3) ChatGPT resolves the named decision points
 (the `core_test_connection` job-type vocabulary extension; the
-`SHOP_INACTIVE`/402/423 class mapping); (4) a separate final task prompt
-is issued.
+`SHOP_INACTIVE`/402/423 class mapping; the job-log system-append write
+path — sanctioned elevation in the core log choke point vs. `job.log`
+ACL widening; the per-run `payload_hash` nonce for target-less jobs,
+which touches accepted AR-019 `idempotency_key` semantics); (4) a
+separate final task prompt is issued.
 
 ## Objective
 
@@ -44,8 +47,11 @@ written to the existing store mirror fields and recorded as a
   `action_test_connection()`; no field changes)
 - `addons/shopify_connector_core/models/shopify_connector_job.py`
   (**only if** ChatGPT accepts the `core_test_connection` `job_type`
-  value — a one-line `selection_add`-style vocabulary extension; if
-  rejected, this file is untouched and `core_readiness_check` is reused)
+  value — a one-line addition to the base `job_type` selection list;
+  `selection_add` remains the domain-module mechanism and is not what
+  this is — and/or the per-run `payload_hash` nonce resolution requires
+  a documented compute note; if both are rejected, this file is
+  untouched and `core_readiness_check` is reused)
 - `addons/shopify_connector_core/models/__init__.py` (import line)
 - `addons/shopify_connector_core/__manifest__.py` (version bump only)
 - `addons/shopify_connector_core/tests/test_api_client.py`,
@@ -56,9 +62,12 @@ written to the existing store mirror fields and recorded as a
 
 Everything else. Explicitly: any view/menu/action/wizard XML; any
 controller/webhook/cron/data file; the credential model file (read-only
-consumer — no changes); security files (no ACL/group changes); job_log/
-location/binding/settings models; `adams_base`; domain modules; CI;
-docs other than the handoff; migrations.
+consumer — no changes); security files — no ACL/group changes (**unless**
+ChatGPT's job-log write-path resolution explicitly chooses ACL widening
+over the recommended system-append elevation, in which case the final
+task prompt must move `security/ir.model.access.csv` into Allowed files
+by name); job_log/location/binding/settings models; `adams_base`; domain
+modules; CI; docs other than the handoff; migrations.
 
 ## API client contract
 
@@ -99,8 +108,12 @@ query ConnectorTestConnection {
 the version header mismatches; on failure: `'fail'` + plain-language
 reason (redacted), `credential_state='invalid'` where the signal is
 auth-shaped; every run recorded as one `job_source='setup_readiness_check'`
-job with attempt/result `job.log` rows; single attempt, no auto-retry
-(interactive check; operator re-runs).
+job with attempt/result `job.log` rows (written through the core
+system-append log choke point per ChatGPT's write-path resolution;
+repeat runs rely on the per-run `payload_hash` nonce resolution so the
+second run's job does not collide with the `(store_id, idempotency_key)`
+unique constraint); single attempt, no auto-retry (interactive check;
+operator re-runs).
 
 ## Read-only guarantee
 
@@ -158,14 +171,20 @@ proven by tests using dummy `shpat_…` values.
    assert the token is absent from the raised exception's str/args, all
    job.log fields, and every store mirror.
 3. **Test connection behavior:** pass path writes all mirrors + snapshot
-   + job/log rows; identity-mismatch path; missing-precondition paths
-   (no credential / no domain) fail cleanly without an HTTP call;
-   auth-failure path sets `credential_state='invalid'`.
+   + job/log rows; identity-mismatch path; the missing-credential
+   precondition fails cleanly without an HTTP call (`shop_domain` and
+   `api_version` are `required=True` on the merged store model, so those
+   preconditions are satisfied by construction — the service's defensive
+   guards for them are exercised only as unit-level checks, not as
+   constructible record states); auth-failure path sets
+   `credential_state='invalid'`.
 4. **Read-only guarantee:** no emittable request body contains
    `mutation`; no Odoo business model is written.
 5. **Job accounting:** exactly one job per run; `job_source =
    'setup_readiness_check'`; the accepted job-type value per ChatGPT's
-   resolution; job reaches a terminal state.
+   resolution; job reaches a terminal state; **a second run on the same
+   store succeeds** (per-run key resolution proven — no
+   `store_idempotency_key_uniq` collision).
 
 Runtime-availability fallback per Task 001A precedent (write +
 syntax-validate + manual checklist if no runtime exists; no invented

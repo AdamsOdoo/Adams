@@ -144,23 +144,38 @@
 - **Items deferred:** the named ChatGPT decision points (compute-blank
   no-read-back variant; `token_variant` vocabulary vs MBQ-05;
   scope-snapshot placement; `core_test_connection` job-type value;
-  `SHOP_INACTIVE`/402/423 class mapping); the store/settings
-  `perm_create` ACL gap (wizard-blocking, Task 005/MBQ-44 residual);
-  in-flight-job disposition at disconnect (Part A §I.4, unchanged);
-  MBQ-06 thresholds/copy; a `/docs/00-source-materials` capture pass for
-  this sprint's excerpts (outside allowed files).
-- **Learning feedback loop:** new issues — the merged Task 001 ACL
+  `SHOP_INACTIVE`/402/423 class mapping; the job-log system-append
+  write path — no group may create `job.log` rows under the merged ACL;
+  the per-run `payload_hash` nonce for target-less jobs — repeat-run
+  `idempotency_key` collision touching accepted AR-019 key semantics);
+  the store/settings `perm_create` ACL gap (wizard-blocking, Task
+  005/MBQ-44 residual); in-flight-job disposition at disconnect (Part A
+  §I.4, unchanged); MBQ-06 thresholds/copy; a
+  `/docs/00-source-materials` capture pass for this sprint's excerpts
+  (outside allowed files).
+- **Learning feedback loop:** new issues — (1) the merged Task 001 ACL
   grants no `perm_create` on store/settings to any group (surfaced,
   routed to MBQ-44 residual/Task 005; not a defect in Task 001's zero-UI
-  scope); repeated patterns — none new (evidence-consistency gate
-  honored: all platform facts cited or logged open); rules/checklists
-  updated — new credential-security/redaction checklist proposed; new
-  rejected approaches — none (options rejected here are proposal-level
+  scope); (2) the merged ACL grants no group create on `job.log`
+  (correct for its system-appended intent, but every future log-writing
+  path needs a decided write mechanism — surfaced as a named decision
+  point); (3) a latent `(store_id, idempotency_key)` collision blocks
+  repeat runs of target-less core jobs (`core_readiness_check`) —
+  surfaced with a proposed per-run-nonce resolution; repeated patterns —
+  none new (evidence-consistency gate honored: all platform facts cited
+  or logged open); rules/checklists updated — new
+  credential-security/redaction checklist proposed; new rejected
+  approaches — none (options rejected here are proposal-level
   evaluations recorded in the planning doc, not RA-log rejections);
   technical debt — none created (docs-only); architecture concerns —
   AR-024 filed (Proposed); tests/review gates needed — the checklist's
-  gates plus both task specs' test plans; future prompts — the next
-  session prompt below reflects ChatGPT's review outcome.
+  gates plus both task specs' test plans; future prompts — Yes: the
+  exact next-session prompt is provided at the end of this entry. A
+  six-lens adversarial self-review ran before commit and its findings
+  (an unverified-historical one-time-reveal phrase inside a Fact bullet;
+  a mislabelled docs-attribution on bucket-size reads; a quote-fidelity
+  slip; the job.log and idempotency-key gaps above; assorted
+  consistency/completeness fixes) were all patched before this PR.
 - **Quality gate confirmation:** handoff updated YES · feedback loop
   checked YES · learning captured YES · rejected approach logged n/a
   (none) · technical debt logged n/a (none) · repeated-issue escalation
@@ -176,6 +191,34 @@
   fields, no models, no views, no API client, no test connection, no
   wizard, no webhook/controller/cron/domain module; no gate opened; Task
   002/003 remain proposed-not-authorized; awaiting ChatGPT review.
+- **Exact next-session prompt:**
+
+  > ChatGPT has reviewed the Credential/Connection/API Foundation
+  > Planning PR (AR-024, branch
+  > `claude/credential-connection-foundation-planning`). Outcome:
+  > **[ACCEPTED / ACCEPTED WITH CORRECTIONS / REVISE — paste ChatGPT's
+  > decision and its resolutions of the named decision points:
+  > compute-blank no-read-back variant; `token_variant` vocabulary /
+  > MBQ-05 direction; scope-snapshot placement; `core_test_connection`
+  > job-type value; `SHOP_INACTIVE`/402/423 class mapping; job-log
+  > system-append write path; per-run `payload_hash` nonce]**. If
+  > ACCEPTED: apply the acceptance patch on this same branch/PR —
+  > update `docs/05-qa/architecture-review-log.md` (AR-024 row →
+  > Accepted + acceptance-patch note), apply the planning document's
+  > "Proposed register impact" wording to
+  > `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-04,
+  > MBQ-05, MBQ-06, MBQ-44, MBQ-51, MBQ-52, MBQ-08 — exactly as accepted,
+  > no other row), add Status/acceptance notes to the five new package
+  > documents, and update `docs/01-research/research-handoff.md`.
+  > Docs-only; no code; **this acceptance does not open the Task 002
+  > gate** — the gate-opening act and the final Task 002 §9 prompt
+  > remain separate, later ChatGPT acts. If REVISE: apply exactly the
+  > requested corrections on this branch, update the handoff, and stop.
+  > Allowed files: the seven files this sprint touched plus
+  > `master-blueprint-open-questions.md` (accepted branch only). Do not
+  > touch DEC-003–DEC-020, `docs/04-decisions/README.md`,
+  > `defect-pattern-log.md`, addon code, `main`, or plain `dev`. Stop
+  > after pushing and updating the PR; await ChatGPT.
 
 ---
 
@@ -8146,3 +8189,14 @@ architecture substance changed; no MBQ row added, deleted, or
 renumbered; DEC-003 through DEC-014 untouched; no code files changed.
 Same branch/PR (#74) — no new PR, no merge, PR stays draft. Next: stop
 for ChatGPT's next direction (Part D or Part E).
+- **Credential/Connection/API Foundation Planning Sprint (2026-07-06):**
+  proposed the AR-024 implementation-planning package (credential
+  storage on a dedicated Admin-only `shopify.connector.store.credential`
+  model within the accepted MBQ-04 Option B posture; redaction
+  contract; lifecycle/test-connection/readiness/API-client planning;
+  proposed-not-authorized Task 002/003 specs; credential-security
+  checklist) with fresh official Shopify/Odoo verification (2026-07-06);
+  docs-only, no code, no gate opened; draft PR into
+  `Shopify-connector`. Next: ChatGPT review of AR-024. (Note: the
+  2026-07-04/05 sprints logged their checkpoints in their compact
+  entries above rather than here.)
