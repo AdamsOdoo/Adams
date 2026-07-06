@@ -1,14 +1,15 @@
 # Research Handoff (rolling)
 
-> Continuity lives in GitHub, not chat. The **current entry (MBQ-04
-> Acceptance Patch: PR #90 accepted by ChatGPT on 2026-07-06 — AR-022
-> Accepted; MBQ-04 now Partially resolved; Option B (dedicated Odoo-managed
-> credential field, plain storage + `groups=` access control + UI masking +
-> mandatory redaction) accepted at posture level only; no implementation;
-> exact model/field/access/rotation/test-connection/redaction/rollback
-> detail routed to a future implementation-planning task)** is immediately
-> below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **MBQ-04 — Credential
+> Continuity lives in GitHub, not chat. The **current entry (UI/UX Final
+> Design Sprint: docs-only implementation-ready UI/UX design specification
+> package created — Premium Simplicity Standard defined; screen-by-screen
+> specs, screen inventory/navigation map, MVP flows/state models, QA
+> design-review checklist, and future UI implementation task map; no
+> implementation, no code, no credentials/API/setup-wizard/test-connection
+> artifacts; draft PR into `Shopify-connector` for ChatGPT review)** is
+> immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **MBQ-04 Acceptance Patch
+> — PR #90 accepted by ChatGPT on 2026-07-06 (history)**, **MBQ-04 — Credential
 > Persistence Research and Decision Proposal, including its PR #90 F1/F2
 > revision (history)**, **Task 001A — Core Runtime
 > Readiness & QA Closure (history)**, **Task 001 — F1
@@ -63,6 +64,105 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### UI/UX Final Design Sprint — compact handoff (2026-07-06)
+
+> **Docs-only UI/UX design sprint — no implementation, no gate change, not
+> Task 002.** Confirmed before starting: PR #90 merged into
+> `Shopify-connector` (merge commit `ffe3500`, 2026-07-06) so the accepted
+> MBQ-04 credential posture (Option B) informs the setup/credential/
+> test-connection UX; branch started from latest `Shopify-connector`
+> (`ffe3500`). DEC-003 through DEC-020 unedited;
+> `docs/04-decisions/README.md` and `docs/05-qa/defect-pattern-log.md`
+> unedited; `master-blueprint-open-questions.md` untouched.
+
+- **Branch / PR:** `claude/ui-ux-final-design-spec-6m44ux` → draft PR into
+  `Shopify-connector` (PR number/URL in the PR itself; remains draft,
+  awaiting ChatGPT review).
+- **Files created:**
+  `docs/02-product/ui-ux-final-design-spec.md` (the main spec: Premium
+  Simplicity Standard; UX principles; roles/surfaces; ~20 screen specs
+  with full state models; 11-step setup wizard detail; dashboard design;
+  error/recovery UX for 11 error types; illustrative microcopy; premium
+  opportunities MVP-vs-Later; open items),
+  `docs/02-product/screen-inventory-and-navigation-map.md` (24-row
+  inventory; menu hierarchy; placeholder action assumptions; navigation
+  paths; cross-links; role visibility matrix; combine-vs-separate
+  rationale),
+  `docs/02-product/mvp-user-flows-and-state-models.md` (nine MVP flows
+  with happy/exception paths, terminal states, guards, audit events),
+  `docs/05-qa/ui-ux-design-review-checklist.md` (strict gate checklist,
+  §A–§M, incl. the per-screen premium-simplicity gate item),
+  `docs/07-implementation-plan/ui-ux-implementation-task-map.md` (15
+  future task groups with prerequisites/risk/must-not-dos/acceptance
+  criteria/premium requirements + proposed sequencing). Plus this handoff
+  update. **No addon/module/code file touched. No DEC file changed. No
+  register row changed. No credential/API/setup-wizard/test-connection
+  implementation created. No Task 002 started.**
+- **Scope:** docs-only; translates DEC-012–DEC-020 + Master Blueprint
+  Parts A–E + the MBQ-04 posture into implementation-ready screen specs.
+  New design detail is labelled **[Design proposal — this spec]**; all
+  copy is **[Illustrative — MBQ-22 open]**; nothing open is asserted as
+  decided; the accepted vocabularies (7 sources / 10 states / 16 classes
+  / 6 sub-reasons / 4 retry cases / 9 dashboard cards / 11 wizard steps /
+  S1–S14) are reused verbatim and unextended.
+- **Premium Simplicity Standard added** (design-spec §2): premium =
+  clarity, confidence, polish, guidance, recovery — never more screens/
+  colors/charts/complexity; includes field/action-budget disciplines,
+  the 10-second dashboard rule, calm-error rules, and progressive
+  disclosure tiers; enforced via the new QA checklist §L.
+- **High-power mode note:** this sprint used a parallel multi-lens
+  self-review workflow (governance/no-code, DEC-traceability, MBQ-status
+  accuracy, premium-simplicity, deliverable-completeness lenses) over the
+  five deliverables before commit; findings were patched in-session (see
+  PR body self-review summary).
+- **Key open items (recorded, not decided):** MBQ-03 XML IDs; MBQ-22
+  final copy; MBQ-44 residual access rows; the MBQ-04
+  implementation-planning task (credential internals); MBQ-05; MBQ-06
+  residual thresholds; MBQ-32 quantity-**read mechanics** (the source
+  itself is decided — `free_qty` semantics, AR-020) and MBQ-38
+  confirmation-record schema; MBQ-56/27 (total-check detail); DEC-020
+  residual (divergent-currency class mapping); MBQ-61; job/log retention
+  policy; whether the field/action-budget disciplines become hard gates;
+  Later premium candidates (activity chart, health score, audit
+  timeline, recovery assistant) each need their own decision.
+- **Learning feedback loop:** new issues: none. Repeated patterns: none
+  new (checked `defect-pattern-log.md` categories — no unsupported-claim
+  or scope-creep occurrence; per-class routing discipline from DEC-014
+  point I applied throughout). Rules updated: none. Rejected approaches:
+  none reintroduced (RA-006/008/009/013–023 checked; encoded as negative
+  checks in the new QA checklist). Technical debt: none new.
+  Architecture concerns: none new — the spec consumes decisions; the one
+  tension worth ChatGPT's attention is that Part D §7 predates DEC-018,
+  so the spec (not Part D) is now the most current UI reference for the
+  decided items; Part D remains authoritative where they overlap.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (N/A — none reintroduced) ·
+  technical debt logged (N/A, none new) · repeated-issue escalation
+  applied (N/A) — all YES.
+- **Stop condition:** stopped immediately after opening the draft PR, per
+  the sprint instruction — no merge, no implementation, no gate change;
+  awaiting ChatGPT review.
+- **Recommended next step:** ChatGPT strict review of the draft PR
+  (against `docs/05-qa/ui-ux-design-review-checklist.md`). After
+  acceptance: (1) the MBQ-04 credential implementation-planning task
+  (§9 template), and (2) a decision on when/whether to open the UI
+  implementation gate for Group 1 (menu shell) per the task map — neither
+  is started.
+
+**Exact next-session prompt:**
+
+> Review the UI/UX Final Design Specification draft PR (branch
+> `claude/ui-ux-final-design-spec-6m44ux` into `Shopify-connector`)
+> against `docs/05-qa/ui-ux-design-review-checklist.md` §A–§M. Verify:
+> traceability of every screen statement to DEC-003–DEC-020 / Parts A–E /
+> the MBQ-04 posture; correct open-vs-decided status for every MBQ cited;
+> no implementation authorization; no invented API behaviour; MVP-vs-Later
+> separation; and the Premium Simplicity Standard per screen. Return
+> ACCEPT / ACCEPT WITH MINOR CHANGES / REVISE with findings. Do not open
+> any implementation gate in the same act.
 
 ---
 
