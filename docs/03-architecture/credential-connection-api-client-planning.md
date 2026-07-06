@@ -17,10 +17,36 @@
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
 > (**AR-024**, this package's own review-log row).
 
+## Acceptance
+
+- **Accepted by ChatGPT on 2026-07-06, at implementation-planning level
+  only** (PR #92 acceptance patch; [`AR-024`](../05-qa/architecture-review-log.md)).
+- **Option C — the dedicated Admin-only `shopify.connector.store.credential`
+  model — is accepted at planning level**, explicitly as **a justified
+  post-AR-022 addition to the previously accepted AR-019 six-core-model
+  plan** (AR-019 §11 named exactly this revisit condition: "a future
+  MBQ-04 decision may add a credential model later" — met by AR-022).
+- **The redaction/no-logging contract is accepted at planning level.**
+- **Task 002 is accepted as the recommended next coding task — not
+  authorized by this acceptance.**
+- **Task 003 is accepted as the proposed follow-up task — not authorized
+  by this acceptance.**
+- **No implementation gate is opened. No code is authorized.**
+- **The following seven decision points remain open** and must be
+  resolved before or inside the relevant future final `CLAUDE.md` §9 task
+  prompt(s): the compute-blank no-read-back hardening variant;
+  `token_variant` vocabulary and the MBQ-05 acquisition-path direction;
+  scope-snapshot placement; the `core_test_connection` job-type value;
+  the `SHOP_INACTIVE`/402/423/403-fraudulent error-class mapping; the
+  job-log system-append write path vs. ACL widening; the per-run
+  `payload_hash` nonce for repeat target-less jobs.
+- See [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  (AR-024) for the full acceptance record and
+  [`./master-blueprint-open-questions.md`](./master-blueprint-open-questions.md)
+  (MBQ-04/05/06/44/51/52/08) for the applied register impact.
+
 ## Status
 
-- **Proposed for ChatGPT review.** Nothing in this document is accepted
-  until ChatGPT reviews it.
 - **Docs-only.**
 - **No implementation.** No code of any kind is created by this document.
 - **Does not open any gate.** The only open implementation gate remains the

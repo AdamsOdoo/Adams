@@ -10,12 +10,15 @@
 
 ## Status
 
-**Proposed for ChatGPT review. Docs-only. No implementation.** This plan
-creates no task authorization, opens no gate, and writes no code. Every
-task below requires (a) ChatGPT acceptance of the architecture package,
-(b) an explicit ChatGPT gate-opening act for its scope (per AR-021, each
-later gate is its own separate act), and (c) its own final `CLAUDE.md` §9
-task prompt.
+**Accepted by ChatGPT on 2026-07-06** (PR #92 acceptance patch;
+[`AR-024`](../05-qa/architecture-review-log.md)) **as sequencing/planning
+guidance only.** Docs-only. No implementation. **Task 002 is recommended
+next — not authorized by this acceptance.** This plan creates no task
+authorization, opens no gate, and writes no code. Every task below still
+requires (a) [the architecture package, now accepted — AR-024], (b) an
+explicit ChatGPT gate-opening act for its scope (per AR-021, each later
+gate is its own separate act), and (c) its own final `CLAUDE.md` §9 task
+prompt.
 
 ## Why this plan exists
 

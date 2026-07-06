@@ -15,6 +15,16 @@ cover it — it explicitly forbids credential fields); (3) ChatGPT issues a
 separate final task prompt. Until all three happen, creating any file
 below is a governance violation.
 
+**Acceptance note (2026-07-06, PR #92 acceptance patch;
+[`AR-024`](../05-qa/architecture-review-log.md)):** this task plan is
+**accepted by ChatGPT as the recommended next coding task plan — not
+authorized**. Starting it still requires (1) a separate, explicit
+credential-storage implementation-gate-opening act, and (2) a separate
+final `CLAUDE.md` §9 task prompt. The compute-blank no-read-back
+hardening variant, the `token_variant` vocabulary, and the
+scope-snapshot placement all remain decisions for that final prompt, not
+decided by this acceptance.
+
 ## Objective
 
 Create the credential storage, status-mirror, service-method, and

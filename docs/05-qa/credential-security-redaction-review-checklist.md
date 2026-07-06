@@ -12,9 +12,13 @@
 
 ## Status
 
-**Proposed for ChatGPT review (2026-07-06). Docs-only.** Applies to
-future Task 002+ reviews once accepted; this document itself creates no
-task and opens no gate.
+**Accepted by ChatGPT on 2026-07-06** (PR #92 acceptance patch;
+[`AR-024`](./architecture-review-log.md)) **as the checklist for
+future credential-, connection-, test-connection-, and
+API-client-related reviews.** **Applies once the relevant implementation
+gate(s) are opened** (Task 002+ reviews). **Does not authorize any
+code.** Docs-only; this document itself creates no task and opens no
+gate.
 
 ## A. Honest security claims
 

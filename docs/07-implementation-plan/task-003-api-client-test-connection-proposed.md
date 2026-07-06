@@ -20,6 +20,17 @@ ACL widening; the per-run `payload_hash` nonce for target-less jobs,
 which touches accepted AR-019 `idempotency_key` semantics); (4) a
 separate final task prompt is issued.
 
+**Acceptance note (2026-07-06, PR #92 acceptance patch;
+[`AR-024`](../05-qa/architecture-review-log.md)):** this task plan is
+**accepted by ChatGPT as the proposed follow-up plan — not authorized**.
+Starting it still requires (1) Task 002 to be merged and reviewed first,
+and (2) a separate, explicit API-client/test-connection
+gate-opening act. The `core_test_connection` job-type value, the
+job-log system-append write path, the per-run `payload_hash`
+target-less-idempotency nonce, and the `SHOP_INACTIVE`/402/423/
+403-fraudulent shop-state error-class mapping all remain decisions for
+the separate final task prompt, not decided by this acceptance.
+
 ## Objective
 
 Create the single GraphQL transport boundary
