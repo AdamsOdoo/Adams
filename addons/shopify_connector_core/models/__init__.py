@@ -1,3 +1,4 @@
+from . import shopify_connector_api_client
 from . import shopify_connector_store
 from . import shopify_connector_store_credential
 from . import shopify_connector_store_settings
