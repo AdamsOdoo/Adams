@@ -31,12 +31,16 @@ class TestJobLogSystemAppend(TransactionCase):
         })
 
     def _create_job(self):
-        return self.env['shopify.connector.job'].create({
+        job = self.env['shopify.connector.job'].create({
             'store_id': self.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'core_manual_maintenance',
             'state': 'running',
         })
+        # Guards the Odoo 19 idempotency_key NOT NULL production fix:
+        # every created job must end up with a populated key.
+        self.assertTrue(job.idempotency_key)
+        return job
 
     # 29. _system_append creates exactly one row with the given fields.
     def test_system_append_creates_one_row(self):

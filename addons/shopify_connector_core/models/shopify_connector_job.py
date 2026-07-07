@@ -129,10 +129,16 @@ class ShopifyConnectorJob(models.Model):
     # target-less exposure but is not fixed by this task -- see TD-001
     # (docs/05-qa/technical-debt-register.md).
     payload_hash = fields.Char(readonly=True)
+    # Not `required=True`: in Odoo 19 the initial INSERT of a new record
+    # happens before its stored-computed fields are evaluated, so a
+    # NOT NULL column here fails create() before `_compute_idempotency_key`
+    # ever runs. `store_id` is always required, so the compute below still
+    # always yields a non-empty value once the row exists -- the
+    # `(store_id, idempotency_key)` unique constraint below still enforces
+    # the same guarantee.
     idempotency_key = fields.Char(
         compute='_compute_idempotency_key',
         store=True,
-        required=True,
         index=True,
         readonly=True,
     )

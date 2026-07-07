@@ -1,5 +1,144 @@
 # Research Handoff (rolling)
 
+### Odoo 19 Runtime Test-Failure Hotfix — compact handoff (2026-07-07)
+
+- **Branch / PR:** current session branch; PR → to be opened as draft into
+  `Shopify-connector`, not yet merged.
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_job.py`,
+  `addons/shopify_connector_core/tests/test_credential_access.py`,
+  `addons/shopify_connector_core/tests/test_credential_service.py`,
+  `addons/shopify_connector_core/tests/test_job_log_system_append.py`,
+  `addons/shopify_connector_core/__manifest__.py` (version bump only),
+  `docs/05-qa/odoo-19-runtime-test-failures.md` (new),
+  `docs/05-qa/task-003-validation-results.md`,
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** PR #104 (merge commit `867074c`) fixed
+  the `res.users.groups_id` → `group_ids` blocker and merged into
+  `Shopify-connector`. Live validation was re-run afterward and progressed
+  through registry load and all 36 test loads, then reported
+  `2 failed, 3 error(s) of 36 tests` (Odoo halted after its max-failed-tests
+  threshold, so additional failures beyond these five may still be hidden —
+  `test_test_connection.py` was not confirmed reached). Full root-cause
+  detail and classification is in the new
+  `docs/05-qa/odoo-19-runtime-test-failures.md`; in summary, two distinct
+  defect classes surfaced: **(a) a real Odoo 19 production runtime issue** —
+  `shopify.connector.job.idempotency_key` was declared
+  `compute=..., store=True, required=True`; in Odoo 19 a new record's
+  stored-computed fields are evaluated *after* its initial row INSERT, so
+  every `shopify.connector.job.create()` call inserted `NULL` into a
+  `NOT NULL` column before `_compute_idempotency_key` ever ran, failing job
+  creation for any caller (surfaced as errors in
+  `test_job_log_system_append.test_non_admin_indirect_append_succeeds_but_direct_create_denied`
+  and `test_redaction_of_message_technical_detail_payload_snapshot`); and
+  **(b) three test-expectation defects**, none a security regression —
+  `test_credential_access.test_non_admin_roles_denied_all_crud_and_search`
+  asserted `fields_get()` returns exactly `{}` for a non-admin role, which
+  is stricter than Odoo 19's actual behavior (it may return the model's
+  schema without exposing any record data);
+  `test_credential_service.test_duplicate_credential_row_for_same_store_raises`
+  used the shared class-level store (isolation risk) and expected a Python
+  `ValidationError` for what Odoo 19 raises as a raw database integrity
+  error for `models.Constraint` violations, un-savepointed (transaction-
+  poisoning risk); and
+  `test_credential_service.test_empty_or_non_string_value_raises_without_echoing`
+  contained a logically-impossible assertion
+  (`assertNotIn('', str(exception))`, which can never pass since `''` is a
+  substring of every string) for the `bad_value == ''` case, unrelated to
+  Odoo 19 itself.
+  **Fix applied:** removed `required=True` from `idempotency_key` (kept
+  `compute`, `store=True`, `index=True`, `readonly=True`;
+  `_compute_idempotency_key` and the `(store_id, idempotency_key)` unique
+  constraint untouched — `store_id` is always required, so the computed key
+  is always non-empty once the row exists, and the uniqueness guarantee is
+  unchanged). `test_credential_access` now asserts `access_token` and every
+  other credential business field (`store_id`, `token_variant`,
+  `credential_state`) are absent from whatever `fields_get()` returns,
+  accepting either an `AccessError` or a returned schema, while every CRUD/
+  search `AccessError` assertion in the same test is unchanged.
+  `test_duplicate_credential_row_for_same_store_raises` now creates its own
+  fresh, test-local store and wraps the expected-to-fail second `create()`
+  in `self.env.cr.savepoint()`, asserting a broad `Exception` — mirroring
+  the pre-existing, unmodified `test_test_connection.test_core_readiness_check_untouched_still_collides`
+  pattern already in this codebase for the identical class of job-model
+  `models.Constraint` violation.
+  `test_empty_or_non_string_value_raises_without_echoing` now asserts the
+  exact generic message (`"A non-empty credential value is required."`,
+  which `action_set_token`/`action_replace_token` already raised
+  unmodified) via `assertEqual`, for both actions and all three bad values,
+  which is strictly stronger than the old `assertNotIn` and not
+  logically broken for `''`. `test_job_log_system_append._create_job()`
+  now asserts `self.assertTrue(job.idempotency_key)` immediately after
+  creation, guarding the production fix for every test that uses the
+  helper. Manifest version bumped `19.0.1.2.1` → `19.0.1.2.2` (production
+  model behavior changed). No credential-service or job-log
+  **production** behavior was changed (only the job model's field
+  definition); no ACL/security XML changed; no Shopify API/behavior
+  changed; TD-001 (`core_readiness_check`'s target-less duplicate-collision
+  exposure) remains open and untouched, as required; no Task 004 work.
+- **Items deferred:** No Odoo runtime/PostgreSQL exists in this
+  repository, so live test execution could not be re-run here —
+  `python3 -m py_compile` passed on all five changed Python files; repo
+  grep confirms no test skip marker was added, `def test_` counts are
+  unchanged in all three test files (4 / 11 / 4), exactly one
+  `assertRaises` type was changed (justified and mirrored against existing
+  precedent, not removed), no new `.sudo()` site was added, and no other
+  computed-stored-required field remains in `addons/shopify_connector_core/models/`.
+  The tester must re-run, after this PR merges: the three affected test
+  classes first (`test_credential_access`, `test_credential_service`,
+  `test_job_log_system_append`), then the full `shopify_connector_core`
+  suite (watching specifically for any new failure in
+  `test_test_connection.py`, which the previous halted run may not have
+  reached), record results in `task-003-validation-results.md`, and only
+  then resume `task-003-manual-validation-checklist.md` from VAL-A1 — Task
+  003 live validation remains blocked until that clean run.
+- **Learning feedback loop:** New issues / repeated patterns: this is the
+  third Odoo-19-compatibility-class defect found only via an actual live
+  install/test run this sprint (after `res.groups.category_id` and
+  `res.users.groups_id`), and the first that is a genuine **production**
+  runtime defect rather than a pure test/registry-load issue — a
+  `compute=..., store=True, required=True` field is unsafe under Odoo 19's
+  insert-then-compute ordering for any *new* stored-computed field in this
+  module going forward; flag for a future rule: any new
+  `compute=..., store=True` field should default to *not* `required=True`
+  unless the field also has an explicit, non-compute-dependent default,
+  and any existing one should be reviewed the same way. Separately, two of
+  the three test-expectation defects (`fields_get() == {}`,
+  `assertNotIn('', ...)`) were static-review-catchable — both are exactly
+  the sort of "test asserts a Python-logic-impossible or overly strict
+  condition" class flagged as a residual risk in earlier reviews.
+  Rules/checklists updated: none this session (routing this observation to
+  ChatGPT rather than unilaterally amending a gate checklist). Rejected
+  approaches: none. Technical debt: none added; TD-001 unchanged.
+  Architecture concerns: none — this is a scoped runtime/test-compatibility
+  fix, no design change; idempotency semantics (compute inputs, unique
+  constraint) are unchanged. Tests or review gates needed: re-run the three
+  affected test classes plus the full `shopify_connector_core` suite live
+  after merge. Should future prompts change? Possibly — consider requiring
+  a documented Odoo-19 insert-vs-compute-ordering check for any new
+  `compute=..., store=True` field, alongside the already-recommended
+  Odoo-19-core-rename static audit.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (none new, TD-001 unchanged) · repeated-issue escalation applied
+  (flagged above, routed to ChatGPT) — all YES.
+- **Next recommended session:** Live tester re-runs the Odoo 19
+  install/test-execution command for `shopify_connector_core` after this PR
+  merges, confirms `2 failed, 3 error(s) of 36 tests` no longer occurs and
+  no new failure appears (especially in `test_test_connection.py`), records
+  results in `task-003-validation-results.md`, and only then resumes
+  `task-003-manual-validation-checklist.md` from VAL-A1 onward. No Task 004
+  session until that full checklist passes and ChatGPT reviews the
+  results.
+- **Stop condition:** Scoped runtime hotfix only; no Task 004 work, no
+  setup wizard/UI/menu/action/wizard/controller/webhook/cron, no product/
+  customer/order/inventory/fulfillment logic, no credential-service or
+  job-log **production** behavior change, no ACL widening, no Shopify API
+  behavior change, TD-001 untouched; no test skipped, deleted, or weakened;
+  PR left as draft, not merged; live validation not started/resumed by
+  this session.
+
+---
+
 ### Odoo 19 Test-Compatibility Hotfix + Compatibility Audit — `res.users` `group_ids` — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/odoo19-test-groups-id-7v35ym`; PR #104, opened as
