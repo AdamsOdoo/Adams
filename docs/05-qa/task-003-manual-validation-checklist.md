@@ -173,13 +173,22 @@ Use only dummy/development-store credentials. Never a production token.
 
 ## C. Redaction and access/security checks
 
-- **VAL-C1 — Token redaction across every persisted surface.** After VAL-B1
-  and VAL-B2 (both used a real, distinct dummy/dev token), grep:
-  - the PostgreSQL database (`store`, `store.credential`, `job`, `job.log`
-    tables/columns) for the exact token string used in either run,
-  - the Odoo server log file(s) for the same string, at every log level
-    including DEBUG.
-  **Expected:** **zero hits** in either location, for either token.
+- **VAL-C1 — Token redaction across every persisted surface except intended
+  credential storage.** After VAL-B1 and VAL-B2 (both used a real, distinct
+  dummy/dev token), grep for the exact token string used in either run:
+  - `shopify.connector.store.credential.access_token` — this is the
+    **intended, by-design storage location** for the token (stored in
+    plain text, protected only by Odoo ACLs — not encrypted at rest). A
+    hit here is **expected** and must **not** be recorded as a leak.
+  - every other persisted surface — the `store` mirror fields, `job` rows,
+    `job.log` rows (`message`, `technical_detail`, `payload_snapshot`, and
+    any other non-credential field), and any other table/column outside
+    `store.credential.access_token`,
+  - the Odoo server log file(s), at every log level including DEBUG.
+  **Expected:** **zero unexpected hits** — i.e. zero hits anywhere other
+  than `store.credential.access_token` — for either token. A hit in
+  `store.credential.access_token` itself is expected and is not a defect;
+  do not report it as a leak, and do not claim it is encrypted.
 - **VAL-C2 — `job.log` direct-create vs `_system_append` path (ACL check).**
   As a non-Admin user who holds `perm_read=1` but **not** `perm_create` on
   `shopify.connector.job.log` (e.g. an Operator/Auditor role per the Task

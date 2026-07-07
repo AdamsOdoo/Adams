@@ -1,5 +1,114 @@
 # Research Handoff (rolling)
 
+### Task 003 Manual Validation — Live Partial Results Recorded (2026-07-07)
+
+- **Branch / PR:** `claude/task-003-validation-docs-7tl074` → **PR #107**,
+  a **draft** PR into `Shopify-connector`; not merged, not marked ready.
+  Docs-only session — no code, test, or module-behavior change. **No Task
+  004 work of any kind in this session.**
+- **Files changed:** `docs/05-qa/task-003-validation-results.md` (live
+  partial-validation results recorded, with a new validation summary table
+  and a condensed-evidence appendix), `docs/05-qa/task-003-manual-validation-checklist.md`
+  (VAL-C1 wording revised to distinguish intended credential storage from
+  unexpected leakage — no step, scope, or expectation changed beyond that
+  clarification), `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** A live Odoo shell session was run
+  (outside this repository) against Odoo 19.0, database/branch prompt
+  `adamsmen-shopify-connector-34582665 [dev/19.0]`, with
+  `shopify_connector_core` installed at `19.0.1.2.3` (post-green-gate
+  hotfix), targeting the Shopify development store
+  `mqiu21-yz.myshopify.com` (API version `2026-07`). This session
+  transcribed that live session's results into
+  `task-003-validation-results.md` per
+  `task-003-manual-validation-checklist.md`. **Task 003 manual validation
+  is partially completed, not fully complete.** Every testable item that
+  did not require a genuine, valid Shopify Admin API access token
+  **passed**: VAL-A1 (installed-module / registry-load observation — the
+  session confirmed `shopify_connector_core` installed at `19.0.1.2.3`
+  with the registry loaded and no traceback; it did **not** re-execute a
+  fresh clean install/upgrade command), VAL-A2 (model registry — including
+  confirming no database table exists for the abstract
+  `shopify.connector.api.client` model), VAL-A3 (exactly 3 `job_type`
+  values), VAL-B1 (invalid-token failure path — correct `error_class`,
+  reason, and `credential_state` flip), VAL-B3 (repeat-run idempotency —
+  no collision, a fresh job row created), VAL-C1's **DB/ORM scan half**
+  (token redaction — **zero unexpected leaks across the ORM/
+  database-visible surfaces scanned** once the intentional
+  `store.credential.access_token` storage field is correctly excluded;
+  the Odoo **server log grep half of VAL-C1 was not tested** this
+  session, so VAL-C1 overall is **PARTIAL**, not fully passed), VAL-C2
+  (ACL — direct `job.log` create by an Operator-group user correctly
+  denied with `AccessError`), VAL-E2
+  (fail-path row accounting — two independent fail-path jobs each show
+  exactly 1 job row + 2 job.log rows), and VAL-F1 (confirms `TD-001` is
+  **still open** — a second `core_readiness_check` job for the same store
+  still collides on `shopify_connector_job_store_idempotency_key_uniq`).
+  **VAL-B2 (the valid-token positive-connection test) is recorded as
+  BLOCKED, not passed and not failed** — no real Shopify Admin API access
+  token was obtainable from the Dev Dashboard app used for this session;
+  the Dev Dashboard did not expose the older admin-created custom-app
+  Admin API token issuance path the connector currently expects (per Task
+  002's `token_variant='offline_custom_app'`). Everything that depends on
+  a successful connection (VAL-E1 pass-path row accounting, and the
+  B-series cross-checks VAL-B4/B5/B6/B7) is therefore also BLOCKED or not
+  tested, not failed. VAL-A4, VAL-C3, VAL-D1, VAL-D2, and VAL-G1–G4 were
+  **not tested** this session (not exercised in the transcribed shell
+  session). **No encryption claim is made anywhere in this update** —
+  `access_token` remains stored in plain text on
+  `shopify.connector.store.credential`, protected only by Odoo ACLs; this
+  is an explicit, documented residual, not a defect introduced or
+  resolved by this session.
+- **Items deferred:** VAL-B2 and everything depending on it remain blocked
+  pending a decision on token acquisition (see next bullet). VAL-A4,
+  VAL-C3, VAL-D1, VAL-D2, and VAL-G1–G4 remain not tested and must be
+  executed in a future live session before Task 003 validation can be
+  called complete. VAL-C1's **Odoo server log grep** was not performed
+  this session and remains not tested — only the DB/ORM scan half of
+  VAL-C1 passed. A fresh clean install/upgrade re-run of VAL-A1 was also
+  not re-executed this session — only an installed-module / registry-load
+  observation was made. `TD-001` remains open, untouched, and unresolved
+  by this session — no fix proposed or attempted, per this session's
+  docs-only, no-code scope.
+- **Open follow-up (routed to ChatGPT):** Decide whether the MVP continues
+  with **offline/custom-app Admin API token only** (accepting that setup
+  requires a customer/partner to create a custom app via the legacy
+  Admin-created path) or whether **OAuth-based token acquisition** (or
+  another Dev-Dashboard/CLI-app-compatible token flow) must be designed
+  and introduced **before** customer-facing setup can ship — the current
+  Shopify Dev Dashboard app path used in this validation session did not
+  offer a way to obtain a token compatible with the connector's current
+  `token_variant='offline_custom_app'` assumption, which blocked VAL-B2
+  and is a genuine open product/architecture question, not merely a
+  test-environment inconvenience.
+- **Learning feedback loop:** New issues / repeated patterns: none beyond
+  the already-logged `TD-001` (re-confirmed open, not newly discovered).
+  Rules/checklists updated: `task-003-manual-validation-checklist.md`'s
+  VAL-C1 wording revised only to distinguish intended credential storage
+  (`store.credential.access_token`) from unexpected leakage — no scope,
+  step, or expectation changed beyond that clarification. Rejected
+  approaches: none. Technical debt: none added; `TD-001` unchanged (still
+  open). Architecture concerns: the token-acquisition open follow-up
+  above is a genuine gap that should be evaluated before Task 004 or any
+  customer-facing setup work. Tests or review gates needed: none in this
+  docs-only session; a future live session must complete VAL-A4, VAL-B2
+  (or formally accept the offline/custom-app-only path and re-scope
+  VAL-B2), VAL-B4–B7, VAL-C3, VAL-D1–D2, and VAL-G1–G4 before Task 003
+  validation is complete. Should future prompts change? Yes — future
+  validation sessions should confirm token-acquisition tooling
+  availability as a **precondition** (alongside the existing
+  preconditions in `task-003-manual-validation-checklist.md`), since its
+  absence blocked a core checklist item in this session.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (none new, `TD-001` unchanged) · repeated-issue escalation
+  applied (n/a, no repeat this session) — all YES.
+- **Next recommended session:** ChatGPT reviews and accepts (or requests
+  revisions to) this validation documentation. **Task 004 remains
+  blocked** until that review/acceptance happens **and** the open
+  token-acquisition follow-up above is resolved and the remaining
+  not-tested/blocked checklist items (VAL-A4, VAL-B2, VAL-B4–B7, VAL-C3,
+  VAL-D1–D2, VAL-G1–G4) are executed in a future live validation session.
+
 ### Odoo 19 Green-Gate Hotfix — compact handoff (2026-07-07)
 
 - **Branch / PR:** current session branch (`claude/odoo-shopify-test-failures-9scudd`);
