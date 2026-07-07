@@ -73,6 +73,20 @@ proposed/not authorized** — accepting these four decisions is not a
 gate-opening act; no code, no API client, no test connection, and no
 final implementation prompt exist yet.
 
+**Gate-preparation note (2026-07-07, AR-028, proposed — NOT yet
+accepted):** the final Task 003 `CLAUDE.md` §9 prompt applying the four
+AR-027 decisions is now prepared in
+[`task-003-final-implementation-prompt.md`](./task-003-final-implementation-prompt.md),
+alongside a narrow gate-opening proposal in
+[`task-003-gate-opening-proposal.md`](./task-003-gate-opening-proposal.md)
+scoping the first authorization of outbound, read-only Shopify Admin API
+calls. Neither document is accepted; neither opens a gate; this task
+remains proposed/not authorized. A further, separate, explicit Task 003
+gate-opening act (mirroring
+[`task-002-credential-storage-gate.md`](./task-002-credential-storage-gate.md)
+for AR-026) is still required, after AR-028 acceptance, before any code
+may be written.
+
 ## Objective
 
 Create the single GraphQL transport boundary

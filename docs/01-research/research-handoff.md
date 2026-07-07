@@ -1,8 +1,29 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry
-> (PR #98 — ChatGPT F1 Revision to Task 003 Decision Closure — AR-027
-> accepted with a scope-narrowing revision to Decision 4: decisions 1–3
+> (AR-028 — Task 003 Final Implementation Prompt and Gate-Opening
+> Proposal, prepared 2026-07-07 on branch
+> `claude/task-003-gate-opening-no0tw4`, PROPOSED — NOT YET ACCEPTED: a
+> docs-only gate-preparation session, closing no new decision (AR-027
+> already closed all four Task 003-specific points) and opening no
+> implementation gate. Packages the complete, copy-paste final Task 003
+> `CLAUDE.md` §9 prompt
+> (`task-003-final-implementation-prompt.md`, applying `core_test_connection`;
+> the `SHOP_INACTIVE`/402/423/403-fraudulent → `shopify_permission_scope_auth`
+> mapping with `credential_state` gating and five mandatory distinct
+> plain-language reasons; the `_system_append` job-log system-append
+> method as the one new sanctioned `sudo()` site; and the per-run UUID4
+> `payload_hash` nonce for `core_test_connection` job creation only —
+> marked not issued/not authorized) and a narrow gate-opening proposal
+> (`task-003-gate-opening-proposal.md`, scoping the first conscious
+> widening of the AR-021 no-external-API rule — the proposal itself
+> opens nothing); `core_readiness_check` (`TD-001`) explicitly excluded
+> from the proposed gate scope; docs-only, no code, no gate opened, no
+> external network call; Task 003 remains not started)** is immediately
+> below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **PR #98 — ChatGPT F1
+> Revision to Task 003 Decision Closure — AR-027 accepted with a
+> scope-narrowing revision to Decision 4: decisions 1–3
 > (`core_test_connection` job-type value; `SHOP_INACTIVE`/402/423/
 > 403-fraudulent → `shopify_permission_scope_auth`; job-log system-append
 > `sudo()` method) accepted as proposed; the per-run `payload_hash` UUID4
@@ -13,8 +34,7 @@
 > `shopify_user_errors_validation` logged as rejected (`RA-024`); AR-019
 > amended to three core-owned `job_type` values; MBQ-44 noted; docs-only,
 > no code, no gate opened, no external network call; Task 003 remains
-> not started)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **Task 003 Decision
+> not started (history)**, **Task 003 Decision
 > Closure — AR-027 originally proposed (2026-07-07), the four Task
 > 003-specific decision points addressed at recommendation level, via
 > `../07-implementation-plan/task-003-decision-closure.md` and companion
@@ -130,6 +150,104 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Task 003 Final Implementation Prompt & Gate-Opening Proposal — compact handoff (2026-07-07)
+
+> **Docs-only gate-preparation sprint for Task 003 — not Task 003
+> itself; no code; no new decision.** Confirmed before starting: PR #98
+> merged into `Shopify-connector` (merged 2026-07-07; merge commit
+> `2e51cf02cd54527ff9dc817b6be1e1189f001a83` = latest
+> `origin/Shopify-connector`); AR-027 Accepted (with the F1 revision to
+> Decision 4); Task 002 merged and implemented (PR #97); Task 003
+> recommended (AR-024) and decision-closed (AR-027) but not authorized;
+> working branch created from that merge commit.
+
+- **Branch / PR:** `claude/task-003-gate-opening-no0tw4` → not opened as
+  a PR by this session (per task scope — commit and push only; PR
+  number to be assigned when opened for ChatGPT review).
+- **Files created:**
+  `docs/07-implementation-plan/task-003-final-implementation-prompt.md`
+  (complete copy-paste final §9 prompt applying the four AR-027
+  decisions — **not issued, not authorized**),
+  `docs/07-implementation-plan/task-003-gate-opening-proposal.md`
+  (proposed narrow gate act for the first outbound-API-call
+  authorization — **opens nothing**).
+  **Files updated:** `docs/05-qa/architecture-review-log.md` (new
+  AR-028 row, **Proposed for ChatGPT review — NOT YET ACCEPTED**, plus a
+  narrative note at the top of the notes section),
+  `docs/07-implementation-plan/task-003-api-client-test-connection-proposed.md`
+  (dated gate-preparation note added to §Status, pointing at the two new
+  documents — no contract content changed), `docs/01-research/research-handoff.md`
+  (this entry + header pointer). **No addon/code file touched. No
+  Python/XML/CSV/manifest/test/CI file created or modified. No API
+  client, test-connection mechanism, credential-model change, or
+  external/Shopify network call of any kind created or made. No
+  webhook/controller/cron/domain module created. No implementation gate
+  opened. Task 003 remains not started.
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/05-qa/task-003-pre-implementation-review-checklist.md`,
+  DEC-003 through DEC-020, `docs/04-decisions/README.md`, and
+  `defect-pattern-log.md` all unchanged — no new decision is made this
+  session, so no register-status change is due.**
+- **What this session did:** applied the four already-accepted AR-027
+  decisions into a single, complete, copy-paste-ready final Task 003
+  implementation prompt (`job_type` gains `core_test_connection`;
+  `SHOP_INACTIVE`/402/423/403-fraudulent → `shopify_permission_scope_auth`
+  with `credential_state` gating and five mandatory, pairwise-distinct
+  plain-language reasons; a new `_system_append` job-log system-append
+  method as the single new sanctioned `sudo()` site, no ACL change;
+  `payload_hash` populated with a per-run UUID4 nonce for
+  `core_test_connection` job creation only), specified the
+  `shopify.connector.api.client` AbstractModel contract and
+  `action_test_connection()` entry point in full, and enumerated 32
+  exact required tests. Packaged a companion gate-opening proposal
+  scoping exactly that implementation boundary as the **first**
+  conscious widening of the AR-021 no-external-API-call rule.
+  `core_readiness_check`'s identical latent collision defect
+  (`TD-001`) is explicitly named as excluded from the proposed gate,
+  not silently folded in.
+- **AR-028:** Proposed. **No implementation. No gate opened.** The
+  final prompt explicitly requires, before execution: AR-028 accepted
+  **and** a separate, explicit ChatGPT gate-opening act merged (a third
+  document, not created by this session, mirroring
+  `task-002-credential-storage-gate.md` for AR-026).
+- **Learning feedback loop:** new issues: none. Repeated patterns: none
+  new (checked `defect-pattern-log.md` categories — no unsupported-claim
+  or scope-creep occurrence; every platform statement reuses the
+  already-authoritative `task-003-api-client-test-connection-proposed.md`
+  or the AR-027-accepted decisions). Rules updated: none. Rejected
+  approaches: none reintroduced (RA-001–RA-024 not re-litigated).
+  Technical debt: none new — `TD-001` referenced, not modified, and
+  explicitly kept out of this task's proposed scope. Architecture
+  concerns: none new — this package stays inside AR-024/AR-027.
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (N/A, none new)
+  · technical debt logged (N/A, `TD-001` already logged via AR-027, only
+  referenced here) · repeated-issue escalation applied (N/A) — all YES.
+- **Stop condition:** stopped after committing and pushing the branch —
+  no PR opened by this session, no merge, no implementation, no gate
+  opened, Task 003 not started.
+- **Recommended next step:** ChatGPT reviews AR-028 (this entry, the
+  final implementation prompt, and the gate-opening proposal); then
+  either (a) accept AR-028 and separately perform the explicit Task 003
+  gate-opening act (its own merged document), after which the final
+  prompt is issued verbatim as the Task 003 coding session; or (b)
+  request revision of this package.
+
+**Exact next-session prompt:**
+
+> Apply ChatGPT's review decision for the Task 003 final-implementation
+> -prompt-and-gate-proposal package (AR-028). If accepted: apply the
+> acceptance patch (AR-028 row → Accepted; handoff entry) and — only if
+> ChatGPT also performs the separate, explicit Task 003 gate-opening act
+> in `task-003-gate-opening-proposal.md` (its own new, merged document,
+> mirroring `task-002-credential-storage-gate.md` for AR-026) — record
+> that act; still no code in that session. If revision is requested:
+> apply the requested revisions to the AR-028 package only. Task 003
+> implementation starts only afterwards, in its own session, via the
+> verbatim `task-003-final-implementation-prompt.md`.
 
 ---
 
