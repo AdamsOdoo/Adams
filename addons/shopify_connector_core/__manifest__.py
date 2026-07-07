@@ -3,8 +3,9 @@
     'version': '19.0.1.1.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
-        'settings, location cache, binding mixin, job and job log models. '
-        'No credentials, no Shopify API calls, no webhooks, no UI.'
+        'settings, location cache, binding mixin, job and job log models, '
+        'plus the credential storage and redaction foundation. No '
+        'Shopify API calls, no webhooks, no UI.'
     ),
     'description': """
 Shopify Connector Core
@@ -24,10 +25,13 @@ addon family:
 * ``shopify.connector.job.log`` -- append-only per-attempt/event history
   for jobs.
 
-This module intentionally contains no credential storage, no Shopify API
-client, no webhook handling, no cron execution, and no operator-facing
-UI. It is a core scaffold only; domain modules (product, sale, inventory,
-fulfillment) build on top of it in later, separately authorized tasks.
+This module now includes the credential storage, masking, and redaction
+foundation (masked storage behind access control, no encryption claim).
+It still contains no Shopify API client, no external API calls, no
+webhook handling, no cron execution, no setup wizard, and no
+operator-facing UI. It is a core scaffold only; domain modules (product,
+sale, inventory, fulfillment) build on top of it in later, separately
+authorized tasks.
 """,
     'author': 'Adams',
     'license': 'LGPL-3',

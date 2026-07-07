@@ -197,3 +197,35 @@ class TestCredentialService(TransactionCase):
         self.assertEqual(
             sudo_call_sites, ['shopify_connector_store_credential.py']
         )
+
+    def test_all_service_methods_decorated_with_api_model(self):
+        # AST-based, matching the sudo guard's approach: proves the
+        # decorator is actually present on each method definition, not
+        # just mentioned somewhere in the file.
+        target_methods = {
+            'action_set_token',
+            'action_replace_token',
+            'action_clear_token',
+            '_get_access_token',
+        }
+        credential_model_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'models',
+            'shopify_connector_store_credential.py',
+        )
+        with open(credential_model_path, 'r', encoding='utf-8') as source_file:
+            tree = ast.parse(
+                source_file.read(), filename=credential_model_path
+            )
+        decorated_methods = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name in target_methods:
+                for decorator in node.decorator_list:
+                    if (
+                        isinstance(decorator, ast.Attribute)
+                        and decorator.attr == 'model'
+                        and isinstance(decorator.value, ast.Name)
+                        and decorator.value.id == 'api'
+                    ):
+                        decorated_methods.add(node.name)
+        self.assertEqual(decorated_methods, target_methods)

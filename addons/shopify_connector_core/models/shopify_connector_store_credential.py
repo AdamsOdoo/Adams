@@ -146,6 +146,7 @@ class ShopifyConnectorStoreCredential(models.Model):
         })
         return None
 
+    @api.model
     def _get_access_token(self, store):
         """Internal-only accessor for the store's stored credential value.
 
