@@ -201,6 +201,49 @@ would risk building on an unvalidated foundation — exactly the risk `CLAUDE.md
 to prevent. This brief does not unblock Task 004, and no part of it should be
 read as doing so.
 
+## 10a. Continuation-session attempt (2026-07-07) — blocked before execution
+
+A session was run, scoped exactly as §5 recommended — a docs/QA-only
+follow-up whose sole deliverable was to attempt the manual
+authorization-code-grant experiment described in §4. **The experiment was
+not executed.** The session could not obtain either of the two prerequisites
+needed to reach the Shopify Dev Dashboard / Shopify Admin at all:
+
+1. **No Fable (or equivalent authenticated browser-automation) tool or
+   connector was available** in that execution session. Checked and
+   confirmed absent via the session's tool-discovery mechanisms (no matching
+   tool, no matching installed/enabled connector, no matching plugin or
+   skill).
+2. **No Shopify Dev Dashboard Client ID/Client Secret or account
+   login/2FA path was available** to that session (checked the process
+   environment; nothing found). Per this project's secret-handling rules,
+   such credentials must never be typed into chat/docs by an agent session
+   in any case — they require a human operator or a securely provisioned,
+   session-scoped credential channel.
+
+**This is not evidence for or against the decision-critical open question
+in §2** (whether authorization-code-grant actually works against a
+Dev-Dashboard-created custom app) — no request reached Shopify. The
+recommendation in §4 stands entirely unchanged and unvalidated. Full record:
+`docs/01-research/research-handoff.md`'s continuation-session entry and
+`docs/05-qa/task-003-validation-results.md` §8.
+
+**Updated required follow-up:** before this experiment can be attempted
+again, a future session needs both (a) an enabled Fable-equivalent
+browser-automation tool/connector, and (b) a secure way to exercise the
+Shopify Dev Dashboard consent/token-exchange steps without exposing secrets
+to the agent's chat, docs, or logs (e.g. a human operator performing the
+browser/consent steps directly and reporting back only the redacted
+outcome). §5's original recommendation (run the experiment, record the
+result, then route the acquisition-path decision through a `DEC-XXX` ADR) is
+otherwise unchanged.
+
+**Option C is neither confirmed nor rejected by this continuation session —
+it remains this brief's [Recommendation], not a [Decision], exactly as in
+§10 below.** Task 003 remains incomplete; Task 004 remains blocked; MBQ-05
+remains open. OAuth implementation remains a future, not-yet-required item
+pending the still-unrun empirical step.
+
 ## 10. Recommendation for ChatGPT
 
 Accept the Option C direction in §4, and authorize the narrow, docs/QA-only

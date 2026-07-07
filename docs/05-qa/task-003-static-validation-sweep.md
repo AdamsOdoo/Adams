@@ -7,7 +7,7 @@
 | Date | 2026-07-07 |
 | Branch | `claude/task-003-static-validation-cszl88` (branched from `Shopify-connector` at merge commit `76cd74e7cf585e1925c3ac280bd6ca97c55df7ab`, PR #108) |
 | Session type | Docs/QA-only, static and offline checks only — **no valid Shopify Admin API token was used, requested, or required** |
-| Scope note | This session runs deliberately in parallel with, and does not touch, a separate concurrently-running session performing the Fable/manual OAuth token-acquisition experiment. No file in that session's scope is touched here. |
+| Scope note | This session was originally run in parallel with the OAuth/Fable attempt, which is now recorded in merged PR #109 as blocked before execution (no Fable-equivalent browser-automation tool and no Shopify Dev Dashboard credentials were available to that session). This session did not touch the OAuth/Fable attempt recorded separately in PR #109. |
 | Files inspected | `addons/shopify_connector_core/models/*.py`, `addons/shopify_connector_core/security/shopify_connector_security.xml`, `addons/shopify_connector_core/__manifest__.py`, `addons/shopify_connector_core/tests/test_api_client.py`, repository-wide file listing under `addons/`, git history for PR #101 (merge commit `e27f10e55f3504d1a9b8871a207b3d9762a3c783`) |
 
 ## Purpose and boundary
@@ -188,8 +188,9 @@ forward unchanged.
 
 - This session does not claim VAL-B2 passed, failed, or was attempted.
 - This session does not claim any OAuth/token-acquisition experiment
-  succeeded or failed — that is out of scope and is being handled by a
-  separate, concurrently-running session.
+  succeeded or failed. That experiment is recorded separately, in merged PR
+  #109, as blocked before execution — this session does not duplicate or
+  second-guess that record.
 - This session does not claim Task 003 manual validation is complete.
 - This session does not claim Task 004 is unblocked.
 - No code, test, manifest, security, XML, or CSV file was created or

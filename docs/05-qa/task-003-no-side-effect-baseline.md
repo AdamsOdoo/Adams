@@ -77,9 +77,9 @@ webhooks were registered — those require inspecting the Shopify development
 store's admin (Orders, Products, Customers, Inventory, Fulfillment, Settings
 → Notifications/Webhooks) before and after a real run, which is the actual
 VAL-D1 step in the checklist. That live check was not performed this session
-and remains **not tested**. No Fable/browser evidence from the separate,
-concurrently-running OAuth-experiment session was available to, or used by,
-this session.
+and remains **not tested**. No Fable/browser evidence from the OAuth/Fable
+attempt recorded separately in merged PR #109 (blocked before execution) was
+available to, or used by, this session.
 
 ---
 
