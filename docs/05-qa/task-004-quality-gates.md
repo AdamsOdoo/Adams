@@ -24,18 +24,22 @@ Modeled on this project's existing gate discipline
 ## 1. Pre-start gate
 
 > **State as of 2026-07-07, per
-> [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md):**
+> [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md) and
+> ChatGPT's gate-acceptance decision recorded in
+> [`task-004-readiness-check-substrate-gate.md`](../07-implementation-plan/task-004-readiness-check-substrate-gate.md):**
 > Task 004 implementation is **still not started**. ChatGPT has formally
-> **deferred VAL-B2** from the Task 003 → Task 004 gate, which allows
-> Task 004 to proceed to **gate-opening review only** — the checkboxes
-> below are **not** satisfied by that deferral alone, and none is checked
-> off by this document. TD-001's routing *requirement* is now recorded
-> (`../05-qa/technical-debt-register.md`), but the actual routing
-> *decision* (fixed in Task 004 vs. a separate patch) remains open pending
-> the gate-opening package's review. **No customer-facing readiness pass,
-> activation, setup wizard, or domain sync may depend on the unproven
-> VAL-B2** — this constraint applies to every gate below, not just the
-> pre-start gate.
+> **deferred VAL-B2** from the Task 003 → Task 004 gate, and has now
+> **accepted the Task 004 gate document**, opening Task 004
+> implementation *planning* — implementation itself still requires a
+> separate, later coding session using the finalized
+> [`task-004-final-implementation-prompt.md`](../07-implementation-plan/task-004-final-implementation-prompt.md).
+> **TD-001's route is now decided: fix inside Task 004**, as the first
+> mandatory implementation acceptance criterion — not left open, and not
+> routed to a separate patch. TD-001 itself remains **not fixed** until
+> that future implementation PR actually merges and is validated. **No
+> customer-facing readiness pass, activation, setup wizard, or domain
+> sync may depend on the unproven VAL-B2** — this constraint applies to
+> every gate below, not just the pre-start gate.
 
 Before any Task 004 code is written:
 
@@ -53,12 +57,17 @@ Before any Task 004 code is written:
       deferred by ChatGPT. **Deferred for Task 004 only 2026-07-07 via
       DEC-021 — not resolved; see `master-blueprint-open-questions.md`
       MBQ-05 row.**
-- [ ] TD-001's routing decision is made (folded into the Task 004 gate by
+- [x] TD-001's routing decision is made (folded into the Task 004 gate by
       name, or scheduled as its own separate follow-up patch) — not left
-      silently unrouted. **Routing requirement recorded 2026-07-07**
-      (`../05-qa/technical-debt-register.md`); the specific choice (fold
-      into Task 004 vs. separate patch) remains open, to be fixed in the
-      accepted gate-opening act.
+      silently unrouted. **Decided 2026-07-07 by ChatGPT's gate-acceptance
+      act: fix TD-001 inside Task 004**, as the first mandatory
+      implementation acceptance criterion (see
+      `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`
+      §TD-001 route and `../05-qa/technical-debt-register.md`). **TD-001
+      itself is still NOT fixed** — this checkbox records only that the
+      routing decision was made, not that the fix exists yet. It remains
+      `Open` in the register until the future Task 004 implementation PR
+      merges and is validated.
 - [ ] MBQ-06's residual (exact readiness-check copy/XML IDs/thresholds) is
       fixed in the Task 004 task prompt itself, not left as a TBD inside
       the code.
@@ -117,12 +126,14 @@ Before any Task 004 PR is merged:
       checklist (mirroring `task-003-manual-validation-checklist.md`) is
       prepared as mandatory review evidence — never silently skipped or
       silently claimed as executed.
-- [ ] Prior-defect regression tests exist for any defect named in
-      `defect-pattern-log.md` or `technical-debt-register.md` that this
-      task's scope touches (specifically: a TD-001 non-regression test, if
-      TD-001's routing decision assigns its fix to this task; otherwise a
-      test proving TD-001's behavior is unchanged, if this task's scope
-      merely consumes the same job type without fixing it).
+- [ ] **The TD-001 regression test is mandatory and present**: two
+      `core_readiness_check` job-creation attempts for the same store both
+      succeed, with no `store_idempotency_key_uniq` collision. TD-001's
+      route is decided (fix inside Task 004, per
+      `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`
+      §TD-001 route) — the implementation PR must include this test; its
+      absence is a definition-of-done failure, not an acceptable
+      "unchanged residual" outcome.
 
 ## 4. Security gate
 
@@ -145,10 +156,12 @@ Before any Task 004 PR is merged:
 ## 5. Retry/idempotency gate
 
 - [ ] TD-001's exact defect (a second `core_readiness_check` job for the
-      same store colliding on `store_idempotency_key_uniq`) is verified as
-      either fixed (if this task's scope names that fix explicitly) or
-      unchanged-and-explicitly-acknowledged (if not) — never silently left
-      ambiguous.
+      same store colliding on `store_idempotency_key_uniq`) is **verified
+      as fixed** — this is decided, not a two-way choice: the Task 004
+      implementation PR must fix it, proven by the mandatory regression
+      test (§3 above). Still `Open` in `technical-debt-register.md` until
+      that PR merges and is validated — do not mark this gate item
+      satisfied before the fix actually exists and is tested.
 - [ ] If this task introduces its own new job-creation path, a repeat-run
       test (mirroring Task 003's VAL-B3) confirms no unintended unique-
       constraint collision.

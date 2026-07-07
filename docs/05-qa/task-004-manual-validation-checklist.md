@@ -32,8 +32,15 @@ created or modified by this document.
   mirror; it does not require a fresh Shopify call to validate its own
   registry/tier/aggregation behavior).
 - [`TD-001`](./technical-debt-register.md) — the `core_readiness_check`
-  target-less idempotency-collision defect — remains **open**, routed but
-  not fixed, as of this session.
+  target-less idempotency-collision defect — remains **open** as of this
+  session, but its route is now **decided**: ChatGPT has accepted fixing
+  TD-001 **inside** Task 004, as the first mandatory implementation
+  acceptance criterion (see
+  [`../07-implementation-plan/task-004-readiness-check-substrate-gate.md`](../07-implementation-plan/task-004-readiness-check-substrate-gate.md)
+  §TD-001 route). **A second `core_readiness_check` job for the same
+  store is expected to succeed with no collision once Task 004 is
+  implemented** — there is no longer an "unchanged residual" branch for
+  this checklist to account for.
 
 ## Why this exists
 
@@ -82,14 +89,14 @@ reviewed, in addition to whatever automated tests exist.
 - **Repeated readiness job behavior / TD-001 regression check.**
   Immediately trigger a second `core_readiness_check` job for the **same**
   store.
-  **Expected:** matches whichever disposition the accepted Task 004
-  implementation PR named for TD-001 — either (a) the second job succeeds
-  with no collision (if TD-001 was fixed in this task's scope), or (b) the
-  second job still collides on `store_idempotency_key_uniq` exactly as
-  before (if TD-001 was explicitly left unchanged, per a separate,
-  documented decision). **Recording the wrong expectation here is a
-  defect** — confirm against the actual accepted implementation PR's
-  stated disposition before marking pass/fail.
+  **Expected: the second job succeeds with no collision.** TD-001's route
+  is decided — fixed inside Task 004 — so this is the single expected
+  outcome, not a two-branch choice. No
+  `store_idempotency_key_uniq` violation may occur on the second attempt.
+  **If the second job still collides, this is a defect in the Task 004
+  implementation PR** (TD-001's mandatory first acceptance criterion was
+  not actually satisfied) — record it as a failed acceptance criterion,
+  not as an acceptable "TD-001 left unchanged" outcome.
 
 ## C. Tier semantics
 
