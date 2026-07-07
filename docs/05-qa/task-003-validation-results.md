@@ -42,20 +42,54 @@ completing, with 4 errors**, in these test classes:
 Observed error: `ValueError: Invalid field 'groups_id' in 'res.users'`. Root
 cause: each of these four test classes' shared `_create_group_user` test
 helper created a `res.users` record with `'groups_id': [(6, 0,
-[group.id])]`; Odoo 19 renamed this field to `group_ids`. A hotfix updating
-only the four test helpers to use `group_ids` (preserving the exact group
-XML IDs, command tuple, users, and test intent) is proposed on branch
-`claude/odoo19-test-groups-id-7v35ym` / PR #104 (see
-`docs/01-research/research-handoff.md`, "Odoo 19 Test-Compatibility Hotfix
-+ Compatibility Audit — `res.users` `group_ids`" entry). That same PR was
-then expanded (F1 revision) into a module-wide Odoo 19 compatibility audit
-— see `docs/05-qa/odoo-19-compatibility-audit.md` — which found no sibling
-`groups_id`/`category_id`/`_sql_constraints`/deprecated-ORM risk anywhere
-else in `addons/shopify_connector_core/` beyond the four call sites already
-being fixed.
+[group.id])]`; Odoo 19 renamed this field to `group_ids`. This was fixed by
+PR #104 (`claude/odoo19-test-groups-id-7v35ym`, merge commit `867074c`),
+which also expanded (F1 revision) into a module-wide Odoo 19 compatibility
+audit — see `docs/05-qa/odoo-19-compatibility-audit.md` — that found no
+sibling `groups_id`/`category_id`/`_sql_constraints`/deprecated-ORM risk
+anywhere else in `addons/shopify_connector_core/` beyond the four call
+sites fixed there.
+
+Live validation was re-run again after PR #104 merged. The install and
+test-loading progressed further this time, reaching **all 36 tests**, but
+the run reported:
+
+```
+2 failed, 3 error(s) of 36 tests
+```
+
+Odoo halted after its max-failed-tests threshold, so additional failures
+beyond these five may still be hidden — in particular, `test_test_connection.py`'s
+job-creation paths were not confirmed to have been reached before the halt.
+Full root-cause detail, classification, and the files-changed list for the
+hotfix addressing this round are recorded in
+[`odoo-19-runtime-test-failures.md`](./odoo-19-runtime-test-failures.md).
+In summary:
+
+1. `test_credential_access.test_non_admin_roles_denied_all_crud_and_search` —
+   **failure**, test-expectation only (an Odoo-19-incompatible
+   `fields_get()` assertion, not a security regression).
+2. `test_credential_service.test_duplicate_credential_row_for_same_store_raises` —
+   **error**, test isolation + test-expectation (shared-store collision risk,
+   and the Odoo 19 unique-constraint violation is a raw database exception,
+   not `ValidationError`).
+3. `test_credential_service.test_empty_or_non_string_value_raises_without_echoing` —
+   **failure**, a logically-invalid assertion (`assertNotIn('', ...)` can
+   never pass), not an Odoo 19 behavior change.
+4. `test_job_log_system_append.test_non_admin_indirect_append_succeeds_but_direct_create_denied` —
+   **error**, production behavior: `shopify.connector.job.idempotency_key`'s
+   `required=True` on a `compute+store` field rejects the row's initial
+   INSERT (NULL at insert time) before the compute ever runs, in Odoo 19.
+5. `test_job_log_system_append.test_redaction_of_message_technical_detail_payload_snapshot` —
+   **error**, identical root cause to #4.
+
+A focused runtime hotfix addressing all five (production model fix for #4/#5;
+test-expectation fixes for #1/#2/#3) is proposed on a new branch/PR (see
+`docs/01-research/research-handoff.md`, "Odoo 19 Runtime Test-Failure
+Hotfix" entry, for the branch/PR reference once opened).
 
 **All live validation remains blocked, and every row below remains
-unexecuted/unpassed, until this second hotfix is reviewed/merged and the
+unexecuted/unpassed, until this runtime hotfix is reviewed/merged and the
 full install + test-execution run is re-run cleanly from VAL-A1.** Do not
 mark VAL-A1 or any later row as passed based on this session's static
 analysis alone — no live re-run was performed here.
@@ -98,7 +132,7 @@ reproducible, say so explicitly in **Actual result** and set **Pass/Fail** to
 
 | Test ID | Test case | Expected result | Actual result | Pass/Fail | Evidence reference |
 | --- | --- | --- | --- | --- | --- |
-| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed (first attempt).** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml`. **Re-run after PR #103 merged:** install progressed past registry load into Odoo 19 test execution, then **failed with 4 errors** — `ValueError: Invalid field 'groups_id' in 'res.users'` in `test_credential_access`, `test_credential_service`, `test_job_log_system_append`, and `test_test_connection` (see Status section above). | **Fail** | Blocked pending hotfix on `claude/odoo19-test-groups-id-7v35ym`; must be re-run from a clean install after that PR merges — do not mark Pass from code-reading or from this session's static checks alone. |
+| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed (first attempt).** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml`. **Re-run after PR #103 merged:** install progressed past registry load into Odoo 19 test execution, then **failed with 4 errors** — `ValueError: Invalid field 'groups_id' in 'res.users'` in `test_credential_access`, `test_credential_service`, `test_job_log_system_append`, and `test_test_connection`. **Re-run after PR #104 merged:** install and test loading reached all 36 tests, then **`2 failed, 3 error(s) of 36 tests`** — see the five-item summary in the Status section above and full detail in `odoo-19-runtime-test-failures.md`. | **Fail** | Blocked pending the runtime hotfix (see `docs/01-research/research-handoff.md`, "Odoo 19 Runtime Test-Failure Hotfix" entry); must be re-run from a clean install after that PR merges — do not mark Pass from code-reading or from this session's static checks alone. |
 | VAL-A2 | Model registry loads | `api.client` abstract (no table); other 3 models intact | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A3 | Three `job_type` values in ORM | Exactly 3 values, no 4th | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A4 | No XML/menu/action/wizard/controller/cron | Zero rows of any kind | _TBD_ | _TBD_ | _TBD_ |

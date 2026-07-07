@@ -6,6 +6,7 @@ from odoo.tests.common import TransactionCase
 
 DUMMY_TOKEN_1 = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 DUMMY_TOKEN_2 = 'shpat_DUMMYDUMMYDUMMY1111111111111111'
+CREDENTIAL_VALUE_ERROR_MESSAGE = 'A non-empty credential value is required.'
 
 
 class TestCredentialService(TransactionCase):
@@ -117,20 +118,40 @@ class TestCredentialService(TransactionCase):
         self.assertFalse(credential)
 
     def test_duplicate_credential_row_for_same_store_raises(self):
+        # A fresh, test-local store (not the shared class-level
+        # `self.store`) so this scenario can never collide with a
+        # credential row another test method left on the class store.
         Credential = self._credential_as_admin()
-        Credential.create({'store_id': self.store.id})
-        with self.assertRaises(ValidationError):
-            Credential.create({'store_id': self.store.id})
+        store = self.env['shopify.connector.store'].create({
+            'name': 'Duplicate Credential Test Store',
+            'shop_domain': 'duplicate-credential-test.myshopify.com',
+            'api_version': '2026-07',
+        })
+        Credential.create({'store_id': store.id})
+        # The second create()'s UNIQUE(store_id) violation is a raw
+        # database-level error (Odoo 19 `models.Constraint`, not a Python
+        # `@api.constrains` ValidationError) -- run it under its own
+        # savepoint so the expected failure does not poison the rest of
+        # this test's transaction, mirroring the existing
+        # `test_core_readiness_check_untouched_still_collides` pattern for
+        # the job model's own unique constraint.
+        with self.assertRaises(Exception):
+            with self.env.cr.savepoint():
+                Credential.create({'store_id': store.id})
 
     def test_empty_or_non_string_value_raises_without_echoing(self):
         Credential = self._credential_as_admin()
         for bad_value in ('', None, 12345):
             with self.assertRaises(ValidationError) as catcher:
                 Credential.action_set_token(self.store, bad_value)
-            self.assertNotIn(str(bad_value), str(catcher.exception))
+            self.assertEqual(
+                str(catcher.exception), CREDENTIAL_VALUE_ERROR_MESSAGE
+            )
             with self.assertRaises(ValidationError) as catcher:
                 Credential.action_replace_token(self.store, bad_value)
-            self.assertNotIn(str(bad_value), str(catcher.exception))
+            self.assertEqual(
+                str(catcher.exception), CREDENTIAL_VALUE_ERROR_MESSAGE
+            )
 
     def test_stamps_based_audit_reflects_acting_admin(self):
         Credential = self._credential_as_admin()
