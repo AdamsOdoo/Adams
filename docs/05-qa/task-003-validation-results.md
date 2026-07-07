@@ -2,8 +2,10 @@
 
 ## Status
 
-**BLOCKED — install progressed past VAL-A1's original failure, but a new
-test-execution blocker was found; a second hotfix is pending review/merge.**
+**BLOCKED — install progressed past VAL-A1's original failure, but a third
+runtime blocker was found after the PR #105 hotfix merged; a fourth
+(green-gate) hotfix is pending review/merge, and this PR must remain draft
+until a live green run confirms it.**
 
 Live validation was first started against a live Odoo 19 + PostgreSQL
 instance and failed immediately at VAL-A1 (clean install) with:
@@ -84,15 +86,62 @@ In summary:
    **error**, identical root cause to #4.
 
 A focused runtime hotfix addressing all five (production model fix for #4/#5;
-test-expectation fixes for #1/#2/#3) is proposed on a new branch/PR (see
-`docs/01-research/research-handoff.md`, "Odoo 19 Runtime Test-Failure
-Hotfix" entry, for the branch/PR reference once opened).
+test-expectation fixes for #1/#2/#3) was applied via PR #105
+(`claude/odoo19-credential-test-fixes-l35wbf`, merge commit `f915211`),
+which has since merged into `Shopify-connector`.
+
+**Live validation was re-run again after PR #105 merged.** The run reached
+all 39 tests this time, but reported:
+
+```
+1 failed, 4 error(s) of 39 tests
+```
+
+Odoo halted again after its max-failed-tests threshold. Full root-cause
+detail, classification, and the files-changed list for this round's
+(green-gate) hotfix are recorded in
+[`odoo-19-green-gate-failures.md`](./odoo-19-green-gate-failures.md). In
+summary:
+
+1. `test_credential_access.test_non_admin_roles_denied_all_crud_and_search` —
+   **failure**, test-expectation only. The PR #105 hotfix's own
+   `fields_get()`-disjoint assertion still fails, because `fields_get()`
+   is a schema call in Odoo and is not gated by `ir.model.access` CRUD
+   rows — only by each field's own `groups=` attribute. Not a security
+   regression: the five actual-operation `AccessError` assertions in the
+   same test are unaffected and still fully prove the access-denial
+   property.
+2. SQL log noise: `duplicate key value violates unique constraint
+   "shopify_connector_store_credential_store_id_uniq"` — the intentional
+   duplicate-credential test still passes, but Odoo's `odoo.sql_db` logger
+   emits an avoidable `ERROR`-level line for the expected violation,
+   polluting the live test log.
+3. `test_job_log_system_append.test_non_admin_indirect_append_succeeds_but_direct_create_denied`,
+   `test_job_log_system_append.test_redaction_of_message_technical_detail_payload_snapshot`,
+   `test_job_log_system_append.test_system_append_creates_one_row`,
+   `test_test_connection.test_auth_failure_sets_credential_invalid` — **four
+   errors**, all the same production root cause:
+   `shopify.connector.job.log.store_id` is a stored related field
+   (`related='job_id.store_id', store=True, required=True`). In Odoo 19 a
+   new record's stored-related fields are populated *after* its initial
+   row INSERT — the identical class of ordering issue already fixed once
+   for `job.idempotency_key` in PR #105 — so every `_system_append()`
+   call's `create()` inserted `NULL` into a `NOT NULL` column before the
+   related value was ever read.
+
+A focused green-gate hotfix addressing all of the above (production model
+fix for the four `job.log.store_id` errors; test-expectation fix for the
+`fields_get()` failure; `mute_logger` for the SQL log noise, without
+weakening or removing the underlying constraint tests) is proposed on the
+current branch/PR (see `docs/01-research/research-handoff.md`, "Odoo 19
+Green-Gate Hotfix" entry, for the branch/PR reference).
 
 **All live validation remains blocked, and every row below remains
-unexecuted/unpassed, until this runtime hotfix is reviewed/merged and the
-full install + test-execution run is re-run cleanly from VAL-A1.** Do not
-mark VAL-A1 or any later row as passed based on this session's static
-analysis alone — no live re-run was performed here.
+unexecuted/unpassed, until this green-gate hotfix is reviewed/merged and
+the full install + test-execution run is re-run cleanly from VAL-A1 and
+comes back fully green.** Do not mark VAL-A1 or any later row as passed
+based on this session's static analysis alone — no live re-run was
+performed here, and this PR must not be merged until one is.
 
 Every field/row below this point is still a placeholder. **Do not fill in
 or check off any row from memory, assumption, or code-reading — only from
@@ -132,7 +181,7 @@ reproducible, say so explicitly in **Actual result** and set **Pass/Fail** to
 
 | Test ID | Test case | Expected result | Actual result | Pass/Fail | Evidence reference |
 | --- | --- | --- | --- | --- | --- |
-| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed (first attempt).** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml`. **Re-run after PR #103 merged:** install progressed past registry load into Odoo 19 test execution, then **failed with 4 errors** — `ValueError: Invalid field 'groups_id' in 'res.users'` in `test_credential_access`, `test_credential_service`, `test_job_log_system_append`, and `test_test_connection`. **Re-run after PR #104 merged:** install and test loading reached all 36 tests, then **`2 failed, 3 error(s) of 36 tests`** — see the five-item summary in the Status section above and full detail in `odoo-19-runtime-test-failures.md`. | **Fail** | Blocked pending the runtime hotfix (see `docs/01-research/research-handoff.md`, "Odoo 19 Runtime Test-Failure Hotfix" entry); must be re-run from a clean install after that PR merges — do not mark Pass from code-reading or from this session's static checks alone. |
+| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed (first attempt).** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml`. **Re-run after PR #103 merged:** install progressed past registry load into Odoo 19 test execution, then **failed with 4 errors** — `ValueError: Invalid field 'groups_id' in 'res.users'` in `test_credential_access`, `test_credential_service`, `test_job_log_system_append`, and `test_test_connection`. **Re-run after PR #104 merged:** install and test loading reached all 36 tests, then **`2 failed, 3 error(s) of 36 tests`** — see the five-item summary in the Status section above and full detail in `odoo-19-runtime-test-failures.md`. **Re-run after PR #105 merged:** install and test loading reached all 39 tests, then **`1 failed, 4 error(s) of 39 tests`** — see the summary in the Status section above and full detail in `odoo-19-green-gate-failures.md`. | **Fail** | Blocked pending the green-gate hotfix (see `docs/01-research/research-handoff.md`, "Odoo 19 Green-Gate Hotfix" entry); must be re-run from a clean install after that PR is reviewed and a live run is performed — do not mark Pass from code-reading or from this session's static checks alone. |
 | VAL-A2 | Model registry loads | `api.client` abstract (no table); other 3 models intact | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A3 | Three `job_type` values in ORM | Exactly 3 values, no 4th | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A4 | No XML/menu/action/wizard/controller/cron | Zero rows of any kind | _TBD_ | _TBD_ | _TBD_ |
