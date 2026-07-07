@@ -1,5 +1,59 @@
 # Research Handoff (rolling)
 
+### Task 003 Manual Validation Package — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/task-003-validation-checklist-bf63ox`; PR → to be
+  opened as draft into `Shopify-connector`, not yet merged.
+- **Files changed:** `docs/05-qa/task-003-manual-validation-checklist.md`
+  (new), `docs/05-qa/task-003-validation-results.md` (new),
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** Created the mandatory manual-validation
+  package for Task 003 (PR #101, merge commit
+  `e27f10e55f3504d1a9b8871a207b3d9762a3c783`, merged into
+  `Shopify-connector`). PR #101 itself states its 32 new tests were written
+  and `py_compile`/`pyflakes`-validated but **not executed** — no Odoo
+  runtime/PostgreSQL/CI exists in this repository — and that live manual
+  validation against a development store was not performed. This session
+  does not perform that validation; it produces the checklist
+  (`task-003-manual-validation-checklist.md`, covering module
+  install/upgrade, model registry + three `job_type` values, absence of any
+  XML/menu/action/wizard/controller/cron, invalid-token and valid-token
+  test-connection runs, the repeat-run idempotency/collision proof,
+  identity-mismatch behavior, shop-state-failure behavior,
+  `credential_state` flip-only-on-genuine-token-invalid-signal, token
+  redaction across store/job/job.log/server logs,
+  `job.log` direct-create-vs-`_system_append` ACL check, exact
+  pass/fail job/log row accounting, the `core_readiness_check`/TD-001
+  regression check, and empirical capture of the previously-open behavioral
+  questions) and the blank results template
+  (`task-003-validation-results.md`) a live tester must fill in.
+- **Items deferred:** The actual live-runtime validation run itself (this
+  session has no Odoo/PostgreSQL/Shopify-dev-store access) — that is the
+  explicit next action once this package is reviewed and a live environment
+  is available. `TD-001` (`core_readiness_check` idempotency collision)
+  remains open and untouched, as required.
+- **Learning feedback loop:** New issues / repeated patterns: none beyond
+  the already-recorded Task 001A/PR #101 no-runtime caveat. Rules/checklists
+  updated: none (this package is new, it does not amend an existing gate
+  checklist). Rejected approaches: none. Technical debt: none added (TD-001
+  unchanged). Architecture concerns: none. Tests or review gates needed: the
+  live execution of this checklist itself, before Task 004 (or any next
+  feature) starts. Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (none new) · repeated-issue escalation applied (n/a) — all YES.
+- **Next recommended session:** Execute
+  `task-003-manual-validation-checklist.md` against a live Odoo 19 +
+  PostgreSQL instance and a Shopify development store, recording results in
+  `task-003-validation-results.md`, then route the resulting go/no-go
+  recommendation to ChatGPT before any Task 004 session is authorized.
+- **Stop condition:** Docs-only session; no addon/Python/XML/security/
+  manifest/test/CI/migration file created or modified; no next task
+  (Task 004 or otherwise) started; PR left as draft for ChatGPT review; no
+  code executed against any real Shopify store.
+
+---
+
 > Continuity lives in GitHub, not chat. The **current entry
 > (Task 003 — API Client Shell and Test Connection implemented, coded
 > 2026-07-07 on branch `claude/task-003-api-client-test-connection-8wsvlc`
