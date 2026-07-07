@@ -45,9 +45,14 @@ helper created a `res.users` record with `'groups_id': [(6, 0,
 [group.id])]`; Odoo 19 renamed this field to `group_ids`. A hotfix updating
 only the four test helpers to use `group_ids` (preserving the exact group
 XML IDs, command tuple, users, and test intent) is proposed on branch
-`claude/odoo19-test-groups-id-7v35ym` (see
-`docs/01-research/research-handoff.md`, "Odoo 19 Test-Compatibility
-Hotfix — `res.users` `group_ids`" entry).
+`claude/odoo19-test-groups-id-7v35ym` / PR #104 (see
+`docs/01-research/research-handoff.md`, "Odoo 19 Test-Compatibility Hotfix
++ Compatibility Audit — `res.users` `group_ids`" entry). That same PR was
+then expanded (F1 revision) into a module-wide Odoo 19 compatibility audit
+— see `docs/05-qa/odoo-19-compatibility-audit.md` — which found no sibling
+`groups_id`/`category_id`/`_sql_constraints`/deprecated-ORM risk anywhere
+else in `addons/shopify_connector_core/` beyond the four call sites already
+being fixed.
 
 **All live validation remains blocked, and every row below remains
 unexecuted/unpassed, until this second hotfix is reviewed/merged and the

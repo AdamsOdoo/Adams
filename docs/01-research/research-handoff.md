@@ -1,13 +1,20 @@
 # Research Handoff (rolling)
 
-### Odoo 19 Test-Compatibility Hotfix — `res.users` `group_ids` — compact handoff (2026-07-07)
+### Odoo 19 Test-Compatibility Hotfix + Compatibility Audit — `res.users` `group_ids` — compact handoff (2026-07-07)
 
-- **Branch / PR:** `claude/odoo19-test-groups-id-7v35ym`; PR → to be opened as
-  draft into `Shopify-connector`, not yet merged.
+- **Branch / PR:** `claude/odoo19-test-groups-id-7v35ym`; PR #104, opened as
+  draft into `Shopify-connector` in this session's first commit, still not
+  merged. **F1 revision pushed as a second commit to this same branch/PR**,
+  adding the module-wide compatibility audit below and updating the PR
+  body — the first commit contained only the four-file `groups_id` →
+  `group_ids` rename plus the two docs updates; this F1 revision expands
+  the scope to a full module audit per follow-up instruction, without
+  touching the original four-file test fix.
 - **Files changed:** `addons/shopify_connector_core/tests/test_credential_access.py`,
   `addons/shopify_connector_core/tests/test_credential_service.py`,
   `addons/shopify_connector_core/tests/test_job_log_system_append.py`,
   `addons/shopify_connector_core/tests/test_test_connection.py`,
+  `docs/05-qa/odoo-19-compatibility-audit.md` (new, this F1 revision),
   `docs/05-qa/task-003-validation-results.md`,
   `docs/01-research/research-handoff.md` (this entry).
 - **What changed / residue fixed:** PR #103 (`claude/odoo19-install-blocker-fnm5ro`,
@@ -34,6 +41,28 @@
   class was changed, removed, skipped, or weakened. No production
   model/service/security/manifest/API-client/credential/job code was
   touched.
+  **F1 audit addendum:** rather than stop at the four stack-trace files,
+  this revision also audits the entire `addons/shopify_connector_core/`
+  module for sibling Odoo 19 compatibility risks and records the result in
+  the new `docs/05-qa/odoo-19-compatibility-audit.md`. Patterns searched
+  module-wide: `groups_id`, `category_id`, `_sql_constraints`, old
+  `res.groups` category assignment, direct `res.users.create` group
+  assignment, test helpers creating users, other deprecated ORM patterns
+  (`@api.one`/`@api.multi`/`@api.cr`/`osv.`/`orm.Model`/`fields.function`/
+  `track_visibility`/`_inherits`), other `.sudo()` sites, and stale
+  docs/comments referencing obsolete fields. Result: no sibling risk found
+  anywhere else in the module — `category_id` appears exactly once,
+  correctly on the `res.groups.privilege` record (not on any `res.groups`
+  record); `_sql_constraints` is fully absent, with `models.Constraint`
+  still in place on all six PR #103 conversions; the only
+  `res.users.create` call sites in the whole module are the four now-fixed
+  test helpers; `test_api_client.py` and `test_redaction.py` create no
+  users and need no change; no other deprecated-API pattern exists; the
+  module's two production `.sudo()` sites are unchanged and match the
+  count the module's own guard tests assert; and no inline comment or docs
+  file misleads a future reader into re-introducing the obsolete field
+  names (the only doc references to `groups_id`/`category_id` are
+  historical root-cause narrative for the two already-fixed failures).
 - **Items deferred:** No Odoo runtime/PostgreSQL exists in this repository, so
   live test execution could not be re-run here — `python3 -m py_compile`
   passed cleanly on all four changed files, and repo-wide grep confirms zero
@@ -64,7 +93,13 @@
   suite live after merge. Should future prompts change? Possibly — consider
   requiring a documented Odoo-19-core-rename audit (covering both production
   and test code) before any "re-run live validation" step, given this is the
-  second such rename found this sprint.
+  second such rename found this sprint. **F1 addendum:** this revision acts
+  on that exact flag — `docs/05-qa/odoo-19-compatibility-audit.md` is the
+  first instance of that requested audit, run module-wide rather than
+  file-by-file, and found no third sibling rename this sprint. Recommend to
+  ChatGPT that a module-wide Odoo-19-rename static audit become a standing
+  pre-live-validation step for this connector going forward (routed here as
+  a recommendation, not unilaterally adopted as a gate).
 - **Quality gate confirmation:** handoff updated · feedback loop checked ·
   learning captured · rejected approach logged (none) · technical debt
   logged (none new, TD-001 unchanged) · repeated-issue escalation applied
