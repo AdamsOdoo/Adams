@@ -334,6 +334,68 @@ routes to ChatGPT.
 
 ---
 
+## 8. Continuation session (2026-07-07) — empirical OAuth experiment attempt, blocked before execution
+
+This section records a **second** 2026-07-07 session, run after the one
+recorded in §§1–7 above and after PR #108's research/decision-brief session,
+scoped specifically to attempt the manual OAuth authorization-code-grant
+experiment PR #108's decision brief recommended (§4–5 there) in order to try
+to unblock VAL-B2. **No part of the checklist result table in §2 above is
+changed by this section** — every status recorded there stands exactly as
+written; this section only adds a new, distinct attempt-and-blocker record.
+
+- **What was planned:** run the standard OAuth authorization-code-grant flow
+  by hand (generic tooling, outside the Odoo codebase) against a
+  Dev-Dashboard-created custom app on `mqiu21-yz.myshopify.com`, requesting a
+  non-expiring offline token, using a browser-automation tool referred to as
+  "Fable" to drive the Shopify Dev Dashboard/Admin steps; if a compatible
+  token resulted, validate it directly against Shopify's Admin GraphQL API,
+  then (only if that passed) re-attempt VAL-B2 in a live Odoo shell.
+- **What actually happened:** the session could not proceed past its own
+  Phase 0/2 tool-and-credential check. No "Fable" tool, connector, or MCP
+  server was available in this execution session (confirmed via `ToolSearch`,
+  `ListConnectors`, `ListPlugins`, and `ListSkills` — see the corresponding
+  entry in `docs/01-research/research-handoff.md` for the exact checks run),
+  and no Shopify Dev Dashboard Client ID/Client Secret or login/2FA path was
+  available either (the process environment was checked for any
+  Shopify/OAuth-shaped variable; none found). Per this session's own explicit
+  instruction not to guess or continue with assumptions when such access is
+  missing, the session stopped **before** opening the Shopify Dev Dashboard,
+  before registering a redirect URI, and before any OAuth request of any
+  kind.
+- **OAuth experiment result:** **Not attempted.** No authorization request
+  was sent to Shopify; no code was exchanged for a token; no claim is made
+  about whether the flow would have succeeded or failed against a
+  Dev-Dashboard-created custom app.
+- **Direct Shopify Admin GraphQL validation:** **Not attempted** (gated on
+  the OAuth experiment, which did not run).
+- **Odoo VAL-B2 re-attempt:** **Not attempted** (gated on the prior two
+  steps; additionally, no Odoo instance/process was reachable from this
+  execution environment).
+- **Remaining Task 003 checklist items (VAL-A4, VAL-B4–B7, VAL-C1's
+  server-log-grep half, VAL-C3, VAL-D1–D2, VAL-E1, VAL-G1–G4):** **unchanged
+  — still Not tested / BLOCKED**, for the same reasons recorded in §2 above.
+  This continuation session did not have Odoo shell access at all, so none of
+  these were re-attempted regardless of the token-acquisition blocker.
+- **No secret exposed:** confirmed — no token, client secret, authorization
+  code, or credential of any kind was ever obtained or handled this session.
+- **No Shopify or Odoo side effect:** confirmed (vacuously — no Shopify or
+  Odoo interaction occurred).
+- **Go/No-Go impact:** **None — the §5 Go/No-Go recommendation above is
+  unchanged.** This session neither adds a pass nor a new blocker beyond the
+  one already known; it documents an unsuccessful *attempt* to resolve the
+  existing VAL-B2 blocker and reports exactly what access is missing to
+  attempt it again.
+- **Required to retry:** (1) a Claude Code execution session with an enabled
+  Fable-equivalent browser-automation tool/connector, and (2) a secure,
+  session-scoped way to supply or interactively exercise Shopify Dev
+  Dashboard Client ID/Client Secret and complete the merchant consent screen
+  — without ever placing the raw secret in chat, docs, or logs. See
+  `docs/01-research/research-handoff.md`'s continuation-session entry for the
+  full blocker record and recommended next steps.
+
+---
+
 ## Appendix — condensed evidence excerpts from the 2026-07-07 live shell session
 
 This appendix records condensed evidence excerpts from the live shell
