@@ -9,7 +9,16 @@
 
 ## Status
 
-**Proposed 2026-07-07 for ChatGPT review, on branch
+**Acceptance note (2026-07-07, applied by the AR-029 gate-opening act,
+[`task-003-api-client-test-connection-gate.md`](./task-003-api-client-test-connection-gate.md);
+[`AR-028`](../05-qa/architecture-review-log.md)): accepted by ChatGPT
+as the proposed gate-opening scope.** **This document itself still does
+not open the gate.** The Task 003 gate is opened by the separate,
+explicit act in
+[`task-003-api-client-test-connection-gate.md`](./task-003-api-client-test-connection-gate.md),
+effective once that document merges into `Shopify-connector`.
+
+**Originally proposed 2026-07-07 for ChatGPT review, on branch
 `claude/task-003-gate-opening-no0tw4`. Docs-only. This document does not
 open the gate.** It is a *proposal* for a future, separate, explicit
 ChatGPT gate-opening act (its own merged document, mirroring

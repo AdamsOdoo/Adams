@@ -1,5 +1,17 @@
 # Task 003 — Final Implementation Prompt (gate-ready, not yet issued)
 
+> **Acceptance (2026-07-07, applied by the AR-029 gate-opening act,
+> [`task-003-api-client-test-connection-gate.md`](./task-003-api-client-test-connection-gate.md);
+> [`AR-028`/`AR-029`](../05-qa/architecture-review-log.md)):** **Accepted
+> by ChatGPT as the binding final Task 003 implementation prompt.** It
+> remains **NOT ISSUED** until
+> [`task-003-api-client-test-connection-gate.md`](./task-003-api-client-test-connection-gate.md)
+> is merged into `Shopify-connector` — precondition (2) below (AR-028
+> acceptance) is now satisfied; precondition (3) (the gate-opening act
+> merged) is not yet satisfied while this document is in draft. The
+> prompt content below is binding as accepted; any deviation requires a
+> new ChatGPT decision.
+>
 > **Status: prepared 2026-07-07 via AR-028 — PROPOSED, NOT ACCEPTED, NOT
 > ISSUED, NOT AUTHORIZED.** This document is the complete, copy-paste
 > final `CLAUDE.md` §9 task prompt for **Task 003 — API Client Shell and
