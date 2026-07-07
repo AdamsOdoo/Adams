@@ -1,5 +1,84 @@
 # Research Handoff (rolling)
 
+### Shopify Token-Acquisition Research — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/shopify-token-acquisition-research-lpi7jt` → draft PR
+  into `Shopify-connector`, not merged, not marked ready. Docs-only session —
+  no code, test, manifest, or security-file change. **No Task 004 work of any
+  kind in this session.**
+- **Files changed:** `docs/01-research/shopify-token-acquisition-research.md`
+  (new), `docs/03-architecture/shopify-token-acquisition-options.md` (new),
+  `docs/04-decisions/shopify-token-acquisition-decision-brief.md` (new),
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** Independently re-verified, live on
+  2026-07-07 (nine topic-scoped research passes plus an adversarial re-fetch
+  verification pass per topic, all against `shopify.dev`/`help.shopify.com`/
+  `changelog.shopify.com`), the prior day's MBQ-05 findings recorded in
+  `../03-architecture/credential-connection-api-client-planning.md`
+  (2026-07-06). **Key finding, confirmed and sharpened:** admin-created custom
+  apps can no longer be newly created as of **January 1, 2026** (exact date now
+  cited, from Shopify's product changelog); existing legacy apps keep working
+  but cannot be rotated except by uninstall/reinstall. New custom apps go
+  through the Dev Dashboard or Shopify CLI; Shopify's own tutorial for
+  "building apps for your own store" shows only the 24-hour client-credentials
+  grant, but the client-credentials mechanism is explicitly restricted to
+  same-organization/own-store apps — "public or custom apps must use token
+  exchange or authorization code grant" instead, and that OAuth flow, by
+  default, still yields a **non-expiring** offline token compatible with the
+  connector's shipped `token_variant='offline_custom_app'` shape. **No official
+  worked example confirms this exact combination** (Dev-Dashboard custom app +
+  authorization code grant) — this is the single decision-critical open
+  question this session could not resolve from documentation alone. Custom
+  apps and merchant-created apps are also confirmed explicitly exempt from
+  Shopify's new (Dec 2025) mandatory expiring-offline-token model, so the
+  connector's non-expiring single-secret model remains fully supported,
+  not deprecated.
+- **Items deferred:** the one open question above (whether the manual
+  authorization-code-grant exchange actually works against a Dev-Dashboard
+  custom app) requires an empirical attempt in a future session — not resolved
+  by documentation research alone. VAL-B2 and Task 003's other
+  blocked/not-tested items are unchanged by this session.
+- **Recommended decision:** Option C (dual path) — keep the shipped
+  offline/custom-app token storage as-is for MVP; treat "how does a new
+  merchant mint a compatible token today" as a research-validation step (attempt
+  the manual OAuth exchange, outside the Odoo codebase, against the same
+  blocked development store) before committing to build a full OAuth
+  implementation (Option B) or accepting the new-merchant onboarding gap
+  indefinitely (Option A alone). Full detail:
+  `../04-decisions/shopify-token-acquisition-decision-brief.md`.
+- **Risks:** if the manual OAuth-exchange experiment fails, this signals real
+  new-merchant-onboarding-architecture work (Option B, or a client-credentials
+  schema extension) is required before MVP can claim self-serve setup — a
+  larger scope than currently assumed. Two research-only nuances also flagged
+  for future attention: the protected-customer-data table has a **third**
+  column ("Admin created custom app" = Level 2 "Varies by plan," not
+  unconditionally "Always available" the way a general custom app is); and the
+  historical "reveal token once" admin-UI behavior remains unconfirmed on any
+  official page.
+- **What remains blocked:** Task 003 manual validation remains incomplete
+  (VAL-B2 and others unchanged from the prior entry below). Task 004 remains
+  blocked. MBQ-05 remains open, not resolved — this session's findings feed
+  ChatGPT's review, they do not close it.
+- **Learning feedback loop:** New issues / repeated patterns: none beyond the
+  already-tracked MBQ-05 gap. Rules/checklists updated: none. Rejected
+  approaches: none. Technical debt: none added. Architecture concerns: the
+  decision-critical open question in this entry should be resolved empirically
+  before Task 004 planning begins. Tests or review gates needed: the manual
+  OAuth-exchange validation step recommended in the decision brief. Should
+  future prompts change? Yes — a future Task-003-continuation session should
+  explicitly scope the manual OAuth-exchange experiment as its sole
+  deliverable, docs/QA-only, no code.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt logged
+  (none) · repeated-issue escalation applied (n/a) — all YES.
+- **Next recommended session:** ChatGPT reviews this brief and the two
+  companion documents; if accepted, a narrow docs/QA-only session runs the
+  manual OAuth-exchange experiment described in the decision brief §4–5 and
+  records the result. **No code was changed in this session — confirmed.**
+- **Stop condition:** stopped at the scoped boundary (research + decision-prep
+  documentation only); no code, test, manifest, or security file touched; Task
+  003 not marked complete; Task 004 not unblocked.
+
 ### Task 003 Manual Validation — Live Partial Results Recorded (2026-07-07)
 
 - **Branch / PR:** `claude/task-003-validation-docs-7tl074` → **PR #107**,
