@@ -2,19 +2,34 @@
 
 > Docs-only test-planning package covering duplicate prevention, binding
 > uniqueness, and idempotency, part of the
-> [MVP QA and Test Strategy](./mvp-qa-test-strategy.md). Baseline:
-> `Shopify-connector` at `f74aaf204745ce0087733870fe56bdda74bfa79a`. Built
-> from the accepted core naming/schema
+> [MVP QA and Test Strategy](./mvp-qa-test-strategy.md). **Historical
+> drafting baseline:** `Shopify-connector` at
+> `f74aaf204745ce0087733870fe56bdda74bfa79a`. Built from the accepted
+> core naming/schema
 > ([`core-naming-schema-planning.md`](../07-implementation-plan/core-naming-schema-planning.md),
 > AR-019) and the domain architecture documents
 > ([`master-blueprint-product-customer-sale.md`](../03-architecture/master-blueprint-product-customer-sale.md),
 > [`master-blueprint-inventory-fulfillment.md`](../03-architecture/master-blueprint-inventory-fulfillment.md)).
-> **Docs-only. No implementation. No gate opened.**
+> **Docs-only. No implementation. No gate opened by this document.**
+> **Freshness note (2026-07-07 revision):** `Shopify-connector` has since
+> also merged PR #93 (`ac250f7fd2f242df7b69f78dc619b0a71680c664`), PR #94
+> (Task 002 decision closure — AR-025,
+> `03ffcb4dc949cd5137b589a6cdc33da9105de31d`), and PR #96 (Task 002
+> credential-storage gate — AR-026,
+> `02b159a39c58a3396c1c249e80896a05c97bb757`). **The Task 002
+> credential-storage gate is now open**; the credential-binding-adjacent
+> content below (e.g. the "target-less job repeat-run risk" section)
+> remains QA planning for whichever task actually resolves it — this
+> document neither opened that gate nor implements against it. Task 003
+> remains not started/not authorized.
 
 ## Status
 
 **Proposed for ChatGPT review. Docs-only. No implementation. No gate
-opened. Does not create tests.**
+opened by this document. Does not create tests.** As of the 2026-07-07
+freshness revision, the Task 002 credential-storage gate is open
+(AR-026/PR #96); this document's own content and status are otherwise
+unchanged.
 
 ## Store uniqueness
 

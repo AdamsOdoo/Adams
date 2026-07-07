@@ -2,24 +2,42 @@
 
 > QA planning matrix for the credential/connection/API-client/readiness
 > foundation tasks (Task 001 through Task 006), part of the
-> [MVP QA and Test Strategy](./mvp-qa-test-strategy.md) package. Baseline:
-> `Shopify-connector` at `f74aaf204745ce0087733870fe56bdda74bfa79a` (PR #92
-> merge). **Docs-only. No implementation. No gate opened.** Task 001 is
-> the only merged/implemented task; Tasks 002–006 remain proposed/not
-> authorized, per
+> [MVP QA and Test Strategy](./mvp-qa-test-strategy.md) package.
+> **Historical drafting baseline:** `Shopify-connector` at
+> `f74aaf204745ce0087733870fe56bdda74bfa79a` (PR #92 merge). **Docs-only.
+> No implementation. No gate opened by this document.** Task 001 is the
+> only merged/implemented task as of this matrix's original drafting; per
 > [`../07-implementation-plan/credential-connection-foundation-task-plan.md`](../07-implementation-plan/credential-connection-foundation-task-plan.md)
-> and [`AR-024`](./architecture-review-log.md). This document defines what
-> each future task's own PR must prove — it does not itself run, execute,
-> or claim any test result.
+> and [`AR-024`](./architecture-review-log.md), Tasks 002–006 were then
+> proposed/not authorized. **Freshness note (2026-07-07 revision):**
+> `Shopify-connector` has since also merged PR #93 (MVP domain
+> implementation slicing, `ac250f7fd2f242df7b69f78dc619b0a71680c664`),
+> PR #94 (Task 002 decision closure — AR-025,
+> `03ffcb4dc949cd5137b589a6cdc33da9105de31d`), and PR #96 (Task 002
+> credential-storage gate — AR-026,
+> `02b159a39c58a3396c1c249e80896a05c97bb757`). **The Task 002
+> credential-storage implementation gate is now open** (see the Task 002
+> section below); Task 003 through Task 006 remain proposed/not
+> authorized, unchanged. This document defines what each future task's
+> own PR must prove — it does not itself run, execute, or claim any test
+> result, and this revision changes only status wording, not the
+> substantive test content.
 
 ## Status
 
 **Proposed for ChatGPT review. Docs-only. No implementation. No gate
-opened. Does not create tests.** Every row below describes a **future**
-test/validation requirement for a task that has not yet started coding
-(Tasks 002–006) or QA-closes a task that has already merged (Task 001, via
+opened by this document. Does not create tests.** Every row below
+describes a **future** test/validation requirement for a task that has
+not yet started coding, or QA-closes a task that has already merged
+(Task 001, via
 [`task-001-core-runtime-readiness.md`](./task-001-core-runtime-readiness.md),
-already complete and not reopened here).
+already complete and not reopened here). **As of the 2026-07-07
+freshness revision:** the Task 002 credential-storage gate is open
+(AR-026/PR #96) and Task 002 implementation may proceed only through
+[`task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+in its own coding session — this matrix remains QA planning only and
+does not itself implement or authorize anything. Tasks 003–006 remain
+not started/not authorized.
 
 ## How to read this matrix
 
@@ -86,7 +104,23 @@ completeness — it does not reopen or repeat the closure work.
 
 ---
 
-## Task 002 — Credential storage, masking, redaction foundation (proposed, not authorized)
+## Task 002 — Credential storage, masking, redaction foundation
+
+> **Status (2026-07-07 freshness revision): gate-opened, not yet
+> implemented.** At this matrix's original drafting (PR #92 baseline)
+> Task 002 was proposed only, not authorized. **At current
+> `Shopify-connector` state, the Task 002 credential-storage
+> implementation gate is open** via
+> [`AR-026`](./architecture-review-log.md) /
+> [`../07-implementation-plan/task-002-credential-storage-gate.md`](../07-implementation-plan/task-002-credential-storage-gate.md)
+> (PR #96). **Implementation may proceed only under the accepted**
+> [`task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+> **, issued verbatim in its own coding session — that session, and its
+> implementation PR, are entirely outside this QA package.** This matrix
+> remains QA planning only: it does not itself implement, start, or
+> authorize Task 002, and the test requirements below are unchanged by
+> the gate opening — they are exactly what that future implementation PR
+> must still satisfy.
 
 - **Test objective.** Prove the Admin-only `shopify.connector.store.credential`
   model, the non-secret status mirrors on `shopify.connector.store`, the

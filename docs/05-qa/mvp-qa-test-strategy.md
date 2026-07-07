@@ -17,6 +17,29 @@
 > decision/gate-pack session or the MVP domain-slicing session — see the
 > handoff document's "No conflict" section for the exact boundary.
 
+> **Freshness note (2026-07-07 revision, per ChatGPT REVISE review of
+> PR #95).** This package's documents were originally written from the
+> `Shopify-connector` state at PR #92's merge commit
+> `f74aaf204745ce0087733870fe56bdda74bfa79a` — that remains this
+> package's **historical drafting baseline**, cited above and unchanged.
+> Since then, `Shopify-connector` has additionally merged **PR #93**
+> (MVP domain implementation slicing, merge commit
+> `ac250f7fd2f242df7b69f78dc619b0a71680c664`), **PR #94** (Task 002
+> decision closure — AR-025 accepted, merge commit
+> `03ffcb4dc949cd5137b589a6cdc33da9105de31d`), and **PR #96** (Task 002
+> credential-storage implementation gate — AR-026 accepted, merge commit
+> `02b159a39c58a3396c1c249e80896a05c97bb757`). **At current
+> `Shopify-connector` state, the Task 002 credential-storage
+> implementation gate is open** via AR-026/PR #96 — Task 002
+> implementation may now proceed, but only through the already-accepted
+> [`task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md),
+> issued verbatim in its own coding session, which stays entirely
+> outside this QA package. **This revision (docs: refresh QA release
+> strategy status) updates only status/freshness wording below — it does
+> not touch this package's substantive test content, does not start
+> Task 002, and does not open, widen, or otherwise touch any gate.**
+> Task 003 remains proposed only, not authorized.
+
 ## Status
 
 - **Proposed for ChatGPT review.**
@@ -25,24 +48,32 @@
   this package.
 - **No implementation.** Nothing in this package implements, starts, or
   advances Task 002, Task 003, or any other coding task.
-- **Does not open any gate.** The only currently open implementation gate
-  remains the limited, core-only, zero-UI gate
+- **This QA package itself opens no gate.** It never has, and this
+  revision does not change that. What *has* changed is the project's own
+  gate state, independently of this package: the limited, core-only,
+  zero-UI gate
   ([`../07-implementation-plan/limited-core-implementation-gate.md`](../07-implementation-plan/limited-core-implementation-gate.md),
-  [`AR-021`](./architecture-review-log.md)), which authorized exactly one
-  task (Task 001, merged via PR #88, QA-closed by
-  [`task-001-core-runtime-readiness.md`](./task-001-core-runtime-readiness.md)).
-  Task 002 (credential storage/redaction) and Task 003 (API client/test
-  connection) remain **proposed only, not authorized** — confirmed by the
-  [`AR-024`](./architecture-review-log.md) acceptance note and by PR #92's
-  own body ("Task 002 ... is accepted as the recommended next coding
-  task — not authorized by this acceptance").
+  [`AR-021`](./architecture-review-log.md)) authorized Task 001 (merged
+  via PR #88, QA-closed by
+  [`task-001-core-runtime-readiness.md`](./task-001-core-runtime-readiness.md));
+  separately, **at current `Shopify-connector` state, the Task 002
+  credential-storage gate is open** via
+  [`AR-026`](./architecture-review-log.md) / PR #96
+  (`docs/07-implementation-plan/task-002-credential-storage-gate.md`).
+  **Task 002 implementation is governed only by**
+  [`task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+  **and remains entirely outside this QA package** — this package neither
+  opened that gate nor implements against it. **Task 003 (API client/test
+  connection) remains proposed only, not authorized** — unchanged since
+  this package's original PR #92 baseline.
 - **Does not create tests.** Every test named in this package and its
   companions is a **future requirement** for the implementation PR that
   will eventually satisfy it — none exists yet, and this package does not
   claim otherwise.
-- **Defines QA strategy for future implementation PRs** — Task 002 onward,
-  and the product/customer/order/inventory/fulfillment domain slices once
-  their own gates open.
+- **Defines QA strategy for future implementation PRs** — the now-gated
+  Task 002 implementation PR, Task 003 onward once its own gate opens,
+  and the product/customer/order/inventory/fulfillment domain slices
+  (proposed via PR #93) once their own gates open.
 
 ## QA principles
 

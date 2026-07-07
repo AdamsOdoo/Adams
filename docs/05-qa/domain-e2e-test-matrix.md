@@ -2,11 +2,12 @@
 
 > End-to-end test-planning matrix for the connector's domain sync flows,
 > part of the [MVP QA and Test Strategy](./mvp-qa-test-strategy.md)
-> package. Baseline: `Shopify-connector` at
+> package. **Historical drafting baseline:** `Shopify-connector` at
 > `f74aaf204745ce0087733870fe56bdda74bfa79a`. **Docs-only. No
-> implementation. No gate opened.** None of the domains below have an open
-> implementation gate today — this matrix plans the tests their future
-> implementation tasks must satisfy, sourced from the accepted
+> implementation. No gate opened by this document.** None of the domains
+> below had an open implementation gate at this matrix's original
+> drafting — this matrix plans the tests their future implementation
+> tasks must satisfy, sourced from the accepted
 > [`DEC-014`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md)
 > and [`DEC-015`](../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md)
 > blueprints and their underlying
@@ -16,11 +17,28 @@
 > architecture documents. This document does not resolve any open MBQ row
 > and does not modify
 > [`master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
+> **Freshness note (2026-07-07 revision):** `Shopify-connector` has since
+> also merged PR #93 (MVP domain implementation slicing —
+> `ac250f7fd2f242df7b69f78dc619b0a71680c664`; proposes, but does not
+> gate-open, Tasks 010–014 covering these domains), PR #94 (Task 002
+> decision closure — AR-025, `03ffcb4dc949cd5137b589a6cdc33da9105de31d`),
+> and PR #96 (Task 002 credential-storage gate — AR-026,
+> `02b159a39c58a3396c1c249e80896a05c97bb757`; unrelated to these
+> domains). **None of the product/customer/order/inventory/fulfillment
+> domains below has an open implementation gate as of this revision** —
+> only the separate Task 002 (credential storage) gate is open. This
+> revision changes only status/freshness wording, not the substantive
+> domain test content.
 
 ## Status
 
 **Proposed for ChatGPT review. Docs-only. No implementation. No gate
-opened. Does not create tests. Does not resolve any MBQ row.**
+opened by this document. Does not create tests. Does not resolve any MBQ
+row.** As of the 2026-07-07 freshness revision, the domains covered by
+this matrix (product, customer, order, inventory, fulfillment) remain
+without an open implementation gate; the unrelated Task 002
+credential-storage gate is open (AR-026/PR #96) but is out of this
+document's scope.
 
 ## Fixed vocabulary used throughout this matrix
 

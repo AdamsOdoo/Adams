@@ -2,23 +2,36 @@
 
 > Docs-only test-planning package covering credential security and
 > redaction, part of the [MVP QA and Test Strategy](./mvp-qa-test-strategy.md).
-> Baseline: `Shopify-connector` at `f74aaf204745ce0087733870fe56bdda74bfa79a`.
-> Builds directly on the accepted
+> **Historical drafting baseline:** `Shopify-connector` at
+> `f74aaf204745ce0087733870fe56bdda74bfa79a`. Builds directly on the
+> accepted
 > [`credential-security-redaction-review-checklist.md`](./credential-security-redaction-review-checklist.md)
 > (AR-024) and the redaction contract in
 > [`credential-connection-api-client-planning.md`](../03-architecture/credential-connection-api-client-planning.md)
 > §Redaction and no-logging contract. **Docs-only. No implementation. No
-> gate opened. No credential model/field/service/redaction utility is
-> created by this document** — Task 002 (which would create them) remains
+> gate opened by this document. No credential model/field/service/
+> redaction utility is created by this document.** **Freshness note
+> (2026-07-07 revision):** at this plan's original drafting, Task 002
+> (which would create the credential model/redaction utility) was
+> proposed, not authorized. `Shopify-connector` has since also merged PR
+> #93 (`ac250f7fd2f242df7b69f78dc619b0a71680c664`), PR #94 (Task 002
+> decision closure — AR-025, `03ffcb4dc949cd5137b589a6cdc33da9105de31d`),
+> and PR #96 (Task 002 credential-storage gate — AR-026,
+> `02b159a39c58a3396c1c249e80896a05c97bb757`). **The Task 002
+> credential-storage gate is now open**; implementation may proceed only
+> through
+> [`task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+> in its own coding session, entirely outside this plan. Task 003 remains
 > proposed, not authorized.
 
 ## Status
 
 **Proposed for ChatGPT review. Docs-only. No implementation. No gate
-opened. Does not create tests, code, or a redaction utility.** This plan
-defines the tests Task 002's (and later tasks') redaction utility and
-credential model must pass — it does not implement or execute any of
-them.
+opened by this document. Does not create tests, code, or a redaction
+utility.** This plan defines the tests Task 002's (now gate-opened, not
+yet implemented) and later tasks' redaction utility and credential model
+must pass — it does not implement or execute any of them, and it did not
+open the Task 002 gate (that happened independently via AR-026/PR #96).
 
 ## Scope
 

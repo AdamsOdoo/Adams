@@ -6,14 +6,50 @@
 > is explicitly unchanged by this sprint (see [No conflict with other
 > sessions](#no-conflict-with-other-sessions) below).
 
+## Freshness revision (2026-07-07)
+
+ChatGPT's review of PR #95 returned **REVISE, not reject**: the package
+is useful, but it was drafted from the older PR #92 baseline and had
+accumulated stale governance/status wording once `Shopify-connector`
+moved on. This revision (commit message `docs: refresh QA release
+strategy status`) updates status/freshness wording across all 8 files in
+this sprint's allowed-files list to reflect that, since the original PR
+#95 baseline, `Shopify-connector` has additionally merged:
+
+1. **PR #93** — MVP domain implementation slicing (merge commit
+   `ac250f7fd2f242df7b69f78dc619b0a71680c664`) — proposes Tasks 010–014
+   for the product/customer/order/inventory/fulfillment domains; does not
+   itself gate-open any of them.
+2. **PR #94** — Task 002 decision closure / AR-025 accepted (merge commit
+   `03ffcb4dc949cd5137b589a6cdc33da9105de31d`) — closed Task 002's three
+   remaining decision points and accepted the gate-ready final
+   implementation prompt, but did not itself open the gate.
+3. **PR #96** — Task 002 credential-storage gate / AR-026 accepted (merge
+   commit `02b159a39c58a3396c1c249e80896a05c97bb757`) — **opens** the
+   Task 002 credential-storage implementation gate, effective from this
+   merge.
+
+**Resulting current state:** Task 002 is no longer merely proposed/not
+authorized — its credential-storage implementation gate is **open**, and
+the accepted
+[`task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+may now be issued verbatim in its own coding session. Task 003 remains
+**not started and not authorized**. **This revision, like the original
+PR #95, still opens no gate and implements no code** — it only refreshes
+status wording so the package accurately describes the project's current
+state; see [Files created](#files-created) for the unchanged file list
+and [No conflict with other sessions](#no-conflict-with-other-sessions)
+for why this revision does not touch the Task 002 gate/session files.
+
 ## Sprint objective
 
 Produce a complete, docs-only QA and release-readiness package for the
 Odoo 19 ↔ Shopify Connector MVP — test strategy, foundation and domain
 end-to-end test matrices, security/redaction and data-integrity/
 idempotency test plans, a go/no-go release-readiness checklist, and
-business-readable UAT scenarios — so that when the Task 002 decision/
-gate-pack session and the MVP domain-slicing session move forward, the
+business-readable UAT scenarios — so that as the Task 002 decision/
+gate-pack session and the MVP domain-slicing session move forward
+(both now further along, per the freshness revision above), the
 project already has a reviewed QA plan every future implementation PR can
 be tested against, instead of inventing test strategy ad hoc per PR.
 
@@ -22,16 +58,28 @@ be tested against, instead of inventing test strategy ad hoc per PR.
 - Branch: `claude/mvp-qa-release-strategy-s8k3hq` (the session's
   designated branch; created from, and verified to sit exactly at, the
   latest `Shopify-connector`).
-- Base commit: `f74aaf204745ce0087733870fe56bdda74bfa79a` — the PR #92
-  merge commit ("Credential and connection foundation planning"),
-  confirmed via `git rev-parse origin/Shopify-connector` and
-  `git merge-base --is-ancestor` before any file was written.
-- Confirmed before starting: PR #92 is merged (state `closed`,
-  `merged: true`); Task 002 is explicitly "accepted... as the recommended
-  next coding task — **not authorized**" per PR #92's own body and per
+- **Historical original baseline** (PR #95's first commit): base commit
+  `f74aaf204745ce0087733870fe56bdda74bfa79a` — the PR #92 merge commit
+  ("Credential and connection foundation planning"), confirmed via
+  `git rev-parse origin/Shopify-connector` and
+  `git merge-base --is-ancestor` before any file was written. Confirmed
+  at that time: PR #92 is merged (state `closed`, `merged: true`); Task
+  002 was explicitly "accepted... as the recommended next coding task —
+  **not authorized**" per PR #92's own body and per
   [`AR-024`](./architecture-review-log.md); the limited core-only zero-UI
-  gate ([`AR-021`](./architecture-review-log.md)) remains the only open
-  gate, authorizing Task 001 only (merged, QA-closed).
+  gate ([`AR-021`](./architecture-review-log.md)) was the only open gate,
+  authorizing Task 001 only (merged, QA-closed).
+- **Current state** (as of this 2026-07-07 freshness revision, confirmed
+  via `git merge-base --is-ancestor` against `origin/Shopify-connector`
+  before editing): the original baseline commit above remains an ancestor
+  of `Shopify-connector`, which has additionally merged PR #93
+  (`ac250f7fd2f242df7b69f78dc619b0a71680c664`), PR #94
+  (`03ffcb4dc949cd5137b589a6cdc33da9105de31d`), and PR #96
+  (`02b159a39c58a3396c1c249e80896a05c97bb757`). **The Task 002
+  credential-storage implementation gate is now open** via
+  [`AR-026`](./architecture-review-log.md); Task 003 remains **not
+  started and not authorized**. This revision's own PR #95 head commit
+  before this patch was `9961d421ab250d06d9314be463ba1f62cfcb4f26`.
 
 ## Files created
 
@@ -125,10 +173,21 @@ below, reflected in the PR description).
 
 ## No conflict with other sessions
 
-- **Task 002 decision/gate-pack session.** This sprint did not touch, and
-  its allowed-files list does not include, any Task 002 decision/gate-pack
-  file: not
+- **Task 002 decision/gate-pack session — including its now-merged PR #94
+  and PR #96.** Neither the original PR #95 sprint nor this 2026-07-07
+  freshness revision touched, or has in its allowed-files list, any Task
+  002 decision/gate-pack file: not
   [`../07-implementation-plan/task-002-credential-storage-redaction-proposed.md`](../07-implementation-plan/task-002-credential-storage-redaction-proposed.md),
+  not
+  [`../07-implementation-plan/task-002-decision-closure.md`](../07-implementation-plan/task-002-decision-closure.md),
+  not
+  [`../07-implementation-plan/task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md),
+  not
+  [`../07-implementation-plan/task-002-gate-opening-proposal.md`](../07-implementation-plan/task-002-gate-opening-proposal.md),
+  not
+  [`../07-implementation-plan/task-002-credential-storage-gate.md`](../07-implementation-plan/task-002-credential-storage-gate.md)
+  (PR #96's own gate-opening document), not
+  [`task-002-pre-implementation-review-checklist.md`](./task-002-pre-implementation-review-checklist.md),
   not
   [`../07-implementation-plan/task-003-api-client-test-connection-proposed.md`](../07-implementation-plan/task-003-api-client-test-connection-proposed.md),
   not
@@ -138,15 +197,22 @@ below, reflected in the PR description).
   not
   [`credential-security-redaction-review-checklist.md`](./credential-security-redaction-review-checklist.md),
   not [`architecture-review-log.md`](./architecture-review-log.md), and
-  not any DEC file. This sprint only **read** those files (required
-  by its own "Read first" list) to source accurate test-planning detail —
-  it never opens the Task 002/003 implementation gate, never authorizes
-  either task, and never proposes a decision on any of Task 003's named
-  open points (job-type vocabulary, job-log write path, the
-  `payload_hash` nonce, the `SHOP_INACTIVE`/402/423 mapping). Those
-  remain exactly as open as the Task 002 session left them.
-- **MVP domain-slicing session.** This sprint did not touch, and its
-  allowed-files list does not include, any MVP domain-slicing file: not
+  not any DEC file. This sprint (both its original commit and this
+  revision) only **read** those files (required by its own "Read first"
+  list, and, for this revision, to confirm current gate status) to source
+  accurate test-planning detail. **This PR did not open or widen the Task
+  002 gate — the Task 002 credential-storage gate opened independently,
+  via PR #96/AR-026, a separate session's own merged act.** This revision
+  only updates this package's status wording to accurately *reflect* that
+  independent gate-opening — it does not perform, repeat, or extend it.
+  This QA package remains docs-only throughout and does not start Task
+  002: no credential model, field, service method, or redaction utility
+  is created by any commit in this PR, including this revision. Task 003
+  remains exactly as open (not started, not authorized, its four decision
+  points unresolved) as the Task 002 session left it.
+- **MVP domain-slicing session — including its now-merged PR #93.**
+  Neither the original PR #95 sprint nor this revision touched, or has in
+  its allowed-files list, any MVP domain-slicing file: not
   [`../04-decisions/DEC-014-master-blueprint-product-customer-sale.md`](../04-decisions/DEC-014-master-blueprint-product-customer-sale.md),
   not
   [`../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md`](../04-decisions/DEC-015-master-blueprint-inventory-fulfillment.md),
@@ -154,24 +220,35 @@ below, reflected in the PR description).
   [`../03-architecture/master-blueprint-product-customer-sale.md`](../03-architecture/master-blueprint-product-customer-sale.md),
   not
   [`../03-architecture/master-blueprint-inventory-fulfillment.md`](../03-architecture/master-blueprint-inventory-fulfillment.md),
-  and not
-  [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
-  This sprint only **read** them to source accurate domain-behavior detail
-  for the E2E test matrix — it does not slice, sequence, or scope any
-  future domain implementation task, and it resolves no MBQ row (every
-  MBQ reference in this package's deliverables quotes the register's
-  existing status, never proposes a new one).
+  not
+  [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md),
+  and not any of PR #93's five new task-spec files (`task-010` through
+  `task-014`, `mvp-domain-implementation-sequence.md`,
+  `mvp-domain-slicing-handoff.md`,
+  `mvp-domain-preimplementation-checklist.md`). This sprint only **read**
+  the pre-existing architecture docs to source accurate domain-behavior
+  detail for the E2E test matrix — it does not slice, sequence, or scope
+  any domain implementation task (PR #93 already did that, independently,
+  in its own session), and it resolves no MBQ row (every MBQ reference in
+  this package's deliverables quotes the register's existing status,
+  never proposes a new one).
 - **No overlapping deliverable.** Every file this sprint created is new
-  (none existed before this session started) and lives entirely under
-  this sprint's own allowed-files list — there is no file both this
-  sprint and either of the other two sessions could plausibly write to,
-  so a merge conflict at the file level is structurally impossible as
-  long as all three sessions honor their own allowed-files lists.
-- **No implementation-gate interaction.** This sprint neither opens nor
-  advances the limited core-only zero-UI gate, the Task 002 gate, the
-  Task 003 gate, or the future UI-implementation gate. It does not start
-  Task 002 or Task 003. Confirmed by the validation steps recorded in this
-  sprint's own PR description.
+  (none existed before the original PR #95 session started) and lives
+  entirely under this sprint's own allowed-files list — there is no file
+  this sprint and either of the other two sessions could plausibly write
+  to, so a merge conflict at the file level is structurally impossible as
+  long as all three sessions honor their own allowed-files lists. This
+  revision confirms that remains true: PR #93/#94/#96 touched zero files
+  from this sprint's allowed-files list, and this revision touches zero
+  files from theirs.
+- **No implementation-gate interaction, by this PR, at any point.** This
+  sprint — neither its original commit nor this freshness revision —
+  opens, advances, or widens the limited core-only zero-UI gate, the Task
+  002 gate, the Task 003 gate, or the future UI-implementation gate. The
+  Task 002 gate that is now open opened via a **different** PR (#96) in a
+  **different** session. This PR does not start Task 002 or Task 003.
+  Confirmed by the validation steps recorded in this revision's own PR
+  description update.
 
 ## Learning feedback loop
 
@@ -199,20 +276,37 @@ list):
   (per the feedback loop's own "count ≥ 2" escalation threshold); the
   session-limit interruption above is an environment/tooling event, not
   a content-quality defect.
+- **Observation (2026-07-07 freshness revision).** A docs-only QA
+  package with an explicit baseline commit is straightforward to keep
+  fresh: because every file already named its baseline SHA and labelled
+  every open-item claim, this revision could locate every stale
+  "proposed/not authorized" phrase precisely (via targeted `grep`) and
+  correct it without re-deriving the whole package from scratch or
+  re-reading unrelated source documents. **Suggested refinement:** a
+  future long-lived QA package could adopt a single, centrally-cited
+  "current state" line (rather than repeating the baseline/status prose
+  in each of the 8 files independently) so a future freshness revision
+  needs one edit instead of eight — flagged as a possible structural
+  improvement for a future sprint, not applied here since it would be a
+  substantive restructuring beyond this revision's freshness-only scope.
 
 ## Recommended next step
 
-**For ChatGPT:** review this package (all eight files) against the
-self-review checklist recorded in this sprint's own PR description, and
-against [`pr-review-checklist.md`](./pr-review-checklist.md) §A. If
-accepted, this package becomes the standing QA/release-readiness
-reference every future implementation task (Task 002 onward, and each
-domain slice) is reviewed against — no further action is required to
+**For ChatGPT:** review this revised package (all eight files) against
+the self-review checklist recorded in the original PR #95 description,
+this revision's updated PR description, and
+[`pr-review-checklist.md`](./pr-review-checklist.md) §A. If accepted,
+this package becomes the standing QA/release-readiness reference every
+future implementation task is reviewed against — including the now-
+gate-opened Task 002 implementation PR (once issued from
+[`task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+in its own session), Task 003 once its own gate opens, and each PR #93
+domain slice once its own gate opens — no further action is required to
 "activate" it; it is reference documentation, not a gate.
 
-**Exact next-session prompt**, once this PR is reviewed:
+**Exact next-session prompt**, once this revision is reviewed:
 
-> Review the merged MVP QA and release-readiness package
+> Review the revised MVP QA and release-readiness package
 > (`docs/05-qa/mvp-qa-test-strategy.md`,
 > `docs/05-qa/foundation-test-matrix.md`,
 > `docs/05-qa/domain-e2e-test-matrix.md`,
@@ -223,4 +317,7 @@ domain slice) is reviewed against — no further action is required to
 > `docs/05-qa/pr-review-checklist.md` §A and record the outcome in
 > `docs/05-qa/architecture-review-log.md` as a new AR row. Do not start
 > Task 002, Task 003, or any domain-slicing work in this session — this
-> is a QA-package review only, docs-only, no code, no gate opened.
+> is a QA-package review only, docs-only, no code, no gate opened. Note
+> that the Task 002 credential-storage gate is already open via a
+> separate, independent act (AR-026/PR #96) — this review does not open,
+> close, or otherwise touch that gate.

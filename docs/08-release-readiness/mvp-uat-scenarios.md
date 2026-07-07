@@ -3,20 +3,37 @@
 > Business-readable user-acceptance-testing scenarios for the connector
 > MVP, part of the
 > [MVP QA and Test Strategy](../05-qa/mvp-qa-test-strategy.md) package.
-> Baseline: `Shopify-connector` at `f74aaf204745ce0087733870fe56bdda74bfa79a`.
+> **Historical drafting baseline:** `Shopify-connector` at
+> `f74aaf204745ce0087733870fe56bdda74bfa79a`.
 > **These scenarios cannot be executed today** — they require a live Odoo
 > 19 + PostgreSQL runtime and, for several scenarios, a Shopify
 > development store, neither of which exists in this environment (see
 > [`mvp-qa-test-strategy.md`](../05-qa/mvp-qa-test-strategy.md) §Runtime
-> limitation strategy) — and they require the underlying tasks (Task 002
-> onward) to be implemented, which they are not yet. This document plans
-> the scenarios a future UAT pass must execute; it does not claim any of
-> them have been run.
+> limitation strategy) — and they require the underlying tasks to be
+> **implemented**, which none of them are yet, **even where a task's
+> implementation gate is now open**. This document plans the scenarios a
+> future UAT pass must execute; it does not claim any of them have been
+> run. **Freshness note (2026-07-07 revision):** `Shopify-connector` has
+> since also merged PR #93 (`ac250f7fd2f242df7b69f78dc619b0a71680c664`),
+> PR #94 (Task 002 decision closure — AR-025,
+> `03ffcb4dc949cd5137b589a6cdc33da9105de31d`), and PR #96 (Task 002
+> credential-storage gate — AR-026,
+> `02b159a39c58a3396c1c249e80896a05c97bb757`). **The Task 002
+> credential-storage gate is open, but Task 002 has not been
+> implemented** — Scenarios 1, 2, and 15 (which depend on credential
+> behavior) remain not executable until a Task 002 implementation PR
+> (issued from
+> [`../07-implementation-plan/task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+> in its own session) merges and a runtime exists. Task 003 remains not
+> started/not authorized.
 
 ## Status
 
 **Proposed for ChatGPT review. Docs-only. No implementation. No gate
-opened. No scenario below has been executed.**
+opened by this document. No scenario below has been executed.** As of
+the 2026-07-07 freshness revision, the Task 002 gate is open (AR-026/
+PR #96) but Task 002 is not implemented, so credential-dependent
+scenarios remain unexecutable exactly as before.
 
 ## How to use this document
 
@@ -24,10 +41,11 @@ Each scenario names: purpose; preconditions; steps; expected result;
 evidence to capture; a pass/fail rule; and the related module/task. A
 future UAT reviewer should be able to execute a scenario exactly as
 written, without needing to consult any other document to understand what
-"pass" means. Every scenario referencing an unauthorized task (Task 002
-onward, or the UI/wizard) is written as the target state that task's
-future PR must satisfy — it is not a claim that the scenario can be run
-against the codebase as it exists at this sprint's baseline.
+"pass" means. Every scenario referencing a task that is not yet
+implemented (Task 002 — gate open, not yet coded — onward, Task 003, or
+the UI/wizard) is written as the target state that task's future PR must
+satisfy — it is not a claim that the scenario can be run against the
+codebase as it exists at this revision's baseline.
 
 **Plain-language first.** Each scenario's "Steps" and "Expected result"
 are written for a business/operations reviewer — plain product language,

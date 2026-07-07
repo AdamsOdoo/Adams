@@ -2,11 +2,25 @@
 
 > Docs-only go/no-go release-readiness checklist for the connector MVP,
 > part of the [MVP QA and Test Strategy](../05-qa/mvp-qa-test-strategy.md)
-> package. Baseline: `Shopify-connector` at
+> package. **Historical drafting baseline:** `Shopify-connector` at
 > `f74aaf204745ce0087733870fe56bdda74bfa79a`. **This checklist plans what
 > a future release-readiness review must confirm — it does not itself
-> confirm any item, since no implementation exists yet beyond Task 001's
-> core scaffold.** Complements
+> confirm any item.** At original drafting, no implementation existed
+> beyond Task 001's core scaffold. **Freshness note (2026-07-07
+> revision):** `Shopify-connector` has since also merged PR #93 (MVP
+> domain implementation slicing — proposes Tasks 010–014, gates none of
+> them, `ac250f7fd2f242df7b69f78dc619b0a71680c664`), PR #94 (Task 002
+> decision closure — AR-025, `03ffcb4dc949cd5137b589a6cdc33da9105de31d`),
+> and PR #96 (Task 002 credential-storage gate — AR-026,
+> `02b159a39c58a3396c1c249e80896a05c97bb757`). **The Task 002
+> credential-storage implementation gate is now open**; Task 002
+> implementation may proceed only through
+> [`../07-implementation-plan/task-002-final-implementation-prompt.md`](../07-implementation-plan/task-002-final-implementation-prompt.md)
+> in its own coding session. Task 003 remains not started/not
+> authorized. No item on this checklist is satisfied by that gate
+> opening alone — every checkbox still represents a future confirmation
+> a release-readiness reviewer must perform once the relevant
+> implementation PR actually merges and is tested. Complements
 > [`../05-qa/pr-review-checklist.md`](../05-qa/pr-review-checklist.md)
 > §C and [`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md),
 > per this directory's own [`README.md`](./README.md).
@@ -14,9 +28,14 @@
 ## Status
 
 **Proposed for ChatGPT review. Docs-only. No implementation. No gate
-opened. No item below is claimed satisfied by this document** — every
-checkbox represents a future confirmation a release-readiness reviewer
-must perform once the relevant implementation task has merged.
+opened by this document. No item below is claimed satisfied by this
+document** — every checkbox represents a future confirmation a
+release-readiness reviewer must perform once the relevant implementation
+task has merged. As of the 2026-07-07 freshness revision, the Task 002
+credential-storage gate is open (AR-026/PR #96), but Task 002's own
+implementation PR has not yet merged, so none of this checklist's Task
+002-relevant items (e.g. "security/redaction checks pass," "access
+rights verified") may yet be marked satisfied.
 
 ## How to use this checklist
 
