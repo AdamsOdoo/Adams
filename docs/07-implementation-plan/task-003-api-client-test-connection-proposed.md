@@ -52,6 +52,27 @@ is decided** until ChatGPT accepts AR-027; this task remains proposed
 only, not authorized; no code, no gate-opening act, and no final
 implementation prompt exist yet.
 
+**F1 acceptance patch (2026-07-07, same PR #98;
+[`AR-027`](../05-qa/architecture-review-log.md)):** ChatGPT **accepted**
+AR-027, decisions 1–3 as proposed and Decision 4 **with a
+scope-narrowing revision** — see
+[`task-003-decision-closure.md`](./task-003-decision-closure.md)
+§Acceptance for the exact wording. In brief: `core_test_connection`
+confirmed; `SHOP_INACTIVE`/402/423/403-fraudulent → `shopify_permission_scope_auth`
+confirmed (distinct plain-language reasons per condition now
+**mandatory**; behavioral shapes not already cited remain `[Requires
+external validation before implementation]`); the job-log system-append
+`sudo()`-wrapped method confirmed, no ACL widening; the per-run UUID4
+`payload_hash` nonce confirmed **for `core_test_connection` job creation
+only** — **`core_readiness_check`'s identical latent collision exposure
+is explicitly NOT included in Task 003's scope**, is not fixed by this
+acceptance, and is tracked as **`TD-001`**
+(`../05-qa/technical-debt-register.md`) for a future, separately-named
+gate inclusion or its own tiny follow-up patch. **This task remains
+proposed/not authorized** — accepting these four decisions is not a
+gate-opening act; no code, no API client, no test connection, and no
+final implementation prompt exist yet.
+
 ## Objective
 
 Create the single GraphQL transport boundary

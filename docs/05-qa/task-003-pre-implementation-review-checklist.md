@@ -11,13 +11,18 @@
 
 ## Status
 
-**Proposed for ChatGPT review.** Not yet accepted. Applies to (A) this
-package now, and (B) the future Task 003 implementation PR only once a
-separate, explicit Task 003 gate-opening act is accepted (not performed
-by this document — see
+**Accepted by ChatGPT on 2026-07-07** (PR #98 F1 revision;
+[`AR-027`](./architecture-review-log.md)) — decisions 1–3 as proposed,
+Decision 4 with a scope-narrowing revision (the `payload_hash` nonce
+applies to `core_test_connection` job creation only; `core_readiness_check`'s
+identical latent exposure is tracked as `TD-001`, out of Task 003's
+scope unless separately, explicitly authorized by name — see
 [`task-003-decision-closure.md`](../07-implementation-plan/task-003-decision-closure.md)
-§Status). **Does not authorize any code.** Docs-only; this document
-itself creates no task and opens no gate.
+§Acceptance). **Applies to the future Task 003 implementation PR once a
+separate, explicit Task 003 gate-opening act is accepted** (not performed
+by this document). **Does not authorize any code.** Docs-only; this
+document itself creates no task and opens no gate. (Originally proposed
+2026-07-07 in this same PR.)
 
 ## A. This package (the AR-027 decision-closure PR)
 
@@ -25,9 +30,10 @@ itself creates no task and opens no gate.
       Python/XML/CSV/manifest/test/CI file created or modified; no API
       client, no test-connection mechanism, no external network call, no
       Shopify API call of any kind.
-- [ ] **[Gate]** No gate opened by this PR: AR-027 is **Proposed**; no
-      gate-opening document, no final Task 003 implementation prompt is
-      included or implied to be authorized.
+- [ ] **[Gate]** No gate opened by this PR: AR-027 is **Accepted (with
+      F1 revision)**, but a decision-closure acceptance is not a
+      gate-opening act; no gate-opening document, no final Task 003
+      implementation prompt is included or implied to be authorized.
 - [ ] **[Gate]** Every Shopify/Odoo platform statement either cites an
       already-accepted or already-written repo document (with that
       document's own original citation and access date preserved) or is
@@ -36,34 +42,42 @@ itself creates no task and opens no gate.
       been performed this session, and none was (network access was
       forbidden).
 - [ ] **[Gate]** The four decisions are internally consistent across all
-      three package documents (decision closure, the amendment note on
-      `task-003-api-client-test-connection-proposed.md`, this checklist):
-      `core_test_connection` recommended; `SHOP_INACTIVE`/402/423/
-      403-fraudulent recommended mapped to `shopify_permission_scope_auth`
-      with `credential_state`-gating; job-log system-append method (not
-      ACL widening) recommended; per-run UUID4 `payload_hash` nonce
-      recommended.
+      package documents (decision closure §Acceptance, the amendment
+      note on `task-003-api-client-test-connection-proposed.md`, this
+      checklist, the AR-027 row, the handoff): `core_test_connection`
+      **accepted**; `SHOP_INACTIVE`/402/423/403-fraudulent **accepted**
+      mapped to `shopify_permission_scope_auth` with `credential_state`-
+      gating and mandatory distinct plain-language reasons; job-log
+      system-append method (not ACL widening) **accepted**; per-run
+      UUID4 `payload_hash` nonce **accepted for `core_test_connection`
+      only** — `core_readiness_check` explicitly excluded and tracked as
+      `TD-001`.
 - [ ] **[Gate]** Task 002 is not re-litigated anywhere in the package
       (compute-blank; `token_variant`; scope-snapshot placement — all
       AR-025/PR #97 settled).
 - [ ] **[Gate]** No error class beyond the fixed 16 is introduced or
-      proposed anywhere in the package; the `shopify_user_errors_validation`
-      alternative is named and reasoned about, not silently dropped.
-- [ ] **[Gate]** Register discipline: no edit to
-      `master-blueprint-open-questions.md` or
-      `architecture-review-log.md`'s existing AR-019/AR-024/AR-025/AR-026
-      rows beyond adding the new AR-027 row itself in **Proposed** status;
-      MBQ-44 status unchanged; no unrelated MBQ row touched;
-      DEC-003–DEC-020, `docs/04-decisions/README.md`, and
-      `defect-pattern-log.md` untouched; `rejected-approaches-log.md`
-      untouched (the `shopify_user_errors_validation` alternative is
-      logged there only upon acceptance, per the ADR template
-      convention).
-- [ ] **[Gate]** The newly-surfaced `core_readiness_check` target-less
-      idempotency-collision observation (Decision 4) is recorded
-      somewhere reviewable (this checklist, the decision-closure
-      document, and the handoff) and is not silently dropped — even
-      though fixing it is not itself authorized by this package.
+      accepted anywhere in the package; the `shopify_user_errors_validation`
+      alternative is named, reasoned about, and now logged as rejected
+      (`RA-024`) — not silently dropped.
+- [ ] **[Gate]** Register discipline: `architecture-review-log.md`
+      touched only for (a) the new AR-027 row (status: **Accepted with
+      F1 revision**) and (b) a short amendment note on AR-019's existing
+      row (job_type now three values) — no rewrite of AR-019's
+      substance; `master-blueprint-open-questions.md` touched only for a
+      short note on MBQ-44 (status unchanged: Partially resolved); no
+      other MBQ/DEC/AR row touched; DEC-003–DEC-020,
+      `docs/04-decisions/README.md`, and `defect-pattern-log.md`
+      untouched; `rejected-approaches-log.md` gains exactly one new
+      entry (`RA-024`, the `shopify_user_errors_validation` alternative)
+      and no other; `technical-debt-register.md` gains exactly one new
+      entry (`TD-001`, the `core_readiness_check` follow-up) and no
+      other.
+- [ ] **[Gate]** The `core_readiness_check` target-less
+      idempotency-collision observation (Decision 4) is recorded as
+      `TD-001` and cross-referenced from the decision-closure document,
+      this checklist, the AR-027 row, and the handoff — and is **not**
+      silently folded into Task 003's implementation scope anywhere in
+      the package.
 - [ ] **[Gate]** No dummy or real credential/token value appears anywhere
       in the package (none should be needed — this package does not
       touch credential material).
@@ -75,15 +89,13 @@ itself creates no task and opens no gate.
       authorization of any outbound Shopify Admin API call — merged into
       `Shopify-connector` before the first implementation commit; both
       referenced by SHA in the PR body.
-- [ ] **[Gate]** `job_type` decision applied correctly: if
-      `core_test_connection` was accepted, it is added as a one-line
-      addition to the base Selection in `shopify_connector_job.py` (not
-      via `selection_add`); if rejected, that file is untouched for this
-      concern and `core_readiness_check` is reused.
+- [ ] **[Gate]** `job_type` decision applied correctly: `core_test_connection`
+      (accepted) is added as a one-line addition to the base Selection in
+      `shopify_connector_job.py` (not via `selection_add`).
 - [ ] **[Gate]** Error-class mapping applied correctly: `SHOP_INACTIVE`,
       HTTP 402, HTTP 423, and HTTP 403-fraudulent each map to the
-      accepted class (recommended: `shopify_permission_scope_auth`) with
-      a **distinct plain-language reason per condition** — not one
+      accepted class (`shopify_permission_scope_auth`) with
+      a **distinct, mandatory plain-language reason per condition** — not one
       generic message reused across all four; `credential_state` is
       flipped to `invalid` only for a genuine token-invalid signal
       (401/`ACCESS_DENIED`), never for a shop-account-state condition.
@@ -98,14 +110,17 @@ itself creates no task and opens no gate.
       diff: the pre-existing Task 002 credential-read accessor (untouched)
       plus exactly one new job-log system-append call site — no other
       `sudo()` anywhere in the diff.
-- [ ] **[Gate]** `payload_hash` nonce applied correctly: every
-      target-less job (`core_test_connection` and, if fixed in this PR
-      or a named companion PR, `core_readiness_check`) is created with a
-      fresh per-run UUID4 (or equivalent unique-per-run generator) in
-      `payload_hash`; no secret, token, or credential-derived value is
-      ever a component; **a second test-connection run on the same store
-      succeeds** with no `store_idempotency_key_uniq` collision (proven
-      by test, not merely asserted).
+- [ ] **[Gate]** `payload_hash` nonce applied correctly: **`core_test_connection`
+      job creation only** is created with a fresh per-run UUID4 (or
+      equivalent unique-per-run generator) in `payload_hash`; no secret,
+      token, or credential-derived value is ever a component; **a second
+      test-connection run on the same store succeeds** with no
+      `store_idempotency_key_uniq` collision (proven by test, not merely
+      asserted).
+- [ ] **[Gate]** `core_readiness_check` is **untouched** by this PR
+      unless a separate, explicit gate act named it — no silent nonce
+      fix, no silent behavior change to that job type; its tracked
+      follow-up remains `TD-001`.
 - [ ] **[Gate]** Fixed 16-class registry respected: no 17th `error_class`
       value added to `shopify_connector_job.py`.
 - [ ] **[Gate]** Dual-path error normalization proven by a fixture

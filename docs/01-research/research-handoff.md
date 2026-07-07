@@ -1,21 +1,25 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry
-> (Task 003 Decision Closure — AR-027 proposed, not yet accepted: the
-> four Task 003-specific decision points (`core_test_connection`
-> job-type value; `SHOP_INACTIVE`/402/423/403-fraudulent error-class
-> mapping; job-log system-append write path vs. ACL widening; per-run
-> `payload_hash` nonce for target-less jobs) addressed at recommendation
-> level only, via `../07-implementation-plan/task-003-decision-closure.md`,
-> a companion QA checklist
-> (`../05-qa/task-003-pre-implementation-review-checklist.md`), and a
-> dated amendment note on the existing Task 003 proposal document;
-> also surfaces a pre-existing latent `payload_hash`/idempotency-key
-> collision defect in the already-merged `core_readiness_check` job
-> type; docs-only, no external network access this session, no code, no
-> gate opened, no final Task 003 implementation prompt written; Task 003
-> remains not started)** is immediately below, in the **compact handoff
-> format** (`../06-prompts/session-handoff-template.md`); **PR #97 —
+> (PR #98 — ChatGPT F1 Revision to Task 003 Decision Closure — AR-027
+> accepted with a scope-narrowing revision to Decision 4: decisions 1–3
+> (`core_test_connection` job-type value; `SHOP_INACTIVE`/402/423/
+> 403-fraudulent → `shopify_permission_scope_auth`; job-log system-append
+> `sudo()` method) accepted as proposed; the per-run `payload_hash` UUID4
+> nonce accepted for `core_test_connection` job creation only —
+> `core_readiness_check`'s identical latent idempotency-collision
+> exposure is explicitly excluded from Task 003's scope and logged as
+> `TD-001` (technical-debt-register.md's first real entry);
+> `shopify_user_errors_validation` logged as rejected (`RA-024`); AR-019
+> amended to three core-owned `job_type` values; MBQ-44 noted; docs-only,
+> no code, no gate opened, no external network call; Task 003 remains
+> not started)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **Task 003 Decision
+> Closure — AR-027 originally proposed (2026-07-07), the four Task
+> 003-specific decision points addressed at recommendation level, via
+> `../07-implementation-plan/task-003-decision-closure.md` and companion
+> QA checklist/amendment note; superseded in part by the F1 revision
+> immediately above, same PR #98 (history)**, **PR #97 —
 > ChatGPT F1 Revision — `_get_access_token` decorator fix, stale
 > "no credential storage" wording corrected, AST decorator-guard test
 > added (history)**, **Task 002 — Credential Storage, Masking, and Redaction Foundation
@@ -126,6 +130,96 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### PR #98 — ChatGPT F1 Revision to Task 003 Decision Closure — compact handoff (2026-07-07)
+
+> **Applies ChatGPT's F1 revision decision for PR #98 (accept
+> decisions 1–3; accept Decision 4 with a scope-narrowing revision) —
+> not new code, not a gate-opening act.** Confirmed before editing: PR
+> #98 (branch `claude/task-003-decisions-xx7u85`) was open, draft, with
+> the decision-closure package from the immediately-preceding session;
+> working tree clean; no additional files changed since that commit.
+
+- **Branch / PR:** `claude/task-003-decisions-xx7u85` → PR #98 into
+  `Shopify-connector` (https://github.com/AdamsOdoo/Adams/pull/98;
+  remains draft, not merged, not marked ready for review).
+- **Files changed:** `docs/07-implementation-plan/task-003-decision-closure.md`
+  (Acceptance section added; Decision 4's body corrected to scope the
+  nonce to `core_test_connection` only; Register/next-step sections
+  updated to reflect acceptance), `docs/07-implementation-plan/task-003-api-client-test-connection-proposed.md`
+  (F1 acceptance-patch note appended to §Status), `docs/05-qa/task-003-pre-implementation-review-checklist.md`
+  (Status updated to Accepted; gate items updated to reflect the
+  accepted, scope-narrowed outcome), `docs/05-qa/architecture-review-log.md`
+  (AR-027 row flipped to **Accepted**; AR-027 Acceptance Patch narrative
+  note and an AR-019 amendment note added), `docs/03-architecture/master-blueprint-open-questions.md`
+  (one note appended to MBQ-44 — status unchanged), `docs/05-qa/rejected-approaches-log.md`
+  (new **RA-024** — `shopify_user_errors_validation` as the rejected
+  error-class alternative), `docs/05-qa/technical-debt-register.md`
+  (new **TD-001** — the `core_readiness_check` follow-up; the register's
+  first real entry), this handoff entry. **No Python/XML/CSV/manifest/
+  test/CI file touched. No `addons/` file of any kind touched. No
+  unrelated MBQ/DEC/AR row touched.**
+- **What changed (the F1 fix itself):** Decision 4 originally implied
+  Task 003 should populate the per-run `payload_hash` nonce "for every
+  target-less job type," which would have silently pulled a fix to the
+  already-merged Task 001 `core_readiness_check` job type into Task
+  003's implementation boundary. Corrected so the accepted nonce
+  mechanism applies to **`core_test_connection` job creation only**;
+  `core_readiness_check`'s identical latent collision exposure is now
+  explicitly out of Task 003's scope, recorded as `TD-001`, and routed
+  to either a future explicitly-named gate inclusion or its own separate
+  tiny follow-up patch (candidate name: "Task 001B — job-framework
+  target-less idempotency patch").
+- **Decisions 1–3:** accepted exactly as proposed — `core_test_connection`
+  confirmed (amends AR-019 to three core-owned `job_type` values);
+  `SHOP_INACTIVE`/402/423/403-fraudulent confirmed mapped to
+  `shopify_permission_scope_auth` (mandatory distinct plain-language
+  reasons; `credential_state`-gating refinement preserved; behavioral
+  shapes not already cited remain `[Requires external validation before
+  implementation]`); the sanctioned internal `sudo()`-wrapped job-log
+  system-append method confirmed over ACL widening (no security-file
+  change).
+- **Register convention used:** proposal and acceptance patch applied
+  within the **same PR/branch**, before merge — matching the
+  AR-025/PR #94 precedent (confirmed this session by diffing that file's
+  pre-acceptance and current versions: both the original decision-closure
+  commit and its later "accept" commit are ancestors of PR #94's merge
+  commit). Chose **"Accepted by ChatGPT — with F1 revision"** for
+  AR-027's status rather than "Proposed — F1 revision applied for
+  ChatGPT re-review," since the instruction directing this patch already
+  stated the acceptance decision explicitly (not merely "revise and
+  I'll look again").
+- **Learning feedback loop:**
+  - New issues discovered: none new this session (the `core_readiness_check`
+    collision risk was already surfaced in the prior session; this
+    session corrects the routing, it does not discover a new defect).
+  - Repeated issue patterns: none at count ≥ 2.
+  - Rules/checklists updated: none — existing templates already
+    accommodated an F1-style acceptance patch (PR #97 precedent).
+  - New rejected approaches: **RA-024** logged (see above).
+  - New technical debt: **TD-001** logged (see above) — the register's
+    first real entry.
+  - Architecture concerns: none new beyond what AR-027/TD-001 already
+    capture.
+  - Tests or review gates needed: the future Task 003 implementation PR
+    must prove `core_readiness_check` is **untouched** unless a gate
+    names it explicitly — added to
+    `task-003-pre-implementation-review-checklist.md` §B.
+  - Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked
+  · learning captured · rejected approach logged (RA-024) · technical
+  debt logged (TD-001) · repeated-issue escalation applied (N/A) — all
+  YES.
+- **Stop condition:** stopped immediately after this handoff update — no
+  merge, no ready-for-review transition, no code, no gate opened, no
+  external network call.
+- **Recommended next step:** ChatGPT (or the control room) schedules
+  `TD-001`'s resolution (folded into a future Task 003 gate by name, or
+  its own "Task 001B"-style patch), then a separate future session
+  prepares the final Task 003 `CLAUDE.md` §9 implementation prompt and a
+  narrow gate-opening proposal.
 
 ---
 

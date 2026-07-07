@@ -23,9 +23,13 @@
 | ID | Date added | Area | Description | Severity | Reason accepted temporarily | Risk | Owner | Target resolution phase | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | _TD-000_ | _YYYY-MM-DD_ | _e.g. Sync engine_ | _What the debt is_ | _Low/Med/High_ | _Why now_ | _What could go wrong_ | _Who owns it_ | _Phase / session_ | _Open_ |
+| TD-001 | 2026-07-07 | Core job framework (`shopify_connector_job.py`) | The already-merged `core_readiness_check` `job_type` (AR-019, Task 001) is target-less (`res_model`/`res_id`/`shopify_target_gid` empty) with no per-run `payload_hash` value, so its `idempotency_key` is identical across every run for a given store; since `(store_id, idempotency_key)` is uniquely constrained and never cleared on terminal state (unlike `operation_scope_key`), a **second** `core_readiness_check` job for the same store would collide with the first, forever. Task 003 (AR-027, accepted with F1 revision) fixes the identical defect for the new `core_test_connection` job type only, by design — `core_readiness_check` is explicitly excluded from Task 003's scope so as not to silently touch already-accepted Task 001 schema/behavior without a named authorization. Separately, `payload_hash` is being repurposed from its originally-planned semantics ("a hash of the normalized outbound payload," `core-naming-schema-planning.md:476-481`) into a per-run nonce for target-less job types — a naming/schema-cleanliness overload, not just a `core_readiness_check`-specific issue. | Medium | Task 003's own scope (AR-027, F1 revision) deliberately excludes fixing already-merged Task 001 schema; fixing it requires its own named authorization, not an incidental Task 003 side-effect | If `core_readiness_check` jobs are ever created more than once per store before this is fixed, the second attempt fails on `store_idempotency_key_uniq` instead of succeeding | Control room (ChatGPT) to route: fold into a future Task 003 (or later) gate by explicit name, or schedule as its own tiny follow-up patch (candidate name: "Task 001B — job-framework target-less idempotency patch") | A future gate naming `core_readiness_check` explicitly, or its own follow-up patch | Open |
 
-_No technical debt recorded yet (Research Sprints A–C — no code written). This
-register becomes active as design and implementation introduce trade-offs._
+_No other technical debt recorded yet (Research Sprints A–C, and the
+docs-only sprints since — no code written until Task 001/002). This
+register becomes active as design and implementation introduce
+trade-offs; TD-001 (above) is its first real entry, logged via AR-027's
+F1 acceptance patch (2026-07-07)._
 
 _**Research Sprint C note (2026-06-30):** none. Sprint C was research-only
 (competitor deep dives, matrix, UX benchmark, patterns, gaps, avoid-list) — no
