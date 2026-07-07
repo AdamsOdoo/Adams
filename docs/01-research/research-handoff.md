@@ -1,16 +1,23 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry
-> (PR #94 Acceptance Patch: AR-025 accepted by ChatGPT on 2026-07-07 at
+> (Task 002 Credential-Storage Gate-Opening Act: AR-026 accepted —
+> gate opens only once this act's PR merges into `Shopify-connector`;
+> authorizes exactly one future coding session, Task 002, via the
+> already-accepted `task-002-final-implementation-prompt.md`; no code
+> in this PR; Task 002 not started by this PR; Task 003 not started;
+> no API/UI/test-connection/domain scope opened)** is immediately
+> below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **PR #94 Acceptance
+> Patch — AR-025 accepted by ChatGPT on 2026-07-07 at
 > decision/gate-preparation level only — compute-blank rejected for
 > Task 002; `token_variant` = `offline_custom_app` only; scope snapshot
 > on `store`; final Task 002 implementation prompt accepted as
 > gate-ready and binding but not issued; gate-opening proposal accepted
 > as proposed scope but the gate is not opened; MBQ-04 still Partially
 > resolved; MBQ-05 still open; MBQ-44 unchanged; no code authorized;
-> Task 002/003 not started)** is immediately below, in the **compact
-> handoff format** (`../06-prompts/session-handoff-template.md`);
-> **Task 002 Decision Closure & Gate-Preparation Sprint — AR-025
+> Task 002/003 not started (history)**, **Task 002 Decision Closure &
+> Gate-Preparation Sprint — AR-025
 > proposed; the three Task 002-specific decision points closed at
 > proposal level; gate-ready final prompt prepared, not issued; narrow
 > credential-storage gate proposed, not opened; official Shopify/Odoo
@@ -94,6 +101,78 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Task 002 Credential-Storage Gate-Opening Act — compact handoff (2026-07-07)
+
+> **Docs-only gate-opening act — not Task 002, not code, not a research
+> sprint.** Confirmed before starting: PR #94 merged into
+> `Shopify-connector` (merge commit
+> `03ffcb4dc949cd5137b589a6cdc33da9105de31d`, confirmed an ancestor of
+> latest `Shopify-connector`); AR-025 Accepted (2026-07-07); the final
+> Task 002 prompt accepted as gate-ready but not issued; the gate
+> proposal accepted as proposed scope but not opened; Task 002/003 not
+> started; working branch created from latest `Shopify-connector`.
+
+- **Branch / PR:** `claude/task-002-gate-opening-act` → draft PR into
+  `Shopify-connector` (PR number recorded once opened; remains draft,
+  not merged).
+- **Files changed:**
+  `docs/07-implementation-plan/task-002-credential-storage-gate.md`
+  (new — the gate-opening act itself),
+  `docs/05-qa/architecture-review-log.md` (new AR-026 row, **Accepted**;
+  gate-opening note appended), `docs/01-research/research-handoff.md`
+  (this entry). **No addon/code file touched. No Python/XML/CSV/
+  manifest/test/CI file created or modified. No credential/token/secret
+  field, model, API client, setup wizard, or test-connection
+  implementation created. No webhook/controller/cron/domain module
+  created. PR #93's 8 files untouched.**
+- **What changed:** **AR-026 accepted — the narrow Task 002
+  credential-storage implementation gate is opened, effective once
+  this PR merges into `Shopify-connector`.** The gate authorizes
+  exactly one future coding session — Task 002 (Credential Storage,
+  Masking, and Redaction Foundation) — using the exact contracts
+  already accepted via AR-025 in
+  `task-002-final-implementation-prompt.md` (referenced by path, not
+  restated/duplicated). **This PR does not implement Task 002, does
+  not create the credential model or any token field, and does not
+  create any code** — the final prompt is not issued inside this PR.
+- **Still forbidden:** API client; test connection; setup wizard;
+  UI/views/menus/actions/wizards; webhooks/controllers/cron; product/
+  customer/order/inventory/fulfillment; domain modules; external
+  network calls; Task 003 (its four decision points remain open); any
+  second task before ChatGPT reviews Task 002's implementation PR.
+- **AR-026:** Accepted. **No implementation gate is opened until this
+  PR merges. Task 002 is not started. Task 003 is not started.**
+- **Learning feedback loop:** new issues: none. Repeated patterns: none
+  new. Rules updated: none. Rejected approaches: none reintroduced.
+  Technical debt: none new. Architecture concerns: none new — this act
+  stays strictly inside the AR-025-accepted scope.
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (N/A) ·
+  technical debt logged (N/A) · repeated-issue escalation applied
+  (N/A) — all YES.
+- **Stop condition:** stopped immediately after opening the draft PR —
+  no merge, no ready-for-review, no implementation, Task 002/003 not
+  started.
+- **Recommended next step:** ChatGPT reviews this gate-opening act; if
+  accepted and merged into `Shopify-connector`, the gate is open and
+  `task-002-final-implementation-prompt.md` is issued verbatim, in its
+  own session, as the Task 002 coding session (that session's PR must
+  remain draft until ChatGPT reviews it).
+
+**Exact next-session prompt:**
+
+> After this gate-opening act (AR-026) is merged into
+> `Shopify-connector`, issue
+> `docs/07-implementation-plan/task-002-final-implementation-prompt.md`
+> verbatim as the Task 002 coding session — create
+> `shopify.connector.store.credential`, the six store mirrors, the
+> redaction utility, the four service methods, the one Admin-only ACL
+> row, the enumerated tests, and the manifest version bump, exactly as
+> specified, with zero deviation from the accepted contracts. Keep the
+> resulting PR draft until ChatGPT reviews it.
 
 ---
 
