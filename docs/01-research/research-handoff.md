@@ -203,11 +203,12 @@
   `tests/test_job_log_system_append.py` (new, 32 tests total);
   `tests/__init__.py` (three import lines — a mechanical addition
   needed for Odoo to discover the three new test files at all; not
-  listed by name in the final prompt's allowed-files list, but treated
-  as unavoidable scaffolding mirroring the already-allowed
-  `models/__init__.py` pattern — flagged for ChatGPT below rather than
-  silently assumed); `docs/01-research/research-handoff.md` (this
-  entry). **No view/menu/action/wizard/XML file, no controller/webhook/cron/data
+  listed by name in the final prompt's allowed-files list, but approved
+  as an F1 exception by ChatGPT's review and now documented in-file —
+  see the F1 revision note below); `test_credential_service.py` (F1
+  revision — one stale test renamed/updated, see below);
+  `docs/01-research/research-handoff.md` (this entry, plus the F1
+  revision note). **No view/menu/action/wizard/XML file, no controller/webhook/cron/data
   file, no `shopify_connector_store_credential.py`,
   `security/ir.model.access.csv`, `security/shopify_connector_security.xml`,
   `shopify_connector_location.py`, `shopify_connector_binding_mixin.py`,
@@ -256,32 +257,35 @@
   any scope; actual missing-scope shape) remain unanswered pending that
   manual validation — not asserted as confirmed anywhere in code, tests,
   or this entry.
-- **Known conflict flagged for ChatGPT (not resolved by this session):**
-  adding the second sanctioned `sudo()` site (in
-  `shopify_connector_job_log.py`, authorized by this task) makes the
-  pre-existing Task 002 test
-  `test_credential_service.py::test_source_level_single_sudo_guard`
-  factually stale — it hard-codes
-  `sudo_call_sites == ['shopify_connector_store_credential.py']` (a
-  single-file list), which no longer holds now that a second, equally
-  sanctioned site exists (confirmed by simulating that test's own logic
-  against this diff). `test_credential_service.py` is **not** in this
-  task's allowed-files list, so it was deliberately left untouched
-  rather than silently edited outside the accepted gate scope. This
-  session's own new test (`test_job_log_system_append.py`'s
-  source-level guard) correctly asserts the updated two-site count.
-  Recommend either a tiny named follow-up authorizing a one-line update
-  to that one stale assertion, or explicitly accepting it as logged,
-  known debt. Neither test executes today (no runtime), so there is no
-  current CI failure — but the inconsistency will surface the moment a
-  runtime exists.
+- **F1 revision applied (ChatGPT review of PR #101, resolved same PR):**
+  ChatGPT reviewed PR #101 with result **REVISE** and explicitly
+  authorized a narrow F1 patch, still on this same branch/PR: (1)
+  `tests/__init__.py`'s three import lines are **kept**, now documented
+  in-file as an approved Odoo test-discovery scaffolding exception
+  (comment cites this F1 review); (2) the stale pre-existing test
+  `test_credential_service.py::test_source_level_single_sudo_guard` —
+  which hard-coded `sudo_call_sites == ['shopify_connector_store_credential.py']`,
+  no longer true once Task 003's second sanctioned `_system_append`
+  `sudo()` site landed — is renamed
+  `test_source_level_sanctioned_sudo_sites_guard` and now asserts the
+  sorted two-site list (`shopify_connector_job_log.py`,
+  `shopify_connector_store_credential.py`), with an updated comment
+  explaining the two sanctioned sites; the guard is strengthened (now
+  order-independent via `sorted()`), never weakened. No production code
+  changed in this F1 patch — re-validated: `core_readiness_check`
+  remains untouched, exactly two `sudo()` sites exist (AST-confirmed),
+  all files `py_compile`-clean, `pyflakes`-clean (same expected
+  `__init__.py` warnings only). PR #101 remains draft, not merged, not
+  marked ready.
 - **Learning feedback loop:**
   - New issues discovered: a task prompt's allowed-files list can miss
     a file that the task's own authorized change necessarily makes
-    stale (the sudo-count-test conflict above); an allowed-files list
-    can also omit a mechanical scaffolding file a newly-authorized test
-    file needs to be discoverable at all (`tests/__init__.py` was not
-    named even though three new test files were mandated).
+    stale (the sudo-count-test conflict, resolved via ChatGPT's F1
+    review above); an allowed-files list can also omit a mechanical
+    scaffolding file a newly-authorized test file needs to be
+    discoverable at all (`tests/__init__.py` was not named even though
+    three new test files were mandated — resolved via the same F1
+    review).
   - Repeated issue patterns: this is the second task (after Task 002)
     with no Odoo runtime available — tests are written and
     `py_compile`-validated but not executed; the Task 001A applicability
@@ -297,8 +301,9 @@
     leaving it for the implementer to discover and flag mid-session; the
     same check should cover `__init__.py`/registration files any new
     module or test file needs in order to load/run at all.
-  - Tests or review gates needed: a decision on the flagged
-    `test_credential_service.py` conflict before or at this PR's review.
+  - Tests or review gates needed: none outstanding — the flagged
+    `test_credential_service.py` conflict was resolved in the same PR
+    via ChatGPT's F1 review (see above).
   - Should future prompts change? Yes — future final implementation
     prompts should audit for (a) existing tests their own authorized
     change will make stale, and (b) registration/`__init__.py` files
@@ -307,35 +312,33 @@
 - **Quality gate confirmation:** handoff updated · feedback loop checked
   · learning captured · rejected approach logged — N/A, none · technical
   debt logged — N/A, `TD-001` unaffected and unmodified · repeated-issue
-  escalation applied — noted above (no-runtime pattern) — all YES
-  **except** the flagged `test_credential_service.py` conflict, which is
-  explicitly left open for ChatGPT's decision rather than silently
-  resolved either way.
-- **Next recommended session:** ChatGPT review of this draft PR against
-  `task-003-pre-implementation-review-checklist.md` §B and
-  `credential-security-redaction-review-checklist.md`, including a
-  decision on the flagged `test_credential_service.py` conflict. No next
+  escalation applied — noted above (no-runtime pattern) — all YES. The
+  previously-flagged `test_credential_service.py` conflict is now
+  resolved (F1 revision, same PR, ChatGPT-authorized) — no item remains
+  open.
+- **Next recommended session:** ChatGPT re-review of this draft PR
+  (post-F1) against `task-003-pre-implementation-review-checklist.md`
+  §B and `credential-security-redaction-review-checklist.md`. No next
   task starts until this PR is reviewed and accepted (per the gate's
   closure rule — the gate authorized exactly one coding session, now
   consumed).
-- **Stop condition:** stopped immediately after opening the draft PR —
-  no merge, no ready-for-review, no manual validation (no runtime), no
-  other task started, `main`/plain `dev` untouched.
+- **Stop condition:** stopped immediately after pushing the F1 revision
+  to the same draft PR — no merge, no ready-for-review, no manual
+  validation (no runtime), no other task started, `main`/plain `dev`
+  untouched.
 
 **Exact next-session prompt:**
 
-> After ChatGPT reviews the Task 003 draft PR
-> (`claude/task-003-api-client-test-connection-8wsvlc`) against
+> After ChatGPT re-reviews the Task 003 draft PR
+> (`claude/task-003-api-client-test-connection-8wsvlc`, post-F1) against
 > `task-003-pre-implementation-review-checklist.md` §B and
-> `credential-security-redaction-review-checklist.md` — including a
-> decision on the flagged `test_credential_service.py`
-> stale-sudo-count-assertion conflict — and either requests fixes or
-> accepts it, the next session applies that feedback (or, if accepted,
-> performs the manual-validation step against a live Odoo 19 +
-> development store once a runtime is available, recording the
-> empirically-observed answers to the open behavioral questions). No
-> new task (including any `core_readiness_check`/`TD-001` follow-up)
-> starts before this PR is reviewed and accepted.
+> `credential-security-redaction-review-checklist.md` and either
+> requests further fixes or accepts it, the next session applies that
+> feedback (or, if accepted, performs the manual-validation step against
+> a live Odoo 19 + development store once a runtime is available,
+> recording the empirically-observed answers to the open behavioral
+> questions). No new task (including any `core_readiness_check`/`TD-001`
+> follow-up) starts before this PR is reviewed and accepted.
 
 ---
 

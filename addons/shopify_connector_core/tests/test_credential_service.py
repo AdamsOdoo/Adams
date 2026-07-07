@@ -171,11 +171,17 @@ class TestCredentialService(TransactionCase):
         with self.assertRaises(AccessError):
             credential_as_operator.action_clear_token(self.store)
 
-    def test_source_level_single_sudo_guard(self):
+    def test_source_level_sanctioned_sudo_sites_guard(self):
         # AST-based, not a text grep: docstrings are required to explain
         # `sudo()` in prose (per this task's own docstring contract), so a
         # substring count would false-positive on them. Only real
         # `<expr>.sudo(...)` call sites count.
+        #
+        # Exactly two sanctioned sudo() sites are expected as of Task 003
+        # (ChatGPT F1 review of PR #101): the pre-existing Task 002
+        # `_get_access_token` accessor, and the Task 003 job-log
+        # `_system_append` system-append writer. Any third site is a
+        # review failure -- this guard must not be weakened.
         models_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'models',
@@ -195,7 +201,11 @@ class TestCredentialService(TransactionCase):
                 ):
                     sudo_call_sites.append(filename)
         self.assertEqual(
-            sudo_call_sites, ['shopify_connector_store_credential.py']
+            sorted(sudo_call_sites),
+            [
+                'shopify_connector_job_log.py',
+                'shopify_connector_store_credential.py',
+            ],
         )
 
     def test_all_service_methods_decorated_with_api_model(self):
