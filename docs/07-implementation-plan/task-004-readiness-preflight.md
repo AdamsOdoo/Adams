@@ -60,15 +60,46 @@ here is a new finding or a new decision.
   environment** — no live Odoo runtime or log files were available —
   and remains not tested). VAL-B4–B7 and VAL-G1–G4 remain not tested. **Task
   003 manual validation has not been called Go or No-Go.**
-- **Task 004 is blocked.** Per
+- **Task 004 implementation is still not started, and remains blocked.**
+  Per
   [`../04-decisions/shopify-token-acquisition-decision-brief.md`](../04-decisions/shopify-token-acquisition-decision-brief.md)
   §9 ("Can Task 004 start before this is resolved? **No.**") and every
-  research-handoff entry since (PR #107, #108, #109, #110): Task 004 remains
-  blocked pending both Task 003 completion/acceptance and a decided
-  token-acquisition direction. Neither PR #109 nor PR #110 changed this —
-  no valid Shopify Admin API token was used or obtained by either, and
-  neither claims OAuth succeeded or that VAL-B2 passed. This preflight
-  package does not change that conclusion either.
+  research-handoff entry since (PR #107, #108, #109, #110): Task 004
+  implementation remains blocked pending both Task 003 completion/acceptance
+  and a decided token-acquisition direction. Neither PR #109 nor PR #110
+  changed this — no valid Shopify Admin API token was used or obtained by
+  either, and neither claims OAuth succeeded or that VAL-B2 passed.
+- **Task 004 may now proceed to gate-opening *review* only, because VAL-B2
+  is formally deferred by ChatGPT.** Per
+  [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+  (2026-07-07): ChatGPT has formally deferred VAL-B2 from the Task 003 →
+  Task 004 gate. VAL-B2 is **not passed, not failed, and not waived** —
+  this deferral changes only what the Task 003 → Task 004 *gate* requires,
+  not VAL-B2's own status. See the corresponding conditional-acceptance
+  update in
+  [`../05-qa/task-003-validation-results.md`](../05-qa/task-003-validation-results.md)
+  §5. **This does not unblock Task 004 implementation** — see the next
+  bullet.
+- **Task 004 still requires its own separate gate-opening act and final
+  implementation prompt**, both explicitly accepted by ChatGPT, before any
+  code is written. DEC-021 authorizes gate-opening *review* preparation
+  only (this session's Phase 7 package;
+  [`task-004-gate-opening-proposal.md`](./task-004-gate-opening-proposal.md),
+  [`task-004-readiness-check-substrate-gate.md`](./task-004-readiness-check-substrate-gate.md),
+  [`task-004-final-implementation-prompt.md`](./task-004-final-implementation-prompt.md)
+  — all draft, none authorizing code).
+- **TD-001 routing remains a hard pre-start condition.** Per
+  [`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md)'s
+  routing note: TD-001 must be explicitly named — either as a mandatory
+  first Task 004 implementation acceptance criterion, or as its own
+  separate pre-Task-004 patch — before or inside the Task 004 gate. No
+  Task 004 implementation may silently inherit the existing
+  `core_readiness_check` collision behavior.
+- **Constraint carried forward from DEC-021:** no customer-facing
+  readiness pass, activation, setup wizard, or domain sync may depend on
+  the unproven VAL-B2. Any Task 004 readiness-signal design must show
+  unknown/not-proven when VAL-B2 evidence is absent — never an inferred
+  "connected"/"pass" state.
 - **VAL-B2 is pending on an unresolved token-acquisition question
   (MBQ-05).** Per the decision brief and
   [`../03-architecture/shopify-token-acquisition-options.md`](../03-architecture/shopify-token-acquisition-options.md):
@@ -104,7 +135,15 @@ not newly invented here. **All** of the following must hold, not just some:
    decided acquisition path, or (b) ChatGPT explicitly accepts a formal
    re-scoping of VAL-B2 (e.g., deferring it with a named, documented
    condition) — silently treating VAL-B2 as "close enough" is not
-   acceptable per the decision brief §8.
+   acceptable per the decision brief §8. **Partially satisfied for
+   gate-opening *review* only, per
+   [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+   (2026-07-07):** ChatGPT has formally deferred VAL-B2 from this gate,
+   satisfying condition (b) for the narrow purpose of allowing Task 004
+   gate-opening review to proceed. **This is a deferral, not a proof of
+   connection** — VAL-B2 itself is still not passed, and this condition is
+   still not satisfied for Task 004 *implementation* to start, which
+   requires its own separate gate-opening act per item 5 below.
 2. **Task 003's validation record must be accepted by ChatGPT.** A partial
    record, however clean, is not the same as an accepted one. The
    `task-003-validation-results.md` Go/No-Go section (§5) currently reads
@@ -322,6 +361,19 @@ naturally reference.
   confirmed mergeable. No further work (including any Task 004 work, any
   Task 003 work, or any edit to `research-handoff.md`) is performed in this
   session.
+- **This revision (2026-07-07, after PR #111 merged, branch
+  `claude/task-004-gate-opening-w3f1zg`):** after ChatGPT's control-room
+  decision to defer VAL-B2 from the Task 003 → Task 004 gate
+  ([`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)),
+  this session updated §1's gate-status bullet and §2 item 1 above to
+  record that Task 004 may now proceed to gate-opening *review* only, and
+  prepared the Task 004 gate-opening package
+  (`task-004-gate-opening-proposal.md`,
+  `task-004-readiness-check-substrate-gate.md`,
+  `task-004-final-implementation-prompt.md`,
+  `../05-qa/task-004-manual-validation-checklist.md`). **Task 004
+  implementation is still not started and is still not authorized by this
+  session or by DEC-021.**
 
 ---
 

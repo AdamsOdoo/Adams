@@ -254,3 +254,43 @@ the new-merchant onboarding gap as a documented limitation for now) or Option B
 (commit to building OAuth immediately), say so explicitly; either is a
 reasonable call given the evidence, but this brief's own recommendation is the
 lower-risk, evidence-gathering path in §4.
+
+## 11. ChatGPT deferral decision for Task 004 gate
+
+Recorded 2026-07-07, per
+[`DEC-021`](./DEC-021-val-b2-deferral-for-task-004.md) (VAL-B2 Deferral for
+Task 004 Gate). This section records ChatGPT's control-room decision to
+defer VAL-B2 — and, as a direct consequence, this brief's own open
+token-acquisition question — from the Task 003 → Task 004 gate. It does
+**not** amend §§1–10 above, which remain the accurate record of the
+evidence, options, and recommendation as they stood before this decision.
+
+- **Option C remains recommended but unproven.** Nothing in this deferral
+  changes §4's recommendation or resolves the decision-critical open
+  question in §2 (whether OAuth authorization-code-grant actually works
+  against a Dev-Dashboard-created custom app). The empirical experiment
+  described in §4 has still not executed (see §10a).
+- **The OAuth/manual token experiment is deferred from the Task 004
+  gate** — it is not required to run, and does not need to succeed,
+  before Task 004 may proceed to **gate-opening review**. It remains
+  required before customer-facing setup, activation, or any live
+  "connected" claim.
+- **Token acquisition remains unresolved for customer-facing setup.**
+  This deferral is scoped narrowly to unblocking Task 004's
+  gate-opening *review* — it does not resolve, and must not be read as
+  resolving, how a new merchant obtains a compatible token.
+- **MBQ-05 is deferred for Task 004 only — not resolved.** See the
+  corresponding update to
+  [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
+  MBQ-05 remains an open question at the product/architecture level.
+- **Task 004 must not implement OAuth.** No OAuth code of any kind is
+  authorized by this deferral or by any Task 004 gate-opening package
+  that cites it.
+- **Task 004 must not claim live connection proof.** Any Task 004
+  readiness-signal design must show unknown/not-proven when VAL-B2
+  evidence is absent — it must never assert a live "connected"/"pass"
+  state from an inference or from the mere presence of a stored token.
+- **VAL-B2 remains deferred, not passed.** This deferral is not a pass,
+  not a fail, and not a waiver of VAL-B2 — see
+  [`../05-qa/task-003-validation-results.md`](../05-qa/task-003-validation-results.md)
+  §5 for the corresponding conditional-acceptance record.

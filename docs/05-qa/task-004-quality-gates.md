@@ -23,18 +23,42 @@ Modeled on this project's existing gate discipline
 
 ## 1. Pre-start gate
 
+> **State as of 2026-07-07, per
+> [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md):**
+> Task 004 implementation is **still not started**. ChatGPT has formally
+> **deferred VAL-B2** from the Task 003 → Task 004 gate, which allows
+> Task 004 to proceed to **gate-opening review only** — the checkboxes
+> below are **not** satisfied by that deferral alone, and none is checked
+> off by this document. TD-001's routing *requirement* is now recorded
+> (`../05-qa/technical-debt-register.md`), but the actual routing
+> *decision* (fixed in Task 004 vs. a separate patch) remains open pending
+> the gate-opening package's review. **No customer-facing readiness pass,
+> activation, setup wizard, or domain sync may depend on the unproven
+> VAL-B2** — this constraint applies to every gate below, not just the
+> pre-start gate.
+
 Before any Task 004 code is written:
 
 - [ ] Task 003 manual validation (`task-003-validation-results.md`) has an
       actual ChatGPT-reviewed Go/No-Go recommendation — not "not yet
-      determined."
+      determined." **Conditionally accepted 2026-07-07 for Task 004
+      gate-opening review purposes only, per DEC-021 — still requires
+      ChatGPT's own review of this PR to become the actual acceptance
+      act.**
 - [ ] VAL-B2 has passed, or ChatGPT has explicitly accepted a formal
       re-scope of it (per the token-acquisition decision brief §8–§9).
+      **Formally deferred (not re-scoped, not passed) 2026-07-07 via
+      DEC-021, for Task 004 gate-opening review only.**
 - [ ] MBQ-05 (token-acquisition direction) is accepted or explicitly
-      deferred by ChatGPT.
+      deferred by ChatGPT. **Deferred for Task 004 only 2026-07-07 via
+      DEC-021 — not resolved; see `master-blueprint-open-questions.md`
+      MBQ-05 row.**
 - [ ] TD-001's routing decision is made (folded into the Task 004 gate by
       name, or scheduled as its own separate follow-up patch) — not left
-      silently unrouted.
+      silently unrouted. **Routing requirement recorded 2026-07-07**
+      (`../05-qa/technical-debt-register.md`); the specific choice (fold
+      into Task 004 vs. separate patch) remains open, to be fixed in the
+      accepted gate-opening act.
 - [ ] MBQ-06's residual (exact readiness-check copy/XML IDs/thresholds) is
       fixed in the Task 004 task prompt itself, not left as a TBD inside
       the code.

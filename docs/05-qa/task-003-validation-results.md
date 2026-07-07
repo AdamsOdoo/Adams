@@ -283,19 +283,39 @@ new bug-fix task (if it must be corrected before Task 004).
 
 ## 5. Go/No-Go recommendation
 
-**Not yet determined — this session provides partial results only.** Task
-003 manual validation cannot be called Go or No-Go until VAL-B2 (or a
-formal decision to re-scope it, see the open follow-up in
-`docs/01-research/research-handoff.md`), VAL-C1's server-log-grep half,
-and the remaining not-tested items (VAL-A4, VAL-B4–B7, VAL-C3, VAL-D1–D2,
-VAL-G1–G4) are resolved in a future live session.
+**Conditionally accepted — deferred, not a full Go, not a No-Go — per
+ChatGPT's [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+control-room decision.** ChatGPT has formally **deferred VAL-B2 from the
+Task 003 → Task 004 gate**, so that Task 004 may proceed to a
+**gate-opening review stage only** (not implementation) despite VAL-B2's
+unresolved status. This is a deferral, not a pass: **VAL-B2 is not
+passed, not failed, and not waived.** Task 003 is **conditionally
+accepted only for the purpose of proceeding to Task 004 gate-opening
+review** — it is explicitly **not** accepted as fully complete, and it is
+**not** accepted as proof that a live valid Shopify connection has ever
+been established. Live valid-token connection remains **unproven**. Task
+003 is **not fully complete for customer-facing readiness**, and the
+connector must not claim customer-facing setup readiness until VAL-B2 (or
+an accepted replacement validation) passes. The remaining live-validation
+gaps — VAL-B2 itself, VAL-C1's server-log-grep half, and the not-tested
+items (VAL-A4's DB/registry half, VAL-B4–B7, VAL-C3's live
+re-confirmation, VAL-D1–D2's live-observation halves, VAL-E1, VAL-G1–G4)
+— are **retained as deferred/residual items**, not closed and not
+silently dropped. **Task 004 may only proceed to gate-opening *review*,
+not implementation, until a separate Task 004 gate-opening package is
+itself accepted by ChatGPT** — see
+[`../07-implementation-plan/task-004-gate-opening-proposal.md`](../07-implementation-plan/task-004-gate-opening-proposal.md).
 
-- **Recommendation:** _Partial — not a full Go, not a No-Go. Every item
+- **Recommendation:** _Conditional acceptance for Task 004 gate-opening
+  review purposes only, per DEC-021 — not a full Go, not a No-Go, and not
+  a claim that Task 003's live validation has fully passed. Every item
   that was testable without a valid Shopify Admin API token passed or, for
   VAL-A1 and VAL-C1, partially passed within the narrower scope actually
   exercised (see notes below); the positive-connection path (VAL-B2) and
-  everything depending on it remain blocked pending a token-acquisition
-  decision._
+  everything depending on it remain unresolved and are now formally
+  deferred, by ChatGPT decision, from blocking Task 004 gate-opening
+  review specifically — they are not deferred from blocking customer-facing
+  readiness, activation, or any live "connected" claim._
 - **Rationale:** Eight checklist items passed cleanly against the live
   environment (VAL-A2–A3, VAL-B1, VAL-B3, VAL-C2, VAL-E2–E3, VAL-F1), with
   no new defects found. VAL-A1 passed only as an installed-module /
@@ -305,16 +325,25 @@ VAL-G1–G4) are resolved in a future live session.
   was not tested this session. Two items (VAL-B2, VAL-E1) are blocked
   purely by token-tooling availability. **No new runtime code defect was
   observed in the tested paths.** Twelve items were not exercised this
-  session and are not assumed to pass.
-- **Conditions (if "Go with conditions"):** Not proposed in this docs-only
-  session — routed to ChatGPT per `docs/01-research/research-handoff.md`'s
-  open follow-up (offline/custom-app-token-only MVP vs. introducing
-  OAuth/Dev-Dashboard-compatible token acquisition).
+  session and are not assumed to pass. This rationale is unchanged by
+  DEC-021 — DEC-021 changes only what the Task 003 → Task 004 *gate*
+  requires, not the underlying test results recorded above.
+- **Conditions (Go with conditions, for Task 004 gate-opening review
+  only):** Per DEC-021 — (1) VAL-B2 remains deferred, not passed, and must
+  not be represented otherwise anywhere in the Task 004 gate package; (2)
+  any Task 004 readiness-signal design must show unknown/not-proven when
+  VAL-B2 evidence is absent, never an inferred "connected"/"pass"; (3)
+  TD-001 must be explicitly routed inside or before the Task 004 gate
+  (see `technical-debt-register.md`); (4) Task 004 implementation itself
+  still requires its own separate gate-opening act and final
+  implementation prompt, both explicitly accepted by ChatGPT.
 - **Blocking defects (if "No-Go"):** None — no new runtime code defect was
   observed in the tested paths. However, token acquisition remains an
   unresolved product/architecture setup blocker before customer-facing
   setup can be accepted, and VAL-C1's server-log scan and several other
-  checklist items remain not tested.
+  checklist items remain not tested. **This conditional acceptance does
+  not resolve any of these gaps — it only permits Task 004 to move to
+  gate-opening review, per DEC-021.**
 
 ## 6. Sign-off
 
@@ -325,12 +354,15 @@ VAL-G1–G4) are resolved in a future live session.
 
 ## 7. Handoff
 
-**Task 004 remains blocked.** This partial validation record must be
-reviewed and accepted by ChatGPT before any further Task 003 validation
-work, and certainly before any Task 004 (or other next-feature) session is
-authorized. See `docs/01-research/research-handoff.md` for the full
-compact handoff entry and the open token-acquisition follow-up this session
-routes to ChatGPT.
+**Task 004 implementation remains blocked.** Per
+[`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md),
+ChatGPT has formally deferred VAL-B2 from the Task 003 → Task 004 gate,
+which allows Task 004 to proceed to **gate-opening review only** — not to
+implementation. This partial validation record, together with DEC-021,
+must be reviewed and accepted by ChatGPT before any Task 004 (or other
+next-feature) implementation session is authorized. See
+`docs/01-research/research-handoff.md` for the full compact handoff entry
+and DEC-021 for the formal deferral decision this session records.
 
 ---
 
