@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.2.3',
+    'version': '19.0.1.3.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
         'settings, location cache, binding mixin, job and job log models, '

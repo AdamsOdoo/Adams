@@ -6,3 +6,4 @@ from . import shopify_connector_location
 from . import shopify_connector_binding_mixin
 from . import shopify_connector_job
 from . import shopify_connector_job_log
+from . import shopify_connector_readiness_check
