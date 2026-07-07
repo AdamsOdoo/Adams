@@ -13,7 +13,12 @@
 
 Prepared 2026-07-07, companion to
 [`task-004-readiness-preflight.md`](./task-004-readiness-preflight.md).
-Docs-only. Branch `claude/task-004-readiness-preflight-vgbkt3`.
+Docs-only. Branch `claude/task-004-readiness-preflight-vgbkt3`. **Revised
+2026-07-07** after **PR #109** (Fable/OAuth token-acquisition experiment,
+blocked before execution) and **PR #110** (static/offline Task 003
+validation sweep) both merged into `Shopify-connector` — see §7 for what
+changed and why the original "sessions in flight" framing has been
+corrected to the past tense.
 
 ---
 
@@ -93,8 +98,9 @@ consumes only merged predecessors; no task reaches forward.").
 | 2 | Task 003 Go/No-Go recommendation | **Not yet determined** — partial results only | `../05-qa/task-003-validation-results.md` §5 |
 | 3 | MBQ-05 (token-acquisition direction) | **Open** — Option C is a Recommendation, not accepted; empirical experiment not yet run | `../04-decisions/shopify-token-acquisition-decision-brief.md`; `master-blueprint-open-questions.md` |
 | 4 | Empirical OAuth exchange experiment | **Blocked before execution twice-attempted-scope** — no Fable-equivalent tool/connector and no Shopify Dev Dashboard credentials available in the one session that attempted it | `../05-qa/task-003-validation-results.md` §8; decision brief §10a |
-| 5 | VAL-C1 server-log-grep half | **Not tested** | `../05-qa/task-003-validation-results.md` |
-| 6 | VAL-A4, VAL-B4–B7, VAL-C3, VAL-D1–D2, VAL-E1, VAL-G1–G4 | **Not tested / blocked** | `../05-qa/task-003-manual-validation-checklist.md`; results doc |
+| 5 | VAL-C1 server-log-grep half | **Not tested** — confirmed by PR #110 (merged) as "not testable in that session's environment" (no live Odoo runtime or log files available); still not tested by any session | `../05-qa/task-003-validation-results.md` |
+| 6 | VAL-A4, VAL-C3, VAL-D1, VAL-D2 | **Statically confirmed by PR #110 (merged)** — repo/source-level evidence only, not live-environment proof | `../05-qa/task-003-static-validation-sweep.md`; `../05-qa/task-003-no-side-effect-baseline.md`; `../05-qa/task-003-server-log-redaction-check.md`; results doc |
+| 6a | VAL-B4–B7, VAL-E1, VAL-G1–G4 | **Not tested / blocked** — unaffected by PR #109 or PR #110 | `../05-qa/task-003-manual-validation-checklist.md`; results doc |
 | 7 | TD-001 (`core_readiness_check` idempotency collision) | **Open**, unrouted beyond its register entry — no gate has yet named it explicitly | `../05-qa/technical-debt-register.md` |
 | 8 | No Task 004 gate-opening act exists | **Not started** — no document analogous to `task-003-api-client-test-connection-gate.md` exists for Task 004 | this repo (absence confirmed) |
 | 9 | No Task 004 final implementation prompt exists | **Not started** | this repo (absence confirmed) |
@@ -219,21 +225,30 @@ session has a single checklist:
 
 ## 7. Conflict map — files future implementation sessions must not touch without explicit approval
 
-This table exists so that (a) the two sessions currently in flight alongside
-this one, and (b) any future Task 004 gate/implementation session, do not
-collide with each other or with this preflight package.
+**Revision note (2026-07-07):** the two sessions this table originally
+described as "currently in flight alongside this one" have both since
+**merged** — the Fable/OAuth experiment as **PR #109** and the
+static/offline Task 003 validation sweep as **PR #110**. This table is
+updated below to reflect that: it no longer describes their file changes
+as expected/future, and it no longer treats them as a live collision risk
+for this package. It still exists so that (a) this package's own file
+choices are recorded accurately, and (b) any future Task 004 gate/
+implementation session knows which files carry standing sensitivity
+(e.g., `research-handoff.md`, the MBQ register) regardless of which
+specific session last touched them.
 
-| File | Owned by / touched by | Why it's sensitive |
+| File | Touched by (historical) | Why it's sensitive |
 | --- | --- | --- |
-| `docs/05-qa/task-003-validation-results.md` | Static/offline Task 003 validation sweep session; Fable/OAuth experiment session | Both parallel sessions are expected to append new sections here (per the existing §8-style continuation-entry pattern). **This preflight session did not touch it.** |
-| `docs/04-decisions/shopify-token-acquisition-decision-brief.md` | Fable/OAuth experiment session | Expected to gain a new continuation-attempt section (§10a-style) if that session runs the empirical exchange. **This preflight session did not touch it.** |
-| `docs/01-research/research-handoff.md` | Both parallel sessions (each is required to prepend its own compact handoff entry per `CLAUDE.md` §12) | High collision risk — this file is prepended-to by nearly every session. **This preflight session did not touch it**, per this session's own explicit instruction to avoid it unless absolutely necessary. |
-| `docs/05-qa/task-003-manual-validation-checklist.md` | Static/offline Task 003 validation sweep session | May gain wording clarifications (as VAL-C1 already did in PR #107) if the sweep session finds an ambiguity. |
-| `docs/05-qa/technical-debt-register.md` | Not owned by any currently-running session | TD-001 lives here; a future TD-001 routing decision (§4 item 3 above) would edit this file — not this preflight session, and not (as far as is known) either parallel session. |
-| `docs/03-architecture/master-blueprint-open-questions.md` | Reserved for ChatGPT-reviewed MBQ closure notes only | MBQ-05/MBQ-06 rows should only be edited by a session ChatGPT has explicitly authorized to record a closure — not by this preflight session (confirmed: not edited here). |
-| `docs/07-implementation-plan/task-004-*.md` (this package) | This session only | The four files this session created. A future Task 004 gate-opening session should treat these as background material to read, not necessarily to edit in place — a gate-opening act should be its own new document, following the `task-00X-*-gate.md` precedent, rather than rewriting this preflight package's status in place. |
-| `docs/06-prompts/task-004-candidate-claude-prompts.md` (this package) | This session only | Draft-only prompts; a future authorized Task 004 session should treat these as a starting point, not a binding spec — the binding spec is whatever future `task-004-final-implementation-prompt.md` ChatGPT actually accepts. |
-| `docs/05-qa/task-004-quality-gates.md` (this package) | This session only | Generic gate checklist; does not assume Task 004's final scope. |
+| `docs/05-qa/task-003-validation-results.md` | Static/offline Task 003 validation sweep (PR #110, merged) added a static/offline addendum; the Fable/OAuth experiment (PR #109, merged) added a §8 continuation entry before it | Both already landed cleanly, in sequence (PR #109 merged first, PR #110 merged on top and preserved PR #109's content unchanged, per PR #110's own test plan). **This preflight package did not touch it, in either the original session or this revision.** |
+| `docs/04-decisions/shopify-token-acquisition-decision-brief.md` | Fable/OAuth experiment (PR #109, merged) — added the §10a continuation-attempt section | Already landed. **This preflight package did not touch it, in either the original session or this revision.** |
+| `docs/01-research/research-handoff.md` | Both PR #109 and PR #110 (each prepended its own compact handoff entry per `CLAUDE.md` §12) | High-churn file — prepended-to by nearly every session. **This preflight package did not touch it, in either the original session or this revision**, per this session's own explicit instruction to avoid it unless ChatGPT asks for a handoff entry. |
+| `docs/05-qa/task-003-manual-validation-checklist.md` | Not touched by PR #110 in the end (its wording clarification landed earlier, in PR #107) | No longer an active collision concern for this package. |
+| `docs/05-qa/task-003-static-validation-sweep.md`, `task-003-no-side-effect-baseline.md`, `task-003-server-log-redaction-check.md` | New files added by PR #110 (merged) | Background evidence this package's §1/§2 now cites; not edited by this package. |
+| `docs/05-qa/technical-debt-register.md` | Not touched by PR #109, PR #110, or this package | TD-001 lives here; a future TD-001 routing decision (§4 item 3 above) would edit this file — still not this preflight package's place to do so. |
+| `docs/03-architecture/master-blueprint-open-questions.md` | Reserved for ChatGPT-reviewed MBQ closure notes only | MBQ-05/MBQ-06 rows should only be edited by a session ChatGPT has explicitly authorized to record a closure — not touched by PR #109, PR #110, or this package. |
+| `docs/07-implementation-plan/task-004-*.md` (this package) | This session (original draft + this revision) only | A future Task 004 gate-opening session should treat these as background material to read, not necessarily to edit in place — a gate-opening act should be its own new document, following the `task-00X-*-gate.md` precedent, rather than rewriting this preflight package's status in place. |
+| `docs/06-prompts/task-004-candidate-claude-prompts.md` (this package) | This session (original draft + this revision) only | Draft-only prompts; a future authorized Task 004 session should treat these as a starting point, not a binding spec — the binding spec is whatever future `task-004-final-implementation-prompt.md` ChatGPT actually accepts. |
+| `docs/05-qa/task-004-quality-gates.md` (this package) | This session (original draft + this revision) only | Generic gate checklist; does not assume Task 004's final scope. |
 
-**No file outside this list, and outside the four files this session
-created, was modified.**
+**No file outside this list, and outside the four files this package
+owns, was modified — in the original session or in this revision.**

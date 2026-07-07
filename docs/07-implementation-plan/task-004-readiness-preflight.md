@@ -12,14 +12,20 @@
 
 ## Status
 
-**Docs-only preflight package. Prepared 2026-07-07** on branch
-`claude/task-004-readiness-preflight-vgbkt3`, branched from
-`Shopify-connector` at its tip after PR #109 merged (merge commit
-`9d0bc11dac55b5fd6cdf338dfec2909e96364f45`). Written in parallel with (and
-deliberately non-overlapping against) two other in-flight sessions: a
-Fable/manual-OAuth token-acquisition experiment session, and a
-static/offline Task 003 validation sweep session. See §7 "Conflict
-avoidance with parallel sessions" below.
+**Docs-only preflight package. Prepared 2026-07-07, revised 2026-07-07**
+on branch `claude/task-004-readiness-preflight-vgbkt3`, originally branched
+from `Shopify-connector` at its tip after PR #109 merged (merge commit
+`9d0bc11dac55b5fd6cdf338dfec2909e96364f45`). This revision updates the
+package after two sessions that were in flight at the time of the original
+draft have since **merged**: **PR #109** (the Fable/manual-OAuth
+token-acquisition experiment, recorded as blocked before execution — no
+Fable tool and no Shopify Dev Dashboard credentials were available) and
+**PR #110** (the static/offline Task 003 validation sweep, recording
+additional static evidence for VAL-A4/VAL-C1(server-log
+half)/VAL-C3/VAL-D1/VAL-D2). Neither PR changed Task 003's overall
+incomplete status or Task 004's blocked status. See §7 "History — prior
+sessions, now merged" below for what changed and why this document no
+longer describes them as concurrent or expected.
 
 This document does not itself change the status of Task 003 or Task 004. It
 only restates their current, already-recorded status (§1) and organizes
@@ -36,23 +42,33 @@ here is a new finding or a new decision.
 - **Task 003 (API client + test connection) is merged but its manual
   validation is incomplete.** Per
   [`../05-qa/task-003-validation-results.md`](../05-qa/task-003-validation-results.md)
-  (PR #107, extended by a blocked continuation session recorded in PR #109):
-  eight checklist items passed live against a real Odoo 19 + Shopify
-  development-store session (VAL-A2, VAL-A3, VAL-B1, VAL-B3, VAL-C2, VAL-E2,
-  VAL-E3, VAL-F1), VAL-A1 passed only as an installed-module/registry-load
-  observation (a fresh clean install/upgrade was not re-executed), VAL-C1 is
-  **PARTIAL** (DB/ORM leakage scan passed; server-log grep half not tested),
-  and **VAL-B2 — the valid-token positive-connection test — remains
-  BLOCKED**, with VAL-E1 blocked as a direct consequence. VAL-A4, VAL-B4–B7,
-  VAL-C3, VAL-D1–D2, and VAL-G1–G4 remain not tested. **Task 003 manual
-  validation has not been called Go or No-Go.**
+  (PR #107; extended by a blocked continuation session recorded in **PR
+  #109, merged**; extended again by a static/offline validation sweep
+  recorded in **PR #110, merged**): eight checklist items passed live
+  against a real Odoo 19 + Shopify development-store session (VAL-A2,
+  VAL-A3, VAL-B1, VAL-B3, VAL-C2, VAL-E2, VAL-E3, VAL-F1), VAL-A1 passed
+  only as an installed-module/registry-load observation (a fresh clean
+  install/upgrade was not re-executed), and **VAL-B2 — the valid-token
+  positive-connection test — remains BLOCKED**, with VAL-E1 blocked as a
+  direct consequence. PR #110's static/offline sweep additionally
+  confirmed, by static repo/source evidence (not live-environment proof):
+  VAL-A4 (no XML/menu/action/wizard/controller/cron introduced), VAL-C3
+  (exactly two `sudo()` call sites), VAL-D1 (the test-connection query is
+  read-only, no mutation string exists), and VAL-D2 (no domain model is
+  touched). VAL-C1 remains **PARTIAL** (DB/ORM leakage scan passed; the
+  server-log grep half was confirmed **not testable in that session's
+  environment** — no live Odoo runtime or log files were available —
+  and remains not tested). VAL-B4–B7 and VAL-G1–G4 remain not tested. **Task
+  003 manual validation has not been called Go or No-Go.**
 - **Task 004 is blocked.** Per
   [`../04-decisions/shopify-token-acquisition-decision-brief.md`](../04-decisions/shopify-token-acquisition-decision-brief.md)
   §9 ("Can Task 004 start before this is resolved? **No.**") and every
-  research-handoff entry since (PR #107, #108, #109): Task 004 remains
+  research-handoff entry since (PR #107, #108, #109, #110): Task 004 remains
   blocked pending both Task 003 completion/acceptance and a decided
-  token-acquisition direction. This preflight package does not change that
-  conclusion.
+  token-acquisition direction. Neither PR #109 nor PR #110 changed this —
+  no valid Shopify Admin API token was used or obtained by either, and
+  neither claims OAuth succeeded or that VAL-B2 passed. This preflight
+  package does not change that conclusion either.
 - **VAL-B2 is pending on an unresolved token-acquisition question
   (MBQ-05).** Per the decision brief and
   [`../03-architecture/shopify-token-acquisition-options.md`](../03-architecture/shopify-token-acquisition-options.md):
@@ -262,55 +278,92 @@ naturally reference.
 
 ## 6. Session handoff
 
-- **Branch:** `claude/task-004-readiness-preflight-vgbkt3`, branched from
-  `Shopify-connector` at merge commit
-  `9d0bc11dac55b5fd6cdf338dfec2909e96364f45` (PR #109's merge commit).
-- **Files changed this session:**
-  - `docs/07-implementation-plan/task-004-readiness-preflight.md` (this
-    file, new)
-  - `docs/07-implementation-plan/task-004-dependency-map.md` (new)
-  - `docs/06-prompts/task-004-candidate-claude-prompts.md` (new)
-  - `docs/05-qa/task-004-quality-gates.md` (new)
-  - No other file was created or modified. `docs/01-research/research-handoff.md`,
-    `docs/05-qa/task-003-validation-results.md`, and
-    `docs/04-decisions/shopify-token-acquisition-decision-brief.md` were
-    read for context but **not edited**, to avoid merge conflicts with the
-    two parallel sessions named in §7.
+- **Branch:** `claude/task-004-readiness-preflight-vgbkt3`.
+- **Original session (2026-07-07):** branched from `Shopify-connector` at
+  merge commit `9d0bc11dac55b5fd6cdf338dfec2909e96364f45` (PR #109's merge
+  commit). Created this file plus
+  `docs/07-implementation-plan/task-004-dependency-map.md`,
+  `docs/06-prompts/task-004-candidate-claude-prompts.md`, and
+  `docs/05-qa/task-004-quality-gates.md`. No other file was created or
+  modified; `docs/01-research/research-handoff.md`,
+  `docs/05-qa/task-003-validation-results.md`, and
+  `docs/04-decisions/shopify-token-acquisition-decision-brief.md` were read
+  for context but not edited, to avoid colliding with the two sessions
+  named in §7 that were in flight at the time (PR #109 and PR #110, both
+  since merged).
+- **This revision (2026-07-07, after PR #109 and PR #110 merged):** merged
+  the latest `Shopify-connector` (which now includes PR #110's static/offline
+  Task 003 validation sweep on top of PR #109) into this branch, then
+  updated wording in this file and in `task-004-dependency-map.md` that
+  described PR #109's and PR #110's work as still concurrent or expected —
+  both have merged, so that wording is now stale and has been corrected to
+  the past tense with their actual recorded outcomes. **No file outside the
+  four allowed files was edited in this revision either** —
+  `research-handoff.md`, `task-003-validation-results.md`, and
+  `shopify-token-acquisition-decision-brief.md` remain untouched by this
+  session, per this session's own explicit instruction to avoid churn in
+  those files unless ChatGPT asks for a handoff entry.
 - **What was prepared:** a Task 004 readiness preflight (this document), a
-  dependency map (§ below file), a set of draft-only, explicitly
-  not-runnable candidate Claude prompts for Task 004's eventual sub-slices,
-  and a generic Task 004 quality-gate checklist — all sourced from
-  already-existing, already-merged planning material, not from new
-  research or new architecture decisions.
-- **What remains blocked:** Task 003 manual validation (VAL-B2 and 11 other
-  items); the MBQ-05 token-acquisition direction; and, as a direct
-  consequence of both, Task 004 itself. **Nothing in this session changes
-  any of that.**
-- **No code changed:** confirmed. No file under `addons/`, no `*.py`,
-  `*.xml`, `*.csv`, manifest, security, test, migration, CI, or Dockerfile
-  was created or modified. Only the four Markdown files listed above.
-- **Stop condition:** this session stops once the four allowed files are
-  written, `git diff` is confirmed to touch only those four files, the
-  branch is pushed, and a draft PR into `Shopify-connector` is opened. No
-  further work (including any Task 004 work, any Task 003 work, or any
-  edit to `research-handoff.md`) is performed in this session.
+  dependency map, a set of draft-only, explicitly not-runnable candidate
+  Claude prompts for Task 004's eventual sub-slices, and a generic Task 004
+  quality-gate checklist — all sourced from already-existing, already-merged
+  planning material, not from new research or new architecture decisions.
+- **What remains blocked:** Task 003 manual validation (VAL-B2 and several
+  other items — see §1) and the MBQ-05 token-acquisition direction; and, as
+  a direct consequence of both, Task 004 itself. **Nothing in this session,
+  nor in PR #109 or PR #110, changes any of that.**
+- **No code changed:** confirmed, in both the original session and this
+  revision. No file under `addons/`, no `*.py`, `*.xml`, `*.csv`, manifest,
+  security, test, migration, CI, or Dockerfile was created or modified.
+  Only the four Markdown files listed above.
+- **Stop condition:** this revision stops once the four allowed files are
+  updated, `git diff` against latest `Shopify-connector` is confirmed to
+  touch only those four files, the branch is pushed, and PR #111 is
+  confirmed mergeable. No further work (including any Task 004 work, any
+  Task 003 work, or any edit to `research-handoff.md`) is performed in this
+  session.
 
 ---
 
-## 7. Conflict avoidance with parallel sessions
+## 7. History — prior sessions, now merged
 
-This session was explicitly scoped not to overlap with two other sessions
-that may be running concurrently:
+At the time this package was originally drafted, two other sessions were
+in flight and this document described them as concurrent/expected. Both
+have since **merged**, so that framing is now stale; this section restates
+what actually happened and why the file-avoidance choices in §6 still
+stand, for a different reason (avoiding unnecessary churn, not avoiding a
+live conflict):
 
-- **The Fable/manual OAuth token-acquisition experiment session** — expected
-  to touch `docs/05-qa/task-003-validation-results.md` (§8-style
-  continuation entries), `docs/04-decisions/shopify-token-acquisition-decision-brief.md`
-  (§10a-style continuation entries), and `docs/01-research/research-handoff.md`.
-- **The static/offline Task 003 validation sweep session** — expected to
-  touch `docs/05-qa/task-003-validation-results.md`,
-  `docs/05-qa/task-003-manual-validation-checklist.md`, and
-  `docs/01-research/research-handoff.md`.
+- **The Fable/manual OAuth token-acquisition experiment — merged as PR
+  #109.** The experiment did not execute: no Fable-equivalent
+  browser-automation tool and no Shopify Dev Dashboard credentials were
+  available to that session, so it stopped before reaching the Shopify Dev
+  Dashboard. PR #109 recorded this outcome in
+  `docs/05-qa/task-003-validation-results.md` (§8) and
+  `docs/04-decisions/shopify-token-acquisition-decision-brief.md` (§10a),
+  and added its own compact handoff entry to
+  `docs/01-research/research-handoff.md`. No OAuth attempt was made; VAL-B2
+  is unchanged (still BLOCKED); MBQ-05 is unchanged (still open).
+- **The static/offline Task 003 validation sweep — merged as PR #110.**
+  This session completed static/offline evidence for the checklist items
+  that do not require a valid Shopify Admin API token (VAL-A4, VAL-C3,
+  VAL-D1, VAL-D2, and the VAL-C1 server-log-half finding of "not testable
+  in this session's environment"). It added three new QA documents
+  (`task-003-static-validation-sweep.md`,
+  `task-003-no-side-effect-baseline.md`,
+  `task-003-server-log-redaction-check.md`), appended a static/offline
+  addendum to `task-003-validation-results.md`, and added its own compact
+  handoff entry to `research-handoff.md`. No real Shopify token was used;
+  VAL-B2 remains BLOCKED/not attempted; Task 003 remains incomplete.
+- **Net effect on this package:** neither merge changes anything in §1–§5
+  above beyond the specific static-evidence updates already folded into
+  §1. Task 003 is still incomplete, Task 004 is still blocked, and MBQ-05
+  is still open. This session's own file-avoidance choice (not editing
+  `research-handoff.md`, `task-003-validation-results.md`, or
+  `shopify-token-acquisition-decision-brief.md`) continues in this
+  revision, now simply because no handoff-entry update was requested for
+  this revision — not because of any remaining conflict risk with PR #109
+  or PR #110, which are both already merged and closed.
 
-This session deliberately avoided editing any of those three files. See
-[`task-004-dependency-map.md`](./task-004-dependency-map.md) §"Conflict
-map" for the full file-overlap analysis.
+See [`task-004-dependency-map.md`](./task-004-dependency-map.md) §"Conflict
+map" for the corresponding, similarly-updated file-ownership table.
