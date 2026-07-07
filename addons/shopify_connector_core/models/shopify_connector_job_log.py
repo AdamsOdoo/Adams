@@ -1,5 +1,6 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
+from ..tools.redaction import redact
 from .shopify_connector_job import JOB_STATE_SELECTION
 
 
@@ -54,3 +55,34 @@ class ShopifyConnectorJobLog(models.Model):
         default=fields.Datetime.now,
         readonly=True,
     )
+
+    @api.model
+    def _system_append(
+        self, job, event_type, message,
+        technical_detail=False, payload_snapshot=False,
+        from_state=False, to_state=False,
+    ):
+        """The one sanctioned write path for system-appended job.log rows.
+
+        No group holds `perm_create` on this model by design -- rows are
+        system-appended, not user-authored (AR-019 §10). This is the only
+        `sudo()` this file contains, mirroring the Task 002
+        `_get_access_token` precedent: never registered as a user-facing
+        action, invoked only from other core/domain service code that
+        already holds an ACL-gated reference to `job` (all four roles hold
+        `perm_read=1` on both `job` and `job.log` today, so this adds no
+        new visibility -- only the ability to append the audit trail that
+        ACL alone cannot). Every free-text argument is redacted before the
+        row is created; `actor_uid` records the acting user, not the
+        elevated context.
+        """
+        self.sudo().create({
+            'job_id': job.id,
+            'event_type': event_type,
+            'from_state': from_state,
+            'to_state': to_state,
+            'message': redact(message),
+            'technical_detail': redact(technical_detail) if technical_detail else technical_detail,
+            'payload_snapshot': redact(payload_snapshot) if payload_snapshot else payload_snapshot,
+            'actor_uid': self.env.uid,
+        })

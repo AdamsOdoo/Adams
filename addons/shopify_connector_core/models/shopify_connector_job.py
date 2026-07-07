@@ -94,6 +94,7 @@ class ShopifyConnectorJob(models.Model):
         selection=[
             ('core_readiness_check', 'Core Readiness Check'),
             ('core_manual_maintenance', 'Core Manual Maintenance'),
+            ('core_test_connection', 'Core Test Connection'),
         ],
         required=True,
         index=True,
@@ -120,6 +121,13 @@ class ShopifyConnectorJob(models.Model):
     res_model = fields.Char(index=True, readonly=True)
     res_id = fields.Integer(index=True, readonly=True)
     shopify_target_gid = fields.Char(index=True, readonly=True)
+    # payload_hash serves two purposes: a hash of the normalized outbound
+    # payload for target-bearing domain jobs, and a per-run UUID4 nonce for
+    # target-less job types (core_test_connection only, as of Task 003) so
+    # that repeat runs do not collide under the (store_id, idempotency_key)
+    # unique constraint. core_readiness_check shares the identical
+    # target-less exposure but is not fixed by this task -- see TD-001
+    # (docs/05-qa/technical-debt-register.md).
     payload_hash = fields.Char(readonly=True)
     idempotency_key = fields.Char(
         compute='_compute_idempotency_key',

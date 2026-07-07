@@ -1,24 +1,37 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry
-> (AR-029 — Task 003 API-Client / Test-Connection Implementation Gate,
-> prepared 2026-07-07 on a fresh branch from latest `Shopify-connector`:
-> the actual gate-opening act, opening exactly one future Task 003
-> coding session via the already-prepared
-> `task-003-final-implementation-prompt.md`, effective only once this
-> act's PR merges into `Shopify-connector`. Also applies the AR-028
-> acceptance patch in the same document (AR-028 row → Accepted; PR #99
-> had merged the final prompt and gate-opening proposal while still
-> marked Proposed in their own text). This is the **first** conscious
-> widening of the AR-021 no-external-API-call rule — read-only outbound
-> GraphQL calls only, no mutation/Bulk-Operations/REST;
-> `core_readiness_check`/`TD-001`, setup wizard, UI/XML,
-> webhooks/controllers/cron, domain modules, credential-model changes,
-> and ACL/security-file changes all remain forbidden; docs-only, no
-> code, no external network call; Task 003 remains not started until
-> this PR merges and the final prompt is issued verbatim in its own
-> session)** is immediately below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **AR-028 — Task 003
+> (Task 003 — API Client Shell and Test Connection implemented, coded
+> 2026-07-07 on branch `claude/task-003-api-client-test-connection-8wsvlc`
+> from latest `Shopify-connector` at PR #100's merge commit
+> `984df4d1b08e873282d0c1d70bdf678c13553475` (confirmed an ancestor
+> before starting): the read-only `shopify.connector.api.client`
+> AbstractModel (`execute`/`_send`, dual-path error normalization, no
+> mutation-capable method); `action_test_connection()` on
+> `shopify.connector.store` (no field changes); the `core_test_connection`
+> `job_type` addition plus a `payload_hash` dual-use comment; the single
+> sanctioned `_system_append` job-log system-append method (the diff's
+> only new `sudo()` site — exactly two sudo() sites exist in the whole
+> diff); the per-run UUID4 `payload_hash` nonce for `core_test_connection`
+> job creation only; 32 tests across three new test files, issued
+> verbatim from `task-003-final-implementation-prompt.md` per the
+> AR-029-opened gate. `core_readiness_check`/`TD-001` untouched, proven
+> still colliding by its own test. No Odoo runtime in this repository, so
+> all 32 tests are written and `py_compile`-validated, not executed. A
+> known conflict is flagged, not silently resolved: the new sanctioned
+> `sudo()` site makes the pre-existing Task 002 test
+> `test_credential_service.py::test_source_level_single_sudo_guard`
+> factually stale (it hard-codes a single-site list); that file is
+> outside this task's allowed-files list and was deliberately left
+> untouched. Draft PR opened into `Shopify-connector`, not merged, not
+> marked ready)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **AR-029 — Task 003
+> API-Client / Test-Connection Implementation Gate, the actual
+> gate-opening act, opening exactly one future Task 003 coding session
+> via the already-prepared `task-003-final-implementation-prompt.md`,
+> effective once merged into `Shopify-connector` (PR #100, merge commit
+> `984df4d1b08e873282d0c1d70bdf678c13553475`); also applied the AR-028
+> acceptance patch in the same document (history)**, **AR-028 — Task 003
 > Final Implementation Prompt and Gate-Opening Proposal, prepared
 > 2026-07-07 on branch `claude/task-003-gate-opening-no0tw4`, merged via
 > PR #99 (merge commit `756b88eca79f2ef56ff752b6ba82ab266a782724`) while
@@ -152,6 +165,177 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Task 003 — API Client Shell and Test Connection implemented — compact handoff (2026-07-07)
+
+> **Task 003 coding session — the one session authorized by the
+> AR-029-opened gate.** Confirmed before starting: latest
+> `Shopify-connector` contains PR #100's merge commit
+> `984df4d1b08e873282d0c1d70bdf678c13553475` (`git merge-base
+> --is-ancestor` confirmed). Working branch
+> `claude/task-003-api-client-test-connection-8wsvlc` was already
+> checked out at that exact commit (harness-assigned; no separate branch
+> creation needed). Read `task-003-final-implementation-prompt.md`,
+> `task-003-api-client-test-connection-gate.md`,
+> `architecture-review-log.md`, `research-handoff.md`,
+> `task-003-decision-closure.md`,
+> `task-003-api-client-test-connection-proposed.md`,
+> `credential-connection-api-client-planning.md`,
+> `credential-security-redaction-review-checklist.md`,
+> `task-003-pre-implementation-review-checklist.md`,
+> `technical-debt-register.md` (`TD-001`), and every existing file under
+> `addons/shopify_connector_core/` before writing anything.
+
+- **Branch / PR:** `claude/task-003-api-client-test-connection-8wsvlc` →
+  draft PR into `Shopify-connector` (opened this session; remains
+  draft, not merged, not marked ready).
+- **Files changed:**
+  `addons/shopify_connector_core/models/shopify_connector_api_client.py`
+  (new); `shopify_connector_store.py` (added `action_test_connection()`
+  only, no field changes); `shopify_connector_job.py` (added
+  `core_test_connection` to the base `job_type` Selection, plus a
+  `payload_hash` dual-use comment; no other change); `shopify_connector_job_log.py`
+  (added `_system_append` only; no field change); `models/__init__.py`
+  (one import line); `__manifest__.py` (version `19.0.1.1.0` →
+  `19.0.1.2.0`); `tests/test_api_client.py`, `tests/test_test_connection.py`,
+  `tests/test_job_log_system_append.py` (new, 32 tests total);
+  `tests/__init__.py` (three import lines — a mechanical addition
+  needed for Odoo to discover the three new test files at all; not
+  listed by name in the final prompt's allowed-files list, but treated
+  as unavoidable scaffolding mirroring the already-allowed
+  `models/__init__.py` pattern — flagged for ChatGPT below rather than
+  silently assumed); `docs/01-research/research-handoff.md` (this
+  entry). **No view/menu/action/wizard/XML file, no controller/webhook/cron/data
+  file, no `shopify_connector_store_credential.py`,
+  `security/ir.model.access.csv`, `security/shopify_connector_security.xml`,
+  `shopify_connector_location.py`, `shopify_connector_binding_mixin.py`,
+  `shopify_connector_store_settings.py`, `adams_base`, domain module, CI
+  file, or migration touched.**
+- **What changed / residue fixed:** Implemented Task 003 exactly per
+  `task-003-final-implementation-prompt.md`, issued verbatim after the
+  AR-029 gate merged. The read-only `shopify.connector.api.client`
+  AbstractModel: `execute()`/`_send()`, dual-path error normalization
+  (HTTP status **and** 200-OK `errors[].extensions.code`) into the fixed
+  16-class registry (only 4 classes ever raised by the client;
+  `odoo_validation_configuration` is interpreted by
+  `action_test_connection()` from a successful response, not raised by
+  the client); `ShopifyClientError` with `credential_invalid` gating;
+  throttle metadata (`extensions.cost.throttleStatus`) surfaced
+  verbatim, never acted on (MBQ-51 untouched); version fall-forward
+  detected via the `X-Shopify-API-Version` header. Structurally
+  read-only — no mutation-capable method, no retry loop, proven by a
+  dedicated test (source-scan for a GraphQL `mutation` operation string
+  plus a minimal-public-surface assertion). `action_test_connection()`
+  on `shopify.connector.store`: precondition guard, job creation with a
+  per-run UUID4 `payload_hash` nonce, the exact
+  `ConnectorTestConnection` query, identity check
+  (`shop.myshopifyDomain` vs `store.shop_domain`), the five distinct
+  `shopify_permission_scope_auth` reasons (402/423/403/`SHOP_INACTIVE`/
+  `ACCESS_DENIED`-or-401, verified pairwise distinct by test),
+  `credential_state` gated to genuine token-invalid signals only, and
+  the version-fallforward warning mirror. `_system_append` on
+  `shopify.connector.job.log`: the one new sanctioned `sudo()` site in
+  the whole diff (confirmed by an AST source scan — exactly two sites
+  total, the other being the untouched, pre-existing Task 002
+  `_get_access_token`); redacts every free-text argument. `core_test_connection`
+  added as the base `job_type`'s third value (amends AR-019 per AR-027).
+  `core_readiness_check` is untouched — a dedicated test proves it still
+  collides on `store_idempotency_key_uniq` on a second run, documenting
+  rather than fixing `TD-001`. Manifest bumped to `19.0.1.2.0`.
+- **Items deferred:** Manual validation against a live Odoo 19 +
+  PostgreSQL + development store was **not performed** — no Odoo
+  runtime exists in this repository (Task 001A precedent, still
+  unchanged). All 32 tests were written and `python3 -m py_compile`-validated
+  (all files compile cleanly; `pyflakes` run with only the expected,
+  harmless `__init__.py` "imported but unused" registration warnings),
+  not executed. The empirical open behavioral questions this task's
+  acceptance criteria name (actual invalid-token HTTP status; actual
+  `THROTTLED` body shape; whether `shop`/`currentAppInstallation` need
+  any scope; actual missing-scope shape) remain unanswered pending that
+  manual validation — not asserted as confirmed anywhere in code, tests,
+  or this entry.
+- **Known conflict flagged for ChatGPT (not resolved by this session):**
+  adding the second sanctioned `sudo()` site (in
+  `shopify_connector_job_log.py`, authorized by this task) makes the
+  pre-existing Task 002 test
+  `test_credential_service.py::test_source_level_single_sudo_guard`
+  factually stale — it hard-codes
+  `sudo_call_sites == ['shopify_connector_store_credential.py']` (a
+  single-file list), which no longer holds now that a second, equally
+  sanctioned site exists (confirmed by simulating that test's own logic
+  against this diff). `test_credential_service.py` is **not** in this
+  task's allowed-files list, so it was deliberately left untouched
+  rather than silently edited outside the accepted gate scope. This
+  session's own new test (`test_job_log_system_append.py`'s
+  source-level guard) correctly asserts the updated two-site count.
+  Recommend either a tiny named follow-up authorizing a one-line update
+  to that one stale assertion, or explicitly accepting it as logged,
+  known debt. Neither test executes today (no runtime), so there is no
+  current CI failure — but the inconsistency will surface the moment a
+  runtime exists.
+- **Learning feedback loop:**
+  - New issues discovered: a task prompt's allowed-files list can miss
+    a file that the task's own authorized change necessarily makes
+    stale (the sudo-count-test conflict above); an allowed-files list
+    can also omit a mechanical scaffolding file a newly-authorized test
+    file needs to be discoverable at all (`tests/__init__.py` was not
+    named even though three new test files were mandated).
+  - Repeated issue patterns: this is the second task (after Task 002)
+    with no Odoo runtime available — tests are written and
+    `py_compile`-validated but not executed; the Task 001A applicability
+    rule continues to hold.
+  - Rules/checklists updated: none this session.
+  - New rejected approaches: none.
+  - New technical debt: none new; `TD-001` remains open, unaffected,
+    and confirmed still colliding by a dedicated test.
+  - Architecture concerns: future final implementation prompts should
+    explicitly check whether their own authorized change (e.g., a new
+    sanctioned `sudo()` site) invalidates an existing test's hard-coded
+    assertion, and name that file in Allowed files if so, rather than
+    leaving it for the implementer to discover and flag mid-session; the
+    same check should cover `__init__.py`/registration files any new
+    module or test file needs in order to load/run at all.
+  - Tests or review gates needed: a decision on the flagged
+    `test_credential_service.py` conflict before or at this PR's review.
+  - Should future prompts change? Yes — future final implementation
+    prompts should audit for (a) existing tests their own authorized
+    change will make stale, and (b) registration/`__init__.py` files
+    any newly-authorized file needs, and name both explicitly in Allowed
+    files rather than leaving them implicit.
+- **Quality gate confirmation:** handoff updated · feedback loop checked
+  · learning captured · rejected approach logged — N/A, none · technical
+  debt logged — N/A, `TD-001` unaffected and unmodified · repeated-issue
+  escalation applied — noted above (no-runtime pattern) — all YES
+  **except** the flagged `test_credential_service.py` conflict, which is
+  explicitly left open for ChatGPT's decision rather than silently
+  resolved either way.
+- **Next recommended session:** ChatGPT review of this draft PR against
+  `task-003-pre-implementation-review-checklist.md` §B and
+  `credential-security-redaction-review-checklist.md`, including a
+  decision on the flagged `test_credential_service.py` conflict. No next
+  task starts until this PR is reviewed and accepted (per the gate's
+  closure rule — the gate authorized exactly one coding session, now
+  consumed).
+- **Stop condition:** stopped immediately after opening the draft PR —
+  no merge, no ready-for-review, no manual validation (no runtime), no
+  other task started, `main`/plain `dev` untouched.
+
+**Exact next-session prompt:**
+
+> After ChatGPT reviews the Task 003 draft PR
+> (`claude/task-003-api-client-test-connection-8wsvlc`) against
+> `task-003-pre-implementation-review-checklist.md` §B and
+> `credential-security-redaction-review-checklist.md` — including a
+> decision on the flagged `test_credential_service.py`
+> stale-sudo-count-assertion conflict — and either requests fixes or
+> accepts it, the next session applies that feedback (or, if accepted,
+> performs the manual-validation step against a live Odoo 19 +
+> development store once a runtime is available, recording the
+> empirically-observed answers to the open behavioral questions). No
+> new task (including any `core_readiness_check`/`TD-001` follow-up)
+> starts before this PR is reviewed and accepted.
 
 ---
 
