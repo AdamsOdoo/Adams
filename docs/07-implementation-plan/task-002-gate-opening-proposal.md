@@ -8,8 +8,16 @@
 
 ## Status
 
-**Proposed for ChatGPT review. Docs-only. This document does not open
-the gate.** It is a *proposal* for a future, separate, explicit ChatGPT
+**Acceptance note (2026-07-07, PR #94 acceptance patch;
+[`AR-025`](../05-qa/architecture-review-log.md)): accepted by ChatGPT
+as the proposed gate-opening scope.** **This document still does not
+open the gate.** The Task 002 gate must be opened by a separate,
+explicit ChatGPT act recorded in its own merged gate-opening document
+(AR-021 pattern); until that happens, credential code remains
+forbidden and Task 002 remains not started.
+
+**Originally proposed 2026-07-06 for ChatGPT review. Docs-only. This
+document does not open the gate.** It is a *proposal* for a future, separate, explicit ChatGPT
 gate-opening act. Until that act happens and is merged, the only open
 implementation gate remains the limited core-only zero-UI gate
 (AR-021), which explicitly forbids credential fields — and Task 002

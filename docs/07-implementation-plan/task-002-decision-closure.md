@@ -17,10 +17,51 @@
 > row: **AR-025** in
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md).
 
+## Acceptance
+
+- **Accepted by ChatGPT on 2026-07-07** (PR #94 acceptance patch;
+  [`AR-025`](../05-qa/architecture-review-log.md)) — **at
+  decision/gate-preparation level only.**
+- **Decision 1 accepted: the compute-blank no-read-back hardening
+  variant is rejected for Task 002.** `access_token` remains a plain
+  stored `fields.Char` with `copy=False` and Admin-only `groups=`; the
+  model ACL remains Admin-only/default-deny for every other role; no
+  compute, no inverse, no raw SQL, no hand-managed column, no companion
+  stored field. The honest residual is binding documentation:
+  Admin-group ORM/RPC read remains technically possible outside
+  connector surfaces; `sudo()`/database/backup access can read the
+  plaintext; no encryption claim may be made.
+- **Decision 2 accepted:** Task 002 uses exactly one `token_variant`
+  value — `offline_custom_app` — and stores exactly one secret value —
+  `access_token`. No `client_id`, no `client_secret`, no token cache,
+  no expiry field, no refresh machinery, no client-credentials
+  implementation. **MBQ-05 remains open** for the MVP acquisition-path
+  decision and the setup-wizard copy.
+- **Decision 3 accepted:** `granted_scopes` and
+  `granted_scopes_checked_at` live on `shopify.connector.store` as
+  readonly status mirrors; Task 002 creates the fields with no writer;
+  Task 003 writes them later after test connection.
+- **The final Task 002 implementation boundary is accepted** (credential
+  model; six store mirrors; redaction utility; four service methods;
+  one Admin-only ACL row; tests; manifest version bump; handoff
+  update).
+- **The final implementation prompt
+  ([`task-002-final-implementation-prompt.md`](./task-002-final-implementation-prompt.md))
+  is accepted as gate-ready and binding — but it is not issued.**
+- **The gate-opening proposal
+  ([`task-002-gate-opening-proposal.md`](./task-002-gate-opening-proposal.md))
+  is accepted as the proposed gate scope — but the gate is not opened
+  by this acceptance.**
+- **No code is authorized.** API client, test connection, setup wizard,
+  UI/views/menus/actions/wizards, webhooks/controllers/cron, domain
+  modules, external network calls, and Task 003 all remain forbidden;
+  the four Task 003-only decision points remain open; Task 002 and
+  Task 003 are not started; no implementation gate is opened.
+
 ## Status
 
-- **Proposed for ChatGPT review.** Nothing below is a Decision until
-  ChatGPT accepts AR-025.
+- **Accepted by ChatGPT on 2026-07-07, at decision/gate-preparation
+  level only** (see Acceptance above; originally proposed 2026-07-06).
 - **Docs-only.** No code, no model, no field, no view, no XML, no Python
   is created by this document or this PR.
 - **No implementation.** Task 002 is not started; Task 003 is not
@@ -39,7 +80,9 @@
 - Per `CLAUDE.md` §8, statements below are labelled **Fact** (official
   source cited), **Official source-code fact**, **Inference**,
   **Recommendation**, or **Open question** where ambiguity is possible.
-  Nothing here is a Decision.
+  The labels reflect the document as written for review; per the
+  Acceptance section above, the three recommendations are now accepted
+  at decision/gate-preparation level (everything else keeps its label).
 
 ## Scope
 

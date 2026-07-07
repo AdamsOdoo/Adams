@@ -1,5 +1,17 @@
 # Task 002 — Final Implementation Prompt (gate-ready, not yet issued)
 
+> **Acceptance (2026-07-07, PR #94 acceptance patch;
+> [`AR-025`](../05-qa/architecture-review-log.md)):** **Accepted by
+> ChatGPT as the binding final Task 002 implementation prompt.** It
+> remains **NOT ISSUED and NOT AUTHORIZED**: it may only be issued
+> after the separate Task 002 gate-opening act
+> ([`task-002-gate-opening-proposal.md`](./task-002-gate-opening-proposal.md))
+> is explicitly accepted by ChatGPT and merged into
+> `Shopify-connector`. Precondition (1) below — AR-025 acceptance — is
+> now satisfied; preconditions (2) and (3) are not. The prompt content
+> below is binding as accepted; any deviation requires a new ChatGPT
+> decision.
+>
 > **Status: prepared 2026-07-06 via AR-025 — NOT ISSUED, NOT AUTHORIZED.**
 > This document is the complete, copy-paste final `CLAUDE.md` §9 task
 > prompt for **Task 002 — Credential Storage, Masking, and Redaction

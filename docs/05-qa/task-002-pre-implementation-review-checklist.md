@@ -10,8 +10,12 @@
 
 ## Status
 
-**Proposed for ChatGPT review (part of the AR-025 package, 2026-07-06).
-Docs-only. Authorizes nothing; opens no gate.**
+**Accepted by ChatGPT on 2026-07-07** (PR #94 acceptance patch;
+[`AR-025`](./architecture-review-log.md)). **Applies to the future Task
+002 implementation PR once the Task 002 gate is opened** by the
+separate, explicit ChatGPT gate-opening act. **Does not authorize any
+code.** Docs-only; this document itself creates no task and opens no
+gate. (Originally proposed 2026-07-06 as part of the AR-025 package.)
 
 ## A. This package (the AR-025 decision/gate-prep PR)
 
