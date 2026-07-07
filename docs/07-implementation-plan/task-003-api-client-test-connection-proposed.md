@@ -31,6 +31,27 @@ target-less-idempotency nonce, and the `SHOP_INACTIVE`/402/423/
 403-fraudulent shop-state error-class mapping all remain decisions for
 the separate final task prompt, not decided by this acceptance.
 
+**Decision-closure note (2026-07-07, proposed — not yet accepted;
+[`AR-027`](../05-qa/architecture-review-log.md)):** Task 002 merged
+(PR #97) and the four decision points named above are now addressed, at
+**proposal level only**, in
+[`task-003-decision-closure.md`](./task-003-decision-closure.md):
+`core_test_connection` recommended as proposed; `SHOP_INACTIVE`/402/423/
+403-fraudulent recommended mapped to `shopify_permission_scope_auth`
+(with `credential_state` flipped to `invalid` only for genuine
+token-invalid signals, not shop-account-state conditions) — the
+underlying HTTP-status/error-code facts are already cited in
+[`../03-architecture/credential-connection-api-client-planning.md`](../03-architecture/credential-connection-api-client-planning.md),
+but the mapping choice itself and several named behavioral shapes remain
+`[Requires external validation before implementation]`; the job-log
+system-append service method (not ACL widening) recommended for the
+write path; a per-run UUID4 nonce in `payload_hash` recommended for
+target-less jobs (also surfacing a pre-existing latent collision defect
+in the already-merged `core_readiness_check` job type). **None of this
+is decided** until ChatGPT accepts AR-027; this task remains proposed
+only, not authorized; no code, no gate-opening act, and no final
+implementation prompt exist yet.
+
 ## Objective
 
 Create the single GraphQL transport boundary
