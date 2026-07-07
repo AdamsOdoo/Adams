@@ -187,7 +187,7 @@ they remain to be executed in a future live session per
 | VAL-A1 | **Passed (installed-module / registry-load observation only)** | `shopify_connector_core` confirmed installed at `19.0.1.2.3`, registry loaded, no traceback during shell startup/module inspection. **Fresh clean install/upgrade was not re-executed in this shell session** — see the Status narrative above for the last full clean-install proof (the PR #103/#104/#105 and green-gate hotfix re-run cycle). |
 | VAL-A2 | **Passed** | Models found: `shopify.connector.api.client`, `shopify.connector.store`, `shopify.connector.job`, `shopify.connector.job.log`, `shopify.connector.store.credential`. No database table exists for `shopify.connector.api.client`, confirming it remains an `AbstractModel`. |
 | VAL-A3 | **Passed** | `job_type` selection count is exactly 3: `core_readiness_check`, `core_manual_maintenance`, `core_test_connection`. |
-| VAL-A4 | Not tested | XML/menu/action/wizard/controller/cron inspection was not exercised this session. |
+| VAL-A4 | **Static repo check: Passed** (docs-only static/offline sweep, 2026-07-07) | Confirmed by repo/source inspection: Task 003 (PR #101) introduced no XML file, menu, action, wizard, controller, route, cron, or server/scheduled action of any kind. The DB/`ir.model.data`-registry-level half against a live installed instance is still not exercised — no live Odoo instance was available. See `task-003-static-validation-sweep.md`. |
 | VAL-B1 | **Passed** | Invalid-token test on store id 7 (`mqiu21-yz.myshopify.com`) with dummy token `shpat_INVALID_INVALID_INVALID0000000000000000`: result `fail`, reason "Your access token appears invalid or was revoked — replace it.", `credential_state='invalid'`, `job` state `failed_final`, `error_class='shopify_permission_scope_auth'`, 2 job-log rows (`['attempt', 'attempt']`), `log_store_ok=True`. Matches the checklist's expected behavior. |
 | VAL-B2 | **BLOCKED** | No real Shopify Admin API access token was available. The Dev Dashboard app used did not expose the older admin-created custom-app Admin API token path the connector currently expects (`token_variant='offline_custom_app'`). Not passed, not failed. |
 | VAL-B3 | **Passed** | Repeat `action_test_connection()` on the same store: job count BEFORE=1, AFTER=2, CREATED=1 — a fresh `core_test_connection` job was created with no unique-constraint collision. |
@@ -195,11 +195,11 @@ they remain to be executed in a future live session per
 | VAL-B5 | Not tested | Shop-state failure behavior not exercised this session. |
 | VAL-B6 | Not tested | Cross-check requires VAL-B4/VAL-B5, neither of which was run this session; only the VAL-B1 flip was observed in isolation. |
 | VAL-B7 | Not tested | Version fall-forward warning behavior not exercised this session. |
-| VAL-C1 | **PARTIAL** | **DB/ORM unexpected-token-leakage scan: Passed.** A naive token-string scan flagged `('shopify.connector.store.credential', 21, 'access_token')` — this is the **intended, by-design credential storage location**, not a leak. A corrected scan that excludes that intended field returned `UNEXPECTED_LEAKS: []` across the ORM/database-visible surfaces scanned (store mirrors, job rows, job-log rows, messages, `technical_detail`, and `payload_snapshot`). **Odoo server log grep: Not tested.** The live shell session checked ORM/database-visible fields only — it did **not** grep the Odoo server log file(s). **`access_token` is stored in plain text on `shopify.connector.store.credential`, protected only by Odoo ACLs — it is not encrypted at rest.** This is a known, documented residual, not a new finding. **Overall VAL-C1: PARTIAL — DB/ORM scan passed, server-log scan pending.** |
+| VAL-C1 | **PARTIAL** | **DB/ORM unexpected-token-leakage scan: Passed.** A naive token-string scan flagged `('shopify.connector.store.credential', 21, 'access_token')` — this is the **intended, by-design credential storage location**, not a leak. A corrected scan that excludes that intended field returned `UNEXPECTED_LEAKS: []` across the ORM/database-visible surfaces scanned (store mirrors, job rows, job-log rows, messages, `technical_detail`, and `payload_snapshot`). **Odoo server log grep: Not tested.** The live shell session checked ORM/database-visible fields only — it did **not** grep the Odoo server log file(s). **`access_token` is stored in plain text on `shopify.connector.store.credential`, protected only by Odoo ACLs — it is not encrypted at rest.** This is a known, documented residual, not a new finding. **Overall VAL-C1: PARTIAL — DB/ORM scan passed, server-log scan pending.** A subsequent docs-only static/offline session (2026-07-07) confirmed this execution environment has no live Odoo runtime and no server log file of any kind to grep — see `task-003-server-log-redaction-check.md`. The server-log half therefore remains **not testable in this session — logs unavailable**, still not pass/fail, pending a future session with actual live-log access. |
 | VAL-C2 | **Passed** | A direct `shopify.connector.job.log.create(...)` attempt by a user in `group_shopify_connector_operator` (uid 18) was denied by Odoo's ACL layer ("Access Denied by ACLs for operation: create"), raising `AccessError` as expected. |
-| VAL-C3 | Not tested | `sudo()` call-site count was not re-verified this session. |
-| VAL-D1 | Not tested | Shopify-side no-mutation check was not exercised this session. |
-| VAL-D2 | Not tested | Odoo-side domain-mutation check was not exercised this session. |
+| VAL-C3 | **Static source check: Passed** (docs-only static/offline sweep, 2026-07-07) | Confirmed exactly 2 `sudo()` call sites in production code — `_get_access_token` (`shopify_connector_store_credential.py`) and `_system_append` (`shopify_connector_job_log.py`) — matching the governance-documented expectation. This is a static source count, not a live-installed-module re-verification. See `task-003-static-validation-sweep.md`. |
+| VAL-D1 | **Static read-only-query evidence only** (docs-only static/offline sweep, 2026-07-07) | Confirmed `TEST_CONNECTION_QUERY` is read-only and matches the expected query exactly; confirmed no GraphQL `mutation` operation string exists anywhere in `shopify_connector_core`. This is static source evidence, not a live Shopify Admin observation of zero changes/webhooks — that live check remains not tested. See `task-003-static-validation-sweep.md` and `task-003-no-side-effect-baseline.md`. |
+| VAL-D2 | **Static code-path evidence only** (docs-only static/offline sweep, 2026-07-07) | Confirmed `action_test_connection()` and its helpers write only to `shopify.connector.store`, `shopify.connector.store.credential` (`credential_state` only), `shopify.connector.job`, and `shopify.connector.job.log` — no product/customer/order/inventory/stock/accounting/sale/purchase model reference anywhere in the code path. This is static code-path evidence, not a live-database mutation observation. See `task-003-static-validation-sweep.md` and `task-003-no-side-effect-baseline.md`. |
 | VAL-E1 | **BLOCKED** | Pass-path row accounting requires a successful connection (VAL-B2), which is blocked. |
 | VAL-E2 | **Passed** | Two independent fail-path jobs recorded: Job 17 and Job 18, both `state='failed_final'`, `error_class='shopify_permission_scope_auth'`, `payload_hash` and `idempotency_key` both present (truthy), exactly 2 `job.log` rows each (`['attempt', 'attempt']`), `log_store_ok=True`. |
 | VAL-E3 | **Passed (fail-path only)** | No extra/missing `job.log` rows observed across Job 17 and Job 18. Pass-path row accounting is not applicable — VAL-B2/VAL-E1 blocked. |
@@ -530,3 +530,69 @@ UniqueViolation
 
 Recorded as **PASSED** — this confirms TD-001 is still open, not that it
 is fixed.
+
+---
+
+## Static/Offline Validation Addendum (docs-only session, 2026-07-07)
+
+This addendum records a **separate, later, docs-only static/offline
+session** (branch `claude/task-003-static-validation-cszl88`, PR #110). This
+session was originally run in parallel with the OAuth/Fable attempt, which
+is now recorded in merged PR #109 (§8 above) as blocked before execution —
+no Fable-equivalent browser-automation tool and no Shopify Dev Dashboard
+credentials were available to that session. This session did not touch that
+attempt. This session had **no live Odoo instance, no live Shopify
+connection, and no valid Shopify Admin API token**; it worked from
+repository/source inspection only. It does not repeat, re-derive, or
+contradict the live-session results recorded above — it only adds narrower,
+static evidence for items that live session left entirely untested.
+
+**Static evidence gathered this session:**
+
+- **VAL-A4** — static repo check **passed**: Task 003 introduced no
+  XML/menu/action/wizard/controller/cron of any kind. DB/registry-level
+  confirmation against a live instance is still not tested. Full detail:
+  `task-003-static-validation-sweep.md`.
+- **VAL-C3** — static source check **passed**: exactly 2 `sudo()` call sites
+  in production code, matching the governance-documented expectation. Live
+  re-verification against an installed module is still not tested. Full
+  detail: `task-003-static-validation-sweep.md`.
+- **VAL-C1 (server-log half)** — **not testable this session — logs
+  unavailable.** No live Odoo runtime and no server log file of any kind
+  exists in this session's execution environment. Only the existing dummy
+  token (`shpat_INVALID_INVALID_INVALID0000000000000000`) was in scope; no
+  real token was used, requested, or recorded. Still not pass/fail. Full
+  detail: `task-003-server-log-redaction-check.md`.
+- **VAL-D1** — static read-only-query evidence **confirmed**: the
+  `TEST_CONNECTION_QUERY` string is read-only and matches the expected query
+  exactly; no GraphQL `mutation` operation string exists anywhere in
+  `shopify_connector_core`. This is not a live Shopify Admin observation of
+  zero changes/webhooks, which remains not tested. Full detail:
+  `task-003-no-side-effect-baseline.md`.
+- **VAL-D2** — static code-path evidence **confirmed**: `action_test_connection()`
+  and its helpers write only to `shopify.connector.store`,
+  `shopify.connector.store.credential` (`credential_state` only),
+  `shopify.connector.job`, and `shopify.connector.job.log` — no domain
+  (product/customer/order/inventory/stock/accounting/sale/purchase) model is
+  referenced anywhere in the path. This is not a live-database mutation
+  proof, which remains not tested. Full detail:
+  `task-003-no-side-effect-baseline.md`.
+- **VAL-G1–G4** — remain **not tested**. No live API call was made this
+  session; no empirical behavior is asserted or invented.
+
+**Remaining open items (unchanged by this addendum):** VAL-A1 (fresh
+install/upgrade re-run), VAL-A4's DB/registry-level half, VAL-B2 and
+everything depending on it (VAL-B4–B7, VAL-E1), VAL-C1's server-log half,
+VAL-D1/D2's live-observation halves, and VAL-G1–G4. All require a live Odoo
+instance, a live Shopify connection, and/or real server logs, none of which
+were available to this session.
+
+**This addendum does not change the Go/No-Go recommendation in §5 above —
+it is still "Not yet determined."** Task 003 manual validation **remains
+incomplete**. Task 004 **remains blocked**. VAL-B2 **remains blocked/not
+attempted**. The OAuth experiment **remains not executed** — PR #109
+(merged, §8 above) already records that attempt as blocked before
+execution; this session makes no claim that OAuth/token acquisition
+succeeded or failed, makes no claim that VAL-B2 passed, and does not
+duplicate or second-guess PR #109's record. This PR (#110) does not unblock
+Task 004.
