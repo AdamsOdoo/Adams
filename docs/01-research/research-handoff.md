@@ -1,16 +1,25 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry
-> (PR #92 Acceptance Patch: AR-024 accepted by ChatGPT on 2026-07-06 at
-> implementation-planning level only; credential/connection/API-client
-> foundation planning package accepted; Option C dedicated credential
-> model accepted at planning level as a justified post-AR-022 addition to
-> the AR-019 six-core-model plan; redaction contract accepted at
-> planning level; Task 002 recommended next but not authorized; Task 003
-> accepted as proposed follow-up but not authorized; seven decision
-> points remain open; no implementation gate opened)** is immediately
-> below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **Credential/Connection/API
+> (PR #94 Acceptance Patch: AR-025 accepted by ChatGPT on 2026-07-07 at
+> decision/gate-preparation level only — compute-blank rejected for
+> Task 002; `token_variant` = `offline_custom_app` only; scope snapshot
+> on `store`; final Task 002 implementation prompt accepted as
+> gate-ready and binding but not issued; gate-opening proposal accepted
+> as proposed scope but the gate is not opened; MBQ-04 still Partially
+> resolved; MBQ-05 still open; MBQ-44 unchanged; no code authorized;
+> Task 002/003 not started)** is immediately below, in the **compact
+> handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Task 002 Decision Closure & Gate-Preparation Sprint — AR-025
+> proposed; the three Task 002-specific decision points closed at
+> proposal level; gate-ready final prompt prepared, not issued; narrow
+> credential-storage gate proposed, not opened; official Shopify/Odoo
+> facts re-verified 2026-07-06; docs-only (history)**, **PR #92 Acceptance
+> Patch — AR-024 accepted by ChatGPT on 2026-07-06 at
+> implementation-planning level only; Option C credential model and
+> redaction contract accepted at planning level; Task 002 recommended
+> next but not authorized; seven decision points left open; no
+> implementation gate opened (history)**, **Credential/Connection/API
 > Foundation Planning Sprint — proposed AR-024 implementation-planning
 > package — credential storage, redaction, connection lifecycle, test
 > connection, readiness checks, API-client boundary, plus
@@ -85,6 +94,207 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### PR #94 Acceptance Patch — compact handoff (2026-07-07)
+
+> **Applies ChatGPT's acceptance of PR #94 — not a new research
+> session, not Task 002, not a gate opening.** Confirmed before
+> editing: PR #94 head commit
+> `4a243941f3542eb29664d5b9ee5bb0af2190cc39`; DEC-003 through DEC-020,
+> `docs/04-decisions/README.md`, and `defect-pattern-log.md` untouched.
+
+- **Branch / PR:** `claude/task-002-decision-gate-pack-0mlsgf` → draft
+  PR #94 into `Shopify-connector`
+  (https://github.com/AdamsOdoo/Adams/pull/94; remains draft, not
+  merged).
+- **Files changed:** the seven AR-025 package files only —
+  `task-002-decision-closure.md` (new Acceptance section),
+  `task-002-final-implementation-prompt.md` (acceptance note: binding,
+  not issued), `task-002-gate-opening-proposal.md` (acceptance note:
+  proposed scope accepted, gate not opened),
+  `task-002-pre-implementation-review-checklist.md` (Status →
+  Accepted), `architecture-review-log.md` (AR-025 row → **Accepted**;
+  acceptance-patch note added),
+  `master-blueprint-open-questions.md` (MBQ-04/05/44 AR-025 notes
+  converted from proposed to accepted wording; **statuses unchanged**),
+  `research-handoff.md` (this entry). **No addon/code file touched. No
+  Python/XML/CSV/manifest/test/CI file created or modified. No
+  credential/API/setup-wizard/test-connection implementation created.
+  No webhook/controller/cron/domain module created.**
+- **What changed:** **AR-025 is now Accepted by ChatGPT (2026-07-07),
+  at decision/gate-preparation level only.** Decision 1: compute-blank
+  no-read-back hardening **rejected for Task 002** — `access_token`
+  stays a plain stored Char (`copy=False`, Admin-only `groups=`,
+  Admin-only default-deny model ACL; no compute/inverse/raw SQL/
+  hand-managed column/companion field; honest residual documented — no
+  encryption claim). Decision 2: exactly one `token_variant` value
+  (`offline_custom_app`) and one secret value (`access_token`); no
+  client-credentials fields or refresh machinery; **MBQ-05 stays open**
+  for the MVP acquisition-path decision and wizard copy. Decision 3:
+  `granted_scopes` + `granted_scopes_checked_at` on
+  `shopify.connector.store`, readonly mirrors, created by Task 002 with
+  no writer, written by Task 003 later. The final Task 002
+  implementation boundary is accepted; the **final prompt is accepted
+  as gate-ready and binding but not issued**; the **gate proposal is
+  accepted as the proposed scope but the gate is not opened**.
+- **Still forbidden/not authorized:** API client, test connection,
+  setup wizard, UI/views/menus/actions/wizards, webhooks/controllers/
+  cron, product/customer/order/inventory/fulfillment, domain modules,
+  external network calls, Task 003. The four Task 003-only decision
+  points remain open. **No implementation gate opened. Task 002 not
+  started. Task 003 not started. No code authorized.**
+- **Register impact applied:** MBQ-04 remains **Partially resolved**
+  (three Task 002 points decided; coding + four Task 003-round points
+  outstanding); MBQ-05 remains **open** (containment accepted only);
+  MBQ-44 status unchanged (ACL row text accepted for the final prompt;
+  both residuals still open).
+- **Learning feedback loop:** new issues: none. Repeated patterns:
+  none new (no unsupported-claim or scope-creep occurrence). Rules
+  updated: none. Rejected approaches: the Task-002-scoped compute-blank
+  rejection is now ChatGPT-accepted with a named revisit condition
+  (recorded in the decision-closure document and AR-025; scoped to
+  Task 002, not a permanent architecture rejection). Technical debt:
+  none new. Architecture concerns: none new.
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (Task-002-
+  scoped, recorded via AR-025 with revisit condition) · technical debt
+  logged (N/A, none new) · repeated-issue escalation applied (N/A) —
+  all YES.
+- **Stop condition:** stopped immediately after pushing the acceptance
+  patch and refreshing the PR body — no merge, no ready-for-review, no
+  gate opened, no implementation.
+- **Recommended next step:** the separate, explicit ChatGPT Task 002
+  gate-opening act (per the accepted
+  `task-002-gate-opening-proposal.md`), merged into
+  `Shopify-connector`; only then is
+  `task-002-final-implementation-prompt.md` issued verbatim as the
+  Task 002 session.
+
+**Exact next-session prompt:**
+
+> Perform the Task 002 gate-opening act, if and only if ChatGPT has
+> explicitly decided to open the gate: create the gate-opening document
+> per the accepted
+> `docs/07-implementation-plan/task-002-gate-opening-proposal.md`
+> (AR-021 pattern — restating the seven gate conditions and the exact
+> allowed/forbidden scope), docs-only, on a fresh branch from latest
+> `Shopify-connector`, as a draft PR for ChatGPT confirmation. Still no
+> code in that session. Task 002 implementation starts only after that
+> gate PR is merged, in its own session, via the verbatim
+> `task-002-final-implementation-prompt.md`.
+
+---
+
+### Task 002 Decision Closure & Gate-Preparation Sprint — compact handoff (2026-07-06)
+
+> **Docs-only decision-closure and gate-preparation sprint for Task 002
+> — not Task 002 itself; no code.** Confirmed before starting: PR #92
+> merged into `Shopify-connector` (merged 2026-07-06; merge commit
+> `f74aaf204745ce0087733870fe56bdda74bfa79a` = latest
+> `origin/Shopify-connector`); AR-024 Accepted; Task 002 recommended
+> but not authorized; working branch created from that merge commit.
+
+- **Branch / PR:** `claude/task-002-decision-gate-pack-0mlsgf` → draft
+  PR #94 into `Shopify-connector`
+  (https://github.com/AdamsOdoo/Adams/pull/94; draft, not merged).
+- **Files created:**
+  `docs/07-implementation-plan/task-002-decision-closure.md` (AR-025
+  decision package),
+  `docs/07-implementation-plan/task-002-final-implementation-prompt.md`
+  (complete copy-paste final §9 prompt — **not issued, not
+  authorized**),
+  `docs/07-implementation-plan/task-002-gate-opening-proposal.md`
+  (proposed narrow gate act — **opens nothing**),
+  `docs/05-qa/task-002-pre-implementation-review-checklist.md`.
+  **Files updated:** `docs/05-qa/architecture-review-log.md` (new
+  AR-025 row, **Proposed**),
+  `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-04/
+  05/44: explicitly *proposed* notes only, **no status changes**),
+  `docs/01-research/research-handoff.md` (this entry). **No addon/code
+  file touched. No Python/XML/CSV/manifest/test/CI file created or
+  modified. No credential/token/secret field, model, API client, setup
+  wizard, or test-connection implementation created. No webhook/
+  controller/cron/domain module created. No implementation gate opened.
+  Task 002/003 not started. DEC-003 through DEC-020,
+  `docs/04-decisions/README.md`, and `defect-pattern-log.md` all
+  unchanged.**
+- **Decisions proposed (AR-025 — Proposed for ChatGPT review, not
+  accepted):** (1) **compute-blank no-read-back hardening: reject for
+  Task 002** — `access_token` stays a plain stored Char behind the two
+  accepted access layers (Admin-only default-deny model ACL +
+  field-level `groups=`), `copy=False`, service-written only; honest
+  residual stated (Admin-group ORM/RPC read technically possible;
+  `sudo()`/DB/backup read regardless; no encryption exists or is
+  claimed); the full `res.users`-style variant is recorded with a
+  revisit condition, and the watered-down companion-field variant is
+  named as never acceptable. (2) **`token_variant`/MBQ-05: Option 2C**
+  — Task 002 stores exactly one secret value with the single Selection
+  value `offline_custom_app`; no `client_id`/`client_secret`/token
+  cache/expiry; the dedicated credential model is the seam; the MVP
+  acquisition-path decision stays open with ChatGPT (MBQ-05 not
+  resolved). (3) **Scope snapshot on `shopify.connector.store`** —
+  `granted_scopes` + `granted_scopes_checked_at` created in Task 002 as
+  readonly mirrors with no writer until Task 003.
+- **Official re-verification (2026-07-06, high-power mode per the task
+  prompt):** three parallel official-source research passes
+  (shopify.dev/help.shopify.com custom-app + client-credentials +
+  expiring-token pages; odoo.com 19.0 ORM/security references;
+  odoo/odoo 19.0 `res_users.py`/`base_data.sql` source) plus an
+  adversarial re-fetch verification pass — 22 of 22 executed
+  verification verdicts confirmed the claims verbatim; 3 verifier
+  agents could not run (session limit) and their claims are
+  independently corroborated by the accepted AR-022 notes and the other
+  verifiers. New facts beyond AR-024: the legacy custom-app creation
+  cutoff is officially dated ("Starting from January 1, 2026…",
+  help.shopify.com) and admin-created custom-app credentials cannot be
+  rotated (delete-and-recreate / uninstall-reinstall only); the
+  December 2025 expiring-offline-token model (1-hour tokens + 90-day
+  refresh tokens) is public-apps-only with custom/merchant apps
+  exempt per two official changelogs.
+- **AR-025:** Proposed. **No implementation. No gate opened.** The
+  final prompt explicitly requires, before execution: AR-025 accepted
+  **and** a separate, explicit ChatGPT gate-opening act merged.
+- **Learning feedback loop:** new issues: none. Repeated patterns:
+  none new (checked `defect-pattern-log.md` categories — no
+  unsupported-claim or scope-creep occurrence; every platform statement
+  in the package is officially cited or labelled an open question).
+  Rules updated: none. Rejected approaches: none reintroduced
+  (RA-001–RA-023 re-checked; the compute-blank rejection is a
+  *proposed* Task-002-scoped rejection with a named revisit condition,
+  routed through AR-025 for ChatGPT to log on acceptance). Technical
+  debt: none new. Architecture concerns: none new — this package stays
+  inside AR-022/AR-023/AR-024.
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (N/A — none
+  reintroduced; proposed rejection routed via AR-025) · technical debt
+  logged (N/A, none new) · repeated-issue escalation applied (N/A) —
+  all YES.
+- **Stop condition:** stopped immediately after opening the draft PR —
+  no merge, no ready-for-review, no implementation, no gate opened,
+  Task 002/003 not started.
+- **Recommended next step:** ChatGPT reviews AR-025 (the decision
+  closure, the final prompt, the gate proposal, and the checklist);
+  then either (a) an acceptance patch (AR-025 → Accepted; register
+  notes per the decision-closure §Register impact proposal) **plus a
+  separate, explicit gate-opening act**, after which the final prompt
+  is issued verbatim as the Task 002 session; or (b) revision of this
+  package.
+
+**Exact next-session prompt:**
+
+> Apply ChatGPT's review decision for the Task 002 decision-closure and
+> gate-preparation PR (AR-025). If accepted: apply the acceptance patch
+> (AR-025 row → Accepted; MBQ-04/05/44 notes converted from proposed to
+> accepted wording per `task-002-decision-closure.md` §Register impact
+> proposal; handoff entry), and — only if ChatGPT also performs the
+> separate, explicit gate-opening act in
+> `task-002-gate-opening-proposal.md` — record that act; still no code
+> in that session. If revision is requested: apply the requested
+> revisions to the AR-025 package only. Task 002 implementation starts
+> only afterwards, in its own session, via the verbatim
+> `task-002-final-implementation-prompt.md`.
 
 ---
 
