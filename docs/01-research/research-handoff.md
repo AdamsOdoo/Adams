@@ -127,9 +127,10 @@
 > credential/token field existed anywhere in the addon); Task 003 not
 > started (no API client/test-connection code existed).
 
-- **Branch / PR:** `claude/task-002-credential-storage` → draft PR into
-  `Shopify-connector` (remains draft, not merged; stop condition per
-  the final prompt).
+- **Branch / PR:** `claude/task-002-credential-storage` → draft PR #97
+  into `Shopify-connector`
+  (https://github.com/AdamsOdoo/Adams/pull/97; remains draft, not
+  merged; stop condition per the final prompt).
 - **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store_credential.py`
   (new — the credential model + four service methods),
   `addons/shopify_connector_core/models/shopify_connector_store.py`
