@@ -17,6 +17,47 @@ dashboard/sync/error-center dependency boundaries — as **proposed future
 task specs only**, docs-only, no code, no gate opened, no domain
 implementation authorized or started.
 
+## Revision note (PR #93, ChatGPT REVISE)
+
+ChatGPT reviewed this package and returned **REVISE, not reject**. Main
+finding: Task 010 over-scoped the first product task by mixing product
+import/variant binding with product export/update/write concerns.
+
+Changes made in response:
+
+- **Task 010 narrowed to product import and variant binding only**
+  (Shopify → Odoo, read-only against Shopify). All product/variant
+  **export, update, and write-back-to-Shopify** content — including
+  `productSet`, `productVariantsBulkUpdate`/`productVariantsBulkCreate`,
+  the destructive-write guard, and the Product preview/diff (S7) screen
+  — was removed from Task 010's scope, acceptance criteria, test
+  requirements, and API-call requirements, and replaced with an explicit
+  "Future product-write/export task concern" section that documents the
+  same risk material strictly as forward-looking, not-authorized
+  reference material.
+- **Product write/export moved to a separate future candidate task**
+  (proposed working name: **Task 015 — Product Write/Update/Export
+  Safety**), referenced consistently in
+  `mvp-domain-implementation-sequence.md` (Area 1, the
+  `shopify_connector_product` domain-boundary bullet, and a new "Future
+  task candidates within MVP scope, not yet sliced by this package"
+  note under "MVP vs later"), in `task-010-product-import-proposed.md`,
+  and in this handoff.
+- **`mvp-domain-preimplementation-checklist.md`** gained two new
+  `[Gate]` items under Section B: a product-import task must not
+  smuggle in export/update/write scope, and any Shopify catalog write
+  requires its own separate product-write gate and final §9 task
+  prompt.
+- Task 011–014 were checked for any dependency on product write/export
+  being part of Task 010; none was found, so none of the four were
+  changed.
+- **No code or gate was opened by this revision.** Every document still
+  states "Proposed only. Not authorized." Task 015 is named only as a
+  proposed working title for a future candidate task — it is not itself
+  proposed at task-spec precision, not authorized, and requires its own
+  separate ChatGPT decision/gate before it can even be drafted at that
+  level.
+
 ## Baseline
 
 - Branch: `claude/mvp-domain-implementation-slicing-2q8pnu`, branched from
@@ -155,6 +196,12 @@ way this sprint did for 010–014.
   snapshots describe it differently over time ("partially resolved" vs.
   "resolved via AR-020, naming only open"); not reconciled by this
   sprint.
+- **Product write/export scope (new, from the PR #93 revision):** now
+  explicitly deferred to a future candidate task (proposed working name
+  Task 015), not yet proposed at task-spec precision, and not part of
+  this package. Its own open items (MBQ-23 variant-write mutation
+  strategy, MBQ-24 `productSet` delete-on-omit-for-media) travel with it
+  rather than with Task 010, and remain unresolved.
 
 ## Collision warning
 

@@ -65,6 +65,17 @@ other domain task.
       (`shopify_connector_customer` is explicitly not part of the
       accepted Phase 1 module set — customer logic belongs inside
       `shopify_connector_sale`).
+- [ ] **[Gate]** A product-import task must not smuggle in
+      product-export/update/write scope: no `productSet` call, no
+      `productVariantsBulkUpdate`/`productVariantsBulkCreate` call, no
+      other Shopify catalog-write mutation, and no destructive-write
+      guard implementation appears in a task scoped as import/binding
+      only (added per the ChatGPT REVISE narrowing Task 010, PR #93).
+- [ ] **[Gate]** Any Shopify catalog write (product export/update or
+      otherwise) requires its own separate, explicitly-named
+      product-write gate and its own final `CLAUDE.md` §9 task prompt —
+      it is never bundled into an import/binding task's scope or
+      acceptance criteria.
 
 ## C. API client used, never bypassed
 
