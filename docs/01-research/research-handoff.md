@@ -1,27 +1,29 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry
-> (AR-028 — Task 003 Final Implementation Prompt and Gate-Opening
-> Proposal, prepared 2026-07-07 on branch
-> `claude/task-003-gate-opening-no0tw4`, PROPOSED — NOT YET ACCEPTED: a
-> docs-only gate-preparation session, closing no new decision (AR-027
-> already closed all four Task 003-specific points) and opening no
-> implementation gate. Packages the complete, copy-paste final Task 003
-> `CLAUDE.md` §9 prompt
-> (`task-003-final-implementation-prompt.md`, applying `core_test_connection`;
-> the `SHOP_INACTIVE`/402/423/403-fraudulent → `shopify_permission_scope_auth`
-> mapping with `credential_state` gating and five mandatory distinct
-> plain-language reasons; the `_system_append` job-log system-append
-> method as the one new sanctioned `sudo()` site; and the per-run UUID4
-> `payload_hash` nonce for `core_test_connection` job creation only —
-> marked not issued/not authorized) and a narrow gate-opening proposal
-> (`task-003-gate-opening-proposal.md`, scoping the first conscious
-> widening of the AR-021 no-external-API rule — the proposal itself
-> opens nothing); `core_readiness_check` (`TD-001`) explicitly excluded
-> from the proposed gate scope; docs-only, no code, no gate opened, no
-> external network call; Task 003 remains not started)** is immediately
-> below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **PR #98 — ChatGPT F1
+> (AR-029 — Task 003 API-Client / Test-Connection Implementation Gate,
+> prepared 2026-07-07 on a fresh branch from latest `Shopify-connector`:
+> the actual gate-opening act, opening exactly one future Task 003
+> coding session via the already-prepared
+> `task-003-final-implementation-prompt.md`, effective only once this
+> act's PR merges into `Shopify-connector`. Also applies the AR-028
+> acceptance patch in the same document (AR-028 row → Accepted; PR #99
+> had merged the final prompt and gate-opening proposal while still
+> marked Proposed in their own text). This is the **first** conscious
+> widening of the AR-021 no-external-API-call rule — read-only outbound
+> GraphQL calls only, no mutation/Bulk-Operations/REST;
+> `core_readiness_check`/`TD-001`, setup wizard, UI/XML,
+> webhooks/controllers/cron, domain modules, credential-model changes,
+> and ACL/security-file changes all remain forbidden; docs-only, no
+> code, no external network call; Task 003 remains not started until
+> this PR merges and the final prompt is issued verbatim in its own
+> session)** is immediately below, in the **compact handoff format**
+> (`../06-prompts/session-handoff-template.md`); **AR-028 — Task 003
+> Final Implementation Prompt and Gate-Opening Proposal, prepared
+> 2026-07-07 on branch `claude/task-003-gate-opening-no0tw4`, merged via
+> PR #99 (merge commit `756b88eca79f2ef56ff752b6ba82ab266a782724`) while
+> still marked Proposed — accepted only later, by the AR-029 act
+> immediately above (history)**, **PR #98 — ChatGPT F1
 > Revision to Task 003 Decision Closure — AR-027 accepted with a
 > scope-narrowing revision to Decision 4: decisions 1–3
 > (`core_test_connection` job-type value; `SHOP_INACTIVE`/402/423/
@@ -150,6 +152,97 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### Task 003 API-Client / Test-Connection Implementation Gate — compact handoff (2026-07-07)
+
+> **Docs-only gate-opening act — not Task 003, not code, not a research
+> sprint.** Confirmed before starting: PR #99 merged into
+> `Shopify-connector` (merge commit
+> `756b88eca79f2ef56ff752b6ba82ab266a782724`, confirmed an ancestor of
+> latest `Shopify-connector`); PR #98 merge commit
+> `2e51cf02cd54527ff9dc817b6be1e1189f001a83` also confirmed an ancestor;
+> AR-027 Accepted (with the F1 revision); the final Task 003 prompt and
+> gate-opening proposal (AR-028) present in the repository but still
+> marked Proposed in their own text; Task 002 implemented and merged
+> (PR #97); Task 003 not started; working branch created from latest
+> `Shopify-connector`.
+
+- **Branch / PR:** `claude/task-003-gate-act-92cfd7` → draft PR into
+  `Shopify-connector` (opened this session; remains draft, not merged).
+- **Files changed:**
+  `docs/07-implementation-plan/task-003-api-client-test-connection-gate.md`
+  (new — the gate-opening act itself), `docs/05-qa/architecture-review-log.md`
+  (AR-028 row → **Accepted**; new AR-029 row, **Accepted**; AR-029
+  gate-opening note appended), `docs/07-implementation-plan/task-003-final-implementation-prompt.md`
+  and `docs/07-implementation-plan/task-003-gate-opening-proposal.md`
+  (short acceptance callouts added to each Status section, mirroring
+  the AR-025/PR #94 precedent — original proposal text preserved below,
+  unedited, as history), `docs/01-research/research-handoff.md` (this
+  entry). **No addon/code file touched. No Python/XML/CSV/manifest/
+  test/CI file created or modified. No API client, test-connection
+  mechanism, credential-model change, or external/Shopify network call
+  of any kind created or made. No webhook/controller/cron/domain module
+  created.**
+- **What changed:** **AR-028 accepted** (its package having merged via
+  PR #99 while still marked Proposed) **and AR-029 accepted — the
+  narrow Task 003 API-client/test-connection implementation gate is
+  opened, effective once this PR merges into `Shopify-connector`.** The
+  gate authorizes exactly one future coding session — Task 003 (API
+  Client Shell and Test Connection) — using the exact contracts already
+  accepted in `task-003-final-implementation-prompt.md` (referenced by
+  path, not restated/duplicated). **This is the first conscious
+  widening of the AR-021 no-external-API-call rule** — read-only
+  outbound GraphQL calls only. **This PR does not implement Task 003,
+  does not create the API client or any model/field, and does not
+  create any code, and makes no external network call** — the final
+  prompt is not issued inside this PR.
+- **Still forbidden:** `core_readiness_check`/`TD-001` fix (unless a
+  future gate names it explicitly); setup wizard; UI/views/menus/
+  actions/wizards; webhooks/controllers/cron; product/customer/order/
+  inventory/fulfillment; domain modules; migrations (none justified);
+  credential-model changes; ACL/security-file changes; mutations; Bulk
+  Operations; REST calls; any `sudo()` beyond the two sanctioned sites;
+  any second task before ChatGPT reviews Task 003's implementation PR.
+- **AR-028 / AR-029:** Both Accepted. **No implementation gate is open
+  until this PR merges. Task 003 is not started.**
+- **Learning feedback loop:** new issues: none. Repeated patterns: none
+  new. Rules updated: none. Rejected approaches: none reintroduced.
+  Technical debt: none new — `TD-001` referenced, not modified, and
+  explicitly kept out of this gate's scope. Architecture concerns: none
+  new — this act stays strictly inside the AR-027/AR-028-accepted
+  scope; the one process note worth flagging is that AR-028's package
+  (PR #99) merged before its own acceptance patch was applied (unlike
+  the AR-025/PR #94 convention of applying the patch before merge) —
+  this act closes that gap by applying the AR-028 acceptance patch and
+  the AR-029 gate-opening act together, in the same document.
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (N/A) ·
+  technical debt logged (N/A, `TD-001` already logged via AR-027, only
+  referenced here) · repeated-issue escalation applied (N/A) — all YES.
+- **Stop condition:** stopped immediately after opening the draft PR —
+  no merge, no ready-for-review, no implementation, Task 003 not
+  started.
+- **Recommended next step:** ChatGPT reviews this gate-opening act; if
+  accepted and merged into `Shopify-connector`, the gate is open and
+  `task-003-final-implementation-prompt.md` is issued verbatim, in its
+  own session, as the Task 003 coding session (that session's PR must
+  remain draft until ChatGPT reviews it).
+
+**Exact next-session prompt:**
+
+> After this gate-opening act (AR-029) is merged into
+> `Shopify-connector`, issue
+> `docs/07-implementation-plan/task-003-final-implementation-prompt.md`
+> verbatim as the Task 003 coding session — create the read-only
+> `shopify.connector.api.client` shell, the `action_test_connection()`
+> entry point, the `core_test_connection` `job_type` addition, the
+> `_system_append` job-log system-append method, the per-run UUID4
+> `payload_hash` nonce for `core_test_connection` job creation only, the
+> enumerated tests, and the manifest version bump, exactly as specified,
+> with zero deviation from the accepted contracts. Keep the resulting PR
+> draft until ChatGPT reviews it.
 
 ---
 
