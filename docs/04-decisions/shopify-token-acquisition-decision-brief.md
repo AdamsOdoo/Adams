@@ -244,6 +244,48 @@ it remains this brief's [Recommendation], not a [Decision], exactly as in
 remains open. OAuth implementation remains a future, not-yet-required item
 pending the still-unrun empirical step.
 
+## 10b. ChatGPT deferral decision for Task 004 gate (2026-07-07)
+
+ChatGPT has reviewed the state recorded above (§10a: the OAuth/Fable
+experiment blocked before execution) together with PR #110's static/offline
+sweep and PR #111's Task 004 readiness preflight package, and has issued a
+**deferral decision**, recorded in full in
+[`DEC-021-val-b2-deferral-for-task-004.md`](./DEC-021-val-b2-deferral-for-task-004.md).
+Summary — this section does not restate DEC-021's full content, only its
+effect on this brief:
+
+- **Option C remains recommended but unproven.** DEC-021 does not accept,
+  reject, or confirm Option C — the empirical OAuth authorization-code-grant
+  experiment described in §4 above has still never been run. Option C
+  remains this brief's **[Recommendation]**, not a **[Decision]**.
+- **The OAuth/manual token experiment is deferred from the Task 004 gate.**
+  DEC-021 defers VAL-B2 (and, with it, the requirement that this experiment
+  succeed before Task 004 can be gate-reviewed) — it does **not** mark the
+  experiment complete, does **not** run it by proxy, and does **not** change
+  §10a's blocked-before-execution record in any way.
+- **Token acquisition remains unresolved for customer-facing setup.** Nothing
+  in DEC-021 lets the connector claim a self-serve, proven token-acquisition
+  path for new merchants. That gap, and the "no in-product path exists today
+  for a merchant without a pre-2026-01-01 legacy app" limitation named in §3
+  above (Option A), stand exactly as before.
+- **MBQ-05 is deferred for Task 004 only, not resolved.** See the
+  corresponding MBQ-05 row update in
+  [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md),
+  which links back to DEC-021. MBQ-05 continues to block the setup-
+  wizard/credential-acquisition slice and any customer-facing setup claim.
+- **Task 004 must not implement OAuth or claim live connection proof.** Per
+  DEC-021 §4: no OAuth implementation, no setup wizard, no customer-facing
+  connection flow, no domain sync, no activation/lifecycle actions, and no
+  claim anywhere (code, tests, docs, or PR description) that a live valid
+  Shopify connection has been proven, until VAL-B2 or an accepted replacement
+  validation actually passes.
+
+This section does not change §§1–10a above in any way — it only records
+where the control room's review of this brief's own open items landed, for
+the narrow, explicitly-scoped purpose of letting Task 004 gate-opening
+*review* proceed. See DEC-021 for the full decision, its non-decisions, and
+its constraints.
+
 ## 10. Recommendation for ChatGPT
 
 Accept the Option C direction in §4, and authorize the narrow, docs/QA-only

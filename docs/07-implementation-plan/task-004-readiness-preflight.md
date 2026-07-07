@@ -1,43 +1,96 @@
 # Task 004 Readiness Preflight
 
-> **Preparatory only. This document does not authorize coding, does not open
-> any implementation gate, does not unblock Task 004, and does not mark Task
-> 003 complete.** It exists so that, once Task 003 and the token-acquisition
-> direction are resolved and ChatGPT is ready to consider Task 004, the
-> control room has one place that summarizes exactly what is true today, what
-> must become true first, and what the candidate scope looks like — without
-> pre-deciding any of it. Nothing in this document may be cited as
-> ChatGPT authorization for Task 004 or as evidence that Task 003 is
-> complete.
+> **Preparatory only. This document does not authorize coding and does not
+> mark Task 003 complete.** As of the 2026-07-07 deferral update in §0,
+> Task 004 may proceed to **gate-opening review** (not implementation) —
+> see §0 for the exact, narrow scope of that change. It exists so that the
+> control room has one place that summarizes exactly what is true today,
+> what must become true before implementation, and what the candidate scope
+> looks like — without pre-deciding any of it. Nothing in this document may
+> be cited as ChatGPT authorization for Task 004 *implementation* or as
+> evidence that Task 003 is complete.
 
 ## Status
 
-**Docs-only preflight package. Prepared 2026-07-07, revised 2026-07-07**
-on branch `claude/task-004-readiness-preflight-vgbkt3`, originally branched
-from `Shopify-connector` at its tip after PR #109 merged (merge commit
-`9d0bc11dac55b5fd6cdf338dfec2909e96364f45`). This revision updates the
-package after two sessions that were in flight at the time of the original
-draft have since **merged**: **PR #109** (the Fable/manual-OAuth
-token-acquisition experiment, recorded as blocked before execution — no
-Fable tool and no Shopify Dev Dashboard credentials were available) and
-**PR #110** (the static/offline Task 003 validation sweep, recording
-additional static evidence for VAL-A4/VAL-C1(server-log
+**Docs-only preflight package. Prepared 2026-07-07, revised 2026-07-07,
+revised again 2026-07-07 (deferral update, §0)** on branch
+`claude/task-004-readiness-preflight-vgbkt3`/`claude/record-val-b2-deferral-5uz9wf`,
+originally branched from `Shopify-connector` at its tip after PR #109 merged
+(merge commit `9d0bc11dac55b5fd6cdf338dfec2909e96364f45`). The second
+revision updated the package after two sessions that were in flight at the
+time of the original draft had since **merged**: **PR #109** (the
+Fable/manual-OAuth token-acquisition experiment, recorded as blocked before
+execution — no Fable tool and no Shopify Dev Dashboard credentials were
+available) and **PR #110** (the static/offline Task 003 validation sweep,
+recording additional static evidence for VAL-A4/VAL-C1(server-log
 half)/VAL-C3/VAL-D1/VAL-D2). Neither PR changed Task 003's overall
-incomplete status or Task 004's blocked status. See §7 "History — prior
-sessions, now merged" below for what changed and why this document no
-longer describes them as concurrent or expected.
+incomplete status or Task 004's blocked status. **This third revision**
+(after **PR #111**, the original preflight package, merged) records
+[`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)'s
+2026-07-07 deferral of VAL-B2 from the Task 003 → Task 004 gate — see §0.
+See §7 "History — prior sessions, now merged" below for what changed before
+this revision and why this document no longer describes PR #109/#110 as
+concurrent or expected.
 
-This document does not itself change the status of Task 003 or Task 004. It
-only restates their current, already-recorded status (§1) and organizes
+This document does not itself change the status of Task 003. It restates
+Task 003's current, already-recorded status (§1) and organizes
 already-existing planning material (§3–§4) so a future gate-review session
-does not have to re-derive it from scratch.
+does not have to re-derive it from scratch; §0 records the one actual status
+change (Task 004 gate-opening review, not implementation) that DEC-021
+introduces.
 
 ---
 
+## 0. Deferral update (2026-07-07) — read this section first
+
+**ChatGPT has formally deferred VAL-B2 from the Task 003 → Task 004 gate**,
+recorded in
+[`../04-decisions/DEC-021-val-b2-deferral-for-task-004.md`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md).
+This changes the bottom-line status this document restates in §1 below —
+**Task 004 implementation is still not started, but Task 004 may now
+proceed to gate-opening review**, because VAL-B2 is formally deferred
+(not passed, not failed, not waived) rather than left as a silent,
+undecided blocker. Specifically:
+
+- **Task 004 implementation is still not started.** Nothing in DEC-021 or
+  this update authorizes any Task 004 code, test, manifest, or view file.
+- **Task 004 may proceed to gate-opening *review*** — a future session may
+  prepare a Task 004 gate-opening proposal (following the
+  `task-002-credential-storage-gate.md` / `task-003-api-client-test-connection-gate.md`
+  precedent) — because DEC-021 formally defers VAL-B2 for that narrow
+  purpose. This is **not** the same as opening Task 004's implementation
+  gate; a separate, explicit gate-opening act and a separate `CLAUDE.md` §9
+  final implementation prompt are still required before any code is written
+  (see `task-004-dependency-map.md` §4 items 5–6, unchanged).
+- **Task 004 still requires its own gate-opening act and final
+  implementation prompt.** DEC-021 does not substitute for either.
+- **TD-001 routing remains a hard pre-start condition.** Per DEC-021 §4 and
+  §5 below, TD-001 must be explicitly routed (folded into the Task 004 gate
+  by name, or scheduled as its own follow-up patch) before or inside the
+  Task 004 gate-opening act — not silently inherited, not silently fixed.
+- **New constraint (DEC-021 §4):** no customer-facing readiness pass,
+  activation, setup wizard, or domain sync may depend on unproven VAL-B2.
+  Any valid-connection readiness check Task 004 implements must remain
+  backed by existing fields (`credential_present`, `credential_state`,
+  `granted_scopes`, `granted_scopes_checked_at`, the `core_test_connection`
+  job/job.log trail) and must not claim a live "connected" pass unless that
+  field evidence actually exists.
+- **MBQ-05 is deferred for Task 004 only, not resolved** — see the updated
+  MBQ-05 row in
+  [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
+  It continues to block the setup-wizard/credential-acquisition slice and
+  any customer-facing setup claim.
+
+The candidate prompts referenced in §6 and in
+[`../06-prompts/task-004-candidate-claude-prompts.md`](../06-prompts/task-004-candidate-claude-prompts.md)
+remain **draft-only and not runnable** — this update does not promote any of
+them to an authorized task prompt.
+
 ## 1. Current gate status
 
-All of the following is restated from already-merged documents — nothing
-here is a new finding or a new decision.
+All of the following is restated from already-merged documents, **except
+where §0 above notes the DEC-021 deferral update** — nothing here is a new
+finding or a new architecture decision.
 
 - **Task 003 (API client + test connection) is merged but its manual
   validation is incomplete.** Per
@@ -60,15 +113,22 @@ here is a new finding or a new decision.
   environment** — no live Odoo runtime or log files were available —
   and remains not tested). VAL-B4–B7 and VAL-G1–G4 remain not tested. **Task
   003 manual validation has not been called Go or No-Go.**
-- **Task 004 is blocked.** Per
+- **Task 004 implementation is still not started; Task 004 may now proceed
+  to gate-opening review only.** Per
   [`../04-decisions/shopify-token-acquisition-decision-brief.md`](../04-decisions/shopify-token-acquisition-decision-brief.md)
-  §9 ("Can Task 004 start before this is resolved? **No.**") and every
-  research-handoff entry since (PR #107, #108, #109, #110): Task 004 remains
-  blocked pending both Task 003 completion/acceptance and a decided
-  token-acquisition direction. Neither PR #109 nor PR #110 changed this —
-  no valid Shopify Admin API token was used or obtained by either, and
-  neither claims OAuth succeeded or that VAL-B2 passed. This preflight
-  package does not change that conclusion either.
+  §9 ("Can Task 004 start before this is resolved? **No.**"), every
+  research-handoff entry through PR #107–#111, and now
+  [`../04-decisions/DEC-021-val-b2-deferral-for-task-004.md`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+  (2026-07-07): VAL-B2 is **formally deferred**, not passed, so Task 004
+  **implementation** remains blocked exactly as before (no code, test, or
+  view file is authorized), but Task 004 may now move to **gate-opening
+  review** under DEC-021 §4's strict constraints (see §0 above). Neither PR
+  #109 nor PR #110 changed the underlying facts — no valid Shopify Admin
+  API token was used or obtained by either, and neither claims OAuth
+  succeeded or that VAL-B2 passed — and DEC-021 does not change those facts
+  either; it only formally defers the consequence of VAL-B2's absence for
+  the narrow purpose of gate-opening review. TD-001 routing remains a hard
+  pre-start condition (§0, §5 below).
 - **VAL-B2 is pending on an unresolved token-acquisition question
   (MBQ-05).** Per the decision brief and
   [`../03-architecture/shopify-token-acquisition-options.md`](../03-architecture/shopify-token-acquisition-options.md):
@@ -316,11 +376,27 @@ naturally reference.
   revision. No file under `addons/`, no `*.py`, `*.xml`, `*.csv`, manifest,
   security, test, migration, CI, or Dockerfile was created or modified.
   Only the four Markdown files listed above.
-- **Stop condition:** this revision stops once the four allowed files are
-  updated, `git diff` against latest `Shopify-connector` is confirmed to
-  touch only those four files, the branch is pushed, and PR #111 is
-  confirmed mergeable. No further work (including any Task 004 work, any
-  Task 003 work, or any edit to `research-handoff.md`) is performed in this
+- **Deferral-recording session (2026-07-07, branch
+  `claude/record-val-b2-deferral-5uz9wf`, after PR #111 merged):** recorded
+  ChatGPT's control-room decision to defer VAL-B2 from the Task 003 → Task
+  004 gate, per
+  [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md). Added
+  §0 above and the corresponding update to §1's Task 004 status line. This
+  session did **not** open Task 004's implementation gate, did **not** write
+  a Task 004 `CLAUDE.md` §9 prompt, and did **not** touch any candidate
+  prompt in
+  [`../06-prompts/task-004-candidate-claude-prompts.md`](../06-prompts/task-004-candidate-claude-prompts.md)
+  (still draft-only, not runnable). No file under `addons/`, no code, test,
+  manifest, security, XML, CSV, migration, or CI file was created or
+  modified — only the eight Markdown files named in this session's own
+  allowed-files list.
+- **Stop condition:** this revision stops once the four allowed files (and,
+  in the 2026-07-07 deferral-recording session, the eight allowed files
+  named in that session's scope) are updated, `git diff` against latest
+  `Shopify-connector` is confirmed to touch only those files, the branch is
+  pushed, and the resulting PR is confirmed mergeable. No further work
+  (including any Task 004 implementation work, any Task 003 live validation
+  work, or any OAuth experiment) is performed in this
   session.
 
 ---

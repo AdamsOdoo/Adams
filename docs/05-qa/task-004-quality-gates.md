@@ -21,34 +21,72 @@ Modeled on this project's existing gate discipline
 
 ---
 
+## 0. Deferral update (2026-07-07)
+
+**ChatGPT has formally deferred VAL-B2 from the Task 003 → Task 004 gate**,
+recorded in
+[`../04-decisions/DEC-021-val-b2-deferral-for-task-004.md`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md).
+This updates two of §1's pre-start gate items below (VAL-B2 and MBQ-05) from
+a hard, undecided block to a **formal deferral, scoped to gate-opening
+review only** — see the strikethrough-equivalent notes inline in §1. **This
+does not remove either item from the checklist; it records that DEC-021
+satisfies them for gate-opening-review purposes only, not for Task 004
+implementation or for any customer-facing readiness claim.** New constraint
+added by DEC-021 §4: no customer-facing readiness pass, activation, setup
+wizard, or domain sync may depend on unproven VAL-B2 — see the new item at
+the end of §1.
+
 ## 1. Pre-start gate
 
 Before any Task 004 code is written:
 
 - [ ] Task 003 manual validation (`task-003-validation-results.md`) has an
       actual ChatGPT-reviewed Go/No-Go recommendation — not "not yet
-      determined."
+      determined." **Status (2026-07-07): satisfied for gate-opening review
+      only** — `task-003-validation-results.md` §5 now records a
+      conditional acceptance / formal deferral, per DEC-021. This is **not**
+      a full Go and **not** a customer-facing-readiness pass.
 - [ ] VAL-B2 has passed, or ChatGPT has explicitly accepted a formal
       re-scope of it (per the token-acquisition decision brief §8–§9).
+      **Status (2026-07-07): VAL-B2 is formally DEFERRED by DEC-021, not
+      passed, not re-scoped as passed.** This satisfies the pre-start gate
+      for Task 004 **gate-opening review** only — it does not satisfy any
+      requirement, in this checklist or elsewhere, that depends on VAL-B2
+      having actually passed.
 - [ ] MBQ-05 (token-acquisition direction) is accepted or explicitly
-      deferred by ChatGPT.
+      deferred by ChatGPT. **Status (2026-07-07): deferred for Task 004
+      only, per DEC-021** — not accepted, not resolved. See the updated
+      MBQ-05 row in `master-blueprint-open-questions.md`.
 - [ ] TD-001's routing decision is made (folded into the Task 004 gate by
       name, or scheduled as its own separate follow-up patch) — not left
-      silently unrouted.
+      silently unrouted. **Status (2026-07-07): still NOT satisfied.**
+      DEC-021 explicitly does not route TD-001 — this remains a hard
+      pre-start condition per DEC-021 §4, to be resolved before or inside
+      the Task 004 gate-opening act.
 - [ ] MBQ-06's residual (exact readiness-check copy/XML IDs/thresholds) is
       fixed in the Task 004 task prompt itself, not left as a TBD inside
       the code.
 - [ ] A Task 004 gate-opening act exists, is its own separate merged
       document (not this preflight package), and has been merged into
-      `Shopify-connector`.
+      `Shopify-connector`. **Status (2026-07-07): still NOT satisfied** —
+      DEC-021 defers VAL-B2/MBQ-05 for gate-opening *review* purposes; it is
+      not itself a Task 004 gate-opening act and does not substitute for one.
 - [ ] A Task 004 final implementation prompt exists, naming an exact,
       exhaustive allowed-files list and an exact, exhaustive forbidden-files
-      list, per `CLAUDE.md` §9.
+      list, per `CLAUDE.md` §9. **Status (2026-07-07): still NOT
+      satisfied.**
 - [ ] The feedback-loop files (`defect-pattern-log.md`,
       `rejected-approaches-log.md`, `architecture-review-log.md`,
       `technical-debt-register.md`) have been checked and are current.
 - [ ] No issue type sits at its 3rd-occurrence pause without a prevention
       rule/test/gate in place (per `implementation-task-template.md`).
+- [ ] **New (DEC-021 §4, 2026-07-07):** no customer-facing readiness pass,
+      activation, setup wizard, or domain sync depends on unproven VAL-B2.
+      Any valid-connection readiness check implemented by Task 004 remains
+      backed by existing fields (`credential_present`, `credential_state`,
+      `granted_scopes`, `granted_scopes_checked_at`, the
+      `core_test_connection` job/job.log trail) and does not claim a live
+      "connected" pass unless that field evidence actually exists.
 
 ## 2. PR gate
 

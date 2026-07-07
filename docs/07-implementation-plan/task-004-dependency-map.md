@@ -22,6 +22,28 @@ corrected to the past tense.
 
 ---
 
+## 0. Deferral update (2026-07-07)
+
+**ChatGPT has formally deferred VAL-B2 from the Task 003 → Task 004 gate**,
+recorded in
+[`../04-decisions/DEC-021-val-b2-deferral-for-task-004.md`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md).
+This updates blocker #1 and blocker #3 in §2's table below (VAL-B2 and
+MBQ-05) from a silent, undecided block to a **formal deferral** — VAL-B2 is
+still not passed; MBQ-05 is still not resolved. The new state, replacing the
+prior "Task 004 remains blocked pending VAL-B2/MBQ-05" framing everywhere in
+this document:
+
+- **Task 004 implementation is still not started.**
+- **Task 004 may proceed to gate-opening review** because VAL-B2 is formally
+  deferred (not passed, not failed, not waived) for that narrow purpose.
+- **Task 004 still requires its own gate-opening act (§4 item 5) and final
+  implementation prompt (§4 item 6)** — DEC-021 does not substitute for
+  either.
+- **TD-001 routing (§4 item 3) remains a hard pre-start condition**, per
+  DEC-021 §4.
+- **New constraint (DEC-021 §4):** no customer-facing readiness pass,
+  activation, setup wizard, or domain sync may depend on unproven VAL-B2.
+
 ## 1. Dependency graph — Task 001/002/003 → Task 004
 
 ```
@@ -40,11 +62,13 @@ Task 003  API client shell + test connection                    — merged,
         │   snapshot on store)                                     (VAL-B2
         │                                                           blocked)
         ▼
-Task 004  Readiness check substrate                              — BLOCKED
-          (candidate scope: check registry, essential/warning
-           tiers per DEC-018/MBQ-06, setup_readiness_check jobs,
-           job.log.payload_snapshot per-check results, summary
-           mirrored to store.last_readiness_result/_at)
+Task 004  Readiness check substrate                          — NOT STARTED;
+        │  (candidate scope: check registry, essential/warning  gate-opening
+        │   tiers per DEC-018/MBQ-06, setup_readiness_check      review only
+        │   jobs, job.log.payload_snapshot per-check results,    per DEC-021
+        │   summary mirrored to store.last_readiness_result/_at) (VAL-B2
+        │                                                         formally
+        │                                                         deferred)
         │
         ▼
 Task 005  Connection lifecycle actions (activate/disconnect/
@@ -69,17 +93,22 @@ Shopify Token-Acquisition Decision (MBQ-05)
         │
         ▼
   ChatGPT accepts a direction (Option A / B / C) → MBQ-05 closes
+  fully (still open today — deferred for Task 004 only, per DEC-021)
         │
         ▼
   VAL-B2 re-attempted with a token obtained via the accepted path
+  (still not attempted — VAL-B2 formally deferred, not passed, DEC-021)
         │
         ▼
-  Task 003 validation Go/No-Go recorded ─────────┐
+  Task 003 validation Go/No-Go: conditionally accepted for Task 004
+  gate purposes only (DEC-021, 2026-07-07) ──────┐
                                                   ▼
-                                    Task 004 becomes reviewable
-                                    (still requires its own
-                                     separate ChatGPT gate act
-                                     + §9 task prompt)
+                                    Task 004 becomes reviewable for
+                                    GATE-OPENING REVIEW ONLY — not
+                                    implementation. Still requires its
+                                    own separate ChatGPT gate-opening
+                                    act + §9 task prompt, and explicit
+                                    TD-001 routing (DEC-021 §4).
 ```
 
 This project's tasks never "reach forward" — each task consumes only
@@ -90,14 +119,14 @@ consumes only merged predecessors; no task reaches forward.").
 
 ---
 
-## 2. Open blockers (as of 2026-07-07)
+## 2. Open blockers (as of 2026-07-07, updated by the DEC-021 deferral)
 
 | # | Blocker | Current state | Tracked in |
 | --- | --- | --- | --- |
-| 1 | VAL-B2 (valid-token positive-connection test) | **BLOCKED** — no valid Shopify Admin API token was obtainable this session | `../05-qa/task-003-validation-results.md` |
-| 2 | Task 003 Go/No-Go recommendation | **Not yet determined** — partial results only | `../05-qa/task-003-validation-results.md` §5 |
-| 3 | MBQ-05 (token-acquisition direction) | **Open** — Option C is a Recommendation, not accepted; empirical experiment not yet run | `../04-decisions/shopify-token-acquisition-decision-brief.md`; `master-blueprint-open-questions.md` |
-| 4 | Empirical OAuth exchange experiment | **Blocked before execution twice-attempted-scope** — no Fable-equivalent tool/connector and no Shopify Dev Dashboard credentials available in the one session that attempted it | `../05-qa/task-003-validation-results.md` §8; decision brief §10a |
+| 1 | VAL-B2 (valid-token positive-connection test) | **Formally DEFERRED for the Task 004 gate only (DEC-021, 2026-07-07)** — still not passed, not failed, not waived; no valid Shopify Admin API token was obtainable this session; still blocks any customer-facing setup claim | `../05-qa/task-003-validation-results.md`; `../04-decisions/DEC-021-val-b2-deferral-for-task-004.md` |
+| 2 | Task 003 Go/No-Go recommendation | **Conditionally accepted for Task 004 gate purposes only (DEC-021, 2026-07-07)** — not a full Go, not a No-Go; not a claim of customer-facing readiness | `../05-qa/task-003-validation-results.md` §5 |
+| 3 | MBQ-05 (token-acquisition direction) | **Deferred for Task 004 only (DEC-021, 2026-07-07)** — Option C remains a Recommendation, not accepted; empirical experiment not yet run; MBQ-05 itself is not resolved | `../04-decisions/shopify-token-acquisition-decision-brief.md` §10b; `master-blueprint-open-questions.md`; `../04-decisions/DEC-021-val-b2-deferral-for-task-004.md` |
+| 4 | Empirical OAuth exchange experiment | **Still blocked before execution; deferred, not run** — no Fable-equivalent tool/connector and no Shopify Dev Dashboard credentials available in the one session that attempted it; DEC-021 does not run this experiment or change this state | `../05-qa/task-003-validation-results.md` §8; decision brief §10a, §10b |
 | 5 | VAL-C1 server-log-grep half | **Not tested** — confirmed by PR #110 (merged) as "not testable in that session's environment" (no live Odoo runtime or log files available); still not tested by any session | `../05-qa/task-003-validation-results.md` |
 | 6 | VAL-A4, VAL-C3, VAL-D1, VAL-D2 | **Statically confirmed by PR #110 (merged)** — repo/source-level evidence only, not live-environment proof | `../05-qa/task-003-static-validation-sweep.md`; `../05-qa/task-003-no-side-effect-baseline.md`; `../05-qa/task-003-server-log-redaction-check.md`; results doc |
 | 6a | VAL-B4–B7, VAL-E1, VAL-G1–G4 | **Not tested / blocked** — unaffected by PR #109 or PR #110 | `../05-qa/task-003-manual-validation-checklist.md`; results doc |
@@ -239,16 +268,17 @@ specific session last touched them.
 
 | File | Touched by (historical) | Why it's sensitive |
 | --- | --- | --- |
-| `docs/05-qa/task-003-validation-results.md` | Static/offline Task 003 validation sweep (PR #110, merged) added a static/offline addendum; the Fable/OAuth experiment (PR #109, merged) added a §8 continuation entry before it | Both already landed cleanly, in sequence (PR #109 merged first, PR #110 merged on top and preserved PR #109's content unchanged, per PR #110's own test plan). **This preflight package did not touch it, in either the original session or this revision.** |
-| `docs/04-decisions/shopify-token-acquisition-decision-brief.md` | Fable/OAuth experiment (PR #109, merged) — added the §10a continuation-attempt section | Already landed. **This preflight package did not touch it, in either the original session or this revision.** |
-| `docs/01-research/research-handoff.md` | Both PR #109 and PR #110 (each prepended its own compact handoff entry per `CLAUDE.md` §12) | High-churn file — prepended-to by nearly every session. **This preflight package did not touch it, in either the original session or this revision**, per this session's own explicit instruction to avoid it unless ChatGPT asks for a handoff entry. |
-| `docs/05-qa/task-003-manual-validation-checklist.md` | Not touched by PR #110 in the end (its wording clarification landed earlier, in PR #107) | No longer an active collision concern for this package. |
-| `docs/05-qa/task-003-static-validation-sweep.md`, `task-003-no-side-effect-baseline.md`, `task-003-server-log-redaction-check.md` | New files added by PR #110 (merged) | Background evidence this package's §1/§2 now cites; not edited by this package. |
-| `docs/05-qa/technical-debt-register.md` | Not touched by PR #109, PR #110, or this package | TD-001 lives here; a future TD-001 routing decision (§4 item 3 above) would edit this file — still not this preflight package's place to do so. |
-| `docs/03-architecture/master-blueprint-open-questions.md` | Reserved for ChatGPT-reviewed MBQ closure notes only | MBQ-05/MBQ-06 rows should only be edited by a session ChatGPT has explicitly authorized to record a closure — not touched by PR #109, PR #110, or this package. |
-| `docs/07-implementation-plan/task-004-*.md` (this package) | This session (original draft + this revision) only | A future Task 004 gate-opening session should treat these as background material to read, not necessarily to edit in place — a gate-opening act should be its own new document, following the `task-00X-*-gate.md` precedent, rather than rewriting this preflight package's status in place. |
-| `docs/06-prompts/task-004-candidate-claude-prompts.md` (this package) | This session (original draft + this revision) only | Draft-only prompts; a future authorized Task 004 session should treat these as a starting point, not a binding spec — the binding spec is whatever future `task-004-final-implementation-prompt.md` ChatGPT actually accepts. |
-| `docs/05-qa/task-004-quality-gates.md` (this package) | This session (original draft + this revision) only | Generic gate checklist; does not assume Task 004's final scope. |
+| `docs/05-qa/task-003-validation-results.md` | Static/offline Task 003 validation sweep (PR #110, merged) added a static/offline addendum; the Fable/OAuth experiment (PR #109, merged) added a §8 continuation entry before it; **the 2026-07-07 deferral-recording session (branch `claude/record-val-b2-deferral-5uz9wf`) updated §5's Go/No-Go section and §6/§7 to record the DEC-021 deferral — explicitly authorized for that session, per its own named allowed-files list** | Both PR #109/#110 landed cleanly in sequence; the deferral-recording session's edit was a ChatGPT-authorized decision recording, not a silent re-scope — it deferred, did not pass, VAL-B2. |
+| `docs/04-decisions/shopify-token-acquisition-decision-brief.md` | Fable/OAuth experiment (PR #109, merged) — added the §10a continuation-attempt section; **the 2026-07-07 deferral-recording session added §10b, recording the DEC-021 deferral, explicitly authorized for that session** | Already landed for §10a. §10b's addition mirrors the same append-only discipline — no existing section rewritten. |
+| `docs/01-research/research-handoff.md` | PR #109 and PR #110 (each prepended its own compact handoff entry per `CLAUDE.md` §12); **the 2026-07-07 deferral-recording session prepended its own top entry recording the DEC-021 decision, per that session's explicit mandate (`CLAUDE.md` §12)** | High-churn file — prepended-to by nearly every session, always at the top, never rewriting prior entries. |
+| `docs/05-qa/task-003-manual-validation-checklist.md` | Not touched by PR #110 in the end (its wording clarification landed earlier, in PR #107); not touched by the 2026-07-07 deferral-recording session either | No longer an active collision concern for this package. |
+| `docs/05-qa/task-003-static-validation-sweep.md`, `task-003-no-side-effect-baseline.md`, `task-003-server-log-redaction-check.md` | New files added by PR #110 (merged); not touched by the 2026-07-07 deferral-recording session | Background evidence this package's §1/§2 now cites; not edited by this package or the deferral-recording session. |
+| `docs/05-qa/technical-debt-register.md` | Not touched by PR #109, PR #110, this package, or the 2026-07-07 deferral-recording session | TD-001 lives here; a future TD-001 *routing* decision (§4 item 3 above) would edit this file — DEC-021 explicitly does not resolve TD-001 and does not edit this file. |
+| `docs/03-architecture/master-blueprint-open-questions.md` | Reserved for ChatGPT-reviewed MBQ closure notes only; **the 2026-07-07 deferral-recording session appended a deferral note to the MBQ-05 row only, explicitly authorized by that session's scope — MBQ-05 is not thereby closed, only annotated as deferred for Task 004** | MBQ-05/MBQ-06 rows should only be edited by a session ChatGPT has explicitly authorized to record a closure or, as here, a deferral. |
+| `docs/07-implementation-plan/task-004-*.md` (this package) | This session (original draft + this revision) + **the 2026-07-07 deferral-recording session (added §0 to this file and to `task-004-readiness-preflight.md`)** | A future Task 004 gate-opening session should treat these as background material to read, not necessarily to edit in place — a gate-opening act should be its own new document, following the `task-00X-*-gate.md` precedent, rather than rewriting this preflight package's status in place. |
+| `docs/06-prompts/task-004-candidate-claude-prompts.md` (this package) | This session (original draft + this revision) only; **not touched by the 2026-07-07 deferral-recording session** — its candidate prompts remain draft-only and not runnable | Draft-only prompts; a future authorized Task 004 session should treat these as a starting point, not a binding spec — the binding spec is whatever future `task-004-final-implementation-prompt.md` ChatGPT actually accepts. |
+| `docs/05-qa/task-004-quality-gates.md` (this package) | This session (original draft + this revision) + **the 2026-07-07 deferral-recording session (updated the pre-start gate items for VAL-B2/MBQ-05/TD-001)** | Generic gate checklist; does not assume Task 004's final scope. |
 
-**No file outside this list, and outside the four files this package
-owns, was modified — in the original session or in this revision.**
+**No file outside this list, and outside the eight files the 2026-07-07
+deferral-recording session's own prompt named, was modified by that
+session.**

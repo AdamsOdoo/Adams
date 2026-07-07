@@ -1,5 +1,119 @@
 # Research Handoff (rolling)
 
+### VAL-B2 Deferral for Task 004 Gate — ChatGPT decision recorded (2026-07-07)
+
+- **Branch / PR:** `claude/record-val-b2-deferral-5uz9wf` → draft PR into
+  `Shopify-connector` (this session's PR, opened after PR #111 merged, merge
+  commit `43f3b2a923a420e523cd2ec2662a46e2a9abed26`). Docs-only session — no
+  code, test, manifest, security, XML, CSV, migration, or CI/workflow file
+  changed. **No Task 004 implementation of any kind in this session. No
+  OAuth implementation. No setup-wizard change. No domain sync.**
+- **Decision recorded:** ChatGPT's control-room decision to **defer VAL-B2**
+  (Task 003's blocked valid-token positive-connection test) **from the Task
+  003 → Task 004 gate, for Task 004 gate purposes only** — recorded in full
+  in
+  [`../04-decisions/DEC-021-val-b2-deferral-for-task-004.md`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+  (new). **VAL-B2 is not passed, not failed, and not waived.** The
+  OAuth/manual token-acquisition experiment remains unexecuted and
+  unresolved (unchanged from PR #109's blocked-before-execution record).
+  MBQ-05 is deferred **for Task 004 only**, not resolved as a final
+  token-acquisition strategy. TD-001 remains open and explicitly not
+  routed by this decision — it must be routed before or inside the Task 004
+  gate-opening act.
+- **Files changed:**
+  `docs/04-decisions/DEC-021-val-b2-deferral-for-task-004.md` (new — the
+  decision record itself);
+  `docs/05-qa/task-003-validation-results.md` (§5 Go/No-Go section updated
+  from "not yet determined" to a conditional acceptance / formal deferral
+  status; §6 sign-off and §7 handoff updated for consistency; no existing
+  evidence removed; PR #109/#110 addenda untouched);
+  `docs/04-decisions/shopify-token-acquisition-decision-brief.md` (new §10b
+  added after the §10a PR #109 continuation note, recording the deferral's
+  effect on this brief — Option C still unproven, experiment still
+  unexecuted, MBQ-05 still open);
+  `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-05 row
+  annotated with the deferral and a link to DEC-021 — status set to
+  "Deferred for Task 004 / still required before customer-facing setup,"
+  not "Resolved"; open-question substance preserved);
+  `docs/07-implementation-plan/task-004-readiness-preflight.md` (new §0;
+  §1's Task 004 status line and §6 session handoff updated);
+  `docs/07-implementation-plan/task-004-dependency-map.md` (new §0; the
+  dependency diagram, §2's blocker table, and §7's conflict map updated);
+  `docs/05-qa/task-004-quality-gates.md` (new §0; §1 pre-start gate items
+  for VAL-B2/MBQ-05/TD-001 annotated with their 2026-07-07 status);
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed:** Task 003's Go/No-Go moved from "not yet determined" to
+  "conditionally accepted for Task 004 gate purposes only" — a formal
+  deferral of VAL-B2, not a pass. The three Task 004 readiness documents
+  (preflight, dependency map, quality gates) were updated to state that
+  Task 004 may now proceed to **gate-opening review** (not implementation)
+  under DEC-021 §4's strict constraints. The MBQ-05 row and the
+  token-acquisition decision brief were both updated to record the
+  deferral without resolving MBQ-05 or reclassifying Option C as accepted.
+- **What remains unresolved:** VAL-B2 itself (still BLOCKED — no valid
+  Shopify Admin API token obtained); the empirical OAuth
+  authorization-code-grant experiment (still not executed — no
+  Fable-equivalent tool and no Shopify Dev Dashboard credentials available
+  to any session so far); MBQ-05 as a final token-acquisition strategy
+  (still open, only deferred for Task 004); VAL-C1's server-log-grep half
+  and the other not-tested Task 003 checklist items (VAL-A4's DB/registry
+  half, VAL-B4–B7, VAL-D1/D2's live halves, VAL-G1–G4); **TD-001**
+  (still Open in `technical-debt-register.md`, explicitly not routed by
+  this decision — routing remains a hard pre-start condition for Task 004);
+  any customer-facing setup readiness claim (still not authorized).
+- **Task 004 status after this PR:** **Ready for gate-opening *review*
+  only, and only once ChatGPT accepts/merges this decision PR.** Task 004
+  **implementation is not started** and is not authorized by this PR — no
+  code, test, manifest, or view file was created or modified. A separate,
+  explicit Task 004 gate-opening act and a separate `CLAUDE.md` §9 final
+  implementation prompt are still required before any Task 004 code is
+  written.
+- **No code changed:** confirmed. No file under `addons/`, no `*.py`,
+  `*.xml`, `*.csv`, manifest, security, test, migration, CI, or Dockerfile
+  was created or modified. Only the eight Markdown files listed above.
+- **Recommended decision:** None further — this session only records the
+  control-room decision already made (VAL-B2 deferral); it does not
+  recommend a new direction.
+- **Risks:** If a future session mistakes this deferral for a pass of
+  VAL-B2 or for Task 004 implementation authorization, it would violate
+  DEC-021 §3's explicit non-decisions and `CLAUDE.md` §8's claim-
+  classification discipline. Mitigated by this entry, DEC-021 itself, and
+  the updated Task 004 readiness documents all stating the same constraint
+  in multiple places.
+- **Learning feedback loop:** New issues / repeated patterns: none. Rules/
+  checklists updated: `task-004-quality-gates.md` §1's pre-start gate items
+  for VAL-B2/MBQ-05 now record their 2026-07-07 deferred status explicitly,
+  rather than leaving them as an undifferentiated open checkbox. Rejected
+  approaches: none newly rejected (see DEC-021 §6 for alternatives
+  considered, none of which were rejected outright). Technical debt: none
+  added; TD-001 unchanged, still Open, still unrouted. Architecture
+  concerns: none new. Tests or review gates needed: unchanged from PR
+  #111's list — a live session must still execute VAL-A1 (fresh re-run),
+  VAL-A4 (DB/registry half), VAL-B2 (or its accepted replacement), VAL-B4–B7,
+  VAL-C1 (server-log half), VAL-D1/D2 (live halves), VAL-E1, VAL-G1–G4;
+  additionally, a future gate-opening session must explicitly route TD-001.
+  Should future prompts change? Yes — any future Task 004 gate-opening
+  proposal prompt should explicitly cite DEC-021 and require TD-001 routing
+  as a named step, not an implicit assumption.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (none new, TD-001 unchanged) · repeated-issue escalation applied
+  (n/a) — all YES.
+- **Next recommended session:** A **Task 004 gate-opening proposal**
+  session — following the `task-002-credential-storage-gate.md` /
+  `task-003-api-client-test-connection-gate.md` precedent — that (a) opens
+  Task 004's gate for review under DEC-021 §4's constraints, (b) explicitly
+  routes TD-001 (fold into the Task 004 gate by name, or schedule as its
+  own separate follow-up patch), and (c) still does not itself authorize
+  Task 004 implementation — a separate `CLAUDE.md` §9 final implementation
+  prompt remains a distinct, later step.
+- **Stop condition:** stopped at the scoped boundary — docs-only decision-
+  recording session; no code, test, manifest, security, XML, CSV,
+  migration, or CI file touched; Task 004 implementation not started and
+  not authorized; no OAuth work performed or claimed; VAL-B2 recorded as
+  deferred, not passed; MBQ-05 recorded as deferred for Task 004 only, not
+  resolved; TD-001 left explicitly open and unrouted.
+
 ### Task 003 Static/Offline Validation Sweep — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/task-003-static-validation-cszl88` → **PR #110**,
