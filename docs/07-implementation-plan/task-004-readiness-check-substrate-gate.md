@@ -1,41 +1,47 @@
-# Task 004 Readiness Check Substrate — Gate Document (Proposed)
+# Task 004 Readiness Check Substrate — Gate Document (Accepted)
 
-> **This is the proposed gate document, not code authorization, until
-> ChatGPT explicitly accepts and merges it.** It mirrors the
+> **ChatGPT has accepted this gate document, pending this PR's own
+> review/merge into `Shopify-connector`.** It mirrors the
 > AR-021/AR-026/AR-028 precedent
 > (`limited-core-implementation-gate.md`, `task-002-credential-storage-gate.md`,
-> `task-003-api-client-test-connection-gate.md`): a gate exists only once
-> its opening document is merged into `Shopify-connector` **with ChatGPT's
-> explicit acceptance**. Unlike those three precedent documents — each of
-> which was written to perform an already-ChatGPT-reviewed gate-opening
-> act — this document has **not** yet been reviewed by ChatGPT. It is a
-> **proposal for that act**, prepared as part of this session's
-> gate-opening package alongside
-> [`task-004-gate-opening-proposal.md`](./task-004-gate-opening-proposal.md).
+> `task-003-api-client-test-connection-gate.md`): the gate formally opens
+> once this document, carrying that acceptance, is merged into
+> `Shopify-connector` — not before. This document was originally prepared
+> as a **proposal** (part of the Task 004 gate-opening package); this
+> revision records ChatGPT's control-room decision to **accept** it, and
+> to select TD-001's disposition (see §TD-001 route below).
 
 ## Status
 
-- **PROPOSED. NOT YET ACCEPTED. Does not open the Task 004 gate.**
+- **ACCEPTED by ChatGPT — pending PR review/merge.** This acceptance
+  patch, prepared 2026-07-07 on branch
+  `claude/task-004-gate-acceptance-338b3a`, records ChatGPT's
+  control-room decision to accept this gate document. **The gate formally
+  opens, and Task 004 implementation planning is authorized, only once
+  this PR is merged into `Shopify-connector`** — not on draft, not on
+  review approval alone in chat, and not by this session's own act of
+  writing it.
 - **Docs-only.** No code, no model, no field, no view, no XML, no Python is
   created by this document or this PR.
-- **Will open the Task 004 implementation gate only if and when ChatGPT
-  explicitly reviews and accepts this exact document** (or a
-  ChatGPT-revised version of it) **and it is merged into
-  `Shopify-connector` carrying that acceptance** — not on draft, not on
-  review approval alone in chat, not on any earlier commit, and not by
-  this session's own act of writing it.
-- **Does not implement Task 004.**
+- **This acceptance opens Task 004 implementation *planning* only** — it
+  does not itself write any code. **Task 004 implementation must be run
+  in a separate, later coding session**, using the finalized
+  [`task-004-final-implementation-prompt.md`](./task-004-final-implementation-prompt.md),
+  issued by ChatGPT in chat after this PR is merged.
+- **Does not implement Task 004.** No implementation code exists as of
+  this PR, and none is written by it.
 - **Does not create code.**
 - **Does not call Shopify.** No external network call is made by this
   document or this PR.
 - **Does not issue the final implementation prompt** — issuing
   [`task-004-final-implementation-prompt.md`](./task-004-final-implementation-prompt.md)
-  is the action that would start a future Task 004 coding session, and
-  that action must happen in a separate turn/session, after this gate
-  document is accepted, not inside this PR.
-- **If accepted, authorizes at most one future coding session** scoped
-  exactly to the readiness-check substrate named below — not a standing
-  implementation mandate.
+  is the action that starts the future Task 004 coding session, and that
+  action must happen in a separate turn/session, after this PR merges,
+  and only when ChatGPT explicitly issues that prompt in chat — not
+  inside this PR.
+- **Authorizes at most one future coding session** scoped exactly to the
+  readiness-check substrate named below (including the TD-001 fix named
+  in §TD-001 route) — not a standing implementation mandate.
 
 ## Preconditions
 
@@ -59,10 +65,12 @@ Confirmed on-disk before this document was written:
   [`../05-qa/task-003-validation-results.md`](../05-qa/task-003-validation-results.md)
   §5.
 - **TD-001 is open**, tracked in
-  [`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md),
-  with a routing note recorded this session requiring it to be handled
-  explicitly by this gate or a separate pre-Task-004 patch (see §TD-001
-  route below).
+  [`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md).
+  **Its route is now decided by this acceptance: fixed inside Task 004**,
+  as the first mandatory implementation acceptance criterion (see
+  §TD-001 route below). TD-001 remains `Open` — not fixed, not closed —
+  until the future Task 004 implementation PR actually merges the fix and
+  it is validated.
 
 ## Gate constraints (exact)
 
@@ -90,12 +98,13 @@ Check Substrate, scoped to:
   confirm this before coding);
 - the webhook-HMAC check and the mapped-Location check registered as
   **pending slots only** — not implemented;
-- the TD-001 disposition named explicitly in the final implementation
-  prompt (see §TD-001 route);
+- **the TD-001 fix, as the first mandatory acceptance criterion** (see
+  §TD-001 route) — repeated `core_readiness_check` job creation for the
+  same store must be safe;
 - tests covering tier semantics, per-check persistence, summary mirroring,
-  fail-closed aggregation, seam registration, and a TD-001
-  non-regression/regression test consistent with whichever disposition the
-  final implementation prompt names;
+  fail-closed aggregation, seam registration, and the mandatory TD-001
+  regression test (two `core_readiness_check` runs for the same store do
+  not collide);
 - a manifest version bump, if the final implementation prompt requires it;
 - the mandatory research-handoff update.
 
@@ -137,26 +146,33 @@ named gate acts:
 
 ## TD-001 route
 
-Per the routing note recorded this session in
-[`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md):
+**Decided by ChatGPT's control-room acceptance decision (2026-07-07):
+option (a) — fix TD-001 inside Task 004, as the first mandatory
+implementation acceptance criterion.**
 
-- **TD-001 must be explicitly handled** — either (a) named as a mandatory
-  first Task 004 implementation acceptance criterion (i.e., the final
-  implementation prompt fixes the `core_readiness_check` target-less
-  idempotency-collision defect as part of Task 004's own scope), or (b)
-  split out as its own separate pre-Task-004 patch (candidate name: "Task
-  001B — job-framework target-less idempotency patch") that must merge
-  before Task 004's implementation PR is opened.
-- **This gate document does not itself choose (a) or (b).** That choice is
-  reserved for ChatGPT's review of this gate document and the final
-  implementation prompt — whichever choice ChatGPT makes must be named
-  explicitly in the accepted final implementation prompt before any code
-  is written.
+- **TD-001 is fixed inside Task 004's own scope.** The Task 004
+  implementation must make the `core_readiness_check` target-less
+  idempotency-collision defect safe for repeated runs — a second
+  `core_readiness_check` job for the same store must no longer collide on
+  `store_idempotency_key_uniq`. This is the **first** mandatory
+  acceptance criterion of the Task 004 implementation PR — it is not
+  optional, and it is not deferred to a separate patch.
+- **The fix must be minimal and scoped to target-less readiness jobs.**
+  It must not alter the already-accepted `core_test_connection` behavior
+  (its per-run UUID4 `payload_hash` nonce, established by Task 003) unless
+  strictly necessary and explicitly justified in the implementation PR's
+  own description.
+- **A regression test is mandatory**, proving that two
+  `core_readiness_check` job-creation attempts for the same store do not
+  collide — mirroring the proof style already used for
+  `core_test_connection` (Task 003's VAL-B3).
 - **No Task 004 implementation may silently inherit the existing
-  `core_readiness_check` collision behavior** without that behavior being
-  named and accounted for, either as a fix-in-scope or as an
-  explicitly-acknowledged, unchanged residual with its own regression
-  test proving the behavior is unchanged.
+  `core_readiness_check` collision behavior**, and no implementation may
+  silently skip this fix — it is a named, mandatory, first acceptance
+  criterion, not a residual to be separately routed.
+- **The candidate name "Task 001B — job-framework target-less idempotency
+  patch" is retired** as an alternative — it is no longer the chosen
+  route; TD-001's fix is folded into Task 004 itself.
 
 ## MBQ-05 deferral conditions
 
@@ -198,9 +214,11 @@ MBQ-05 row update:
 - The domain-extension registration seam is provable: a check can be
   registered from outside `shopify_connector_core` without modifying core
   files.
-- TD-001's disposition (fixed-in-scope or explicitly-unchanged-residual)
-  matches exactly what the accepted final implementation prompt named —
-  no silent deviation either way.
+- **TD-001 is fixed** — a second `core_readiness_check` job for the same
+  store no longer collides on `store_idempotency_key_uniq`, proven by the
+  mandatory regression test. This is the first acceptance criterion; no
+  silent deviation (fix skipped, or fix broadened beyond target-less
+  readiness jobs without justification) is acceptable.
 - Only the files named in the accepted final implementation prompt's
   allowed-files list were changed — confirmed by `git diff` review, not by
   assumption.
@@ -223,10 +241,9 @@ MBQ-05 row update:
   core without modifying core files.
 - Read-only guarantee test: no mutation-capable call path exists in any
   check implementation this stage implements.
-- A TD-001 test matching whichever disposition the final implementation
-  prompt names: either a fix-verification test (if TD-001 is fixed in
-  this scope) or a non-regression test proving the existing collision
-  behavior is unchanged (if it is not).
+- **The mandatory TD-001 fix-verification/regression test:** two
+  `core_readiness_check` job-creation attempts for the same store must
+  both succeed, with no `store_idempotency_key_uniq` collision.
 - If the repository still has no Odoo runtime/CI at the time this task
   runs, tests are honestly recorded as written and
   `py_compile`/`pyflakes`-validated only, and
@@ -265,16 +282,17 @@ MBQ-05 row update:
 
 ## Explicit acceptance requirement
 
-**This document must be explicitly reviewed and accepted by ChatGPT, and
-merged into `Shopify-connector` carrying that acceptance, before Task 004
-implementation may begin.** Preparing, drafting, or reading this document
-does not open the gate. Neither does merging this docs-only PR by itself
-constitute "acceptance" unless the PR's own review record shows ChatGPT
-explicitly accepting this gate document's content (mirroring the
-AR-021/AR-026/AR-028 precedent, where the gate-opening documents were
-merged only after ChatGPT had already reviewed and accepted their
-content). Until that acceptance is recorded, Task 004 remains at
-**gate-opening review** status only — implementation is not authorized.
+**ChatGPT has reviewed and accepted this gate document's content**,
+including the TD-001 route decision above (§TD-001 route). Per the
+AR-021/AR-026/AR-028 precedent, this acceptance becomes operative — and
+Task 004 implementation *planning* is authorized — **only once this PR is
+merged into `Shopify-connector`**, not on draft, and not by this
+acceptance being recorded in chat alone. **Task 004 implementation itself
+must still be run as its own, separate, later coding session** — issuing
+[`task-004-final-implementation-prompt.md`](./task-004-final-implementation-prompt.md)
+is a distinct action ChatGPT takes in chat after this PR merges; merging
+this PR does not itself start that coding session. Until this PR merges,
+Task 004 remains at **gate-opening review** status only.
 
 ## Closure rule
 

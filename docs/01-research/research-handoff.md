@@ -1,5 +1,109 @@
 # Research Handoff (rolling)
 
+### Task 004 Gate Acceptance / TD-001 Route Selected — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/task-004-gate-acceptance-338b3a`, branched from
+  `Shopify-connector` at PR #113's merge commit
+  `0848b8cde5720162b795936161e884678ae52c71` → draft PR into
+  `Shopify-connector` (this session's PR). Docs-only session — no code,
+  test, manifest, security, XML, CSV, migration, or CI file of any kind
+  changed. **No addons/ file touched. No Task 004 implementation. No
+  OAuth. No setup wizard.**
+- **Gate accepted for Task 004 implementation planning.** ChatGPT's
+  control-room decision records **acceptance** of
+  [`task-004-readiness-check-substrate-gate.md`](../07-implementation-plan/task-004-readiness-check-substrate-gate.md)
+  — status changed from "Proposed, not yet accepted" to "Accepted by
+  ChatGPT, pending PR review/merge." This acceptance opens Task 004
+  implementation *planning* only, and only once this PR is merged; Task
+  004 implementation itself must still be run as a separate, later coding
+  session, using
+  [`task-004-final-implementation-prompt.md`](../07-implementation-plan/task-004-final-implementation-prompt.md),
+  issued by ChatGPT in chat.
+- **TD-001 route selected: fix inside Task 004.** ChatGPT chose option
+  (a) from the gate document's TD-001 route section: TD-001 is fixed
+  inside Task 004's own scope, as the **first mandatory implementation
+  acceptance criterion** — not deferred to a separate "Task 001B" patch
+  (that candidate is now retired). The fix must be minimal, scoped
+  exclusively to target-less readiness jobs (`core_readiness_check`),
+  must not alter the already-accepted `core_test_connection` behavior
+  without explicit justification, and must include a mandatory regression
+  test proving two `core_readiness_check` runs for the same store do not
+  collide. **TD-001 remains `Open`** in `technical-debt-register.md` —
+  this session records the routing decision, not a fix.
+- **Files changed:**
+  - `docs/07-implementation-plan/task-004-readiness-check-substrate-gate.md`
+    — status changed to Accepted; TD-001 route section rewritten from an
+    open (a)/(b) choice to the decided fix-inside-Task-004 disposition;
+    acceptance-criteria/test-expectation/explicit-acceptance-requirement
+    sections updated to match; all non-goals and constraints (no OAuth, no
+    setup wizard, no UI, no lifecycle, no domain sync, no live-connection
+    pass claim from unproven VAL-B2) preserved unchanged.
+  - `docs/07-implementation-plan/task-004-final-implementation-prompt.md`
+    — converted from a draft with unfilled `<PLACEHOLDER>`s into a
+    finalized, ready-for-later-use prompt: exact allowed-files list
+    (proposed after repo inspection — one new core model file, one new
+    test file, two one-line `__init__.py` additions, a manifest version
+    bump, and the research-handoff update), TD-001 disposition filled in
+    as the first mandatory acceptance criterion with its regression-test
+    requirement, forbidden files kept strict. Still marked "DO NOT RUN
+    UNTIL THIS GATE-ACCEPTANCE PR IS MERGED AND CHATGPT ISSUES THIS
+    PROMPT IN CHAT" — not executed by this session.
+  - `docs/05-qa/task-004-manual-validation-checklist.md` — the "Repeated
+    readiness job behavior / TD-001 regression check" item rewritten from
+    a two-branch expectation to a single expected outcome (second job
+    succeeds, no collision), removing the "TD-001 may remain unchanged"
+    ambiguity.
+  - `docs/05-qa/task-004-quality-gates.md` — pre-start-gate preamble and
+    the TD-001 routing checkbox updated to record the decided route; the
+    test-gate and retry/idempotency-gate TD-001 items updated from a
+    branching expectation to a mandatory regression-test requirement.
+  - `docs/05-qa/technical-debt-register.md` — TD-001's Owner column
+    updated with "ROUTE SELECTED" wording (fix inside Task 004); Target
+    resolution phase column updated to "Task 004 implementation." **TD-001
+    is not marked fixed and not closed — Status remains `Open`.**
+  - `docs/01-research/research-handoff.md` (this entry).
+- **No code changed:** confirmed. This session touched only the six
+  allowed Markdown files; `addons/`, and every
+  `*.py`/`*.xml`/`*.csv`/manifest/security/test/migration/CI file, are
+  unchanged.
+- **Task 004 implementation still not started.** No readiness-check
+  registry/service model, no TD-001 fix, and no test file exists in the
+  repository as of this branch. This session records a planning-gate
+  acceptance and a routing decision — it does not write code, and it does
+  not run the finalized implementation prompt.
+- **VAL-B2 / MBQ-05 unchanged by this session:** VAL-B2 remains deferred,
+  not passed, not failed, not waived (per DEC-021). MBQ-05 remains
+  deferred for Task 004 only, not resolved as a final token-acquisition
+  strategy.
+- **Learning feedback loop:** New issues / repeated patterns: none.
+  Rules/checklists updated: none beyond the files listed above. Rejected
+  approaches: the "Task 001B — job-framework target-less idempotency
+  patch" candidate route is retired in favor of fixing TD-001 inside Task
+  004 — recorded in `technical-debt-register.md`'s Owner column and the
+  gate document, not in `rejected-approaches-log.md` (this is a routing
+  choice between two previously-open options, not a rejected architecture
+  approach). Technical debt: TD-001 unchanged in substance (still `Open`),
+  only its routing note and target resolution phase updated. Architecture
+  concerns: none new. Tests or review gates needed: the future Task 004
+  implementation PR must include the mandatory TD-001 regression test.
+  Should future prompts change? No — the finalized implementation prompt
+  is now ready for ChatGPT to issue as-is once this PR merges.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a — routing choice, not
+  a rejected approach) · technical debt logged (routing note only, not a
+  fix) · repeated-issue escalation applied (n/a) — all YES.
+- **Next recommended session:** run the finalized
+  [`task-004-final-implementation-prompt.md`](../07-implementation-plan/task-004-final-implementation-prompt.md)
+  after ChatGPT review — but only once this PR is merged into
+  `Shopify-connector` and ChatGPT explicitly issues that exact prompt text
+  in chat as its own turn. No other Task 004, Task 005, or next-feature
+  work should start before then.
+- **Stop condition:** stopped at the scoped boundary — docs-only session;
+  no code, test, manifest, security, XML, CSV, migration, or CI file
+  touched; no addons/ file touched; Task 004 not marked implemented; the
+  finalized implementation prompt was not run; VAL-B2 remains deferred,
+  not passed; MBQ-05 remains deferred for Task 004 only, not resolved.
+
 ### VAL-B2 Deferral / Task 004 Gate-Opening Package — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/task-004-gate-opening-w3f1zg`, branched from
