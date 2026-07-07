@@ -60,6 +60,9 @@ class TestJobLogSystemAppend(TransactionCase):
         self.assertEqual(row.to_state, 'succeeded')
         self.assertEqual(row.message, 'Hello world.')
         self.assertEqual(row.technical_detail, 'detail')
+        # Guards the Odoo 19 job.log.store_id NOT NULL production fix:
+        # the stored related field must still resolve to the job's store.
+        self.assertEqual(row.store_id, job.store_id)
 
     # 30. Elevation, not a widened ACL, is what makes indirect append work.
     def test_non_admin_indirect_append_succeeds_but_direct_create_denied(self):
@@ -78,6 +81,10 @@ class TestJobLogSystemAppend(TransactionCase):
         )
         after = JobLog.search_count([('job_id', '=', job.id)])
         self.assertEqual(after, before + 1)
+        row = JobLog.search(
+            [('job_id', '=', job.id)], order='id desc', limit=1,
+        )
+        self.assertEqual(row.store_id, job.store_id)
 
     # 31. Source-level guard: exactly two sudo( occurrences in the whole diff.
     def test_source_level_two_sudo_sites_total(self):
@@ -123,3 +130,4 @@ class TestJobLogSystemAppend(TransactionCase):
         self.assertNotIn(DUMMY_TOKEN, row.message)
         self.assertNotIn(DUMMY_TOKEN, row.technical_detail)
         self.assertNotIn(DUMMY_TOKEN, row.payload_snapshot)
+        self.assertEqual(row.store_id, job.store_id)

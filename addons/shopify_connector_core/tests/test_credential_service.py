@@ -3,6 +3,7 @@ import os
 
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 DUMMY_TOKEN_1 = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 DUMMY_TOKEN_2 = 'shpat_DUMMYDUMMYDUMMY1111111111111111'
@@ -47,6 +48,10 @@ class TestCredentialService(TransactionCase):
         )
 
     def _assert_dummy_absent_except_access_token(self, token):
+        # fields_get() here is schema enumeration only (which char/text
+        # fields exist), not a security oracle -- the actual assertion is
+        # the value-content scan below, run as admin against already-
+        # fetched records, unrelated to any ACL/visibility check.
         store_fields = self.store.fields_get()
         for field_name, field_info in store_fields.items():
             if field_info['type'] not in ('char', 'text'):
@@ -117,6 +122,11 @@ class TestCredentialService(TransactionCase):
         credential = Credential.search([('store_id', '=', self.store.id)])
         self.assertFalse(credential)
 
+    # mute_logger: the second create() below intentionally triggers the
+    # store_id UNIQUE constraint (shopify_connector_store_credential_
+    # store_id_uniq); without muting, Odoo's `odoo.sql_db` logger emits
+    # an avoidable ERROR-level "bad query" line for this expected failure.
+    @mute_logger('odoo.sql_db')
     def test_duplicate_credential_row_for_same_store_raises(self):
         # A fresh, test-local store (not the shared class-level
         # `self.store`) so this scenario can never collide with a

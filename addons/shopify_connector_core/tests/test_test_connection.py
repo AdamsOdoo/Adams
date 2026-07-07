@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 from .test_api_client import FakeResponse, _success_body
 
@@ -81,6 +82,8 @@ class TestTestConnection(TransactionCase):
         self.assertEqual(len(logs), 2)
         self.assertEqual(logs.mapped('event_type'), ['attempt', 'attempt'])
         self.assertEqual(logs[1].to_state, 'succeeded')
+        # Guards the Odoo 19 job.log.store_id NOT NULL production fix.
+        self.assertTrue(all(log.store_id == self.store for log in logs))
 
     # 21. Identity-mismatch path.
     def test_identity_mismatch_fails_odoo_validation_configuration(self):
@@ -133,6 +136,14 @@ class TestTestConnection(TransactionCase):
         self.assertEqual(job.state, 'failed_final')
         self.assertEqual(job.error_class, 'shopify_permission_scope_auth')
         self.assertEqual(self._get_credential().credential_state, 'invalid')
+        # Guards the Odoo 19 job.log.store_id NOT NULL production fix:
+        # this failure path's own _system_append() call must still
+        # succeed and resolve store_id to the job's store.
+        logs = self.env['shopify.connector.job.log'].search(
+            [('job_id', '=', job.id)]
+        )
+        self.assertTrue(logs)
+        self.assertTrue(all(log.store_id == self.store for log in logs))
 
     # 24. Shop-state-failure path: credential_state never flips (four fixtures).
     def test_shop_state_failure_never_flips_credential_state(self):
@@ -196,6 +207,10 @@ class TestTestConnection(TransactionCase):
         logs = self.env['shopify.connector.job.log'].search(
             [('job_id', '=', job.id)]
         )
+        # fields_get() here is schema enumeration only (which char/text
+        # fields exist), not a security oracle -- the assertion below
+        # scans actual field values for token leakage, unrelated to any
+        # ACL/visibility check.
         for recordset in (self.store, job, logs):
             fields_info = recordset.fields_get()
             for field_name, info in fields_info.items():
@@ -207,6 +222,11 @@ class TestTestConnection(TransactionCase):
                         self.assertNotIn(DUMMY_TOKEN, value)
 
     # 28. core_readiness_check untouched -- documents TD-001, must still collide.
+    # mute_logger: this test intentionally triggers the job model's
+    # (store_id, idempotency_key) unique-constraint violation (TD-001,
+    # not fixed here); without muting, Odoo's `odoo.sql_db` logger emits
+    # an avoidable ERROR-level "bad query" line for this expected failure.
+    @mute_logger('odoo.sql_db')
     def test_core_readiness_check_untouched_still_collides(self):
         Job = self.env['shopify.connector.job']
         Job.create({

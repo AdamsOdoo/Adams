@@ -23,11 +23,17 @@ class ShopifyConnectorJobLog(models.Model):
         readonly=True,
         ondelete='restrict',
     )
+    # Not `required=True`: in Odoo 19 the initial INSERT of a new record
+    # happens before its stored-related fields are populated from
+    # `related=`, so a NOT NULL column here fails `_system_append()`'s
+    # `create()` before `job_id.store_id` is ever read (identical class
+    # of issue to `shopify.connector.job.idempotency_key`, a
+    # stored-computed field fixed the same way). `job_id` is always
+    # required, so `store_id` is always non-empty once the row exists.
     store_id = fields.Many2one(
         comodel_name='shopify.connector.store',
         related='job_id.store_id',
         store=True,
-        required=True,
         index=True,
         readonly=True,
     )

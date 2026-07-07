@@ -55,23 +55,18 @@ class TestCredentialAccess(TransactionCase):
                 )
             with self.assertRaises(AccessError):
                 credential_as_user.browse(admin_credential.id).unlink()
-            # Odoo 19 may return the model's fields_get() schema even for
-            # a role with zero ACL rows on the model -- fields_get()
-            # describes the model's shape, not a record's data, so that
-            # alone is not a security failure. Security intent: the
-            # sensitive `access_token` field, and every other credential
-            # business field, must never be exposed to a role with no ACL
-            # row on this model.
-            try:
-                exposed_fields = credential_as_user.fields_get()
-            except AccessError:
-                exposed_fields = {}
-            self.assertTrue(
-                {
-                    'store_id', 'access_token', 'token_variant',
-                    'credential_state',
-                }.isdisjoint(exposed_fields)
-            )
+            # fields_get() is a schema call, not gated by ir.model.access
+            # CRUD rows in Odoo -- it may legitimately return the model's
+            # field metadata (names/types) even for a role with zero ACL
+            # rows on the model, so it must not be used as a security
+            # oracle here. Security is instead proven above by the five
+            # actual operations (search/create/read/write/unlink), all of
+            # which raise AccessError for every non-admin role -- that is
+            # the real guarantee that no credential data, including
+            # `access_token`, is ever reachable by these roles. The
+            # `access_token` field's own independent field-level `groups=`
+            # protection (which fields_get() *does* honor) is separately
+            # covered by test_field_groups_independent_of_model_acl below.
 
     def test_admin_can_crud_except_unlink(self):
         credential = self.env['shopify.connector.store.credential'].with_user(
@@ -106,6 +101,14 @@ class TestCredentialAccess(TransactionCase):
             'store_id': self.store.id,
         })
         credential_as_operator = Credential.with_user(self.user_operator)
+        # Unlike test_non_admin_roles_denied_all_crud_and_search above,
+        # this fields_get() call is not standing in for a model-ACL check
+        # -- with model read access now temporarily widened, the only
+        # thing left protecting `access_token` is its own field-level
+        # `groups=` attribute, which fields_get() *does* honor (it hides
+        # any field the caller's groups don't satisfy). The real proof is
+        # still the actual-operation read() below; this assertion is a
+        # supplementary check of that specific, independent mechanism.
         exposed_fields = credential_as_operator.fields_get()
         self.assertNotIn('access_token', exposed_fields)
         with self.assertRaises(AccessError):
