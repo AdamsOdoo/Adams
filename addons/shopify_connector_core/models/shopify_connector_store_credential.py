@@ -60,13 +60,10 @@ class ShopifyConnectorStoreCredential(models.Model):
         readonly=True,
     )
 
-    _sql_constraints = [
-        (
-            'store_id_uniq',
-            'unique(store_id)',
-            'Only one credential record is allowed per store.',
-        ),
-    ]
+    _store_id_uniq = models.Constraint(
+        'UNIQUE(store_id)',
+        'Only one credential record is allowed per store.',
+    )
 
     @api.model
     def action_set_token(self, store, value):

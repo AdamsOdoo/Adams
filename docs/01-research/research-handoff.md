@@ -1,5 +1,95 @@
 # Research Handoff (rolling)
 
+### Odoo 19 Install-Compatibility Hotfix — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/odoo19-install-blocker-fnm5ro`; PR → to be opened
+  as draft into `Shopify-connector`, not yet merged.
+- **Files changed:** `addons/shopify_connector_core/security/shopify_connector_security.xml`,
+  `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/models/shopify_connector_store_credential.py`,
+  `addons/shopify_connector_core/models/shopify_connector_store_settings.py`,
+  `addons/shopify_connector_core/models/shopify_connector_location.py`,
+  `addons/shopify_connector_core/models/shopify_connector_job.py`,
+  `addons/shopify_connector_core/__manifest__.py` (version bump only),
+  `docs/05-qa/task-003-validation-results.md`,
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** Live validation of the Task 003 package
+  (PR #101 merge commit `e27f10e5...`, PR #102 merge commit `f4437a80...`)
+  started and failed immediately at VAL-A1 install/upgrade: Odoo 19 raised
+  `ValueError: Invalid field 'category_id' in 'res.groups'` while loading
+  `shopify_connector_security.xml`, a fatal registry-load failure. Root
+  cause: Odoo 19 removed the direct `category_id` field from `res.groups`
+  (confirmed against `github.com/odoo/odoo` at the `19.0` tag,
+  `odoo/addons/base/models/res_groups.py` and the new
+  `odoo/addons/base/models/res_groups_privilege.py`) — groups now carry a
+  `privilege_id` Many2one to the new `res.groups.privilege` model, and
+  `category_id` (Many2one to `ir.module.category`) moved onto that
+  privilege record instead. This hotfix adds one
+  `res.groups.privilege` record (`privilege_shopify_connector`, keeping
+  the existing `module_category_shopify_connector` category) and points
+  all four existing group XML IDs
+  (`group_shopify_connector_auditor/_operator/_reviewer/_admin`) at it via
+  `privilege_id`, preserving the exact implied-group hierarchy
+  (Operator/Reviewer imply Auditor; Administrator implies both) and every
+  ACL CSV row unchanged. Separately, Odoo 19 also deprecated
+  `_sql_constraints`; this hotfix converts all five affected constraints
+  (store `shop_domain` uniqueness, store-credential and store-settings
+  one-per-store uniqueness, location `(store_id, shopify_location_gid)`
+  uniqueness, and job's two constraints —
+  `(store_id, idempotency_key)` and `(store_id, operation_scope_key)`) to
+  the Odoo 19 `models.Constraint(sql, message)` class-attribute style,
+  preserving the exact SQL intent and exact error messages verbatim.
+  Manifest version bumped `19.0.1.2.0` → `19.0.1.2.1`. No compute logic,
+  idempotency behavior, `operation_scope_key` behavior, API client,
+  `_system_append`, or Shopify call behavior was touched.
+  `core_readiness_check`'s duplicate-collision exposure (TD-001,
+  `docs/05-qa/technical-debt-register.md`) remains open and untouched, as
+  required — this hotfix does not fix it.
+- **Items deferred:** No Odoo runtime/PostgreSQL exists in this repository,
+  so the install/upgrade regression (VAL-A1) could not be re-executed here
+  — `py_compile` passed on every changed Python file, the security XML
+  parses cleanly, and source-level grep checks confirm no `category_id`
+  remains on any `res.groups` record, `privilege_id` is used on all four,
+  the `res.groups.privilege` record exists, no `_sql_constraints` remains
+  in `addons/shopify_connector_core/models/`, and the ACL CSV is
+  byte-for-byte unchanged — but the tester must re-run the actual Odoo 19
+  install log after this PR merges and confirm no fatal error, then
+  restart `task-003-manual-validation-checklist.md` from VAL-A1. No
+  VAL-B credential/API steps should resume until VAL-A1–VAL-A4 pass.
+- **Learning feedback loop:** New issues / repeated patterns: Odoo 19
+  removed `res.groups.category_id` (now `privilege_id` →
+  `res.groups.privilege.category_id`) and deprecated `_sql_constraints`
+  (now `models.Constraint`); neither breaking change was caught before
+  Task 003 merged because no live Odoo 19 install was run pre-merge — flag
+  for a future rule: any module-install-affecting file (security XML,
+  manifest, model constraints) should get at least one static Odoo-19-API
+  compatibility pass even in a no-runtime environment. Rules/checklists
+  updated: none this session (routing this observation to ChatGPT rather
+  than unilaterally amending a gate checklist). Rejected approaches: none.
+  Technical debt: none added; TD-001 unchanged. Architecture concerns:
+  none — this is a pure Odoo-19-API compatibility fix, no design change.
+  Tests or review gates needed: re-run VAL-A1–VAL-A4 live after merge
+  before any VAL-B step. Should future prompts change? Possibly — consider
+  requiring a documented Odoo 19 core-source citation check for any XML
+  `res.groups`/model-constraint change, given this defect class.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (none new, TD-001 unchanged) · repeated-issue escalation applied
+  (flagged above, routed to ChatGPT) — all YES.
+- **Next recommended session:** Live tester re-runs Odoo 19 install/upgrade
+  of `shopify_connector_core` after this PR merges, confirms VAL-A1–VAL-A4
+  pass cleanly, records results in `task-003-validation-results.md`, then
+  resumes VAL-B onward per `task-003-manual-validation-checklist.md`. No
+  Task 004 session until that full checklist passes and ChatGPT reviews
+  the results.
+- **Stop condition:** Scoped hotfix only; no Task 004 work, no setup
+  wizard/UI/menu/action/wizard/controller/webhook/cron, no product/
+  customer/order/inventory/fulfillment logic, no API/credential/job
+  behavior change, no ACL widening, TD-001 untouched; PR left as draft,
+  not merged; live validation not started/resumed by this session.
+
+---
+
 ### Task 003 Manual Validation Package — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/task-003-validation-checklist-bf63ox`; PR → to be
