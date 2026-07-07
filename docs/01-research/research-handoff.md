@@ -115,9 +115,10 @@
 > proposal accepted as proposed scope but not opened; Task 002/003 not
 > started; working branch created from latest `Shopify-connector`.
 
-- **Branch / PR:** `claude/task-002-gate-opening-act` → draft PR into
-  `Shopify-connector` (PR number recorded once opened; remains draft,
-  not merged).
+- **Branch / PR:** `claude/task-002-gate-opening-act` → draft PR #96
+  into `Shopify-connector`
+  (https://github.com/AdamsOdoo/Adams/pull/96; remains draft, not
+  merged).
 - **Files changed:**
   `docs/07-implementation-plan/task-002-credential-storage-gate.md`
   (new — the gate-opening act itself),
