@@ -24,10 +24,7 @@ class ShopifyConnectorLocation(models.Model):
     shopify_location_active = fields.Boolean(default=True, readonly=True)
     last_synced_at = fields.Datetime(readonly=True)
 
-    _sql_constraints = [
-        (
-            'store_location_gid_uniq',
-            'unique(store_id, shopify_location_gid)',
-            'A location with this Shopify location GID already exists for this store.',
-        ),
-    ]
+    _store_location_gid_uniq = models.Constraint(
+        'UNIQUE(store_id, shopify_location_gid)',
+        'A location with this Shopify location GID already exists for this store.',
+    )

@@ -2,16 +2,43 @@
 
 ## Status
 
-**TEMPLATE — NOT YET EXECUTED.** No live validation has taken place. Every
-field below is a placeholder. **Do not fill in or check off any row from
-memory, assumption, or code-reading — only from an actual observed run
-against a live Odoo 19 + PostgreSQL instance and a Shopify development
-store**, per
+**BLOCKED — VAL-A1 failed on first live install attempt; hotfix pending
+review/merge.** Live validation was started against a live Odoo 19 +
+PostgreSQL instance and failed immediately at VAL-A1 (clean install). The
+observed `install.log` error:
+
+```
+Loading module shopify_connector_core
+Loading shopify_connector_core/security/shopify_connector_security.xml
+Failed to load registry
+
+Fatal error:
+ValueError: Invalid field 'category_id' in 'res.groups'
+```
+
+with a parse location inside `group_shopify_connector_auditor`'s
+`<field name="category_id" .../>`, plus a pre-existing warning noted in the
+same run: `Model attribute '_sql_constraints' is no longer supported,
+please define models.Constraint on the model.` Root cause: Odoo 19 removed
+`category_id` from `res.groups` (groups now use `privilege_id` →
+`res.groups.privilege`) and deprecated `_sql_constraints` in favor of
+`models.Constraint`. A hotfix addressing both is proposed on branch
+`claude/odoo19-install-blocker-fnm5ro` (see
+`docs/01-research/research-handoff.md`, "Odoo 19 Install-Compatibility
+Hotfix" entry). **All live validation is blocked, and every row below
+remains unexecuted, until that hotfix is reviewed/merged and VAL-A1 is
+re-run from a clean state.**
+
+Every field/row below this point is still a placeholder. **Do not fill in
+or check off any row from memory, assumption, or code-reading — only from
+an actual observed run against a live Odoo 19 + PostgreSQL instance and a
+Shopify development store**, per
 [`task-003-manual-validation-checklist.md`](./task-003-manual-validation-checklist.md).
 
 This document does not, and must not, assert that Task 003 validation has
 passed. It becomes a real results record only once a tester fills it in
-against a live environment; until then it is scaffolding.
+against a live environment; until then it is scaffolding plus the one
+recorded VAL-A1 failure above.
 
 ---
 
@@ -40,7 +67,7 @@ reproducible, say so explicitly in **Actual result** and set **Pass/Fail** to
 
 | Test ID | Test case | Expected result | Actual result | Pass/Fail | Evidence reference |
 | --- | --- | --- | --- | --- | --- |
-| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | _TBD_ | _TBD_ | _TBD_ |
+| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed.** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml` (see Status section above for full log excerpt). | **Fail** | Blocked pending hotfix on `claude/odoo19-install-blocker-fnm5ro`; must be re-run from a clean install after that PR merges — do not mark Pass from code-reading. |
 | VAL-A2 | Model registry loads | `api.client` abstract (no table); other 3 models intact | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A3 | Three `job_type` values in ORM | Exactly 3 values, no 4th | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A4 | No XML/menu/action/wizard/controller/cron | Zero rows of any kind | _TBD_ | _TBD_ | _TBD_ |

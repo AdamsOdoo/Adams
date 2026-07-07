@@ -151,18 +151,14 @@ class ShopifyConnectorJob(models.Model):
     started_at = fields.Datetime(readonly=True)
     finished_at = fields.Datetime(readonly=True)
 
-    _sql_constraints = [
-        (
-            'store_idempotency_key_uniq',
-            'unique(store_id, idempotency_key)',
-            'A job with this idempotency key already exists for this store.',
-        ),
-        (
-            'store_operation_scope_key_uniq',
-            'unique(store_id, operation_scope_key)',
-            'A non-terminal job already holds this operation scope for this store.',
-        ),
-    ]
+    _store_idempotency_key_uniq = models.Constraint(
+        'UNIQUE(store_id, idempotency_key)',
+        'A job with this idempotency key already exists for this store.',
+    )
+    _store_operation_scope_key_uniq = models.Constraint(
+        'UNIQUE(store_id, operation_scope_key)',
+        'A non-terminal job already holds this operation scope for this store.',
+    )
 
     @api.depends(
         'store_id', 'job_type', 'res_model', 'res_id',

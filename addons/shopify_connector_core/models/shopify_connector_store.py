@@ -78,13 +78,10 @@ class ShopifyConnectorStore(models.Model):
     granted_scopes = fields.Text(readonly=True)
     granted_scopes_checked_at = fields.Datetime(readonly=True)
 
-    _sql_constraints = [
-        (
-            'shop_domain_uniq',
-            'unique(shop_domain)',
-            'A store already exists for this Shopify shop domain.',
-        ),
-    ]
+    _shop_domain_uniq = models.Constraint(
+        'UNIQUE(shop_domain)',
+        'A store already exists for this Shopify shop domain.',
+    )
 
     def action_test_connection(self):
         """Run one read-only Shopify test-connection check (Task 003).

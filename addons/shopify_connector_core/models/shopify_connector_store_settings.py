@@ -39,10 +39,7 @@ class ShopifyConnectorStoreSettings(models.Model):
     )
     notification_default_enabled = fields.Boolean(default=False)
 
-    _sql_constraints = [
-        (
-            'store_id_uniq',
-            'unique(store_id)',
-            'Only one settings record is allowed per store.',
-        ),
-    ]
+    _store_id_uniq = models.Constraint(
+        'UNIQUE(store_id)',
+        'Only one settings record is allowed per store.',
+    )
