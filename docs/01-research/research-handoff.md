@@ -1,11 +1,162 @@
 # Research Handoff (rolling)
 
+### Task 003 Validation / Task 004 Prep — Continuation Session, Blocked at Empirical OAuth Experiment (2026-07-07)
+
+- **Branch / PR:** `claude/task-003-validation-task-004-prep-fbq3qd`, branched
+  from `Shopify-connector` at its current tip (PR #108's merge commit
+  `76cd74e7cf585e1925c3ac280bd6ca97c55df7ab`) → draft PR into
+  `Shopify-connector` (this session's PR). Docs-only session — no code, test,
+  manifest, security, or addon file changed. **No Task 004 work of any kind
+  in this session.**
+- **Files changed:** `docs/01-research/research-handoff.md` (this entry, plus
+  a correction to the PR #108 entry's stale "draft/not merged" wording, fixed
+  below it), `docs/05-qa/task-003-validation-results.md` (continuation-session
+  section recording the blocked experiment attempt),
+  `docs/04-decisions/shopify-token-acquisition-decision-brief.md`
+  (continuation-session note recording the same blocker against the
+  brief's own §4–5 recommended next step).
+- **Session objective (per the assigning prompt):** this session was scoped
+  as the "future, separately-scoped Task-003-continuation session" that PR
+  #108's decision brief (§5) called for — its sole deliverable was to run the
+  manual OAuth authorization-code-grant experiment described in the decision
+  brief §4, using a browser-automation tool referred to as "Fable" for
+  Shopify Dev Dashboard / Shopify Admin interaction, and generic tooling
+  outside the Odoo codebase for the token exchange, then (only if a
+  compatible token was obtained) re-attempt VAL-B2 in Odoo.
+- **What was tested / attempted:**
+  1. **Phase 0 (repo state check) — completed.** Confirmed `Shopify-connector`
+     HEAD is PR #108's merge commit `76cd74e7cf585e1925c3ac280bd6ca97c55df7ab`
+     (verified via `git merge-base --is-ancestor`); confirmed `main` is
+     untouched (still at the pre-Shopify-connector-project commit `a5d4543`,
+     no Shopify-related history); read all files listed in the assigning
+     prompt's Phase 0 step 4 (this handoff, the token-acquisition research
+     doc, the token-acquisition options doc, the decision brief, the Task 003
+     checklist and results docs, the master blueprint open-questions doc's
+     MBQ-05 row); found and corrected the stale PR #108 "draft/not merged"
+     wording noted above.
+  2. **Phase 1 (plan the empirical token experiment) — completed as a plan
+     only.** The store (`mqiu21-yz.myshopify.com`), app surface
+     (Dev-Dashboard-created custom app), flow (OAuth authorization-code
+     grant, offline non-expiring token, no client-credentials fallback as
+     the primary path), and explicit success/failure criteria from the
+     assigning prompt were reviewed and found consistent with the decision
+     brief's own §4 plan — no changes needed.
+  3. **Phase 2 (use Fable to configure/inspect Shopify) — blocked before any
+     Shopify interaction.** This execution session has **no "Fable" tool,
+     connector, or MCP server of any kind available** — checked via
+     `ToolSearch` (queries for "fable browser shopify" and "browser computer
+     use playwright screenshot navigate" returned no matching tool),
+     `ListConnectors` (only Gmail, Google Calendar, and Google Drive are
+     installed for this account, none enabled in this chat, none relevant to
+     Shopify/browser automation), and `ListPlugins`/`ListSkills` (both
+     returned zero results for "fable"/"browser"/"shopify" keywords). This
+     session also has **no Shopify Dev Dashboard credentials of any kind**
+     — checked the process environment for any `SHOPIFY_*`/`FABLE_*`/
+     `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH_*`-shaped variable; none found. There
+     is therefore no way for this session to open the Shopify Dev Dashboard,
+     inspect or configure the app used in the prior blocked session, register
+     a redirect URI, or begin an OAuth authorization request.
+  4. **Phases 3–5 (OAuth exchange, direct Shopify token validation, Odoo
+     VAL-B2 re-attempt) — not attempted.** Each is explicitly gated on Phase
+     2 succeeding; since Phase 2 could not start, none of these were run.
+     No Odoo instance is reachable from this execution environment either
+     (confirmed no `odoo` process/binary present), which would have blocked
+     Phase 5 independently even had Phases 2–4 succeeded.
+- **Result:** **Case 4 (per the assigning prompt's Phase 6) — blocked by
+  missing Fable/Shopify access, not a platform or OAuth failure.** No OAuth
+  attempt was made; no claim is made about whether Shopify's OAuth
+  authorization-code-grant flow does or does not work for a
+  Dev-Dashboard-created custom app. That question, raised in PR #108's
+  research and decision brief, remains exactly as open as it was before this
+  session.
+- **Remaining blockers (exact, per the assigning prompt's instruction to
+  report exactly what is missing):**
+  1. No Fable (or equivalent authenticated browser-automation) tool/connector
+     is enabled for this Claude Code execution session. This must be
+     provisioned (e.g. via this session's connector settings, or by running
+     the experiment from a session that has such a tool available) before
+     the Shopify Dev Dashboard / Shopify Admin steps in decision-brief §4 can
+     be attempted.
+  2. No Shopify Dev Dashboard app Client ID / Client Secret, and no Shopify
+     Partner/store-owner login/2FA path, is available to this session. These
+     are secrets and must **not** be pasted into chat, docs, or environment
+     dumps per this project's secret-handling rules — they must be supplied
+     through a secure, session-scoped channel (e.g. the human operator
+     completing the Shopify consent/login step interactively in an actual
+     browser session, with only the resulting redacted outcome reported
+     back) in a session that has both Fable/browser access and that secure
+     channel available.
+- **Task 003 status:** **Still incomplete — unchanged from the PR #107/#108
+  state.** VAL-B2, VAL-E1, VAL-A4, VAL-B4–B7, VAL-C1's server-log-grep half,
+  VAL-C3, VAL-D1–D2, and VAL-G1–G4 remain blocked or not tested, for exactly
+  the same reason recorded in PR #107: no valid Shopify Admin API access
+  token. This session neither improves nor worsens that state.
+- **Task 004 status:** **Still blocked — not ready for ChatGPT review to
+  unblock.** No new evidence was gathered this session (the empirical
+  experiment recommended in the PR #108 decision brief could not be run), so
+  there is no basis to change the brief's existing "Task 004 remains blocked"
+  conclusion (§9). This is explicitly **not** a claim that Task 004 is
+  "unblocked automatically" — it is not.
+- **No code changed — confirmed.** This session touched only the docs files
+  listed above; `addons/`, and every `*.py`/`*.xml`/`*.csv`/manifest/
+  security/test file, are unchanged.
+- **No secret exposed — confirmed.** No Shopify token, client secret,
+  authorization code, or credential of any kind was obtained, handled, or
+  recorded by this session, because Phase 2 never started.
+- **No Shopify or Odoo side effects — confirmed (vacuously).** No Shopify or
+  Odoo interaction of any kind occurred this session.
+- **Learning feedback loop:** New issues / repeated patterns: **this
+  project's session-assignment process should confirm tool/connector
+  availability (e.g. "is a Fable-equivalent browser tool enabled for this
+  session") before scoping a session around it**, the same way it already
+  confirms branch/PR state — this is the second consecutive Shopify
+  token-acquisition session blocked short of its main deliverable (the first
+  by an unavailable admin-UI token path, this one by an unavailable
+  browser-automation tool and unavailable Shopify credentials). Rules/
+  checklists updated: none (no file in `/docs/05-qa` was identified as
+  needing a new rule from this specific blocker — it is an environment/
+  tooling-provisioning gap, not a process defect). Rejected approaches:
+  none — no approach was attempted or rejected; the session stopped before
+  reaching a point where an approach could be tried. Technical debt: none
+  added. Architecture concerns: none new — the decision-critical open
+  question already tracked in the decision brief and MBQ-05 is unchanged.
+  Tests or review gates needed: the same empirical OAuth-exchange experiment
+  recommended in the decision brief §4–5, now additionally conditioned on a
+  future session actually having Fable/browser access and a secure channel
+  for Shopify Dev Dashboard credentials. Should future prompts change?
+  **Yes** — see "Next recommended session" below.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none — none occurred) ·
+  technical debt logged (none) · repeated-issue escalation applied (yes —
+  flagged above as a second consecutive blocked-before-deliverable session)
+  — all YES.
+- **Next recommended session:** ChatGPT reviews this entry and confirms
+  whether to (a) provision a Fable-equivalent browser-automation tool and a
+  secure Shopify-credential channel for a future Claude Code session and
+  re-run this same scoped experiment, (b) have a human operator run the
+  manual OAuth authorization-code-grant exchange themselves (following the
+  decision brief §4's exact steps) and report back only the redacted
+  result for Claude to record, or (c) skip the empirical step entirely and
+  commit directly to Option A or Option B per the decision brief §10's
+  standing offer. Whichever is chosen, the next session's prompt should
+  explicitly confirm tool/credential availability in Phase 0 before
+  attempting Phase 2.
+- **Stop condition:** stopped at the scoped boundary — blocked at Phase 2
+  (Fable/Shopify access) per the assigning prompt's own explicit instruction
+  not to proceed, guess, or continue with assumptions when such access is
+  missing; no code, test, manifest, or security file touched; Task 003 not
+  marked complete; Task 004 not unblocked; a draft, unmerged PR opened
+  recording this blocker for ChatGPT review.
+
 ### Shopify Token-Acquisition Research — compact handoff (2026-07-07)
 
-- **Branch / PR:** `claude/shopify-token-acquisition-research-lpi7jt` → draft PR
-  into `Shopify-connector`, not merged, not marked ready. Docs-only session —
-  no code, test, manifest, or security-file change. **No Task 004 work of any
-  kind in this session.**
+- **Branch / PR:** `claude/shopify-token-acquisition-research-lpi7jt` →
+  **PR #108**, merged into `Shopify-connector` (merge commit
+  `76cd74e7cf585e1925c3ac280bd6ca97c55df7ab`). **Correction (added during the
+  2026-07-07 continuation session below): this entry originally described PR
+  #108 as a draft, not-merged PR; that wording was stale — PR #108 has since
+  merged.** Docs-only session — no code, test, manifest, or security-file
+  change. **No Task 004 work of any kind in this session.**
 - **Files changed:** `docs/01-research/shopify-token-acquisition-research.md`
   (new), `docs/03-architecture/shopify-token-acquisition-options.md` (new),
   `docs/04-decisions/shopify-token-acquisition-decision-brief.md` (new),
