@@ -1,14 +1,31 @@
 # Research Handoff (rolling)
 
 > Continuity lives in GitHub, not chat. The **current entry
-> (Task 002 Credential-Storage Gate-Opening Act: AR-026 accepted —
-> gate opens only once this act's PR merges into `Shopify-connector`;
-> authorizes exactly one future coding session, Task 002, via the
-> already-accepted `task-002-final-implementation-prompt.md`; no code
-> in this PR; Task 002 not started by this PR; Task 003 not started;
-> no API/UI/test-connection/domain scope opened)** is immediately
-> below, in the **compact handoff format**
-> (`../06-prompts/session-handoff-template.md`); **PR #94 Acceptance
+> (PR #97 — ChatGPT F1 revision applied: REVISE, not reject —
+> `_get_access_token` now decorated with `@api.model`; stale
+> "no credential storage" / "credential persistence descoped" wording
+> corrected in the store model docstring and the manifest
+> summary/description; a new AST-based decorator guard test proves all
+> four service methods carry `@api.model`; the existing single-`sudo()`
+> guard kept unweakened; no Task 003 scope opened; PR remains
+> draft/open for ChatGPT re-review)** is immediately below, in the
+> **compact handoff format** (`../06-prompts/session-handoff-template.md`);
+> **Task 002 — Credential Storage, Masking, and Redaction Foundation
+> implemented: the Admin-only `shopify.connector.store.credential`
+> model, six store status mirrors, the redaction utility, the four
+> credential service methods, one Admin-only ACL row, and 21 tests
+> across three test files, executed per the AR-026-opened gate and the
+> binding `task-002-final-implementation-prompt.md`, issued verbatim;
+> zero API calls, zero UI, zero webhooks/controllers/cron; Task 003 not
+> started; no Odoo runtime in this repository so most tests are written
+> and syntax-validated, not executed — except the redaction utility's 7
+> tests, which have zero Odoo dependency and were actually run and
+> passed (history)**, **Task 002
+> Credential-Storage Gate-Opening Act — AR-026 accepted — gate opened
+> only once merged into `Shopify-connector`; authorized exactly one
+> future coding session, Task 002, via the already-accepted
+> `task-002-final-implementation-prompt.md`; no code in that PR
+> (history)**, **PR #94 Acceptance
 > Patch — AR-025 accepted by ChatGPT on 2026-07-07 at
 > decision/gate-preparation level only — compute-blank rejected for
 > Task 002; `token_variant` = `offline_custom_app` only; scope snapshot
@@ -101,6 +118,195 @@
 > retained underneath as history. The running **Sprint checkpoint log** (one note per
 > stage, all sprints) is at the very bottom. The **product-side** handoff lives at
 > [`../02-product/product-research-handoff.md`](../02-product/product-research-handoff.md).
+
+---
+
+### PR #97 — ChatGPT F1 Revision — compact handoff (2026-07-07)
+
+> **Applies ChatGPT's F1 revision decision for PR #97 (REVISE, not
+> reject) — not a new task, not Task 003.** Confirmed before editing:
+> PR #97 head `342427dd07ddb576e0af6b87b66cd3d297082cf0`; only the
+> five files this patch is scoped to were touched.
+
+- **Branch / PR:** `claude/task-002-credential-storage` → PR #97 into
+  `Shopify-connector` (still draft, still open, not merged).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store_credential.py`
+  (`@api.model` added to `_get_access_token`),
+  `addons/shopify_connector_core/models/shopify_connector_store.py`
+  (docstring only — no field/method change),
+  `addons/shopify_connector_core/__manifest__.py` (summary/description
+  wording only — version unchanged at `19.0.1.1.0`),
+  `addons/shopify_connector_core/tests/test_credential_service.py` (new
+  AST-based decorator-guard test added; existing single-`sudo()` guard
+  unchanged), `docs/01-research/research-handoff.md` (this entry). **No
+  new file added. No XML touched. No API/test-connection/setup-wizard/
+  UI/webhook/controller/cron/domain-logic content added.**
+- **Findings addressed:** (1) `_get_access_token` was missing
+  `@api.model` — added, no behavior change. (2) The store model's
+  docstring and the manifest's summary/description still said
+  "credential persistence... descoped" / "no credential storage",
+  false after Task 002's own model exists — corrected to state plainly
+  that `shopify.connector.store` holds only non-secret status mirrors,
+  the secret lives on the dedicated credential model, and the module
+  now includes the credential-storage/redaction foundation while still
+  excluding the API client, external calls, webhooks, cron, setup
+  wizard, and UI. No encryption claim, no marketing language.
+- **Test coverage added:** a new AST-based test proves
+  `action_set_token`, `action_replace_token`, `action_clear_token`, and
+  `_get_access_token` are all decorated with `@api.model` (parses the
+  credential model file, checks each `FunctionDef`'s `decorator_list`
+  for an `Attribute(attr='model')` on `Name(id='api')` — not a text
+  grep, for the same false-positive-avoidance reason as the existing
+  sudo guard). The existing single-`sudo()` AST guard is unchanged and
+  was not weakened.
+- **Verification performed this session:** both AST-based guards
+  (single-`sudo()` and all-four-`@api.model`) were extracted and run
+  standalone against the actual fixed files — both pass. All four
+  changed Python files `py_compile`-validated cleanly. The redaction
+  utility's 7 pure-Python tests were re-run standalone and still pass
+  (unaffected by this patch). Manifest re-parsed:
+  `version == '19.0.1.1.0'` confirmed unchanged.
+- **Test execution status (unchanged honesty):** this repository still
+  has no Odoo runtime/psycopg2/PostgreSQL/CI. The 14 ORM-dependent
+  tests (`test_credential_access.py`, `test_credential_service.py`)
+  remain **written and syntax-validated only, not executed**; the
+  manual validation checklist remains the mandatory review-evidence
+  path. `test_redaction.py`'s 7 tests remain **actually executed and
+  passing** (zero Odoo dependency).
+- **Learning feedback loop:** new issue: none (this was ChatGPT's own
+  finding, not a self-discovered defect). Repeated patterns: none new.
+  Rejected approaches: none reintroduced. Technical debt: none new.
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (N/A) ·
+  technical debt logged (N/A) · repeated-issue escalation applied
+  (N/A) — all YES.
+- **Stop condition:** stopped immediately after pushing this patch and
+  refreshing the PR body — no merge, no ready-for-review, no Task 003.
+- **Recommended next step:** ChatGPT re-reviews PR #97 with the F1
+  fixes applied.
+
+---
+
+### Task 002 — Credential Storage, Masking, and Redaction Foundation — compact handoff (2026-07-07)
+
+> **Implementation session — the first coding PR under the AR-026-opened
+> Task 002 gate.** Issued verbatim from
+> `docs/07-implementation-plan/task-002-final-implementation-prompt.md`
+> (the `BEGIN FINAL TASK PROMPT` … `END FINAL TASK PROMPT` block, no
+> reinterpretation). Confirmed before starting: latest `Shopify-connector`
+> contains PR #92 merge commit `f74aaf204745ce0087733870fe56bdda74bfa79a`,
+> PR #94 merge commit `03ffcb4dc949cd5137b589a6cdc33da9105de31d`, and PR
+> #96 merge commit `02b159a39c58a3396c1c249e80896a05c97bb757`; AR-026
+> Accepted and the gate open; Task 002 not already implemented (no
+> credential/token field existed anywhere in the addon); Task 003 not
+> started (no API client/test-connection code existed).
+
+- **Branch / PR:** `claude/task-002-credential-storage` → draft PR #97
+  into `Shopify-connector`
+  (https://github.com/AdamsOdoo/Adams/pull/97; remains draft, not
+  merged; stop condition per the final prompt).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store_credential.py`
+  (new — the credential model + four service methods),
+  `addons/shopify_connector_core/models/shopify_connector_store.py`
+  (six mirror fields added only), `addons/shopify_connector_core/models/__init__.py`
+  (one import line), `addons/shopify_connector_core/tools/__init__.py`
+  (new), `addons/shopify_connector_core/tools/redaction.py` (new),
+  `addons/shopify_connector_core/security/ir.model.access.csv` (one
+  credential ACL row appended), `addons/shopify_connector_core/__manifest__.py`
+  (version bump `19.0.1.0.0` → `19.0.1.1.0`),
+  `addons/shopify_connector_core/tests/__init__.py`,
+  `test_credential_access.py`, `test_redaction.py`,
+  `test_credential_service.py` (new — 21 enumerated tests), this
+  handoff entry. **No XML file touched. No controller/webhook/cron/data
+  file. `security/shopify_connector_security.xml` unchanged. No other
+  core model file (`job`, `job_log`, `location`, `binding_mixin`,
+  `store_settings`) touched. No `adams_base`/domain/CI/migration file.**
+- **What was built:** exactly the AR-025-accepted contracts, applied
+  with zero deviation — the Admin-only `shopify.connector.store.credential`
+  model (`store_id`, `access_token` with `copy=False` + Admin-only
+  `groups=`, `token_variant` = single value `offline_custom_app`,
+  `credential_state`, one SQL unique constraint); six readonly status
+  mirrors on `shopify.connector.store` (`credential_present`,
+  `credential_last_verified_at`, `credential_last_replaced_at`,
+  `credential_last_failure_reason`, `granted_scopes`,
+  `granted_scopes_checked_at` — the last two created with no writer,
+  per Decision 3); the four service methods (`action_set_token`,
+  `action_replace_token`, `action_clear_token`, `_get_access_token`),
+  every write path running as the calling user with **zero** `sudo()`
+  except the single sanctioned occurrence inside `_get_access_token`;
+  the `tools/redaction.py` utility (`SENSITIVE_KEYS`,
+  `SENSITIVE_VALUE_PATTERNS`, `redact()`); one Admin-only ACL row
+  (`1,1,1,0`, no unlink, no rows for auditor/operator/reviewer).
+- **Compute-blank rejected, as decided:** `access_token` is a plain
+  stored Char, no compute/inverse/raw SQL/hand-managed column/companion
+  field. The model docstring states the honest residual (Admin-group
+  ORM/RPC read technically possible; `sudo()`/DB/backup reads the
+  plaintext; no encryption claim) and the deliberate absence of
+  `client_id`/`client_secret`/token-cache/expiry fields pending MBQ-05.
+- **Tests (21 enumerated, across 3 files):** written exactly to the
+  final prompt's list — access/denial matrix + independent field-`groups`
+  layer + `display_name` safety (`test_credential_access.py`, 4 tests);
+  redaction key/value/exact-scrub/nesting/idempotence/passthrough/
+  no-mutation (`test_redaction.py`, 7 tests); service behavior +
+  duplicate-row + validation-message-safety + stamps-audit + leak-sweep
+  + no-job-log-writes + internal-accessor-vs-write-path-denial +
+  AST-based single-`sudo()` source guard (`test_credential_service.py`,
+  10 tests).
+- **Test execution status (stated honestly, per the Task 001A
+  precedent):** this repository still has **no Odoo runtime, no
+  `psycopg2`, no PostgreSQL, no `odoo-bin`, no CI** (re-confirmed this
+  session). `test_credential_access.py` and `test_credential_service.py`
+  (14 tests) require the Odoo ORM and were **written and
+  `py_compile`-validated only — not executed.** `test_redaction.py` (7
+  tests) targets a pure-Python utility with **zero Odoo dependency**;
+  its test bodies were **extracted and actually executed directly
+  against `tools/redaction.py` outside any Odoo harness — all 7
+  passed** (this is real execution evidence, not just a compile check,
+  though it is not the same as running the file as an installed Odoo
+  test). The manual validation checklist in the final prompt is
+  mandatory review evidence for the 14 ORM-dependent tests.
+- **Source-level `sudo()` guard:** the naive literal-substring
+  version of this test would have false-positived on the model
+  docstring's own required prose explaining `sudo()` (the final
+  prompt mandates that prose) — rewritten to an AST-based scan
+  (`ast.Call`/`ast.Attribute(attr='sudo')`) that only counts real
+  method-call sites; manually re-run standalone and confirmed exactly
+  one real `.sudo()` call, inside `_get_access_token`.
+- **No `job.log` writes; no encryption claim; no real token anywhere**
+  (dummy tokens only, e.g. `shpat_DUMMYDUMMYDUMMY0000000000000000`);
+  no `ir.config_parameter`; no raw SQL; zero API/UI/webhook/controller/
+  cron/domain-logic content in the diff (grep-swept and confirmed).
+- **Learning feedback loop:** new issue found and fixed in-session: the
+  originally-drafted source-level `sudo()` guard test would have been a
+  false-positive trap against this task's own mandatory docstring
+  content — caught before commit, corrected to an AST-based check, not
+  logged as a repeated defect-pattern-log category (design correction
+  within the same task, not a recurring pattern). Rejected approaches:
+  none reintroduced. Technical debt: none new — the redaction utility
+  has no consumer inside Task 002's own shipped code (by design; its
+  sink-side wiring is a named Task 003 concern per the accepted
+  architecture).
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (N/A) ·
+  technical debt logged (N/A, none new) · repeated-issue escalation
+  applied (N/A) — all YES.
+- **Stop condition:** stopped immediately after opening the draft PR,
+  exactly as the final prompt requires — no merge, no ready-for-review,
+  no Task 003, no further task.
+- **Recommended next step:** ChatGPT reviews the Task 002 implementation
+  PR against `credential-security-redaction-review-checklist.md` and
+  `task-002-pre-implementation-review-checklist.md` §B. Task 003
+  remains blocked until that review is accepted.
+
+**Exact next-session prompt:**
+
+> Apply ChatGPT's review decision for the Task 002 implementation PR.
+> If accepted: this closes MBQ-04 fully (pending the acceptance patch)
+> and unblocks preparing a Task 003 decision-closure package (API
+> client shell, test connection) — its own separate gate-opening act
+> is still required before any Shopify API call is authorized. If
+> revision is requested: apply the requested fixes on the same PR,
+> re-run the same validation sweep, and keep the PR draft.
 
 ---
 

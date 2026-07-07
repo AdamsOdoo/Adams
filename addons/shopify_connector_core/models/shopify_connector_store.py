@@ -5,9 +5,13 @@ class ShopifyConnectorStore(models.Model):
     """The DEC-006 store-scoping anchor every other core model references.
 
     Holds connection lifecycle, API version/health, and readiness
-    metadata only. No credential/token/secret field is defined here --
-    real credential persistence is fully descoped for this slice
-    (MBQ-04, core-naming-schema-planning.md §11).
+    metadata, plus non-secret credential status mirrors only. This
+    model stores no secret value itself: the credential presence flag,
+    replacement/verification timestamps, failure reason, and
+    granted-scope snapshot below are all non-secret status mirrors,
+    written only by the credential service (Task 002). The actual
+    secret credential value is persisted exclusively on the dedicated
+    Admin-only `shopify.connector.store.credential` model.
     """
 
     _name = 'shopify.connector.store'
@@ -49,6 +53,12 @@ class ShopifyConnectorStore(models.Model):
         readonly=True,
     )
     last_readiness_at = fields.Datetime(readonly=True)
+    credential_present = fields.Boolean(default=False, readonly=True)
+    credential_last_verified_at = fields.Datetime(readonly=True)
+    credential_last_replaced_at = fields.Datetime(readonly=True)
+    credential_last_failure_reason = fields.Char(readonly=True)
+    granted_scopes = fields.Text(readonly=True)
+    granted_scopes_checked_at = fields.Datetime(readonly=True)
 
     _sql_constraints = [
         (
