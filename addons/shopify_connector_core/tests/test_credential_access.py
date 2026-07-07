@@ -31,7 +31,7 @@ class TestCredentialAccess(TransactionCase):
         return cls.env['res.users'].create({
             'name': 'Credential Access Test %s' % label,
             'login': 'credential_access_test_%s' % label,
-            'groups_id': [(6, 0, [group.id])],
+            'group_ids': [(6, 0, [group.id])],
         })
 
     def test_non_admin_roles_denied_all_crud_and_search(self):

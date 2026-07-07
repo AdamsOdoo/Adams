@@ -29,7 +29,7 @@ class TestTestConnection(TransactionCase):
         return cls.env['res.users'].create({
             'name': 'Test Connection Test %s' % label,
             'login': 'test_connection_test_%s' % label,
-            'groups_id': [(6, 0, [group.id])],
+            'group_ids': [(6, 0, [group.id])],
         })
 
     def _set_token(self):
