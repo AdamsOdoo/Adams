@@ -23,9 +23,10 @@
 ## Status
 
 **Accepted by ChatGPT control-room decision, pending PR review/merge.**
-Prepared 2026-07-07 on branch `claude/record-val-b2-deferral-5uz9wf`, branched
-from `Shopify-connector` at its tip after **PR #111** merged (Task 004
-readiness preflight package, merge commit `43f3b2a923a420e523cd2ec2662a46e2a9abed26`).
+Prepared 2026-07-07 on branch `claude/record-val-b2-deferral-5uz9wf` →
+**PR #112**, draft into `Shopify-connector`, not merged, not marked ready.
+Branched from `Shopify-connector` at its tip after **PR #111** merged (Task
+004 readiness preflight package, merge commit `43f3b2a923a420e523cd2ec2662a46e2a9abed26`).
 **Documentation-only.** No code, test, manifest, security, XML, CSV, migration,
 or CI/workflow file is created or modified by this record. This record does
 **not** authorize Task 004 implementation, does **not** open Task 004's

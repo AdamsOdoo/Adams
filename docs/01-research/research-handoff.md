@@ -2,9 +2,10 @@
 
 ### VAL-B2 Deferral for Task 004 Gate — ChatGPT decision recorded (2026-07-07)
 
-- **Branch / PR:** `claude/record-val-b2-deferral-5uz9wf` → draft PR into
-  `Shopify-connector` (this session's PR, opened after PR #111 merged, merge
-  commit `43f3b2a923a420e523cd2ec2662a46e2a9abed26`). Docs-only session — no
+- **Branch / PR:** `claude/record-val-b2-deferral-5uz9wf` → **PR #112**,
+  draft into `Shopify-connector`, not merged, not marked ready. Opened after
+  PR #111 merged (merge commit
+  `43f3b2a923a420e523cd2ec2662a46e2a9abed26`). Docs-only session — no
   code, test, manifest, security, XML, CSV, migration, or CI/workflow file
   changed. **No Task 004 implementation of any kind in this session. No
   OAuth implementation. No setup-wizard change. No domain sync.**
