@@ -2,13 +2,13 @@
 
 ### Task 003 Manual Validation — Live Partial Results Recorded (2026-07-07)
 
-- **Branch / PR:** `claude/task-003-validation-docs-7tl074` → to be opened
-  as a **draft** PR into `Shopify-connector`; not merged, not marked
-  ready. Docs-only session — no code, test, or module-behavior change.
-  **No Task 004 work of any kind in this session.**
+- **Branch / PR:** `claude/task-003-validation-docs-7tl074` → **PR #107**,
+  a **draft** PR into `Shopify-connector`; not merged, not marked ready.
+  Docs-only session — no code, test, or module-behavior change. **No Task
+  004 work of any kind in this session.**
 - **Files changed:** `docs/05-qa/task-003-validation-results.md` (live
   partial-validation results recorded, with a new validation summary table
-  and a raw-evidence appendix), `docs/05-qa/task-003-manual-validation-checklist.md`
+  and a condensed-evidence appendix), `docs/05-qa/task-003-manual-validation-checklist.md`
   (VAL-C1 wording revised to distinguish intended credential storage from
   unexpected leakage — no step, scope, or expectation changed beyond that
   clarification), `docs/01-research/research-handoff.md` (this entry).
@@ -23,16 +23,22 @@
   `task-003-manual-validation-checklist.md`. **Task 003 manual validation
   is partially completed, not fully complete.** Every testable item that
   did not require a genuine, valid Shopify Admin API access token
-  **passed**: VAL-A1 (clean install), VAL-A2 (model registry — including
+  **passed**: VAL-A1 (installed-module / registry-load observation — the
+  session confirmed `shopify_connector_core` installed at `19.0.1.2.3`
+  with the registry loaded and no traceback; it did **not** re-execute a
+  fresh clean install/upgrade command), VAL-A2 (model registry — including
   confirming no database table exists for the abstract
   `shopify.connector.api.client` model), VAL-A3 (exactly 3 `job_type`
   values), VAL-B1 (invalid-token failure path — correct `error_class`,
   reason, and `credential_state` flip), VAL-B3 (repeat-run idempotency —
-  no collision, a fresh job row created), VAL-C1 (token redaction — **zero
-  unexpected leaks** once the intentional
-  `store.credential.access_token` storage field is correctly excluded
-  from the leak scan), VAL-C2 (ACL — direct `job.log` create by an
-  Operator-group user correctly denied with `AccessError`), VAL-E2
+  no collision, a fresh job row created), VAL-C1's **DB/ORM scan half**
+  (token redaction — **zero unexpected leaks across the ORM/
+  database-visible surfaces scanned** once the intentional
+  `store.credential.access_token` storage field is correctly excluded;
+  the Odoo **server log grep half of VAL-C1 was not tested** this
+  session, so VAL-C1 overall is **PARTIAL**, not fully passed), VAL-C2
+  (ACL — direct `job.log` create by an Operator-group user correctly
+  denied with `AccessError`), VAL-E2
   (fail-path row accounting — two independent fail-path jobs each show
   exactly 1 job row + 2 job.log rows), and VAL-F1 (confirms `TD-001` is
   **still open** — a second `core_readiness_check` job for the same store
@@ -56,8 +62,12 @@
   pending a decision on token acquisition (see next bullet). VAL-A4,
   VAL-C3, VAL-D1, VAL-D2, and VAL-G1–G4 remain not tested and must be
   executed in a future live session before Task 003 validation can be
-  called complete. `TD-001` remains open, untouched, and unresolved by
-  this session — no fix proposed or attempted, per this session's
+  called complete. VAL-C1's **Odoo server log grep** was not performed
+  this session and remains not tested — only the DB/ORM scan half of
+  VAL-C1 passed. A fresh clean install/upgrade re-run of VAL-A1 was also
+  not re-executed this session — only an installed-module / registry-load
+  observation was made. `TD-001` remains open, untouched, and unresolved
+  by this session — no fix proposed or attempted, per this session's
   docs-only, no-code scope.
 - **Open follow-up (routed to ChatGPT):** Decide whether the MVP continues
   with **offline/custom-app Admin API token only** (accepting that setup

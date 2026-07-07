@@ -146,10 +146,16 @@ prompt `adamsmen-shopify-connector-34582665 [dev/19.0]` on **Odoo 19.0**,
 with `shopify_connector_core` **installed at version `19.0.1.2.3`**,
 targeting the Shopify development store **`mqiu21-yz.myshopify.com`**
 (API version `2026-07` configured in the shell variables). This confirms
-VAL-A1 (clean install) live, and a substantial portion of the remaining
-checklist was exercised — see the **Validation summary** table
-immediately below for the full per-item breakdown, and §§1–3 for the
-detailed results.
+an **installed-module / registry-load observation** for VAL-A1 —
+the module was found installed at this version with the registry loaded
+and no traceback during shell startup/module inspection. **This session
+did not re-execute a fresh clean install/upgrade command**; the last
+full clean-install proof (a fresh install with no error) is the
+PR #103/#104/#105 and green-gate hotfix re-run history described above,
+not this shell session. A substantial portion of the remaining checklist
+was also exercised — see the **Validation summary** table immediately
+below for the full per-item breakdown, and §§1–3 for the detailed
+results.
 
 **No valid Shopify Admin API access token was available for this
 session.** The Shopify Dev Dashboard app used did not provide the older
@@ -159,10 +165,11 @@ Every checklist item that requires a **successful, passing** Shopify
 connection — most importantly **VAL-B2**, the valid-token positive-
 connection test — is therefore recorded as **BLOCKED, not passed and not
 failed**, and everything depending on it (e.g. VAL-E1's pass-path row
-accounting) is BLOCKED or not tested as well. This is a genuine open
-product/architecture question (see
-`docs/01-research/research-handoff.md` for the routed follow-up), not a
-defect in the code validated so far.
+accounting) is BLOCKED or not tested as well. **No new runtime code
+defect was observed in the tested paths.** However, token acquisition
+remains an unresolved product/architecture setup blocker before
+customer-facing setup can be accepted — see
+`docs/01-research/research-handoff.md` for the routed follow-up.
 
 **This document does not assert that Task 003 validation has passed in
 full, and does not assert that a valid Shopify connection has been
@@ -177,7 +184,7 @@ they remain to be executed in a future live session per
 
 | Test ID | Status | Notes |
 | --- | --- | --- |
-| VAL-A1 | **Passed** | `shopify_connector_core` installed cleanly at `19.0.1.2.3`, no traceback. |
+| VAL-A1 | **Passed (installed-module / registry-load observation only)** | `shopify_connector_core` confirmed installed at `19.0.1.2.3`, registry loaded, no traceback during shell startup/module inspection. **Fresh clean install/upgrade was not re-executed in this shell session** — see the Status narrative above for the last full clean-install proof (the PR #103/#104/#105 and green-gate hotfix re-run cycle). |
 | VAL-A2 | **Passed** | Models found: `shopify.connector.api.client`, `shopify.connector.store`, `shopify.connector.job`, `shopify.connector.job.log`, `shopify.connector.store.credential`. No database table exists for `shopify.connector.api.client`, confirming it remains an `AbstractModel`. |
 | VAL-A3 | **Passed** | `job_type` selection count is exactly 3: `core_readiness_check`, `core_manual_maintenance`, `core_test_connection`. |
 | VAL-A4 | Not tested | XML/menu/action/wizard/controller/cron inspection was not exercised this session. |
@@ -188,7 +195,7 @@ they remain to be executed in a future live session per
 | VAL-B5 | Not tested | Shop-state failure behavior not exercised this session. |
 | VAL-B6 | Not tested | Cross-check requires VAL-B4/VAL-B5, neither of which was run this session; only the VAL-B1 flip was observed in isolation. |
 | VAL-B7 | Not tested | Version fall-forward warning behavior not exercised this session. |
-| VAL-C1 | **Passed** | A naive token-string scan flagged `('shopify.connector.store.credential', 21, 'access_token')` — this is the **intended, by-design credential storage location**, not a leak. A corrected scan that excludes that intended field returned `UNEXPECTED_LEAKS: []` — zero unexpected token exposure across store mirrors, job rows, job-log rows, messages, `technical_detail`, and `payload_snapshot`. **`access_token` is stored in plain text on `shopify.connector.store.credential`, protected only by Odoo ACLs — it is not encrypted at rest.** This is a known, documented residual, not a new finding. |
+| VAL-C1 | **PARTIAL** | **DB/ORM unexpected-token-leakage scan: Passed.** A naive token-string scan flagged `('shopify.connector.store.credential', 21, 'access_token')` — this is the **intended, by-design credential storage location**, not a leak. A corrected scan that excludes that intended field returned `UNEXPECTED_LEAKS: []` across the ORM/database-visible surfaces scanned (store mirrors, job rows, job-log rows, messages, `technical_detail`, and `payload_snapshot`). **Odoo server log grep: Not tested.** The live shell session checked ORM/database-visible fields only — it did **not** grep the Odoo server log file(s). **`access_token` is stored in plain text on `shopify.connector.store.credential`, protected only by Odoo ACLs — it is not encrypted at rest.** This is a known, documented residual, not a new finding. **Overall VAL-C1: PARTIAL — DB/ORM scan passed, server-log scan pending.** |
 | VAL-C2 | **Passed** | A direct `shopify.connector.job.log.create(...)` attempt by a user in `group_shopify_connector_operator` (uid 18) was denied by Odoo's ACL layer ("Access Denied by ACLs for operation: create"), raising `AccessError` as expected. |
 | VAL-C3 | Not tested | `sudo()` call-site count was not re-verified this session. |
 | VAL-D1 | Not tested | Shopify-side no-mutation check was not exercised this session. |
@@ -229,7 +236,7 @@ reproducible, say so explicitly in **Actual result** and set **Pass/Fail** to
 
 | Test ID | Test case | Expected result | Actual result | Pass/Fail | Evidence reference |
 | --- | --- | --- | --- | --- | --- |
-| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed (first attempt).** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml`. **Re-run after PR #103 merged:** install progressed past registry load into Odoo 19 test execution, then **failed with 4 errors** — `ValueError: Invalid field 'groups_id' in 'res.users'`. **Re-run after PR #104 merged:** reached all 36 tests, then **`2 failed, 3 error(s) of 36 tests`**. **Re-run after PR #105 merged:** reached all 39 tests, then **`1 failed, 4 error(s) of 39 tests`**. **Live session, 2026-07-07 (post-green-gate hotfix):** module installed cleanly at version `19.0.1.2.3`, no traceback. | **Pass (2026-07-07 live session)** | See Appendix §A "Install/model checks" below. |
+| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed (first attempt).** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml`. **Re-run after PR #103 merged:** install progressed past registry load into Odoo 19 test execution, then **failed with 4 errors** — `ValueError: Invalid field 'groups_id' in 'res.users'`. **Re-run after PR #104 merged:** reached all 36 tests, then **`2 failed, 3 error(s) of 36 tests`**. **Re-run after PR #105 merged:** reached all 39 tests, then **`1 failed, 4 error(s) of 39 tests`**. **Live session, 2026-07-07 (post-green-gate hotfix):** confirmed `shopify_connector_core` installed at version `19.0.1.2.3`, registry loaded, no traceback during shell startup/module inspection. **This shell session did not re-execute a fresh clean install/upgrade command** — it observed the state of an already-installed module, not a fresh install run. | **Pass (installed-module / registry-load observation only, 2026-07-07 live session) — fresh clean install/upgrade not re-executed this session** | See Appendix §A "Install/model checks" below. |
 | VAL-A2 | Model registry loads | `api.client` abstract (no table); other 3 models intact | Live session confirmed all 5 known models present (`shopify.connector.api.client`, `store`, `job`, `job.log`, `store.credential`); no database table for `shopify.connector.api.client`. | **Pass (2026-07-07)** | See Appendix §A. |
 | VAL-A3 | Three `job_type` values in ORM | Exactly 3 values, no 4th | `job_type` selection count = 3 (`core_readiness_check`, `core_manual_maintenance`, `core_test_connection`). | **Pass (2026-07-07)** | See Appendix §A. |
 | VAL-A4 | No XML/menu/action/wizard/controller/cron | Zero rows of any kind | Not exercised this session. | **N/A (not tested this session)** | — |
@@ -240,7 +247,7 @@ reproducible, say so explicitly in **Actual result** and set **Pass/Fail** to
 | VAL-B5 | Shop-state failure behavior (if reproducible) | Auth class, distinct reason, `credential_state` untouched | Not exercised this session. | **N/A (not tested this session)** | — |
 | VAL-B6 | `credential_state` flips only on genuine token-invalid signal | Confirmed against B1/B4/B5 | Cannot be cross-checked — VAL-B4/VAL-B5 not run this session. | **N/A (not tested this session)** | — |
 | VAL-B7 | Version fall-forward warning (if reproducible) | Still `pass`; `api_health_state='degraded'` | Not exercised this session. | **N/A (not tested this session)** | — |
-| VAL-C1 | Token redaction (DB + server log) | Zero hits for either token, outside intended credential storage | Naive scan: `LEAKS: [('shopify.connector.store.credential', 21, 'access_token')]` — this is the **intended** credential storage field, not a leak (see checklist revision, item 4 below). Corrected scan excluding that field: `UNEXPECTED_LEAKS: []`. **Zero unexpected token exposure confirmed.** `access_token` remains stored in plain text, protected only by ACLs — no encryption claim is made. | **Pass (2026-07-07)** | See Appendix §D "Token leakage validation." |
+| VAL-C1 | Token redaction (DB + server log) | Zero hits for either token, outside intended credential storage | **DB/ORM unexpected-token-leakage scan:** naive scan: `LEAKS: [('shopify.connector.store.credential', 21, 'access_token')]` — this is the **intended** credential storage field, not a leak (see checklist revision, item 4 below). Corrected scan excluding that field: `UNEXPECTED_LEAKS: []` across the ORM/database-visible surfaces scanned. **Odoo server log grep:** not performed this session — the live shell session checked ORM/database-visible fields only. `access_token` remains stored in plain text, protected only by ACLs — no encryption claim is made. | **PARTIAL — DB/ORM scan: Pass; server-log scan: Not tested (2026-07-07)** | See Appendix §D "Token leakage validation." |
 | VAL-C2 | `job.log` direct-create vs `_system_append` ACL check | Direct create → `AccessError`; indirect via `_system_append` → succeeds | Direct `job.log.create(...)` by a `group_shopify_connector_operator` user (uid 18) was denied: "Access Denied by ACLs for operation: create, uid: 18, model: shopify.connector.job.log" → `AccessError` raised as expected. Indirect path via `_system_append` not separately re-exercised this session (already proven passing/failing through VAL-B1/VAL-B3's job-log creation, which succeeded via the system path). | **Pass (2026-07-07, direct-create half)** | See Appendix §E "ACL validation." |
 | VAL-C3 | Exactly two `sudo()` sites (live-confirmed) | 2 sites, no more | Not re-verified this session. | **N/A (not tested this session)** | — |
 | VAL-D1 | No Shopify-side mutation | Zero changes, zero webhooks | Not exercised this session. | **N/A (not tested this session)** | — |
@@ -279,26 +286,35 @@ new bug-fix task (if it must be corrected before Task 004).
 **Not yet determined — this session provides partial results only.** Task
 003 manual validation cannot be called Go or No-Go until VAL-B2 (or a
 formal decision to re-scope it, see the open follow-up in
-`docs/01-research/research-handoff.md`) and the remaining not-tested items
-(VAL-A4, VAL-B4–B7, VAL-C3, VAL-D1–D2, VAL-G1–G4) are resolved in a future
-live session.
+`docs/01-research/research-handoff.md`), VAL-C1's server-log-grep half,
+and the remaining not-tested items (VAL-A4, VAL-B4–B7, VAL-C3, VAL-D1–D2,
+VAL-G1–G4) are resolved in a future live session.
 
 - **Recommendation:** _Partial — not a full Go, not a No-Go. Every item
-  that was testable without a valid Shopify Admin API token passed; the
-  positive-connection path (VAL-B2) and everything depending on it remain
-  blocked pending a token-acquisition decision._
-- **Rationale:** Ten checklist items passed cleanly against the live
-  environment (VAL-A1–A3, VAL-B1, VAL-B3, VAL-C1–C2, VAL-E2–E3, VAL-F1),
-  with no new defects found. Two items (VAL-B2, VAL-E1) are blocked purely
-  by token-tooling availability, not by any observed code defect. Eight
-  items were not exercised this session and are not assumed to pass.
+  that was testable without a valid Shopify Admin API token passed or, for
+  VAL-A1 and VAL-C1, partially passed within the narrower scope actually
+  exercised (see notes below); the positive-connection path (VAL-B2) and
+  everything depending on it remain blocked pending a token-acquisition
+  decision._
+- **Rationale:** Eight checklist items passed cleanly against the live
+  environment (VAL-A2–A3, VAL-B1, VAL-B3, VAL-C2, VAL-E2–E3, VAL-F1), with
+  no new defects found. VAL-A1 passed only as an installed-module /
+  registry-load observation — a fresh clean install/upgrade command was
+  not re-executed this session. VAL-C1 is **PARTIAL**: its DB/ORM
+  unexpected-token-leakage scan passed, but its Odoo server-log-grep half
+  was not tested this session. Two items (VAL-B2, VAL-E1) are blocked
+  purely by token-tooling availability. **No new runtime code defect was
+  observed in the tested paths.** Twelve items were not exercised this
+  session and are not assumed to pass.
 - **Conditions (if "Go with conditions"):** Not proposed in this docs-only
   session — routed to ChatGPT per `docs/01-research/research-handoff.md`'s
   open follow-up (offline/custom-app-token-only MVP vs. introducing
   OAuth/Dev-Dashboard-compatible token acquisition).
-- **Blocking defects (if "No-Go"):** None — no code defect blocks Go; the
-  blocker is missing token-acquisition tooling for this validation
-  session, not a code or design defect.
+- **Blocking defects (if "No-Go"):** None — no new runtime code defect was
+  observed in the tested paths. However, token acquisition remains an
+  unresolved product/architecture setup blocker before customer-facing
+  setup can be accepted, and VAL-C1's server-log scan and several other
+  checklist items remain not tested.
 
 ## 6. Sign-off
 
@@ -318,11 +334,11 @@ routes to ChatGPT.
 
 ---
 
-## Appendix — raw evidence from the 2026-07-07 live shell session
+## Appendix — condensed evidence excerpts from the 2026-07-07 live shell session
 
-This appendix transcribes the live session's recorded output verbatim, for
-traceability. It supplements, and does not replace, the summary and
-per-row tables above.
+This appendix records condensed evidence excerpts from the live shell
+session, for traceability — it is not a verbatim transcript. It
+supplements, and does not replace, the summary and per-row tables above.
 
 ### A. Install/model checks
 
@@ -388,8 +404,12 @@ Corrected unexpected-leak scan (excluding store.credential.access_token):
   UNEXPECTED_LEAKS: []
 ```
 
-Zero unexpected token leakage outside the intended credential storage
-field — recorded as **PASSED**.
+Zero unexpected token leakage found across the ORM/database-visible
+surfaces scanned (store mirrors, job rows, job-log rows, message/
+`technical_detail`/`payload_snapshot` fields), outside the intended
+credential storage field. The Odoo server log file(s) were **not**
+grepped in this session — that half of VAL-C1 is **Not tested**. DB/ORM
+scan recorded as **PASSED**; overall VAL-C1 is **PARTIAL**.
 
 ### E. ACL validation
 
