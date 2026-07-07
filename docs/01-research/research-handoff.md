@@ -1,5 +1,118 @@
 # Research Handoff (rolling)
 
+### Task 003 Static/Offline Validation Sweep — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/task-003-static-validation-cszl88` → **PR #110**,
+  draft into `Shopify-connector`, not merged, not marked ready. Docs-only
+  session — no code, test, manifest, security, XML, or CSV change of any
+  kind. **No Task 004 work of any kind in this session. No OAuth
+  implementation. No setup-wizard change.**
+- **Files changed:** `docs/05-qa/task-003-static-validation-sweep.md` (new),
+  `docs/05-qa/task-003-server-log-redaction-check.md` (new),
+  `docs/05-qa/task-003-no-side-effect-baseline.md` (new),
+  `docs/05-qa/task-003-validation-results.md` (static/offline addendum
+  appended; four summary-table rows annotated with static evidence, none of
+  the prior live-session findings overwritten), `docs/01-research/research-handoff.md`
+  (this entry; corrected the PR #108 entry's stale "draft PR, not merged"
+  wording, which this session confirmed is merged, merge commit
+  `76cd74e7cf585e1925c3ac280bd6ca97c55df7ab`; that correction was
+  independently also made by PR #109, which merged first — this entry has
+  since been rebased onto that merged state, so both PR #109's entry and the
+  already-corrected PR #108 entry appear below, unmodified).
+- **What changed / residue fixed:** This session ran a static/offline-only
+  validation pass over the `task-003-manual-validation-checklist.md` items
+  that do not require a valid Shopify Admin API token. This session was
+  originally run in parallel with the OAuth/Fable attempt, which is now
+  recorded in merged PR #109 (entry below) as blocked before execution — no
+  Fable-equivalent browser-automation tool and no Shopify Dev Dashboard
+  credentials were available to that session. This session did not touch
+  that attempt. Confirmed by direct repo/source inspection: **VAL-A4** —
+  Task 003 (PR #101, merge commit
+  `e27f10e55f3504d1a9b8871a207b3d9762a3c783`) introduced no XML file, menu,
+  action, wizard, controller, route, cron, or server/scheduled action of any
+  kind; the module's only XML file
+  (`security/shopify_connector_security.xml`) predates Task 003 and defines
+  only `ir.module.category`/`res.groups.privilege`/`res.groups` records; no
+  `controllers/` or `wizards/` directory exists anywhere in the addon; a
+  repo-wide grep for `ir.cron`, `ir.actions.server`, `ir.ui.menu`, and
+  `ir.actions.act_window` returns zero hits. This is a **static repo check**,
+  not an `ir.model.data`/live-registry DB inspection — no live Odoo instance
+  was available this session. **VAL-C3** — confirmed exactly **2** `sudo()`
+  call sites in production code: `_get_access_token`
+  (`shopify_connector_store_credential.py:158`) and `_system_append`
+  (`shopify_connector_job_log.py:85`) — matching the governance-documented
+  expectation; a static source count, not a live-installed-module
+  re-verification. **VAL-D1** — confirmed the `TEST_CONNECTION_QUERY` GraphQL
+  string (`shopify_connector_store.py:15-18`) is exactly `query
+  ConnectorTestConnection { shop { id name myshopifyDomain }
+  currentAppInstallation { accessScopes { handle } } }`, and a repo-wide grep
+  for the `mutation` GraphQL keyword found no mutation operation string
+  anywhere in the module (only a docstring/comment noting its absence, and
+  the pre-existing regression test that asserts this by regex). Static
+  read-only-query evidence only — no live Shopify Admin store was inspected.
+  **VAL-D2** — confirmed `action_test_connection()` and its helpers
+  (`_get_access_token`, `_system_append`,
+  `ShopifyConnectorApiClient.execute`) write only to
+  `shopify.connector.store`, `shopify.connector.store.credential`
+  (`credential_state` field only), `shopify.connector.job`, and
+  `shopify.connector.job.log` — no product/customer/order/inventory/stock/
+  accounting/sale/purchase model reference anywhere in the code path. Static
+  code-path evidence only — no live Odoo database was inspected. **VAL-C1
+  (server-log half)** — this container/session has no live Odoo runtime and
+  no server log files anywhere on the filesystem (confirmed by filesystem
+  search); the dummy token
+  `shpat_INVALID_INVALID_INVALID0000000000000000` could not be grepped
+  against any log because none exist here. Recorded as **not testable in
+  this session — logs unavailable**, not pass/fail. **VAL-G1–G4** — left
+  **not tested**; no empirical API behavior was observed or invented this
+  session.
+- **Items deferred:** Everything requiring a live Odoo instance, a live
+  Shopify connection, or real server logs remains deferred to a future live
+  session: VAL-A1 (fresh install re-run), VAL-A4's DB/`ir.model.data`-level
+  half, VAL-B2/B4–B7, VAL-C1's server-log half, VAL-D1/D2's live-observation
+  halves, VAL-E1, VAL-G1–G4. The separate manual-OAuth-token-acquisition
+  experiment, now recorded in merged PR #109 (entry below) as blocked before
+  execution, is untouched by this session.
+- **Recommended decision:** None — this session makes no recommendation and
+  reaches no go/no-go conclusion; it only adds static evidence for items that
+  were previously entirely untested.
+- **Risks:** None newly identified. Static evidence narrows, but does not
+  close, the remaining live-validation gap; a future live session must still
+  confirm the DB/registry-level half of VAL-A4, the live-observation halves
+  of VAL-D1/D2, and VAL-C1's server-log half before Task 003 validation can
+  be considered complete.
+- **What remains blocked:** Task 003 manual validation **remains
+  incomplete**. Task 004 **remains blocked**. VAL-B2 remains blocked/not
+  attempted. The OAuth/token-acquisition experiment remains not executed —
+  PR #109 (merged, entry below) already records that attempt as blocked
+  before execution; this session does not duplicate or second-guess that
+  record. This PR (#110) does not unblock Task 004.
+- **Learning feedback loop:** New issues / repeated patterns: none. Rules/
+  checklists updated: none (checklist wording unchanged this session).
+  Rejected approaches: none. Technical debt: none added; `TD-001` unchanged.
+  Architecture concerns: none new. Tests or review gates needed: a future
+  live session must still execute VAL-A1 (fresh re-run), VAL-A4 (DB/registry
+  half), VAL-B2/B4–B7, VAL-C1 (server-log half), VAL-D1/D2 (live-observation
+  halves), VAL-E1, VAL-G1–G4. Should future prompts change? Yes — a future
+  static/offline continuation should note this session confirmed no live
+  Odoo runtime or log files exist in the current execution environment, so
+  VAL-C1's server-log half and any DB/registry-level check will require a
+  session with actual live-environment access, not just repo/source
+  inspection.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (none new) · repeated-issue escalation applied (n/a) — all YES.
+- **Next recommended session:** ChatGPT reviews this static/offline sweep
+  alongside PR #109's (merged) OAuth-experiment-blocked findings; a future
+  live session (with an actual Odoo 19 instance, PostgreSQL, live Shopify
+  dev store, and server-log access) is still required to close VAL-A1,
+  VAL-A4's DB half, VAL-B2, VAL-B4–B7, VAL-C1's server-log half, VAL-D1/D2's
+  live halves, VAL-E1, and VAL-G1–G4 before Task 003 can be marked complete.
+- **Stop condition:** stopped at the scoped boundary — docs-only static/
+  offline validation sweep; no code, test, manifest, security, XML, or CSV
+  file touched; Task 003 not marked complete; Task 004 not unblocked; no
+  OAuth work performed or claimed; no secrets used.
+
 ### Task 003 Validation / Task 004 Prep — Continuation Session, Blocked at Empirical OAuth Experiment (2026-07-07)
 
 - **Branch / PR:** `claude/task-003-validation-task-004-prep-fbq3qd`, branched
