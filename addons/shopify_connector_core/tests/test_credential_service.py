@@ -37,7 +37,7 @@ class TestCredentialService(TransactionCase):
         return cls.env['res.users'].create({
             'name': 'Credential Service Test %s' % label,
             'login': 'credential_service_test_%s' % label,
-            'groups_id': [(6, 0, [group.id])],
+            'group_ids': [(6, 0, [group.id])],
         })
 
     def _credential_as_admin(self):

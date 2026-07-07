@@ -1,5 +1,124 @@
 # Research Handoff (rolling)
 
+### Odoo 19 Test-Compatibility Hotfix + Compatibility Audit — `res.users` `group_ids` — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/odoo19-test-groups-id-7v35ym`; PR #104, opened as
+  draft into `Shopify-connector` in this session's first commit, still not
+  merged. **F1 revision pushed as a second commit to this same branch/PR**,
+  adding the module-wide compatibility audit below and updating the PR
+  body — the first commit contained only the four-file `groups_id` →
+  `group_ids` rename plus the two docs updates; this F1 revision expands
+  the scope to a full module audit per follow-up instruction, without
+  touching the original four-file test fix.
+- **Files changed:** `addons/shopify_connector_core/tests/test_credential_access.py`,
+  `addons/shopify_connector_core/tests/test_credential_service.py`,
+  `addons/shopify_connector_core/tests/test_job_log_system_append.py`,
+  `addons/shopify_connector_core/tests/test_test_connection.py`,
+  `docs/05-qa/odoo-19-compatibility-audit.md` (new, this F1 revision),
+  `docs/05-qa/task-003-validation-results.md`,
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** PR #103 (`claude/odoo19-install-blocker-fnm5ro`,
+  merge commit `7361fbc`, fix commit `99fc84d`) merged into `Shopify-connector`
+  and resolved the prior `res.groups.category_id` / `_sql_constraints`
+  registry-load blocker. Live validation was re-run afterward and progressed
+  past registry load into actual Odoo 19 test execution for
+  `shopify_connector_core`, then errored out before completing, in four test
+  classes: `test_credential_access.TestCredentialAccess`,
+  `test_credential_service.TestCredentialService`,
+  `test_job_log_system_append.TestJobLogSystemAppend`, and
+  `test_test_connection.TestTestConnection`. Observed error:
+  `ValueError: Invalid field 'groups_id' in 'res.users'`. Root cause: each of
+  these four test classes shares an identical `_create_group_user(cls, label,
+  group_xmlid)` classmethod helper that created a `res.users` record with
+  `'groups_id': [(6, 0, [group.id])]` — Odoo 19 renamed this field to
+  `group_ids` (the same class of Odoo-19 field-rename breakage already seen
+  once this sprint on `res.groups.category_id` → `privilege_id`). This hotfix
+  renames the dict key in all four occurrences (one per file, in the shared
+  helper pattern) from `groups_id` to `group_ids`, preserving the exact `(6,
+  0, [group.id])` command tuple, the same four group XML IDs
+  (`group_shopify_connector_auditor/_operator/_reviewer/_admin`), the same
+  test users, and the same test intent. No assertion, test method, or test
+  class was changed, removed, skipped, or weakened. No production
+  model/service/security/manifest/API-client/credential/job code was
+  touched.
+  **F1 audit addendum:** rather than stop at the four stack-trace files,
+  this revision also audits the entire `addons/shopify_connector_core/`
+  module for sibling Odoo 19 compatibility risks and records the result in
+  the new `docs/05-qa/odoo-19-compatibility-audit.md`. Patterns searched
+  module-wide: `groups_id`, `category_id`, `_sql_constraints`, old
+  `res.groups` category assignment, direct `res.users.create` group
+  assignment, test helpers creating users, other deprecated ORM patterns
+  (`@api.one`/`@api.multi`/`@api.cr`/`osv.`/`orm.Model`/`fields.function`/
+  `track_visibility`/`_inherits`), other `.sudo()` sites, and stale
+  docs/comments referencing obsolete fields. Result: no sibling risk found
+  anywhere else in the module — `category_id` appears exactly once,
+  correctly on the `res.groups.privilege` record (not on any `res.groups`
+  record); `_sql_constraints` is fully absent, with `models.Constraint`
+  still in place on all six PR #103 conversions; the only
+  `res.users.create` call sites in the whole module are the four now-fixed
+  test helpers; `test_api_client.py` and `test_redaction.py` create no
+  users and need no change; no other deprecated-API pattern exists; the
+  module's two production `.sudo()` sites are unchanged and match the
+  count the module's own guard tests assert; and no inline comment or docs
+  file misleads a future reader into re-introducing the obsolete field
+  names (the only doc references to `groups_id`/`category_id` are
+  historical root-cause narrative for the two already-fixed failures).
+- **Items deferred:** No Odoo runtime/PostgreSQL exists in this repository, so
+  live test execution could not be re-run here — `python3 -m py_compile`
+  passed cleanly on all four changed files, and repo-wide grep confirms zero
+  remaining occurrences of `groups_id` anywhere in the repository (not just
+  the tests directory) and `group_ids` present in exactly the four affected
+  `_create_group_user` helpers. The tester must re-run the live Odoo 19
+  install/test-execution command for `shopify_connector_core` after this PR
+  merges, confirm `ValueError: Invalid field 'groups_id' in 'res.users'` no
+  longer occurs, record any newly surfaced error separately (do not fix an
+  unrelated new error in this same PR without ChatGPT authorization), and
+  only then continue `task-003-manual-validation-checklist.md` from VAL-A1 —
+  validation remains blocked pending both this PR and PR #103 being reflected
+  in a clean live run.
+- **Learning feedback loop:** New issues / repeated patterns: two Odoo 19
+  breaking field renames surfaced back-to-back in the same module
+  (`res.groups.category_id` → `privilege_id`, and now `res.users.groups_id` →
+  `group_ids`), both only caught by an actual live install/test run rather
+  than static review — flag for a future rule: before the next live
+  validation attempt, do a static pass of every `res.users`/`res.groups`
+  field reference (production **and** test code) against the Odoo 19 core
+  rename list, rather than discovering renames one live-run failure at a
+  time. Rules/checklists updated: none this session (routing this
+  observation to ChatGPT rather than unilaterally amending a gate checklist).
+  Rejected approaches: none. Technical debt: none added; TD-001 unchanged.
+  Architecture concerns: none — this is a test-only compatibility fix, no
+  design or production-behavior change. Tests or review gates needed: re-run
+  the four affected test classes plus the full `shopify_connector_core` test
+  suite live after merge. Should future prompts change? Possibly — consider
+  requiring a documented Odoo-19-core-rename audit (covering both production
+  and test code) before any "re-run live validation" step, given this is the
+  second such rename found this sprint. **F1 addendum:** this revision acts
+  on that exact flag — `docs/05-qa/odoo-19-compatibility-audit.md` is the
+  first instance of that requested audit, run module-wide rather than
+  file-by-file, and found no third sibling rename this sprint. Recommend to
+  ChatGPT that a module-wide Odoo-19-rename static audit become a standing
+  pre-live-validation step for this connector going forward (routed here as
+  a recommendation, not unilaterally adopted as a gate).
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (none new, TD-001 unchanged) · repeated-issue escalation applied
+  (flagged above, routed to ChatGPT) — all YES.
+- **Next recommended session:** Live tester re-runs the Odoo 19
+  install/test-execution command for `shopify_connector_core` after this PR
+  merges, confirms the four previously-erroring test classes now execute
+  without the `groups_id` `ValueError`, records results in
+  `task-003-validation-results.md`, and only then resumes
+  `task-003-manual-validation-checklist.md` from VAL-A1 onward. No Task 004
+  session until that full checklist passes and ChatGPT reviews the results.
+- **Stop condition:** Scoped test-compatibility hotfix only; no production
+  model/service/security/manifest/API-client/credential/job/UI/controller
+  code touched; no test skipped, deleted, renamed, or weakened; no Task 004
+  work; PR left as draft, not merged; live validation not started/resumed by
+  this session.
+
+---
+
 ### Odoo 19 Install-Compatibility Hotfix — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/odoo19-install-blocker-fnm5ro`; PR → to be opened

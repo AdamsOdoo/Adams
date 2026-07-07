@@ -2,10 +2,11 @@
 
 ## Status
 
-**BLOCKED — VAL-A1 failed on first live install attempt; hotfix pending
-review/merge.** Live validation was started against a live Odoo 19 +
-PostgreSQL instance and failed immediately at VAL-A1 (clean install). The
-observed `install.log` error:
+**BLOCKED — install progressed past VAL-A1's original failure, but a new
+test-execution blocker was found; a second hotfix is pending review/merge.**
+
+Live validation was first started against a live Odoo 19 + PostgreSQL
+instance and failed immediately at VAL-A1 (clean install) with:
 
 ```
 Loading module shopify_connector_core
@@ -22,12 +23,42 @@ same run: `Model attribute '_sql_constraints' is no longer supported,
 please define models.Constraint on the model.` Root cause: Odoo 19 removed
 `category_id` from `res.groups` (groups now use `privilege_id` →
 `res.groups.privilege`) and deprecated `_sql_constraints` in favor of
-`models.Constraint`. A hotfix addressing both is proposed on branch
-`claude/odoo19-install-blocker-fnm5ro` (see
+`models.Constraint`. This was fixed by PR #103
+(`claude/odoo19-install-blocker-fnm5ro`, merge commit `7361fbc`), which has
+since merged into `Shopify-connector` (see
 `docs/01-research/research-handoff.md`, "Odoo 19 Install-Compatibility
-Hotfix" entry). **All live validation is blocked, and every row below
-remains unexecuted, until that hotfix is reviewed/merged and VAL-A1 is
-re-run from a clean state.**
+Hotfix" entry).
+
+Live validation was re-run after PR #103 merged. The install progressed
+past registry load this time and reached actual **Odoo 19 test execution**
+for `shopify_connector_core`, but that run **errored out before
+completing, with 4 errors**, in these test classes:
+
+- `shopify_connector_core.tests.test_credential_access.TestCredentialAccess`
+- `shopify_connector_core.tests.test_credential_service.TestCredentialService`
+- `shopify_connector_core.tests.test_job_log_system_append.TestJobLogSystemAppend`
+- `shopify_connector_core.tests.test_test_connection.TestTestConnection`
+
+Observed error: `ValueError: Invalid field 'groups_id' in 'res.users'`. Root
+cause: each of these four test classes' shared `_create_group_user` test
+helper created a `res.users` record with `'groups_id': [(6, 0,
+[group.id])]`; Odoo 19 renamed this field to `group_ids`. A hotfix updating
+only the four test helpers to use `group_ids` (preserving the exact group
+XML IDs, command tuple, users, and test intent) is proposed on branch
+`claude/odoo19-test-groups-id-7v35ym` / PR #104 (see
+`docs/01-research/research-handoff.md`, "Odoo 19 Test-Compatibility Hotfix
++ Compatibility Audit — `res.users` `group_ids`" entry). That same PR was
+then expanded (F1 revision) into a module-wide Odoo 19 compatibility audit
+— see `docs/05-qa/odoo-19-compatibility-audit.md` — which found no sibling
+`groups_id`/`category_id`/`_sql_constraints`/deprecated-ORM risk anywhere
+else in `addons/shopify_connector_core/` beyond the four call sites already
+being fixed.
+
+**All live validation remains blocked, and every row below remains
+unexecuted/unpassed, until this second hotfix is reviewed/merged and the
+full install + test-execution run is re-run cleanly from VAL-A1.** Do not
+mark VAL-A1 or any later row as passed based on this session's static
+analysis alone — no live re-run was performed here.
 
 Every field/row below this point is still a placeholder. **Do not fill in
 or check off any row from memory, assumption, or code-reading — only from
@@ -67,7 +98,7 @@ reproducible, say so explicitly in **Actual result** and set **Pass/Fail** to
 
 | Test ID | Test case | Expected result | Actual result | Pass/Fail | Evidence reference |
 | --- | --- | --- | --- | --- | --- |
-| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed.** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml` (see Status section above for full log excerpt). | **Fail** | Blocked pending hotfix on `claude/odoo19-install-blocker-fnm5ro`; must be re-run from a clean install after that PR merges — do not mark Pass from code-reading. |
+| VAL-A1 | Clean install/upgrade | Installs/upgrades without error | **Failed (first attempt).** `Failed to load registry` / `ValueError: Invalid field 'category_id' in 'res.groups'` while loading `shopify_connector_security.xml`. **Re-run after PR #103 merged:** install progressed past registry load into Odoo 19 test execution, then **failed with 4 errors** — `ValueError: Invalid field 'groups_id' in 'res.users'` in `test_credential_access`, `test_credential_service`, `test_job_log_system_append`, and `test_test_connection` (see Status section above). | **Fail** | Blocked pending hotfix on `claude/odoo19-test-groups-id-7v35ym`; must be re-run from a clean install after that PR merges — do not mark Pass from code-reading or from this session's static checks alone. |
 | VAL-A2 | Model registry loads | `api.client` abstract (no table); other 3 models intact | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A3 | Three `job_type` values in ORM | Exactly 3 values, no 4th | _TBD_ | _TBD_ | _TBD_ |
 | VAL-A4 | No XML/menu/action/wizard/controller/cron | Zero rows of any kind | _TBD_ | _TBD_ | _TBD_ |

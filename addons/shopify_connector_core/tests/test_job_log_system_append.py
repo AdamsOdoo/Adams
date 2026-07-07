@@ -27,7 +27,7 @@ class TestJobLogSystemAppend(TransactionCase):
         return cls.env['res.users'].create({
             'name': 'Job Log System Append Test %s' % label,
             'login': 'job_log_system_append_test_%s' % label,
-            'groups_id': [(6, 0, [group.id])],
+            'group_ids': [(6, 0, [group.id])],
         })
 
     def _create_job(self):
