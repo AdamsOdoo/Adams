@@ -40,11 +40,11 @@ Task 003  API client shell + test connection                    — merged,
         │   snapshot on store)                                     (VAL-B2
         │                                                           blocked)
         ▼
-Task 004  Readiness check substrate                              — BLOCKED
-          (candidate scope: check registry, essential/warning
-           tiers per DEC-018/MBQ-06, setup_readiness_check jobs,
-           job.log.payload_snapshot per-check results, summary
-           mirrored to store.last_readiness_result/_at)
+Task 004  Readiness check substrate                    — IMPLEMENTATION
+          (candidate scope: check registry, essential/warning    NOT STARTED;
+           tiers per DEC-018/MBQ-06, setup_readiness_check jobs,  gate-opening
+           job.log.payload_snapshot per-check results, summary    REVIEW ONLY
+           mirrored to store.last_readiness_result/_at)          per DEC-021
         │
         ▼
 Task 005  Connection lifecycle actions (activate/disconnect/
@@ -80,6 +80,24 @@ Shopify Token-Acquisition Decision (MBQ-05)
                                     (still requires its own
                                      separate ChatGPT gate act
                                      + §9 task prompt)
+
+  ── DEC-021 deferral branch (2026-07-07) ──────────────────────
+  ChatGPT defers VAL-B2 from the Task 003 → Task 004 gate
+  (DEC-021) — MBQ-05 does NOT close; VAL-B2 is NOT passed
+        │
+        ▼
+  Task 003 conditionally accepted for Task 004 gate-opening
+  REVIEW purposes only (task-003-validation-results.md §5)
+        │
+        ▼
+  Task 004 gate-opening package may be prepared and reviewed
+  (task-004-gate-opening-proposal.md,
+   task-004-readiness-check-substrate-gate.md,
+   task-004-final-implementation-prompt.md) — still requires its
+  own separate ChatGPT gate-opening act before ANY code is written;
+  TD-001 routing is a hard pre-start condition; no customer-facing
+  readiness/activation/wizard/domain-sync claim may depend on the
+  unproven VAL-B2
 ```
 
 This project's tasks never "reach forward" — each task consumes only
@@ -94,16 +112,16 @@ consumes only merged predecessors; no task reaches forward.").
 
 | # | Blocker | Current state | Tracked in |
 | --- | --- | --- | --- |
-| 1 | VAL-B2 (valid-token positive-connection test) | **BLOCKED** — no valid Shopify Admin API token was obtainable this session | `../05-qa/task-003-validation-results.md` |
-| 2 | Task 003 Go/No-Go recommendation | **Not yet determined** — partial results only | `../05-qa/task-003-validation-results.md` §5 |
-| 3 | MBQ-05 (token-acquisition direction) | **Open** — Option C is a Recommendation, not accepted; empirical experiment not yet run | `../04-decisions/shopify-token-acquisition-decision-brief.md`; `master-blueprint-open-questions.md` |
+| 1 | VAL-B2 (valid-token positive-connection test) | **BLOCKED, now formally DEFERRED from the Task 003 → Task 004 gate by [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md) (2026-07-07)** — no valid Shopify Admin API token was obtainable in any session to date; deferral unblocks Task 004 gate-opening *review* only, not implementation, and is not a pass | `../05-qa/task-003-validation-results.md`; `../04-decisions/DEC-021-val-b2-deferral-for-task-004.md` |
+| 2 | Task 003 Go/No-Go recommendation | **Conditionally accepted for Task 004 gate-opening review only, per DEC-021** — not a full Go, not a No-Go; live valid-token connection remains unproven and Task 003 is not fully complete for customer-facing readiness | `../05-qa/task-003-validation-results.md` §5 |
+| 3 | MBQ-05 (token-acquisition direction) | **Open — deferred for Task 004 only, not resolved, per DEC-021.** Option C is still a Recommendation, not accepted; empirical experiment not yet run | `../04-decisions/shopify-token-acquisition-decision-brief.md`; `master-blueprint-open-questions.md` |
 | 4 | Empirical OAuth exchange experiment | **Blocked before execution twice-attempted-scope** — no Fable-equivalent tool/connector and no Shopify Dev Dashboard credentials available in the one session that attempted it | `../05-qa/task-003-validation-results.md` §8; decision brief §10a |
 | 5 | VAL-C1 server-log-grep half | **Not tested** — confirmed by PR #110 (merged) as "not testable in that session's environment" (no live Odoo runtime or log files available); still not tested by any session | `../05-qa/task-003-validation-results.md` |
 | 6 | VAL-A4, VAL-C3, VAL-D1, VAL-D2 | **Statically confirmed by PR #110 (merged)** — repo/source-level evidence only, not live-environment proof | `../05-qa/task-003-static-validation-sweep.md`; `../05-qa/task-003-no-side-effect-baseline.md`; `../05-qa/task-003-server-log-redaction-check.md`; results doc |
 | 6a | VAL-B4–B7, VAL-E1, VAL-G1–G4 | **Not tested / blocked** — unaffected by PR #109 or PR #110 | `../05-qa/task-003-manual-validation-checklist.md`; results doc |
 | 7 | TD-001 (`core_readiness_check` idempotency collision) | **Open**, unrouted beyond its register entry — no gate has yet named it explicitly | `../05-qa/technical-debt-register.md` |
-| 8 | No Task 004 gate-opening act exists | **Not started** — no document analogous to `task-003-api-client-test-connection-gate.md` exists for Task 004 | this repo (absence confirmed) |
-| 9 | No Task 004 final implementation prompt exists | **Not started** | this repo (absence confirmed) |
+| 8 | No Task 004 gate-opening act exists | **Proposal only, not yet accepted** — `task-004-gate-opening-proposal.md` and `task-004-readiness-check-substrate-gate.md` are prepared this session as proposals for ChatGPT review; the gate does **not** open until ChatGPT explicitly accepts and merges a gate-opening act, per the AR-021/AR-026/AR-028 precedent | `task-004-gate-opening-proposal.md`; `task-004-readiness-check-substrate-gate.md` |
+| 9 | No Task 004 final implementation prompt exists | **Draft only, not yet accepted** — `task-004-final-implementation-prompt.md` is prepared this session, marked "DRAFT — DO NOT RUN UNTIL CHATGPT EXPLICITLY APPROVES AFTER REVIEW"; it is not issued and does not authorize any code | `task-004-final-implementation-prompt.md` |
 
 ---
 
@@ -147,16 +165,31 @@ session has a single checklist:
 1. **MBQ-05 closure or explicit deferral** — Option A, B, or C, or an
    explicit "defer, ship Task 004 anyway with VAL-B2 formally re-scoped"
    call — recorded as an MBQ-05 closure note or a proper `DEC-XXX`.
+   **Explicit deferral recorded 2026-07-07 via
+   [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)** —
+   this satisfies the "explicit deferral" branch for Task 004 gate-opening
+   *review* purposes only; it is **not** an MBQ-05 closure and does not
+   decide Option A/B/C. MBQ-05 remains open at the product/architecture
+   level (see `master-blueprint-open-questions.md`).
 2. **Task 003 acceptance** — ChatGPT reviews and classifies
    `task-003-validation-results.md`'s Go/No-Go (§5) as accepted, accepted
    with conditions, or requires further live validation before Task 004 is
-   considered.
+   considered. **Conditionally accepted 2026-07-07 for Task 004
+   gate-opening review purposes only, per DEC-021** — not a full Go, not a
+   No-Go, and not a claim of full completion; ChatGPT's own review of this
+   PR is still the acceptance act being sought.
 3. **TD-001 routing decision** — fold into a future gate by explicit name
    (e.g., the Task 004 gate itself, if ChatGPT so chooses), or schedule as
    its own separate "Task 001B" follow-up patch, per
    `technical-debt-register.md`'s own "owner" column recommendation. Task
    004 must not silently inherit or silently fix TD-001 without a named
-   decision either way.
+   decision either way. **Routing requirement recorded 2026-07-07** in
+   `technical-debt-register.md` and named explicitly in
+   `task-004-gate-opening-proposal.md` /
+   `task-004-readiness-check-substrate-gate.md` — this records that TD-001
+   *must* be routed inside the Task 004 gate; it does not itself decide
+   *whether* Task 004 fixes it or a separate patch does. That choice is
+   still open, pending ChatGPT's review of the gate-opening package.
 4. **MBQ-06 residual thresholds** — the exact readiness-check copy, XML
    IDs, and numeric thresholds must be fixed in whatever future Task 004
    task prompt is issued (already flagged as task-spec detail, not

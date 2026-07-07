@@ -2,6 +2,16 @@
 
 > **DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
 >
+> **Do not use until [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+> is merged and the Task 004 gate is accepted by ChatGPT.** DEC-021
+> (2026-07-07) formally defers VAL-B2 from the Task 003 → Task 004 gate,
+> which allows Task 004 to proceed to **gate-opening review only** — it
+> does **not** authorize any prompt below to be issued. None of these
+> prompts is runnable, and none authorizes code, until a separate Task 004
+> gate-opening act (`../07-implementation-plan/task-004-gate-opening-proposal.md`,
+> `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`) is
+> itself explicitly accepted and merged by ChatGPT.
+>
 > Every prompt below is a **draft candidate only**. None of them is
 > authorized. None of them may be pasted into a Claude Code session and run
 > as-is. Each one requires, at minimum: (1) Task 003 validation accepted by
@@ -19,10 +29,14 @@
 ## Status
 
 Prepared 2026-07-07, docs-only, as part of the Task 004 readiness preflight
-package. Branch `claude/task-004-readiness-preflight-vgbkt3`. This document
-does not open any gate and does not itself constitute a §9 implementation
-task per `CLAUDE.md` §9 — it is a set of **shaped drafts** for whatever
-future session actually writes the binding prompt.
+package. Branch `claude/task-004-readiness-preflight-vgbkt3`; revised
+2026-07-07 on branch `claude/task-004-gate-opening-w3f1zg` to add the
+DEC-021 warning banner above each candidate. This document does not open
+any gate and does not itself constitute a §9 implementation task per
+`CLAUDE.md` §9 — it is a set of **shaped drafts** for whatever future
+session actually writes the binding prompt. **No code is authorized by
+this file, by DEC-021, or by the Task 004 gate-opening package prepared
+alongside it — this document remains draft-only and not runnable.**
 
 None of these prompts says "build the connector," and none authorizes broad
 implementation. Each is deliberately narrow, mirroring the small-PR
@@ -53,7 +67,17 @@ discipline already used for Tasks 002 and 003
 
 ## Candidate 004A — Finalize accepted scope and allowed files only
 
-**DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+> **DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+>
+> **Do not use until [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+> is merged and the Task 004 gate is accepted by ChatGPT.** DEC-021
+> (2026-07-07) formally defers VAL-B2 from the Task 003 → Task 004 gate,
+> which allows Task 004 to proceed to **gate-opening review only** — it
+> does **not** authorize any prompt below to be issued. None of these
+> prompts is runnable, and none authorizes code, until a separate Task 004
+> gate-opening act (`../07-implementation-plan/task-004-gate-opening-proposal.md`,
+> `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`) is
+> itself explicitly accepted and merged by ChatGPT.
 
 > **Purpose:** a docs-only session that converts the candidate scope in
 > `task-004-readiness-preflight.md` §4 into a binding, ChatGPT-accepted Task
@@ -118,7 +142,17 @@ Task 004 gate-preparation work. Stop at the scoped boundary; do not draft
 
 ## Candidate 004B — Create skeleton only, if authorized
 
-**DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+> **DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+>
+> **Do not use until [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+> is merged and the Task 004 gate is accepted by ChatGPT.** DEC-021
+> (2026-07-07) formally defers VAL-B2 from the Task 003 → Task 004 gate,
+> which allows Task 004 to proceed to **gate-opening review only** — it
+> does **not** authorize any prompt below to be issued. None of these
+> prompts is runnable, and none authorizes code, until a separate Task 004
+> gate-opening act (`../07-implementation-plan/task-004-gate-opening-proposal.md`,
+> `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`) is
+> itself explicitly accepted and merged by ChatGPT.
 
 > **Purpose:** once 004A's gate-opening act is merged, create the minimal
 > readiness-service model/registry skeleton — no check logic, no tests
@@ -186,7 +220,17 @@ designated branch, then STOP. Do not start 004C in this session.
 
 ## Candidate 004C — Add tests only, if authorized
 
-**DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+> **DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+>
+> **Do not use until [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+> is merged and the Task 004 gate is accepted by ChatGPT.** DEC-021
+> (2026-07-07) formally defers VAL-B2 from the Task 003 → Task 004 gate,
+> which allows Task 004 to proceed to **gate-opening review only** — it
+> does **not** authorize any prompt below to be issued. None of these
+> prompts is runnable, and none authorizes code, until a separate Task 004
+> gate-opening act (`../07-implementation-plan/task-004-gate-opening-proposal.md`,
+> `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`) is
+> itself explicitly accepted and merged by ChatGPT.
 
 > **Purpose:** once 004B's skeleton is merged and reviewed, add the actual
 > essential/warning check implementations and their tests — one session,
@@ -261,7 +305,17 @@ in this session.
 
 ## Candidate 004D — UI/config only, if authorized
 
-**DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+> **DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+>
+> **Do not use until [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+> is merged and the Task 004 gate is accepted by ChatGPT.** DEC-021
+> (2026-07-07) formally defers VAL-B2 from the Task 003 → Task 004 gate,
+> which allows Task 004 to proceed to **gate-opening review only** — it
+> does **not** authorize any prompt below to be issued. None of these
+> prompts is runnable, and none authorizes code, until a separate Task 004
+> gate-opening act (`../07-implementation-plan/task-004-gate-opening-proposal.md`,
+> `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`) is
+> itself explicitly accepted and merged by ChatGPT.
 
 > **Purpose:** placeholder for any UI/config surface Task 004 might
 > eventually need (e.g., surfacing readiness results on a future
@@ -311,7 +365,17 @@ opened the UI implementation gate. Stop at the scoped boundary.
 
 ## Candidate — Rollback/review prompt
 
-**DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+> **DRAFT — DO NOT USE UNTIL CHATGPT UNBLOCKS TASK 004.**
+>
+> **Do not use until [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
+> is merged and the Task 004 gate is accepted by ChatGPT.** DEC-021
+> (2026-07-07) formally defers VAL-B2 from the Task 003 → Task 004 gate,
+> which allows Task 004 to proceed to **gate-opening review only** — it
+> does **not** authorize any prompt below to be issued. None of these
+> prompts is runnable, and none authorizes code, until a separate Task 004
+> gate-opening act (`../07-implementation-plan/task-004-gate-opening-proposal.md`,
+> `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`) is
+> itself explicitly accepted and merged by ChatGPT.
 
 > **Purpose:** a standing prompt for a dedicated review/rollback session,
 > to be used if any Task 004 stage (004B/004C/004D) needs to be reverted or

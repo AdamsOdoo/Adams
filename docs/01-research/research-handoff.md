@@ -1,5 +1,140 @@
 # Research Handoff (rolling)
 
+### VAL-B2 Deferral / Task 004 Gate-Opening Package — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/task-004-gate-opening-w3f1zg`, branched from
+  `Shopify-connector` at PR #111's merge commit
+  `43f3b2a923a420e523cd2ec2662a46e2a9abed26` → draft PR into
+  `Shopify-connector` (this session's PR, not merged, not marked ready).
+  Docs-only session — no code, test, manifest, security, XML, CSV,
+  migration, or CI file of any kind changed. **No addons/ file touched. No
+  OAuth implementation. No setup-wizard implementation. No lifecycle
+  activation/disconnect/reconnect implementation. No product/customer/
+  order/inventory/fulfillment implementation.**
+- **Decision recorded:** ChatGPT's control-room decision that **VAL-B2 is
+  deferred for the Task 003 → Task 004 gate only** — recorded in the new
+  [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md).
+  VAL-B2 is **not passed, not failed, and not waived**. MBQ-05 (the
+  token-acquisition direction) is **deferred for Task 004 only, not
+  resolved** as a final MVP strategy. This deferral permits Task 004 to
+  proceed to **gate-opening review only** — it does not authorize Task 004
+  implementation.
+- **Files changed:**
+  - `docs/04-decisions/DEC-021-val-b2-deferral-for-task-004.md` (new) —
+    the formal deferral decision record.
+  - `docs/05-qa/task-003-validation-results.md` — §5 Go/No-Go updated from
+    "not yet determined" to conditional acceptance for Task 004
+    gate-opening review only, per DEC-021; §7 Handoff updated to match. No
+    existing evidence, and no PR #109/#110 addendum content, was deleted
+    or weakened.
+  - `docs/04-decisions/shopify-token-acquisition-decision-brief.md` — new
+    §11 "ChatGPT deferral decision for Task 004 gate" appended; §§1–10
+    unchanged.
+  - `docs/03-architecture/master-blueprint-open-questions.md` — MBQ-05 row
+    updated to record the DEC-021 deferral ("Deferred for Task 004 / still
+    required before customer-facing setup"); not marked resolved; open
+    substance preserved.
+  - `docs/05-qa/technical-debt-register.md` — TD-001's Owner/Target
+    resolution columns updated with an explicit Task-004-gate routing
+    note; TD-001 not marked fixed, not closed, still `Open`.
+  - `docs/07-implementation-plan/task-004-readiness-preflight.md`,
+    `task-004-dependency-map.md`, `docs/05-qa/task-004-quality-gates.md`,
+    `docs/06-prompts/task-004-candidate-claude-prompts.md` — updated from
+    "Task 004 remains blocked pending VAL-B2/MBQ-05" to: Task 004
+    implementation is still not started; Task 004 may proceed to
+    gate-opening review because VAL-B2 is formally deferred by ChatGPT via
+    DEC-021; Task 004 still requires its own separate gate-opening act and
+    final implementation prompt; TD-001 routing remains a hard pre-start
+    condition; no customer-facing readiness/activation/wizard/domain-sync
+    claim may depend on the unproven VAL-B2. Candidate prompts remain
+    draft-only, not runnable, now with a prominent "do not use until
+    DEC-021 is merged and the Task 004 gate is accepted by ChatGPT"
+    warning on every candidate.
+  - `docs/07-implementation-plan/task-004-gate-opening-proposal.md` (new)
+    — the Task 004 gate-opening proposal (readiness-check-substrate
+    objective, included/excluded scope, gate conditions).
+  - `docs/07-implementation-plan/task-004-readiness-check-substrate-gate.md`
+    (new) — the proposed gate document itself (exact constraints,
+    non-goals, TD-001 route, MBQ-05 deferral conditions, acceptance
+    criteria, test/rollback expectations, definition of done). **PROPOSED,
+    NOT YET ACCEPTED** — does not open the gate.
+  - `docs/07-implementation-plan/task-004-final-implementation-prompt.md`
+    (new) — a draft future Claude Code prompt for Task 004 implementation,
+    marked "DRAFT — DO NOT RUN UNTIL CHATGPT EXPLICITLY APPROVES AFTER
+    REVIEW," with `<PLACEHOLDER>`s for exact allowed files and TD-001
+    disposition.
+  - `docs/05-qa/task-004-manual-validation-checklist.md` (new) — a future
+    manual validation checklist for Task 004, marked not executed (no Task
+    004 code exists yet).
+  - `docs/01-research/research-handoff.md` (this entry).
+- **What changed:** ChatGPT's VAL-B2 deferral decision is now recorded in
+  writing (DEC-021) and threaded consistently through every file that
+  previously stated Task 004 was blocked pending VAL-B2/MBQ-05. A complete
+  Task 004 gate-opening *review* package now exists (proposal, gate
+  document, draft final implementation prompt, future manual validation
+  checklist) for ChatGPT to review. TD-001 is routed — named explicitly as
+  a hard pre-start condition for the Task 004 gate — but not fixed.
+- **What remains unresolved:**
+  - **VAL-B2** — still not passed, not failed, not waived; still requires
+    a real, valid Shopify Admin API token to actually execute.
+  - **MBQ-05** — still open; deferred for Task 004 gate-opening review
+    only, not resolved as a final token-acquisition strategy.
+  - **OAuth/token acquisition** — still not attempted since PR #109's
+    blocked-before-execution record; no Fable-equivalent tool or Shopify
+    Dev Dashboard credentials were available to this session either (not
+    re-attempted this session — this was a docs-governance session, not a
+    token-acquisition session).
+  - **Customer-facing setup readiness** — still not ready; the connector
+    must not claim customer-facing setup readiness until VAL-B2 or an
+    accepted replacement validation passes, per DEC-021 §4.
+  - **TD-001** — routed explicitly to the Task 004 gate, but **not
+    fixed**; its disposition (fixed-in-scope vs. separate pre-Task-004
+    patch) remains an open choice for ChatGPT's review of the gate
+    document.
+- **Task 004 status after this PR:** ready for **gate-opening review
+  only**, and only after ChatGPT accepts/merges this PR (and, separately,
+  reviews and accepts
+  `task-004-readiness-check-substrate-gate.md`). **Not
+  implementation-started.** **No code authorized** by this PR, by DEC-021,
+  or by any document in this package.
+- **No code changed:** confirmed. This session touched only the Markdown
+  files listed above; `addons/`, and every `*.py`/`*.xml`/`*.csv`/manifest/
+  security/test/migration/CI file, are unchanged.
+- **No secret exposed / no Shopify or Odoo side effects:** confirmed
+  (vacuously) — no Shopify, Odoo, or credential interaction of any kind
+  occurred this session.
+- **Learning feedback loop:** New issues / repeated patterns: none this
+  session — this was a straightforward decision-recording and
+  gate-package-preparation session, not a research or validation session.
+  Rules/checklists updated: none beyond the files listed above. Rejected
+  approaches: none — no approach was rejected this session; nothing in
+  `rejected-approaches-log.md` was re-proposed. Technical debt: TD-001
+  unchanged in substance (still `Open`), only its routing note updated.
+  Architecture concerns: none new. Tests or review gates needed: ChatGPT's
+  own review and explicit acceptance of
+  `task-004-readiness-check-substrate-gate.md` is the next required gate,
+  per its own "Explicit acceptance requirement" section. Should future
+  prompts change? Yes — any future Task 004 implementation prompt must be
+  issued only after that acceptance, with TD-001's disposition filled in
+  exactly as ChatGPT names it.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (none) · technical debt
+  logged (routing note only, not a fix) · repeated-issue escalation
+  applied (n/a) — all YES.
+- **Next recommended session:** ChatGPT reviews this Task 004 gate-opening
+  package — `DEC-021`, the updated Task 003 Go/No-Go, the updated MBQ-05
+  row, the TD-001 routing note, and the three new gate-opening documents.
+  **Only if ChatGPT explicitly accepts and merges
+  `task-004-readiness-check-substrate-gate.md`** should a separate,
+  future session issue the Task 004 final implementation prompt (filling
+  in its remaining `<PLACEHOLDER>`s, including TD-001's disposition) as
+  its own scoped coding session.
+- **Stop condition:** stopped at the scoped boundary — docs-only session;
+  no code, test, manifest, security, XML, CSV, migration, or CI file
+  touched; no addons/ file touched; Task 004 not marked implemented; no
+  claim that VAL-B2 passed or that MBQ-05 is resolved; this session did
+  not merge its own PR.
+
 ### Task 003 Static/Offline Validation Sweep — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/task-003-static-validation-cszl88` → **PR #110**,
