@@ -103,8 +103,8 @@
 > but not authorized; working branch created from that merge commit.
 
 - **Branch / PR:** `claude/task-002-decision-gate-pack-0mlsgf` → draft
-  PR into `Shopify-connector` (PR number recorded in a follow-up
-  handoff note after opening; remains draft, not merged).
+  PR #94 into `Shopify-connector`
+  (https://github.com/AdamsOdoo/Adams/pull/94; draft, not merged).
 - **Files created:**
   `docs/07-implementation-plan/task-002-decision-closure.md` (AR-025
   decision package),
