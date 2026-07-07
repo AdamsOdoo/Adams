@@ -49,6 +49,12 @@ class ShopifyConnectorStore(models.Model):
         readonly=True,
     )
     last_readiness_at = fields.Datetime(readonly=True)
+    credential_present = fields.Boolean(default=False, readonly=True)
+    credential_last_verified_at = fields.Datetime(readonly=True)
+    credential_last_replaced_at = fields.Datetime(readonly=True)
+    credential_last_failure_reason = fields.Char(readonly=True)
+    granted_scopes = fields.Text(readonly=True)
+    granted_scopes_checked_at = fields.Datetime(readonly=True)
 
     _sql_constraints = [
         (
