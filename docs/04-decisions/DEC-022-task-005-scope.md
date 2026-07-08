@@ -72,18 +72,28 @@ and §7/§8 below are updated accordingly.
   acceptance recorded (PR #116, merge commit
   `f4a6ace519bed1073d9b76e0fd91823e03ab7a59`); TD-001 is Resolved.
 - VAL-B2 remains deferred, not passed
-  (`DEC-021-val-b2-deferral-for-task-004.md`). MBQ-05 remains open, not
-  resolved (`../03-architecture/master-blueprint-open-questions.md`).
-- **PR #117 / DEC-023 is the separate token-acquisition / VAL-B2 proposal
-  track** (branch `claude/token-acquisition-val-b2-5zi8bg`, proposing
-  `DEC-023-token-acquisition-and-val-b2.md` and a `val-b2-closure-plan.md`).
-  **DEC-023 remains Proposed, not accepted, unless a future ChatGPT decision
-  explicitly accepts it** — whether PR #117 itself is draft, merged, or
-  later updated does not change that status. This decision proposal treats
-  PR #117/DEC-023 as an active, unresolved parallel track, not as settled
-  input (per the session instruction that produced this document: "do not
-  make final token-acquisition assumptions... treat PR #117 as an active
-  dependency/risk, not an accepted decision").
+  (`DEC-021-val-b2-deferral-for-task-004.md`). MBQ-05 remains partially
+  routed / open, not fully resolved
+  (`../03-architecture/master-blueprint-open-questions.md`, as updated by
+  PR #119).
+- **PR #117 merged the separate DEC-023 token-acquisition / VAL-B2 proposal
+  package** (branch `claude/token-acquisition-val-b2-5zi8bg`, carrying
+  `DEC-023-token-acquisition-and-val-b2.md` and `val-b2-closure-plan.md`).
+  **PR #119 later accepted DEC-023, but only in limited scope, as a
+  routing decision** — not as a final token-acquisition-strategy decision.
+  DEC-023 is accepted only for: (a) the staged VAL-B2 closure plan as the
+  next evidence path to attempt, and (b) one-store / same-Plus-org /
+  private-customer / VAL-B2-evidence-gathering use of Custom
+  Distribution/manual OAuth. **DEC-023 does not decide the final, scalable
+  many-unrelated-customer distribution architecture** — that remains a
+  separate, unevaluated, gated research/decision task. **DEC-023 does not
+  fully resolve MBQ-05, does not pass VAL-B2, and does not authorize
+  OAuth, a setup wizard, a UI, or sync implementation of any kind.** None
+  of this changes Task 005's scope: Task 005's lifecycle actions call the
+  existing Task 003/004 test-connection/readiness substrate and do not
+  implement token acquisition, so Task 005 remains independent of
+  whichever final token-acquisition/distribution architecture DEC-023's
+  still-open branch eventually resolves to.
 - The existing accepted `credential-connection-foundation-task-plan.md`
   (AR-024, accepted by ChatGPT at implementation-planning level, PR #92,
   2026-07-06) already names "Task 005" as "Connection lifecycle actions" and
@@ -103,7 +113,7 @@ Six candidates were compared in full in
 
 | Option | Summary | Why not chosen as Task 005 |
 | --- | --- | --- |
-| A. Token acquisition / VAL-B2 closure | Close VAL-B2 with live evidence, or decide a durable OAuth architecture | Not a codeable implementation task; covered separately by PR #117/DEC-023 (Proposed, not accepted, regardless of PR #117's own merge status); would pre-empt DEC-023's review and MBQ-05's resolution |
+| A. Token acquisition / VAL-B2 closure | Close VAL-B2 with live evidence, or decide a durable OAuth architecture | Not a codeable implementation task; covered separately by the DEC-023 track (PR #117, merged; DEC-023 later accepted only in limited routing scope via PR #119); would pre-empt DEC-023's still-open scalable-distribution-architecture decision and MBQ-05's full resolution |
 | B. Setup wizard / connection UX | Build the 11-step wizard UI | Already named "Task 006 (horizon only)" in the accepted foundation plan; requires the still-closed UI implementation gate and Task 005 itself as a prerequisite |
 | C. Queue/job runner execution layer | Build a dedicated job-execution substrate | No accepted document names this as a discrete future task; the core job/queue substrate already exists from Task 001 |
 | D. Store configuration/readiness display | Build a Dashboard-style readiness UI | UI work requiring the closed UI gate; depends on state fields Task 005 has not yet created |
@@ -139,8 +149,9 @@ None of Options A–E is a **rejected approach** in the
 was evaluated on its technical merits and refused. All five are **deferred
 by sequencing**, not rejected:
 
-- **Option A** is not deferred by this decision at all — it proceeds on its
-  own separate track (PR #117/DEC-023), unaffected by whichever way Task 005
+- **Option A** is not deferred by this decision at all — it proceeded on
+  its own separate track (PR #117, merged; DEC-023 accepted only in
+  limited routing scope via PR #119), unaffected by whichever way Task 005
   is scoped.
 - **Options B and D** become buildable once Task 005 merges and the UI
   implementation gate separately opens (AR-023).
@@ -186,8 +197,11 @@ reasoning above.
   [`task-005-connection-lifecycle-gate.md`](../07-implementation-plan/task-005-connection-lifecycle-gate.md)**.
 - A final Task 005 implementation task prompt — **still not yet written**;
   a separate, later ChatGPT act, per `CLAUDE.md` §9.
-- **Not** dependent on PR #117/DEC-023's acceptance, revision, or rejection
-  (see `task-005-gate-proposal.md` §16 for the full interaction analysis).
+- **Not** dependent on DEC-023's limited-scope routing acceptance (PR #119)
+  or on its still-open scalable-distribution-architecture branch (see
+  `task-005-gate-proposal.md` §16 for the full interaction analysis) —
+  Task 005's lifecycle actions call the existing Task 003/004 substrate
+  and do not implement token acquisition.
 
 ## 8. Explicit non-claims
 
@@ -229,7 +243,10 @@ except by later ChatGPT/control-room instruction.
 - `../04-decisions/DEC-021-val-b2-deferral-for-task-004.md` — VAL-B2/MBQ-05
   deferred status, unchanged.
 - `../05-qa/architecture-review-log.md` — AR-024 acceptance record.
-- PR #117 / DEC-023, the separate token-acquisition/VAL-B2 proposal track
-  (`claude/token-acquisition-val-b2-5zi8bg`) — access: Accessible via GitHub
-  API, observed 2026-07-08 (its draft/merge state may change after this
-  date; see §7/§8 above for why that does not affect this decision).
+- PR #117 (merged), the separate token-acquisition/VAL-B2 proposal package
+  (`claude/token-acquisition-val-b2-5zi8bg`, `DEC-023-token-acquisition-and-val-b2.md`)
+  — access: Accessible via GitHub API, observed 2026-07-08.
+- PR #119 (merged), merge commit
+  `eb5d8d91b46c4b3e21c1387eee03bc9688b773e6` — ChatGPT's limited-scope
+  routing acceptance of DEC-023 and the corresponding MBQ-05 register-row
+  update — access: Accessible via GitHub API, observed 2026-07-08.
