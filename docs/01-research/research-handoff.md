@@ -1,5 +1,102 @@
 # Research Handoff (rolling)
 
+### Task 006A — sync engine source research and evidence map — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006a-sync-engine-research-zj7pmv`, based on
+  latest `origin/Shopify-connector` (merge commit
+  `9247fea3c36afdb761a82678f3e5e66e8ef42e87`, PR #122) → target
+  `Shopify-connector`, **draft**, opened this session.
+- **Files created (all docs-only, per the allowed-files list):**
+  - `docs/01-research/sync-engine-source-inventory.md` — 60-source reliability-graded inventory.
+  - `docs/01-research/sync-engine-source-notes.md` — detailed source-backed notes across all required sections.
+  - `docs/01-research/sync-engine-evidence-map.md` — the 18 mandatory claims plus 6 supplementary findings, each mapped to graded evidence.
+  - `docs/05-qa/sync-engine-open-questions.md` — 39 open questions, categorized per the required section structure.
+  - `docs/05-qa/sync-engine-risk-register.md` — 7 evidence-backed risks (created; judged warranted given the volume of concurrency/performance findings).
+  - `docs/01-research/research-handoff.md` — this entry.
+- **Source categories researched:** repo code (job/log/store/credential/
+  readiness models, tests), repo governance/decision docs (DEC-005, DEC-009,
+  AR-003/AR-006 acceptance status, core-naming-schema-planning §8/§9,
+  master-blueprint-core-substrate §A.5/§I/§K.2, MBQ register, rejected-
+  approaches log), existing repo research syntheses (Shopify/Odoo official-
+  source notes), fresh official Shopify docs (cursor pagination/connections,
+  bulk operations incl. cancellation/error-handling, webhooks, idempotency —
+  re-verified 2026-07-08), fresh official Odoo 19.0 docs/source (transactions/
+  rollback/savepoints, concurrency/locking, `ir.cron` failure model — a
+  genuine prior gap), OCA `queue_job` (first full source read this project
+  has done — reference pattern only, RA-004 unchanged), and reputable
+  engineering references (Stripe idempotency, AWS Builders' Library,
+  Google SRE book, AWS SQS DLQ docs, OWASP Logging Cheat Sheet).
+- **Key high-confidence findings:**
+  - The core job/log/store-gating substrate (Tasks 001–005) already
+    satisfies most "mandatory claims" (idempotency key, serialization guard,
+    inspectable append-only logs, redaction-at-write-path, store-state
+    gating) at the *implementation* level, not just design intent.
+  - **New, quantified constraint**: Odoo's official coding guidelines cap
+    per-transaction savepoints at ~64 before PostgreSQL performance
+    degrades — directly load-bearing for DEC-005's per-record-savepoint
+    design and not previously in this project's research corpus.
+  - Odoo's automatic RPC-layer serialization-retry (`retrying()`) does
+    **not** extend to a cron job's own record-processing code — a future
+    sync-engine cron batch must handle conflicts itself (locking and/or
+    retry), a genuine prior research gap now filled.
+  - The Shopify 25,000-object pagination cap is **Liquid/Storefront-only**,
+    not Admin GraphQL — corrects an ambiguity the pre-006A baseline had left
+    open.
+  - Odoo `ir.cron` has **no dead-letter concept** at all (no persisted
+    error/traceback field, no redrive) — this repo's own job state machine
+    already independently fills that gap.
+- **Key low-confidence/uncertain areas:**
+  - **Discrepancy, not resolved:** existing DEC-009/AR-006 research cites
+    "17" `@idempotent` mutations; this session's fresh fetch counts 16 named
+    mutations on Shopify's own (self-dated) list. Flagged for
+    re-verification, does not block core-engine research.
+  - Whether the Task-005 disconnect-cancellation sweep fully closes the race
+    against a job already `running` at the instant of disconnect —
+    unproven by any source, requires live Odoo.sh proof.
+  - Cursor-pagination resumability across a paused sync of unspecified
+    length is undocumented by Shopify.
+  - "Lite/Full" packaging has **no existing concept** in this repo beyond
+    the already-accepted per-domain-enablement-flag mechanism — flagged as
+    a genuine gap between the task's framing and current repo state.
+- **No implementation performed.** No addon file, Python, XML, CSV,
+  manifest, security, migration, CI, controller, view, wizard, OAuth, or
+  domain-sync code was created or modified. No architecture-decision file
+  (`docs/03-architecture/sync-engine-architecture-gate.md`) or
+  implementation-scope file was created. No DEC-025 was created. VAL-B2
+  remains deferred/not passed; MBQ-05 remains partially routed/open; TD-002
+  remains Open — all unmodified by this session.
+- **Learning feedback loop:**
+  - New issues discovered: the 16-vs-17 `@idempotent` mutation-count
+    discrepancy (see open-questions #4); the Liquid/Storefront-only scope
+    of the 25,000-object pagination cap (a correction, not a defect).
+  - Repeated issue patterns: none — this was a research-only session, no
+    code to regress.
+  - Rules/checklists updated: none (outside this session's allowed-files
+    scope).
+  - New rejected approaches: none — RA-004 (OCA `queue_job` not the Phase 1
+    default) checked and confirmed unchanged by this session's full source
+    read of `queue_job` (kept as reference pattern only).
+  - New technical debt: none logged by this session (research-only; any
+    future debt is for the implementation task that eventually acts on this
+    research).
+  - Architecture concerns: whether the future job-drain concurrent-
+    acquisition mechanism should reuse Odoo's `lock_for_update()`/`SKIP
+    LOCKED` pattern (open, routed to a future architecture gate, not this
+    session).
+  - Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** ChatGPT review of this Task 006A research package. If
+  accepted, a separate Task 006B architecture-gate session (not this one)
+  would be the next place any sync-engine design decision could be proposed
+  — this session proposes none.
+- **Stop condition:** docs-only research session, stopped after opening a
+  draft PR against `Shopify-connector`. No code touched. No merge performed.
+  Awaiting ChatGPT review.
+
+---
+
 ### Task 005 closure — connection lifecycle merged (PR #121) — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-closure-docs-s5d9mf` (docs-only closure) →
