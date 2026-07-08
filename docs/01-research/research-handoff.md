@@ -1,5 +1,602 @@
 # Research Handoff (rolling)
 
+### Task 005 PR #121 revision — Odoo.sh runtime failure fix (lifecycle state invalidation gap) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store_credential.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `addons/shopify_connector_core/tests/test_credential_service.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched.
+- **What changed:** Odoo.sh runtime re-validation after Revision 4 found
+  **1 remaining failure**:
+  `TestConnectionLifecycle.test_activate_rejects_stale_evidence_after_credential_replace`
+  (`AssertionError: 'connected' == 'connected'`). **Root cause:**
+  `action_replace_token()` cleared `credential_last_verified_at` (correctly
+  invalidating the verification evidence) but left `store.state` as
+  `'connected'` — a real product risk, since Task 005 business-job gating
+  keys off `store.state == 'connected'`, so a connected store left
+  connected after its credential changed could let sync jobs run against
+  an unverified changed credential. **Fixed** by adding lifecycle state
+  invalidation inside the credential service itself (no jobs/logs
+  created, no `sudo()`, no `access_token` read):
+  - `action_set_token()` / `action_replace_token()`: a `'connected'` store
+    also moves to `'reconnect_needed'`.
+  - `action_clear_token()`: a `'connected'` or `'reconnect_needed'` store
+    also moves to `'disconnected'`. `action_disconnect()`'s own follow-up
+    `state='disconnected'` write remains a fine, idempotent no-op on top
+    of this.
+  Tests updated: `test_activate_rejects_stale_evidence_after_credential_replace`
+  and `test_activate_rejects_stale_evidence_after_action_set_token_update`
+  now assert `store.state == 'reconnect_needed'` after the credential
+  mutation (the latter no longer manually moves state before calling
+  `action_set_token()` — the service does it); a new
+  `test_credential_service_clear_token_sets_state_disconnected_directly`
+  test calls `action_clear_token()` directly (not via
+  `action_disconnect()`) and asserts `state == 'disconnected'` with no
+  job/log rows created. `test_credential_service.py` gained four focused
+  tests covering the same three transitions plus the no-job/no-log
+  guarantee under a `'connected'`/`'reconnect_needed'` starting state
+  (the existing `test_no_job_or_job_log_rows_written` was left unchanged,
+  not weakened). **No scope expansion** — no OAuth/setup wizard/UI/
+  sync/domain implementation, no security/ACL change, no new job state/
+  type/source, no new `sudo()`, no new schema field, no `access_token`
+  read/log. Revision 4's `action_activate()` requirements and the
+  Revision 1 `action_reconnect()` missing-credential fix remain
+  untouched and confirmed intact.
+- **Local validation performed:** `python -m py_compile` on all three
+  changed Python files — passes. **No Odoo runtime is available in this
+  session's container**, so the updated test suite was not re-executed
+  here — stated honestly; Odoo.sh validation is requested again via the
+  same command:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`
+  (focused: `--test-tags /shopify_connector_core:TestConnectionLifecycle`).
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+
+---
+
+### Task 005 PR #121 revision — Odoo.sh runtime failure fix (brittle write_date guard) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/models/shopify_connector_store_credential.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched.
+- **What changed:** Odoo.sh runtime validation (the first actual
+  in-Odoo test run of this PR) **failed 5 tests**, all for the same
+  reason: `action_activate()`'s `credential.write_date >
+  credential_last_verified_at` freshness guard (added in the prior
+  revision) raised "Cannot activate: the stored credential changed
+  after the last verification" even on legitimately fresh evidence --
+  `test_activate_succeeds_with_pass_and_pass`,
+  `_succeeds_with_pass_and_warning`, and all three
+  `_rejects_stale_evidence_after_*` tests. **Root cause**: comparing a
+  credential row's own `write_date` against a manually/test-seeded
+  `credential_last_verified_at` is brittle against real DB write timing
+  under Odoo.sh -- a purely static/unit-test-level guard that never ran
+  in an actual Odoo runtime until now. **Fixed** by removing the
+  `write_date` comparison entirely and instead closing the same
+  stale-evidence path at its real source: `action_set_token()` (in
+  `shopify_connector_store_credential.py`) now clears
+  `credential_last_verified_at` on every token set/update -- including
+  updating an *existing* credential row -- exactly mirroring
+  `action_replace_token()`'s existing behavior, so a token silently
+  overwritten via `action_set_token()` can no longer activate on
+  pass/pass evidence recorded for the value it replaced. `action_
+  activate()` also gained a readiness-freshness requirement:
+  `last_readiness_at` must be truthy and not older than
+  `credential_last_verified_at` -- otherwise a readiness pass recorded
+  *before* the current credential was verified could incorrectly count
+  as evidence for it. Full accepted check order: `credential_present` →
+  credential row exists → `credential_last_verified_at` truthy →
+  `last_test_connection_result == 'pass'` → `last_readiness_result in
+  ('pass', 'warning')` → `last_readiness_at` truthy and `>=
+  credential_last_verified_at`. Raises `UserError` before any write on
+  any failure; no audit job on rejection; no Shopify call; no readiness
+  run. Tests updated: all successful-activation setups now seed
+  `last_readiness_at` (via a new `_seed_verified_evidence()` helper that
+  stamps both `credential_last_verified_at`/`last_readiness_at` from the
+  same timestamp, deterministically satisfying `>=`); the
+  `action_set_token`-stale-evidence test was rewritten to prove
+  `credential_last_verified_at` clears (not `write_date` comparison);
+  two new tests added --
+  `test_activate_rejects_stale_readiness_evidence_before_verification`
+  (10-minute deterministic gap) and
+  `test_activate_rejects_missing_readiness_at`. The prior
+  `action_reconnect()` missing-credential transaction-safety fix
+  (Revision 1) remains untouched and confirmed intact. **No scope
+  expansion** -- no OAuth/setup wizard/UI/sync/domain implementation, no
+  security/ACL change, no new job state/type/source, no new `sudo()`, no
+  new schema field, no `access_token` read/log.
+- **Local validation performed:** `python -m py_compile` on all three
+  changed Python files -- passes. **No Odoo runtime is available in this
+  session's container**, so the updated test suite was not re-executed
+  here -- stated honestly; Odoo.sh validation is requested again via the
+  same command:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`
+  (focused: `--test-tags /shopify_connector_core:TestConnectionLifecycle`).
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the `credential.write_date` freshness guard
+    was a genuine runtime defect (not merely a style nit) -- it passed
+    every static review and `py_compile` check across three prior
+    revisions, and only Odoo.sh's actual test execution exposed it. This
+    is the first defect in this PR's history that a static-only review
+    process (including the earlier adversarial-review workflow) could
+    not have caught, since it depended on real Postgres `write_date`
+    timestamp-column write timing, not reproducible via source
+    inspection alone.
+  - Repeated issue patterns: the credential-service stale-evidence
+    pattern (flagged across Revisions 2–3) is now closed at its actual
+    source (`action_set_token`/`action_replace_token` both clear
+    `credential_last_verified_at`) rather than via a derived-timestamp
+    comparison -- a more robust fix than the one it replaces.
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope) -- flagged for a future docs-scoped session: **any freshness
+    guard comparing ORM-managed timestamp fields (`write_date`,
+    `create_date`) against manually-stamped fields should be treated as
+    requiring actual Odoo-runtime validation before being trusted, not
+    just `py_compile`/static review** -- this is the concrete lesson
+    from this failure.
+  - New rejected approaches: comparing `credential.write_date` to
+    `credential_last_verified_at` as an activation freshness gate is now
+    a rejected mechanism for this codebase (superseded by clearing
+    `credential_last_verified_at` at the credential-service source plus
+    the new `last_readiness_at` freshness check) -- not logged to
+    `rejected-approaches-log.md` since that file is out of this
+    revision's allowed-files scope; flagged here for a future
+    docs-scoped session to formalize if warranted.
+  - New technical debt: none.
+  - Tests or review gates needed: **runtime validation (Odoo.sh or a
+    local Odoo instance) should run at least once before any future
+    "static review accepted" milestone is treated as sufficient for
+    merge** -- this failure is the concrete evidence for that gate,
+    consistent with the "prepare for runtime validation" session that
+    immediately preceded this one.
+  - Should future prompts change? Yes, for future timestamp-comparison
+    guards specifically: prefer clearing/invalidating a dependent field
+    at its mutation source over deriving freshness from a second,
+    independently-managed timestamp field, per the lesson above.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (noted above, not yet
+  formalized in the log file -- out of scope) · technical debt logged
+  (n/a) · repeated-issue escalation applied (noted above) — all YES.
+- **Next step:** re-run Odoo.sh runtime validation against this revised
+  commit; report the result back for ChatGPT re-review.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; no merge; PR remains draft, not marked ready for
+  review.
+
+### Task 005 PR #121 revision — stale activation evidence after action_set_token() update — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched — the credential model (`shopify_connector_store_credential.py`)
+  was explicitly not edited, per this session's instructions.
+- **What changed:** ChatGPT's re-review of PR #121 found a remaining
+  stale-evidence path in `action_activate()`, distinct from the one
+  fixed in the prior revision: `action_set_token()` can update an
+  *existing* credential row (re-entering/correcting a token) without
+  clearing `credential_last_verified_at` at all — unlike
+  `action_replace_token()`, which does clear it. So the truthy-only
+  `credential_last_verified_at` check added in the previous revision was
+  not enough: a token silently overwritten via `action_set_token()`
+  could still activate on pass/pass evidence recorded for the credential
+  value it replaced. **Fixed** by adding a credential-row-freshness
+  check to `action_activate()`, in order: `credential_present` →
+  credential row exists (searched via the normal ORM, no `sudo()`, no
+  `access_token` read) → `credential_last_verified_at` truthy →
+  credential row's `write_date` not newer than
+  `credential_last_verified_at` → `last_test_connection_result == 'pass'`
+  → `last_readiness_result in ('pass', 'warning')`. Raises `UserError`
+  before any write on any failure; leaves state unchanged; creates no
+  audit job on rejection; no Shopify call; no readiness run; no
+  credential mutation. Added
+  `test_activate_rejects_stale_evidence_after_action_set_token_update`
+  (activates once with fresh verified evidence, moves state away from
+  `connected`, deterministically backdates `credential_last_verified_at`
+  by 10 minutes to avoid same-second flakiness, overwrites the
+  credential via `action_set_token()`, confirms the mirrors stay
+  stale/`credential.write_date` is newer than `credential_last_verified_at`,
+  confirms the second `action_activate()` raises and does not connect,
+  confirms no new audit job). All existing activate tests already seed
+  `credential_last_verified_at` via `fields.Datetime.now()` called
+  strictly after the credential's creation in the same test method, so
+  each already satisfies the new freshness check without modification
+  (verified by inspection, not assumed). The prior
+  `action_reconnect()`/`action_activate()` fixes (Revisions 1–2) are
+  untouched and confirmed intact. **No scope expansion** — no OAuth/
+  setup wizard/UI/sync/domain implementation, no security/ACL change, no
+  new job state/type/source, no new `sudo()`, no credential-model edit.
+- **Local validation performed:** `python -m py_compile` on both changed
+  Python files — passes. **No Odoo runtime is available in this session's
+  container**, so the test suite was not executed here — stated honestly;
+  the same Odoo.sh/manual validation command from the original PR #121
+  handoff entry still applies:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the `action_set_token()`-update stale-
+    evidence path above, found by ChatGPT's re-review — a third instance
+    of the same defect class as the two prior stale-evidence fixes
+    (credential-service writes that leave a pass/pass evidence mirror
+    behind without clearing whatever presence/verification signal
+    `action_activate()` relies on).
+  - Repeated issue patterns: **yes, now a confirmed third occurrence** —
+    (1) `action_disconnect` clears `credential_present` but not the
+    evidence mirrors; (2) `action_replace_token` clears
+    `credential_last_verified_at` but not the evidence mirrors; (3)
+    `action_set_token` clears *neither* `credential_last_verified_at`
+    nor the evidence mirrors when updating an existing row. The standing
+    rule flagged in the prior handoff entry ("any credential-service
+    write that clears a presence/verification field must be checked
+    against every consumer of the evidence mirrors it does not clear")
+    should be broadened: also check credential-service writes that clear
+    *nothing new* but still change the underlying credential identity
+    (e.g. `write_date` freshness, not just an explicit cleared field).
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope) — flagged above for a future docs-authorized session.
+  - New rejected approaches: none.
+  - New technical debt: none.
+  - Tests or review gates needed: none beyond the regression test added.
+  - Should future prompts change? Worth a dedicated, docs-scoped session
+    to audit the full credential-service surface
+    (`action_set_token`/`action_replace_token`/`action_clear_token`)
+    against every consumer of `credential_present`/
+    `credential_last_verified_at`/the test-connection/readiness evidence
+    mirrors, now that three related-but-distinct instances have surfaced
+    across three review rounds — not actioned here, out of scope.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt
+  logged (n/a) · repeated-issue escalation applied (noted above as a
+  now-third-occurrence pattern; no rule file updated, out of scope) —
+  all YES.
+- **Next step:** ChatGPT re-review of the revised PR #121.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; credential model untouched; no merge; PR
+  remains draft, not marked ready for review.
+
+### Task 005 PR #121 revision — stale activation evidence after credential replace — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched.
+- **What changed:** ChatGPT's re-review of PR #121 found that
+  `action_activate()`'s existing checks (`credential_present` +
+  `last_test_connection_result == 'pass'` + `last_readiness_result in
+  ('pass', 'warning')`) were not enough after a credential replacement:
+  `shopify.connector.store.credential.action_replace_token()` clears
+  `credential_last_verified_at` on every token swap but does not reset
+  `last_test_connection_result`/`last_readiness_result`, so a replaced
+  token could activate on pass/pass evidence recorded for the *previous*
+  token — violating the Task 005 "never infer connection success" rule.
+  **Fixed** by adding a `credential_last_verified_at` truthy check to
+  `action_activate()`, in the required order: `credential_present` →
+  `credential_last_verified_at` → `last_test_connection_result == 'pass'`
+  → `last_readiness_result in ('pass', 'warning')`. Raises `UserError`
+  before any write when missing; leaves state unchanged; creates no
+  audit job on rejection; calls no Shopify API; runs no readiness check.
+  Added `test_activate_rejects_stale_evidence_after_credential_replace`
+  (activates once with fresh verified evidence, replaces the token via
+  the existing credential service, confirms the mirrors go stale
+  relative to the new credential, confirms the second `action_activate()`
+  raises `UserError`, confirms state does not become `connected`, and
+  confirms no new lifecycle audit job is created). Updated every existing
+  test that expects a successful (or evidence-specific-failure)
+  `action_activate()` call to also seed `credential_last_verified_at`
+  via a direct store write alongside the other evidence-mirror fields
+  (`last_test_connection_result`/`last_readiness_result`) — this matches
+  the file's existing convention of seeding those mirrors directly for
+  unit-level activate/reconnect tests, since no dedicated credential-
+  service method stamps `credential_last_verified_at` outside a live/
+  mocked `action_test_connection()` run. The prior `action_reconnect()`
+  missing-credential transaction-safety fix (PR #121's previous revision)
+  is untouched and confirmed intact. **No scope expansion** — no OAuth/
+  setup wizard/UI/sync/domain implementation, no security/ACL change, no
+  new job state/type/source.
+- **Local validation performed:** `python -m py_compile` on both changed
+  Python files — passes. **No Odoo runtime is available in this session's
+  container**, so the test suite was not executed here — stated honestly;
+  the same Odoo.sh/manual validation command from the original PR #121
+  handoff entry still applies:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the stale-activation-evidence-after-credential-
+    replace issue above, found by ChatGPT's re-review — a second instance
+    of the same defect class as the earlier stale-evidence-after-
+    disconnect fix (credential-service writes that clear a presence/
+    verification mirror without also clearing the pass/fail evidence
+    mirrors that were computed against the old credential).
+  - Repeated issue patterns: **yes** — this is the second "credential-
+    service mutation leaves a stale pass/pass evidence mirror behind"
+    defect found in this PR (first: `action_disconnect` vs.
+    `action_activate`'s `credential_present` check; second:
+    `action_replace_token` vs. `action_activate`'s
+    `credential_last_verified_at` check). Worth a standing rule for
+    future lifecycle/credential work: any credential-service write that
+    clears a presence/verification field must be checked against every
+    consumer of the evidence mirrors it does *not* clear.
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope) — flagged above for a future docs-scoped session to formalize.
+  - New rejected approaches: none.
+  - New technical debt: none.
+  - Tests or review gates needed: none beyond the regression test added.
+  - Should future prompts change? Worth considering, for a future
+    docs-authorized session, adding an explicit "stale-mirror" check to
+    whatever future review checklist covers this connector's credential/
+    lifecycle surface — not actioned here since it is out of this
+    revision's allowed-files scope.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt
+  logged (n/a) · repeated-issue escalation applied (noted above as a
+  pattern; no rule file updated, out of scope) — all YES.
+- **Next step:** ChatGPT re-review of the revised PR #121.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; no merge; PR remains draft, not marked ready for
+  review.
+
+### Task 005 PR #121 revision — reconnect transaction-safety fix — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched — `shopify_connector_job.py`, `__manifest__.py`,
+  `tests/__init__.py`, and every XML/CSV/security/migration/CI/domain/UI
+  file remain untouched by this revision.
+- **What changed:** ChatGPT's review of PR #121 found a transaction-safety
+  issue in `action_reconnect()`'s missing-credential branch: it wrote
+  `state='reconnect_needed'` and created the lifecycle audit job, then
+  raised `UserError` — in normal Odoo RPC/service execution a raised
+  exception can roll back ORM writes made earlier in the same call, so the
+  state/audit write this branch exists to guarantee might never actually
+  persist. **Fixed** by removing the `raise` after the write: the
+  missing-credential branch now only writes `state='reconnect_needed'`,
+  creates the audit job, and `return`s `None` — no Shopify call, no
+  readiness run, no credential clear, no auto-reconnect, unchanged
+  otherwise. The existing `test_reconnect_missing_credential_does_not_connect`
+  test was updated to no longer expect `UserError`, and now asserts the
+  call returns `None`, the state persists as `reconnect_needed`,
+  `credential_present` stays `False`, exactly one lifecycle audit job is
+  created, and no `core_test_connection`/`core_readiness_check` job is
+  created. `action_activate()`'s existing `UserError`-on-rejected-evidence
+  tests are unchanged — that method intentionally leaves state untouched
+  on rejection rather than writing first, so it has no equivalent
+  transaction-safety issue. PR #121's body was updated to match (the
+  `action_reconnect()` bullet no longer says "raises `UserError`").
+  **No scope expansion** — no OAuth/setup wizard/UI/sync/domain
+  implementation, no security/ACL change, no new job state/type/source.
+- **Local validation performed:** `python -m py_compile` on both changed
+  Python files — passes. **No Odoo runtime is available in this session's
+  container**, so the test suite was not executed here — stated honestly;
+  the same Odoo.sh/manual validation command from the original PR #121
+  handoff entry below still applies:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the reconnect missing-credential
+    transaction-safety issue above, found by ChatGPT's review (not by
+    this session's own prior adversarial-review pass) — logged here as a
+    gap in that pass's coverage (it checked for duplicate writes/audits
+    but not for a write-then-raise rollback risk).
+  - Repeated issue patterns: none.
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope).
+  - New rejected approaches: none.
+  - New technical debt: none.
+  - Tests or review gates needed: worth noting for future sessions —
+    "does this method write state/audit and then raise?" is now a
+    pattern to check for across all four lifecycle actions, not just
+    `reconnect`; `action_disconnect`/`action_mark_reconnect_needed` do
+    not raise at all (no issue), and `action_activate` raises *before*
+    any write (no issue) — confirmed by inspection, not newly changed.
+  - Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt
+  logged (n/a) · repeated-issue escalation applied (n/a) — all YES.
+- **Next step:** ChatGPT re-review of the revised PR #121.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; no merge; PR remains draft, not marked ready for
+  review.
+
+### Task 005 Connection Lifecycle Actions — implementation — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5`, branched from
+  latest `origin/Shopify-connector` (includes PR #120 merge commit
+  `69b67ece38ea1db27144f7eaa92f9d37076e0593`) → **draft** PR into
+  `Shopify-connector` (this session's PR; not merged, not marked ready for
+  review). First code-implementation session in this project (gated by
+  `task-005-connection-lifecycle-gate.md` and `DEC-022-task-005-scope.md`,
+  both merged via PR #120).
+- **Files changed:** `addons/shopify_connector_core/__manifest__.py`
+  (version `19.0.1.3.0` → `19.0.1.4.0` only),
+  `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/models/shopify_connector_job.py`,
+  `addons/shopify_connector_core/tests/__init__.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py` (new),
+  `docs/01-research/research-handoff.md` (this entry). No XML/CSV/security/
+  migration/CI/controller/webhook/UI/wizard file touched; no domain-module
+  file touched; no other docs file touched.
+- **What changed:** implemented the four Task 005 connection-lifecycle
+  actions on `shopify.connector.store` — `action_activate()`,
+  `action_disconnect()`, `action_reconnect()`,
+  `action_mark_reconnect_needed(reason=False)` — plus a shared
+  `_create_lifecycle_audit_job()` helper that records every transition as
+  an audited `core_manual_maintenance` job/log row (reusing the existing
+  `_system_append` path, no new job type/log path). Added
+  `BUSINESS_JOB_SOURCES` and store-state gating to
+  `shopify_connector_job.py`: `create()` blocks business-job creation
+  unless the store is `connected`; `write()` blocks a business job's move
+  to `running` unless the store is `connected` at that moment (the
+  create→execute race guard). `action_test_connection()`'s existing
+  `ShopifyClientError` handler now also calls
+  `action_mark_reconnect_needed()` on any auth/permission/scope-
+  invalidation signal (`credential_invalid` or
+  `error_class == 'shopify_permission_scope_auth'`), not only a
+  genuine token-invalid one. `disconnect` reuses the existing Task 002
+  `action_clear_token` service (no second clear path) and cancels
+  non-terminal business jobs via the existing `TERMINAL_JOB_STATES`
+  import, never a re-typed literal.
+- **Self-review / independent adversarial review (Workflow tool, 3
+  parallel review lenses + synthesis) found and this session fixed three
+  real issues before commit:**
+  1. `action_activate()` did not check `credential_present`, so a stale
+     `last_test_connection_result`/`last_readiness_result` pass mirror
+     left over from *before* a `disconnect` could silently re-activate a
+     credential-less store. Fixed: `action_activate()` now also requires
+     `credential_present`.
+  2. `Job.write()`'s execution-time gate read the job's *pre-write*
+     cached `job_source`/`store_id`, so a single `write()` call that also
+     changed `job_source`/`store_id` alongside `state='running'` could
+     bypass the gate (both fields are UI-`readonly` only, not
+     ORM-enforced). Fixed: the gate now evaluates the effective
+     post-write values (`vals` when present, current value otherwise).
+  3. `action_reconnect()` double-wrote `state='reconnect_needed'` and
+     created two audit jobs for one logical attempt whenever the nested
+     `action_test_connection()` call itself already auto-transitioned via
+     an auth-classified failure. Fixed: `action_reconnect()` now detects
+     this (via the freshly created `core_test_connection` job's
+     `error_class`) and skips the redundant re-write/audit; every other
+     failure path (identity mismatch, temporary/throttle/unknown errors,
+     readiness-only failure) still audits exactly once, unaffected.
+  All three fixes are covered by new, explicit tests (see below).
+  Two lower-confidence items were considered and consciously **not**
+  changed: (a) `create()`'s per-call batch atomicity (a failing business
+  entry in a hypothetical future multi-record `Job.create([...])` call
+  would collaterally block a sibling core entry in the same call) — no
+  current caller batches heterogeneous job sources in one `create()`
+  call; (b) no `FOR UPDATE` row lock closes the narrow TOCTOU window
+  between the state check and the guarded write under concurrent
+  disconnect — the gate document's own §11 "Open risks" already frames
+  the two-checkpoint (enqueue + execution) re-check as the required
+  mechanism, not full transactional exclusivity, so a row lock would be
+  scope creep beyond this task's "service/model layer only" scope.
+- **Tests added:** `tests/test_connection_lifecycle.py` — one
+  `TransactionCase`, ~40 tests covering: activate (pass/pass,
+  pass/warning, missing evidence, failing evidence, fail test-connection,
+  missing credential, stale-evidence-after-disconnect); disconnect
+  (credential clear, credential-row preservation, state transition,
+  business-job cancellation with reason/log, core-job/terminal-job
+  non-interference, idempotency); business-job create-time gating (all
+  three non-connected states × all five business sources blocked;
+  connected succeeds; core sources always creatable); business-job
+  execution-time gating (blocked when disconnected mid-flight, succeeds
+  when connected, the two same-call bypass-attempt tests, cancel-while-
+  disconnected allowed, core jobs never gated); `action_mark_reconnect_
+  needed` (state set, credential kept, idempotent);
+  `action_test_connection`'s auto-transition wiring (credential-invalid
+  path, shop-state-failure path, success path does not auto-activate);
+  reconnect (missing credential, connects on pass/pass, connects on
+  pass/warning, remains `reconnect_needed` on readiness failure, on
+  test-connection failure, on credential-invalid failure, on identity-
+  mismatch failure — the last three each assert exactly one audit job,
+  proving the double-audit fix); and a no-secret-leakage sweep across
+  activate+disconnect. All Shopify API calls are mocked at the existing
+  `_send`/`run_for_store` seams — no live network, no real credentials.
+- **Local validation performed:** `python -m py_compile` on every changed
+  Python file — passes. **No Odoo runtime/CI is available in this
+  session's container** (`python3 -c "import odoo"` fails — module not
+  installed; no `odoo-bin` on `PATH`), so the test suite itself was
+  **not executed** in this session — this is stated honestly, not
+  claimed as passing. Manual/Odoo.sh validation command for a future
+  session or reviewer with a runtime:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **Docs/code boundary confirmed respected:** only the allowed files
+  listed above changed (verified via `git diff --stat` against the PR
+  #120 merge-base, plus an independent governance-compliance review
+  agent's 10/10-pass audit); no XML/CSV/security/migration/CI file; no
+  domain-module file (`shopify_connector_product/_customer/_sale/
+  _inventory/_fulfillment/_accounting/_refund/_payout/_multi_store`); no
+  `perm_create` grant added anywhere (`security/ir.model.access.csv` is
+  untouched); no OAuth/setup-wizard/UI/controller/webhook file; no new
+  job state, job type, or job source added to
+  `shopify_connector_job.py`'s selections (only a new plain-Python
+  `BUSINESS_JOB_SOURCES` tuple over the existing source values); exactly
+  the same two `sudo()` call sites as before this session
+  (`shopify_connector_job_log.py`, `shopify_connector_store_credential.py`
+  — confirmed by the existing AST-based guard tests, which still pass by
+  inspection since no new file adds a `sudo()` call).
+- **VAL-B2 remains deferred / not passed.** No live Shopify connection
+  was attempted or claimed this session; `activate`/`reconnect` still
+  report the existing Task 003/004 unknown/not-proven fail-closed state
+  whenever real evidence is absent — unchanged.
+- **MBQ-05 remains partially routed / open**, not fully resolved.
+  Unchanged by this session — `reconnect` calls the existing Task 003/004
+  substrate exactly as-is, independent of the eventual token-acquisition
+  direction.
+- **TD-002 remains open**, not fixed — out of this task's scope, not
+  touched.
+- **TD-001 remains Resolved.** Unchanged by this session.
+- **Learning feedback loop:**
+  - New issues discovered: the three real defects listed above (stale-
+    evidence activate bypass; write()-gate stale-value bypass; reconnect
+    duplicate-audit) — all found by an independent adversarial review
+    pass before commit, all fixed in this same session, all now covered
+    by explicit regression tests.
+  - Repeated issue patterns: none new; this session's UUID4-nonce
+    `payload_hash` pattern for `_create_lifecycle_audit_job` follows the
+    same TD-001-avoidance convention already established by
+    `action_test_connection`/`run_for_store` — no new instance of that
+    class of defect was introduced.
+  - Rules/checklists updated: none this session (docs-only rule changes
+    are out of this task's allowed-files scope).
+  - New rejected approaches: none — `rejected-approaches-log.md` was
+    checked; nothing in this implementation revisits a logged rejection.
+  - New technical debt: none logged. The two lower-confidence review
+    items (batch-create atomicity; TOCTOU row-locking) are design
+    tradeoffs explicitly within the gate document's own accepted risk
+    framing (§11), not undisclosed shortcuts, so they are recorded here
+    in this handoff rather than as a new technical-debt register row —
+    flagged for ChatGPT review to confirm that treatment is correct.
+  - Architecture concerns: none beyond what's already recorded in the
+    gate document's own "Open risks" §11.
+  - Tests or review gates needed: an Odoo runtime run of
+    `--test-tags /shopify_connector_core` is still needed before this can
+    be called fully verified — flagged above, not hidden.
+  - Should future prompts change? No process change recommended; the
+    adversarial-review-before-commit step this session added (via the
+    Workflow tool) caught real bugs that a single-pass implementation
+    would have shipped — worth keeping as a standing practice for future
+    code-implementation sessions, not a prompt-template change.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a, none reintroduced) ·
+  technical debt logged (n/a, no new debt; two accepted design tradeoffs
+  recorded above for reviewer visibility) · repeated-issue escalation
+  applied (n/a) — all YES.
+- **Next step:** ChatGPT code review of this draft PR — in particular the
+  three self-found-and-fixed issues above, and the two consciously-not-
+  fixed lower-confidence items (batch-create atomicity, TOCTOU row
+  locking), to confirm the "not fixed" calls are correct or to direct a
+  follow-up.
+- **Stop condition:** stopped at the scoped boundary — exactly the
+  allowed files touched; no XML/CSV/security/migration/CI/domain/UI/OAuth
+  file created or modified; no `perm_create` grant; no new job state/
+  type/source; VAL-B2 remains deferred, not passed; MBQ-05 remains
+  partially routed/open; TD-002 remains open; tests added but not run
+  (no Odoo runtime available, stated honestly); PR opened as **draft
+  only**, not marked ready for review, not merged.
+
 ### Task 005 Connection Lifecycle Gate Opening — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-gate-opening-jr5a9i`, branched from

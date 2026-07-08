@@ -71,7 +71,17 @@ class ShopifyConnectorStoreCredential(models.Model):
 
         Runs as the calling user (no `sudo()`) so the ACL layer stays
         live: a non-admin caller fails with `AccessError` from the ORM
-        itself.
+        itself. Any set/update -- including overwriting an *existing*
+        credential row (e.g. re-entering/correcting a token) -- clears
+        `credential_last_verified_at`: a token change invalidates
+        whatever verification was recorded for the value it replaced,
+        closing the Task 005 stale-evidence path at the source instead
+        of relying on the credential row's own `write_date` as a
+        freshness signal. A `connected` store also moves to
+        `reconnect_needed`: business-job gating keys off `store.state`,
+        so a credential mutation must invalidate that state too, not
+        just the verification mirror -- otherwise sync jobs could run
+        against an unverified changed credential.
         """
         if not isinstance(value, str) or not value:
             raise ValidationError(
@@ -89,7 +99,12 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'access_token': value,
                 'credential_state': 'present',
             })
-        store.write({'credential_present': True})
+        store.write({
+            'credential_present': True,
+            'credential_last_verified_at': False,
+        })
+        if store.state == 'connected':
+            store.write({'state': 'reconnect_needed'})
         return None
 
     @api.model
@@ -97,7 +112,12 @@ class ShopifyConnectorStoreCredential(models.Model):
         """Replace the store's credential value and reset verification.
 
         Stamps `credential_last_replaced_at`; does not touch
-        `last_test_connection_*` (Task 003 owns those).
+        `last_test_connection_*` (Task 003 owns those). A `connected`
+        store also moves to `reconnect_needed`: business-job gating
+        keys off `store.state`, so a credential replacement must
+        invalidate that state too, not just the verification mirror --
+        otherwise sync jobs could run against an unverified changed
+        credential.
         """
         if not isinstance(value, str) or not value:
             raise ValidationError(
@@ -120,6 +140,8 @@ class ShopifyConnectorStoreCredential(models.Model):
             'credential_last_replaced_at': fields.Datetime.now(),
             'credential_last_verified_at': False,
         })
+        if store.state == 'connected':
+            store.write({'state': 'reconnect_needed'})
         return None
 
     @api.model
@@ -128,7 +150,12 @@ class ShopifyConnectorStoreCredential(models.Model):
 
         Idempotent when no credential row exists yet: no error, no row
         created. The credential row itself and
-        `credential_last_replaced_at` are never removed (MBQ-08).
+        `credential_last_replaced_at` are never removed (MBQ-08). A
+        `connected` or `reconnect_needed` store also moves to
+        `disconnected`: with the credential gone, `store.state` must
+        not still claim a live/recoverable connection --
+        `action_disconnect()` may still write `disconnected` afterward,
+        which remains fine and idempotent.
         """
         credential = self.search([('store_id', '=', store.id)], limit=1)
         if credential:
@@ -141,6 +168,8 @@ class ShopifyConnectorStoreCredential(models.Model):
             'credential_last_verified_at': False,
             'credential_last_failure_reason': False,
         })
+        if store.state in ('connected', 'reconnect_needed'):
+            store.write({'state': 'disconnected'})
         return None
 
     @api.model

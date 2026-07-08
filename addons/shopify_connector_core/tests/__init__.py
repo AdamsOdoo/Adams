@@ -6,6 +6,7 @@
 # exception by ChatGPT's F1 review of PR #101 (mirrors the
 # already-allowed models/__init__.py one-import-line pattern).
 from . import test_api_client
+from . import test_connection_lifecycle
 from . import test_credential_access
 from . import test_credential_service
 from . import test_job_log_system_append

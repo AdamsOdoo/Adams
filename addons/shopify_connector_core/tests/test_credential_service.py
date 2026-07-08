@@ -98,6 +98,83 @@ class TestCredentialService(TransactionCase):
         self.assertEqual(credential.access_token, DUMMY_TOKEN_2)
         self._assert_dummy_absent_except_access_token(DUMMY_TOKEN_2)
 
+    def test_action_set_token_update_on_connected_store_moves_to_reconnect_needed(self):
+        # PR #121 Revision 5: credential mutation must invalidate
+        # store.state, not just credential_last_verified_at --
+        # business-job gating keys off store.state, so a 'connected'
+        # store must not remain 'connected' after its token is
+        # silently overwritten via action_set_token().
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({
+            'state': 'connected',
+            'credential_last_verified_at': '2026-07-07 00:00:00',
+        })
+        Job = self.env['shopify.connector.job']
+        JobLog = self.env['shopify.connector.job.log']
+        job_count_before = Job.search_count([])
+        job_log_count_before = JobLog.search_count([])
+
+        Credential.action_set_token(self.store, DUMMY_TOKEN_2)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertFalse(self.store.credential_last_verified_at)
+        self.assertEqual(Job.search_count([]), job_count_before)
+        self.assertEqual(JobLog.search_count([]), job_log_count_before)
+
+    def test_action_replace_token_on_connected_store_moves_to_reconnect_needed(self):
+        # PR #121 Revision 5: same invalidation requirement as
+        # action_set_token(), for the replace path.
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({
+            'state': 'connected',
+            'credential_last_verified_at': '2026-07-07 00:00:00',
+        })
+        Job = self.env['shopify.connector.job']
+        JobLog = self.env['shopify.connector.job.log']
+        job_count_before = Job.search_count([])
+        job_log_count_before = JobLog.search_count([])
+
+        Credential.action_replace_token(self.store, DUMMY_TOKEN_2)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertFalse(self.store.credential_last_verified_at)
+        self.assertEqual(Job.search_count([]), job_count_before)
+        self.assertEqual(JobLog.search_count([]), job_log_count_before)
+
+    def test_action_clear_token_on_connected_store_moves_to_disconnected(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'connected'})
+        Job = self.env['shopify.connector.job']
+        JobLog = self.env['shopify.connector.job.log']
+        job_count_before = Job.search_count([])
+        job_log_count_before = JobLog.search_count([])
+
+        Credential.action_clear_token(self.store)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnected')
+        self.assertFalse(self.store.credential_present)
+        self.assertEqual(Job.search_count([]), job_count_before)
+        self.assertEqual(JobLog.search_count([]), job_log_count_before)
+
+    def test_action_clear_token_on_reconnect_needed_store_moves_to_disconnected(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'reconnect_needed'})
+        Job = self.env['shopify.connector.job']
+        JobLog = self.env['shopify.connector.job.log']
+        job_count_before = Job.search_count([])
+        job_log_count_before = JobLog.search_count([])
+
+        Credential.action_clear_token(self.store)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnected')
+        self.assertFalse(self.store.credential_present)
+        self.assertEqual(Job.search_count([]), job_count_before)
+        self.assertEqual(JobLog.search_count([]), job_log_count_before)
+
     def test_action_clear_token_empties_and_preserves_history(self):
         Credential = self._credential_as_admin()
         Credential.action_set_token(self.store, DUMMY_TOKEN_1)
