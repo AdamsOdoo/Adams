@@ -256,19 +256,30 @@ class ShopifyConnectorStore(models.Model):
         disconnect -- `action_disconnect` clears `credential_present`
         but does not reset `last_test_connection_result`/
         `last_readiness_result`, so this check is the guard against
-        re-activating a credential-less store on old evidence) plus a
-        stored passing test-connection result and a passing-or-warning-
-        tier readiness result already on record before moving the state
-        at all. If any is missing or failing, raises `UserError` and
-        leaves the state untouched -- never calls Shopify, never runs
-        OAuth, and never claims VAL-B2 has passed or that MBQ-05 is
-        resolved (DEC-022 §4.4).
+        re-activating a credential-less store on old evidence) *and*
+        that the current credential has actually been verified
+        (`credential_last_verified_at` truthy -- the credential service's
+        `action_replace_token` clears this stamp on every token swap but
+        does not reset `last_test_connection_result`/
+        `last_readiness_result`, so without this check a replaced token
+        could activate on pass/pass evidence recorded for the *previous*
+        token) plus a stored passing test-connection result and a
+        passing-or-warning-tier readiness result already on record before
+        moving the state at all. If any is missing or failing, raises
+        `UserError` and leaves the state untouched -- never calls
+        Shopify, never runs OAuth, and never claims VAL-B2 has passed or
+        that MBQ-05 is resolved (DEC-022 §4.4).
         """
         self.ensure_one()
         if not self.credential_present:
             raise UserError(
                 'Cannot activate: no credential is present for this '
                 'store -- enter a credential first.'
+            )
+        if not self.credential_last_verified_at:
+            raise UserError(
+                'Cannot activate: the current credential has not been '
+                'verified yet — run Test Connection first.'
             )
         if self.last_test_connection_result != 'pass':
             raise UserError(

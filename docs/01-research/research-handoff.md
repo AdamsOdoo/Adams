@@ -1,5 +1,90 @@
 # Research Handoff (rolling)
 
+### Task 005 PR #121 revision — stale activation evidence after credential replace — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched.
+- **What changed:** ChatGPT's re-review of PR #121 found that
+  `action_activate()`'s existing checks (`credential_present` +
+  `last_test_connection_result == 'pass'` + `last_readiness_result in
+  ('pass', 'warning')`) were not enough after a credential replacement:
+  `shopify.connector.store.credential.action_replace_token()` clears
+  `credential_last_verified_at` on every token swap but does not reset
+  `last_test_connection_result`/`last_readiness_result`, so a replaced
+  token could activate on pass/pass evidence recorded for the *previous*
+  token — violating the Task 005 "never infer connection success" rule.
+  **Fixed** by adding a `credential_last_verified_at` truthy check to
+  `action_activate()`, in the required order: `credential_present` →
+  `credential_last_verified_at` → `last_test_connection_result == 'pass'`
+  → `last_readiness_result in ('pass', 'warning')`. Raises `UserError`
+  before any write when missing; leaves state unchanged; creates no
+  audit job on rejection; calls no Shopify API; runs no readiness check.
+  Added `test_activate_rejects_stale_evidence_after_credential_replace`
+  (activates once with fresh verified evidence, replaces the token via
+  the existing credential service, confirms the mirrors go stale
+  relative to the new credential, confirms the second `action_activate()`
+  raises `UserError`, confirms state does not become `connected`, and
+  confirms no new lifecycle audit job is created). Updated every existing
+  test that expects a successful (or evidence-specific-failure)
+  `action_activate()` call to also seed `credential_last_verified_at`
+  via a direct store write alongside the other evidence-mirror fields
+  (`last_test_connection_result`/`last_readiness_result`) — this matches
+  the file's existing convention of seeding those mirrors directly for
+  unit-level activate/reconnect tests, since no dedicated credential-
+  service method stamps `credential_last_verified_at` outside a live/
+  mocked `action_test_connection()` run. The prior `action_reconnect()`
+  missing-credential transaction-safety fix (PR #121's previous revision)
+  is untouched and confirmed intact. **No scope expansion** — no OAuth/
+  setup wizard/UI/sync/domain implementation, no security/ACL change, no
+  new job state/type/source.
+- **Local validation performed:** `python -m py_compile` on both changed
+  Python files — passes. **No Odoo runtime is available in this session's
+  container**, so the test suite was not executed here — stated honestly;
+  the same Odoo.sh/manual validation command from the original PR #121
+  handoff entry still applies:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the stale-activation-evidence-after-credential-
+    replace issue above, found by ChatGPT's re-review — a second instance
+    of the same defect class as the earlier stale-evidence-after-
+    disconnect fix (credential-service writes that clear a presence/
+    verification mirror without also clearing the pass/fail evidence
+    mirrors that were computed against the old credential).
+  - Repeated issue patterns: **yes** — this is the second "credential-
+    service mutation leaves a stale pass/pass evidence mirror behind"
+    defect found in this PR (first: `action_disconnect` vs.
+    `action_activate`'s `credential_present` check; second:
+    `action_replace_token` vs. `action_activate`'s
+    `credential_last_verified_at` check). Worth a standing rule for
+    future lifecycle/credential work: any credential-service write that
+    clears a presence/verification field must be checked against every
+    consumer of the evidence mirrors it does *not* clear.
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope) — flagged above for a future docs-scoped session to formalize.
+  - New rejected approaches: none.
+  - New technical debt: none.
+  - Tests or review gates needed: none beyond the regression test added.
+  - Should future prompts change? Worth considering, for a future
+    docs-authorized session, adding an explicit "stale-mirror" check to
+    whatever future review checklist covers this connector's credential/
+    lifecycle surface — not actioned here since it is out of this
+    revision's allowed-files scope.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt
+  logged (n/a) · repeated-issue escalation applied (noted above as a
+  pattern; no rule file updated, out of scope) — all YES.
+- **Next step:** ChatGPT re-review of the revised PR #121.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; no merge; PR remains draft, not marked ready for
+  review.
+
 ### Task 005 PR #121 revision — reconnect transaction-safety fix — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into

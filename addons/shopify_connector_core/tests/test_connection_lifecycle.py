@@ -113,6 +113,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.write({
             'last_test_connection_result': 'pass',
             'last_readiness_result': 'pass',
+            'credential_last_verified_at': fields.Datetime.now(),
         })
         self._store().action_activate()
         self.store.invalidate_recordset()
@@ -128,6 +129,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.write({
             'last_test_connection_result': 'pass',
             'last_readiness_result': 'warning',
+            'credential_last_verified_at': fields.Datetime.now(),
         })
         self._store().action_activate()
         self.store.invalidate_recordset()
@@ -149,6 +151,7 @@ class TestConnectionLifecycle(TransactionCase):
             'state': 'reconnect_needed',
             'last_test_connection_result': 'pass',
             'last_readiness_result': 'fail',
+            'credential_last_verified_at': fields.Datetime.now(),
         })
         with self.assertRaises(UserError):
             self._store().action_activate()
@@ -160,6 +163,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.write({
             'last_test_connection_result': 'fail',
             'last_readiness_result': 'pass',
+            'credential_last_verified_at': fields.Datetime.now(),
         })
         with self.assertRaises(UserError):
             self._store().action_activate()
@@ -187,6 +191,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.write({
             'last_test_connection_result': 'pass',
             'last_readiness_result': 'pass',
+            'credential_last_verified_at': fields.Datetime.now(),
         })
         self._store().action_activate()
         self.store.invalidate_recordset()
@@ -206,6 +211,43 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.invalidate_recordset()
         self.assertNotEqual(self.store.state, 'connected')
         self.assertEqual(self.store.state, 'disconnected')
+
+    def test_activate_rejects_stale_evidence_after_credential_replace(self):
+        # ChatGPT review (PR #121): action_replace_token clears
+        # credential_last_verified_at on every token swap but does not
+        # reset last_test_connection_result/last_readiness_result, so a
+        # replaced token could otherwise activate on pass/pass evidence
+        # recorded for the PREVIOUS token -- exactly the "never infer
+        # connection success" violation credential_last_verified_at
+        # exists to close.
+        self._set_token()
+        self.store.write({
+            'last_test_connection_result': 'pass',
+            'last_readiness_result': 'pass',
+            'credential_last_verified_at': fields.Datetime.now(),
+        })
+        self._store().action_activate()
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'connected')
+        audit_jobs_before = self._audit_jobs()
+
+        self.Credential.with_user(self.user_admin).action_replace_token(
+            self.store, DUMMY_TOKEN + 'REPLACED'
+        )
+        self.store.invalidate_recordset()
+        self.assertTrue(self.store.credential_present)
+        self.assertFalse(self.store.credential_last_verified_at)
+        # The stale mirrors are untouched by the token replacement --
+        # still 'pass'/'pass', but they no longer describe the current
+        # credential.
+        self.assertEqual(self.store.last_test_connection_result, 'pass')
+        self.assertEqual(self.store.last_readiness_result, 'pass')
+
+        with self.assertRaises(UserError):
+            self._store().action_activate()
+        self.store.invalidate_recordset()
+        self.assertNotEqual(self.store.state, 'connected')
+        self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
 
     # ------------------------------------------------------------------
     # action_disconnect
@@ -582,6 +624,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.write({
             'last_test_connection_result': 'pass',
             'last_readiness_result': 'pass',
+            'credential_last_verified_at': fields.Datetime.now(),
         })
         self._store().action_activate()
         self._store().action_disconnect()
