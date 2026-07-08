@@ -9,13 +9,19 @@
 > completeness, per the task's mandatory-known-items requirement) or was
 > surfaced fresh by this session's research — each is marked accordingly.
 >
-> **Revision note:** this branch was updated against latest
-> `Shopify-connector` after PR #123 and PR #124 merged. Questions 17, 18,
-> and 30 (Odoo concurrency/locking) are cross-referenced against
-> `docs/01-research/sync-engine-odoo-repo-source-notes.md` (PR #124, the
-> canonical Odoo/repo-substrate shard for this task family), which
-> independently examined `ir.cron`'s job-acquisition locking and reached the
-> same "not fully settled without runtime proof" framing.
+> **Revision note (2):** revision 1 updated this branch against latest
+> `Shopify-connector` after PR #123 and PR #124 merged, cross-referencing
+> questions 17, 18, and 30 against `docs/01-research/sync-engine-odoo-repo-source-notes.md`
+> (PR #124, `R31`, the canonical Odoo/repo-substrate shard). **This
+> revision** updates again after PR #126 merged, adding cross-references to
+> `docs/01-research/sync-engine-queue-idempotency-source-notes.md` (PR #126,
+> `R33`, the canonical queue/idempotency/retry/backoff/dead-letter reference
+> shard) against questions 10, 17, and 18, plus four new questions (40–43)
+> for topics `R33` surfaced that this package had not previously raised.
+> **Numbering note:** existing question numbers 1–39 are preserved unchanged
+> (they are cross-referenced by number from the evidence map and risk
+> register) — new questions are appended as 40+ within their most relevant
+> section rather than renumbering the whole document.
 
 ## Blocking questions before implementation
 
@@ -83,12 +89,24 @@ written.
    mirroring OCA `queue_job`'s pattern, `Q5`) is worth adopting is an
    open, non-blocking design idea — not evaluated to acceptance or rejection
    by this research session.
+42. **[New this revision, from `R33`, minor/immaterial]** An unreconciled
+    discrepancy on OCA `queue_job`'s minimum worker-count precondition: this
+    package's pre-006A baseline (`R25`) cites `--workers > 0`; `R33` (PR
+    #126, `OCA-4`) cites `--workers > 1`. Neither shard resolves this. Not
+    blocking — `queue_job` remains reference-only (RA-004 unchanged) — but
+    worth re-verifying against the live OCA README if `queue_job` is ever
+    evaluated in earnest at a future architecture gate.
 
 ## Shopify API uncertainties
 
-10. **[New this session]** Cursor durability/reuse across a paused-and-
-    resumed sync of unspecified length is undocumented by Shopify (`S1`,
-    `S2`) — neither confirmed safe nor confirmed unsafe.
+10. **[New this session, now corroborated by `R33`]** Cursor durability/reuse
+    across a paused-and-resumed sync of unspecified length is undocumented
+    by Shopify for GraphQL (`S1`, `S2`) — neither confirmed safe nor
+    confirmed unsafe. `R33` (PR #126) independently reached the identical
+    conclusion via its own separate research pass, and additionally found
+    that the **REST** equivalent (`page_info` cursor URLs) *is* explicitly
+    documented as temporary/not-for-saving — suggestive context for GraphQL,
+    not proof either way.
 11. **[New this session]** Whether pagination ordering is stable if the
     underlying dataset mutates between page requests is undocumented.
 12. **[New this session]** Whether `partialDataUrl`/`url` populate for a
@@ -110,33 +128,73 @@ written.
     *success-path* duplicate webhook deliveries (as distinct from the
     documented 8-retries-over-4-hours *failure*-triggered retry schedule) is
     undocumented (`S14`).
+40. **[New this revision, from `R33`]** A throttled Shopify **GraphQL** call
+    can return **HTTP 200** with a `THROTTLED` code in the response body
+    rather than a 4xx status (`R33`'s `SH-4`) — a genuinely new fact this
+    package had not independently verified before this revision (see
+    Mandatory Claim 12 / supplementary row 26 in the evidence map). No
+    fetched source (by this package or `R33`) documents a
+    `Retry-After`-equivalent signal for GraphQL `THROTTLED` responses
+    specifically, leaving open exactly how a client should pace its retry
+    beyond deriving a wait time from `throttleStatus`. Related: `R33`
+    independently found that vendors **disagree** on how to handle a
+    concurrent, still-in-flight duplicate idempotent request — the IETF
+    idempotency-key draft recommends HTTP 409, Stripe's documented behavior
+    is to not cache a result and tell the client to retry, and Shopify's own
+    `IDEMPOTENCY_CONCURRENT_REQUEST` is a third distinct shape — so no
+    single vendor's behavior should be assumed as a universal pattern if the
+    sync engine ever needs to define its own answer to the same question.
 
 ## Odoo concurrency/transaction uncertainties
 
-17. **[New this session]** Whether the Task-005 disconnect-cancellation
-    sweep (`action_disconnect()`) fully closes the race against a business
-    job already transitioned to `running` inside an in-flight `ir.cron`
-    batch at the exact instant of disconnect is **not proven by any source**
-    in this package or in `R31` (PR #124, which independently inspected the
-    same substrate) — the existing gating blocks a transition *into*
-    `running`, but does not itself interrupt a job already past that check.
-    Requires live Odoo-runtime proof (see below), not resolved by
-    documentation research alone.
-18. **[New this session]** Whether `lock_for_update()`/`try_lock_for_update()`
-    (Odoo's `@api.private` row-locking primitives, `O9`, independently
-    confirmed by `R31`) should be adopted by a future sync-engine's own
-    cron-batch record processing is an open design question this research
-    surfaces but does not answer. The underlying premise is itself a
-    **source-backed inference, not a proven fact**: Odoo's RPC-layer
-    automatic retry (`retrying()`, `O5`, `O6`) is source-confirmed for
-    RPC/HTTP dispatch, but the `ir.cron` job-processing code reviewed did not
-    show an equivalent automatic retry around each domain record-processing
-    step (`O7`) — `R31` independently examined `ir.cron`'s job-*acquisition*
-    locking specifically (a related but distinct layer) without settling
-    this narrower question either. If the inference holds, *some* explicit
-    mechanism (locking, or catch-and-retry, or both) would plausibly be
-    needed; which one, and whether the inference is even correct, both
-    remain unresolved pending runtime proof.
+17. **[New this session, now a three-shard-corroborated question]** Whether
+    the Task-005 disconnect-cancellation sweep (`action_disconnect()`) fully
+    closes the race against a business job already transitioned to `running`
+    inside an in-flight `ir.cron` batch at the exact instant of disconnect
+    is **not proven by any source** in this package, in `R31` (PR #124), or
+    in `R33` (PR #126) — all three independently inspected related Odoo
+    concurrency/locking substrate without resolving this specific race. The
+    existing gating blocks a transition *into* `running`, but does not
+    itself interrupt a job already past that check. Requires live
+    Odoo-runtime proof (see below), not resolved by documentation research
+    alone.
+18. **[New this session, now a three-shard-corroborated question]** Whether
+    `lock_for_update()`/`try_lock_for_update()` (Odoo's `@api.private`
+    row-locking primitives, `O9`, independently confirmed by both `R31` and
+    `R33`) should be adopted by a future sync-engine's own cron-batch record
+    processing is an open design question this research surfaces but does
+    not answer. The underlying premise is itself a **source-backed
+    inference, not a proven fact**: Odoo's RPC-layer automatic retry
+    (`retrying()`, `O5`, `O6`) is source-confirmed for RPC/HTTP dispatch, but
+    the `ir.cron` job-processing code reviewed did not show an equivalent
+    automatic retry around each domain record-processing step (`O7`) —
+    `R31` independently examined `ir.cron`'s job-*acquisition* locking
+    specifically (a related but distinct layer) without settling this
+    narrower question either; `R33` independently reaches the identical
+    "requires an actual concurrency test... to verify the documented intent
+    matches real runtime behavior" conclusion, making this a
+    **three-shard-corroborated** open question. If the inference holds,
+    *some* explicit mechanism (locking, or catch-and-retry, or both) would
+    plausibly be needed; which one, and whether the inference is even
+    correct, both remain unresolved pending runtime proof.
+41. **[New this revision, from `R33`]** Whether the row-lock-only
+    (`FOR NO KEY UPDATE SKIP LOCKED`) approach `ir.cron` uses is sufficient
+    with **no additional cross-server coordination** when multiple Odoo
+    application servers share one PostgreSQL database — `R33` names this a
+    real operational pain point worth an explicit runtime test, citing a
+    historical GitHub issue referencing load-balanced cron scheduling as
+    circumstantial (not conclusive) evidence. Neither this package nor `R31`
+    had previously surfaced this specific multi-server framing (both
+    focused on single-server multi-worker concurrency). Related: `R33`
+    independently researched PostgreSQL advisory locks (`pg_advisory_lock`
+    and variants) as an alternative/complementary locking primitive this
+    package had not examined — including a documented hazard where an
+    advisory-lock call inside a `SELECT ... ORDER BY ... LIMIT` query can
+    lock rows before `LIMIT` is applied, and that session-scoped advisory
+    locks are not released by a transaction rollback. Whether advisory locks
+    are worth considering for a future job-claiming design alongside or
+    instead of `lock_for_update()`/`SKIP LOCKED` is undecided — flagged for
+    the architecture gate, not resolved here.
 
 ## UX/observability uncertainties
 
@@ -209,11 +267,17 @@ written.
 
 ## Questions that require live Odoo.sh proof
 
+> Three independently-produced research shards — this package, `R31` (PR
+> #124), and `R33` (PR #126) — now converge on the same conclusion for
+> questions 30 and 41: Odoo 19's cron-acquisition/locking mechanics have
+> only ever been confirmed by reading source and documentation comments,
+> never by an observed concurrency test.
+
 30. **[New this session]** Whether the disconnect/in-flight-job race
     (Blocking Question 5 / Open Question 17) is a real, exploitable
     condition under actual concurrent `ir.cron` worker execution, or is
     closed in practice by transaction/savepoint timing — no static or
-    source-level analysis in this package resolves it.
+    source-level analysis in this package, `R31`, or `R33` resolves it.
 31. **[New this session]** Real-world behavior of `_commit_progress()` /
     `CompletionStatus` interacting with a per-record-savepoint batch loop at
     scale approaching (or exceeding) the documented 64-savepoint performance
@@ -226,6 +290,12 @@ written.
     only caught by live Odoo.sh execution. Any future sync-engine
     concurrency/locking design carries the same category of risk and should
     not be considered validated until proven live.
+43. **[New this revision, from `R33`]** Whether `ir.cron`'s row-lock-only
+    acquisition (Open Question 41) holds with no additional cross-server
+    coordination when multiple Odoo application servers share one
+    PostgreSQL database can only be settled by an actual multi-server test
+    — source-reading alone cannot resolve it, per `R33`'s own explicit
+    framing.
 
 ## Questions that require live Shopify proof
 

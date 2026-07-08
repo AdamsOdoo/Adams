@@ -9,12 +9,14 @@
 > **2026-07-08**. Repo/internal sources retain their own original access dates
 > where already dated by a prior session.
 >
-> **Revision note:** this branch's initial commit was created from PR #122
-> (`9247fea3c36afdb761a82678f3e5e66e8ef42e87`); it has since been updated
-> against latest `origin/Shopify-connector`, which now also includes the
-> merged PR #123 and PR #124 (merge commit
-> `3735ae2292d1fcf926c83034ac8513906c9f5020`). `R31` and `R32` below are
-> those two sibling shards, added this revision.
+> **Revision note (2):** this branch's initial commit was created from PR
+> #122 (`9247fea3c36afdb761a82678f3e5e66e8ef42e87`); revision 1 updated
+> against latest `origin/Shopify-connector` after PR #123 and PR #124
+> merged (`3735ae2292d1fcf926c83034ac8513906c9f5020`), adding `R31`/`R32`.
+> **This revision** updates again after PR #126 merged
+> (`3c9fad896f996c19d4978e5aca58b39674b7b35a`), adding `R33`. Four sibling
+> Task 006A shards now exist, each canonical for its own scope — see the
+> "Synthesis hierarchy" note directly below the source tables.
 
 ## Purpose
 
@@ -83,6 +85,32 @@ evidence-map files should rest on a source not listed here.
 | R30 | Best-in-Class Observations | `docs/01-research/best-in-class-observations.md` | 2026-06-30 | Cross-competitor best-practice synthesis | Secondary | Partial | |
 | R31 | **Sync Engine Odoo and Repo Source Notes (PR #124, merged, "Task 006A-2")** | `docs/01-research/sync-engine-odoo-repo-source-notes.md` | 2026-07-08 | **The canonical Odoo/repo-substrate shard for this task family.** Line-cited inspection of the same job/log/store/credential/readiness substrate this package covers, plus deeper Odoo source research this package did not independently perform: `@api.constrains` propagation mechanics, the modern `models.Constraint`/`Index` DDL API (superseding legacy `_sql_constraints`), constraint-DDL timing (`NOT DEFERRABLE` by Postgres default — an inference, not a directly-stated Odoo fact), `cr.savepoint()` usage patterns (selective, not automatic on `create()`/`write()`), and `ir.cron`'s `_acquire_one_job()`/`FOR NO KEY UPDATE SKIP LOCKED` job-acquisition locking | Primary | Yes | **Added this revision.** Accepted/merged (PR #124, merge commit `3735ae2292d1fcf926c83034ac8513906c9f5020`, part of `3735ae2`). Where this package's own independent Odoo research (fetched the same day via a separate workflow) reaches the same conclusion as `R31`, both are cited as corroboration; where `R31` goes further, this package defers to it rather than restating. See `sync-engine-source-notes.md`'s "Companion Task 006A shards" note for the full cross-reference. |
 | R32 | Sync Engine Competitor / Common Pattern Notes (PR #123, merged, "Task 006A-4") | `docs/01-research/sync-engine-competitor-pattern-notes.md` | 2026-07-08 | Sync-engine-specific re-lens of this repo's existing competitor research corpus (R27–R30) — manual/scheduled sync, queues, logs, retry, webhooks, dedup, mapping screens | Secondary | Partial | **Added this revision**, for completeness (accepted/merged, merge commit `aeaf7eb7782178b260edd452c9075a8dd1df323a`). Not independently integrated into this package's own "Competitor/common-pattern notes" section — out of scope for this revision, which was scoped to incorporating `R31` specifically. |
+| R33 | **Sync Engine Queue / Idempotency / Retry Source Notes (PR #126, merged, "Task 006A-3")** | `docs/01-research/sync-engine-queue-idempotency-source-notes.md` | 2026-07-08 | **The canonical queue/idempotency/retry/backoff/dead-letter reference-pattern shard for this task family.** A 52-source, 9-topic, adversarially-verified (each topic independently re-fact-checked against live sources, with a dedicated "corrected on verification" trail) treatment of: OCA `queue_job` mechanics, idempotency-key design (Stripe/IETF/AWS/Google), retry/backoff/jitter (AWS/Azure/Google SRE, with corrected jitter formulas), dead-letter/permanent-failure visibility (AWS SQS/Azure Service Bus/RabbitMQ/EIP), duplicate-running prevention (PostgreSQL locking incl. advisory locks, Odoo `ir.cron` acquisition, Kubernetes leader-election), checkpoint/resume (Shopify cursors/bulk operations, AWS Glue/Step Functions, Azure Data Factory), and observability/redaction (OWASP, MITRE CWE-532, NIST, GDPR, Twelve-Factor). | Primary | Yes | **Added this revision.** Accepted/merged (PR #126, merge commit `3c9fad896f996c19d4978e5aca58b39674b7b35a`). Explicitly reaffirms RA-004/DEC-005 (OCA `queue_job` remains reference-only, not reconsidered) and the already-accepted RA-014/015/016/017 retry/idempotency taxonomy — no decision is proposed. Where this package's own research overlaps, both are cited as corroboration; where `R33` is deeper or corrects something this package stated less precisely, this package now defers to and cross-references it — see the "Wording alignment against R33" notes in `sync-engine-source-notes.md`. Can support a later architecture gate as Primary evidence, subject to the same "no decision yet" caveat every source in this package carries. |
+
+### Synthesis hierarchy (added this revision)
+
+Four Task 006A shards now exist in `Shopify-connector`. Each is canonical
+for its own scope; this package (PR #125) is the **cross-cutting synthesis
+and evidence-map**, not a fifth independent research pass that duplicates
+any of the other three:
+
+- **`R31` (PR #124)** — canonical for **Odoo/repo substrate** research
+  (the existing job/log/store/credential/readiness models, plus Odoo 19
+  transaction/constraint/concurrency source research).
+- **`R33` (PR #126)** — canonical for **queue/idempotency/retry/backoff/
+  dead-letter reference patterns** (OCA `queue_job` plus vendor-neutral and
+  vendor-specific engineering references).
+- **`R32` (PR #123)** — canonical for **competitor/common sync patterns**.
+- **This package (PR #125)** — the **synthesis/evidence-map package**: a
+  source inventory, source notes, evidence map, open-questions register, and
+  risk register that draw on and cross-reference all three shards above
+  (plus this package's own independent Shopify/Odoo/OCA/engineering-
+  reference research, `S1`–`S16`, `O1`–`O14`, `Q1`–`Q8`, `E1`–`E9`), rather
+  than replacing any of them. Where this package's own research and a sibling
+  shard reach the same conclusion, both are cited as corroboration. Where a
+  sibling shard is deeper, more precisely sourced, or corrects something this
+  package stated less precisely, this package defers to and cross-references
+  it rather than re-deriving or duplicating it.
 
 ## 4. Official Shopify sources — freshly fetched this session (2026-07-08)
 
@@ -171,7 +199,7 @@ evidence-map files should rest on a source not listed here.
 - All of §8 (Engineering references, E1–E9) — general distributed-systems/API-client patterns, cited only because Shopify/Odoo official docs are silent on these specific topics (idempotency-key *design* for our own outbound calls, dead-letter-queue *pattern*, resumable-checkpoint *pattern*, log-redaction *pattern*). None may be cited as a Shopify or Odoo fact.
 - **C1** (Shopify Community Forums) — corroboration only.
 - §3 competitor-tier docs (R27–R30) — `[Competitor claim]`/synthesis tier per `CLAUDE.md` §8, useful for UX/quality-bar framing, not architecture facts.
-- **Q1–Q8** (OCA `queue_job`) — explicitly a reference pattern only. RA-004 (OCA `queue_job` not the Phase 1 default substrate) remains binding and is **not** reconsidered by this research; nothing in §7 argues for adopting `queue_job`.
+- **Q1–Q8** (OCA `queue_job`) — explicitly a reference pattern only. RA-004 (OCA `queue_job` not the Phase 1 default substrate) remains binding and is **not** reconsidered by this research; nothing in §7 argues for adopting `queue_job`. `R33` (PR #126) independently reached the same OCA/`queue_job` source material via a separate, adversarially-verified research pass — see the discrepancy note below on the exact `--workers` threshold.
 
 ## Version / API caveats
 
@@ -181,4 +209,7 @@ evidence-map files should rest on a source not listed here.
 4. **Odoo 19.0 source layout changed mid-line**: `odoo/models.py` → `odoo/orm/models.py` (O9). Any future citation of "the ORM source" must target the new path.
 5. **This package's Odoo source-code citations are a live-branch (19.0) snapshot as of 2026-07-08** — line numbers cited in the companion notes will drift as upstream edits land; re-locate by method/constant name, not line number, on any future re-verification.
 6. **The 25,000-object pagination cap is Liquid/Storefront-only** (S5), not Admin GraphQL — this corrects an ambiguity left open in the pre-006A baseline (R24).
-7. **R31 (PR #124) is the canonical Odoo/repo-substrate shard for this task family, added this revision.** Where this package's own Odoo research (O1–O14) and R31 independently reach the same conclusion, both are cited as corroboration between two independently-produced shards produced the same day (2026-07-08). Two overclaim-risk conclusions this package originally stated too strongly — (a) that "Tasks 001–005 already satisfies most mandatory claims," and (b) that Odoo's RPC-layer retry "does not extend" to a cron job's own record-processing code — have been relabeled this revision as, respectively, a partial-primitives statement with explicit named gaps, and a source-backed inference requiring runtime proof, not settled facts. See `sync-engine-source-notes.md`'s "Companion Task 006A shards" note and `sync-engine-evidence-map.md` rows 1 and 20 for the corrected wording.
+7. **R31 (PR #124) is the canonical Odoo/repo-substrate shard for this task family, added revision 1.** Where this package's own Odoo research (O1–O14) and R31 independently reach the same conclusion, both are cited as corroboration between two independently-produced shards produced the same day (2026-07-08). Two overclaim-risk conclusions this package originally stated too strongly — (a) that "Tasks 001–005 already satisfies most mandatory claims," and (b) that Odoo's RPC-layer retry "does not extend" to a cron job's own record-processing code — have been relabeled as, respectively, a partial-primitives statement with explicit named gaps, and a source-backed inference requiring runtime proof, not settled facts. See `sync-engine-source-notes.md`'s "Companion Task 006A shards" note and `sync-engine-evidence-map.md` rows 1 and 20 for the corrected wording.
+8. **R33 (PR #126) is the canonical queue/idempotency/retry/backoff/dead-letter reference shard, added this revision.** Where this package's own engineering-reference research (`E1`–`E9`) and R33 independently reach the same conclusion (bounded retry + exponential backoff + jitter as a converged, cross-vendor requirement; dead-letter visibility as a structural pattern this repo's own job states already satisfy; OCA `queue_job` as reference-only, RA-004 unchanged), both are cited as corroboration. Where R33 is genuinely new or corrects this package: (a) a throttled Shopify GraphQL call can return **HTTP 200** with a `THROTTLED` code in the body rather than a 4xx status — this package's own rate-limit research (carried from the pre-006A baseline, `R24`, not independently re-verified for GraphQL response-status behavior this session) did not previously surface this; (b) dead-letter-queue visibility across every vendor examined is an **opt-in alarm/metric**, not a default push notification, and dead-lettering can trigger on a **single** failed attempt (not only after multiple retries) — both nuances now cross-referenced into this package's dead-letter claim; (c) PostgreSQL advisory locks (session- vs. transaction-scoped, and a documented `LIMIT`+advisory-lock hazard) were not previously researched by this package; (d) R33's own duplicate-running-prevention research independently reaches the identical "requires actual Odoo 19 runtime proof, not source-reading alone" conclusion this package and R31 already carried — now a three-shard-corroborated open question, not a single package's inference. See `sync-engine-source-notes.md`'s "Wording alignment against R33" notes for the full list.
+9. **A discrepancy on OCA `queue_job`'s minimum worker count is noted, not resolved.** This package's pre-006A baseline (`R25`) cites `--workers > 0` as the Jobrunner's operational precondition; `R33` (PR #126, OCA-4) cites `--workers > 1`. Neither this package nor R33 resolves this — recorded here as an unreconciled discrepancy between two source passes, consistent with the source rules' "record the conflict, do not resolve it prematurely" instruction. Immaterial to RA-004 either way (queue_job remains reference-only).
+10. **A methodological note on `E2`/`GEN-9` (the AWS Builders' Library "Timeouts, retries, and backoff with jitter" essay).** `R33` (PR #126) reports this exact URL as unextractable (JS-rendered) in **both** of its own research passes and treats it as "Reference only... not used as evidence for any fact" (`GEN-9`). This package's own `E2` citation of the same URL used a different retrieval method — a Wayback Machine archived snapshot — and did extract quotable content from it (see `E2`'s inventory notes). This is disclosed as a methodological difference between the two shards' retrieval approaches, not a factual contradiction; `E2`'s content is independently corroborated by R33's own successfully-fetched sources on the same topic (`GEN-10`, `GEN-12`, `GEN-13`, `GEN-15` — Google SRE, Azure, and AWS Well-Architected all converge on the same bounded-retry-plus-jitter conclusion `E2` describes).

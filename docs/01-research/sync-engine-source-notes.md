@@ -26,9 +26,14 @@ behavior only.
 
 ### Companion Task 006A shards (revision note)
 
-This document was originally drafted before two sibling Task 006A shards
-merged into `Shopify-connector`. Both are now **accepted/merged** and this
-revision cross-references them rather than duplicating their content:
+This document was originally drafted before three sibling Task 006A shards
+merged into `Shopify-connector`. All three are now **accepted/merged** and
+this document (across two revisions) cross-references them rather than
+duplicating their content. **Synthesis hierarchy:** `R31` is canonical for
+Odoo/repo substrate; `R33` is canonical for queue/idempotency/retry/backoff/
+dead-letter reference patterns; `R32` is canonical for competitor/common
+sync patterns; this document is the cross-cutting synthesis, not a fourth
+independent research pass that replaces any of the three.
 
 - **`docs/01-research/sync-engine-odoo-repo-source-notes.md`** (`R31`, PR
   #124, "Task 006A-2 — Odoo and repository substrate research for the sync
@@ -45,12 +50,27 @@ revision cross-references them rather than duplicating their content:
   constraint-DDL-timing/`DEFERRABLE` inference, the `@api.constrains`
   propagation mechanics), this document defers to `R31` and does not restate
   that detail.
+- **`docs/01-research/sync-engine-queue-idempotency-source-notes.md`**
+  (`R33`, PR #126, "Task 006A-3 — queue/idempotency/retry/backoff/dead-letter
+  source notes") is the **canonical queue/idempotency/retry/backoff/
+  dead-letter reference-pattern shard** for this task family — a
+  52-source, 9-topic, adversarially-verified treatment covering OCA
+  `queue_job`, idempotency-key design, retry/backoff/jitter, dead-letter
+  visibility, duplicate-running prevention (including PostgreSQL advisory
+  locks, not previously researched by this document), checkpoint/resume, and
+  observability/redaction — substantially deeper than this document's own
+  `E1`–`E9` engineering-reference pass on the same topics. Where this
+  document's own research and `R33` converge, both are cited as
+  corroboration below. Where `R33` is new, deeper, or corrects something
+  this document stated less precisely, this document now defers to and
+  cross-references it — see "Wording alignment against R33" callouts
+  throughout the sections below.
 - **`docs/01-research/sync-engine-competitor-pattern-notes.md`** (`R32`, PR
-  #123, "Task 006A-4 — sync engine competitor pattern research") is a
-  sync-engine-specific re-lens of this repo's existing competitor research
-  corpus. It is mentioned here for completeness; this document's own
-  "Competitor/common-pattern notes" section below was not rewritten against
-  it, since the task scoping this revision did not request that.
+  #123, "Task 006A-4 — sync engine competitor pattern research") is the
+  **canonical competitor/common-pattern shard**. It is mentioned here for
+  completeness; this document's own "Competitor/common-pattern notes"
+  section below was not rewritten against it, since no revision has scoped
+  that specifically.
 
 ## Current repo substrate notes
 
@@ -125,22 +145,53 @@ line-number citations — see the companion-shards note above.
 *(Re-verification not separately re-run this session for the numeric
 constants themselves — R24's baseline, dated 2026-06-30/07-01/07-02, is
 carried forward unchanged; no fresh fetch in this session's workflow
-contradicted it.)*
+contradicted it. `R33`/PR #126 independently re-fetched and adversarially
+verified this exact topic on 2026-07-08 — see the alignment note below.)*
 
 - **[Fact]** REST leaky-bucket: Standard 40-request bucket / 2 req/s restore;
   Shopify Plus 400-request bucket / 20 req/s restore; HTTP 429 +
-  `Retry-After` on exceed (`R24`).
+  `Retry-After` on exceed (`R24`; independently corroborated by `R33`'s
+  `SH-1`, which additionally confirms the exact figure via the REST Admin
+  API rate-limits page specifically, not the general limits page).
 - **[Fact]** GraphQL calculated-cost throttling: points restored per second
   by plan (Standard 100, Advanced 200, Plus 1000, Enterprise 2000); a single
   query capped at 1,000 points; `extensions.cost.throttleStatus` returned on
-  every response (`R24`).
+  every response (`R24`). **`R33` flags a staleness caveat this package did
+  not previously carry**: a 2023-06-07 Shopify changelog states the
+  Advanced-plan GraphQL figure as 100 points/second, but the current
+  "Shopify API limits" page states 200 points/second for the same tier —
+  the changelog figure is superseded (`R33`'s `SH-8` vs `SH-2`). This
+  package's own `R24`-carried "Advanced 200" figure already matches the
+  *current* number, so no correction is needed here, but the changelog
+  discrepancy is worth knowing if a future session encounters the older
+  page.
+- **[Fact — new this revision, from `R33`]** A throttled Shopify **GraphQL**
+  call can return **HTTP 200** with a `THROTTLED` error code in the response
+  body, rather than a 4xx status (`R33`'s `SH-4`). This package's own
+  pre-006A rate-limit baseline (`R24`) did not independently verify GraphQL
+  throttle response-status behavior — this is a genuine gap `R33` fills, not
+  a correction of an existing claim. *Why it matters:* a sync-engine client
+  that only branches on HTTP status code (the common pattern for REST-style
+  429 handling) would **silently treat a throttled GraphQL call as
+  successful** unless it also inspects the response body for a `THROTTLED`
+  error code. No fetched source (by this package or `R33`) documents a
+  `Retry-After`-equivalent signal for GraphQL `THROTTLED` responses
+  specifically — `R33` logs this as an explicit open question, and this
+  package now carries the same open question (see the companion
+  open-questions document). *Scope:* **core engine** (the client/response-
+  parsing logic must check the response body, not just HTTP status, for any
+  GraphQL call).
 - **[Inference]** Because cost/throttle status is returned on every GraphQL
   response, a sync-engine client can pace itself reactively (read
   `throttleStatus.currentlyAvailable`/`restoreRate` and back off before
   hitting 429) rather than only reactively retrying after a throttle error.
   This is this session's own inference from `R24`'s already-cited facts, not
-  a new fetch. *Scope:* **core engine** (the client/backoff mechanism; which
-  queries to run is **domain**).
+  a new fetch; `R33` independently confirms Shopify's own general guidance
+  points the same direction — "Your code should stop making additional API
+  requests until enough time has passed to retry. The recommended backoff
+  time is one second" and "you could implement a request queue with an
+  exponential backoff algorithm" (`R33`'s `SH-2`). *Scope:* **core engine**
+  (the client/backoff mechanism; which queries to run is **domain**).
 
 ## Shopify pagination notes
 
@@ -164,14 +215,35 @@ contradicted it.)*
   per query/connection the way a Liquid-theme developer would. *Scope:*
   **core engine** (pagination-loop design), **domain-module-relevant**
   (large-catalog imports).
-- **[Open question]** Neither `S1` nor `S2` states whether a saved cursor
-  remains valid if pagination is paused and resumed hours or days later (no
-  documented expiry policy), nor whether ordering is stable if the underlying
-  dataset mutates between page requests. *Why it matters:* directly affects
-  whether "store `endCursor`, resume later" is a *safe* resumable-import
-  design or merely a *technically possible* one — Shopify does not confirm
-  either way. *Scope:* **core engine** design constraint; **domain-module**
-  first-sync/reconciliation design consequence.
+- **[Open question — independently corroborated by `R33`]** Neither `S1` nor
+  `S2` states whether a saved GraphQL cursor remains valid if pagination is
+  paused and resumed hours or days later (no documented expiry policy), nor
+  whether ordering is stable if the underlying dataset mutates between page
+  requests. `R33` (PR #126) independently searched for this and reached the
+  identical conclusion: "No equivalent explicit statement was found for
+  GraphQL `after` cursors specifically — their reuse-safety after a
+  long-delayed resume is an Open question, not a documented guarantee either
+  way" (`R33`'s Checkpoint/resume notes). This is now a **two-shard-
+  corroborated open question**, not a single package's finding. *Why it
+  matters:* directly affects whether "store `endCursor`, resume later" is a
+  *safe* resumable-import design or merely a *technically possible* one —
+  Shopify does not confirm either way for GraphQL. *Scope:* **core engine**
+  design constraint; **domain-module** first-sync/reconciliation design
+  consequence.
+- **[Fact — new this revision, from `R33`]** For the **REST** Admin API
+  (not GraphQL), Shopify explicitly documents that `page_info`/Link-header
+  cursor URLs are **temporary**: "The link header URLs are temporary and we
+  don't recommend saving them to use later. Use link header URLs only while
+  working with the request that generated them" (`R33`'s `SH-16`, direct
+  quote); a request using `page_info` also cannot combine with any parameter
+  other than `limit`/`fields`. This package's own research is GraphQL/Admin-
+  API-focused and had not independently checked the REST pagination page for
+  this specific caveat. *Why it matters:* this is a documented, explicit
+  "don't do this" for the REST cursor equivalent of the open question above
+  — while no equivalent statement exists for GraphQL specifically, the REST
+  precedent is a reasonable signal (not proof) that GraphQL cursors may
+  carry a similar informal expectation. Treat as suggestive context, not a
+  substitute for the still-open GraphQL question. *Scope:* **core engine**.
 
 ## Shopify bulk-operation notes
 
@@ -227,6 +299,23 @@ contradicted it.)*
   recommendation against routine use — the two should not be conflated.
   *Scope:* **domain-module** decision (first-sync product import is the
   concrete candidate), informed by **core-engine** resumability limits above.
+- **[Fact — independently corroborated by `R33`]** `R33` (PR #126)
+  independently researched this exact topic and reached the same
+  not-resumable-at-the-API-level conclusion: "you can retry canceled bulk
+  operations by submitting the query again," and a failed operation's
+  documented remedy is likewise "these errors might be intermittent, so you
+  can try submitting the query again" — with only a separate,
+  one-week-expiring `partialDataUrl` recovering rows already produced before
+  a failure (`R33`'s Checkpoint/resume notes, citing `SH-14`). This
+  package's own `S7`/`S8` findings and `R33`'s independent findings converge
+  exactly — cited here as two-shard corroboration, not a new fact. `R33`
+  also demonstrates good adversarial-verification practice worth noting: an
+  earlier draft of its own research attributed a specific SQL `WHERE`-clause
+  string to a Shopify Engineering blog post about cursor mechanics, but two
+  independent re-fetches found no such code block on the live page, and the
+  unverifiable quote was removed rather than retained (`R33`'s "Unsupported
+  claims removed" §Checkpoint/resume). No equivalent fabricated-quote issue
+  was found in this package's own bulk-operations research.
 
 ## Shopify webhook delivery/retry/HMAC notes
 
@@ -316,6 +405,33 @@ contradicted it.)*
   Bulk-operation notes above) — this is the same fact, cross-referenced here
   because it is simultaneously an idempotency-notes and bulk-operation-notes
   finding.
+- **[Fact — cross-referenced from `R33`]** Shopify's `IDEMPOTENCY_CONCURRENT_REQUEST`
+  behavior (above) is one specific vendor's answer to a question the
+  broader idempotency-key literature does **not** answer uniformly. `R33`
+  (PR #126) independently researched how a concurrent, still-in-flight
+  duplicate request should be handled across vendors and found genuine
+  disagreement: the IETF idempotency-key draft recommends HTTP 409 for this
+  case, while Stripe's own documented behavior is to **not** cache a result
+  for the conflicting concurrent request and tell the client to retry,
+  because no endpoint has yet completed the execution that would produce a
+  result to cache (`R33`'s Idempotency notes, citing `GEN-1`/`GEN-3`). Shopify's
+  own `IDEMPOTENCY_CONCURRENT_REQUEST` response is a third documented shape
+  (a distinct error code rather than either a 409 or silent non-caching).
+  *Why it matters:* a sync engine's own idempotency-layer design (if it ever
+  needs to define behavior for its own concurrent-duplicate case, as opposed
+  to relying on Shopify's) should not assume any one vendor's shape is
+  "the" standard — three platforms researched across this package and `R33`
+  document three different shapes. *Scope:* **core engine**.
+- **[Recommendation-candidate, cross-referenced from `R33`, not a decision]**
+  `R33` independently offers a candidate idempotency-key composition for a
+  *future* architecture review: scoping a key to (a) which two systems'
+  records are involved, (b) which kind of operation is being performed, and
+  (c) a caller-or-event-supplied unique token — explicitly noting Shopify's
+  own `X-Shopify-Webhook-Id` as a candidate for component (c) (`R33`'s
+  Idempotency notes). This is offered by `R33` only as candidate/inference
+  material for later architecture review, not a decision, and is restated
+  here only as a pointer — this package does not adopt, evaluate, or decide
+  on it.
 
 ## Odoo scheduled-action notes
 
@@ -403,9 +519,11 @@ contradicted it.)*
   the whole in-flight transaction, and that Odoo *already* has a bounded,
   jittered, automatic retry mechanism for concurrency conflicts specifically
   — which the sync engine's own retry design should be aware of (and not
-  duplicate at the RPC layer) but which does **not** extend to a cron job's
-  own record-processing code (see Concurrency/locking notes below). *Scope:*
-  **core engine**.
+  duplicate at the RPC layer). **Whether this mechanism extends to a cron
+  job's own record-processing code is a separate, source-backed inference,
+  not a settled fact** — see "Odoo concurrency/locking notes" below for the
+  full framing (now corroborated by three independent shards: this package,
+  `R31`, and `R33`). *Scope:* **core engine**.
 - **[Fact — new this session, source-level confirmation]** `ir.cron`'s own
   `_callback()` method independently implements the identical
   commit-on-success / rollback-and-reraise-on-exception pattern
@@ -527,6 +645,60 @@ contradicted it.)*
   functions" guide (`O13` vs `O1`, confirmed absence). *Why it matters: a*
   future implementer must know to look at the cron-writing guide, not the
   general ORM reference, to find this primitive documented at all.
+- **[Open question — now corroborated by three independent shards]** Whether
+  Odoo 19's `FOR NO KEY UPDATE SKIP LOCKED` cron-acquisition mechanism
+  *actually* prevents duplicate execution under a real multi-worker,
+  multi-process, or multi-server (load-balanced) deployment has, in every
+  research pass performed on this topic, been confirmed only by **reading
+  source and documentation comments** — never by an observed concurrency
+  test. This package's own research (above) and `R31` (PR #124) both reached
+  this conclusion independently; `R33` (PR #126) now makes it a **third**
+  independent shard reaching the identical conclusion, and states it more
+  starkly: "it has not been observed running, and would need an actual
+  concurrency test (fire the same cron from two processes/threads
+  simultaneously and confirm exactly one executes) to verify the documented
+  intent matches real runtime behavior" (`R33`'s Duplicate-running
+  prevention notes). `R33` also names a **more specific** open question this
+  package had not previously surfaced: whether the row-lock-only approach is
+  sufficient with **no additional cross-server coordination** when multiple
+  Odoo application servers share one PostgreSQL database — flagged by `R33`
+  as a real operational pain point worth an explicit runtime test, citing a
+  historical GitHub issue about load-balanced cron scheduling as
+  circumstantial (not conclusive) evidence this has been a problem in
+  practice elsewhere. *Scope:* **core engine**. Restated in full in the
+  companion open-questions and risk-register documents.
+- **[Fact — new this revision, from `R33`, genuine gap this package had not
+  researched]** PostgreSQL's own advisory-lock mechanism (`pg_advisory_lock`
+  and related functions) is a documented alternative/complementary locking
+  primitive this package had not previously examined. Two caveats `R33`
+  surfaces are directly relevant to any future connector-level locking
+  design: (a) calling an advisory-lock function inside a `SELECT ... ORDER
+  BY ... LIMIT` query can lock rows **before** the `LIMIT` is applied,
+  leaving "dangling" locks the application never intended to acquire, held
+  until session end — PostgreSQL's own documentation frames this as a
+  "danger!" worked example (`R33`'s Duplicate-running prevention notes,
+  citing `GEN-30`); (b) **session-scoped** advisory locks are **not**
+  released by a transaction rollback and persist "until explicitly released
+  or the session ends" — a design reusing pooled DB connections across
+  unrelated units of work would need an explicit release step or the
+  transaction-scoped variant (`pg_advisory_xact_lock`) to avoid a lock
+  surviving past its intended scope (`R33`, same source). *Why it matters:*
+  advisory locks are a plausible alternative to row-level `SKIP LOCKED`
+  locking for a future job-claiming design, but carry their own,
+  non-obvious hazards not present in the `lock_for_update()`/`ir.cron`
+  pattern already documented above — worth weighing at the future
+  architecture gate, not decided here. *Scope:* **core engine**.
+- **[Cross-reference, from `R33`]** Odoo's job-acquisition deadlock
+  avoidance (above) is one instance of a general pattern: election/
+  acquisition mechanisms are not automatically proof of a hard
+  mutual-exclusion guarantee. `R33` cites Kubernetes' own `client-go`
+  leader-election package as a structurally similar admission for a
+  different mechanism: "This implementation does not guarantee that only
+  one client is acting as a leader (a.k.a. fencing)" (`R33`'s Duplicate-
+  running prevention notes, citing `GEN-34`, contrasted with `etcd`'s
+  documented single-leader guarantee, `GEN-35`). Offered as corroborating
+  context for treating Odoo's own locking claims with the same "verify, don't
+  assume" discipline, not as a claim about Odoo's mechanism specifically.
 
 ## Existing Task 005 state-gating implications
 
@@ -672,6 +844,39 @@ adoption.
   exists in a mature module — even `queue_job`'s own maintainers flag this
   as unresolved.
 
+**Wording alignment against `R33`.** `R33` (PR #126) independently researched
+OCA `queue_job` via a separate 18.0-branch source read (`OCA-1`–`OCA-10`,
+this package's own `Q1`–`Q8` read the 19.0 branch directly). Points of
+agreement, corroboration, and one unreconciled discrepancy:
+
+- **Reference-only posture**: identical — `R33` explicitly frames its entire
+  OCA section as "reference pattern only," reaffirms RA-004/DEC-005, and
+  states it "does not recommend installing, depending on, or adopting
+  `queue_job`" (`R33`'s OCA queue_job notes). No conflict.
+- **Retry constants**: `R33` independently confirms `DEFAULT_MAX_RETRIES = 5`
+  and `RETRY_INTERVAL = 10 * 60` (600 seconds) (`R33`'s `OCA-6`) — an exact
+  match to this package's own `Q2`/`Q3` findings. Corroboration.
+- **`identity_key` non-terminal-only dedup scope**: `R33` independently
+  confirms the identical narrow-window finding — the dedup check "only
+  searches for existing jobs whose state is `in [wait_dependencies, pending,
+  enqueued]` — **not** `started`" (`R33`'s Idempotency notes, citing
+  `OCA-6`) — an exact match to this package's own `Q3` finding. Corroboration.
+- **`FailedJobError` docstring vs. inference**: `R33` explicitly separates
+  the verbatim docstring ("A job had an error having to be resolved.") from
+  its own interpretive gloss ("terminal failure needing manual
+  intervention"), flagging the blend as a defect its own adversarial-
+  verification pass caught and fixed (`R33`'s OCA queue_job notes,
+  "Corrected on verification"). This package's own `Q3`/`Q8` treatment
+  already kept the two separate; no correction needed here, but `R33`'s
+  explicit self-correction is a useful demonstration of the same discipline.
+- **Discrepancy, not resolved**: `R33` states the standard Jobrunner requires
+  "multiple workers (`--workers > 1`)" (`R33`'s OCA queue_job notes, citing
+  `OCA-4`); this package's pre-006A baseline (`R25`) cites `--workers > 0`
+  for the same requirement. Neither shard resolves this — recorded as an
+  open, unreconciled discrepancy between two independently-produced source
+  passes (see the source inventory's "Version / API caveats" §9). Immaterial
+  to RA-004 either way.
+
 ## Engineering pattern notes
 
 Cited only where Shopify/Odoo official docs are silent, per `CLAUDE.md`
@@ -683,24 +888,49 @@ authoritative for Shopify/Odoo facts.
   retries per layer amplifying load on the deepest dependency **243x**
   under failure (`E2`); Google's SRE book gives an independent worked
   example of retried QPS compounding turn-over-turn (100→200→300 QPS)
-  (`E3`). *Why it matters:* a sync engine that retries at multiple levels
+  (`E3`). **`R33` (PR #126) independently cites the same Google SRE chapter
+  with a different worked example** — "if the database can't service
+  requests because it's overloaded, and the backend, frontend, and
+  JavaScript layers all issue 3 retries (4 attempts), then a single user
+  action may create 64 attempts (4³) on the database" (`R33`'s Retry and
+  backoff notes, citing `GEN-10`) — a different passage from the same
+  source, not a conflict with this package's own `E3` citation; both
+  illustrate the identical multiplicative-amplification principle with
+  different numbers. `R33` also independently confirms AWS Well-Architected
+  rates the risk of unbounded/uncoordinated retries as explicitly **"High"**
+  and separately names "retrying at multiple layers... in a manner which
+  compounds retry attempts" as a documented anti-pattern (`R33`, citing
+  `GEN-15`). *Why it matters:* a sync engine that retries at multiple levels
   (e.g. the GraphQL client retries a request, *and* the cron batch loop
   retries the whole batch, *and* an operator manually retries the same job)
-  risks exactly this amplification against Shopify's own rate limits. Both
+  risks exactly this amplification against Shopify's own rate limits. All
   sources recommend **concentrating retry logic at one layer** and bounding
   it with either a fixed per-request cap or a shared retry budget (`E2`,
-  `E3`). *Scope:* **core engine**.
+  `E3`, `R33`). *Scope:* **core engine**.
 - **[Inference, grounded in `E2`/`E3`]** Non-jittered backoff is undermined
   by correlation — "If all the failed calls back off to the same time, they
   cause contention or overload again when they are retried" (`E2`, direct
   quote) — jitter (randomizing the backoff delay) exists specifically to
   break this correlation. Google SRE guidance: "Always use randomized
-  exponential backoff when scheduling retries" (`E3`, direct quote). *Why it
-  matters:* the already-accepted planning-default retry schedule (`R11` §9:
-  30s base, ×2 multiplier, capped at 30 min, **±20% jitter**) already
-  incorporates jitter — this engineering-reference research **corroborates**
-  that design choice as consistent with recognized practice, it does not
-  surface a gap. *Scope:* **core engine**.
+  exponential backoff when scheduling retries" (`E3`, direct quote). **`R33`
+  adds a specific, corrected formula this package did not previously have**:
+  the canonical AWS Architecture Blog "Equal Jitter" formula is `temp =
+  min(cap, base * 2^attempt); sleep = temp/2 + random(0, temp/2)` — `R33`'s
+  own adversarial-verification pass explicitly flags that an earlier draft
+  of its own research recorded an inaccurate formula for this and corrected
+  it after two independent re-fetches (`R33`'s Retry and backoff notes,
+  citing `GEN-8`); Equal Jitter is documented as strictly worse than Full
+  Jitter ("the loser... doing slightly more work... and tak[ing] much
+  longer"), not merely "similar" as an earlier draft of `R33`'s own research
+  had it. *Why it matters:* the already-accepted planning-default retry
+  schedule (`R11` §9: 30s base, ×2 multiplier, capped at 30 min, **±20%
+  jitter**) already incorporates jitter — this engineering-reference
+  research (this package's own `E2`/`E3`, independently corroborated and
+  extended by `R33`) **corroborates** that design choice as consistent with
+  recognized practice; the exact jitter *formula* the planning default uses
+  (a fixed ±20% band, not Full/Equal/Decorrelated Jitter specifically) is a
+  distinct implementation-planning detail neither this package nor `R33`
+  decides. *Scope:* **core engine**.
 - **[Inference, grounded in `E2`]** "APIs with side effects aren't safe to
   retry unless they provide idempotency" (`E2`, direct quote) —
   general-practice restatement of exactly the principle DEC-009's
@@ -716,33 +946,85 @@ authoritative for Shopify/Odoo facts.
   *Scope:* **domain-module** (if/when the connector ever generates its own
   idempotency keys for Shopify `@idempotent` calls — already anticipated by
   the existing `idempotency_key` field, `R1`).
-- **[Inference, grounded in `E4`]** A dead-letter queue's *purpose* — isolate
-  messages/jobs that failed processing into a separate, inspectable holding
-  area rather than silently dropping or endlessly retrying them, with
-  routing typically keyed to "received/attempted N times without success"
-  (`E4`) — is structurally identical to what `blocked_manual_review` and
-  `failed_final` already do in this repo's accepted job state machine
-  (`R1`). *Why it matters:* the existing design already implements the
-  *pattern* a formal DLQ exists to provide; this research finds no gap here,
-  only confirmation. *Scope:* **core engine**.
-- **[Inference, grounded in `E6`/`E7`]** The general checkpoint/resume
-  pattern for long-running jobs — periodically persist progress externally,
-  resume from last-saved state on restart, design for idempotent
-  re-processing of the last (possibly-repeated) unit of work (`E6`, `E7`) —
-  maps cleanly onto Shopify's own `endCursor`-based pagination (`S1`) *if*
-  the sync engine persists the last-seen cursor as part of a job's own state.
-  Neither Shopify nor Odoo officially documents this combination
-  (cursor-as-checkpoint) as a named pattern — it is this session's own
-  synthesis of two independently-documented mechanisms (Shopify's cursor
-  API + the general checkpoint pattern), not a source's own claim. *Scope:*
-  **core engine** (if the engine owns checkpoint persistence) or
-  **domain-module** (if each domain's import job owns its own cursor
-  state) — **genuinely undecided**, logged as an open question.
-- **[Inference, grounded in `E9`]** OWASP's canonical "never log" list
-  (access tokens, session identifiers, passwords, connection strings,
-  encryption keys, payment-card data, sensitive PII) (`E9`) matches, at the
-  category level, what this repo's existing `redact()`-at-write-path design
-  already guards against for job logs (`R2`). No gap found; corroboration
+- **[Inference, grounded in `E4`, substantially deepened by `R33`]** A
+  dead-letter queue's *purpose* — isolate messages/jobs that failed
+  processing into a separate, inspectable holding area rather than silently
+  dropping or endlessly retrying them, with routing typically keyed to
+  "received/attempted N times without success" (`E4`) — is structurally
+  identical to what `blocked_manual_review` and `failed_final` already do in
+  this repo's accepted job state machine (`R1`). `R33` (PR #126) researched
+  this exact topic far more deeply (SQS, Azure Service Bus, RabbitMQ, EIP —
+  `GEN-18` through `GEN-29`) and surfaces two nuances this package's own
+  lighter `E4` pass did not carry: **(a) visibility is everywhere an opt-in,
+  separately-wired alarm/metric, not a default push notification** — "Set up
+  a CloudWatch alarm to monitor messages in a dead-letter queue using the
+  `ApproximateNumberOfMessagesVisible` metric... [o]nly then can you poll the
+  queue to review and retrieve them," with an equivalent named
+  `DeadletteredMessages` metric in Azure Monitor (`R33`'s Dead-letter notes,
+  citing `GEN-19`/`GEN-25`) — "a bare DLQ with no alarm/monitor wired up
+  therefore provides no visibility guarantee by itself" (`R33`, its own
+  inference); **(b) dead-lettering is not exclusively a multi-attempt
+  phenomenon** — AWS's own SQS docs note "if the `maxReceiveCount` is set to
+  a low value such as 1, one failure to receive a message would cause the
+  message to move to the dead-letter queue," and RabbitMQ dead-letters on a
+  single negative acknowledgment as one of its documented triggers (`R33`,
+  citing `GEN-18`/`GEN-27`). *Why it matters:* this package's own Mandatory
+  Claim 9 evidence ("Permanent failure/dead-letter must be visible") already
+  concluded Odoo core provides no ready-made dead-letter surface and this
+  repo's own job states fill that gap — `R33`'s finding (a) sharpens that
+  conclusion: *visibility* is a separate design concern from *state
+  capture*, and this repo's job/log substrate captures state but has not yet
+  been evaluated (out of scope for this research-only package) against
+  whether an alarm/dashboard is wired to it. *Scope:* **core engine**.
+- **[Inference, grounded in `E6`/`E7`, independently deepened by `R33`]** The
+  general checkpoint/resume pattern for long-running jobs — periodically
+  persist progress externally, resume from last-saved state on restart,
+  design for idempotent re-processing of the last (possibly-repeated) unit
+  of work (`E6`, `E7`) — maps cleanly onto Shopify's own `endCursor`-based
+  pagination (`S1`) *if* the sync engine persists the last-seen cursor as
+  part of a job's own state. Neither Shopify nor Odoo officially documents
+  this combination (cursor-as-checkpoint) as a named pattern — it is this
+  session's own synthesis of two independently-documented mechanisms
+  (Shopify's cursor API + the general checkpoint pattern), not a source's
+  own claim. `R33` (PR #126) independently researched general
+  checkpoint/resume patterns via a different, deeper source set (AWS
+  Glue workflow-resume, AWS Step Functions redrive, Azure Data Factory
+  rerun) and surfaces a sharper framing of the same underlying risk this
+  package's synthesis gestures at: **double-processing** an
+  already-committed record (if the mutating side effect commits before the
+  checkpoint/cursor is persisted, a crash between the two causes
+  reprocessing on resume) versus **silently skipping** a record (if the
+  checkpoint advances before the mutation is durably committed, a crash
+  after the checkpoint-advance but before the commit causes that record to
+  be missed on resume) (`R33`'s Checkpoint/resume notes, citing `GEN-36`,
+  `GEN-37`). *Scope:* **core engine** (if the engine owns checkpoint
+  persistence) or **domain-module** (if each domain's import job owns its
+  own cursor state) — **genuinely undecided**, logged as an open question.
+- **[Inference, grounded in `E9`, independently deepened by `R33`]** OWASP's
+  canonical "never log" list (access tokens, session identifiers, passwords,
+  connection strings, encryption keys, payment-card data, sensitive PII)
+  (`E9`) matches, at the category level, what this repo's existing
+  `redact()`-at-write-path design already guards against for job logs
+  (`R2`). `R33` (PR #126) independently researched observability/redaction
+  via a substantially larger source set (OWASP Top 10 A09 2021/2025, OWASP
+  Secrets Management Cheat Sheet, MITRE CWE-532, NIST SP 800-122, GDPR
+  Art. 5, the Twelve-Factor App) and surfaces two facts directly relevant to
+  this project's own two platforms that this package's lighter `E9` pass did
+  not carry: Shopify's own docs recommend regular client-credential
+  rotation, citing "employees leave, client credentials can be accidentally
+  committed to version control" (`R33`'s Observability/redaction notes,
+  citing `SH-18`); and Odoo's own 19.0 developer documentation states an API
+  key "should [be] store[d]... as carefully as the password as they
+  essentially provide the same access to your user account" (`R33`, citing
+  `OD-10` — `R33` itself flags this exact sentence as needing a citation
+  correction during its own adversarial-verification pass, tracing it to the
+  "External RPC API" page rather than the page an earlier draft attributed
+  it to). *Why it matters:* both platforms this connector integrates with
+  independently treat their own credentials as password-equivalent in their
+  own official documentation — directly relevant to `store_credential.py`'s
+  `access_token` field (`R5`), which this repo's own docstrings already
+  treat the same way. No gap found against the existing `redact()` design;
+  corroboration
   only. *Scope:* **core engine**.
 
 ## Competitor/common-pattern notes (externally sourced only)
@@ -825,6 +1107,34 @@ mechanics (`S13`, `S14` vs `R24`), the 24-hour idempotency-key TTL (`S16` vs
 `R24`), and `ir.cron`'s 3-consecutive/5-over-7-days failure thresholds (`O14`
 vs `R25`) — all match the pre-006A baseline with no material change found.
 
+**New this revision, from `R33` (PR #126):**
+- A throttled Shopify **GraphQL** call can return HTTP 200 with a
+  `THROTTLED` body code rather than a 4xx status — this package's rate-limit
+  research had not independently verified GraphQL throttle response-status
+  behavior before this revision.
+- Dead-letter-queue visibility, across every vendor `R33` examined, is an
+  **opt-in alarm/metric**, not a default push notification; dead-lettering
+  can also trigger on a single failed attempt, not only after exhausted
+  retries.
+- PostgreSQL advisory locks (session- vs. transaction-scoped, and the
+  documented `LIMIT`+advisory-lock hazard) — not previously researched by
+  this package.
+- The exact AWS Architecture Blog Equal Jitter formula, corrected by `R33`'s
+  own adversarial-verification pass.
+- Three independent shards (this package, `R31`, `R33`) now converge on the
+  identical "requires actual Odoo 19 runtime proof, not source-reading
+  alone" conclusion for whether `ir.cron`'s locking prevents duplicate
+  execution — previously a single package's finding, now a
+  three-shard-corroborated open question.
+- REST Admin API `page_info` cursor URLs are explicitly documented as
+  temporary/not-for-saving — the GraphQL equivalent remains an open
+  question, now corroborated by an independent shard reaching the same
+  "undocumented for GraphQL" conclusion.
+- Vendor disagreement on how to handle a concurrent, still-in-flight
+  duplicate request (IETF: HTTP 409; Stripe: don't cache, tell client to
+  retry) — Shopify's own `IDEMPOTENCY_CONCURRENT_REQUEST` is a third
+  documented shape.
+
 ## Inferences
 
 Every claim tagged **[Inference]** above is this session's own reasoned
@@ -899,7 +1209,10 @@ items like VAL-B2/MBQ-05/TD-002):
 ## Source list
 
 See [`sync-engine-source-inventory.md`](./sync-engine-source-inventory.md)
-for the full graded list (62 sources: 6 repo-code, 17 repo-docs/decisions, 9
-repo-research-synthesis — including `R31`/PR #124 and `R32`/PR #123, both
-added this revision — 16 official-Shopify, 1 community, 14 official-Odoo, 8
-OCA, 9 engineering-reference).
+for the full graded list (63 sources: 6 repo-code, 17 repo-docs/decisions, 10
+repo-research-synthesis — including `R31`/PR #124 and `R32`/PR #123 (added
+revision 1) and `R33`/PR #126 (added this revision) — 16 official-Shopify, 1
+community, 14 official-Odoo, 8 OCA, 9 engineering-reference; `R33` itself
+separately catalogs 52 additional sources within its own document, not
+double-counted here). See the source inventory's "Synthesis hierarchy" note
+for how this package, `R31`, `R32`, and `R33` relate to one another.
