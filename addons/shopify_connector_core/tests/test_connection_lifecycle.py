@@ -109,13 +109,24 @@ class TestConnectionLifecycle(TransactionCase):
     # action_activate
     # ------------------------------------------------------------------
 
-    def test_activate_succeeds_with_pass_and_pass(self):
-        self._set_token()
+    def _seed_verified_evidence(self, readiness_result='pass', readiness_at=None):
+        # Shared helper: seeds a fully fresh, activate-eligible evidence
+        # set -- credential_last_verified_at and last_readiness_at
+        # default to the SAME timestamp so last_readiness_at >=
+        # credential_last_verified_at holds deterministically (equal
+        # timestamps satisfy the freshness check).
+        now = fields.Datetime.now()
         self.store.write({
             'last_test_connection_result': 'pass',
-            'last_readiness_result': 'pass',
-            'credential_last_verified_at': fields.Datetime.now(),
+            'last_readiness_result': readiness_result,
+            'credential_last_verified_at': now,
+            'last_readiness_at': readiness_at if readiness_at is not None else now,
         })
+        return now
+
+    def test_activate_succeeds_with_pass_and_pass(self):
+        self._set_token()
+        self._seed_verified_evidence(readiness_result='pass')
         self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
@@ -127,11 +138,7 @@ class TestConnectionLifecycle(TransactionCase):
 
     def test_activate_succeeds_with_pass_and_warning(self):
         self._set_token()
-        self.store.write({
-            'last_test_connection_result': 'pass',
-            'last_readiness_result': 'warning',
-            'credential_last_verified_at': fields.Datetime.now(),
-        })
+        self._seed_verified_evidence(readiness_result='warning')
         self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
@@ -189,11 +196,7 @@ class TestConnectionLifecycle(TransactionCase):
         # result mirrors are untouched by disconnect), then activate
         # again -- must NOT silently reconnect on the now-stale mirrors.
         self._set_token()
-        self.store.write({
-            'last_test_connection_result': 'pass',
-            'last_readiness_result': 'pass',
-            'credential_last_verified_at': fields.Datetime.now(),
-        })
+        self._seed_verified_evidence()
         self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
@@ -222,11 +225,7 @@ class TestConnectionLifecycle(TransactionCase):
         # connection success" violation credential_last_verified_at
         # exists to close.
         self._set_token()
-        self.store.write({
-            'last_test_connection_result': 'pass',
-            'last_readiness_result': 'pass',
-            'credential_last_verified_at': fields.Datetime.now(),
-        })
+        self._seed_verified_evidence()
         self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
@@ -251,21 +250,18 @@ class TestConnectionLifecycle(TransactionCase):
         self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
 
     def test_activate_rejects_stale_evidence_after_action_set_token_update(self):
-        # ChatGPT re-review (PR #121): unlike action_replace_token(),
-        # action_set_token() can update an EXISTING credential row
-        # without clearing credential_last_verified_at at all -- so the
-        # truthy check alone is not enough. This proves the credential-
-        # row-freshness check (credential.write_date not newer than
-        # credential_last_verified_at) closes that remaining path: a
-        # token silently overwritten via action_set_token() must not let
-        # activate succeed on pass/pass evidence recorded for the value
-        # it replaced.
+        # Odoo.sh runtime revision (PR #121): the credential.write_date
+        # freshness comparison this test originally exercised proved
+        # brittle against real DB write timing and was removed. The
+        # stale-evidence path via action_set_token() is now closed at
+        # the credential-service source instead: action_set_token()
+        # itself clears credential_last_verified_at on every set/update
+        # (including updating an EXISTING credential row, e.g.
+        # re-entering/correcting a token) -- so a token silently
+        # overwritten via action_set_token() can no longer activate on
+        # pass/pass evidence recorded for the value it replaced.
         self._set_token()
-        self.store.write({
-            'last_test_connection_result': 'pass',
-            'last_readiness_result': 'pass',
-            'credential_last_verified_at': fields.Datetime.now(),
-        })
+        self._seed_verified_evidence()
         self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
@@ -276,26 +272,17 @@ class TestConnectionLifecycle(TransactionCase):
         # re-activation of an already-connected store.
         self.store.write({'state': 'reconnect_needed'})
 
-        # Deterministic setup (avoids same-second write_date/verified_at
-        # flakiness): explicitly backdate credential_last_verified_at
-        # well before the upcoming credential overwrite, rather than
-        # relying on real wall-clock ordering between two nearby writes.
-        stale_verified_at = fields.Datetime.now() - timedelta(minutes=10)
-        self.store.write({'credential_last_verified_at': stale_verified_at})
-
         self.Credential.with_user(self.user_admin).action_set_token(
             self.store, DUMMY_TOKEN + 'OVERWRITTEN'
         )
         self.store.invalidate_recordset()
         self.assertTrue(self.store.credential_present)
-        self.assertTrue(self.store.credential_last_verified_at)
+        self.assertFalse(self.store.credential_last_verified_at)
+        # The stale mirrors are untouched by the token overwrite -- still
+        # 'pass'/'pass', but they no longer describe the current
+        # credential.
         self.assertEqual(self.store.last_test_connection_result, 'pass')
         self.assertEqual(self.store.last_readiness_result, 'pass')
-        credential = self._get_credential()
-        self.assertTrue(credential.write_date)
-        self.assertGreater(
-            credential.write_date, self.store.credential_last_verified_at
-        )
 
         with self.assertRaises(UserError):
             self._store().action_activate()
@@ -303,6 +290,42 @@ class TestConnectionLifecycle(TransactionCase):
         self.assertNotEqual(self.store.state, 'connected')
         self.assertEqual(self.store.state, 'reconnect_needed')
         self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
+
+    def test_activate_rejects_stale_readiness_evidence_before_verification(self):
+        # Readiness-freshness guard: a readiness pass recorded BEFORE the
+        # current credential was verified must not count as evidence for
+        # it -- otherwise stale readiness evidence from an old
+        # credential/test-connection cycle could carry an activation for
+        # a credential it never actually validated against. Deterministic
+        # setup (explicit 10-minute gap) avoids same-second flakiness.
+        self._set_token()
+        verified_at = fields.Datetime.now()
+        old_readiness_at = verified_at - timedelta(minutes=10)
+        self.store.write({
+            'last_test_connection_result': 'pass',
+            'last_readiness_result': 'pass',
+            'last_readiness_at': old_readiness_at,
+            'credential_last_verified_at': verified_at,
+        })
+        jobs_before = self._audit_jobs()
+        with self.assertRaises(UserError):
+            self._store().action_activate()
+        self.store.invalidate_recordset()
+        self.assertNotEqual(self.store.state, 'connected')
+        self.assertEqual(self._audit_jobs(), jobs_before)
+
+    def test_activate_rejects_missing_readiness_at(self):
+        self._set_token()
+        self.store.write({
+            'last_test_connection_result': 'pass',
+            'last_readiness_result': 'pass',
+            'credential_last_verified_at': fields.Datetime.now(),
+        })
+        self.assertFalse(self.store.last_readiness_at)
+        with self.assertRaises(UserError):
+            self._store().action_activate()
+        self.store.invalidate_recordset()
+        self.assertNotEqual(self.store.state, 'connected')
 
     # ------------------------------------------------------------------
     # action_disconnect
@@ -676,11 +699,7 @@ class TestConnectionLifecycle(TransactionCase):
 
     def test_no_secret_leakage_across_lifecycle_actions(self):
         self._set_token()
-        self.store.write({
-            'last_test_connection_result': 'pass',
-            'last_readiness_result': 'pass',
-            'credential_last_verified_at': fields.Datetime.now(),
-        })
+        self._seed_verified_evidence()
         self._store().action_activate()
         self._store().action_disconnect()
         jobs = self.Job.search([('store_id', '=', self.store.id)])

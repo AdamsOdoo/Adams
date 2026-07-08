@@ -71,7 +71,13 @@ class ShopifyConnectorStoreCredential(models.Model):
 
         Runs as the calling user (no `sudo()`) so the ACL layer stays
         live: a non-admin caller fails with `AccessError` from the ORM
-        itself.
+        itself. Any set/update -- including overwriting an *existing*
+        credential row (e.g. re-entering/correcting a token) -- clears
+        `credential_last_verified_at`: a token change invalidates
+        whatever verification was recorded for the value it replaced,
+        closing the Task 005 stale-evidence path at the source instead
+        of relying on the credential row's own `write_date` as a
+        freshness signal.
         """
         if not isinstance(value, str) or not value:
             raise ValidationError(
@@ -89,7 +95,10 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'access_token': value,
                 'credential_state': 'present',
             })
-        store.write({'credential_present': True})
+        store.write({
+            'credential_present': True,
+            'credential_last_verified_at': False,
+        })
         return None
 
     @api.model

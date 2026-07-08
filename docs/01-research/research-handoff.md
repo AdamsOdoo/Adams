@@ -1,5 +1,121 @@
 # Research Handoff (rolling)
 
+### Task 005 PR #121 revision — Odoo.sh runtime failure fix (brittle write_date guard) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/models/shopify_connector_store_credential.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched.
+- **What changed:** Odoo.sh runtime validation (the first actual
+  in-Odoo test run of this PR) **failed 5 tests**, all for the same
+  reason: `action_activate()`'s `credential.write_date >
+  credential_last_verified_at` freshness guard (added in the prior
+  revision) raised "Cannot activate: the stored credential changed
+  after the last verification" even on legitimately fresh evidence --
+  `test_activate_succeeds_with_pass_and_pass`,
+  `_succeeds_with_pass_and_warning`, and all three
+  `_rejects_stale_evidence_after_*` tests. **Root cause**: comparing a
+  credential row's own `write_date` against a manually/test-seeded
+  `credential_last_verified_at` is brittle against real DB write timing
+  under Odoo.sh -- a purely static/unit-test-level guard that never ran
+  in an actual Odoo runtime until now. **Fixed** by removing the
+  `write_date` comparison entirely and instead closing the same
+  stale-evidence path at its real source: `action_set_token()` (in
+  `shopify_connector_store_credential.py`) now clears
+  `credential_last_verified_at` on every token set/update -- including
+  updating an *existing* credential row -- exactly mirroring
+  `action_replace_token()`'s existing behavior, so a token silently
+  overwritten via `action_set_token()` can no longer activate on
+  pass/pass evidence recorded for the value it replaced. `action_
+  activate()` also gained a readiness-freshness requirement:
+  `last_readiness_at` must be truthy and not older than
+  `credential_last_verified_at` -- otherwise a readiness pass recorded
+  *before* the current credential was verified could incorrectly count
+  as evidence for it. Full accepted check order: `credential_present` →
+  credential row exists → `credential_last_verified_at` truthy →
+  `last_test_connection_result == 'pass'` → `last_readiness_result in
+  ('pass', 'warning')` → `last_readiness_at` truthy and `>=
+  credential_last_verified_at`. Raises `UserError` before any write on
+  any failure; no audit job on rejection; no Shopify call; no readiness
+  run. Tests updated: all successful-activation setups now seed
+  `last_readiness_at` (via a new `_seed_verified_evidence()` helper that
+  stamps both `credential_last_verified_at`/`last_readiness_at` from the
+  same timestamp, deterministically satisfying `>=`); the
+  `action_set_token`-stale-evidence test was rewritten to prove
+  `credential_last_verified_at` clears (not `write_date` comparison);
+  two new tests added --
+  `test_activate_rejects_stale_readiness_evidence_before_verification`
+  (10-minute deterministic gap) and
+  `test_activate_rejects_missing_readiness_at`. The prior
+  `action_reconnect()` missing-credential transaction-safety fix
+  (Revision 1) remains untouched and confirmed intact. **No scope
+  expansion** -- no OAuth/setup wizard/UI/sync/domain implementation, no
+  security/ACL change, no new job state/type/source, no new `sudo()`, no
+  new schema field, no `access_token` read/log.
+- **Local validation performed:** `python -m py_compile` on all three
+  changed Python files -- passes. **No Odoo runtime is available in this
+  session's container**, so the updated test suite was not re-executed
+  here -- stated honestly; Odoo.sh validation is requested again via the
+  same command:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`
+  (focused: `--test-tags /shopify_connector_core:TestConnectionLifecycle`).
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the `credential.write_date` freshness guard
+    was a genuine runtime defect (not merely a style nit) -- it passed
+    every static review and `py_compile` check across three prior
+    revisions, and only Odoo.sh's actual test execution exposed it. This
+    is the first defect in this PR's history that a static-only review
+    process (including the earlier adversarial-review workflow) could
+    not have caught, since it depended on real Postgres `write_date`
+    timestamp-column write timing, not reproducible via source
+    inspection alone.
+  - Repeated issue patterns: the credential-service stale-evidence
+    pattern (flagged across Revisions 2–3) is now closed at its actual
+    source (`action_set_token`/`action_replace_token` both clear
+    `credential_last_verified_at`) rather than via a derived-timestamp
+    comparison -- a more robust fix than the one it replaces.
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope) -- flagged for a future docs-scoped session: **any freshness
+    guard comparing ORM-managed timestamp fields (`write_date`,
+    `create_date`) against manually-stamped fields should be treated as
+    requiring actual Odoo-runtime validation before being trusted, not
+    just `py_compile`/static review** -- this is the concrete lesson
+    from this failure.
+  - New rejected approaches: comparing `credential.write_date` to
+    `credential_last_verified_at` as an activation freshness gate is now
+    a rejected mechanism for this codebase (superseded by clearing
+    `credential_last_verified_at` at the credential-service source plus
+    the new `last_readiness_at` freshness check) -- not logged to
+    `rejected-approaches-log.md` since that file is out of this
+    revision's allowed-files scope; flagged here for a future
+    docs-scoped session to formalize if warranted.
+  - New technical debt: none.
+  - Tests or review gates needed: **runtime validation (Odoo.sh or a
+    local Odoo instance) should run at least once before any future
+    "static review accepted" milestone is treated as sufficient for
+    merge** -- this failure is the concrete evidence for that gate,
+    consistent with the "prepare for runtime validation" session that
+    immediately preceded this one.
+  - Should future prompts change? Yes, for future timestamp-comparison
+    guards specifically: prefer clearing/invalidating a dependent field
+    at its mutation source over deriving freshness from a second,
+    independently-managed timestamp field, per the lesson above.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (noted above, not yet
+  formalized in the log file -- out of scope) · technical debt logged
+  (n/a) · repeated-issue escalation applied (noted above) — all YES.
+- **Next step:** re-run Odoo.sh runtime validation against this revised
+  commit; report the result back for ChatGPT re-review.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; no merge; PR remains draft, not marked ready for
+  review.
+
 ### Task 005 PR #121 revision — stale activation evidence after action_set_token() update — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
