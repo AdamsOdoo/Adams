@@ -1,5 +1,103 @@
 # Research Handoff (rolling)
 
+### Task 005 closure — connection lifecycle merged (PR #121) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-closure-docs-s5d9mf` (docs-only closure) →
+  target `Shopify-connector`, **draft**. Closes out PR #121, which is
+  **merged** into `Shopify-connector`, merge commit
+  `8f2d7846fb70ecb62d2353c3f18ca3bbcbb96e82` (PR #121 head commit before
+  merge: `f2ce29c0422258f92877f6464b1746455d28dcb5`, confirmed against this
+  repository's own git history).
+- **Files changed:** this file (new top entry, this session only);
+  `../05-qa/task-005-validation-results.md` (new);
+  `../04-decisions/DEC-024-task-005-closure.md` (new). No code, manifest,
+  XML, CSV, security, migration, CI, controller, view, or wizard file
+  touched by this closure session.
+- **What changed / residue fixed:** Task 005 ("Connection lifecycle
+  actions", scoped by DEC-022) is now merged and closed out at
+  documentation/control-room level. Delivered: `action_activate()`,
+  `action_disconnect()`, `action_reconnect()`,
+  `action_mark_reconnect_needed()`; business-job enqueue-time gating and
+  execution-time gating on store connection state; credential-service
+  state invalidation on token set/replace/clear (`action_set_token()` /
+  `action_replace_token()` move a `connected` store to
+  `reconnect_needed`; `action_clear_token()` moves a `connected` or
+  `reconnect_needed` store to `disconnected`); lifecycle and
+  credential-service tests (`test_connection_lifecycle.py`,
+  `test_credential_service.py`). Live Odoo.sh runtime validation (real
+  Odoo 19 + PostgreSQL registry, not static/`py_compile`-only) passed
+  both the focused `TestConnectionLifecycle` class (**0 failed, 0
+  error(s) of 41 tests**) and the full `shopify_connector_core` module
+  suite (**0 failed, 0 error(s) of 123 tests**) at the merged head commit
+  — see
+  [`task-005-validation-results.md`](../05-qa/task-005-validation-results.md)
+  for the full evidence record, including the two rounds of runtime
+  failures found and fixed before merge.
+- **Runtime lessons learned** (carried forward from the pre-merge PR #121
+  revision entries below, restated here as the closure-level summary):
+  - **Static review missed a real Odoo ORM timestamp-behavior defect.**
+    The `credential.write_date > credential_last_verified_at` freshness
+    guard passed `py_compile` and every static/adversarial review across
+    three PR revisions, but failed live on Odoo.sh (5 activation test
+    failures) because it depended on actual Postgres `write_date`
+    write-timing behavior that no static check exercises.
+  - **The `credential.write_date` freshness guard was brittle and was
+    removed** — replaced by clearing `credential_last_verified_at`
+    directly at its real source (`action_set_token()` /
+    `action_replace_token()`), which does not depend on ORM timestamp-
+    column write timing.
+  - **Credential mutation must invalidate both the verification evidence
+    and the derived `store.state`.** A second, separate runtime failure
+    (1 test) showed that clearing `credential_last_verified_at` alone was
+    not enough: `action_replace_token()` left a `connected` store's
+    `state` unchanged, which would have let business-job gating (keyed on
+    `state == 'connected'`) treat an unverified changed credential as
+    still connected. Fixed by adding lifecycle state invalidation inside
+    the credential service itself.
+- **Current open items (unchanged by this closure):**
+  - **VAL-B2 remains deferred / not passed** — no live Shopify Admin API
+    connection evidence exists; this closure supplies none
+    (`DEC-021-val-b2-deferral-for-task-004.md`).
+  - **MBQ-05 remains partially routed / open** — the scalable
+    many-unrelated-customer distribution/auth architecture is still
+    undecided (`../03-architecture/master-blueprint-open-questions.md`
+    MBQ-05 row; `DEC-023-token-acquisition-and-val-b2.md`).
+  - **TD-002 remains Open** — the `read_fulfillments` readiness-scope
+    correctness concern, routed to the fulfillment domain's own task spec
+    once the fulfillment API model is decided
+    (`../05-qa/technical-debt-register.md` TD-002 row).
+- **No scope expansion.** This session is docs-only: no OAuth, no setup
+  wizard, no UI, no product/customer/order/inventory/fulfillment sync, no
+  security/ACL change. See
+  [`DEC-024-task-005-closure.md`](../04-decisions/DEC-024-task-005-closure.md)
+  for the full accepted-outcome/non-decision record.
+- **Learning feedback loop:**
+  - New issues discovered: none in this closure session (docs-only; the
+    two runtime defects were found and fixed in the pre-merge PR #121
+    revisions, already logged below).
+  - Repeated issue patterns: none new.
+  - Rules/checklists updated: none in this session's allowed-files scope.
+  - New rejected approaches: none new (the `write_date`-as-freshness-guard
+    rejection was already logged in the pre-merge revision entry below).
+  - New technical debt: none new.
+  - Architecture concerns: none new.
+  - Tests or review gates needed: none new — see "Current open items"
+    above for the pre-existing, still-open items.
+  - Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (restated from PR #121's own revision
+  entries; no new learning this session) · no new rejected approach · no
+  new technical debt · no repeated-issue escalation needed.
+- **Next recommended session:** control room (ChatGPT) reviews this
+  closure package and decides the next gated task — candidates listed in
+  [`DEC-024-task-005-closure.md`](../04-decisions/DEC-024-task-005-closure.md)
+  §"Next task candidates" (not selected by this session).
+- **Stop condition:** docs-only closure session, stopped after opening a
+  draft PR against `Shopify-connector`. No code touched. No merge
+  performed. Awaiting ChatGPT review.
+
+---
+
 ### Task 005 PR #121 revision — Odoo.sh runtime failure fix (lifecycle state invalidation gap) — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
