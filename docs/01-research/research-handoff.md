@@ -1,5 +1,249 @@
 # Research Handoff (rolling)
 
+### Task 006B — PR #128 acceptance patch — DEC-025 / AR-030 accepted — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` → PR #128 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened). Applies ChatGPT's acceptance of the sync-engine
+  architecture gate, per control-room review, after the prior revisions'
+  governance fixes (direct baseline-file inspection; the `AR-030` addition;
+  the stale-wording consistency fix).
+- **Files changed:** `docs/04-decisions/DEC-025-task-006-sync-engine-gate.md`
+  (Status → Accepted by ChatGPT, 2026-07-08; new Acceptance note added),
+  `docs/05-qa/architecture-review-log.md` (`AR-030` row → Accepted by
+  ChatGPT, Status → Accepted; only this one row touched, no other AR row
+  altered), `docs/05-qa/task-006b-architecture-gate-review-checklist.md`
+  (overall review decision recorded as accepted; DEC-025/`AR-030`
+  acceptance confirmed), `docs/01-research/research-handoff.md` (this
+  entry).
+- **What changed / residue fixed:** **DEC-025 is now `Accepted by
+  ChatGPT`** (acceptance date 2026-07-08) — the architecture gate itself
+  (`docs/03-architecture/sync-engine-architecture-gate.md`, unchanged by
+  this patch) is accepted as the architecture-level shape for the future
+  domain-neutral sync engine. **`AR-030` is now `Accepted`**, mirroring
+  DEC-025 exactly, with its Follow-up action column stating explicitly that
+  future Task 006C implementation-scope drafting may be proposed in a
+  separate session but no implementation is authorized by `AR-030`/DEC-025
+  itself. Every internally-contradictory "Proposed" framing left over from
+  the pre-acceptance drafting (top blockquote, Status section, "Proposed
+  architecture decisions" heading, Consequences/Follow-ups wording, the
+  Architecture-review-log note, and the "No implementation authorized"
+  section) was updated for tense consistency with the new Accepted status,
+  while preserving every non-implementation guardrail verbatim in substance.
+- **No implementation was authorized. No implementation-scope file was
+  created.** No addon file, Python, XML, CSV, manifest, security,
+  migration, CI/workflow, controller, view, wizard, OAuth, or domain-sync
+  code was created or modified. `docs/07-implementation-plan/
+  task-006-sync-engine-implementation-scope.md` and `docs/07-
+  implementation-plan/task-006c-sync-engine-implementation-scope.md` do not
+  exist and were not created.
+- **Every Task 006A open item remains preserved, exactly as open as
+  before:** VAL-B2 deferred/not passed; MBQ-05 Partially routed/Open (token
+  acquisition for many unrelated customers unresolved); TD-002 Open;
+  fulfillment API model unresolved; product first-sync dedup thresholds
+  still domain-design work; Lite/Full packaging not finalized; the
+  16-vs-17 `@idempotent` mutation-count and OCA `queue_job` worker-count
+  wording discrepancies both still open/non-blocking; multi-server/Odoo.sh
+  runtime concurrency proof still explicitly required before any future
+  implementation relies on a concurrency assumption named in the gate. None
+  of these was resolved, narrowed, or silently decided by this acceptance
+  patch.
+- **Items deferred:** none new.
+- **Learning feedback loop:** new issues discovered: none — this patch
+  applies a clean acceptance outcome, with no new governance gap found.
+  Repeated issue patterns: none. Rules/checklists updated:
+  `task-006b-architecture-gate-review-checklist.md`'s DEC-025-status,
+  AR-log, and overall-review-decision sections updated to reflect
+  acceptance. New rejected approaches: none. New technical debt: none.
+  Architecture concerns: none beyond what Task 006A already flagged
+  (carried forward unchanged, per DEC-025's Acceptance note). Should future
+  prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** a future Task 006C implementation-scope proposal — a
+  **separately-scoped, separately-authorized** session, not started, not
+  drafted, and not implied by this acceptance patch. **This is not a coding
+  session** and does not itself open the implementation gate
+  (`../05-qa/quality-feedback-loop.md` §10, `CLAUDE.md` §5/§9 both still
+  apply).
+- **Stop condition:** docs-only acceptance patch, no code touched, no
+  implementation authorized, no implementation-scope file created. Stopped
+  after pushing to the same PR #128 branch. No merge performed. PR remains
+  draft/unmerged, awaiting ChatGPT's final merge review.
+
+---
+
+### Task 006B — PR #128 revision — governance corrections (AR-log row + direct baseline inspection) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` → PR #128 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened). Revises the initial version per control-room review
+  (GitHub review artifact/comment ID `4918187862`), which found the PR
+  directionally strong but not yet acceptable on two points.
+- **Files changed:** `docs/03-architecture/sync-engine-architecture-gate.md`
+  (revised), `docs/04-decisions/DEC-025-task-006-sync-engine-gate.md`
+  (revised), `docs/05-qa/task-006b-architecture-gate-review-checklist.md`
+  (revised), `docs/05-qa/architecture-review-log.md` (new `AR-030` row
+  added), `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:**
+  1. **Directly read, in full, the two pre-006A baseline sources** —
+     `docs/01-research/shopify-official-api-notes.md` (917 lines) and
+     `docs/01-research/odoo-official-architecture-notes.md` (803 lines) —
+     which the initial PR version had cited only via the Task 006A synthesis
+     layer, not independently. Direct inspection **confirmed, rather than
+     changed**, this gate's proposed architecture content: every fact the
+     gate cites from these two baselines is present and unchanged in the
+     baseline text, and every fact the gate cites that goes beyond the
+     baselines (GraphQL HTTP-200/`THROTTLED`-body behavior, `SKIP LOCKED`/
+     `lock_for_update()` precedent, the >64-savepoint warning, `retrying()`'s
+     RPC-layer retry, the 16-vs-17 `@idempotent` count discrepancy) is
+     correctly attributed to Task 006A's own deeper source-level research,
+     not to these baselines. One genuine sharpening was found and named
+     explicitly in the gate document's new "Revision note": the baseline
+     describes `ir.cron`'s deactivation as notifying "the DB admin," while
+     Task 006A's source-level reading found the base `_notify_admin()` is a
+     log-line-only no-op by default — already correctly cited at the sharper
+     level in this gate's §C/§E via `O7`/SRR-05, so no content change was
+     needed there. **No material architecture change was required** by this
+     direct inspection.
+  2. **Added `AR-030`** to `docs/05-qa/architecture-review-log.md` for this
+     proposal, after inspecting the log's complete existing `AR-0##`
+     sequence (highest prior: `AR-029`, 2026-07-07) to confirm `030` is the
+     correct next number. `AR-030`'s Review decision and Status both read
+     "Proposed for ChatGPT review — NOT YET ACCEPTED" / "Proposed,"
+     mirroring DEC-025's own status exactly — **not** marked Accepted.
+  3. Updated DEC-025's "Architecture-review-log note" to state the row is
+     now added (replacing the prior version's explanation of why no row was
+     added), and added the two baseline sources to DEC-025's evidence list,
+     noting they were directly read this revision.
+  4. Updated `docs/05-qa/task-006b-architecture-gate-review-checklist.md`'s
+     architecture-review-log and Task-006A-coverage items so a reviewer can
+     confirm: the `AR-030` row exists, it is not marked Accepted, DEC-025
+     remains Proposed/Pending, and the two baseline files were directly
+     read.
+- **No new rejected approach was created; no implementation was
+  authorized; no implementation-scope file was created.** DEC-025's
+  `Status` remains **"Proposed / Pending ChatGPT review"** — not Accepted.
+  `AR-030`'s Status remains **"Proposed"** — not Accepted. Every Task 006A
+  open blocker (VAL-B2, MBQ-05, TD-002, fulfillment API model, product
+  first-sync dedup thresholds, Lite/Full packaging, the 16-vs-17 mutation
+  count and OCA `queue_job` worker-count discrepancies, multi-server/
+  Odoo.sh runtime concurrency proof) remains exactly as open as the prior
+  revision left it — none was silently resolved by this revision.
+- **Items deferred:** none new; the `architecture-review-log.md` gap
+  flagged in the prior revision's handoff entry is now resolved (row
+  added), not deferred further.
+- **Learning feedback loop:** new issues discovered: two governance gaps
+  from the initial PR version (missing `architecture-review-log` row;
+  baseline files not independently re-read) — both fixed this revision, both
+  logged here rather than silently corrected. Repeated issue patterns: none
+  (first occurrence of both categories for this task). Rules/checklists
+  updated: `task-006b-architecture-gate-review-checklist.md` gained explicit
+  checks for both. New rejected approaches: none. New technical debt: none.
+  Architecture concerns: none beyond what Task 006A already flagged (carried
+  forward unchanged). Should future prompts change? No — the original task
+  prompt already listed both baseline files as required inputs; the gap was
+  in how the first pass satisfied that requirement (synthesis-layer citation
+  instead of direct read), not in the prompt itself.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** ChatGPT re-review of PR #128 (revised) and its `AR-030` /
+  DEC-025 proposal.
+- **Stop condition:** docs-only revision, no code touched, no implementation
+  authorized, DEC-025 and `AR-030` both left Proposed/Pending, not Accepted.
+  Stopped after pushing to the same PR #128 branch. No merge performed. PR
+  remains draft/unmerged.
+
+---
+
+### Task 006B — sync engine architecture gate proposal — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` (harness-
+  designated session branch, based on `origin/Shopify-connector` HEAD
+  `3207791412ebedbc83eceaf70592df8c8df0d97a` — the PR #127 merge commit,
+  confirmed an ancestor before any edit) → target `Shopify-connector`,
+  **draft**, opened this session. Note: the task prompt's suggested branch
+  name (`claude/task-006b-sync-engine-architecture-gate`) was not used — the
+  harness had already assigned and checked out
+  `claude/task-006b-sync-engine-gate-865mw5` per this session's Git
+  Development Branch Requirements, and per governance this session developed
+  on the harness-assigned branch rather than creating a second one.
+- **Files changed:** `docs/03-architecture/sync-engine-architecture-gate.md`
+  (new), `docs/04-decisions/DEC-025-task-006-sync-engine-gate.md` (new),
+  `docs/05-qa/task-006b-architecture-gate-review-checklist.md` (new),
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** converted the accepted Task 006A
+  research package (PR #123 competitor/common-pattern research, PR #124
+  Odoo/repo substrate research, PR #126 queue/idempotency/retry/backoff/
+  dead-letter research, PR #125 final synthesis/evidence map, PR #127
+  completeness audit — all confirmed merged and ancestor-verified) into a
+  **proposed architecture gate** for the future domain-neutral sync engine.
+  Synthesized: architecture principles (domain-neutrality, no duplicate
+  domain queue/retry/log engines, trigger convergence, webhook
+  enqueue-only, core/domain ownership split, extension seams); a proposed
+  core-engine shape (job creation/enqueue, drain loop, dispatcher, handler
+  registry, retry scheduling, idempotency/duplicate-running guardrails,
+  manual-review surface, checkpoint/resume, audit trail, redaction, gating,
+  disconnect/reconnect lifecycle); a job-trigger model (manual/scheduled/
+  webhook/reconciliation/`odoo_event`, all converging on one job mechanism,
+  trigger source kept distinct from job type); a retry/failure policy
+  (DEC-009's classified taxonomy, Shopify REST 429/`Retry-After` and GraphQL
+  HTTP-200/`THROTTLED`-body handling, MBQ-16 planning-default backoff
+  constants); a layered idempotency/duplicate-prevention architecture
+  (core-owned job key + serialization guard + webhook dedup vs.
+  domain-owned `@idempotent`/binding rules); the Odoo execution substrate
+  (`ir.cron` as Phase 1 primitive, OCA `queue_job` reference-only/RA-004
+  unchanged, savepoint performance constraint, three-shard-corroborated
+  concurrency open questions); Shopify API implications (GraphQL-preferred,
+  cost/rate-limit awareness, cursor/bulk-operation checkpoint trade-offs,
+  non-guaranteed webhook delivery); a core-vs-domain responsibility table;
+  and an MVP-implication section stating explicitly that no implementation,
+  Task 006C, or implementation-scope file is authorized by this gate.
+- **Items deferred:** this session did not modify
+  `docs/05-qa/architecture-review-log.md` — despite an observed repo
+  convention of adding a "Proposed for ChatGPT review" row for each proposed
+  DEC, this session judged the risk of mis-numbering/mis-formatting a row in
+  that 1,600+-line log too high for a docs-synthesis session to take on
+  unprompted; flagged explicitly in DEC-025's own "Architecture-review-log
+  note" and in this session's final report, per the task's "if uncertain, do
+  not modify it" instruction.
+- **Learning feedback loop:** new issues discovered: none (synthesis-only
+  session; no code, no defects possible). Repeated issue patterns: none.
+  Rules/checklists updated: none (a new checklist file was created, not an
+  existing rule modified). New rejected approaches: none — checked
+  `rejected-approaches-log.md` before drafting; no approach proposed here
+  meets or conflicts with any existing RA row. New technical debt: none.
+  Architecture concerns: none beyond what Task 006A already flagged as open
+  (carried forward in DEC-025 §Open questions and §Risks, not newly
+  introduced). Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **DEC-025 status:** **Proposed / Pending ChatGPT review** — not Accepted.
+  No decision in this session's output is marked Accepted; no implementation
+  is authorized; no Task 006C or implementation-scope file was created.
+- **Preserved blockers (confirmed unchanged by this session):** VAL-B2
+  deferred/not passed; MBQ-05 Partially routed/Open; TD-002 Open; fulfillment
+  API model unresolved; product first-sync dedup thresholds still domain
+  design; Lite/Full packaging not finalized; the 16-vs-17 `@idempotent`
+  mutation-count discrepancy and the OCA `queue_job` `--workers > 0` vs.
+  `> 1` wording discrepancy both still open/non-blocking; multi-server/
+  Odoo.sh runtime concurrency proof still required before any future
+  implementation relies on a concurrency assumption named in this gate.
+- **Next step:** ChatGPT review of this architecture gate and DEC-025 (see
+  `docs/05-qa/task-006b-architecture-gate-review-checklist.md`). If
+  accepted, the recommended next session is a separately-scoped, separately-
+  authorized Task 006C implementation-scope drafting session — not started
+  here.
+- **Stop condition:** docs-only session, no code touched, no implementation
+  authorized, no Task 006C/implementation-scope file created, DEC-025 left
+  as Proposed/Pending, not Accepted. Stopped after opening a draft PR
+  against `Shopify-connector`. Awaiting ChatGPT review.
+
+---
+
 ### Task 006A completeness audit — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-006a-completeness-audit-ptq56q` → target
