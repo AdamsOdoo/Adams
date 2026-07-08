@@ -8,6 +8,14 @@
 > Every question below either predates this session (restated here for
 > completeness, per the task's mandatory-known-items requirement) or was
 > surfaced fresh by this session's research — each is marked accordingly.
+>
+> **Revision note:** this branch was updated against latest
+> `Shopify-connector` after PR #123 and PR #124 merged. Questions 17, 18,
+> and 30 (Odoo concurrency/locking) are cross-referenced against
+> `docs/01-research/sync-engine-odoo-repo-source-notes.md` (PR #124, the
+> canonical Odoo/repo-substrate shard for this task family), which
+> independently examined `ir.cron`'s job-acquisition locking and reached the
+> same "not fully settled without runtime proof" framing.
 
 ## Blocking questions before implementation
 
@@ -109,18 +117,26 @@ written.
     sweep (`action_disconnect()`) fully closes the race against a business
     job already transitioned to `running` inside an in-flight `ir.cron`
     batch at the exact instant of disconnect is **not proven by any source**
-    in this package — the existing gating blocks a transition *into*
+    in this package or in `R31` (PR #124, which independently inspected the
+    same substrate) — the existing gating blocks a transition *into*
     `running`, but does not itself interrupt a job already past that check.
     Requires live Odoo-runtime proof (see below), not resolved by
     documentation research alone.
 18. **[New this session]** Whether `lock_for_update()`/`try_lock_for_update()`
-    (Odoo's `@api.private` row-locking primitives, `O9`) should be adopted by
-    a future sync-engine's own cron-batch record processing is an open
-    design question this research surfaces but does not answer — the primary
-    finding is only that Odoo's RPC-layer automatic retry (`retrying()`,
-    `O5`) does **not** extend to a cron job's own record-processing code, so
-    *some* explicit mechanism (locking, or catch-and-retry, or both) will be
-    needed; which one is unresolved.
+    (Odoo's `@api.private` row-locking primitives, `O9`, independently
+    confirmed by `R31`) should be adopted by a future sync-engine's own
+    cron-batch record processing is an open design question this research
+    surfaces but does not answer. The underlying premise is itself a
+    **source-backed inference, not a proven fact**: Odoo's RPC-layer
+    automatic retry (`retrying()`, `O5`, `O6`) is source-confirmed for
+    RPC/HTTP dispatch, but the `ir.cron` job-processing code reviewed did not
+    show an equivalent automatic retry around each domain record-processing
+    step (`O7`) — `R31` independently examined `ir.cron`'s job-*acquisition*
+    locking specifically (a related but distinct layer) without settling
+    this narrower question either. If the inference holds, *some* explicit
+    mechanism (locking, or catch-and-retry, or both) would plausibly be
+    needed; which one, and whether the inference is even correct, both
+    remain unresolved pending runtime proof.
 
 ## UX/observability uncertainties
 

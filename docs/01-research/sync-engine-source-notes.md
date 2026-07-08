@@ -24,7 +24,33 @@ Odoo docs/source, (4) OCA `queue_job` as reference pattern only, (5)
 reputable engineering references, (6) competitor docs for externally visible
 behavior only.
 
----
+### Companion Task 006A shards (revision note)
+
+This document was originally drafted before two sibling Task 006A shards
+merged into `Shopify-connector`. Both are now **accepted/merged** and this
+revision cross-references them rather than duplicating their content:
+
+- **`docs/01-research/sync-engine-odoo-repo-source-notes.md`** (`R31`, PR
+  #124, "Task 006A-2 — Odoo and repository substrate research for the sync
+  engine") is the **canonical Odoo/repo-substrate shard** for this task
+  family — a dedicated, line-cited inspection of the same job/log/store/
+  credential/readiness substrate this document also covers, plus
+  substantially deeper Odoo source-code research (constraints/DDL timing,
+  `@api.constrains` propagation, `cr.savepoint()` usage patterns) than this
+  document independently performed. Where this document's own independent
+  Odoo research (fetched the same day, 2026-07-08, via a separate research
+  workflow) reaches the same conclusion, that is noted below as
+  **corroboration between two independently produced shards**, not restated
+  as if discovered only once. Where `R31` goes further (e.g. the
+  constraint-DDL-timing/`DEFERRABLE` inference, the `@api.constrains`
+  propagation mechanics), this document defers to `R31` and does not restate
+  that detail.
+- **`docs/01-research/sync-engine-competitor-pattern-notes.md`** (`R32`, PR
+  #123, "Task 006A-4 — sync engine competitor pattern research") is a
+  sync-engine-specific re-lens of this repo's existing competitor research
+  corpus. It is mentioned here for completeness; this document's own
+  "Competitor/common-pattern notes" section below was not rewritten against
+  it, since the task scoping this revision did not request that.
 
 ## Current repo substrate notes
 
@@ -32,9 +58,14 @@ The core job/log/store/credential/readiness substrate is **already
 implemented and merged** (Tasks 001–005; PR #121 merged into
 `Shopify-connector`, merge commit `8f2d7846fb70ecb62d2353c3f18ca3bbcbb96e82`;
 PR #122 docs-closure merged, merge commit
-`9247fea3c36afdb761a82678f3e5e66e8ef42e87` — this session's branch is based on
-that commit). This is not a research finding to weigh against alternatives;
-it is ground truth this research must build on, not re-derive.
+`9247fea3c36afdb761a82678f3e5e66e8ef42e87`). **This document's branch was
+initially created from that PR #122 base; it has since been updated against
+latest `Shopify-connector`, which now also includes PR #123 and PR #124**
+(merge commit `3735ae2292d1fcf926c83034ac8513906c9f5020`). This is not a
+research finding to weigh against alternatives; it is ground truth this
+research must build on, not re-derive. `R31` (PR #124) independently
+inspected this same substrate at the source-code level with additional
+line-number citations — see the companion-shards note above.
 
 - **[Fact]** `shopify.connector.job` (`R1`) already has: a 10-state machine
   (`draft/queued/running/succeeded/failed_final/skipped/cancelled/
@@ -323,15 +354,18 @@ contradicted it.)*
   at the exact field/method level. *Scope:* **core engine**.
 - **[Fact — new this session]** `ir.cron.progress` stores **no error
   message, exception, traceback, or failed-payload field** — only integer
-  counters and a boolean. Combined with the confirmed absence of any "dead
-  letter"/"DLQ" terminology anywhere in `ir_cron.py` or the official
-  Scheduled Actions documentation section (`O7`, `O14`, verified by full-text
-  search), Odoo's closest analog to a dead-letter concept is: failure
-  counters + eventual deactivation + a log-only notification — **no
-  persisted record of what failed or why, and no built-in redrive/replay**.
-  *Why it matters:* directly informs Mandatory Claim "Permanent
-  failure/dead-letter must be visible" — Odoo core provides **no**
-  ready-made dead-letter surface; a sync engine wanting one must build it
+  counters and a boolean. No documented or reviewed Odoo `ir.cron`
+  dead-letter/redrive mechanism was found in the sources inspected — no
+  "dead letter"/"DLQ" terminology appears anywhere in `ir_cron.py` or the
+  official Scheduled Actions documentation section (`O7`, `O14`, verified by
+  full-text search of the files actually reviewed, not a whole-codebase
+  claim). What Odoo's failure handling *does* provide, within the sources
+  inspected, is: failure counters + eventual deactivation + a log-only
+  notification — no persisted record of what failed or why, and no
+  redrive/replay mechanism was found in what was reviewed. *Why it matters:*
+  directly informs Mandatory Claim "Permanent failure/dead-letter must be
+  visible" — the connector must not rely on `ir.cron` for permanent-failure
+  visibility; a sync engine wanting a dead-letter surface must build it
   itself (this repo's own `shopify.connector.job`/`.job.log`
   `failed_final`/`blocked_manual_review` states plus the audit log **already
   are** that self-built surface — see "Existing job/log substrate
@@ -382,20 +416,28 @@ contradicted it.)*
   the last commit point is rolled back (`O7`, this session's synthesis of
   two source blocks, marked **[Inference]** in the raw research but treated
   here as a well-grounded reading of the two quoted code blocks).
-- **[Fact — new this session]** Odoo's official coding guidelines give an
-  **explicit, quantified performance ceiling** on the per-record-savepoint
-  pattern DEC-005 already specifies: *"After you start more than 64
+- **[Fact — new this session, independently corroborated by `R31`]** Odoo's
+  official coding guidelines warn that PostgreSQL performance degrades when
+  a transaction uses more than 64 savepoints: *"After you start more than 64
   savepoints during a single transaction, PostgreSQL will slow down. In all
   cases, if the server runs replicas, savepoints have a huge overhead. If
   you process records and savepoint in a loop... limit the size of the
   batch. If you have more records, the function should maybe become a
   scheduled job or you have to accept the performance penalty"* (`O8`,
-  direct quote). *Why it matters:* this is the single most directly
-  load-bearing new fact in this whole research package for Analysis Area E
-  (batch sizing) — DEC-005's "per-record isolation (savepoints)" requirement
-  now has an official, numeric upper bound to design against, which no prior
-  repo research had surfaced. *Scope:* **core engine** (the batch-size /
-  savepoint-per-item cron-loop design).
+  direct quote; `R31` independently fetched and quotes the same passage).
+  **This is a performance constraint to design against, not a hard
+  functional cap** — nothing enforces it at the code level, and `R31`
+  additionally found that core `create()`/`write()` do **not** wrap
+  themselves in a savepoint by default: savepoints are used **selectively**
+  by higher-level code (e.g. `Model.load()`'s per-record retry-on-batch-
+  failure) and in business-logic `try`/`except` blocks across addons, not as
+  an automatic per-record mechanism. *Why it matters:* future
+  per-record-savepoint loops (as DEC-005's "per-record isolation
+  (savepoints)" language contemplates) must treat this as a batch-sizing
+  input to weigh, not an automatic ceiling the framework itself enforces —
+  no prior repo research had surfaced this warning before this session and
+  `R31`. *Scope:* **core engine** (the batch-size / savepoint-per-item
+  cron-loop design).
 - **[Fact]** `TransactionCase` runs all test methods in one shared
   transaction, but **each test method in its own savepoint sub-transaction**,
   with the cursor always closed without committing; the source additionally
@@ -443,22 +485,31 @@ contradicted it.)*
   move on to other jobs** rather than retrying that specific job acquisition
   in a loop (`O7`, direct quote of both the docstring and the `except
   psycopg2.extensions.TransactionRollbackError: ... continue` code).
-- **[Fact — important negative finding]** The RPC-layer automatic
-  serialization-retry safety net (`retrying()`, above) does **not** extend to
-  a scheduled action's own record-processing code. `_callback()` (the method
-  that actually runs a cron's server action) does not call `retrying()` and
-  has no special handling for serialization/deadlock error codes — only a
-  generic rollback-and-reraise on any exception (`O7`, confirmed by grep: the
-  string `retrying` does not occur anywhere in `ir_cron.py`). *Why it
-  matters:* a future sync-engine cron job that hits a serialization failure
-  or lock conflict while writing its own domain records will **not** be
-  transparently retried within that run by the framework — only the
-  `ir_cron`/`ir_cron.progress` bookkeeping rows themselves are protected by
-  SKIP LOCKED acquisition. The connector's own scheduled-action code would
-  need to explicitly call `lock_for_update()`/`try_lock_for_update()` and/or
-  implement its own catch-rollback-retry logic for conflict-safety on the
-  business records it writes (`O7`, this session's synthesis, marked
-  **[Inference]** in the raw research). *Scope:* **core engine**.
+- **[Inference, source-backed — relabeled this revision, was previously
+  overstated as a "Fact — important negative finding"]** Source-level review
+  indicates this as a synthesis/inference, not a directly-quoted
+  single-source conclusion: Odoo's RPC-layer `retrying()` behavior is
+  source-confirmed for RPC/HTTP dispatch (`O5`, `O6`), while the reviewed
+  `ir.cron` job-processing path did not show an equivalent automatic retry
+  around each domain record-processing step — `_callback()` (the method that
+  actually runs a cron's server action) does not call `retrying()` and has
+  no special handling for serialization/deadlock error codes in the code
+  reviewed, only a generic rollback-and-reraise on any exception (`O7`,
+  confirmed by grep: the string `retrying` does not occur anywhere in
+  `ir_cron.py`). `R31` (PR #124) independently examined a related but
+  **distinct** layer — `ir.cron`'s own job-*acquisition* query
+  (`_acquire_one_job`, `FOR NO KEY UPDATE SKIP LOCKED`) and its
+  `SerializationFailure`-triggers-rollback-and-continue behavior in
+  `_process_jobs_loop` — which corroborates that job *acquisition* is
+  conflict-aware, but does not itself examine whether a domain record write
+  *inside* a cron job's own business logic gets equivalent protection. **This
+  remains a source-backed inference requiring runtime proof before
+  implementation relies on it**, not a settled fact: if the connector's own
+  scheduled-action code needs conflict-safety on the business records it
+  writes, explicitly calling `lock_for_update()`/`try_lock_for_update()`
+  and/or implementing its own catch-rollback-retry logic is a plausible
+  design response to this inference, not a confirmed requirement. *Scope:*
+  **core engine**.
 - **[Fact]** `LockError` (raised by `lock_for_update()`) is a `UserError`
   subclass mapped to HTTP 409; the lower-level `ConcurrencyError`'s own
   docstring explicitly cross-references `retrying()` as "the intended
@@ -514,14 +565,26 @@ contradicted it.)*
 
 ## Existing job/log substrate implications
 
-- **[Fact]** The job/log split (`R1`, `R2`) already satisfies several
-  mandatory claims at the implementation level, not merely the design level:
+- **[Fact — corrected wording this revision]** The existing Tasks 001–005
+  substrate already provides implemented **primitives** for several
+  mandatory sync-engine claims — the job/log split (`R1`, `R2`) gives
   "duplicate-running prevention is mandatory" → `operation_scope_key` unique
   constraint; "logs must be inspectable" → append-only `job.log` rows with
   `event_type` (`attempt`/`state_change`/`verification_read`/`manual_action`/
   `note`); "secrets must never be logged" → redaction at the single write
-  path. A sync engine built on top of this substrate inherits these
-  properties automatically **if and only if** it uses the existing
+  path — **but this does not mean the full sync-engine requirements are
+  complete.** `R31` (PR #124)'s "Current gaps" section independently and
+  more thoroughly confirms this same boundary by direct code inspection:
+  actual sync **operation execution** (`job.job_type` has exactly three
+  values, all core/diagnostic — no domain job type exists), **retry
+  scheduling** (no `ir.cron` reference exists anywhere under `addons/`),
+  **checkpoint/resume** (`operation_scope_key` is a single-active-operation
+  lock, not a pagination cursor or resume token), **domain deduplication**
+  (the binding mixin is shape-only, no concrete binding table exists), and
+  **handler dispatch** (no domain-neutral operation registry exists,
+  distinct from the readiness-check pattern) **all remain unbuilt**. A sync
+  engine built on top of this substrate inherits the primitives listed above
+  **if and only if** it uses the existing
   `Job.create()`/`.write()`/`JobLog._system_append()` paths and does not
   invent a parallel path. *Scope:* **core engine**.
 - **[Fact]** `payload_hash` currently serves a dual role — a hash of the
@@ -727,13 +790,20 @@ the pre-006A repo research did not cover) versus **re-confirmations**:
   in the cron-writing guide (`O9`, `O12`, `O13`).
 - `odoo.service.model.retrying()` as Odoo's automatic, bounded,
   jittered-backoff retry-on-serialization-conflict mechanism for RPC/HTTP
-  dispatch — and its confirmed **non**-extension to a cron job's own
-  record-processing code (`O5`, `O6`, `O7`).
-- The official **>64-savepoints-per-transaction performance ceiling** (`O8`)
-  — the single most load-bearing new fact for batch-size design.
-- `ir.cron.progress`'s field shape and the confirmed **absence of any
-  dead-letter/DLQ concept** anywhere in `ir_cron.py` or its official docs
-  (`O7`, `O14`).
+  dispatch (`O5`, `O6`) — **fact**. Whether this extends to a cron job's own
+  record-processing code does **not**, per the code reviewed (`O7`) — this
+  narrower point is a **source-backed inference**, not independently proven
+  either way, and is stated as such in the "Inferences" section below and in
+  the Odoo concurrency/locking notes above (relabeled this revision from an
+  earlier, overstated "Fact — important negative finding").
+- Odoo's official coding guidelines' warning that PostgreSQL performance
+  degrades past 64 savepoints in one transaction (`O8`, independently
+  corroborated by `R31`) — a performance constraint to design against, not a
+  hard functional cap (see the fuller wording in "Odoo transaction/error/
+  rollback notes" above).
+- `ir.cron.progress`'s field shape, and that no dead-letter/DLQ terminology
+  or mechanism was found in the specific files/pages reviewed (`O7`, `O14`)
+  — not asserted as an absolute claim about the entire Odoo codebase.
 - The **Liquid/Storefront-only scope of the 25,000-object pagination cap**
   (`S5`), correcting an ambiguity the pre-006A baseline had left open.
 - Full cursor-pagination mechanics (`S1`, `S2`, `S3`) — not previously
@@ -761,9 +831,17 @@ Every claim tagged **[Inference]** above is this session's own reasoned
 synthesis of two or more cited facts, never presented as a directly-stated
 source claim. The highest-stakes inferences, restated for visibility:
 
-1. A future sync-engine cron job writing its own domain records is **not**
-   automatically protected by Odoo's RPC-layer serialization-retry — it must
-   explicitly lock or catch-and-retry itself (`O5`+`O6`+`O7` synthesis).
+1. A future sync-engine cron job writing its own domain records may **not**
+   be automatically protected by Odoo's RPC-layer serialization-retry, based
+   on the code reviewed (`O5`+`O6`+`O7` synthesis; `R31` independently
+   confirms the RPC/HTTP-dispatch half of this synthesis and separately
+   documents `ir.cron`'s job-*acquisition*-level locking, without itself
+   settling the domain-record-processing question). **This is a
+   source-backed inference, not a proven fact — it requires live Odoo
+   runtime evidence before any implementation relies on it** (see "Questions
+   that require live Odoo.sh proof" in the companion open-questions
+   document). If confirmed, explicit locking or catch-and-retry inside the
+   job handler would be a plausible response, not a settled requirement.
 2. Cursor-based pagination *could* serve as a resumable-import checkpoint,
    but neither Shopify nor Odoo documents this combination as a named
    pattern, and Shopify does not confirm cursor durability across a paused
@@ -821,6 +899,7 @@ items like VAL-B2/MBQ-05/TD-002):
 ## Source list
 
 See [`sync-engine-source-inventory.md`](./sync-engine-source-inventory.md)
-for the full graded list (60 sources: 6 repo-code, 17 repo-docs/decisions, 7
-repo-research-synthesis, 16 official-Shopify, 1 community, 14 official-Odoo,
-8 OCA, 9 engineering-reference).
+for the full graded list (62 sources: 6 repo-code, 17 repo-docs/decisions, 9
+repo-research-synthesis — including `R31`/PR #124 and `R32`/PR #123, both
+added this revision — 16 official-Shopify, 1 community, 14 official-Odoo, 8
+OCA, 9 engineering-reference).
