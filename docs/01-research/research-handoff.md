@@ -1,5 +1,91 @@
 # Research Handoff (rolling)
 
+### Task 006B — sync engine architecture gate proposal — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` (harness-
+  designated session branch, based on `origin/Shopify-connector` HEAD
+  `3207791412ebedbc83eceaf70592df8c8df0d97a` — the PR #127 merge commit,
+  confirmed an ancestor before any edit) → target `Shopify-connector`,
+  **draft**, opened this session. Note: the task prompt's suggested branch
+  name (`claude/task-006b-sync-engine-architecture-gate`) was not used — the
+  harness had already assigned and checked out
+  `claude/task-006b-sync-engine-gate-865mw5` per this session's Git
+  Development Branch Requirements, and per governance this session developed
+  on the harness-assigned branch rather than creating a second one.
+- **Files changed:** `docs/03-architecture/sync-engine-architecture-gate.md`
+  (new), `docs/04-decisions/DEC-025-task-006-sync-engine-gate.md` (new),
+  `docs/05-qa/task-006b-architecture-gate-review-checklist.md` (new),
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** converted the accepted Task 006A
+  research package (PR #123 competitor/common-pattern research, PR #124
+  Odoo/repo substrate research, PR #126 queue/idempotency/retry/backoff/
+  dead-letter research, PR #125 final synthesis/evidence map, PR #127
+  completeness audit — all confirmed merged and ancestor-verified) into a
+  **proposed architecture gate** for the future domain-neutral sync engine.
+  Synthesized: architecture principles (domain-neutrality, no duplicate
+  domain queue/retry/log engines, trigger convergence, webhook
+  enqueue-only, core/domain ownership split, extension seams); a proposed
+  core-engine shape (job creation/enqueue, drain loop, dispatcher, handler
+  registry, retry scheduling, idempotency/duplicate-running guardrails,
+  manual-review surface, checkpoint/resume, audit trail, redaction, gating,
+  disconnect/reconnect lifecycle); a job-trigger model (manual/scheduled/
+  webhook/reconciliation/`odoo_event`, all converging on one job mechanism,
+  trigger source kept distinct from job type); a retry/failure policy
+  (DEC-009's classified taxonomy, Shopify REST 429/`Retry-After` and GraphQL
+  HTTP-200/`THROTTLED`-body handling, MBQ-16 planning-default backoff
+  constants); a layered idempotency/duplicate-prevention architecture
+  (core-owned job key + serialization guard + webhook dedup vs.
+  domain-owned `@idempotent`/binding rules); the Odoo execution substrate
+  (`ir.cron` as Phase 1 primitive, OCA `queue_job` reference-only/RA-004
+  unchanged, savepoint performance constraint, three-shard-corroborated
+  concurrency open questions); Shopify API implications (GraphQL-preferred,
+  cost/rate-limit awareness, cursor/bulk-operation checkpoint trade-offs,
+  non-guaranteed webhook delivery); a core-vs-domain responsibility table;
+  and an MVP-implication section stating explicitly that no implementation,
+  Task 006C, or implementation-scope file is authorized by this gate.
+- **Items deferred:** this session did not modify
+  `docs/05-qa/architecture-review-log.md` — despite an observed repo
+  convention of adding a "Proposed for ChatGPT review" row for each proposed
+  DEC, this session judged the risk of mis-numbering/mis-formatting a row in
+  that 1,600+-line log too high for a docs-synthesis session to take on
+  unprompted; flagged explicitly in DEC-025's own "Architecture-review-log
+  note" and in this session's final report, per the task's "if uncertain, do
+  not modify it" instruction.
+- **Learning feedback loop:** new issues discovered: none (synthesis-only
+  session; no code, no defects possible). Repeated issue patterns: none.
+  Rules/checklists updated: none (a new checklist file was created, not an
+  existing rule modified). New rejected approaches: none — checked
+  `rejected-approaches-log.md` before drafting; no approach proposed here
+  meets or conflicts with any existing RA row. New technical debt: none.
+  Architecture concerns: none beyond what Task 006A already flagged as open
+  (carried forward in DEC-025 §Open questions and §Risks, not newly
+  introduced). Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **DEC-025 status:** **Proposed / Pending ChatGPT review** — not Accepted.
+  No decision in this session's output is marked Accepted; no implementation
+  is authorized; no Task 006C or implementation-scope file was created.
+- **Preserved blockers (confirmed unchanged by this session):** VAL-B2
+  deferred/not passed; MBQ-05 Partially routed/Open; TD-002 Open; fulfillment
+  API model unresolved; product first-sync dedup thresholds still domain
+  design; Lite/Full packaging not finalized; the 16-vs-17 `@idempotent`
+  mutation-count discrepancy and the OCA `queue_job` `--workers > 0` vs.
+  `> 1` wording discrepancy both still open/non-blocking; multi-server/
+  Odoo.sh runtime concurrency proof still required before any future
+  implementation relies on a concurrency assumption named in this gate.
+- **Next step:** ChatGPT review of this architecture gate and DEC-025 (see
+  `docs/05-qa/task-006b-architecture-gate-review-checklist.md`). If
+  accepted, the recommended next session is a separately-scoped, separately-
+  authorized Task 006C implementation-scope drafting session — not started
+  here.
+- **Stop condition:** docs-only session, no code touched, no implementation
+  authorized, no Task 006C/implementation-scope file created, DEC-025 left
+  as Proposed/Pending, not Accepted. Stopped after opening a draft PR
+  against `Shopify-connector`. Awaiting ChatGPT review.
+
+---
+
 ### Task 006A completeness audit — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-006a-completeness-audit-ptq56q` → target
