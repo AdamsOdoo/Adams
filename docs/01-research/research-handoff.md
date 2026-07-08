@@ -1,5 +1,79 @@
 # Research Handoff (rolling)
 
+### Task 006B — PR #128 acceptance patch — DEC-025 / AR-030 accepted — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` → PR #128 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened). Applies ChatGPT's acceptance of the sync-engine
+  architecture gate, per control-room review, after the prior revisions'
+  governance fixes (direct baseline-file inspection; the `AR-030` addition;
+  the stale-wording consistency fix).
+- **Files changed:** `docs/04-decisions/DEC-025-task-006-sync-engine-gate.md`
+  (Status → Accepted by ChatGPT, 2026-07-08; new Acceptance note added),
+  `docs/05-qa/architecture-review-log.md` (`AR-030` row → Accepted by
+  ChatGPT, Status → Accepted; only this one row touched, no other AR row
+  altered), `docs/05-qa/task-006b-architecture-gate-review-checklist.md`
+  (overall review decision recorded as accepted; DEC-025/`AR-030`
+  acceptance confirmed), `docs/01-research/research-handoff.md` (this
+  entry).
+- **What changed / residue fixed:** **DEC-025 is now `Accepted by
+  ChatGPT`** (acceptance date 2026-07-08) — the architecture gate itself
+  (`docs/03-architecture/sync-engine-architecture-gate.md`, unchanged by
+  this patch) is accepted as the architecture-level shape for the future
+  domain-neutral sync engine. **`AR-030` is now `Accepted`**, mirroring
+  DEC-025 exactly, with its Follow-up action column stating explicitly that
+  future Task 006C implementation-scope drafting may be proposed in a
+  separate session but no implementation is authorized by `AR-030`/DEC-025
+  itself. Every internally-contradictory "Proposed" framing left over from
+  the pre-acceptance drafting (top blockquote, Status section, "Proposed
+  architecture decisions" heading, Consequences/Follow-ups wording, the
+  Architecture-review-log note, and the "No implementation authorized"
+  section) was updated for tense consistency with the new Accepted status,
+  while preserving every non-implementation guardrail verbatim in substance.
+- **No implementation was authorized. No implementation-scope file was
+  created.** No addon file, Python, XML, CSV, manifest, security,
+  migration, CI/workflow, controller, view, wizard, OAuth, or domain-sync
+  code was created or modified. `docs/07-implementation-plan/
+  task-006-sync-engine-implementation-scope.md` and `docs/07-
+  implementation-plan/task-006c-sync-engine-implementation-scope.md` do not
+  exist and were not created.
+- **Every Task 006A open item remains preserved, exactly as open as
+  before:** VAL-B2 deferred/not passed; MBQ-05 Partially routed/Open (token
+  acquisition for many unrelated customers unresolved); TD-002 Open;
+  fulfillment API model unresolved; product first-sync dedup thresholds
+  still domain-design work; Lite/Full packaging not finalized; the
+  16-vs-17 `@idempotent` mutation-count and OCA `queue_job` worker-count
+  wording discrepancies both still open/non-blocking; multi-server/Odoo.sh
+  runtime concurrency proof still explicitly required before any future
+  implementation relies on a concurrency assumption named in the gate. None
+  of these was resolved, narrowed, or silently decided by this acceptance
+  patch.
+- **Items deferred:** none new.
+- **Learning feedback loop:** new issues discovered: none — this patch
+  applies a clean acceptance outcome, with no new governance gap found.
+  Repeated issue patterns: none. Rules/checklists updated:
+  `task-006b-architecture-gate-review-checklist.md`'s DEC-025-status,
+  AR-log, and overall-review-decision sections updated to reflect
+  acceptance. New rejected approaches: none. New technical debt: none.
+  Architecture concerns: none beyond what Task 006A already flagged
+  (carried forward unchanged, per DEC-025's Acceptance note). Should future
+  prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** a future Task 006C implementation-scope proposal — a
+  **separately-scoped, separately-authorized** session, not started, not
+  drafted, and not implied by this acceptance patch. **This is not a coding
+  session** and does not itself open the implementation gate
+  (`../05-qa/quality-feedback-loop.md` §10, `CLAUDE.md` §5/§9 both still
+  apply).
+- **Stop condition:** docs-only acceptance patch, no code touched, no
+  implementation authorized, no implementation-scope file created. Stopped
+  after pushing to the same PR #128 branch. No merge performed. PR remains
+  draft/unmerged, awaiting ChatGPT's final merge review.
+
+---
+
 ### Task 006B — PR #128 revision — governance corrections (AR-log row + direct baseline inspection) — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` → PR #128 into

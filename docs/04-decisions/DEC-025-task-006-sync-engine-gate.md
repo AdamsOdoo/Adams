@@ -1,22 +1,55 @@
 # DEC-025 — Task 006 Sync Engine Architecture Gate (Proposed)
 
-> **Proposed architecture decision record. NOT accepted.** This record
-> proposes the sync-engine architecture gate synthesized in
-> [`../03-architecture/sync-engine-architecture-gate.md`](../03-architecture/sync-engine-architecture-gate.md)
-> for ChatGPT review. It does **not** resolve or reopen AR-002 through
-> AR-014 (already accepted, unchanged). This proposal has a corresponding
-> row, **`AR-030`**, in
+> **Accepted architecture decision record.** ChatGPT accepted this record on
+> **2026-07-08**, after PR #128's governance revisions (direct, full
+> inspection of the two pre-006A baseline sources; the `AR-030` addition;
+> the stale-wording consistency fix) — see *Acceptance note* below. This
+> record accepts the **architecture gate only**, synthesized in
+> [`../03-architecture/sync-engine-architecture-gate.md`](../03-architecture/sync-engine-architecture-gate.md).
+> It does **not** resolve or reopen AR-002 through AR-014 (already accepted,
+> unchanged). It resolves the corresponding row, **`AR-030`**, in
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
-> — **`AR-030` is Proposed / not Accepted**, mirroring this record's own
-> **Proposed / Pending ChatGPT review** status exactly; see this record's
-> "Architecture-review-log note" below. **Implementation remains
-> unauthorized** by this record or by `AR-030` under any circumstance.
+> — **`AR-030` is now Accepted**, mirroring this record's own acceptance
+> exactly; see this record's "Architecture-review-log note" below.
+> **Acceptance does not by itself authorize implementation.** No Task 006C
+> and no implementation-scope document is created or authorized by this
+> acceptance — both remain a future, separately authorized session.
 
 ## Status
 
-**Proposed / Pending ChatGPT review.** Not Accepted. Acceptance of this
-record would **not**, by itself, authorize implementation — see *No
-implementation authorized* below.
+**Accepted by ChatGPT.** Acceptance date: **2026-07-08**. Not
+implementation-authorizing on its own — see *No implementation authorized*
+below.
+
+## Acceptance note (2026-07-08)
+
+- **Accepted by ChatGPT** for PR #128, after this PR's governance revisions
+  were applied: direct, full inspection of the two pre-006A baseline
+  sources (`shopify-official-api-notes.md`, `odoo-official-architecture-
+  notes.md`); the addition of the corresponding `AR-030` row in
+  `../05-qa/architecture-review-log.md`; and the consistency fix removing
+  this record's stale "does not itself open any new AR row" wording.
+- **This accepts the architecture gate only** —
+  [`sync-engine-architecture-gate.md`](../03-architecture/sync-engine-architecture-gate.md)
+  and this record, DEC-025, as the accepted architecture-level shape for the
+  future domain-neutral sync engine.
+- **This does not authorize implementation.** No code, addon file, Python
+  class, Odoo module, view, controller, security file, migration, CI/
+  workflow file, or domain module is created or authorized by this
+  acceptance.
+- **Task 006C, and any implementation-scope document, remain a future,
+  separately authorized session** — not created, not started, and not
+  implied by this acceptance.
+- **Preserved, unchanged by acceptance:** every item in *Open questions*
+  below remains exactly as open as before — VAL-B2 (deferred/not passed),
+  MBQ-05 (partially routed/open — token acquisition for many unrelated
+  customers), TD-002 (Open), the fulfillment API model (unresolved),
+  product first-sync deduplication thresholds (domain design work), and
+  Lite/Full packaging (not finalized) — none is resolved, narrowed, or
+  silently decided by this acceptance. Every item in *Risks and required
+  runtime validation* below also stands unchanged — no concurrency claim is
+  treated as proven, and live Odoo.sh/multi-server runtime proof is still
+  required before any implementation relies on one.
 
 ## Date
 
@@ -93,10 +126,9 @@ responsibility boundaries. Full detail lives in the companion document,
   this proposal, per `CLAUDE.md` §10; **no rejected approach is
   re-proposed** by this record.
 
-## Proposed architecture decisions
+## Accepted architecture decisions
 
-This record proposes, at architecture level (not implementation-final),
-that ChatGPT accept:
+This record accepts, at architecture level only (not implementation-final):
 
 1. **The sync engine is domain-neutral**, with core owning orchestration/
    job-lifecycle/retry/logging/visibility/guardrails and domain modules
@@ -229,9 +261,10 @@ companion gate document §K and in
   checkpoint ownership) remain candidates only, meaning a future
   implementation-scope session will still need its own design work before
   code can be written.
-- **Follow-ups:** none authorized by this record. If ChatGPT accepts this
-  gate, the recommended next step is a separately-scoped, separately-
-  authorized Task 006C implementation-scope session — not created here.
+- **Follow-ups:** none authorized by this record, even now that it is
+  accepted. The recommended next step is a separately-scoped, separately-
+  authorized Task 006C implementation-scope session — not created, and not
+  started, by this acceptance.
 
 ## Alternatives considered
 
@@ -248,30 +281,29 @@ by this record.
 question through its "Not decided" → "Proposed for ChatGPT review" →
 "Accepted" lifecycle — the same pattern DEC-004/005/006/010/011/013 through
 DEC-020 and every subsequent Task 00X gate/decision record already followed.
-**This revision adds the corresponding row, `AR-030`** (the next free number
-after `AR-029`, confirmed by inspecting the full existing `AR-0##` sequence
-in that log before adding), for this exact proposal. **`AR-030`'s Review
-decision and Status are both "Proposed for ChatGPT review — NOT YET
-ACCEPTED" / "Proposed"** — mirroring this record's own status exactly.
-Acceptance of `AR-030` (moving its row to "Accepted") remains a **future,
-separate ChatGPT action**, performed together with any future acceptance of
-this record (mirroring, for example, the AR-010/DEC-013 or AR-018/audit
-acceptance pattern already used elsewhere in this log) — it is **not**
-performed by this revision. **Implementation remains unauthorized** by the
-addition of this row, exactly as before: `AR-030` records a proposal under
-review, not a commitment, per this log's own "How to use" §1 instruction.
+**This acceptance moves the corresponding row, `AR-030`, from "Proposed for
+ChatGPT review" to "Accepted by ChatGPT (2026-07-08)"** — mirroring this
+record's own acceptance exactly, in the same acceptance-patch pattern
+already used elsewhere in that log (e.g. the AR-010/DEC-013 or AR-018/audit
+acceptance pattern). **Implementation remains unauthorized** by this
+acceptance: per this log's own "How to use" §1 instruction, an `Accepted`
+row means the *architecture proposal* is accepted, not that any code, Odoo
+module, or implementation task is thereby created or authorized — `AR-030`'s
+own Follow-up action column states this explicitly.
 
 ## No implementation authorized
 
-**Acceptance of this architecture decision would not by itself authorize
+**Acceptance of this architecture decision does not by itself authorize
 implementation.** This record creates no code, no database DDL, no Python
 class, no Odoo module, and no file outside `docs/03-architecture/**` and
 `docs/04-decisions/**`. The no-code gate (`CLAUDE.md` §4–§5) remains in
-force. **This record's current status is Proposed / Pending ChatGPT
-review — not Accepted** — and even upon acceptance, implementation remains
-blocked until ChatGPT separately opens a dedicated implementation gate per
+force. **This record's current status is Accepted by ChatGPT** (acceptance
+date 2026-07-08) — but implementation remains blocked until ChatGPT
+separately opens a dedicated implementation gate per
 `../05-qa/quality-feedback-loop.md` §10 and authorizes a Task 006C
-implementation-scope document per `CLAUDE.md` §9.
+implementation-scope document per `CLAUDE.md` §9. **No Task 006C and no
+implementation-scope file is created or authorized by this acceptance** —
+both remain a future, separately authorized session.
 
 ## Evidence / references
 

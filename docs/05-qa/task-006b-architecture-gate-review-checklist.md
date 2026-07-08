@@ -43,15 +43,18 @@
 
 ## 2. DEC-025 status
 
-- [ ] **DEC-025's `Status` field reads exactly "Proposed / Pending ChatGPT
-      review"** — not "Accepted," not "Proposed for ChatGPT review" alone
-      without the "Pending" qualifier being unambiguous, not any other
-      wording implying acceptance.
-- [ ] **No decision inside DEC-025 or the gate document is marked
-      Accepted.** Every proposed architecture decision is phrased as a
-      proposal subject to review.
-- [ ] DEC-025 explicitly states that acceptance of the record would not, by
-      itself, authorize implementation.
+- [x] **DEC-025's `Status` field reads "Accepted by ChatGPT," with
+      acceptance date 2026-07-08** — the acceptance-patch update applied by
+      this revision, per control-room review of PR #128 after its governance
+      revisions.
+- [x] **DEC-025 carries an explicit Acceptance note** stating: this accepts
+      the architecture gate only; it does not authorize implementation; no
+      Task 006C or implementation-scope document is created or authorized;
+      every open item and runtime-validation requirement remains preserved,
+      unchanged by acceptance.
+- [x] DEC-025 explicitly states that acceptance of the record does not, by
+      itself, authorize implementation — restated in the top blockquote,
+      the Acceptance note, and the "No implementation authorized" section.
 
 ## 3. Task 006A coverage
 
@@ -143,33 +146,41 @@
 - [ ] The handoff entry's Learning feedback loop fields are all present
       (new issues / repeated patterns / rules updated / rejected approaches
       / technical debt / architecture concerns — "None" where applicable).
-- [ ] **A corresponding `architecture-review-log.md` row exists** —
-      `AR-030`, added after inspecting the log's full existing `AR-0##`
-      sequence to confirm it is the correct next number.
-- [ ] **`AR-030`'s Review decision / Status reads "Proposed for ChatGPT
-      review — NOT YET ACCEPTED" / "Proposed"** — not "Accepted," not any
-      wording implying acceptance.
-- [ ] **DEC-025's `Status` still reads "Proposed / Pending ChatGPT
-      review"** — adding the `AR-030` row did not itself change DEC-025's
-      status, and the two are consistent with each other.
+- [x] **The corresponding `architecture-review-log.md` row exists and is
+      updated** — `AR-030`'s Review decision now reads "Accepted by ChatGPT
+      (2026-07-08)" and its Status reads "Accepted," mirroring DEC-025's own
+      acceptance exactly.
+- [x] **`AR-030`'s Follow-up action column states implementation is still
+      not authorized** — future Task 006C implementation-scope drafting may
+      be proposed in a separate session, but no implementation is authorized
+      by `AR-030`/DEC-025 itself.
+- [x] **DEC-025's `Status` and `AR-030`'s Status are consistent with each
+      other** — both read "Accepted" as of this acceptance patch, applied
+      together in the same revision.
 
 ## 9. Overall review decision (record the outcome)
 
-- [ ] Overall decision recorded: **accepted / accepted with minor
-      corrections / revise / reject**.
-- [ ] Any issue found is classified by type
-      (`quality-feedback-loop.md` §3) and logged in the correct
-      `/docs/05-qa` file.
-- [ ] If accepted: DEC-025's `Status` field is updated from "Proposed /
-      Pending ChatGPT review" to "Accepted by ChatGPT," with an acceptance
-      date, mirroring the DEC-005/DEC-009/DEC-013 acceptance pattern —
-      **this update itself is a future, separate act, not performed by this
-      session.**
-- [ ] If accepted: `AR-030`'s row in `architecture-review-log.md` is moved
-      from "Proposed for ChatGPT review" to "Accepted," in the same
-      acceptance patch that updates DEC-025's `Status` (see DEC-025's
-      "Architecture-review-log note") — **this update itself is a future,
-      separate act, not performed by this revision.**
-- [ ] Next recommended session named (e.g. a separately-scoped Task 006C
-      implementation-scope drafting session) — **not started by this
-      session**.
+- [x] **Overall decision recorded: accepted.** ChatGPT accepted PR #128
+      (the architecture gate, DEC-025, and this checklist) on 2026-07-08,
+      after the prior revisions' governance fixes (direct baseline-file
+      inspection, the `AR-030` addition, and the stale-wording consistency
+      fix) — this acceptance patch applies that outcome to the repository.
+- [x] No issue survived to this acceptance patch requiring a new
+      `/docs/05-qa` log entry — the two prior governance gaps were already
+      fixed and logged in earlier revisions' handoff entries; no new issue
+      is found by this patch.
+- [x] **DEC-025's `Status` field is updated from "Proposed / Pending
+      ChatGPT review" to "Accepted by ChatGPT," acceptance date 2026-07-08**
+      — mirroring the DEC-005/DEC-009/DEC-013 acceptance pattern. **This
+      acceptance does not by itself authorize implementation** — restated
+      explicitly in DEC-025's Acceptance note and "No implementation
+      authorized" section.
+- [x] **`AR-030`'s row in `architecture-review-log.md` is moved from
+      "Proposed for ChatGPT review" to "Accepted"** — applied in the same
+      acceptance patch that updates DEC-025's `Status`, per DEC-025's
+      "Architecture-review-log note."
+- [ ] **Next recommended session:** a separately-scoped, separately-
+      authorized Task 006C implementation-scope drafting session — **named
+      as the recommended next step, but not started, drafted, or authorized
+      by this acceptance patch.** No implementation-scope file exists;
+      no code, addon, or domain work is authorized by this acceptance.
