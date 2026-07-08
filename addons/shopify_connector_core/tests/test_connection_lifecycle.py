@@ -478,12 +478,28 @@ class TestConnectionLifecycle(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_reconnect_missing_credential_does_not_connect(self):
+        # ChatGPT review (PR #121): with no credential present,
+        # action_reconnect() must not raise after writing state/audit --
+        # a raised exception in normal Odoo RPC/service execution can
+        # roll back those very writes. It persists reconnect_needed +
+        # the audit job and returns None instead.
         self.assertFalse(self.store.credential_present)
-        with self.assertRaises(UserError):
-            self._store().action_reconnect()
+        result = self._store().action_reconnect()
+        self.assertIsNone(result)
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'reconnect_needed')
         self.assertFalse(self.store.credential_present)
+        self.assertEqual(len(self._audit_jobs()), 1)
+        test_connection_jobs = self.Job.search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_test_connection'),
+        ])
+        self.assertFalse(test_connection_jobs)
+        readiness_jobs = self.Job.search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_readiness_check'),
+        ])
+        self.assertFalse(readiness_jobs)
 
     def test_reconnect_connects_when_both_pass(self):
         self._set_token()

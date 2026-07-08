@@ -340,6 +340,18 @@ class ShopifyConnectorStore(models.Model):
         freshly re-run test-connection and readiness substrate both
         actually support it, otherwise remains/transitions to
         `reconnect_needed` (DEC-022 §4.6).
+
+        With no credential present: this method does not call Shopify,
+        does not run readiness, does not clear the credential, and does
+        not auto-reconnect -- it only persists the reconnect_needed
+        state and its audit job, then returns `None`. It deliberately
+        does not raise afterward: in normal Odoo RPC/service execution a
+        raised exception can roll back the ORM writes made earlier in
+        the same call, which would silently discard the very
+        state/audit write this branch exists to guarantee. A caller
+        that needs to distinguish "reconnect actually connected" from
+        "reconnect left the store in reconnect_needed" should check
+        `self.state` after calling, not rely on an exception.
         """
         self.ensure_one()
         if not self.credential_present:
@@ -348,9 +360,7 @@ class ShopifyConnectorStore(models.Model):
                 'Reconnect attempted with no stored credential; remains '
                 'reconnect_needed.'
             )
-            raise UserError(
-                'Enter a credential before reconnecting.'
-            )
+            return None
         self.action_test_connection()
         self.invalidate_recordset()
         # If test-connection just failed with an auth/permission/scope

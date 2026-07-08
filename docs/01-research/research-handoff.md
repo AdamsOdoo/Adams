@@ -1,5 +1,72 @@
 # Research Handoff (rolling)
 
+### Task 005 PR #121 revision — reconnect transaction-safety fix — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched — `shopify_connector_job.py`, `__manifest__.py`,
+  `tests/__init__.py`, and every XML/CSV/security/migration/CI/domain/UI
+  file remain untouched by this revision.
+- **What changed:** ChatGPT's review of PR #121 found a transaction-safety
+  issue in `action_reconnect()`'s missing-credential branch: it wrote
+  `state='reconnect_needed'` and created the lifecycle audit job, then
+  raised `UserError` — in normal Odoo RPC/service execution a raised
+  exception can roll back ORM writes made earlier in the same call, so the
+  state/audit write this branch exists to guarantee might never actually
+  persist. **Fixed** by removing the `raise` after the write: the
+  missing-credential branch now only writes `state='reconnect_needed'`,
+  creates the audit job, and `return`s `None` — no Shopify call, no
+  readiness run, no credential clear, no auto-reconnect, unchanged
+  otherwise. The existing `test_reconnect_missing_credential_does_not_connect`
+  test was updated to no longer expect `UserError`, and now asserts the
+  call returns `None`, the state persists as `reconnect_needed`,
+  `credential_present` stays `False`, exactly one lifecycle audit job is
+  created, and no `core_test_connection`/`core_readiness_check` job is
+  created. `action_activate()`'s existing `UserError`-on-rejected-evidence
+  tests are unchanged — that method intentionally leaves state untouched
+  on rejection rather than writing first, so it has no equivalent
+  transaction-safety issue. PR #121's body was updated to match (the
+  `action_reconnect()` bullet no longer says "raises `UserError`").
+  **No scope expansion** — no OAuth/setup wizard/UI/sync/domain
+  implementation, no security/ACL change, no new job state/type/source.
+- **Local validation performed:** `python -m py_compile` on both changed
+  Python files — passes. **No Odoo runtime is available in this session's
+  container**, so the test suite was not executed here — stated honestly;
+  the same Odoo.sh/manual validation command from the original PR #121
+  handoff entry below still applies:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the reconnect missing-credential
+    transaction-safety issue above, found by ChatGPT's review (not by
+    this session's own prior adversarial-review pass) — logged here as a
+    gap in that pass's coverage (it checked for duplicate writes/audits
+    but not for a write-then-raise rollback risk).
+  - Repeated issue patterns: none.
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope).
+  - New rejected approaches: none.
+  - New technical debt: none.
+  - Tests or review gates needed: worth noting for future sessions —
+    "does this method write state/audit and then raise?" is now a
+    pattern to check for across all four lifecycle actions, not just
+    `reconnect`; `action_disconnect`/`action_mark_reconnect_needed` do
+    not raise at all (no issue), and `action_activate` raises *before*
+    any write (no issue) — confirmed by inspection, not newly changed.
+  - Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt
+  logged (n/a) · repeated-issue escalation applied (n/a) — all YES.
+- **Next step:** ChatGPT re-review of the revised PR #121.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; no merge; PR remains draft, not marked ready for
+  review.
+
 ### Task 005 Connection Lifecycle Actions — implementation — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5`, branched from
