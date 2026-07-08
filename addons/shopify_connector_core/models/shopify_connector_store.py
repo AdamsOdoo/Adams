@@ -5,7 +5,8 @@ from odoo import fields, models
 from odoo.exceptions import UserError
 
 from ..tools.redaction import redact
-from .shopify_connector_api_client import ShopifyClientError
+from .shopify_connector_api_client import ERROR_AUTH, ShopifyClientError
+from .shopify_connector_job import BUSINESS_JOB_SOURCES, TERMINAL_JOB_STATES
 
 # The read-only test-connection query (Task 003) -- confirmed in the
 # 2026-07 official reference (Facts #7/#8,
@@ -132,6 +133,13 @@ class ShopifyConnectorStore(models.Model):
                 ].search([('store_id', '=', self.id)], limit=1)
                 if credential:
                     credential.write({'credential_state': 'invalid'})
+            if exc.credential_invalid or exc.error_class == ERROR_AUTH:
+                # Task 005 / DEC-022 §4.7: any auth/permission/scope
+                # invalidation signal -- not only a genuine token-invalid
+                # one -- moves the store to reconnect_needed. Human/admin
+                # action (reconnect/disconnect) is the only way out; this
+                # never auto-reconnects.
+                self.action_mark_reconnect_needed(reason=exc.reason)
             job.write({
                 'error_class': exc.error_class,
                 'state': 'failed_final',
@@ -200,4 +208,211 @@ class ShopifyConnectorStore(models.Model):
             'Connection verified with %s.' % shop.get('name'),
             from_state='running', to_state='succeeded',
         )
+        return None
+
+    # ------------------------------------------------------------------
+    # Task 005: connection lifecycle actions (DEC-022 / gate document)
+    # ------------------------------------------------------------------
+
+    def _create_lifecycle_audit_job(self, message):
+        """Create + close one audited `core_manual_maintenance` job.
+
+        The single sanctioned audit-trail path every lifecycle action
+        below funnels through. `job_source='setup_readiness_check'` keeps
+        this on the existing core/diagnostic source vocabulary (so it is
+        never itself business-job-gated); a fresh UUID4 `payload_hash`
+        nonce mirrors the already-accepted `action_test_connection`/
+        `run_for_store` pattern so repeat lifecycle actions never collide
+        on `store_idempotency_key_uniq` (the TD-001 class of issue); every
+        log row goes through the existing `_system_append` path -- no new
+        job type, no second log-creation path, no `sudo()`.
+        """
+        self.ensure_one()
+        Job = self.env['shopify.connector.job']
+        JobLog = self.env['shopify.connector.job.log']
+        job = Job.create({
+            'store_id': self.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'core_manual_maintenance',
+            'state': 'running',
+            'payload_hash': str(uuid.uuid4()),
+            'started_at': fields.Datetime.now(),
+        })
+        JobLog._system_append(
+            job, 'manual_action', message,
+            from_state='running', to_state='succeeded',
+        )
+        job.write({
+            'state': 'succeeded',
+            'finished_at': fields.Datetime.now(),
+        })
+        return job
+
+    def action_activate(self):
+        """Transition to `connected` -- only on real Task 003/004 evidence.
+
+        Never infers success: requires a credential currently on record
+        (not merely a stale pass mirror left over from before a
+        disconnect -- `action_disconnect` clears `credential_present`
+        but does not reset `last_test_connection_result`/
+        `last_readiness_result`, so this check is the guard against
+        re-activating a credential-less store on old evidence) plus a
+        stored passing test-connection result and a passing-or-warning-
+        tier readiness result already on record before moving the state
+        at all. If any is missing or failing, raises `UserError` and
+        leaves the state untouched -- never calls Shopify, never runs
+        OAuth, and never claims VAL-B2 has passed or that MBQ-05 is
+        resolved (DEC-022 §4.4).
+        """
+        self.ensure_one()
+        if not self.credential_present:
+            raise UserError(
+                'Cannot activate: no credential is present for this '
+                'store -- enter a credential first.'
+            )
+        if self.last_test_connection_result != 'pass':
+            raise UserError(
+                'Cannot activate: no passing test-connection result is '
+                'recorded for this store yet -- run Test Connection first.'
+            )
+        if self.last_readiness_result not in ('pass', 'warning'):
+            raise UserError(
+                'Cannot activate: no passing or warning-tier readiness '
+                'result is recorded for this store yet -- run the '
+                'readiness check first.'
+            )
+        self.write({'state': 'connected'})
+        self._create_lifecycle_audit_job(
+            'Store activated (test-connection: %s, readiness: %s).' % (
+                self.last_test_connection_result, self.last_readiness_result,
+            )
+        )
+        return None
+
+    def action_disconnect(self):
+        """Clear the credential, cancel non-terminal business jobs, disconnect.
+
+        Reuses the existing Task 002 credential-clear service -- no
+        second credential-clear path -- which preserves the credential
+        row and its history. Cancels every non-terminal business job for
+        this store (never deletes a job); core setup/test/readiness/
+        maintenance jobs and already-terminal jobs are left untouched.
+        Idempotent: a second call finds nothing left to cancel and simply
+        re-records an audited no-op (DEC-022 §4.1/§4.5).
+        """
+        self.ensure_one()
+        self.env['shopify.connector.store.credential'].action_clear_token(
+            self
+        )
+        self.write({'state': 'disconnected'})
+        Job = self.env['shopify.connector.job']
+        JobLog = self.env['shopify.connector.job.log']
+        jobs_to_cancel = Job.search([
+            ('store_id', '=', self.id),
+            ('job_source', 'in', list(BUSINESS_JOB_SOURCES)),
+            ('state', 'not in', list(TERMINAL_JOB_STATES)),
+        ])
+        for job in jobs_to_cancel:
+            from_state = job.state
+            job.write({
+                'state': 'cancelled',
+                'cancel_reason': 'Store disconnected.',
+                'finished_at': fields.Datetime.now(),
+            })
+            JobLog._system_append(
+                job, 'state_change', 'Job cancelled: store disconnected.',
+                from_state=from_state, to_state='cancelled',
+            )
+        self._create_lifecycle_audit_job(
+            'Store disconnected (%d non-terminal business job(s) '
+            'cancelled).' % len(jobs_to_cancel)
+        )
+        return None
+
+    def action_reconnect(self):
+        """Re-run the existing Task 003/004 substrate; connect only on evidence.
+
+        Service/model layer only -- no OAuth, no setup wizard, no new
+        credential-input mechanism; token re-entry goes through the
+        existing Task 002 credential service exactly as `activate`/
+        initial setup already do. Never infers `connected` from
+        credential presence alone: transitions to `connected` only if the
+        freshly re-run test-connection and readiness substrate both
+        actually support it, otherwise remains/transitions to
+        `reconnect_needed` (DEC-022 §4.6).
+        """
+        self.ensure_one()
+        if not self.credential_present:
+            self.write({'state': 'reconnect_needed'})
+            self._create_lifecycle_audit_job(
+                'Reconnect attempted with no stored credential; remains '
+                'reconnect_needed.'
+            )
+            raise UserError(
+                'Enter a credential before reconnecting.'
+            )
+        self.action_test_connection()
+        self.invalidate_recordset()
+        # If test-connection just failed with an auth/permission/scope
+        # signal, action_test_connection()'s own exception handler
+        # already called action_mark_reconnect_needed() -- its state
+        # write and audit job are already recorded. Re-running that same
+        # write/audit below would double the audit trail for one logical
+        # reconnect attempt, so detect it via the fresh job's error_class
+        # (the same condition action_test_connection() itself used) and
+        # skip the redundant re-write. Every other failure path (identity
+        # mismatch, temporary/throttle/unknown errors, or a readiness
+        # failure with a passing test-connection) still falls through to
+        # this method's own reconnect_needed write/audit below, since
+        # action_test_connection() does not handle those itself.
+        already_marked_reconnect_needed = False
+        if self.last_test_connection_result != 'pass':
+            last_test_job = self.env['shopify.connector.job'].search([
+                ('store_id', '=', self.id),
+                ('job_type', '=', 'core_test_connection'),
+            ], order='id desc', limit=1)
+            already_marked_reconnect_needed = (
+                last_test_job.error_class == ERROR_AUTH
+            )
+        self.env['shopify.connector.readiness.check'].run_for_store(self)
+        self.invalidate_recordset()
+        if (
+            self.last_test_connection_result == 'pass'
+            and self.last_readiness_result in ('pass', 'warning')
+        ):
+            self.write({'state': 'connected'})
+            self._create_lifecycle_audit_job(
+                'Store reconnected (test-connection: %s, readiness: '
+                '%s).' % (
+                    self.last_test_connection_result,
+                    self.last_readiness_result,
+                )
+            )
+        elif not already_marked_reconnect_needed:
+            self.write({'state': 'reconnect_needed'})
+            self._create_lifecycle_audit_job(
+                'Reconnect evidence insufficient; remains reconnect_needed '
+                '(test-connection: %s, readiness: %s).' % (
+                    self.last_test_connection_result,
+                    self.last_readiness_result,
+                )
+            )
+        return None
+
+    def action_mark_reconnect_needed(self, reason=False):
+        """Move to `reconnect_needed`; never auto-clears the credential or reconnects.
+
+        Only an explicit `action_reconnect`/`action_disconnect`, taken by
+        an operator, may move the store away from this state -- no
+        automatic reconnect is ever attempted here or anywhere else
+        (DEC-022 §4.7). Idempotent: calling this on a store already in
+        `reconnect_needed` is a safe, audited no-op re-record, never an
+        error.
+        """
+        self.ensure_one()
+        self.write({'state': 'reconnect_needed'})
+        message = 'Store marked reconnect_needed.'
+        if reason:
+            message = 'Store marked reconnect_needed: %s' % redact(reason)
+        self._create_lifecycle_audit_job(message)
         return None

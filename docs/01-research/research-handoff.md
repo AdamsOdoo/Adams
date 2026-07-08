@@ -1,5 +1,182 @@
 # Research Handoff (rolling)
 
+### Task 005 Connection Lifecycle Actions — implementation — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5`, branched from
+  latest `origin/Shopify-connector` (includes PR #120 merge commit
+  `69b67ece38ea1db27144f7eaa92f9d37076e0593`) → **draft** PR into
+  `Shopify-connector` (this session's PR; not merged, not marked ready for
+  review). First code-implementation session in this project (gated by
+  `task-005-connection-lifecycle-gate.md` and `DEC-022-task-005-scope.md`,
+  both merged via PR #120).
+- **Files changed:** `addons/shopify_connector_core/__manifest__.py`
+  (version `19.0.1.3.0` → `19.0.1.4.0` only),
+  `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/models/shopify_connector_job.py`,
+  `addons/shopify_connector_core/tests/__init__.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py` (new),
+  `docs/01-research/research-handoff.md` (this entry). No XML/CSV/security/
+  migration/CI/controller/webhook/UI/wizard file touched; no domain-module
+  file touched; no other docs file touched.
+- **What changed:** implemented the four Task 005 connection-lifecycle
+  actions on `shopify.connector.store` — `action_activate()`,
+  `action_disconnect()`, `action_reconnect()`,
+  `action_mark_reconnect_needed(reason=False)` — plus a shared
+  `_create_lifecycle_audit_job()` helper that records every transition as
+  an audited `core_manual_maintenance` job/log row (reusing the existing
+  `_system_append` path, no new job type/log path). Added
+  `BUSINESS_JOB_SOURCES` and store-state gating to
+  `shopify_connector_job.py`: `create()` blocks business-job creation
+  unless the store is `connected`; `write()` blocks a business job's move
+  to `running` unless the store is `connected` at that moment (the
+  create→execute race guard). `action_test_connection()`'s existing
+  `ShopifyClientError` handler now also calls
+  `action_mark_reconnect_needed()` on any auth/permission/scope-
+  invalidation signal (`credential_invalid` or
+  `error_class == 'shopify_permission_scope_auth'`), not only a
+  genuine token-invalid one. `disconnect` reuses the existing Task 002
+  `action_clear_token` service (no second clear path) and cancels
+  non-terminal business jobs via the existing `TERMINAL_JOB_STATES`
+  import, never a re-typed literal.
+- **Self-review / independent adversarial review (Workflow tool, 3
+  parallel review lenses + synthesis) found and this session fixed three
+  real issues before commit:**
+  1. `action_activate()` did not check `credential_present`, so a stale
+     `last_test_connection_result`/`last_readiness_result` pass mirror
+     left over from *before* a `disconnect` could silently re-activate a
+     credential-less store. Fixed: `action_activate()` now also requires
+     `credential_present`.
+  2. `Job.write()`'s execution-time gate read the job's *pre-write*
+     cached `job_source`/`store_id`, so a single `write()` call that also
+     changed `job_source`/`store_id` alongside `state='running'` could
+     bypass the gate (both fields are UI-`readonly` only, not
+     ORM-enforced). Fixed: the gate now evaluates the effective
+     post-write values (`vals` when present, current value otherwise).
+  3. `action_reconnect()` double-wrote `state='reconnect_needed'` and
+     created two audit jobs for one logical attempt whenever the nested
+     `action_test_connection()` call itself already auto-transitioned via
+     an auth-classified failure. Fixed: `action_reconnect()` now detects
+     this (via the freshly created `core_test_connection` job's
+     `error_class`) and skips the redundant re-write/audit; every other
+     failure path (identity mismatch, temporary/throttle/unknown errors,
+     readiness-only failure) still audits exactly once, unaffected.
+  All three fixes are covered by new, explicit tests (see below).
+  Two lower-confidence items were considered and consciously **not**
+  changed: (a) `create()`'s per-call batch atomicity (a failing business
+  entry in a hypothetical future multi-record `Job.create([...])` call
+  would collaterally block a sibling core entry in the same call) — no
+  current caller batches heterogeneous job sources in one `create()`
+  call; (b) no `FOR UPDATE` row lock closes the narrow TOCTOU window
+  between the state check and the guarded write under concurrent
+  disconnect — the gate document's own §11 "Open risks" already frames
+  the two-checkpoint (enqueue + execution) re-check as the required
+  mechanism, not full transactional exclusivity, so a row lock would be
+  scope creep beyond this task's "service/model layer only" scope.
+- **Tests added:** `tests/test_connection_lifecycle.py` — one
+  `TransactionCase`, ~40 tests covering: activate (pass/pass,
+  pass/warning, missing evidence, failing evidence, fail test-connection,
+  missing credential, stale-evidence-after-disconnect); disconnect
+  (credential clear, credential-row preservation, state transition,
+  business-job cancellation with reason/log, core-job/terminal-job
+  non-interference, idempotency); business-job create-time gating (all
+  three non-connected states × all five business sources blocked;
+  connected succeeds; core sources always creatable); business-job
+  execution-time gating (blocked when disconnected mid-flight, succeeds
+  when connected, the two same-call bypass-attempt tests, cancel-while-
+  disconnected allowed, core jobs never gated); `action_mark_reconnect_
+  needed` (state set, credential kept, idempotent);
+  `action_test_connection`'s auto-transition wiring (credential-invalid
+  path, shop-state-failure path, success path does not auto-activate);
+  reconnect (missing credential, connects on pass/pass, connects on
+  pass/warning, remains `reconnect_needed` on readiness failure, on
+  test-connection failure, on credential-invalid failure, on identity-
+  mismatch failure — the last three each assert exactly one audit job,
+  proving the double-audit fix); and a no-secret-leakage sweep across
+  activate+disconnect. All Shopify API calls are mocked at the existing
+  `_send`/`run_for_store` seams — no live network, no real credentials.
+- **Local validation performed:** `python -m py_compile` on every changed
+  Python file — passes. **No Odoo runtime/CI is available in this
+  session's container** (`python3 -c "import odoo"` fails — module not
+  installed; no `odoo-bin` on `PATH`), so the test suite itself was
+  **not executed** in this session — this is stated honestly, not
+  claimed as passing. Manual/Odoo.sh validation command for a future
+  session or reviewer with a runtime:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **Docs/code boundary confirmed respected:** only the allowed files
+  listed above changed (verified via `git diff --stat` against the PR
+  #120 merge-base, plus an independent governance-compliance review
+  agent's 10/10-pass audit); no XML/CSV/security/migration/CI file; no
+  domain-module file (`shopify_connector_product/_customer/_sale/
+  _inventory/_fulfillment/_accounting/_refund/_payout/_multi_store`); no
+  `perm_create` grant added anywhere (`security/ir.model.access.csv` is
+  untouched); no OAuth/setup-wizard/UI/controller/webhook file; no new
+  job state, job type, or job source added to
+  `shopify_connector_job.py`'s selections (only a new plain-Python
+  `BUSINESS_JOB_SOURCES` tuple over the existing source values); exactly
+  the same two `sudo()` call sites as before this session
+  (`shopify_connector_job_log.py`, `shopify_connector_store_credential.py`
+  — confirmed by the existing AST-based guard tests, which still pass by
+  inspection since no new file adds a `sudo()` call).
+- **VAL-B2 remains deferred / not passed.** No live Shopify connection
+  was attempted or claimed this session; `activate`/`reconnect` still
+  report the existing Task 003/004 unknown/not-proven fail-closed state
+  whenever real evidence is absent — unchanged.
+- **MBQ-05 remains partially routed / open**, not fully resolved.
+  Unchanged by this session — `reconnect` calls the existing Task 003/004
+  substrate exactly as-is, independent of the eventual token-acquisition
+  direction.
+- **TD-002 remains open**, not fixed — out of this task's scope, not
+  touched.
+- **TD-001 remains Resolved.** Unchanged by this session.
+- **Learning feedback loop:**
+  - New issues discovered: the three real defects listed above (stale-
+    evidence activate bypass; write()-gate stale-value bypass; reconnect
+    duplicate-audit) — all found by an independent adversarial review
+    pass before commit, all fixed in this same session, all now covered
+    by explicit regression tests.
+  - Repeated issue patterns: none new; this session's UUID4-nonce
+    `payload_hash` pattern for `_create_lifecycle_audit_job` follows the
+    same TD-001-avoidance convention already established by
+    `action_test_connection`/`run_for_store` — no new instance of that
+    class of defect was introduced.
+  - Rules/checklists updated: none this session (docs-only rule changes
+    are out of this task's allowed-files scope).
+  - New rejected approaches: none — `rejected-approaches-log.md` was
+    checked; nothing in this implementation revisits a logged rejection.
+  - New technical debt: none logged. The two lower-confidence review
+    items (batch-create atomicity; TOCTOU row-locking) are design
+    tradeoffs explicitly within the gate document's own accepted risk
+    framing (§11), not undisclosed shortcuts, so they are recorded here
+    in this handoff rather than as a new technical-debt register row —
+    flagged for ChatGPT review to confirm that treatment is correct.
+  - Architecture concerns: none beyond what's already recorded in the
+    gate document's own "Open risks" §11.
+  - Tests or review gates needed: an Odoo runtime run of
+    `--test-tags /shopify_connector_core` is still needed before this can
+    be called fully verified — flagged above, not hidden.
+  - Should future prompts change? No process change recommended; the
+    adversarial-review-before-commit step this session added (via the
+    Workflow tool) caught real bugs that a single-pass implementation
+    would have shipped — worth keeping as a standing practice for future
+    code-implementation sessions, not a prompt-template change.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a, none reintroduced) ·
+  technical debt logged (n/a, no new debt; two accepted design tradeoffs
+  recorded above for reviewer visibility) · repeated-issue escalation
+  applied (n/a) — all YES.
+- **Next step:** ChatGPT code review of this draft PR — in particular the
+  three self-found-and-fixed issues above, and the two consciously-not-
+  fixed lower-confidence items (batch-create atomicity, TOCTOU row
+  locking), to confirm the "not fixed" calls are correct or to direct a
+  follow-up.
+- **Stop condition:** stopped at the scoped boundary — exactly the
+  allowed files touched; no XML/CSV/security/migration/CI/domain/UI/OAuth
+  file created or modified; no `perm_create` grant; no new job state/
+  type/source; VAL-B2 remains deferred, not passed; MBQ-05 remains
+  partially routed/open; TD-002 remains open; tests added but not run
+  (no Odoo runtime available, stated honestly); PR opened as **draft
+  only**, not marked ready for review, not merged.
+
 ### Task 005 Connection Lifecycle Gate Opening — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-gate-opening-jr5a9i`, branched from

@@ -18,6 +18,17 @@ JOB_STATE_SELECTION = [
 
 TERMINAL_JOB_STATES = ('succeeded', 'failed_final', 'skipped', 'cancelled')
 
+# The Task 005 / DEC-022 §4.2 business-job source subset: job_source
+# values representing business sync/write work, subject to store-state
+# gating at both enqueue (create()) and execution (write() to 'running')
+# time. setup_readiness_check/export_preview_dry_run, and any other
+# source outside this tuple, remain ungated core/diagnostic sources --
+# gating them on 'connected' would be circular, since they exist to
+# determine connection/readiness state in the first place.
+BUSINESS_JOB_SOURCES = (
+    'webhook', 'manual_sync', 'scheduled_sync', 'reconciliation', 'odoo_event',
+)
+
 # The six DEC-009 §D.5.4 confirmation-required error classes, reused as
 # both a subset of ERROR_CLASS_SELECTION and the full
 # manual_review_subreason vocabulary.
@@ -165,6 +176,76 @@ class ShopifyConnectorJob(models.Model):
         'UNIQUE(store_id, operation_scope_key)',
         'A non-terminal job already holds this operation scope for this store.',
     )
+
+    @api.model
+    def _is_business_job_source(self, job_source):
+        """Whether `job_source` is one of the Task 005 business-gated sources.
+
+        The one place future domain job-creation code should consult
+        before assuming a job needs store-state gating -- keeps this
+        list from drifting between callers (create()/write() below, and
+        `shopify_connector_store.py`'s disconnect cancellation sweep).
+        """
+        return job_source in BUSINESS_JOB_SOURCES
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Enqueue-time store-state gating (Task 005 / DEC-022 §4.2).
+
+        A business job (`job_source` in `BUSINESS_JOB_SOURCES`) may only
+        be created for a store already in state `connected` -- regardless
+        of the job's own initial `state` (draft/queued/running all
+        gated alike). Core setup/readiness/test/maintenance jobs are
+        exempt: they exist to determine connection/readiness state, so
+        gating them on `connected` would be circular.
+        """
+        Store = self.env['shopify.connector.store']
+        for vals in vals_list:
+            if self._is_business_job_source(vals.get('job_source')):
+                store = Store.browse(vals.get('store_id')).exists()
+                if not store or store.state != 'connected':
+                    raise ValidationError(
+                        "A business job (job_source=%r) can only be "
+                        "created for a store in state 'connected'." % (
+                            vals.get('job_source'),
+                        )
+                    )
+        return super().create(vals_list)
+
+    def write(self, vals):
+        """Execution/start-time store-state gating (Task 005 / DEC-022 §4.2).
+
+        Re-checks store state the moment a business job is about to
+        start (`state` -> 'running') -- the fail-closed guard for the
+        race between a job's creation and its execution, so a store
+        disconnected after enqueue can never let a business job proceed
+        to a live Shopify call. Writes to any other state (including
+        `cancelled`, e.g. `action_disconnect`'s cancellation sweep) are
+        never blocked by this check.
+
+        Evaluates the *effective* post-write `job_source`/`store_id` --
+        i.e. the incoming `vals` value when present, the job's current
+        value otherwise -- not the stale pre-write cache, so a single
+        call that also changes `job_source`/`store_id` alongside `state`
+        cannot slip a business job past the gate by changing identity in
+        the same write() as the state transition.
+        """
+        if vals.get('state') == 'running':
+            Store = self.env['shopify.connector.store']
+            for job in self:
+                job_source = vals.get('job_source', job.job_source)
+                if not self._is_business_job_source(job_source):
+                    continue
+                if 'store_id' in vals:
+                    store = Store.browse(vals['store_id'])
+                else:
+                    store = job.store_id
+                if store.state != 'connected':
+                    raise ValidationError(
+                        "This business job's store is not 'connected' -- "
+                        "it cannot start."
+                    )
+        return super().write(vals)
 
     @api.depends(
         'store_id', 'job_type', 'res_model', 'res_id',
