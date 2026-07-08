@@ -68,6 +68,14 @@
       job/log/store/credential/readiness substrate facts; the `ir.cron`/
       savepoint/locking facts; the Shopify GraphQL throttle-body and cursor-
       durability facts).
+- [ ] **The two pre-006A baseline sources —
+      `docs/01-research/shopify-official-api-notes.md` and
+      `docs/01-research/odoo-official-architecture-notes.md` — were directly
+      read in full**, not only consulted via the Task 006A synthesis layer;
+      the gate document's "Revision note" states this and confirms whether
+      direct inspection required any material architecture-content change
+      (it did not, per this revision — see the note for the specific facts
+      checked).
 
 ## 4. Claim classification discipline
 
@@ -135,9 +143,15 @@
 - [ ] The handoff entry's Learning feedback loop fields are all present
       (new issues / repeated patterns / rules updated / rejected approaches
       / technical debt / architecture concerns — "None" where applicable).
-- [ ] The `architecture-review-log.md` non-modification is explicitly
-      flagged (in DEC-025's "Architecture-review-log note" and in the
-      session's final report) rather than silently decided either way.
+- [ ] **A corresponding `architecture-review-log.md` row exists** —
+      `AR-030`, added after inspecting the log's full existing `AR-0##`
+      sequence to confirm it is the correct next number.
+- [ ] **`AR-030`'s Review decision / Status reads "Proposed for ChatGPT
+      review — NOT YET ACCEPTED" / "Proposed"** — not "Accepted," not any
+      wording implying acceptance.
+- [ ] **DEC-025's `Status` still reads "Proposed / Pending ChatGPT
+      review"** — adding the `AR-030` row did not itself change DEC-025's
+      status, and the two are consistent with each other.
 
 ## 9. Overall review decision (record the outcome)
 
@@ -151,9 +165,11 @@
       date, mirroring the DEC-005/DEC-009/DEC-013 acceptance pattern —
       **this update itself is a future, separate act, not performed by this
       session.**
-- [ ] If accepted: a decision is made on whether to add a corresponding
-      "Accepted" row to `architecture-review-log.md` (see DEC-025's
-      "Architecture-review-log note").
+- [ ] If accepted: `AR-030`'s row in `architecture-review-log.md` is moved
+      from "Proposed for ChatGPT review" to "Accepted," in the same
+      acceptance patch that updates DEC-025's `Status` (see DEC-025's
+      "Architecture-review-log note") — **this update itself is a future,
+      separate act, not performed by this revision.**
 - [ ] Next recommended session named (e.g. a separately-scoped Task 006C
       implementation-scope drafting session) — **not started by this
       session**.

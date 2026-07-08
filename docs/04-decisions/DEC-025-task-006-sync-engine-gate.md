@@ -242,18 +242,20 @@ by this record.
 
 `../05-qa/architecture-review-log.md` records each AR-numbered architecture
 question through its "Not decided" → "Proposed for ChatGPT review" →
-"Accepted" lifecycle. This session did **not** add or modify a row in that
-log for this proposal, out of caution: assigning the correct next AR number
-and confirming the row format without materially risking an error in a
-1,600+ line, heavily cross-referenced log felt like a real risk for a
-docs-synthesis session under this scope, and `CLAUDE.md`'s explicit
-instruction is to leave the file untouched and flag the question here when
-uncertain rather than guess. **If ChatGPT's convention is that every
-proposed DEC record gets a corresponding "Proposed for ChatGPT review" row
-in `architecture-review-log.md` (as DEC-004/005/006/010/011/013 through
-DEC-017 all did), a follow-up patch should add that row** (a candidate next
-number, not assigned here) rather than this record silently deciding the
-question itself.
+"Accepted" lifecycle — the same pattern DEC-004/005/006/010/011/013 through
+DEC-020 and every subsequent Task 00X gate/decision record already followed.
+**This revision adds the corresponding row, `AR-030`** (the next free number
+after `AR-029`, confirmed by inspecting the full existing `AR-0##` sequence
+in that log before adding), for this exact proposal. **`AR-030`'s Review
+decision and Status are both "Proposed for ChatGPT review — NOT YET
+ACCEPTED" / "Proposed"** — mirroring this record's own status exactly.
+Acceptance of `AR-030` (moving its row to "Accepted") remains a **future,
+separate ChatGPT action**, performed together with any future acceptance of
+this record (mirroring, for example, the AR-010/DEC-013 or AR-018/audit
+acceptance pattern already used elsewhere in this log) — it is **not**
+performed by this revision. **Implementation remains unauthorized** by the
+addition of this row, exactly as before: `AR-030` records a proposal under
+review, not a commitment, per this log's own "How to use" §1 instruction.
 
 ## No implementation authorized
 
@@ -294,3 +296,10 @@ implementation-scope document per `CLAUDE.md` §9.
 - [`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md),
   [`rejected-approaches-log.md`](../05-qa/rejected-approaches-log.md) —
   access: Accessible, this repository.
+- [`../01-research/shopify-official-api-notes.md`](../01-research/shopify-official-api-notes.md),
+  [`odoo-official-architecture-notes.md`](../01-research/odoo-official-architecture-notes.md)
+  — pre-006A baseline sources, **directly read in full during this
+  revision** (2026-07-08); access: Accessible, this repository. Task 006A's
+  own deeper research remains controlling wherever it re-verifies or
+  corrects a baseline fact — see the companion gate document's "Revision
+  note."

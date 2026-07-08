@@ -39,16 +39,45 @@
   [`master-blueprint-open-questions.md`](./master-blueprint-open-questions.md),
   [`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md),
   [`../05-qa/rejected-approaches-log.md`](../05-qa/rejected-approaches-log.md)),
-  all read in full this session. `docs/01-research/shopify-official-api-notes.md`
-  and `docs/01-research/odoo-official-architecture-notes.md` (the pre-006A
-  baselines, R24/R25) and `docs/01-research/research-handoff.md`'s most recent
-  entries were consulted via the Task 006A synthesis layer that already
-  re-verifies, cross-cites, and in places corrects them (source inventory §3
-  "Synthesis hierarchy"; evidence map; queue-idempotency source notes) rather
-  than independently re-read line-by-line in this session — the same
-  cross-referencing discipline PR #124/#126 used against each other. No new
-  external research (no fresh `WebFetch`/`WebSearch`) was performed by this
-  session; this is a synthesis session, not a research session.
+  all read in full this session. No new external research (no fresh
+  `WebFetch`/`WebSearch`) was performed by this session; this is a synthesis
+  session, not a research session.
+- **Revision note (this PR revision, 2026-07-08):** `docs/01-research/
+  shopify-official-api-notes.md` and `docs/01-research/odoo-official-
+  architecture-notes.md` (the pre-006A baselines, `R24`/`R25`) were **directly
+  read in full during this revision**, in response to control-room review
+  feedback on the first version of this gate, which had cited them only via
+  the Task 006A synthesis layer rather than independently. Both remain
+  **baseline / pre-006A sources** — Task 006A's own deeper research (PR #124's
+  `sync-engine-odoo-repo-source-notes.md`; PR #126's `sync-engine-
+  queue-idempotency-source-notes.md`; the source inventory's §3 "Synthesis
+  hierarchy" and version-caveats section) remains the **controlling, latest
+  source** wherever it re-verifies, sharpens, or corrects a baseline fact —
+  consistent with this repo's own "latest dated refresh wins" convention,
+  already used throughout both baseline documents' own revision history.
+  Direct inspection **did not require any material change to this gate's
+  proposed architecture content.** Every fact this gate cites from the two
+  baselines (GraphQL-preferred direction, REST/GraphQL rate-limit mechanics,
+  webhook HMAC/dedup/retry facts, bulk-operation mechanics, the `ir.cron`
+  failure-count/deactivation constants, the "no core async job queue, only
+  `ir.cron`" inference, OCA `queue_job` as community/reference-only) is
+  confirmed present and unchanged in the baseline text, and every fact this
+  gate cites that goes *beyond* the two baselines (the GraphQL HTTP-200/
+  `THROTTLED`-body behavior, `SKIP LOCKED`/`lock_for_update()` job-claiming
+  precedent, the >64-savepoint performance warning, `retrying()`'s RPC-layer
+  serialization retry, the 16-vs-17 `@idempotent` mutation-count discrepancy)
+  is correctly attributed to Task 006A's own deeper source-level research
+  (`O5`–`O9`, `OD-1`, `OD-3`, `OD-5`, `S16`, `SH-4`), not to these two
+  baselines, which do not contain those facts. One genuine sharpening was
+  found and is worth naming explicitly: `odoo-official-architecture-notes.md`
+  describes `ir.cron`'s 5-failures-over-≥7-days deactivation as notifying
+  "the DB admin" at the documentation level; Task 006A's source-level reading
+  of `ir_cron.py` (`O7`) found the base `_notify_admin()` implementation is a
+  `_logger.warning()` call only, explicitly meant to be overridden — a
+  sharpening from "a notification occurs" to "a log line is written unless a
+  real notification is wired up," not a contradiction. This gate's §E and §C
+  already cited the sharper, source-level fact (via `O7`/SRR-05), so no
+  content change was needed there either.
 - **`docs/01-research/sync-engine-shopify-source-notes.md`** does not exist —
   per the accepted Task 006A completeness audit (PR #127, Recommendation A),
   its intended content is covered-by-synthesis across the source inventory

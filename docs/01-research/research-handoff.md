@@ -1,5 +1,89 @@
 # Research Handoff (rolling)
 
+### Task 006B — PR #128 revision — governance corrections (AR-log row + direct baseline inspection) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` → PR #128 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened). Revises the initial version per control-room review
+  (GitHub review artifact/comment ID `4918187862`), which found the PR
+  directionally strong but not yet acceptable on two points.
+- **Files changed:** `docs/03-architecture/sync-engine-architecture-gate.md`
+  (revised), `docs/04-decisions/DEC-025-task-006-sync-engine-gate.md`
+  (revised), `docs/05-qa/task-006b-architecture-gate-review-checklist.md`
+  (revised), `docs/05-qa/architecture-review-log.md` (new `AR-030` row
+  added), `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:**
+  1. **Directly read, in full, the two pre-006A baseline sources** —
+     `docs/01-research/shopify-official-api-notes.md` (917 lines) and
+     `docs/01-research/odoo-official-architecture-notes.md` (803 lines) —
+     which the initial PR version had cited only via the Task 006A synthesis
+     layer, not independently. Direct inspection **confirmed, rather than
+     changed**, this gate's proposed architecture content: every fact the
+     gate cites from these two baselines is present and unchanged in the
+     baseline text, and every fact the gate cites that goes beyond the
+     baselines (GraphQL HTTP-200/`THROTTLED`-body behavior, `SKIP LOCKED`/
+     `lock_for_update()` precedent, the >64-savepoint warning, `retrying()`'s
+     RPC-layer retry, the 16-vs-17 `@idempotent` count discrepancy) is
+     correctly attributed to Task 006A's own deeper source-level research,
+     not to these baselines. One genuine sharpening was found and named
+     explicitly in the gate document's new "Revision note": the baseline
+     describes `ir.cron`'s deactivation as notifying "the DB admin," while
+     Task 006A's source-level reading found the base `_notify_admin()` is a
+     log-line-only no-op by default — already correctly cited at the sharper
+     level in this gate's §C/§E via `O7`/SRR-05, so no content change was
+     needed there. **No material architecture change was required** by this
+     direct inspection.
+  2. **Added `AR-030`** to `docs/05-qa/architecture-review-log.md` for this
+     proposal, after inspecting the log's complete existing `AR-0##`
+     sequence (highest prior: `AR-029`, 2026-07-07) to confirm `030` is the
+     correct next number. `AR-030`'s Review decision and Status both read
+     "Proposed for ChatGPT review — NOT YET ACCEPTED" / "Proposed,"
+     mirroring DEC-025's own status exactly — **not** marked Accepted.
+  3. Updated DEC-025's "Architecture-review-log note" to state the row is
+     now added (replacing the prior version's explanation of why no row was
+     added), and added the two baseline sources to DEC-025's evidence list,
+     noting they were directly read this revision.
+  4. Updated `docs/05-qa/task-006b-architecture-gate-review-checklist.md`'s
+     architecture-review-log and Task-006A-coverage items so a reviewer can
+     confirm: the `AR-030` row exists, it is not marked Accepted, DEC-025
+     remains Proposed/Pending, and the two baseline files were directly
+     read.
+- **No new rejected approach was created; no implementation was
+  authorized; no implementation-scope file was created.** DEC-025's
+  `Status` remains **"Proposed / Pending ChatGPT review"** — not Accepted.
+  `AR-030`'s Status remains **"Proposed"** — not Accepted. Every Task 006A
+  open blocker (VAL-B2, MBQ-05, TD-002, fulfillment API model, product
+  first-sync dedup thresholds, Lite/Full packaging, the 16-vs-17 mutation
+  count and OCA `queue_job` worker-count discrepancies, multi-server/
+  Odoo.sh runtime concurrency proof) remains exactly as open as the prior
+  revision left it — none was silently resolved by this revision.
+- **Items deferred:** none new; the `architecture-review-log.md` gap
+  flagged in the prior revision's handoff entry is now resolved (row
+  added), not deferred further.
+- **Learning feedback loop:** new issues discovered: two governance gaps
+  from the initial PR version (missing `architecture-review-log` row;
+  baseline files not independently re-read) — both fixed this revision, both
+  logged here rather than silently corrected. Repeated issue patterns: none
+  (first occurrence of both categories for this task). Rules/checklists
+  updated: `task-006b-architecture-gate-review-checklist.md` gained explicit
+  checks for both. New rejected approaches: none. New technical debt: none.
+  Architecture concerns: none beyond what Task 006A already flagged (carried
+  forward unchanged). Should future prompts change? No — the original task
+  prompt already listed both baseline files as required inputs; the gap was
+  in how the first pass satisfied that requirement (synthesis-layer citation
+  instead of direct read), not in the prompt itself.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** ChatGPT re-review of PR #128 (revised) and its `AR-030` /
+  DEC-025 proposal.
+- **Stop condition:** docs-only revision, no code touched, no implementation
+  authorized, DEC-025 and `AR-030` both left Proposed/Pending, not Accepted.
+  Stopped after pushing to the same PR #128 branch. No merge performed. PR
+  remains draft/unmerged.
+
+---
+
 ### Task 006B — sync engine architecture gate proposal — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-006b-sync-engine-gate-865mw5` (harness-
