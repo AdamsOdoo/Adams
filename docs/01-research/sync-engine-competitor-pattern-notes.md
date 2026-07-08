@@ -43,20 +43,24 @@ Reasoning:
   [`../00-source-materials/competitor-screenshot-inventory.md`](../00-source-materials/competitor-screenshot-inventory.md).
 - That sprint already went through a **capture → adversarial-verify** pass per
   source (claims were actively downgraded where a workflow wasn't actually
-  shown — e.g. Teqstars pHash, automatic-retry, and dashboard claims). Re-fetching
-  the same pages 8 days later, with no signal that anything sync-relevant
-  changed, would duplicate that work rather than add value.
+  shown — e.g. Teqstars pHash, automatic-retry, and dashboard claims).
+  Re-fetching the same pages 8 days later, absent a specific reason to believe
+  something sync-relevant changed, would duplicate that work rather than add
+  value.
 - This document's job is to **re-cut** that existing evidence into the
   sync-engine-specific taxonomy the task asks for (manual/scheduled/logs/
   retry/queue/import-export/webhook/dedup/mapping/multi-store/first-sync),
   which is a different organizing lens than the full-feature deep dives — that
   re-cut is the value-add of this session, not new fact-finding.
-- No source status has changed for these six targets since the last check
-  (all still recorded as of 2026-06-30/07-01 in the files above); this session
-  performed no new HTTP fetches and therefore records no new access-date
-  changes. If ChatGPT wants a fresh re-check of a specific vendor page (e.g. to
-  catch a mid-week release), that is flagged as a next-step candidate in the
-  Handoff section, not performed here.
+- **No new source re-check was performed in this session.** The latest
+  recorded source status in the repo remains the **2026-06-30 / 2026-07-01**
+  research baseline (Sprint C / Sprint C2). This session made **no new HTTP
+  fetches**, so it cannot confirm whether that status still holds — it only
+  reuses what was already recorded. Any vendor-page changes after those dates
+  are **not reflected here** unless they were already captured in the
+  existing repo research. If ChatGPT wants a fresh re-check of a specific
+  vendor page (e.g. to catch a mid-week release), that is flagged as a
+  next-step candidate in the Handoff section, not performed here.
 
 Every claim below carries its **original** vendor citation (URL) plus the
 **existing repo file** it was captured in, per the task's citation rule.
