@@ -1,5 +1,72 @@
 # Research Handoff (rolling)
 
+### Task 005 Connection Lifecycle Gate Opening — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-gate-opening-jr5a9i`, branched from
+  latest `origin/Shopify-connector` (includes PR #118 merge commit
+  `440b9beec108bf1cf7617688f1e32ba60b6a661f` and PR #119 merge commit
+  `eb5d8d91b46c4b3e21c1387eee03bc9688b773e6`) → **draft** PR into
+  `Shopify-connector` (this session's PR; not merged).
+- **Files changed:** `docs/07-implementation-plan/task-005-connection-lifecycle-gate.md`
+  (new), `docs/04-decisions/DEC-022-task-005-scope.md` (edited),
+  `docs/01-research/research-handoff.md` (this entry). **No `addons/`
+  file, no Python/XML/CSV/manifest/security/test/migration/CI file
+  touched. No code changed.**
+- **What changed:** the Task 005 gate-opening document created;
+  **DEC-022 accepted at gate-opening level** — status changed from
+  "Proposed, not accepted" to "Accepted — Task 005 gate opened for final
+  implementation prompt." **Task 005 scope:** connection lifecycle actions
+  (`activate`, `disconnect`, `reconnect`, `reconnect_needed`
+  auto-transition, business-job enqueue/execution gating by store
+  connection state) — service/model layer only, no UI.
+- **Key decisions recorded** (full text in
+  `task-005-connection-lifecycle-gate.md` §4):
+  - **Disconnect cancels non-terminal business jobs**, preserving history —
+    no job record deleted; core maintenance/readiness jobs and
+    terminal-state jobs unaffected.
+  - **Store/settings `perm_create` remains closed** — no grant on
+    `shopify.connector.store` or `shopify.connector.store.settings`.
+  - **Business job enqueue/execution requires store state `connected`** —
+    gated at both enqueue time and execution time (defense in depth); a
+    store-state change after enqueue must fail closed before any Shopify
+    operation.
+  - `activate`/`reconnect` semantics: never infer connection success; only
+    transition to `connected` on actual Task 003/004 evidence; never claim
+    VAL-B2 passed; no OAuth/setup-wizard logic.
+  - `reconnect_needed`: auto-transition on auth/permission/scope-
+    invalidation signal; no automatic reconnect; human/admin action
+    required to leave the state.
+- **No code changed.** No OAuth, setup wizard, UI, or sync implementation
+  of any kind was created or authorized — this document opens the gate for
+  a separate, later `CLAUDE.md` §9 final implementation task prompt only.
+- **VAL-B2 remains deferred / not passed.** Unchanged by this session — no
+  live Shopify connection was attempted or claimed.
+- **MBQ-05 remains partially routed / open**, not fully resolved. Unchanged
+  by this session (PR #119's routing note stands as-is).
+- **TD-002 remains open**, not fixed. Unchanged by this session.
+- **TD-001 remains Resolved.** Unchanged by this session.
+- **Learning feedback loop:** no new defect pattern in shipped code (no
+  code was touched); no new rejected approach (this session does not
+  reintroduce any entry from `rejected-approaches-log.md`); no new
+  technical debt (docs-only, decisions recorded, not implemented).
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a, none reintroduced) ·
+  technical debt logged (n/a, no new debt) · repeated-issue escalation
+  applied (n/a) — all YES.
+- **Next step:** ChatGPT review of this gate-opening PR; if accepted, a
+  separate, explicit `CLAUDE.md` §9 final Task 005 implementation task
+  prompt, naming exact allowed/forbidden files (mirroring
+  `task-004-final-implementation-prompt.md`), issued by ChatGPT in chat
+  after this PR merges. Task 005 remains not implemented until that
+  prompt is issued and a later, separate coding session executes it.
+- **Stop condition:** stopped at the scoped boundary — docs-only session;
+  exactly the 3 allowed files touched (2 new/edited plus this handoff), no
+  other file created or modified; no code, test, manifest, security, XML,
+  CSV, migration, or CI file touched; VAL-B2 remains deferred, not passed;
+  MBQ-05 remains partially routed/open, not fully resolved; TD-002 remains
+  open; Task 005 is not implemented; PR not merged, not marked ready for
+  review.
+
 ### DEC-023 Limited Acceptance / MBQ-05 Routing — compact handoff (2026-07-08)
 
 - **Branch / PR:** new branch off latest `origin/Shopify-connector` (which
