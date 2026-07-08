@@ -1,5 +1,266 @@
 # Research Handoff (rolling)
 
+### Task 004 Implementation — Readiness-Check Substrate + TD-001 Fix — compact handoff (2026-07-07)
+
+- **Branch / PR:** `claude/task-004-readiness-substrate-me21qg`, branched
+  from `Shopify-connector` at PR #114's merge commit
+  `a4dbbb44c765a6341491f7e572e5fb705c70c1cc` → **draft** PR into
+  `Shopify-connector` (this session's PR; not merged, not marked ready).
+  PR #114 (gate acceptance / TD-001 route selection) was confirmed merged
+  before this session started coding — its head SHA
+  (`e0214857df559d422b785e4574fbe7c8132b803e`), base
+  (`0848b8cde5720162b795936161e884678ae52c71`), and 6-file allowed-files
+  diff were independently re-verified against `origin/Shopify-connector`
+  before this branch was created.
+- **Revision (ChatGPT review, same PR, 2026-07-07).** ChatGPT's review of
+  PR #115 found two correctness issues and returned it for a targeted
+  fix, not acceptance:
+  1. `_check_required_scopes()` previously passed on **any non-empty**
+     `granted_scopes` JSON list (e.g. a single `read_products` scope
+     alone was enough) — it did not verify the actual scopes needed for
+     Phase 1. **Fixed:** a new `REQUIRED_MVP_SCOPES` constant (the six
+     Phase-1 read scopes — `read_products`, `read_customers`,
+     `read_orders`, `read_inventory`, `read_locations`,
+     `read_fulfillments`) is now checked; the result is `fail` (not
+     `not_proven`) with a reason naming every missing scope if one or
+     more required scopes is absent, `pass` only when all six are
+     present (extra granted scopes are still allowed), and unchanged
+     `not_proven` behavior for an absent/malformed/empty snapshot.
+  2. `_check_domain_flag_enablement()` previously passed merely because
+     a `shopify.connector.store.settings` record **existed** for the
+     store, even if every domain flag on it was `False` (i.e., no sync
+     domain would actually run). **Fixed:** a new
+     `ACCEPTED_DOMAIN_FLAGS` constant (the four DEC-008 domain flags)
+     is now checked; the result is `fail` with the reason "No sync
+     domain is enabled." when a settings record exists but every
+     accepted flag is `False` (confirmed `notification_default_enabled`
+     alone still does not pass, since it is not one of the four
+     accepted flags), `pass` only when at least one accepted flag is
+     `True`, and unchanged `not_proven` behavior when no settings
+     record exists at all.
+  - Both fixes stayed inside
+    `addons/shopify_connector_core/models/shopify_connector_readiness_check.py`
+    — no forbidden file was touched, no new file was needed.
+  - **Tests added/updated:** 14 new test methods in
+    `test_readiness_check.py` (7 for the required-scopes fix — all
+    required present passes; missing one fails and names it; extra
+    scope still passes; a single scope is not enough; malformed JSON /
+    empty list / absent snapshot are all `not_proven`; and 7 for the
+    domain-flag fix — no settings record is `not_proven`; all-flags-False
+    is `fail`, not `pass`; `notification_default_enabled` alone does not
+    pass; each of the four accepted flags passes on its own). Every
+    pre-existing test — the TD-001 regression pair, the aggregation
+    unit tests, the credential/VAL-B2 tests, the payload-snapshot/
+    mirror/seam/read-only/redaction tests, and both AST-level structural
+    scans — is unchanged and still present. Test-method count:
+    **17 → 31** (this corrects a stale count: the prior handoff entry
+    said "20," which was already inaccurate against the actual
+    17-method file committed at PR-open time — confirmed by
+    `git show HEAD:...test_readiness_check.py \| grep -c 'def test_'`
+    before writing this note).
+  - **Tests run this revision:** `python3 -m py_compile` on both
+    changed files (pass); the same throwaway, uncommitted dry-run
+    harness used in the original session (updated to match the new
+    scope/flag semantics) — 50/50 assertions pass, zero defects in the
+    model file itself; both AST-level structural regression checks
+    manually replayed and still pass (2 `sudo()` sites, unchanged; zero
+    mutating calls in any `_check_*` method). No Odoo/PostgreSQL
+    runtime is available in this environment (same as the original
+    session), so the live `TransactionCase` suite was still not
+    executed — stated honestly, not silently skipped.
+  - VAL-B2 remains deferred, not passed; MBQ-05 remains deferred for
+    Task 004 only, not resolved; TD-001's fix and regression test are
+    unchanged and intact; no OAuth/setup-wizard/UI/lifecycle/domain-sync
+    work was added. PR #115 remains **draft** and **unmerged**.
+- **Task 004 implementation summary.** Implemented the readiness-check
+  substrate for `shopify_connector_core` exactly per the finalized
+  [`task-004-final-implementation-prompt.md`](../07-implementation-plan/task-004-final-implementation-prompt.md)
+  and the MBQ-06/DEC-018 essential/warning split: a new
+  `shopify.connector.readiness.check` `models.AbstractModel` service
+  (`shopify_connector_readiness_check.py`) providing `run_for_store(store)`,
+  a domain-extension registration seam (`_get_checks(store)`, overridable
+  via classic `_inherit` + `super()` from a future domain module, tested
+  with a `patch.object` seam test that proves a check can be injected
+  without modifying any core file), fail-closed aggregation (`_aggregate`:
+  any essential check not `pass` — including `not_proven` — forces overall
+  `fail`; all essential `pass` + any warning not `pass` yields overall
+  `warning`; all `pass` yields overall `pass`), and the nine core-owned
+  essential checks accepted by MBQ-06 (credential/test-connection stored
+  evidence, required scopes, API-version health, store identity,
+  `web.base.url` HTTPS reachability, and three registered-pending-slot
+  checks — webhook HMAC, mapped Location, cron/queue health — plus a
+  domain-flag-enablement presence check). Each `run_for_store` call
+  creates one `core_readiness_check` job, appends exactly two
+  `job.log` rows via the existing `_system_append` path (an `attempt`
+  start row, and a `verification_read` completion row carrying the
+  per-check JSON array in `payload_snapshot`), mirrors the summary onto
+  `store.last_readiness_result`/`_at` (both fields already existed on
+  `shopify.connector.store` — no field addition was needed), and marks
+  the job `succeeded` regardless of whether the readiness result itself
+  is pass/fail/warning (the job records that the *evaluation* completed,
+  not that it passed). **By design, a fresh/current-state store always
+  computes overall `fail`** — the three registered-pending-slot checks
+  (webhook HMAC, mapped Location, cron/queue health) are essential per
+  MBQ-06 and have no real signal to read yet (no webhook, domain, or cron
+  implementation exists), so fail-closed aggregation correctly withholds
+  `pass`/`warning` until those future tasks exist. This is intentional,
+  not a defect, and is exactly what DEC-021 §4 requires ("no
+  customer-facing readiness pass ... based on an unproven live
+  connection" / no inferred pass from absent data) — confirmed by both a
+  dry-run harness and `test_fresh_store_never_passes_readiness`.
+- **TD-001 fix implemented, pending ChatGPT review.** `core_readiness_check`
+  job creation inside `run_for_store` now uses its own fresh UUID4
+  `payload_hash` nonce, exactly mirroring the already-accepted
+  `action_test_connection`/`core_test_connection` pattern in
+  `shopify_connector_store.py` (Task 003) — the fix lives entirely inside
+  the new file's own job-creation call, as required; **neither
+  `shopify_connector_job.py` nor `shopify_connector_store.py` was
+  touched**, so `core_test_connection`'s own behavior is unchanged (a
+  focused test, `test_core_test_connection_repeat_run_still_does_not_collide`,
+  confirms the shared idempotency-key substrate still yields distinct
+  keys for two `core_test_connection` creations). The mandatory
+  regression test (`test_td001_repeated_readiness_job_does_not_collide`)
+  proves two `core_readiness_check` job-creation attempts for the same
+  store both succeed with distinct `payload_hash`/`idempotency_key`
+  values — no `store_idempotency_key_uniq` collision. **TD-001 remains
+  `Open` in `technical-debt-register.md`** — per the accepted prompt, its
+  Status is intentionally left for ChatGPT to mark `Resolved` after this
+  PR is reviewed and accepted, not changed unilaterally in this PR (that
+  file is not in this task's allowed-files list).
+- **Files changed (exactly, confirmed by `git diff --name-only` against
+  `origin/Shopify-connector`):**
+  - `addons/shopify_connector_core/models/shopify_connector_readiness_check.py`
+    (new)
+  - `addons/shopify_connector_core/models/__init__.py` (one import line
+    added)
+  - `addons/shopify_connector_core/tests/test_readiness_check.py` (new)
+  - `addons/shopify_connector_core/tests/__init__.py` (one import line
+    added)
+  - `addons/shopify_connector_core/__manifest__.py` (version
+    `19.0.1.2.3` → `19.0.1.3.0` only)
+  - `docs/01-research/research-handoff.md` (this entry)
+- **Tests run.** `python3 -m py_compile` on every changed `.py` file
+  (pass, no syntax errors). **No Odoo runtime or PostgreSQL is installed
+  in this execution environment** (`python3 -c "import odoo"` fails;
+  no `odoo-bin`; no `pyflakes`/`flake8`/`pylint` available either), so
+  the 17 `TransactionCase` tests in `test_readiness_check.py` (the count
+  at PR-open time — see the revision note above for the corrected count
+  after this same PR's later revision) were
+  **not** executed against a live Odoo registry — mirroring the Task
+  001A precedent, this is stated honestly, not silently skipped or
+  claimed as run. As additional, stronger-than-`py_compile` diligence
+  (not a substitute for a real Odoo test run), a throwaway, uncommitted
+  dry-run harness (minimal hand-written `odoo.api`/`fields`/`models`
+  stub, scratchpad-only, never touches the repo) imported the actual
+  `shopify_connector_readiness_check.py` module unmodified and exercised
+  every `_check_*` method, `_aggregate`, `_get_checks`, and
+  `run_for_store` against fake store/job/job.log/env objects covering
+  every branch named in the acceptance criteria (all passed, 41/41
+  assertions) — this caught zero defects in the model file itself, giving
+  moderate additional confidence the logic is correct beyond syntax
+  validity, but it is **not** a substitute for the real `TransactionCase`
+  suite against a
+  live Odoo/PostgreSQL registry. The two AST-level structural regression
+  checks — the pre-existing `test_source_level_two_sudo_sites_total`
+  (`test_job_log_system_append.py`) and this task's new
+  `test_source_level_no_check_method_mutates_state`
+  (`test_readiness_check.py`) — were manually replayed standalone against
+  the real files and both pass: the new file adds **zero** `sudo()` call
+  sites (the existing two-site inventory is unchanged), and no
+  `_check_*` method contains a `write`/`create`/`unlink`/`execute`/`sudo`
+  call. **One test-file-only defect was found and fixed during the
+  self-review loop** (not a model-logic defect): the first draft of
+  `test_readiness_check_only_writes_its_own_mirror_fields` compared a
+  store's full `read()` dict before/after `run_for_store` and excluded
+  only `__last_update`, which would have made the test fail against a
+  real Odoo registry (`write_date`/`write_uid` change on every `write()`
+  call, unrelated to this task's own mirror fields) — corrected by also
+  excluding `write_date`/`write_uid` before this PR was opened.
+- **Tests not run and why:** the full `test_readiness_check.py` suite
+  (17 test methods at PR-open time; 31 after this same PR's later
+  ChatGPT-review revision — see the revision note above) and the two
+  pre-existing test files that share the `models/` directory scan were
+  not executed as live Odoo `TransactionCase` runs — no Odoo/PostgreSQL
+  runtime exists in this container. `docs/05-qa/task-004-manual-validation-checklist.md`
+  (already prepared by the PR #114 gate-acceptance session) remains the
+  mandatory live-validation evidence for a future session with a real
+  Odoo instance, per that document's own preconditions.
+- **No OAuth / setup wizard / domain sync / UI / lifecycle work:**
+  confirmed. Zero XML, view, menu, action, wizard, controller, cron, or
+  webhook file exists anywhere in this diff; zero
+  `shopify_connector_product`/`_sale`/`_inventory`/`_fulfillment` file
+  touched; zero activation/disconnect/reconnect code added.
+  `shopify_connector_store_credential.py` and every file under
+  `security/` are untouched.
+- **No Shopify API call:** confirmed. Every check reads only
+  already-stored core evidence (`store.last_test_connection_result`,
+  `.granted_scopes`, `.api_health_state`/`_reason`, `.shop_domain`) or
+  `ir.config_parameter` (`web.base.url`) — never
+  `shopify.connector.api.client`. Both
+  `test_readiness_check_never_calls_shopify_api_client` (patches
+  `execute` to raise if called) and the AST read-only scanner enforce
+  this structurally, not just behaviorally.
+- **No secrets:** confirmed. Zero new `sudo()` call site (AST-verified
+  against both this file and the whole `models/` directory); no
+  credential/token value is read by any check; `_system_append`'s
+  existing redaction contract still covers the new `payload_snapshot`
+  writes, and `test_no_secret_leakage_in_job_or_log` confirms a dummy
+  token embedded in a stored `last_test_connection_reason` never
+  surfaces in any job/job.log field.
+- **No customer-facing readiness claim:** confirmed — see the "by
+  design, a fresh store always computes overall fail" note above; the
+  credential/test-connection check reports `not_proven` (never `pass`)
+  whenever `store.last_test_connection_result` has never recorded a
+  pass, per DEC-021 §4, exactly as `test_credential_check_unproven_without_val_b2_evidence`
+  requires.
+- **VAL-B2 / MBQ-05 unchanged by this session:** VAL-B2 remains
+  deferred, not passed, not failed, not waived. MBQ-05 remains deferred
+  for Task 004 only, not resolved as a final token-acquisition strategy.
+  Neither is touched by this diff.
+- **Learning feedback loop:** New issues / repeated patterns: none new.
+  `defect-pattern-log.md`, `rejected-approaches-log.md`, and
+  `architecture-review-log.md` were checked before implementation (per
+  `pr-review-checklist.md` §"Before reviewing") — no rejected approach
+  was reintroduced; no new defect pattern was introduced (the two
+  AST-level structural regression tests reuse, rather than duplicate,
+  the existing `test_source_level_two_sudo_sites_total` convention from
+  Task 003, consistent with RA-013's "no forked per-domain
+  logging"/single-substrate discipline extended to "no forked readiness
+  logging"). Rejected approaches: none new — no design option was
+  evaluated and rejected this session. Technical debt: TD-001's fix is
+  implemented and regression-tested but its register `Status` column is
+  intentionally left `Open` pending ChatGPT's review of this PR, per the
+  final implementation prompt's own instruction; no new technical debt
+  introduced (the three registered-pending-slot essential checks are
+  the accepted MBQ-06 design, not a shortcut — they are explicitly
+  documented as such, not silently stubbed). Architecture concerns:
+  none new — no MBQ-06 residual beyond "exact copy/XML IDs remain open
+  for implementation planning" was hit, and this task adds no UI/XML.
+  Tests or review gates needed: a future session with a live Odoo
+  runtime must execute `test_readiness_check.py` for real and complete
+  `task-004-manual-validation-checklist.md`. Should future prompts
+  change? No.
+- **Quality gate confirmation:** handoff updated · feedback loop
+  checked · learning captured · rejected approach logged (n/a — none
+  this session) · technical debt logged (TD-001 fix status recorded
+  here; register file itself intentionally left for ChatGPT's
+  post-review update, not this task's allowed-files list) ·
+  repeated-issue escalation applied (n/a) — all YES.
+- **Next recommended session:** ChatGPT reviews this Task 004
+  implementation PR (readiness-check substrate + TD-001 fix). On
+  acceptance: (1) mark TD-001 `Resolved` in
+  `technical-debt-register.md`, (2) decide whether/when to run
+  `task-004-manual-validation-checklist.md` against a live Odoo
+  instance, (3) do not start Task 005, OAuth, the setup wizard, or any
+  UI/domain-sync work without a separate, explicit gate-opening act.
+- **Stop condition:** stopped at the scoped boundary — exactly the six
+  allowed files changed; no forbidden file touched; the implementation
+  PR is opened as **DRAFT** and is **not merged**; TD-001 is fixed and
+  regression-tested but not marked `Resolved`; VAL-B2 remains deferred,
+  not passed; MBQ-05 remains deferred for Task 004 only, not resolved;
+  no OAuth/setup-wizard/UI/lifecycle/domain-sync work of any kind was
+  started; Task 005 was not started.
+
 ### Task 004 Gate Acceptance / TD-001 Route Selected — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/task-004-gate-acceptance-338b3a`, branched from
