@@ -2,9 +2,11 @@
 
 > Session-specific handoff for the Task 005 gate-proposal package. This is a
 > **standalone** handoff document, separate from the rolling
-> `../01-research/research-handoff.md`, because that file is currently owned
-> by the parallel, not-yet-merged PR #117 (`claude/token-acquisition-val-b2-5zi8bg`)
-> and is out of scope for this session by explicit instruction.
+> `../01-research/research-handoff.md`, because that file is owned by the
+> separate PR #117 / DEC-023 token-acquisition / VAL-B2 proposal track
+> (`claude/token-acquisition-val-b2-5zi8bg`) and is out of scope for this
+> session by explicit instruction, regardless of PR #117's own draft/merge
+> state.
 
 ## Branch name
 
@@ -60,18 +62,27 @@ Full reasoning, dependency diagram, and risk table: `task-005-gate-proposal.md`
 
 ## Known dependencies on PR #117 / DEC-023
 
-**None that block Task 005.** Analyzed in full in `task-005-gate-proposal.md`
-§16:
+**None that block Task 005.** PR #117 / DEC-023 is the separate
+token-acquisition / VAL-B2 proposal track. Analyzed in full in
+`task-005-gate-proposal.md` §16:
 
-- If PR #117/DEC-023 is accepted: no change to Task 005's recommended
-  scope — `reconnect`'s test/readiness steps call the existing Task 003/004
-  substrate regardless of which token-acquisition mechanism is eventually
-  chosen. Acceptance would primarily affect the later Task 006 (wizard).
-- If PR #117/DEC-023 is revised or rejected: Task 005 is **not blocked** —
-  nothing in this proposal assumes a particular token-acquisition mechanism.
+- **DEC-023 remains Proposed, not accepted, unless a future ChatGPT decision
+  explicitly accepts it** — whether PR #117 itself is draft, merged, or
+  later updated does not change that status.
+- **Whether PR #117 is draft, merged, or later updated does not change the
+  Task 005 scope recommendation** — `reconnect`'s test/readiness steps call
+  the existing Task 003/004 substrate regardless of which token-acquisition
+  mechanism MBQ-05 eventually resolves to.
+- **PR #117/DEC-023 does not resolve MBQ-05** unless ChatGPT explicitly
+  accepts and records that separately.
+- **PR #117/DEC-023 does not pass VAL-B2** unless live evidence is executed
+  and recorded separately.
+- **Task 005 remains independent of the final token-acquisition decision**
+  because lifecycle actions call the existing Task 003/004 test/readiness
+  substrate and do not implement OAuth or setup-wizard logic of any kind.
 - This session did not read, cite as decided, or modify any of PR #117's
-  four files beyond the read-only verification needed to describe its
-  current (draft, unaccepted) state accurately.
+  four files beyond the read-only verification needed to describe this
+  track accurately.
 
 ## VAL-B2 status
 

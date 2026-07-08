@@ -29,12 +29,15 @@ not itself decide anything.
 - VAL-B2 remains deferred, not passed
   (`DEC-021-val-b2-deferral-for-task-004.md`). MBQ-05 remains open, not
   resolved (`../03-architecture/master-blueprint-open-questions.md`).
-- PR #117 (branch `claude/token-acquisition-val-b2-5zi8bg`) is open, draft,
-  proposing `DEC-023` (token-acquisition strategy + VAL-B2 closure plan) —
-  **not yet accepted**. This decision proposal treats PR #117 as an active,
-  unresolved parallel track, not as settled input (per the session
-  instruction that produced this document: "do not make final
-  token-acquisition assumptions... treat PR #117 as an active
+- **PR #117 / DEC-023 is the separate token-acquisition / VAL-B2 proposal
+  track** (branch `claude/token-acquisition-val-b2-5zi8bg`, proposing
+  `DEC-023-token-acquisition-and-val-b2.md` and a `val-b2-closure-plan.md`).
+  **DEC-023 remains Proposed, not accepted, unless a future ChatGPT decision
+  explicitly accepts it** — whether PR #117 itself is draft, merged, or
+  later updated does not change that status. This decision proposal treats
+  PR #117/DEC-023 as an active, unresolved parallel track, not as settled
+  input (per the session instruction that produced this document: "do not
+  make final token-acquisition assumptions... treat PR #117 as an active
   dependency/risk, not an accepted decision").
 - The existing accepted `credential-connection-foundation-task-plan.md`
   (AR-024, accepted by ChatGPT at implementation-planning level, PR #92,
@@ -55,7 +58,7 @@ Six candidates were compared in full in
 
 | Option | Summary | Why not chosen as Task 005 |
 | --- | --- | --- |
-| A. Token acquisition / VAL-B2 closure | Close VAL-B2 with live evidence, or decide a durable OAuth architecture | Not a codeable implementation task; actively under separate review as PR #117/DEC-023; would pre-empt that review and MBQ-05 |
+| A. Token acquisition / VAL-B2 closure | Close VAL-B2 with live evidence, or decide a durable OAuth architecture | Not a codeable implementation task; covered separately by PR #117/DEC-023 (Proposed, not accepted, regardless of PR #117's own merge status); would pre-empt DEC-023's review and MBQ-05's resolution |
 | B. Setup wizard / connection UX | Build the 11-step wizard UI | Already named "Task 006 (horizon only)" in the accepted foundation plan; requires the still-closed UI implementation gate and Task 005 itself as a prerequisite |
 | C. Queue/job runner execution layer | Build a dedicated job-execution substrate | No accepted document names this as a discrete future task; the core job/queue substrate already exists from Task 001 |
 | D. Store configuration/readiness display | Build a Dashboard-style readiness UI | UI work requiring the closed UI gate; depends on state fields Task 005 has not yet created |
@@ -143,10 +146,7 @@ This decision proposal does **not**:
 - pass VAL-B2 or change its deferred status;
 - authorize OAuth, a setup wizard, any UI, or any domain sync;
 - take any position on PR #117 or DEC-023's eventual acceptance, revision,
-  or rejection;
-- reopen or revisit DP-008 (the separate PR #116 merge-process finding in
-  `../05-qa/defect-pattern-log.md`) — this document is unrelated to that
-  finding and does not touch it.
+  or rejection.
 
 ## 9. What this does not authorize
 
@@ -169,5 +169,7 @@ review, except by later ChatGPT/control-room instruction.
 - `../04-decisions/DEC-021-val-b2-deferral-for-task-004.md` — VAL-B2/MBQ-05
   deferred status, unchanged.
 - `../05-qa/architecture-review-log.md` — AR-024 acceptance record.
-- PR #117 (`claude/token-acquisition-val-b2-5zi8bg`), open/draft — access:
-  Accessible via GitHub API, 2026-07-08.
+- PR #117 / DEC-023, the separate token-acquisition/VAL-B2 proposal track
+  (`claude/token-acquisition-val-b2-5zi8bg`) — access: Accessible via GitHub
+  API, observed 2026-07-08 (its draft/merge state may change after this
+  date; see §7/§8 above for why that does not affect this decision).

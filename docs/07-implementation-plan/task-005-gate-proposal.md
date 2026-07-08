@@ -26,12 +26,14 @@
   (`../04-decisions/DEC-021-val-b2-deferral-for-task-004.md`).
 - **MBQ-05 remains open, not resolved** as a final token-acquisition
   strategy (`../03-architecture/master-blueprint-open-questions.md`).
-- **PR #117** ("Token acquisition and VAL-B2 closure proposal," branch
-  `claude/token-acquisition-val-b2-5zi8bg`) is open, **draft**, base
-  `Shopify-connector` at the same commit `f4a6ace...`, with **zero** merged
-  content — it proposes `DEC-023` (Status: Proposed, not accepted) and a
-  `val-b2-closure-plan.md`. It is a **parallel, not-yet-accepted** research/
-  decision track, not a dependency this proposal treats as decided. See §10.
+- **PR #117 / DEC-023 is the separate token-acquisition / VAL-B2 proposal
+  track** (branch `claude/token-acquisition-val-b2-5zi8bg`, proposing
+  `docs/04-decisions/DEC-023-token-acquisition-and-val-b2.md` and a
+  `val-b2-closure-plan.md`). **DEC-023 remains Proposed, not accepted,
+  unless a future ChatGPT decision explicitly accepts it** — whether PR #117
+  itself is draft, merged, or later updated does not change that status or
+  this proposal's Task 005 recommendation. This proposal does not treat
+  PR #117/DEC-023 as settled input. See §16.
 - **No OAuth, no setup wizard, no UI, no lifecycle action, no
   product/customer/order/inventory/fulfillment/domain sync exists** anywhere
   in the merged codebase as of this commit.
@@ -72,9 +74,11 @@ reasoning that leads to recommending it.
   token and close VAL-B2 with live evidence, or (b) implementing a durable
   token-acquisition architecture (OAuth app, setup flow) per whatever DEC-023
   eventually decides.
-- **Status:** actively being proposed by **PR #117** (open, draft, not
-  accepted) — `DEC-023-token-acquisition-and-val-b2.md`. Not this session's
-  work to re-decide (see §10).
+- **Status:** actively being proposed via PR #117 / DEC-023 — a separate
+  track this session does not decide. DEC-023 remains Proposed, not
+  accepted, unless and until a future ChatGPT decision explicitly accepts
+  it, independent of whether PR #117 itself is draft, merged, or later
+  updated (see §16).
 - **Fit as "Task 005":** poor. Closure of VAL-B2 (a) is a manual
   evidence-gathering activity outside the Odoo codebase, not a coded
   implementation task with an allowed/forbidden-files shape. A durable OAuth
@@ -228,9 +232,9 @@ Task 005 — the only candidate whose prerequisites are already satisfied
   sequencing document's own words, on Task 005 existing.
 - **Candidate 3** has no accepted planning document naming it as a discrete
   future task — the substrate it would build already exists from Task 001.
-- **Candidate 1** is a parallel, not-yet-accepted research/decision track
-  (PR #117 / DEC-023), not a codeable implementation task, and does not
-  itself require or block Task 005 — see §10.
+- **Candidate 1** is a parallel research/decision track (PR #117 / DEC-023),
+  not a codeable implementation task, and does not itself require or block
+  Task 005 regardless of PR #117's own lifecycle state — see §16.
 - **Candidate 6** is the only direction with all of its named code-level
   prerequisites (Tasks 002, 003, 004) already merged, and is the specific
   item every other blocked candidate (2, 4, 5) names as its own remaining
@@ -240,7 +244,7 @@ Task 005 — the only candidate whose prerequisites are already satisfied
 
 | Candidate | Primary risk if pursued as Task 005 now |
 | --- | --- |
-| 1. Token acquisition/VAL-B2 | Pre-empts DEC-023 (still under review) and MBQ-05; not a codeable task shape |
+| 1. Token acquisition/VAL-B2 | Pre-empts DEC-023 (Proposed, not accepted, regardless of PR #117's merge status) and MBQ-05; not a codeable task shape |
 | 2. Setup wizard/UX | Builds UI before the UI gate opens (AR-023) and before its own mechanics (lifecycle) exist |
 | 3. Queue/job runner | Invents an unbacked task; risks duplicating already-merged Task 001 substrate |
 | 4. Store config/readiness display | Same UI-gate risk as Candidate 2; displays state fields Candidate 6 has not yet created |
@@ -402,24 +406,34 @@ Task 006/010 work starts.
   only block UI") get a formal triggering definition before or after Task
   005 — not resolved here.
 
-## 16. Interaction with PR #117
+## 16. Interaction with PR #117 / DEC-023
 
-- **If PR #117 / DEC-023 is accepted as currently proposed:** no change to
-  this proposal's recommendation. DEC-023's own scope is a token-acquisition
-  *strategy* decision (MBQ-05) and a VAL-B2 evidence-closure plan — neither
-  changes Task 005's lifecycle-action scope, since `reconnect`'s
-  "re-enter → test → readiness" steps call the existing Task 003/004
-  substrate regardless of which token-acquisition path is eventually chosen.
-  Acceptance would, however, likely accelerate a *future* Task 006 (wizard)
-  by resolving MBQ-05 — it does not accelerate or change Task 005 itself.
-- **If PR #117 / DEC-023 is revised or rejected:** Task 005 as scoped here
-  is **not blocked**. Nothing in §6–§12 assumes a particular
-  token-acquisition mechanism; `reconnect`'s test/readiness calls are
-  agnostic to how the stored credential was originally obtained. A revision
-  or rejection of DEC-023 would only affect the eventual Task 006 wizard's
-  OAuth step, not this proposal's recommended scope.
+- **PR #117 / DEC-023 is the separate token-acquisition / VAL-B2 proposal
+  track.** This proposal does not decide it and does not depend on it.
+- **DEC-023 remains Proposed, not accepted, unless a future ChatGPT decision
+  explicitly accepts it.** Nothing in this document treats DEC-023 as
+  settled, now or after any future PR #117 update.
+- **Whether PR #117 is draft, merged, or later updated does not change the
+  Task 005 scope recommendation in §6.** This proposal's recommendation is
+  written to hold regardless of PR #117's lifecycle state — merging,
+  revising, or closing PR #117 does not by itself require revising this
+  recommendation.
+- **PR #117/DEC-023 does not resolve MBQ-05** unless and until ChatGPT
+  explicitly accepts and records that separately in
+  `../03-architecture/master-blueprint-open-questions.md`'s own register.
+- **PR #117/DEC-023 does not pass VAL-B2** unless live evidence is actually
+  executed and recorded separately, per `val-b2-closure-plan.md`'s own
+  pass/fail criteria — a proposal document, merged or not, cannot itself
+  constitute that evidence.
+- **Task 005 remains independent of the final token-acquisition decision**
+  because `reconnect`'s "re-enter → test → readiness" steps call the
+  existing Task 003/004 substrate as-is, and this scope implements no OAuth
+  or setup-wizard logic of any kind — whatever token-acquisition mechanism
+  MBQ-05 eventually resolves to, Task 005's lifecycle actions do not change.
+  Only the later, separately-gated Task 006 (wizard) would be affected by
+  MBQ-05's eventual resolution.
 - **Isolation confirmed:** this proposal touches none of PR #117's four
   files (`research-handoff.md`, `shopify-token-acquisition-notes.md`,
   `DEC-023-token-acquisition-and-val-b2.md`, `val-b2-closure-plan.md`) —
-  verified by the allowed-files list in §17 of the companion handoff and by
+  verified by the allowed-files list in the companion handoff and by
   `git diff --name-only` before commit.
