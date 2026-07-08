@@ -669,12 +669,16 @@ The following were considered while drafting this document and were
     request/RPC call = one transaction, committed only at the end on
     success; automatic retry only on specific PostgreSQL
     serialization/lock/deadlock errors (max 5 tries, exponential backoff),
-    never on `IntegrityError`; the modern `models.Constraint` API (already
-    used verbatim by this repo) enforces immediately per-statement, not
-    deferred to commit; and Odoo 19 ships official, source-level row-locking
-    methods (`lock_for_update`/`try_lock_for_update`) whose only official
-    documented use case is exactly the cron-batch-processing pattern a
-    future sync engine's dispatcher would need.
+    never on `IntegrityError`; and Odoo 19 ships official, source-level
+    row-locking methods (`lock_for_update`/`try_lock_for_update`) whose only
+    official documented use case is exactly the cron-batch-processing
+    pattern a future sync engine's dispatcher would need. Separately, the
+    modern `models.Constraint` API is used by this repo; based on Odoo's
+    generated `ALTER TABLE ADD CONSTRAINT` behavior and PostgreSQL's default
+    `NOT DEFERRABLE` behavior when `DEFERRABLE` is not specified, the
+    immediate per-statement enforcement conclusion is an inference, not a
+    directly stated Odoo documentation claim (see Odoo official/source
+    facts §Constraints).
   - `ir.cron`'s own job-claiming query (`FOR NO KEY UPDATE SKIP LOCKED`) is
     a directly reusable, official-source-backed precedent for a future
     job-claiming design.
