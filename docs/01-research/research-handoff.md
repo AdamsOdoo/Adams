@@ -1,5 +1,63 @@
 # Research Handoff (rolling)
 
+### Token Acquisition / VAL-B2 / MBQ-05 Closure-Path Proposal — revision (second pass) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/token-acquisition-val-b2-5zi8bg`, same branch as
+  the original session below → PR #117 into `Shopify-connector`, **still
+  draft, unmerged**. This entry documents a revision commit on the same PR,
+  not a new PR.
+- **Files changed:** `docs/01-research/shopify-token-acquisition-notes.md`,
+  `docs/04-decisions/DEC-023-token-acquisition-and-val-b2.md`,
+  `docs/05-qa/val-b2-closure-plan.md`, `docs/01-research/research-handoff.md`
+  (this entry) — the same 4 allowed files as the original session, edited in
+  place. **No code changed. No `addons/` file, no
+  Python/XML/CSV/manifest/security/test/migration/CI file touched.**
+- **Reason for revision:** ChatGPT reviewed PR #117 and found one material
+  issue — the proposal **overstated Custom Distribution as a scalable future
+  MVP architecture for many unrelated customers**. Official Shopify docs are
+  explicit that Custom distribution is scoped to "one store or multiple
+  stores on the same Plus organization using a link," while Public
+  distribution is the documented route to "distribute or sell your app to
+  many merchants through the Shopify App Store"
+  (https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
+  — Accessible — 2026-07-08).
+- **What changed:** all three docs now clearly separate (a) the **one-store
+  VAL-B2 evidence path** — a cross-organizational Custom Distribution app may
+  be valid for a single pilot customer or purely for closing VAL-B2 — from
+  (b) **scalable multi-customer/commercial distribution**, which Custom
+  Distribution's documented scope does not cover and which now requires its
+  own separate, gated evaluation of Public distribution or another
+  officially-supported route (not performed by this session). DEC-023's
+  former "vendor-owned Custom Distribution app, installed per customer"
+  recommendation is withdrawn and replaced with a candidate-architecture
+  split (branch A / branch B). The community-forum staff evidence is
+  unchanged and still cited, but is now explicitly labelled as supporting
+  OAuth token-flow mechanics only, never as evidence about distribution
+  scale. The `read_fulfillments` least-privilege correctness concern (from
+  the original session) is unchanged and still flagged, not fixed.
+- **VAL-B2 still deferred, not passed.** Unchanged by this revision — no live
+  Shopify connection was attempted.
+- **MBQ-05 still open, not resolved.** Unchanged by this revision — DEC-023
+  remains **Proposed, not accepted**.
+- **PR #117 remains draft and unmerged** — not marked ready for review by
+  this revision.
+- **Learning feedback loop:** the overstatement is treated as a correction to
+  this session's own not-yet-accepted proposal, not a new defect pattern in
+  shipped code, and not a new rejected approach (no alternative was rejected
+  — Custom Distribution's one-store use remains proposed for that narrow
+  scope; only the many-customer claim was withdrawn). No new technical debt.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt logged
+  (n/a) · repeated-issue escalation applied (n/a) — all YES.
+- **Recommended next control-room step:** ChatGPT re-review of the revised
+  DEC-023, `shopify-token-acquisition-notes.md`, and `val-b2-closure-plan.md`
+  on PR #117.
+- **Stop condition:** stopped at the scoped boundary — docs-only revision;
+  exactly the 4 allowed files edited, no new file created; no code, test,
+  manifest, security, XML, CSV, migration, or CI file touched; VAL-B2 remains
+  deferred, not passed; MBQ-05 remains open, not resolved; PR #117 remains
+  draft, unmerged, not marked ready for review.
+
 ### Token Acquisition / VAL-B2 / MBQ-05 Closure-Path Proposal — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/token-acquisition-val-b2-5zi8bg`, branched from

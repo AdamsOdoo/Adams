@@ -7,6 +7,16 @@
 > outside the Odoo codebase, with zero code change. It operationalizes
 > [`../04-decisions/DEC-023-token-acquisition-and-val-b2.md`](../04-decisions/DEC-023-token-acquisition-and-val-b2.md)
 > §3.1. Status: **Proposed** — not yet executed by any session to date.
+>
+> **Revised 2026-07-08 (second pass), after ChatGPT review:** Path 2 below
+> (cross-organizational Custom Distribution app) is a **one-store evidence
+> path for VAL-B2 only**. It is not, and must not be read as, proof that
+> Custom Distribution is a valid mechanism for distributing the connector to
+> many unrelated customer stores — Shopify's own distribution-method
+> documentation scopes Custom Distribution to one store, or multiple stores
+> in the same Plus organization only. See DEC-023 §2/§3.2 for the corrected
+> framing and the separate, unresolved many-customer/commercial-distribution
+> question (branch B).
 
 ## Status
 
@@ -88,11 +98,22 @@ This path requires zero OAuth, zero redirect endpoint, and matches the
 connector's existing `token_variant='offline_custom_app'` shape exactly as
 already shipped.
 
-### Path 2 — Cross-organizational Custom Distribution app (recommended if Path 1 unavailable)
+### Path 2 — Cross-organizational Custom Distribution app, ONE store only (recommended if Path 1 unavailable)
 
-Per `shopify-token-acquisition-notes.md` §2 and DEC-023 §2/§3.1, this is the
-combination Shopify's own staff guidance indicates is most likely to support a
-non-expiring offline token via the standard authorization-code-grant flow:
+**Scope of this path, stated explicitly:** this is a **one-store evidence
+path for VAL-B2** — it registers a single Custom Distribution app against a
+single test development store, purely to obtain one token and observe one
+result. **It is not, and this plan does not claim it to be, a demonstration
+that Custom Distribution can serve many unrelated customer stores.** Shopify's
+own distribution-method documentation scopes Custom Distribution to "one
+store or multiple stores on the same Plus organization using a link"
+(https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
+— Accessible — 2026-07-08); nothing in this path or its result should be
+read as evidence about distribution scale, only about OAuth token-flow
+mechanics for one app+store pair. Per `shopify-token-acquisition-notes.md` §2
+and DEC-023 §2/§3.1, this is the combination Shopify's own staff guidance
+indicates is most likely to support a non-expiring offline token via the
+standard authorization-code-grant flow, for that one store:
 
 1. Register a Custom Distribution app in a Shopify Dev Dashboard organization
    that is **different** from the organization that owns the test development
@@ -138,15 +159,22 @@ The token must carry, at minimum, the six scopes the connector's shipped
 - `read_fulfillments`
 
 **Known caveat, carried from `shopify-token-acquisition-notes.md` §3 and
-DEC-023 §5:** per official Shopify documentation, `read_fulfillments` does not
-actually gate read access to order fulfillment data (it governs
-`FulfillmentService` only) — `read_orders` (already in this list) is the scope
-that actually covers `Fulfillment` reads. Grant `read_fulfillments` anyway
-(matching the shipped code's current check, so the readiness-check's
-required-scopes gate reports `pass` rather than an unrelated `fail`), but do
-not treat its presence as proof that fulfillment-object reads are covered by
-it — that correctness question is separately flagged, not resolved, by this
-plan.
+DEC-023 §5:** `read_fulfillments` is required here **only for current-code
+compatibility** with the shipped `REQUIRED_MVP_SCOPES` check — per official
+Shopify documentation it does not actually gate read access to order
+fulfillment data (it governs `FulfillmentService` only); `read_orders`
+(already in this list) is the scope that actually covers `Fulfillment` reads.
+Grant `read_fulfillments` anyway for this closure attempt (matching the
+shipped code's current check, so the readiness-check's required-scopes gate
+reports `pass` rather than an unrelated `fail`), but do not treat its
+presence as proof that fulfillment-object reads are covered by it. **This is
+a least-privilege correctness concern, not merely a naming nitpick:**
+requiring a scope that does not grant the access its name implies is exactly
+the kind of over-broad/mis-scoped grant DEC-004's least-privilege posture
+exists to avoid, and it must be explicitly routed (corrected or justified) by
+ChatGPT/a future task **before** this connector makes any customer-facing
+setup-readiness claim — it is flagged here, not resolved, and is not fixed by
+this closure plan.
 
 Do not grant broader scopes than these six for this validation. Any
 additional scope needed later belongs to a future domain task's own scope
@@ -249,6 +277,10 @@ the already-shipped code.
   pass** — if the shipped code needs a fix to pass validly (e.g., the
   `read_fulfillments` finding in §4 turning out to matter), that is a separate,
   explicitly-gated implementation task, not part of this closure.
+- **A successful Path 2 attempt does not count as proof that Custom
+  Distribution can serve many unrelated customer stores.** It is one-store
+  evidence only (§3, Path 2); the many-customer/commercial-distribution
+  question is separate and unresolved (DEC-023 §3.2 branch B).
 
 ## 9. Security constraints (binding, unchanged from existing policy)
 

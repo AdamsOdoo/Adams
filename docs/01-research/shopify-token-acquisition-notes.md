@@ -103,7 +103,7 @@ above.
 
 ---
 
-## 2. New evidence: the "who owns the app" resolution of the decision-critical open question
+## 2. New evidence: the "who owns the app" resolution of the OAuth token-flow question (token-flow mechanics only — not a distribution-scale finding)
 
 The 2026-07-07 file flagged, as **the single most decision-critical open
 question**, whether a Dev-Dashboard-created custom app — built for a merchant's
@@ -115,7 +115,12 @@ Today's re-verification pass surfaced new evidence that **substantially
 narrows, though does not 100% officially close, this question** — and the
 narrowing turns on an axis the 2026-07-07 file did not fully separate out:
 **which organization owns the Shopify app relative to which organization owns
-the store.**
+the store.** **This entire section is about which OAuth grant type an
+app+store pairing is routed to — it is a token-flow finding, not a
+distribution-scale finding.** It must not be read as evidence that Custom
+Distribution can serve many unrelated merchant organizations; the official,
+separate limit on that is stated as its own **[Fact]** below and is not
+overridden or widened by the community-forum evidence that follows.
 
 - **[Fact]** Official docs state the client-credentials/OAuth split by
   organizational ownership, not by custom-vs-public app type: "Client
@@ -153,38 +158,62 @@ the store.**
   app and store are owned by the same organization."
   https://community.shopify.dev/t/custom-app-credentials/27460/9 — Accessible —
   2026-07-08. Community-forum staff reply, same caveat as above.
-- **[Inference]** Combining the two threads with the official client-credentials
-  scoping fact: the connector's real architectural choice is not simply
-  "Option A vs Option B" in the abstract — it is **who registers the Shopify
-  app**. If each customer creates their own Dev-Dashboard custom app for their
-  own store (same organization owns app + store), Shopify routes them to
-  client-credentials-grant only (24-hour token, no admin-UI reveal, requires a
-  programmatic refresh loop the connector does not implement). If instead a
-  **single Shopify app is registered by the connector vendor's own
-  organization** (a Custom Distribution app, per
-  `shopify-token-acquisition-research.md` §9's distribution table — one app
-  installable on one store, or several stores in the same Plus org), and each
-  customer installs *that* app on *their own, different-organization* store,
-  the app+store relationship is cross-organizational — the scenario the second
-  thread confirms supports authorization-code-grant with a non-expiring offline
-  token, matching the connector's already-shipped credential shape
-  (`token_variant='offline_custom_app'`) with **zero schema change**. This
-  mirrors how most third-party Shopify connectors (including the competitors
-  already studied in this project's own research) are actually built — one
-  vendor-owned app definition, installed per customer — and is consistent with
-  Shopify's own framing of ERP integrations as standalone-app-eligible
-  (`shopify-token-acquisition-research.md` §5, Source 25).
-- **[Open question, narrowed but not closed]** No official `shopify.dev`
-  tutorial or worked example — as of 2026-07-08 — shows this specific
-  cross-organizational combination end-to-end (vendor-owned Custom Distribution
-  app + standalone authorization-code-grant + non-expiring offline token). The
-  evidence above is strong circumstantial support (official scoping rule +
-  two independent staff replies covering each half of the ownership axis), but
-  it is **not a single official page confirming the full combination**. This
-  residual should be treated as **plausible, evidence-backed, but still
-  empirically unverified** until an actual authorization-code-grant exchange is
-  run against a real cross-organizational app+store pair and observed to
-  succeed.
+- **[Fact — official distribution-method limit, verified live 2026-07-08]**
+  Shopify's own distribution-method page scopes **Custom distribution**
+  explicitly by store count/organization, not by merchant count: "Select this
+  method if you've built a custom app that you want to distribute to one store
+  or multiple stores on the same Plus organization using a link." **Public
+  distribution** is Shopify's documented route for reaching many unrelated
+  merchants: "Select this method to make your app public. You can distribute
+  or sell your app to many merchants through the Shopify App Store using this
+  method." https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
+  — Accessible — 2026-07-08 (re-confirms and sharpens
+  `shopify-token-acquisition-research.md` §9's distribution table). **This is
+  a distribution-method/store-count limit, entirely separate from the
+  token-flow evidence above** — the community-forum staff replies describe
+  which OAuth grant an app+store *pair* is routed to; they say nothing about,
+  and do not widen, how many unrelated merchant organizations one Custom
+  Distribution app may officially serve.
+- **[Inference — scoped to one store (or same-Plus-org stores); NOT a
+  scalable multi-customer finding]** Combining the two community threads with
+  the official client-credentials scoping fact and the distribution-method
+  limit immediately above: for **a single customer/pilot store, or purely for
+  gathering VAL-B2 evidence**, a Custom Distribution app registered by a
+  *different* organization than the one that owns that one store sits in the
+  cross-organizational scenario the second thread confirms supports
+  authorization-code-grant with a non-expiring offline token, matching the
+  connector's already-shipped credential shape
+  (`token_variant='offline_custom_app'`) with **zero schema change** — **for
+  that one store**. **This is a one-store (or same-Plus-org) evidence path.
+  It must not be read as, and this document does not claim it is, an
+  officially-supported mechanism for installing one vendor-owned Custom
+  Distribution app across many unrelated customer stores** — Custom
+  Distribution's own documented scope (the Fact immediately above) excludes
+  that.
+- **[Open question, distinct from the one-store token-flow question above]**
+  Whether and how the connector could be distributed as a commercial product
+  to many unrelated customers at all — via Public distribution (App Store
+  review, compliance webhooks, Billing API — see
+  `shopify-token-acquisition-research.md` §9), via some other officially
+  supported route, or via a materially different technical arrangement — is
+  **not answered by this session's research** and is a separate,
+  separately-gated architecture question from the one-store finding above.
+  This session did not verify how any specific competitor connector is
+  actually distributed; it only confirms, from Shopify's own documentation,
+  that Custom Distribution's documented scope does not cover many unrelated
+  merchant organizations.
+- **[Open question, narrowed but not closed — one-store scenario only]** No
+  official `shopify.dev` tutorial or worked example — as of 2026-07-08 —
+  shows this specific cross-organizational combination end-to-end (a Custom
+  Distribution app registered by one organization, installed on one different
+  organization's store, completing standalone authorization-code-grant for a
+  non-expiring offline token). The evidence above is strong circumstantial
+  support (official scoping rule + two independent staff replies covering each
+  half of the ownership axis), but it is **not a single official page
+  confirming the full combination**. This residual should be treated as
+  **plausible, evidence-backed, but still empirically unverified** until an
+  actual authorization-code-grant exchange is run against a real
+  cross-organizational app+store pair and observed to succeed.
 - **[Open question]** Whether it is technically *possible* (as opposed to
   officially documented) for a **same-organization** own-store Dev-Dashboard
   custom app to still be manually driven through `/admin/oauth/authorize` is
@@ -343,11 +372,21 @@ axis until this session's community-forum evidence.
 
 ## 6. Risks and assumptions
 
+- **Conflation risk (corrected this revision):** the §2 token-flow evidence
+  (which OAuth grant an app+store pair is routed to) must not be conflated
+  with distribution scale (how many unrelated merchant stores one app may
+  serve). Custom Distribution's official scope is one store, or multiple
+  stores in the same Plus organization — never many unrelated organizations.
+  An earlier draft of this document risked exactly this conflation by
+  describing a vendor-owned Custom Distribution app as a general
+  install-per-customer mechanism; that wording has been corrected in §2.
 - The community-forum evidence in §2 is the best currently-available signal on
-  the decision-critical question, but it is **not** a `shopify.dev` page and
+  the one-store token-flow question, but it is **not** a `shopify.dev` page and
   carries the evidentiary weight of an informal staff reply, not formal
   documentation. Shopify could clarify or change this informally-stated
-  behavior without a changelog entry.
+  behavior without a changelog entry. It says nothing about, and does not
+  widen, Custom Distribution's separate, officially documented store-count
+  limit.
 - The `read_fulfillments` scope-name finding (§3) is a correctness risk in
   already-shipped code (`shopify_connector_readiness_check.py`), not something
   this docs-only session may fix. If left unaddressed, the readiness check's
@@ -359,10 +398,12 @@ axis until this session's community-forum evidence.
 
 ## 7. Unanswered / open questions carried forward
 
-1. Whether a cross-organizational (vendor-owned app, customer-owned store)
+1. Whether a cross-organizational (vendor-owned app, one customer-owned store)
    Custom Distribution app can complete authorization-code-grant end-to-end
    for a non-expiring offline token has strong circumstantial support (§2) but
    no single official worked example — genuinely unverified until attempted.
+   **This is a one-store question; it does not address multi-customer
+   distribution scale (see item 6 below).**
 2. Whether a same-organization own-store app can still be manually driven
    through `/admin/oauth/authorize` (§2, narrow residual) is unconfirmed either
    way.
@@ -376,13 +417,23 @@ axis until this session's community-forum evidence.
    session so far has had access to (see
    [`../05-qa/val-b2-closure-plan.md`](../05-qa/val-b2-closure-plan.md)).
 5. No numeric client-secret rotation cadence is stated anywhere official (§4).
+6. **Whether/how the connector could be distributed to many unrelated
+   customers at all** — via Public distribution, a per-customer Custom
+   Distribution app, or another officially-supported route — is unresolved
+   and is a separate, separately-gated architecture question from the
+   one-store token-flow finding in §2. This session's research does not
+   answer it.
 
 ## 8. Explicit non-claims
 
 This document does not claim: that OAuth authorization-code-grant has been
 tested against this connector's actual Shopify development store; that VAL-B2
 has passed; that MBQ-05 is resolved; that any token-acquisition direction is
-accepted; or that the `read_fulfillments` finding has been corrected in code.
+accepted; that the `read_fulfillments` finding has been corrected in code; or
+that Custom Distribution is an officially-supported mechanism for installing
+one vendor-owned app across many unrelated customer stores (it is not — see
+§2's distribution-method limit, which scopes Custom Distribution to one store
+or multiple stores in the same Plus organization only).
 See [`../04-decisions/DEC-023-token-acquisition-and-val-b2.md`](../04-decisions/DEC-023-token-acquisition-and-val-b2.md)
 for the decision proposal this research feeds, and
 [`../05-qa/val-b2-closure-plan.md`](../05-qa/val-b2-closure-plan.md) for the

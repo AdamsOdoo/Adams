@@ -2,10 +2,26 @@
 
 ## Status
 
-**Proposed, not accepted.** Prepared 2026-07-08. Does not resolve MBQ-05. Does
-not pass VAL-B2. Does not authorize OAuth implementation, a setup wizard, or
-any code change. Requires explicit ChatGPT review and acceptance before any
-part of it becomes binding, per `CLAUDE.md` §2/§6/§8.
+**Proposed, not accepted.** Prepared 2026-07-08; revised 2026-07-08 (second
+pass, same day) after ChatGPT review. Does not resolve MBQ-05. Does not pass
+VAL-B2. Does not authorize OAuth implementation, a setup wizard, or any code
+change. Requires explicit ChatGPT review and acceptance before any part of it
+becomes binding, per `CLAUDE.md` §2/§6/§8.
+
+**Revision note (second pass):** ChatGPT's review of the first version found
+one material issue — it overstated Custom Distribution as a scalable future
+MVP architecture for many unrelated customers. Official Shopify docs are
+explicit that Custom distribution is scoped to "one store or multiple stores
+on the same Plus organization using a link," while Public distribution is
+the documented route to "distribute or sell your app to many merchants
+through the Shopify App Store."
+(https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
+— Accessible — 2026-07-08). A single vendor-owned Custom Distribution app is
+therefore **not** a general install-per-customer mechanism for many unrelated
+customer stores. §2 through §4 below are corrected accordingly, and §3.2 (the
+"later track") is narrowed to a candidate-architecture split rather than a
+single recommended architecture. This correction does not change VAL-B2's
+status, MBQ-05's status, or this document's own Proposed-not-accepted status.
 
 Builds on, and does not weaken or reopen:
 [`DEC-004`](./DEC-004-distribution-api-auth-strategy.md) (accepted
@@ -52,7 +68,7 @@ Evidence base:
   plus one correctness finding in already-shipped code (§5), plus concrete
   official security guidance for a future setup wizard (§6).
 
-## 2. What is newly known: the "who owns the app" axis
+## 2. What is newly known: the "who owns the app" axis (token-flow mechanics only — not a distribution-scale finding)
 
 The 2026-07-07 decision brief's single most decision-critical open question
 was whether a Dev-Dashboard custom app, built for a merchant's own store, can
@@ -74,22 +90,47 @@ session's research (full detail and citations in
   shape) **does** support OAuth (token exchange or authorization-code-grant),
   and authorization-code-grant can yield a non-expiring offline token
   (`expiring` omitted/`0`) in that scenario.
-- **[Inference]** The connector's real choice is not "manual token vs. OAuth"
-  in the abstract — it is **who registers the Shopify app**. A Custom
-  Distribution app registered **once, by the connector vendor's own
-  organization**, and installed by each customer on *their own, different*
-  organization's store, sits in the cross-organizational scenario that
-  supports a non-expiring offline token compatible with the existing
-  `token_variant='offline_custom_app'` storage shape, with **zero schema
-  change**. This is also the shape most third-party Shopify connectors
-  (including this project's own studied competitors) already use, and matches
-  Shopify's own framing of ERP integrations as standalone-app-eligible.
-- **This is evidence-backed, not officially demonstrated end-to-end.** No
-  single `shopify.dev` page shows this exact combination (vendor-owned Custom
-  Distribution app + standalone authorization-code-grant + non-expiring
-  offline token) working, start to finish. It remains an **empirically
-  unverified hypothesis**, materially stronger than the 2026-07-07 "genuinely
-  unclear either way" status, but not yet a proven fact.
+- **[Fact — official distribution-method limit, corrects the first version
+  of this proposal]** Shopify's own distribution-method page scopes **Custom
+  distribution** by store count/organization, not by merchant count: "Select
+  this method if you've built a custom app that you want to distribute to one
+  store or multiple stores on the same Plus organization using a link."
+  **Public distribution** is the documented route for reaching many
+  unrelated merchants: "Select this method to make your app public. You can
+  distribute or sell your app to many merchants through the Shopify App
+  Store using this method."
+  https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
+  — Accessible — 2026-07-08. **This is a separate, official limit that the
+  token-flow evidence above does not override or widen** — the community
+  replies describe which OAuth grant an app+store *pair* uses; they say
+  nothing about how many unrelated merchant organizations one Custom
+  Distribution app may serve.
+- **[Inference — scoped to one store, or same-Plus-org stores; not a
+  scalable multi-customer finding]** For **a single customer/pilot store, or
+  purely for VAL-B2 evidence-gathering**, a Custom Distribution app
+  registered by a *different* organization than the one that owns that one
+  store sits in the cross-organizational scenario the second thread confirms
+  supports authorization-code-grant with a non-expiring offline token,
+  matching the existing `token_variant='offline_custom_app'` storage shape
+  with **zero schema change** — **for that one store**. **This is not, and
+  must not be read as, an officially-supported mechanism for installing one
+  vendor-owned Custom Distribution app across many unrelated customer
+  stores** — the distribution-method limit above excludes that.
+- **[Open question — distinct from the one-store finding above]** Whether
+  and how the connector could be distributed as a commercial product to many
+  unrelated customers at all — via Public distribution (App Store review,
+  compliance webhooks, Billing API), or another officially-supported route —
+  is **not answered by this research** and is a separate, separately-gated
+  architecture question. See §3.2's revised framing below.
+- **The one-store finding is evidence-backed, not officially demonstrated
+  end-to-end.** No single `shopify.dev` page shows the specific combination
+  (one Custom Distribution app, registered by one organization, installed on
+  one different organization's store, completing standalone
+  authorization-code-grant for a non-expiring offline token) working, start
+  to finish. It remains an **empirically unverified hypothesis**, materially
+  stronger than the 2026-07-07 "genuinely unclear either way" status, but not
+  yet a proven fact — and, independently of whether it is proven, it says
+  nothing about distribution scale.
 
 ## 3. Decision proposal
 
@@ -124,30 +165,56 @@ already works — **no code change**, per
 [`shopify-token-acquisition-options.md`](../03-architecture/shopify-token-acquisition-options.md)
 Option C's original framing.
 
-### 3.2 Later track — the real MVP token-acquisition architecture (Task 005+, separately gated)
+### 3.2 Later track — final MVP auth/distribution architecture remains a gated decision, not recommended here
 
-**Recommend, for future implementation-planning review (not authorized by this
-document):** build the standard OAuth authorization-code-grant flow into the
-connector itself, using **one Shopify app definition registered by the
-connector vendor's own organization** (Custom Distribution), installed by each
-customer on their own store via an install link; each customer's own Odoo
-instance hosts the redirect/callback controller at its own `web.base.url` (no
-central Adams-hosted server required); a non-expiring offline token is
-requested (`expiring` omitted/`0`), stored via the **existing**
-`token_variant='offline_custom_app'` shape with no schema migration.
+**Corrected this revision:** the first version of this proposal recommended a
+single "vendor-owned Custom Distribution app, installed by each customer"
+architecture as the target MVP design. That recommendation is **withdrawn** —
+it is factually incompatible with Shopify's own documented Custom Distribution
+scope (§2's Fact: one store, or multiple stores in the same Plus
+organization only — never many unrelated organizations). **This document does
+not recommend a final MVP auth/distribution architecture.** It instead
+proposes a **candidate-architecture split**, both branches of which remain
+open and require their own separate, gated evaluation before any
+implementation:
 
-This is a refinement of Option B (from the 2026-07-07 decision brief), not a
-new option — it resolves the "does OAuth even work for this shape of app"
-ambiguity that made Option B's feasibility uncertain, by identifying the
-specific app-ownership arrangement under which it is expected to work.
+- **A — one-store / private-customer / VAL-B2-evidence scope.** For a single
+  pilot customer, a private/custom deployment, or purely for gathering VAL-B2
+  evidence, a Custom Distribution app **may be valid** — per §2's evidence, a
+  Custom Distribution app registered by an organization different from the
+  one store it serves supports authorization-code-grant with a non-expiring
+  offline token, for that one store. This is the scope
+  [`../05-qa/val-b2-closure-plan.md`](../05-qa/val-b2-closure-plan.md)'s
+  Path 2 already operates in.
+- **B — many unrelated customers / commercial product scope.** If the
+  connector is to be distributed as a product to many unrelated customer
+  organizations, Custom Distribution's documented one-store/same-Plus-org
+  limit means it is **not**, by itself, a valid general mechanism for that.
+  **Public distribution, or another officially-supported scalable
+  route, must be separately evaluated and accepted by ChatGPT before any
+  implementation work assumes a specific multi-customer distribution
+  mechanism.** This evaluation is not performed by this document — it is a
+  distinct, not-yet-scoped research/decision task.
 
-**Not decided by this proposal:** exact controller/hosting mechanics, exact
-install-link distribution mechanism, the Shopify Partner organization
-under which the vendor-owned app is registered, whether the vendor-owned app
-is Custom or Public distribution, and the exact setup-wizard screens — all of
-these remain Task 005+ implementation-task-spec detail, to be written using
-`../06-prompts/implementation-task-template.md` once a separate ChatGPT gate
-authorizes that work.
+Whichever branch (or combination) is eventually accepted, the underlying
+OAuth mechanics (authorization-code-grant, non-expiring offline token,
+existing `token_variant='offline_custom_app'` storage shape, each customer's
+own Odoo instance hosting its own redirect/callback controller at its own
+`web.base.url`) are expected to be similar — but **which Shopify app
+definition(s) get registered, under which distribution method, by whom, is
+not decided here** and must not be assumed by any future task spec without a
+separate ChatGPT decision.
+
+**Not decided by this proposal:** which of A/B (or both) the project adopts;
+exact controller/hosting mechanics; exact install-link distribution
+mechanism; the Shopify Partner organization(s) under which any app is
+registered; and the exact setup-wizard screens — all of these remain open,
+and the B branch specifically requires its own dedicated research/decision
+pass (Public distribution's app-review, compliance-webhook, and Billing API
+obligations per `shopify-token-acquisition-research.md` §9 are not evaluated
+by this document) before any Task 005+ implementation-task-spec assumes a
+distribution architecture, per
+`../06-prompts/implementation-task-template.md`.
 
 ## 4. Options considered
 
@@ -156,14 +223,24 @@ authorizes that work.
 | **A — offline token only, status quo** | Merchant supplies a static token by whatever means available; connector implements no OAuth. | Not sufficient alone — no in-product path exists today for a new merchant without a pre-2026 legacy app (unchanged from 2026-07-07). Still used as the immediate-track storage mechanism (§3.1). |
 | **B — OAuth before MVP, as originally framed** | Build OAuth without specifying who owns the app. | Superseded by the refined version in §3.2 — the original framing left the decision-critical ambiguity (§2) unresolved. |
 | **C — dual path (2026-07-07 decision brief)** | Keep Option A's storage now; empirically test OAuth by hand later. | **Retained and extended** — this proposal is Option C's immediate track (§3.1), now with a sharper recommendation on *which* manual exchange to attempt first, informed by §2. |
-| **B-refined (this proposal, §3.2)** | Vendor-owned Custom Distribution app + standard OAuth, non-expiring offline token, per-customer Odoo-hosted redirect. | **Proposed as the target MVP architecture**, gated on (a) ChatGPT acceptance of this direction and (b) a separate implementation-gate act before any code is written. |
+| **B-refined, branch A (§3.2)** | One-store/private-customer/VAL-B2-evidence: a Custom Distribution app registered by a different organization than the one store it serves, standard OAuth, non-expiring offline token. | **May be valid for a single customer or VAL-B2 evidence-gathering only** — not proposed or valid as a many-unrelated-customer mechanism (corrected this revision; see §3.2). |
+| **B-refined, branch B (§3.2)** | Many-unrelated-customers/commercial-product scope: Public distribution, or another officially-supported scalable route. | **Not evaluated by this document.** Must be separately researched and accepted by ChatGPT before any implementation assumes a multi-customer distribution mechanism. |
+
+**Corrected this revision:** the first version of this table proposed a
+single "vendor-owned Custom Distribution app, installed per customer" row as
+"the target MVP architecture." That framing has been withdrawn — Custom
+Distribution's own documented scope (§2) does not support a many-unrelated-
+customer reading, so no single "B-refined" architecture is recommended as
+final; see the A/B split above and §3.2.
 
 No alternative is rejected outright; per `CLAUDE.md` §10, none of the options
 above matches an existing `rejected-approaches-log.md` entry (checked — the
 only on-topic entry, RA-003, rejects **public App Store distribution as a
-Phase 1 architecture requirement**, which is not what §3.2 proposes — §3.2
-proposes Custom Distribution, not Public — no rejected approach is
-re-introduced here).
+Phase 1 architecture requirement**; this proposal does not reintroduce that
+rejected approach — branch B above proposes only that Public distribution be
+*evaluated*, not adopted, for the many-unrelated-customer scope, which is
+consistent with RA-003's still-open revisit condition, not a repeat of the
+rejected approach itself).
 
 ## 5. New correctness finding (not fixed by this document)
 
@@ -229,14 +306,17 @@ the wizard.
 - **MBQ-05 is not resolved by this document.** It remains open in
   `master-blueprint-open-questions.md`, exactly as DEC-021 already states.
 - If ChatGPT accepts this proposal, MBQ-05's register row should be updated to
-  reflect: (a) the "who owns the app" clarification is now the accepted
-  framing for future implementation planning; (b) the exact vendor-organization
+  reflect: (a) the "who owns the app" token-flow clarification (§2) is now the
+  accepted framing for the **one-store/branch-A** evidence scope only — it is
+  **not** an accepted framing for many-unrelated-customer distribution
+  (branch B, unresolved, §3.2); (b) the exact vendor-organization
   registration, hosting, and wizard mechanics remain open, routed as
   task-spec detail per the existing MBQ-register convention (`TASK`/`SLICE`
   routing, matching how MBQ-05 was already routed by the 2026-07-05 final-MBQ
-  closure plan); (c) VAL-B2 must still separately pass before any
-  customer-facing "connected" claim, unchanged from DEC-021 §4's fail-closed
-  requirement.
+  closure plan); (c) branch B's Public-distribution-or-other-route evaluation
+  remains a separate, unscoped, open item; (d) VAL-B2 must still separately
+  pass before any customer-facing "connected" claim, unchanged from DEC-021
+  §4's fail-closed requirement.
 - **This document does not edit `master-blueprint-open-questions.md`** — that
   file is outside this session's allowed-files list. Any register update is
   for ChatGPT/a future session to apply, exactly as `credential-connection-api-client-planning.md`'s
@@ -257,6 +337,14 @@ This document does not:
 - Fix the `read_fulfillments` scope-naming finding in §5 — that remains
   unmodified code, flagged only.
 - Make the connector customer-ready for self-serve new-merchant setup.
+- **This proposal does not prove that Custom Distribution is valid for
+  selling the connector to many unrelated customers.** Custom Distribution's
+  officially documented scope is one store, or multiple stores in the same
+  Plus organization — not many unrelated merchant organizations. The
+  many-unrelated-customer/commercial-product question (§3.2 branch B) remains
+  a separate, unevaluated, gated decision.
+- Recommend a final MVP auth/distribution architecture — §3.2 proposes a
+  candidate split (branch A / branch B), not a recommended final design.
 
 ## 10. Rollback / revisit triggers
 
@@ -271,7 +359,10 @@ This document does not:
   directly; (c) Shopify changes the client-credentials/authorization-code-grant
   organizational-ownership rule itself; (d) a future fulfillment-domain task
   spec resolves which scope actually governs fulfillment reads (§5), which may
-  warrant a corresponding correction to `REQUIRED_MVP_SCOPES`.
+  warrant a corresponding correction to `REQUIRED_MVP_SCOPES`; (e) ChatGPT
+  authorizes a dedicated research/decision pass on §3.2 branch B (the
+  many-unrelated-customer/commercial-product distribution question), which
+  would produce its own separate DEC, not an amendment to this one.
 
 ## 11. Evidence / references
 
@@ -292,5 +383,9 @@ This document does not:
   — 2026-07-08 (informal, not primary documentation).
 - Shopify, "Access scopes" —
   https://shopify.dev/docs/api/usage/access-scopes — Accessible — 2026-07-08.
+- Shopify, "Select a distribution method" (Custom vs. Public distribution
+  scope) —
+  https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
+  — Accessible — 2026-07-08.
 - Full inventory: [`../01-research/shopify-token-acquisition-notes.md`](../01-research/shopify-token-acquisition-notes.md)
   and [`../01-research/shopify-token-acquisition-research.md`](../01-research/shopify-token-acquisition-research.md).
