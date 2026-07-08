@@ -1,5 +1,141 @@
 # Research Handoff (rolling)
 
+### Token Acquisition / VAL-B2 / MBQ-05 Closure-Path Proposal — revision (second pass) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/token-acquisition-val-b2-5zi8bg`, same branch as
+  the original session below → PR #117 into `Shopify-connector`, **still
+  draft, unmerged**. This entry documents a revision commit on the same PR,
+  not a new PR.
+- **Files changed:** `docs/01-research/shopify-token-acquisition-notes.md`,
+  `docs/04-decisions/DEC-023-token-acquisition-and-val-b2.md`,
+  `docs/05-qa/val-b2-closure-plan.md`, `docs/01-research/research-handoff.md`
+  (this entry) — the same 4 allowed files as the original session, edited in
+  place. **No code changed. No `addons/` file, no
+  Python/XML/CSV/manifest/security/test/migration/CI file touched.**
+- **Reason for revision:** ChatGPT reviewed PR #117 and found one material
+  issue — the proposal **overstated Custom Distribution as a scalable future
+  MVP architecture for many unrelated customers**. Official Shopify docs are
+  explicit that Custom distribution is scoped to "one store or multiple
+  stores on the same Plus organization using a link," while Public
+  distribution is the documented route to "distribute or sell your app to
+  many merchants through the Shopify App Store"
+  (https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
+  — Accessible — 2026-07-08).
+- **What changed:** all three docs now clearly separate (a) the **one-store
+  VAL-B2 evidence path** — a cross-organizational Custom Distribution app may
+  be valid for a single pilot customer or purely for closing VAL-B2 — from
+  (b) **scalable multi-customer/commercial distribution**, which Custom
+  Distribution's documented scope does not cover and which now requires its
+  own separate, gated evaluation of Public distribution or another
+  officially-supported route (not performed by this session). DEC-023's
+  former "vendor-owned Custom Distribution app, installed per customer"
+  recommendation is withdrawn and replaced with a candidate-architecture
+  split (branch A / branch B). The community-forum staff evidence is
+  unchanged and still cited, but is now explicitly labelled as supporting
+  OAuth token-flow mechanics only, never as evidence about distribution
+  scale. The `read_fulfillments` least-privilege correctness concern (from
+  the original session) is unchanged and still flagged, not fixed.
+- **VAL-B2 still deferred, not passed.** Unchanged by this revision — no live
+  Shopify connection was attempted.
+- **MBQ-05 still open, not resolved.** Unchanged by this revision — DEC-023
+  remains **Proposed, not accepted**.
+- **PR #117 remains draft and unmerged** — not marked ready for review by
+  this revision.
+- **Learning feedback loop:** the overstatement is treated as a correction to
+  this session's own not-yet-accepted proposal, not a new defect pattern in
+  shipped code, and not a new rejected approach (no alternative was rejected
+  — Custom Distribution's one-store use remains proposed for that narrow
+  scope; only the many-customer claim was withdrawn). No new technical debt.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt logged
+  (n/a) · repeated-issue escalation applied (n/a) — all YES.
+- **Recommended next control-room step:** ChatGPT re-review of the revised
+  DEC-023, `shopify-token-acquisition-notes.md`, and `val-b2-closure-plan.md`
+  on PR #117.
+- **Stop condition:** stopped at the scoped boundary — docs-only revision;
+  exactly the 4 allowed files edited, no new file created; no code, test,
+  manifest, security, XML, CSV, migration, or CI file touched; VAL-B2 remains
+  deferred, not passed; MBQ-05 remains open, not resolved; PR #117 remains
+  draft, unmerged, not marked ready for review.
+
+### Token Acquisition / VAL-B2 / MBQ-05 Closure-Path Proposal — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/token-acquisition-val-b2-5zi8bg`, branched from
+  `Shopify-connector` at PR #116's merge commit
+  `f4a6ace519bed1073d9b76e0fd91823e03ab7a59` (independently confirmed as an
+  ancestor before this session started) → **draft** PR into
+  `Shopify-connector` (this session's PR; not merged).
+- **Files changed:** `docs/01-research/shopify-token-acquisition-notes.md`
+  (new), `docs/04-decisions/DEC-023-token-acquisition-and-val-b2.md` (new),
+  `docs/05-qa/val-b2-closure-plan.md` (new),
+  `docs/01-research/research-handoff.md` (this entry). **No `addons/` file, no
+  Python/XML/CSV/manifest/security/test/migration/CI file touched. No code
+  changed.**
+- **What changed / research produced:** a research-and-proposal package for
+  how the connector should acquire Shopify Admin API access for MVP, and how
+  VAL-B2 should be closed, built on a 10-agent research fan-out (6 external
+  Shopify-doc re-verification agents, 4 internal governance/code-reading
+  agents) authorized under `CLAUDE.md`'s official-API-verification allowance.
+  Re-verified live today: the January 1, 2026 legacy-custom-app creation
+  cutoff, the Dev Dashboard/CLI client-credentials-only own-store path, and
+  the custom-app exemption from the December 2025 expiring-offline-token
+  mandate — **no material change since the 2026-07-07 research**. New this
+  session: (a) Shopify Developer Community staff replies clarifying that the
+  decision-critical "does OAuth work for a Dev-Dashboard custom app" question
+  turns on **which organization owns the app relative to the store** —
+  same-org (merchant's own store) routes to client-credentials-grant only
+  (24h token); cross-org (vendor-owned app installed on a different
+  organization's store) supports authorization-code-grant with a non-expiring
+  offline token — evidence-backed but not yet empirically tested end-to-end;
+  (b) exact current Admin API scope names for the MVP baseline, plus a
+  **correctness finding** (not fixed, code untouched) that the shipped
+  `REQUIRED_MVP_SCOPES` constant's `read_fulfillments` entry does not, per
+  official docs, gate `Fulfillment`/`FulfillmentOrder` reads the way its name
+  implies; (c) official OAuth security guidance (mandatory HMAC verification,
+  pre-registered redirect URI, `state`/CSRF requirement, client-secret
+  rotation sequence) for whenever a setup wizard is later built.
+- **VAL-B2 still deferred/not passed.** Untouched by this session — no live
+  Shopify connection was attempted or available; this remains true unless a
+  future session with real Shopify Partner/Dev Dashboard access executes
+  [`../05-qa/val-b2-closure-plan.md`](../05-qa/val-b2-closure-plan.md) and
+  records live evidence.
+- **MBQ-05 remains proposed/not fully resolved** — DEC-023 is a **decision
+  proposal only** (Status: Proposed, not accepted); MBQ-05's register row is
+  unchanged by this session (that file is outside this session's allowed-files
+  list) and remains open until ChatGPT explicitly accepts DEC-023 and applies
+  a corresponding register update.
+- **No OAuth, no setup wizard, no UI, no sync implementation** — none exist in
+  this PR's scope, and none were added by this docs session.
+- **Items deferred:** the empirical cross-organizational OAuth exchange
+  (DEC-023 §2/§3.1) remains unexecuted; the `read_fulfillments` scope-naming
+  correctness finding (§5) remains unfixed; whether this project's own Shopify
+  Partner account already holds a usable pre-2026 legacy custom app is
+  unknown (requires a human operator to check).
+- **Learning feedback loop:** No new defect pattern in this project's own
+  code (the `read_fulfillments` finding is a pre-existing correctness question
+  in already-shipped code, surfaced not introduced, by this docs-only
+  session). No new rejected approach — checked `rejected-approaches-log.md` in
+  full; the only on-topic entry (RA-003, public App Store distribution) is not
+  reintroduced by this proposal's cross-org **Custom** Distribution direction.
+  No new technical debt logged by this session (the scope-naming finding is
+  flagged in DEC-023 §5 and the notes file, not filed as a TD entry, since
+  `technical-debt-register.md` is outside this session's allowed files —
+  logging it there is left for ChatGPT/a future session to do explicitly).
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a, none reintroduced) ·
+  technical debt logged (n/a this session — flagged for a future session, not
+  filed) · repeated-issue escalation applied (n/a) — all YES.
+- **Recommended next control-room step:** ChatGPT review of DEC-023 — either
+  accept, reject, or request revision of the §3.2 vendor-owned
+  cross-organizational OAuth direction; separately, authorize (or decline) a
+  future session with real Shopify Partner/Dev Dashboard access to execute
+  `val-b2-closure-plan.md` and attempt to actually close VAL-B2.
+- **Stop condition:** stopped at the scoped boundary — docs-only session;
+  exactly the 4 allowed files touched (3 newly created); no code, test,
+  manifest, security, XML, CSV, migration, or CI file touched; VAL-B2 remains
+  deferred, not passed; MBQ-05 remains open, not resolved; no OAuth/setup
+  wizard/UI implementation.
+
 ### Task 004 Acceptance / TD-001 Closure — compact handoff (2026-07-08)
 
 - **Docs-only session.** This entry records post-merge acceptance for
