@@ -1,5 +1,60 @@
 # Research Handoff (rolling)
 
+### Task 006A completeness audit — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006a-completeness-audit-ptq56q` → target
+  `Shopify-connector`, **draft**, opened this session.
+- **Files changed:** `docs/05-qa/task-006a-completeness-audit.md` (new),
+  `docs/01-research/research-handoff.md` (this entry).
+- **What changed / residue fixed:** audit-only session verifying Task 006A
+  research completeness after PR #123, #124, #125 (revision 2), and #126 all
+  merged into `Shopify-connector` (all four merge/head commits confirmed
+  ancestors of current HEAD `b39096e`). Confirmed
+  `docs/01-research/sync-engine-shopify-source-notes.md` was never created;
+  found its intended content is covered-by-synthesis across PR #125's
+  `sync-engine-source-inventory.md` §4 (S1–S16, all official `shopify.dev`,
+  Primary-graded) plus PR #126's cross-referenced `SH-` sources — all 9
+  required protocol/mechanics topics (GraphQL overview, cost/rate limits,
+  cursor pagination, bulk operations, webhooks, HMAC/dedup, idempotency,
+  REST 429+Retry-After, GraphQL 200+THROTTLED) have at least one official
+  citation; the 10th (domain API surfaces) is intentionally scoped light,
+  deferred to Tasks 010–014. Confirmed PR #125's five synthesis outputs
+  exist and are internally consistent (26-claim evidence map, fully cited;
+  43 open questions; 9 risk-register rows). Confirmed VAL-B2
+  (deferred/not passed), MBQ-05 (partially routed/open), TD-002 (Open),
+  fulfillment scope/API model, product first-sync dedup, and
+  many-unrelated-customers token acquisition all remain open, each with a
+  direct citation. Confirmed no architecture decision, no `DEC-025`, no
+  implementation-scope file, and no sync-engine/domain code exists anywhere
+  in the repo.
+- **Items deferred:** the 16-vs-17 `@idempotent` mutation-count discrepancy
+  and the OCA `queue_job` `--workers > 0` vs. `> 1` discrepancy (both
+  pre-existing, immaterial, carried forward as tracked open items, not
+  re-researched by this audit).
+- **Learning feedback loop:** new issues discovered: none (audit-only, no
+  defects found). Repeated issue patterns: none. Rules/checklists updated:
+  none. New rejected approaches: none. New technical debt: none. Architecture
+  concerns: the "engine-requirement level only" domain-API-surface scoping
+  boundary is followed in practice but not written down explicitly anywhere
+  — flagged as a documentation-clarity recommendation for a future session,
+  not a defect. Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Recommendation (this audit, not a decision):** **Proceed to Task 006B**
+  without a separate Shopify-shard backfill session — the missing standalone
+  file is an organizational/naming gap, not a research/coverage gap. See
+  `docs/05-qa/task-006a-completeness-audit.md` §9 for the full reasoning and
+  the conditions under which ChatGPT might instead select the backfill
+  alternative (Recommendation B).
+- **Next step:** ChatGPT review of this audit and its recommendation.
+- **Stop condition:** audit-only session, docs-only, no code touched, no
+  architecture decision made, no DEC-025 created, no implementation-scope
+  file created, no implementation authorized. Stopped after opening a draft
+  PR against `Shopify-connector`. Awaiting ChatGPT review.
+
+---
+
 ### Task 006A — PR #125 revision 2 — incorporated merged PR #126 queue/idempotency/retry/backoff/dead-letter research — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-006a-sync-engine-research-zj7pmv` → PR #125
