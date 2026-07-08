@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import fields
@@ -247,6 +248,60 @@ class TestConnectionLifecycle(TransactionCase):
             self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertNotEqual(self.store.state, 'connected')
+        self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
+
+    def test_activate_rejects_stale_evidence_after_action_set_token_update(self):
+        # ChatGPT re-review (PR #121): unlike action_replace_token(),
+        # action_set_token() can update an EXISTING credential row
+        # without clearing credential_last_verified_at at all -- so the
+        # truthy check alone is not enough. This proves the credential-
+        # row-freshness check (credential.write_date not newer than
+        # credential_last_verified_at) closes that remaining path: a
+        # token silently overwritten via action_set_token() must not let
+        # activate succeed on pass/pass evidence recorded for the value
+        # it replaced.
+        self._set_token()
+        self.store.write({
+            'last_test_connection_result': 'pass',
+            'last_readiness_result': 'pass',
+            'credential_last_verified_at': fields.Datetime.now(),
+        })
+        self._store().action_activate()
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'connected')
+        audit_jobs_before = self._audit_jobs()
+
+        # Move state away from connected first, so a second activation
+        # attempt that wrongly succeeds cannot be mistaken for a no-op
+        # re-activation of an already-connected store.
+        self.store.write({'state': 'reconnect_needed'})
+
+        # Deterministic setup (avoids same-second write_date/verified_at
+        # flakiness): explicitly backdate credential_last_verified_at
+        # well before the upcoming credential overwrite, rather than
+        # relying on real wall-clock ordering between two nearby writes.
+        stale_verified_at = fields.Datetime.now() - timedelta(minutes=10)
+        self.store.write({'credential_last_verified_at': stale_verified_at})
+
+        self.Credential.with_user(self.user_admin).action_set_token(
+            self.store, DUMMY_TOKEN + 'OVERWRITTEN'
+        )
+        self.store.invalidate_recordset()
+        self.assertTrue(self.store.credential_present)
+        self.assertTrue(self.store.credential_last_verified_at)
+        self.assertEqual(self.store.last_test_connection_result, 'pass')
+        self.assertEqual(self.store.last_readiness_result, 'pass')
+        credential = self._get_credential()
+        self.assertTrue(credential.write_date)
+        self.assertGreater(
+            credential.write_date, self.store.credential_last_verified_at
+        )
+
+        with self.assertRaises(UserError):
+            self._store().action_activate()
+        self.store.invalidate_recordset()
+        self.assertNotEqual(self.store.state, 'connected')
+        self.assertEqual(self.store.state, 'reconnect_needed')
         self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
 
     # ------------------------------------------------------------------

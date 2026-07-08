@@ -257,15 +257,24 @@ class ShopifyConnectorStore(models.Model):
         but does not reset `last_test_connection_result`/
         `last_readiness_result`, so this check is the guard against
         re-activating a credential-less store on old evidence) *and*
-        that the current credential has actually been verified
-        (`credential_last_verified_at` truthy -- the credential service's
-        `action_replace_token` clears this stamp on every token swap but
-        does not reset `last_test_connection_result`/
-        `last_readiness_result`, so without this check a replaced token
-        could activate on pass/pass evidence recorded for the *previous*
-        token) plus a stored passing test-connection result and a
-        passing-or-warning-tier readiness result already on record before
-        moving the state at all. If any is missing or failing, raises
+        that the current credential row has actually been verified
+        *and not changed since*. `credential_last_verified_at` truthy
+        alone is not enough: `action_replace_token` clears that stamp on
+        every swap (covered by the truthy check below), but
+        `action_set_token` can also update an *existing* credential row
+        -- e.g. re-entering/correcting a token for a store that already
+        has one -- without clearing `credential_last_verified_at` at
+        all. Without also comparing the credential row's own
+        `write_date`, a token silently overwritten via `action_set_token`
+        could activate on pass/pass evidence recorded for the credential
+        value it replaced. Neither check reads or logs the credential's
+        `access_token`, and neither uses `sudo()` -- the search runs as
+        the calling (Admin) user, exactly as the rest of this model's
+        credential-adjacent reads already do. Only after credential
+        presence, row existence, verification, and freshness all hold
+        does this method require a stored passing test-connection result
+        and a passing-or-warning-tier readiness result already on record
+        before moving the state at all. If any check fails, raises
         `UserError` and leaves the state untouched -- never calls
         Shopify, never runs OAuth, and never claims VAL-B2 has passed or
         that MBQ-05 is resolved (DEC-022 §4.4).
@@ -276,10 +285,26 @@ class ShopifyConnectorStore(models.Model):
                 'Cannot activate: no credential is present for this '
                 'store -- enter a credential first.'
             )
+        credential = self.env['shopify.connector.store.credential'].search(
+            [('store_id', '=', self.id)], limit=1
+        )
+        if not credential:
+            raise UserError(
+                'Cannot activate: no credential record exists for this '
+                'store -- enter a credential first.'
+            )
         if not self.credential_last_verified_at:
             raise UserError(
                 'Cannot activate: the current credential has not been '
                 'verified yet — run Test Connection first.'
+            )
+        if (
+            credential.write_date
+            and self.credential_last_verified_at < credential.write_date
+        ):
+            raise UserError(
+                'Cannot activate: the stored credential changed after '
+                'the last verification — run Test Connection first.'
             )
         if self.last_test_connection_result != 'pass':
             raise UserError(

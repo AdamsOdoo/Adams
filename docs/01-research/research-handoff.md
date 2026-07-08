@@ -1,5 +1,99 @@
 # Research Handoff (rolling)
 
+### Task 005 PR #121 revision — stale activation evidence after action_set_token() update — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched — the credential model (`shopify_connector_store_credential.py`)
+  was explicitly not edited, per this session's instructions.
+- **What changed:** ChatGPT's re-review of PR #121 found a remaining
+  stale-evidence path in `action_activate()`, distinct from the one
+  fixed in the prior revision: `action_set_token()` can update an
+  *existing* credential row (re-entering/correcting a token) without
+  clearing `credential_last_verified_at` at all — unlike
+  `action_replace_token()`, which does clear it. So the truthy-only
+  `credential_last_verified_at` check added in the previous revision was
+  not enough: a token silently overwritten via `action_set_token()`
+  could still activate on pass/pass evidence recorded for the credential
+  value it replaced. **Fixed** by adding a credential-row-freshness
+  check to `action_activate()`, in order: `credential_present` →
+  credential row exists (searched via the normal ORM, no `sudo()`, no
+  `access_token` read) → `credential_last_verified_at` truthy →
+  credential row's `write_date` not newer than
+  `credential_last_verified_at` → `last_test_connection_result == 'pass'`
+  → `last_readiness_result in ('pass', 'warning')`. Raises `UserError`
+  before any write on any failure; leaves state unchanged; creates no
+  audit job on rejection; no Shopify call; no readiness run; no
+  credential mutation. Added
+  `test_activate_rejects_stale_evidence_after_action_set_token_update`
+  (activates once with fresh verified evidence, moves state away from
+  `connected`, deterministically backdates `credential_last_verified_at`
+  by 10 minutes to avoid same-second flakiness, overwrites the
+  credential via `action_set_token()`, confirms the mirrors stay
+  stale/`credential.write_date` is newer than `credential_last_verified_at`,
+  confirms the second `action_activate()` raises and does not connect,
+  confirms no new audit job). All existing activate tests already seed
+  `credential_last_verified_at` via `fields.Datetime.now()` called
+  strictly after the credential's creation in the same test method, so
+  each already satisfies the new freshness check without modification
+  (verified by inspection, not assumed). The prior
+  `action_reconnect()`/`action_activate()` fixes (Revisions 1–2) are
+  untouched and confirmed intact. **No scope expansion** — no OAuth/
+  setup wizard/UI/sync/domain implementation, no security/ACL change, no
+  new job state/type/source, no new `sudo()`, no credential-model edit.
+- **Local validation performed:** `python -m py_compile` on both changed
+  Python files — passes. **No Odoo runtime is available in this session's
+  container**, so the test suite was not executed here — stated honestly;
+  the same Odoo.sh/manual validation command from the original PR #121
+  handoff entry still applies:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`.
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+- **Learning feedback loop:**
+  - New issues discovered: the `action_set_token()`-update stale-
+    evidence path above, found by ChatGPT's re-review — a third instance
+    of the same defect class as the two prior stale-evidence fixes
+    (credential-service writes that leave a pass/pass evidence mirror
+    behind without clearing whatever presence/verification signal
+    `action_activate()` relies on).
+  - Repeated issue patterns: **yes, now a confirmed third occurrence** —
+    (1) `action_disconnect` clears `credential_present` but not the
+    evidence mirrors; (2) `action_replace_token` clears
+    `credential_last_verified_at` but not the evidence mirrors; (3)
+    `action_set_token` clears *neither* `credential_last_verified_at`
+    nor the evidence mirrors when updating an existing row. The standing
+    rule flagged in the prior handoff entry ("any credential-service
+    write that clears a presence/verification field must be checked
+    against every consumer of the evidence mirrors it does not clear")
+    should be broadened: also check credential-service writes that clear
+    *nothing new* but still change the underlying credential identity
+    (e.g. `write_date` freshness, not just an explicit cleared field).
+  - Rules/checklists updated: none (out of this revision's allowed-files
+    scope) — flagged above for a future docs-authorized session.
+  - New rejected approaches: none.
+  - New technical debt: none.
+  - Tests or review gates needed: none beyond the regression test added.
+  - Should future prompts change? Worth a dedicated, docs-scoped session
+    to audit the full credential-service surface
+    (`action_set_token`/`action_replace_token`/`action_clear_token`)
+    against every consumer of `credential_present`/
+    `credential_last_verified_at`/the test-connection/readiness evidence
+    mirrors, now that three related-but-distinct instances have surfaced
+    across three review rounds — not actioned here, out of scope.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a) · technical debt
+  logged (n/a) · repeated-issue escalation applied (noted above as a
+  now-third-occurrence pattern; no rule file updated, out of scope) —
+  all YES.
+- **Next step:** ChatGPT re-review of the revised PR #121.
+- **Stop condition:** stopped at the scoped boundary — exactly the three
+  allowed files touched; credential model untouched; no merge; PR
+  remains draft, not marked ready for review.
+
 ### Task 005 PR #121 revision — stale activation evidence after credential replace — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
