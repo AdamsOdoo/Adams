@@ -1,5 +1,63 @@
 # Research Handoff (rolling)
 
+### Task 005 PR #121 revision — Odoo.sh runtime failure fix (lifecycle state invalidation gap) — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place — no
+  new PR opened).
+- **Files changed:** `addons/shopify_connector_core/models/shopify_connector_store_credential.py`,
+  `addons/shopify_connector_core/tests/test_connection_lifecycle.py`,
+  `addons/shopify_connector_core/tests/test_credential_service.py`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  touched.
+- **What changed:** Odoo.sh runtime re-validation after Revision 4 found
+  **1 remaining failure**:
+  `TestConnectionLifecycle.test_activate_rejects_stale_evidence_after_credential_replace`
+  (`AssertionError: 'connected' == 'connected'`). **Root cause:**
+  `action_replace_token()` cleared `credential_last_verified_at` (correctly
+  invalidating the verification evidence) but left `store.state` as
+  `'connected'` — a real product risk, since Task 005 business-job gating
+  keys off `store.state == 'connected'`, so a connected store left
+  connected after its credential changed could let sync jobs run against
+  an unverified changed credential. **Fixed** by adding lifecycle state
+  invalidation inside the credential service itself (no jobs/logs
+  created, no `sudo()`, no `access_token` read):
+  - `action_set_token()` / `action_replace_token()`: a `'connected'` store
+    also moves to `'reconnect_needed'`.
+  - `action_clear_token()`: a `'connected'` or `'reconnect_needed'` store
+    also moves to `'disconnected'`. `action_disconnect()`'s own follow-up
+    `state='disconnected'` write remains a fine, idempotent no-op on top
+    of this.
+  Tests updated: `test_activate_rejects_stale_evidence_after_credential_replace`
+  and `test_activate_rejects_stale_evidence_after_action_set_token_update`
+  now assert `store.state == 'reconnect_needed'` after the credential
+  mutation (the latter no longer manually moves state before calling
+  `action_set_token()` — the service does it); a new
+  `test_credential_service_clear_token_sets_state_disconnected_directly`
+  test calls `action_clear_token()` directly (not via
+  `action_disconnect()`) and asserts `state == 'disconnected'` with no
+  job/log rows created. `test_credential_service.py` gained four focused
+  tests covering the same three transitions plus the no-job/no-log
+  guarantee under a `'connected'`/`'reconnect_needed'` starting state
+  (the existing `test_no_job_or_job_log_rows_written` was left unchanged,
+  not weakened). **No scope expansion** — no OAuth/setup wizard/UI/
+  sync/domain implementation, no security/ACL change, no new job state/
+  type/source, no new `sudo()`, no new schema field, no `access_token`
+  read/log. Revision 4's `action_activate()` requirements and the
+  Revision 1 `action_reconnect()` missing-credential fix remain
+  untouched and confirmed intact.
+- **Local validation performed:** `python -m py_compile` on all three
+  changed Python files — passes. **No Odoo runtime is available in this
+  session's container**, so the updated test suite was not re-executed
+  here — stated honestly; Odoo.sh validation is requested again via the
+  same command:
+  `odoo-bin -d <db> -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --log-level=test`
+  (focused: `--test-tags /shopify_connector_core:TestConnectionLifecycle`).
+- **VAL-B2 remains deferred / not passed. MBQ-05 remains partially routed /
+  open. TD-002 remains open.** Unchanged by this revision.
+
+---
+
 ### Task 005 PR #121 revision — Odoo.sh runtime failure fix (brittle write_date guard) — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-lifecycle-actions-k3ixq5` → PR #121 into

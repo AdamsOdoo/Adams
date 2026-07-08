@@ -217,13 +217,20 @@ class TestConnectionLifecycle(TransactionCase):
         self.assertEqual(self.store.state, 'disconnected')
 
     def test_activate_rejects_stale_evidence_after_credential_replace(self):
-        # ChatGPT review (PR #121): action_replace_token clears
-        # credential_last_verified_at on every token swap but does not
-        # reset last_test_connection_result/last_readiness_result, so a
-        # replaced token could otherwise activate on pass/pass evidence
-        # recorded for the PREVIOUS token -- exactly the "never infer
-        # connection success" violation credential_last_verified_at
-        # exists to close.
+        # ChatGPT review (PR #121, Revision 5): action_replace_token
+        # clears credential_last_verified_at on every token swap but
+        # does not reset last_test_connection_result/last_readiness_
+        # result, so a replaced token could otherwise activate on
+        # pass/pass evidence recorded for the PREVIOUS token -- exactly
+        # the "never infer connection success" violation
+        # credential_last_verified_at exists to close. Odoo.sh runtime
+        # exposed a lifecycle state invalidation gap on top of that:
+        # action_replace_token() left store.state == 'connected' even
+        # though the credential backing that state had just changed --
+        # a connected store must not remain connected after its
+        # credential is replaced, since business-job gating keys off
+        # store.state. action_replace_token() now also moves a
+        # 'connected' store to 'reconnect_needed'.
         self._set_token()
         self._seed_verified_evidence()
         self._store().action_activate()
@@ -237,16 +244,22 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.invalidate_recordset()
         self.assertTrue(self.store.credential_present)
         self.assertFalse(self.store.credential_last_verified_at)
+        self.assertEqual(self.store.state, 'reconnect_needed')
         # The stale mirrors are untouched by the token replacement --
         # still 'pass'/'pass', but they no longer describe the current
         # credential.
         self.assertEqual(self.store.last_test_connection_result, 'pass')
         self.assertEqual(self.store.last_readiness_result, 'pass')
+        # action_replace_token() itself creates no job/log rows -- the
+        # state move above is a credential-service side effect, not an
+        # audited lifecycle action.
+        self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
 
         with self.assertRaises(UserError):
             self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertNotEqual(self.store.state, 'connected')
+        self.assertEqual(self.store.state, 'reconnect_needed')
         self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
 
     def test_activate_rejects_stale_evidence_after_action_set_token_update(self):
@@ -260,6 +273,10 @@ class TestConnectionLifecycle(TransactionCase):
         # re-entering/correcting a token) -- so a token silently
         # overwritten via action_set_token() can no longer activate on
         # pass/pass evidence recorded for the value it replaced.
+        # Revision 5: action_set_token() now also performs the
+        # store.state invalidation itself (connected -> reconnect_
+        # needed) -- no manual state move is done here anymore, this
+        # test proves the credential service does it.
         self._set_token()
         self._seed_verified_evidence()
         self._store().action_activate()
@@ -267,22 +284,22 @@ class TestConnectionLifecycle(TransactionCase):
         self.assertEqual(self.store.state, 'connected')
         audit_jobs_before = self._audit_jobs()
 
-        # Move state away from connected first, so a second activation
-        # attempt that wrongly succeeds cannot be mistaken for a no-op
-        # re-activation of an already-connected store.
-        self.store.write({'state': 'reconnect_needed'})
-
         self.Credential.with_user(self.user_admin).action_set_token(
             self.store, DUMMY_TOKEN + 'OVERWRITTEN'
         )
         self.store.invalidate_recordset()
         self.assertTrue(self.store.credential_present)
         self.assertFalse(self.store.credential_last_verified_at)
+        self.assertEqual(self.store.state, 'reconnect_needed')
         # The stale mirrors are untouched by the token overwrite -- still
         # 'pass'/'pass', but they no longer describe the current
         # credential.
         self.assertEqual(self.store.last_test_connection_result, 'pass')
         self.assertEqual(self.store.last_readiness_result, 'pass')
+        # action_set_token() itself creates no job/log rows -- the state
+        # move above is a credential-service side effect, not an audited
+        # lifecycle action.
+        self.assertEqual(len(self._audit_jobs()), len(audit_jobs_before))
 
         with self.assertRaises(UserError):
             self._store().action_activate()
@@ -326,6 +343,33 @@ class TestConnectionLifecycle(TransactionCase):
             self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertNotEqual(self.store.state, 'connected')
+
+    # ------------------------------------------------------------------
+    # Credential-service lifecycle state invalidation (direct calls,
+    # not via action_disconnect())
+    # ------------------------------------------------------------------
+
+    def test_credential_service_clear_token_sets_state_disconnected_directly(self):
+        # Calls the credential service's action_clear_token() directly
+        # -- not action_disconnect() -- to prove the state invalidation
+        # lives in the credential service itself, not only in
+        # action_disconnect()'s own follow-up write.
+        self._set_token()
+        self._seed_verified_evidence()
+        self._store().action_activate()
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'connected')
+        jobs_before = self.Job.search_count([])
+        logs_before = self.JobLog.search_count([])
+
+        self.Credential.with_user(self.user_admin).action_clear_token(
+            self.store
+        )
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnected')
+        self.assertFalse(self.store.credential_present)
+        self.assertEqual(self.Job.search_count([]), jobs_before)
+        self.assertEqual(self.JobLog.search_count([]), logs_before)
 
     # ------------------------------------------------------------------
     # action_disconnect
