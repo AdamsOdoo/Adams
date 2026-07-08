@@ -1,15 +1,51 @@
 # Task 004 Quality Gates
 
-> **Preparatory only. Not authorization to code, not an architecture
-> decision, and not a claim that Task 004 is unblocked.** This is a generic
-> quality-gate checklist for whatever Task 004 ("Readiness check substrate")
-> eventually becomes, once ChatGPT unblocks it. It is deliberately written
-> to not assume Task 004's final scope — see
+> **Preparatory only, at original authoring time. Not authorization to
+> code, not an architecture decision, and not a claim that Task 004 is
+> unblocked.** This is a generic quality-gate checklist for whatever Task
+> 004 ("Readiness check substrate") eventually became, once ChatGPT
+> unblocked it. It was deliberately written to not assume Task 004's
+> final scope — see
 > [`../07-implementation-plan/task-004-readiness-preflight.md`](../07-implementation-plan/task-004-readiness-preflight.md)
-> §4 for the current candidate scope, which this checklist does not
-> re-litigate.
+> §4 for the original candidate scope. **See the acceptance status block
+> immediately below for the current (post-implementation, post-merge)
+> state — this original preparatory framing is retained as history, not
+> current status.**
 
-## Status
+## Acceptance status (2026-07-08)
+
+**Task 004 implementation gate: PASSED / ACCEPTED, scoped exactly to the
+readiness-check substrate implemented by PR #115.**
+
+- **PR #115 merged** into `Shopify-connector` — merge commit
+  `4145faf69ae6c1d541006890fc2b997fe4c07238`.
+- **Live Odoo.sh validation passed** — a real Odoo 19 + PostgreSQL
+  registry ran the full `shopify_connector_core` suite
+  (`0 failed, 0 error(s) of 78 tests`) and the focused
+  `TestReadinessCheck` class (`0 failed, 0 error(s) of 31 tests`) against
+  PR #115's exact head commit
+  (`ddecd9d28ac543145e9b4ec303e84e2afbbd2b15`) before merge. Full
+  evidence: [`task-004-validation-results.md`](./task-004-validation-results.md).
+- **TD-001 resolved** — see
+  [`technical-debt-register.md`](./technical-debt-register.md); proven by
+  the live-run regression test, not merely a routing decision.
+
+**Explicit non-claims (unchanged by this acceptance):**
+
+- **VAL-B2 remains deferred, not passed.**
+- **MBQ-05 remains deferred for Task 004 only, not resolved** as a final
+  token-acquisition strategy.
+- **No OAuth, no setup wizard, no UI (views/menus/actions/wizards/
+  controllers), no lifecycle (activate/disconnect/reconnect) code, and no
+  product/customer/order/inventory/fulfillment/domain sync** exist
+  anywhere in PR #115's scope.
+- Three essential checks (webhook HMAC, mapped Location, cron/queue
+  health) remain registered pending slots by design — a
+  fresh/current-state store may still compute overall readiness `fail`
+  until future tasks give them a real signal. No customer-facing
+  readiness pass is claimed by this acceptance.
+
+## Status (original, pre-implementation)
 
 Prepared 2026-07-07, docs-only, companion to the Task 004 readiness
 preflight package. Branch `claude/task-004-readiness-preflight-vgbkt3`.
@@ -23,23 +59,25 @@ Modeled on this project's existing gate discipline
 
 ## 1. Pre-start gate
 
-> **State as of 2026-07-07, per
+> **State as of 2026-07-07 (original authoring), per
 > [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md) and
 > ChatGPT's gate-acceptance decision recorded in
 > [`task-004-readiness-check-substrate-gate.md`](../07-implementation-plan/task-004-readiness-check-substrate-gate.md):**
-> Task 004 implementation is **still not started**. ChatGPT has formally
-> **deferred VAL-B2** from the Task 003 → Task 004 gate, and has now
-> **accepted the Task 004 gate document**, opening Task 004
-> implementation *planning* — implementation itself still requires a
+> Task 004 implementation was **not started** at authoring time. **Superseded
+> 2026-07-08 — see the "Acceptance status" block above: Task 004 implemented,
+> PR #115 merged, live-validated, TD-001 resolved.** ChatGPT had formally
+> **deferred VAL-B2** from the Task 003 → Task 004 gate (still deferred,
+> not passed), and accepted the Task 004 gate document, opening Task 004
+> implementation *planning*; implementation itself was then run as a
 > separate, later coding session using the finalized
 > [`task-004-final-implementation-prompt.md`](../07-implementation-plan/task-004-final-implementation-prompt.md).
-> **TD-001's route is now decided: fix inside Task 004**, as the first
-> mandatory implementation acceptance criterion — not left open, and not
-> routed to a separate patch. TD-001 itself remains **not fixed** until
-> that future implementation PR actually merges and is validated. **No
-> customer-facing readiness pass, activation, setup wizard, or domain
-> sync may depend on the unproven VAL-B2** — this constraint applies to
-> every gate below, not just the pre-start gate.
+> **TD-001's route was decided: fix inside Task 004**, as the first
+> mandatory implementation acceptance criterion — and TD-001 **is now
+> fixed and resolved**, proven by a live regression-test run on Odoo 19
+> (see `technical-debt-register.md`). **No customer-facing readiness
+> pass, activation, setup wizard, or domain sync depends on the still-
+> unproven VAL-B2** — this constraint applies to every gate below, not
+> just the pre-start gate, and remains true after this acceptance.
 
 Before any Task 004 code is written:
 
@@ -64,10 +102,9 @@ Before any Task 004 code is written:
       implementation acceptance criterion (see
       `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`
       §TD-001 route and `../05-qa/technical-debt-register.md`). **TD-001
-      itself is still NOT fixed** — this checkbox records only that the
-      routing decision was made, not that the fix exists yet. It remains
-      `Open` in the register until the future Task 004 implementation PR
-      merges and is validated.
+      is now `Resolved` (2026-07-08)** — fixed by PR #115 and proven by
+      its live-run regression test on Odoo 19; no longer just a routing
+      decision.
 - [ ] MBQ-06's residual (exact readiness-check copy/XML IDs/thresholds) is
       fixed in the Task 004 task prompt itself, not left as a TBD inside
       the code.
@@ -120,20 +157,22 @@ Before any Task 004 PR is merged:
       from outside `shopify_connector_core` without modifying core files).
 - [ ] Every check implemented in this stage is tested as provably
       read-only (no mutation-capable call path exists).
-- [ ] If the repository still has no Odoo runtime/CI at the time this task
+- [x] If the repository still has no Odoo runtime/CI at the time this task
       runs, tests are honestly recorded as written and
       `py_compile`/`pyflakes`-validated only, and a manual validation
       checklist (mirroring `task-003-manual-validation-checklist.md`) is
       prepared as mandatory review evidence — never silently skipped or
-      silently claimed as executed.
-- [ ] **The TD-001 regression test is mandatory and present**: two
+      silently claimed as executed. **Satisfied and then superseded:**
+      the implementation session honestly recorded `py_compile`-only
+      evidence (no local Odoo runtime); a later session then ran the
+      real suite live on Odoo.sh — see
+      `../05-qa/task-004-validation-results.md`.
+- [x] **The TD-001 regression test is mandatory and present**: two
       `core_readiness_check` job-creation attempts for the same store both
-      succeed, with no `store_idempotency_key_uniq` collision. TD-001's
-      route is decided (fix inside Task 004, per
-      `../07-implementation-plan/task-004-readiness-check-substrate-gate.md`
-      §TD-001 route) — the implementation PR must include this test; its
-      absence is a definition-of-done failure, not an acceptable
-      "unchanged residual" outcome.
+      succeed, with no `store_idempotency_key_uniq` collision. **Present
+      and passed live** (`test_td001_repeated_readiness_job_does_not_collide`,
+      confirmed on Odoo 19 via Odoo.sh — see
+      `../05-qa/task-004-validation-results.md`).
 
 ## 4. Security gate
 
@@ -155,13 +194,12 @@ Before any Task 004 PR is merged:
 
 ## 5. Retry/idempotency gate
 
-- [ ] TD-001's exact defect (a second `core_readiness_check` job for the
+- [x] TD-001's exact defect (a second `core_readiness_check` job for the
       same store colliding on `store_idempotency_key_uniq`) is **verified
-      as fixed** — this is decided, not a two-way choice: the Task 004
-      implementation PR must fix it, proven by the mandatory regression
-      test (§3 above). Still `Open` in `technical-debt-register.md` until
-      that PR merges and is validated — do not mark this gate item
-      satisfied before the fix actually exists and is tested.
+      as fixed** — proven by the mandatory regression test (§3 above),
+      run live on Odoo 19 via Odoo.sh. **`Resolved` in
+      `technical-debt-register.md` as of 2026-07-08**, after PR #115
+      merged and this validation passed.
 - [ ] If this task introduces its own new job-creation path, a repeat-run
       test (mirroring Task 003's VAL-B3) confirms no unintended unique-
       constraint collision.
@@ -222,10 +260,15 @@ Before any Task 004 PR is merged:
 
 ## 10. ChatGPT review gate
 
-- [ ] Task 004's PR is reviewed and explicitly classified by ChatGPT as
+- [x] Task 004's PR is reviewed and explicitly classified by ChatGPT as
       one of: accepted / accepted with minor corrections / revise / reject
       (per `quality-feedback-loop.md` §2) — before any next task (Task 005
-      or otherwise) is started.
+      or otherwise) is started. **PR #115 was reviewed across its
+      revision cycle: ChatGPT's first review returned a required
+      correction** (the `_check_required_scopes`/`_check_domain_flag_enablement`
+      fixes, applied before merge) **and the PR was then accepted for
+      live validation, merged, and this acceptance recorded** — Task 005
+      is not started by this acceptance.
 - [ ] Any "revise" or "reject" issue is logged by category
       (`quality-feedback-loop.md` §3) and, if it recurs a third time
       without a prevention rule, escalated per that document's own
@@ -237,14 +280,27 @@ Before any Task 004 PR is merged:
 
 ---
 
+## Acceptance decision (2026-07-08)
+
+**Task 004's implementation gate is PASSED / ACCEPTED for the
+readiness-check substrate scope implemented by PR #115** — see
+"Acceptance status" at the top of this document and
+[`task-004-validation-results.md`](./task-004-validation-results.md) for
+the full evidence. This decision does **not** extend to any capability
+outside that scope: it does not authorize Task 005, OAuth, the setup
+wizard, any UI, any lifecycle action, or any domain sync, and it does not
+change VAL-B2's or MBQ-05's own deferred status.
+
 ## What this checklist does not do
 
 - It does not assume Task 004's final scope will match the candidate
   described in `task-004-readiness-preflight.md` §4 — every item above is
   phrased generically enough to apply whether the final scope matches that
   candidate exactly, is narrowed further, or is revised by ChatGPT.
-- It does not authorize Task 004 to start.
+- It does not authorize Task 005 or any further implementation.
 - It does not mark any Task 003 item complete.
-- It does not decide MBQ-05, MBQ-06, or TD-001's routing — it only lists
-  them as gate conditions that must be decided by someone with the
-  authority to decide them (ChatGPT, per `CLAUDE.md` §2).
+- It does not decide MBQ-05, or resolve it — MBQ-05 remains deferred for
+  Task 004 only. MBQ-06 was already decided prior to Task 004 (via
+  DEC-018) and TD-001's routing/fix is now resolved (see above) — this
+  document only lists them as gate conditions; it is not itself the
+  authority that decided them (ChatGPT, per `CLAUDE.md` §2, is).

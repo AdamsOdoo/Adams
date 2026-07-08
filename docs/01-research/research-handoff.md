@@ -1,5 +1,79 @@
 # Research Handoff (rolling)
 
+### Task 004 Acceptance / TD-001 Closure — compact handoff (2026-07-08)
+
+- **Docs-only session.** This entry records post-merge acceptance for
+  Task 004 — **no code changed in this documentation session.** Allowed
+  files touched: `docs/05-qa/technical-debt-register.md`,
+  `docs/05-qa/task-004-validation-results.md` (new),
+  `docs/05-qa/task-004-manual-validation-checklist.md`,
+  `docs/05-qa/task-004-quality-gates.md`,
+  `docs/01-research/research-handoff.md` (this entry). No `addons/` file,
+  no Python/XML/CSV/manifest/security/test/migration/CI file touched.
+- **PR #115 merged** into `Shopify-connector` — merge commit
+  `4145faf69ae6c1d541006890fc2b997fe4c07238` (head SHA before merge:
+  `ddecd9d28ac543145e9b4ec303e84e2afbbd2b15`).
+- **Task 004 readiness-check substrate accepted.** See
+  [`../05-qa/task-004-validation-results.md`](../05-qa/task-004-validation-results.md)
+  (new) for the full evidence record: environment, commands, results,
+  evidence interpretation, what it does not prove, and the final
+  acceptance decision.
+- **TD-001 resolved.** `technical-debt-register.md`'s TD-001 row `Status`
+  is now `Resolved`, with a resolution note citing PR #115, the merge
+  commit, the fix (fresh UUID4 `payload_hash` for
+  `core_readiness_check`), and the live regression-test evidence. The
+  original TD-001 context (why it existed, how it was routed) is
+  preserved, not deleted.
+- **Live validation passed**, run against a real Odoo 19 + PostgreSQL
+  registry on Odoo.sh (branch database
+  `adamsmen-claude-task-004-readiness-substrate-me21qg-34601850`,
+  commit `ddecd9d28ac543145e9b4ec303e84e2afbbd2b15`):
+  - Full `shopify_connector_core` suite: `0 failed, 0 error(s) of 78
+    tests`.
+  - Focused `TestReadinessCheck`: `0 failed, 0 error(s) of 31 tests`.
+- **`task-004-manual-validation-checklist.md`** updated with a top
+  status note: PR #115 exists and has merged; automated/live Odoo.sh
+  validation has passed; the checklist is now partially superseded by
+  `task-004-validation-results.md`; the few steps not covered by the
+  automated suite (literal server-log grep, literal UI/menu/cron-row
+  inspection, literal revert-and-reinspect) remain optional future
+  hardening, not an acceptance blocker, unless ChatGPT reopens them. The
+  original checklist body is preserved as reference, not deleted.
+- **`task-004-quality-gates.md`** updated with an "Acceptance status"
+  block marking the implementation gate passed/accepted for the
+  readiness-check substrate scope, plus targeted updates to the
+  TD-001-tied checkboxes (§1, §3, §5) and the ChatGPT review gate (§10)
+  — all citing PR #115 and the live-validation evidence.
+- **VAL-B2 remains deferred, not passed.** Untouched by this session —
+  the credential/test-connection check still only reads stored evidence
+  and never asserts a live connection.
+- **MBQ-05 remains deferred for Task 004 only, not resolved** as a final
+  token-acquisition strategy. Untouched by this session.
+- **No OAuth, no setup wizard, no UI, no lifecycle action, no
+  product/customer/order/inventory/fulfillment/domain sync** — none
+  exist in PR #115's scope, and none were added by this docs session.
+- **Task 005 not started.**
+- **Learning feedback loop:** No new defect pattern, no new rejected
+  approach, no new technical debt introduced by this session (TD-001 is
+  *closed*, not newly opened). This session's own discipline — preserving
+  original document context while adding superseding status blocks,
+  rather than deleting history — follows the standing DP-007 "sweep
+  status lines without erasing history" lesson.
+- **Quality gate confirmation:** handoff updated · feedback loop checked
+  · learning captured · rejected approach logged (n/a) · technical debt
+  logged (TD-001 resolution recorded) · repeated-issue escalation applied
+  (n/a) — all YES.
+- **Recommended next control-room step:** decide the next gated task —
+  either Task 005 planning, or a small documentation/governance gate
+  before any setup-wizard/OAuth work — per the open MBQ register and
+  this project's phase-gate discipline. No task is self-authorized to
+  start by this entry.
+- **Stop condition:** stopped at the scoped boundary — docs-only session;
+  exactly the 5 allowed files touched (one newly created); no code, test,
+  manifest, security, XML, CSV, migration, or CI file touched; TD-001
+  marked `Resolved`; VAL-B2 remains deferred, not passed; MBQ-05 remains
+  deferred for Task 004 only, not resolved; Task 005 not started.
+
 ### Task 004 Implementation — Readiness-Check Substrate + TD-001 Fix — compact handoff (2026-07-07)
 
 - **Branch / PR:** `claude/task-004-readiness-substrate-me21qg`, branched

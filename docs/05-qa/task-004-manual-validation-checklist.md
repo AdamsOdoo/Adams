@@ -1,46 +1,67 @@
-# Task 004 — Manual Validation Checklist (Future, Not Executed)
+# Task 004 — Manual Validation Checklist
 
-> **Future checklist only — not executed now.** This document is prepared
-> as part of the Task 004 gate-opening package, mirroring the precedent set
-> by
-> [`task-003-manual-validation-checklist.md`](./task-003-manual-validation-checklist.md)
-> for Task 003. **No Task 004 code exists yet, so no step below has been
-> run.** This checklist becomes actionable only after a future, separately
-> authorized Task 004 implementation PR exists and Task 004's own gate
-> ([`../07-implementation-plan/task-004-readiness-check-substrate-gate.md`](../07-implementation-plan/task-004-readiness-check-substrate-gate.md))
-> has been accepted by ChatGPT.
+> **Superseding status note (2026-07-08).** Task 004 implementation PR
+> [#115](https://github.com/AdamsOdoo/Adams/pull/115) exists and **has
+> merged** into `Shopify-connector` (merge commit
+> `4145faf69ae6c1d541006890fc2b997fe4c07238`). **Automated/live Odoo.sh
+> `TransactionCase` validation has passed** — see
+> [`task-004-validation-results.md`](./task-004-validation-results.md)
+> for the full evidence record (full module: `0 failed, 0 error(s) of 78
+> tests`; focused `TestReadinessCheck`: `0 failed, 0 error(s) of 31
+> tests`). **This checklist is now partially superseded by
+> `task-004-validation-results.md`** — the substance of most sections
+> below (B readiness job creation/TD-001 regression, C tier semantics, D
+> payload-snapshot structure, F no domain mutation, G no Shopify
+> mutation) is covered by the automated `TestReadinessCheck` suite that
+> ran live in that validation pass. A few steps were **not** exercised by
+> the automated suite (E's literal Odoo-server-log grep; H's literal
+> `ir.ui.menu`/`ir.actions`/`ir.cron` row inspection; I's literal
+> revert-and-reinspect) — these **remain optional future hardening, not a
+> blocker to Task 004 acceptance**, unless ChatGPT explicitly reopens
+> them. **This note does not claim VAL-B2 has passed** (the readiness
+> substrate's credential/test-connection check still only reads stored
+> evidence and never asserts a live connection — see
+> `task-004-validation-results.md`) **and does not claim customer-facing
+> readiness** — three essential checks remain registered pending slots by
+> design, so a fresh store may still compute overall readiness `fail`.
+>
+> The original text below is preserved as a reference checklist —
+> written before Task 004 implementation existed, describing what a
+> future validation session should check. It is retained for its
+> per-item detail, not as a live "not yet executed" status.
 
-## Status
+This document was originally prepared as part of the Task 004
+gate-opening package, mirroring the precedent set by
+[`task-003-manual-validation-checklist.md`](./task-003-manual-validation-checklist.md)
+for Task 003.
+
+## Status (original, pre-implementation)
 
 Prepared 2026-07-07, docs-only, as part of the Task 004 gate-opening
-package (branch `claude/task-004-gate-opening-w3f1zg`). **Package/template
-only — no live or static validation has been performed against any Task
-004 code, because no Task 004 code exists.** This session is a
-**gate-preparation session, not a coding or validation session** — no
-addon code, test, security file, manifest, migration, or CI file is
-created or modified by this document.
+package (branch `claude/task-004-gate-opening-w3f1zg`), **before** any
+Task 004 code existed. See the superseding status note above for the
+current (post-merge, post-live-validation) status.
 
-## Verified starting state
+## Verified starting state (original, pre-implementation)
 
-- Task 004 implementation is **not started**. No readiness-check registry/
-  service model exists in the repository as of this branch.
 - [`DEC-021`](../04-decisions/DEC-021-val-b2-deferral-for-task-004.md)
   (2026-07-07) formally defers VAL-B2 from the Task 003 → Task 004 gate —
   it does not prove a live Shopify connection, and this checklist's own
   future execution must not be read as depending on VAL-B2 having passed
   (Task 004's readiness engine only reads Task 003's existing stored
   mirror; it does not require a fresh Shopify call to validate its own
-  registry/tier/aggregation behavior).
+  registry/tier/aggregation behavior). **VAL-B2 remains deferred, not
+  passed, as of the superseding status note above too.**
 - [`TD-001`](./technical-debt-register.md) — the `core_readiness_check`
-  target-less idempotency-collision defect — remains **open** as of this
-  session, but its route is now **decided**: ChatGPT has accepted fixing
+  target-less idempotency-collision defect — was **open** as of this
+  original session, with its route decided: ChatGPT accepted fixing
   TD-001 **inside** Task 004, as the first mandatory implementation
   acceptance criterion (see
   [`../07-implementation-plan/task-004-readiness-check-substrate-gate.md`](../07-implementation-plan/task-004-readiness-check-substrate-gate.md)
-  §TD-001 route). **A second `core_readiness_check` job for the same
-  store is expected to succeed with no collision once Task 004 is
-  implemented** — there is no longer an "unchanged residual" branch for
-  this checklist to account for.
+  §TD-001 route). **TD-001 is now `Resolved`** (see
+  `technical-debt-register.md`) — PR #115's regression test proved a
+  second `core_readiness_check` job for the same store succeeds with no
+  collision, live on Odoo 19.
 
 ## Why this exists
 
@@ -194,8 +215,20 @@ reviewed, in addition to whatever automated tests exist.
 ## Acceptance / non-acceptance
 
 This checklist, on its own, **proves nothing** — it is not "passed" or
-"failed" until every applicable step has actually been executed against a
-live environment, after a real Task 004 implementation PR exists, and
-recorded in a results document mirroring
-[`task-003-validation-results.md`](./task-003-validation-results.md).
-**As of this session, no step above has been executed.**
+"failed" until either every applicable step is actually executed against
+a live environment, or an equivalent automated live-Odoo run covers the
+same substance. **As of the original 2026-07-07 session, no step above
+had been executed** (no Task 004 code existed yet).
+
+**Update (2026-07-08):** Task 004 implementation PR #115 merged and was
+live-validated against a real Odoo 19 + PostgreSQL registry on Odoo.sh —
+see [`task-004-validation-results.md`](./task-004-validation-results.md),
+which is now the authoritative results document (mirroring
+[`task-003-validation-results.md`](./task-003-validation-results.md)'s
+role for Task 003). That automated `TestReadinessCheck` suite covers the
+substance of sections B, C, D, F, and G above. Sections E (the literal
+Odoo-server-log grep), H (the literal `ir.ui.menu`/`ir.actions`/`ir.cron`
+row inspection), and I (the literal revert-and-reinspect) were **not**
+exercised by that automated run and remain optional future hardening —
+not a blocker to the Task 004 acceptance recorded in
+`task-004-validation-results.md`, unless ChatGPT explicitly reopens them.
