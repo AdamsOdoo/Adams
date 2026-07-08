@@ -3,10 +3,14 @@
 > **Proposed architecture decision record. NOT accepted.** This record
 > proposes the sync-engine architecture gate synthesized in
 > [`../03-architecture/sync-engine-architecture-gate.md`](../03-architecture/sync-engine-architecture-gate.md)
-> for ChatGPT review. It does **not** resolve AR-002 through AR-014 (already
-> accepted, unchanged) and does not itself open any new AR row in
+> for ChatGPT review. It does **not** resolve or reopen AR-002 through
+> AR-014 (already accepted, unchanged). This proposal has a corresponding
+> row, **`AR-030`**, in
 > [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
-> — see this record's "Architecture-review-log note" below.
+> — **`AR-030` is Proposed / not Accepted**, mirroring this record's own
+> **Proposed / Pending ChatGPT review** status exactly; see this record's
+> "Architecture-review-log note" below. **Implementation remains
+> unauthorized** by this record or by `AR-030` under any circumstance.
 
 ## Status
 
