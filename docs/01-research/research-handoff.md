@@ -1,5 +1,247 @@
 # Research Handoff (rolling)
 
+### Task 006A — PR #125 revision 2 — incorporated merged PR #126 queue/idempotency/retry/backoff/dead-letter research — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006a-sync-engine-research-zj7pmv` → PR #125
+  into `Shopify-connector` (**draft**, unmerged; same PR, revised in place —
+  no new PR opened; this is the second revision, following revision 1
+  below). **Full base progression:** PR #125's initial branch was created
+  **before PR #124 and PR #126 were merged**, from the PR #122-era base
+  (`9247fea3c36afdb761a82678f3e5e66e8ef42e87`). **Revision 1** (below)
+  incorporated PR #124 (`3735ae2292d1fcf926c83034ac8513906c9f5020`). **This
+  revision** incorporates PR #126 — "Task 006A-3 queue/idempotency/retry/
+  backoff/dead-letter source notes" — after merging latest
+  `origin/Shopify-connector`, confirmed to include the PR #126 merge commit
+  `3c9fad896f996c19d4978e5aca58b39674b7b35a` (clean merge, no conflicts).
+  **PR #123, PR #124, and PR #126 are all now merged sibling Task 006A
+  shards.**
+- **What changed / residue fixed:** control-room review found PR #125 was
+  not ready to merge because it predated PR #126 and therefore did not
+  incorporate the now-accepted
+  `docs/01-research/sync-engine-queue-idempotency-source-notes.md` (PR #126
+  — the canonical queue/idempotency/retry/backoff/dead-letter reference
+  shard for this task family: a 52-source, 9-topic, adversarially-verified
+  treatment). This revision:
+  - Establishes and documents the full **synthesis hierarchy** across all
+    four Task 006A shards: `R31`/PR #124 canonical for Odoo/repo substrate;
+    `R33`/PR #126 canonical for queue/idempotency/retry/backoff/dead-letter
+    reference patterns; `R32`/PR #123 canonical for competitor/common sync
+    patterns; PR #125 (this package) as the cross-cutting synthesis and
+    evidence-map, not a fifth independent research pass replacing any of
+    the three.
+  - Cross-references PR #126's document throughout the source inventory,
+    source notes, evidence map, open questions, and risk register, rather
+    than duplicating its content.
+  - Incorporates several genuinely new findings PR #126 surfaced that this
+    package had not independently researched: a throttled Shopify
+    **GraphQL** call can return **HTTP 200** with a `THROTTLED` body code
+    rather than a 4xx status; dead-letter-queue visibility is everywhere an
+    **opt-in alarm/metric**, not a default push notification, and can
+    trigger on a single failed attempt; PostgreSQL advisory locks carry
+    documented hazards (a `LIMIT`-ordering danger, session-vs-transaction
+    scope) not previously researched; a specific, corrected AWS jitter
+    formula; and a more specific open question about multi-server/
+    load-balanced `ir.cron` coordination.
+  - Strengthens three existing findings from single-shard to
+    multi-shard-corroborated: the "requires live Odoo.sh runtime proof"
+    conclusion for `ir.cron` locking/duplicate-execution (now confirmed
+    independently by three shards — this package, `R31`, and `R33`); the
+    bulk-operations non-resumability finding; and the GraphQL-cursor-
+    durability open question (with a new, related REST-specific fact:
+    `page_info` cursor URLs are explicitly documented as temporary).
+  - Notes one new, unreconciled, immaterial discrepancy: this package's
+    pre-006A baseline cites OCA `queue_job`'s Jobrunner precondition as
+    `--workers > 0`; PR #126 cites `--workers > 1`. Not resolved; does not
+    affect RA-004 (`queue_job` remains reference-only either way).
+  - All prior corrections from revision 1 are preserved unchanged: existing
+    Tasks 001–005 substrate provides *primitives*, not the full sync engine;
+    the savepoint warning is a performance constraint, not a hard cap; the
+    cron-retry conclusion remains a labeled source-backed inference; the
+    dead-letter wording remains scoped to sources inspected.
+- **No architecture decision. No implementation.** No addon file, Python,
+  XML, CSV, manifest, security, migration, CI, controller, view, wizard,
+  OAuth, or domain-sync code was created or modified in this revision. No
+  architecture-decision file, no DEC-025, no implementation-scope file was
+  created. VAL-B2 remains deferred/not passed; MBQ-05 remains partially
+  routed/open; TD-002 remains Open — all unmodified by this revision.
+- **Next step:** ChatGPT re-review of this revised Task 006A research
+  package.
+- **Stop condition:** docs-only revision, stopped after pushing to the same
+  PR #125 branch. No code touched. No merge performed. PR remains draft/
+  unmerged.
+
+---
+
+### Task 006A — PR #125 revision — incorporated merged PR #124 Odoo/repo substrate research — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006a-sync-engine-research-zj7pmv` → PR #125
+  into `Shopify-connector` (**draft**, unmerged; same PR, revised in place —
+  no new PR opened). **PR #125's initial branch was created from the PR
+  #122-era base** (`9247fea3c36afdb761a82678f3e5e66e8ef42e87`). **PR #123 and
+  PR #124 are now merged** (`aeaf7eb7782178b260edd452c9075a8dd1df323a` and
+  `3735ae2292d1fcf926c83034ac8513906c9f5020` respectively); this revision
+  merges latest `origin/Shopify-connector` (confirmed to include the PR #124
+  merge commit) into the PR #125 branch, a clean merge with no conflicts.
+- **What changed / residue fixed:** control-room review found PR #125 was
+  not ready to merge because it predated PR #124 and therefore did not
+  incorporate the now-accepted `docs/01-research/sync-engine-odoo-repo-source-notes.md`
+  (PR #124, "Task 006A-2 sync engine Odoo/repo substrate research" — the
+  canonical Odoo/repo substrate shard for this task family). This revision:
+  - Cross-references PR #124's document throughout the source inventory,
+    source notes, and evidence map as an accepted/merged source, rather than
+    duplicating its content. Where this PR's own independent Odoo research
+    reached the same facts (e.g. the `retrying()` mechanism, the >64-savepoint
+    coding-guideline warning, `lock_for_update()`/`try_lock_for_update()`),
+    that overlap is now marked as corroboration between two independently
+    produced shards, not restated as if newly discovered by this PR alone.
+  - Softens four overclaim/underclaimed-uncertainty wordings the control-room
+    review flagged: (1) "Tasks 001–005 already satisfies most mandatory
+    claims" → clarified that only specific *primitives* are implemented, not
+    the full sync-engine requirement set; (2) "Odoo caps savepoints at ~64" →
+    reworded as a performance-constraint warning, not a hard functional cap
+    (also now corroborated by PR #124's independent finding that core
+    `create()`/`write()` do not wrap themselves in a savepoint by default —
+    savepoints are used selectively); (3) the cron-retry-does-not-extend
+    conclusion → relabeled explicitly as a source-backed **inference**
+    requiring runtime proof, not a directly-quoted single-source conclusion;
+    (4) "Odoo `ir.cron` has no dead-letter concept at all" → scoped to "no
+    such mechanism was found in the sources inspected," not an absolute
+    whole-codebase claim.
+  - Updates the stale "based on latest Shopify-connector at PR #122" wording
+    in the original entry below to accurately describe the PR #122 → PR #124
+    base progression.
+- **No architecture decision. No implementation.** No addon file, Python,
+  XML, CSV, manifest, security, migration, CI, controller, view, wizard,
+  OAuth, or domain-sync code was created or modified in this revision. No
+  architecture-decision file, no DEC-025, no implementation-scope file was
+  created. VAL-B2 remains deferred/not passed; MBQ-05 remains partially
+  routed/open; TD-002 remains Open — all unmodified by this revision.
+- **Next step:** ChatGPT re-review of this revised Task 006A research
+  package.
+- **Stop condition:** docs-only revision, stopped after pushing to the same
+  PR #125 branch. No code touched. No merge performed. PR remains draft/
+  unmerged.
+
+---
+
+### Task 006A — sync engine source research and evidence map — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006a-sync-engine-research-zj7pmv` → target
+  `Shopify-connector`, **draft**, opened this session. **Correction (see the
+  revision entry above this one):** this PR's initial branch was created
+  from PR #122; that is a historical starting point, not this PR's current
+  base — the branch was subsequently updated against latest
+  `Shopify-connector` after PR #123 and PR #124 merged.
+- **Files created (all docs-only, per the allowed-files list):**
+  - `docs/01-research/sync-engine-source-inventory.md` — 60-source reliability-graded inventory.
+  - `docs/01-research/sync-engine-source-notes.md` — detailed source-backed notes across all required sections.
+  - `docs/01-research/sync-engine-evidence-map.md` — the 18 mandatory claims plus 6 supplementary findings, each mapped to graded evidence.
+  - `docs/05-qa/sync-engine-open-questions.md` — 39 open questions, categorized per the required section structure.
+  - `docs/05-qa/sync-engine-risk-register.md` — 7 evidence-backed risks (created; judged warranted given the volume of concurrency/performance findings).
+  - `docs/01-research/research-handoff.md` — this entry.
+- **Source categories researched:** repo code (job/log/store/credential/
+  readiness models, tests), repo governance/decision docs (DEC-005, DEC-009,
+  AR-003/AR-006 acceptance status, core-naming-schema-planning §8/§9,
+  master-blueprint-core-substrate §A.5/§I/§K.2, MBQ register, rejected-
+  approaches log), existing repo research syntheses (Shopify/Odoo official-
+  source notes), fresh official Shopify docs (cursor pagination/connections,
+  bulk operations incl. cancellation/error-handling, webhooks, idempotency —
+  re-verified 2026-07-08), fresh official Odoo 19.0 docs/source (transactions/
+  rollback/savepoints, concurrency/locking, `ir.cron` failure model — a
+  genuine prior gap), OCA `queue_job` (first full source read this project
+  has done — reference pattern only, RA-004 unchanged), and reputable
+  engineering references (Stripe idempotency, AWS Builders' Library,
+  Google SRE book, AWS SQS DLQ docs, OWASP Logging Cheat Sheet).
+- **Key high-confidence findings (corrected wording, see the revision entry
+  above this one):**
+  - The existing Tasks 001–005 substrate already provides implemented
+    primitives for several mandatory sync-engine claims — idempotency keys,
+    the operation-scope serialization guard, append-only redacted logs, and
+    store-state gating — but this does not mean the full sync engine
+    requirements are complete. Actual sync operation execution, retry
+    scheduling, checkpoint/resume, domain deduplication, and handler
+    dispatch remain unbuilt (independently corroborated by PR #124's
+    "Current gaps" section: no sync operation abstraction, no retry
+    scheduling engine, no domain-neutral handler registry for operations, no
+    checkpoint/resume model, no first-sync dedup implementation).
+  - Odoo's coding guidelines warn that PostgreSQL performance degrades when a
+    transaction uses more than 64 savepoints, so future per-record-savepoint
+    loops must treat this as a performance constraint, not a hard functional
+    cap — independently corroborated by PR #124's Odoo/repo substrate
+    research (same source, same quote), which additionally notes core
+    `create()`/`write()` do not wrap themselves in a savepoint by default;
+    savepoints are used selectively by higher-level code.
+  - Source-level review indicates this as a synthesis/inference, not a
+    directly-quoted single-source conclusion: Odoo's RPC-layer `retrying()`
+    behavior is source-confirmed for RPC/HTTP dispatch, while the reviewed
+    `ir.cron` job-processing path did not show an equivalent automatic retry
+    around each domain record-processing step. This remains a source-backed
+    inference requiring runtime proof before implementation relies on it.
+    PR #124 independently confirms the `retrying()` RPC/HTTP mechanism and
+    separately documents `ir.cron`'s own job-*acquisition* locking
+    (`_acquire_one_job`, `FOR NO KEY UPDATE SKIP LOCKED`) — a related but
+    distinct finding (job acquisition, not domain-record-processing retry)
+    that does not itself settle this inference either way.
+  - The Shopify 25,000-object pagination cap is **Liquid/Storefront-only**,
+    not Admin GraphQL — corrects an ambiguity the pre-006A baseline had left
+    open.
+  - No documented or reviewed Odoo `ir.cron` dead-letter/redrive mechanism
+    was found in the sources inspected (by this session or independently by
+    PR #124); the connector must not rely on `ir.cron` for permanent-failure
+    visibility — this repo's own job state machine is the actual
+    operator-visible failure surface.
+- **Key low-confidence/uncertain areas:**
+  - **Discrepancy, not resolved:** existing DEC-009/AR-006 research cites
+    "17" `@idempotent` mutations; this session's fresh fetch counts 16 named
+    mutations on Shopify's own (self-dated) list. Flagged for
+    re-verification, does not block core-engine research.
+  - Whether the Task-005 disconnect-cancellation sweep fully closes the race
+    against a job already `running` at the instant of disconnect —
+    unproven by any source, requires live Odoo.sh proof.
+  - Cursor-pagination resumability across a paused sync of unspecified
+    length is undocumented by Shopify.
+  - "Lite/Full" packaging has **no existing concept** in this repo beyond
+    the already-accepted per-domain-enablement-flag mechanism — flagged as
+    a genuine gap between the task's framing and current repo state.
+- **No implementation performed.** No addon file, Python, XML, CSV,
+  manifest, security, migration, CI, controller, view, wizard, OAuth, or
+  domain-sync code was created or modified. No architecture-decision file
+  (`docs/03-architecture/sync-engine-architecture-gate.md`) or
+  implementation-scope file was created. No DEC-025 was created. VAL-B2
+  remains deferred/not passed; MBQ-05 remains partially routed/open; TD-002
+  remains Open — all unmodified by this session.
+- **Learning feedback loop:**
+  - New issues discovered: the 16-vs-17 `@idempotent` mutation-count
+    discrepancy (see open-questions #4); the Liquid/Storefront-only scope
+    of the 25,000-object pagination cap (a correction, not a defect).
+  - Repeated issue patterns: none — this was a research-only session, no
+    code to regress.
+  - Rules/checklists updated: none (outside this session's allowed-files
+    scope).
+  - New rejected approaches: none — RA-004 (OCA `queue_job` not the Phase 1
+    default) checked and confirmed unchanged by this session's full source
+    read of `queue_job` (kept as reference pattern only).
+  - New technical debt: none logged by this session (research-only; any
+    future debt is for the implementation task that eventually acts on this
+    research).
+  - Architecture concerns: whether the future job-drain concurrent-
+    acquisition mechanism should reuse Odoo's `lock_for_update()`/`SKIP
+    LOCKED` pattern (open, routed to a future architecture gate, not this
+    session).
+  - Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** ChatGPT review of this Task 006A research package. If
+  accepted, a separate Task 006B architecture-gate session (not this one)
+  would be the next place any sync-engine design decision could be proposed
+  — this session proposes none.
+- **Stop condition:** docs-only research session, stopped after opening a
+  draft PR against `Shopify-connector`. No code touched. No merge performed.
+  Awaiting ChatGPT review.
+
+---
+
 ### Task 005 closure — connection lifecycle merged (PR #121) — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-005-closure-docs-s5d9mf` (docs-only closure) →
