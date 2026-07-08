@@ -2,26 +2,59 @@
 
 ## Status
 
-**Proposed, not accepted.** Prepared 2026-07-08; revised 2026-07-08 (second
-pass, same day) after ChatGPT review. Does not resolve MBQ-05. Does not pass
-VAL-B2. Does not authorize OAuth implementation, a setup wizard, or any code
-change. Requires explicit ChatGPT review and acceptance before any part of it
-becomes binding, per `CLAUDE.md` §2/§6/§8.
+**Accepted in limited scope — routing decision only.** Prepared 2026-07-08;
+revised 2026-07-08 (second pass, same day) after ChatGPT review; **accepted in
+limited scope by ChatGPT on 2026-07-08** (third pass, same day), as a
+**routing decision only** — see "Acceptance note (limited scope)" immediately
+below. This acceptance does **not** resolve MBQ-05, does **not** pass VAL-B2,
+and does **not** authorize OAuth implementation, a setup wizard, a UI, sync
+implementation, or any code change of any kind.
 
-**Revision note (second pass):** ChatGPT's review of the first version found
-one material issue — it overstated Custom Distribution as a scalable future
-MVP architecture for many unrelated customers. Official Shopify docs are
-explicit that Custom distribution is scoped to "one store or multiple stores
-on the same Plus organization using a link," while Public distribution is
-the documented route to "distribute or sell your app to many merchants
-through the Shopify App Store."
+**Acceptance note (limited scope, 2026-07-08):**
+
+- **Accepted:** the staged VAL-B2 closure plan
+  ([`../05-qa/val-b2-closure-plan.md`](../05-qa/val-b2-closure-plan.md)) as
+  the next evidence path to attempt.
+- **Accepted:** Custom Distribution / a manually-completed OAuth exchange may
+  be used **only** for one-store / same-Plus-org / private-customer /
+  VAL-B2-evidence-gathering purposes (§3.2 branch A) — nothing broader.
+- **Not accepted:** Custom Distribution as a scalable multi-customer
+  architecture. That claim is not made anywhere in this document and remains
+  explicitly withdrawn (see the second-pass revision note below, preserved
+  unchanged).
+- **Not resolved:** the final many-unrelated-customer/commercial-distribution
+  architecture (§3.2 branch B) — Public distribution, or another
+  officially-supported scalable route, remains a separate, unevaluated, gated
+  research/decision task.
+- **Not passed:** VAL-B2. This acceptance is a routing decision, not evidence
+  — VAL-B2 remains BLOCKED until the closure plan is actually executed and
+  observed to succeed.
+- **Not authorized:** OAuth implementation, a setup wizard, a UI, or sync
+  implementation of any kind.
+- **Routed as technical debt:** the `read_fulfillments` scope-naming
+  correctness concern (§5) is logged in
+  [`../05-qa/technical-debt-register.md`](../05-qa/technical-debt-register.md)
+  as TD-002, to be fixed before any customer-facing setup/readiness claim —
+  not fixed by this acceptance.
+- This acceptance is recorded in `master-blueprint-open-questions.md`'s
+  MBQ-05 row as a routing note; **MBQ-05 itself remains open, not resolved**
+  (partially routed only).
+
+**Revision note (second pass, preserved):** ChatGPT's review of the first
+version found one material issue — it overstated Custom Distribution as a
+scalable future MVP architecture for many unrelated customers. Official
+Shopify docs are explicit that Custom distribution is scoped to "one store or
+multiple stores on the same Plus organization using a link," while Public
+distribution is the documented route to "distribute or sell your app to many
+merchants through the Shopify App Store."
 (https://shopify.dev/docs/apps/launch/distribution/select-distribution-method
 — Accessible — 2026-07-08). A single vendor-owned Custom Distribution app is
 therefore **not** a general install-per-customer mechanism for many unrelated
 customer stores. §2 through §4 below are corrected accordingly, and §3.2 (the
 "later track") is narrowed to a candidate-architecture split rather than a
 single recommended architecture. This correction does not change VAL-B2's
-status, MBQ-05's status, or this document's own Proposed-not-accepted status.
+status or MBQ-05's status, and the limited acceptance above does not reopen or
+weaken it.
 
 Builds on, and does not weaken or reopen:
 [`DEC-004`](./DEC-004-distribution-api-auth-strategy.md) (accepted
@@ -134,7 +167,14 @@ session's research (full detail and citations in
 
 ## 3. Decision proposal
 
-**Proposed for ChatGPT review — a two-track approach:**
+**A two-track approach.** §3.1 (the immediate track) is **accepted in limited
+scope, as a routing decision**, per the Acceptance note above: it is the
+accepted next evidence-gathering step for VAL-B2, and its one-store/
+VAL-B2-evidence use of Custom Distribution (the same narrow scope as §3.2
+branch A) is accepted for that purpose only — **not** as a general
+architecture. §3.2's candidate-architecture split otherwise remains
+proposed/undecided: branch A is not adopted as a final MVP architecture, and
+branch B is not evaluated or adopted by this acceptance.
 
 ### 3.1 Immediate track — close VAL-B2 with zero code (evidence-gathering only)
 
@@ -303,24 +343,29 @@ the wizard.
 
 ## 8. Implications for MBQ-05
 
-- **MBQ-05 is not resolved by this document.** It remains open in
-  `master-blueprint-open-questions.md`, exactly as DEC-021 already states.
-- If ChatGPT accepts this proposal, MBQ-05's register row should be updated to
-  reflect: (a) the "who owns the app" token-flow clarification (§2) is now the
-  accepted framing for the **one-store/branch-A** evidence scope only — it is
-  **not** an accepted framing for many-unrelated-customer distribution
-  (branch B, unresolved, §3.2); (b) the exact vendor-organization
-  registration, hosting, and wizard mechanics remain open, routed as
-  task-spec detail per the existing MBQ-register convention (`TASK`/`SLICE`
-  routing, matching how MBQ-05 was already routed by the 2026-07-05 final-MBQ
-  closure plan); (c) branch B's Public-distribution-or-other-route evaluation
-  remains a separate, unscoped, open item; (d) VAL-B2 must still separately
-  pass before any customer-facing "connected" claim, unchanged from DEC-021
-  §4's fail-closed requirement.
-- **This document does not edit `master-blueprint-open-questions.md`** — that
-  file is outside this session's allowed-files list. Any register update is
-  for ChatGPT/a future session to apply, exactly as `credential-connection-api-client-planning.md`'s
-  own acceptance pattern (AR-024) did.
+- **MBQ-05 is not resolved by this document, and is not resolved by this
+  acceptance.** It remains **open** in `master-blueprint-open-questions.md`
+  — this acceptance is a **limited routing decision**, recorded as a new
+  milestone note on the MBQ-05 row, not a resolution.
+- **MBQ-05's register row is updated by this same session** (the routing
+  acceptance below applies to that file directly, since it is an allowed file
+  for this revision) to reflect: (a) the "who owns the app" token-flow
+  clarification (§2) is now the accepted framing for the
+  **one-store/branch-A** evidence scope only — it is **not** an accepted
+  framing for many-unrelated-customer distribution (branch B, unresolved,
+  §3.2); (b) the staged VAL-B2 closure plan is accepted as the next evidence
+  path; (c) the exact vendor-organization registration, hosting, and wizard
+  mechanics remain open, routed as task-spec detail per the existing
+  MBQ-register convention (`TASK`/`SLICE` routing, matching how MBQ-05 was
+  already routed by the 2026-07-05 final-MBQ closure plan); (d) branch B's
+  Public-distribution-or-other-route evaluation remains a separate,
+  unscoped, open item; (e) VAL-B2 must still separately pass, with live
+  execution evidence, before any customer-facing "connected" claim,
+  unchanged from DEC-021 §4's fail-closed requirement.
+- **This acceptance does not mark MBQ-05 `Resolved`.** The register row's own
+  status language reads "partially routed / open," matching this document's
+  own limited-scope acceptance — see
+  [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md).
 
 ## 9. Explicit non-claims
 
@@ -348,9 +393,11 @@ This document does not:
 
 ## 10. Rollback / revisit triggers
 
-- **Rollback:** revert this docs PR. The project returns to the pre-existing
-  state: VAL-B2 BLOCKED per DEC-021, MBQ-05 open per its current register row,
-  no code/schema/runtime effect of any kind (this proposal touches Markdown
+- **Rollback:** revert this docs PR (and, for this acceptance specifically,
+  the companion routing patch that updated the MBQ-05 register row and added
+  TD-002). The project returns to the pre-existing state: VAL-B2 BLOCKED per
+  DEC-021, MBQ-05 open per its prior register row, no code/schema/runtime
+  effect of any kind (this proposal and its acceptance touch Markdown
   documentation only).
 - **Revisit if:** (a) the §3.1 immediate-track attempt is actually run and
   either succeeds or fails — either outcome should be recorded and may change

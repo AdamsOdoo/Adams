@@ -1,5 +1,61 @@
 # Research Handoff (rolling)
 
+### DEC-023 Limited Acceptance / MBQ-05 Routing — compact handoff (2026-07-08)
+
+- **Branch / PR:** new branch off latest `origin/Shopify-connector` (which
+  includes PR #117's merge commit
+  `1436ca8efbb9daca1766d5c1774e1ced40869079`) → **draft** PR into
+  `Shopify-connector` (this session's PR; not merged).
+- **Files changed:** `docs/04-decisions/DEC-023-token-acquisition-and-val-b2.md`,
+  `docs/03-architecture/master-blueprint-open-questions.md`,
+  `docs/05-qa/technical-debt-register.md`,
+  `docs/01-research/research-handoff.md` (this entry). **No `addons/` file, no
+  Python/XML/CSV/manifest/security/test/migration/CI file touched. No code
+  changed.**
+- **What changed:** records ChatGPT's **limited acceptance of DEC-023 as a
+  routing decision only** — accepted: the staged VAL-B2 closure plan as the
+  next evidence path, and Custom Distribution/manual-OAuth use restricted to
+  one-store / same-Plus-org / private-customer / VAL-B2-evidence-gathering
+  purposes only. Not accepted: Custom Distribution as a scalable
+  multi-customer architecture. Not resolved: the many-unrelated-customer
+  commercial-distribution architecture (Public distribution or another
+  official scalable route remains a separate, gated research/decision task).
+  MBQ-05's register row is updated with this same routing note (status:
+  "Partially routed / Open"), preserving its full prior history. The
+  `read_fulfillments` correctness concern is logged as **TD-002** in the
+  technical debt register (Open, Medium severity) — not fixed.
+- **DEC-023 status:** changed from "Proposed, not accepted" to **"Accepted in
+  limited scope — routing decision only."** This is not a full acceptance of
+  a final token-acquisition strategy.
+- **VAL-B2 still deferred/not passed.** This acceptance is a routing
+  decision, not evidence — no live Shopify connection was attempted; VAL-B2
+  remains BLOCKED per `task-003-validation-results.md` and DEC-021's
+  deferral is unchanged.
+- **MBQ-05 partially routed but still open/not fully resolved.** The register
+  row is explicitly **not** marked `Resolved` — it carries a new "Partially
+  routed / Open" status note alongside its preserved history.
+- **No OAuth, no setup wizard, no UI, no sync implementation** — none exist in
+  this PR's scope, and none were added by this docs session.
+- **Learning feedback loop:** No new defect pattern in shipped code beyond the
+  already-flagged `read_fulfillments` concern, now formally logged as TD-002
+  (new technical debt this session). No new rejected approach — this session
+  does not adopt Custom Distribution as a scalable architecture, consistent
+  with the existing `rejected-approaches-log.md` (RA-003) revisit condition.
+- **Quality gate confirmation:** handoff updated · feedback loop checked ·
+  learning captured · rejected approach logged (n/a, none reintroduced) ·
+  technical debt logged (TD-002, new) · repeated-issue escalation applied
+  (n/a) — all YES.
+- **Recommended next control-room step:** ChatGPT review of this routing
+  patch; separately, authorize a future session with real Shopify Partner/Dev
+  Dashboard access to execute `val-b2-closure-plan.md`, and/or authorize a
+  dedicated research/decision task for DEC-023 §3.2 branch B (scalable
+  many-unrelated-customer distribution).
+- **Stop condition:** stopped at the scoped boundary — docs-only session;
+  exactly the 4 allowed files touched, no new file created; no code, test,
+  manifest, security, XML, CSV, migration, or CI file touched; VAL-B2 remains
+  deferred, not passed; MBQ-05 remains open (partially routed), not fully
+  resolved; no OAuth/setup wizard/UI/sync implementation.
+
 ### Token Acquisition / VAL-B2 / MBQ-05 Closure-Path Proposal — revision (second pass) — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/token-acquisition-val-b2-5zi8bg`, same branch as
