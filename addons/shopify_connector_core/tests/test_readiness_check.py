@@ -291,3 +291,133 @@ class TestReadinessCheck(TransactionCase):
                     value = rec[field_name]
                     if value:
                         self.assertNotIn(DUMMY_TOKEN, value)
+
+    # ------------------------------------------------------------------
+    # 13. Required scopes: must validate the accepted MVP scope set
+    # (REQUIRED_MVP_SCOPES), not merely a non-empty list.
+    # ------------------------------------------------------------------
+
+    def _scopes_json(self, scopes):
+        return json.dumps(list(scopes))
+
+    def test_required_scopes_all_present_passes(self):
+        self.store.write({
+            'granted_scopes': self._scopes_json(
+                self.ReadinessCheck.REQUIRED_MVP_SCOPES
+            ),
+        })
+        check = self.ReadinessCheck._check_required_scopes(self.store)
+        self.assertEqual(check['result'], 'pass')
+
+    def test_required_scopes_missing_one_fails_and_identifies_it(self):
+        scopes = list(self.ReadinessCheck.REQUIRED_MVP_SCOPES)
+        missing_scope = scopes.pop()
+        self.store.write({'granted_scopes': self._scopes_json(scopes)})
+        check = self.ReadinessCheck._check_required_scopes(self.store)
+        self.assertEqual(check['result'], 'fail')
+        self.assertNotEqual(check['result'], 'pass')
+        self.assertIn(missing_scope, check['reason'])
+
+    def test_required_scopes_extra_scope_still_passes(self):
+        scopes = list(self.ReadinessCheck.REQUIRED_MVP_SCOPES) + [
+            'read_draft_orders',
+        ]
+        self.store.write({'granted_scopes': self._scopes_json(scopes)})
+        check = self.ReadinessCheck._check_required_scopes(self.store)
+        self.assertEqual(check['result'], 'pass')
+
+    def test_required_scopes_single_scope_is_not_enough(self):
+        # A non-empty snapshot missing most required scopes must not
+        # pass -- this is the exact defect ChatGPT review found: any
+        # non-empty list used to pass.
+        self.store.write({
+            'granted_scopes': json.dumps(['read_products']),
+        })
+        check = self.ReadinessCheck._check_required_scopes(self.store)
+        self.assertEqual(check['result'], 'fail')
+
+    def test_required_scopes_malformed_json_not_proven(self):
+        self.store.write({'granted_scopes': 'not-valid-json'})
+        check = self.ReadinessCheck._check_required_scopes(self.store)
+        self.assertEqual(check['result'], 'not_proven')
+
+    def test_required_scopes_empty_list_not_proven(self):
+        self.store.write({'granted_scopes': json.dumps([])})
+        check = self.ReadinessCheck._check_required_scopes(self.store)
+        self.assertEqual(check['result'], 'not_proven')
+
+    def test_required_scopes_absent_not_proven(self):
+        self.assertFalse(self.store.granted_scopes)
+        check = self.ReadinessCheck._check_required_scopes(self.store)
+        self.assertEqual(check['result'], 'not_proven')
+
+    # ------------------------------------------------------------------
+    # 14. Domain flag enablement: must pass only when at least one
+    # accepted domain flag is True, not merely because a settings record
+    # exists.
+    # ------------------------------------------------------------------
+
+    def _create_settings(self, **flags):
+        return self.env['shopify.connector.store.settings'].create({
+            'store_id': self.store.id,
+            **flags,
+        })
+
+    def test_domain_flag_no_settings_record_not_proven(self):
+        settings = self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', self.store.id)]
+        )
+        self.assertFalse(settings)
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['result'], 'not_proven')
+
+    def test_domain_flag_settings_with_all_flags_false_does_not_pass(self):
+        # This is the exact defect ChatGPT review found: a settings
+        # record's mere existence used to pass, even with every domain
+        # flag False (i.e., no sync domain would actually run).
+        self._create_settings()
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['result'], 'fail')
+        self.assertNotEqual(check['result'], 'pass')
+        self.assertIn('No sync domain is enabled', check['reason'])
+
+    def test_domain_flag_notification_default_alone_does_not_pass(self):
+        # notification_default_enabled is not one of the four accepted
+        # sync-domain flags and must never cause a pass by itself.
+        self._create_settings(notification_default_enabled=True)
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertNotEqual(check['result'], 'pass')
+
+    def test_domain_flag_product_domain_enabled_passes(self):
+        self._create_settings(product_domain_enabled=True)
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['result'], 'pass')
+
+    def test_domain_flag_sale_domain_enabled_passes(self):
+        self._create_settings(sale_domain_enabled=True)
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['result'], 'pass')
+
+    def test_domain_flag_inventory_domain_enabled_passes(self):
+        self._create_settings(inventory_domain_enabled=True)
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['result'], 'pass')
+
+    def test_domain_flag_fulfillment_domain_enabled_passes(self):
+        self._create_settings(fulfillment_domain_enabled=True)
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['result'], 'pass')

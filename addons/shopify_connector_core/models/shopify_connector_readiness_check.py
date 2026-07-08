@@ -46,6 +46,31 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
     # the overall summary 'fail' (fail-closed; never inferred as a pass).
     RESULT_NOT_PROVEN = 'not_proven'
 
+    # The accepted Phase 1 MVP scope set (DEC-003/DEC-007 domain scope --
+    # product, customer, order, inventory, location, fulfillment reads).
+    # Extra granted scopes beyond this set are allowed; every one of
+    # these must be present for the required-scopes check to pass.
+    REQUIRED_MVP_SCOPES = (
+        'read_products',
+        'read_customers',
+        'read_orders',
+        'read_inventory',
+        'read_locations',
+        'read_fulfillments',
+    )
+
+    # The four DEC-008 domain-module flags on
+    # `shopify.connector.store.settings` -- readiness requires at least
+    # one to be True; `notification_default_enabled` and any other
+    # settings field is not a sync-domain flag and must never cause a
+    # pass by itself.
+    ACCEPTED_DOMAIN_FLAGS = (
+        'product_domain_enabled',
+        'sale_domain_enabled',
+        'inventory_domain_enabled',
+        'fulfillment_domain_enabled',
+    )
+
     # ------------------------------------------------------------------
     # Public entry point
     # ------------------------------------------------------------------
@@ -194,7 +219,13 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
 
     @api.model
     def _check_required_scopes(self, store):
-        """Reads `store.granted_scopes` only -- no live Shopify call."""
+        """Reads `store.granted_scopes` only -- no live Shopify call.
+
+        Passes only when every scope in `self.REQUIRED_MVP_SCOPES` is
+        present in the stored snapshot -- extra granted scopes are
+        allowed, but a non-empty snapshot missing even one required
+        scope must not pass.
+        """
         code = 'required_scopes'
         if not store.granted_scopes:
             return self._check_result(
@@ -213,9 +244,21 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
                 code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
                 'Stored granted-scopes snapshot is empty or malformed.',
             )
+        granted = set(scopes)
+        missing = [
+            scope for scope in self.REQUIRED_MVP_SCOPES
+            if scope not in granted
+        ]
+        if missing:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_FAIL,
+                'Missing required scope(s): %s.' % ', '.join(missing),
+            )
         return self._check_result(
             code, self.ESSENTIAL, self.RESULT_PASS,
-            'Granted-scopes snapshot recorded: %d scope(s).' % len(scopes),
+            'All required scopes are granted (%d scope(s) recorded).' % (
+                len(scopes),
+            ),
         )
 
     @api.model
@@ -310,25 +353,34 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
 
     @api.model
     def _check_domain_flag_enablement(self, store):
-        """Reads `shopify.connector.store.settings` presence only.
+        """Reads `shopify.connector.store.settings` only -- no write, no
+        domain-module dependency.
 
-        No per-flag "explicitly set" tracking exists on the settings
-        model (every domain flag defaults to False), so the only safe,
-        non-inferred signal available at core level is whether an
-        explicit settings record exists for this store at all.
+        Passes only when at least one of `self.ACCEPTED_DOMAIN_FLAGS` is
+        True on the store's settings record -- a settings record simply
+        existing with every domain flag False means no sync domain would
+        actually run, so that state must not pass. Any other settings
+        field (e.g. `notification_default_enabled`) is not a sync-domain
+        flag and never contributes to this check.
         """
         code = 'domain_flag_enablement'
         settings = self.env['shopify.connector.store.settings'].search(
             [('store_id', '=', store.id)], limit=1,
         )
-        if settings:
+        if not settings:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
+                'No store-settings record exists yet -- domain enablement '
+                'has not been configured.',
+            )
+        if any(
+            getattr(settings, flag) for flag in self.ACCEPTED_DOMAIN_FLAGS
+        ):
             return self._check_result(
                 code, self.ESSENTIAL, self.RESULT_PASS,
-                'Store-settings record exists; domain enablement is '
-                'explicitly configured.',
+                'At least one sync domain is enabled.',
             )
         return self._check_result(
-            code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
-            'No store-settings record exists yet -- domain enablement '
-            'has not been configured.',
+            code, self.ESSENTIAL, self.RESULT_FAIL,
+            'No sync domain is enabled.',
         )

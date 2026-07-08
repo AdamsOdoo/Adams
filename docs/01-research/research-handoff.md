@@ -12,6 +12,66 @@
   (`0848b8cde5720162b795936161e884678ae52c71`), and 6-file allowed-files
   diff were independently re-verified against `origin/Shopify-connector`
   before this branch was created.
+- **Revision (ChatGPT review, same PR, 2026-07-07).** ChatGPT's review of
+  PR #115 found two correctness issues and returned it for a targeted
+  fix, not acceptance:
+  1. `_check_required_scopes()` previously passed on **any non-empty**
+     `granted_scopes` JSON list (e.g. a single `read_products` scope
+     alone was enough) — it did not verify the actual scopes needed for
+     Phase 1. **Fixed:** a new `REQUIRED_MVP_SCOPES` constant (the six
+     Phase-1 read scopes — `read_products`, `read_customers`,
+     `read_orders`, `read_inventory`, `read_locations`,
+     `read_fulfillments`) is now checked; the result is `fail` (not
+     `not_proven`) with a reason naming every missing scope if one or
+     more required scopes is absent, `pass` only when all six are
+     present (extra granted scopes are still allowed), and unchanged
+     `not_proven` behavior for an absent/malformed/empty snapshot.
+  2. `_check_domain_flag_enablement()` previously passed merely because
+     a `shopify.connector.store.settings` record **existed** for the
+     store, even if every domain flag on it was `False` (i.e., no sync
+     domain would actually run). **Fixed:** a new
+     `ACCEPTED_DOMAIN_FLAGS` constant (the four DEC-008 domain flags)
+     is now checked; the result is `fail` with the reason "No sync
+     domain is enabled." when a settings record exists but every
+     accepted flag is `False` (confirmed `notification_default_enabled`
+     alone still does not pass, since it is not one of the four
+     accepted flags), `pass` only when at least one accepted flag is
+     `True`, and unchanged `not_proven` behavior when no settings
+     record exists at all.
+  - Both fixes stayed inside
+    `addons/shopify_connector_core/models/shopify_connector_readiness_check.py`
+    — no forbidden file was touched, no new file was needed.
+  - **Tests added/updated:** 14 new test methods in
+    `test_readiness_check.py` (7 for the required-scopes fix — all
+    required present passes; missing one fails and names it; extra
+    scope still passes; a single scope is not enough; malformed JSON /
+    empty list / absent snapshot are all `not_proven`; and 7 for the
+    domain-flag fix — no settings record is `not_proven`; all-flags-False
+    is `fail`, not `pass`; `notification_default_enabled` alone does not
+    pass; each of the four accepted flags passes on its own). Every
+    pre-existing test — the TD-001 regression pair, the aggregation
+    unit tests, the credential/VAL-B2 tests, the payload-snapshot/
+    mirror/seam/read-only/redaction tests, and both AST-level structural
+    scans — is unchanged and still present. Test-method count:
+    **17 → 31** (this corrects a stale count: the prior handoff entry
+    said "20," which was already inaccurate against the actual
+    17-method file committed at PR-open time — confirmed by
+    `git show HEAD:...test_readiness_check.py \| grep -c 'def test_'`
+    before writing this note).
+  - **Tests run this revision:** `python3 -m py_compile` on both
+    changed files (pass); the same throwaway, uncommitted dry-run
+    harness used in the original session (updated to match the new
+    scope/flag semantics) — 50/50 assertions pass, zero defects in the
+    model file itself; both AST-level structural regression checks
+    manually replayed and still pass (2 `sudo()` sites, unchanged; zero
+    mutating calls in any `_check_*` method). No Odoo/PostgreSQL
+    runtime is available in this environment (same as the original
+    session), so the live `TransactionCase` suite was still not
+    executed — stated honestly, not silently skipped.
+  - VAL-B2 remains deferred, not passed; MBQ-05 remains deferred for
+    Task 004 only, not resolved; TD-001's fix and regression test are
+    unchanged and intact; no OAuth/setup-wizard/UI/lifecycle/domain-sync
+    work was added. PR #115 remains **draft** and **unmerged**.
 - **Task 004 implementation summary.** Implemented the readiness-check
   substrate for `shopify_connector_core` exactly per the finalized
   [`task-004-final-implementation-prompt.md`](../07-implementation-plan/task-004-final-implementation-prompt.md)
@@ -83,7 +143,9 @@
   (pass, no syntax errors). **No Odoo runtime or PostgreSQL is installed
   in this execution environment** (`python3 -c "import odoo"` fails;
   no `odoo-bin`; no `pyflakes`/`flake8`/`pylint` available either), so
-  the 20 `TransactionCase` tests in `test_readiness_check.py` were
+  the 17 `TransactionCase` tests in `test_readiness_check.py` (the count
+  at PR-open time — see the revision note above for the corrected count
+  after this same PR's later revision) were
   **not** executed against a live Odoo registry — mirroring the Task
   001A precedent, this is stated honestly, not silently skipped or
   claimed as run. As additional, stronger-than-`py_compile` diligence
@@ -115,10 +177,11 @@
   call, unrelated to this task's own mirror fields) — corrected by also
   excluding `write_date`/`write_uid` before this PR was opened.
 - **Tests not run and why:** the full `test_readiness_check.py` suite
-  (20 test methods) and the two pre-existing test files that share the
-  `models/` directory scan were not executed as live Odoo
-  `TransactionCase` runs — no Odoo/PostgreSQL runtime exists in this
-  container. `docs/05-qa/task-004-manual-validation-checklist.md`
+  (17 test methods at PR-open time; 31 after this same PR's later
+  ChatGPT-review revision — see the revision note above) and the two
+  pre-existing test files that share the `models/` directory scan were
+  not executed as live Odoo `TransactionCase` runs — no Odoo/PostgreSQL
+  runtime exists in this container. `docs/05-qa/task-004-manual-validation-checklist.md`
   (already prepared by the PR #114 gate-acceptance session) remains the
   mandatory live-validation evidence for a future session with a real
   Odoo instance, per that document's own preconditions.
