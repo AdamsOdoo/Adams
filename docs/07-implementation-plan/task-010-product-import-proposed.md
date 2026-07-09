@@ -327,3 +327,50 @@ above, and does not authorize any implementation of any kind. Task 010
 still needs a future final implementation prompt that fixes exact
 file/allowed/forbidden lists and dedup thresholds, using the now-accepted
 names above.
+
+## Task 010 final prompt drafted — not issued
+
+**Added 2026-07-09, docs-only. Proposed only. Does not authorize
+implementation.**
+
+A file-exact final implementation prompt,
+[`task-010-product-import-final-implementation-prompt.md`](./task-010-product-import-final-implementation-prompt.md),
+and a product-domain gate-opening proposal,
+[`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md),
+have now been drafted, converting the accepted MBQ-55 names above into
+exact allowed/forbidden files, exact schema, and exact dedup thresholds.
+
+**The prompt is not issued.** It carries its own header stating it must
+not be used until ChatGPT accepts the gate-opening proposal and explicitly
+issues it in a new chat turn. **Task 010 implementation remains
+unauthorized.** **The product-domain gate, and the Task 010 gate, both
+remain closed** — this note does not open either, does not change this
+task's Status/Preconditions sections above, and does not authorize any
+code, module, model, view, controller, security, manifest, test, or CI
+file.
+
+**Revision (2026-07-09, PR #137 control-room review, comment ID
+`4925370944`):** ChatGPT required revision before merge; the final prompt
+was revised for manifest-dependency, field-type, model-declaration, and
+product-domain-gating precision (see the final prompt's own revision
+note). Still not issued; Task 010 still unauthorized; both gates still
+closed.
+
+**Acceptance (2026-07-09, PR #137 control-room review, comment ID
+`4926437491`):** ChatGPT accepted PR #137's content, including the
+gate-opening proposal. **The product-domain gate named in this document's
+own Preconditions section above is now opened — for exactly one future
+implementation session, Task 010 only — effective once PR #137 merges
+into `Shopify-connector`.** The gate closes again the moment the future
+Task 010 implementation PR is opened as draft; that future PR must remain
+draft until ChatGPT separately reviews it. **The final prompt is now
+Accepted final prompt / Not issued — its content is fixed as binding, but
+it is still not issued.** Task 010 implementation still cannot begin
+until, in order: (1) PR #137 merges; (2) ChatGPT explicitly pastes/issues
+the final prompt, verbatim, into a new Claude Code session, as its own
+later chat turn. **No other work is authorized** — not Task 011/012/
+013/014, Task 015, any UI, webhook, OAuth, or Lite/Full packaging. This
+note does not itself change this document's own Status/Preconditions
+sections above (which predate and are superseded in effect, not in text,
+by this linkage record), and does not authorize any code, module, model,
+view, controller, security, manifest, test, or CI file.
