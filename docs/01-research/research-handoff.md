@@ -5,7 +5,7 @@
 - **Branch / PR:** `claude/task-010-product-import-gate-0uh7g4`, base
   `Shopify-connector` (tip `431b4bf`, the PR #137 merge commit —
   confirmed current at session start, no drift to re-verify); PR
-  **#TBD-FILLED-ON-OPEN** → `Shopify-connector`, **draft, unmerged.**
+  **#138** → `Shopify-connector`, **draft, unmerged.**
 - **What happened:** ChatGPT issued the accepted Task 010 final
   implementation prompt verbatim, opening the product-domain
   implementation gate for exactly this one session (per
@@ -118,7 +118,7 @@
 **Next-session prompt (exact, for after ChatGPT's review):**
 
 ```text
-ChatGPT reviews draft PR <PR#> (Task 010 product import/variant binding
+ChatGPT reviews draft PR #138 (Task 010 product import/variant binding
 implementation) against docs/07-implementation-plan/task-010-product-
 import-final-implementation-prompt.md §3-§14,
 docs/05-qa/architecture-review-log.md AR-036, and
