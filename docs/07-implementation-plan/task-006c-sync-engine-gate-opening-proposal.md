@@ -1,41 +1,66 @@
 # Task 006C — Sync Engine Skeleton Gate-Opening Proposal
 
-> **Status: Proposed for ChatGPT gate-opening review. Does not open the
-> Task 006C implementation gate yet.** This document proposes opening the
-> Task 006C coding gate **only after** (a) ChatGPT accepts this proposal,
-> (b) ChatGPT accepts the companion gate document
-> ([`task-006c-sync-engine-skeleton-gate.md`](./task-006c-sync-engine-skeleton-gate.md)),
-> and (c) this PR (or its accepted revision) merges into
-> `Shopify-connector`. **Implementation is still NOT authorized by this
-> document by itself** — not as a draft, not under review, and not even
-> immediately after its own acceptance and merge, taken alone. Opening the
-> gate additionally
-> requires ChatGPT to separately paste
+> **Status: Accepted by ChatGPT (2026-07-09). Gate opens only after this
+> PR merges into `Shopify-connector` and the final implementation prompt
+> is separately issued.** ChatGPT accepted this proposal — including the
+> six proposed gate-opening decisions (§6) — via control-room review
+> (GitHub review artifact/comment ID `4658949628`, PR #130).
+> **Acceptance does not, by itself, open the Task 006C implementation
+> gate.** The gate becomes effective only once (a) this PR (or its
+> accepted revision) merges into `Shopify-connector`, and (b) ChatGPT
+> separately pastes
 > [`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md)
 > in chat, as its own turn, in a new Claude Code session, per `CLAUDE.md`
-> §5/§9. Mirrors the
+> §5/§9 — **neither has happened yet.** **Implementation is still NOT
+> authorized by this acceptance** — not now, not immediately after this
+> PR merges, and not until that separate prompt-issuance act occurs, with
+> the merge-commit SHA filled in. Mirrors the
 > [`task-004-gate-opening-proposal.md`](./task-004-gate-opening-proposal.md) →
 > [`task-004-readiness-check-substrate-gate.md`](./task-004-readiness-check-substrate-gate.md)
 > and
 > [`task-002-gate-opening-proposal.md`](./task-002-gate-opening-proposal.md) →
 > [`task-002-credential-storage-gate.md`](./task-002-credential-storage-gate.md)
-> precedent — a **proposal** document (this file), a paired **gate**
-> document
-> ([`task-006c-sync-engine-skeleton-gate.md`](./task-006c-sync-engine-skeleton-gate.md)),
-> and a companion **final prompt**
-> ([`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md)).
-> **Nothing in this document is a Decision** (`CLAUDE.md` §8) until
-> ChatGPT accepts it — every proposed answer below is labelled
-> **[Recommendation]**, not **[Decision]**.
+> precedent — a **proposal** document (this file, now accepted), a paired
+> **gate** document
+> ([`task-006c-sync-engine-skeleton-gate.md`](./task-006c-sync-engine-skeleton-gate.md),
+> also accepted by this same review), and a companion **final prompt**
+> ([`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md),
+> accepted but **not issued**).
 
-**Session note (Task 006D, 2026-07-09):** this revision turns the prior,
-general Task 006C gate-opening proposal into a concrete proposed
-gate-opening decision package, answering — as recommendations, not
-decisions — the six open implementation choices the accepted
+## Acceptance note (2026-07-09)
+
+- **ChatGPT accepted the six proposed gate-opening choices** (Decisions
+  A–F in §6 below), via control-room review (GitHub review
+  artifact/comment ID `4658949628`, PR #130).
+- **This accepts the gate-opening proposal only** — the document you are
+  reading. The companion gate document and final prompt carry their own,
+  separately recorded acceptance-status updates (same review) — this note
+  does not restate or supersede those.
+- **This does not start implementation.** No addon file, Python, XML,
+  CSV, manifest, security, migration, CI/workflow, controller, view,
+  wizard, OAuth, or domain-sync code is created, modified, or implied by
+  this acceptance.
+- **This does not issue the final prompt.**
+  [`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md)
+  is now **Accepted final prompt / Not issued** — accepted, but still not
+  issued, still not to be pasted/run.
+- **This does not fill the merge-commit-SHA placeholder**
+  (`<TASK_006D_GATE_MERGE_COMMIT_SHA>`) — this PR has not merged, so that
+  value cannot be known yet.
+- **Implementation still requires this PR to merge into
+  `Shopify-connector` and ChatGPT to separately paste the finalized
+  implementation prompt in a new Claude Code session**, with the actual
+  merge-commit SHA filled in — neither has happened yet.
+
+**Session note (Task 006D, 2026-07-08/09):** this document was revised
+2026-07-09 to turn the prior, general Task 006C gate-opening proposal
+into a concrete proposed gate-opening decision package, answering — as
+recommendations — the six open implementation choices the accepted
 implementation-scope package (PR #129, accepted 2026-07-08 as a
-planning/scope package only) and the still-**Draft-only** final prompt
-both left for a future, separate ChatGPT act. See "Proposed gate-opening
-decisions" (§6) below.
+planning/scope package only) left for a future, separate ChatGPT act (see
+"Proposed gate-opening decisions", §6). That same-day control-room review
+(GitHub review artifact/comment ID `4658949628`) then accepted this
+proposal — see the Acceptance note immediately above.
 
 ---
 
@@ -223,16 +248,17 @@ do **not**:
 - Fill the final prompt's merge-commit-SHA placeholder — this PR has not
   merged, so that value cannot be known (§9).
 
-## 6. Proposed gate-opening decisions
+## 6. Proposed gate-opening decisions — Accepted 2026-07-09
 
-**Each decision below is a [Recommendation] for ChatGPT's gate-opening
-review, not a [Decision].** These are the exact six items the accepted
+**Each decision below was proposed as a [Recommendation] and is now
+[Accepted by ChatGPT] (2026-07-09, review artifact/comment ID
+`4658949628`, PR #130)** — these are the exact six items the accepted
 implementation-scope document's §F and this proposal's prior §6 named as
-"candidate requiring ChatGPT approval" or "requiring confirmation." This
-section replaces the prior revision's "What ChatGPT's gate-opening act
-would need to fix" — instead of only listing the open items, it proposes
-a concrete answer for each, for ChatGPT to accept, revise, or reject in
-the companion gate document.
+"candidate requiring ChatGPT approval" or "requiring confirmation."
+**Acceptance of these six choices is the accepted basis for the future
+Task 006C implementation prompt; it does not, by itself, open the
+implementation gate or authorize any code** — the gate still requires
+this PR to merge and the final prompt to be separately issued (§9).
 
 ### Decision A — execution-time claim/concurrency mechanism
 
@@ -446,23 +472,30 @@ precedent.
 ## 9. Gate-opening and gate-closing conditions
 
 **Exact condition for the gate to open** — **all** of the following must
-be true; none is satisfied by this document alone:
+be true; conditions 1–2 are now satisfied by this acceptance patch,
+conditions 3–4 are not:
 
-1. ChatGPT accepts this gate-opening proposal (including any revision
-   ChatGPT requires).
-2. ChatGPT accepts the companion gate document
-   ([`task-006c-sync-engine-skeleton-gate.md`](./task-006c-sync-engine-skeleton-gate.md)).
-3. This PR (or its accepted revision) merges into `Shopify-connector`.
-4. ChatGPT separately issues the final implementation prompt
+1. ~~ChatGPT accepts this gate-opening proposal (including any revision
+   ChatGPT requires).~~ **Satisfied 2026-07-09** — accepted via
+   control-room review (GitHub review artifact/comment ID `4658949628`,
+   PR #130).
+2. ~~ChatGPT accepts the companion gate document
+   ([`task-006c-sync-engine-skeleton-gate.md`](./task-006c-sync-engine-skeleton-gate.md)).~~
+   **Satisfied 2026-07-09** — accepted by the same review, recorded in
+   that document's own acceptance-status update.
+3. **This PR (or its accepted revision) merges into `Shopify-connector`.**
+   **Not yet satisfied** — PR #130 remains open/draft/unmerged as of this
+   patch.
+4. **ChatGPT separately issues the final implementation prompt**
    ([`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md))
    **in chat, as its own turn, in a new Claude Code session** — pasting it
    verbatim, with its merge-commit-SHA placeholder filled in from
-   condition 3's actual merge commit. Acceptance of conditions 1–3 does
-   not, by itself, constitute issuing that prompt.
+   condition 3's actual merge commit. **Not yet satisfied.** Acceptance of
+   conditions 1–3 does not, by itself, constitute issuing that prompt.
 
-**No implementation is authorized by this document.** No Task 006C
-implementation gate is opened by this document. This document does not
-claim any of the four conditions above is satisfied.
+**No implementation is authorized by this document, and no implementation
+gate is opened by this acceptance patch.** This document does not claim
+conditions 3 or 4 above are satisfied — only conditions 1 and 2.
 
 **Exact condition for the gate to close (once opened):** the gate closes
 again the moment the future Task 006C implementation PR this gate

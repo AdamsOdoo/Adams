@@ -263,42 +263,54 @@
 
 ## 18. Architecture-review-log handling
 
-- [ ] Confirm whether
+- [x] Confirm whether
       [`architecture-review-log.md`](./architecture-review-log.md) was
       modified by this session, and whether a new AR row was added.
-      **Expected, per this repo's own convention** (confirmed this
-      session by inspecting the AR-026/AR-029 "Gate-Opening Note" rows
-      for the Task 002/Task 003 implementation gates): a gate-opening act
-      of this kind **is** recorded as its own AR row — so a new row
-      (AR-031, immediately following AR-030) should exist, with **Status:
-      Proposed**, not Accepted, mirroring how AR-026/AR-029 were first
-      drafted as part of their own gate-opening PRs before ChatGPT's
+      **Confirmed, per this repo's own convention** (confirmed by
+      inspecting the AR-026/AR-029 "Gate-Opening Note" rows for the Task
+      002/Task 003 implementation gates): AR-031 exists (immediately
+      following AR-030). **Status updated to Accepted by this
+      acceptance-status patch (2026-07-09)**, mirroring how AR-025/AR-027
+      moved from Proposed to Accepted upon ChatGPT's decision-closure
+      review, and how AR-026/AR-029 record their own gate-opening
       acceptance.
-- [ ] If an AR row was added, confirm it is not marked Accepted by this
-      session — only ChatGPT's own review can move it to Accepted.
-- [ ] If the session's final report instead explains a decision **not**
-      to add an AR row, confirm that explanation directly addresses the
-      AR-026/AR-029 precedent rather than silently diverging from it.
+- [x] AR-031's Status is now **Accepted** — this reflects ChatGPT's actual
+      acceptance of this package (2026-07-09, review artifact/comment ID
+      `4658949628`, PR #130), not a self-granted status.
+- [ ] _(Not applicable — an AR row was added and is being accepted, not
+      omitted.)_
 
-## 19. Overall review decision (ChatGPT to complete)
+## 19. Overall review decision — Accepted (2026-07-09)
 
-- [ ] **Overall decision:** _______ (Accept as proposed / Accept with
-      revisions / Revise / Reject)
-- [ ] **If revisions are required, list them:** _______
-- [ ] **Confirm before accepting:** none of VAL-B2, MBQ-05, TD-002, the
-      fulfillment API model, product first-sync dedup, token
-      acquisition, Lite/Full packaging, checkpoint/resume ownership, or
-      the multi-server runtime concurrency proof requirement is silently
-      resolved by accepting this package.
-- [ ] **Confirm before accepting:** accepting this package does **not**,
+- [x] **Overall decision: Accepted.** ChatGPT accepted PR #130 content-wise
+      via control-room review (GitHub review artifact/comment ID
+      `4658949628`) on 2026-07-09. **The six proposed choices (Decisions
+      A–F) are accepted as the Task 006C implementation basis.** The
+      gate-opening proposal is accepted. The companion gate document is
+      accepted. The final prompt is accepted but **not issued** — its
+      merge-commit-SHA placeholder (`<TASK_006D_GATE_MERGE_COMMIT_SHA>`)
+      remains unresolved, since PR #130 has not merged.
+- [x] **No revisions required.** This acceptance patch applies a clean
+      "accepted" outcome across the gate-opening proposal, the gate
+      document, the final prompt, and AR-031 — no issue survived requiring
+      a further revision round.
+- [x] **Confirmed at acceptance:** none of VAL-B2, MBQ-05, TD-002, the
+      fulfillment API model, product first-sync dedup, token acquisition,
+      Lite/Full packaging, checkpoint/resume ownership, or the
+      multi-server runtime concurrency proof requirement is resolved by
+      this acceptance — every one remains exactly as open as before,
+      restated unchanged in every accepted document's own "open blockers
+      preserved" section.
+- [x] **Confirmed at acceptance:** accepting this package does **not**,
       by itself, authorize implementation or open the Task 006C gate —
-      the gate opens only once the gate document is merged, and
-      implementation starts only once the final prompt is separately
-      pasted in a new session, per `task-006c-sync-engine-skeleton-
-      gate.md` §K.
-- [ ] **Next recommended session (ChatGPT to confirm or override):**
-      after this package merges, ChatGPT pastes
+      the gate becomes effective only once PR #130 actually merges into
+      `Shopify-connector`, and implementation starts only once the final
+      prompt is separately pasted, with the merge-commit SHA filled in,
+      into a **new** Claude Code session, per `task-006c-sync-engine-
+      skeleton-gate.md` §K. **No code is authorized by this patch.**
+- [x] **Next recommended step:** ChatGPT's final merge review of PR #130.
+      After PR #130 merges, ChatGPT pastes
       [`task-006c-sync-engine-skeleton-final-prompt.md`](../07-implementation-plan/task-006c-sync-engine-skeleton-final-prompt.md)
       verbatim (merge-commit SHA filled in) into a new Claude Code
-      session as the Task 006C implementation session. **Not started,
-      named as selected, or authorized by this checklist.**
+      session as the Task 006C implementation session. **Not started, not
+      performed, and not authorized by this acceptance patch.**
