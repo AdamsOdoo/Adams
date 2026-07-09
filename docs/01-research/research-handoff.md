@@ -1,5 +1,104 @@
 # Research Handoff (rolling)
 
+### Task 006D — sync-engine skeleton gate-opening decision package — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-006d-sync-engine-gate-opening-fp33xo` → PR
+  into `Shopify-connector` (**draft**, to be opened this session). Based
+  on `origin/Shopify-connector` HEAD
+  `241871b70f8151d8b796dbb4fb7bcb69cc3b2db3` (PR #129 merge commit),
+  confirmed the tip of that branch before any edit.
+- **Files changed:**
+  `docs/07-implementation-plan/task-006c-sync-engine-gate-opening-proposal.md`
+  (revised — Status: Proposed for ChatGPT gate-opening review / Does not
+  open gate yet; added §6 "Proposed gate-opening decisions"),
+  `docs/07-implementation-plan/task-006c-sync-engine-skeleton-final-prompt.md`
+  (revised — Status: Final draft / Pending gate acceptance / Not issued;
+  all placeholders except the merge-commit SHA resolved),
+  `docs/07-implementation-plan/task-006c-sync-engine-skeleton-gate.md`
+  (new — Status: Proposed / Pending ChatGPT review),
+  `docs/05-qa/task-006d-gate-opening-review-checklist.md` (new),
+  `docs/05-qa/architecture-review-log.md` (AR-031 row added, Status:
+  Proposed, mirroring the AR-026/AR-029 Task 002/003 gate-opening-note
+  convention), `docs/01-research/research-handoff.md` (this entry).
+  `docs/07-implementation-plan/task-006c-sync-engine-skeleton-
+  implementation-scope.md` was **not** modified (explicitly forbidden
+  this session). No addon file was modified — the five named model files
+  were read for decision accuracy only.
+- **Proposed concrete choices for the six open items** (gate-opening
+  proposal §6, all **[Recommendation]**, not yet ChatGPT-accepted): (A)
+  concurrency mechanism — `try_lock_for_update()` per candidate job row,
+  skip locked/unavailable rows, no raw SQL `SKIP LOCKED`, no PostgreSQL
+  advisory locks; (B) handler-registry seam — new `_get_handlers()` seam
+  on a `shopify.connector.job.dispatch` `AbstractModel`, adapting (not
+  copying) `_get_checks()`, safe missing-handler failure; (C) retry
+  defaults — 12 attempts / 30s base / ×2 / 30-minute cap / ±20% jitter /
+  24-hour window, named/tunable; (D) file split —
+  `shopify_connector_job_enqueue.py` + `shopify_connector_job_dispatch.py`,
+  both `AbstractModel`s, no services package, no ACL file; (E) cron
+  batch/interval — batch size 20, interval 5 minutes, conservative
+  pending runtime validation; (F) diagnostic `job_type` —
+  `core_dispatch_selftest`, core/diagnostic-only, never calls Shopify,
+  never a domain-sync template.
+- **No code was authorized. No implementation gate was opened.** The
+  gate-opening proposal reads "Proposed for ChatGPT gate-opening review /
+  Does not open gate yet"; the new gate document reads "Proposed /
+  Pending ChatGPT review"; the final prompt reads "Final draft / Pending
+  gate acceptance / Not issued" (still not issued; merge-commit-SHA
+  placeholder `<TASK_006D_GATE_MERGE_COMMIT_SHA>` deliberately left
+  unresolved, since this PR has not merged).
+- **AR-031 added** to `architecture-review-log.md`, Status **Proposed**
+  (not Accepted) — mirroring the repo's own established convention that a
+  gate-opening act is recorded as its own AR row (confirmed by inspecting
+  the AR-026/AR-029 Task 002/003 gate-opening-note precedent before
+  drafting).
+- **Every preserved open item remains exactly as open as before:**
+  VAL-B2 deferred/not passed; MBQ-05 Partially routed/Open; TD-002 Open;
+  fulfillment API model unresolved; product first-sync dedup thresholds
+  still domain-design work; token acquisition for many unrelated
+  customers unresolved; Lite/Full packaging not finalized; the 16-vs-17
+  `@idempotent` mutation-count and OCA `queue_job` worker-count wording
+  discrepancies both still open/non-blocking; checkpoint/resume ownership
+  still undecided; multi-server/Odoo.sh runtime concurrency proof still
+  explicitly required. None of these is touched, resolved, or narrowed by
+  this package — every one is restated unchanged in §7 of the revised
+  gate-opening proposal and §J of the new gate document.
+- **Self-correction (red-team) passes run this session:** authorization-
+  leakage grep across all changed files (no "gate is open"/"implementation
+  authorized"/"Claude may begin"/unqualified "issued" wording found
+  outside quoted/negated context); open-choice consistency across the
+  four decision-bearing documents (gate-opening proposal, final prompt,
+  gate document, QA checklist — no conflicting default found); scope-creep
+  check (no domain sync, no UI/wizard, no webhook controller, no OAuth, no
+  live Shopify call anywhere in the package); architecture-consistency
+  check (every choice traces back to DEC-025/PR #129; OCA `queue_job`
+  remains reference-only; no rejected approach reintroduced; no claim that
+  `try_lock_for_update()` is proven safe under real workers); final-prompt
+  readiness check (copy-ready except the merge-commit SHA; allowed/
+  forbidden files and tests match the accepted scope document exactly).
+- **Items deferred:** none new.
+- **Learning feedback loop:** new issues discovered: none. Repeated issue
+  patterns: none. Rules/checklists updated: new
+  `task-006d-gate-opening-review-checklist.md` created for this package.
+  New rejected approaches: none. New technical debt: none. Architecture
+  concerns: none beyond what DEC-025/the scope package already flagged
+  (carried forward unchanged). Should future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** ChatGPT review of this gate-opening decision package
+  (`docs/05-qa/task-006d-gate-opening-review-checklist.md`) — accept,
+  revise, or reject. **If accepted and this PR merges, implementation
+  still does not start automatically** — ChatGPT must separately paste
+  the finalized final-prompt text (merge-commit SHA filled in) into a
+  **new** Claude Code session, as its own turn. **This is not a coding
+  session; no gate is opened by this patch.**
+- **Stop condition:** docs-only gate-opening decision package, no code
+  touched, no implementation authorized, no gate opened, no merge
+  commit SHA filled in (this PR has not merged). Stopped after opening
+  this PR as draft against `Shopify-connector`. No merge performed.
+
+---
+
 ### Task 006C — PR #129 acceptance-status patch — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-006c-sync-engine-scope-pmj6ta` → PR #129

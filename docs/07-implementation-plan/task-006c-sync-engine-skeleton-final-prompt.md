@@ -1,29 +1,40 @@
-# Task 006C — Sync Engine Skeleton Final Implementation Prompt (Draft)
+# Task 006C — Sync Engine Skeleton Final Implementation Prompt (Final Draft)
 
-> **Status: Draft only / Not issued.** This is a **copy-ready draft** of the
-> future Claude Code prompt for Task 006C implementation. **It is not
-> issued. It must not be pasted into any Claude Code session and run.**
-> Issuing it requires, in order: (1) ChatGPT accepts
-> [`task-006c-sync-engine-skeleton-implementation-scope.md`](./task-006c-sync-engine-skeleton-implementation-scope.md);
-> (2) ChatGPT accepts this document, filling in every `<PLACEHOLDER>`
-> below (most importantly the eventual gate-acceptance PR's merge-commit
-> SHA, which cannot be known before that PR merges); (3) ChatGPT accepts
+> **Status: Final draft / Pending gate acceptance / Not issued.** This is a
+> **copy-ready draft** of the future Claude Code prompt for Task 006C
+> implementation, revised (Task 006D, 2026-07-09) to incorporate the six
+> concrete recommendations proposed in
+> [`task-006c-sync-engine-gate-opening-proposal.md`](./task-006c-sync-engine-gate-opening-proposal.md)'s
+> §6. **It is still not issued. It must still not be pasted into any
+> Claude Code session and run.** Issuing it requires, in order: (1)
+> ChatGPT already accepted
+> [`task-006c-sync-engine-skeleton-implementation-scope.md`](./task-006c-sync-engine-skeleton-implementation-scope.md)
+> as a planning/scope package (2026-07-08, PR #129); (2) ChatGPT accepts
+> this document, including its resolution of every prior `<PLACEHOLDER>`
+> below except the merge-commit SHA (which cannot be known before the
+> gate-acceptance PR merges); (3) ChatGPT accepts
 > [`task-006c-sync-engine-gate-opening-proposal.md`](./task-006c-sync-engine-gate-opening-proposal.md);
-> (4) that gate-acceptance PR merges into `Shopify-connector`; and (5)
-> ChatGPT explicitly pastes this exact finalized prompt text into a new
-> Claude Code session, as its own chat turn. **Nothing in this document
-> authorizes Claude to begin implementation now or at any point before all
-> five of those conditions are met.** This draft mirrors the
+> (4) ChatGPT accepts the companion gate document
+> [`task-006c-sync-engine-skeleton-gate.md`](./task-006c-sync-engine-skeleton-gate.md);
+> (5) that gate-acceptance PR merges into `Shopify-connector`, fixing the
+> remaining `<TASK_006D_GATE_MERGE_COMMIT_SHA>` placeholder to its actual
+> value; and (6) ChatGPT explicitly pastes this exact finalized prompt
+> text into a **new** Claude Code session, as its own chat turn. **Nothing
+> in this document authorizes Claude to begin implementation now or at any
+> point before all six of those conditions are met.** This draft mirrors
+> the
 > [`task-004-final-implementation-prompt.md`](./task-004-final-implementation-prompt.md)
 > draft-then-finalize precedent.
 
-## How this document will be used (once, and only once, all five
+## How this document will be used (once, and only once, all six
 ## conditions above are met)
 
 1. Confirm the Task 006C gate-acceptance PR is actually merged into
    `Shopify-connector` — do not assume it is because this document exists.
-2. Confirm every `<PLACEHOLDER>` below is filled in with its actual,
-   post-merge value.
+2. Confirm the `<TASK_006D_GATE_MERGE_COMMIT_SHA>` placeholder below is
+   filled in with its actual, post-merge value (every other placeholder
+   this document previously carried is already resolved by this
+   revision — see the six resolved values below).
 3. ChatGPT issues the exact prompt text below in chat, as its own
    session/turn.
 4. The implementing session stops at its own scoped boundary
@@ -38,9 +49,10 @@
 You are Claude Code implementing ONE scoped task for the Odoo 19 Shopify
 Connector. Implementation is AUTHORISED by ChatGPT for THIS task only —
 confirm the Task 006C gate-opening act
-(docs/07-implementation-plan/task-006c-sync-engine-gate-opening-proposal.md,
-merge commit <MERGE_COMMIT_SHA>) exists, is merged, and carries ChatGPT's
-explicit acceptance, together with accepted
+(docs/07-implementation-plan/task-006c-sync-engine-gate-opening-proposal.md
+and docs/07-implementation-plan/task-006c-sync-engine-skeleton-gate.md,
+merge commit <TASK_006D_GATE_MERGE_COMMIT_SHA>) exists, is merged, and
+carries ChatGPT's explicit acceptance, together with accepted
 docs/07-implementation-plan/task-006c-sync-engine-skeleton-implementation-scope.md
 and this exact prompt document, before writing any code.
 
@@ -56,26 +68,31 @@ docs/05-qa/architecture-review-log.md;
 docs/05-qa/technical-debt-register.md (confirm TD-002 is still Open and is
 NOT touched by this task); docs/05-qa/pr-review-checklist.md (A-C).
 
-File-split note (resolve before issuing): the split below between
+File-split note (confirm before issuing): the split below between
 shopify_connector_job_enqueue.py and shopify_connector_job_dispatch.py is
-the implementation-scope document's default proposal, NOT yet
-ChatGPT-confirmed (see the gate-opening proposal's §6). If ChatGPT's
-gate-opening act specifies a different split (e.g. folding both into
-shopify_connector_job.py), replace the two Allowed-files entries below
-with that decision before this prompt is issued.
+Decision D of the gate-opening proposal's §6 (Task 006D) — a
+[Recommendation] confirming the implementation-scope document's own
+default proposal, still pending ChatGPT's acceptance of that proposal and
+the companion gate document. If ChatGPT's gate-opening act specifies a
+different split (e.g. folding both into shopify_connector_job.py), replace
+the two Allowed-files entries below with that decision before this prompt
+is issued.
 
 Objective: Implement the core sync-engine skeleton inside
 shopify_connector_core: a job enqueue service, an ir.cron-driven claim/
-drain loop, a handler-registry dispatch seam (shape:
-<HANDLER_REGISTRY_SHAPE_CHATGPT_APPROVED>, per the gate-opening proposal's
-own resolution of implementation-scope §F item 4 — the default proposal is
-a new _get_handlers() method adapting the existing _get_checks()
-inheritance-append precedent), a retry scheduler honoring the existing
+drain loop, a handler-registry dispatch seam (shape: `_get_handlers()`
+registry seam on new shopify.connector.job.dispatch AbstractModel,
+returning job_type -> handler mapping, adapted from readiness-check
+inheritance/append pattern, with safe missing-handler failure — per
+Decision B of the gate-opening proposal's own resolution of
+implementation-scope §F item 4), a retry scheduler honoring the existing
 DEC-009 error-class taxonomy already encoded in shopify_connector_job.py,
 duplicate-running guards at both job creation (reusing the existing
 operation_scope_key constraint) and job execution (claim-time guard —
-mechanism: <CONCURRENCY_MECHANISM_CHATGPT_APPROVED>, per the gate-opening
-proposal's own resolution of implementation-scope §F item 1), an
+mechanism: try_lock_for_update() per candidate job row, skip locked/
+unavailable rows, no raw SQL SKIP LOCKED, no PostgreSQL advisory locks —
+per Decision A of the gate-opening proposal's own resolution of
+implementation-scope §F item 1), an
 execution-time-immediately-before-dispatch store-state re-check (narrows
 but does not close the SRR-03 disconnect/in-flight-job race — never claim
 it is closed), permanent-failure/blocked-manual-review transition helpers, job
@@ -93,16 +110,20 @@ setup wizard/UI/view/menu/action work.
 Allowed files (exact):
 - addons/shopify_connector_core/models/shopify_connector_job.py (MODIFY
   only) — add: an execution-time claim/lock helper implementing
-  <CONCURRENCY_MECHANISM_CHATGPT_APPROVED>; state-transition helper
+  try_lock_for_update() per candidate job row, skip locked/unavailable
+  rows, no raw SQL SKIP LOCKED, no PostgreSQL advisory locks;
+  state-transition helper
   methods for retry_waiting / failed_retryable / failed_final /
   blocked_manual_review / skipped; a domain-enabled execution-time
   re-check inside write(), alongside (not replacing) the existing
   store-state re-check; an execution-time-immediately-before-dispatch
   store-state re-check (SRR-03 narrowing, never claim it closes the race);
   exactly ONE new job_type Selection value, core/diagnostic-only, added
-  inline to the existing static selection=[...] list — candidate name
-  core_dispatch_selftest — reserved solely for this task's own dispatcher/
-  registry self-tests (never dispatched to a live Shopify call). Do NOT
+  inline to the existing static selection=[...] list — name
+  core_dispatch_selftest (Decision F of the gate-opening proposal's §6)
+  — reserved solely for this task's own dispatcher/registry self-tests
+  (never dispatched to a live Shopify call, never a template for a future
+  domain job_type). Do NOT
   remove, weaken, or alter any existing field, constraint, or gating
   check, and do NOT touch the three pre-existing job_type values' meaning.
 - addons/shopify_connector_core/models/shopify_connector_job_enqueue.py
@@ -112,12 +133,13 @@ Allowed files (exact):
 - addons/shopify_connector_core/models/shopify_connector_job_dispatch.py
   (NEW, AbstractModel, no table, DEFAULT proposal — see File-split note
   above) — the drain-loop entry point, the _get_handlers() registry seam
-  per <HANDLER_REGISTRY_SHAPE_CHATGPT_APPROVED> above (default proposal
-  mirrors shopify_connector_readiness_check.py's _get_checks() precedent),
-  the dispatcher, and the retry-scheduling sweep using the named,
-  non-magic-number constants <RETRY_DEFAULTS_CHATGPT_APPROVED> (per
-  MBQ-16's implementation-planning defaults, unless the gate-opening act
-  specifies different values).
+  described above (mirrors shopify_connector_readiness_check.py's
+  _get_checks() precedent), the dispatcher, and the retry-scheduling
+  sweep using the named, non-magic-number constants: 12 attempts,
+  30-second base delay, multiplier 2, 30-minute cap, ±20% jitter,
+  24-hour retry window (per MBQ-16's implementation-planning defaults,
+  Decision C of the gate-opening proposal's §6, unless the gate-opening
+  act specifies different values).
 - addons/shopify_connector_core/models/shopify_connector_job_log.py
   (MODIFY, ONLY if a new event_type value is genuinely required — if the
   existing five values suffice, do NOT touch this file; if you do modify
@@ -273,12 +295,23 @@ session.
 - Does not execute the prompt above.
 - Does not write any implementation code.
 - Does not authorize the future Task 006C coding session to start now or
-  at any point before all five conditions in the header above are met.
-- Does not resolve any `<PLACEHOLDER>` above — every one remains open
-  until ChatGPT's gate-opening act fixes it.
+  at any point before all six conditions in the header above are met.
+- Does not itself finalize any resolved value above. The
+  concurrency-mechanism, handler-registry-shape, and retry-default values
+  are this session's proposed recommendations (gate-opening proposal §6),
+  not yet ChatGPT-accepted — the remaining `<TASK_006D_GATE_MERGE_COMMIT_SHA>`
+  placeholder cannot be resolved at all until the gate-acceptance PR
+  merges.
 - Does not claim any open item named in
   [`task-006c-sync-engine-skeleton-implementation-scope.md`](./task-006c-sync-engine-skeleton-implementation-scope.md)
   §G is resolved.
 - Does not itself open the Task 006C implementation gate — that requires
   [`task-006c-sync-engine-gate-opening-proposal.md`](./task-006c-sync-engine-gate-opening-proposal.md)
-  to be separately accepted and merged, per its own §5 conditions.
+  and
+  [`task-006c-sync-engine-skeleton-gate.md`](./task-006c-sync-engine-skeleton-gate.md)
+  to be separately accepted and merged, per the proposal's own §9
+  conditions.
+- Does not claim ChatGPT has issued this prompt. Issuance is a distinct,
+  later, separate chat turn by ChatGPT in a new Claude Code session — this
+  revision's incorporation of the six §6 recommendations does not
+  constitute issuance.
