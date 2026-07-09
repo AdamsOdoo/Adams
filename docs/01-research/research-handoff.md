@@ -1,5 +1,140 @@
 # Research Handoff (rolling)
 
+### Task 010 product import implementation — draft PR opened, not yet reviewed — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-010-product-import-gate-0uh7g4`, base
+  `Shopify-connector` (tip `431b4bf`, the PR #137 merge commit —
+  confirmed current at session start, no drift to re-verify); PR
+  **#TBD-FILLED-ON-OPEN** → `Shopify-connector`, **draft, unmerged.**
+- **What happened:** ChatGPT issued the accepted Task 010 final
+  implementation prompt verbatim, opening the product-domain
+  implementation gate for exactly this one session (per
+  `task-010-product-import-gate-opening-proposal.md` §9). This session
+  implemented the `shopify_connector_product` addon per that prompt:
+  - Two concrete binding models —
+    `shopify.connector.product.template.binding`,
+    `shopify.connector.product.variant.binding` — both extending
+    `shopify.connector.binding.mixin`, both with explicit `_name`/
+    `_inherit`, per the accepted MBQ-55 schema (final prompt §7).
+    `models.Constraint(...)` throughout, no `_sql_constraints`.
+  - A read-only `shopify.connector.product.importer` `AbstractModel`
+    implementing final prompt §8's exact match-key/dedup-threshold
+    sequence: existing binding → SKU (`default_code`) → barcode →
+    confident no-match (create, gated) → ambiguous/blind (never create,
+    routed to `blocked_manual_review` via the existing, unmodified
+    `JobHandlerError`/`_route_failure()` mechanism — no new routing
+    logic).
+  - The three required extension seams — `job_type` `selection_add`
+    (`product_import_sync`); a `_domain_flag_for_job_type()` override
+    mapping it to `product_domain_enabled`, `super()` for every other
+    `job_type`; a `_get_handlers()` override registering the handler —
+    all declared inside `shopify_connector_product_importer.py` only.
+    **Zero edits to any `shopify_connector_core` file** (confirmed by
+    `git diff --stat` and by this session's own file-list review).
+  - `ir.model.access.csv` only (8 rows, two models x the four existing
+    groups: auditor read-only, operator read+create, reviewer
+    read+write, admin read+write+create) — no new group, no new
+    `security/*.xml`.
+  - Four required test files (`test_product_template_binding.py`,
+    `test_product_variant_binding.py`, `test_product_import_matching.py`,
+    `test_product_duplicate_prevention.py`), ~35 test methods, covering
+    every case named in final prompt §10.
+- **Three narrow in-task decisions** (final prompt §8/§9's own
+  allowance), recorded in full in
+  [`../05-qa/task-010-product-import-validation-results.md`](../05-qa/task-010-product-import-validation-results.md)
+  §C:
+  1. **`res_model`/`res_id` targeting** — a future enqueue-trigger
+     session should target
+     `res_model='shopify.connector.product.template.binding'` (the
+     binding model, not the underlying `product.template`). Task 010
+     itself builds no enqueue-trigger call site (multi-product
+     enumeration is explicitly out of this job type's scope, final
+     prompt §9); every test constructs job rows directly, mirroring the
+     existing `core_dispatch_selftest` pattern.
+  2. **Ambiguous/blind matches never create a binding row** — both
+     binding models' `product_template_id`/`product_variant_id` are
+     `required=True`, so a "pending review" binding with no confirmed
+     candidate would require an automatic guess, which DEC-006 forbids.
+     The outcome is represented entirely at the job level instead
+     (`blocked_manual_review` + `manual_review_subreason`), exactly what
+     every required §10 test asserts.
+  3. **New `product.product` creation is scoped to a brand-new
+     template's own Odoo-generated first/singleton variant only** —
+     every other new-variant-under-an-existing-template case routes to
+     `blocked_manual_review`/`duplicate_risk` rather than synthesizing
+     Odoo variant-attribute structure from Shopify option data, which no
+     accepted document specifies.
+- **Validation: static only, honestly reported.** No `odoo` package is
+  installed and no Odoo.sh/CI is reachable in this environment —
+  `py_compile` and `pyflakes` are clean on every new file (zero unused
+  imports, zero undefined names); source-level greps confirm zero
+  Shopify mutation calls, zero bypass-flag identifiers, and zero
+  customer/order/inventory/fulfillment model references anywhere in the
+  new addon. **The four new test files are written and statically valid
+  but not execution-proven this session** — no Odoo runtime was
+  reachable. Full detail:
+  [`../05-qa/task-010-product-import-validation-results.md`](../05-qa/task-010-product-import-validation-results.md).
+- **AR-036** (`../05-qa/architecture-review-log.md`) records this
+  session's output, Status **Proposed** — **not yet reviewed by
+  ChatGPT**, no acceptance claimed.
+- **Files changed:** `addons/shopify_connector_product/**` (new addon:
+  manifest, init files, three model files, one security CSV, four test
+  files); `../05-qa/task-010-product-import-validation-results.md` (new);
+  `../05-qa/architecture-review-log.md` (AR-036 row only); this handoff
+  entry. **No `shopify_connector_core` file touched.** No UI/view/menu/
+  wizard/webhook/OAuth/CI/Dockerfile/requirements file of any kind.
+- **Explicit hard constraints restated (per final prompt, unweakened):**
+  no live Shopify API call of any kind in tests; no Shopify mutation
+  call of any kind anywhere in the diff; no customer/order/inventory/
+  fulfillment logic of any kind; no UI/view/menu/action/wizard/webhook/
+  OAuth file of any kind; VAL-B2, MBQ-05, TD-002 (confirmed still
+  `Open`), the fulfillment API model, Lite/Full packaging, and the
+  multi-server concurrency proof requirement (SRR-03/04/09) remain
+  exactly as open as before this task; no claim that the Task 006C
+  claim/dispatch mechanism is proven safe under real concurrent-worker
+  or multi-server execution.
+- **Learning feedback loop:** no new defect pattern discovered; no new
+  rejected approach (checked `rejected-approaches-log.md` — none
+  applicable, none reintroduced); no rule/checklist change needed; new
+  technical debt: **none formally logged** —
+  `technical-debt-register.md` is outside this task's own §3 allowed-file
+  list, so the three in-task scope narrowings above are recorded in the
+  validation-results doc instead, per this task's own file-list
+  constraint; flagged here for ChatGPT to decide whether a formal TD row
+  is warranted on review.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  technical debt honestly flagged (not filed, file outside allowed list)
+  · no repeated-issue escalation needed.
+- **Stop condition:** all four required test files written; static
+  validation clean and honestly reported (no runtime claim made); zero
+  `shopify_connector_core` edits confirmed; only the files listed above
+  changed; PR opened as **DRAFT**, not marked ready, not merged; no
+  further domain task (011/012/013/014, 015), UI, webhook, OAuth, or
+  Lite/Full packaging work started. **Next step: ChatGPT reviews the
+  draft PR against final prompt §3–§14 and this handoff/AR-036/
+  validation-results evidence.**
+
+**Next-session prompt (exact, for after ChatGPT's review):**
+
+```text
+ChatGPT reviews draft PR <PR#> (Task 010 product import/variant binding
+implementation) against docs/07-implementation-plan/task-010-product-
+import-final-implementation-prompt.md §3-§14,
+docs/05-qa/architecture-review-log.md AR-036, and
+docs/05-qa/task-010-product-import-validation-results.md. Decide: accept
+as-is, accept with minor changes, revise before merge, or reject. In
+particular review the three narrow in-task decisions recorded in the
+validation-results doc §C (res_model/res_id targeting choice;
+ambiguous/blind matches never creating a binding row; the new-variant-
+creation scope narrowing) and the fact that no live Odoo runtime executed
+the four new test files this session (no odoo package / Odoo.sh / CI was
+reachable). Do not authorize Task 011/012/013/014, Task 015, any UI,
+webhook, OAuth, or Lite/Full packaging work as part of this review.
+```
+
+---
+
 ### PR #137 content accepted — final status patch applied — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-010-docs-prep-vsijz0` (PR #137), base

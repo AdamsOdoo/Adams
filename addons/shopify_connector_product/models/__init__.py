@@ -1,0 +1,3 @@
+from . import shopify_connector_product_template_binding
+from . import shopify_connector_product_variant_binding
+from . import shopify_connector_product_importer
