@@ -378,6 +378,11 @@ class TestJobDispatch(TransactionCase):
             self.store.action_disconnect()
             job.invalidate_recordset()
             self.assertEqual(job.state, 'cancelled', state)
+            # A job cancelled out of blocked_manual_review must not keep
+            # carrying manual_review_subreason -- action_disconnect()'s
+            # own constraint (_check_manual_review_subreason_required)
+            # would otherwise reject this exact transition.
+            self.assertFalse(job.manual_review_subreason, state)
 
     # ------------------------------------------------------------------
     # Logs appended through sanctioned path only + no direct

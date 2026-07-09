@@ -1,5 +1,109 @@
 # Research Handoff (rolling)
 
+### Task 006C — PR #131 approved one-file exception: `action_disconnect()` clears `manual_review_subreason` — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged), starting from head
+  `f0a246a9152805f1b55124080579830a9a99c80a`. Applies the control-room-
+  approved one-file exception (GitHub review artifact/comment ID
+  `4923059289`) to fix the real production bug reported in the prior
+  session's real-runtime validation.
+- **Files changed:** `addons/shopify_connector_core/models/
+  shopify_connector_store.py` (the approved one-file exception --
+  exactly one write-vals key added, nothing else in the file touched),
+  `addons/shopify_connector_core/tests/test_job_dispatch.py` (one
+  assertion added to an already-existing, unmodified-otherwise test),
+  `docs/01-research/research-handoff.md` (this entry). No other file.
+- **What changed / why required:** `action_disconnect()`'s cancellation
+  loop now writes `'manual_review_subreason': False` alongside the
+  existing `state: 'cancelled'` / `cancel_reason` / `finished_at` vals.
+  Required because `action_disconnect()` already deliberately searches
+  for and cancels every non-terminal business job -- `blocked_manual_
+  review` is not in `TERMINAL_JOB_STATES`, so it is correctly included
+  -- but a job in `blocked_manual_review` legitimately carries a
+  `manual_review_subreason` (required by that state's own constraint).
+  Cancelling it without clearing the subreason left it set while
+  `state` became `cancelled`, violating the job model's own
+  `_check_manual_review_subreason_required` constraint (`manual_review_
+  subreason must be empty unless state is 'blocked_manual_review'`) and
+  aborting `action_disconnect()` with a `ValidationError` -- exactly the
+  1 error the real Odoo 19/PostgreSQL runtime reported. **No other
+  disconnect semantics changed**: `TERMINAL_JOB_STATES` untouched,
+  credential clearing untouched, reconnect/activate/test-connection
+  untouched, the API client untouched, no new sudo/ACL/migration/UI/
+  webhook/OAuth file. `test_disconnect_cancels_business_jobs_in_new_
+  dispatch_states` (already correct, already covering all three
+  scenarios -- `retry_waiting`, `failed_retryable`, `blocked_manual_
+  review`) now also asserts `self.assertFalse(job.manual_review_
+  subreason, state)` after cancellation for every scenario, proving the
+  field is cleared regardless of the job's originating state, and (by
+  the test completing without error) that no `ValidationError` is
+  raised.
+- **Status of the other patch-#3 item:** the fake-handler-signature fix
+  (4 retry-routing test failures, fixed in the prior session, commit
+  `f0a246a`) remains **pending a live runtime re-run** -- it was
+  committed on static-correctness grounds only and has not yet been
+  re-confirmed against a real Odoo/PostgreSQL registry.
+- **Static validation (all pass):** `py_compile` on both changed Python
+  files; `git diff` of `shopify_connector_store.py` confirms exactly one
+  key (`'manual_review_subreason': False`) added to one `write()` call,
+  nothing else in the file changed; zero new `sudo()` sites (diff-only
+  check); zero new direct `job.log.create()`/`JobLog.create()` calls;
+  zero new Shopify API client/`.execute(` references introduced in any
+  Task 006C changed production file; `git status`/`git diff --stat`
+  confirm only the three allowed files changed.
+- **Runtime re-run:** **not performed by this session** -- no `odoo`
+  package, no `psycopg2`, no responding PostgreSQL server in this
+  sandboxed environment (unchanged from every prior session on this
+  PR). This fix is committed on static-correctness grounds only. A
+  fresh external Odoo.sh runtime re-run is required to confirm: (a) the
+  single previously-failing disconnect test now passes; (b) the four
+  retry-routing tests (fixed in the prior session) now pass; (c) the
+  full `shopify_connector_core` suite passes beyond the prior 122-test
+  halt point, with no newly-surfaced failure.
+- **Items deferred:** unchanged -- VAL-B2, MBQ-05, TD-002 (untouched),
+  the fulfillment API model, product first-sync dedup thresholds, token
+  acquisition, Lite/Full packaging, checkpoint/resume ownership, and the
+  multi-server runtime concurrency proof requirement remain exactly as
+  open as before. The `action_disconnect()`/`manual_review_subreason`
+  blocker named in the prior entry is now **resolved** (statically) and
+  removed as an open blocker, pending the same live re-run every other
+  static-only fix on this PR still awaits.
+- **Learning feedback loop:** this closes out the two-part real-runtime
+  validation failure from the prior session (4 test-fake-signature
+  failures + 1 real production bug) with a clean split: the test-only
+  defect was fixed directly within the session's own authority: the
+  production defect was correctly escalated, not worked around, and
+  fixed only after an explicit one-file exception was granted -- this
+  is the intended, working shape of the "stop and request the minimal
+  exception" pattern this project's governance model calls for, so no
+  new process gap to log. New rejected approaches: none. New technical
+  debt: none (the bug is fixed, not deferred). Should future prompts
+  change? Recommend a standing project-level note: when a Task 006C-
+  family (or any) session identifies a real production bug outside its
+  allowed-file scope, the stop-and-report-with-a-proposed-minimal-fix
+  pattern (used here) is confirmed to work end-to-end across two
+  sessions and should remain the default, rather than being treated as
+  a one-off improvisation.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (pattern-confirmation note above) ·
+  no new rejected approach · no new technical debt · no repeated-issue
+  count change (this is a distinct issue category from the manifest-
+  truthfulness pattern, still at 2 occurrences, unchanged).
+- **Next recommended session:** a fresh external Odoo.sh runtime
+  re-run of `test_disconnect_cancels_business_jobs_in_new_dispatch_
+  states`, the four retry-routing tests, and then the full
+  `shopify_connector_core` suite -- the first full live confirmation
+  this PR has ever received, and the last outstanding item before this
+  PR can be considered ready for ChatGPT's merge-readiness decision.
+- **Stop condition:** approved one-file exception applied exactly as
+  scoped (one write-vals key, nothing else); test extended with the
+  minimal required assertion; no broader disconnect semantics touched;
+  no forbidden file touched; PR left draft/unmerged; no merge
+  performed. Next step: fresh Odoo.sh runtime re-run.
+
+---
+
 ### Task 006C — PR #131 real-runtime validation failure + fake-handler-signature fix — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
