@@ -354,6 +354,13 @@ class ShopifyConnectorStore(models.Model):
                 'state': 'cancelled',
                 'cancel_reason': 'Store disconnected.',
                 'finished_at': fields.Datetime.now(),
+                # A job coming from blocked_manual_review carries a
+                # manual_review_subreason (required by that state's own
+                # constraint) -- clearing it here is required so the
+                # same job's move to 'cancelled' doesn't violate
+                # _check_manual_review_subreason_required, which forbids
+                # a non-blocked_manual_review state from carrying one.
+                'manual_review_subreason': False,
             })
             JobLog._system_append(
                 job, 'state_change', 'Job cancelled: store disconnected.',

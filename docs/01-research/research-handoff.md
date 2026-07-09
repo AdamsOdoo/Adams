@@ -1,5 +1,652 @@
 # Research Handoff (rolling)
 
+### Task 006C — PR #131 approved one-file exception: `action_disconnect()` clears `manual_review_subreason` — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged), starting from head
+  `f0a246a9152805f1b55124080579830a9a99c80a`. Applies the control-room-
+  approved one-file exception (GitHub review artifact/comment ID
+  `4923059289`) to fix the real production bug reported in the prior
+  session's real-runtime validation.
+- **Files changed:** `addons/shopify_connector_core/models/
+  shopify_connector_store.py` (the approved one-file exception --
+  exactly one write-vals key added, nothing else in the file touched),
+  `addons/shopify_connector_core/tests/test_job_dispatch.py` (one
+  assertion added to an already-existing, unmodified-otherwise test),
+  `docs/01-research/research-handoff.md` (this entry). No other file.
+- **What changed / why required:** `action_disconnect()`'s cancellation
+  loop now writes `'manual_review_subreason': False` alongside the
+  existing `state: 'cancelled'` / `cancel_reason` / `finished_at` vals.
+  Required because `action_disconnect()` already deliberately searches
+  for and cancels every non-terminal business job -- `blocked_manual_
+  review` is not in `TERMINAL_JOB_STATES`, so it is correctly included
+  -- but a job in `blocked_manual_review` legitimately carries a
+  `manual_review_subreason` (required by that state's own constraint).
+  Cancelling it without clearing the subreason left it set while
+  `state` became `cancelled`, violating the job model's own
+  `_check_manual_review_subreason_required` constraint (`manual_review_
+  subreason must be empty unless state is 'blocked_manual_review'`) and
+  aborting `action_disconnect()` with a `ValidationError` -- exactly the
+  1 error the real Odoo 19/PostgreSQL runtime reported. **No other
+  disconnect semantics changed**: `TERMINAL_JOB_STATES` untouched,
+  credential clearing untouched, reconnect/activate/test-connection
+  untouched, the API client untouched, no new sudo/ACL/migration/UI/
+  webhook/OAuth file. `test_disconnect_cancels_business_jobs_in_new_
+  dispatch_states` (already correct, already covering all three
+  scenarios -- `retry_waiting`, `failed_retryable`, `blocked_manual_
+  review`) now also asserts `self.assertFalse(job.manual_review_
+  subreason, state)` after cancellation for every scenario, proving the
+  field is cleared regardless of the job's originating state, and (by
+  the test completing without error) that no `ValidationError` is
+  raised.
+- **Status of the other patch-#3 item:** the fake-handler-signature fix
+  (4 retry-routing test failures, fixed in the prior session, commit
+  `f0a246a`) remains **pending a live runtime re-run** -- it was
+  committed on static-correctness grounds only and has not yet been
+  re-confirmed against a real Odoo/PostgreSQL registry.
+- **Static validation (all pass):** `py_compile` on both changed Python
+  files; `git diff` of `shopify_connector_store.py` confirms exactly one
+  key (`'manual_review_subreason': False`) added to one `write()` call,
+  nothing else in the file changed; zero new `sudo()` sites (diff-only
+  check); zero new direct `job.log.create()`/`JobLog.create()` calls;
+  zero new Shopify API client/`.execute(` references introduced in any
+  Task 006C changed production file; `git status`/`git diff --stat`
+  confirm only the three allowed files changed.
+- **Runtime re-run:** **not performed by this session** -- no `odoo`
+  package, no `psycopg2`, no responding PostgreSQL server in this
+  sandboxed environment (unchanged from every prior session on this
+  PR). This fix is committed on static-correctness grounds only. A
+  fresh external Odoo.sh runtime re-run is required to confirm: (a) the
+  single previously-failing disconnect test now passes; (b) the four
+  retry-routing tests (fixed in the prior session) now pass; (c) the
+  full `shopify_connector_core` suite passes beyond the prior 122-test
+  halt point, with no newly-surfaced failure.
+- **Items deferred:** unchanged -- VAL-B2, MBQ-05, TD-002 (untouched),
+  the fulfillment API model, product first-sync dedup thresholds, token
+  acquisition, Lite/Full packaging, checkpoint/resume ownership, and the
+  multi-server runtime concurrency proof requirement remain exactly as
+  open as before. The `action_disconnect()`/`manual_review_subreason`
+  blocker named in the prior entry is now **resolved** (statically) and
+  removed as an open blocker, pending the same live re-run every other
+  static-only fix on this PR still awaits.
+- **Learning feedback loop:** this closes out the two-part real-runtime
+  validation failure from the prior session (4 test-fake-signature
+  failures + 1 real production bug) with a clean split: the test-only
+  defect was fixed directly within the session's own authority: the
+  production defect was correctly escalated, not worked around, and
+  fixed only after an explicit one-file exception was granted -- this
+  is the intended, working shape of the "stop and request the minimal
+  exception" pattern this project's governance model calls for, so no
+  new process gap to log. New rejected approaches: none. New technical
+  debt: none (the bug is fixed, not deferred). Should future prompts
+  change? Recommend a standing project-level note: when a Task 006C-
+  family (or any) session identifies a real production bug outside its
+  allowed-file scope, the stop-and-report-with-a-proposed-minimal-fix
+  pattern (used here) is confirmed to work end-to-end across two
+  sessions and should remain the default, rather than being treated as
+  a one-off improvisation.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (pattern-confirmation note above) ·
+  no new rejected approach · no new technical debt · no repeated-issue
+  count change (this is a distinct issue category from the manifest-
+  truthfulness pattern, still at 2 occurrences, unchanged).
+- **Next recommended session:** a fresh external Odoo.sh runtime
+  re-run of `test_disconnect_cancels_business_jobs_in_new_dispatch_
+  states`, the four retry-routing tests, and then the full
+  `shopify_connector_core` suite -- the first full live confirmation
+  this PR has ever received, and the last outstanding item before this
+  PR can be considered ready for ChatGPT's merge-readiness decision.
+- **Stop condition:** approved one-file exception applied exactly as
+  scoped (one write-vals key, nothing else); test extended with the
+  minimal required assertion; no broader disconnect semantics touched;
+  no forbidden file touched; PR left draft/unmerged; no merge
+  performed. Next step: fresh Odoo.sh runtime re-run.
+
+---
+
+### Task 006C — PR #131 real-runtime validation failure + fake-handler-signature fix — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged). A real Odoo 19/PostgreSQL
+  runtime validation (external Odoo.sh runtime, not this session's
+  environment) reported **4 failures, 1 error, of 122 tests loaded
+  before halt**, starting from head
+  `3e6edd8347560ed5e31bd60bb4296053bfa18c99`.
+- **Files changed this session:** `addons/shopify_connector_core/tests/
+  test_job_retry_scheduling.py`, `addons/shopify_connector_core/tests/
+  test_job_dispatch.py`, `docs/01-research/research-handoff.md` (this
+  entry). No production model/dispatch file touched -- inspection
+  proved production routing correct; only test fakes were wrong.
+- **Root cause 1 (fixed) -- fake-handler signature mismatch (4 test
+  failures):** `_invoke_handler()` retrieves `handler = self.
+  _get_handlers().get(job.job_type)` from a plain dict -- a dict lookup
+  never triggers Python's descriptor/binding protocol, so the retrieved
+  callable is never bound. The dispatcher then calls it as `handler(job)`
+  (one argument). Production's real handler (`self.
+  _handle_core_dispatch_selftest`) already went through attribute access
+  before being placed in the dict, so it's correctly bound and works.
+  The test fakes in `_run_with_handler_error()` (`test_job_retry_
+  scheduling.py`), `test_generic_exception_from_handler_treated_as_
+  unknown_system_error`, and `test_secrets_redacted_in_dispatch_failure_
+  path` (`test_job_dispatch.py`) were defined as `def _raise(self, job):`
+  -- an unused, incorrect extra `self` parameter. Calling `handler(job)`
+  against that 2-arg function raises `TypeError: missing 1 required
+  positional argument`, caught by `_invoke_handler`'s fail-safe
+  `except Exception` boundary and reclassified as `unknown_system_error`
+  -- masking every intended `error_class`/state outcome the retry tests
+  asserted. Fixed by dropping the stray `self` parameter from all three
+  fake handlers (`_raise`, `_raise_plain`, `_raise_with_secret`) so they
+  match the dispatcher's real one-argument `handler(job)` contract --
+  the same contract two other, already-correct fakes in `test_job_
+  dispatch.py` (`lambda job: calls.append(job.id)`, used twice) already
+  followed. **Production dispatch/routing code was inspected and proven
+  correct -- not modified.**
+- **Root cause 2 (NOT fixed -- real production bug, out of this
+  session's allowed-file scope) -- `action_disconnect()` /
+  `manual_review_subreason`:** `test_disconnect_cancels_business_jobs_
+  in_new_dispatch_states` (`test_job_dispatch.py`, unmodified this
+  session) puts a job in `blocked_manual_review` with `manual_review_
+  subreason='ambiguous_match'` set (required by the job model's own
+  `_check_manual_review_subreason_required` constraint), then calls
+  `self.store.action_disconnect()`. `action_disconnect()`
+  (`shopify_connector_store.py`, **not modified this session, per the
+  original final implementation prompt's explicit "action_disconnect
+  remains unmodified" instruction**) deliberately searches for
+  non-terminal business jobs to cancel -- `blocked_manual_review` is
+  correctly included, since it is not in `TERMINAL_JOB_STATES` -- but
+  its cancellation `job.write({'state': 'cancelled', 'cancel_reason':
+  ..., 'finished_at': ...})` never clears `manual_review_subreason`.
+  For a job coming from `blocked_manual_review`, the leftover subreason
+  with the new `state='cancelled'` violates the same constraint
+  (`manual_review_subreason must be empty unless state is
+  'blocked_manual_review'`), raising `ValidationError` and aborting
+  `action_disconnect()` entirely. **This is a real, pre-existing latent
+  production bug in `action_disconnect()`, only now reachable because
+  Task 006C is the first code path that ever sets `blocked_manual_
+  review`** -- today, any store with a job stuck in `blocked_manual_
+  review` cannot be disconnected at all. The test is correct and was
+  left unmodified; narrowing it to skip `blocked_manual_review` would
+  hide this real bug, which the session prompt explicitly forbade.
+  **Proposed minimal one-file exception** (not applied this session):
+  in `shopify_connector_store.py::action_disconnect()`'s cancellation
+  loop, add `'manual_review_subreason': False` to the `job.write({...})`
+  vals dict (harmless no-op for jobs where it's already empty; clears it
+  for jobs coming from `blocked_manual_review`). Requires explicit
+  ChatGPT approval to touch `shopify_connector_store.py`, a file outside
+  this session's allowed-file list.
+- **Static validation (all pass):** `py_compile` on both changed test
+  files; `xml.dom.minidom` parse of the cron XML; manifest parses via
+  `ast.literal_eval`; zero `numbercall`; zero direct `job.log.create()`
+  calls in dispatch; `job_enqueue.py`'s only `.create(` call targets
+  `shopify.connector.job`; zero Shopify API client / `.execute(`
+  references in the three changed production files; zero new `sudo()`
+  sites. `git status`/`git diff --stat` confirm only the two allowed
+  test files changed.
+- **Runtime re-run:** **not performed by this session** -- no `odoo`
+  package, no `psycopg2`, no responding PostgreSQL server, no CI/Docker
+  daemon in this sandboxed environment (unchanged from every prior
+  session on this PR). The narrow fake-handler-signature fix is
+  committed on static-correctness grounds only; the external Odoo.sh
+  runtime must re-run the focused `test_job_retry_scheduling.py` /
+  `test_job_dispatch.py` classes, then the full `shopify_connector_core`
+  suite, to confirm the fix actually resolves the 4 reported failures
+  and to determine whether `test_disconnect_cancels_business_jobs_in_
+  new_dispatch_states` (the reported error) is now the *only* remaining
+  failure, or whether further tests beyond the 122-test halt point
+  surface new issues once these are cleared.
+- **Items deferred:** unchanged -- VAL-B2, MBQ-05, TD-002 (untouched),
+  the fulfillment API model, product first-sync dedup thresholds, token
+  acquisition, Lite/Full packaging, checkpoint/resume ownership, and the
+  multi-server runtime concurrency proof requirement remain exactly as
+  open as before. New: the `action_disconnect()`/`manual_review_
+  subreason` production bug above is now an open, named blocker on this
+  PR pending an explicit one-file exception.
+- **Learning feedback loop:** new issue class discovered: a fake
+  test-double stored directly in a dict (not accessed via attribute
+  lookup) is never bound by Python's descriptor protocol -- a `self`
+  parameter on such a fake silently breaks its call arity, and if the
+  code under test has a fail-safe `except Exception` boundary, the
+  resulting `TypeError` can be silently reclassified into a *valid*-
+  looking but wrong outcome rather than an obvious crash, delaying
+  detection until a real runtime actually asserts the specific value.
+  Worth a standing checklist item: whenever a handler/callback is
+  registered via a plain dict (not `self.method`), any test fake
+  replacing it must match the *unbound* call signature exactly. First
+  occurrence of this category on this PR -- log only, no rule/checklist
+  update yet (below escalation threshold). Second, unrelated issue
+  discovered: `action_disconnect()`'s cancellation write path doesn't
+  clear `manual_review_subreason` -- first occurrence of this category;
+  logged as an open blocker above, not yet a rejected-approach or
+  technical-debt entry (pending ChatGPT's decision on the one-file
+  exception). New rejected approaches: none. Should future prompts
+  change? Recommend a future Task 006C-family prompt authorize the
+  `manual_review_subreason` clear as a pre-approved one-line exception
+  in `shopify_connector_store.py`, scoped exactly to that field in that
+  one write() call, rather than requiring a fresh stop-and-report cycle.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (two new issue-class notes above) ·
+  no new rejected approach · new technical-debt-shaped item logged
+  (disconnect/manual_review_subreason bug, pending exception approval,
+  not yet added to `docs/05-qa/technical-debt-register.md` since that
+  file is outside this session's allowed-file list) · repeated-issue
+  count: manifest-truthfulness pattern remains at 2 (unchanged this
+  session; these are two different, unrelated issue categories).
+- **Next recommended session:** either (a) an explicit ChatGPT-approved
+  one-file exception authorizing the minimal `manual_review_subreason`
+  clear in `shopify_connector_store.py::action_disconnect()`, or (b) a
+  fresh external Odoo.sh runtime re-run confirming the fake-handler fix
+  resolves failures #2-#5 and re-confirming failure #1 (the disconnect
+  error) is still the one open, named, unfixed item.
+- **Stop condition:** narrow fake-handler-signature fix complete and
+  committed; production `action_disconnect()`/`manual_review_subreason`
+  bug identified, NOT fixed (outside allowed-file scope), reported with
+  an exact proposed minimal exception instead; no unrelated change made;
+  PR left draft/unmerged; no merge performed. Next step: ChatGPT review
+  of this runtime-validation-failure fix and decision on the proposed
+  `shopify_connector_store.py` exception.
+
+---
+
+### Task 006C — PR #131 manifest truthfulness patch — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place --
+  no new PR opened). Applies a narrow manifest-truthfulness fix per
+  control-room re-review (GitHub review artifact/comment ID
+  `4922068739`), starting from head
+  `b28c1849a19ee63c828d13e42a65b172475ab1e6`.
+- **Files changed:** `addons/shopify_connector_core/__manifest__.py`
+  (wording only -- no key added/removed/reordered), `docs/01-research/
+  research-handoff.md` (this entry). No other file touched.
+- **What changed / residue fixed:** fixed stale "no Shopify API client" /
+  "no external API calls" **module-level** wording in the manifest --
+  the module has carried a working, callable Shopify API client
+  (`shopify_connector_api_client.py`) and its test-connection/readiness
+  call path since Task 003/004, well before this PR; claiming "no
+  Shopify API calls" for the whole module was false and predates this
+  session (the prior corrective patch fixed the narrower "no cron
+  execution" claim but left this one, in the same paragraph,
+  unaddressed). Both the `description` and the `summary` fields carried
+  the same category of false claim (the `summary` field said "No
+  Shopify API calls, no webhooks, no UI" in slightly different wording
+  than the `description` field's "no Shopify API client, no external
+  API calls") -- fixed both, since both are in the one allowed file and
+  both are the identical defect; only `description` was explicitly named
+  by the review, so this is flagged here as a small, disclosed,
+  same-file consistency fix, not a silent scope expansion. New wording
+  in both fields: states the module now includes the credential/
+  redaction foundation, the API-client/test-connection foundation, and
+  the core job enqueue/dispatch/cron drain skeleton; states plainly that
+  the **Task 006C sync-engine skeleton itself** performs no Shopify API
+  calls and implements no domain sync logic (a narrower, accurate claim,
+  distinct from the false whole-module claim it replaces); keeps "no
+  webhook handling," "no setup wizard," and "no operator-facing UI"
+  verbatim in meaning. **No code behavior changed anywhere** -- this is
+  a documentation/wording-only patch; no Python, XML, security, test, or
+  model file was touched. **No implementation scope expanded** -- no
+  new capability, field, method, or file was added or authorized.
+- **Items deferred:** unchanged -- VAL-B2, MBQ-05, TD-002 (untouched),
+  the fulfillment API model, product first-sync dedup thresholds, token
+  acquisition, Lite/Full packaging, checkpoint/resume ownership, and the
+  multi-server runtime concurrency proof requirement remain exactly as
+  open as before. **Odoo/PostgreSQL runtime validation is still not run
+  this session** -- no `odoo` package, no `psycopg2`, no responding
+  Postgres server in this environment; `py_compile` was not needed since
+  no Python file changed (the manifest is a plain Python dict literal,
+  validated by `eval()`-parsing it directly instead).
+- **Learning feedback loop:** new issues discovered: a stale-wording
+  defect can hide in more than one manifest field at once (`summary` and
+  `description` both claimed "no Shopify API calls" in different words)
+  -- worth a standing reminder that a manifest truthfulness sweep should
+  grep the whole file for the flagged claim's synonyms, not just the
+  one field a reviewer happened to quote. Repeated issue pattern: this
+  is the **second** manifest-truthfulness finding on this same PR (the
+  prior patch fixed "no cron execution"; this one fixes "no Shopify API
+  client"/"no external API calls") -- both are the same root-cause
+  category (manifest prose drifting stale as the module gains real
+  capability across tasks), now at 2 occurrences; not yet at the
+  3rd-occurrence pause threshold (`quality-feedback-loop.md` §4), but
+  worth naming explicitly here so a third recurrence is recognized
+  immediately rather than treated as a fresh, unrelated issue. Rules/
+  checklists updated: none this session (below escalation threshold).
+  New rejected approaches: none. New technical debt: none. Architecture
+  concerns: none beyond what prior entries already flagged. Should
+  future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (repeated-pattern note above) · no
+  new rejected approach · no new technical debt · repeated-issue count
+  noted (2nd occurrence, below 3rd-occurrence escalation).
+- **Next recommended session:** unchanged -- a live Odoo.sh
+  runtime-validation pass for this PR remains the first outstanding
+  item; still not performed by any session on this PR.
+- **Stop condition:** manifest-truthfulness patch complete per the exact
+  allowed-files list and required-fix scope named in this session's
+  prompt; no unrelated change made; PR left draft/unmerged; no merge
+  performed. Next step: ChatGPT final re-review.
+
+---
+
+### Task 006C — PR #131 corrective patch — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place --
+  no new PR opened). Applies a narrow corrective patch per control-room
+  review (GitHub review artifact/comment ID `4921925802`), starting from
+  head `c51c16e5f68e3b0a57d4bc8bb0f003f3bfbc39e9`.
+- **Files changed:** `addons/shopify_connector_core/__manifest__.py`
+  (description fix only), `addons/shopify_connector_core/data/
+  shopify_connector_cron_drain.xml` (removed the invalid `numbercall`
+  field; also fixed a second, previously-undetected defect found while
+  validating -- the record's own XML comment contained a literal `--`,
+  which is invalid inside an XML comment per spec and made the whole
+  file fail to parse), `addons/shopify_connector_core/models/
+  shopify_connector_job.py` (`_transition_failed_final()` gained an
+  optional `retry_count` kwarg, written only when explicitly provided),
+  `addons/shopify_connector_core/models/shopify_connector_job_
+  dispatch.py` (the retry-exhaustion branch now passes the exhausted
+  attempt count through; `_start_running()` now routes a blocked start
+  to `failed_retryable`/`odoo_validation_configuration` instead of
+  silently returning `False`), `addons/shopify_connector_core/tests/
+  test_job_dispatch.py` (two new tests for start-gating visibility; the
+  no-live-Shopify source-level guard now scans `shopify_connector_
+  job.py` too, via a new `_changed_production_files()` helper),
+  `addons/shopify_connector_core/tests/test_job_retry_scheduling.py`
+  (added `retry_count` assertions to the two auto-retry exhaustion
+  tests -- the `unknown_system_error` safety-net exhaustion test already
+  asserted the count and was the one the reviewer's own example cited
+  as mismatched against the pre-fix code), `docs/01-research/
+  research-handoff.md` (this entry). No new files created -- every fix
+  applied to an existing allowed file.
+- **What changed / residue fixed:**
+  1. **Cron XML install risk** -- `numbercall` is not a field on Odoo
+     19's `ir.cron` model (confirmed by fetching the actual 19.0
+     `ir_cron.py` source: the model's fields are `active`,
+     `interval_number`, `interval_type`, `nextcall`, `lastcall`,
+     `priority`, `failure_count`, `first_failure_date`, `user_id`, plus
+     fields delegated from `ir.actions.server` via `ir_actions_server_id`
+     -- no `numbercall`/`doall`); removed. Confirmed `model_id`/`state`/
+     `code` remain valid on `ir.cron` via that same delegation
+     mechanism, so no other field in the record needed to change.
+     Separately found and fixed a genuine XML well-formedness bug in the
+     same file's own comment (a literal `--` inside `<!-- -->`), which
+     would have failed module installation outright regardless of the
+     `numbercall` question.
+  2. **Manifest description** -- the "no cron execution" claim was
+     false as of this PR; narrowly reworded to state the module now
+     includes a core job enqueue/dispatch and cron drain skeleton, while
+     still explicitly stating no Shopify API calls, no webhooks, no
+     setup wizard, no operator-facing UI, and no domain sync logic. No
+     other manifest content changed.
+  3. **Retry exhaustion count** -- `_transition_failed_final()` did not
+     persist `retry_count`, so a job routed to `failed_final` via
+     exhaustion kept its pre-attempt count, contradicting the fact that
+     it did attempt and fail one more time. Fixed additively (an
+     optional kwarg, written only when passed) without weakening bounded
+     -retry behavior or touching DEC-009 classification; the
+     max-attempts and retry-window exhaustion tests now assert the
+     persisted count too, not only the safety-net test that already did.
+  4. **Silent start-gating failures** -- `_start_running()` previously
+     caught a blocked-start `ValidationError` and returned `False` with
+     no state change and no log, so a gated job could remain
+     `queued`/`retry_waiting` indefinitely with no visible outcome. Now
+     routes to `failed_retryable`/`odoo_validation_configuration` (the
+     same DEC-009 "manual fix then retry" class this error_class already
+     maps to via `_route_failure()`), logged exclusively through the
+     existing `_transition_failed_retryable()` helper -- no new
+     `job.log.create()` call, no bypass of either gate, no claim that
+     SRR-03 is closed (this fix is entirely about checkpoint 2, not
+     checkpoint 3).
+  5. **No-live-Shopify source guard scope** -- the guard previously
+     scanned only the two new files; now scans all three changed
+     production files (`shopify_connector_job.py` included) via a new
+     `_changed_production_files()` helper, kept separate from the
+     sudo-site guard's own (intentionally unchanged, still two-file)
+     scope.
+- **Items deferred:** unchanged from the prior entry -- VAL-B2, MBQ-05,
+  TD-002 (untouched), the fulfillment API model, product first-sync
+  dedup thresholds, token acquisition, Lite/Full packaging, and every
+  named runtime-validation item (§I) remain exactly as open/undone as
+  before this patch. No live Odoo.sh run was performed this session
+  either -- see below.
+- **Learning feedback loop:**
+  - New issues discovered: (a) an XML comment containing a literal `--`
+    is invalid per the XML spec and breaks parsing outright -- worth a
+    standing reminder for any future `<!-- -->` comment in this repo's
+    data/view XML to avoid double-hyphens; (b) `numbercall`/`doall` are
+    legacy `ir.cron` fields no longer present in Odoo 19 -- confirmed by
+    fetching the actual 19.0 source this session (not merely inferred
+    from older-version memory), now recorded here for any future cron
+    record in this project to avoid repeating.
+  - Repeated issue patterns: none (both are first occurrences).
+  - Rules/checklists updated: none this session (below the
+    repeated-issue escalation threshold).
+  - New rejected approaches: none.
+  - New technical debt: none -- every fix here closes a genuine defect
+    rather than accepting a compromise; `technical-debt-register.md` is
+    unmodified.
+  - Architecture concerns: none beyond what the original PR already
+    flagged (SRR-03 narrowed-not-closed; claim-mechanism concurrency
+    safety unproven by unit tests; batch-size/interval defaults
+    unvalidated at realistic volume) -- unchanged by this patch.
+  - Tests or review gates needed: the same separate, later, live
+    Odoo.sh validation session named in the original PR entry --
+    unchanged, still not performed.
+  - Should future prompts change? No.
+  - **Self-verification performed this session (no live Odoo
+    available):** `python3 -m py_compile` on every changed Python file;
+    `xml.dom.minidom` parse confirming the cron XML is now well-formed
+    (it was not, before this patch, due to the comment defect); a
+    repo-wide scan confirming no other XML file in this addon has the
+    same double-hyphen-in-comment defect; a live fetch of the actual
+    Odoo 19.0 `ir_cron.py` source confirming `numbercall`'s absence
+    (not asserted from memory alone); a standalone Python script
+    replicating every updated AST-based source-level test (sudo-site
+    count unchanged at 2, `job_dispatch.py` still zero `.create(` calls,
+    `job_enqueue.py`'s sole `.create(` target still `shopify.connector.
+    job`, no Shopify-API-client reference in any of the three changed
+    production files); a full manual trace of the retry-exhaustion math
+    and the two new start-gating tests against the updated production
+    code.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next recommended session:** unchanged -- a live Odoo.sh
+  runtime-validation pass for this PR, now against the corrected code
+  (this is the first session where the cron XML would actually load
+  without an install-time error).
+- **Stop condition:** corrective patch complete per the exact allowed-
+  files list and required-fixes scope named in this session's prompt;
+  no unrelated change made; PR left draft/unmerged; no merge performed.
+  Next step: ChatGPT re-review.
+
+---
+
+### Task 006C — sync-engine skeleton implementation — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR into
+  `Shopify-connector` (**draft**, to be opened this session). First
+  **code** session of this project (`CLAUDE.md` §5 no-code gate lifted
+  for this task only, per the Task 006C gate-opening act -- confirmed
+  merged at `6e482ec60b3601c3c77cba257f97b64cc889aae1`, the exact SHA
+  cited in this session's issued final prompt, and confirmed via `git
+  log`/`git rev-parse HEAD` before any edit). No Odoo/Postgres runtime
+  is available in this session's execution environment (no `odoo`
+  package, no vendored Odoo source, no running Postgres) -- every test
+  below is written and verified by careful manual control-flow tracing
+  plus AST/py_compile-level static self-checks (see Learning feedback
+  loop), not by an actual Odoo test-runner execution. This mirrors, not
+  substitutes for, the project's own established Odoo.sh live-validation
+  practice (Tasks 001-005) -- see "Items deferred" below.
+- **Files changed:** `addons/shopify_connector_core/models/
+  shopify_connector_job.py` (modify -- new `core_dispatch_selftest`
+  `job_type` value; `_domain_flag_for_job_type()`; the domain-flag
+  branch added inside `write()` alongside the unmodified store-state
+  re-check; `_claim_for_dispatch()`; five state-transition helpers --
+  `_transition_retry_waiting`/`_failed_retryable`/`_failed_final`/
+  `_blocked_manual_review`/`_skipped`, plus a shared `_log_transition`
+  private helper), `addons/shopify_connector_core/models/
+  shopify_connector_job_enqueue.py` (new, `AbstractModel`),
+  `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`
+  (new, `AbstractModel` -- `_get_handlers()` seam, `run_drain()`,
+  dispatch/checkpoint-3 logic, `JobHandlerError`, the DEC-009 retry-class
+  routing tables, `_schedule_retry_or_fail`/`_retry_delay_seconds`),
+  `addons/shopify_connector_core/data/shopify_connector_cron_drain.xml`
+  (new -- one `ir.cron` record, no view/menu/action),
+  `addons/shopify_connector_core/models/__init__.py` (two new import
+  lines), `addons/shopify_connector_core/tests/test_job_enqueue.py`
+  (new), `addons/shopify_connector_core/tests/test_job_dispatch.py`
+  (new), `addons/shopify_connector_core/tests/
+  test_job_retry_scheduling.py` (new, kept as its own file rather than
+  folded into `test_job_dispatch.py` -- retry-scheduling has enough
+  distinct scenarios, per the final prompt's own either/or option, to
+  warrant separation), `addons/shopify_connector_core/tests/__init__.py`
+  (three new import lines), `addons/shopify_connector_core/__manifest__.py`
+  (version `19.0.1.4.0` -> `19.0.1.5.0`; one new `data` entry for the
+  cron file), `docs/01-research/research-handoff.md` (this entry).
+  **Not modified:** `shopify_connector_job_log.py` (the existing five
+  `event_type` values -- `attempt`/`state_change`/`verification_read`/
+  `manual_action`/`note` -- fully covered every log write this task
+  needed; no sixth value was genuinely required), `shopify_connector_
+  store.py`, `shopify_connector_store_credential.py`, `shopify_connector_
+  store_settings.py`, `shopify_connector_location.py`, `shopify_connector_
+  binding_mixin.py`, `shopify_connector_api_client.py`, `tools/
+  redaction.py` (all read/called, never modified, exactly as forbidden),
+  no security/ACL file (both new models are `AbstractModel`s, mirroring
+  `shopify_connector_readiness_check.py`), no view/menu/action/wizard/
+  webhook/OAuth/domain-module file of any kind.
+- **What changed / residue fixed:** implemented the core sync-engine
+  skeleton exactly per the issued final prompt's six accepted gate-
+  opening decisions: **(A)** `_claim_for_dispatch()` on the job model
+  uses `try_lock_for_update()` per candidate row, silently skipping a
+  row it cannot lock, re-checking claimability under the lock (mirrors
+  Odoo's own official "Writing cron functions" worked example) -- never
+  a raw SQL `SKIP LOCKED` reimplementation, never a PostgreSQL advisory
+  lock. **(B)** `shopify.connector.job.dispatch._get_handlers()` is a
+  `job_type -> handler` dict-lookup registry seam, adapted (not copied)
+  from the `_get_checks()` inheritance-append precedent -- a job routes
+  to exactly one handler, a missing handler fails safely to
+  `failed_final`/`unknown_system_error`, never hangs, never silently
+  drops. **(C)** retry scheduling uses named, tunable constants (12 max
+  attempts, 30s base, x2 multiplier, 30-minute cap, +/-20% jitter,
+  24-hour window) plus a distinct 1-attempt "safety net" budget for
+  `unknown_system_error` (architecture gate §E's own framing) -- bounded
+  retries only, no infinite retries under any circumstance. **(D)** the
+  enqueue/dispatch file split matches the accepted default exactly, both
+  `AbstractModel`s, no `services/` package, no concrete model, no ACL
+  file. **(E)** batch size 20 / cron interval 5 minutes, both named
+  constants. **(F)** `core_dispatch_selftest` added inline to the
+  existing static `job_type` selection list, used only by this task's
+  own tests, never dispatched to a live Shopify call. Beyond the six
+  decisions: the enqueue service is a thin `Job.create()` wrapper adding
+  no new idempotency/scope-key mechanism (the existing `idempotency_key`/
+  `operation_scope_key` unique constraints do the work, reused verbatim
+  and proven via two collision tests each, using the established
+  `mute_logger('odoo.sql_db')` + `cr.savepoint()` pattern); the DEC-009
+  error-class taxonomy is fully and exhaustively mapped (all 16 fixed
+  `ERROR_CLASS_SELECTION` values, cross-checked programmatically --
+  see Learning feedback loop) across four routing buckets (auto-retry,
+  manual-fix-then-retry, conservative-never-silent -> `failed_retryable`
+  since `financial_total_mismatch` is not one of the six
+  `manual_review_subreason` values, and the six operator-confirmation-
+  required classes -> `blocked_manual_review` with a matching
+  subreason); a new domain-enabled execution-time-only gating hook
+  (`_domain_flag_for_job_type()`, DEC-013 §I.3) was added inside
+  `write()`'s existing `state -> 'running'` branch, alongside (never
+  replacing) the unmodified store-state re-check -- maps every job_type
+  shipped in this repo to `None` today (a true no-op in production),
+  tested only via a patched synthetic mapping, and proven never to run
+  at `create()` time (so it cannot alter an enqueue-time decision); a
+  third store-state checkpoint (`_invoke_handler`'s immediate pre-
+  dispatch re-check) narrows -- and is documented everywhere as **not
+  closing** -- the SRR-03 disconnect/in-flight-job race, exactly per
+  Decision A's own explicit framing; `action_disconnect()`
+  (`shopify_connector_store.py`) is untouched and proven (by test) to
+  already cancel jobs reaching the three new non-terminal states this
+  task makes reachable (`retry_waiting`/`failed_retryable`/
+  `blocked_manual_review`), since none of the three was ever in
+  `TERMINAL_JOB_STATES`.
+- **Items deferred:** every item the gate-opening proposal/gate document
+  named as preserved remains exactly as open as before this task --
+  VAL-B2 (deferred/not passed), MBQ-05 (Partially routed/Open), **TD-002
+  (confirmed still Open before any edit, not touched)**, the fulfillment
+  API model, product first-sync dedup thresholds, token acquisition for
+  many unrelated customers, Lite/Full packaging, the 16-vs-17
+  `@idempotent` mutation-count and OCA `queue_job` worker-count wording
+  discrepancies, checkpoint/resume ownership. **Live Odoo.sh runtime
+  validation (§I of the implementation-scope document) is not performed
+  by this session** -- cron drain firing in real Odoo runtime,
+  concurrency behavior under multiple `--max-cron-threads`, a live
+  SRR-03 reproduction, retry scheduling over real wall-clock time,
+  failed-job visibility in a live registry, a live server-log token-leak
+  grep, and savepoint/batch behavior at realistic volumes are all
+  **explicitly named as a separate, later, follow-up validation pass**
+  in this session's own PR body -- none is claimed as passed here. No
+  claim is made anywhere in code, tests, or docs that the claim
+  mechanism (Decision A) is proven safe under real concurrent-worker or
+  multi-server execution.
+- **Learning feedback loop:**
+  - New issues discovered: none rising to a defect-pattern-log entry.
+    One design subtlety worth naming for a future session: constructing
+    a genuine two-real-transaction concurrency test for the claim
+    mechanism is impractical inside Odoo's own `TransactionCase` harness
+    (test-mode cursors share the enclosing transaction's sandbox, so a
+    second `registry.cursor()` cannot observe uncommitted fixture data
+    from the first) -- the claim-guard tests in
+    `test_job_dispatch.py` therefore use `unittest.mock.patch.object` on
+    `try_lock_for_update()` itself to prove the code-level "skip an
+    already-locked row" contract, exactly as the gate-opening proposal's
+    own §4 anticipated ("a test proving ... is a code-level proof, not a
+    concurrent-worker proof") -- not a gap, but worth stating explicitly
+    so a future session does not mistake the mock-based test for a
+    stronger claim than it is.
+  - Repeated issue patterns: none.
+  - Rules/checklists updated: none this session (no repeated-issue
+    threshold reached).
+  - New rejected approaches: none.
+  - New technical debt: none -- no compromise was knowingly accepted;
+    `technical-debt-register.md` is unmodified (TD-002 confirmed Open,
+    not touched, per this task's own explicit instruction).
+  - Architecture concerns: none beyond what DEC-025/the gate-opening
+    proposal already flagged (SRR-03 narrowed-not-closed; the claim
+    mechanism's real concurrency safety unproven by unit tests; the
+    batch-size/interval defaults unvalidated at realistic volume) --
+    all restated, not resolved, by this task, exactly as required.
+  - Tests or review gates needed: a **separate, later, live Odoo.sh
+    validation session** (mirroring Task 004/005's own
+    `task-00X-validation-results.md` precedent) is the concrete next
+    gate this task's own PR body names but does not itself satisfy.
+  - Should future prompts change? No.
+  - **Self-verification performed this session (no live Odoo available):**
+    `python3 -m py_compile` on every new/modified file; a standalone
+    Python script replicating each new AST-based source-level test
+    (sudo-site count, `job_dispatch.py` zero-`.create(`-calls,
+    `job_enqueue.py`'s sole `.create(` target, no Shopify-API-client
+    reference in either new production file) -- all passed; an
+    independent numerical re-derivation of the retry backoff/jitter
+    formula against every bound assertion in
+    `test_job_retry_scheduling.py` (attempt 0, attempt 3, the 30-minute
+    cap, and the deterministic `random.uniform`-patched case) -- all
+    passed; a full manual line-by-line trace of every new test's control
+    flow against the production code for correctness (state
+    transitions, gating order, constraint interactions).
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next recommended session:** a live Odoo.sh runtime-validation pass
+  for this PR (mirroring `task-004-validation-results.md`/
+  `task-005-validation-results.md`) -- install the module fresh, run the
+  full `shopify_connector_core` test suite (must show all pre-existing
+  tests plus this task's new tests passing, zero domain modules
+  installed), then exercise the §I runtime-validation checklist items
+  this session's PR body names as not yet performed.
+- **Stop condition:** implementation complete per the issued final
+  prompt's exact allowed-files list; no domain-module task, no further
+  Task 006 sub-slice, and no other next-feature work started in this
+  session. Stopping here to open the PR as **draft** and await ChatGPT's
+  own review, per the final prompt's own closing instruction.
+
+---
+
 ### Task 006D — PR #130 consistency patch — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-006d-sync-engine-gate-opening-fp33xo` →
