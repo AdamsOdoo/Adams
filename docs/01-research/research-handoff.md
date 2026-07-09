@@ -1,5 +1,78 @@
 # Research Handoff (rolling)
 
+### Task 006C — PR #129 acceptance-status patch — compact handoff (2026-07-08)
+
+- **Branch / PR:** `claude/task-006c-sync-engine-scope-pmj6ta` → PR #129
+  into `Shopify-connector` (**draft**, unmerged; same PR, revised in
+  place — no new PR opened). Applies ChatGPT's content-level acceptance
+  of the Task 006C implementation-scope package, per control-room review
+  (GitHub review artifact/comment ID `4920363287`).
+- **Files changed:**
+  `docs/07-implementation-plan/task-006c-sync-engine-skeleton-implementation-scope.md`
+  (Status → Accepted by ChatGPT as planning/scope package, acceptance
+  date 2026-07-08; new Acceptance note added), `docs/05-qa/task-006c-pre-
+  implementation-review-checklist.md` (§14 Overall review decision
+  recorded as accepted-as-planning/scope-package-only), `docs/01-research/
+  research-handoff.md` (this entry). **Not modified:**
+  `task-006c-sync-engine-skeleton-final-prompt.md`,
+  `task-006c-sync-engine-gate-opening-proposal.md`,
+  `architecture-review-log.md`.
+- **What changed / residue fixed:** the Task 006C **implementation-scope
+  package is now accepted, content-wise, as a planning/scope package
+  only** — the underlying scope document's substance (§A–§L) is
+  unchanged by this patch; only its status block and a new Acceptance
+  note were added. **No code was authorized. No implementation gate was
+  opened. The final prompt was not issued or accepted — it remains
+  Draft only / Not issued, unmodified. The gate-opening proposal was not
+  accepted — it remains Proposed only / Does not open the gate,
+  unmodified.** No placeholder in the final-prompt draft was filled. The
+  execution-time claim/concurrency mechanism (§F item 1) and the
+  handler-registry seam shape (§F item 4) both remain undecided
+  candidates requiring ChatGPT approval in a future, separate
+  gate-opening act — this acceptance does not select either.
+- **Open choices preserved, unchanged by this acceptance:** the
+  execution-time claim/concurrency mechanism; the handler-registry seam
+  shape; the retry-default constants; the enqueue/dispatch file split;
+  the cron batch-size default — none is confirmed or selected by this
+  patch, all remain for a future gate-opening act.
+- **Every preserved open item remains exactly as open as before:**
+  VAL-B2 deferred/not passed; MBQ-05 Partially routed/Open; TD-002 Open;
+  fulfillment API model unresolved; product first-sync dedup thresholds
+  still domain-design work; token acquisition for many unrelated
+  customers unresolved; Lite/Full packaging not finalized; the 16-vs-17
+  `@idempotent` mutation-count and OCA `queue_job` worker-count wording
+  discrepancies both still open/non-blocking; multi-server/Odoo.sh
+  runtime concurrency proof still explicitly required. None of these was
+  touched by this patch.
+- **`architecture-review-log.md` was not modified** — unchanged from the
+  prior session; this acceptance patch proposes no new architecture
+  decision and records no new AR row.
+- **Items deferred:** none new.
+- **Learning feedback loop:** new issues discovered: none — this patch
+  applies a clean content-level acceptance outcome, with every
+  non-implementation guardrail restated, not weakened. Repeated issue
+  patterns: none. Rules/checklists updated: `task-006c-pre-
+  implementation-review-checklist.md` §14 updated to reflect the
+  recorded acceptance outcome. New rejected approaches: none. New
+  technical debt: none. Architecture concerns: none beyond what DEC-025
+  already flagged (carried forward unchanged). Should future prompts
+  change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next step:** a future, separately-scoped, separately-authorized
+  Task 006C gate-opening-decision session (to fix the still-open
+  candidates and separately accept the gate-opening proposal and issue
+  the final prompt) or a distinct future Task 006D — **neither is
+  started, selected, or authorized by this patch.** **This is not a
+  coding session.**
+- **Stop condition:** docs-only acceptance-status patch, no code
+  touched, no implementation authorized, no gate opened. Stopped after
+  pushing to the same PR #129 branch. No merge performed. PR remains
+  draft/unmerged, awaiting ChatGPT's final merge review.
+
+---
+
 ### Task 006C — sync-engine skeleton implementation-scope package — compact handoff (2026-07-08)
 
 - **Branch / PR:** `claude/task-006c-sync-engine-scope-pmj6ta` → PR into

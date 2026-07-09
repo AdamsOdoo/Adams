@@ -229,13 +229,41 @@
 
 ## 14. Overall review decision (record the outcome)
 
-- [ ] **Overall decision recorded:** accepted / accepted with minor
-      corrections / revise / reject (per
-      [`quality-feedback-loop.md`](./quality-feedback-loop.md) §2). Not
-      pre-filled by this session — left for ChatGPT's review turn.
-- [ ] If accepted with revision: the specific revision(s) required are
-      named here before proceeding to §5/§6 of
-      `task-006c-sync-engine-gate-opening-proposal.md`.
-- [ ] **Next recommended session:** named here only once ChatGPT decides
-      whether/when to proceed to the gate-opening act — not pre-decided
-      by this checklist.
+- [x] **Overall decision recorded: accepted as a planning/scope package
+      only.** ChatGPT accepted PR #129's content (control-room review,
+      GitHub review artifact/comment ID `4920363287`) on 2026-07-08 — the
+      Task 006C implementation-scope document is now **Accepted by
+      ChatGPT as planning/scope package** (acceptance date 2026-07-08),
+      recorded via its own Acceptance note.
+- [x] **Implementation remains unauthorized.** This acceptance patch, and
+      the acceptance it records, does not authorize any code, does not
+      create or modify any addon/Python/XML/CSV/security/manifest/
+      migration/CI file, and does not open the Task 006C implementation
+      gate.
+- [x] **The final prompt remains `Draft only / Not issued`.**
+      `task-006c-sync-engine-skeleton-final-prompt.md` was not modified by
+      this acceptance patch — its status, and every one of its
+      placeholders, are unchanged.
+- [x] **The gate-opening proposal remains `Proposed only / Does not open
+      the gate`.** `task-006c-sync-engine-gate-opening-proposal.md` was
+      not modified by this acceptance patch — its status is unchanged,
+      and it is not itself accepted by this patch.
+- [x] **The execution-time claim/concurrency mechanism remains
+      undecided** — still a candidate requiring ChatGPT approval in a
+      future, separate gate-opening act (implementation-scope §F item 1).
+- [x] **The handler-registry seam shape remains undecided** — still a
+      candidate requiring ChatGPT approval in a future, separate
+      gate-opening act (implementation-scope §F item 4).
+- [x] **No revision was required.** This acceptance patch applies a clean
+      "accepted as planning/scope package" outcome — no issue survived
+      this patch requiring a further revision round.
+- [x] **Next recommended session:** a future, separately-scoped,
+      separately-authorized session — either (a) a Task 006C
+      gate-opening-decision session, where ChatGPT's own act would fix
+      the still-open candidates (concurrency mechanism, handler-registry
+      shape, file split, retry defaults, cron batch size) and separately
+      accept the gate-opening proposal and issue the final prompt, or
+      (b) a distinct future Task 006D. **Neither is started, named as
+      selected, or authorized by this checklist update** — this remains a
+      control-room decision, not self-selected here. **This is not a
+      coding session.**

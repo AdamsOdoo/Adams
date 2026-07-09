@@ -1,6 +1,8 @@
 # Task 006C — Sync Engine Skeleton Implementation-Scope Package
 
-> **Status: Proposed / Pending ChatGPT review.** This document is a
+> **Status: Accepted by ChatGPT as planning/scope package.** Acceptance
+> date: **2026-07-08** (control-room review, GitHub review artifact/comment
+> ID `4920363287`, PR #129). This document remains a
 > **future-implementation-planning package only**. It authorizes **no
 > code**. It creates no Odoo module, model, view, XML, security file,
 > migration, CI/workflow file, or dependency. The `CLAUDE.md` §4–§5 no-code
@@ -8,10 +10,52 @@
 > implementation gate — that is a separate, later ChatGPT act, gated on
 > this document, its companion
 > [`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md)
-> (Status: **Draft only / Not issued**), and
+> (Status: **Draft only / Not issued** — unchanged by this acceptance), and
 > [`task-006c-sync-engine-gate-opening-proposal.md`](./task-006c-sync-engine-gate-opening-proposal.md)
-> (Status: **Proposed only / Does not open the gate**) all being separately
-> accepted, per §L below.
+> (Status: **Proposed only / Does not open the gate** — unchanged by this
+> acceptance) all being separately accepted, per §L below. See the
+> Acceptance note immediately below for the full scope of what this
+> acceptance does, and explicitly does not, do.
+
+## Acceptance note (2026-07-08)
+
+- **Accepted by ChatGPT** for PR #129, per control-room review (GitHub
+  review artifact/comment ID `4920363287`) — **content-wise, as a
+  planning/scope package only**.
+- **This accepts the Task 006C implementation-scope package only** — the
+  document you are reading. It does not accept, modify, or extend the
+  status of any other document.
+- **This does not authorize code.** No addon file, Python, XML, CSV,
+  manifest, security, migration, CI/workflow, controller, view, wizard,
+  OAuth, or domain-sync code is created, modified, or implied by this
+  acceptance.
+- **This does not open the Task 006C implementation gate.**
+- **This does not issue or accept the final prompt.**
+  [`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md)
+  is unmodified by this acceptance and remains **Draft only / Not
+  issued**.
+- **This does not accept the gate-opening proposal.**
+  [`task-006c-sync-engine-gate-opening-proposal.md`](./task-006c-sync-engine-gate-opening-proposal.md)
+  is unmodified by this acceptance and remains **Proposed only / Does not
+  open the gate**.
+- **This does not fill any placeholder** in the final-prompt draft (the
+  concurrency mechanism, the handler-registry shape, the retry-default
+  constants, the merge-commit SHA, or the file-split note) — every one
+  remains exactly as unresolved as before this acceptance.
+- **This does not select the execution-time claim/concurrency mechanism**
+  (§F item 1) — remains a candidate requiring ChatGPT approval in a
+  future, separate gate-opening act.
+- **This does not select the handler-registry seam shape** (§F item 4) —
+  remains a candidate requiring ChatGPT approval in a future, separate
+  gate-opening act.
+- **Task 006C implementation remains blocked** until a future, separately
+  authorized gate-opening act and a separately issued final prompt —
+  neither is created, started, or implied by this acceptance. Every open
+  item preserved by §G below (VAL-B2, MBQ-05, TD-002, the fulfillment API
+  model, product first-sync dedup, token acquisition, Lite/Full
+  packaging, the 16-vs-17 discrepancy, the OCA `queue_job` wording
+  discrepancy, and the multi-server/Odoo.sh runtime concurrency proof
+  requirement) remains exactly as open as it was before this acceptance.
 
 - **Session date:** 2026-07-08.
 - **Branch:** `claude/task-006c-sync-engine-scope-pmj6ta` (harness-designated
