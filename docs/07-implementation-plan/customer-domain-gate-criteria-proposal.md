@@ -8,9 +8,10 @@
 > (the accepted product-domain gate criteria, PR #136) and of
 > [`limited-core-implementation-gate.md`](./limited-core-implementation-gate.md)
 > and the Task 003/006C gate documents, but as a **criteria proposal only**,
-> not a gate-opening act itself, and **not yet reviewed or accepted by
-> ChatGPT** — unlike the product-domain document this one mirrors, which is
-> already Accepted.
+> not a gate-opening act itself. **Accepted by ChatGPT as criteria only**
+> (control-room review, comment ID `4928377625`) — mirroring the
+> product-domain document this one mirrors, which is already Accepted on
+> the same basis.
 
 ## 1. Status
 
@@ -24,10 +25,30 @@
 > document adds a new criterion 15 requiring the future Task 011 final
 > prompt to explicitly define ambiguous-match handling, and revises
 > criterion 13 to state the fallback-partner Task 011/Task 012 boundary
-> (Posture A) explicitly. **Still proposed only, not yet accepted; PR
-> remains draft, unmerged; no implementation authorized.**
+> (Posture A) explicitly. (Superseded in effect, not in text, by the
+> Acceptance note immediately below — kept verbatim as an accurate record of
+> this document's state at the time of this revision.)
 
-- **Proposed only. Not yet reviewed or accepted by ChatGPT.**
+> **Acceptance note (2026-07-09, ChatGPT control-room review, comment ID
+> `4928377625`).** ChatGPT **accepts the criteria list in §3 below as the
+> correct criteria, as criteria only.** This is a distinct act from
+> confirming those criteria are satisfied, which is itself distinct from
+> the gate-opening act (§4). **The customer-domain implementation gate
+> itself remains closed** — accepting this list does not open it, and does
+> not, by itself, authorize Task 011 implementation, Task 012, or any code
+> of any kind. Criterion 2 (MBQ-55 customer-binding portion accepted/
+> closed) is now **Satisfied**, since the companion naming proposal was
+> accepted by the same review — see §3 below for the full, criterion-by-
+> criterion status update.
+
+- **Accepted by ChatGPT as criteria only** (control-room review, comment ID
+  `4928377625`) — mirroring exactly how
+  `product-domain-gate-criteria-proposal.md`'s criteria were accepted for
+  the product domain via PR #136. **Accepting the criteria list as correct
+  is not the same as every criterion being satisfied, which is itself not
+  the same as the gate being opened** — see §3 for per-criterion status and
+  §4 for the gate-closure rule, both unchanged in substance by this
+  acceptance.
 - **Does not open the customer-domain implementation gate.** Even a future
   acceptance of the criteria list in §3 as the correct criteria is a
   distinct act from confirming those criteria are satisfied, which is
@@ -63,8 +84,15 @@ satisfy any of the criteria it lists, and it does not perform the act.
 
 ## 3. Proposed gate-opening criteria
 
-**Not yet reviewed by ChatGPT.** Satisfaction status is marked per criterion
-below, accurate as of this revision, not permanently fixed.
+**Accepted by ChatGPT as the correct criteria** (control-room review,
+comment ID `4928377625`). Accepting this list as the correct criteria is
+**not** the same as every criterion being satisfied — satisfaction status
+is marked per criterion below, accurate as of this revision, not
+permanently fixed: one additional criterion (criterion 2) is now satisfied
+by this same review's acceptance of the companion naming proposal; several
+others remain unsatisfied. **The gate remains closed** because not every
+criterion is yet satisfied, and because no separate, explicit ChatGPT
+gate-opening act has occurred.
 
 1. **Task 010 (product import/variant binding) closed and runtime-green.**
    PR #138 merged into `Shopify-connector` (merge commit
@@ -75,9 +103,11 @@ below, accurate as of this revision, not permanently fixed.
    `297f398da96d11d1f8f9e25a9d15570a66aed80a`). **Status: Satisfied.**
 2. **MBQ-55 (customer-binding portion) accepted/closed.**
    [`mbq-55-customer-binding-naming-schema-proposal.md`](./mbq-55-customer-binding-naming-schema-proposal.md)
-   proposes exact model/file/class/field names for the customer-binding
-   model, but **is not yet accepted by ChatGPT.** **Status: Not yet
-   satisfied.**
+   is now **Accepted by ChatGPT** for the customer-binding portion of MBQ-55
+   (control-room review, comment ID `4928377625`), including its corrected
+   ambiguous-match posture and its Posture A fallback-partner boundary. The
+   order-binding portion of MBQ-55 remains open, unaffected. **Status:
+   Satisfied.**
 3. **Task 011's final implementation prompt has exact file/model/field
    names.** Depends on criterion 2's acceptance; a future final-prompt
    session would still have to convert the accepted naming into an actual
@@ -114,8 +144,9 @@ below, accurate as of this revision, not permanently fixed.
    `test_customer_duplicate_prevention.py`,
    `test_customer_fallback_partner.py`) — a future final prompt confirms or
    revises these, it does not have to invent them from nothing. **Status:
-   Not yet satisfied** — starting-point names proposed, but not yet
-   confirmed by an accepted document or a final implementation prompt.
+   Not yet satisfied** — starting-point names proposed and now carried by
+   an accepted document (comment `4928377625`), but not yet confirmed by a
+   final implementation prompt.
 10. **Rollback plan defined.** Both Task 011 proposed-scope documents already
     carry a Rollback section (single-PR revert; reverting drops the
     customer-binding model; any already-created `res.partner` records
@@ -149,8 +180,11 @@ below, accurate as of this revision, not permanently fixed.
     order-level audit marker, are entirely Task 012's own future scope. The
     future final implementation prompt must restate this boundary
     explicitly, not merely define the field. **Status: Not yet satisfied**
-    — proposed only, not yet accepted or confirmed by a final implementation
-    prompt.
+    — the field name/home model and the Posture A boundary are now
+    Accepted, as part of the naming proposal's own acceptance (comment
+    `4928377625`), but exact field type/default/creation mechanics and the
+    final implementation prompt's own restatement of the boundary remain
+    open.
 14. **Address handling and company/person (`is_company`) classification
     explicitly scoped** (resolved, or explicitly excluded/deferred) in the
     final Task 011 prompt. Both remain **open, not yet decided anywhere in
@@ -171,16 +205,19 @@ below, accurate as of this revision, not permanently fixed.
     fixes the principle but not the exact field name(s)); and (d) that a
     binding row is created only once, and not before, an operator manually
     confirms exactly one candidate. **Status: Not yet satisfied** — the
-    principle is now fixed by the naming proposal (this revision); the exact
-    job/log field name(s) remain open for the final implementation prompt.
+    principle is now fixed **and Accepted** by the naming proposal's own
+    acceptance (comment `4928377625`); the exact job/log field name(s) used
+    to store candidate detail remain open for the final implementation
+    prompt.
 
 ## 4. Gate closure rule
 
-- **This criteria proposal is not yet Accepted.** Should ChatGPT accept it
-  as criteria only, a future, distinct, explicit ChatGPT act would still be
-  required to confirm every criterion in §3 satisfied before the gate
-  itself opens — mirroring `product-domain-gate-criteria-proposal.md` §4's
-  identical rule.
+- **This criteria proposal is now Accepted** (comment `4928377625`). **The
+  gate itself still opens only** by a distinct, future, explicit ChatGPT
+  gate-opening act confirming that every criterion in §3 is satisfied at
+  that time — not by this acceptance, and not by any individual criterion
+  being satisfied in isolation — mirroring
+  `product-domain-gate-criteria-proposal.md` §4's identical rule.
 - **If opened, the gate would authorize exactly one future implementation
   session — Task 011 only** — mirroring the pattern already used for Task
   003 (AR-029), Task 006C (AR-031), and Task 010
@@ -205,20 +242,23 @@ This document does not:
 - Authorize any code, module, model, view, controller, security file,
   manifest, test, or CI file of any kind.
 - Mark any criterion as satisfied that is not. §3 states each criterion's
-  actual satisfaction status as of this revision: criteria 1, 6, 7, 8, 10,
-  and 11 are satisfied; criteria 2, 3, 4, 5, 9, 12, 13, 14, and 15 remain
+  actual satisfaction status as of this revision: criteria 1, 2, 6, 7, 8,
+  10, and 11 are satisfied; criteria 3, 4, 5, 9, 12, 13, 14, and 15 remain
   unsatisfied. Satisfying every remaining criterion does not, by itself,
   open the gate — only a separate, explicit, future ChatGPT gate-opening act
   does that.
-- Mark MBQ-55 as fully Accepted or Resolved — only its product-template/
-  product-variant portion is Accepted; the customer-binding portion is
-  proposed only (companion document, not yet accepted); the order-binding
+- Mark MBQ-55 as fully Accepted or Resolved — its product-template/
+  product-variant portion is Accepted, and its customer-binding portion is
+  now Accepted (companion document, comment `4928377625`); the order-binding
   portion remains open.
 - Propose, define, or imply criteria for opening any gate covering order
   import (Task 012) — that remains a separate, future, not-yet-scoped
   proposal.
-- Claim ChatGPT accepted anything in this session. Nothing in this document
-  is asserted as already accepted.
+- Claim ChatGPT accepted anything beyond what is explicitly recorded above:
+  the criteria list in §3 as the correct criteria, and (via the companion
+  document) the MBQ-55 customer-binding portion. This does not claim the
+  customer-domain gate is open, that Task 011 is authorized, that Task 012
+  is authorized, or that any code is authorized.
 
 ---
 
@@ -243,7 +283,10 @@ This document does not:
   AR-034 (product-domain gate-criteria acceptance pattern this proposal
   mirrors) — access: Accessible, this repository, observed 2026-07-09.
 
-**Next step:** ChatGPT review of this criteria proposal alongside
-[`mbq-55-customer-binding-naming-schema-proposal.md`](./mbq-55-customer-binding-naming-schema-proposal.md),
-mirroring the PR #136 review pattern that accepted both the product-binding
-naming proposal and the product-domain gate criteria together.
+**Next step:** this criteria proposal and the companion
+[`mbq-55-customer-binding-naming-schema-proposal.md`](./mbq-55-customer-binding-naming-schema-proposal.md)
+(customer-binding portion) are now Accepted. The customer-domain
+implementation gate itself remains closed, and Task 011 remains
+unauthorized, until every criterion in §3 is confirmed satisfied and a
+distinct, explicit ChatGPT gate-opening act occurs. The immediate next
+step is ChatGPT's final merge review of PR #140.
