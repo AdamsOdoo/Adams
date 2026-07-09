@@ -1,5 +1,71 @@
 # Research Handoff (rolling)
 
+### PR #136 revised — MBQ-55 product portion and gate criteria accepted by ChatGPT — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/mbq-55-product-binding-schema-8kd3vp` (PR #136),
+  base `Shopify-connector`; revised in place after ChatGPT control-room
+  review (GitHub comment ID `4924917266`); **draft, unmerged.**
+- **What happened:** ChatGPT reviewed PR #136 and accepted, in principle,
+  (a) the product-template/product-variant portion of the MBQ-55
+  naming/schema proposal — exact model names
+  (`shopify.connector.product.template.binding`,
+  `shopify.connector.product.variant.binding`), the proposed
+  module/file/class names, and the field proposal — and (b) the
+  product-domain gate criteria proposal, **as criteria only**. This session
+  updated the two proposal documents' Status sections, the Task 010
+  linkage section, and AR-033/AR-034 to record that acceptance accurately,
+  without overclaiming.
+- **MBQ-55 product-template/product-variant portion: Accepted/closed.** The
+  customer-binding and order-binding portions of MBQ-55 **remain open**,
+  unaddressed by this or any prior session.
+- **Product-domain gate criteria: Accepted, as criteria only.** Some
+  criteria are already satisfied (PR #135 merged and its conclusions
+  accepted; the MBQ-55 product portion accepted; the standing
+  no-export/no-customer-order-inventory-fulfillment/no-UI-wizard-webhook-
+  OAuth scope exclusions; the rollback plan; the runtime/live-Shopify-
+  dependency statement); some remain unsatisfied (Task 010's file-exact
+  final prompt; exact allowed/forbidden files; dedup thresholds; final
+  test-file confirmation; the blocker-classification reconfirmation
+  required at gate-opening time).
+- **Product-domain implementation gate: still closed.** It opens only via a
+  future, distinct, explicit ChatGPT gate-opening act, once every criterion
+  is confirmed satisfied — not performed by this session.
+- **Task 010: still unauthorized.** No code, module, model, view,
+  controller, security, manifest, test, or CI file touched or authorized.
+- **AR-033 updated:** Review decision/Status corrected from "Proposed /
+  Under review — NOT Accepted" to **Accepted** (control-room comment ID
+  `4924290291`, PR #135) — records that PR #135's Option 2 ("not ready")
+  conclusion was itself already accepted when PR #135 merged; does not
+  newly authorize anything.
+- **AR-034 updated:** Review decision/Status corrected from "Proposed /
+  Under review — NOT Accepted" to **Accepted** (control-room comment ID
+  `4924917266`, PR #136) — records the acceptance described above, scoped
+  exactly as above.
+- **Files changed (this revision):**
+  [`../07-implementation-plan/mbq-55-product-binding-naming-schema-proposal.md`](../07-implementation-plan/mbq-55-product-binding-naming-schema-proposal.md),
+  [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md),
+  [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md)
+  (linkage section only), [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  (AR-033/AR-034), this handoff entry. No addon/code, test, manifest,
+  XML/security, migration, or CI file touched; no product module of any
+  kind created.
+- **Learning feedback loop:** no new issues discovered; no new
+  repeated-issue pattern; no rule/checklist change needed; no new rejected
+  approach (checked `rejected-approaches-log.md` for relevance — none
+  applicable); no new technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach · no
+  new technical debt · no repeated-issue escalation needed.
+- **Stop condition:** both proposal documents' Status sections revised to
+  Accepted (scoped exactly as above); the Task 010 linkage section
+  retitled and revised; AR-033/AR-034 corrected; this handoff entry
+  written; only the five allowed docs files changed; PR left
+  **draft/unmerged**; no merge performed; no implementation gate opened;
+  no product module or code written. **Next step: ChatGPT review of the
+  revised PR, then merge if accepted.**
+
+---
+
 ### MBQ-55 product binding naming/schema proposal and product-domain gate criteria — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/mbq-55-product-binding-schema-8kd3vp`, based on

@@ -24,20 +24,28 @@
 
 ## 1. Status
 
-- **Proposed / Under review.**
-- **Not accepted.** No ChatGPT acceptance of this document exists anywhere in
-  this repository as of this session.
+- **Accepted by ChatGPT** — for the product-template/product-variant
+  portion of MBQ-55 only, via control-room review, GitHub comment ID
+  `4924917266`, on PR #136.
+- **Closes only the product-template/product-variant portion of MBQ-55.**
+  The customer-binding and order-binding portions of MBQ-55 **remain fully
+  open**, unaddressed by this document or this acceptance — a future,
+  separate naming pass is still required before Tasks 011 (customer
+  import/matching) or 012 (order import).
 - **Does not authorize implementation of any kind.**
 - **Does not open the Task 010 implementation gate.**
 - **Does not open the product-domain gate** (see the companion document,
-  [`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md),
-  which only proposes criteria for that future, separate act).
+  [`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md) —
+  its criteria are accepted **as criteria only**; the product-domain
+  implementation gate itself remains closed until a distinct, future,
+  explicit ChatGPT gate-opening act confirms every criterion satisfied).
 - **Does not create any product module, file, model, or code.** Every model
-  name, file name, class name, and field name below is a **proposal**, not a
-  committed artifact — nothing in this document exists in the addon tree.
-- **Does not mark MBQ-55 (product portion or otherwise) as Resolved.** MBQ-55
-  remains **Open** until ChatGPT explicitly accepts this proposal (or a
-  revision of it).
+  name, file name, class name, and field name below is now an **accepted
+  proposed name**, not a committed artifact — nothing in this document
+  exists in the addon tree; a future, separately-authorized implementation
+  session still has to create the actual files.
+- **Does not authorize any product export/update, customer/order/inventory/
+  fulfillment logic, or any UI/wizard/webhook/OAuth file or behavior.**
 
 ## 2. Purpose
 
@@ -492,17 +500,20 @@ level only. It does not authorize, schedule, or start any implementation.
 
 ## 12. Impact on Task 010 readiness
 
-- **If this proposal is accepted by ChatGPT**, it would close **only the
-  product-template/product-variant portion** of MBQ-55. It would **not**
+- **This proposal is Accepted by ChatGPT** (control-room review, GitHub
+  comment ID `4924917266`, PR #136), closing **only the
+  product-template/product-variant portion** of MBQ-55. It does **not**
   close MBQ-55 as a whole — the customer-binding and order-binding portions
   (needed for Tasks 011/012) remain open and require their own, separate
   naming pass.
-- **What would still remain before the Task 010 gate can open**, even after
-  this proposal's acceptance:
+- **What still remains before the Task 010 gate can open**, even after this
+  proposal's acceptance:
   1. The **product-domain gate** itself must still be opened by a distinct,
-     explicit ChatGPT act — this document does not open it. See the
-     companion [`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md),
-     which proposes criteria for that act only.
+     explicit ChatGPT act — this acceptance does not open it. See the
+     companion [`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md)
+     (its criteria are now Accepted, but accepting the criteria list is not
+     the same as confirming every criterion satisfied, and is not the
+     gate-opening act itself).
   2. **Product first-sync dedup thresholds** (the MBQ-59 residual — exact
      eligibility-check/match-confidence thresholds) still need to be fixed,
      either in Task 010's own future final implementation prompt or
@@ -522,8 +533,12 @@ level only. It does not authorize, schedule, or start any implementation.
      binding models themselves or the underlying `product.template`/
      `product.product` records remains open (§8) — to be fixed in Task
      010's own final implementation prompt.
-- **Product-domain gate criteria still need acceptance** — yes, explicitly.
-  See the companion document.
+- **Product-domain gate criteria are Accepted, as criteria only** (same
+  PR #136 acceptance, comment ID `4924917266`) — see the companion
+  document. Acceptance of the criteria list is **not** the same as the
+  criteria being satisfied, or the gate being opened: the product-domain
+  implementation gate itself remains closed until a distinct, future,
+  explicit ChatGPT gate-opening act confirms every criterion satisfied.
 - **Product first-sync dedup thresholds still need to be fixed in the final
   Task 010 prompt** — yes, unchanged from `task-010-product-import-proposed.md`'s
   own existing statement; this document does not weaken or resolve that
@@ -543,13 +558,17 @@ This document does not:
   kind.
 - Authorize any UI, wizard, webhook, or OAuth/token-acquisition file or
   behavior of any kind.
-- Mark MBQ-55 — in whole or in the product portion addressed here — as
-  Accepted or Resolved. MBQ-55 remains Open until ChatGPT explicitly
-  accepts this proposal (or a revision of it) via a recorded acceptance
-  act, mirroring how `core-naming-schema-planning.md` required its own
-  explicit ChatGPT acceptance (AR-019) before MBQ-01/02 closed for the
-  core models.
-- Claim ChatGPT accepted anything in this session.
+- Mark MBQ-55 **as a whole** as Accepted or Resolved. Only the
+  product-template/product-variant portion is Accepted, via this session's
+  recorded acceptance act (control-room review, GitHub comment ID
+  `4924917266`, PR #136), mirroring how `core-naming-schema-planning.md`'s
+  own explicit ChatGPT acceptance (AR-019) closed MBQ-01/02 for the core
+  models only. The customer-binding and order-binding portions of MBQ-55
+  remain Open, requiring their own future, separate naming pass.
+- Overstate this acceptance as authorizing Task 010, opening the Task 010
+  implementation gate, or opening the product-domain implementation gate —
+  none of those follow from this acceptance; each remains its own
+  distinct, separate, future ChatGPT act.
 
 ---
 
@@ -593,5 +612,12 @@ This document does not:
   session to confirm the test-file naming convention — access: Accessible,
   this repository, observed 2026-07-09.
 
-**Next step:** ChatGPT review of this proposal and the companion
-[`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md).
+**Next step:** with this naming/schema proposal (product-template/
+product-variant portion) and the companion
+[`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md)
+now Accepted, a future session may draft Task 010's file-exact final
+implementation prompt and a product-domain gate-opening proposal using the
+accepted names — the product-domain implementation gate itself still
+requires its own separate, explicit ChatGPT gate-opening act, confirming
+every criterion in the gate-criteria document satisfied, before it opens
+or Task 010 is authorized.
