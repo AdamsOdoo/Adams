@@ -224,6 +224,27 @@ its own later chat turn, after PR #137 merges. This section does not
 itself change the criteria in §3 above, and does not authorize any Task
 010 code — that remains gated on the prompt actually being issued.
 
+## 8. Task 010 implementation merged — gate stays closed (post-merge status note)
+
+**Added 2026-07-09, docs-only, no new decision.** Per §4's own closure
+rule, the gate closed the moment the Task 010 implementation PR (#138)
+was opened as draft. That PR has since **merged** into
+`Shopify-connector` (merge commit
+`1f478032d8581a949fa7820847e5c1ab419586b4`), and a post-merge Odoo.sh
+runtime build is **green** (`shopify_connector_core` 187 tests,
+`shopify_connector_product` 61 tests, 0 failed, 0 error(s) of 220
+tests) — see
+[`../05-qa/task-010-product-import-validation-results.md`](../05-qa/task-010-product-import-validation-results.md)
+§K and
+[`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+AR-036 (Accepted). **This note records that merge and runtime result
+only.** Consistent with §4/§5 above, the gate itself remains **closed**
+for further product-domain work — this note does not reopen it, does
+not authorize Task 011/012/013/014/015 or any other implementation, and
+does not add or revise any criterion in §3. A new task requires its own
+separate planning/gate-proposal session and its own explicit ChatGPT
+authorization, exactly as this document's own §4/§5 already require.
+
 ---
 
 ## Evidence / references

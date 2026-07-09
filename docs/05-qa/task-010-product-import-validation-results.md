@@ -2,6 +2,17 @@
 
 ## Summary
 
+**Post-merge update (2026-07-09) — superseded by §K below.** PR #138
+merged into `Shopify-connector` (merge commit
+`1f478032d8581a949fa7820847e5c1ab419586b4`) and a subsequent Odoo.sh
+runtime build is **green**: `shopify_connector_core` 187 tests,
+`shopify_connector_product` 61 tests, final result **0 failed, 0
+error(s) of 220 tests**. §K below is the authoritative closure record
+for Task 010's runtime-validation status; everything below this point
+in the Summary, and §A–§J, describe the PR's history up to and
+including the draft/unmerged, still-REVISE state as it stood before
+this post-merge evidence — accurate as history, not as current status.
+
 **Revised a third time after a second actual Odoo.sh runtime red
 build, PR still DRAFT — not accepted, not merged.** ChatGPT reviewed
 the first red-build evidence (GitHub comment ID `4927278355`) and
@@ -653,7 +664,95 @@ OAuth/export/customer/order/inventory/fulfillment scope added; no
 Shopify mutation logic added; this document, AR-036, the handoff, and
 the PR body all updated; PR remains draft/unmerged.
 
-## Stop condition
+## K. Final post-merge validation (2026-07-09) — PR #138 merged, runtime-green
+
+**This section is the authoritative, current closure record for Task
+010's runtime-validation status, superseding the "DRAFT, unmerged" /
+"pending the next Odoo.sh build" language in §A–§J and in the original
+Stop condition below (kept, unedited, as history).** This section is
+itself **docs-only** — it does not modify any addon/code, test,
+manifest, XML/security, migration, or CI file.
+
+### K.1 Merge
+
+PR #138 ("Task 010: Shopify product import and variant binding")
+merged into `Shopify-connector`. **Merge commit:
+`1f478032d8581a949fa7820847e5c1ab419586b4`.** This resolves the
+draft/unmerged status described throughout §A–§J — the fix from §J
+(narrowing the singleton-variant shortcut to `existing_binding`/
+`created` template-resolution sources only) was the last production
+change made before merge; no further production or test file changed
+between §J and merge.
+
+### K.2 Green Odoo.sh runtime evidence (user-provided, not independently re-run by Claude)
+
+- `shopify_connector_core`: **187 tests.**
+- `shopify_connector_product`: **61 tests.**
+- **Final result: 0 failed, 0 error(s) of 220 tests.**
+- Database/build name: `adamsmen-shopify-connector-34704468`.
+- Timestamp range: `2026-07-09 17:18:02` to `2026-07-09 17:18:12`.
+
+This is the first **green** Odoo.sh result this PR has received, after
+the two red builds recorded in §I and §J. As with every other runtime
+evidence record in this document, it is reported honestly as
+user-provided — this Claude Code session has no local Odoo/PostgreSQL
+runtime and did not independently execute these tests.
+
+### K.3 SQL ERROR / ACL denied log noise — expected, not failures
+
+The build log for this run contains SQL `ERROR` lines and ACL `denied`
+lines. These are **expected negative-test noise, not failures**:
+
+- **SQL constraint `ERROR` lines** are the expected output of this
+  addon's own required-field/constraint tests (e.g. the
+  `product_template_id`/`product_variant_id` `required=True` binding
+  fields per the accepted MBQ-55 schema, §C above) — a test that
+  asserts a constraint violation is correctly raised necessarily causes
+  PostgreSQL to log that violation as an `ERROR` line, even though the
+  Odoo test runner itself records the test as passing (the test
+  asserts the exception, catches it, and rolls back). This is the same
+  class of expected noise already described for this project's
+  general test-writing pattern (constraint/negative-path tests
+  intentionally trigger a database-level error to prove the guard
+  works) and is not evidence of an actual defect.
+- **ACL `denied` lines** are the expected output of this addon's own
+  access-matrix tests (e.g. `test_access_matrix_across_four_groups` in
+  `test_product_variant_binding.py`, §I.3 above) — a test that asserts
+  a given group is correctly denied a given operation necessarily
+  causes Odoo's ACL layer to log that denial, even though the test
+  itself passes (it asserts the denial is raised). This is not
+  evidence of a real permission defect.
+- Neither noise source is counted against the reported **0 failed, 0
+  error(s) of 220 tests** result — that figure is Odoo's own test-runner
+  summary, which already accounts for expected-exception assertions
+  passing correctly.
+
+### K.4 Acceptance
+
+**Task 010 runtime validation is accepted.** PR #138 is merged into
+`Shopify-connector` (merge commit
+`1f478032d8581a949fa7820847e5c1ab419586b4`); the post-merge Odoo.sh
+build is green (§K.2); the log noise that could otherwise be
+misread as failures is explained and confirmed non-blocking (§K.3).
+This closes out the fix-revise-revalidate cycle described in §H/§I/§J.
+
+**What this acceptance does NOT do:** it does not reopen or narrow any
+of the in-task decisions recorded in §C; it does not resolve VAL-B2,
+MBQ-05, TD-002, the fulfillment API model decision, Lite/Full
+packaging, or the multi-server/concurrent-worker safety proof
+(SRR-03/04/09) — all remain exactly as open as §F states, untouched by
+this record. It does not authorize Task 011 (customer import/
+matching), Task 012 (order import), Task 013 (inventory sync), Task
+014 (fulfillment/tracking), Task 015 (product write/export), any UI,
+webhook, OAuth, or Lite/Full packaging work. The next step is a
+separate, explicit planning/gate proposal for whichever task ChatGPT
+selects next — not direct implementation. See
+[`../05-qa/architecture-review-log.md`](./architecture-review-log.md)
+AR-036 (status updated to Accepted) and
+[`../01-research/research-handoff.md`](../01-research/research-handoff.md)
+for the current handoff record.
+
+## Stop condition (original — see §K above for the current, superseded-by-merge status)
 
 Per final prompt §14: this PR is opened as **DRAFT**. It is not marked
 ready for review and not merged. This revision (comment ID
@@ -665,3 +764,9 @@ confirm, a green result. ChatGPT's own separate review is the next
 required act — see the mandatory handoff update
 ([`research-handoff.md`](../01-research/research-handoff.md)) for the
 exact next-session prompt.
+
+**Superseded by §K above (2026-07-09):** PR #138 has since merged into
+`Shopify-connector` and received a green Odoo.sh runtime build. This
+original Stop condition text is kept verbatim as an accurate record of
+this PR's status at the time it was written; it is no longer the
+current status.

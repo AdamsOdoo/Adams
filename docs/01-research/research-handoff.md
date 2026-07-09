@@ -1,5 +1,96 @@
 # Research Handoff (rolling)
 
+### Task 010 merged and runtime-green — post-merge closure (2026-07-09)
+
+- **What happened:** PR #138 (Task 010: Shopify product import and
+  variant binding), previously draft/unmerged through three REVISE
+  cycles (see the entry directly below), has since **merged** into
+  `Shopify-connector`. **Merge commit:
+  `1f478032d8581a949fa7820847e5c1ab419586b4`.** A subsequent Odoo.sh
+  runtime build is **green**.
+- **Final test counts (user-provided Odoo.sh evidence, not
+  independently re-run by Claude):** `shopify_connector_core` — 187
+  tests; `shopify_connector_product` — 61 tests; final result **0
+  failed, 0 error(s) of 220 tests**. Database/build name
+  `adamsmen-shopify-connector-34704468`; timestamp range
+  `2026-07-09 17:18:02` to `2026-07-09 17:18:12`.
+- **Build-log noise, explained:** the SQL constraint `ERROR` lines and
+  ACL `denied` lines present in the log are expected negative-test
+  noise — the addon's own required-field/constraint tests and its
+  four-group access-matrix tests intentionally trigger a database-level
+  error / an ACL denial to prove each guard works, and the Odoo test
+  runner correctly records those tests as passing. They are not
+  failures and are not counted against the reported 0/0 result. Full
+  explanation:
+  [`../05-qa/task-010-product-import-validation-results.md`](../05-qa/task-010-product-import-validation-results.md)
+  §K.3.
+- **Records updated this session (docs-only closure patch):**
+  [`../05-qa/task-010-product-import-validation-results.md`](../05-qa/task-010-product-import-validation-results.md)
+  new §K (final post-merge validation, merge commit, green evidence,
+  noise explanation, acceptance); AR-036 in
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  updated from **Proposed** to **Accepted**, with a new AR-036
+  Acceptance Note footnote citing the merge commit and green evidence;
+  this handoff entry;
+  [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md)
+  and
+  [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md)
+  each received a short status note marking Task 010
+  implemented/merged/runtime-green, with no scope rewrite and no new
+  decision added.
+- **What this closure does NOT do:** it does not reopen or narrow any
+  of the in-task decisions recorded in
+  `task-010-product-import-validation-results.md` §C; it does not
+  resolve or touch **VAL-B2, MBQ-05, TD-002, the fulfillment API model
+  decision, Lite/Full packaging, or the multi-server/concurrent-worker
+  safety proof (SRR-03/04/09)** — all remain exactly as open as before
+  this closure. It does not authorize Task 011 (customer import/
+  matching), Task 012 (order import), Task 013 (inventory sync), Task
+  014 (fulfillment/tracking), Task 015 (product write/export), any UI,
+  webhook, OAuth, or Lite/Full packaging work. **Next step is planning /
+  a gate proposal for whichever task ChatGPT selects next — not direct
+  implementation.**
+- **Learning feedback loop:** no new defect, rejected approach, or
+  technical-debt item is introduced by this closure — it is a pure
+  evidence-recording patch. The pattern worth carrying forward: when a
+  runtime build log contains `ERROR`/`denied` lines from intentional
+  negative-path tests, record the explanation explicitly next to the
+  green result (as §K.3 now does) so a future reviewer does not
+  misread expected constraint/ACL-denial noise as a regression. No
+  entry required in `rejected-approaches-log.md` (checked — not
+  applicable) or `technical-debt-register.md` (checked — not
+  applicable; nothing new is deferred by this patch).
+- **Quality gate confirmation:** handoff updated (this block) ·
+  feedback loop checked (above) · learning captured (above) · no new
+  rejected approach · no new technical debt · only the five allowed
+  files for this closure patch were touched (validated below) · main
+  and plain `dev` untouched.
+- **Branch / PR:** `claude/task-010-post-merge-docs-a6lhw6`, base
+  `Shopify-connector`; a new **draft** PR opened for this docs-only
+  closure patch — see the PR body for the exact number. This closure
+  patch does not itself authorize any next implementation task.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT reviews the docs-only Task 010 post-merge closure PR (branch
+claude/task-010-post-merge-docs-a6lhw6, base Shopify-connector) against
+docs/05-qa/task-010-product-import-validation-results.md §K,
+docs/05-qa/architecture-review-log.md AR-036 (row + Acceptance Note
+footnote), and this handoff's top entry. Confirm: PR #138's merge
+commit and the green Odoo.sh evidence are recorded accurately; the SQL
+ERROR / ACL denied log-noise explanation is correct and non-blocking;
+AR-036's Accepted status is warranted; VAL-B2, MBQ-05, TD-002, the
+fulfillment API model decision, Lite/Full packaging, and the
+multi-server concurrency proof (SRR-03/04/09) all remain open and
+untouched. If confirmed, merge this closure PR into Shopify-connector,
+then separately decide and explicitly authorize which task comes next
+(customer import/matching, order import, inventory sync, fulfillment/
+tracking, or product write/export) via its own planning/gate-proposal
+session — this closure PR does not authorize implementation of any of
+them.
+```
+
 ### Task 010 product import PR #138 revised after second Odoo.sh red build — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-010-product-import-gate-0uh7g4`, base
