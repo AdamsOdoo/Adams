@@ -1,5 +1,126 @@
 # Research Handoff (rolling)
 
+### PR #140 revised after ChatGPT control-room review — ambiguous-match fix, fallback-partner boundary (2026-07-09)
+
+- **What happened:** ChatGPT reviewed PR #140 (the Task 011 customer import
+  readiness and binding-naming proposal package, entry directly below) via
+  GitHub control-room comment ID `4928244425` and required **revision
+  before merge**. PR #140 was revised in place; it remains **draft,
+  unmerged**. No implementation is authorized by this revision.
+- **Blocking issue found and fixed:** the naming proposal
+  ([`../07-implementation-plan/mbq-55-customer-binding-naming-schema-proposal.md`](../07-implementation-plan/mbq-55-customer-binding-naming-schema-proposal.md))
+  originally proposed that an ambiguous customer match (multiple plausible
+  email candidates) creates a `shopify.connector.customer.binding` row in
+  `status = 'review'` with no `match_key`. This was **unsafe and
+  structurally inconsistent**: `partner_id` is `required=True`, and an
+  ambiguous match has no single confirmed candidate — creating a row would
+  force an automatic guess among several `res.partner` candidates, directly
+  contradicting DEC-006/RA-006's no-guessing posture and the **Task 010
+  precedent** (ambiguous/blind product matches never create a binding row;
+  the job routes to `blocked_manual_review` instead —
+  `../05-qa/task-010-product-import-validation-results.md` §C.2).
+- **Revised posture (applied across all four Task 011 documents):**
+  1. **Ambiguous customer matches now create no binding row.** The job/
+     import attempt routes directly to `blocked_manual_review` with the
+     `ambiguous match` sub-reason; candidate `res.partner` detail (IDs/
+     display-names/emails considered) is stored at the
+     `shopify.connector.job`/`.job.log` level only, never in a binding row.
+     A binding row for the Shopify Customer GID is created only once, and
+     not before, an operator manually confirms exactly one candidate — at
+     that point with a real `partner_id`, `match_key = 'manual'`, and
+     `matched_by_uid`/`matched_at` populated. `status = 'review'` on this
+     model is now explicitly scoped to lifecycle review of an
+     **already-real** binding (e.g. stale/recreated Shopify ID, manual
+     override) — never a placeholder for an unresolved candidate selection.
+     The exact job/log field(s) used to store candidate detail remain open,
+     tracked as a new gate criterion (criterion 15) and blocker row for a
+     future final implementation prompt to fix.
+  2. **Fallback-partner Task 011/Task 012 boundary — Posture A chosen.**
+     Task 011 proposes only the `customer_fallback_partner_id` store-
+     settings config field as inert supporting substrate — zero
+     order-resolution behavior, zero consumption within Task 011's own
+     import/matching flow, zero coupling to order import. The decision of
+     when/how an order is actually routed to that partner, and its
+     order-level audit marker, remain entirely **Task 012's** own future,
+     separately-authorized scope. Posture B (deferring the field's
+     definition entirely to Task 012) was considered and not chosen, since
+     the field is inert configuration data with no behavior of its own.
+- **Files revised (all within this session's allowed-files list, no new
+  files):**
+  [`../07-implementation-plan/mbq-55-customer-binding-naming-schema-proposal.md`](../07-implementation-plan/mbq-55-customer-binding-naming-schema-proposal.md)
+  (§1 revision note; §3 new constraint bullet citing the Task 010
+  precedent; §7.1.A status-field clarification; §9 ambiguous-match and
+  no-PII-fallback bullets rewritten; §7.3 Posture A statement added; §10
+  flow steps 5/6 rewritten; §11 three new alternatives-rejected rows; §12
+  new residual item);
+  [`../07-implementation-plan/customer-domain-gate-criteria-proposal.md`](../07-implementation-plan/customer-domain-gate-criteria-proposal.md)
+  (§1 revision note; criterion 13 revised for the Posture A boundary; new
+  criterion 15 for ambiguous-match handling; §5 satisfaction-count updated);
+  [`../07-implementation-plan/task-011-customer-import-gate-readiness.md`](../07-implementation-plan/task-011-customer-import-gate-readiness.md)
+  (Status revision note; §5 blocker table gained a new ambiguous-match row
+  and a revised fallback-partner row; §9 two new named risks);
+  [`../07-implementation-plan/task-011-customer-import-proposed.md`](../07-implementation-plan/task-011-customer-import-proposed.md)
+  (§1 revision note; §2 new item 8 summarizing both corrections);
+  `docs/05-qa/architecture-review-log.md` (AR-037 row's Review-decision
+  column updated from "Proposed for ChatGPT review" to **REVISE**, citing
+  comment `4928244425` and the full corrected posture); this handoff entry.
+- **What this revision does NOT do:** it does not accept, authorize, or
+  open anything. PR #140 remains **draft, unmerged**. Task 011 remains
+  unauthorized. Task 012 (order import) remains unauthorized and untouched.
+  MBQ-55's customer-binding portion remains Open (revised, but still not
+  accepted). No code, module, view, controller, security, manifest, test,
+  CI, XML, or CSV file was touched; `shopify_connector_core` and
+  `shopify_connector_product` remain untouched.
+- **Learning feedback loop:** the recurring pattern now confirmed a second
+  time (first for the product domain, mid-implementation via Task 010's own
+  in-task correction; now for the customer domain, caught at the
+  naming-proposal stage before any implementation) — a binding model with a
+  `required=True` Odoo-side relational field structurally cannot represent
+  an ambiguous/unresolved match as a row of that model, because doing so
+  would force an automatic guess. Any future domain binding-naming proposal
+  (order/Task 012, inventory/Task 013, FulfillmentOrder/Task 014) should
+  check this pattern explicitly during its own naming pass, rather than
+  waiting for a future implementation session to discover and fix it
+  in-task, as Task 010 originally did. No new rejected approach logged
+  (RA-006 already covers the underlying no-guessing rule; not re-logged).
+  No new technical debt (this is a pre-implementation documentation
+  correction, not a shipped compromise).
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked (above) · learning captured (above) · no new rejected
+  approach · no new technical debt · only the six allowed files for this
+  session were touched (validated: the four `07-implementation-plan`
+  documents above, `architecture-review-log.md`, `research-handoff.md`) ·
+  no code/XML/CSV/security/addon file changed · `main` and plain `dev`
+  untouched · PR #140 remains draft/unmerged.
+- **Branch / PR:** `claude/task-011-customer-readiness-5xunqw`, PR #140,
+  base `Shopify-connector` — revised in place, **still draft, still
+  unmerged.**
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT re-reviews the revised PR #140 (branch
+claude/task-011-customer-readiness-5xunqw, base Shopify-connector) against
+docs/07-implementation-plan/mbq-55-customer-binding-naming-schema-proposal.md
+§1/§3/§7.1.A/§9/§10/§11, docs/07-implementation-plan/customer-domain-gate-criteria-proposal.md
+§1/§3 (criteria 13 and 15), docs/07-implementation-plan/task-011-customer-import-gate-readiness.md
+§5/§9, docs/07-implementation-plan/task-011-customer-import-proposed.md §1/§2,
+and docs/05-qa/architecture-review-log.md AR-037 (REVISE decision + revised
+posture). Confirm: partner_id remains required on
+shopify.connector.customer.binding; an ambiguous customer match no longer
+creates any binding row and instead routes to blocked_manual_review with
+candidate detail stored at job/log level only; status = 'review' is now
+correctly scoped to lifecycle review of an already-real binding only; the
+Posture A fallback-partner boundary (Task 011 = config field substrate
+only, zero order-resolution behavior; Task 012 = all order-routing/audit-
+marker logic) is stated consistently and does not drag order-import
+behavior into Task 011. If satisfied, the recommended next step is
+accepting the naming proposal and the gate-criteria proposal together
+(mirroring the PR #136 pattern), after which a future session could draft
+Task 011's file-exact final implementation prompt — this PR does not
+authorize that drafting or any Task 011/Task 012 code.
+```
+
 ### Task 011 customer import readiness and binding-naming proposal package (2026-07-09)
 
 - **What happened:** confirmed Task 010 is closed and runtime-green (PR #138

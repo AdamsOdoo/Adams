@@ -13,6 +13,16 @@
 
 ## 1. Status
 
+> **Revision note (2026-07-09, ChatGPT control-room review, comment ID
+> `4928244425`).** The companion
+> [`mbq-55-customer-binding-naming-schema-proposal.md`](./mbq-55-customer-binding-naming-schema-proposal.md)
+> was revised to remove an unsafe ambiguous-match placeholder-binding-row
+> behavior and to adopt an explicit Task 011/Task 012 fallback-partner
+> boundary (Posture A — see §2 item 8 below). This document's own scope/
+> preconditions are unaffected; it is updated only for cross-reference
+> consistency. **Still proposed only, not authorized; PR remains draft,
+> unmerged.**
+
 **Proposed only. Not authorized.** Prepared after PR #138 (Task 010
 implementation) and PR #139 (Task 010 post-merge closure docs) both merged
 into `Shopify-connector`, in the same session as
@@ -83,6 +93,24 @@ which reopen or contradict that document's own scope/objective/approach:
 7. **Address handling and company/person (`is_company`) classification
    remain open, unchanged.** Neither the original draft nor any document
    read this session resolves either gap.
+8. **Two corrections made after ChatGPT control-room review (comment
+   `4928244425`), before this PR could merge:** (a) the naming proposal's
+   original wording — an ambiguous customer match creates a
+   `shopify.connector.customer.binding` row in `status = 'review'` with no
+   `match_key` — was unsafe and structurally inconsistent, since
+   `partner_id` is required and no single confirmed candidate exists for an
+   ambiguous match; the naming proposal now specifies that ambiguous matches
+   create **no** binding row, routing instead to `blocked_manual_review`
+   with candidate detail stored at the job/log level only, mirroring the
+   Task 010 precedent. (b) the fallback-partner concept is now bounded by an
+   explicit **Posture A**: Task 011 proposes only the
+   `customer_fallback_partner_id` store-settings config field as inert
+   substrate, with zero order-resolution behavior and zero consumption
+   within Task 011's own flow — the decision of when/how an order is routed
+   to that partner remains entirely Task 012's future scope. Both
+   corrections are detailed in
+   [`mbq-55-customer-binding-naming-schema-proposal.md`](./mbq-55-customer-binding-naming-schema-proposal.md)
+   §1 (revision note), §7.1.A, §7.3, §9, §10, and §11.
 
 ## 3. Objective, approach, and exclusions — restated by reference
 

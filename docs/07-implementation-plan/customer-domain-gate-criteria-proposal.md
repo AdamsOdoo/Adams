@@ -14,6 +14,19 @@
 
 ## 1. Status
 
+> **Revision note (2026-07-09, ChatGPT control-room review, comment ID
+> `4928244425`).** ChatGPT required revision before merge to
+> [`mbq-55-customer-binding-naming-schema-proposal.md`](./mbq-55-customer-binding-naming-schema-proposal.md)
+> (an ambiguous customer match must not create a placeholder
+> `shopify.connector.customer.binding` row, since `partner_id` is required
+> and candidate selection would be an automatic guess) and to the fallback-
+> partner boundary (must not drag order-import behavior into Task 011). This
+> document adds a new criterion 15 requiring the future Task 011 final
+> prompt to explicitly define ambiguous-match handling, and revises
+> criterion 13 to state the fallback-partner Task 011/Task 012 boundary
+> (Posture A) explicitly. **Still proposed only, not yet accepted; PR
+> remains draft, unmerged; no implementation authorized.**
+
 - **Proposed only. Not yet reviewed or accepted by ChatGPT.**
 - **Does not open the customer-domain implementation gate.** Even a future
   acceptance of the criteria list in §3 as the correct criteria is a
@@ -124,22 +137,42 @@ below, accurate as of this revision, not permanently fixed.
     satisfied** — reconfirmation is a point-in-time act to be performed when
     the gate-opening act itself is considered, not before (mirrors
     `product-domain-gate-criteria-proposal.md` criterion 12 exactly).
-13. **Customer fallback-partner store-settings field proposed and
-    reviewed.** `mbq-55-customer-binding-naming-schema-proposal.md` §7.3
-    proposes `customer_fallback_partner_id` on
-    `shopify.connector.store.settings` as the field's name and home model —
-    a customer-domain-specific criterion with no product-domain analog,
-    added because MBQ-29's Resolved status (§3 of the naming proposal) makes
-    the fallback-partner concept a concrete, now-confirmed Phase 1 mechanism
-    Task 011 must actually implement, not an open design question it can
-    defer. **Status: Not yet satisfied** — proposed only, not yet accepted
-    or confirmed by a final implementation prompt.
+13. **Customer fallback-partner store-settings field proposed and reviewed,
+    with an explicit Task 011/Task 012 boundary.**
+    `mbq-55-customer-binding-naming-schema-proposal.md` §7.3 proposes
+    `customer_fallback_partner_id` on `shopify.connector.store.settings` as
+    the field's name and home model, and adopts **Posture A**: Task 011 may
+    propose/implement only this config field as supporting substrate, with
+    **zero order-resolution behavior, zero consumption of the field within
+    Task 011's own flow, and zero coupling to order import** — the decision
+    of when/how an order is actually routed to this partner, and its
+    order-level audit marker, are entirely Task 012's own future scope. The
+    future final implementation prompt must restate this boundary
+    explicitly, not merely define the field. **Status: Not yet satisfied**
+    — proposed only, not yet accepted or confirmed by a final implementation
+    prompt.
 14. **Address handling and company/person (`is_company`) classification
     explicitly scoped** (resolved, or explicitly excluded/deferred) in the
     final Task 011 prompt. Both remain **open, not yet decided anywhere in
     this repository** (restated unchanged from
     `task-011-customer-import-matching-proposed.md`). **Status: Not yet
     satisfied.**
+15. **Ambiguous-customer-match handling explicitly defined in the final
+    Task 011 prompt — added this revision, per ChatGPT control-room review
+    (comment `4928244425`).** The future final implementation prompt must
+    explicitly define: (a) that an ambiguous customer match (multiple
+    plausible email/customer-key candidates) creates **no**
+    `shopify.connector.customer.binding` row — `partner_id` is required, and
+    a row cannot exist without one single confirmed candidate; (b) that the
+    job/import attempt instead routes directly to `blocked_manual_review`
+    with the `ambiguous match` sub-reason; (c) the exact job/log field(s)
+    used to store candidate `res.partner` detail (never a binding row —
+    `mbq-55-customer-binding-naming-schema-proposal.md` §9/§10/§12 item 7
+    fixes the principle but not the exact field name(s)); and (d) that a
+    binding row is created only once, and not before, an operator manually
+    confirms exactly one candidate. **Status: Not yet satisfied** — the
+    principle is now fixed by the naming proposal (this revision); the exact
+    job/log field name(s) remain open for the final implementation prompt.
 
 ## 4. Gate closure rule
 
@@ -173,7 +206,7 @@ This document does not:
   manifest, test, or CI file of any kind.
 - Mark any criterion as satisfied that is not. §3 states each criterion's
   actual satisfaction status as of this revision: criteria 1, 6, 7, 8, 10,
-  and 11 are satisfied; criteria 2, 3, 4, 5, 9, 12, 13, and 14 remain
+  and 11 are satisfied; criteria 2, 3, 4, 5, 9, 12, 13, 14, and 15 remain
   unsatisfied. Satisfying every remaining criterion does not, by itself,
   open the gate — only a separate, explicit, future ChatGPT gate-opening act
   does that.

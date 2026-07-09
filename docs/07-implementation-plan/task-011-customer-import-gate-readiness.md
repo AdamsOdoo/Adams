@@ -20,6 +20,16 @@
 
 ## Status
 
+> **Revision note (2026-07-09, ChatGPT control-room review, comment ID
+> `4928244425`).** ChatGPT required revision before merge to the companion
+> naming proposal (an ambiguous customer match must not create a
+> placeholder `shopify.connector.customer.binding` row) and to the
+> fallback-partner boundary (must not drag order-import behavior into Task
+> 011). This document's blocker table (§5) is revised to add an explicit
+> ambiguous-match-handling blocker row, and §9 is revised to name the
+> corrected risks explicitly. **Conclusion unchanged: still not ready to
+> gate.** PR remains draft, unmerged; no implementation authorized.
+
 - **Not ready to open a Task 011 gate.** Two explicit, named preconditions
   in Task 011's own proposed-scope documents are unmet (§1, §4).
 - Confirms PR #138 and PR #139 are merged into `Shopify-connector` (merge
@@ -216,7 +226,8 @@ work.
 | **Customer-domain gate (not opened; trigger conditions undefined until this session)** | **A** | [`task-011-customer-import-matching-proposed.md`](./task-011-customer-import-matching-proposed.md) §Preconditions; [`ui-ux-implementation-task-map.md`](./ui-ux-implementation-task-map.md) Group 11 | **Yes — hard blocker** | Named as an explicit precondition; this session drafts criteria (`customer-domain-gate-criteria-proposal.md`) but they are not yet accepted, and even acceptance would not itself open the gate | ChatGPT review/acceptance of the criteria proposal, then a distinct future gate-opening act once every criterion is satisfied |
 | **MBQ-55 (customer-binding model/field names)** | **A** | [`master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md) MBQ-55 row; [`task-011-customer-import-proposed.md`](./task-011-customer-import-proposed.md) §4 | **Yes — hard blocker** | Task 011's own documents state MBQ-55 must be resolved before the task starts; this session drafts a naming/schema proposal but it is not yet accepted | ChatGPT review/acceptance of `mbq-55-customer-binding-naming-schema-proposal.md` |
 | **Customer first-sync dedup/match-confidence thresholds (MBQ-59 residual, customer-domain instance)** | **A** | `mbq-55-customer-binding-naming-schema-proposal.md` §12; `master-blueprint-product-customer-sale.md` §B.2/§B.9 | Yes — blocks a §9-precision final prompt, not the docs-only prep track | Deferred by design to Task 011's own future final implementation prompt; policy direction (two-tier gate, blocking preview) is accepted, exact thresholds are not | Task 011's own final implementation prompt (once the gate opens) |
-| **Customer fallback-partner store-settings field exact schema** | **A** | `mbq-55-customer-binding-naming-schema-proposal.md` §7.3 | Yes | Field name/home model proposed this session, not yet accepted or confirmed by a final prompt; exact type/default/creation mechanics remain open | Task 011's own final implementation prompt |
+| **Ambiguous-customer-match handling — exact job/log candidate-detail field(s) — added this revision, per ChatGPT control-room review (comment `4928244425`)** | **A** | `mbq-55-customer-binding-naming-schema-proposal.md` §9/§10/§12 item 7; `customer-domain-gate-criteria-proposal.md` criterion 15 | Yes — blocks a §9-precision final prompt | The naming proposal now fixes the **principle** (no binding row for an ambiguous match; `partner_id` required; candidate detail lives on `shopify.connector.job`/`.job.log`, never a binding row; a binding row is created only once an operator confirms exactly one candidate) as a correction to its own prior, unsafe wording — but the exact job/log field name(s) used to store candidate detail remain open | Task 011's own final implementation prompt |
+| **Customer fallback-partner store-settings field exact schema, with Posture A boundary** | **A** | `mbq-55-customer-binding-naming-schema-proposal.md` §7.3 | Yes | Field name/home model, and the Task 011/Task 012 boundary (Posture A — Task 011 proposes only the config field, zero order-resolution behavior, zero consumption within its own flow), proposed this session, not yet accepted or confirmed by a final prompt; exact type/default/creation mechanics remain open | Task 011's own final implementation prompt |
 | **Address handling** | **A** | `task-011-customer-import-matching-proposed.md` §"Address handling" ("Open — not yet decided in the repo") | Yes — an unaddressed scope gap, must not be assumed either way | No accepted decision anywhere states whether/how Task 011 imports address data; must be explicitly scoped (recommend: excluded from first cut) before a final prompt is issued | Task 011's own final implementation prompt, as an explicit narrow scope decision |
 | **Company/person (`is_company`) classification** | **A** | `task-011-customer-import-matching-proposed.md` §"Company/person handling" ("Open — not yet decided in the repo") | Yes | Same reasoning as address handling | Task 011's own final implementation prompt, as an explicit narrow scope decision |
 | **Manifest product-dependency question (`shopify_connector_sale` depends on `shopify_connector_product` at Task 011 time or later)** | **A** | `mbq-55-customer-binding-naming-schema-proposal.md` §4 | Yes — affects how Task 011's own manifest is written | Both options are structurally safe; genuinely undecided, narrow, in-task | Task 011's own final implementation prompt, as a named in-task decision (mirrors Task 010's own `res_model`/`res_id` precedent) |
@@ -330,6 +341,15 @@ chooses next:
   code, tests, or a task spec.
 - Any silent assumption about address handling or company/person
   classification baked into code, tests, or a task spec.
+- Any placeholder `shopify.connector.customer.binding` row created for an
+  ambiguous match, or any candidate-partner selection made automatically —
+  `partner_id` remains required, and a binding row may only ever be created
+  once an operator confirms exactly one candidate (per the naming
+  proposal's own revision this session).
+- Any order-resolution behavior, order-level audit-marker logic, or
+  no-PII-routing decision implemented as part of Task 011 — the fallback
+  partner is supporting config substrate only (Posture A); its consumption
+  is exclusively Task 012's own future scope.
 - Any implementation gate being treated as opened, extended, or
   reinterpreted by this document.
 

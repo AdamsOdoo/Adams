@@ -23,6 +23,26 @@
 
 ## 1. Status
 
+> **Revision note (2026-07-09, ChatGPT control-room review, comment ID
+> `4928244425`).** ChatGPT reviewed this document (and its three companion
+> documents) and required revision before merge: the original version
+> proposed that an ambiguous customer match creates a
+> `shopify.connector.customer.binding` row in `status = 'review'` with no
+> `match_key`. This was unsafe and structurally inconsistent — `partner_id`
+> is `required=True`, and an ambiguous match has no single confirmed
+> candidate, so creating a row would force an arbitrary choice among
+> several `res.partner` candidates, exactly the "automatic guess" DEC-006/
+> RA-006 forbid, and exactly the tension Task 010's own implementation
+> already resolved for the product domain (never creating a binding row for
+> an ambiguous/blind match). This revision fixes §3, §7.1.A, §9, §10, and
+> §11 accordingly (no binding row for an ambiguous match; candidate detail
+> at job/log level only; `status = 'review'` reserved for lifecycle review
+> of an already-real binding), and fixes §7.3/§9/§10 to adopt an explicit
+> Task 011/Task 012 boundary (Posture A: Task 011 proposes only the
+> `customer_fallback_partner_id` config field as inert substrate, with zero
+> order-resolution behavior). **Still proposed only, not yet accepted; PR
+> remains draft, unmerged; no implementation authorized.**
+
 - **Proposed only. Not yet reviewed or accepted by ChatGPT.** This document
   is drafted in the same session as, and for review alongside,
   [`task-011-customer-import-proposed.md`](./task-011-customer-import-proposed.md),
@@ -120,6 +140,24 @@ proposal does not reinterpret or weaken any of them.
 - **No name-only automatic matching** — structural exclusion, unchanged
   **[Accepted — DEC-003; DEC-006; RA-006; `master-blueprint-product-customer-sale.md`
   §B.5]**.
+- **Ambiguous/blind matches never create a binding row (Task 010 precedent,
+  applied here)** — Task 010's own implementation narrowed the original
+  product-side MBQ-55 naming proposal's "the binding row itself is created
+  in `status = 'review'`" language, for a documented, structural reason: an
+  ambiguous or blind match has, by definition, no single confirmed Odoo
+  record to point a "pending review" binding at, since the binding's Odoo-
+  side relational field is `required=True`; picking one of several
+  candidates arbitrarily would be exactly the "automatic guess" DEC-006/
+  RA-006 forbid. The outcome is instead represented entirely at the **job**
+  level (`blocked_manual_review` + the matching `manual_review_subreason`),
+  never by a placeholder binding row **[Accepted precedent —
+  `../05-qa/task-010-product-import-validation-results.md` §C.2, applied to
+  `shopify.connector.product.template.binding`/`.product.variant.binding`;
+  DEC-006; RA-006]**. This document applies the identical rule to
+  `shopify.connector.customer.binding` from the outset (§9/§10 below),
+  rather than repeating the original product-side proposal's now-corrected
+  wording and waiting for a future implementation session to narrow it
+  in-task.
 - **Single fallback partner per store, no per-order anonymous identity** —
   MBQ-29 is **Resolved** (not merely partially resolved) as of the Final MBQ
   closure pass: *"one single, clearly-flagged fallback partner per store (the
@@ -261,6 +299,17 @@ this session — unchanged since the product naming pass read it):
 - `override_at` (Datetime, readonly)
 - `override_previous_candidate` (Char, readonly)
 
+**`status = 'review'` meaning — clarified, revised this session.** On this
+model, `status = 'review'` denotes **lifecycle review of an already-real
+binding row that already carries a confirmed `partner_id`** — for example a
+stale/recreated Shopify Customer ID, or a binding flagged by reconciliation
+for manual override. It is **never** a placeholder for an unresolved,
+still-ambiguous candidate selection: because `partner_id` is `required=True`
+(§7.1.B), no row of this model can exist without a single, already-confirmed
+Odoo partner. An ambiguous customer match therefore **never** reaches this
+model at all until an operator has confirmed exactly one candidate — see
+§9/§10 for the full ambiguous-match handling this revision fixes.
+
 **B. Required new relational fields:**
 
 - `partner_id` (Many2one → `res.partner`, required, index,
@@ -349,6 +398,29 @@ authoritatively once bound).
 
 ### 7.3 Fallback-partner configuration — proposed home: `shopify.connector.store.settings`, not the binding model
 
+**Task 011 / Task 012 boundary — Posture A (chosen this session, per
+ChatGPT control-room review comment `4928244425`).** The fallback partner
+is primarily a genuine-no-PII **order-import** concept (DEC-014 §B.7: it
+exists so order import always has a customer-resolution outcome available
+to it), not a Task 011 customer-import/matching concept — Task 011's own
+service matches a real, received Shopify Customer payload; it has nothing
+to do when there is no such payload at all. To avoid dragging order-import
+behavior into Task 011, this document adopts **Posture A**: **Task 011 may
+propose/implement only the store-settings configuration field
+(`customer_fallback_partner_id`, below) as supporting customer-domain
+substrate — a plain configuration reference with zero order-resolution
+logic, zero consumption within Task 011's own import/matching flow (§10),
+and zero coupling to order import.** The decision of *when* and *how* an
+order actually gets routed to this configured partner — and the order-level
+audit marker that decision requires (DEC-014 §B.7) — is entirely **Task
+012's** own future, separately-authorized scope (see the third bullet
+below). Posture B (deferring even this field's definition to Task 012) was
+considered and not chosen, because the field itself is inert configuration
+data with no behavior of its own — defining its name/home model now costs
+nothing and lets Task 012 consume an already-named field rather than
+re-deriving the same naming exercise; see §11 for the full alternatives
+comparison.
+
 The single, clearly-flagged fallback partner per store (§3; DEC-014 §B.7;
 MBQ-29 Resolved) is **not** a `shopify.connector.customer.binding` row —
 there is no Shopify Customer GID to bind it to, since it exists precisely
@@ -375,12 +447,16 @@ settings-extension seam):
   DEC-006 only permits business-record convenience fields as a **read**
   convenience, never as the primary configuration mechanism.
 - **The order-level audit marker** ("no customer data available — fallback
-  used," DEC-014 §B.7) that must appear on every order bound to the fallback
-  partner is an **order-binding-model field**, not a field on
-  `shopify.connector.customer.binding` or on `shopify.connector.store.settings`
-  — **out of scope for this document**, deferred to the future Task 012
-  order-binding naming pass (the order-binding portion of MBQ-55, which
-  remains fully open per the scope note at the top of this document).
+  used," DEC-014 §B.7), the decision logic that determines an order
+  genuinely has no PII, and the act of actually routing an order to this
+  configured partner are all **Task 012's own future, separately-authorized
+  scope** (Posture A above) — an order-binding-model concern, not a field on
+  `shopify.connector.customer.binding` or on
+  `shopify.connector.store.settings`. **Out of scope for this document**,
+  deferred to the future Task 012 order-binding naming pass (the
+  order-binding portion of MBQ-55, which remains fully open per the scope
+  note at the top of this document). Task 011 itself neither reads nor
+  writes this field in any decision logic of its own.
 - **Exact field type/default and the exact partner-creation mechanism**
   (whether the fallback partner record is auto-created on first
   domain-enablement, or must be manually configured before Task 011 can run)
@@ -429,16 +505,38 @@ accepted matching/duplicate-prevention policy:
   `match_key = 'email'`. Email is the **sole** automatic match key — phone
   and name are advisory-hint-only, never automatic (DEC-014 point E; §3
   above).
-- **Manual review for ambiguous matches** — more than one plausible
-  candidate sets `status = 'review'` (the mixin's own vocabulary — this
-  proposal invents no new status value) and `match_key` is left unset
-  pending operator resolution, consistent with the accepted `ambiguous
-  match` → `blocked_manual_review` job-level routing. The binding row
-  itself is created in `status = 'review'`; the **job** that attempted the
-  create/bind is what transitions to `blocked_manual_review` — the binding
-  record and the job record are two distinct, already-accepted concepts,
-  not conflated here (mirrors the product-binding proposal's identical
-  distinction, §9).
+- **Ambiguous matches never create a binding row — revised this session
+  per ChatGPT control-room review (comment `4928244425`).** More than one
+  plausible email/customer-key candidate does **not** create a
+  `shopify.connector.customer.binding` row. `partner_id` is `required=True`
+  (§7.1.B); creating a row would force choosing one of several candidate
+  `res.partner` records arbitrarily, which is exactly the "automatic guess"
+  DEC-006/RA-006 forbid, and exactly the tension already resolved for the
+  product domain by Task 010's own implementation (§3 above, "Ambiguous/
+  blind matches never create a binding row"). Instead:
+  - The job (or import attempt) routes directly to `blocked_manual_review`
+    with the `ambiguous match` error class/sub-reason (DEC-009's own
+    16-class error taxonomy; no new class is proposed).
+  - **Candidate detail is stored at the job/log/manual-review level only**
+    — e.g. the list of plausible `res.partner` IDs/display-names/emails
+    considered, on `shopify.connector.job`/`shopify.connector.job.log`'s own
+    existing payload/evidence-snapshot fields (Part A §D job/log
+    abstraction) — **never** in a `shopify.connector.customer.binding` row.
+    The exact job/log field(s) used are not fixed by this document (see §12
+    item 7).
+  - A `shopify.connector.customer.binding` row for this Shopify Customer GID
+    is created **only once an operator manually confirms exactly one
+    candidate** — at that point, and not before, with a real `partner_id`,
+    `match_key = 'manual'`, and `matched_by_uid`/`matched_at` populated.
+  - `status = 'review'` is never used to represent this in-progress,
+    not-yet-resolved state, per the field-level clarification in §7.1.A
+    above — it is reserved for lifecycle review of an already-real binding.
+  - This replaces this document's own prior wording (which incorrectly
+    proposed creating the binding row in `status = 'review'` with no
+    `match_key`, mirroring the same flaw the original product-side MBQ-55
+    naming proposal carried before Task 010's implementation corrected it
+    in-task) — corrected here at the naming-proposal stage instead of
+    deferring the correction to a future implementation session.
 - **No blind create** — the pre-create duplicate check (the same match-key
   sequence above) runs **before** any binding row is created for an
   automated (webhook/scheduled/reconciliation) import, gated by the accepted
@@ -447,16 +545,21 @@ accepted matching/duplicate-prevention policy:
   "applies identically to Customer §B.2, substituting the customer domain").
   Exact eligibility-check/match-confidence thresholds remain open — **this
   document does not fix them** (see §12).
-- **No-PII fallback is a separate path, never a matching outcome** — the
-  fallback partner (§7.3) is used only when Shopify genuinely withholds all
-  customer PII for an order; it is never a routing outcome of the match-key
-  sequence above, and it never substitutes for the manual-review outcome of
-  an ordinary ambiguous match (DEC-014 §B.7: "never as a default for an
-  ordinary matching failure, which instead creates a new, properly matched
-  partner or routes to manual review if ambiguous"). This document keeps
-  these two concepts structurally separate: the binding model (§7.1) governs
-  registered-customer matching; the store-settings fallback field (§7.3)
-  governs the distinct no-PII case.
+- **No-PII fallback is not part of Task 011's own matching flow at all —
+  revised this session (§7.3 Posture A).** The fallback partner (§7.3) is
+  used only when Shopify genuinely withholds all customer PII for an order
+  — a decision made by the **order-import** process (Task 012), which in
+  that case never invokes Task 011's customer-import/matching service at
+  all, since there is no Shopify Customer payload for it to receive. It is
+  never a routing outcome Task 011's own match-key sequence produces, and it
+  never substitutes for the manual-review outcome of an ordinary ambiguous
+  match (DEC-014 §B.7: "never as a default for an ordinary matching
+  failure, which instead creates a new, properly matched partner or routes
+  to manual review if ambiguous"). Task 011 defines only the
+  `customer_fallback_partner_id` config field (§7.3) as supporting
+  substrate for Task 012 to later consume — it implements no branching
+  logic that reads or resolves to that field, and no step of Task 011's own
+  flow (§10) depends on it.
 
 ## 10. Customer import flow implication (design level only)
 
@@ -476,13 +579,23 @@ level only. It does not authorize, schedule, or start any implementation.
 4. **On a confident no-match** — create a new `res.partner` and a new
    binding row, gated by §9's no-blind-create policy for automated imports
    (§9, MBQ-59).
-5. **On an ambiguous match** — create the binding row in `status = 'review'`,
-   populate no `match_key`, and route the job to `blocked_manual_review`.
-6. **On genuine no-PII data** — resolve to the store's configured
-   `customer_fallback_partner_id` (§7.3) instead of running the match-key
-   sequence at all; this path never creates or touches a
-   `shopify.connector.customer.binding` row, since there is no Shopify
-   Customer GID to bind.
+5. **On an ambiguous match** — create **no** binding row (`partner_id` is
+   required and no single confirmed candidate exists); route the job/import
+   attempt directly to `blocked_manual_review` with the `ambiguous match`
+   sub-reason, recording the candidate `res.partner` IDs/display-names/
+   emails considered in the job's own log/audit detail, never in a binding
+   row. A `shopify.connector.customer.binding` row for this Shopify Customer
+   GID is created only once, and not before, an operator manually confirms
+   exactly one candidate — at that point with a real `partner_id`,
+   `match_key = 'manual'`, and `matched_by_uid`/`matched_at` populated (§9).
+6. **Genuine no-PII data never reaches this flow** — per the Task 011/Task
+   012 boundary (§7.3, Posture A), the decision that a given Shopify order
+   carries no customer PII at all, and the act of routing it to the store's
+   configured `customer_fallback_partner_id`, belong entirely to **Task
+   012's** own future order-import flow, which in that case does not invoke
+   Task 011's customer-import/matching service at all — there is no Shopify
+   Customer payload for steps 1–5 above to receive. This flow never reads,
+   writes, or resolves to `customer_fallback_partner_id`.
 7. **No Shopify write** — no mutation call of any kind is made anywhere in
    this flow; every step above is a read + an Odoo-side create/bind only,
    consistent with the unchanged DEC-003 "no customer export" deferral.
@@ -503,6 +616,9 @@ level only. It does not authorize, schedule, or start any implementation.
 | **Adding customer fields directly to `shopify.connector.store` or `shopify.connector.job`** | Violates DEC-008's module-boundary rule — customer binding responsibility belongs to `shopify_connector_sale`, not `shopify_connector_core`. `core` remains domain-agnostic substrate only. |
 | **Making phone a second automatic match key** | Evaluated and **rejected** by DEC-014 point E: phone reliability/availability is gated by the same protected-customer-data approval as email, with no demonstrated additional dedup value over email alone — would introduce a second point of match-key drift without a cited safety benefit. |
 | **Per-order anonymous fallback identity instead of one shared fallback partner** | Evaluated and **resolved against** by MBQ-29's Final MBQ closure (AR-020, 2026-07-05): "per-order anonymous identity is explicitly non-MVP." A single, clearly-flagged fallback partner per store is the accepted Phase 1 answer. |
+| **Creating a `shopify.connector.customer.binding` row in `status = 'review'` for an ambiguous match, with `match_key` left unset** | **Rejected this session, per ChatGPT control-room review (comment `4928244425`).** `partner_id` is `required=True`; an ambiguous match has no single confirmed candidate, so creating a row would force an arbitrary choice among several `res.partner` candidates — exactly the "automatic guess" DEC-006/RA-006 forbid. This was this document's own prior wording, carrying the same flaw the original product-side MBQ-55 naming proposal had before Task 010's implementation corrected it in-task (§3, §9). Corrected here instead of deferring the correction to a future implementation session. |
+| **Posture B — deferring the `customer_fallback_partner_id` field's definition entirely to Task 012** | **Considered, not chosen (Posture A chosen instead, §7.3).** The field is inert configuration data with no behavior of its own; defining its name/home model in this document costs nothing (Task 011 implements no logic that consumes it) and lets a future Task 012 naming pass consume an already-named field rather than re-deriving the same naming exercise. Posture A was chosen specifically because it does **not** require Task 011 to implement any order-resolution behavior — only the config field itself. |
+| **Task 011 implementing the order-level "fallback used" audit marker or any no-PII routing decision** | **Rejected — out of Task 011's own scope entirely (§7.3 Posture A).** Both are order-import concerns (DEC-014 §B.7); implementing either in Task 011 would drag order-import behavior into a task explicitly scoped to Shopify → Odoo customer import/matching only, and would require an order-binding model this document does not propose. |
 
 ## 12. Impact on Task 011 readiness
 
@@ -537,6 +653,13 @@ level only. It does not authorize, schedule, or start any implementation.
      be explicitly scoped (resolved, or explicitly excluded/deferred) in
      Task 011's own future final implementation prompt before code, not
      silently assumed either way.
+  7. **Exact job/log field(s) used to store ambiguous-match candidate
+     detail** (§9/§10) — this document fixes the principle (candidate
+     `res.partner` detail lives on `shopify.connector.job`/`.job.log`, never
+     on a binding row) but not the exact field name(s)/shape; a future final
+     implementation prompt must name them explicitly, reusing the existing
+     job/log payload/evidence-snapshot fields (Part A §D) rather than
+     inventing a new mechanism.
 
 ## 13. Non-authorizations
 
