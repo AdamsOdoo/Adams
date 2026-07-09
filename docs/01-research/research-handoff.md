@@ -1,5 +1,63 @@
 # Research Handoff (rolling)
 
+### Task 006C — PR #131 merged, closure/validation-results docs — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-006c-validation-docs-g4yj8s`; docs-only
+  closure PR into `Shopify-connector`, **draft**. PR #131 itself
+  (`claude/sync-engine-skeleton-10hd4p` → `Shopify-connector`) is
+  **merged** — merge commit `152b1553fe10c6efcbad75b4eba9cfcd2f101385`
+  (head before merge `e68a5319bb7a7602bb8cc72568ef0c022551f542`; base
+  `6e482ec60b3601c3c77cba257f97b64cc889aae1`), 2026-07-09T08:32:33Z.
+- **Files changed:** `docs/05-qa/task-006c-sync-engine-skeleton-validation-results.md`
+  (new closure/validation record), `docs/05-qa/architecture-review-log.md`
+  (new row AR-032), `docs/01-research/research-handoff.md` (this entry).
+  No addon/code, test, manifest, XML/security, migration, or CI file
+  touched.
+- **What changed / residue fixed:** Task 006C's sync-engine core
+  skeleton (job enqueue, `ir.cron` claim/drain dispatch, handler
+  registry, retry scheduler, state-transition helpers, diagnostic
+  `core_dispatch_selftest` job type, and the approved
+  `action_disconnect()`/`manual_review_subreason` one-file exception)
+  is now formally closed out with a dedicated validation-results
+  document and an architecture-review-log entry (AR-032), recording the
+  two real-runtime defects found and fixed (test-only fake-handler
+  signature bug; real production `action_disconnect()` bug, fixed via
+  approved exception, review artifact `4923059289`) and the honest state
+  of Odoo.sh verification: GitHub `get_status`/`get_check_runs` for the
+  merged head still return `pending`/empty as of this session — merge
+  rests on user-provided green-build confirmation, not on independently
+  observed CI evidence.
+- **Items deferred:** unchanged and explicitly preserved as open —
+  multi-server/concurrent-worker runtime proof for
+  `try_lock_for_update()`, VAL-B2, MBQ-05, TD-002, the fulfillment API
+  model, product first-sync dedup thresholds, token acquisition for many
+  unrelated customers, Lite/Full packaging, checkpoint/resume ownership.
+  No domain sync implementation exists yet.
+- **Learning feedback loop:** no new issues discovered this session; no
+  new repeated-issue pattern; no rule/checklist change needed. No new
+  rejected approach. No new technical debt (Task 006C's own debt items
+  are unchanged, not newly introduced). No architecture concern beyond
+  what AR-031/AR-032 already record. Should future prompts change? No —
+  the docs-only closure pattern (validation-results doc + AR log row +
+  compact handoff) worked cleanly for a post-merge task and should
+  remain the default for future task closures.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed.
+- **Next recommended session:** decide the next controlled task.
+  Recommended: Task 006D/006E closure review if numbering requires it,
+  then proceed to the next core prerequisite or Product MVP Task 010
+  only after ChatGPT issues a separate implementation prompt.
+- **Stop condition:** docs-only closure complete — validation-results
+  doc created, AR-032 logged, this handoff entry written; all open
+  blockers preserved as open, none claimed resolved; no addon/code/test/
+  manifest/XML/security/migration/CI file touched; no claim of
+  independent Odoo.sh verification; no claim of proven multi-server
+  concurrency; PR left **draft/unmerged**; no merge performed. Next
+  step: ChatGPT review.
+
+---
+
 ### Task 006C — PR #131 approved one-file exception: `action_disconnect()` clears `manual_review_subreason` — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
