@@ -1,5 +1,81 @@
 # Research Handoff (rolling)
 
+### Master implementation-readiness checkpoint — Task 010 gate assessment — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-010-readiness-checkpoint-jrx96i`, based on
+  latest `Shopify-connector` tip `51628f77a7da1e47cfdb30d17559b496c4c45a1d`
+  (PR #134 merge commit, confirmed via `git merge-base` = branch HEAD = origin
+  tip this session); docs-only checkpoint PR into `Shopify-connector`,
+  **draft**.
+- **What happened:** PR #131, #132, #133, #134 confirmed **merged** via
+  `pull_request_read` (all four `merged: true`, `state: closed`). Ran a full
+  post-Task-006C implementation-readiness consolidation: read every file
+  named in this session's required-reading list plus the `docs/04-decisions/`,
+  `docs/03-architecture/`, and `docs/02-product/` cross-references relevant to
+  Task 010, and directly inspected (read-only) `addons/shopify_connector_core/models/`
+  and `/tests/` to confirm current module state (core substrate only; no
+  product/customer/order/inventory/fulfillment code exists).
+- **Readiness conclusion: NOT READY.** Created
+  [`../07-implementation-plan/master-implementation-readiness-checkpoint.md`](../07-implementation-plan/master-implementation-readiness-checkpoint.md),
+  concluding **Option 2 — not ready to open a Task 010 gate**. Two explicit
+  preconditions named in `task-010-product-import-proposed.md` itself remain
+  unmet: (1) the "product domain gate" (`ui-ux-implementation-task-map.md`
+  Group 10) has never been opened and its own trigger conditions are
+  undefined anywhere in the repository; (2) MBQ-55 (exact Odoo model/field
+  names for the product-template and product-variant binding models) remains
+  open, confirmed unresolved across every cross-reference checked (including
+  the DEC-014 acceptance patch, which explicitly lists MBQ-55 as still open).
+  This conclusion is consistent with, not a reversal of, PR #133's own
+  recommendation (Product MVP Task 010 preparation explicitly "not
+  recommended as the immediate next task") and PR #134's own stated fallback
+  (MBQ-05 planning, absent a live runtime — still absent).
+- **Recommended first build task: none.** No build task is recommended.
+  Recommended next docs-only steps: (1) a dedicated documentation-only domain
+  naming/schema planning pass resolving MBQ-55 for the product-template/
+  variant binding models (primary — most directly closes one of Task 010's
+  own two named preconditions); (2) MBQ-05 branch B auth-distribution
+  planning as a non-competing parallel candidate; (3) a separate ChatGPT act
+  defining the product domain gate's own opening criteria, since no document
+  anywhere specifies them.
+- **Task 010 final implementation prompt: NOT drafted.** Per this session's
+  own phase-gating rule, the prompt is drafted only if the readiness decision
+  is "ready" — it was not.
+- **Task 010 gate-opening proposal: NOT drafted**, for the same reason.
+- **Architecture review log:** added row **AR-033** — status **Proposed /
+  Under review**, explicitly **not** Accepted, explicitly not claiming
+  ChatGPT accepted anything in this session, and explicitly not authorizing
+  any implementation gate.
+- **Files changed:** created
+  [`../07-implementation-plan/master-implementation-readiness-checkpoint.md`](../07-implementation-plan/master-implementation-readiness-checkpoint.md);
+  added AR-033 to
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md);
+  this handoff entry. No `task-010-product-import-final-implementation-prompt.md`
+  or `task-010-product-import-gate-opening-proposal.md` file was created (not
+  applicable — see readiness conclusion above). No addon/code, test,
+  manifest, XML/security, migration, or CI file touched.
+- **Open blockers preserved, none resolved by this session:** multi-server/
+  concurrent-worker runtime proof (SRR-03/SRR-04/SRR-09), VAL-B2, MBQ-05,
+  MBQ-55, TD-002, the fulfillment API model, product first-sync dedup
+  thresholds, token acquisition for many unrelated customers, Lite/Full
+  packaging, checkpoint/resume ownership, and the two Task-010-specific
+  preconditions named above (product domain gate; MBQ-55).
+- **No code touched.** No implementation authorized by this document or this
+  session. No implementation gate opened, extended, or reinterpreted.
+- **Learning feedback loop:** no new issues discovered; no new repeated-issue
+  pattern; no rule/checklist change needed; no new rejected approach (checked
+  `rejected-approaches-log.md` for relevance — none applicable to a
+  readiness-checkpoint session); no new technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback loop
+  checked · learning captured (above) · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Stop condition:** checkpoint document created; AR-033 logged; this
+  handoff entry written; all open blockers preserved as open, none claimed
+  resolved; only the allowed docs files changed; PR left **draft/unmerged**;
+  no merge performed; no implementation gate opened; no Task 010 code
+  written. **Next step: ChatGPT review.**
+
+---
+
 ### Sync-engine concurrency validation plan drafted — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/sync-engine-concurrency-plan-bq6ech`, based on
