@@ -1,8 +1,74 @@
 # ChatGPT Control-Room Operating Guide
 
-> Purpose: preserve the operating style, lessons learned, and handover rules for future ChatGPT sessions on the Odoo 19 Shopify Connector project. This file is an operational guide, not an architecture decision by itself. Architecture truth remains in `docs/04-decisions/`, `docs/03-architecture/`, `docs/05-qa/architecture-review-log.md`, and accepted PR records.
+> Purpose: preserve the operating style, project definition, product goals, lessons learned, and handover rules for future ChatGPT sessions on the Odoo 19 Shopify Connector project. This file is an operational guide, not an architecture decision by itself. Architecture truth remains in `docs/04-decisions/`, `docs/03-architecture/`, `docs/05-qa/architecture-review-log.md`, and accepted PR records.
 
-## 1. Role model
+## 1. Project definition and product goal
+
+We are designing and building a premium, modular Shopify Connector for Odoo 19.
+
+The target product must be better than existing market connectors in:
+
+- UX and UI clarity;
+- setup simplicity;
+- feature completeness;
+- reliability;
+- robustness;
+- performance;
+- modularity;
+- maintainability;
+- extensibility;
+- logs and operator visibility;
+- error recovery;
+- retries;
+- duplicate prevention;
+- testability;
+- UAT readiness;
+- release readiness.
+
+The connector must be commercially packageable later, including Lite and Full editions, without weakening the technical foundation. Major capabilities must be enableable, disableable, addable, removable, or extendable safely. Never allow one giant connector module.
+
+Expected module direction, subject to accepted architecture and future planning closure:
+
+- `shopify_connector_core`
+- `shopify_connector_product`
+- `shopify_connector_sale`
+- `shopify_connector_inventory`
+- `shopify_connector_fulfillment`
+- `shopify_connector_accounting`
+- `shopify_connector_refund`
+- `shopify_connector_payout`
+- `shopify_connector_multi_store`
+
+Current MVP direction:
+
+- store connection;
+- secure credentials;
+- test connection;
+- setup readiness;
+- dashboard/readiness checks;
+- product and variant import;
+- customer import and matching;
+- order import into Odoo sales orders;
+- basic inventory sync;
+- fulfillment/tracking update back to Shopify;
+- scheduled sync;
+- manual sync;
+- user-friendly logs;
+- retry failed jobs;
+- duplicate prevention;
+- simple mapping screens;
+- basic permissions.
+
+Important product principles:
+
+- Research first, architecture second, MVP implementation third, advanced features later.
+- MVP must be small but excellent.
+- Reliability, logs, retries, duplicate prevention, clean configuration, manual review handling, and good UX are first-class product features.
+- Bidirectional sync is required in MVP, but each direction must be scoped and gated carefully.
+- Product export/update/write-back is not part of Task 010 and remains a future Task 015 candidate unless later accepted.
+- Lite/Full packaging is commercially important but must not distort the technical foundation.
+
+## 2. Role model
 
 - ChatGPT is the strategic control room.
 - GitHub is the source of truth.
@@ -11,7 +77,7 @@
 - Every worker session must be narrow, scoped, and stopped after its objective.
 - No worker may move from research/planning into implementation without a new ChatGPT-issued prompt.
 
-## 2. Branch and repository rules
+## 3. Branch and repository rules
 
 - Repository: `AdamsOdoo/Adams`.
 - Integration branch: `Shopify-connector`.
@@ -24,7 +90,7 @@
 - Use standard merge commits unless ChatGPT explicitly says otherwise.
 - No squash, no rebase, unless explicitly authorized.
 
-## 3. Work sequencing discipline
+## 4. Work sequencing discipline
 
 Use this sequence:
 
@@ -44,7 +110,7 @@ Use this sequence:
 
 Never skip from planning to code. Never treat a criteria document as an opened gate. Never treat a proposed scope document as implementation authorization.
 
-## 4. Required review structure when a worker reports back
+## 5. Required review structure when a worker reports back
 
 ChatGPT should respond in this structure:
 
@@ -56,7 +122,7 @@ ChatGPT should respond in this structure:
 
 For merge sessions, include exact PR number, expected head SHA, expected base SHA, changed files, and all final pre-merge checks.
 
-## 5. Evidence rules
+## 6. Evidence rules
 
 - Facts require evidence from repo, accepted PRs, official docs, or directly inspected code.
 - Current Shopify/Odoo/API behavior must be checked against official/current sources when it may have changed.
@@ -65,7 +131,7 @@ For merge sessions, include exact PR number, expected head SHA, expected base SH
 - Separate facts, accepted decisions, proposed items, recommendations, open questions, and assumptions.
 - Do not close an open point by inference unless the inference is explicitly marked and supported.
 
-## 6. Gate-status language
+## 7. Gate-status language
 
 Use precise language:
 
@@ -76,9 +142,9 @@ Use precise language:
 - `Merged` must be verified in GitHub, not assumed from a worker report.
 - `Runtime-green` requires explicit Odoo.sh or runtime evidence, not static checks.
 
-## 7. Known recurring lessons
+## 8. Known recurring lessons
 
-### 7.1 Ambiguous matches and required bindings
+### 8.1 Ambiguous matches and required bindings
 
 If a binding model has a required Odoo-side relational field, it cannot represent an unresolved ambiguous match as a binding row. Creating such a row would force an automatic guess.
 
@@ -91,23 +157,23 @@ Correct posture:
 
 This pattern was learned in Task 010 product import and applied to the Task 011 customer-binding proposal.
 
-### 7.2 Negative tests can produce scary logs
+### 8.2 Negative tests can produce scary logs
 
 Odoo required-field and ACL tests may log SQL/ACL `ERROR` lines even when tests pass. Treat final Odoo test summary as source of truth. If the final summary says `0 failed, 0 error(s)`, the noisy negative-test lines are not by themselves a failed build.
 
-### 7.3 PR bodies can become stale
+### 8.3 PR bodies can become stale
 
 A PR body may still show earlier pending/red wording after later commits fix the issue. Check latest head SHA, comments, validation docs, and final runtime logs. Do not rely only on the PR body.
 
-### 7.4 Post-merge closure is important
+### 8.4 Post-merge closure is important
 
 After an implementation PR merges, create a docs-only closure PR if final validation evidence, accepted AR status, or handoff status needs to be recorded. This prevents future sessions from working from stale proposed/revise language.
 
-### 7.5 Do not let planning docs imply code authorization
+### 8.5 Do not let planning docs imply code authorization
 
 Planning docs may accept names, criteria, and boundaries. They must still state clearly that implementation is not authorized unless the gate is opened and a final prompt is issued.
 
-## 8. Worker prompt requirements
+## 9. Worker prompt requirements
 
 Every implementation prompt must include:
 
@@ -135,34 +201,36 @@ Every docs-only planning prompt must include:
 - self-audit requirements;
 - exact next-session prompt to write into handoff.
 
-## 9. Current project-state verification checklist
+## 10. Current project-state verification checklist
 
 At the start of a new ChatGPT session, verify from GitHub instead of relying on memory:
 
 - Latest `Shopify-connector` HEAD.
 - PR #138 merged status and merge commit.
 - PR #139 merged status and merge commit.
-- PR #140 current status. At the time this guide was created, PR #140 had been accepted for merge but still needed final merge execution; verify whether it has since merged.
+- PR #140 merged status and merge commit.
+- PR #141 current status. At the time this guide was patched, PR #141 was being prepared for merge; verify whether it has since merged.
 - Current open PRs.
 - Current `docs/01-research/research-handoff.md` top entry.
 - Current `docs/05-qa/architecture-review-log.md` latest AR row.
 - Current `docs/05-qa/technical-debt-register.md`.
 - Current `docs/08-release-readiness/` readiness files, if present.
 
-## 10. Current known status at time of this guide
+## 11. Current known status at time of this guide
 
 This section is a snapshot and must be verified before use.
 
 - Task 010 product import + variant binding: implemented and runtime-green through PR #138.
 - PR #139: Task 010 post-merge closure docs merged.
-- PR #140: Task 011 customer readiness and binding schema proposal had ChatGPT merge authorization issued, but merge execution still needed verification.
-- Customer-binding portion of MBQ-55: accepted in PR #140 content, subject to merge verification.
-- Customer-domain gate criteria: accepted as criteria only in PR #140 content, subject to merge verification.
+- PR #140: Task 011 customer readiness and binding schema proposal merged, with merge commit recorded by GitHub.
+- Customer-binding portion of MBQ-55: accepted through PR #140.
+- Customer-domain gate criteria: accepted as criteria only through PR #140.
 - Customer-domain gate: closed.
 - Task 011 implementation: unauthorized.
 - Task 012/order import: unauthorized.
+- PR #141: this operational guide and handover prompt PR; verify whether it has merged.
 
-## 11. Persistent open points to track
+## 12. Persistent open points to track
 
 Verify latest register status before acting. Expected open items include:
 
@@ -187,7 +255,7 @@ Verify latest register status before acting. Expected open items include:
 - UAT readiness.
 - Release readiness.
 
-## 12. High-performance expectations
+## 13. High-performance expectations
 
 - Be strict and practical.
 - Prefer small controlled sessions over broad prompts.
@@ -200,14 +268,14 @@ Verify latest register status before acting. Expected open items include:
 - Never allow code drift beyond authorized files.
 - Always update handoff docs.
 
-## 13. Recommended new-chat startup protocol
+## 14. Recommended new-chat startup protocol
 
 1. Read this file.
 2. Verify GitHub state.
 3. Read latest `research-handoff.md` top entry.
 4. Read latest `architecture-review-log.md` row.
 5. Check open PRs.
-6. Confirm whether PR #140 merged.
-7. If PR #140 is unmerged, finish its merge using the last ChatGPT authorization only if state/head/files remain unchanged.
-8. If PR #140 is merged, start the Fable master audit/planning-closure session or review its PR if already completed.
+6. Confirm PR #140 merged.
+7. Confirm PR #141 merged.
+8. If PR #141 is merged, start the Fable master audit/planning-closure session or review its PR if already completed.
 9. Do not start implementation until the Fable audit/planning PR is reviewed and ChatGPT explicitly chooses the next gate sequence.
