@@ -1,5 +1,191 @@
 # Research Handoff (rolling)
 
+### Task 006C — sync-engine skeleton implementation — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR into
+  `Shopify-connector` (**draft**, to be opened this session). First
+  **code** session of this project (`CLAUDE.md` §5 no-code gate lifted
+  for this task only, per the Task 006C gate-opening act -- confirmed
+  merged at `6e482ec60b3601c3c77cba257f97b64cc889aae1`, the exact SHA
+  cited in this session's issued final prompt, and confirmed via `git
+  log`/`git rev-parse HEAD` before any edit). No Odoo/Postgres runtime
+  is available in this session's execution environment (no `odoo`
+  package, no vendored Odoo source, no running Postgres) -- every test
+  below is written and verified by careful manual control-flow tracing
+  plus AST/py_compile-level static self-checks (see Learning feedback
+  loop), not by an actual Odoo test-runner execution. This mirrors, not
+  substitutes for, the project's own established Odoo.sh live-validation
+  practice (Tasks 001-005) -- see "Items deferred" below.
+- **Files changed:** `addons/shopify_connector_core/models/
+  shopify_connector_job.py` (modify -- new `core_dispatch_selftest`
+  `job_type` value; `_domain_flag_for_job_type()`; the domain-flag
+  branch added inside `write()` alongside the unmodified store-state
+  re-check; `_claim_for_dispatch()`; five state-transition helpers --
+  `_transition_retry_waiting`/`_failed_retryable`/`_failed_final`/
+  `_blocked_manual_review`/`_skipped`, plus a shared `_log_transition`
+  private helper), `addons/shopify_connector_core/models/
+  shopify_connector_job_enqueue.py` (new, `AbstractModel`),
+  `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`
+  (new, `AbstractModel` -- `_get_handlers()` seam, `run_drain()`,
+  dispatch/checkpoint-3 logic, `JobHandlerError`, the DEC-009 retry-class
+  routing tables, `_schedule_retry_or_fail`/`_retry_delay_seconds`),
+  `addons/shopify_connector_core/data/shopify_connector_cron_drain.xml`
+  (new -- one `ir.cron` record, no view/menu/action),
+  `addons/shopify_connector_core/models/__init__.py` (two new import
+  lines), `addons/shopify_connector_core/tests/test_job_enqueue.py`
+  (new), `addons/shopify_connector_core/tests/test_job_dispatch.py`
+  (new), `addons/shopify_connector_core/tests/
+  test_job_retry_scheduling.py` (new, kept as its own file rather than
+  folded into `test_job_dispatch.py` -- retry-scheduling has enough
+  distinct scenarios, per the final prompt's own either/or option, to
+  warrant separation), `addons/shopify_connector_core/tests/__init__.py`
+  (three new import lines), `addons/shopify_connector_core/__manifest__.py`
+  (version `19.0.1.4.0` -> `19.0.1.5.0`; one new `data` entry for the
+  cron file), `docs/01-research/research-handoff.md` (this entry).
+  **Not modified:** `shopify_connector_job_log.py` (the existing five
+  `event_type` values -- `attempt`/`state_change`/`verification_read`/
+  `manual_action`/`note` -- fully covered every log write this task
+  needed; no sixth value was genuinely required), `shopify_connector_
+  store.py`, `shopify_connector_store_credential.py`, `shopify_connector_
+  store_settings.py`, `shopify_connector_location.py`, `shopify_connector_
+  binding_mixin.py`, `shopify_connector_api_client.py`, `tools/
+  redaction.py` (all read/called, never modified, exactly as forbidden),
+  no security/ACL file (both new models are `AbstractModel`s, mirroring
+  `shopify_connector_readiness_check.py`), no view/menu/action/wizard/
+  webhook/OAuth/domain-module file of any kind.
+- **What changed / residue fixed:** implemented the core sync-engine
+  skeleton exactly per the issued final prompt's six accepted gate-
+  opening decisions: **(A)** `_claim_for_dispatch()` on the job model
+  uses `try_lock_for_update()` per candidate row, silently skipping a
+  row it cannot lock, re-checking claimability under the lock (mirrors
+  Odoo's own official "Writing cron functions" worked example) -- never
+  a raw SQL `SKIP LOCKED` reimplementation, never a PostgreSQL advisory
+  lock. **(B)** `shopify.connector.job.dispatch._get_handlers()` is a
+  `job_type -> handler` dict-lookup registry seam, adapted (not copied)
+  from the `_get_checks()` inheritance-append precedent -- a job routes
+  to exactly one handler, a missing handler fails safely to
+  `failed_final`/`unknown_system_error`, never hangs, never silently
+  drops. **(C)** retry scheduling uses named, tunable constants (12 max
+  attempts, 30s base, x2 multiplier, 30-minute cap, +/-20% jitter,
+  24-hour window) plus a distinct 1-attempt "safety net" budget for
+  `unknown_system_error` (architecture gate §E's own framing) -- bounded
+  retries only, no infinite retries under any circumstance. **(D)** the
+  enqueue/dispatch file split matches the accepted default exactly, both
+  `AbstractModel`s, no `services/` package, no concrete model, no ACL
+  file. **(E)** batch size 20 / cron interval 5 minutes, both named
+  constants. **(F)** `core_dispatch_selftest` added inline to the
+  existing static `job_type` selection list, used only by this task's
+  own tests, never dispatched to a live Shopify call. Beyond the six
+  decisions: the enqueue service is a thin `Job.create()` wrapper adding
+  no new idempotency/scope-key mechanism (the existing `idempotency_key`/
+  `operation_scope_key` unique constraints do the work, reused verbatim
+  and proven via two collision tests each, using the established
+  `mute_logger('odoo.sql_db')` + `cr.savepoint()` pattern); the DEC-009
+  error-class taxonomy is fully and exhaustively mapped (all 16 fixed
+  `ERROR_CLASS_SELECTION` values, cross-checked programmatically --
+  see Learning feedback loop) across four routing buckets (auto-retry,
+  manual-fix-then-retry, conservative-never-silent -> `failed_retryable`
+  since `financial_total_mismatch` is not one of the six
+  `manual_review_subreason` values, and the six operator-confirmation-
+  required classes -> `blocked_manual_review` with a matching
+  subreason); a new domain-enabled execution-time-only gating hook
+  (`_domain_flag_for_job_type()`, DEC-013 §I.3) was added inside
+  `write()`'s existing `state -> 'running'` branch, alongside (never
+  replacing) the unmodified store-state re-check -- maps every job_type
+  shipped in this repo to `None` today (a true no-op in production),
+  tested only via a patched synthetic mapping, and proven never to run
+  at `create()` time (so it cannot alter an enqueue-time decision); a
+  third store-state checkpoint (`_invoke_handler`'s immediate pre-
+  dispatch re-check) narrows -- and is documented everywhere as **not
+  closing** -- the SRR-03 disconnect/in-flight-job race, exactly per
+  Decision A's own explicit framing; `action_disconnect()`
+  (`shopify_connector_store.py`) is untouched and proven (by test) to
+  already cancel jobs reaching the three new non-terminal states this
+  task makes reachable (`retry_waiting`/`failed_retryable`/
+  `blocked_manual_review`), since none of the three was ever in
+  `TERMINAL_JOB_STATES`.
+- **Items deferred:** every item the gate-opening proposal/gate document
+  named as preserved remains exactly as open as before this task --
+  VAL-B2 (deferred/not passed), MBQ-05 (Partially routed/Open), **TD-002
+  (confirmed still Open before any edit, not touched)**, the fulfillment
+  API model, product first-sync dedup thresholds, token acquisition for
+  many unrelated customers, Lite/Full packaging, the 16-vs-17
+  `@idempotent` mutation-count and OCA `queue_job` worker-count wording
+  discrepancies, checkpoint/resume ownership. **Live Odoo.sh runtime
+  validation (§I of the implementation-scope document) is not performed
+  by this session** -- cron drain firing in real Odoo runtime,
+  concurrency behavior under multiple `--max-cron-threads`, a live
+  SRR-03 reproduction, retry scheduling over real wall-clock time,
+  failed-job visibility in a live registry, a live server-log token-leak
+  grep, and savepoint/batch behavior at realistic volumes are all
+  **explicitly named as a separate, later, follow-up validation pass**
+  in this session's own PR body -- none is claimed as passed here. No
+  claim is made anywhere in code, tests, or docs that the claim
+  mechanism (Decision A) is proven safe under real concurrent-worker or
+  multi-server execution.
+- **Learning feedback loop:**
+  - New issues discovered: none rising to a defect-pattern-log entry.
+    One design subtlety worth naming for a future session: constructing
+    a genuine two-real-transaction concurrency test for the claim
+    mechanism is impractical inside Odoo's own `TransactionCase` harness
+    (test-mode cursors share the enclosing transaction's sandbox, so a
+    second `registry.cursor()` cannot observe uncommitted fixture data
+    from the first) -- the claim-guard tests in
+    `test_job_dispatch.py` therefore use `unittest.mock.patch.object` on
+    `try_lock_for_update()` itself to prove the code-level "skip an
+    already-locked row" contract, exactly as the gate-opening proposal's
+    own §4 anticipated ("a test proving ... is a code-level proof, not a
+    concurrent-worker proof") -- not a gap, but worth stating explicitly
+    so a future session does not mistake the mock-based test for a
+    stronger claim than it is.
+  - Repeated issue patterns: none.
+  - Rules/checklists updated: none this session (no repeated-issue
+    threshold reached).
+  - New rejected approaches: none.
+  - New technical debt: none -- no compromise was knowingly accepted;
+    `technical-debt-register.md` is unmodified (TD-002 confirmed Open,
+    not touched, per this task's own explicit instruction).
+  - Architecture concerns: none beyond what DEC-025/the gate-opening
+    proposal already flagged (SRR-03 narrowed-not-closed; the claim
+    mechanism's real concurrency safety unproven by unit tests; the
+    batch-size/interval defaults unvalidated at realistic volume) --
+    all restated, not resolved, by this task, exactly as required.
+  - Tests or review gates needed: a **separate, later, live Odoo.sh
+    validation session** (mirroring Task 004/005's own
+    `task-00X-validation-results.md` precedent) is the concrete next
+    gate this task's own PR body names but does not itself satisfy.
+  - Should future prompts change? No.
+  - **Self-verification performed this session (no live Odoo available):**
+    `python3 -m py_compile` on every new/modified file; a standalone
+    Python script replicating each new AST-based source-level test
+    (sudo-site count, `job_dispatch.py` zero-`.create(`-calls,
+    `job_enqueue.py`'s sole `.create(` target, no Shopify-API-client
+    reference in either new production file) -- all passed; an
+    independent numerical re-derivation of the retry backoff/jitter
+    formula against every bound assertion in
+    `test_job_retry_scheduling.py` (attempt 0, attempt 3, the 30-minute
+    cap, and the deterministic `random.uniform`-patched case) -- all
+    passed; a full manual line-by-line trace of every new test's control
+    flow against the production code for correctness (state
+    transitions, gating order, constraint interactions).
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next recommended session:** a live Odoo.sh runtime-validation pass
+  for this PR (mirroring `task-004-validation-results.md`/
+  `task-005-validation-results.md`) -- install the module fresh, run the
+  full `shopify_connector_core` test suite (must show all pre-existing
+  tests plus this task's new tests passing, zero domain modules
+  installed), then exercise the §I runtime-validation checklist items
+  this session's PR body names as not yet performed.
+- **Stop condition:** implementation complete per the issued final
+  prompt's exact allowed-files list; no domain-module task, no further
+  Task 006 sub-slice, and no other next-feature work started in this
+  session. Stopping here to open the PR as **draft** and await ChatGPT's
+  own review, per the final prompt's own closing instruction.
+
+---
+
 ### Task 006D — PR #130 consistency patch — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-006d-sync-engine-gate-opening-fp33xo` →

@@ -106,6 +106,12 @@ class ShopifyConnectorJob(models.Model):
             ('core_readiness_check', 'Core Readiness Check'),
             ('core_manual_maintenance', 'Core Manual Maintenance'),
             ('core_test_connection', 'Core Test Connection'),
+            # Task 006C / Decision F (gate-opening proposal §6):
+            # core/diagnostic-only, reserved solely for the dispatcher's
+            # own registry/dispatch self-tests (shopify_connector_job_
+            # dispatch.py) -- never dispatched to a live Shopify call,
+            # never a template for a future domain job_type.
+            ('core_dispatch_selftest', 'Core Dispatch Selftest'),
         ],
         required=True,
         index=True,
@@ -213,7 +219,8 @@ class ShopifyConnectorJob(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
-        """Execution/start-time store-state gating (Task 005 / DEC-022 §4.2).
+        """Execution/start-time gating (Task 005 / DEC-022 §4.2, plus
+        Task 006C's domain-enabled hook below).
 
         Re-checks store state the moment a business job is about to
         start (`state` -> 'running') -- the fail-closed guard for the
@@ -223,29 +230,238 @@ class ShopifyConnectorJob(models.Model):
         `cancelled`, e.g. `action_disconnect`'s cancellation sweep) are
         never blocked by this check.
 
-        Evaluates the *effective* post-write `job_source`/`store_id` --
-        i.e. the incoming `vals` value when present, the job's current
-        value otherwise -- not the stale pre-write cache, so a single
-        call that also changes `job_source`/`store_id` alongside `state`
-        cannot slip a business job past the gate by changing identity in
-        the same write() as the state transition.
+        Evaluates the *effective* post-write `job_source`/`job_type`/
+        `store_id` -- i.e. the incoming `vals` value when present, the
+        job's current value otherwise -- not the stale pre-write cache,
+        so a single call that also changes `job_source`/`job_type`/
+        `store_id` alongside `state` cannot slip a job past either gate
+        below by changing identity in the same write() as the state
+        transition.
+
+        Alongside (not replacing) the store-state re-check: a
+        domain-enabled execution-time-only gating hook (Task 006C,
+        DEC-013 §I.3) -- see `_domain_flag_for_job_type()`. This second
+        check runs for every job, not only business-sourced ones, since
+        a domain-enablement requirement is orthogonal to trigger source;
+        every job_type shipped in this file maps to no flag today, so it
+        is a no-op unless/until a future domain module registers one.
         """
         if vals.get('state') == 'running':
             Store = self.env['shopify.connector.store']
+            Settings = self.env['shopify.connector.store.settings']
             for job in self:
                 job_source = vals.get('job_source', job.job_source)
-                if not self._is_business_job_source(job_source):
-                    continue
+                job_type = vals.get('job_type', job.job_type)
                 if 'store_id' in vals:
                     store = Store.browse(vals['store_id'])
                 else:
                     store = job.store_id
-                if store.state != 'connected':
-                    raise ValidationError(
-                        "This business job's store is not 'connected' -- "
-                        "it cannot start."
+                if self._is_business_job_source(job_source):
+                    if store.state != 'connected':
+                        raise ValidationError(
+                            "This business job's store is not "
+                            "'connected' -- it cannot start."
+                        )
+                flag_name = self._domain_flag_for_job_type(job_type)
+                if flag_name:
+                    settings = Settings.search(
+                        [('store_id', '=', store.id)], limit=1,
                     )
+                    if not settings or not settings[flag_name]:
+                        raise ValidationError(
+                            "This job's required domain flag (%r) is "
+                            "not enabled for this store -- it cannot "
+                            "start." % (flag_name,)
+                        )
         return super().write(vals)
+
+    @api.model
+    def _domain_flag_for_job_type(self, job_type):
+        """`job_type` -> the required `shopify.connector.store.settings`
+        boolean flag name, or `None` if this job_type has no
+        domain-enablement requirement.
+
+        Execution-time-only gating hook (DEC-013 §I.3): consulted only
+        from `write()`'s state -> 'running' re-check above, never from
+        `create()` -- this hook may stop/hold/block a job at start time,
+        it never alters an enqueue-time decision, and it can only ever
+        ADD a new reason to block a start -- it never bypasses the
+        store-state check above or any other existing guard.
+
+        Every job_type shipped in this file today (`core_readiness_
+        check`, `core_manual_maintenance`, `core_test_connection`,
+        `core_dispatch_selftest`) maps to `None` -- no domain flag ever
+        drives real behavior yet, since no domain module exists to
+        register one. A domain module extends this mapping via classic
+        Odoo inheritance (`_inherit` + `super()._domain_flag_for_
+        job_type(job_type)`), mirroring the `_get_checks()`/
+        `_get_handlers()` append-seam pattern -- never removing or
+        silently overriding an already-mapped job_type.
+        """
+        return None
+
+    # ------------------------------------------------------------------
+    # Task 006C: execution-time claim mechanism (Decision A)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _claim_for_dispatch(self, limit):
+        """Claim up to `limit` claimable (`queued`, or due `retry_
+        waiting`) jobs for one drain pass.
+
+        Non-blocking claim: `try_lock_for_update()` (Odoo 19's official
+        row-locking primitive, documented for exactly this cron-batch-
+        processing pattern) attempts a PostgreSQL row lock per candidate
+        row and silently skips any row already locked by a concurrent
+        claim attempt in the same pass -- never a raw SQL `SKIP LOCKED`
+        reimplementation, never a PostgreSQL advisory lock (Decision A,
+        Task 006C gate-opening proposal §6). After locking, re-checks
+        each row's actual current state under the lock -- mirroring
+        Odoo's own official "Writing cron functions" worked example
+        (`record.try_lock_for_update().filtered_domain(domain)`: lock,
+        then re-check nothing changed underneath) -- since a
+        concurrently committed write could have moved a row out of a
+        claimable state between the initial search and the lock being
+        acquired.
+
+        This is a code-level claim guard only. `TransactionCase` cannot
+        exercise real concurrent workers, so this method's behavior
+        under actual multi-worker/multi-server execution is NOT proven
+        by any unit test in this repository -- see the Task 006C
+        gate-opening proposal §4/§8 for the live-runtime validation this
+        does not, and could not, perform.
+        """
+        now = fields.Datetime.now()
+        candidates = self.search([
+            '|',
+            ('state', '=', 'queued'),
+            '&', ('state', '=', 'retry_waiting'), ('next_retry_at', '<=', now),
+        ], limit=limit, order='id asc')
+        if not candidates:
+            return candidates
+        locked = candidates.try_lock_for_update()
+        if not locked:
+            return locked
+        locked.invalidate_recordset()
+        return locked.filtered(
+            lambda job: job.state == 'queued' or (
+                job.state == 'retry_waiting'
+                and job.next_retry_at
+                and job.next_retry_at <= fields.Datetime.now()
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Task 006C: state-transition helpers (permanent-failure /
+    # manual-review / retry / skip), implementing already-accepted
+    # DEC-009 state semantics. Every transition below writes state
+    # (+ error_class/manual_review_subreason/finished_at as applicable)
+    # in a single write() call, then logs it exclusively through the
+    # existing sanctioned `job.log._system_append()` path -- no direct
+    # `job.log.create()` call, no `sudo()`.
+    # ------------------------------------------------------------------
+
+    def _log_transition(
+        self, event_type, message, technical_detail=False,
+        from_state=False, to_state=False,
+    ):
+        self.env['shopify.connector.job.log']._system_append(
+            self, event_type, message, technical_detail=technical_detail,
+            from_state=from_state, to_state=to_state,
+        )
+
+    def _transition_retry_waiting(
+        self, next_retry_at, retry_count, error_class, message,
+        technical_detail=False,
+    ):
+        """Move a claimed job back to `retry_waiting`, scheduled per the
+        Task 006C retry-scheduling constants
+        (`shopify_connector_job_dispatch.py`)."""
+        self.ensure_one()
+        from_state = self.state
+        self.write({
+            'state': 'retry_waiting',
+            'error_class': error_class,
+            'next_retry_at': next_retry_at,
+            'retry_count': retry_count,
+        })
+        self._log_transition(
+            'state_change', message, technical_detail=technical_detail,
+            from_state=from_state, to_state='retry_waiting',
+        )
+
+    def _transition_failed_retryable(
+        self, error_class, message, technical_detail=False,
+    ):
+        """Move a claimed job to `failed_retryable` -- a manual-fix-
+        then-retry class error (DEC-009): the job stops, no automatic
+        retry is scheduled, an operator fix is required before any
+        future retry attempt."""
+        self.ensure_one()
+        from_state = self.state
+        self.write({
+            'state': 'failed_retryable',
+            'error_class': error_class,
+            'finished_at': fields.Datetime.now(),
+        })
+        self._log_transition(
+            'state_change', message, technical_detail=technical_detail,
+            from_state=from_state, to_state='failed_retryable',
+        )
+
+    def _transition_failed_final(
+        self, error_class, message, technical_detail=False,
+    ):
+        """Move a claimed job to the permanent-failure terminal state."""
+        self.ensure_one()
+        from_state = self.state
+        self.write({
+            'state': 'failed_final',
+            'error_class': error_class,
+            'finished_at': fields.Datetime.now(),
+        })
+        self._log_transition(
+            'state_change', message, technical_detail=technical_detail,
+            from_state=from_state, to_state='failed_final',
+        )
+
+    def _transition_blocked_manual_review(
+        self, error_class, manual_review_subreason, message,
+        technical_detail=False,
+    ):
+        """Move a claimed job to the operator-confirmation-required
+        state, setting the matching `manual_review_subreason` in the
+        same write() the `_check_manual_review_subreason_required`
+        constraint requires."""
+        self.ensure_one()
+        from_state = self.state
+        self.write({
+            'state': 'blocked_manual_review',
+            'error_class': error_class,
+            'manual_review_subreason': manual_review_subreason,
+            'finished_at': fields.Datetime.now(),
+        })
+        self._log_transition(
+            'state_change', message, technical_detail=technical_detail,
+            from_state=from_state, to_state='blocked_manual_review',
+        )
+
+    def _transition_skipped(self, message, technical_detail=False):
+        """Move a claimed job to `skipped` without ever invoking a
+        handler -- used by the dispatcher's execution-time-immediately-
+        before-dispatch store-state re-check (SRR-03 narrowing;
+        narrows, never claims to close, the disconnect/in-flight-job
+        race)."""
+        self.ensure_one()
+        from_state = self.state
+        self.write({
+            'state': 'skipped',
+            'finished_at': fields.Datetime.now(),
+        })
+        self._log_transition(
+            'state_change', message, technical_detail=technical_detail,
+            from_state=from_state, to_state='skipped',
+        )
 
     @api.depends(
         'store_id', 'job_type', 'res_model', 'res_id',

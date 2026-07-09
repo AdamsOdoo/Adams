@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.4.0',
+    'version': '19.0.1.5.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
         'settings, location cache, binding mixin, job and job log models, '
@@ -40,6 +40,7 @@ authorized tasks.
     'data': [
         'security/shopify_connector_security.xml',
         'security/ir.model.access.csv',
+        'data/shopify_connector_cron_drain.xml',
     ],
     'installable': True,
     'application': False,
