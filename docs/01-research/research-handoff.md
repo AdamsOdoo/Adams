@@ -1,5 +1,140 @@
 # Research Handoff (rolling)
 
+### Task 006C — PR #131 corrective patch — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place --
+  no new PR opened). Applies a narrow corrective patch per control-room
+  review (GitHub review artifact/comment ID `4921925802`), starting from
+  head `c51c16e5f68e3b0a57d4bc8bb0f003f3bfbc39e9`.
+- **Files changed:** `addons/shopify_connector_core/__manifest__.py`
+  (description fix only), `addons/shopify_connector_core/data/
+  shopify_connector_cron_drain.xml` (removed the invalid `numbercall`
+  field; also fixed a second, previously-undetected defect found while
+  validating -- the record's own XML comment contained a literal `--`,
+  which is invalid inside an XML comment per spec and made the whole
+  file fail to parse), `addons/shopify_connector_core/models/
+  shopify_connector_job.py` (`_transition_failed_final()` gained an
+  optional `retry_count` kwarg, written only when explicitly provided),
+  `addons/shopify_connector_core/models/shopify_connector_job_
+  dispatch.py` (the retry-exhaustion branch now passes the exhausted
+  attempt count through; `_start_running()` now routes a blocked start
+  to `failed_retryable`/`odoo_validation_configuration` instead of
+  silently returning `False`), `addons/shopify_connector_core/tests/
+  test_job_dispatch.py` (two new tests for start-gating visibility; the
+  no-live-Shopify source-level guard now scans `shopify_connector_
+  job.py` too, via a new `_changed_production_files()` helper),
+  `addons/shopify_connector_core/tests/test_job_retry_scheduling.py`
+  (added `retry_count` assertions to the two auto-retry exhaustion
+  tests -- the `unknown_system_error` safety-net exhaustion test already
+  asserted the count and was the one the reviewer's own example cited
+  as mismatched against the pre-fix code), `docs/01-research/
+  research-handoff.md` (this entry). No new files created -- every fix
+  applied to an existing allowed file.
+- **What changed / residue fixed:**
+  1. **Cron XML install risk** -- `numbercall` is not a field on Odoo
+     19's `ir.cron` model (confirmed by fetching the actual 19.0
+     `ir_cron.py` source: the model's fields are `active`,
+     `interval_number`, `interval_type`, `nextcall`, `lastcall`,
+     `priority`, `failure_count`, `first_failure_date`, `user_id`, plus
+     fields delegated from `ir.actions.server` via `ir_actions_server_id`
+     -- no `numbercall`/`doall`); removed. Confirmed `model_id`/`state`/
+     `code` remain valid on `ir.cron` via that same delegation
+     mechanism, so no other field in the record needed to change.
+     Separately found and fixed a genuine XML well-formedness bug in the
+     same file's own comment (a literal `--` inside `<!-- -->`), which
+     would have failed module installation outright regardless of the
+     `numbercall` question.
+  2. **Manifest description** -- the "no cron execution" claim was
+     false as of this PR; narrowly reworded to state the module now
+     includes a core job enqueue/dispatch and cron drain skeleton, while
+     still explicitly stating no Shopify API calls, no webhooks, no
+     setup wizard, no operator-facing UI, and no domain sync logic. No
+     other manifest content changed.
+  3. **Retry exhaustion count** -- `_transition_failed_final()` did not
+     persist `retry_count`, so a job routed to `failed_final` via
+     exhaustion kept its pre-attempt count, contradicting the fact that
+     it did attempt and fail one more time. Fixed additively (an
+     optional kwarg, written only when passed) without weakening bounded
+     -retry behavior or touching DEC-009 classification; the
+     max-attempts and retry-window exhaustion tests now assert the
+     persisted count too, not only the safety-net test that already did.
+  4. **Silent start-gating failures** -- `_start_running()` previously
+     caught a blocked-start `ValidationError` and returned `False` with
+     no state change and no log, so a gated job could remain
+     `queued`/`retry_waiting` indefinitely with no visible outcome. Now
+     routes to `failed_retryable`/`odoo_validation_configuration` (the
+     same DEC-009 "manual fix then retry" class this error_class already
+     maps to via `_route_failure()`), logged exclusively through the
+     existing `_transition_failed_retryable()` helper -- no new
+     `job.log.create()` call, no bypass of either gate, no claim that
+     SRR-03 is closed (this fix is entirely about checkpoint 2, not
+     checkpoint 3).
+  5. **No-live-Shopify source guard scope** -- the guard previously
+     scanned only the two new files; now scans all three changed
+     production files (`shopify_connector_job.py` included) via a new
+     `_changed_production_files()` helper, kept separate from the
+     sudo-site guard's own (intentionally unchanged, still two-file)
+     scope.
+- **Items deferred:** unchanged from the prior entry -- VAL-B2, MBQ-05,
+  TD-002 (untouched), the fulfillment API model, product first-sync
+  dedup thresholds, token acquisition, Lite/Full packaging, and every
+  named runtime-validation item (§I) remain exactly as open/undone as
+  before this patch. No live Odoo.sh run was performed this session
+  either -- see below.
+- **Learning feedback loop:**
+  - New issues discovered: (a) an XML comment containing a literal `--`
+    is invalid per the XML spec and breaks parsing outright -- worth a
+    standing reminder for any future `<!-- -->` comment in this repo's
+    data/view XML to avoid double-hyphens; (b) `numbercall`/`doall` are
+    legacy `ir.cron` fields no longer present in Odoo 19 -- confirmed by
+    fetching the actual 19.0 source this session (not merely inferred
+    from older-version memory), now recorded here for any future cron
+    record in this project to avoid repeating.
+  - Repeated issue patterns: none (both are first occurrences).
+  - Rules/checklists updated: none this session (below the
+    repeated-issue escalation threshold).
+  - New rejected approaches: none.
+  - New technical debt: none -- every fix here closes a genuine defect
+    rather than accepting a compromise; `technical-debt-register.md` is
+    unmodified.
+  - Architecture concerns: none beyond what the original PR already
+    flagged (SRR-03 narrowed-not-closed; claim-mechanism concurrency
+    safety unproven by unit tests; batch-size/interval defaults
+    unvalidated at realistic volume) -- unchanged by this patch.
+  - Tests or review gates needed: the same separate, later, live
+    Odoo.sh validation session named in the original PR entry --
+    unchanged, still not performed.
+  - Should future prompts change? No.
+  - **Self-verification performed this session (no live Odoo
+    available):** `python3 -m py_compile` on every changed Python file;
+    `xml.dom.minidom` parse confirming the cron XML is now well-formed
+    (it was not, before this patch, due to the comment defect); a
+    repo-wide scan confirming no other XML file in this addon has the
+    same double-hyphen-in-comment defect; a live fetch of the actual
+    Odoo 19.0 `ir_cron.py` source confirming `numbercall`'s absence
+    (not asserted from memory alone); a standalone Python script
+    replicating every updated AST-based source-level test (sudo-site
+    count unchanged at 2, `job_dispatch.py` still zero `.create(` calls,
+    `job_enqueue.py`'s sole `.create(` target still `shopify.connector.
+    job`, no Shopify-API-client reference in any of the three changed
+    production files); a full manual trace of the retry-exhaustion math
+    and the two new start-gating tests against the updated production
+    code.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · no new rejected approach · no new
+  technical debt · no repeated-issue escalation needed.
+- **Next recommended session:** unchanged -- a live Odoo.sh
+  runtime-validation pass for this PR, now against the corrected code
+  (this is the first session where the cron XML would actually load
+  without an install-time error).
+- **Stop condition:** corrective patch complete per the exact allowed-
+  files list and required-fixes scope named in this session's prompt;
+  no unrelated change made; PR left draft/unmerged; no merge performed.
+  Next step: ChatGPT re-review.
+
+---
+
 ### Task 006C — sync-engine skeleton implementation — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR into

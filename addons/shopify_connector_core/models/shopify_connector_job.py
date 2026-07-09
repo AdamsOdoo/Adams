@@ -410,16 +410,30 @@ class ShopifyConnectorJob(models.Model):
         )
 
     def _transition_failed_final(
-        self, error_class, message, technical_detail=False,
+        self, error_class, message, technical_detail=False, retry_count=False,
     ):
-        """Move a claimed job to the permanent-failure terminal state."""
+        """Move a claimed job to the permanent-failure terminal state.
+
+        `retry_count` is optional and only written when explicitly
+        provided (truthy) -- callers reached via a retry-exhaustion path
+        (`shopify_connector_job_dispatch.py::_schedule_retry_or_fail`)
+        pass the exhausted attempt count so it is persisted (the job did
+        attempt and fail again, one more time than its last recorded
+        `retry_count`); callers with no attempt to count (e.g. a
+        missing-handler failure, or a blocked start-time gate) omit it,
+        leaving the field untouched, exactly as before this parameter
+        existed.
+        """
         self.ensure_one()
         from_state = self.state
-        self.write({
+        vals = {
             'state': 'failed_final',
             'error_class': error_class,
             'finished_at': fields.Datetime.now(),
-        })
+        }
+        if retry_count:
+            vals['retry_count'] = retry_count
+        self.write(vals)
         self._log_transition(
             'state_change', message, technical_detail=technical_detail,
             from_state=from_state, to_state='failed_final',

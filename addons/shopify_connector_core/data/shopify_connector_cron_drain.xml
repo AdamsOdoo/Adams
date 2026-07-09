@@ -5,9 +5,9 @@
              ir.cron record driving shopify.connector.job.dispatch's
              claim/drain loop. Batch size (20) and interval (5 minutes)
              are conservative implementation defaults pending live
-             runtime validation -- see docs/07-implementation-plan/
+             runtime validation, see docs/07-implementation-plan/
              task-006c-sync-engine-gate-opening-proposal.md §8. Data
-             only -- no view, menu, or action accompanies this record. -->
+             only, no view, menu, or action accompanies this record. -->
         <record id="ir_cron_shopify_connector_job_dispatch_drain" model="ir.cron">
             <field name="name">Shopify Connector: Job Dispatch Drain</field>
             <field name="model_id" ref="model_shopify_connector_job_dispatch"/>
@@ -15,7 +15,6 @@
             <field name="code">model.run_drain()</field>
             <field name="interval_number">5</field>
             <field name="interval_type">minutes</field>
-            <field name="numbercall">-1</field>
             <field name="active" eval="True"/>
         </record>
     </data>

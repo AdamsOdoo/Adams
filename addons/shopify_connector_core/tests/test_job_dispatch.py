@@ -230,6 +230,63 @@ class TestJobDispatch(TransactionCase):
         self.assertEqual(job.state, 'succeeded')
 
     # ------------------------------------------------------------------
+    # Start-gating (checkpoint 2) failures are visible and audited, not
+    # silent -- a job blocked at start time must not remain indefinitely
+    # queued/retry_waiting with no observable outcome.
+    # ------------------------------------------------------------------
+
+    def test_start_running_blocked_by_store_state_becomes_visible_audited(self):
+        self.store.write({'state': 'connected'})
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'manual_sync',
+            'job_type': 'core_dispatch_selftest',
+            'state': 'draft',
+            'payload_hash': str(uuid.uuid4()),
+        })
+        # The store disconnects strictly before the start-running
+        # transition is even attempted (unlike the checkpoint-3 tests
+        # above, which disconnect strictly after it succeeds).
+        self.store.write({'state': 'disconnected'})
+        result = self.Dispatch._start_running(job)
+        self.assertFalse(result)
+        job.invalidate_recordset()
+        self.assertNotIn(job.state, ('queued', 'retry_waiting', 'draft'))
+        self.assertEqual(job.state, 'failed_retryable')
+        self.assertEqual(job.error_class, 'odoo_validation_configuration')
+        self.assertTrue(job.finished_at)
+        logs = self._logs_for(job)
+        self.assertTrue(logs)
+        self.assertTrue(
+            any(log.to_state == 'failed_retryable' for log in logs)
+        )
+
+    def test_start_running_blocked_by_domain_flag_becomes_visible_audited(self):
+        self.store.write({'state': 'connected'})
+        job = self._create_selftest_job(state='draft')
+        JobModel = self.env.registry['shopify.connector.job']
+
+        def _fake_domain_flag_for_job_type(self, job_type):
+            return 'product_domain_enabled'
+
+        with patch.object(
+            JobModel, '_domain_flag_for_job_type',
+            _fake_domain_flag_for_job_type,
+        ):
+            result = self.Dispatch._start_running(job)
+        self.assertFalse(result)
+        job.invalidate_recordset()
+        self.assertNotIn(job.state, ('queued', 'retry_waiting', 'draft'))
+        self.assertEqual(job.state, 'failed_retryable')
+        self.assertEqual(job.error_class, 'odoo_validation_configuration')
+        self.assertTrue(job.finished_at)
+        logs = self._logs_for(job)
+        self.assertTrue(logs)
+        self.assertTrue(
+            any(log.to_state == 'failed_retryable' for log in logs)
+        )
+
+    # ------------------------------------------------------------------
     # Execution-time domain-enabled recheck (fail-safe only, DEC-013
     # §I.3) -- synthetic/test-only flag mapping, never a live domain
     # flag, per implementation-scope §F item 5.
@@ -341,6 +398,15 @@ class TestJobDispatch(TransactionCase):
             os.path.join(self._models_dir(), 'shopify_connector_job_dispatch.py'),
         )
 
+    def _changed_production_files(self):
+        # All three production Python files this task touches, including
+        # the modified (not merely new) shopify_connector_job.py -- used
+        # by guards that must cover every changed file, not only the two
+        # brand-new ones (e.g. the no-live-Shopify-call guard below).
+        return (
+            os.path.join(self._models_dir(), 'shopify_connector_job.py'),
+        ) + self._find_new_model_files()
+
     def _models_dir(self):
         return os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -414,24 +480,27 @@ class TestJobDispatch(TransactionCase):
             self.assertEqual(offenders, [], path)
 
     # ------------------------------------------------------------------
-    # No live Shopify call anywhere in this task's new files
-    # (source-level).
+    # No live Shopify call anywhere in this task's changed production
+    # files (source-level).
     # ------------------------------------------------------------------
 
-    def test_source_level_no_shopify_api_client_reference_in_new_production_files(self):
-        """Stronger than a per-test mocking sample: neither new
-        production model file references the Shopify API client at all
-        -- so no test exercising them could reach a live call regardless
-        of what any individual test does or does not mock. (The test
-        files themselves legitimately reference `shopify.connector.api.
-        client` in order to patch/assert it is never called -- mirroring
+    def test_source_level_no_shopify_api_client_reference_in_changed_production_files(self):
+        """Stronger than a per-test mocking sample: none of this task's
+        three changed production files -- the modified
+        shopify_connector_job.py, and the two new
+        shopify_connector_job_enqueue.py/shopify_connector_job_
+        dispatch.py -- references the Shopify API client at all, so no
+        test exercising them could reach a live call regardless of what
+        any individual test does or does not mock. (The test files
+        themselves legitimately reference `shopify.connector.api.client`
+        in order to patch/assert it is never called -- mirroring
         `test_readiness_check_never_calls_shopify_api_client` -- so they
         are intentionally not scanned here; see
         test_no_live_shopify_call_during_a_real_drain_run and
         test_job_enqueue.py's own equivalent for the corresponding
         behavioral proof.)
         """
-        for path in self._find_new_model_files():
+        for path in self._changed_production_files():
             with open(path, 'r', encoding='utf-8') as source_file:
                 content = source_file.read()
             self.assertNotIn('shopify.connector.api.client', content, path)

@@ -166,10 +166,21 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         `shopify.connector.job`'s own `write()` (the unmodified
         store-state gate plus the new domain-flag gate).
 
-        Returns `False` -- leaving the job in its pre-claim state for a
-        future drain pass -- if a gating check blocks the start; never
-        raises out of the drain loop, so one blocked job never stops the
-        rest of the batch.
+        If a gating check blocks the start, the job is routed to
+        `failed_retryable` with `error_class='odoo_validation_
+        configuration'` -- a visible, audited outcome (via the existing
+        `_transition_failed_retryable()` helper, logged exclusively
+        through `_system_append()`) rather than silently remaining
+        `queued`/`retry_waiting` forever. This does not bypass or weaken
+        either gate: `job.write()` itself still raises exactly as
+        before -- this only makes an already-blocked start observable,
+        as a configuration/state problem an operator can correct and
+        retry later (the same DEC-009 "manual fix then retry" class
+        `odoo_validation_configuration` already routes to via
+        `_route_failure()`). Never raises out of the drain loop, so one
+        blocked job never stops the rest of the batch -- `write()`
+        either succeeds (returns `True`) or is caught here and routed
+        to `failed_retryable` (returns `False`).
         """
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
@@ -178,7 +189,14 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 'state': 'running',
                 'started_at': job.started_at or fields.Datetime.now(),
             })
-        except ValidationError:
+        except ValidationError as exc:
+            job._transition_failed_retryable(
+                error_class='odoo_validation_configuration',
+                message=(
+                    'Job could not start: a start-time gating check '
+                    'blocked it (%s).' % str(exc)
+                ),
+            )
             return False
         JobLog._system_append(
             job, 'attempt', 'Dispatch attempt started.',
@@ -302,9 +320,13 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             new_retry_count > max_attempts
             or elapsed > timedelta(hours=RETRY_WINDOW_HOURS)
         ):
+            # The job did attempt and fail again -- persist the
+            # exhausted attempt count (one more than its last recorded
+            # retry_count), not just the terminal state.
             job._transition_failed_final(
                 error_class=error_class, message=reason,
                 technical_detail=technical_detail,
+                retry_count=new_retry_count,
             )
             return
         delay_seconds = self._retry_delay_seconds(new_retry_count - 1)

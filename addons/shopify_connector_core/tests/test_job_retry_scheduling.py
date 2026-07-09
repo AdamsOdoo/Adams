@@ -136,6 +136,9 @@ class TestJobRetryScheduling(TransactionCase):
         self._run_with_handler_error(job, 'shopify_throttling_rate_limit')
         self.assertEqual(job.state, 'failed_final')
         self.assertEqual(job.error_class, 'shopify_throttling_rate_limit')
+        # The job did attempt and fail again -- the exhausted attempt
+        # count must be persisted, not left at its pre-attempt value.
+        self.assertEqual(job.retry_count, RETRY_MAX_ATTEMPTS + 1)
 
     def test_auto_retry_class_exceeds_retry_window_to_failed_final(self):
         self.store.write({'state': 'connected'})
@@ -148,6 +151,7 @@ class TestJobRetryScheduling(TransactionCase):
         )
         self._run_with_handler_error(job, 'shopify_throttling_rate_limit')
         self.assertEqual(job.state, 'failed_final')
+        self.assertEqual(job.retry_count, 2)
 
     def test_unknown_system_error_retries_once_then_fails_final(self):
         self.store.write({'state': 'connected'})

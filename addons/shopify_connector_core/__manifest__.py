@@ -26,12 +26,13 @@ addon family:
   for jobs.
 
 This module now includes the credential storage, masking, and redaction
-foundation (masked storage behind access control, no encryption claim).
-It still contains no Shopify API client, no external API calls, no
-webhook handling, no cron execution, no setup wizard, and no
-operator-facing UI. It is a core scaffold only; domain modules (product,
-sale, inventory, fulfillment) build on top of it in later, separately
-authorized tasks.
+foundation (masked storage behind access control, no encryption claim),
+plus a core job enqueue/dispatch and cron drain skeleton (claim, retry
+scheduling, and failure routing only). It still contains no Shopify API
+client, no external API calls, no webhook handling, no setup wizard, and
+no operator-facing UI, and implements no domain sync logic. It is a core
+scaffold only; domain modules (product, sale, inventory, fulfillment)
+build on top of it in later, separately authorized tasks.
 """,
     'author': 'Adams',
     'license': 'LGPL-3',
