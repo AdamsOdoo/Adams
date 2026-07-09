@@ -1,5 +1,84 @@
 # Research Handoff (rolling)
 
+### Task 006C — PR #131 manifest truthfulness patch — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged; same PR, revised in place --
+  no new PR opened). Applies a narrow manifest-truthfulness fix per
+  control-room re-review (GitHub review artifact/comment ID
+  `4922068739`), starting from head
+  `b28c1849a19ee63c828d13e42a65b172475ab1e6`.
+- **Files changed:** `addons/shopify_connector_core/__manifest__.py`
+  (wording only -- no key added/removed/reordered), `docs/01-research/
+  research-handoff.md` (this entry). No other file touched.
+- **What changed / residue fixed:** fixed stale "no Shopify API client" /
+  "no external API calls" **module-level** wording in the manifest --
+  the module has carried a working, callable Shopify API client
+  (`shopify_connector_api_client.py`) and its test-connection/readiness
+  call path since Task 003/004, well before this PR; claiming "no
+  Shopify API calls" for the whole module was false and predates this
+  session (the prior corrective patch fixed the narrower "no cron
+  execution" claim but left this one, in the same paragraph,
+  unaddressed). Both the `description` and the `summary` fields carried
+  the same category of false claim (the `summary` field said "No
+  Shopify API calls, no webhooks, no UI" in slightly different wording
+  than the `description` field's "no Shopify API client, no external
+  API calls") -- fixed both, since both are in the one allowed file and
+  both are the identical defect; only `description` was explicitly named
+  by the review, so this is flagged here as a small, disclosed,
+  same-file consistency fix, not a silent scope expansion. New wording
+  in both fields: states the module now includes the credential/
+  redaction foundation, the API-client/test-connection foundation, and
+  the core job enqueue/dispatch/cron drain skeleton; states plainly that
+  the **Task 006C sync-engine skeleton itself** performs no Shopify API
+  calls and implements no domain sync logic (a narrower, accurate claim,
+  distinct from the false whole-module claim it replaces); keeps "no
+  webhook handling," "no setup wizard," and "no operator-facing UI"
+  verbatim in meaning. **No code behavior changed anywhere** -- this is
+  a documentation/wording-only patch; no Python, XML, security, test, or
+  model file was touched. **No implementation scope expanded** -- no
+  new capability, field, method, or file was added or authorized.
+- **Items deferred:** unchanged -- VAL-B2, MBQ-05, TD-002 (untouched),
+  the fulfillment API model, product first-sync dedup thresholds, token
+  acquisition, Lite/Full packaging, checkpoint/resume ownership, and the
+  multi-server runtime concurrency proof requirement remain exactly as
+  open as before. **Odoo/PostgreSQL runtime validation is still not run
+  this session** -- no `odoo` package, no `psycopg2`, no responding
+  Postgres server in this environment; `py_compile` was not needed since
+  no Python file changed (the manifest is a plain Python dict literal,
+  validated by `eval()`-parsing it directly instead).
+- **Learning feedback loop:** new issues discovered: a stale-wording
+  defect can hide in more than one manifest field at once (`summary` and
+  `description` both claimed "no Shopify API calls" in different words)
+  -- worth a standing reminder that a manifest truthfulness sweep should
+  grep the whole file for the flagged claim's synonyms, not just the
+  one field a reviewer happened to quote. Repeated issue pattern: this
+  is the **second** manifest-truthfulness finding on this same PR (the
+  prior patch fixed "no cron execution"; this one fixes "no Shopify API
+  client"/"no external API calls") -- both are the same root-cause
+  category (manifest prose drifting stale as the module gains real
+  capability across tasks), now at 2 occurrences; not yet at the
+  3rd-occurrence pause threshold (`quality-feedback-loop.md` §4), but
+  worth naming explicitly here so a third recurrence is recognized
+  immediately rather than treated as a fresh, unrelated issue. Rules/
+  checklists updated: none this session (below escalation threshold).
+  New rejected approaches: none. New technical debt: none. Architecture
+  concerns: none beyond what prior entries already flagged. Should
+  future prompts change? No.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (repeated-pattern note above) · no
+  new rejected approach · no new technical debt · repeated-issue count
+  noted (2nd occurrence, below 3rd-occurrence escalation).
+- **Next recommended session:** unchanged -- a live Odoo.sh
+  runtime-validation pass for this PR remains the first outstanding
+  item; still not performed by any session on this PR.
+- **Stop condition:** manifest-truthfulness patch complete per the exact
+  allowed-files list and required-fix scope named in this session's
+  prompt; no unrelated change made; PR left draft/unmerged; no merge
+  performed. Next step: ChatGPT final re-review.
+
+---
+
 ### Task 006C — PR #131 corrective patch — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
