@@ -1,5 +1,72 @@
 # Research Handoff (rolling)
 
+### Task 010 final prompt and product-domain gate-opening proposal drafted — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-010-docs-prep-vsijz0`, based on latest
+  `Shopify-connector` tip `c171d8f9b404f0b9bc066ee6fbef811086f5d0fc` (PR
+  #136 merge commit, confirmed via `git rev-parse` and
+  `pull_request_read`); docs-only proposal PR into `Shopify-connector`,
+  **draft**.
+- **What happened:** PR #136 (MBQ-55 product portion + product-domain gate
+  criteria, both accepted by ChatGPT) confirmed **merged**. This session
+  drafted [`../07-implementation-plan/task-010-product-import-final-implementation-prompt.md`](../07-implementation-plan/task-010-product-import-final-implementation-prompt.md) —
+  a file-exact `CLAUDE.md` §9 prompt converting the accepted MBQ-55 names
+  into exact allowed/forbidden files, exact schema, an exact MVP
+  dedup-threshold conversion of the already-accepted DEC-014 point H
+  two-tier gate, and a strict job/sync-engine usage recommendation (one
+  `product_import_sync` job type via the existing `selection_add`/
+  `_get_handlers()` seams, zero `shopify_connector_core` edits) — and
+  [`../07-implementation-plan/task-010-product-import-gate-opening-proposal.md`](../07-implementation-plan/task-010-product-import-gate-opening-proposal.md),
+  auditing all twelve product-domain gate criteria and presenting evidence
+  that criteria 3, 4, 5, 9, and 12 (previously not yet satisfied) are now
+  satisfied by this session's own drafting act.
+- **Task 010 final prompt: drafted, but NOT issued.** It carries its own
+  header: "DO NOT USE THIS PROMPT UNTIL CHATGPT ACCEPTS THE TASK 010
+  GATE-OPENING PROPOSAL AND EXPLICITLY ISSUES THIS PROMPT IN CHAT."
+- **Product-domain gate-opening proposal: drafted, but NOT accepted.**
+  Status: Proposed / Under review only.
+- **Product-domain implementation gate: still closed.** It opens only via
+  a future, distinct, explicit ChatGPT gate-opening act — not performed by
+  this session.
+- **Task 010: still unauthorized.** No code, module, model, view,
+  controller, security, manifest, test, or CI file touched or authorized.
+- **AR-035 added:** Proposed / Under review only — records both documents,
+  explicitly not Accepted.
+- **Files changed (this session):**
+  [`../07-implementation-plan/task-010-product-import-final-implementation-prompt.md`](../07-implementation-plan/task-010-product-import-final-implementation-prompt.md)
+  (new),
+  [`../07-implementation-plan/task-010-product-import-gate-opening-proposal.md`](../07-implementation-plan/task-010-product-import-gate-opening-proposal.md)
+  (new),
+  [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md)
+  (linkage section added, §3 criteria text unchanged),
+  [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md)
+  (linkage section added), [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  (AR-035 added), this handoff entry. No addon/code, test, manifest,
+  XML/security, migration, or CI file touched; no product module of any
+  kind created.
+- **Learning feedback loop:** no new issues discovered; no new
+  repeated-issue pattern; no rule/checklist change needed; no new rejected
+  approach (checked `rejected-approaches-log.md` for relevance — none
+  applicable); one narrow, in-task decision recorded (MVP dedup
+  thresholds, job-type/seam choice) — both explicitly grounded in
+  already-accepted architecture (DEC-014 point H; the confirmed-this-session
+  `job_type`/`_get_handlers()` extension seams), not a new architecture
+  decision, and both flagged in the gate-opening proposal for ChatGPT
+  review, not silently asserted; no new technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach · no
+  new technical debt · no repeated-issue escalation needed.
+- **Stop condition:** final prompt marked not-issued; gate-opening
+  proposal marked Proposed/Under review, not Accepted; linkage sections
+  added to the gate-criteria doc and the Task 010 proposed doc; AR-035
+  added as Proposed/Under review; this handoff entry written; only the
+  six allowed docs files changed; PR left **draft/unmerged**; no merge
+  performed; no implementation gate opened; no product module or code
+  written. **Next step: ChatGPT review of the gate-opening proposal and
+  the final prompt.**
+
+---
+
 ### PR #136 revised — MBQ-55 product portion and gate criteria accepted by ChatGPT — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/mbq-55-product-binding-schema-8kd3vp` (PR #136),

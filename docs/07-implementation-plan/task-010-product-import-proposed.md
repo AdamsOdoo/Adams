@@ -327,3 +327,24 @@ above, and does not authorize any implementation of any kind. Task 010
 still needs a future final implementation prompt that fixes exact
 file/allowed/forbidden lists and dedup thresholds, using the now-accepted
 names above.
+
+## Task 010 final prompt drafted — not issued
+
+**Added 2026-07-09, docs-only. Proposed only. Does not authorize
+implementation.**
+
+A file-exact final implementation prompt,
+[`task-010-product-import-final-implementation-prompt.md`](./task-010-product-import-final-implementation-prompt.md),
+and a product-domain gate-opening proposal,
+[`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md),
+have now been drafted, converting the accepted MBQ-55 names above into
+exact allowed/forbidden files, exact schema, and exact dedup thresholds.
+
+**The prompt is not issued.** It carries its own header stating it must
+not be used until ChatGPT accepts the gate-opening proposal and explicitly
+issues it in a new chat turn. **Task 010 implementation remains
+unauthorized.** **The product-domain gate, and the Task 010 gate, both
+remain closed** — this note does not open either, does not change this
+task's Status/Preconditions sections above, and does not authorize any
+code, module, model, view, controller, security, manifest, test, or CI
+file.

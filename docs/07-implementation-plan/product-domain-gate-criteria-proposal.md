@@ -173,6 +173,31 @@ This document does not:
   not claim the product-domain gate is open, that Task 010 is authorized,
   or that any code is authorized.
 
+## 6. Task 010 gate proposal linkage — not a gate opening
+
+**Added 2026-07-09, docs-only. Proposed only. Does not open the
+product-domain implementation gate.**
+
+A future-session pairing —
+[`task-010-product-import-final-implementation-prompt.md`](./task-010-product-import-final-implementation-prompt.md)
+(the file-exact `CLAUDE.md` §9 prompt, converting criteria 3/4/5/9's
+requirements into exact model/field/file names and dedup thresholds) and
+[`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md)
+(the proposal that criteria 3, 4, 5, 9, and 12 above are now satisfied, and
+that reconfirms criteria 1/2/6/7/8/10/11 are unchanged) — has been drafted
+against this document's §3 criteria.
+
+**Both linked documents are proposed only, not accepted.** Drafting them
+does not itself satisfy any criterion by assertion — the gate-opening
+proposal states its own evidence for each criterion, subject to ChatGPT's
+own review. **The product-domain implementation gate remains closed** until
+ChatGPT explicitly accepts
+[`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md)
+as the distinct, explicit gate-opening act §4 above requires. This section
+does not itself perform that act, does not mark any criterion in §3 above
+as ChatGPT-confirmed satisfied, and does not authorize Task 010 or any
+code of any kind.
+
 ---
 
 ## Evidence / references
