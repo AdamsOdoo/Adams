@@ -1,0 +1,91 @@
+# Implementation Readiness Map — Post-PR #140 State of Every Task and Gate
+
+> **Status: [Recommendation] per `CLAUDE.md` §8. Docs-only. Does not
+> authorize implementation, does not open any gate.** Prepared 2026-07-09
+> as part of the post-PR #140 master audit
+> ([`project-readiness-master-audit.md`](./project-readiness-master-audit.md)).
+> Successor-in-function to the Task-010-era
+> [`../07-implementation-plan/master-implementation-readiness-checkpoint.md`](../07-implementation-plan/master-implementation-readiness-checkpoint.md)
+> and the Task-011-scoped
+> [`../07-implementation-plan/task-011-customer-import-gate-readiness.md`](../07-implementation-plan/task-011-customer-import-gate-readiness.md)
+> (both are preserved unchanged as historical records; where their "next
+> step" lines said "ChatGPT's final merge review of PR #140," that step is
+> now complete — merge commit `0e138d9`).
+
+## 1. Task-by-task map
+
+Gate lifecycle vocabulary (established Tasks 002–010 pattern):
+`unproposed → criteria/scope proposed → criteria/scope accepted →
+final prompt drafted (not issued) → gate opened (explicit ChatGPT act,
+one session only) → implementation PR (draft, review, merge) →
+runtime-validated → closed/exhausted`.
+
+| Task | Scope | Gate status | Implementation status | Runtime evidence | Remaining work |
+| --- | --- | --- | --- | --- | --- |
+| 001 | Core module scaffold | Closed/exhausted (AR-021 limited core gate) | Merged (PR #88) | Live Odoo.sh validated (Task 001A, PR #89) | None — closed |
+| 002 | Credential storage/masking/redaction | Closed/exhausted (AR-026) | Merged (PR #97) | Live validated (via later green suites) | None — closed |
+| 003 | Read-only API client + test connection | Closed/exhausted (AR-029) | Merged (PR #101 + hotfixes #103–#106) | Live partial validation (PR #107); **VAL-B2 still BLOCKED** (deferred by DEC-021, routed by DEC-023) | VAL-B2 live evidence (OP-06) |
+| 004 | Readiness-check substrate (+ TD-001 fix) | Closed/exhausted (PR #114 gate acceptance) | Merged (PR #115) | Live green 78/78 + 31/31 (`task-004-validation-results.md`) | None — closed (TD-001 Resolved) |
+| 005 | Connection lifecycle actions | Closed/exhausted (DEC-022, PR #120) | Merged (PR #121, after 2 runtime-defect REVISE cycles) | Live green 123/123 (DEC-024) | None — closed |
+| 006A/B/C/D | Sync-engine research → architecture gate → skeleton | 006B accepted (DEC-025); 006C gate closed/exhausted (AR-031) | 006C merged (PR #131) | Live green (AR-032; two runtime defects fixed pre-merge) | Concurrency plan (PR #134) unexecuted (OP-22) |
+| **010** | Product import / variant binding | **Closed/exhausted** (criteria accepted PR #136/AR-034; gate opened PR #137/AR-035; closed when PR #138 opened as draft) | **Merged** (PR #138; closure PR #139) | **0 failed / 0 errors of 220 tests**, Odoo.sh, 2026-07-09 (§K) | None for the import slice. Not operator-triggerable yet (no enqueue call site — OP-28); export/update is Task 015 |
+| **011** | Customer import / matching | **Criteria accepted as criteria only** (PR #140/AR-037, comment `4928377625`); **gate CLOSED**; 7/15 criteria satisfied | Not started — `shopify_connector_sale` does not exist | n/a | Final-prompt + gate-opening-proposal session (OP-02), gate act (OP-01), then one implementation session |
+| 012 | Order import | **Unproposed criteria**; order-binding naming pass never run | Not started | n/a | OP-14/OP-15/OP-16/OP-17 after Task 011 closes |
+| 013 | Inventory sync | **Unproposed criteria** | Not started | n/a | OP-18/OP-19 after Task 010 (product) — sequenced after 012 per the accepted order, but structurally dependent only on product |
+| 014 | Fulfillment/tracking | **Unproposed criteria**; write model already decided (DEC-011) | Not started | n/a | OP-20 (incl. exact scope set + TD-002 fix routing) after Task 012 |
+| 015 | Controlled product export/update | In MVP scope (DEC-003/PR #55) but never proposed as a task | Not started | n/a | Own proposal + naming/criteria pass when sequenced (OP-21) |
+| Area 6 | Manual/scheduled sync trigger call sites | Never gated | Not started | n/a | OP-28 — converts backend domains into operator-usable behavior |
+| UI Groups 1–15 | Menus/dashboard/wizard/screens | UI implementation gate never opened; zero views exist | Not started | n/a | OP-26; wizard OAuth step additionally needs OP-05 + OP-06 |
+| OAuth / token distribution | Setup-facing acquisition | No gate exists | Not started | n/a | MBQ-05 branch B decision first (OP-05) |
+| Webhooks | Per-domain slices | Posture accepted (layered, never webhook-only); no code gate | Not started | n/a | Per-domain proposals when reached (OP-27) |
+| Lite/Full packaging | Product/licensing shape | Undefined concept | Not started | n/a | Q27 framing decision, then planning task (OP-23) |
+
+## 2. Customer-domain gate criteria — live satisfaction table
+
+Source: [`../07-implementation-plan/customer-domain-gate-criteria-proposal.md`](../07-implementation-plan/customer-domain-gate-criteria-proposal.md)
+§3 (Accepted as criteria only, comment `4928377625`). Statuses below are
+restated from that document; nothing is newly satisfied by this audit.
+
+| # | Criterion | Status | Satisfiable by |
+| --- | --- | --- | --- |
+| 1 | Task 010 closed and runtime-green | **Satisfied** | — |
+| 2 | MBQ-55 customer-binding portion accepted | **Satisfied** | — |
+| 3 | Final prompt has exact file/model/field names | Not yet | Final-prompt session |
+| 4 | Exact allowed/forbidden files defined | Not yet | Final-prompt session |
+| 5 | Dedup/match-confidence thresholds fixed or explicitly in-task | Not yet | Final-prompt session (OP-10) |
+| 6 | No order-import scope | **Satisfied** (must remain so) | — |
+| 7 | No product/inventory/fulfillment scope | **Satisfied** | — |
+| 8 | No UI/wizard/webhook/OAuth scope | **Satisfied** | — |
+| 9 | Exact test files confirmed | Not yet | Final-prompt session |
+| 10 | Rollback plan defined | **Satisfied** (restate in prompt) | — |
+| 11 | No live-Shopify dependency beyond Task 003 client | **Satisfied** | — |
+| 12 | Blocker classification reconfirmed at gate time | Not yet (point-in-time act) | Gate-opening act |
+| 13 | Fallback-partner field + Posture A boundary in prompt | Not yet (name/home/boundary accepted; mechanics open) | Final-prompt session (OP-11) |
+| 14 | Address handling + `is_company` explicitly scoped | Not yet | Final-prompt session (OP-07/OP-08 — decision inputs ready) |
+| 15 | Ambiguous-match handling incl. exact job/log candidate fields | Not yet (principle accepted) | Final-prompt session (OP-09) |
+
+**[Inference]** Every unsatisfied criterion is resolvable by exactly one
+docs-only drafting session plus the gate-opening act itself. No research,
+code, or live-access blocker stands between the current state and an
+openable customer-domain gate.
+
+## 3. Cross-cutting readiness layers
+
+| Layer | State | Evidence | Gap |
+| --- | --- | --- | --- |
+| Governance / decision base | Complete: DEC-003–025 accepted; AR-001–037 accepted; RA-001–024 binding | Master audit §2.3 | None |
+| Core substrate | Merged, runtime-green, sufficient for Task 011 (incl. `read_customers` already in `REQUIRED_MVP_SCOPES`) | Master audit §2.2/§6 | Concurrency proof (OP-22) |
+| Domain code | Product import only | Addon tree | Tasks 011–015 |
+| Operator surface | **None** (zero views; no trigger call sites) | Addon tree; OP-26/OP-28 | Entire UI chain |
+| Live-Shopify evidence | **None ever** (VAL-B2 BLOCKED) | OP-06 | Human-operator execution of the closure plan |
+| Distribution/auth architecture | Branch A (one-store evidence) routed only | DEC-023 | Branch B decision (OP-05) |
+| UAT | 0/15 scenarios executable | [`uat-readiness-gap-analysis.md`](./uat-readiness-gap-analysis.md) | See that file |
+| Release | Checklist template ready; nothing executable | OP-30 | Roadmap tail |
+
+## 4. Explicit non-authorizations
+
+This map does not open any gate, does not authorize any task listed in §1,
+and does not change any criterion's satisfaction status — §2 restates the
+accepted criteria document verbatim in substance. Any future change to a
+criterion's status must come from its own governing document or a ChatGPT
+act, not from this map.
