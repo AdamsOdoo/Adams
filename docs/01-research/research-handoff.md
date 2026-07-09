@@ -1,5 +1,69 @@
 # Research Handoff (rolling)
 
+### Sync-engine concurrency validation plan drafted — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-concurrency-plan-bq6ech`, based on
+  latest `Shopify-connector` tip
+  `c0a0bb3787947bba746f865a02883efa4e1c921d` (PR #133 merge commit);
+  docs-only planning PR into `Shopify-connector`, **draft**.
+- **What happened:** PR #133 (post-Task 006C next-task recommendation
+  checkpoint) confirmed **merged** via `pull_request_read`. Per its
+  recommendation (Candidate 1), drafted
+  [`sync-engine-concurrency-validation-plan.md`](../05-qa/sync-engine-concurrency-validation-plan.md):
+  purpose/scope; SRR-03/SRR-04/SRR-09 risk mapping (current status, what
+  Task 006C already does, what remains unproven, sufficient evidence);
+  required runtime topology (A single-instance multi-worker, B
+  multi-worker single-DB, C multi-server — preferred/strongest for
+  SRR-09); code-free test-data setup using the shipped `core_dispatch_
+  selftest` no-op handler and existing enqueue service; nine validation
+  scenarios (single drain, concurrent workers, locked-row skip, retry-
+  due filtering, three disconnect-race variants, multi-server drain,
+  crash/interruption observation); evidence-to-collect and pass/fail
+  matrix; explicit "what this plan can/cannot prove" section; a
+  recommended execution order; the required future results-document
+  spec (`sync-engine-concurrency-validation-results.md`); and a closing
+  recommendation (execute only if a runtime is available; otherwise
+  parallel-track MBQ-05 planning).
+- **Files changed:** created
+  [`../05-qa/sync-engine-concurrency-validation-plan.md`](../05-qa/sync-engine-concurrency-validation-plan.md);
+  this handoff entry. No addon/code, test, manifest, XML/security,
+  migration, or CI file touched. No live runtime, Odoo.sh, or Shopify
+  access was used or available to this session — the plan was grounded
+  by directly reading (never modifying) the merged Task 006C code
+  (`shopify_connector_job.py`, `_dispatch.py`, `_log.py`, `_enqueue.py`,
+  `_store.py`) to cite exact field/method names, not by inventing
+  behavior.
+- **Does not claim concurrency is proven; does not authorize
+  implementation.** SRR-03/SRR-04/SRR-09 remain exactly as open as the
+  risk register and DEC-025 state them; the plan explicitly states that
+  even a fully green future execution would not mean concurrency is
+  proven "for all time or all conditions." No implementation gate is
+  opened, extended, or reinterpreted.
+- **Recommended next step:** execute this plan only when a live
+  Odoo/Odoo.sh runtime becomes available (topology A minimum, C
+  preferred). If no runtime is available, proceed to MBQ-05 token
+  acquisition/auth-distribution planning as a parallel docs-only track.
+- **Open blockers preserved, none resolved by this session:** multi-
+  server/concurrent-worker runtime proof (SRR-03/SRR-04/SRR-09), VAL-B2,
+  MBQ-05, TD-002, the fulfillment API model, product first-sync dedup
+  thresholds, token acquisition for many unrelated customers, Lite/Full
+  packaging, checkpoint/resume ownership.
+- **No code touched.** No implementation authorized by this document or
+  this session.
+- **Learning feedback loop:** no new issues discovered; no new
+  repeated-issue pattern; no rule/checklist change needed; no new
+  rejected approach (checked `rejected-approaches-log.md` for relevance
+  — none applicable to a validation-plan draft); no new technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed.
+- **Stop condition:** validation plan created; this handoff entry
+  written; all open blockers preserved as open; only the two allowed
+  docs files changed; PR left **draft/unmerged**; no merge performed;
+  no implementation gate opened. Next step: ChatGPT review.
+
+---
+
 ### Post-Task 006C — next-task recommendation checkpoint — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-006c-next-recommendation-n1lp91`, based on
