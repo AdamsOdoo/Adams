@@ -1,5 +1,148 @@
 # Research Handoff (rolling)
 
+### Task 006C — PR #131 real-runtime validation failure + fake-handler-signature fix — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into
+  `Shopify-connector` (**draft**, unmerged). A real Odoo 19/PostgreSQL
+  runtime validation (external Odoo.sh runtime, not this session's
+  environment) reported **4 failures, 1 error, of 122 tests loaded
+  before halt**, starting from head
+  `3e6edd8347560ed5e31bd60bb4296053bfa18c99`.
+- **Files changed this session:** `addons/shopify_connector_core/tests/
+  test_job_retry_scheduling.py`, `addons/shopify_connector_core/tests/
+  test_job_dispatch.py`, `docs/01-research/research-handoff.md` (this
+  entry). No production model/dispatch file touched -- inspection
+  proved production routing correct; only test fakes were wrong.
+- **Root cause 1 (fixed) -- fake-handler signature mismatch (4 test
+  failures):** `_invoke_handler()` retrieves `handler = self.
+  _get_handlers().get(job.job_type)` from a plain dict -- a dict lookup
+  never triggers Python's descriptor/binding protocol, so the retrieved
+  callable is never bound. The dispatcher then calls it as `handler(job)`
+  (one argument). Production's real handler (`self.
+  _handle_core_dispatch_selftest`) already went through attribute access
+  before being placed in the dict, so it's correctly bound and works.
+  The test fakes in `_run_with_handler_error()` (`test_job_retry_
+  scheduling.py`), `test_generic_exception_from_handler_treated_as_
+  unknown_system_error`, and `test_secrets_redacted_in_dispatch_failure_
+  path` (`test_job_dispatch.py`) were defined as `def _raise(self, job):`
+  -- an unused, incorrect extra `self` parameter. Calling `handler(job)`
+  against that 2-arg function raises `TypeError: missing 1 required
+  positional argument`, caught by `_invoke_handler`'s fail-safe
+  `except Exception` boundary and reclassified as `unknown_system_error`
+  -- masking every intended `error_class`/state outcome the retry tests
+  asserted. Fixed by dropping the stray `self` parameter from all three
+  fake handlers (`_raise`, `_raise_plain`, `_raise_with_secret`) so they
+  match the dispatcher's real one-argument `handler(job)` contract --
+  the same contract two other, already-correct fakes in `test_job_
+  dispatch.py` (`lambda job: calls.append(job.id)`, used twice) already
+  followed. **Production dispatch/routing code was inspected and proven
+  correct -- not modified.**
+- **Root cause 2 (NOT fixed -- real production bug, out of this
+  session's allowed-file scope) -- `action_disconnect()` /
+  `manual_review_subreason`:** `test_disconnect_cancels_business_jobs_
+  in_new_dispatch_states` (`test_job_dispatch.py`, unmodified this
+  session) puts a job in `blocked_manual_review` with `manual_review_
+  subreason='ambiguous_match'` set (required by the job model's own
+  `_check_manual_review_subreason_required` constraint), then calls
+  `self.store.action_disconnect()`. `action_disconnect()`
+  (`shopify_connector_store.py`, **not modified this session, per the
+  original final implementation prompt's explicit "action_disconnect
+  remains unmodified" instruction**) deliberately searches for
+  non-terminal business jobs to cancel -- `blocked_manual_review` is
+  correctly included, since it is not in `TERMINAL_JOB_STATES` -- but
+  its cancellation `job.write({'state': 'cancelled', 'cancel_reason':
+  ..., 'finished_at': ...})` never clears `manual_review_subreason`.
+  For a job coming from `blocked_manual_review`, the leftover subreason
+  with the new `state='cancelled'` violates the same constraint
+  (`manual_review_subreason must be empty unless state is
+  'blocked_manual_review'`), raising `ValidationError` and aborting
+  `action_disconnect()` entirely. **This is a real, pre-existing latent
+  production bug in `action_disconnect()`, only now reachable because
+  Task 006C is the first code path that ever sets `blocked_manual_
+  review`** -- today, any store with a job stuck in `blocked_manual_
+  review` cannot be disconnected at all. The test is correct and was
+  left unmodified; narrowing it to skip `blocked_manual_review` would
+  hide this real bug, which the session prompt explicitly forbade.
+  **Proposed minimal one-file exception** (not applied this session):
+  in `shopify_connector_store.py::action_disconnect()`'s cancellation
+  loop, add `'manual_review_subreason': False` to the `job.write({...})`
+  vals dict (harmless no-op for jobs where it's already empty; clears it
+  for jobs coming from `blocked_manual_review`). Requires explicit
+  ChatGPT approval to touch `shopify_connector_store.py`, a file outside
+  this session's allowed-file list.
+- **Static validation (all pass):** `py_compile` on both changed test
+  files; `xml.dom.minidom` parse of the cron XML; manifest parses via
+  `ast.literal_eval`; zero `numbercall`; zero direct `job.log.create()`
+  calls in dispatch; `job_enqueue.py`'s only `.create(` call targets
+  `shopify.connector.job`; zero Shopify API client / `.execute(`
+  references in the three changed production files; zero new `sudo()`
+  sites. `git status`/`git diff --stat` confirm only the two allowed
+  test files changed.
+- **Runtime re-run:** **not performed by this session** -- no `odoo`
+  package, no `psycopg2`, no responding PostgreSQL server, no CI/Docker
+  daemon in this sandboxed environment (unchanged from every prior
+  session on this PR). The narrow fake-handler-signature fix is
+  committed on static-correctness grounds only; the external Odoo.sh
+  runtime must re-run the focused `test_job_retry_scheduling.py` /
+  `test_job_dispatch.py` classes, then the full `shopify_connector_core`
+  suite, to confirm the fix actually resolves the 4 reported failures
+  and to determine whether `test_disconnect_cancels_business_jobs_in_
+  new_dispatch_states` (the reported error) is now the *only* remaining
+  failure, or whether further tests beyond the 122-test halt point
+  surface new issues once these are cleared.
+- **Items deferred:** unchanged -- VAL-B2, MBQ-05, TD-002 (untouched),
+  the fulfillment API model, product first-sync dedup thresholds, token
+  acquisition, Lite/Full packaging, checkpoint/resume ownership, and the
+  multi-server runtime concurrency proof requirement remain exactly as
+  open as before. New: the `action_disconnect()`/`manual_review_
+  subreason` production bug above is now an open, named blocker on this
+  PR pending an explicit one-file exception.
+- **Learning feedback loop:** new issue class discovered: a fake
+  test-double stored directly in a dict (not accessed via attribute
+  lookup) is never bound by Python's descriptor protocol -- a `self`
+  parameter on such a fake silently breaks its call arity, and if the
+  code under test has a fail-safe `except Exception` boundary, the
+  resulting `TypeError` can be silently reclassified into a *valid*-
+  looking but wrong outcome rather than an obvious crash, delaying
+  detection until a real runtime actually asserts the specific value.
+  Worth a standing checklist item: whenever a handler/callback is
+  registered via a plain dict (not `self.method`), any test fake
+  replacing it must match the *unbound* call signature exactly. First
+  occurrence of this category on this PR -- log only, no rule/checklist
+  update yet (below escalation threshold). Second, unrelated issue
+  discovered: `action_disconnect()`'s cancellation write path doesn't
+  clear `manual_review_subreason` -- first occurrence of this category;
+  logged as an open blocker above, not yet a rejected-approach or
+  technical-debt entry (pending ChatGPT's decision on the one-file
+  exception). New rejected approaches: none. Should future prompts
+  change? Recommend a future Task 006C-family prompt authorize the
+  `manual_review_subreason` clear as a pre-approved one-line exception
+  in `shopify_connector_store.py`, scoped exactly to that field in that
+  one write() call, rather than requiring a fresh stop-and-report cycle.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (two new issue-class notes above) ·
+  no new rejected approach · new technical-debt-shaped item logged
+  (disconnect/manual_review_subreason bug, pending exception approval,
+  not yet added to `docs/05-qa/technical-debt-register.md` since that
+  file is outside this session's allowed-file list) · repeated-issue
+  count: manifest-truthfulness pattern remains at 2 (unchanged this
+  session; these are two different, unrelated issue categories).
+- **Next recommended session:** either (a) an explicit ChatGPT-approved
+  one-file exception authorizing the minimal `manual_review_subreason`
+  clear in `shopify_connector_store.py::action_disconnect()`, or (b) a
+  fresh external Odoo.sh runtime re-run confirming the fake-handler fix
+  resolves failures #2-#5 and re-confirming failure #1 (the disconnect
+  error) is still the one open, named, unfixed item.
+- **Stop condition:** narrow fake-handler-signature fix complete and
+  committed; production `action_disconnect()`/`manual_review_subreason`
+  bug identified, NOT fixed (outside allowed-file scope), reported with
+  an exact proposed minimal exception instead; no unrelated change made;
+  PR left draft/unmerged; no merge performed. Next step: ChatGPT review
+  of this runtime-validation-failure fix and decision on the proposed
+  `shopify_connector_store.py` exception.
+
+---
+
 ### Task 006C — PR #131 manifest truthfulness patch — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/sync-engine-skeleton-10hd4p` → PR #131 into

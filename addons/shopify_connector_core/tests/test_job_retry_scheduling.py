@@ -50,7 +50,16 @@ class TestJobRetryScheduling(TransactionCase):
         return self.Job.create(vals)
 
     def _run_with_handler_error(self, job, error_class, reason='synthetic failure'):
-        def _raise(self, job):
+        def _raise(job):
+            # Stored directly in the `_get_handlers()` dict, never bound
+            # via attribute access -- the dispatcher calls it as
+            # `handler(job)` (one positional argument only), mirroring
+            # exactly how the real `self._handle_core_dispatch_selftest`
+            # is called (already bound before being placed in the dict).
+            # A `self` parameter here would silently mismatch that
+            # contract: `handler(job)` would raise TypeError, which the
+            # dispatcher's fail-safe boundary reclassifies as
+            # unknown_system_error, masking the intended error_class.
             raise JobHandlerError(error_class, reason)
         with patch.object(
             type(self.Dispatch), '_get_handlers',
@@ -213,7 +222,7 @@ class TestJobRetryScheduling(TransactionCase):
         self.store.write({'state': 'connected'})
         job = self._create_selftest_job(state='queued')
 
-        def _raise_plain(self, job):
+        def _raise_plain(job):
             raise RuntimeError('unexpected handler bug')
 
         with patch.object(

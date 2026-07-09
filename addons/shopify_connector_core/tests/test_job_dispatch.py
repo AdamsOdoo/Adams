@@ -529,7 +529,7 @@ class TestJobDispatch(TransactionCase):
         self.store.write({'state': 'connected'})
         job = self._create_selftest_job(state='queued')
 
-        def _raise_with_secret(self, job):
+        def _raise_with_secret(job):
             raise JobHandlerError(
                 'unknown_system_error',
                 'failure mentioning token %s' % DUMMY_TOKEN,
