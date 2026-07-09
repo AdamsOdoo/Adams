@@ -297,3 +297,26 @@ and accepts the implementation before any next task starts.
   Task 010; Product preview/diff S7 belongs to the future
   product-write/export task, Group 10, both requiring their own future
   gate act).
+
+## MBQ-55 proposal linkage — not accepted
+
+A documentation-only naming/schema closure proposal for this task's two
+binding models has been drafted:
+[`mbq-55-product-binding-naming-schema-proposal.md`](./mbq-55-product-binding-naming-schema-proposal.md).
+It proposes exact model names
+(`shopify.connector.product.template.binding`,
+`shopify.connector.product.variant.binding`), file names, class names, and
+fields, addressing only the product-template/product-variant portion of
+MBQ-55 (the customer-binding and order-binding portions remain separately
+open).
+
+**MBQ-55 remains open until ChatGPT explicitly accepts that proposal** (or a
+revision of it). This linkage note does not itself resolve MBQ-55, does not
+change this task's Status/Preconditions sections above, and does not imply
+acceptance.
+
+**The Task 010 gate — and the product domain gate named in this document's
+own Preconditions section above — both remain closed.** A companion
+[`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md)
+proposes criteria for opening the product domain gate; it does not open it.
+No implementation of any kind is authorized by this linkage note.

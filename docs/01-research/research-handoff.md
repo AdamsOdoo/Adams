@@ -1,5 +1,69 @@
 # Research Handoff (rolling)
 
+### MBQ-55 product binding naming/schema proposal and product-domain gate criteria — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/mbq-55-product-binding-schema-8kd3vp`, based on
+  latest `Shopify-connector` tip
+  `308e9cb96b71861f774f1904aeb40f489cff867f` (PR #135 merge commit);
+  docs-only proposal PR into `Shopify-connector`, **draft**.
+- **What happened:** PR #135 (master implementation-readiness checkpoint)
+  confirmed **merged** via `pull_request_read`. Drafted
+  [`../07-implementation-plan/mbq-55-product-binding-naming-schema-proposal.md`](../07-implementation-plan/mbq-55-product-binding-naming-schema-proposal.md):
+  proposes exact model names for the product-template/product-variant
+  portion of MBQ-55 only (`shopify.connector.product.template.binding`,
+  `shopify.connector.product.variant.binding`), future module/file/class
+  names, and a full field proposal (inherited-from-mixin, new relational,
+  identity, imported-snapshot, out-of-scope, deferred), grounded directly in
+  read-only inspection of the merged core code (binding mixin, store,
+  store.settings, location, job) and the already-accepted DEC-006/DEC-008/
+  DEC-013/DEC-014 architecture. Also drafted
+  [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md),
+  proposing 12 concrete criteria for the future, separate ChatGPT act that
+  would open the product-domain implementation gate — the gap identified in
+  PR #135's own checkpoint. Added a clearly-marked, non-rewriting "MBQ-55
+  proposal linkage — not accepted" section to
+  [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md),
+  linking both new documents without changing that document's existing
+  Status/Preconditions sections.
+- **MBQ-55 naming/schema proposal drafted: yes** — product-template/
+  product-variant portion only. The customer-binding and order-binding
+  portions of MBQ-55 remain separately open, not addressed by this session.
+- **Product-domain gate criteria proposal drafted: yes** — 12 criteria
+  proposed; none satisfied yet; the gate itself remains closed.
+- **Task 010 proposed doc: linked, not rewritten.** Only the new linkage
+  section was added; Status/Preconditions/scope sections are unchanged.
+- **AR-034 added** — status **Proposed / Under review**, explicitly **not**
+  Accepted, explicitly not claiming ChatGPT accepted anything this session,
+  explicitly not authorizing any implementation gate.
+- **Files changed:** created
+  [`../07-implementation-plan/mbq-55-product-binding-naming-schema-proposal.md`](../07-implementation-plan/mbq-55-product-binding-naming-schema-proposal.md)
+  and
+  [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md)
+  (new); added a linkage section to
+  [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md);
+  added AR-034 to
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md);
+  this handoff entry. No addon/code, test, manifest, XML/security,
+  migration, or CI file touched; no product module of any kind created.
+- **No code touched. No implementation authorized.** MBQ-55 (product
+  portion or otherwise) is not marked Accepted or Resolved. The Task 010
+  gate and the product-domain gate both remain closed.
+- **Learning feedback loop:** no new issues discovered; no new
+  repeated-issue pattern; no rule/checklist change needed; no new rejected
+  approach (checked `rejected-approaches-log.md` for relevance — none
+  applicable to a naming/schema proposal session); no new technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach · no
+  new technical debt · no repeated-issue escalation needed.
+- **Stop condition:** both proposals created; the Task 010 linkage section
+  added; AR-034 logged; this handoff entry written; all open blockers
+  preserved as open, none claimed resolved; only the allowed docs files
+  changed; PR left **draft/unmerged**; no merge performed; no implementation
+  gate opened; no product module or code written. **Next step: ChatGPT
+  review.**
+
+---
+
 ### Master implementation-readiness checkpoint — Task 010 gate assessment — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-010-readiness-checkpoint-jrx96i`, based on
