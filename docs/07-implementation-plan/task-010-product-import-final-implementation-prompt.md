@@ -2,9 +2,10 @@
 
 DO NOT USE THIS PROMPT UNTIL CHATGPT ACCEPTS THE TASK 010 GATE-OPENING PROPOSAL AND EXPLICITLY ISSUES THIS PROMPT IN CHAT.
 
-> **Status: Drafted / Not issued / Not authorized.** This document converts
-> the accepted MBQ-55 product-template/product-variant naming/schema
-> proposal
+> **Status: Accepted final prompt / Not issued.** Accepted by ChatGPT via
+> PR #137 control-room review, GitHub comment ID `4926437491`. This
+> document converts the accepted MBQ-55 product-template/product-variant
+> naming/schema proposal
 > ([`mbq-55-product-binding-naming-schema-proposal.md`](./mbq-55-product-binding-naming-schema-proposal.md),
 > Accepted by ChatGPT, control-room comment ID `4924917266`, PR #136) and
 > the accepted product-domain gate criteria
@@ -12,14 +13,17 @@ DO NOT USE THIS PROMPT UNTIL CHATGPT ACCEPTS THE TASK 010 GATE-OPENING PROPOSAL 
 > Accepted as criteria only, same PR #136) into a copy-paste-ready
 > `CLAUDE.md` §9 implementation prompt for Task 010, per
 > [`task-010-product-import-proposed.md`](./task-010-product-import-proposed.md).
-> **Drafting this prompt does not issue it, does not open the Task 010 gate,
-> does not open the product-domain implementation gate, and does not
-> authorize any code.** It exists so that, if and when ChatGPT separately
-> accepts the companion
+> **This document's content is now accepted, fixing it as binding — it is
+> still NOT issued.** Acceptance authorizes the product-domain
+> implementation gate to open for exactly one future Task 010
+> implementation session (see the companion
 > [`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md)
-> and performs the distinct, explicit gate-opening act it requires, ChatGPT
-> can issue this exact prompt text (with the base-commit verification step
-> performed first) into a **new** Claude Code session, mirroring the
+> §1/§9), effective once PR #137 merges into `Shopify-connector` — it does
+> **not**, by itself, authorize Claude to write any Task 010 code now, and
+> it does **not** issue this prompt. **Claude must not use this prompt
+> until ChatGPT explicitly pastes/issues it, verbatim, into a new Claude
+> Code session, as its own later chat turn, after PR #137 merges** — the
+> top warning above is unweakened by this acceptance. This mirrors the
 > draft-then-finalize precedent already used for Task 004
 > ([`task-004-final-implementation-prompt.md`](./task-004-final-implementation-prompt.md))
 > and Task 006C
@@ -46,28 +50,44 @@ DO NOT USE THIS PROMPT UNTIL CHATGPT ACCEPTS THE TASK 010 GATE-OPENING PROPOSAL 
 > other section's substance, does not open any gate, and does not
 > authorize any code.
 
-## How this document will be used (once, and only once, all conditions below are met)
+> **Acceptance note (2026-07-09, PR #137 control-room review, GitHub
+> comment ID `4926437491`) — Content accepted.** ChatGPT confirmed all
+> five precision fixes above and accepted this document's content,
+> **fixing it as binding**. This acceptance does **not** issue the prompt
+> and does **not** itself authorize any Task 010 code — see the companion
+> gate-opening proposal's own §1/§9 for the exact authorization boundary
+> (gate opens for exactly one future Task 010 session once PR #137
+> merges; the prompt is issued only by a later, separate ChatGPT chat
+> turn). This note updates only this document's Status; §1–§14 and the
+> draft prompt text below are otherwise unchanged by this acceptance.
 
-1. ChatGPT reviews and accepts
+## How this document will be used
+
+1. ✅ **Satisfied** — ChatGPT reviewed and accepted
    [`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md)
-   — **not yet satisfied**.
-2. ChatGPT performs the distinct, explicit product-domain gate-opening act
-   named in that proposal and in
+   (PR #137 control-room review, comment ID `4926437491`).
+2. ✅ **Satisfied** — ChatGPT performed the distinct, explicit
+   product-domain gate-opening act named in that proposal and in
    [`product-domain-gate-criteria-proposal.md`](./product-domain-gate-criteria-proposal.md)
-   §4 — **not yet satisfied, and not performed by this document**.
-3. The gate-opening PR (if any is required to merge the acceptance) merges
-   into `Shopify-connector`.
-4. Before pasting the prompt below, the issuing session verifies the
-   base-commit placeholder in the prompt text is still the actual current
-   tip of `Shopify-connector` (see "Current base placeholder" below) — if
-   `Shopify-connector` has moved since this document was drafted, the
-   issuing session must re-verify every cited accepted document/decision is
-   still unchanged before pasting, not assume it.
-5. ChatGPT explicitly pastes the exact finalized prompt text below into a
-   **new** Claude Code session, as its own chat turn.
-6. The implementing session stops at its own scoped boundary (`CLAUDE.md`
-   §6) — it must not chain into Task 011/012/013/014, Task 015, any UI
-   work, or any other next-feature work.
+   §4, via that same acceptance — the gate opens for exactly one future
+   Task 010 implementation session, effective once condition 3 below is
+   also met.
+3. **Not yet satisfied** — PR #137 (carrying this acceptance) has not yet
+   merged into `Shopify-connector`.
+4. **Not yet satisfied** — before pasting the prompt below, the issuing
+   session verifies the base-commit placeholder in the prompt text is
+   still the actual current tip of `Shopify-connector` (see "Current base
+   placeholder" below) — if `Shopify-connector` has moved since this
+   document was drafted, the issuing session must re-verify every cited
+   accepted document/decision is still unchanged before pasting, not
+   assume it.
+5. **Not yet satisfied** — ChatGPT explicitly pastes the exact finalized
+   prompt text below into a **new** Claude Code session, as its own chat
+   turn.
+6. **Not yet satisfied** — the implementing session stops at its own
+   scoped boundary (`CLAUDE.md` §6) — it must not chain into Task
+   011/012/013/014, Task 015, any UI work, or any other next-feature
+   work.
 
 **Nothing in this document authorizes Claude to begin implementation now or
 at any point before all six conditions above are met.**
@@ -694,9 +714,15 @@ open the PR as DRAFT, then STOP. Do not start Task 011/012/013/014, Task
 - Does not authorize the future Task 010 coding session to start now or at
   any point before the conditions in "How this document will be used"
   above are all met.
-- Does not open the Task 010 implementation gate or the product-domain
-  implementation gate — both remain closed; see the companion
-  [`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md).
+- Does not itself open the Task 010/product-domain implementation gate —
+  that act is performed by the companion
+  [`task-010-product-import-gate-opening-proposal.md`](./task-010-product-import-gate-opening-proposal.md)'s
+  own acceptance (PR #137 control-room review, comment ID `4926437491`),
+  not by this document. See that document's §1/§9 for the exact,
+  current gate status: open for exactly one future Task 010
+  implementation session, effective once PR #137 merges into
+  `Shopify-connector` — not a standing authorization for any other
+  product-domain task.
 - Does not claim ChatGPT has issued this prompt. Issuance is a distinct,
   later, separate chat turn by ChatGPT in a new Claude Code session.
 - Does not resolve VAL-B2, MBQ-05, TD-002, the fulfillment API model,
@@ -757,3 +783,6 @@ open the PR as DRAFT, then STOP. Do not start Task 011/012/013/014, Task
   a flag name, blocks the start unless a matching, truthy
   `shopify.connector.store.settings` row exists for the store — access:
   Accessible, this repository, observed 2026-07-09.
+- **Acceptance evidence (2026-07-09, PR #137 control-room review, comment
+  ID `4926437491`):** ChatGPT confirmed all five precision fixes above and
+  accepted this document's content — access: Accessible, 2026-07-09.

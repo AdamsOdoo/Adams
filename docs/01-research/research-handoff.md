@@ -1,5 +1,69 @@
 # Research Handoff (rolling)
 
+### PR #137 content accepted — final status patch applied — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-010-docs-prep-vsijz0` (PR #137), base
+  `Shopify-connector`; final status patch applied after ChatGPT
+  control-room acceptance (GitHub comment ID `4926437491`); **draft,
+  unmerged.**
+- **What happened:** ChatGPT reviewed the revised PR #137 (after the prior
+  REVISE, comment ID `4925370944`) and returned **content accepted — final
+  status patch required before merge.** This session applied that patch:
+  - [`../07-implementation-plan/task-010-product-import-gate-opening-proposal.md`](../07-implementation-plan/task-010-product-import-gate-opening-proposal.md)
+    Status changed from Proposed/Under review to **Accepted by ChatGPT**
+    (comment ID `4926437491`).
+  - [`../07-implementation-plan/task-010-product-import-final-implementation-prompt.md`](../07-implementation-plan/task-010-product-import-final-implementation-prompt.md)
+    Status changed from Drafted/Not issued/Not authorized to **Accepted
+    final prompt / Not issued** — its own top "DO NOT USE..." warning is
+    unchanged, unweakened.
+  - AR-035 (`../05-qa/architecture-review-log.md`) Status changed to
+    **Accepted**, citing comment ID `4926437491`; a new AR-035 Acceptance
+    Note footnote records the exact authorization boundary.
+  - Linkage sections in
+    [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md)
+    (new §7) and
+    [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md)
+    updated for consistency — §3's twelve accepted criteria and this
+    document's own accepted-criteria text were **not** rewritten.
+- **Final prompt: accepted, but not issued.** Its content is now fixed as
+  binding. Claude must not use it until ChatGPT explicitly pastes/issues
+  it, verbatim, into a **new** Claude Code session, as its own later chat
+  turn, **after PR #137 merges.**
+- **Product-domain implementation gate: opened for exactly one future
+  implementation session — Task 010 only** — effective once PR #137
+  merges into `Shopify-connector`. **The gate closes again the moment the
+  future Task 010 implementation PR is opened as draft; that future PR
+  must remain draft until ChatGPT separately reviews it.** No other
+  product-domain task (011/012/013/014, 015), UI, webhook, OAuth, or
+  Lite/Full packaging work is authorized by this acceptance.
+- **Task 010 code: still not started.** This patch touches no
+  addon/code/test/manifest/XML/security/migration/CI file — docs only.
+- **Files changed (this patch):**
+  [`../07-implementation-plan/task-010-product-import-gate-opening-proposal.md`](../07-implementation-plan/task-010-product-import-gate-opening-proposal.md),
+  [`../07-implementation-plan/task-010-product-import-final-implementation-prompt.md`](../07-implementation-plan/task-010-product-import-final-implementation-prompt.md),
+  [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md),
+  [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md),
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md),
+  this handoff entry. `main` and plain `dev` untouched.
+- **Learning feedback loop:** no new issues discovered; no new
+  repeated-issue pattern; no rule/checklist change needed; no new
+  rejected approach (checked `rejected-approaches-log.md` — none
+  applicable); no new technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed.
+- **Stop condition:** gate-opening proposal marked Accepted, citing
+  comment ID `4926437491`; final prompt marked Accepted final prompt /
+  Not issued, top warning intact; AR-035 marked Accepted with its
+  Acceptance Note footnote; linkage sections updated for consistency
+  without rewriting accepted criteria; this handoff entry written; only
+  the six allowed docs files changed; PR #137 left **draft/unmerged**; no
+  merge performed; no implementation started; no final prompt issued in
+  chat. **Next step: ChatGPT final review and merge of PR #137, then
+  ChatGPT issues the final prompt in a new Claude Code session.**
+
+---
+
 ### PR #137 revised after control-room review — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-010-docs-prep-vsijz0` (PR #137), base

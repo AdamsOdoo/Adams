@@ -355,3 +355,22 @@ was revised for manifest-dependency, field-type, model-declaration, and
 product-domain-gating precision (see the final prompt's own revision
 note). Still not issued; Task 010 still unauthorized; both gates still
 closed.
+
+**Acceptance (2026-07-09, PR #137 control-room review, comment ID
+`4926437491`):** ChatGPT accepted PR #137's content, including the
+gate-opening proposal. **The product-domain gate named in this document's
+own Preconditions section above is now opened — for exactly one future
+implementation session, Task 010 only — effective once PR #137 merges
+into `Shopify-connector`.** The gate closes again the moment the future
+Task 010 implementation PR is opened as draft; that future PR must remain
+draft until ChatGPT separately reviews it. **The final prompt is now
+Accepted final prompt / Not issued — its content is fixed as binding, but
+it is still not issued.** Task 010 implementation still cannot begin
+until, in order: (1) PR #137 merges; (2) ChatGPT explicitly pastes/issues
+the final prompt, verbatim, into a new Claude Code session, as its own
+later chat turn. **No other work is authorized** — not Task 011/012/
+013/014, Task 015, any UI, webhook, OAuth, or Lite/Full packaging. This
+note does not itself change this document's own Status/Preconditions
+sections above (which predate and are superseded in effect, not in text,
+by this linkage record), and does not authorize any code, module, model,
+view, controller, security, manifest, test, or CI file.
