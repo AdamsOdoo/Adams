@@ -1,5 +1,135 @@
 # Research Handoff (rolling)
 
+### Task 010 product import PR #138 revised after control-room review — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-010-product-import-gate-0uh7g4`, base
+  `Shopify-connector`; PR **#138**, revised in place after ChatGPT
+  control-room review (GitHub comment ID `4927037139`); **draft,
+  unmerged.**
+- **What happened:** ChatGPT reviewed PR #138 and returned **REVISE
+  before merge** — not marked ready, not merged, Task 010 still not
+  accepted. Four required fixes applied, all inside
+  `shopify_connector_product_importer.py` only (no other production
+  file touched; no file added outside the existing Task 010 allowed-file
+  envelope; no `shopify_connector_core` file touched):
+  1. **Shopify API client error taxonomy preserved.**
+     `import_product_sync()` now catches `ShopifyClientError` (read-only
+     import from `shopify_connector_core`'s API-client module) and
+     re-raises it as `JobHandlerError(exc.error_class, exc.reason,
+     exc.technical_detail)`, so throttling/temporary-network/
+     permission-scope-auth failures keep their accepted DEC-009 error
+     class through `_route_failure()` instead of becoming
+     `unknown_system_error`. `exc.credential_invalid`-triggered
+     store-lifecycle side effects are deliberately not replicated
+     (out of scope). 4 new tests confirm each named class routes
+     correctly (not `unknown_system_error`) and that the importer never
+     retries the Shopify call itself.
+  2. **One-product import is now atomic.** `_apply_import()`'s entire
+     write sequence runs inside one `self.env.cr.savepoint()` block —
+     the same mechanism this addon's own tests already used to probe a
+     constraint violation. Any `JobHandlerError`/validation failure
+     rolls back every write the call made. A regression test proves a
+     two-variant payload where variant 2 always fails `duplicate_risk`
+     leaves zero residue (no template, no product, no bindings for
+     either GID); a companion test proves the savepoint does not affect
+     a separate, already-successful import.
+  3. **Malformed payloads are now validated explicitly.** A new
+     `_validate_payload()` method runs before any write and raises
+     `JobHandlerError('data_shape_schema_mismatch', ...)` for a missing
+     product node/GID, a missing variant GID, or an unexpected product
+     status. 6 new tests cover each case plus a regression guard that
+     the four accepted statuses remain allowed.
+  4. **Silent variant truncation is now blocked, not implemented.**
+     `PRODUCT_IMPORT_QUERY` now requests `variants.pageInfo.
+     hasNextPage`/`endCursor`; `_validate_payload()` blocks the import
+     with `data_shape_schema_mismatch` when `hasNextPage` is true. Full
+     pagination remains out of Task 010's scope — this blocks, it does
+     not implement. 4 new tests cover the blocked case (unit +
+     end-to-end) and a regression guard that a normal single-page
+     response is not blocked.
+- **Test count:** grew from 4 files/~35 methods to 4 files/**51
+  methods** (`test_product_import_matching.py` 17→28;
+  `test_product_duplicate_prevention.py` 8→10; the two binding-model
+  test files unchanged).
+- **Validation: still static only, honestly reported.** No `odoo`
+  package/Odoo.sh/CI is reachable in this environment — `py_compile`/
+  `pyflakes` clean on every changed file; the same source-level
+  mutation/bypass/forbidden-model guards re-run clean against the
+  revised file. **All 51 test methods, including the 17 new ones, are
+  written and statically valid but not execution-proven this session.**
+- **AR-036** (`../05-qa/architecture-review-log.md`) row's Review-
+  decision column updated to record the REVISE decision; a new "AR-036
+  Revision Note" footnote records full detail. Status remains
+  **Proposed** — still not accepted.
+- **Files changed (this revision):**
+  `addons/shopify_connector_product/models/shopify_connector_product_importer.py`
+  (the four fixes); `addons/shopify_connector_product/tests/test_product_import_matching.py`
+  (17 new tests); `addons/shopify_connector_product/tests/test_product_duplicate_prevention.py`
+  (2 new tests); `docs/05-qa/task-010-product-import-validation-results.md`
+  (new §H); `docs/05-qa/architecture-review-log.md` (AR-036 row +
+  footnote); this handoff entry; the PR body. **No
+  `shopify_connector_core` file touched. No UI/view/menu/wizard/webhook/
+  OAuth/CI/Dockerfile/requirements file of any kind. No file outside
+  the existing Task 010 allowed-file envelope.**
+- **Learning feedback loop:** new issue pattern noted — the original PR
+  #138 session did not anticipate that the dispatcher's generic
+  exception boundary would swallow the Shopify API client's own
+  classified error taxonomy, that a multi-write import needed explicit
+  atomicity, that malformed payloads needed explicit pre-write
+  validation, or that unbounded `variants(first: 100)` could silently
+  truncate; all four are now fixed and tested. No new rejected approach
+  (checked `rejected-approaches-log.md` — none applicable). No new
+  technical debt beyond what was already honestly flagged in the prior
+  handoff entry (technical-debt-register.md remains outside this task's
+  allowed-file envelope). No rule/checklist change made this session —
+  flagged for ChatGPT to decide whether the PR-review checklist (§C,
+  implementation phase) should gain an explicit "does the domain
+  handler preserve the core API client's own error taxonomy" /
+  "is a multi-write import atomic" / "are malformed inputs validated
+  before any write" / "does a bounded-page API call guard against
+  truncation" line, since these are exactly the kind of recurring
+  connector-correctness concerns this checklist exists to catch
+  systematically.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  no new technical debt (beyond the already-flagged item) · no
+  repeated-issue escalation needed (first occurrence of this pattern).
+- **Stop condition:** all four required fixes applied and tested; static
+  validation clean and honestly reported (no runtime claim made); zero
+  `shopify_connector_core` edits confirmed; zero UI/webhook/OAuth/
+  export/mutation/customer/order/inventory/fulfillment scope added; no
+  file added outside the Task 010 allowed-file envelope; only the files
+  listed above changed; PR remains **DRAFT**, not marked ready, not
+  merged; no further domain task (011/012/013/014, 015), UI, webhook,
+  OAuth, or Lite/Full packaging work started. **Next step: ChatGPT
+  reviews the revised draft PR #138 against this handoff/AR-036/
+  validation-results §H evidence.**
+
+**Next-session prompt (exact, for after ChatGPT's review):**
+
+```text
+ChatGPT reviews revised draft PR #138 (Task 010 product import/variant
+binding implementation, revised per control-room comment 4927037139)
+against docs/07-implementation-plan/task-010-product-import-final-
+implementation-prompt.md §3-§14, docs/05-qa/architecture-review-log.md
+AR-036 (row + Revision Note footnote), and docs/05-qa/task-010-product-
+import-validation-results.md §H. Decide: accept as-is, accept with minor
+changes, revise before merge, or reject. In particular confirm the four
+required fixes (Shopify API client error taxonomy preservation; atomic
+one-product import via savepoint; explicit malformed-payload
+validation; variant-pagination-truncation guard) are correctly and
+sufficiently implemented, and that no scope expansion occurred (no
+shopify_connector_core edit, no UI/webhook/OAuth/export/mutation/
+customer/order/inventory/fulfillment file or logic, no file outside the
+existing Task 010 allowed-file envelope). Note that no live Odoo runtime
+executed any of the 51 test methods this session (no odoo package /
+Odoo.sh / CI was reachable). Do not authorize Task 011/012/013/014,
+Task 015, any UI, webhook, OAuth, or Lite/Full packaging work as part of
+this review.
+```
+
+---
+
 ### Task 010 product import implementation — draft PR opened, not yet reviewed — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-010-product-import-gate-0uh7g4`, base

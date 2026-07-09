@@ -4,6 +4,9 @@ from unittest.mock import patch
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
+    ShopifyClientError,
+)
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
@@ -374,4 +377,307 @@ class TestProductImportMatching(TransactionCase):
         self.assertEqual(
             Job._domain_flag_for_job_type('product_import_sync'),
             'product_domain_enabled',
+        )
+
+    # ------------------------------------------------------------------
+    # 9. Shopify API client error taxonomy preserved (control-room
+    # review, comment 4927037139, fix 1) -- a ShopifyClientError raised
+    # by execute() must keep its accepted DEC-009 error_class through
+    # the dispatcher's own, unmodified _route_failure() routing, never
+    # falling through to unknown_system_error.
+    # ------------------------------------------------------------------
+
+    def _make_client_error_job(self, shopify_target_gid):
+        self.store.write({'state': 'connected'})
+        self.Settings.create({
+            'store_id': self.store.id, 'product_domain_enabled': True,
+        })
+        return self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'product_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': shopify_target_gid,
+        })
+
+    def test_shopify_client_error_throttling_preserved_not_unknown(self):
+        job = self._make_client_error_job('gid://shopify/Product/960')
+
+        def fake_execute(self, store, query, variables=None):
+            raise ShopifyClientError(
+                'shopify_throttling_rate_limit',
+                'Shopify is asking us to slow down — try again shortly.',
+            )
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            self.Dispatch.run_drain(20)
+        job.invalidate_recordset()
+        self.assertEqual(job.error_class, 'shopify_throttling_rate_limit')
+        self.assertNotEqual(job.error_class, 'unknown_system_error')
+        # DEC-009: throttling is auto-retryable -- a fresh job's first
+        # failure schedules a retry rather than terminating immediately.
+        self.assertEqual(job.state, 'retry_waiting')
+
+    def test_shopify_client_error_temporary_network_preserved_not_unknown(self):
+        job = self._make_client_error_job('gid://shopify/Product/961')
+
+        def fake_execute(self, store, query, variables=None):
+            raise ShopifyClientError(
+                'shopify_temporary_server_network',
+                'Shopify could not be reached right now — this is '
+                'usually temporary.',
+            )
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            self.Dispatch.run_drain(20)
+        job.invalidate_recordset()
+        self.assertEqual(job.error_class, 'shopify_temporary_server_network')
+        self.assertNotEqual(job.error_class, 'unknown_system_error')
+        self.assertEqual(job.state, 'retry_waiting')
+
+    def test_shopify_client_error_permission_scope_auth_preserved_not_unknown(self):
+        job = self._make_client_error_job('gid://shopify/Product/962')
+
+        def fake_execute(self, store, query, variables=None):
+            raise ShopifyClientError(
+                'shopify_permission_scope_auth',
+                'Your access token appears invalid or was revoked — '
+                'replace it.',
+                credential_invalid=True,
+            )
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            self.Dispatch.run_drain(20)
+        job.invalidate_recordset()
+        self.assertEqual(job.error_class, 'shopify_permission_scope_auth')
+        self.assertNotEqual(job.error_class, 'unknown_system_error')
+        # DEC-009: permission/scope/auth is "manual fix then retry" --
+        # never auto-retried.
+        self.assertEqual(job.state, 'failed_retryable')
+
+    def test_shopify_client_error_never_calls_execute_a_second_time(self):
+        """The importer re-raises immediately as JobHandlerError -- it
+        does not itself retry the Shopify call (retry policy belongs to
+        the job layer, per shopify_connector_api_client.py's own
+        docstring)."""
+        calls = []
+
+        def fake_execute(self, store, query, variables=None):
+            calls.append(1)
+            raise ShopifyClientError(
+                'shopify_throttling_rate_limit', 'Slow down.',
+            )
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(
+                    self.store, 'gid://shopify/Product/963',
+                )
+        self.assertEqual(ctx.exception.error_class, 'shopify_throttling_rate_limit')
+        self.assertEqual(len(calls), 1)
+
+    # ------------------------------------------------------------------
+    # 10. Malformed payloads are validated explicitly, before any write
+    # (control-room review, comment 4927037139, fix 3).
+    # ------------------------------------------------------------------
+
+    def test_malformed_payload_missing_product_node_blocked(self):
+        templates_before = self.env['product.template'].search_count([])
+        payload = {
+            'gid': None, 'title': None, 'status': None,
+            'image_url': None, 'variants': [],
+        }
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+
+    def test_malformed_payload_missing_product_node_blocked_end_to_end(self):
+        """Same case, exercised through the real import_product_sync()
+        entry point against a GraphQL response with no `product` node at
+        all -- not just the lower-level _apply_import() unit test
+        above."""
+        def fake_execute(self, store, query, variables=None):
+            return {'data': {'product': None}}
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(
+                    self.store, 'gid://shopify/Product/970',
+                )
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+
+    def test_malformed_payload_missing_product_gid_blocked(self):
+        payload = self._product_payload(
+            gid=None,
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/971', sku='SKU-971',
+                ),
+            ],
+        )
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+
+    def test_malformed_payload_missing_variant_gid_blocked(self):
+        templates_before = self.env['product.template'].search_count([])
+        payload = self._product_payload(
+            gid='gid://shopify/Product/972',
+            variants=[self._variant_payload(None, sku='SKU-972')],
+        )
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', 'gid://shopify/Product/972'),
+        ]))
+
+    def test_malformed_payload_unexpected_status_blocked(self):
+        templates_before = self.env['product.template'].search_count([])
+        payload = self._product_payload(
+            gid='gid://shopify/Product/973', status='some_unexpected_status',
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/973', sku='SKU-973',
+                ),
+            ],
+        )
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+
+    def test_well_formed_status_values_all_accepted(self):
+        """The four accepted statuses must NOT be rejected by the new
+        validation -- a regression guard against over-tightening."""
+        for index, status in enumerate(
+            ('active', 'archived', 'draft', 'unlisted')
+        ):
+            payload = self._product_payload(
+                gid='gid://shopify/Product/97%d' % (4 + index),
+                status=status,
+                variants=[
+                    self._variant_payload(
+                        'gid://shopify/ProductVariant/97%d' % (4 + index),
+                        sku='SKU-STATUS-%d' % index,
+                    ),
+                ],
+            )
+            result = self.Importer._apply_import(self.store, payload)
+            self.assertEqual(result['template_binding'].shopify_status, status)
+
+    # ------------------------------------------------------------------
+    # 11. Silent variant truncation is blocked (control-room review,
+    # comment 4927037139, fix 4).
+    # ------------------------------------------------------------------
+
+    def test_product_import_query_requests_page_info(self):
+        self.assertIn('pageInfo', PRODUCT_IMPORT_QUERY)
+        self.assertIn('hasNextPage', PRODUCT_IMPORT_QUERY)
+
+    def test_variant_pagination_truncation_blocked_unit(self):
+        templates_before = self.env['product.template'].search_count([])
+        payload = self._product_payload(
+            gid='gid://shopify/Product/980',
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/980', sku='SKU-980',
+                ),
+            ],
+        )
+        payload['variants_has_next_page'] = True
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+
+    def test_variant_pagination_truncation_blocked_end_to_end(self):
+        templates_before = self.env['product.template'].search_count([])
+
+        def fake_execute(self, store, query, variables=None):
+            return {
+                'data': {
+                    'product': {
+                        'id': 'gid://shopify/Product/981',
+                        'title': 'Paginated Product', 'status': 'ACTIVE',
+                        'featuredImage': None,
+                        'variants': {
+                            'nodes': [{
+                                'id': 'gid://shopify/ProductVariant/981',
+                                'sku': 'SKU-981', 'barcode': None,
+                                'price': 9.99, 'compareAtPrice': None,
+                                'selectedOptions': [], 'image': None,
+                            }],
+                            'pageInfo': {
+                                'hasNextPage': True, 'endCursor': 'abc123',
+                            },
+                        },
+                    },
+                },
+            }
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(
+                    self.store, 'gid://shopify/Product/981',
+                )
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', 'gid://shopify/Product/981'),
+        ]))
+
+    def test_variant_no_next_page_not_blocked(self):
+        """Regression guard: hasNextPage=False (or absent) must not
+        block a normal, well-formed import."""
+        def fake_execute(self, store, query, variables=None):
+            return {
+                'data': {
+                    'product': {
+                        'id': 'gid://shopify/Product/982',
+                        'title': 'Single Page Product', 'status': 'ACTIVE',
+                        'featuredImage': None,
+                        'variants': {
+                            'nodes': [{
+                                'id': 'gid://shopify/ProductVariant/982',
+                                'sku': 'SKU-982', 'barcode': None,
+                                'price': 9.99, 'compareAtPrice': None,
+                                'selectedOptions': [], 'image': None,
+                            }],
+                            'pageInfo': {
+                                'hasNextPage': False, 'endCursor': None,
+                            },
+                        },
+                    },
+                },
+            }
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            result = self.Importer.import_product_sync(
+                self.store, 'gid://shopify/Product/982',
+            )
+        self.assertEqual(
+            result['template_binding'].shopify_gid, 'gid://shopify/Product/982',
         )

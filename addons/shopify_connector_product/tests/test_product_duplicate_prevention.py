@@ -198,3 +198,96 @@ class TestProductDuplicatePrevention(TransactionCase):
         self.assertEqual(
             self.env['res.partner'].search_count([]), partner_count_before,
         )
+
+    # ------------------------------------------------------------------
+    # 6. One-product import is atomic on classified failure
+    # (control-room review, comment 4927037139, fix 2).
+    # ------------------------------------------------------------------
+
+    def test_source_level_apply_import_uses_savepoint(self):
+        _path, content = self._importer_source()
+        self.assertIn('self.env.cr.savepoint()', content)
+
+    def test_atomic_rollback_leaves_no_partial_residue_on_later_variant_failure(self):
+        """Regression test: variant 1 of a brand-new product succeeds
+        (binds to the template's own auto-generated singleton variant),
+        but variant 2 always fails `duplicate_risk` (no safe automatic
+        variant creation is available under an existing template -- this
+        importer's own conservative-scope decision). Without the
+        savepoint fix, this would leave the template, its auto-generated
+        `product.product`, and variant 1's binding persisted while
+        variant 2 has no binding at all -- a genuine partial-import
+        residue. The savepoint must roll back all of it, leaving zero
+        trace of this attempted import."""
+        templates_before = self.env['product.template'].search_count([])
+        products_before = self.env['product.product'].search_count([])
+        payload = self._product_payload(
+            gid='gid://shopify/Product/955',
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/955', sku='ATOMIC-SKU-1',
+                ),
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/956', sku='ATOMIC-SKU-2',
+                ),
+            ],
+        )
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'duplicate_risk')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+            'a partially-imported product.template was not rolled back',
+        )
+        self.assertEqual(
+            self.env['product.product'].search_count([]), products_before,
+            'a partially-imported product.product was not rolled back',
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', 'gid://shopify/Product/955'),
+        ]), 'a partially-imported template binding was not rolled back')
+        self.assertFalse(self.VariantBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', 'in', [
+                'gid://shopify/ProductVariant/955',
+                'gid://shopify/ProductVariant/956',
+            ]),
+        ]), 'a partially-imported variant binding was not rolled back')
+
+    def test_atomic_rollback_does_not_affect_a_separate_successful_import(self):
+        """The savepoint scopes exactly one _apply_import() call -- a
+        prior, already-committed successful import must be unaffected by
+        a later, failing one."""
+        earlier_payload = self._product_payload(
+            gid='gid://shopify/Product/957',
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/957', sku='ATOMIC-SKU-3',
+                ),
+            ],
+        )
+        earlier_result = self.Importer._apply_import(self.store, earlier_payload)
+
+        failing_payload = self._product_payload(
+            gid='gid://shopify/Product/958',
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/958', sku='ATOMIC-SKU-4',
+                ),
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/959', sku='ATOMIC-SKU-5',
+                ),
+            ],
+        )
+        with self.assertRaises(JobHandlerError):
+            self.Importer._apply_import(self.store, failing_payload)
+
+        earlier_result['template_binding'].invalidate_recordset()
+        self.assertTrue(earlier_result['template_binding'].exists())
+        self.assertEqual(
+            self.TemplateBinding.search_count([
+                ('store_id', '=', self.store.id),
+                ('shopify_gid', '=', 'gid://shopify/Product/957'),
+            ]), 1,
+        )

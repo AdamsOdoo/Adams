@@ -2,9 +2,15 @@
 
 ## Summary
 
-**Implementation session complete, PR opened as DRAFT — not accepted,
-not merged.** This document is the closure-level validation-evidence
-record for Task 010's own scope, mirroring the format of
+**Revised after control-room review, PR still DRAFT — not accepted, not
+merged.** ChatGPT reviewed PR #138 (GitHub comment ID `4927037139`) and
+returned **REVISE before merge**. Four required fixes were applied in
+this revision — see §H below for full detail. §A–§G below describe the
+PR's scope/implementation as of the original session and remain
+accurate except where §H supersedes them (test-file line counts grew;
+no other prior claim changed). This document is the closure-level
+validation-evidence record for Task 010's own scope, mirroring the
+format of
 [`task-006c-sync-engine-skeleton-validation-results.md`](./task-006c-sync-engine-skeleton-validation-results.md).
 Unlike Task 006C, **no live Odoo/PostgreSQL runtime was reachable in
 this session** (no `odoo` package installed, no Odoo.sh access, no
@@ -199,9 +205,10 @@ constraints, not weakened:
   inherits the existing, already-merged Task 006C claim/dispatch
   mechanism unmodified; it neither closes nor claims to close any of
   these.
-- **Runtime execution proof for this task's own 4 new test files** — not
-  yet obtained (§D above); a future session/runtime must actually run
-  them before any "0 failed, 0 error(s)" claim can be made.
+- **Runtime execution proof for this task's own 4 test files (51 test
+  methods as of the §H revision)** — not yet obtained (§D/§H above); a
+  future session/runtime must actually run them before any "0 failed,
+  0 error(s)" claim can be made.
 - **The three in-task narrowings in §C** (ambiguous/blind create a
   binding row; multi-variant new-product creation) are conservative,
   documented decisions, not yet exercised against real Shopify data or
@@ -219,10 +226,109 @@ constraints, not weakened:
   closure rule (product-domain-gate-criteria-proposal.md §4; task-010
   gate-opening-proposal.md §9).
 
+## H. Revision after control-room review (comment ID `4927037139`)
+
+**Decision: REVISE before merge. Not marked ready. Not merged.**
+
+Four required fixes were applied to
+`shopify_connector_product_importer.py` only (no other production file
+changed; no file added outside the existing Task 010 allowed-file
+envelope):
+
+1. **Shopify API client error taxonomy preserved.**
+   `import_product_sync()` now catches `ShopifyClientError` (imported
+   read-only from `shopify_connector_core`'s own API-client module —
+   not a `shopify_connector_core` file edit) and re-raises it as
+   `JobHandlerError(exc.error_class, exc.reason, exc.technical_detail)`.
+   Without this, the dispatcher's generic `except Exception` boundary in
+   `_invoke_handler()` would have reclassified every throttling/
+   temporary-network/auth failure as `unknown_system_error`, losing the
+   accepted DEC-009 auto-retry (throttling, temporary/network) and
+   manual-fix-then-retry (permission/scope/auth) routing.
+   `exc.credential_invalid`-triggered store-lifecycle side effects (the
+   store→`reconnect_needed` transition `action_test_connection()`
+   performs in `shopify_connector_core`) are deliberately **not**
+   replicated here — out of this task's own scope; only the classified
+   `error_class`/`reason`/`technical_detail` are preserved. **4 new
+   tests** in `test_product_import_matching.py` (§9): throttling and
+   temporary-network each confirmed to route to `retry_waiting` with
+   their own error class (not `unknown_system_error`); permission/
+   scope/auth confirmed to route to `failed_retryable`; a fourth test
+   confirms the importer itself never retries the Shopify call (retry
+   policy stays owned by the job/dispatch layer).
+2. **One-product import is now atomic.** `_apply_import()`'s entire
+   write sequence (template resolution + every variant resolution) runs
+   inside one `self.env.cr.savepoint()` block — the exact mechanism this
+   addon's own `test_product_template_binding.py`/
+   `test_product_variant_binding.py` already used to probe constraint
+   violations, now used in production code, not only tests. Any
+   `JobHandlerError` or Odoo validation failure anywhere in the sequence
+   rolls back every write the call made. **3 new tests**: a source-level
+   guard confirming the savepoint call exists
+   (`test_product_duplicate_prevention.py` §6); a regression test
+   proving a two-variant payload where variant 1 would succeed and
+   variant 2 always fails `duplicate_risk` leaves **zero** residue — no
+   `product.template`, no `product.product`, no template binding, no
+   variant binding for either GID; and a companion test proving the
+   savepoint does not affect a separate, already-successful import made
+   in an earlier call.
+3. **Malformed payloads are now validated explicitly.** A new
+   `_validate_payload()` method runs before any write and raises
+   `JobHandlerError('data_shape_schema_mismatch', ...)` for: a missing
+   product node/GID; an unexpected product status outside
+   `PRODUCT_STATUS_VALUES` (`active`/`archived`/`draft`/`unlisted`); and
+   any variant missing its own Shopify GID. **6 new tests** in
+   `test_product_import_matching.py` (§10): missing product node (unit
+   + end-to-end through `import_product_sync()`), missing product GID,
+   missing variant GID, unexpected status, and a regression guard that
+   the four accepted statuses are still allowed (not over-tightened).
+4. **Silent variant truncation is now blocked, not implemented.**
+   `PRODUCT_IMPORT_QUERY` now requests `variants.pageInfo.
+   hasNextPage`/`endCursor`; `_validate_payload()` (folded into fix 3's
+   method) raises `JobHandlerError('data_shape_schema_mismatch', ...)`
+   when `hasNextPage` is true, rather than silently importing only the
+   first 100 variants. Full multi-page pagination remains explicitly out
+   of Task 010's scope — this is a block, not an implementation. **4 new
+   tests**: the query string itself requests `pageInfo`/`hasNextPage`;
+   a unit test and an end-to-end test (through `import_product_sync()`)
+   both confirm a truncated response is blocked with zero residue; a
+   regression guard confirms `hasNextPage=False`/absent does not block a
+   normal import.
+
+**Test count:** 4 test files, **51 test methods** (up from ~35 before
+this revision — `test_product_import_matching.py` alone grew from 17 to
+28; `test_product_duplicate_prevention.py` grew from 8 to 10; the two
+binding-model test files are unchanged).
+
+**Validation status: still static only, honestly reported.** No `odoo`
+package is installed and no Odoo.sh/CI is reachable in this environment
+— `python3 -m py_compile` and `python3 -m pyflakes` are clean on every
+changed file; the same source-level guards (zero mutation-call
+substring inside the query text, zero bypass-flag identifier, zero
+customer/order/inventory/fulfillment model reference) were re-run
+against the revised file and remain clean. **All 51 test methods,
+including the 17 new ones added by this revision, are written and
+statically valid but not execution-proven this session** — no Odoo
+runtime was reachable, exactly as before this revision.
+
+**Self-audit against the control-room revision instructions (all
+confirmed):** no `shopify_connector_core` file changed; no UI/view/
+menu/action/wizard/controller file added; no webhook/OAuth file added;
+no export/update/write/mutation logic added; no customer/order/
+inventory/fulfillment logic added; `ShopifyClientError` is converted to
+`JobHandlerError` preserving `error_class`; `_apply_import()` is atomic
+via `self.env.cr.savepoint()`; malformed payloads raise
+`data_shape_schema_mismatch` before any write; `variants.pageInfo.
+hasNextPage` blocks the import; tests cover all four fixes; this
+document and the PR body honestly state validation is static-only; the
+PR remains draft/unmerged.
+
 ## Stop condition
 
 Per final prompt §14: this PR is opened as **DRAFT**. It is not marked
-ready for review and not merged. ChatGPT's own separate review is the
-next required act — see the mandatory handoff update
+ready for review and not merged. This revision (comment ID
+`4927037139`) does not change that — it remains **DRAFT, unmerged**.
+ChatGPT's own separate review is the next required act — see the
+mandatory handoff update
 ([`research-handoff.md`](../01-research/research-handoff.md)) for the
 exact next-session prompt.
