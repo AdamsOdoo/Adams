@@ -280,20 +280,35 @@
 - [ ] _(Not applicable — an AR row was added and is being accepted, not
       omitted.)_
 
-## 19. Overall review decision — Accepted (2026-07-09)
+## 19. Overall review decision — Accepted, subject to consistency patch (2026-07-09)
 
-- [x] **Overall decision: Accepted.** ChatGPT accepted PR #130 content-wise
-      via control-room review (GitHub review artifact/comment ID
-      `4658949628`) on 2026-07-09. **The six proposed choices (Decisions
-      A–F) are accepted as the Task 006C implementation basis.** The
-      gate-opening proposal is accepted. The companion gate document is
-      accepted. The final prompt is accepted but **not issued** — its
-      merge-commit-SHA placeholder (`<TASK_006D_GATE_MERGE_COMMIT_SHA>`)
-      remains unresolved, since PR #130 has not merged.
-- [x] **No revisions required.** This acceptance patch applies a clean
-      "accepted" outcome across the gate-opening proposal, the gate
-      document, the final prompt, and AR-031 — no issue survived requiring
-      a further revision round.
+- [x] **Overall decision remains Accepted, subject to this consistency
+      patch.** ChatGPT accepted PR #130 content-wise via control-room
+      review (GitHub review artifact/comment ID `4658949628`) on
+      2026-07-09. **The six proposed choices (Decisions A–F) remain
+      accepted as the Task 006C implementation basis.** The gate-opening
+      proposal remains accepted. The companion gate document remains
+      accepted. **The final prompt remains accepted but not issued** —
+      its merge-commit-SHA placeholder (`<TASK_006D_GATE_MERGE_COMMIT_SHA>`)
+      remains unresolved, since PR #130 has not merged. **The gate remains
+      accepted but not effective until PR #130 merges and the final prompt
+      is separately issued.**
+- [x] **A consistency patch was required and has been applied.** A
+      follow-up control-room review (GitHub review artifact/comment ID
+      `4921331441`) found stale pre-acceptance wording surviving inside
+      the gate document (§A's "if and when accepted and merged" framing,
+      "this document does not itself decide any of the six choices,"
+      "subject to ChatGPT's acceptance," and stale statuses in the
+      accepted-inputs section) and stale "DEFAULT proposal" wording in the
+      final prompt's allowed-files entries for the two new model files.
+      **Both are now fixed** — the gate document and final prompt
+      consistently state the six choices and both companion documents are
+      accepted, the gate is accepted but not yet effective, and no
+      implementation is authorized. No issue survived beyond this
+      wording-consistency fix; no new revision round is required after
+      this patch.
+- [x] **No implementation is authorized** by this consistency patch or by
+      the acceptance it clarifies.
 - [x] **Confirmed at acceptance:** none of VAL-B2, MBQ-05, TD-002, the
       fulfillment API model, product first-sync dedup, token acquisition,
       Lite/Full packaging, checkpoint/resume ownership, or the

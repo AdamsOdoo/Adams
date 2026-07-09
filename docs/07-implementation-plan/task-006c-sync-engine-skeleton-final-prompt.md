@@ -146,12 +146,14 @@ Allowed files (exact):
   remove, weaken, or alter any existing field, constraint, or gating
   check, and do NOT touch the three pre-existing job_type values' meaning.
 - addons/shopify_connector_core/models/shopify_connector_job_enqueue.py
-  (NEW, AbstractModel, no table, DEFAULT proposal — see File-split note
-  above) — the enqueue service wrapping Job.create(); no new idempotency/
-  scope-key mechanism (reuse the existing computed fields verbatim).
+  (NEW, AbstractModel, no table, accepted file split, Decision D — see
+  File-split note above) — the enqueue service wrapping Job.create(); no
+  new idempotency/scope-key mechanism (reuse the existing computed fields
+  verbatim).
 - addons/shopify_connector_core/models/shopify_connector_job_dispatch.py
-  (NEW, AbstractModel, no table, DEFAULT proposal — see File-split note
-  above) — the drain-loop entry point, the _get_handlers() registry seam
+  (NEW, AbstractModel, no table, accepted file split, Decision D — see
+  File-split note above) — the drain-loop entry point, the
+  _get_handlers() registry seam
   described above (mirrors shopify_connector_readiness_check.py's
   _get_checks() precedent), the dispatcher, and the retry-scheduling
   sweep using the named, non-magic-number constants: 12 attempts,

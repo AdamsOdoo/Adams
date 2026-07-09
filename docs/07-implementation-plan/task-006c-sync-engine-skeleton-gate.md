@@ -49,7 +49,9 @@
 
 ## A. Gate purpose
 
-This gate, **if and when accepted and merged**, would open a narrow,
+**ChatGPT has accepted this gate document and the six gate-opening
+choices it records** (2026-07-09, control-room review, GitHub review
+artifact/comment ID `4658949628`, PR #130). This gate is the narrow,
 one-time authorization for exactly one future coding session — **Task
 006C: Sync Engine Skeleton Implementation** — building the core
 job-enqueue/claim/dispatch/retry skeleton inside `shopify_connector_core`
@@ -57,16 +59,26 @@ that the accepted DEC-025 architecture gate and the accepted (as a
 planning/scope package) Task 006C implementation-scope document (PR #129)
 both describe. It exists because the accepted scope package's own §F left
 six concrete implementation choices as candidates requiring ChatGPT's
-explicit approval — this document is the vehicle for that approval,
-paired with the six recommendations proposed in
+explicit approval — this document is the vehicle that **records ChatGPT's
+acceptance** of those six choices, exactly as proposed in
 [`task-006c-sync-engine-gate-opening-proposal.md`](./task-006c-sync-engine-gate-opening-proposal.md)
-§6. **This document does not itself decide any of the six choices** — it
-proposes to adopt the gate-opening proposal's recommendations, subject to
-ChatGPT's acceptance, revision, or rejection of each.
+§6 (also accepted by this same review).
+
+**The gate is accepted, but not yet effective, because PR #130 has not
+merged.** The gate becomes effective only after PR #130 merges into
+`Shopify-connector`. **Even after that merge, implementation still
+requires ChatGPT to separately issue the finalized implementation prompt**
+([`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md))
+**in a new Claude Code session, with the merge commit SHA filled in** —
+replacing the still-unresolved `<TASK_006D_GATE_MERGE_COMMIT_SHA>`
+placeholder. **The six choices in §C are accepted as gate-opening
+decisions — the accepted basis for that future prompt — but code is still
+not authorized until both PR #130 merges and that prompt is separately
+issued.**
 
 ## B. Accepted inputs
 
-This gate proposal rests on the following already-accepted state,
+This gate document rests on the following already-accepted state,
 confirmed by direct inspection this session (2026-07-09):
 
 - **DEC-025** — Task 006 sync-engine architecture gate. **Accepted by
@@ -80,14 +92,17 @@ confirmed by direct inspection this session (2026-07-09):
 - **PR #129 merge commit `241871b70f8151d8b796dbb4fb7bcb69cc3b2db3`** —
   confirmed present on `origin/Shopify-connector` (the tip of that branch
   as of this session; this branch is based on it).
-- **`task-006c-sync-engine-skeleton-final-prompt.md`** — status **Final
-  draft / Pending gate acceptance / Not issued** (revised this session,
-  Task 006D, incorporating the six recommendations below; still not
-  issued; still carries an unresolved merge-commit-SHA placeholder).
+- **`task-006c-sync-engine-skeleton-final-prompt.md`** — status
+  **Accepted final prompt / Not issued** (accepted 2026-07-09,
+  incorporating the six accepted choices below; still not issued; still
+  carries an unresolved merge-commit-SHA placeholder,
+  `<TASK_006D_GATE_MERGE_COMMIT_SHA>`, which cannot be filled until PR
+  #130 merges).
 - **`task-006c-sync-engine-gate-opening-proposal.md`** — status
-  **Proposed for ChatGPT gate-opening review / Does not open the gate
-  yet** (revised this session, Task 006D, adding the six concrete
-  recommendations this gate proposes to adopt).
+  **Accepted by ChatGPT (2026-07-09) / Gate opens only after PR #130
+  merges and the final prompt is separately issued** (accepted by the
+  same review as this gate document, recording the six accepted
+  gate-opening decisions in its own §6).
 - **Existing accepted substrate**, confirmed unchanged by direct
   inspection of `addons/shopify_connector_core/models/` this session:
   `shopify.connector.job`'s full state machine (`JOB_STATE_SELECTION`,
@@ -110,7 +125,7 @@ Restated here in summary form (full detail, evidence, and caveats live in
 that document, not duplicated verbatim here, per this repo's existing
 gate-document convention of referencing rather than restating):
 
-| # | Choice | Proposed decision |
+| # | Choice | Accepted decision |
 | --- | --- | --- |
 | A | Execution-time claim/concurrency mechanism | `try_lock_for_update()` per candidate job row; skip locked/unavailable rows in the same drain pass; never raw SQL `SKIP LOCKED`; never a PostgreSQL advisory lock in this phase |
 | B | Handler-registry seam shape | New `shopify.connector.job.dispatch` `AbstractModel` with a `_get_handlers()` registry seam, returning a `job_type → handler` mapping, adapting (not copying) the `_get_checks()` inheritance-append precedent; fails safely for a missing handler |
@@ -127,21 +142,21 @@ into `Shopify-connector` and the final prompt to be separately issued
 
 ## D. Final implementation prompt reference
 
-- **The only implementation prompt this gate would authorize, if
-  accepted and merged, is:**
+- **The only implementation prompt this gate authorizes, once effective
+  (i.e. once PR #130 merges), is:**
   [`docs/07-implementation-plan/task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md)
-  (status: Final draft / Pending gate acceptance / Not issued).
+  (status: **Accepted final prompt / Not issued**).
 - **This gate document does not restate that prompt's contracts** — it
   references it by exact path, mirroring the Task 002/003 gate
   precedent, so the two documents cannot silently drift apart.
 - **Any deviation from that final prompt requires a new ChatGPT
   decision** — a future implementing session may not improvise a
   different field shape, file split, constant set, or test list.
-- **The prompt is issued only after** this gate document is accepted and
-  merged, **and** ChatGPT separately pastes the prompt's exact text into
-  a **new** Claude Code session, as its own chat turn, with the
-  merge-commit-SHA placeholder filled in from this document's actual
-  post-merge commit.
+- **The prompt is issued only after** this gate document (already
+  accepted) **merges**, **and** ChatGPT separately pastes the prompt's
+  exact text into a **new** Claude Code session, as its own chat turn,
+  with the merge-commit-SHA placeholder filled in from this document's
+  actual post-merge commit.
 
 ## E. Exact future coding scope
 
