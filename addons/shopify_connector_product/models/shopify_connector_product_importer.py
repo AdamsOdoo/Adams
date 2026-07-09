@@ -120,18 +120,20 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     its own brand-new parent product.template (Odoo auto-generates
     exactly one singleton variant on product.template.create() with no
     attribute lines; the importer binds that Odoo-generated variant to
-    the payload's first variant), or, when an existing template binding
-    is already resolved and the Shopify payload carries exactly one
-    variant and that template already has exactly one product.product
-    variant that is not yet bound to a different Shopify variant for
-    this store, by binding the incoming Shopify variant directly to
-    that singleton Odoo variant -- a deterministic association, not a
-    guess, since there is only one possible Odoo record the one
-    incoming Shopify variant could mean (control-room revision, comment
-    4927278355, fix 1; see _resolve_deterministic_variant() below). Any
-    additional variant in the same payload, or any variant that would
-    need a fresh product.product under an existing template that
-    already has more than one variant, is not auto-created -- Odoo
+    the payload's first variant), or, when an *existing template
+    binding row* (not a template just matched this same call via SKU/
+    barcode candidate search -- see fix 1 below) is already resolved and
+    the Shopify payload carries exactly one variant and that template
+    already has exactly one product.product variant that is not yet
+    bound to a different Shopify variant for this store, by binding the
+    incoming Shopify variant directly to that singleton Odoo variant --
+    a deterministic association, not a guess, since there is only one
+    possible Odoo record the one incoming Shopify variant could mean
+    (control-room revision, comment 4927278355, fix 1; narrowed by
+    comment 4927455927, fix 1; see _resolve_deterministic_variant()
+    below). Any additional variant in the same payload, or any variant
+    that would need a fresh product.product under an existing template
+    that already has more than one variant, is not auto-created -- Odoo
     variant generation for a multi-variant template is driven by
     attribute_line_ids, which no accepted document in this project
     specifies a mapping for (MBQ-55 section 7.2.F defers richer variant
@@ -142,7 +144,16 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     resolved singleton variant is already bound to a different Shopify
     variant for this store, so does the single-variant case above --
     never an automatic guess about which of two competing Shopify
-    variants actually owns that Odoo record.
+    variants actually owns that Odoo record. A template resolved via
+    SKU/barcode candidate search always runs its own variant(s) through
+    the ordinary _find_variant_candidates() match-key search instead,
+    even when that template happens to have exactly one variant and the
+    payload happens to carry exactly one variant -- otherwise the
+    variant-level match_key would wrongly stay unset for a genuine SKU/
+    barcode variant match, the regression the second Odoo.sh red build
+    (comment 4927455927) caught in
+    test_sku_match_when_no_existing_binding and
+    test_barcode_match_when_no_sku_match.
 
     Control-room revision, comment 4927037139, four fixes applied: the
     Shopify API client error taxonomy is now preserved, since
@@ -326,14 +337,15 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         self._validate_payload(payload)
         with self.env.cr.savepoint():
             variants = payload.get('variants') or []
-            template_binding, template_just_created = (
+            template_binding, template_resolution_source = (
                 self._resolve_template_binding(store, payload)
             )
             VariantBinding = self.env['shopify.connector.product.variant.binding']
             variant_bindings = VariantBinding.browse()
             for index, variant_payload in enumerate(variants):
                 deterministic_variant = self._resolve_deterministic_variant(
-                    template_binding, template_just_created, variants, index,
+                    template_binding, template_resolution_source, variants,
+                    index,
                 )
                 variant_binding = self._resolve_variant_binding(
                     store, template_binding, variant_payload,
@@ -347,7 +359,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _resolve_deterministic_variant(
-        self, template_binding, template_just_created, variants, index,
+        self, template_binding, template_resolution_source, variants, index,
     ):
         """A product.product this call may bind the payload variant at
         `index` to directly, without running SKU/barcode candidate
@@ -355,34 +367,56 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         could possibly mean -- never a guess among several plausible
         candidates.
 
-        Two cases (both fixed, conservative, and documented in this
-        class's own docstring):
+        `template_resolution_source` (control-room revision, comment
+        4927455927, fix 1) is one of the three values
+        `_resolve_template_binding()` returns as its second element --
+        `'created'`, `'existing_binding'`, or `'candidate_match'` -- and
+        is what this method uses to decide whether either shortcut case
+        below applies. It is not inferred from `template_just_created`
+        alone, since a template resolved via SKU/barcode candidate match
+        is not "just created" but must still be excluded from the
+        singleton shortcut: that template's own variant-level match was
+        never actually run, so its match_key would wrongly stay unset,
+        exactly the regression the second Odoo.sh red build (comment
+        4927455927) caught.
 
-        - `template_just_created` and `index == 0`: the Odoo-generated
-          singleton variant of a `product.template` this same call just
-          created. Always safe -- the product.product did not exist
-          before this call, so it cannot already be bound to anything.
-        - The resolved template (existing or just created) has exactly
-          one `product.product` variant, and the incoming Shopify
-          payload carries exactly one variant total -- there is no
-          possible ambiguity about which Shopify variant that lone Odoo
-          variant corresponds to (control-room revision, comment
-          4927278355, fix 1). `_resolve_variant_binding()` still checks
-          this candidate is not already bound to a *different* Shopify
-          variant for this store before using it -- this method only
-          identifies the candidate, it never itself decides the bind is
-          safe.
+        Two cases apply, both fixed and conservative, and documented in
+        this class's own docstring. The first is
+        `template_resolution_source == 'created'` and `index == 0`,
+        which is the Odoo-generated singleton variant of a
+        `product.template` this same call just created and is always
+        safe, since the product.product did not exist before this call
+        and so cannot already be bound to anything. The second is
+        `template_resolution_source == 'existing_binding'` together with
+        an incoming Shopify payload that carries exactly one variant
+        total and a pre-existing template that has exactly one
+        `product.product` variant, where there is no possible ambiguity
+        about which Shopify variant that lone Odoo variant corresponds
+        to (control-room revision, comment 4927278355, fix 1); even
+        then, `_resolve_variant_binding()` still checks this candidate is
+        not already bound to a *different* Shopify variant for this
+        store before using it -- this method only identifies the
+        candidate, it never itself decides the bind is safe.
+
+        A template resolved via `'candidate_match'` (SKU/barcode) never
+        takes either shortcut, at any index -- its variant(s) must go
+        through `_find_variant_candidates()` so a genuine SKU/barcode
+        variant match_key is recorded (control-room revision, comment
+        4927455927, fix 1).
 
         Returns an empty `product.product` recordset when neither case
         applies -- the caller must fall back to SKU/barcode candidate
-        search. A payload with more than one variant never takes this
-        shortcut for any index, preserving the conservative "no blind
-        multi-variant creation" rule unchanged.
+        search. A payload with more than one variant never takes the
+        `'existing_binding'` shortcut for any index, preserving the
+        conservative "no blind multi-variant creation" rule unchanged.
         """
         ProductProduct = self.env['product.product']
-        if template_just_created and index == 0:
+        if template_resolution_source == 'created' and index == 0:
             return template_binding.product_template_id.product_variant_id
-        if len(variants) == 1 and index == 0:
+        if (
+            template_resolution_source == 'existing_binding'
+            and len(variants) == 1 and index == 0
+        ):
             template_variants = template_binding.product_template_id.product_variant_ids
             if len(template_variants) == 1:
                 return template_variants
@@ -392,10 +426,13 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     def _resolve_template_binding(self, store, payload):
         """Match-key sequence for the product-template binding.
 
-        Returns `(binding, just_created)` -- `just_created` tells the
-        caller whether this template's Odoo-generated singleton variant
-        is available for the payload's first variant (see this class's
-        own docstring, "conservative scope" decision).
+        Returns `(binding, template_resolution_source)` --
+        `template_resolution_source` is one of `'existing_binding'`,
+        `'candidate_match'`, or `'created'`, and tells
+        `_resolve_deterministic_variant()` (control-room revision,
+        comment 4927455927, fix 1) which, if any, deterministic
+        singleton-variant shortcut is available for this template (see
+        this class's own docstring, "conservative scope" decision).
         """
         TemplateBinding = self.env['shopify.connector.product.template.binding']
         shopify_gid = payload.get('gid')
@@ -411,7 +448,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         ], limit=1)
         if existing:
             existing.write(snapshot_vals)
-            return existing, False
+            return existing, 'existing_binding'
 
         variants = payload.get('variants') or []
         candidate_ids, match_key = self._find_template_candidates(
@@ -432,7 +469,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 product_template_id=candidate_ids[0],
                 match_key=match_key, matched_at=fields.Datetime.now(),
             ))
-            return binding, False
+            return binding, 'candidate_match'
 
         any_identifier_present = any(
             variant.get('sku') or variant.get('barcode')
@@ -458,7 +495,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             product_template_id=product_template.id,
             matched_at=fields.Datetime.now(),
         ))
-        return binding, True
+        return binding, 'created'
 
     @api.model
     def _find_template_candidates(self, store, variants):

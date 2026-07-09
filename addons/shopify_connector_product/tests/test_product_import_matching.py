@@ -211,6 +211,13 @@ class TestProductImportMatching(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_sku_match_when_no_existing_binding(self):
+        """Regression test (control-room review, comment 4927455927, fix
+        1): the template here has exactly one product.product variant
+        and the payload carries exactly one variant -- the same shape
+        the existing-binding singleton shortcut uses -- but this
+        template is resolved via SKU candidate match, not an existing
+        binding, so the shortcut must NOT apply and the variant's own
+        match_key must still come from _find_variant_candidates()."""
         template, variant = self._make_product('SKU Product', default_code='SKU-42')
         payload = self._product_payload(
             gid='gid://shopify/Product/901',
@@ -231,6 +238,11 @@ class TestProductImportMatching(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_barcode_match_when_no_sku_match(self):
+        """Regression test (control-room review, comment 4927455927, fix
+        1): same singleton template/payload shape as
+        test_sku_match_when_no_existing_binding above, but for the
+        barcode candidate-match path -- must not take the
+        existing-binding singleton shortcut either."""
         template, variant = self._make_product(
             'Barcode Product', barcode='0123456789012',
         )

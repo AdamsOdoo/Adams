@@ -1,5 +1,156 @@
 # Research Handoff (rolling)
 
+### Task 010 product import PR #138 revised after second Odoo.sh red build — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-010-product-import-gate-0uh7g4`, base
+  `Shopify-connector`; PR **#138**, revised in place a third time after
+  ChatGPT control-room review of a *second* actual Odoo.sh red build
+  (GitHub comment ID `4927455927`); **draft, unmerged.**
+- **What happened:** the previous revision's own fix (comment
+  `4927278355`, recorded in the entry directly below) was pushed, and a
+  second Odoo.sh build ran against it (evidence provided by the user).
+  Result: module `shopify_connector_product` — **2 failures, 0 errors
+  of 53 tests**; full database load — **2 failed, 0 error(s) of 220
+  tests**; the same docutils/RST build-log warning as before, byte-for-
+  byte unchanged. ChatGPT reviewed this evidence and returned
+  **REVISE** again.
+- **Root cause:** the prior revision's `_resolve_deterministic_variant()`
+  singleton-variant shortcut was too broad. It fired whenever the
+  *resolved* template had exactly one Odoo variant and the payload
+  carried exactly one variant, regardless of *how* the template was
+  resolved. That correctly covered the intended existing-binding case,
+  but also incorrectly covered the SKU/barcode candidate-match case: a
+  template freshly matched by SKU or barcode (not an existing binding,
+  not a brand-new template) also has exactly one Odoo variant in these
+  fixtures, so the shortcut fired there too and skipped
+  `_find_variant_candidates()` entirely — the variant binding was still
+  created correctly, but its `match_key` stayed `False` instead of
+  `sku_reference`/`barcode`. Confirmed by the two failing tests:
+  `TestProductImportMatching.test_sku_match_when_no_existing_binding`
+  and `..._test_barcode_match_when_no_sku_match`.
+- **Fix (production logic, one file):**
+  `_resolve_template_binding()` now returns a three-way
+  `template_resolution_source` string (`'existing_binding'`,
+  `'candidate_match'`, or `'created'`) instead of a `just_created`
+  boolean. `_resolve_deterministic_variant()` now gates its two
+  shortcut cases strictly on that source: `'created'` (brand-new
+  template, unchanged) and `'existing_binding'` (the singleton case
+  from the prior revision, unchanged) still take the shortcut;
+  `'candidate_match'` never does, at any index, regardless of variant
+  count — its variant(s) always run through the ordinary
+  `_find_variant_candidates()` match-key search. This restores the
+  correct `sku_reference`/`barcode` match-keys while leaving every fix
+  from the prior revision (the existing-binding singleton case, its
+  already-bound-singleton conflict guard, the multi-variant
+  conservative/atomic case, the savepoint atomicity) completely
+  unchanged — re-traced by hand for all five of that revision's tests
+  and confirmed unaffected.
+- **docutils/RST warning — re-investigated, conclusion strengthened:**
+  the second build ran against commit `636493e`, which already
+  contained the prior revision's own plain-prose rewrite of both the
+  manifest `description` and the importer's class docstring. The
+  warning reappeared at the **exact same** `<string>:38`/`<string>:43`
+  location despite that substantial content change — if either rewritten
+  file were the true source, the reported line would have shifted. It
+  did not. This is now positive evidence the warning is **not** sourced
+  from PR #138's files (strengthened from the prior revision's "could
+  not reproduce, inconclusive" finding). A fresh local `docutils` 0.23
+  scan across all twelve files this PR has ever touched found zero
+  warnings. No further file was edited to chase this warning, per this
+  revision's own instruction that it is secondary to the two test
+  failures and must not be chased into forbidden files.
+- **Test count:** unchanged at **53** methods — no new test method
+  added; the two previously-failing tests already exercised the exact
+  regression shape (a singleton template matched by SKU/barcode against
+  a singleton-variant payload) and now pass from the production-code fix
+  alone. Both received a short docstring annotation recording this as
+  the regression scenario for future readers.
+- **Validation: still no local Odoo runtime, honestly reported.**
+  `py_compile`/`pyflakes` clean on every changed file; the same
+  source-level mutation/bypass/forbidden-model guards re-run clean; a
+  fresh local `docutils` scan across all PR-changed files re-run clean.
+  **No Odoo runtime was available in this session's own sandbox to
+  re-execute the fixed tests** — the fix is traced by hand against the
+  real, user-provided Odoo.sh failure evidence, but this session does
+  not, and cannot, claim a new green Odoo.sh build. That requires an
+  actual next Odoo.sh run.
+- **AR-036** (`../05-qa/architecture-review-log.md`) row's Review-
+  decision column updated a third time to record this REVISE decision;
+  a new "AR-036 Revision Note 3" footnote records full detail. Status
+  remains **Proposed** — still not accepted.
+- **Files changed (this revision):**
+  `addons/shopify_connector_product/models/shopify_connector_product_importer.py`
+  (`_resolve_template_binding()` returns `template_resolution_source`
+  instead of a boolean; `_resolve_deterministic_variant()` gates on it;
+  `_apply_import()` updated to match; class/method docstrings updated);
+  `addons/shopify_connector_product/tests/test_product_import_matching.py`
+  (2 existing tests annotated, no assertion changes);
+  `docs/05-qa/task-010-product-import-validation-results.md` (new §J);
+  `docs/05-qa/architecture-review-log.md` (AR-036 row + third footnote);
+  this handoff entry; the PR body. **Both production/test files were
+  pre-existing files, modified in place — zero new files added, zero
+  `shopify_connector_core` files touched, no file outside the existing
+  Task 010 allowed-file envelope.**
+- **Learning feedback loop:** the pattern from the prior revision's own
+  learning note recurred and sharpened: fixing one under-specified
+  branch of match-key resolution ("existing binding, singleton variant")
+  by keying only on a *shape* condition (variant-count fan-in), not on
+  *how the caller arrived at that shape*, silently widened the fix's own
+  blast radius into an unrelated branch (candidate-match) that happened
+  to share the same shape in these test fixtures. The general lesson:
+  when a deterministic/skip-search shortcut is introduced for one named
+  case, it must be keyed on an explicit, enumerated source/identity
+  value (here, `template_resolution_source`), never on a structural
+  coincidence (variant count) that other, unrelated cases can also
+  satisfy. Flagged for ChatGPT to decide whether
+  `pr-review-checklist.md` §C should gain an explicit line: "does a new
+  deterministic/shortcut branch key on an explicit enumerated source,
+  not merely on a data shape that other branches could also produce?".
+  No new rejected approach (checked `rejected-approaches-log.md` — none
+  applicable). No new technical debt beyond what was already flagged.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed (this is
+  the second occurrence of a related-but-distinct pattern — noted above,
+  not escalated, since each occurrence's root cause was distinct and
+  each was fixed on first real-runtime evidence).
+- **Stop condition:** the one required fix applied and traced by hand
+  against the real Odoo.sh failure evidence, plus all five tests from
+  the prior revision re-traced and confirmed unaffected; the docutils
+  warning re-investigated and not chased into any forbidden file; static
+  validation clean and honestly reported (no new green-build claim
+  made); zero `shopify_connector_core` edits confirmed; zero UI/webhook/
+  OAuth/export/mutation/customer/order/inventory/fulfillment scope
+  added; no file added outside the Task 010 allowed-file envelope; only
+  the files listed above changed; PR remains **DRAFT**, not marked
+  ready, not merged; no further domain task (011/012/013/014, 015), UI,
+  webhook, OAuth, or Lite/Full packaging work started. **Next step: the
+  next Odoo.sh validation cycle, then ChatGPT reviews the result.**
+
+**Next-session prompt (exact, for after the next Odoo.sh build):**
+
+```text
+ChatGPT reviews the next Odoo.sh build result for draft PR #138 (Task
+010 product import/variant binding implementation, revised per
+control-room comments 4927037139, 4927278355, and 4927455927) against
+docs/07-implementation-plan/task-010-product-import-final-implementation-prompt.md
+§3-§14, docs/05-qa/architecture-review-log.md AR-036 (row + all three
+Revision Note footnotes), and
+docs/05-qa/task-010-product-import-validation-results.md §J. If the
+build is green: confirm shopify_connector_product installs with
+shopify_connector_core, all 53 focused Task 010 tests pass, and note
+whether the docutils/RST warning persists even on a clean/green run (if
+it does, that would further confirm it is unrelated to PR #138); then
+decide whether to authorize merge. If the build is still red: report
+the exact new failure evidence and continue the fix-revise-revalidate
+cycle, staying within the Task 010 allowed-file envelope, never editing
+shopify_connector_core, and keeping the PR draft/unmerged. Do not
+authorize Task 011/012/013/014, Task 015, any UI, webhook, OAuth, or
+Lite/Full packaging work as part of this review.
+```
+
+---
+
 ### Task 010 product import PR #138 revised after Odoo.sh red build — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-010-product-import-gate-0uh7g4`, base
