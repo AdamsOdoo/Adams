@@ -71,7 +71,14 @@ class TestProductImportMatching(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_existing_binding_takes_priority_over_sku_barcode(self):
-        bound_template, _bound_variant = self._make_product('Bound Product')
+        """Regression test (control-room review, comment 4927278355, fix
+        1): the existing template binding resolves the template
+        regardless of the decoy SKU, and -- since the payload carries
+        exactly one variant and the bound template has exactly one,
+        unbound Odoo variant -- the singleton-variant shortcut binds
+        that Shopify variant directly, without SKU/barcode candidate
+        search ever considering the (irrelevant) decoy match."""
+        bound_template, bound_variant = self._make_product('Bound Product')
         template_binding = self.TemplateBinding.create({
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Product/900',
@@ -95,6 +102,108 @@ class TestProductImportMatching(TransactionCase):
         self.assertEqual(result['template_binding'], template_binding)
         self.assertEqual(
             result['template_binding'].product_template_id, bound_template,
+        )
+        self.assertEqual(len(result['variant_bindings']), 1)
+        self.assertEqual(
+            result['variant_bindings'].product_variant_id, bound_variant,
+        )
+        self.assertEqual(
+            result['variant_bindings'].shopify_gid,
+            'gid://shopify/ProductVariant/900',
+        )
+        # The singleton shortcut never ran SKU/barcode candidate search
+        # -- match_key stays unset, exactly like the auto-created-
+        # singleton case.
+        self.assertFalse(result['variant_bindings'].match_key)
+
+    def test_existing_template_singleton_variant_already_bound_blocks_safely(self):
+        """Existing template binding + one Shopify variant, but the
+        template's singleton Odoo variant is already bound to a
+        *different* Shopify variant for this store -- must block,
+        classified, never silently rebind or guess."""
+        template, variant = self._make_product('Already Bound Singleton')
+        template_binding = self.TemplateBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/990',
+            'product_template_id': template.id,
+            'match_key': 'manual',
+        })
+        self.VariantBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/other-990',
+            'product_variant_id': variant.id,
+            'product_template_binding_id': template_binding.id,
+            'match_key': 'manual',
+        })
+        payload = self._product_payload(
+            gid='gid://shopify/Product/990',
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/990', sku='SKU-990-UNMATCHED',
+                ),
+            ],
+        )
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'duplicate_risk')
+        self.assertFalse(self.VariantBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', 'gid://shopify/ProductVariant/990'),
+        ]))
+        # The pre-existing binding to the other Shopify variant is
+        # completely untouched.
+        self.assertEqual(
+            self.VariantBinding.search_count([
+                ('store_id', '=', self.store.id),
+                ('product_variant_id', '=', variant.id),
+            ]), 1,
+        )
+
+    def test_existing_template_multi_variant_payload_still_conservative_and_atomic(self):
+        """Existing template binding + multiple Shopify variants must
+        NOT take the singleton shortcut for any variant (even the one
+        whose SKU legitimately matches) -- an unmatched later variant
+        still blocks the whole import, and the savepoint still rolls
+        back the would-be-successful earlier variant too."""
+        template, variant = self._make_product(
+            'Existing Multi Variant Template', default_code='SKU-991-MATCH',
+        )
+        template_binding = self.TemplateBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/991',
+            'product_template_id': template.id,
+            'match_key': 'manual',
+        })
+        payload = self._product_payload(
+            gid='gid://shopify/Product/991',
+            variants=[
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/991a', sku='SKU-991-MATCH',
+                ),
+                self._variant_payload(
+                    'gid://shopify/ProductVariant/991b',
+                    sku='SKU-991-NO-MATCH',
+                ),
+            ],
+        )
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'duplicate_risk')
+        # Atomic: variant 991a's would-be-successful SKU match must not
+        # persist once variant 991b fails.
+        self.assertFalse(self.VariantBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', 'in', [
+                'gid://shopify/ProductVariant/991a',
+                'gid://shopify/ProductVariant/991b',
+            ]),
+        ]))
+        self.assertEqual(
+            self.TemplateBinding.search([
+                ('store_id', '=', self.store.id),
+                ('shopify_gid', '=', 'gid://shopify/Product/991'),
+            ]),
+            template_binding,
         )
 
     # ------------------------------------------------------------------

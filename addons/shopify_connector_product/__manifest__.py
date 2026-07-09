@@ -9,26 +9,24 @@
     ),
     'description': """
 Shopify Connector Product
-==========================
 
-Product/variant import and binding domain module, built on
-``shopify_connector_core``:
+Product and variant import and binding domain module, built on
+shopify_connector_core.
 
-* ``shopify.connector.product.template.binding`` -- binds one Shopify
-  Product to one Odoo ``product.template``.
-* ``shopify.connector.product.variant.binding`` -- binds one Shopify
-  ProductVariant to one Odoo ``product.product``, always linked to its
-  parent template binding.
-* ``shopify.connector.product.importer`` -- the read-only import/matching
-  service (existing binding -> SKU -> barcode -> manual review), gated by
-  the MBQ-59 two-tier no-blind-create policy.
-* The ``product_import_sync`` job type, registered on the existing core
-  job/dispatch substrate via three narrow extension seams (``job_type``
-  ``selection_add``, a ``_domain_flag_for_job_type()`` override gating it
-  on ``product_domain_enabled``, and a ``_get_handlers()`` override) --
-  zero edits to ``shopify_connector_core`` itself.
+Provides the shopify.connector.product.template.binding model, which
+binds one Shopify Product to one Odoo product.template; the
+shopify.connector.product.variant.binding model, which binds one
+Shopify ProductVariant to one Odoo product.product and is always linked
+to its parent template binding; the shopify.connector.product.importer
+read-only import and matching service, using the match-key priority
+existing binding, then SKU, then barcode, then manual review, gated by
+the MBQ-59 two-tier no-blind-create policy; and the product_import_sync
+job type, registered on the existing core job and dispatch substrate
+via three narrow extension seams, a job_type selection addition, a
+domain flag mapping gating it on product_domain_enabled, and a handler
+registration, with zero edits to shopify_connector_core itself.
 
-Import-only: no product/variant export, update, or write back to
+Import-only. No product or variant export, update, or write back to
 Shopify of any kind. No customer, order, inventory, or fulfillment
 logic. No UI, wizard, webhook, or OAuth file.
 """,

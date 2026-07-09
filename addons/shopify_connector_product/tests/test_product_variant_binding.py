@@ -154,9 +154,17 @@ class TestProductVariantBinding(TransactionCase):
             'product_template_binding_id': template_binding.id,
         })
 
-        other_template = self.env['product.template'].with_user(
-            self.user_admin
-        ).create({'name': 'Other Access Product'})
+        # Fix (control-room review, comment 4927278355, fix 2): the
+        # supporting product.template record this test's own ACL
+        # assertions bind against must be created with the normal test
+        # environment/setup user, not a connector-role user -- the
+        # connector admin group is not in Odoo's own Products/Create
+        # group (correct Odoo behaviour, not a connector ACL to widen),
+        # and this test is about binding-model ACLs, not Product app
+        # permissions.
+        other_template = self.env['product.template'].create({
+            'name': 'Other Access Product',
+        })
 
         # Auditor: read-only.
         auditor_view = self.VariantBinding.with_user(self.user_auditor)

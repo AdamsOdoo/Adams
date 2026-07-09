@@ -56,108 +56,124 @@ PRODUCT_STATUS_VALUES = ('active', 'archived', 'draft', 'unlisted')
 
 
 class ShopifyConnectorProductImporter(models.AbstractModel):
-    """The read-only product/variant import + matching service (Task 010).
+    """The read-only product and variant import and matching service.
 
-    Stateless (`AbstractModel` -- no table, no new ACL row), mirroring
-    `shopify_connector_readiness_check.py`'s/`shopify_connector_job_
-    dispatch.py`'s own `AbstractModel` pattern. Every write path here
-    creates/updates only this module's own two binding models (and, on a
-    confident no-match, a new `product.template`/its Odoo-generated
-    singleton `product.product`) -- never a customer/order/inventory/
-    fulfillment model, and never a Shopify mutation call (only
-    `shopify.connector.api.client.execute()` with a `query` operation).
+    Written in plain prose, not RST or Markdown list/bold syntax, per
+    the control-room review of comment 4927278355 (docutils warnings
+    ERROR/3 unexpected indentation and WARNING/2 block quote ends
+    without a blank line, observed in the Odoo.sh build log for PR 138)
+    -- this class docstring and the manifest description are the two
+    files that review named as the most likely RST-sensitive source; no
+    functional behaviour changes with this rewrite.
 
-    Match-key priority (DEC-006; final prompt §8, an in-task conversion
-    of the already-accepted DEC-014 point H two-tier gate, not a
-    re-derivation of it): existing binding -> SKU (`default_code`) ->
-    barcode -> manual review. Ambiguous or blind (no identifier at all)
-    conditions never create -- they raise `JobHandlerError` with
-    `error_class` `ambiguous_match`/`duplicate_risk`, which the existing,
-    unmodified `shopify.connector.job.dispatch._route_failure()` already
-    routes to `blocked_manual_review` with the matching
-    `manual_review_subreason` (both values are already-accepted members
-    of `MANUAL_REVIEW_SUBREASON_SELECTION` -- no new vocabulary is added
-    here).
+    Stateless, an AbstractModel with no table and no new ACL row,
+    mirroring shopify_connector_readiness_check.py and
+    shopify_connector_job_dispatch.py's own AbstractModel pattern. Every
+    write path here creates or updates only this module's own two
+    binding models, plus, on a confident no-match, a new product.template
+    and its Odoo-generated singleton product.product. It never touches a
+    customer, order, inventory, or fulfillment model, and it never
+    issues a Shopify mutation call, only
+    shopify.connector.api.client.execute() with a query operation.
 
-    In-task decision (final prompt §9, "res_model/res_id targeting... the
-    implementing session fixes this as its own narrow, named in-task
-    decision"): a future enqueue-trigger session should target
-    `res_model='shopify.connector.product.template.binding'` (the
-    binding model, not the underlying `product.template`) -- the binding
-    is the connector-owned identity concept a `product_import_sync` job
-    is really about, and, unlike `product.template`, it is guaranteed to
-    exist by the time any *second* job for the same Shopify product could
+    Match-key priority (DEC-006, final prompt section 8, an in-task
+    conversion of the already-accepted DEC-014 point H two-tier gate,
+    not a re-derivation of it) is: existing binding, then SKU
+    (default_code), then barcode, then manual review. Ambiguous or blind
+    (no identifier at all) conditions never create a record -- they
+    raise JobHandlerError with error_class ambiguous_match or
+    duplicate_risk, which the existing, unmodified
+    shopify.connector.job.dispatch._route_failure() already routes to
+    blocked_manual_review with the matching manual_review_subreason.
+    Both values are already-accepted members of
+    MANUAL_REVIEW_SUBREASON_SELECTION -- no new vocabulary is added
+    here.
+
+    In-task decision, per final prompt section 9's own allowance for the
+    implementing session to fix res_model/res_id targeting as a narrow,
+    named in-task decision: a future enqueue-trigger session should
+    target res_model equal to
+    shopify.connector.product.template.binding, the binding model, not
+    the underlying product.template, because the binding is the
+    connector-owned identity concept a product_import_sync job is
+    really about, and, unlike product.template, it is guaranteed to
+    exist by the time any second job for the same Shopify product could
     be enqueued. Task 010 itself does not build that enqueue-trigger
-    call site (multi-product enumeration is explicitly out of this job
-    type's scope, final prompt §9) -- this decision is recorded here for
-    that future session, not implemented by this one.
+    call site, since multi-product enumeration is explicitly out of
+    this job type's scope per final prompt section 9 -- this decision is
+    recorded here for that future session, not implemented by this one.
 
-    Design decision (structural, not a schema change): an ambiguous or
-    blind match never creates a binding row, even in `status='review'`,
-    because both binding models' `product_template_id`/
-    `product_variant_id` are `required=True` -- there is no safe,
-    non-guessing Odoo record to point a "pending review" binding at
+    Design decision, structural and not a schema change: an ambiguous or
+    blind match never creates a binding row, even in review status,
+    because both binding models' product_template_id and
+    product_variant_id fields are required -- there is no safe,
+    non-guessing Odoo record to point a pending-review binding at
     without picking one of several plausible candidates, which DEC-006
-    forbids ("no automatic name-only matching... ambiguous matches route
-    to manual review, never an automatic guess"). The outcome is instead
-    represented entirely at the job level (`blocked_manual_review` +
-    `manual_review_subreason`), which is what every required test in
-    `task-010-product-import-final-implementation-prompt.md` §10 actually
-    asserts.
+    forbids (no automatic name-only matching, ambiguous matches route to
+    manual review, never an automatic guess). The outcome is instead
+    represented entirely at the job level, blocked_manual_review plus
+    manual_review_subreason, which is what every required test in the
+    Task 010 final implementation prompt section 10 actually asserts.
 
-    Design decision (conservative scope, not a schema change): a new
-    `product.product` is only ever created as the side effect of
-    creating its own brand-new parent `product.template` (Odoo
-    auto-generates exactly one singleton variant on `product.template.
-    create()` with no attribute lines; the importer binds that
-    Odoo-generated variant to the payload's first variant). Any
+    Design decision, conservative scope and not a schema change: a new
+    product.product is created either as the side effect of creating
+    its own brand-new parent product.template (Odoo auto-generates
+    exactly one singleton variant on product.template.create() with no
+    attribute lines; the importer binds that Odoo-generated variant to
+    the payload's first variant), or, when an existing template binding
+    is already resolved and the Shopify payload carries exactly one
+    variant and that template already has exactly one product.product
+    variant that is not yet bound to a different Shopify variant for
+    this store, by binding the incoming Shopify variant directly to
+    that singleton Odoo variant -- a deterministic association, not a
+    guess, since there is only one possible Odoo record the one
+    incoming Shopify variant could mean (control-room revision, comment
+    4927278355, fix 1; see _resolve_deterministic_variant() below). Any
     additional variant in the same payload, or any variant that would
-    need a fresh `product.product` under an *existing* template, is
-    *not* auto-created -- Odoo variant generation for a multi-variant
-    template is driven by `attribute_line_ids`, which no accepted
-    document in this project specifies a mapping for (MBQ-55 §7.2.F
-    defers "richer" variant/media modeling); manufacturing that mapping
-    here would be inventing behaviour beyond this task's own accepted
-    schema. That case instead routes to `blocked_manual_review` /
-    `duplicate_risk`, the same conservative outcome as a blind create.
+    need a fresh product.product under an existing template that
+    already has more than one variant, is not auto-created -- Odoo
+    variant generation for a multi-variant template is driven by
+    attribute_line_ids, which no accepted document in this project
+    specifies a mapping for (MBQ-55 section 7.2.F defers richer variant
+    and media modeling); manufacturing that mapping here would be
+    inventing behaviour beyond this task's own accepted schema. That
+    case instead routes to blocked_manual_review with duplicate_risk,
+    the same conservative outcome as a blind create, and, if the
+    resolved singleton variant is already bound to a different Shopify
+    variant for this store, so does the single-variant case above --
+    never an automatic guess about which of two competing Shopify
+    variants actually owns that Odoo record.
 
-    Control-room revision (comment 4927037139) -- four fixes applied:
-
-    1. **Shopify API client error taxonomy preserved.**
-       `import_product_sync()` catches `ShopifyClientError` and
-       re-raises it as `JobHandlerError(exc.error_class, exc.reason,
-       exc.technical_detail)`, so a throttling/temporary-network/auth
-       failure keeps its accepted DEC-009 error class through
-       `_route_failure()` instead of being reclassified as
-       `unknown_system_error` by the dispatcher's generic exception
-       boundary. `exc.credential_invalid`-triggered store-lifecycle side
-       effects (e.g. marking the store `reconnect_needed`, as
-       `shopify_connector_store.py`'s `action_test_connection()` does)
-       are deliberately **not** replicated here -- that lifecycle
-       mutation belongs to the store/credential services, which this
-       task does not touch; only the classified `error_class`/`reason`/
-       `technical_detail` are preserved.
-    2. **One-product import is atomic.** `_apply_import()`'s entire
-       write sequence (template resolution + every variant resolution)
-       runs inside one `self.env.cr.savepoint()` block (the same
-       mechanism this addon's own tests already use to probe a
-       constraint violation) -- any `JobHandlerError` or Odoo validation
-       failure anywhere in that sequence rolls back every write the call
-       made, so a later-variant failure can never leave an
-       earlier-variant, or the template, partially imported.
-    3. **Malformed payloads are validated explicitly.**
-       `_validate_payload()` runs before any write and raises
-       `JobHandlerError('data_shape_schema_mismatch', ...)` for a
-       missing product node/GID, a missing variant GID, or an unexpected
-       product status -- never a generic Odoo validation/selection
-       error.
-    4. **Silent variant truncation is blocked, not implemented.**
-       `PRODUCT_IMPORT_QUERY` now requests `variants.pageInfo.
-       hasNextPage`; `_validate_payload()` raises
-       `JobHandlerError('data_shape_schema_mismatch', ...)` when it is
-       true. Full multi-page variant pagination remains out of Task
-       010's scope -- a >100-variant product is blocked, never silently
-       partially imported.
+    Control-room revision, comment 4927037139, four fixes applied: the
+    Shopify API client error taxonomy is now preserved, since
+    import_product_sync() catches ShopifyClientError and re-raises it as
+    JobHandlerError, keeping its accepted DEC-009 error class through
+    _route_failure() instead of it being reclassified as
+    unknown_system_error by the dispatcher's generic exception boundary
+    (exc.credential_invalid-triggered store-lifecycle side effects, such
+    as marking the store reconnect_needed the way
+    shopify_connector_store.py's action_test_connection() does, are
+    deliberately not replicated here, since that lifecycle mutation
+    belongs to the store and credential services this task does not
+    touch -- only the classified error_class, reason, and
+    technical_detail are preserved); one-product import is now atomic,
+    since _apply_import()'s entire write sequence runs inside one
+    self.env.cr.savepoint() block, the same mechanism this addon's own
+    tests already use to probe a constraint violation, so any
+    JobHandlerError or Odoo validation failure anywhere in that sequence
+    rolls back every write the call made and a later-variant failure can
+    never leave an earlier-variant or the template partially imported;
+    malformed payloads are now validated explicitly, since
+    _validate_payload() runs before any write and raises JobHandlerError
+    with error_class data_shape_schema_mismatch for a missing product
+    node or GID, a missing variant GID, or an unexpected product status,
+    never a generic Odoo validation or selection error; and silent
+    variant truncation is now blocked rather than implemented, since
+    PRODUCT_IMPORT_QUERY now requests variants.pageInfo.hasNextPage and
+    _validate_payload() raises the same data_shape_schema_mismatch class
+    when it is true, so a product with more than 100 variants is blocked
+    rather than silently partially imported (full multi-page variant
+    pagination remains out of Task 010's own scope).
     """
 
     _name = 'shopify.connector.product.importer'
@@ -316,18 +332,61 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             VariantBinding = self.env['shopify.connector.product.variant.binding']
             variant_bindings = VariantBinding.browse()
             for index, variant_payload in enumerate(variants):
-                auto_variant = False
-                if template_just_created and index == 0:
-                    auto_variant = template_binding.product_template_id.product_variant_id
+                deterministic_variant = self._resolve_deterministic_variant(
+                    template_binding, template_just_created, variants, index,
+                )
                 variant_binding = self._resolve_variant_binding(
                     store, template_binding, variant_payload,
-                    auto_variant=auto_variant,
+                    deterministic_variant=deterministic_variant,
                 )
                 variant_bindings |= variant_binding
             return {
                 'template_binding': template_binding,
                 'variant_bindings': variant_bindings,
             }
+
+    @api.model
+    def _resolve_deterministic_variant(
+        self, template_binding, template_just_created, variants, index,
+    ):
+        """A product.product this call may bind the payload variant at
+        `index` to directly, without running SKU/barcode candidate
+        search, because it is the only Odoo record that Shopify variant
+        could possibly mean -- never a guess among several plausible
+        candidates.
+
+        Two cases (both fixed, conservative, and documented in this
+        class's own docstring):
+
+        - `template_just_created` and `index == 0`: the Odoo-generated
+          singleton variant of a `product.template` this same call just
+          created. Always safe -- the product.product did not exist
+          before this call, so it cannot already be bound to anything.
+        - The resolved template (existing or just created) has exactly
+          one `product.product` variant, and the incoming Shopify
+          payload carries exactly one variant total -- there is no
+          possible ambiguity about which Shopify variant that lone Odoo
+          variant corresponds to (control-room revision, comment
+          4927278355, fix 1). `_resolve_variant_binding()` still checks
+          this candidate is not already bound to a *different* Shopify
+          variant for this store before using it -- this method only
+          identifies the candidate, it never itself decides the bind is
+          safe.
+
+        Returns an empty `product.product` recordset when neither case
+        applies -- the caller must fall back to SKU/barcode candidate
+        search. A payload with more than one variant never takes this
+        shortcut for any index, preserving the conservative "no blind
+        multi-variant creation" rule unchanged.
+        """
+        ProductProduct = self.env['product.product']
+        if template_just_created and index == 0:
+            return template_binding.product_template_id.product_variant_id
+        if len(variants) == 1 and index == 0:
+            template_variants = template_binding.product_template_id.product_variant_ids
+            if len(template_variants) == 1:
+                return template_variants
+        return ProductProduct.browse()
 
     @api.model
     def _resolve_template_binding(self, store, payload):
@@ -445,15 +504,25 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _resolve_variant_binding(
-        self, store, template_binding, variant_payload, auto_variant=False,
+        self, store, template_binding, variant_payload,
+        deterministic_variant=False,
     ):
         """Match-key sequence for one product-variant binding.
 
-        `auto_variant`, when truthy, is the Odoo-generated singleton
-        `product.product` created alongside a brand-new parent template
-        in this same import -- a deterministic association, not a
-        "match" (no candidate search is needed or run; `match_key` stays
-        unset, since no key was actually checked)."""
+        `deterministic_variant`, when truthy, is a `product.product`
+        `_resolve_deterministic_variant()` has already identified as the
+        only Odoo record this Shopify variant could mean (either the
+        Odoo-generated singleton of a brand-new parent template, or the
+        sole existing variant of an already-resolved template when the
+        payload itself carries exactly one variant) -- a deterministic
+        association, not a "match" (no SKU/barcode candidate search is
+        needed or run; `match_key` stays unset, since no key was
+        actually checked). Still guarded here: if that candidate is
+        already bound, for this store, to a *different* Shopify variant,
+        the bind is blocked exactly like a duplicate-risk create --
+        never an automatic guess about which of two competing Shopify
+        variants actually owns that Odoo record.
+        """
         VariantBinding = self.env['shopify.connector.product.variant.binding']
         shopify_gid = variant_payload.get('gid')
         snapshot_vals = {
@@ -473,11 +542,25 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             existing.write(snapshot_vals)
             return existing
 
-        if auto_variant:
+        if deterministic_variant:
+            conflicting = VariantBinding.search([
+                ('store_id', '=', store.id),
+                ('product_variant_id', '=', deterministic_variant.id),
+            ], limit=1)
+            if conflicting:
+                raise JobHandlerError(
+                    'duplicate_risk',
+                    'Product-variant create blocked for Shopify variant '
+                    '%s: the corresponding Odoo product.product is '
+                    'already bound to a different Shopify variant (%s) '
+                    'for this store.' % (
+                        shopify_gid, conflicting.shopify_gid,
+                    ),
+                )
             return VariantBinding.create(dict(
                 snapshot_vals,
                 store_id=store.id, shopify_gid=shopify_gid,
-                product_variant_id=auto_variant.id,
+                product_variant_id=deterministic_variant.id,
                 product_template_binding_id=template_binding.id,
                 matched_at=fields.Datetime.now(),
             ))

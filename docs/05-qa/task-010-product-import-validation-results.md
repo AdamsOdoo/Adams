@@ -2,21 +2,29 @@
 
 ## Summary
 
-**Revised after control-room review, PR still DRAFT — not accepted, not
-merged.** ChatGPT reviewed PR #138 (GitHub comment ID `4927037139`) and
-returned **REVISE before merge**. Four required fixes were applied in
-this revision — see §H below for full detail. §A–§G below describe the
-PR's scope/implementation as of the original session and remain
-accurate except where §H supersedes them (test-file line counts grew;
-no other prior claim changed). This document is the closure-level
-validation-evidence record for Task 010's own scope, mirroring the
-format of
+**Revised again after an actual Odoo.sh runtime red build, PR still
+DRAFT — not accepted, not merged.** This is the first session in which
+a real Odoo 19 runtime actually executed these tests (via Odoo.sh,
+evidence provided by the user, not independently observed by Claude
+through the GitHub API — see §I). ChatGPT reviewed the red-build
+evidence (GitHub comment ID `4927278355`) and returned **REVISE**:
+0 failures / 2 errors of 51 Task 010 tests; full database load 0 failed
+/ 2 error(s) of 218 tests; plus a docutils/RST build-log warning. Three
+required fixes were applied in this revision — see §I below for full
+detail. §A–§H below describe the PR's scope/implementation as of the
+prior sessions and remain accurate except where §I supersedes them
+(test-file counts grew again; the `auto_variant` design decision in §B/
+§C is superseded by the new singleton-variant matching behaviour — see
+§I fix 1). This document is the closure-level validation-evidence
+record for Task 010's own scope, mirroring the format of
 [`task-006c-sync-engine-skeleton-validation-results.md`](./task-006c-sync-engine-skeleton-validation-results.md).
-Unlike Task 006C, **no live Odoo/PostgreSQL runtime was reachable in
-this session** (no `odoo` package installed, no Odoo.sh access, no
-external CI configured for this repository) — every check below is
-**static only**, reported honestly per this task's own final prompt
-§11/§12 and the Task 001A precedent it restates.
+Prior to this session, **no live Odoo/PostgreSQL runtime was reachable**
+(no `odoo` package installed, no Odoo.sh access, no external CI
+configured for this repository) — this session's own environment is
+unchanged in that respect (still no local runtime), but the user has now
+supplied real Odoo.sh build/test evidence, which §I reports honestly,
+including its limits (evidence provided by the user, not independently
+re-run by Claude this session).
 
 This record itself is **docs-only**: it does not modify any addon/code,
 test, manifest, XML/security, migration, or CI file.
@@ -323,11 +331,185 @@ hasNextPage` blocks the import; tests cover all four fixes; this
 document and the PR body honestly state validation is static-only; the
 PR remains draft/unmerged.
 
+## I. Odoo.sh red-build revision (comment ID `4927278355`)
+
+**Decision: REVISE. Not merged. Kept draft.**
+
+### I.1 Evidence (user-provided, not independently re-run by Claude)
+
+- Module `shopify_connector_product`: **0 failures, 2 errors of 51
+  tests.**
+- Full database load: **0 failed, 2 error(s) of 218 tests.**
+- Build-log docutils/RST warning:
+  `<string>:38: (ERROR/3) Unexpected indentation.` and
+  `<string>:43: (WARNING/2) Block quote ends without a blank line;
+  unexpected unindent.`
+- The two errored tests, named by the control-room review:
+  `TestProductImportMatching.test_existing_binding_takes_priority_over_sku_barcode`
+  and `TestProductVariantBinding.test_access_matrix_across_four_groups`.
+
+This is the **first actual Odoo 19 runtime execution evidence** this PR
+has received. Everything reported as "static only" in §D/§H above is
+now superseded for these two specific defects — they are real,
+runtime-confirmed bugs, not merely untested code.
+
+### I.2 Fix 1 — existing-template-binding singleton-variant matching
+
+**Root cause (confirmed real production bug, not a test-only defect):**
+when an existing template binding was already resolved (found by
+Shopify Product GID, not created fresh in this call), the variant
+resolver had no path to bind a single incoming Shopify variant to that
+template's own single, unbound Odoo variant — it only ever ran
+SKU/barcode candidate search, scoped to that template's own variants.
+When the incoming Shopify variant carried an SKU/barcode that did not
+match the template's own singleton variant (e.g. because the Odoo
+variant simply had no `default_code`/`barcode` set, or the Shopify SKU
+was a coincidental decoy value unrelated to it), the importer raised
+`duplicate_risk` even though there was exactly one Odoo record the
+Shopify variant could possibly mean.
+
+**Fix (production logic, not a test-only change):** a new
+`_resolve_deterministic_variant()` method, called from `_apply_import()`
+before each variant resolution, identifies two safe, non-guessing
+cases where SKU/barcode candidate search can be skipped entirely: (1)
+the pre-existing "brand-new template" case (Odoo-generated singleton of
+a template this same call just created), unchanged from before; and (2)
+the new case — an existing (not just-created) template binding, a
+Shopify payload carrying exactly one variant, and that template having
+exactly one Odoo `product.product` variant. `_resolve_variant_binding()`
+still guards this candidate: if it is already bound, for this store, to
+a *different* Shopify variant, the bind is blocked with a classified
+`JobHandlerError('duplicate_risk', ...)` naming the conflicting Shopify
+GID — never a silent rebind, never a guess between two competing
+Shopify variants. A payload with more than one variant never takes this
+shortcut for any index, so the conservative "no blind multi-variant
+creation under an existing template" rule is completely unchanged.
+
+**Tests added/updated** (`test_product_import_matching.py`):
+- `test_existing_binding_takes_priority_over_sku_barcode` (updated,
+  the previously-erroring test) — now asserts the import succeeds and
+  the singleton Odoo variant is correctly bound, with `match_key`
+  unset (deterministic association, not a candidate-search match).
+- `test_existing_template_singleton_variant_already_bound_blocks_safely`
+  (new) — the template's singleton variant already bound to a
+  *different* Shopify variant blocks with `duplicate_risk`, no rebind,
+  pre-existing binding left untouched.
+- `test_existing_template_multi_variant_payload_still_conservative_and_atomic`
+  (new) — a two-variant payload against an existing template: the
+  first variant's SKU legitimately matches (would succeed on its own),
+  but the second is unmatched and blocks the whole import;
+  `self.env.cr.savepoint()` (fix 2 of the prior revision) rolls back
+  the first variant's would-be-successful bind too — proving the
+  singleton shortcut and the atomicity fix compose correctly together.
+
+### I.3 Fix 2 — variant-binding ACL test fixture
+
+**Root cause (test-fixture-only bug, confirmed by the control-room
+review's own diagnosis, not a connector ACL defect):**
+`test_access_matrix_across_four_groups` created its supporting
+`product.template` record via
+`self.env['product.template'].with_user(self.user_admin).create(...)`
+— forcing the connector admin test user's own (real, non-superuser)
+Odoo access context. The connector admin group is not, and must not
+become, a member of Odoo's own Products/Create group — that would be an
+unjustified widening of an Odoo application permission having nothing
+to do with this module's own binding-model ACLs, which is exactly what
+this test is supposed to verify. This is correct Odoo ACL enforcement
+being exposed by a bug in the test's own fixture, not a defect in the
+connector's ACL rows.
+
+**Fix (test file only, `test_product_variant_binding.py`):** the
+supporting `product.template` is now created via plain
+`self.env['product.template'].create(...)` — the normal test
+environment/setup (superuser) context, exactly matching the pattern
+`_make_template_binding()` (used earlier in the very same test) and
+`test_product_template_binding.py`'s own equivalent helper already use.
+**No connector group ACL was touched** — `ir.model.access.csv` is
+unchanged (confirmed by `git status`); no `product.template`/
+`product.product` create right was granted to any
+`shopify_connector_core.group_shopify_connector_*` group.
+
+### I.4 Fix 3 — docutils/RST build-log warning
+
+**Investigation:** installed `docutils` (0.23) locally and
+systematically parsed every module/class/function docstring and both
+manifest `description`/`summary` fields across
+`shopify_connector_product` (and, to rule out a `shopify_connector_core`
+source given "Do not edit `shopify_connector_core`" makes that
+irrelevant to fix either way, checked there too) with
+`docutils.parsers.rst.Parser` directly. **No exact reproduction of
+`<string>:38`/`<string>:43` was found** — every current docstring/
+manifest field in `shopify_connector_product` parsed cleanly under
+strict RST parsing before this fix, and the one warning found in
+`shopify_connector_core` (`shopify_connector_job.py::_claim_for_dispatch`,
+an unrelated inline-literal warning at line 1) does not match either.
+This is honestly reported as **inconclusive** — the exact Odoo.sh
+rendering pipeline (which may differ from bare `docutils.core.
+publish_string`, e.g. via `pypandoc` or a different settings profile)
+was not available to reproduce locally.
+
+**Fix applied per the final prompt's own explicit fallback instruction**
+("if uncertain, simplify the manifest description and any long
+RST-heavy model docstring... enough to eliminate blockquote/list
+indentation issues"): both `__manifest__.py`'s `description` field and
+`shopify_connector_product_importer.py`'s `ShopifyConnectorProductImporter`
+class docstring (by far the longest, most RST/Markdown-flavored
+docstring in the module — double-backtick literals, a bulleted list, a
+section-title underline, numbered lists with bold lead-ins) were
+rewritten as **plain prose paragraphs only** — no headers, no literal
+markup, no bulleted or numbered lists, no bold/emphasis markers. This
+removes every RST-sensitive construct regardless of the true root
+cause, while preserving every substantive fact the original content
+recorded (DEC-006/DEC-014/MBQ-55 citations, the four control-room-fix
+summaries, the new singleton-variant design decision). **No functional
+behaviour changed** — confirmed by `py_compile`/`pyflakes` clean, and by
+the fact that only docstring/description string literals were edited,
+no executable code. Both new versions were re-verified clean under the
+same local `docutils` parse.
+
+### I.5 Test count and validation status
+
+4 test files, **53 test methods** (up from 51 — 2 new tests added in
+`test_product_import_matching.py`; `test_product_variant_binding.py`'s
+test count is unchanged, only its existing test's fixture was fixed).
+
+**Validation status:** `py_compile`/`pyflakes` clean on every changed
+file; the same source-level mutation/bypass/forbidden-model guards
+re-run clean; the local `docutils` RST scan re-run clean on both
+rewritten strings. **No Odoo runtime was available in this session's
+own sandbox to re-execute the fixed tests** — the fixes are informed by
+real, user-provided Odoo.sh failure evidence (§I.1) and are believed
+correct based on careful tracing of the fixed code against that
+evidence, but **this session does not, and cannot, claim a new green
+Odoo.sh build** — that requires an actual next Odoo.sh run, not
+performed by this session.
+
+**Self-audit (control-room instructions, all confirmed):** no
+`shopify_connector_core` file changed; no file added outside the Task
+010 allowed-file envelope (only 4 pre-existing files modified, zero new
+files); the existing-template + singleton-variant case now succeeds
+(traced by hand against the fixed code, §I.2); an already-bound
+singleton variant blocks safely and classified (`duplicate_risk`,
+§I.2); the existing-template multi-variant case remains conservative
+and atomic (§I.2, third new test); the variant-binding ACL test no
+longer creates `product.template` as a connector-role user (§I.3); no
+connector group received `product.template`/`product.product` create
+rights (`ir.model.access.csv` unchanged); the docutils/RST source was
+investigated and both plausible candidates simplified to plain prose
+(§I.4, root cause not definitively confirmed, honestly reported as
+such); no UI/webhook/OAuth/export/customer/order/inventory/fulfillment
+scope added; no Shopify mutation logic added; tests updated (§I.2);
+this document, AR-036, the handoff, and the PR body all updated; PR
+remains draft/unmerged.
+
 ## Stop condition
 
 Per final prompt §14: this PR is opened as **DRAFT**. It is not marked
 ready for review and not merged. This revision (comment ID
+`4927278355`, following the earlier revision at comment ID
 `4927037139`) does not change that — it remains **DRAFT, unmerged**.
+Runtime validation is **pending the next Odoo.sh build** — this session
+does not claim, and cannot independently confirm, a green result.
 ChatGPT's own separate review is the next required act — see the
 mandatory handoff update
 ([`research-handoff.md`](../01-research/research-handoff.md)) for the
