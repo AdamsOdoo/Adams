@@ -12,6 +12,20 @@
 > does not perform that act.** The gate remains closed, and Task 010
 > remains unauthorized, until ChatGPT explicitly accepts this proposal.
 
+> **Revision note (2026-07-09, PR #137 control-room review, GitHub comment
+> ID `4925370944`) — REVISE before merge.** ChatGPT's decision: this
+> proposal and its referenced final prompt require revision before merge;
+> not marked ready, not merged, Task 010 not authorized, product-domain
+> gate not opened. Five precision gaps in the referenced final prompt were
+> identified and fixed in this revision (manifest dependency; exact field
+> types; explicit `_name`/`_inherit` declarations; a required
+> product-domain enablement gating seam; tests proving that gating) — see
+> the final prompt's own revision note for detail. §3 below is updated so
+> criteria 3/4/5/9/12 are claimed satisfied only against the **revised**
+> final prompt, not the original draft. This document's own status remains
+> **Proposed / Under review, not accepted** — this revision does not open
+> the gate and does not authorize any code.
+
 ## 1. Status
 
 **Proposed / Under review. Not accepted.**
@@ -48,17 +62,38 @@ completeness). Criteria 3, 4, 5, 9, and 12 were **not yet satisfied**
 before this session; this section states, for each, what this session did
 and why it is now satisfied.
 
+**Per control-room review (comment ID `4925370944`): criteria 3, 4, 5, 9,
+and 12 may be claimed satisfied only once all five of the following
+precision preconditions hold in the referenced final prompt — all five now
+do, as of this revision:**
+
+1. ✅ The future manifest's `depends` is exact: `['shopify_connector_core',
+   'product']` (final prompt §3).
+2. ✅ Every field type is exact: `fields.Text`/`fields.Float`, no "Char or
+   Text"/"Monetary or Float" ambiguity, no unauthorized `Monetary`/currency
+   field (final prompt §7.2).
+3. ✅ Both concrete binding models explicitly declare `_name` **and**
+   `_inherit` (final prompt §7.1/§7.2).
+4. ✅ The product-domain enablement gating seam is exact: a
+   `_domain_flag_for_job_type()` override mapping `product_import_sync` to
+   the already-existing `product_domain_enabled` flag, preserving
+   `super()` for every other `job_type`, declared inside the one allowed
+   importer file, zero `shopify_connector_core` edits (final prompt §9).
+5. ✅ Tests cover product-domain gating: cannot-start-when-disabled,
+   cannot-start-when-settings-missing, can-start-when-enabled, and
+   `core_dispatch_selftest` preservation (final prompt §10).
+
 | # | Criterion | Satisfied before this session? | Satisfied by this session? | Evidence | Remaining risk |
 | --- | --- | --- | --- | --- | --- |
 | 1 | PR #135 merged and conclusions accepted | Yes | Unchanged | `pull_request_read` confirms PR #135 `merged: true`; AR-033 Accepted | None — a standing fact |
 | 2 | MBQ-55 product-template/variant portion accepted/closed | Yes | Unchanged | PR #136 acceptance, comment ID `4924917266` | None for this portion; customer/order portions remain separately open (unaffected) |
-| 3 | Final prompt has exact file/model/field names | No | **Yes** | [`task-010-product-import-final-implementation-prompt.md`](./task-010-product-import-final-implementation-prompt.md) §3, §7 fixes exact model names (`shopify.connector.product.template.binding`, `shopify.connector.product.variant.binding`), exact file names, and the exact field list, all converted from the accepted MBQ-55 proposal without re-deriving it | Low — the prompt is drafted, not yet exercised by an implementation session; a future session could still discover a field gap during coding, per §8 below |
-| 4 | Exact allowed/forbidden files defined | No | **Yes** | Final prompt §3 (allowed, exact list) and §4 (forbidden, exact list) | Low — same as criterion 3; the implementing session must still self-audit its own diff against this exact list |
+| 3 | Final prompt has exact file/model/field names | No | **Yes** | [`task-010-product-import-final-implementation-prompt.md`](./task-010-product-import-final-implementation-prompt.md) §3, §7 fixes exact model names (`shopify.connector.product.template.binding`, `shopify.connector.product.variant.binding`), each with an explicit `_name`/`_inherit` declaration; exact file names; the exact manifest dependency (`['shopify_connector_core', 'product']`); and the exact field list with exact Odoo field types (`fields.Text`/`fields.Float`, no ambiguous choices, no unauthorized `Monetary`), all converted from the accepted MBQ-55 proposal without re-deriving it — **precision gaps found and fixed on control-room review, comment ID `4925370944`** | Low — the prompt is drafted, not yet exercised by an implementation session; a future session could still discover a field gap during coding, per §8 below |
+| 4 | Exact allowed/forbidden files defined | No | **Yes** | Final prompt §3 (allowed, exact list) and §4 (forbidden, exact list — now naming all **three** narrow `shopify_connector_core` extension seams exactly, not two, per the control-room-review fix) | Low — same as criterion 3; the implementing session must still self-audit its own diff against this exact list |
 | 5 | Dedup thresholds fixed or explicitly scoped as in-task decision | No | **Yes** | Final prompt §8 fixes exact MVP thresholds (existing binding / single-candidate SKU-or-barcode / confident no-match / ambiguous / blind), explicitly grounded in the already-accepted DEC-014 point H two-tier gate — not a new architecture decision, a narrow conversion of an already-accepted policy into exact MVP numbers/conditions | Low — thresholds are conservative by design (ambiguous and blind both route to manual review, never create); a future session could still find the "single-candidate" rule too strict or too loose once exercised against real data, which is why VAL-B2 remains explicitly out of this task's scope (§6 below) |
 | 6 | No export/update scope | Yes | Unchanged | `task-010-product-import-proposed.md`, ChatGPT REVISE on PR #93; restated in final prompt §4/§6 | None — standing requirement, restated not weakened |
 | 7 | No customer/order/inventory/fulfillment scope | Yes | Unchanged | Same source; restated in final prompt §4/§6 | None |
 | 8 | No UI/wizard/webhook/OAuth scope | Yes | Unchanged | Same source; restated in final prompt §4/§6 | None — Matching Center (S6) UI remains separately gated and out of this task's scope |
-| 9 | Tests defined | No | **Yes** | Final prompt §10 confirms the four MBQ-55-proposed test file names and names the exact test cases within each, mapped to every acceptance criterion in `task-010-product-import-proposed.md` | Low — test *names* are fixed; a future session could still need to add narrowly-scoped test helper code within an allowed file, which the final prompt's allowed-files list already accommodates |
+| 9 | Tests defined | No | **Yes** | Final prompt §10 confirms the four MBQ-55-proposed test file names and names the exact test cases within each, mapped to every acceptance criterion in `task-010-product-import-proposed.md` — **now including the required product-domain gating tests added on control-room review** (cannot-start-when-disabled; cannot-start-when-settings-missing; can-start-when-enabled; `core_dispatch_selftest` preservation), placed inside the existing `test_product_import_matching.py`, no new test file added | Low — test *names* are fixed; a future session could still need to add narrowly-scoped test helper code within an allowed file, which the final prompt's allowed-files list already accommodates |
 | 10 | Rollback plan defined | Yes | Unchanged | `task-010-product-import-proposed.md` §Rollback; restated in final prompt §13 | None |
 | 11 | Runtime/live-Shopify dependency explicitly stated as absent/controlled | Yes | Unchanged | `task-010-product-import-proposed.md`; restated in final prompt §6/§11/§12 | None |
 | 12 | Open blockers listed and reconfirmed as non-blocking for Task 010 | No | **Yes** | §7 below performs the point-in-time reconfirmation this criterion requires, against `master-implementation-readiness-checkpoint.md`'s existing blocker-classification table — no new blocker discovered, no existing blocker's classification silently changed | See §7 — one item (checkpoint/resume ownership) required more than a restatement; see below |
@@ -102,13 +137,17 @@ open, unaddressed by this proposal.
 ## 6. Scope and non-scope
 
 **Scope** (Task 010, per the final prompt §5): create
-`shopify_connector_product`; two concrete binding models extending
-`shopify.connector.binding.mixin`; a read-only importer/matching service;
-match-key priority existing binding → SKU → barcode → manual review; the
-MBQ-59 two-tier no-blind-create gate at the exact thresholds fixed in the
-final prompt §8; one new `product_import_sync` job type registered via the
-existing `selection_add`/`_get_handlers()` extension seams, zero edits to
-`shopify_connector_core`.
+`shopify_connector_product` (depending on `shopify_connector_core` and
+Odoo's own `product` module); two concrete binding models, each with an
+explicit `_name`/`_inherit`, extending `shopify.connector.binding.mixin`;
+a read-only importer/matching service; match-key priority existing
+binding → SKU → barcode → manual review; the MBQ-59 two-tier
+no-blind-create gate at the exact thresholds fixed in the final prompt
+§8; one new `product_import_sync` job type registered via three seam
+extensions (`selection_add`, a `_domain_flag_for_job_type()` override
+gating it on the existing `product_domain_enabled` store-settings flag,
+and `_get_handlers()`), all declared inside the one allowed importer file,
+zero edits to `shopify_connector_core`.
 
 **Non-scope** (final prompt §6, restated): no product export/update/write
 of any kind; no `productSet`/bulk-variant mutation; no image/media sync
@@ -190,15 +229,25 @@ true.
    scope — thresholds are validated only against fake/stub payloads in
    this task; any live-data recalibration is a future, separate concern,
    not silently assumed correct here.
-3. **Risk:** the `product_import_sync` job-type registration, though using
-   an already-proven seam, is still this connector's **first** domain
-   job-type registration — an unforeseen interaction with the existing
-   store-state/domain-flag gating in `shopify_connector_job.py` could
-   surface only at implementation or runtime-validation time.
-   **Mitigation:** the final prompt requires zero edits to
-   `shopify_connector_core` itself; any genuine seam insufficiency must be
-   reported as a blocker, not patched into core silently (final prompt
-   §9).
+3. **Risk (identified on control-room review, comment ID `4925370944`,
+   fixed in this revision):** the original draft registered
+   `product_import_sync` via `selection_add`/`_get_handlers()` but did
+   **not** wire it to the existing `_domain_flag_for_job_type()`/
+   `product_domain_enabled` gate — meaning the job type would have started
+   with no product-domain-enablement check at all, silently bypassing the
+   same mechanism every other future domain job type is expected to use.
+   **Mitigation (applied):** the final prompt §9 now requires a third seam
+   extension — a `_domain_flag_for_job_type()` override mapping
+   `product_import_sync` to `product_domain_enabled`, preserving `super()`
+   for every other `job_type` — plus tests proving the gate actually
+   blocks/allows starts correctly and that core job types are unaffected
+   (final prompt §10). This is still this connector's **first** domain
+   job-type registration exercising this gate in practice — some
+   unforeseen interaction could still surface only at implementation or
+   runtime-validation time; the final prompt continues to require zero
+   edits to `shopify_connector_core` itself, and any genuine seam
+   insufficiency discovered during implementation must be reported as a
+   blocker, not patched into core silently.
 4. **Risk:** multi-product enumeration/pagination, deliberately left out
    of this job type's scope (§7 above), could later require a core-engine
    primitive (a checkpoint/cursor field) that this proposal did not
@@ -256,6 +305,12 @@ true.
 - [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
   AR-026, AR-029, AR-031 (gate-opening-act precedent pattern) — access:
   Accessible, this repository, observed 2026-07-09.
+- GitHub PR #137 comment ID `4925370944` (`AdamsOdoo/Adams`) —
+  control-room REVISE decision this revision addresses — access:
+  Accessible, 2026-07-09.
+- `addons/shopify_connector_core/models/shopify_connector_store_settings.py` —
+  read directly this revision, confirms `product_domain_enabled` already
+  exists — access: Accessible, this repository, observed 2026-07-09.
 
 **Next step:** ChatGPT review of this proposal and the referenced final
 prompt. This proposal remains **Proposed / Under review**, not accepted,

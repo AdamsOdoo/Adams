@@ -1,5 +1,96 @@
 # Research Handoff (rolling)
 
+### PR #137 revised after control-room review — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-010-docs-prep-vsijz0` (PR #137), base
+  `Shopify-connector`; revised in place after ChatGPT control-room review
+  (GitHub comment ID `4925370944`); **draft, unmerged.**
+- **What happened:** ChatGPT reviewed PR #137 and returned **REVISE before
+  merge** — not marked ready, not merged, Task 010 not authorized,
+  product-domain gate not opened. Five precision gaps in
+  [`../07-implementation-plan/task-010-product-import-final-implementation-prompt.md`](../07-implementation-plan/task-010-product-import-final-implementation-prompt.md)
+  were identified and fixed this revision:
+  1. **Manifest dependency precision** — the future manifest's `depends`
+     now reads `['shopify_connector_core', 'product']` (was
+     `['shopify_connector_core']` only); `shopify_connector_core` itself
+     depends only on `base`, and Task 010's two binding models link to
+     `product.template`/`product.product`, so `product` must be an
+     explicit dependency. Also fixed stray "two security files" wording
+     to name the one actually-allowed file.
+  2. **Exact field types** — `shopify_option_values` is now
+     `fields.Text`; `shopify_price_snapshot`/
+     `shopify_compare_at_price_snapshot` are now `fields.Float`; removed
+     all "Char or Text"/"Monetary or Float" ambiguity; no currency field
+     authorized.
+  3. **Exact `_name`/`_inherit` declarations** — both concrete binding
+     models now explicitly state `_name = 'shopify.connector.product.
+     template.binding'`/`_name = 'shopify.connector.product.variant.
+     binding'` alongside `_inherit = 'shopify.connector.binding.mixin'`,
+     not implied through `_inherit` alone.
+  4. **Product-domain enablement gating** — added a required third seam
+     extension (alongside the existing `job_type` `selection_add` and
+     `_get_handlers()` registration, all inside the one already-allowed
+     `shopify_connector_product_importer.py`): a
+     `_domain_flag_for_job_type()` override on `shopify.connector.job`
+     mapping `product_import_sync` to the already-existing
+     `product_domain_enabled` flag on `shopify.connector.store.settings`
+     (confirmed directly this revision), preserving `super()` for every
+     other `job_type` — so the new job type is gated by the same
+     mechanism `shopify.connector.job.write()`'s existing start-running
+     check already implements, instead of silently bypassing it. Zero
+     `shopify_connector_core` edits.
+  5. **Product-domain flag tests** — added required tests (cannot start
+     when `product_domain_enabled` is false; cannot start when no
+     settings record exists; can start when connected and enabled;
+     `core_dispatch_selftest` preservation) inside the already-allowed
+     `test_product_import_matching.py` — no new test file.
+- **Gate-opening proposal:**
+  [`../07-implementation-plan/task-010-product-import-gate-opening-proposal.md`](../07-implementation-plan/task-010-product-import-gate-opening-proposal.md)
+  §3's evidence table, §6 (scope), and §8 (risk 3) updated to reflect the
+  revised final prompt — criteria 3/4/5/9/12 are now claimed satisfied
+  only against the corrected precision. **Status unchanged: Proposed /
+  Under review, not accepted.**
+- **Product-domain implementation gate: still closed.** **Task 010: still
+  unauthorized.** No code, module, model, view, controller, security,
+  manifest, test, or CI file touched.
+- **AR-035:** unchanged row, Status remains **Proposed / Under review, not
+  Accepted** — a new AR-035 Revision Note footnote records this revision
+  in place (mirrors the existing AR-02X footnote pattern), without
+  changing AR-035's own row/status.
+- **Files changed (this revision):**
+  [`../07-implementation-plan/task-010-product-import-final-implementation-prompt.md`](../07-implementation-plan/task-010-product-import-final-implementation-prompt.md),
+  [`../07-implementation-plan/task-010-product-import-gate-opening-proposal.md`](../07-implementation-plan/task-010-product-import-gate-opening-proposal.md),
+  [`../07-implementation-plan/product-domain-gate-criteria-proposal.md`](../07-implementation-plan/product-domain-gate-criteria-proposal.md)
+  (linkage section note only — §3 criteria text unchanged),
+  [`../07-implementation-plan/task-010-product-import-proposed.md`](../07-implementation-plan/task-010-product-import-proposed.md)
+  (linkage section note only), [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  (AR-035 Revision Note footnote added), this handoff entry. No
+  addon/code, test, manifest, XML/security, migration, or CI file
+  touched; no product module of any kind created; `main` and plain `dev`
+  untouched.
+- **Learning feedback loop:** one repeated-issue-relevant pattern
+  captured — a final implementation prompt drafted without directly
+  re-deriving every core gating mechanism from the actual merged code
+  (the original draft registered the new job type without wiring it to
+  the existing `_domain_flag_for_job_type()`/`product_domain_enabled`
+  gate) can silently under-specify a required safety seam; no rule/
+  checklist file changed by this session, logged here for visibility. No
+  new rejected approach (checked `rejected-approaches-log.md` — none
+  applicable). No new technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed.
+- **Stop condition:** final prompt revised per all five required fixes;
+  gate-opening proposal updated, still Proposed/Under review, not
+  Accepted; linkage sections in the gate-criteria doc and Task 010
+  proposed doc updated with non-rewriting revision notes; AR-035 revision
+  footnote added, AR-035's own status unchanged; this handoff entry
+  written; only the six allowed docs files changed; PR #137 left
+  **draft/unmerged**; no merge performed; no implementation gate opened;
+  no product module or code written. **Next step: ChatGPT review.**
+
+---
+
 ### Task 010 final prompt and product-domain gate-opening proposal drafted — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-010-docs-prep-vsijz0`, based on latest

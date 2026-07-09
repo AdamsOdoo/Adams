@@ -348,3 +348,10 @@ remain closed** — this note does not open either, does not change this
 task's Status/Preconditions sections above, and does not authorize any
 code, module, model, view, controller, security, manifest, test, or CI
 file.
+
+**Revision (2026-07-09, PR #137 control-room review, comment ID
+`4925370944`):** ChatGPT required revision before merge; the final prompt
+was revised for manifest-dependency, field-type, model-declaration, and
+product-domain-gating precision (see the final prompt's own revision
+note). Still not issued; Task 010 still unauthorized; both gates still
+closed.

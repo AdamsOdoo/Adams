@@ -25,6 +25,27 @@ DO NOT USE THIS PROMPT UNTIL CHATGPT ACCEPTS THE TASK 010 GATE-OPENING PROPOSAL 
 > and Task 006C
 > ([`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md)).
 
+> **Revision note (2026-07-09, PR #137 control-room review, GitHub comment
+> ID `4925370944`) — REVISE before merge, addressed in this revision.**
+> Five precision gaps were identified and are fixed in this revision: (1)
+> §3's manifest `depends` now includes Odoo's own `product` module
+> explicitly, and the "two security files" wording is corrected to "one"
+> (only `ir.model.access.csv` is allowed); (2) §7.2's imported snapshot
+> fields now name exact Odoo field types (`fields.Text`/`fields.Float`)
+> instead of "Char or Text"/"Monetary or Float", and explicitly forbid a
+> `Monetary`/currency field; (3) §7.1/§7.2 now state each concrete binding
+> model's `_name` explicitly, not implied through `_inherit` alone; (4) §9
+> now requires a third seam extension — a `_domain_flag_for_job_type()`
+> override mapping `product_import_sync` to the already-existing
+> `product_domain_enabled` flag on `shopify.connector.store.settings`
+> (confirmed directly this revision), so the new job type is gated by the
+> same product-domain-enablement mechanism the core `write()` gate already
+> implements, instead of silently bypassing it; (5) §10 now requires tests
+> proving that gating (false / missing-settings / true cases) and
+> `core_dispatch_selftest` preservation. This revision does not change any
+> other section's substance, does not open any gate, and does not
+> authorize any code.
+
 ## How this document will be used (once, and only once, all conditions below are met)
 
 1. ChatGPT reviews and accepts
@@ -88,9 +109,14 @@ has advanced past this commit, the implementing session must:
 
 - `addons/shopify_connector_product/__init__.py` (NEW)
 - `addons/shopify_connector_product/__manifest__.py` (NEW — `depends:
-  ['shopify_connector_core']`, per DEC-008's one-directional dependency
-  DAG; `installable: True`; `application: False`; no `data` entry other
-  than the two security files below)
+  ['shopify_connector_core', 'product']`, per DEC-008's one-directional
+  dependency DAG plus an explicit Odoo `product` dependency — confirmed
+  directly this session that `shopify_connector_core` itself depends only
+  on `base`, and this task's two binding models link to `product.template`
+  and `product.product`, so `shopify_connector_product` must declare
+  `product` as its own explicit dependency rather than relying on it
+  transitively; `installable: True`; `application: False`; no `data` entry
+  other than the one security file below, `security/ir.model.access.csv`)
 - `addons/shopify_connector_product/models/__init__.py` (NEW)
 - `addons/shopify_connector_product/models/shopify_connector_product_template_binding.py`
   (NEW) — the `shopify.connector.product.template.binding` model, §7.1
@@ -103,12 +129,15 @@ has advanced past this commit, the implementing session must:
   `AbstractModel` (no table, no new ACL row) mirroring
   `shopify_connector_readiness_check.py`'s and
   `shopify_connector_job_dispatch.py`'s own `AbstractModel` pattern
-  (confirmed directly this session), **plus** the two narrow
+  (confirmed directly this session), **plus** the three narrow
   extension-seam classes named in §9 (`_inherit =
-  'shopify.connector.job'` for the `job_type` `selection_add`, and
-  `_inherit = 'shopify.connector.job.dispatch'` for the `_get_handlers()`
-  override) — this is the **one** allowed file where those two seam
-  extensions may live; do not add a separate file for them.
+  'shopify.connector.job'` for the `job_type` `selection_add`; a second
+  `_inherit = 'shopify.connector.job'` extension, or the same class, for
+  the `_domain_flag_for_job_type()` override mapping `product_import_sync`
+  to `product_domain_enabled`; and `_inherit =
+  'shopify.connector.job.dispatch'` for the `_get_handlers()` override) —
+  this is the **one** allowed file where those three seam extensions may
+  live; do not add a separate file for them.
 - `addons/shopify_connector_product/security/ir.model.access.csv` (NEW) —
   access rows for the two concrete binding models only, reusing the four
   **existing** `shopify_connector_core` groups
@@ -146,13 +175,15 @@ its PR description, per this prompt's own §9 boundary below.**
 Explicitly forbidden, no exceptions unless ChatGPT explicitly authorizes in
 a separate act:
 
-- Any file under `addons/shopify_connector_core/**` **except** the two
+- Any file under `addons/shopify_connector_core/**` **except** the three
   narrow, already-proven extension-seam edits named in §9 below (a
-  `selection_add` on `shopify.connector.job`'s `job_type` field, and a
+  `selection_add` on `shopify.connector.job`'s `job_type` field; a
+  `_domain_flag_for_job_type()` override on `shopify.connector.job`
+  mapping `product_import_sync` to `product_domain_enabled`; and a
   `_get_handlers()` override on `shopify.connector.job.dispatch`) — no
-  core file may be touched at all; both edits happen exclusively inside
-  the already-listed `shopify_connector_product_importer.py` (§3, §9),
-  using classic Odoo inheritance, never by editing
+  core file may be touched at all; all three edits happen exclusively
+  inside the already-listed `shopify_connector_product_importer.py` (§3,
+  §9), using classic Odoo inheritance, never by editing
   `shopify_connector_core`'s own files directly.
 - Any file under `shopify_connector_sale`, `shopify_connector_customer`,
   `shopify_connector_inventory`, `shopify_connector_fulfillment`, or any
@@ -244,8 +275,13 @@ the deprecated `_sql_constraints` dict.
 
 ### 7.1 `shopify.connector.product.template.binding`
 
-Class `ShopifyConnectorProductTemplateBinding`, `_inherit =
-'shopify.connector.binding.mixin'`.
+Class `ShopifyConnectorProductTemplateBinding`, declaring **both**
+`_name = 'shopify.connector.product.template.binding'` **and**
+`_inherit = 'shopify.connector.binding.mixin'` explicitly (fixed on
+control-room review, comment ID `4925370944` — do not leave `_name`
+implied through `_inherit` alone; this is a **new concrete model**
+extending an `AbstractModel` contract, not a re-opening of an existing
+model, so both attributes must be stated).
 
 - **Inherited from the mixin** (confirmed field set, read directly this
   session): `store_id` (Many2one → `shopify.connector.store`, required,
@@ -274,8 +310,10 @@ Class `ShopifyConnectorProductTemplateBinding`, `_inherit =
 
 ### 7.2 `shopify.connector.product.variant.binding`
 
-Class `ShopifyConnectorProductVariantBinding`, `_inherit =
-'shopify.connector.binding.mixin'`.
+Class `ShopifyConnectorProductVariantBinding`, declaring **both**
+`_name = 'shopify.connector.product.variant.binding'` **and**
+`_inherit = 'shopify.connector.binding.mixin'` explicitly (same fix,
+same reason, as §7.1).
 
 - **Inherited from the mixin:** identical set to §7.1 — here `shopify_gid`
   holds the Shopify **ProductVariant** GID, independent of, and never
@@ -285,12 +323,18 @@ Class `ShopifyConnectorProductVariantBinding`, `_inherit =
   `product_template_binding_id` (Many2one →
   `shopify.connector.product.template.binding`, **required**, index,
   `ondelete='restrict'`).
-- **Imported snapshot fields (readonly):** `shopify_option_values` (Char
-  or Text), `shopify_price_snapshot` (Monetary or Float — read-only
+- **Imported snapshot fields (readonly, exact types — fixed on
+  control-room review, comment ID `4925370944`):** `shopify_option_values`
+  (`fields.Text`), `shopify_price_snapshot` (`fields.Float` — read-only
   snapshot, no write-back, no `price_source_of_truth` enforcement — that
-  belongs to future Task 015), `shopify_compare_at_price_snapshot`
-  (Monetary or Float), `shopify_last_imported_at` (Datetime),
-  `shopify_primary_image_url` (Char).
+  belongs to future Task 015; **not** `Monetary` — no currency field is
+  authorized by this prompt, see below), `shopify_compare_at_price_snapshot`
+  (`fields.Float`, same posture), `shopify_last_imported_at` (`fields.Datetime`),
+  `shopify_primary_image_url` (`fields.Char`). **Do not add a
+  `currency_id`/`Monetary` field of any kind** — a `Monetary` field
+  requires a companion currency field, and no currency field is
+  authorized by this prompt; using `fields.Float` avoids inventing one
+  silently.
 - **SKU/barcode are deliberately not duplicated as new fields.** Matching
   reads the incoming Shopify SKU/barcode and compares against
   `product.product.default_code`/`product.product.barcode` directly
@@ -349,30 +393,57 @@ thresholds:**
 
 ## 9. Job/sync-engine usage
 
-**Strict recommendation: register exactly one product job type via the
-existing, already-proven extension seam — do not build any new cron
-mechanism.**
+**Strict recommendation: register exactly one product job type via three
+already-proven extension seams — do not build any new cron mechanism.**
+Revised on control-room review (comment ID `4925370944`) to add the
+required product-domain enablement gating seam (the third bullet below),
+which the original draft omitted.
 
-- Register **one** new `job_type` Selection value, `product_import_sync`
-  (one job imports/binds one Shopify Product plus all of its variants
-  together, read-only) — added via `selection_add` on
-  `shopify.connector.job`'s existing `job_type` field, through classic
-  Odoo inheritance (`_inherit = 'shopify.connector.job'`), **and** the
-  handler registered via a `_get_handlers()` override on
-  `shopify.connector.job.dispatch` (`_inherit =
-  'shopify.connector.job.dispatch'`, calling `super()._get_handlers()` and
-  adding `'product_import_sync': self._handle_product_import_sync`) — both
-  declared **inside the already-listed
-  `addons/shopify_connector_product/models/shopify_connector_product_importer.py`**
-  (§3) via classic Odoo inheritance, never in a file outside §3's exact
-  allowed-files list, and never by editing `shopify_connector_job.py` or
-  `shopify_connector_job_dispatch.py` themselves. This mirrors the pattern
-  the core model's own docstring anticipates (a domain module extends
-  `_domain_flag_for_job_type()`/registers a `job_type` via classic
-  inheritance) and the accepted, already-demonstrated extension seam
-  (`core_dispatch_selftest`'s own registration is the working precedent)
-  — both confirmed directly this session by reading
-  `shopify_connector_job.py` and `shopify_connector_job_dispatch.py`.
+All three seam extensions below are declared **inside the already-listed
+`addons/shopify_connector_product/models/shopify_connector_product_importer.py`**
+(§3), via classic Odoo inheritance only, never in a file outside §3's
+exact allowed-files list, and never by editing `shopify_connector_job.py`
+or `shopify_connector_job_dispatch.py` themselves:
+
+1. **Register the job type.** Extend `shopify.connector.job` (`_inherit =
+   'shopify.connector.job'`) to add **one** new `job_type` Selection
+   value, `product_import_sync` (one job imports/binds one Shopify
+   Product plus all of its variants together, read-only), via
+   `selection_add` on the existing `job_type` field.
+2. **Gate it on product-domain enablement.** Extend `shopify.connector.job`
+   (same `_inherit`) to override `_domain_flag_for_job_type()`: return
+   `'product_domain_enabled'` when `job_type == 'product_import_sync'`,
+   and `super()._domain_flag_for_job_type(job_type)` for every other
+   `job_type` — never remove or silently override an already-mapped
+   `job_type`, matching the method's own docstring instruction, confirmed
+   directly this session by reading `shopify_connector_job.py`. This is
+   **not optional** — without it, `product_import_sync` jobs would start
+   with no product-domain enablement check at all, silently bypassing the
+   gate every other future domain job type is expected to use. The
+   mapped flag, `product_domain_enabled`, is confirmed directly this
+   session to already exist as `fields.Boolean(default=False)` on
+   `shopify.connector.store.settings`
+   (`shopify_connector_store_settings.py`) — no core field is added by
+   this task. The core gate that consults this mapping already exists
+   and is unmodified by this task: `shopify.connector.job.write()`, on
+   any transition to `state == 'running'`, calls
+   `_domain_flag_for_job_type(job_type)`; if it returns a flag name, the
+   job is blocked unless a `shopify.connector.store.settings` row exists
+   for that store **and** that row's flag field is true (confirmed
+   directly this session by reading `shopify_connector_job.py`'s
+   `write()` method) — a blocked start is routed by
+   `shopify_connector_job_dispatch.py`'s existing `_start_running()` to
+   `failed_retryable`/`odoo_validation_configuration`, unmodified by this
+   task.
+3. **Register the handler.** Extend `shopify.connector.job.dispatch`
+   (`_inherit = 'shopify.connector.job.dispatch'`) to override
+   `_get_handlers()`: call `super()._get_handlers()` and add
+   `'product_import_sync': self._handle_product_import_sync` to the
+   returned mapping — mirrors the accepted, already-demonstrated
+   extension seam (`core_dispatch_selftest`'s own registration is the
+   working precedent), confirmed directly this session by reading
+   `shopify_connector_job_dispatch.py`.
+
 - The existing, already-merged, generic `ir.cron`-driven drain loop
   (`shopify_connector_cron_drain.xml`, core-owned) already claims and
   dispatches **any** registered `job_type` — Task 010 does **not** need
@@ -439,6 +510,29 @@ Exact test files (per §3) and their required test cases:
 - The importer constructs **zero** Shopify mutation calls — a
   source-level test asserting the fake/stub API client double never
   receives anything but read/query calls.
+- **Product-domain gating (added on control-room review, comment ID
+  `4925370944`) — required, exact:**
+  - A `product_import_sync` job **cannot** transition to `running` when
+    a `shopify.connector.store.settings` row exists for its store with
+    `product_domain_enabled = False` — asserts the existing
+    `ValidationError`/`failed_retryable`/`odoo_validation_configuration`
+    routing already implemented in `shopify_connector_job.py`'s
+    `write()` and `shopify_connector_job_dispatch.py`'s
+    `_start_running()`, both unmodified by this task.
+  - A `product_import_sync` job **cannot** transition to `running` when
+    **no** `shopify.connector.store.settings` row exists at all for its
+    store (same routing as above — `not settings` is falsy exactly like
+    `not settings[flag_name]`).
+  - A `product_import_sync` job **can** transition to `running` when the
+    store is `connected` **and** its settings row has
+    `product_domain_enabled = True`.
+  - The `_domain_flag_for_job_type()` override preserves every
+    pre-existing core `job_type`'s behavior (`core_readiness_check`,
+    `core_manual_maintenance`, `core_test_connection`,
+    `core_dispatch_selftest` each still map to `None`, via `super()`) —
+    a regression test proving `core_dispatch_selftest` still dispatches
+    successfully with `shopify_connector_product` installed, unchanged
+    from its `shopify_connector_core`-only behavior.
 
 **`test_product_duplicate_prevention.py`:**
 - No automated create without a confident match or confident no-match, per
@@ -545,9 +639,11 @@ Product binding schema: see §7. Dedup thresholds: see §8 (fixed, an
 in-task decision consistent with DEC-014 point H — do not re-derive or
 weaken).
 Job/sync-engine usage: see §9 (product_import_sync job type via
-selection_add + _get_handlers() override, both declared inside
-shopify_connector_product_importer.py only, zero edits to
-shopify_connector_core).
+selection_add; product-domain gating via a _domain_flag_for_job_type()
+override mapping product_import_sync -> product_domain_enabled, preserving
+super() for every other job_type; handler via _get_handlers() override —
+all three declared inside shopify_connector_product_importer.py only,
+zero edits to shopify_connector_core).
 Tests required (exact): see §10.
 Static checks: see §11. Runtime checks if available: see §12.
 Rollback notes: see §13.
@@ -567,10 +663,11 @@ Explicit hard constraints (restate in the PR body before finishing):
   of any kind anywhere in the diff.
 - No customer/order/inventory/fulfillment logic of any kind.
 - No UI, view, menu, action, wizard, webhook, or OAuth file of any kind.
-- No edit to any shopify_connector_core file except the two seam-based
-  registrations named in §9, both declared inside
-  shopify_connector_product_importer.py only, via classic Odoo
-  inheritance.
+- No edit to any shopify_connector_core file except the three seam-based
+  registrations named in §9 (job_type selection_add,
+  _domain_flag_for_job_type() override, _get_handlers() override), all
+  declared inside shopify_connector_product_importer.py only, via classic
+  Odoo inheritance.
 - VAL-B2, MBQ-05, TD-002, the fulfillment API model, Lite/Full packaging,
   and the multi-server concurrency proof requirement remain exactly as
   open as before this task — none is touched, resolved, or narrowed.
@@ -649,3 +746,14 @@ open the PR as DRAFT, then STOP. Do not start Task 011/012/013/014, Task
   [`task-006c-sync-engine-skeleton-final-prompt.md`](./task-006c-sync-engine-skeleton-final-prompt.md) —
   structural pattern this document mirrors — access: Accessible, this
   repository, observed 2026-07-09.
+- **Revision evidence (2026-07-09, PR #137 control-room review, comment ID
+  `4925370944`):** `addons/shopify_connector_core/models/shopify_connector_store_settings.py`
+  — read directly this revision, confirms `product_domain_enabled =
+  fields.Boolean(default=False)` already exists on
+  `shopify.connector.store.settings`, unmodified by this task.
+  `addons/shopify_connector_core/models/shopify_connector_job.py` — re-read
+  directly this revision, confirms `write()`'s `state -> 'running'` gate
+  already calls `_domain_flag_for_job_type(job_type)` and, when it returns
+  a flag name, blocks the start unless a matching, truthy
+  `shopify.connector.store.settings` row exists for the store — access:
+  Accessible, this repository, observed 2026-07-09.

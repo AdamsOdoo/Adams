@@ -198,6 +198,15 @@ does not itself perform that act, does not mark any criterion in §3 above
 as ChatGPT-confirmed satisfied, and does not authorize Task 010 or any
 code of any kind.
 
+**Revision note (2026-07-09, PR #137 control-room review, comment ID
+`4925370944`):** ChatGPT reviewed the linked pairing and required revision
+before merge — five precision gaps in the final prompt (manifest
+dependency, exact field types, exact `_name`/`_inherit` declarations, a
+required product-domain enablement gating seam, and tests covering it)
+were fixed; both linked documents were revised accordingly. This does not
+change the criteria in §3 above, does not open the gate, and does not mark
+either linked document Accepted.
+
 ---
 
 ## Evidence / references
