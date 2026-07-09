@@ -1,5 +1,54 @@
 # Research Handoff (rolling)
 
+### Post-Task 006C — next-task recommendation checkpoint — compact handoff (2026-07-09)
+
+- **Branch / PR:** `claude/task-006c-next-recommendation-n1lp91`, based on
+  latest `Shopify-connector` tip `b97df00a4dc6aa109e0485df881efac343feccdb`
+  (merge-base confirmed equal to branch HEAD this session); docs-only
+  checkpoint PR into `Shopify-connector`, **draft**.
+- **What happened:** PR #132 (Task 006C closure/validation-results docs)
+  confirmed **merged** via `pull_request_read`. Task 006C is now **fully
+  closed** — sync-engine core skeleton (enqueue, `ir.cron` claim/drain
+  dispatch, handler registry, retry scheduler, state-transition helpers)
+  merged and validated per the user-provided Odoo.sh green-build report;
+  no domain sync implemented.
+- **Files changed:** created
+  [`../07-implementation-plan/next-task-recommendation-after-task-006c.md`](../07-implementation-plan/next-task-recommendation-after-task-006c.md)
+  (next-task recommendation doc, comparing five candidate next tasks and
+  recommending one); this handoff entry. No addon/code, test, manifest,
+  XML/security, migration, or CI file touched.
+- **Recommended next step:** a docs-only **multi-server/concurrent-worker
+  concurrency validation *plan*** for the Task 006C job-claim mechanism
+  (`_claim_for_dispatch()`/`try_lock_for_update()`), mirroring
+  `val-b2-closure-plan.md`'s pattern — not code, not the live test itself.
+  Token acquisition/auth-distribution planning (MBQ-05 branch B) is named
+  as a strong parallel/second candidate. Product MVP Task 010 preparation
+  and setup/config UX planning are explicitly **not** recommended next —
+  see the recommendation doc §E for the rework risk of starting either
+  ahead of the concurrency-proof and distribution-architecture questions.
+- **Open blockers preserved, none resolved by this session:** multi-server/
+  concurrent-worker runtime proof, VAL-B2, MBQ-05, TD-002, the fulfillment
+  API model, product first-sync dedup thresholds, token acquisition for
+  many unrelated customers, Lite/Full packaging, checkpoint/resume
+  ownership.
+- **No code touched.** No implementation authorized by this document or
+  this session — the recommendation doc explicitly lists its own
+  non-authorizations.
+- **Learning feedback loop:** no new issues discovered; no new repeated-
+  issue pattern; no rule/checklist change needed; no new rejected
+  approach (checked `rejected-approaches-log.md` RA-003 for relevance to
+  Lite/Full packaging — not re-proposed, only cited as context); no new
+  technical debt.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured (above) · no new rejected approach ·
+  no new technical debt · no repeated-issue escalation needed.
+- **Stop condition:** recommendation doc created; this handoff entry
+  written; all open blockers preserved as open; only the two allowed docs
+  files changed; PR left **draft/unmerged**; no merge performed. Next
+  step: ChatGPT review.
+
+---
+
 ### Task 006C — PR #131 merged, closure/validation-results docs — compact handoff (2026-07-09)
 
 - **Branch / PR:** `claude/task-006c-validation-docs-g4yj8s`; docs-only
