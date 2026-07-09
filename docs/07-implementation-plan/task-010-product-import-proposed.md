@@ -26,7 +26,23 @@
 
 ## Status
 
-**Proposed only. Not authorized.** Scope: product import and variant
+**Post-implementation update (2026-07-09, docs-only):** implemented via
+PR #138, **merged** into `Shopify-connector` (merge commit
+`1f478032d8581a949fa7820847e5c1ab419586b4`), post-merge Odoo.sh runtime
+build **green** (`shopify_connector_core` 187 tests,
+`shopify_connector_product` 61 tests, 0 failed, 0 error(s) of 220
+tests) — see
+[`../05-qa/task-010-product-import-validation-results.md`](../05-qa/task-010-product-import-validation-results.md)
+§K and
+[`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+AR-036 (Accepted). This status note records implementation/merge/
+runtime-green only; it does not rewrite the scope description below,
+which remains the accurate record of what this task was proposed and
+authorized to do.
+
+**Proposed only. Not authorized.** (Original status line, describing
+this document's own state prior to Task 010's authorization and
+implementation — kept for history.) Scope: product import and variant
 binding (Shopify → Odoo) only — **no product export, update, or write
 back to Shopify of any kind.** Depends on: Task 002 (credential
 storage/redaction) and Task 003 (API client/test connection) merged and
