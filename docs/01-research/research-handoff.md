@@ -1,5 +1,40 @@
 # Research Handoff (rolling)
 
+### PR #143 acceptance/status note — docs-only audit/planning closure, merge-safe after PR #142 (2026-07-10)
+
+- **What happened:** ChatGPT reviewed PR #143 (branch
+  `claude/shopify-connector-planning-ue8ew7`, base `Shopify-connector`,
+  the AR-038 audit/planning-closure package described in the entry
+  directly below) via control-room comment
+  [`4932199585`](https://github.com/AdamsOdoo/Adams/pull/143#issuecomment-4932199585)
+  and **accepted it as docs-only audit/planning closure, for merge once
+  final checks pass**. Per that comment's required actions, this session
+  refreshed the branch against the current `Shopify-connector` head (now
+  including **PR #142**'s merge commit
+  `8514d74dba1e606c77489b84165e991b8d9c11da`), kept the PR diff limited to
+  the same ten Markdown planning/register files, and applied the AR-038
+  acceptance patch — see
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  (AR-038 row now **Accepted**, with an AR-038 Acceptance Note).
+- **This note is the current status and remains correct after PR #143 is
+  merged — treat it, not the "Proposed"/draft language in the entry below,
+  as authoritative.** **Merging PR #143 authorizes nothing.** No
+  implementation of any kind is authorized by the merge; the
+  customer-domain gate is **not** opened; **Task 011, 012, 013, 014, and
+  015 remain unauthorized**; **no usable implementation prompt is
+  issued**; decisions D1–D8 remain recommendations/decision inputs for a
+  future session, not final decisions.
+- **The next step after PR #143 merges is *not* implementation.** It is a
+  separate **Task 011 final-prompt / customer-domain gate-opening-proposal
+  session** (per
+  [`../07-implementation-plan/next-gate-readiness-roadmap.md`](../07-implementation-plan/next-gate-readiness-roadmap.md)
+  §2, deciding D1–D8 in §4 during its review), **plus a separate, distinct
+  ChatGPT decision on MBQ-05 branch B** — neither is performed by this
+  note, by PR #143's merge, or by this session.
+- **This session does not merge PR #143, does not start Task 011, does not
+  open any gate, and does not issue or draft any usable implementation
+  prompt.**
+
 ### Project readiness master audit and final pre-implementation roadmap — post-PR #140 planning-closure package (2026-07-09)
 
 - **What happened:** a high-power audit session (explicitly authorized as
