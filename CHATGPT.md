@@ -173,6 +173,18 @@ After an implementation PR merges, create a docs-only closure PR if final valida
 
 Planning docs may accept names, criteria, and boundaries. They must still state clearly that implementation is not authorized unless the gate is opened and a final prompt is issued.
 
+### 8.6 Handoff entries can become stale after later merges
+
+A handoff entry may be correct when written and stale later after a PR is merged or patched. At session start, if GitHub PR state conflicts with `research-handoff.md`, PR bodies, or older prompt text, treat GitHub's current PR metadata and merge commits as the source of truth, then record the documentation conflict for cleanup. Do not infer implementation authorization from either source.
+
+### 8.7 First response after verification must surface conflicts
+
+When a new session begins with state verification, the first state report should explicitly identify any conflict between GitHub truth and repository handoff text. This prevents the next worker prompt from carrying stale instructions into a new loop.
+
+### 8.8 Fable audit starts with reconciliation, not new planning
+
+After a handover/control-room PR merges, the next Fable master audit must first reconcile stale status documents and evidence conflicts before proposing roadmap changes. Example: after PR #141, `research-handoff.md` still contained text saying PR #140 remained unmerged even though GitHub showed PR #140 and PR #141 merged.
+
 ## 9. Worker prompt requirements
 
 Every implementation prompt must include:
@@ -209,12 +221,13 @@ At the start of a new ChatGPT session, verify from GitHub instead of relying on 
 - PR #138 merged status and merge commit.
 - PR #139 merged status and merge commit.
 - PR #140 merged status and merge commit.
-- PR #141 current status. At the time this guide was patched, PR #141 was being prepared for merge; verify whether it has since merged.
+- PR #141 merged status and merge commit.
 - Current open PRs.
 - Current `docs/01-research/research-handoff.md` top entry.
 - Current `docs/05-qa/architecture-review-log.md` latest AR row.
 - Current `docs/05-qa/technical-debt-register.md`.
 - Current `docs/08-release-readiness/` readiness files, if present.
+- Any conflict between GitHub PR state and the handoff/status documents.
 
 ## 11. Current known status at time of this guide
 
@@ -228,7 +241,7 @@ This section is a snapshot and must be verified before use.
 - Customer-domain gate: closed.
 - Task 011 implementation: unauthorized.
 - Task 012/order import: unauthorized.
-- PR #141: this operational guide and handover prompt PR; verify whether it has merged.
+- PR #141: operational guide and handover prompt merged; verify current GitHub state before use.
 
 ## 12. Persistent open points to track
 
@@ -267,6 +280,7 @@ Verify latest register status before acting. Expected open items include:
 - Treat reliability, logs, retries, duplicate prevention, clean configuration, and good UX as first-class features.
 - Never allow code drift beyond authorized files.
 - Always update handoff docs.
+- Record durable process lessons in this file when they would help the next ChatGPT session avoid repeating mistakes.
 
 ## 14. Recommended new-chat startup protocol
 
@@ -277,5 +291,32 @@ Verify latest register status before acting. Expected open items include:
 5. Check open PRs.
 6. Confirm PR #140 merged.
 7. Confirm PR #141 merged.
-8. If PR #141 is merged, start the Fable master audit/planning-closure session or review its PR if already completed.
-9. Do not start implementation until the Fable audit/planning PR is reviewed and ChatGPT explicitly chooses the next gate sequence.
+8. Compare GitHub state against handoff/status text and explicitly record any stale/conflicting source.
+9. If PR #141 is merged, start the Fable master audit/planning-closure session or review its PR if already completed.
+10. Do not start implementation until the Fable audit/planning PR is reviewed and ChatGPT explicitly chooses the next gate sequence.
+
+## 15. Continuous learning loop
+
+At the end of every substantial control-room session, ChatGPT should ask internally: did this session reveal a reusable lesson that would help a future session avoid drift, stale-state errors, unsafe authorization, weak prompting, or repeated review defects?
+
+If yes:
+
+1. Record the lesson in `CHATGPT.md` through a docs-only feature branch and draft PR into `Shopify-connector`.
+2. Keep the lesson concise, stable, and operational. Do not add raw session transcript material.
+3. Preserve source-of-truth hierarchy: if the lesson belongs in `architecture-review-log.md`, `technical-debt-register.md`, `research-handoff.md`, or a task validation file, update or route that file too. `CHATGPT.md` is for operating lessons, not for replacing formal decision records.
+4. Never use a `CHATGPT.md` lesson update to open a gate, authorize implementation, change architecture, close an MBQ, or mark runtime evidence green.
+5. Keep the PR docs-only unless ChatGPT explicitly authorizes a different, separate task.
+
+## 16. Session-specific lessons added after PR #141
+
+### 16.1 GitHub truth supersedes stale handoff text
+
+In the first verification after PR #141, GitHub showed PR #140 and PR #141 merged, while the latest top entry of `docs/01-research/research-handoff.md` still said PR #140 was draft/unmerged and merge was not authorized. The correct response is to trust current GitHub PR metadata for PR state, mark the handoff entry as stale, and route a docs-only cleanup through the next audit/planning pass.
+
+### 16.2 The next Fable phase must include status reconciliation
+
+The Fable master audit/planning-closure prompt should explicitly require reconciliation of stale status docs before roadmap planning. Otherwise Fable may carry forward an obsolete next-session prompt and re-review or re-merge work that is already closed.
+
+### 16.3 Improvement lessons must be committed, not just remembered
+
+When the user asks for durable operating improvement, do not rely on chat memory alone. Preserve the improvement in `CHATGPT.md` via the repository process so the next ChatGPT session can continue smoothly from source-controlled instructions.
