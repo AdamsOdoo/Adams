@@ -69,8 +69,11 @@
   core scaffold, 2026-07-05) through PR #140 (2026-07-09) with no direct
   non-PR commits observed on the first-parent line other than PR-merge
   commits and squash-merge commits carrying their PR number (`git log
-  --first-parent`, run 2026-07-09). PR #112 does not appear on the branch
-  (never merged into it).
+  --first-parent`, run 2026-07-09). PR #112 does not appear on the branch:
+  GitHub confirms it was the original "Record VAL-B2 deferral for Task 004
+  gate (docs-only)" PR, **closed unmerged as draft** on 2026-07-07 and
+  superseded in content by the merged PR #113 (`pull_request_read`,
+  2026-07-09: `state: closed`, `merged: false`).
 - **[Fact]** `main` is untouched by this session; no plain `dev` branch ref
   exists on the remote clone used by this session (`git branch -a`).
 
@@ -100,11 +103,20 @@
   manual review) and the MBQ-59 two-tier no-blind-create policy, registered
   through three narrow extension seams with **zero edits to
   `shopify_connector_core`** (manifest description; PR #138).
-- **[Fact]** Post-merge Odoo.sh runtime evidence (user-provided, recorded
-  in `../05-qa/task-010-product-import-validation-results.md` §K):
-  `shopify_connector_core` 187 tests + `shopify_connector_product` 61
-  tests = **0 failed, 0 error(s) of 220 tests**, database
-  `adamsmen-shopify-connector-34704468`, 2026-07-09.
+- **[Fact — as recorded; see the precision flag]** Post-merge Odoo.sh
+  runtime evidence (user-provided build-log figures, recorded in
+  `../05-qa/task-010-product-import-validation-results.md` §K):
+  `shopify_connector_core` "187 tests", `shopify_connector_product`
+  "61 tests", final result "**0 failed, 0 error(s) of 220 tests**",
+  database `adamsmen-shopify-connector-34704468`, 2026-07-09. **Precision
+  flag (OP-43):** the record's own per-module figures do not
+  arithmetically match its total (187 + 61 = 248 ≠ 220), and a static
+  count of `def test_` in the current tree yields 175 + 53 = 228 — the
+  individual numbers are therefore unreconciled build-log figures quoted
+  verbatim; the **green outcome (0 failed, 0 errors)** is the recorded
+  acceptance basis and is what AR-036's acceptance rests on. This audit
+  flags the arithmetic for ChatGPT's awareness; it does not dispute the
+  acceptance.
 - **[Fact]** No `shopify_connector_sale`, inventory, or fulfillment module
   exists; no webhook controller, OAuth file, setup wizard, view, menu, or
   action exists anywhere in the addon tree (directory listing, 2026-07-09).
@@ -123,7 +135,7 @@
   **Accepted** status. AR-036 (Task 010 implementation) and AR-037 (Task
   011 readiness package) each passed recorded REVISE cycles before
   acceptance (AR-036: comments `4927037139`/`4927278355`/`4927455927`,
-  accepted post-merge with the 0/220 runtime evidence; AR-037: REVISE
+  accepted post-merge with the recorded green runtime evidence; AR-037: REVISE
   comment `4928244425`, accepted comment `4928377625`). No AR row is left
   dangling in Proposed/REVISE.
 - **[Fact]** The rejected-approaches log carries 24 binding final
@@ -387,7 +399,37 @@ Checks run against this audit package before commit:
   checklist is a forward-looking template; (iii) the MBQ-05
   parallel-track recommendation was tightened to cite RA-003's revisit
   condition explicitly so it cannot be read as re-proposing a rejected
-  approach.
+  approach; (iv) reconciliation against the independent parallel readers
+  added findings the first draft missed — the MBQ-04 register-row drift
+  and the stale `docs/02-product`/`07`/`08` README "Empty" statuses
+  (folded into OP-24/OP-25), the `quality-feedback-loop.md` §10/§11
+  binding-status ambiguity (new OP-42), a catch-all row for minor
+  per-task residuals so §4's completeness claim is not an overclaim
+  (new OP-41), and a precision correction in the UAT gap analysis (the
+  PR #95 planning package merged after a REVISE cycle but carries no
+  explicit acceptance record — its scenarios are treated as the planning
+  baseline without upgrading their acceptance status). A pre-existing
+  stray cell separator in the AR-037 table row (which made GFM drop that
+  row's Accepted status cell) was also found and repaired,
+  formatting-only, text preserved verbatim; (v) the final reader
+  reconciliation surfaced three more items now carried in the register —
+  the Task 010 test-count arithmetic flag (OP-43), further stale
+  README/backlog statuses folded into OP-25, and additional minor
+  residuals folded into OP-41 (a stale TD-001-era code comment in
+  `test_test_connection.py`; a documented methodology-vs-practice naming
+  drift for competitor deep-dive files) — and PR #112's absence from the
+  branch was positively resolved via GitHub (closed unmerged, superseded
+  by PR #113).
+- **Raised conflict (CLAUDE.md §7.4 vs this session's allowed-files
+  list):** §7.4 requires capturing high-value external excerpts under
+  `/docs/00-source-materials`, but that directory is not on this
+  session's allowed-files list. Per CLAUDE.md's own instruction to raise
+  rather than silently choose, this audit records the conflict explicitly
+  and resolves it in favor of the task's explicit allowed-files list: the
+  fetched official-source findings are recorded with full URLs and access
+  dates in this package (§9, OP rows), and their capture into
+  `00-source-materials` is routed forward as part of OP-44 for the next
+  session whose allowed files include that directory.
 
 ## 8. Explicit non-authorizations
 

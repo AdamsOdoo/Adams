@@ -35,7 +35,7 @@ suite-tested green; it never means the scenario is executable as written.
 | --- | --- | --- | --- |
 | 1 | Connect store successfully | Merged (Tasks 002/003/005; store/credential/test-connection/lifecycle) | U-1, U-2, U-3 (credentials + readiness screens, Groups 4–5) |
 | 2 | Failed credential and recovery | Merged (error classes, `reconnect_needed`, lifecycle rules — DEC-024) | U-1, U-3; U-2 only for the realistic live-failure variant (an invalid-token path was already exercised live in the PR #107 partial validation) |
-| 3 | Import simple product | **Merged (Task 010)** — importer + bindings, 220-test green | U-1, U-2, U-3, U-4 |
+| 3 | Import simple product | **Merged (Task 010)** — importer + bindings, suite green as recorded (§K; OP-43) | U-1, U-2, U-3, U-4 |
 | 4 | Import variant product | **Merged (Task 010)** — variant binding linked to template binding | U-1, U-2, U-3, U-4 |
 | 5 | Import customer and match existing partner | **Not implemented** (Task 011; `shopify_connector_sale` absent) | Task 011 cycle (OP-01/OP-02), then U-1..U-4 |
 | 6 | Import same-currency order | Not implemented (Task 012) | OP-14..OP-17 → Task 012 cycle, then U-1..U-4 |

@@ -13,8 +13,10 @@
   binding; TD-001 Resolved / TD-002 Open; all implementation gates
   exhausted/closed; customer-domain gate criteria accepted as criteria
   only, gate closed), audited the merged addon code read-only
-  (`shopify_connector_core` + `shopify_connector_product`, 0/220
-  runtime-green), verified the Task-011-relevant official facts against
+  (`shopify_connector_core` + `shopify_connector_product`, runtime-green
+  as recorded — 0 failed/0 errors; the record's per-module test-count
+  arithmetic is flagged as OP-43), verified the Task-011-relevant
+  official facts against
   current Shopify/Odoo sources (2026-07-09), closed every safely-closable
   docs-only status gap, and produced the pre-implementation planning
   package below.
