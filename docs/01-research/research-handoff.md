@@ -1,5 +1,48 @@
 # Research Handoff (rolling)
 
+### PR #144 acceptance/status note — REVISE fixes applied, merge-safe (2026-07-10)
+
+- **What happened:** ChatGPT reviewed PR #144 (branch
+  `claude/task-011-readiness-closure-wj4g2c`, base `Shopify-connector`,
+  the AR-039 gate-readiness package described in the entry directly
+  below) via control-room comment
+  [`4932704451`](https://github.com/AdamsOdoo/Adams/pull/144#issuecomment-4932704451)
+  — decision **REVISE before merge**, accepting the package in principle
+  and requiring two fixes, **both applied in the same PR**: (1) the D1
+  email-candidate discovery rule is now explicitly **recall-safe** (no
+  prefilter may exclude a partner whose normalized email equals the
+  incoming normalized email; `'=ilike'` forbidden; the substring
+  `('email', 'ilike', normalized_incoming)` prefilter + mandatory
+  Python-side normalized comparison, or no prefilter at all; applied to
+  both the active and archived-inclusive searches; new
+  wrapped/display-name/mixed-case test expectations added to the final
+  prompt §10 and brief D8); (2) the merge-safety status patch — AR-039
+  is now **Accepted** with an AR-039 Acceptance Note
+  ([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)),
+  the final prompt's usage conditions now distinguish
+  satisfied-by-acceptance/merge from still-unsatisfied conditions, and
+  this note makes the handoff post-merge-safe.
+- **This note is the current status and remains correct after PR #144 is
+  merged — treat it, not the "Proposed" language in the entry below, as
+  authoritative.** **Merging PR #144 authorizes nothing.** The
+  acceptance fixes the final prompt's content as binding — **the prompt
+  is still NOT issued and NOT usable** (its DO-NOT-USE lock is
+  unweakened); **the customer-domain gate remains CLOSED** (the
+  acceptance comment's own words: "Do not open the gate"); **Task 011,
+  012, 013, 014, and 015 remain unauthorized**; **MBQ-05 branch B
+  remains undecided**; no implementation of any kind may start.
+- **The next steps after PR #144 merges are ChatGPT's own distinct
+  acts:** (1) the explicit customer-domain **gate-opening act**,
+  confirming the gate proposal's criterion-12 table as of that date
+  ([`../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md`](../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md)
+  §1/§3); (2) the separate **MBQ-05 branch B** parallel-authorization
+  decision; (3) only after (1), issuing
+  [`../07-implementation-plan/task-011-final-implementation-prompt.md`](../07-implementation-plan/task-011-final-implementation-prompt.md)'s
+  draft prompt text, verbatim, in a **new** Claude Code session. None of
+  these is performed by this note, by the acceptance, or by the merge.
+- **This session does not merge PR #144, does not open any gate, does
+  not issue any prompt, and does not start any implementation.**
+
 ### AR-039 Task 011 final gate-readiness and pre-implementation closure package (2026-07-10)
 
 - **What happened:** the explicitly-authorized high-power gate-readiness

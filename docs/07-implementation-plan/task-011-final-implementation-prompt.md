@@ -2,9 +2,23 @@
 
 DO NOT USE UNTIL CHATGPT REVIEWS, ACCEPTS, EXPLICITLY OPENS THE TASK 011 GATE, AND ISSUES THIS PROMPT.
 
-> **Status: Proposed final prompt — NOT accepted, NOT issued, NOT
-> usable.** Prepared 2026-07-10 by the AR-039 gate-readiness session
-> (Proposed for ChatGPT review). This document converts the **accepted**
+> **Status: Accepted final prompt / NOT issued, NOT usable.** Accepted
+> by ChatGPT via PR #144 control-room review, GitHub comment ID
+> `4932704451` (a REVISE-with-required-fixes review whose two required
+> fixes — the D1 recall-safe candidate-discovery rule and this
+> merge-safety status patch — are applied in this same PR, per that
+> comment's own required actions). **Acceptance fixes this document's
+> content as binding — it is still NOT issued, and the top warning above
+> is unweakened.** The customer-domain gate remains **closed**: the
+> acceptance comment explicitly does not open the gate ("Do not open the
+> gate"), does not issue this prompt, does not authorize Task
+> 011/012/013/014/015, and does not decide MBQ-05 branch B. Issuance
+> remains a distinct, later ChatGPT chat turn in a new Claude Code
+> session, only after the separate, explicit gate-opening act.
+>
+> Originally prepared 2026-07-10 by the AR-039 gate-readiness session
+> (Proposed for ChatGPT review at drafting time — superseded by the
+> acceptance above). This document converts the **accepted**
 > MBQ-55 customer-binding naming/schema proposal
 > ([`mbq-55-customer-binding-naming-schema-proposal.md`](./mbq-55-customer-binding-naming-schema-proposal.md),
 > Accepted, control-room comment `4928377625`, PR #140) and the
@@ -13,32 +27,36 @@ DO NOT USE UNTIL CHATGPT REVIEWS, ACCEPTS, EXPLICITLY OPENS THE TASK 011 GATE, A
 > into a copy-paste-ready `CLAUDE.md` §9 implementation prompt for Task
 > 011, carrying the D1–D8 recommendations of
 > [`task-011-decision-closure-brief.md`](./task-011-decision-closure-brief.md)
-> as **proposed prompt content**. It mirrors the accepted Task 010
-> pattern
+> as prompt content — **now accepted/fixed as binding per the acceptance
+> note above**. It mirrors the accepted Task 010 pattern
 > ([`task-010-product-import-final-implementation-prompt.md`](./task-010-product-import-final-implementation-prompt.md)).
-> **Nothing in this document is binding until ChatGPT accepts it, and
-> nothing is executable until ChatGPT additionally (a) performs the
-> distinct customer-domain gate-opening act and (b) explicitly issues
-> this prompt, verbatim, as its own later chat turn in a new Claude Code
-> session.** The customer-domain gate is **closed** today. Task 011 is
-> **unauthorized** today.
+> **Nothing in this document is executable until ChatGPT additionally
+> (a) performs the distinct customer-domain gate-opening act and
+> (b) explicitly issues this prompt, verbatim, as its own later chat
+> turn in a new Claude Code session.** The customer-domain gate is
+> **closed**. Task 011 is **unauthorized**.
 
 ## How this document will be used
 
-1. **Not yet satisfied** — ChatGPT reviews and accepts this document and
+1. ✅ **Satisfied** — ChatGPT reviewed and accepted this document and
    the companion
    [`task-011-customer-domain-gate-opening-proposal.md`](./task-011-customer-domain-gate-opening-proposal.md)
    (deciding D1–D8 via
-   [`task-011-decision-closure-brief.md`](./task-011-decision-closure-brief.md)
-   in the same review).
-2. **Not yet satisfied** — ChatGPT performs the distinct, explicit
-   **customer-domain gate-opening act** named in
+   [`task-011-decision-closure-brief.md`](./task-011-decision-closure-brief.md))
+   via PR #144 control-room review, comment ID `4932704451` — a
+   REVISE-with-required-fixes review whose two required fixes are
+   applied in the same PR, per that comment's own required actions.
+2. **Not yet satisfied — explicitly NOT performed by the PR #144
+   acceptance** (comment `4932704451`: "Do not open the gate") — ChatGPT
+   performs the distinct, explicit **customer-domain gate-opening act**
+   named in
    [`customer-domain-gate-criteria-proposal.md`](./customer-domain-gate-criteria-proposal.md)
    §4 — the gate opens for exactly one future Task 011 implementation
    session, effective once condition 3 is also met, and closes again the
    moment that session's PR opens as draft.
-3. **Not yet satisfied** — the PR carrying this package has merged into
-   `Shopify-connector`.
+3. **Satisfied once PR #144 merges into `Shopify-connector`** (not
+   merged at the time of this patch — the issuing session verifies the
+   merge itself, not this wording).
 4. **Not yet satisfied** — before pasting the prompt below, the issuing
    session verifies the base placeholder in §2 is still the actual
    current tip of `Shopify-connector`; if the branch has moved, it
@@ -296,13 +314,27 @@ weaken any accepted decision, and do not resolve MBQ-59 project-wide.
 
 1. **Existing binding** for `(store_id, shopify_gid)` → bind/refresh;
    `match_key = 'existing_binding'`.
-2. **Email normalization:** `normalized_incoming =
+2. **Email normalization — candidate discovery must be recall-safe
+   (fixed on control-room review, comment `4932704451`):**
+   `normalized_incoming =
    odoo.tools.email_normalize(payload defaultEmailAddress.emailAddress)`;
    missing/empty/unnormalizable → rule 5. Candidate comparison happens on
    normalized forms on both sides
-   (`email_normalize(partner.email) == normalized_incoming`); a
-   case-insensitive pre-filter search (`'=ilike'`) is permitted for
-   efficiency but the normalized comparison decides.
+   (`email_normalize(partner.email) == normalized_incoming`). Candidate
+   discovery must **not** use any database prefilter that can exclude a
+   partner whose `email_normalize(partner.email)` equals
+   `normalized_incoming` — partner emails may be stored in display-name/
+   wrapped/mixed-case forms (e.g. `"Jane Doe" <Jane.DOE@Example.COM>`)
+   that normalize to the same bare address; missing one would fall
+   through to rule 4 and create a duplicate. Always-safe baseline:
+   search `[('email', '!=', False)]` and compare normalized forms
+   Python-side. A prefilter is permitted **only** if it provably
+   preserves recall — e.g. the substring form
+   `('email', 'ilike', normalized_incoming)` plus the mandatory
+   Python-side normalized comparison. Do **not** use `'=ilike'` (it
+   excludes wrapped/display-name forms). This applies identically to the
+   active-candidate search and rule 7's archived-inclusive search; the
+   Python-side normalized comparison always decides.
 3. **Exactly one active candidate** (`active = True` partners only) whose
    normalized email matches, and that partner has no existing
    customer binding in this store for a different `shopify_gid` → bind;
@@ -470,6 +502,11 @@ Exact test files (§3) and required cases:
 - Exactly-one-active-email match binds with `match_key = 'email'`.
 - Case-folding/normalization: an incoming `Foo@BAR.com` matches a
   partner stored as `foo@bar.com`.
+- **Recall-safety (added on control-room review, comment `4932704451`):**
+  a partner whose `email` is stored in a display-name/wrapped,
+  mixed-case form (e.g. `"Jane Doe" <Jane.DOE@Example.COM>`) is found
+  and bound by an incoming `jane.doe@example.com` — never missed, never
+  a duplicate create.
 - Single candidate already bound to a different Customer GID in-store →
   `blocked_manual_review` / `'binding_conflict'`, no new row.
 - Ambiguous (two active candidates, same normalized email) → **no**
@@ -503,6 +540,13 @@ Exact test files (§3) and required cases:
 **`test_customer_duplicate_prevention.py`:**
 - Re-importing the same Customer GID binds to the existing row — never a
   duplicate partner, never a duplicate binding.
+- **Recall-safety duplicate-prevention proof (added on control-room
+  review, comment `4932704451`):** an existing active partner whose
+  `email` is stored in a wrapped/display-name/mixed-case form that
+  normalizes to the incoming email is matched — the import never falls
+  through to the create path; the same wrapped-form coverage for an
+  **archived** partner via the archived-inclusive search (routes to
+  `'duplicate_risk'`, never creates).
 - Missing/empty email on the automated path → no create;
   `blocked_manual_review` / `'duplicate_risk'`.
 - Archived-only email match → no create, no bind, no un-archive;

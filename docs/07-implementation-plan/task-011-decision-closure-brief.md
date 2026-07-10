@@ -21,6 +21,19 @@
 > [`../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md`](../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md)
 > per `CLAUDE.md` §7.4 (OP-44).
 
+> **Acceptance note (2026-07-10, PR #144 control-room review, comment ID
+> `4932704451` — supersedes the "NOT accepted" wording above, which is
+> preserved as the accurate drafting-time record).** ChatGPT accepted
+> this package with two required fixes, both applied in this same PR:
+> D1's candidate-discovery rule is now explicitly recall-safe (see D1
+> rule 2 — `'=ilike'` forbidden; recall-preserving discovery mandatory
+> for both active and archived-inclusive searches; new test expectations
+> in D8), and the merge-safety status patch is applied. **D1–D8 are
+> thereby fixed as binding content of the accepted final prompt — which
+> remains NOT issued.** This acceptance does not open the customer-domain
+> gate (closed), does not authorize Task 011–015, and does not decide
+> MBQ-05 branch B.
+
 ## 0. How to read this brief
 
 Each section states: the decision question (from
@@ -69,16 +82,33 @@ matches never create a binding row (accepted naming proposal §9, comment
 1. **Existing-binding match.** A `shopify.connector.customer.binding` row
    for `(store_id, shopify_gid)` exists → bind/refresh against its
    `partner_id`; `match_key = 'existing_binding'`. Always checked first.
-2. **Email normalization rule.** `normalized_incoming =
+2. **Email normalization rule — candidate discovery must be
+   recall-safe (revised on control-room review, comment `4932704451`).**
+   `normalized_incoming =
    odoo.tools.mail.email_normalize(<incoming defaultEmailAddress.emailAddress>)`.
    If the incoming email is missing, empty, or fails normalization, the
    record is treated under rule 5 (no automatic key available). Candidate
    comparison is performed on normalized forms on **both** sides
    (`email_normalize(partner.email) == normalized_incoming`) — case
-   folding and whitespace are therefore never a mismatch source. The
-   implementation may pre-filter with a case-insensitive search
-   (`('email', '=ilike', …)`) for efficiency, but the normalized
-   comparison is the deciding test.
+   folding, whitespace, and display-name wrapping are therefore never a
+   mismatch source. **Recall-safety rule:** candidate discovery must not
+   use any database prefilter that can exclude a partner whose
+   `email_normalize(partner.email)` equals `normalized_incoming` — Odoo
+   partner emails may be stored in display-name/wrapped/mixed-case forms
+   (e.g. `"Jane Doe" <Jane.DOE@Example.COM>`) that normalize to the same
+   bare address; a narrowing exact prefilter would miss such a partner
+   and fall through to the rule-4 create path, creating a duplicate. The
+   always-safe baseline is to search `[('email', '!=', False)]` and
+   compare normalized forms Python-side. A database prefilter is
+   permitted **only** if it provably preserves recall — e.g. the
+   substring form `('email', 'ilike', normalized_incoming)` followed by
+   the mandatory Python-side normalized comparison. The exact-match form
+   `'=ilike'` must **not** be used (it excludes wrapped/display-name
+   forms) unless the implementation first proves it cannot reduce recall
+   for normalized-equivalent Odoo email formats. This recall-safety rule
+   applies identically to the **active-candidate search and the rule-7
+   archived-inclusive search**. The Python-side normalized comparison is
+   always the deciding test.
 3. **Exactly one active candidate → automatic match.** Candidate set =
    **active** `res.partner` records (`active = True`; archived partners
    are never automatic candidates) whose normalized email equals
@@ -563,9 +593,14 @@ full per-file case list):**
 2. **`test_customer_import_matching.py`** — positive: existing-binding
    priority beats email; exactly-one-active-email match binds with
    `match_key='email'`; normalization/case-folding (`Foo@BAR.com` matches
-   `foo@bar.com`); create-path address mapping incl. unresolvable-country
-   tolerance (D3); created partner is a person (`is_company=False`) even
-   with a non-empty address-company string (D4). Negative/ambiguous:
+   `foo@bar.com`); **recall-safety (added on control-room review, comment
+   `4932704451`): a partner stored with a display-name/wrapped,
+   mixed-case email (e.g. `"Jane Doe" <Jane.DOE@Example.COM>`) is found
+   and bound by incoming `jane.doe@example.com` — never missed, never a
+   duplicate create**; create-path address mapping incl.
+   unresolvable-country tolerance (D3); created partner is a person
+   (`is_company=False`) even with a non-empty address-company string
+   (D4). Negative/ambiguous:
    two active candidates → **no** binding row, job
    `blocked_manual_review`/`ambiguous_match`, D2 JSON payload complete and
    shape-exact; single candidate already bound in-store to another GID →
@@ -579,10 +614,14 @@ full per-file case list):**
    proof: the fake client double records reads only.
 3. **`test_customer_duplicate_prevention.py`** — re-importing the same
    Customer GID binds to the existing row, never duplicates the partner or
-   the binding; missing/empty email on the automated path → no create,
-   `duplicate_risk` (D1 rule 5); archived-only email match → no create, no
-   bind, no un-archive, `duplicate_risk` with `"active": false` candidate
-   detail (D1 rule 7); no settings flag/config combination bypasses any
+   the binding; **recall-safety proof (comment `4932704451`): a
+   wrapped/display-name-form email on an existing active partner never
+   falls through to the create path, and the same wrapped-form coverage
+   holds for an archived partner via the archived-inclusive search
+   (`duplicate_risk`, never creates)**; missing/empty email on the
+   automated path → no create, `duplicate_risk` (D1 rule 5);
+   archived-only email match → no create, no bind, no un-archive,
+   `duplicate_risk` with `"active": false` candidate detail (D1 rule 7); no settings flag/config combination bypasses any
    D1 rule (no-bypass test); uniqueness constraints hold as the backstop
    (direct-create attempts collide).
 4. **`test_customer_fallback_partner.py`** — field exists on

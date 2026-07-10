@@ -15,6 +15,21 @@
 > package** — it does not itself open the gate, satisfy criteria by
 > fiat, or authorize any code.
 
+> **Acceptance note (2026-07-10, PR #144 control-room review, comment ID
+> `4932704451` — supersedes the "NOT accepted" wording above, which is
+> preserved as the accurate drafting-time record).** ChatGPT accepted
+> this package with two required fixes, both applied in this same PR
+> (see the AR-039 Acceptance Note in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)).
+> With that acceptance, criteria 3/4/5/9/13/14/15's
+> "Satisfied-on-acceptance" status in §2 takes effect once PR #144
+> merges. **The customer-domain gate itself remains CLOSED** — the
+> acceptance comment explicitly does not perform the gate-opening act
+> ("Do not open the gate"); criterion 12's point-in-time confirmation
+> and the distinct, explicit gate-opening act remain outstanding
+> ChatGPT acts (§1/§3). Task 011 remains unauthorized; the final prompt
+> remains not issued.
+
 ## 1. What this proposal asks ChatGPT to do (and not do)
 
 If ChatGPT, on review, (a) accepts

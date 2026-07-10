@@ -11,6 +11,18 @@
 > acts. The customer-domain gate is **closed**; Task 011 is
 > **unauthorized**; no implementation prompt is issued or usable.
 
+> **Acceptance note (2026-07-10, PR #144 control-room review, comment ID
+> `4932704451` — supersedes the "Proposed" wording above, which is
+> preserved as the accurate drafting-time record).** ChatGPT accepted
+> this package with two required fixes, both applied in this same PR
+> (D1 recall-safe candidate discovery; the merge-safety status patch —
+> see the AR-039 Acceptance Note in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)).
+> §3's blocker 1 is thereby closed; blockers 2–4 (merge, the distinct
+> gate-opening act, prompt issuance) remain ChatGPT's own outstanding
+> acts. **No gate is opened, no prompt is issued or usable, Task 011–015
+> remain unauthorized, and MBQ-05 branch B remains undecided.**
+
 ## 1. Implementation-readiness conclusion
 
 **[Recommendation] Ready — Option A.** After ChatGPT reviews and merges
