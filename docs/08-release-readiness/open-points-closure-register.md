@@ -134,6 +134,23 @@ resolved here.
 | OP-44 (source-capture routing) | **Closed this session (docs-only):** 2026-07-10 official excerpts captured in [`../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md`](../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md); the Tier-1 Customer-object gap closed via a dated section in [`../01-research/shopify-official-api-notes.md`](../01-research/shopify-official-api-notes.md) |
 | All other rows (OP-03/04/06/14–23/26–39/41) | Unchanged — re-verified 2026-07-10 as still accurate; no silent closure |
 
+## 3.7 AR-040 session addendum (2026-07-10) — MBQ-05 branch B decision package
+
+> Added by the AR-040 MBQ-05 branch B research/decision-preparation
+> session (docs-only; **Proposed for ChatGPT review**). The §3.1–§3.6 row
+> texts above are preserved unchanged; this addendum is the current
+> delta. Nothing here opens a gate, issues a prompt, or converts a
+> recommendation into a decision. This session did not touch Task 011
+> files/scope in any way.
+
+| ID | 2026-07-10 status delta |
+| --- | --- |
+| OP-05 (MBQ-05 branch B) | **Decision package now complete**, still open (ChatGPT's decision): [`../03-architecture/mbq-05-branch-b-final-decision-brief.md`](../03-architecture/mbq-05-branch-b-final-decision-brief.md) evaluates all four candidates in full (official evidence, compliance/PCD analysis, billing analysis, setup-wizard/Lite-Full/MVP impact, risks, open questions) against fresh 2026-07-10 gap-fill research and a five-claim adversarial verification pass; [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md) is a **Proposed, not accepted** recommendation (hybrid: keep DEC-023 branch A unchanged; designate Public/limited-visibility as the target scalable architecture; do not adopt per-customer custom apps as the standing commercial-scale answer). MBQ-05 branch B remains **Partially routed / Open**, not Resolved, pending ChatGPT's review |
+| OP-40 (PCD posture) | **Compliance/billing analysis completed** in the final decision brief §4/§5: the MBQ-04 encryption-posture tension (PCD Level 2's review-enforced encryption/retention/access-log/incident-response obligations vs. the accepted Task 002 plain-`Char`-plus-ACL, no-encryption-claim credential posture) is explicitly named as a hard prerequisite for any public-app path, requiring its own future DEC — not resolved by this session. Posture decision remains open |
+| OP-45 *(new)* | **Shopify Partner Program Agreement fee schedule / "Enforcement of Shopify's Partner Program Policies" page not yet sourced** — the PPA itself was fetched in full this session (`shopify.com/partners/terms`, "Last updated February 27, 2026," Accessible 2026-07-10, no login wall) and contains no numeric cap on custom-app count, but its fee/revenue-share schedule and the referenced Enforcement page (graduated consequences for policy violations) were not fetched. Needed before finalizing any commercial model under a public-app (B-1/B-2) outcome, or before treating B-3's anti-duplication-clause risk as fully characterized. Class: B + G. Owner/next action: a narrowly-scoped follow-up fetch, authorized separately, if/when a commercial model is being finalized. Can this session close it? **No** |
+| OP-46 *(new)* | **DEC-023 branch-A scope generalization question** — DEC-023 §3.1 accepts Custom Distribution's evidence path for "**a single pilot customer**" (singular); this session's B-4 candidate evaluation surfaced that treating "early/pilot/private customers" (plural, ongoing practice) as already covered by that acceptance is a broader claim than DEC-023 actually made. Not a branch B decision itself, but a prerequisite scope clarification for any hybrid (B-4-style) outcome. Class: B + G. Owner/next action: ChatGPT gives an explicit one-line confirmation (or declines to) whether DEC-023's acceptance extends to multiple simultaneous pilot customers. Can this session close it? **No** — a scope-clarification call is ChatGPT's |
+| All other rows (OP-01–04/06/14–39/41–44) | Unchanged — not touched by this session; re-confirmed accurate as of 2026-07-10 by cross-reference only, no new closure |
+
 ## 4. Cross-check completeness statement
 
 Every open item named in: the PR #140 body's "Open blockers" list, the

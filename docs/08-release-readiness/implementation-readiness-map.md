@@ -108,6 +108,42 @@ openable customer-domain gate.
   ([`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md)
   — not blocking Task 011); every other layer unchanged.
 
+## 4.1 AR-040 session addendum (2026-07-10) — distribution/auth architecture layer
+
+> Added by the AR-040 MBQ-05 branch B research/decision-preparation
+> session. §1–§4 above are preserved unchanged. Current delta, **Proposed
+> for ChatGPT review** (nothing below opens a gate or authorizes any
+> task):
+
+- **§3 "Distribution/auth architecture" layer delta:** the branch B
+  blocking analysis (§4 row) is now followed by a **complete decision
+  package** —
+  [`../03-architecture/mbq-05-branch-b-final-decision-brief.md`](../03-architecture/mbq-05-branch-b-final-decision-brief.md)
+  (full B-1/B-2/B-3/B-4 evaluation, official evidence re-verified and
+  gap-filled 2026-07-10, adversarial verification of five load-bearing
+  claims) and
+  [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
+  (**Proposed, not accepted**). The layer's state moves from "Branch A
+  (one-store evidence) routed only; branch B decision (OP-05) open" to
+  "Branch A unchanged; a fully-evidenced branch B recommendation is
+  ready for ChatGPT review — architecture decision itself still open."
+- **OAuth / token distribution row (§1) delta:** unchanged in status
+  ("No gate exists; Not started") — a decision package now exists to
+  inform the eventual gate, but no gate is opened and no implementation
+  is authorized by this addendum.
+- **Lite/Full packaging row (§1) delta:** unchanged ("Undefined concept;
+  Not started") — the final decision brief's §7 fit-analysis for each
+  candidate is explicitly contingent on OP-23/Q27 being answered first,
+  and does not itself answer it.
+- **New dependency surfaced, not previously named in this map:** the
+  MBQ-04 encryption-posture tension (PCD Level 2's review-enforced
+  obligations vs. the accepted Task 002 plain-`Char`-plus-ACL credential
+  posture) is now an explicit, named prerequisite for any future public-
+  app (B-1/B-2) implementation work — see the final decision brief §4 and
+  §1.1. This does not change MBQ-04's own row/status in
+  [`master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md);
+  it only records the dependency here.
+
 ## 5. Explicit non-authorizations
 
 This map does not open any gate, does not authorize any task listed in §1,

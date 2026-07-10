@@ -33,6 +33,163 @@
 - **Next recommended session:** ChatGPT's own review of this draft PR against the final implementation prompt §3–§14 and the validation-results record, followed by arranging the mandatory live Odoo.sh run before any merge decision — no next Claude Code session is scoped or authorized by this entry.
 - **Stop condition:** Per final prompt §14 — PR opened as **DRAFT**, not marked ready for review, not merged. The customer-domain implementation gate **closes** the moment this PR opens as draft, per the accepted gate-closure rule — no further customer-domain work (and no Task 012/013/014, Task 015, UI, webhook, OAuth, or Lite/Full packaging work) may start in this or any session regardless of this PR's own outcome, until a distinct, future, explicit ChatGPT act authorizes it.
 
+### AR-040 MBQ-05 branch B distribution/auth final decision package (2026-07-10)
+
+- **What happened:** a dedicated, docs-only MBQ-05 branch B research/
+  decision-preparation session (Fable acting as strategic auditor /
+  architecture decision researcher, not as implementation worker,
+  authorized separately from and not interfering with the Task 011
+  implementation gate ChatGPT opened separately) first verified the
+  baseline from GitHub — **PR #144 merged** into `Shopify-connector`
+  (merge commit `8b364aa360cb596dd584bbc8345b790cc7ad20ed`), branch
+  `claude/mbq-05-branch-b-research-w0m0p3` at that same commit, 0 commits
+  ahead, clean working tree — then completed the parallel branch B
+  research/decision task the AR-039 session's own brief recommended
+  (§8 of
+  [`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md)),
+  producing the full MBQ-05 branch B decision package below. A
+  bounded, justified research fan-out (5 parallel gap-fill topics, a
+  4-candidate evaluation pipeline, and a 5-claim adversarial verification
+  pass — all official Shopify sources, all dated 2026-07-10) closed the
+  prior brief's named open items: Built for Shopify eligibility/
+  requirements (confirmed optional, not a listing precondition), the
+  Shopify Partner Program Agreement's accessibility and per-partner
+  custom-app-count limits (fully accessible — "Last updated February 27,
+  2026" — no numeric cap found, an absence-of-evidence finding not a
+  guarantee), App Store listing/ongoing-quality-check obligations (7-day/
+  30-day recurring quality-check regime; 10-point Lighthouse ceiling
+  confirmed as a *baseline* publishing requirement, not solely a Built
+  for Shopify criterion), OAuth mechanics for public vs. custom apps
+  (upgraded DEC-023's cross-organization claim from community-sourced to
+  an officially-grounded elimination-based inference via the
+  client-credentials-grant page's same-organization restriction), and
+  Billing API mechanics (`AppSubscription`/`AppPurchaseOneTime`; custom
+  apps categorically barred from any Shopify billing mechanism, no
+  carve-out).
+- **New files (all docs-only):**
+  [`../03-architecture/mbq-05-branch-b-final-decision-brief.md`](../03-architecture/mbq-05-branch-b-final-decision-brief.md)
+  (full evaluation of B-1 public/limited-visibility, B-2 public/fully-
+  visible, B-3 per-customer custom apps, B-4 hybrid, across official
+  evidence, PCD/compliance analysis, billing/commercial analysis, setup-
+  wizard/Lite-Full/MVP impact, risks, and open questions; candidate
+  comparison table; adversarial verification record for five load-bearing
+  claims, all **CONFIRMED**);
+  [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
+  (**Proposed for ChatGPT review, NOT accepted** — recommends a hybrid
+  trajectory: keep DEC-023 branch A unchanged; designate Public
+  distribution/limited visibility as the target scalable architecture
+  for many-unrelated-commercial-customers, with the limited-vs-fully-
+  visible choice deferred to a later GTM decision; do **not** adopt
+  per-customer custom apps as the standing commercial-scale answer,
+  since its scalability ceiling is officially undocumented and its
+  per-client operational burden is unquantified; treats this as Phase 2+
+  scope strictly under RA-003's own stated revisit condition);
+  [`../07-implementation-plan/mbq-05-branch-b-next-implementation-implications.md`](../07-implementation-plan/mbq-05-branch-b-next-implementation-implications.md)
+  (outcome-conditional implications across OAuth/token acquisition, setup
+  wizard, store-connection UX, compliance webhooks, PCD governance,
+  billing/commercial packaging, Lite/Full packaging, release readiness,
+  and UAT — none triggered by this document).
+- **Status patches (allowed registers/docs only):**
+  `docs/05-qa/architecture-review-log.md` — new **AR-040** row
+  (**Proposed for ChatGPT review**);
+  `docs/03-architecture/master-blueprint-open-questions.md` — MBQ-05 row
+  dated note (decision package prepared; row stays **Partially routed /
+  Open**, not Resolved);
+  `docs/08-release-readiness/open-points-closure-register.md` — new §3.7
+  AR-040 addendum (OP-05/OP-40 status deltas; two new open points, OP-45
+  Partner Program Agreement fee-schedule/Enforcement-page sourcing, OP-46
+  DEC-023 branch-A single-vs-plural-pilot-customer scope clarification);
+  `docs/08-release-readiness/implementation-readiness-map.md` — new §4.1
+  AR-040 addendum (distribution/auth architecture layer delta; MBQ-04
+  dependency named, not resolved);
+  this handoff entry.
+- **What this session does NOT do:** does not implement any code or
+  touch any addon/py/xml/csv/manifest/security/migration/workflow/test/
+  requirements/Docker/CI file (confirmed by `git diff --name-only
+  origin/Shopify-connector...HEAD` before commit — Markdown only); does
+  not authorize OAuth implementation, a setup wizard, App Store
+  packaging, billing integration, or compliance-webhook code of any
+  kind; does not select or adopt a branch B distribution method — DEC-026
+  is **Proposed**, not accepted; does not weaken or reopen RA-003, does
+  not change DEC-023's accepted branch-A scope, does not resolve MBQ-04
+  or OP-23/Q27; does not touch, reference implementation for, or affect
+  in any way the Task 011 implementation gate/branch/files ChatGPT opened
+  separately; does not merge anything; `main` and plain `dev` untouched.
+- **Learning feedback loop:** (a) a same-day (2026-07-10) prior-session
+  capture file already existed with strong official-source coverage —
+  the correct move was a *targeted* gap-fill fan-out (5 topics) rather
+  than a full broad re-research, which kept the research proportionate
+  to what was actually missing while still meeting every "at minimum
+  verify" item the task specified; (b) adversarial verification (5
+  claims, actively attempting refutation before confirming) surfaced a
+  genuine nuance worth preserving — the Protected Customer Data table's
+  "Custom app" (Custom Distribution) vs. "Admin created custom app" rows
+  carry *different* Level 2 answers ("Always available" vs. "Varies by
+  plan"), which must not be conflated when citing DEC-023's evidence
+  path; (c) the OAuth cross-organization claim in DEC-023 §2 was
+  strengthened from an informal Developer-Community-sourced inference to
+  an officially-grounded one (via the client-credentials-grant page's
+  explicit same-organization restriction), but remains an elimination-
+  based inference, not a single directly-quoted Shopify statement —
+  future sessions should keep that precision rather than upgrading it to
+  Fact prematurely; (d) candidate evaluation surfaced an unnamed
+  sub-decision the original brief had not flagged — DEC-023's "a single
+  pilot customer" acceptance language is narrower than the plural
+  "early/pilot/private customers" framing a hybrid (B-4) outcome implies,
+  now logged as new open point OP-46 rather than silently assumed
+  resolved. No new rejected approach (checked against RA-001–RA-024 —
+  nothing proposed here matches; RA-003 explicitly respected via its own
+  revisit condition, not reintroduced or weakened). No new technical debt
+  (nothing deferred that is not already tracked as an open point).
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked (above) · learning captured (above) · no new rejected
+  approach · no new technical debt · only Markdown docs touched
+  (validated via `git diff --name-only` before commit) · no
+  code/XML/CSV/security/addon file changed · `main`/plain `dev`
+  untouched · Task 011 files/branch untouched · draft PR only, no merge
+  · self-review/red-team pass run (12 mandated checks; findings +
+  dispositions in the PR body).
+- **Branch / PR:** `claude/mbq-05-branch-b-research-w0m0p3`, base
+  `Shopify-connector`; draft PR **"MBQ-05 branch B distribution-auth
+  decision package"**. This session authorizes nothing; MBQ-05 branch B
+  remains undecided pending ChatGPT review.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT reviews the draft PR "MBQ-05 branch B distribution-auth decision
+package" (branch claude/mbq-05-branch-b-research-w0m0p3, base
+Shopify-connector) against:
+docs/03-architecture/mbq-05-branch-b-final-decision-brief.md (candidate
+comparison table §2, evidence §3/§6, PCD/compliance analysis §4,
+billing analysis §5, adversarial verification record §8, risks §9, open
+questions §10, "what ChatGPT must decide" §11),
+docs/04-decisions/DEC-026-distribution-auth-branch-b-proposal.md
+(Proposed only — verify it is not marked Accepted and every
+non-authorization in its §8 is intact),
+docs/07-implementation-plan/mbq-05-branch-b-next-implementation-implications.md,
+the new AR-040 row (Proposed) in docs/05-qa/architecture-review-log.md,
+and the register addenda (open-points-closure-register.md §3.7;
+implementation-readiness-map.md §4.1). Confirm: the diff is Markdown-only;
+no OAuth/wizard/billing/webhook code was added; DEC-026 is Proposed, not
+accepted; MBQ-05 branch B remains undecided; RA-003 is not weakened or
+reopened; DEC-023's accepted branch-A scope is unchanged; the Task 011
+implementation branch/files are completely untouched. Then decide: (1)
+accept, revise, or reject DEC-026's hybrid recommendation (or select a
+different candidate/combination); (2) if accepted, separately decide
+whether/when to lift RA-003's Phase-1 deferral for the engineering
+surfaces this unlocks (OAuth, wizard, billing, webhooks) — not requested
+or performed by this package; (3) resolve the MBQ-04 encryption-posture
+tension via its own DEC before any PCD-Level-2-relevant work; (4) answer
+OP-23/Q27 (Lite/Full packaging mechanism); (5) give an explicit
+confirmation on OP-46 (whether DEC-023's "a single pilot customer"
+acceptance extends to multiple simultaneous pilot customers); (6)
+optionally authorize a follow-up task to source the Partner Program
+Agreement's fee schedule and the "Enforcement" page (OP-45). No step here
+authorizes any code, and none of this affects the separately-running Task
+011 implementation gate.
+```
+
 ### PR #144 acceptance/status note — REVISE fixes applied, merge-safe (2026-07-10)
 
 - **What happened:** ChatGPT reviewed PR #144 (branch
