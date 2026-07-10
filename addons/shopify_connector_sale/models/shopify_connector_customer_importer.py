@@ -88,7 +88,7 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def import_customer_sync(self, store, shopify_customer_gid):
+    def import_customer_sync(self, store, shopify_customer_gid, job=False):
         """Fetch one Shopify customer payload and import/match it.
 
         The only method in this file that calls the Shopify API client --
@@ -97,6 +97,12 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
         matching/creation logic and takes a plain, already-normalized
         payload dict, so it can be unit-tested directly against a fake/
         stub payload with no API-client involvement at all.
+
+        `job`, when provided by the dispatcher path
+        (`_handle_customer_import_sync()` below), is threaded through
+        only so an unresolved country/state code can append an
+        informational job-log note (§8.3) -- optional and otherwise
+        unused; direct calls with no `job` behave exactly as before.
 
         A `ShopifyClientError` raised by `execute()` is re-raised as
         `JobHandlerError(exc.error_class, exc.reason,
@@ -113,7 +119,7 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
                 exc.error_class, exc.reason, exc.technical_detail,
             ) from exc
         payload = self._normalize_payload(result)
-        return self._apply_import(store, payload)
+        return self._apply_import(store, payload, job=job)
 
     @api.model
     def _normalize_payload(self, result):
@@ -175,18 +181,25 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _apply_import(self, store, payload):
+    def _apply_import(self, store, payload, job=False):
         """Validate, then match/create/bind one Shopify customer payload
         atomically. Returns the (possibly newly created)
         `shopify.connector.customer.binding` record on success, or
         raises a classified `JobHandlerError` -- never creates a partner
-        or a binding row on any of the blocked paths (§8.1)."""
+        or a binding row on any of the blocked paths (§8.1).
+
+        `job` is optional and defaults to `False` -- direct calls (as
+        every test in this module makes) remain fully usable with no
+        job context; it is threaded through only so the dispatcher path
+        can append an informational job-log note on an unresolved
+        country/state code (§8.3, see `_log_unresolved_address_code()`).
+        """
         self._validate_payload(payload)
         with self.env.cr.savepoint():
-            return self._resolve_customer_binding(store, payload)
+            return self._resolve_customer_binding(store, payload, job=job)
 
     @api.model
-    def _resolve_customer_binding(self, store, payload):
+    def _resolve_customer_binding(self, store, payload, job=False):
         """The full D1 match sequence, in order: existing binding ->
         email normalization -> exactly-one-active-candidate bind
         (guarded against a binding conflict) -> archived-match check ->
@@ -283,7 +296,7 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
         # Rule 4: confident no-match -- eligibility (store connected,
         # sale domain enabled) is already enforced by the unmodified
         # core job-start gate before this handler ever runs.
-        partner = self._create_partner(shopify_gid, payload)
+        partner = self._create_partner(shopify_gid, payload, job=job)
         return CustomerBinding.create(dict(
             snapshot_vals,
             store_id=store.id, shopify_gid=shopify_gid,
@@ -356,7 +369,7 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _create_partner(self, shopify_gid, payload):
+    def _create_partner(self, shopify_gid, payload, job=False):
         """Create a new res.partner for a confident no-match (rule 4).
 
         Always a person: `is_company` is never set (default `False`
@@ -365,7 +378,12 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
         matched partner, never a child partner. Country/state are
         lookup-only (never created); an unresolvable code simply leaves
         that field empty -- address resolution failures never fail the
-        import and never invent records.
+        import and never invent records. When a code was provided but
+        could not be resolved, and this call runs through the
+        dispatcher's job context, an informational job-log note is
+        appended (`_log_unresolved_address_code()` below) -- direct
+        calls with no `job` skip the note, the field is still left
+        empty either way.
         """
         vals = {
             'name': payload.get('display_name') or shopify_gid,
@@ -377,14 +395,22 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
             vals['street2'] = address.get('address2') or False
             vals['city'] = address.get('city') or False
             vals['zip'] = address.get('zip') or False
-            country = self._resolve_country(address.get('country_code'))
+            country_code = address.get('country_code')
+            country = self._resolve_country(country_code)
             if country:
                 vals['country_id'] = country.id
-                state = self._resolve_state(
-                    country, address.get('province_code')
-                )
+                province_code = address.get('province_code')
+                state = self._resolve_state(country, province_code)
                 if state:
                     vals['state_id'] = state.id
+                elif province_code:
+                    self._log_unresolved_address_code(
+                        job, 'province_code', province_code,
+                    )
+            elif country_code:
+                self._log_unresolved_address_code(
+                    job, 'country_code', country_code,
+                )
         return self.env['res.partner'].create(vals)
 
     @api.model
@@ -402,6 +428,37 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
         return self.env['res.country.state'].search([
             ('country_id', '=', country.id), ('code', '=', province_code),
         ], limit=1)
+
+    @api.model
+    def _log_unresolved_address_code(self, job, kind, code):
+        """Informational note for an unresolvable country/state code
+        (§8.3) -- appended only when `_create_partner()` runs through
+        the dispatcher's job context (`job` truthy); a direct
+        `_apply_import(store, payload)` call with no job continues to
+        skip it, exactly as before this note existed. Uses only the
+        existing, sanctioned `job.log._system_append()` path -- no new
+        field, no core edit, no server log write.
+
+        Kept minimal and operator-safe: the human-readable `message`
+        never names the specific code, the partner, or any address/
+        phone value -- only that a code-based lookup was skipped. The
+        bare code itself (a short country/region code, never PII, never
+        a full address, never phone data) is carried in
+        `technical_detail`, the field this project's own convention
+        already reserves for structured/diagnostic detail.
+        """
+        if not job:
+            return
+        label = 'country' if kind == 'country_code' else 'province/state'
+        self.env['shopify.connector.job.log']._system_append(
+            job, 'note',
+            'Customer import: an unresolvable %s code left the '
+            'corresponding partner field empty; no partner field was '
+            'invented and no country/state record was created.' % (
+                label,
+            ),
+            technical_detail='%s=%s' % (kind, code),
+        )
 
 
 # ----------------------------------------------------------------------
@@ -453,7 +510,12 @@ class ShopifyConnectorJobDispatchCustomerExtension(models.AbstractModel):
         `JobHandlerError` it raises propagates unchanged to the
         dispatcher's own `_invoke_handler()`, which already routes it
         via `_route_failure()` -- no duplicate routing logic here.
+
+        `job` itself is also passed through so an unresolved country/
+        state code (§8.3) can append an informational job-log note via
+        the existing sanctioned path -- the only reason this handler
+        now threads `job` into the importer at all.
         """
         self.env['shopify.connector.customer.importer'].import_customer_sync(
-            job.store_id, job.shopify_target_gid,
+            job.store_id, job.shopify_target_gid, job=job,
         )

@@ -272,6 +272,8 @@ class TestCustomerImportMatching(TransactionCase):
         self.assertFalse(partner.child_ids)
 
     def test_create_path_unresolvable_country_leaves_field_empty(self):
+        JobLog = self.env['shopify.connector.job.log']
+        logs_before = JobLog.search_count([])
         payload = self._customer_payload(
             'gid://shopify/Customer/910', email='unresolvable@example.com',
             address={
@@ -280,11 +282,154 @@ class TestCustomerImportMatching(TransactionCase):
                 'province_code': 'ZZ', 'country_code': 'ZZ',
             },
         )
+        # Direct _apply_import(store, payload) call, no job context.
         result = self.Importer._apply_import(self.store, payload)
         partner = result.partner_id
         self.assertFalse(partner.country_id)
         self.assertFalse(partner.state_id)
         self.assertEqual(partner.street, '1 Nowhere Rd')
+        # Import succeeds and requires no job context whatsoever; with
+        # no job to log through, no job-log note is (or could be)
+        # appended -- proves _apply_import(store, payload) remains
+        # fully usable with zero job context.
+        self.assertEqual(JobLog.search_count([]), logs_before)
+
+    def test_create_path_unresolvable_state_leaves_field_empty(self):
+        """Country resolves but the province/state code does not --
+        state_id stays empty, country_id is still set, import
+        succeeds."""
+        payload = self._customer_payload(
+            'gid://shopify/Customer/9102',
+            email='unresolvable-state@example.com',
+            address={
+                'address1': '2 Somewhere Rd', 'address2': None,
+                'city': 'Somewhere', 'zip': '00001',
+                'province_code': 'ZZ', 'country_code': 'US',
+            },
+        )
+        result = self.Importer._apply_import(self.store, payload)
+        partner = result.partner_id
+        self.assertTrue(partner.country_id)
+        self.assertEqual(partner.country_id.code, 'US')
+        self.assertFalse(partner.state_id)
+
+    # ------------------------------------------------------------------
+    # 7b. Unresolved country/state informational job-log note --
+    # appended only through the dispatcher/job path (control-room
+    # review comment 4934451381).
+    # ------------------------------------------------------------------
+
+    def test_unresolved_country_logs_informational_note_via_job_path(self):
+        self.store.write({'state': 'connected'})
+        self.Settings.create({
+            'store_id': self.store.id, 'sale_domain_enabled': True,
+        })
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'customer_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': 'gid://shopify/Customer/920',
+        })
+
+        def fake_execute(self, store, query, variables=None):
+            return {
+                'data': {
+                    'customer': {
+                        'id': 'gid://shopify/Customer/920',
+                        'firstName': 'Un', 'lastName': 'Resolved',
+                        'displayName': 'Un Resolved',
+                        'defaultEmailAddress': {
+                            'emailAddress': 'unresolved-country@example.com',
+                        },
+                        'defaultPhoneNumber': {
+                            'phoneNumber': '+15551234567',
+                        },
+                        'defaultAddress': {
+                            'address1': '1 Test St', 'address2': None,
+                            'city': 'Testville', 'zip': '99999',
+                            'provinceCode': 'ZZ', 'countryCodeV2': 'ZZ',
+                        },
+                        'updatedAt': '2026-07-10T00:00:00Z',
+                    },
+                },
+            }
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            self.Dispatch.run_drain(20)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+
+        JobLog = self.env['shopify.connector.job.log']
+        notes = JobLog.search([
+            ('job_id', '=', job.id), ('event_type', '=', 'note'),
+        ])
+        self.assertEqual(len(notes), 1)
+        note = notes[0]
+        self.assertIn('country', note.message.lower())
+        # Minimal and operator-safe: no phone, no full address, no
+        # Shopify-bound sensitive data (email/phone/street/city) in the
+        # human-readable message.
+        self.assertNotIn('phone', note.message.lower())
+        self.assertNotIn('+15551234567', note.message)
+        self.assertNotIn('1 Test St', note.message)
+        self.assertNotIn('Testville', note.message)
+        self.assertNotIn('unresolved-country@example.com', note.message)
+        self.assertEqual(note.technical_detail, 'country_code=ZZ')
+
+    def test_unresolved_state_logs_informational_note_via_job_path(self):
+        self.store.write({'state': 'connected'})
+        self.Settings.create({
+            'store_id': self.store.id, 'sale_domain_enabled': True,
+        })
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'customer_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': 'gid://shopify/Customer/921',
+        })
+
+        def fake_execute(self, store, query, variables=None):
+            return {
+                'data': {
+                    'customer': {
+                        'id': 'gid://shopify/Customer/921',
+                        'firstName': 'State', 'lastName': 'Unresolved',
+                        'displayName': 'State Unresolved',
+                        'defaultEmailAddress': {
+                            'emailAddress': 'unresolved-state@example.com',
+                        },
+                        'defaultPhoneNumber': None,
+                        'defaultAddress': {
+                            'address1': '2 Test Ave', 'address2': None,
+                            'city': 'Testburg', 'zip': '88888',
+                            'provinceCode': 'ZZ', 'countryCodeV2': 'US',
+                        },
+                        'updatedAt': '2026-07-10T00:00:00Z',
+                    },
+                },
+            }
+
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            self.Dispatch.run_drain(20)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+
+        JobLog = self.env['shopify.connector.job.log']
+        notes = JobLog.search([
+            ('job_id', '=', job.id), ('event_type', '=', 'note'),
+        ])
+        self.assertEqual(len(notes), 1)
+        note = notes[0]
+        self.assertIn('province', note.message.lower())
+        self.assertNotIn('2 Test Ave', note.message)
+        self.assertNotIn('Testburg', note.message)
+        self.assertEqual(note.technical_detail, 'province_code=ZZ')
 
     def test_existing_matched_partner_address_never_written(self):
         partner = self._make_partner(

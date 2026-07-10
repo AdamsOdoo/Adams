@@ -2,15 +2,21 @@
 
 ## Summary
 
-**Draft PR opened, not yet reviewed by ChatGPT.** This is the first
-implementation session for Task 011, executed under the explicit gate
-opened by the customer-domain gate-opening act
-(GitHub comment `4934249603`, PR #144, merge commit
-`8b364aa360cb596dd584bbc8345b790cc7ad20ed`). No live Odoo/PostgreSQL
-runtime was reachable in this session's own environment (no `odoo`
-package installed, no Odoo.sh access, no external CI configured for
-this repository) -- every validation check below is static, honestly
-reported as such, mirroring the format of
+**Revised once, per ChatGPT control-room review of PR #145 (GitHub
+comment ID
+[`4934451381`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934451381)).
+Still draft PR, not yet re-reviewed.** This is the first implementation
+session for Task 011, executed under the explicit gate opened by the
+customer-domain gate-opening act (GitHub comment `4934249603`, PR #144,
+merge commit `8b364aa360cb596dd584bbc8345b790cc7ad20ed`). The first
+submission of this PR omitted the final prompt's required unresolved-
+country/state informational job-log note; that omission was reviewed
+as **not acceptable as-is** and is now fixed -- see §H below for the
+full revision record. No live Odoo/PostgreSQL runtime was reachable in
+this session's own environment (no `odoo` package installed, no
+Odoo.sh access, no external CI configured for this repository) --
+every validation check below is static, honestly reported as such,
+mirroring the format of
 [`task-010-product-import-validation-results.md`](./task-010-product-import-validation-results.md).
 This record itself is **docs-only**: it does not modify any addon/code,
 test, manifest, XML/security, migration, or CI file.
@@ -81,7 +87,14 @@ test, manifest, XML/security, migration, or CI file.
     the new partner's own flat fields; country/state resolved by
     lookup only (never created); unresolvable codes leave the field
     empty without failing the import. Never written on an existing
-    matched partner; no child partner ever created.
+    matched partner; no child partner ever created. **When a provided
+    country/state code cannot be resolved and this call runs through
+    the dispatcher's job context, an informational `event_type='note'`
+    job-log row is appended through the existing sanctioned
+    `job.log._system_append()` path (§H)** -- direct
+    `_apply_import(store, payload)` calls with no job continue to work
+    with zero job context and simply skip the note; the field is left
+    empty either way.
   - Person-only classification (§8.4): `is_company` is never set;
     `defaultAddress.company` (not even requested by the query) is never
     read, mapped, or stored.
@@ -142,29 +155,35 @@ instructions:
    `shopify_connector_product_importer.py`'s identical `title or
    shopify_gid` pattern for `product.template.name`.
 4. **Informational job-log line for unresolved country/state (§8.3)**
-   -- not implemented. The final prompt's prose names this as desired
-   behavior, but `_apply_import(store, payload)` -- mirroring Task
-   010's own established signature convention -- has no `job`
-   parameter to append a log line through, and introducing one would
-   require either a new call-signature or a new job-lookup mechanism
-   neither this task's allowed files nor any accepted document
-   authorizes. The two behavioral guarantees the final prompt actually
-   requires are met without it: an unresolvable country/state leaves
-   the field empty, and the import never fails or invents a record.
-   Flagged here as an honest, narrow scope gap, not silently omitted.
+   -- **implemented**, per the control-room revision in §H below.
+   `import_customer_sync()`/`_apply_import()`/`_create_partner()` each
+   gained an optional `job=False` parameter, threaded through from
+   `_handle_customer_import_sync(job)` only -- `_apply_import(store,
+   payload)` remains fully direct-testable and requires no job context
+   for its every other test. When a provided country or province/state
+   code cannot be resolved by lookup, and a `job` is present,
+   `_create_partner()` appends one informational `event_type='note'`
+   row through the existing, sanctioned
+   `job.log._system_append()` path -- no new field, no core edit, no
+   server log write. The note's `message` is minimal/operator-safe
+   (names only that a code-based lookup was skipped, never the
+   specific code, partner, email, phone, or full address); the bare
+   code itself lives only in `technical_detail`.
 
 ## D. Static validation
 
 No `odoo` package is installed in this environment and no external CI/
-Odoo.sh is reachable from this session -- every check below is static:
+Odoo.sh is reachable from this session -- every check below is static
+(re-run after the §H revision, not only at first submission):
 
-- `python3 -m py_compile` -- clean on every new Python file (11 files:
-  4 `__init__.py`, 3 models, 4 tests).
-- `python3 -m pyflakes` -- clean on all seven substantive new Python
-  files (3 models, 4 tests); the only "unused import" findings are the
-  four `__init__.py` aggregator files, the expected Odoo
-  module-registration pattern (identical to every existing `__init__.py`
-  in `shopify_connector_core`/`shopify_connector_product`).
+- `python3 -m py_compile` -- clean on every changed Python file (the
+  importer and `test_customer_import_matching.py`; the other 9 files
+  from the first submission are unchanged).
+- `python3 -m pyflakes` -- clean on the same changed files; the only
+  "unused import" findings project-wide remain the four `__init__.py`
+  aggregator files, the expected Odoo module-registration pattern
+  (identical to every existing `__init__.py` in
+  `shopify_connector_core`/`shopify_connector_product`).
 - A local `docutils` 0.23 RST parse of every module/class/function
   docstring and the manifest `description`/`summary` fields across
   `shopify_connector_sale` -- **zero `system_message` (warning/error)
@@ -261,12 +280,124 @@ constraints, not weakened:
   further customer-domain work may start regardless of this PR's
   outcome.
 
+## H. Revision after control-room review (comment ID `4934451381`)
+
+**Decision: REVISE before runtime validation / merge review. Not
+merged, kept draft.**
+
+### H.1 What was found
+
+ChatGPT's review confirmed the PR was largely within the accepted
+Task 011 envelope (scope, allowed-file boundary, D1 recall-safety, and
+the honest static-only validation status were all confirmed correct),
+but found one required fix: the final prompt's §8.3 unresolved-
+country/state behavior requires **four** guarantees, not three --
+empty field, import succeeds, no country/state record invented, **and
+an informational job-log line appended**. The first submission met
+only the first three and explicitly did not implement the fourth,
+reasoning that `_apply_import(store, payload)` had no `job` parameter
+to log through. The review held that this reasoning was not
+acceptable as-is, since the allowed importer file can carry an
+optional job-context parameter without any core edit.
+
+### H.2 Fix applied
+
+`shopify_connector_customer_importer.py` only (no other production
+file changed):
+
+- `import_customer_sync(store, shopify_customer_gid, job=False)`,
+  `_apply_import(store, payload, job=False)`,
+  `_resolve_customer_binding(store, payload, job=False)`, and
+  `_create_partner(shopify_gid, payload, job=False)` each gained an
+  optional `job` parameter, defaulting to `False` and threaded through
+  only -- no other behavior changes. Every existing direct test call
+  (`Importer._apply_import(store, payload)` with no `job` argument)
+  continues to work unmodified.
+- `_handle_customer_import_sync(job)` (the dispatcher seam) now passes
+  `job=job` into `import_customer_sync()` -- the only call site that
+  ever supplies a job.
+- A new `_log_unresolved_address_code(job, kind, code)` helper: a
+  no-op when `job` is falsy (direct calls); otherwise appends exactly
+  one `event_type='note'` row via the existing, unmodified
+  `shopify.connector.job.log._system_append()` path -- no new field,
+  no core edit, no server log write (`logging`/`_logger` is not used
+  anywhere in this file). Called from `_create_partner()` when a
+  provided `country_code` fails to resolve, and separately when a
+  provided `province_code` fails to resolve under an already-resolved
+  country -- mirroring the same two distinct failure points named in
+  §8.3.
+- **Message content, kept minimal and operator-safe:** the
+  human-readable `message` names only that a country/province lookup
+  was skipped (`"Customer import: an unresolvable country code left
+  the corresponding partner field empty; ..."` / same for
+  province/state) -- it never repeats the specific code, the partner's
+  name/email, any street/city/zip value, or any phone value. The bare
+  offending code (e.g. `country_code=ZZ`) lives only in
+  `technical_detail`, the field this project's own convention already
+  reserves for structured/diagnostic detail (mirroring the §8.2
+  candidate-evidence payload's own message-vs-technical_detail split).
+
+### H.3 Tests added/updated (`test_customer_import_matching.py`)
+
+- `test_create_path_unresolvable_country_leaves_field_empty` (updated)
+  -- now also asserts the direct, no-job call appends **zero** new
+  `job.log` rows (proving `_apply_import(store, payload)` remains
+  fully usable with no job context, per the review's own requirement).
+- `test_create_path_unresolvable_state_leaves_field_empty` (new) --
+  country resolves (`US`), province code does not (`ZZ`); `state_id`
+  stays empty, `country_id` is set, import succeeds.
+- `test_unresolved_country_logs_informational_note_via_job_path` (new)
+  -- runs a `customer_import_sync` job end-to-end through
+  `Dispatch.run_drain()` against a fake client returning an
+  unresolvable `countryCodeV2`; asserts exactly one `job.log` row with
+  `event_type='note'` exists, `technical_detail == 'country_code=ZZ'`,
+  and the `message` contains neither the fake customer's phone number,
+  street, city, nor email.
+- `test_unresolved_state_logs_informational_note_via_job_path` (new) --
+  same shape for an unresolvable `provinceCode` under a resolving
+  country; asserts `technical_detail == 'province_code=ZZ'` and the
+  `message` contains neither the street nor city value.
+
+Test count: `test_customer_import_matching.py` gained 3 new test
+methods (1 updated, 3 new) in this revision; the other three test
+files are unchanged.
+
+### H.4 Validation status after this revision
+
+Still static only -- no Odoo runtime was reachable in this session
+either time. `python3 -m py_compile` and `python3 -m pyflakes` are
+clean on both changed files; a fresh local `docutils` 0.23 RST scan of
+every docstring/manifest field across the whole addon (not only the
+changed file) re-ran with **zero warnings**; the same source-level
+guards (zero mutation, zero bypass identifier, zero forbidden-model
+reference, zero `customer_fallback_partner_id` read, and a new check
+confirming no `logging`/`_logger` call exists in the importer) were
+re-run and remain clean. **A live Odoo.sh branch-database run of the
+full suite is still mandatory before merge and has still not been
+obtained** -- this revision does not change that requirement.
+
+**Self-audit against the review's own instructions (all confirmed):**
+no `shopify_connector_core`/`shopify_connector_product`/`adams_base`
+file touched; no new model or field added; no server log write added;
+only the existing job/job-log pathway used; `_apply_import(store,
+payload)` remains directly testable and every pre-existing direct-call
+test still passes unmodified (traced by hand -- no runtime available);
+direct calls with no job continue to skip the note; the dispatch/job
+path logs it; the message is minimal and operator-safe with no phone
+data, no full address data, and no other Shopify-bound sensitive data;
+no Shopify write added; no UI/webhook/OAuth/order/product/inventory/
+fulfillment/next-task logic added; this document and the AR-040 row
+both updated to record the actual patched behavior rather than the
+prior "not implemented" framing; PR remains draft, unmerged.
+
 ## Stop condition
 
 Per final prompt §14: this PR is opened as **DRAFT**. It is not marked
-ready for review and not merged. Runtime validation is **pending an
-Odoo.sh build** -- this session does not claim, and cannot independently
-confirm, a green result. ChatGPT's own separate review is the next
-required act -- see the mandatory handoff update
+ready for review and not merged. This revision (comment ID
+`4934451381`) does not change that -- it remains **DRAFT, unmerged**.
+Runtime validation is **pending an Odoo.sh build** -- this session does
+not claim, and cannot independently confirm, a green result. ChatGPT's
+own separate review is the next required act -- see the mandatory
+handoff update
 ([`research-handoff.md`](../01-research/research-handoff.md)) for the
 exact next-session prompt.
