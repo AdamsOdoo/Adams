@@ -1,5 +1,91 @@
 # Research Handoff (rolling)
 
+### AR-042 — MVP planning-completion package (2026-07-10)
+
+- **What happened:** the single authorized Fable planning-completion
+  session (docs-only, high-power research mode per the issued prompt)
+  produced the complete remaining-MVP planning package. Phases:
+  **A** baseline reconciliation (tip `21d59ec` verified; PRs
+  #145/#146/#147 confirmed merged from GitHub; AR-040 stale status
+  reconciled with a documentary note; full planning inventory built);
+  **B** research closure (fresh 2026-07-10 official-source captures for
+  Orders/Inventory/FulfillmentOrders/product-mutations/Partner-Program/
+  PCD+webhooks/Odoo-19-source/versioning-scopes-limits — 24/24
+  load-bearing claims adversarially re-verified + raw-HTML spot checks;
+  **OP-45's fee schedule turned out to be public and is now fully
+  sourced**; encryption-at-rest confirmed a PCD **Level 1**
+  requirement; VAL-B2 and concurrency plans completed as external
+  validations); **C** final architecture + packaging (module map with
+  PD-1..6; DEC-029 Lite/Full two-layer model); **D** implementation
+  packets with locked prompts (Tasks 012/013/014/015, Area 6 "Task
+  016", UI U1, webhook W1; U2/U3+W2 prompts intentionally staged
+  post-predecessor), 24-scenario UAT plan, release execution plan,
+  master plan, completion audit, signoff; plus DEC-027 (pilot scope)
+  and DEC-028 (credential/PCD ladder) proposals and register addenda.
+- **Files changed:** all Markdown (verified via
+  `git diff --name-only origin/Shopify-connector...HEAD` — no
+  code/XML/CSV/manifest/security/migration/workflow/test file).
+  New: captures (00-source-materials), DEC-027/028/029,
+  final-mvp-module-and-dependency-architecture,
+  lite-full-packaging-final-proposal, five task/area packets + UI +
+  webhook packets, final-mvp-uat-plan, release-readiness-execution-plan,
+  implementation-ready-master-plan, mvp-planning-completion-audit,
+  mvp-planning-completion-signoff. Updated (append-only notes):
+  architecture-review-log (AR-040 note + AR-042 row),
+  open-points-closure-register (§3.9), master-blueprint-open-questions
+  (session note), val-b2-closure-plan (§12), concurrency plan (§13),
+  this handoff.
+- **What this session does NOT do:** accepts nothing (every DEC/PD/
+  packet is Proposed, NOT accepted); opens no gate; issues no usable
+  prompt; implements nothing; does not lift RA-003; does not execute
+  VAL-B2/concurrency/UAT/release; does not claim concurrency safety or
+  live-Shopify evidence; `main`/plain `dev` untouched.
+- **Learning feedback loop:** new issues — (1) a WebFetch summarizer
+  hallucinated a "30%" PPA figure during research; caught by raw-HTML
+  grep — lesson recorded in the captures header: load-bearing quotes
+  must be raw-text-verified, never summarizer-trusted; (2) Shopify's
+  own docs carry stale prose in two places (the 2026-07
+  inventory-mutation page still mentions removed CAS fields; the
+  bulk-ops page's rate-limit section) — recorded so future sessions
+  cite the schema, not the prose; repeated patterns — the append-only
+  dated-note register convention followed throughout; the OP-43
+  verbatim-quote rule baked into every packet's validation
+  requirements; rejected approaches — none reintroduced
+  (RA-003/006/009/013/014/018/019/020/022/023 each explicitly honored
+  in the packets); technical debt — none new (TD-002 fix routed to
+  Task 014); architecture concerns — the six PD points and the flagged
+  D-items are surfaced as explicit review calls rather than silent
+  choices.
+- **Quality gate confirmation:** handoff updated (this entry) ·
+  feedback loop checked · learning captured · no new rejected approach
+  · no new technical debt · Markdown-only diff verified · no gate
+  opened · draft PR only, not merged, not marked ready for review.
+- **Stop condition:** branch pushed; draft PR opened into
+  `Shopify-connector`; session stops. No implementation started.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT reviews the draft PR "Complete remaining MVP research and
+implementation planning" (AR-042 package) against
+docs/08-release-readiness/mvp-planning-completion-audit.md,
+mvp-planning-completion-signoff.md, and
+implementation-ready-master-plan.md §1's eleven review calls
+(DEC-027, DEC-028, DEC-029, ARCH PD-1..6, the flagged D-item
+confirmations for Tasks 012/013/014/015/Area 6, and the webhook
+MVP-tail scoping). Decide accept / revise / reject per item; merging
+the PR without named exceptions accepts them as proposed. After
+merging: perform the order-domain gate-opening act (including the
+criterion-12 point-in-time blocker reconfirmation), then issue the
+Task 012 locked prompt from
+docs/07-implementation-plan/task-012-order-import-implementation-packet.md
+§15 verbatim in a new session, stating the verified base SHA. In
+parallel, at ChatGPT's discretion: authorize VAL-B2 execution (human,
+val-b2-closure-plan §12) and the concurrency-plan execution (runtime,
+§13) — both external validations, independent of the Task 012 chain.
+No other work is scoped or authorized by this entry.
+```
+
 ### DEC-026 acceptance / status-refresh patch (2026-07-10)
 
 - **What happened:** ChatGPT explicitly decided to **accept DEC-026's

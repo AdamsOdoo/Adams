@@ -1,0 +1,90 @@
+# Release-Readiness Execution Plan (MVP)
+
+> **Status: Proposed for ChatGPT review. NOT accepted. Nothing here is
+> executed; the merged `mvp-release-readiness-checklist.md` remains the
+> item-level checklist — this plan sequences and operationalizes it.**
+> Produced 2026-07-10 (AR-042 candidate). Execution is
+> **[External validation required]** end-to-end (runtime + live store
+> + human operator).
+
+## 1. Release definition
+
+MVP release = the Full edition (six modules, ARCH §1) at a pinned
+version set, runtime-green, UAT-exited (final-mvp-uat-plan §6),
+distributed under DEC-023 branch A within the DEC-027 pilot scope.
+Lite is released implicitly (subset of the same artifacts).
+
+## 2. Execution sections (each produces evidence into the checklist run)
+
+1. **Installation:** clean-database install of Lite; clean install of
+   Full; install on a database with existing products/partners/orders
+   (brownfield — matching flows exercised); every install: zero
+   errors/warnings attributable to connector modules in the install
+   log (docutils/RST rule from the merged validation records applies);
+   demo data — **none shipped** (decision: connector modules carry no
+   demo data; UAT fixtures are operator-seeded — avoids demo bindings
+   against nonexistent stores).
+2. **Upgrade:** module upgrade (`-u`) across the release's own commit
+   range on a populated database; settings/checkpoint fields additive
+   (no migration scripts expected for MVP — any task introducing one
+   invalidates this line and adds its own tested migration).
+3. **Uninstall/downgrade:** DEC-029 §5 walked exactly: flags-off path
+   (everything survives); Full-module uninstall path (business data
+   survives; binding/mapping tables + cascade-removed domain jobs
+   documented as lost — screenshot evidence); reinstall re-match
+   (deterministic keys re-bind; manual matches redone).
+4. **Permissions:** UAT scenario 24 evidence + ACL-matrix suites green.
+5. **Documentation:** operator install/setup guide; the DEC-028 Rung-1
+   hosting-encryption statement; known-limitations page (§4); the
+   uninstall consequences; the 60-day order-window note; troubleshooting
+   (reading the Error Center; retry semantics).
+6. **Support diagnostics:** the readiness check + job/log export
+   (existing surfaces) documented as the support bundle; no new code.
+7. **Performance:** the concurrency plan §13.2 baseline + UAT §7
+   observations recorded against realistic volumes (1k products / 500
+   orders / 2 locations); budgets set (or explicitly deferred with
+   reasons) by ChatGPT at this step — release hardening (Area 8) owns
+   any resulting optimization tasks.
+8. **Security:** credential redaction suite green (existing);
+   masked-entry/no-read-back re-verified in UI; no-encryption-claim
+   copy audit (grep of views/copy decks); PII redaction lists in
+   place (Task 012 / W1); sudo inventory audit = exactly the named
+   sanctioned elevations (2 merged + D-013-5's third if accepted).
+9. **API versioning:** store pinned 2026-07; the quarterly re-check
+   procedure (MBQ-52) recorded with the next check date (2026-10
+   release: `FULFILLMENT_NOT_REQUIRED` enum + `ITEM_NOT_STOCKED_AT_
+   LOCATION` removal are the named watch items — captures §9);
+   fall-forward behavior documented for operators.
+10. **Webhooks (MVP tail):** W1+W2 merged and their subscription
+    self-healing verified live; if ChatGPT descopes W1/W2 from the MVP
+    release, DEC-003's C-SYNC-01/02/03 rows must be explicitly
+    re-scoped by that decision (flagged — this plan does not make that
+    call).
+11. **Shopify app-review readiness:** **Phase 2+ (B-1)** — the DEC-028
+    Rung-2 ladder + compliance webhooks (W5) + App Store requirements
+    are pre-listed for that future gate; explicitly NOT an MVP release
+    item (RA-003 unchanged).
+12. **Odoo Apps packaging (if ChatGPT chooses that channel):** six
+    listings with dependency metadata per DEC-029; icons/descriptions
+    from the copy pass; LGPL-3 declared; not required for branch-A
+    delivery.
+13. **Rollback:** per-module single-PR revert map (each task packet's
+    rollback note aggregated); database restore procedure for a failed
+    production install (operator doc); Shopify-side: no automatic
+    un-doing — documented manual cleanup list (delete test
+    fulfillments, etc.).
+14. **Release notes & known limitations:** generated from the AR log
+    rows of the release range; limitations at minimum: 60-day order
+    window; same-currency-only; duties/divergent orders skipped by
+    policy; single-fulfillment-location; no refunds/media-export/
+    payouts/B2B/Markets; concurrency proof status (whatever OP-22's
+    state is at release — stated honestly); webhook posture.
+
+## 3. Go/No-Go gate
+
+ChatGPT holds the release act. Inputs: checklist run with evidence per
+section; UAT exit record; open-register review (no open S1/S2, TD
+register clean or explicitly accepted); the §2.10 webhook scope
+confirmation; DEC-027 pilot-scope confirmation for the receiving
+customer(s). The release act, like every gate act, is a distinct
+recorded ChatGPT decision.

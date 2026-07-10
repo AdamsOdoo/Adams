@@ -430,6 +430,36 @@ qualified "at screen-design blueprint level," not a full resolution).
 > acceptance **does not open the implementation gate and does not
 > start Task 002** — a separate, explicit ChatGPT act.
 
+> **AR-042 planning-completion session note (2026-07-10) — closure
+> proposals prepared for ChatGPT review; NOTHING in this note resolves
+> any row.** The MVP planning-completion package
+> ([`../08-release-readiness/mvp-planning-completion-audit.md`](../08-release-readiness/mvp-planning-completion-audit.md))
+> drafts, all **Proposed, NOT accepted**: (a) **MBQ-04** — a
+> credential/PCD posture-ladder decision
+> ([`../04-decisions/DEC-028-credential-pcd-posture-ladder-proposal.md`](../04-decisions/DEC-028-credential-pcd-posture-ladder-proposal.md)),
+> on fresh 2026-07-10 evidence that encryption-at-rest is a protected-
+> customer-data **Level 1** requirement (superseding older Level-2
+> phrasing); if accepted, ChatGPT may simultaneously make the
+> Partially-resolved→Resolved wording call this row has been awaiting;
+> (b) **MBQ-55 order portion** — the order-binding naming pass inside
+> the Task 012 packet (D-012-1); note also that the MBQ-55 row's
+> 2026-07-10 status-refresh phrase "not yet implemented (Task 011
+> unauthorized)" is now stale — Task 011 merged runtime-green via
+> PR #145 later the same day (see `implementation-readiness-map.md`
+> §4.2); (c) **MBQ-56 / MBQ-27 / DEC-020 residual** — exact mechanics
+> in the Task 012 packet (D-012-2/-9/-3); (d) **MBQ-32 residual /
+> MBQ-38** — in the Task 013 packet; (e) **MBQ-23 / MBQ-24 / MBQ-25
+> residual** — in the Task 015 packet; (f) **MBQ-03 / MBQ-44
+> residual** — XML-ID scheme + ACL plan in the UI packet (MBQ-22 copy
+> remains a UI-phase deliverable; MBQ-53 stays open/partial until its
+> siblings are accepted AND built); (g) **MBQ-65 residual / Q23** — in
+> the webhook packet; (h) **OP-23/Q27 Lite/Full** —
+> [`../04-decisions/DEC-029-lite-full-packaging-proposal.md`](../04-decisions/DEC-029-lite-full-packaging-proposal.md).
+> MBQ-61/MBQ-63 exclusions, MBQ-05's gating, and the MBQ-12/28/50/58
+> accepted-open risks are all unchanged. Each proposal binds only if
+> ChatGPT accepts the package; every row keeps its current status until
+> then.
+
 ## How to read
 
 - **Decision owner:** **ChatGPT** (a control-room decision), **Implementation

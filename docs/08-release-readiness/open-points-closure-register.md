@@ -170,6 +170,39 @@ resolved here.
 | Task 012 / 013 / 014 / 015 | **Not authorized.** Unaffected by this session in any way |
 | All other rows (OP-01–04/06–22/24–39/41–44) | Unchanged — not touched by this session |
 
+## 3.9 AR-042 planning-completion session addendum (2026-07-10)
+
+> Added by the MVP planning-completion session (docs-only; **Proposed
+> for ChatGPT review** except where a closure is purely documentary and
+> evidence-cited). §3.1–§3.8 texts above are preserved unchanged; this
+> addendum is the current delta. **Nothing here opens a gate, issues a
+> usable prompt, or converts a recommendation into a decision.** Master
+> record: [`mvp-planning-completion-audit.md`](./mvp-planning-completion-audit.md)
+> (its §3 table is the row-by-row source for the deltas below).
+
+| ID | 2026-07-10 status delta |
+| --- | --- |
+| OP-45 | **Research-closed this session:** the Partner Program Agreement's app fee schedule is public and fully sourced (0% first USD $1M lifetime / 15% above / $19 registration / 2.9% processing; 80/20 unregistered), and the "Enforcement of Shopify's Partner Program Policies" page is captured — [`../00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md`](../00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md) §6. Residual (named, non-blocking for MVP): App-Store review SLA undocumented; Partner-Dashboard-only operational limits unobservable (login wall). Row closes fully when ChatGPT accepts the capture as sufficient |
+| OP-46 | **Closure proposed:** [`../04-decisions/DEC-027-branch-a-pilot-customer-scope-proposal.md`](../04-decisions/DEC-027-branch-a-pilot-customer-scope-proposal.md) — Proposed, NOT accepted |
+| OP-40 / MBQ-04 | **Closure proposed:** [`../04-decisions/DEC-028-credential-pcd-posture-ladder-proposal.md`](../04-decisions/DEC-028-credential-pcd-posture-ladder-proposal.md) — Proposed, NOT accepted. Evidence update: encryption-at-rest is a PCD **Level 1** requirement per the current official page (captures §7) |
+| OP-23 | **Closure proposed:** [`../04-decisions/DEC-029-lite-full-packaging-proposal.md`](../04-decisions/DEC-029-lite-full-packaging-proposal.md) + [`../02-product/lite-full-packaging-final-proposal.md`](../02-product/lite-full-packaging-final-proposal.md) — Proposed, NOT accepted |
+| OP-14/15/16/17 | **Closure proposed** in [`../07-implementation-plan/task-012-order-import-implementation-packet.md`](../07-implementation-plan/task-012-order-import-implementation-packet.md) (D-012-1..12 incl. MBQ-55 order portion, MBQ-56 mechanics, MBQ-27 mechanism T-B, DEC-020-residual routing) |
+| OP-18/19 | **Closure proposed** in the Task 013 packet (D-013-1..8 incl. MBQ-32 residual = location-context `free_qty`, MBQ-38 = on-row confirmation record) |
+| OP-20 / OP-03 | **Closure proposed** in the Task 014 packet (exact scope set = merchant_managed family; TD-002 fix routed as the one named core edit) — TD-002 itself stays **Open** until that task merges |
+| OP-21 | **Closure proposed** in the Task 015 packet (module per ARCH PD-1; MBQ-23/24 residual closures; media → 015B deferred candidate, explicit ChatGPT call) |
+| OP-28 | **Closure proposed** in the Area-6 packet (Lite-trio retrofit split — supersedes the sequence doc's Area-6 description on acceptance) |
+| OP-26 | **Plan proposed:** UI phases U1–U3 with the MBQ-03 XML-ID scheme and MBQ-44 ACL plan ([`../07-implementation-plan/ui-implementation-phases-packet.md`](../07-implementation-plan/ui-implementation-phases-packet.md)) |
+| OP-27 / OP-36 | **Plan proposed:** W1–W5 ([`../07-implementation-plan/webhook-implementation-packets.md`](../07-implementation-plan/webhook-implementation-packets.md)); Q23's PII list proposed in its §3; W1+W2 proposed as MVP-tail (C-SYNC-01/02/03), W3–W5 deferred/Phase-2+ |
+| OP-29 / OP-30 | **Plans completed** ([`final-mvp-uat-plan.md`](./final-mvp-uat-plan.md) — 24 scenarios; [`release-readiness-execution-plan.md`](./release-readiness-execution-plan.md)); execution remains External-live |
+| OP-06 (VAL-B2) | **Plan completed** (val-b2-closure-plan §12 addendum: result template, cleanup, escalation); classified **External validation required** — not a research gap |
+| OP-22 | **Plan audited + performance capture added** (concurrency plan §13); classified **External validation required** |
+| OP-33 / Q4 / Q26 | **Dissolved by current evidence:** the official `@idempotent` list (page updated 2026-02-02) has 17 entries — inventory/location/refund mutations only; the 2026-01/2026-04 changes made the key mandatory for inventory set/adjust. No packet depends on the count; build-time re-verify rule stands |
+| OP-34 / OP-35 | Officially-documentable subset re-checked (bucket maxima confirmed unpublished-by-design; THROTTLED-in-200-body confirmed); empirical subset folded into VAL-B2 §12.5 + the mutation tasks' dev-store runs |
+| OP-37 | Re-verified: 2026-07 latest stable (until 2027-07-16); 2026-10 watch items named in the release plan §2.9 |
+| OP-05 / OP-31 / RA-003 | **Unchanged** — Phase 2+ under DEC-026; nothing in this session touches the gating |
+| OP-24/25/32/38/39/41/42/43/44 | **Unchanged** — restated where consumed; OP-25 residue still awaits its ChatGPT-authorized micro-patch (P-C) |
+| AR-040 status cell | Stale "draft, unmerged" wording reconciled via a dated documentary note in the AR log (facts only; wording call left to ChatGPT) |
+
 ## 4. Cross-check completeness statement
 
 Every open item named in: the PR #140 body's "Open blockers" list, the

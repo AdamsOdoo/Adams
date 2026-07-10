@@ -176,6 +176,80 @@ roadmap item has been silently dropped. Items OP-01, OP-02, OP-04 and
 OP-07–OP-13 are consumed/closed by the completed Task 011 lifecycle
 (gate act PR #144, implementation PR #145) and are not restated as open.
 
-*(§3 Closure results, §4 Contradictions found and corrected, §5
-Evidence-quality assessment, and §6 Readiness verdict are appended by
-the later phases of this session — see the dated sections below.)*
+## 3. Closure results (Phases B–D, 2026-07-10)
+
+Per-row outcomes against §2's "Session closure" plan — every planned
+closure was produced; none silently changed class:
+
+| Item(s) | Outcome | Artifact |
+| --- | --- | --- |
+| OP-45 | **Closed-by-research** — the fee schedule is public (PPA Part C: 0% first $1M lifetime / 15% / $19 / 2.9%; 80/20 unregistered) and the Enforcement page is captured; residual legal unknowns named (review SLA; dashboard-only limits) | captures §6 |
+| OP-46 | **Proposed-DEC** | DEC-027 |
+| MBQ-04 / OP-40 / Q22 | **Proposed-DEC** — posture ladder on fresh evidence (encryption-at-rest = PCD **Level 1** requirement, superseding older Level-2 phrasing) | DEC-028; captures §7 |
+| OP-23 / Q6 / Q21 / Q27 | **Proposed-DEC** — two-layer model | DEC-029 + packaging proposal |
+| VAL-B2 | **External-live**, plan completed (result template, cleanup, escalation, piggyback checks) | val-b2-closure-plan §12 |
+| OP-22 / SRR-03/04/09 / Q17/Q18/Q24/Q30/Q31/Q41/Q43 | **External-live**, plan audited + performance capture added | concurrency plan §13 |
+| OP-14/15/16/17, MBQ-55-order, MBQ-56, MBQ-27, DEC-020 residual | **Proposed-DEC / Planned** — D-012-1..12 | Task 012 packet |
+| OP-18/19, MBQ-32 residual, MBQ-38 | **Proposed-DEC / Planned** — D-013-1..8 | Task 013 packet |
+| OP-20, OP-03/TD-002, MBQ-40/42/43 residuals | **Proposed-DEC / Planned** — D-014-1..8 (exact scope set: merchant_managed family; TD-002 fix routed as the one named core edit) | Task 014 packet |
+| OP-21, MBQ-23/24/25 residuals | **Proposed-DEC / Planned** — D-015-1..8 | Task 015 packet |
+| OP-28 | **Planned** — Area-6 split (Lite-trio retrofit; Full modules ship native triggers) | area-6 packet |
+| OP-26, MBQ-03, MBQ-44 residual, MBQ-22 (plan) | **Planned / Proposed-DEC** — U1–U3 phases, XML-ID scheme, ACL plan, copy-deck process | ui packet |
+| OP-27, Q23/OP-36, MBQ-65 residual | **Planned** — W1–W5; PII redaction list proposed | webhook packet |
+| OP-29 / UAT gaps | **Planned / External-live** — 24-scenario catalogue + entry/exit | final-mvp-uat-plan |
+| OP-30 | **Planned / External-live** | release-readiness-execution-plan |
+| Q7, MBQ-51, OP-33/Q4/Q26, OP-37, Q19 | **Closed at proposal level / Closed-by-research** — PD-5 checkpoints; runtime-read throttle posture; fresh idempotent-list count (17 entries, inventory/location/refund only — the old 16-vs-17 discrepancy dissolved by the 2026-01/2026-04 changes); versions re-verified; `_notify_admin` assumption confirmed | ARCH §5/§6; captures §3/§9 |
+| OP-05/OP-31 (Phase 2+), MBQ-61/63 exclusions, OP-24/25/32/38/39/41/42/43/44 | **Deferred / No-action / ChatGPT-only** — unchanged, restated where consumed | master plan §3/§4 |
+
+New IDs created this session: DEC-027/028/029 (all Proposed); AR-042
+(this package's row); no new OP/MBQ/RA/TD numbers (deferred items
+013B/015B are task candidates, not register rows, until ChatGPT
+chooses to number them).
+
+## 4. Contradictions found and corrected
+
+1. AR-040 status cell vs GitHub merge state — corrected via a dated
+   documentary note (§1.1 S-1).
+2. Older repo phrasing tying encryption obligations to PCD Level 2 vs
+   the current official Level-1 placement — superseded by captures §7
+   (DEC-028 evidence item 1); no historical file rewritten.
+3. The blueprint's fulfillment-binding key sketch (FO GID) vs the
+   backorder-independence rule — refined to Fulfillment-GID +
+   (store,picking) anchoring, explicitly flagged (ARCH §3, D-014-1).
+4. Task 013's "MBQ-33/34 remain formally open per DEC-015" vs the
+   register's DEC-018 decisions — resolved in DEC-018's favor by
+   direct register read (packet carries them as settled).
+5. The 16-vs-17 `@idempotent` count discrepancy — dissolved: the
+   current official list has 17 entries but a different composition
+   than the old research assumed (inventory/location/refund;
+   fulfillment never on it); packets no longer depend on the count.
+6. Shopify's own docs carry two internal inconsistencies (stale
+   `ignoreCompareQuantity` prose on the 2026-07 mutation page; stale
+   one-bulk-op wording in the bulk page's Rate-limits section) —
+   recorded in captures §3/§9 so no future session cites them.
+
+## 5. Evidence-quality assessment
+
+Strong (official, dated, adversarially re-verified 24/24 CONFIRMED,
+plus raw-HTML spot checks on the four highest-stakes pages): all
+API-shape, scope, versioning, PPA-fee, PCD, and webhook-mechanics
+claims. Strong (source-level, 19.0 branch): all Odoo claims. Medium
+(officially undocumented → converted to named empirical checks):
+null-variant semantics, negative-available sets, customId upsert
+behavior, list-not-supplied boundary, tip line items, webhook
+duplicate-window, cursor durability. Known weak spots deliberately
+avoided: WebFetch summarizer text was not trusted for load-bearing
+quotes after the caught "30%" hallucination (captures header records
+the methodology caution).
+
+## 6. Readiness verdict
+
+**Planning-complete per the session's §22 standard, as a proposal
+package** — see `mvp-planning-completion-signoff.md` for the ten
+answers and the exact statement. The repository now contains: the
+reconciled state (§1), closure for every §2 item (§3), six proposed-
+decision records/points sets (DEC-027/028/029 + PD-1..6 + the packet
+D-items), seven implementation packets with locked prompts (012, 013,
+014, 015, Area 6, UI-U1, W1), the UAT and release plans, and one
+unambiguous next step (Task 012). Nothing herein is accepted, no gate
+is open, and no external validation is claimed to have occurred.
