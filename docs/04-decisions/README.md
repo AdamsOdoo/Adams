@@ -13,6 +13,28 @@ discussion — those live in `../05-qa/architecture-review-log.md` until accepte
 Rejected alternatives must also be logged in
 `../05-qa/rejected-approaches-log.md`.
 
+> **Index refresh note (2026-07-10, OP-25 docs-maintenance).** The
+> narrative below is a historical record that ends at DEC-017 (2026-07-04)
+> and is preserved unchanged. The current, complete state is: **DEC-003
+> through DEC-025 all exist and all carry `Status: Accepted by ChatGPT`**
+> (several at explicitly limited levels recorded in their own Status
+> sections: DEC-016 screen-design-blueprint level; DEC-017
+> planning-guidance level; DEC-019/DEC-020 decision/posture level; DEC-022
+> gate-opening level; DEC-023 limited routing only; DEC-024 closure
+> record). The records added after DEC-017 are:
+> [`DEC-018-mbq-decision-batch-1.md`](./DEC-018-mbq-decision-batch-1.md),
+> [`DEC-019-mbq-62-odoo-event-job-source.md`](./DEC-019-mbq-62-odoo-event-job-source.md),
+> [`DEC-020-mbq-64-65-currency-webhook-residuals.md`](./DEC-020-mbq-64-65-currency-webhook-residuals.md),
+> [`DEC-021-val-b2-deferral-for-task-004.md`](./DEC-021-val-b2-deferral-for-task-004.md),
+> [`DEC-022-task-005-scope.md`](./DEC-022-task-005-scope.md),
+> [`DEC-023-token-acquisition-and-val-b2.md`](./DEC-023-token-acquisition-and-val-b2.md),
+> [`DEC-024-task-005-closure.md`](./DEC-024-task-005-closure.md), and
+> [`DEC-025-task-006-sync-engine-gate.md`](./DEC-025-task-006-sync-engine-gate.md). Per-file
+> Status sections and `../05-qa/architecture-review-log.md` remain the
+> authoritative sources; none of the decisions below authorizes
+> implementation by itself. This note refreshes the stale index only and
+> decides nothing.
+
 **Current status:** Contains [`DEC-003-mvp-scope.md`](./DEC-003-mvp-scope.md) —
 the accepted **MVP product-scope** decision (ChatGPT, 2026-07-01, RB-13) — plus
 three **accepted architecture decision records**, proposed 2026-07-02 (Evidence

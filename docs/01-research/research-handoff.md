@@ -1,5 +1,195 @@
 # Research Handoff (rolling)
 
+### PR #144 acceptance/status note — REVISE fixes applied, merge-safe (2026-07-10)
+
+- **What happened:** ChatGPT reviewed PR #144 (branch
+  `claude/task-011-readiness-closure-wj4g2c`, base `Shopify-connector`,
+  the AR-039 gate-readiness package described in the entry directly
+  below) via control-room comment
+  [`4932704451`](https://github.com/AdamsOdoo/Adams/pull/144#issuecomment-4932704451)
+  — decision **REVISE before merge**, accepting the package in principle
+  and requiring two fixes, **both applied in the same PR**: (1) the D1
+  email-candidate discovery rule is now explicitly **recall-safe** (no
+  prefilter may exclude a partner whose normalized email equals the
+  incoming normalized email; `'=ilike'` forbidden; the substring
+  `('email', 'ilike', normalized_incoming)` prefilter + mandatory
+  Python-side normalized comparison, or no prefilter at all; applied to
+  both the active and archived-inclusive searches; new
+  wrapped/display-name/mixed-case test expectations added to the final
+  prompt §10 and brief D8); (2) the merge-safety status patch — AR-039
+  is now **Accepted** with an AR-039 Acceptance Note
+  ([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)),
+  the final prompt's usage conditions now distinguish
+  satisfied-by-acceptance/merge from still-unsatisfied conditions, and
+  this note makes the handoff post-merge-safe.
+- **This note is the current status and remains correct after PR #144 is
+  merged — treat it, not the "Proposed" language in the entry below, as
+  authoritative.** **Merging PR #144 authorizes nothing.** The
+  acceptance fixes the final prompt's content as binding — **the prompt
+  is still NOT issued and NOT usable** (its DO-NOT-USE lock is
+  unweakened); **the customer-domain gate remains CLOSED** (the
+  acceptance comment's own words: "Do not open the gate"); **Task 011,
+  012, 013, 014, and 015 remain unauthorized**; **MBQ-05 branch B
+  remains undecided**; no implementation of any kind may start.
+- **The next steps after PR #144 merges are ChatGPT's own distinct
+  acts:** (1) the explicit customer-domain **gate-opening act**,
+  confirming the gate proposal's criterion-12 table as of that date
+  ([`../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md`](../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md)
+  §1/§3); (2) the separate **MBQ-05 branch B** parallel-authorization
+  decision; (3) only after (1), issuing
+  [`../07-implementation-plan/task-011-final-implementation-prompt.md`](../07-implementation-plan/task-011-final-implementation-prompt.md)'s
+  draft prompt text, verbatim, in a **new** Claude Code session. None of
+  these is performed by this note, by the acceptance, or by the merge.
+- **This session does not merge PR #144, does not open any gate, does
+  not issue any prompt, and does not start any implementation.**
+
+### AR-039 Task 011 final gate-readiness and pre-implementation closure package (2026-07-10)
+
+- **What happened:** the explicitly-authorized high-power gate-readiness
+  session (Fable as strategic auditor/planning finisher — not the
+  implementation worker) first verified the baseline from GitHub —
+  **PR #143 merged** into `Shopify-connector` (merge commit
+  `4a45f3ea1e6e92acd0621fdc6e2a435b29170221`, merged 2026-07-10T05:35:06Z,
+  `pull_request_read`), AR-038 Accepted — then produced the complete Task
+  011 pre-implementation closure package specified by
+  [`../07-implementation-plan/next-gate-readiness-roadmap.md`](../07-implementation-plan/next-gate-readiness-roadmap.md)
+  §2 (the PR #137 analogue for the customer domain), with every Task 011
+  platform fact **re-verified against current official sources on
+  2026-07-10** (8-topic parallel research pass + a 7-claim adversarial
+  verification pass, all load-bearing claims confirmed).
+- **New files (all docs-only):**
+  [`../07-implementation-plan/task-011-decision-closure-brief.md`](../07-implementation-plan/task-011-decision-closure-brief.md)
+  (D1–D8 closed at **recommendation level**: exact dedup thresholds with
+  normalization/archived/binding-conflict rules; the ambiguous-candidate
+  evidence field — existing `job.log.technical_detail` — with an exact
+  JSON shape and PII posture; defaultAddress-only create-only address
+  mapping; person-only classification; fallback-partner mechanics under
+  Posture A; `depends: ['shopify_connector_core']` only — with the Odoo
+  `sale`-app dependency also explicitly deferred to Task 012; the exact
+  `customer(id:)` query field list avoiding the deprecated
+  `email`/`phone`/`addresses` fields; four exact test files with full
+  coverage);
+  [`../07-implementation-plan/task-011-final-implementation-prompt.md`](../07-implementation-plan/task-011-final-implementation-prompt.md)
+  (file-exact final prompt, first line **DO NOT USE UNTIL CHATGPT
+  REVIEWS, ACCEPTS, EXPLICITLY OPENS THE TASK 011 GATE, AND ISSUES THIS
+  PROMPT** — six unmet usage conditions, none satisfied);
+  [`../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md`](../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md)
+  (all 15 accepted criteria: 7 Satisfied · 7 Satisfied-on-acceptance ·
+  criterion 12 assembled as the gate-act item with a re-verified
+  2026-07-10 blocker table);
+  [`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md)
+  (branch B **does not block Task 011** — evidence-cited; parallel
+  research task recommended with proposed scope; 2026-07-10 facts: no
+  review-free multi-merchant distribution route exists; candidate set
+  B-1 reviewed-public-limited-visibility / B-2 reviewed-public-visible /
+  B-3 per-customer custom apps (scalability ceiling undocumented — open
+  question) / B-4 hybrid);
+  [`../08-release-readiness/pre-implementation-readiness-signoff.md`](../08-release-readiness/pre-implementation-readiness-signoff.md)
+  (**Option A: ready** — only ChatGPT acts remain);
+  [`../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md`](../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md)
+  (the OP-44 source captures: Shopify Customer/CustomerEmailAddress/
+  CustomerPhoneNumber/MailingAddress/customers-query/scopes/versioning/
+  limits/PCD/distribution pages; Odoo 19 `res_partner.py`/
+  `sale_order.py`/`mail_thread_blacklist.py`).
+- **Status patches (allowed registers/docs only):**
+  `docs/05-qa/architecture-review-log.md` — new **AR-039** row
+  (**Proposed for ChatGPT review**);
+  `docs/08-release-readiness/open-points-closure-register.md` — §3.6
+  addendum (OP-01/02 unblocked-pending-ChatGPT; OP-07–OP-13 drafted as
+  D1–D8; OP-24/OP-44 closed docs-only; OP-25 partially closed + residue
+  routed; OP-42 flagged in-file; OP-43 classified);
+  `docs/08-release-readiness/implementation-readiness-map.md` — §4
+  addendum (criteria 3/4/5/9/13/14/15 → Satisfied-on-acceptance);
+  `docs/03-architecture/master-blueprint-open-questions.md` — MBQ-55 and
+  MBQ-04 dated status-refresh notes (OP-24; recorded facts only, no new
+  decision);
+  `docs/01-research/shopify-official-api-notes.md` — new dated
+  Customer-object section (2026-07-10);
+  `docs/05-qa/quality-feedback-loop.md` — OP-42 binding-status notes
+  under §10/§11 (decision left to ChatGPT);
+  the five stale READMEs (`00-source-materials`, `02-product`,
+  `04-decisions` index note, `07-implementation-plan`,
+  `08-release-readiness`) refreshed with dated notes (OP-25);
+  this handoff entry.
+- **What this session does NOT do:** does not implement any code or
+  touch any addon/py/xml/csv/manifest/security/test/CI file
+  (`shopify_connector_core`/`shopify_connector_product`/`adams_base`
+  untouched); does not open the customer-domain gate (**closed**); does
+  not issue or render usable any implementation prompt; does not
+  authorize Task 011/012/013/014/015; does not decide D1–D8 (all
+  **Recommended for ChatGPT acceptance**); does not decide MBQ-05 branch
+  B (blocking analysis only); does not resolve VAL-B2, TD-002, MBQ-55's
+  order portion, MBQ-56, MBQ-27, MBQ-32, Lite/Full, or SRR-03/04/09;
+  does not merge anything; `main` and plain `dev` untouched.
+- **Learning feedback loop:** (a) re-verifying official facts *at
+  drafting time* (standing practice) caught real precision deltas even
+  one day after the prior audit's fetch — the `sale.order` computes are
+  two separate `address_get(['invoice'])`/`address_get(['delivery'])`
+  calls, not one combined call, and the customers-query `updated_at`
+  filter carries a "whole day" description quirk now logged as an open
+  question instead of assumed; (b) an adversarial verify pass over
+  load-bearing claims (7/7 confirmed) is cheap relative to the cost of a
+  final prompt built on a refuted fact — recommend repeating for every
+  future domain final-prompt session; (c) D-level closure surfaced a
+  decision the roadmap row had not named (no Odoo `sale`-app manifest
+  dependency in Task 011) — final-prompt sessions should expect to find
+  at least one such unnamed sub-decision and name it explicitly rather
+  than leave it implementer-inferred. No new rejected approach (checked
+  against RA-001–RA-024 — nothing proposed matches; RA-003/RA-006
+  explicitly complied with). No new technical debt (nothing deferred
+  that is not already tracked; OP-25 residue is routed, not hidden).
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked (above) · learning captured (above) · no new rejected
+  approach · no new technical debt · only Markdown docs touched
+  (validated via `git diff --name-only` before commit) · no
+  code/XML/CSV/security/addon file changed · `main`/plain `dev`
+  untouched · draft PR only, no merge · self-review/red-team pass run
+  (15 mandated checks; findings + dispositions in the PR body and
+  signoff §8).
+- **Branch / PR:** `claude/task-011-readiness-closure-wj4g2c`, base
+  `Shopify-connector`; draft PR **"Task 011 final gate readiness and
+  pre-implementation closure"**. This session authorizes nothing.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT reviews the draft PR "Task 011 final gate readiness and
+pre-implementation closure" (branch claude/task-011-readiness-closure-wj4g2c,
+base Shopify-connector) against:
+docs/07-implementation-plan/task-011-decision-closure-brief.md (D1-D8,
+recommendation level),
+docs/07-implementation-plan/task-011-final-implementation-prompt.md
+(marked DO NOT USE - verify the warning and the six usage conditions are
+intact and unweakened),
+docs/07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md
+(15-criterion table + criterion-12 reconfirmation evidence),
+docs/03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md,
+docs/08-release-readiness/pre-implementation-readiness-signoff.md, the
+AR-039 row (Proposed) in docs/05-qa/architecture-review-log.md, the
+register addenda (open-points-closure-register.md §3.6;
+implementation-readiness-map.md §4), the OP-24/OP-25/OP-42/OP-44
+cleanup edits, and
+docs/00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md.
+Confirm: the diff is Markdown-only; no gate was opened; the final prompt
+was not issued as usable; Task 011-015 remain unauthorized; D1-D8 are
+recommendations, not accepted decisions; no accepted DEC/AR/RA/MBQ
+record is weakened; no rejected approach is reintroduced. Then decide:
+(1) accept/revise/reject the package (accepting the final prompt fixes
+D1-D8 as binding prompt content - still not issued); (2) if accepted,
+merge (merging authorizes nothing), then perform - as a distinct,
+explicit act - the customer-domain gate-opening act, confirming the
+gate proposal's criterion-12 table as of that date (the gate then opens
+for exactly one Task 011 implementation session and closes when its PR
+opens as draft); (3) separately decide whether to authorize the MBQ-05
+branch B parallel research task (recommended; not blocking Task 011
+either way); (4) optionally give the one-line OP-42 binding
+confirmation and set the allowed-files list for the OP-25 residue
+maintenance batch (exact files: pre-implementation-readiness-signoff.md
+§5); (5) only after (1)+(2), issue the final prompt's draft prompt
+text, verbatim, in a NEW Claude Code session as its own chat turn.
+No step before (5) authorizes any code.
+```
+
 ### PR #143 acceptance/status note — docs-only audit/planning closure, merge-safe after PR #142 (2026-07-10)
 
 - **What happened:** ChatGPT reviewed PR #143 (branch

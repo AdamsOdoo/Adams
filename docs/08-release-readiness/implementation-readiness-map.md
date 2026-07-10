@@ -82,10 +82,37 @@ openable customer-domain gate.
 | UAT | 0/15 scenarios executable | [`uat-readiness-gap-analysis.md`](./uat-readiness-gap-analysis.md) | See that file |
 | Release | Checklist template ready; nothing executable | OP-30 | Roadmap tail |
 
-## 4. Explicit non-authorizations
+## 4. AR-039 session addendum (2026-07-10) — Task 011 row and criteria-table delta
+
+> Added by the AR-039 gate-readiness session. §1/§2 above are preserved
+> unchanged as the 2026-07-09 baseline. Current delta, **Proposed for
+> ChatGPT review** (nothing below opens a gate or authorizes a task):
+
+- **Task 011 row delta:** the "Final-prompt + gate-opening-proposal
+  session (OP-02)" step is now **done at proposal level** — the AR-039
+  package drafts the final prompt (marked not usable), the gate-opening
+  proposal, and the D1–D8 decision-closure brief. Remaining work is
+  exclusively ChatGPT's: package acceptance + merge, the gate act
+  (OP-01), then prompt issuance.
+- **Criteria-table delta (§2):** criteria 3, 4, 5, 9, 13, 14, 15 move
+  from "Not yet / Final-prompt session" to **"Satisfied-on-acceptance —
+  drafted in
+  [`../07-implementation-plan/task-011-final-implementation-prompt.md`](../07-implementation-plan/task-011-final-implementation-prompt.md),
+  effective when ChatGPT accepts the AR-039 package"**; criterion 12's
+  reconfirmation evidence is assembled in
+  [`../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md`](../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md)
+  §3 (the confirmation itself belongs to the gate act). Criteria 1, 2,
+  6, 7, 8, 10, 11 unchanged (Satisfied).
+- **§3 layer delta:** "Distribution/auth architecture" gains the
+  branch B blocking analysis
+  ([`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md)
+  — not blocking Task 011); every other layer unchanged.
+
+## 5. Explicit non-authorizations
 
 This map does not open any gate, does not authorize any task listed in §1,
 and does not change any criterion's satisfaction status — §2 restates the
-accepted criteria document verbatim in substance. Any future change to a
-criterion's status must come from its own governing document or a ChatGPT
-act, not from this map.
+accepted criteria document verbatim in substance, and §4's addendum takes
+effect only through ChatGPT's own acceptance of the AR-039 package. Any
+future change to a criterion's status must come from its own governing
+document or a ChatGPT act, not from this map.

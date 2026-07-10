@@ -111,6 +111,29 @@ resolved here.
 | OP-32 | **Blocked competitor/research sources**: Teqstars 19.0 docs host (HTTP 403 bot-block; Apps-listing surrogate already used), VentorTech Confluence (17 of 28 child articles unread, anonymous-access limit), project Google Doc (sign-in wall; confirmed to be the `ecommerce_shopify` "Get Started" guide) | C + D-live | Unchanged; no auth bypass attempted (per `CLAUDE.md` §7.6) | [`../01-research/resource-inventory.md`](../01-research/resource-inventory.md) | Owner-granted access/export, or accept as permanent evidence downgrade (already handled via DP-003/DP-004 down-weighting) | **No** — access is human/owner-gated |
 | OP-39 | **Competitor/research gaps still relevant before MVP implementation** | C | None found beyond OP-32: the competitor matrix, UX benchmark, avoid-list, sync-engine shards, token-acquisition research, and official-notes corpus cover every MVP-planning decision made to date; no MVP decision rests on an untraceable claim | Master audit §1 method; research-corpus sweep | Keep future domain passes citing current official docs at drafting time (established practice) | Closed as a finding: **no blocking research gap** (this row records the negative result; OP-32 items stay tracked separately) |
 
+## 3.6 AR-039 session addendum (2026-07-10) — per-row status updates
+
+> Added by the AR-039 gate-readiness session (docs-only; **Proposed for
+> ChatGPT review** except where a closure is purely documentary and
+> evidence-cited). The §3 row texts above are preserved unchanged as the
+> 2026-07-09 baseline; this addendum is the current delta. Nothing here
+> opens a gate, issues a prompt, or converts a recommendation into a
+> decision.
+
+| ID | 2026-07-10 status delta |
+| --- | --- |
+| OP-01 (gate act) | Still open — **now fully unblocked**: the gate-opening proposal exists ([`../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md`](../07-implementation-plan/task-011-customer-domain-gate-opening-proposal.md)) with all 15 criteria evidenced and the criterion-12 reconfirmation table assembled. Remaining: ChatGPT's own act only |
+| OP-02 (final prompt) | **Drafted** — [`../07-implementation-plan/task-011-final-implementation-prompt.md`](../07-implementation-plan/task-011-final-implementation-prompt.md), marked not usable until ChatGPT accepts, opens the gate, and issues it. Remaining: ChatGPT acceptance |
+| OP-07 (address) / OP-08 (company-person) / OP-10 (thresholds) / OP-11 (fallback mechanics) / OP-12 (manifest) / OP-13 (query/pagination) / OP-09 (candidate-detail fields) | **Recommended-for-acceptance closures drafted** as D3/D4/D1/D5/D6/D7/D2 respectively in [`../07-implementation-plan/task-011-decision-closure-brief.md`](../07-implementation-plan/task-011-decision-closure-brief.md), carried as exact content in the final prompt §7–§10; official-source inputs re-verified 2026-07-10 (not reused from 2026-07-09). Each closes only when ChatGPT accepts the final prompt |
+| OP-05 (MBQ-05 branch B) | Decision still open (ChatGPT's); the **blocking analysis is now closed**: [`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md) — does not block Task 011; parallel research task recommended with proposed scope/allowed files |
+| OP-40 (PCD posture) | Inputs refreshed 2026-07-10 (Level 1/Level 2 obligations quoted; availability by app type re-confirmed); posture decision remains with the branch B task |
+| OP-24 (MBQ rows) | **Closed this session (docs-only):** dated status-refresh notes added to the MBQ-55 and MBQ-04 rows in [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md), recording the already-made PR #136/#140 acceptances and the PR #97 merge; no status upgraded beyond recorded facts (MBQ-04's Partially-resolved→Resolved call explicitly left to ChatGPT) |
+| OP-25 (stale indexes/preambles) | **Partially closed this session (docs-only):** the five READMEs refreshed (`00-source-materials`, `02-product`, `04-decisions` index note, `07-implementation-plan`, `08-release-readiness`). **Residue routed, deliberately untouched** (exact files + reasons: [`pre-implementation-readiness-signoff.md`](./pre-implementation-readiness-signoff.md) §5): QA/test-strategy package headers, UAT/release-checklist preambles, DEC-021/024/025 wording artifacts (decision records — need explicit ChatGPT authorization), research-backlog RB-14.1 |
+| OP-42 (quality-feedback-loop binding status) | **Flagged in-file this session** (dated notes under §10/§11); the binding confirmation itself remains ChatGPT's one-line call |
+| OP-43 (Task 010 test-count arithmetic) | **Classified this session:** evidence-precision flag only; the accepted green outcome (0 failed/0 errors, AR-036) is undisputed and is the only fact any gate document relies on; per-module figures stay unreconciled until a fresh build log exists; the Task 011 final prompt bakes the quote-verbatim rule into its validation record requirements |
+| OP-44 (source-capture routing) | **Closed this session (docs-only):** 2026-07-10 official excerpts captured in [`../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md`](../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md); the Tier-1 Customer-object gap closed via a dated section in [`../01-research/shopify-official-api-notes.md`](../01-research/shopify-official-api-notes.md) |
+| All other rows (OP-03/04/06/14–23/26–39/41) | Unchanged — re-verified 2026-07-10 as still accurate; no silent closure |
+
 ## 4. Cross-check completeness statement
 
 Every open item named in: the PR #140 body's "Open blockers" list, the
