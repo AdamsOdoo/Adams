@@ -134,6 +134,19 @@ ChatGPT approval gate (`CLAUDE.md` §5).
 
 `[Recommendation — becomes binding when this PR is merged by ChatGPT]`
 
+> **Binding-status note (2026-07-10, AR-039 session — OP-42).** The label
+> above is preserved verbatim. Its literal condition ("when this PR is
+> merged") was met long ago — this file merged into `Shopify-connector` —
+> and later accepted audits treat §10/§11 as operative in practice, but no
+> explicit ChatGPT confirmation that they are binding has ever been
+> recorded. Whether §10 and §11 are binding is a governance-status call
+> that only ChatGPT can make (tracked as OP-42 in
+> [`../08-release-readiness/open-points-closure-register.md`](../08-release-readiness/open-points-closure-register.md)).
+> This note flags the ambiguity in-file; it does **not** itself make
+> either section binding. `CLAUDE.md` §12's "both currently
+> [Recommendation]" wording should be updated in the same act that
+> confirms the status.
+
 **Research phase exit for Phase 1** requires all of:
 
 1. DEC-003 accepted. *(Done — 2026-07-01.)*
@@ -162,6 +175,11 @@ every phase transition, architecture acceptance, and MVP-scope change (see
 ## 11. Documentation maintenance rule
 
 `[Recommendation — becomes binding when this PR is merged by ChatGPT]`
+
+> **Binding-status note (2026-07-10, AR-039 session — OP-42).** Same
+> status as §10's note above: label preserved verbatim; operative in
+> practice; explicit ChatGPT binding confirmation still outstanding
+> (OP-42). This note does not itself make this section binding.
 
 To keep the repo reviewable as it grows:
 
