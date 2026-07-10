@@ -708,3 +708,58 @@ This document does not:
 available; otherwise proceed to MBQ-05 token acquisition/auth-
 distribution planning as a parallel docs-only track (§12). Either way,
 ChatGPT review of this plan itself precedes both.
+
+---
+
+## 13. Planning-completion addendum (2026-07-10, AR-042 session — plan audit; scenarios above unchanged)
+
+> Appended by the MVP planning-completion session after auditing this
+> plan against the required concurrency-proof planning dimensions
+> (same-job competing workers; multi-worker; multi-server; retry races;
+> duplicate prevention; claim expiry; crash recovery; transaction
+> boundaries; idempotency; deadlocks; lock contention; performance;
+> harness; pass/fail; evidence template). Verdict: **the plan is
+> execution-complete for every dimension except explicit performance
+> capture, added below.** OP-22 / SRR-03 / SRR-04 / SRR-09 (and the
+> runtime questions Q17/Q18/Q30/Q31/Q41/Q43) are hereby classified
+> `[External validation required]` — live/runtime validation items, not
+> planning gaps. Nothing below modifies §1–§12, executes anything, or
+> claims any concurrency property is proven.
+
+### 13.1 Dimension audit result
+
+Covered by the existing plan: competing workers on the same job pool
+(Scenarios 2/3/8), retry races (Scenario 4 + the retry-scheduling test
+suite), duplicate prevention (claim mechanism + `(store_id,
+operation_scope_key)` interplay, Scenarios 2/8), crash behavior
+observation without invented recovery (Scenario 9 — explicitly feeds
+the Q7 checkpoint/stuck-job question), disconnect/transaction-boundary
+races (Scenarios 5–7), deadlock/lock-contention observation (§7's
+`pg_locks`/`pg_stat_activity` capture; Scenario 8 fail symptoms),
+idempotency (§5 test data + constraints), topology ladder A/B/C with
+honest evidence-strength limits (§4/§9), execution order (§10), result
+document contract (§11). **Gap found: no explicit performance-metric
+capture was required.** Closed by §13.2.
+
+### 13.2 Performance capture requirement (added)
+
+For Scenarios 1, 2, and 8, the executing session must additionally
+record, per drain pass: wall-clock duration of `run_drain()`; jobs
+claimed/processed per pass (vs `DISPATCH_BATCH_SIZE = 20`); per-job
+handler latency (from the `attempt`/`state_change` log-row
+`occurred_at` deltas); PostgreSQL lock-wait counts observed during the
+pass (`pg_stat_activity` sampled before/after); and, for topology B/C,
+total throughput across all workers (jobs/minute) with the worker count
+stated. These are **observations for the release-hardening baseline**
+(SRR-01's savepoint-ceiling context), not pass/fail criteria — no
+performance number in this addendum is a target.
+
+### 13.3 Standing classification
+
+Until a session with a live Odoo.sh (topology A minimum, C preferred)
+runtime executes §6 and writes
+`docs/05-qa/sync-engine-concurrency-validation-results.md` per §11, no
+planning session may claim concurrency safety, and every Task 012–015
+planning packet must continue to carry the "claim/dispatch mechanism is
+not proven under real concurrent-worker/multi-server execution" caveat
+verbatim.
