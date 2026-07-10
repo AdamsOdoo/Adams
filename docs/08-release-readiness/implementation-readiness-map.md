@@ -113,7 +113,11 @@ openable customer-domain gate.
 > Added by the AR-041 MBQ-05 branch B research/decision-preparation
 > session. §1–§4 above are preserved unchanged. Current delta, **Proposed
 > for ChatGPT review** (nothing below opens a gate or authorizes any
-> task):
+> task). **This addendum only patches the "Distribution/auth
+> architecture" layer — it does not touch, and must not be read as
+> confirming current, the Task 011 row in §1 or the "Domain code"/
+> "Operator surface" rows in §3; those are addressed separately by §4.2
+> below, which supersedes them after PR #145.**
 
 - **§3 "Distribution/auth architecture" layer delta:** the branch B
   blocking analysis (§4 row) is now followed by a **complete decision
@@ -143,6 +147,55 @@ openable customer-domain gate.
   §1.1. This does not change MBQ-04's own row/status in
   [`master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md);
   it only records the dependency here.
+
+## 4.2 Post-PR #145 status-refresh note (2026-07-10) — Task 011 closed/exhausted
+
+> Added by this docs-only PR #146 status-refresh patch, per ChatGPT
+> review comment
+> [`4935147220`](https://github.com/AdamsOdoo/Adams/pull/146#issuecomment-4935147220).
+> **§1's Task 011 row and §3's "Domain code"/"Operator surface" rows above
+> are historical, pre-PR-#145 baseline text — they are left unedited
+> here as the least-risky option, and are superseded by the facts in
+> this note, not still current.** Nothing below opens any new gate or
+> authorizes any task.
+
+- **[Fact]** PR #145 ("Task 011: Shopify customer import and matching")
+  merged into `Shopify-connector`, merge commit
+  `7e83abba502c898fa413822c4d9b4866138a454a`.
+- **[Fact]** Task 011 customer import/matching is now **implemented and
+  merged**. The `shopify_connector_sale` addon now exists (the
+  `shopify.connector.customer.binding` model; the read-only
+  `shopify.connector.customer.importer` importer service; the inert
+  `customer_fallback_partner_id` store-settings field, Posture A).
+- **[Fact]** Runtime validation is green: **`0 failed, 0 error(s) of 268
+  tests`** (operator-provided Odoo.sh install log — see the AR-040 row in
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  and
+  [`../05-qa/task-011-customer-import-validation-results.md`](../05-qa/task-011-customer-import-validation-results.md)
+  §J).
+- **[Fact]** The Task 011 customer-domain implementation gate is now
+  **closed/exhausted** — it closed the moment PR #145 opened as draft
+  (per the accepted gate-closure rule) and PR #145 has since merged with
+  runtime-green evidence; no further customer-domain work may start
+  without a distinct, future, explicit ChatGPT act.
+- **Table-row supersession (§1/§3 above):** the §1 Task 011 row ("Not
+  started — `shopify_connector_sale` does not exist"; "Final-prompt +
+  gate-opening-proposal session (OP-02), gate act (OP-01), then one
+  implementation session") and the §3 "Domain code" row ("Product import
+  only") are both **superseded by the facts above** — Task 011 is no
+  longer "not started," `shopify_connector_sale` exists and is merged,
+  and domain code now includes the merged customer-import slice, not
+  product import alone.
+- **Explicit non-authorizations (unchanged by this note):** this note
+  does **not** authorize Task 012, Task 013, Task 014, Task 015, UI,
+  OAuth, webhooks, or Lite/Full packaging implementation of any kind, and
+  does not authorize MBQ-05 branch B implementation. PR #146 / **AR-041**
+  remains a branch-B **decision package only** —
+  [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
+  remains **Proposed for ChatGPT review, NOT accepted**, and **MBQ-05
+  branch B remains undecided**. This note does not touch, edit, or
+  reopen PR #145, and does not alter any Task 011 implementation record
+  except to reference its already-merged, runtime-green status.
 
 ## 5. Explicit non-authorizations
 

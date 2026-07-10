@@ -1,5 +1,38 @@
 # Research Handoff (rolling)
 
+### PR #146 status-refresh patch — implementation-readiness-map.md Task 011 row (2026-07-10)
+
+- **What happened:** a narrow, docs-only PR #146 revision session, per
+  ChatGPT review comment
+  [`4935147220`](https://github.com/AdamsOdoo/Adams/pull/146#issuecomment-4935147220).
+  `docs/08-release-readiness/implementation-readiness-map.md` still
+  carried the pre-Task-011 baseline text ("Not started —
+  `shopify_connector_sale` does not exist") even though PR #145 merged
+  into `Shopify-connector` (merge commit
+  `7e83abba502c898fa413822c4d9b4866138a454a`) with Task 011 customer
+  import/matching implemented and runtime-green
+  (`0 failed, 0 error(s) of 268 tests`).
+- **Fix:** added a new §4.2 "Post-PR #145 status-refresh note" to
+  `implementation-readiness-map.md`, stating the merge commit, that
+  `shopify_connector_sale` now exists and is merged, the runtime-green
+  evidence, that the Task 011 gate is now closed/exhausted, and that the
+  §1 Task 011 row / §3 "Domain code" row above it are historical
+  (pre-PR-#145) text superseded by this note — left unedited as the
+  least-risky option, per the review comment's own instruction. Added one
+  clarifying sentence to the existing §4.1 AR-041 addendum so it cannot
+  be read as confirming the stale §1 table is current. This entry.
+- **What this session does NOT do:** does not authorize Task 012, 013,
+  014, or 015, UI, OAuth, webhooks, or Lite/Full packaging; does not
+  authorize MBQ-05 branch B implementation; does not mark DEC-026
+  accepted; does not decide MBQ-05 branch B; does not touch, edit, or
+  reopen PR #145; does not alter any Task 011 implementation record
+  except to reference its already-merged, runtime-green status; does not
+  touch any code/addon/XML/CSV/manifest/security/migration/workflow/test
+  file (confirmed via `git diff --name-only` before commit — Markdown
+  only); does not merge PR #146; does not mark PR #146 ready for review.
+- **Stop condition:** patch pushed; PR #146 remains **draft**, unmerged,
+  mergeable.
+
 ### PR #146 refresh — merge-sequencing rule executed (2026-07-10)
 
 - **What happened:** a narrow, docs-only PR #146 refresh session. PR #145
