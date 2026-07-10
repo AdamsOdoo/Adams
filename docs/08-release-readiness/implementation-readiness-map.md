@@ -199,9 +199,10 @@ openable customer-domain gate.
 
 ## 5. Explicit non-authorizations
 
-This map does not open any gate, does not authorize any task listed in §1,
-and does not change any criterion's satisfaction status — §2 restates the
-accepted criteria document verbatim in substance, and §4's addendum takes
-effect only through ChatGPT's own acceptance of the AR-039 package. Any
-future change to a criterion's status must come from its own governing
-document or a ChatGPT act, not from this map.
+This map does not open any gate or authorize any implementation task. §2
+restates the historical customer-domain criteria document; §4 records
+AR-039 gate-readiness deltas; §4.1 records the AR-041 distribution/auth
+decision-package delta; and §4.2 records the post-PR #145 factual Task 011
+status refresh. Any future task authorization, gate opening, or change to
+DEC-026 / MBQ-05 branch B status must come from its own governing document
+or an explicit ChatGPT act.
