@@ -2,21 +2,26 @@
 
 ## Summary
 
-**Revised once, per ChatGPT control-room review of PR #145 (GitHub
-comment ID
-[`4934451381`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934451381)).
+**Revised twice, per ChatGPT control-room review of PR #145 (GitHub
+comment IDs
+[`4934451381`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934451381)
+and
+[`4934627954`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934627954)).
 Still draft PR, not yet re-reviewed.** This is the first implementation
 session for Task 011, executed under the explicit gate opened by the
 customer-domain gate-opening act (GitHub comment `4934249603`, PR #144,
 merge commit `8b364aa360cb596dd584bbc8345b790cc7ad20ed`). The first
 submission of this PR omitted the final prompt's required unresolved-
 country/state informational job-log note; that omission was reviewed
-as **not acceptable as-is** and is now fixed -- see §H below for the
-full revision record. No live Odoo/PostgreSQL runtime was reachable in
-this session's own environment (no `odoo` package installed, no
-Odoo.sh access, no external CI configured for this repository) --
-every validation check below is static, honestly reported as such,
-mirroring the format of
+as **not acceptable as-is** and was fixed -- see §H for that revision
+record. A subsequent live Odoo.sh run (the first this PR has actually
+received) then found exactly one runtime test failure -- a brittle,
+formatting-dependent source-level assertion, not a functional importer
+defect -- now fixed; see §I for that revision record. No live Odoo/
+PostgreSQL runtime was reachable in this session's own environment (no
+`odoo` package installed, no Odoo.sh access, no external CI configured
+for this repository) -- every validation check this session performed
+directly is static, honestly reported as such, mirroring the format of
 [`task-010-product-import-validation-results.md`](./task-010-product-import-validation-results.md).
 This record itself is **docs-only**: it does not modify any addon/code,
 test, manifest, XML/security, migration, or CI file.
@@ -390,14 +395,133 @@ fulfillment/next-task logic added; this document and the AR-040 row
 both updated to record the actual patched behavior rather than the
 prior "not implemented" framing; PR remains draft, unmerged.
 
+## I. Live Odoo.sh run and runtime-failure fix (comment ID `4934627954`)
+
+**Decision: REVISE -- one runtime test failure found. Not merged, kept
+draft.**
+
+### I.1 First live Odoo.sh runtime evidence (user/control-room-provided,
+not independently run by Claude)
+
+This is the **first actual Odoo 19 runtime execution evidence** this PR
+has received -- everything reported as "static only" in §D/§H above is
+now superseded for the one specific defect below; it is a real,
+runtime-confirmed test-brittleness bug, not merely untested code.
+Quoted verbatim from the control-room review (comment `4934627954`):
+
+- `Module shopify_connector_sale: 1 failures, 0 errors of 48 tests`
+- Final database summary: `1 failed, 0 error(s) of 268 tests`
+- Failing test:
+  `TestCustomerImportMatching.test_source_level_single_execute_call_uses_fixed_query_constant`
+
+The review also confirmed, and this record restates without treating
+either as a failure: the SQL `bad query` log lines for missing-
+required-field/duplicate-uniqueness-constraint tests are expected
+negative-test noise (the same class of expected noise Task 010's own
+validation record already documented in its §K.3), and the build-log
+docutils warning **did not fail this run**.
+
+### I.2 Root cause
+
+**Test-fixture-only bug, not a functional importer defect.** The
+failing test asserted the exact source substring
+`"CUSTOMER_IMPORT_QUERY, variables="`. The actual, correct production
+code passes the fixed query constant across a cosmetic line break:
+
+```python
+self.env['shopify.connector.api.client'].execute(
+    store, CUSTOMER_IMPORT_QUERY,
+    variables={'id': shopify_customer_gid},
+)
+```
+
+The substring the test looked for never appears verbatim once the call
+is wrapped onto three lines -- a purely cosmetic formatting difference
+with zero functional effect on the importer, which genuinely does issue
+exactly one `execute()` call using the fixed constant. This is the
+identical class of brittleness already logged against the equivalent
+Task 010 assertion pattern in principle (a raw-substring source guard
+tied to exact formatting), not a new kind of defect.
+
+### I.3 Fix applied
+
+`test_customer_import_matching.py` only (no production file changed):
+`test_source_level_single_execute_call_uses_fixed_query_constant` is
+rewritten to parse the importer source with Python's `ast` module
+instead of matching a raw substring, per the review's own preferred
+approach. The rewritten test:
+
+1. Parses `shopify_connector_customer_importer.py` with `ast.parse()`.
+2. Walks the tree for every `ast.Call` node whose function is an
+   attribute access named `execute`, and asserts there is **exactly
+   one** such call anywhere in the module.
+3. Asserts that call's arguments (positional or keyword) contain a
+   plain `ast.Name` reference to `CUSTOMER_IMPORT_QUERY` -- proving the
+   fixed constant is used, independent of argument order, line
+   placement, or wrapping.
+4. Asserts none of that call's arguments is an `ast.JoinedStr`
+   (f-string) or a literal string `ast.Constant` -- proving no
+   dynamically-built or second, differently-sourced operation string
+   could stand in for the query.
+5. Re-asserts, directly against the imported `CUSTOMER_IMPORT_QUERY`
+   constant, that it still starts with `query` and never contains
+   `mutation` -- the query remains read-only.
+
+This proves the identical safety property the original test intended
+(one execute() call, always using the fixed, read-only query constant,
+never a dynamic/second operation string) without depending on any
+particular line-wrapping or whitespace choice in the production file.
+Manually simulated against the actual current importer file before
+committing: the rewritten logic finds exactly one `execute()` call,
+confirms `CUSTOMER_IMPORT_QUERY` is referenced, and finds no literal-
+string/f-string argument -- passes.
+
+### I.4 Validation status after this fix
+
+Still static only -- no Odoo/PostgreSQL runtime is reachable in this
+session's own environment (unchanged from every prior session). `python3
+-m py_compile` and `python3 -m pyflakes` are clean on the changed test
+file; a fresh local `docutils` 0.23 RST scan of every docstring/
+manifest field across the whole addon re-ran with **zero warnings**
+(reconfirming the build-log docutils warning the review noted as
+non-blocking is not attributable to any `shopify_connector_sale` file,
+consistent with Task 010's own established conclusion that the
+identical warning is pre-existing/unrelated build-log noise); the same
+source-level guards (zero mutation, zero bypass identifier, zero
+forbidden-model reference) were re-run and remain clean. The rewritten
+test's own logic was additionally hand-simulated against the real
+importer file (§I.3) and confirmed to pass.
+
+**A new live Odoo.sh branch-database run has not been independently
+obtained by this session** -- this session has no live Odoo.sh/CI
+access, exactly as every prior session in this PR's history. The fix
+is believed correct based on the root-cause trace above and the
+manual AST-logic simulation against the real file, but **this session
+does not, and cannot, claim a new green Odoo.sh build** -- that
+requires an actual next Odoo.sh run, not performed by this session.
+
+**Self-audit (review's own instructions, all confirmed):** only
+`test_customer_import_matching.py` changed (no production file, no
+manifest, no security file, no core/product/adams_base file); the
+rewritten test proves the same four properties the review named
+(exactly one `execute()` call; it uses `CUSTOMER_IMPORT_QUERY`; no
+dynamic/second operation string; the query stays read-only, no
+mutation); the SQL `bad query`/ACL-denial log noise was not
+misclassified as a failure; the docutils warning was rechecked, found
+not attributable to this PR's files, and not chased further per the
+review's own routing instruction; PR remains draft, unmerged; no
+Task 012/013/014/015, UI, webhook, OAuth, or MBQ-05 scope touched.
+
 ## Stop condition
 
 Per final prompt §14: this PR is opened as **DRAFT**. It is not marked
-ready for review and not merged. This revision (comment ID
-`4934451381`) does not change that -- it remains **DRAFT, unmerged**.
-Runtime validation is **pending an Odoo.sh build** -- this session does
-not claim, and cannot independently confirm, a green result. ChatGPT's
-own separate review is the next required act -- see the mandatory
-handoff update
+ready for review and not merged. Neither this revision (comment ID
+`4934627954`) nor the prior one (comment ID `4934451381`) changes that
+-- it remains **DRAFT, unmerged**. The first live Odoo.sh run found
+exactly one failure (§I), now fixed; **a new live Odoo.sh run is
+required to confirm `0 failed, 0 error(s)`** and has not been obtained
+by this session -- this session does not claim, and cannot
+independently confirm, a green result. ChatGPT's own separate review
+and re-run is the next required act -- see the mandatory handoff update
 ([`research-handoff.md`](../01-research/research-handoff.md)) for the
 exact next-session prompt.

@@ -1,3 +1,4 @@
+import ast
 import json
 import re
 import uuid
@@ -631,12 +632,74 @@ class TestCustomerImportMatching(TransactionCase):
         """Confirms exactly one Shopify API-client call exists in the
         whole module, and it always passes the fixed
         `CUSTOMER_IMPORT_QUERY` constant -- never a dynamically-built or
-        second operation string that could be a mutation."""
+        second operation string that could be a mutation.
+
+        Parses the source with `ast` rather than matching a raw
+        substring (control-room review, comment `4934627954`): the
+        prior `'CUSTOMER_IMPORT_QUERY, variables='` substring
+        assertion broke on a purely cosmetic line-wrap with no
+        functional effect (`execute(store, CUSTOMER_IMPORT_QUERY,` /
+        `variables={...})` split across lines) -- this rewrite proves
+        the identical safety property independent of whitespace/
+        line-wrapping/argument formatting.
+        """
         path = self._importer_source_path()
         with open(path, 'r', encoding='utf-8') as source_file:
             content = source_file.read()
-        self.assertEqual(content.count("api.client'].execute("), 1)
-        self.assertIn('CUSTOMER_IMPORT_QUERY, variables=', content)
+        tree = ast.parse(content, filename=path)
+
+        execute_calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'execute'
+        ]
+        # 1. Exactly one Shopify API-client execute() call exists.
+        self.assertEqual(
+            len(execute_calls), 1,
+            'exactly one Shopify API-client execute() call must exist '
+            'in the importer module',
+        )
+        call = execute_calls[0]
+
+        # 2. That one call uses the fixed CUSTOMER_IMPORT_QUERY
+        # constant -- a plain Name reference among its arguments,
+        # regardless of positional/keyword form or line placement.
+        referenced_names = {
+            arg.id for arg in call.args if isinstance(arg, ast.Name)
+        } | {
+            keyword.value.id for keyword in call.keywords
+            if isinstance(keyword.value, ast.Name)
+        }
+        self.assertIn(
+            'CUSTOMER_IMPORT_QUERY', referenced_names,
+            'the execute() call must reference the fixed '
+            'CUSTOMER_IMPORT_QUERY constant',
+        )
+
+        # 3. No dynamically-built query string or second operation
+        # string is introduced -- no argument is a literal string
+        # (other than via the named constant above), an f-string, or a
+        # string concatenation/call result standing in for a query.
+        for argument in list(call.args) + [kw.value for kw in call.keywords]:
+            self.assertNotIsInstance(
+                argument, ast.JoinedStr,
+                'execute() must never receive a dynamically-built '
+                '(f-string) query argument',
+            )
+            if isinstance(argument, ast.Constant) and isinstance(
+                argument.value, str,
+            ):
+                self.fail(
+                    'execute() must never receive a literal string '
+                    'argument -- the query must always be the named '
+                    'CUSTOMER_IMPORT_QUERY constant'
+                )
+
+        # 4. The referenced constant itself is still read-only -- a
+        # query, never a mutation.
+        self.assertTrue(CUSTOMER_IMPORT_QUERY.strip().startswith('query'))
+        self.assertNotIn('mutation', CUSTOMER_IMPORT_QUERY.lower())
 
     # ------------------------------------------------------------------
     # 12. The importer requests only the §9 field list.
