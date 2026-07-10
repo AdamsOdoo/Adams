@@ -108,11 +108,101 @@ openable customer-domain gate.
   ([`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md)
   — not blocking Task 011); every other layer unchanged.
 
+## 4.1 AR-041 session addendum (2026-07-10) — distribution/auth architecture layer
+
+> Added by the AR-041 MBQ-05 branch B research/decision-preparation
+> session. §1–§4 above are preserved unchanged. Current delta, **Proposed
+> for ChatGPT review** (nothing below opens a gate or authorizes any
+> task). **This addendum only patches the "Distribution/auth
+> architecture" layer — it does not touch, and must not be read as
+> confirming current, the Task 011 row in §1 or the "Domain code"/
+> "Operator surface" rows in §3; those are addressed separately by §4.2
+> below, which supersedes them after PR #145.**
+
+- **§3 "Distribution/auth architecture" layer delta:** the branch B
+  blocking analysis (§4 row) is now followed by a **complete decision
+  package** —
+  [`../03-architecture/mbq-05-branch-b-final-decision-brief.md`](../03-architecture/mbq-05-branch-b-final-decision-brief.md)
+  (full B-1/B-2/B-3/B-4 evaluation, official evidence re-verified and
+  gap-filled 2026-07-10, adversarial verification of five load-bearing
+  claims) and
+  [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
+  (**Proposed, not accepted**). The layer's state moves from "Branch A
+  (one-store evidence) routed only; branch B decision (OP-05) open" to
+  "Branch A unchanged; a fully-evidenced branch B recommendation is
+  ready for ChatGPT review — architecture decision itself still open."
+- **OAuth / token distribution row (§1) delta:** unchanged in status
+  ("No gate exists; Not started") — a decision package now exists to
+  inform the eventual gate, but no gate is opened and no implementation
+  is authorized by this addendum.
+- **Lite/Full packaging row (§1) delta:** unchanged ("Undefined concept;
+  Not started") — the final decision brief's §7 fit-analysis for each
+  candidate is explicitly contingent on OP-23/Q27 being answered first,
+  and does not itself answer it.
+- **New dependency surfaced, not previously named in this map:** the
+  MBQ-04 encryption-posture tension (PCD Level 2's review-enforced
+  obligations vs. the accepted Task 002 plain-`Char`-plus-ACL credential
+  posture) is now an explicit, named prerequisite for any future public-
+  app (B-1/B-2) implementation work — see the final decision brief §4 and
+  §1.1. This does not change MBQ-04's own row/status in
+  [`master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md);
+  it only records the dependency here.
+
+## 4.2 Post-PR #145 status-refresh note (2026-07-10) — Task 011 closed/exhausted
+
+> Added by this docs-only PR #146 status-refresh patch, per ChatGPT
+> review comment
+> [`4935147220`](https://github.com/AdamsOdoo/Adams/pull/146#issuecomment-4935147220).
+> **§1's Task 011 row and §3's "Domain code"/"Operator surface" rows above
+> are historical, pre-PR-#145 baseline text — they are left unedited
+> here as the least-risky option, and are superseded by the facts in
+> this note, not still current.** Nothing below opens any new gate or
+> authorizes any task.
+
+- **[Fact]** PR #145 ("Task 011: Shopify customer import and matching")
+  merged into `Shopify-connector`, merge commit
+  `7e83abba502c898fa413822c4d9b4866138a454a`.
+- **[Fact]** Task 011 customer import/matching is now **implemented and
+  merged**. The `shopify_connector_sale` addon now exists (the
+  `shopify.connector.customer.binding` model; the read-only
+  `shopify.connector.customer.importer` importer service; the inert
+  `customer_fallback_partner_id` store-settings field, Posture A).
+- **[Fact]** Runtime validation is green: **`0 failed, 0 error(s) of 268
+  tests`** (operator-provided Odoo.sh install log — see the AR-040 row in
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  and
+  [`../05-qa/task-011-customer-import-validation-results.md`](../05-qa/task-011-customer-import-validation-results.md)
+  §J).
+- **[Fact]** The Task 011 customer-domain implementation gate is now
+  **closed/exhausted** — it closed the moment PR #145 opened as draft
+  (per the accepted gate-closure rule) and PR #145 has since merged with
+  runtime-green evidence; no further customer-domain work may start
+  without a distinct, future, explicit ChatGPT act.
+- **Table-row supersession (§1/§3 above):** the §1 Task 011 row ("Not
+  started — `shopify_connector_sale` does not exist"; "Final-prompt +
+  gate-opening-proposal session (OP-02), gate act (OP-01), then one
+  implementation session") and the §3 "Domain code" row ("Product import
+  only") are both **superseded by the facts above** — Task 011 is no
+  longer "not started," `shopify_connector_sale` exists and is merged,
+  and domain code now includes the merged customer-import slice, not
+  product import alone.
+- **Explicit non-authorizations (unchanged by this note):** this note
+  does **not** authorize Task 012, Task 013, Task 014, Task 015, UI,
+  OAuth, webhooks, or Lite/Full packaging implementation of any kind, and
+  does not authorize MBQ-05 branch B implementation. PR #146 / **AR-041**
+  remains a branch-B **decision package only** —
+  [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
+  remains **Proposed for ChatGPT review, NOT accepted**, and **MBQ-05
+  branch B remains undecided**. This note does not touch, edit, or
+  reopen PR #145, and does not alter any Task 011 implementation record
+  except to reference its already-merged, runtime-green status.
+
 ## 5. Explicit non-authorizations
 
-This map does not open any gate, does not authorize any task listed in §1,
-and does not change any criterion's satisfaction status — §2 restates the
-accepted criteria document verbatim in substance, and §4's addendum takes
-effect only through ChatGPT's own acceptance of the AR-039 package. Any
-future change to a criterion's status must come from its own governing
-document or a ChatGPT act, not from this map.
+This map does not open any gate or authorize any implementation task. §2
+restates the historical customer-domain criteria document; §4 records
+AR-039 gate-readiness deltas; §4.1 records the AR-041 distribution/auth
+decision-package delta; and §4.2 records the post-PR #145 factual Task 011
+status refresh. Any future task authorization, gate opening, or change to
+DEC-026 / MBQ-05 branch B status must come from its own governing document
+or an explicit ChatGPT act.
