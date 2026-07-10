@@ -108,6 +108,30 @@ duplicated. This refresh does not accept DEC-026, does not decide MBQ-05
 branch B, does not touch PR #145 or any `addons/shopify_connector_sale`
 file, and does not merge PR #146._
 
+_**AR-040 status-refresh note (2026-07-10, AR-042 planning-completion
+session — documentary only).** The AR-040 row's Status cell above still
+reads "Proposed for ChatGPT review" and its body says "PR #145 remains
+draft, unmerged" — both were accurate when written and are now stale
+facts. **[Verified repository state]** GitHub `pull_request_read` (PR
+#145, checked 2026-07-10): `merged: true`, merged 2026-07-10T11:56:01Z
+by the repository owner, merge commit
+`7e83abba502c898fa413822c4d9b4866138a454a`, base `Shopify-connector`;
+runtime-green evidence (`0 failed, 0 error(s) of 268 tests`) is recorded
+in the row itself and in
+[`task-011-customer-import-validation-results.md`](./task-011-customer-import-validation-results.md)
+§J; the post-merge factual closure is already recorded in
+[`../08-release-readiness/implementation-readiness-map.md`](../08-release-readiness/implementation-readiness-map.md)
+§4.2 (Task 011 merged, runtime-green, customer-domain gate
+closed/exhausted). This note records those facts against the AR-040 row
+so no future session re-reviews PR #145 as an open draft. It does **not**
+retroactively convert the row's "Proposed" status into a ChatGPT
+acceptance wording decision — whether AR-040's Status cell should read
+"Accepted" is a one-line ChatGPT register call (the merge act itself was
+performed by the control room on GitHub); until then, treat **GitHub's
+merged state as the source of truth for PR #145** and this row's Status
+cell as historical. No gate is opened, and no Task 012/013/014/015, UI,
+webhook, OAuth, or packaging work is authorized by this note._
+
 _**AR-039 Acceptance Note (2026-07-10) — PR #144 accepted by ChatGPT
 with two required fixes, both applied in the same PR**, via control-room
 review comment
