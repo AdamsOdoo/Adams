@@ -123,9 +123,16 @@
   commit) · no code/XML/CSV/security/addon file changed · `main` and plain
   `dev` untouched · draft PR only, no merge.
 - **Branch / PR:** `claude/shopify-connector-planning-ue8ew7`, base
-  `Shopify-connector`; a new **draft** PR opened for this docs-only
-  audit/planning-closure package — see the PR body for the exact number.
-  This session does not itself authorize any next implementation task.
+  `Shopify-connector`; **draft PR #143** opened for this docs-only
+  audit/planning-closure package. This session does not itself authorize
+  any next implementation task.
+- **Base-movement note:** while this session ran, ChatGPT merged
+  **PR #141** (`CHATGPT.md` operating guide + new-chat handover prompt,
+  merge commit `81b1f62`) and opened **PR #142** (draft, `CHATGPT.md`
+  learning-loop update — pending ChatGPT's own review, untouched by this
+  session). No file overlap with this package; the updated base was
+  merged into this branch; every audit finding stands unchanged against
+  the new HEAD (see the master audit §2.1 base-movement addendum).
 
 **Next-session prompt (exact):**
 

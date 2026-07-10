@@ -60,11 +60,26 @@
 
 ### 2.1 Branch/PR state
 
-- **[Fact]** `Shopify-connector` HEAD is
+- **[Fact]** At audit time, `Shopify-connector` HEAD was
   `0e138d9ad8e14a9d0766122f30beea2e19df549a` = the PR #140 merge commit.
   PR #140 is `merged: true`, merged 2026-07-09T19:00:34Z, base
   `Shopify-connector`, head `claude/task-011-customer-readiness-5xunqw`
   (GitHub `pull_request_read`, 2026-07-09).
+- **[Fact — base-movement addendum, added before this PR opened/finalized]**
+  While this audit session ran, the control room advanced the base:
+  **PR #141** ("Add ChatGPT operating guide and handover prompt" —
+  `CHATGPT.md` + `docs/06-prompts/chatgpt-new-chat-handover-prompt.md`,
+  ChatGPT-authored, docs-only) **merged** into `Shopify-connector` at
+  2026-07-09T20:02:28Z (merge commit
+  `81b1f62899dc820f26b96b4f2b496752454f735a`), and **PR #142** ("Record
+  ChatGPT continuous learning loop", `CHATGPT.md` only) is **open,
+  draft** — ChatGPT's own review pending, untouched by this session.
+  Neither PR overlaps any file this audit reads statuses from or writes
+  to, and neither changes any gate, decision, task authorization, or open
+  point recorded here — every §2–§6 finding stands unchanged against the
+  new HEAD. The updated base was merged into this audit branch before the
+  draft PR was finalized, so the PR diff remains exactly the ten audited
+  files.
 - **[Fact]** The branch's first-parent merge line runs PR #88 (Task 001
   core scaffold, 2026-07-05) through PR #140 (2026-07-09) with no direct
   non-PR commits observed on the first-parent line other than PR-merge
