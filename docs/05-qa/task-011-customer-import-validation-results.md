@@ -2,27 +2,35 @@
 
 ## Summary
 
-**Revised twice, per ChatGPT control-room review of PR #145 (GitHub
-comment IDs
-[`4934451381`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934451381)
+**Revised twice, then closed out with green runtime evidence, per
+ChatGPT control-room review of PR #145 (GitHub comment IDs
+[`4934451381`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934451381),
+[`4934627954`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934627954),
 and
-[`4934627954`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934627954)).
-Still draft PR, not yet re-reviewed.** This is the first implementation
-session for Task 011, executed under the explicit gate opened by the
-customer-domain gate-opening act (GitHub comment `4934249603`, PR #144,
-merge commit `8b364aa360cb596dd584bbc8345b790cc7ad20ed`). The first
-submission of this PR omitted the final prompt's required unresolved-
-country/state informational job-log note; that omission was reviewed
-as **not acceptable as-is** and was fixed -- see §H for that revision
-record. A subsequent live Odoo.sh run (the first this PR has actually
-received) then found exactly one runtime test failure -- a brittle,
-formatting-dependent source-level assertion, not a functional importer
-defect -- now fixed; see §I for that revision record. No live Odoo/
-PostgreSQL runtime was reachable in this session's own environment (no
-`odoo` package installed, no Odoo.sh access, no external CI configured
-for this repository) -- every validation check this session performed
-directly is static, honestly reported as such, mirroring the format of
-[`task-010-product-import-validation-results.md`](./task-010-product-import-validation-results.md).
+[`4934730895`](https://github.com/AdamsOdoo/Adams/pull/145#issuecomment-4934730895)).
+Still draft PR, ready for ChatGPT's final merge review.** This is the
+first implementation session for Task 011, executed under the explicit
+gate opened by the customer-domain gate-opening act (GitHub comment
+`4934249603`, PR #144, merge commit
+`8b364aa360cb596dd584bbc8345b790cc7ad20ed`). The first submission of
+this PR omitted the final prompt's required unresolved-country/state
+informational job-log note; that omission was reviewed as **not
+acceptable as-is** and was fixed -- see §H for that revision record. A
+subsequent live Odoo.sh run (the first this PR has actually received)
+then found exactly one runtime test failure -- a brittle, formatting-
+dependent source-level assertion, not a functional importer defect --
+now fixed; see §I for that revision record. **A second live Odoo.sh
+run then came back green: `0 failed, 0 error(s) of 268 tests`** -- see
+§J for the full runtime-green closure record, including the exact
+quoted summary lines and the database/build identifier. No live Odoo/
+PostgreSQL runtime is reachable in **this session's own environment**
+(no `odoo` package installed, no Odoo.sh access, no external CI
+configured for this repository); the green runtime evidence in §J was
+provided by the operator (an Odoo.sh install log), not independently
+run by Claude, and is recorded honestly as such, mirroring the format
+of
+[`task-010-product-import-validation-results.md`](./task-010-product-import-validation-results.md)'s
+own "user-provided, not independently re-run by Claude" convention.
 This record itself is **docs-only**: it does not modify any addon/code,
 test, manifest, XML/security, migration, or CI file.
 
@@ -177,6 +185,11 @@ instructions:
 
 ## D. Static validation
 
+**Superseded by §J below for the runtime-execution question** (a live
+Odoo.sh run has since come back green, `0 failed, 0 error(s) of 268
+tests`) -- everything else in this section remains accurate as the
+static-validation record.
+
 No `odoo` package is installed in this environment and no external CI/
 Odoo.sh is reachable from this session -- every check below is static
 (re-run after the §H revision, not only at first submission):
@@ -235,13 +248,20 @@ Odoo.sh is reachable from this session -- every check below is static
 - No live Shopify API call was made or attempted (explicitly out of
   scope, VAL-B2).
 - **A live Odoo.sh branch-database run of the full suite is mandatory
-  before merge** (SRR-06 standing practice, final prompt §12) and has
-  **not** been obtained. This PR stays draft until it is.
+  before merge** (SRR-06 standing practice, final prompt §12) and, at
+  the time this section was written, had **not** been obtained.
+  **Superseded by §J below: this run has since been obtained and came
+  back green** (`0 failed, 0 error(s) of 268 tests`). This paragraph is
+  kept verbatim as an accurate record of this PR's status prior to that
+  run, per this project's own history-preservation convention (mirrors
+  Task 010's own validation record).
 
 ## E. What is accepted
 
 Nothing is accepted by this document. This is an honest evidence record
-for ChatGPT's own separate review -- see the Stop condition below.
+for ChatGPT's own separate review -- see the Stop condition below. (§J's
+runtime-green result is likewise not a merge acceptance -- only
+ChatGPT's own final merge review can accept and merge this PR.)
 
 ## F. What is NOT accepted / still open
 
@@ -263,12 +283,16 @@ constraints, not weakened:
   mechanism unmodified; it neither closes nor claims to close any of
   these, and makes no claim that mechanism is proven safe under real
   concurrent-worker/multi-server execution.
-- **Runtime execution proof for this task's own 4 test files** -- not
-  yet obtained (§D above); a future session/runtime must actually run
-  them before any "0 failed, 0 error(s)" claim can be made.
+- **Runtime execution proof for this task's own test files** -- now
+  **obtained** (§J: `0 failed, 0 error(s) of 268 tests`, database
+  `adamsmen-claude-task-011-shopify-connector-solrrp-34736893`) --
+  superseding the earlier "not yet obtained" status in §D. This does
+  not by itself constitute ChatGPT's final merge review or a merge
+  decision.
 - **The four in-task decisions in §C** are conservative, documented
-  choices, not yet exercised against real Shopify data or reviewed by
-  ChatGPT.
+  choices, exercised only against fake/stub Shopify data in this
+  runtime run (VAL-B2 remains untouched, no live Shopify data was
+  involved), and not yet reviewed by ChatGPT.
 
 ## G. Release/UAT implication
 
@@ -512,16 +536,127 @@ not attributable to this PR's files, and not chased further per the
 review's own routing instruction; PR remains draft, unmerged; no
 Task 012/013/014/015, UI, webhook, OAuth, or MBQ-05 scope touched.
 
+## J. Runtime-green closure -- live Odoo.sh run confirmed green
+
+**Decision: runtime validation passed. PR #145 ready for final ChatGPT
+merge review. Still not merged, kept draft.**
+
+### J.1 Scope of this closure session
+
+Docs-only. This session changed no production code, no test file, no
+manifest, no security file, and no core/product/adams_base file --
+only this validation record, the AR-040 log row, the research
+handoff, and the PR #145 body were updated, per the operator's own
+narrow closure-session scope.
+
+### J.2 Green runtime evidence
+
+- **PR head SHA at the time of this run:** `45d275c9c459db4d6696e3198472726eccdb6458`
+  (the exact commit the §I fix produced -- unchanged by this
+  docs-only closure session).
+- **Odoo.sh database/build identifier** (from the install log's own
+  connection and summary lines): `adamsmen-claude-task-011-shopify-connector-solrrp-34736893`
+  (Postgres connection line: `database: p_adamsmen_claude_task_011_shopify_connector_solrrp_34736893@192.168.1.1:5432`).
+- **Exact quoted final runtime summary lines** (verbatim from the
+  Odoo.sh install log, `odoo.tests.stats`/`odoo.tests.result` logger
+  lines, timestamp `2026-07-10 11:12:14,762`):
+
+  ```
+  odoo.tests.stats: shopify_connector_core: 187 tests 1.66s 3556 queries
+  odoo.tests.stats: shopify_connector_product: 61 tests 1.60s 2485 queries
+  odoo.tests.stats: shopify_connector_sale: 56 tests 0.74s 1067 queries
+  odoo.tests.result: 0 failed, 0 error(s) of 268 tests when loading database 'adamsmen-claude-task-011-shopify-connector-solrrp-34736893'
+  ```
+
+  Per the OP-43 lesson (Task 010's own validation record): the
+  per-module `odoo.tests.stats` counts (187 + 61 + 56 = 304) do not
+  arithmetically reconcile with the final `odoo.tests.result` total
+  (268) -- this discrepancy is **not resolved or explained by this
+  session**, is quoted verbatim rather than synthesized, and does not
+  change the green outcome: Odoo's own authoritative summary line is
+  `0 failed, 0 error(s) of 268 tests`, with no ambiguity in that
+  figure itself.
+- **Module completion line:**
+  `odoo.modules.loading: Module shopify_connector_sale loaded in 0.88s (incl. 0.74s test), 144 queries (+1067 test, +144 other)`.
+
+### J.3 The previous brittle AST-test failure is no longer present
+
+`TestCustomerImportMatching.test_source_level_single_execute_call_uses_fixed_query_constant`
+starts (`Starting TestCustomerImportMatching.test_source_level_single_execute_call_uses_fixed_query_constant ...`)
+and the log proceeds directly to the next test
+(`Starting TestCustomerImportMatching.test_unresolved_country_logs_informational_note_via_job_path ...`)
+with **zero `ERROR`-level or traceback lines in between** -- the
+identical pattern every other passing test in this run shows. This is
+independent, direct confirmation (not an inference from the aggregate
+count alone) that the §I AST-based fix resolved the one failure
+comment `4934627954` reported.
+
+### J.4 SQL `bad query` lines are expected negative-test noise, not failures
+
+Exactly five `ERROR`-level `odoo.sql_db: bad query` lines appear
+during `shopify_connector_sale`'s test run, and they map one-to-one
+onto this addon's own tests that intentionally assert database
+constraints:
+
+- `null value in column "partner_id" ... violates not-null constraint`
+  -- `test_requires_partner_id`.
+- `null value in column "shopify_gid" ... violates not-null constraint`
+  -- `test_requires_shopify_gid`.
+- `null value in column "store_id" ... violates not-null constraint`
+  -- `test_requires_store_id`.
+- `duplicate key value violates unique constraint "shopify_connector_customer_binding_store_shopify_gid_uniq"`
+  and `..._store_partner_uniq` (two lines) --
+  `test_direct_create_collisions_prove_uniqueness_backstop`.
+
+No other `ERROR`-level line appears anywhere in `shopify_connector_sale`'s
+test section. This is the same class of expected noise Task 010's own
+validation record (§K.3) already documented for its own constraint/ACL
+tests -- confirmed here, not merely assumed, by direct inspection of
+this run's own log.
+
+### J.5 The docutils warning did not fail the build, and is confirmed unrelated to this PR's files
+
+The build log's docutils/RST warning --
+
+```
+<string>:38: (ERROR/3) Unexpected indentation.
+<string>:43: (WARNING/2) Block quote ends without a blank line; unexpected unindent.
+```
+
+-- appears immediately after `odoo.models: Prepare computation of
+res.partner.email_normalized`, during the **`mail`** module's own load
+(module 23/44) -- a full ten modules and roughly five seconds after
+`shopify_connector_sale` (module 13/44) already finished loading and
+testing. It is not adjacent to, or plausibly sourced from, any
+`shopify_connector_sale` file. This independently corroborates (via
+direct log-position evidence, not renewed guesswork) Task 010's own
+established conclusion that this exact warning is pre-existing/
+unrelated build-log noise. It did not fail this build -- the final
+result is still `0 failed, 0 error(s) of 268 tests` -- and, per the
+review's own routing instruction, it is not chased further or fixed
+in this PR, since it is not attributable to any Task 011 file.
+
+### J.6 Final result
+
+**Runtime validation passed.** `0 failed, 0 error(s) of 268 tests`,
+verbatim from the Odoo.sh install log, database
+`adamsmen-claude-task-011-shopify-connector-solrrp-34736893`, head SHA
+`45d275c9c459db4d6696e3198472726eccdb6458`. Combined with the static
+validation already recorded in §D/§H.4/§I.4 (unchanged, all clean),
+Task 011's own validation requirements (final prompt §11/§12) are now
+satisfied. **PR #145 is ready for ChatGPT's final merge review** -- it
+remains **draft** and **unmerged**; this record does not itself
+authorize merge, mark it ready for review, or start any further scope.
+
 ## Stop condition
 
 Per final prompt §14: this PR is opened as **DRAFT**. It is not marked
-ready for review and not merged. Neither this revision (comment ID
-`4934627954`) nor the prior one (comment ID `4934451381`) changes that
--- it remains **DRAFT, unmerged**. The first live Odoo.sh run found
-exactly one failure (§I), now fixed; **a new live Odoo.sh run is
-required to confirm `0 failed, 0 error(s)`** and has not been obtained
-by this session -- this session does not claim, and cannot
-independently confirm, a green result. ChatGPT's own separate review
-and re-run is the next required act -- see the mandatory handoff update
+ready for review and not merged. Neither this closure session, nor the
+runtime-failure fix (comment ID `4934627954`), nor the revision before
+it (comment ID `4934451381`), changes that -- it remains **DRAFT,
+unmerged**. Runtime validation is now **green** (§J: `0 failed, 0
+error(s) of 268 tests`) -- **ChatGPT's own final merge review is the
+next required act**; only ChatGPT may merge or mark this PR ready for
+review -- see the mandatory handoff update
 ([`research-handoff.md`](../01-research/research-handoff.md)) for the
 exact next-session prompt.

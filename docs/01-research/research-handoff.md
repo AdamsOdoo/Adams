@@ -1,5 +1,16 @@
 # Research Handoff (rolling)
 
+### Task 011 — PR #145 runtime-green closure — compact handoff (2026-07-10)
+
+- **Branch / PR:** `claude/task-011-shopify-connector-solrrp`; PR #145 → `Shopify-connector`, **draft**, not merged, not marked ready for review.
+- **Files changed:** `docs/05-qa/task-011-customer-import-validation-results.md` (§J added: runtime-green closure); `docs/05-qa/architecture-review-log.md` (AR-040 row updated); `docs/01-research/research-handoff.md` (this entry); PR #145 body refreshed on GitHub. **No code, test, manifest, or security file changed this session.**
+- **What changed:** A follow-on live Odoo.sh run (after the §I brittle-test fix) came back green. Verified directly from the operator-provided install log: `odoo.tests.result: 0 failed, 0 error(s) of 268 tests when loading database 'adamsmen-claude-task-011-shopify-connector-solrrp-34736893'`. Confirmed by direct log inspection: the previously-failing AST-based test now completes cleanly; the five `bad query` SQL `ERROR` lines during `shopify_connector_sale`'s run map exactly onto its own intentional constraint tests (expected noise, not failures); the docutils/RST warning occurs during the unrelated `mail` module's own load, not any Task 011 file, and did not fail the build. **Runtime validation requirement (final prompt §11/§12) is now satisfied.**
+- **Items deferred:** none new. VAL-B2, MBQ-05 (both branches), MBQ-55's order portion, TD-002, the fulfillment API model, Lite/Full packaging, and SRR-03/04/09 all remain exactly as open as before.
+- **Learning feedback loop:** new issues — none; repeated patterns — the OP-43 lesson (quote build-log summary lines verbatim, never synthesize per-module totals) was directly relevant again: the per-module `odoo.tests.stats` counts (187+61+56=304) do not reconcile with the final 268-test total, recorded verbatim without resolving the discrepancy, exactly as OP-43 prescribes; a genuine blocker was also hit and handled correctly this session — the operator's first-uploaded log excerpt did not itself contain the final summary line, so it was flagged and a second, complete log was requested rather than fabricating a plausible-looking result; rules updated — none; rejected approaches — none new; technical debt — none new; architecture concerns — none.
+- **Quality gate confirmation:** handoff updated (this entry) · feedback loop checked (above) · learning captured (above) · no new rejected approach · no new technical debt · only docs changed this session (confirmed via `git status`) · no core/product/adams_base/UI/webhook/OAuth/workflow/CI/manifest/security file touched · PR remains draft, not merged, not marked ready for review.
+- **Next recommended session:** **ChatGPT's own final merge review of PR #145** — this is the next required act; no further Claude Code implementation session is scoped or authorized by this entry.
+- **Stop condition:** Runtime-evidence closure patch pushed; PR #145 remains draft, unmerged, not marked ready for review. No other scope (Task 012, PR #146, MBQ-05) was touched or started.
+
 ### Task 011 — PR #145 revision: unresolved country/state job-log note — compact handoff (2026-07-10)
 
 - **Branch / PR:** `claude/task-011-shopify-connector-solrrp`; PR #145 → `Shopify-connector`, **draft**, not merged, not marked ready for review.
