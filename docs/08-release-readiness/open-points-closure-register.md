@@ -151,6 +151,25 @@ resolved here.
 | OP-46 *(new)* | **DEC-023 branch-A scope generalization question** — DEC-023 §3.1 accepts Custom Distribution's evidence path for "**a single pilot customer**" (singular); this session's B-4 candidate evaluation surfaced that treating "early/pilot/private customers" (plural, ongoing practice) as already covered by that acceptance is a broader claim than DEC-023 actually made. Not a branch B decision itself, but a prerequisite scope clarification for any hybrid (B-4-style) outcome. Class: B + G. Owner/next action: ChatGPT gives an explicit one-line confirmation (or declines to) whether DEC-023's acceptance extends to multiple simultaneous pilot customers. Can this session close it? **No** — a scope-clarification call is ChatGPT's |
 | All other rows (OP-01–04/06/14–39/41–44) | Unchanged — not touched by this session; re-confirmed accurate as of 2026-07-10 by cross-reference only, no new closure |
 
+## 3.8 DEC-026 acceptance status-refresh addendum (2026-07-10)
+
+> Added by this docs-only DEC-026 acceptance/status patch session. §3.1–§3.7
+> row texts above are preserved unchanged; this addendum is the current
+> delta. **Nothing here opens a gate, issues a prompt, authorizes
+> implementation, or resolves any row not explicitly named below.**
+
+| ID | 2026-07-10 status delta |
+| --- | --- |
+| OP-05 (MBQ-05 branch B) | **Strategic direction accepted, not fully resolved:** ChatGPT accepted [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)'s hybrid recommendation — DEC-023 branch A unchanged; Public distribution/Limited Visibility (B-1) designated the target scalable branch-B architecture; B-3 per-customer custom apps not adopted as the standing commercial-scale answer; Phase 2+ scope under RA-003's own revisit condition. **Implementation gated separately — not authorized by this acceptance.** New status: "Accepted strategic direction; implementation gated separately" (was "Partially routed / Open"), not "Resolved" |
+| OP-40 (PCD posture) | Unchanged — still open. The MBQ-04 encryption-posture tension named in DEC-026's acceptance note remains a named, unresolved prerequisite for any public-app path |
+| OP-45 (Partner Program Agreement fee schedule / Enforcement page) | **Unchanged — remains open.** Not sourced by this session. Still requires its own narrowly-scoped follow-up fetch before any commercial model is finalized |
+| OP-46 (DEC-023 branch-A single-vs-plural pilot-customer scope) | **Unchanged — remains open.** DEC-026's acceptance does not itself answer this; still requires ChatGPT's own explicit one-line confirmation |
+| OP-23 (Lite/Full packaging) | **Unchanged — remains open** at framing level. DEC-026's acceptance does not answer Q27; sequencing note (ChatGPT first answers Q27, then a dedicated planning task) stands |
+| MBQ-04 (credential-persistence/encryption posture) | **Unchanged — remains at its existing status** (see `master-blueprint-open-questions.md` MBQ-04 row). Not upgraded, not resolved, by this session |
+| RA-003 (App-Store-distribution Phase-1 rejection) | **Not lifted.** DEC-026's acceptance exercises RA-003's own stated revisit condition; it does not weaken, reopen, or supersede RA-003 |
+| Task 012 / 013 / 014 / 015 | **Not authorized.** Unaffected by this session in any way |
+| All other rows (OP-01–04/06–22/24–39/41–44) | Unchanged — not touched by this session |
+
 ## 4. Cross-check completeness statement
 
 Every open item named in: the PR #140 body's "Open blockers" list, the

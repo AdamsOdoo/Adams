@@ -189,20 +189,70 @@ openable customer-domain gate.
 - **Explicit non-authorizations (unchanged by this note):** this note
   does **not** authorize Task 012, Task 013, Task 014, Task 015, UI,
   OAuth, webhooks, or Lite/Full packaging implementation of any kind, and
-  does not authorize MBQ-05 branch B implementation. PR #146 / **AR-041**
-  remains a branch-B **decision package only** —
+  does not authorize MBQ-05 branch B implementation.
+- **Historical / superseded by §4.3 below (2026-07-10 correction, per
+  ChatGPT review comment
+  [`4936371088`](https://github.com/AdamsOdoo/Adams/pull/147#issuecomment-4936371088)
+  on PR #147):** at the time this §4.2 note was added (the PR #146 merge),
+  PR #146 / AR-041 was a branch-B **decision package only** —
   [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
-  remains **Proposed for ChatGPT review, NOT accepted**, and **MBQ-05
-  branch B remains undecided**. This note does not touch, edit, or
+  was then **Proposed for ChatGPT review, NOT accepted**, and **MBQ-05
+  branch B was then undecided**. **That pre-acceptance status is
+  superseded for strategic-direction purposes by §4.3 below**, which
+  records that ChatGPT has since accepted DEC-026's hybrid recommendation
+  as the strategic branch-B distribution/auth direction — implementation
+  remains gated separately and is **not** authorized by that acceptance;
+  RA-003 is **not** lifted; MBQ-04, OP-23/Q27, OP-45, and OP-46 remain
+  open. **This §4.2 note remains authoritative only for the PR #145 /
+  Task 011 factual closure it records above** (Task 011 merged,
+  runtime-green, gate closed/exhausted) — it does not touch, edit, or
   reopen PR #145, and does not alter any Task 011 implementation record
   except to reference its already-merged, runtime-green status.
+
+## 4.3 DEC-026 acceptance status-refresh note (2026-07-10) — distribution/auth architecture layer
+
+> Added by this docs-only DEC-026 acceptance/status patch session, per
+> ChatGPT's explicit decision to accept DEC-026's hybrid recommendation as
+> the strategic branch-B distribution/auth direction. §4.1 above is
+> preserved unchanged as the pre-acceptance baseline; this note is the
+> current delta. **Nothing below opens a gate or authorizes any
+> implementation task.**
+
+- **[Fact]** ChatGPT has accepted
+  [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
+  (2026-07-10) as the strategic branch-B distribution/auth direction — see
+  that document's "Acceptance note" and the AR-041 row in
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md).
+  §4.1's characterization ("architecture decision itself still open") is
+  superseded at the **strategic-direction** level only, by this note.
+- **"Distribution/auth architecture" layer state moves to:** "Branch A
+  unchanged; Public distribution/Limited Visibility (candidate B-1)
+  accepted as the target scalable branch-B architecture (strategic
+  direction only); engineering implementation remains gated separately —
+  not authorized."
+- **"OAuth / token distribution" row (§1) — unchanged in status:** "No
+  gate exists; Not started." An accepted strategic direction now exists,
+  but no gate is opened and no implementation is authorized by this note.
+- **"Lite/Full packaging" row (§1) — unchanged:** "Undefined concept; Not
+  started" — OP-23/Q27 remains open and is a named prerequisite, not
+  resolved here.
+- **Five prerequisites remain open**, unchanged by this note: the MBQ-04
+  encryption-posture decision; OP-23/Q27 (Lite/Full packaging mechanism);
+  OP-46 (DEC-023 branch-A single-vs-plural pilot-customer scope
+  clarification); a separate RA-003 deferral-lift act; and OP-45 (Partner
+  Program Agreement fee-schedule / "Enforcement" page sourcing).
+- **Explicit non-authorizations:** this note does not authorize OAuth,
+  a setup wizard, App Store packaging, billing integration, compliance
+  webhooks, any UI, or Task 012/013/014/015 work; does not lift RA-003;
+  does not resolve MBQ-04, OP-23/Q27, OP-45, or OP-46.
 
 ## 5. Explicit non-authorizations
 
 This map does not open any gate or authorize any implementation task. §2
 restates the historical customer-domain criteria document; §4 records
 AR-039 gate-readiness deltas; §4.1 records the AR-041 distribution/auth
-decision-package delta; and §4.2 records the post-PR #145 factual Task 011
-status refresh. Any future task authorization, gate opening, or change to
-DEC-026 / MBQ-05 branch B status must come from its own governing document
-or an explicit ChatGPT act.
+decision-package delta; §4.2 records the post-PR #145 factual Task 011
+status refresh; and §4.3 records the DEC-026 acceptance status refresh
+(strategic direction accepted, implementation gated separately). Any
+future task authorization or gate opening must come from its own
+governing document or an explicit ChatGPT act.

@@ -12,6 +12,19 @@
 > does not change any task's current gate status. Every row below is
 > conditional on its stated "if accepted" premise; none is triggered by
 > this document.
+>
+> **Status-refresh note (2026-07-10, DEC-026 acceptance session — records
+> the already-made acceptance fact only, does not authorize anything
+> new):** ChatGPT has accepted DEC-026's hybrid recommendation (see that
+> document's "Acceptance note") as the strategic branch-B direction — the
+> "**If the hybrid recommendation … is accepted**" / "**If DEC-026's
+> hybrid recommendation (B-1 + continued branch A) is accepted**" rows
+> below are therefore the now-operative outcome at *strategic-direction*
+> level. This does **not** trigger, authorize, or gate-open any row's
+> implication — every row still requires its own separate, explicit
+> ChatGPT gate-opening act and final implementation prompt, and the five
+> prerequisites named in DEC-026's Acceptance note (MBQ-04, OP-23/Q27,
+> OP-46, the RA-003 deferral-lift act, and OP-45) remain open.
 
 ## 0. Baseline that does not change regardless of outcome
 

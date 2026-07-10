@@ -2,16 +2,63 @@
 
 ## Status
 
-**Proposed for ChatGPT review. NOT accepted.** Prepared 2026-07-10 by a
+**Accepted by ChatGPT as the strategic branch-B distribution/auth
+direction — implementation gated separately.** Prepared 2026-07-10 by a
 dedicated MBQ-05 branch B research/decision-preparation session (Fable
 acting as strategic auditor / architecture decision researcher, not as
-implementation worker). This proposal does **not** resolve MBQ-05, does
-**not** select a final distribution method, does **not** authorize any
+implementation worker); **accepted by ChatGPT on 2026-07-10** — see
+"Acceptance note" immediately below. This acceptance does **not** resolve
+MBQ-05 for implementation purposes, does **not** authorize any
 OAuth/wizard/billing/webhook implementation, does **not** weaken DEC-023's
 accepted branch A scope or RA-003's rejection, and does **not** affect
-Task 011 (or any other implementation task) in any way. It becomes
-binding only if and when ChatGPT explicitly accepts it; until then, MBQ-05
-branch B remains **undecided**.
+Task 011 (or any other implementation task) in any way.
+
+**Acceptance note (2026-07-10):**
+
+- **Accepted:** this proposal's hybrid recommendation as the strategic
+  branch-B distribution/auth direction —
+  1. **DEC-023 branch A stays unchanged**, exactly as already accepted in
+     its limited scope (one-store/same-Plus-org/private-customer/
+     VAL-B2-evidence purposes only).
+  2. **Public distribution with Limited Visibility (candidate B-1) is
+     designated the target scalable architecture** for the
+     many-unrelated-commercial-customer use case, with the B-1-vs-B-2
+     (limited vs. fully visible) choice deferred to a later, separate
+     go-to-market decision.
+  3. **B-3 (per-customer Custom Distribution) is *not* adopted** as the
+     standing, sole answer at commercial scale.
+  4. **This is Phase 2+ scope**, evaluated strictly under RA-003's own
+     stated revisit condition.
+- **Implementation gated separately — no implementation authorized by
+  this acceptance.** No OAuth, token-exchange, setup wizard, UI, App
+  Store packaging, billing integration, or compliance-webhook code of any
+  kind is authorized. The "Non-authorizations" and "No implementation
+  authorized" sections below remain fully in force, unchanged.
+- **RA-003 is not lifted.** This acceptance exercises RA-003's own stated
+  revisit condition (evaluating public distribution for Phase 2+); it
+  does not weaken, reopen, or supersede RA-003's rejection of public App
+  Store distribution as a Phase 1 requirement.
+- **Five prerequisites remain open**, each requiring its own separate,
+  explicit ChatGPT act before any implementation surfaces this direction
+  might eventually unlock: (i) a dedicated DEC resolving the MBQ-04
+  encryption-posture tension; (ii) ChatGPT's answer to OP-23/Q27
+  (Lite/Full packaging mechanism); (iii) an explicit scope clarification
+  of DEC-023 branch A (OP-46 — single vs. multiple simultaneous pilot
+  customers); (iv) a separate ChatGPT act lifting RA-003's Phase-1
+  deferral for the specific engineering surfaces this direction
+  eventually unlocks; (v) sourcing the Partner Program Agreement's fee
+  schedule and the "Enforcement of Shopify's Partner Program Policies"
+  page (OP-45).
+- **MBQ-05 branch B register status:** moves from "Partially routed /
+  Open" to **"Accepted strategic direction; implementation gated
+  separately"** — **not** "Resolved," since no code, wizard, or billing
+  mechanism is authorized by this acceptance. See the MBQ-05 row in
+  [`../03-architecture/master-blueprint-open-questions.md`](../03-architecture/master-blueprint-open-questions.md)
+  and the AR-041 row in
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md).
+- This acceptance record is itself a Markdown-only, docs-only patch; it
+  creates no code, no Odoo module, no OAuth flow, no webhook, and no
+  billing integration.
 
 ## Date
 

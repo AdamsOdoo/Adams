@@ -1,5 +1,112 @@
 # Research Handoff (rolling)
 
+### DEC-026 acceptance / status-refresh patch (2026-07-10)
+
+- **What happened:** ChatGPT explicitly decided to **accept DEC-026's
+  hybrid recommendation as the strategic branch-B distribution/auth
+  direction, with implementation gated separately.** This narrow,
+  docs-only session records that decision across the repo's governance
+  registers. It does **not** implement anything, does **not** lift
+  RA-003, does **not** resolve MBQ-04, does **not** resolve OP-23/Q27
+  Lite/Full packaging, does **not** resolve OP-45, and does **not**
+  resolve OP-46 (recorded as remaining open only).
+- **Decision recorded, exactly as ChatGPT stated it:** (1) DEC-023 branch
+  A stays unchanged, exactly as already accepted in its limited scope;
+  (2) Public distribution with Limited Visibility (candidate B-1) is
+  accepted as the target scalable architecture for the
+  many-unrelated-commercial-customer use case; (3) B-3 (per-customer
+  Custom Distribution) is **not** adopted as the standing commercial-scale
+  answer; (4) this is **Phase 2+ scope** under RA-003's own stated
+  revisit condition; (5) **no implementation is authorized.**
+- **Files changed (all Markdown, docs-only):**
+  `docs/04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`
+  (Status section: new "Acceptance note (2026-07-10)");
+  `docs/05-qa/architecture-review-log.md` (AR-041 row: Review decision and
+  Status columns Proposed → Accepted);
+  `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-05 row:
+  new dated acceptance note — "Accepted strategic direction;
+  implementation gated separately," explicitly **not** "Resolved");
+  `docs/08-release-readiness/implementation-readiness-map.md` (new §4.3
+  DEC-026 acceptance status-refresh addendum);
+  `docs/08-release-readiness/open-points-closure-register.md` (new §3.8
+  addendum: OP-05 status delta; OP-45/OP-46/OP-23/MBQ-04/RA-003 confirmed
+  unchanged/open);
+  `docs/07-implementation-plan/mbq-05-branch-b-next-implementation-implications.md`
+  (status-refresh note only, naming which conditional rows are now
+  operative — no row's implication triggered); this handoff entry.
+- **What this session does NOT do:** does not create, modify, or touch
+  any code/addon/`.py`/`.xml`/`.csv`/manifest/security/migration/
+  workflow/test/`requirements*.txt`/Dockerfile/CI file (confirmed via
+  `git diff --name-only origin/Shopify-connector...HEAD` before commit —
+  Markdown only); does not authorize OAuth, a setup wizard, App Store
+  packaging, billing integration, compliance-webhook code, any UI, or
+  Task 012/013/014/015 implementation of any kind; does not authorize
+  MBQ-05 branch B *implementation*; does not lift RA-003's Phase-1
+  deferral; does not resolve MBQ-04, OP-23/Q27, OP-45, or OP-46 — all
+  five prerequisites named in DEC-026's Acceptance note remain open,
+  each requiring its own separate, future, explicit ChatGPT act; does not
+  touch Task 011/PR #145's files, branch, or merged record in any way;
+  does not merge anything; `main` and plain `dev` untouched.
+- **Learning feedback loop:** new issues — none; repeated patterns — the
+  established repo convention (seen in DEC-023's own acceptance, and in
+  the MBQ-04/Final-MBQ-Closure acceptance patches in
+  `master-blueprint-open-questions.md`) is to **append** a dated
+  acceptance note to the Status section / register row rather than
+  rewrite the original historical proposal text — followed exactly here,
+  for consistency and to preserve the full decision trail; a
+  wording-discipline lesson worth keeping — every acceptance sentence
+  pairs "accepted strategic direction" with an explicit "implementation
+  gated separately / not authorized" clause, so a future reader cannot
+  mistake strategic acceptance for an implementation green light; rules
+  updated — none; rejected approaches — none new (RA-003 explicitly
+  respected via its own revisit condition, not reintroduced or weakened);
+  technical debt — none new; architecture concerns — none.
+- **Quality gate confirmation:** handoff updated (this entry) · feedback
+  loop checked (above) · learning captured (above) · no new rejected
+  approach · no new technical debt · only Markdown docs touched
+  (confirmed via `git diff --name-only` before commit) · no
+  code/XML/CSV/security/addon/manifest/migration/workflow/test file
+  changed · `main`/plain `dev` untouched · Task 011 files/branch
+  untouched · RA-003 not lifted · MBQ-04/OP-23/OP-45/OP-46 confirmed still
+  open · draft PR only, no merge, not marked ready for review.
+- **Branch / PR:** `claude/dec-026-acceptance-mbq-05-branch-b`, base
+  `Shopify-connector`; draft PR **"Accept DEC-026 strategic direction for
+  MBQ-05 branch B."**
+- **Next recommended session:** one of the five now-open prerequisite
+  acts — a dedicated DEC resolving the MBQ-04 encryption-posture tension;
+  ChatGPT's answer to OP-23/Q27; the OP-46 scope-clarification
+  confirmation; the Partner Program Agreement fee-schedule/Enforcement-
+  page sourcing task (OP-45); or, separately and only when ChatGPT
+  chooses, the RA-003 Phase-1-deferral-lift act for a specific
+  engineering surface. No implementation session is scoped or authorized
+  by this entry.
+- **Stop condition:** DEC-026 acceptance/status patch pushed; draft PR
+  opened into `Shopify-connector`, **not** marked ready for review, not
+  merged. No other scope (OAuth, wizard, App Store packaging, billing,
+  compliance webhooks, webhooks, UI, Task 012/013/014/015, or MBQ-05
+  implementation) was touched or started.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT reviews the draft PR "Accept DEC-026 strategic direction for
+MBQ-05 branch B" (branch claude/dec-026-acceptance-mbq-05-branch-b, base
+Shopify-connector) confirming: the diff is Markdown-only; DEC-026's Status
+section correctly records acceptance as strategic-direction-only with
+implementation gated separately; the AR-041 row in
+docs/05-qa/architecture-review-log.md reads Accepted; the MBQ-05 row in
+docs/03-architecture/master-blueprint-open-questions.md reads "Accepted
+strategic direction; implementation gated separately," not "Resolved";
+RA-003 is not lifted; MBQ-04, OP-23/Q27, OP-45, and OP-46 remain open; no
+OAuth/wizard/App-Store/billing/webhook/UI/Task-012-015/MBQ-05-
+implementation work was authorized. Then choose which of the five open
+prerequisites (MBQ-04 encryption-posture DEC; OP-23/Q27 Lite/Full
+packaging answer; OP-46 scope-clarification confirmation; OP-45 Partner
+Program Agreement fee-schedule/Enforcement-page sourcing task; or a future
+RA-003 Phase-1-deferral-lift act) to authorize next, each as its own
+distinct, separately-scoped session.
+```
+
 ### PR #146 status-refresh patch — implementation-readiness-map.md Task 011 row (2026-07-10)
 
 - **What happened:** a narrow, docs-only PR #146 revision session, per
