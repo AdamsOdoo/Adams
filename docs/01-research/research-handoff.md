@@ -1,5 +1,39 @@
 # Research Handoff (rolling)
 
+### PR #146 refresh — merge-sequencing rule executed (2026-07-10)
+
+- **What happened:** a narrow, docs-only PR #146 refresh session. PR #145
+  (Task 011 customer import/matching, `shopify_connector_sale`) merged
+  into `Shopify-connector`, merge commit
+  `7e83abba502c898fa413822c4d9b4866138a454a`. Per this package's own
+  AR-041 merge-sequencing rule ("if PR #145 merges first, PR #146 must be
+  refreshed against the new `Shopify-connector` tip before its own final
+  merge review"), this session rebased branch
+  `claude/mbq-05-branch-b-research-w0m0p3` (PR #146) onto the new
+  `Shopify-connector` tip.
+- **Method:** `git rebase origin/Shopify-connector`. Conflicts occurred in
+  exactly the two files both PRs touch —
+  `docs/01-research/research-handoff.md` and
+  `docs/05-qa/architecture-review-log.md` (both PRs insert new top-of-file
+  content) — resolved conservatively: PR #145's already-merged AR-040 row
+  and handoff entries preserved verbatim, unduplicated, ahead of this
+  package's own AR-041 row/entry; no content from either package was
+  dropped or rewritten.
+- **Files changed this session:** the same two files (conflict
+  resolution only) plus this entry. No other file in the PR #146 package
+  was touched; no addon/code/XML/CSV/manifest/security/migration/
+  workflow/test file was touched; `addons/shopify_connector_sale` and
+  every Task 011 runtime-green closure record (`AR-040` row,
+  `docs/05-qa/task-011-customer-import-validation-results.md`) are
+  untouched and preserved exactly as merged.
+- **What this session does NOT do:** does not accept DEC-026, does not
+  decide MBQ-05 branch B, does not perform final acceptance of PR #146,
+  does not edit or reopen PR #145, does not merge PR #146, does not mark
+  PR #146 ready for review, does not authorize OAuth/wizard/App-Store-
+  packaging/billing/compliance-webhook work of any kind.
+- **Stop condition:** refreshed branch pushed; PR #146 remains **draft**,
+  unmerged, mergeable/clean against the new `Shopify-connector` tip.
+
 ### Task 011 — PR #145 runtime-green closure — compact handoff (2026-07-10)
 
 - **Branch / PR:** `claude/task-011-shopify-connector-solrrp`; PR #145 → `Shopify-connector`, **draft**, not merged, not marked ready for review.
@@ -33,7 +67,7 @@
 - **Next recommended session:** ChatGPT's own review of this draft PR against the final implementation prompt §3–§14 and the validation-results record, followed by arranging the mandatory live Odoo.sh run before any merge decision — no next Claude Code session is scoped or authorized by this entry.
 - **Stop condition:** Per final prompt §14 — PR opened as **DRAFT**, not marked ready for review, not merged. The customer-domain implementation gate **closes** the moment this PR opens as draft, per the accepted gate-closure rule — no further customer-domain work (and no Task 012/013/014, Task 015, UI, webhook, OAuth, or Lite/Full packaging work) may start in this or any session regardless of this PR's own outcome, until a distinct, future, explicit ChatGPT act authorizes it.
 
-### AR-040 MBQ-05 branch B distribution/auth final decision package (2026-07-10)
+### AR-041 MBQ-05 branch B distribution/auth final decision package (2026-07-10)
 
 - **What happened:** a dedicated, docs-only MBQ-05 branch B research/
   decision-preparation session (Fable acting as strategic auditor /
@@ -90,19 +124,35 @@
   billing/commercial packaging, Lite/Full packaging, release readiness,
   and UAT — none triggered by this document).
 - **Status patches (allowed registers/docs only):**
-  `docs/05-qa/architecture-review-log.md` — new **AR-040** row
+  `docs/05-qa/architecture-review-log.md` — new **AR-041** row
   (**Proposed for ChatGPT review**);
   `docs/03-architecture/master-blueprint-open-questions.md` — MBQ-05 row
   dated note (decision package prepared; row stays **Partially routed /
   Open**, not Resolved);
   `docs/08-release-readiness/open-points-closure-register.md` — new §3.7
-  AR-040 addendum (OP-05/OP-40 status deltas; two new open points, OP-45
+  AR-041 addendum (OP-05/OP-40 status deltas; two new open points, OP-45
   Partner Program Agreement fee-schedule/Enforcement-page sourcing, OP-46
   DEC-023 branch-A single-vs-plural-pilot-customer scope clarification);
   `docs/08-release-readiness/implementation-readiness-map.md` — new §4.1
-  AR-040 addendum (distribution/auth architecture layer delta; MBQ-04
+  AR-041 addendum (distribution/auth architecture layer delta; MBQ-04
   dependency named, not resolved);
   this handoff entry.
+- **AR numbering / merge-sequencing note (2026-07-10, ChatGPT control-room
+  review comment
+  [`4934676616`](https://github.com/AdamsOdoo/Adams/pull/146#issuecomment-4934676616)
+  on PR #146) — REVISE applied in the same PR, before any acceptance:**
+  this package was originally drafted and pushed as "AR-040"; ChatGPT's
+  review caught that **PR #145** (the Task 011 customer-import
+  implementation draft PR, opened earlier and currently under
+  runtime-fix review) already owns **AR-040**. Every self-reference
+  across this package was renumbered to **AR-041** in the same PR #146.
+  **Merge-sequencing rule: PR #145 owns AR-040; PR #146 owns AR-041; PR
+  #146 must not be merged ahead of PR #145 unless ChatGPT explicitly
+  decides to reorder/renumber the AR sequence; if PR #145 merges first,
+  PR #146 must be refreshed against the new `Shopify-connector` tip
+  before its own final merge review.** This note does not accept
+  DEC-026, does not decide MBQ-05 branch B, and does not affect PR #145
+  or Task 011 in any way.
 - **What this session does NOT do:** does not implement any code or
   touch any addon/py/xml/csv/manifest/security/migration/workflow/test/
   requirements/Docker/CI file (confirmed by `git diff --name-only
@@ -168,7 +218,8 @@ docs/04-decisions/DEC-026-distribution-auth-branch-b-proposal.md
 (Proposed only — verify it is not marked Accepted and every
 non-authorization in its §8 is intact),
 docs/07-implementation-plan/mbq-05-branch-b-next-implementation-implications.md,
-the new AR-040 row (Proposed) in docs/05-qa/architecture-review-log.md,
+the new AR-041 row (Proposed) in docs/05-qa/architecture-review-log.md,
+and confirm PR #145 remains the sole owner of AR-040,
 and the register addenda (open-points-closure-register.md §3.7;
 implementation-readiness-map.md §4.1). Confirm: the diff is Markdown-only;
 no OAuth/wizard/billing/webhook code was added; DEC-026 is Proposed, not

@@ -134,9 +134,9 @@ resolved here.
 | OP-44 (source-capture routing) | **Closed this session (docs-only):** 2026-07-10 official excerpts captured in [`../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md`](../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md); the Tier-1 Customer-object gap closed via a dated section in [`../01-research/shopify-official-api-notes.md`](../01-research/shopify-official-api-notes.md) |
 | All other rows (OP-03/04/06/14–23/26–39/41) | Unchanged — re-verified 2026-07-10 as still accurate; no silent closure |
 
-## 3.7 AR-040 session addendum (2026-07-10) — MBQ-05 branch B decision package
+## 3.7 AR-041 session addendum (2026-07-10) — MBQ-05 branch B decision package
 
-> Added by the AR-040 MBQ-05 branch B research/decision-preparation
+> Added by the AR-041 MBQ-05 branch B research/decision-preparation
 > session (docs-only; **Proposed for ChatGPT review**). The §3.1–§3.6 row
 > texts above are preserved unchanged; this addendum is the current
 > delta. Nothing here opens a gate, issues a prompt, or converts a

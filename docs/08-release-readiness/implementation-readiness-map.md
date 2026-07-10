@@ -108,9 +108,9 @@ openable customer-domain gate.
   ([`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md)
   — not blocking Task 011); every other layer unchanged.
 
-## 4.1 AR-040 session addendum (2026-07-10) — distribution/auth architecture layer
+## 4.1 AR-041 session addendum (2026-07-10) — distribution/auth architecture layer
 
-> Added by the AR-040 MBQ-05 branch B research/decision-preparation
+> Added by the AR-041 MBQ-05 branch B research/decision-preparation
 > session. §1–§4 above are preserved unchanged. Current delta, **Proposed
 > for ChatGPT review** (nothing below opens a gate or authorizes any
 > task):
