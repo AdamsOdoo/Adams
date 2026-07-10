@@ -189,11 +189,23 @@ openable customer-domain gate.
 - **Explicit non-authorizations (unchanged by this note):** this note
   does **not** authorize Task 012, Task 013, Task 014, Task 015, UI,
   OAuth, webhooks, or Lite/Full packaging implementation of any kind, and
-  does not authorize MBQ-05 branch B implementation. PR #146 / **AR-041**
-  remains a branch-B **decision package only** —
+  does not authorize MBQ-05 branch B implementation.
+- **Historical / superseded by §4.3 below (2026-07-10 correction, per
+  ChatGPT review comment
+  [`4936371088`](https://github.com/AdamsOdoo/Adams/pull/147#issuecomment-4936371088)
+  on PR #147):** at the time this §4.2 note was added (the PR #146 merge),
+  PR #146 / AR-041 was a branch-B **decision package only** —
   [`../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md`](../04-decisions/DEC-026-distribution-auth-branch-b-proposal.md)
-  remains **Proposed for ChatGPT review, NOT accepted**, and **MBQ-05
-  branch B remains undecided**. This note does not touch, edit, or
+  was then **Proposed for ChatGPT review, NOT accepted**, and **MBQ-05
+  branch B was then undecided**. **That pre-acceptance status is
+  superseded for strategic-direction purposes by §4.3 below**, which
+  records that ChatGPT has since accepted DEC-026's hybrid recommendation
+  as the strategic branch-B distribution/auth direction — implementation
+  remains gated separately and is **not** authorized by that acceptance;
+  RA-003 is **not** lifted; MBQ-04, OP-23/Q27, OP-45, and OP-46 remain
+  open. **This §4.2 note remains authoritative only for the PR #145 /
+  Task 011 factual closure it records above** (Task 011 merged,
+  runtime-green, gate closed/exhausted) — it does not touch, edit, or
   reopen PR #145, and does not alter any Task 011 implementation record
   except to reference its already-merged, runtime-green status.
 
