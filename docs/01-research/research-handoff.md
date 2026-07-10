@@ -1,5 +1,205 @@
 # Research Handoff (rolling)
 
+### PR #143 acceptance/status note — docs-only audit/planning closure, merge-safe after PR #142 (2026-07-10)
+
+- **What happened:** ChatGPT reviewed PR #143 (branch
+  `claude/shopify-connector-planning-ue8ew7`, base `Shopify-connector`,
+  the AR-038 audit/planning-closure package described in the entry
+  directly below) via control-room comment
+  [`4932199585`](https://github.com/AdamsOdoo/Adams/pull/143#issuecomment-4932199585)
+  and **accepted it as docs-only audit/planning closure, for merge once
+  final checks pass**. Per that comment's required actions, this session
+  refreshed the branch against the current `Shopify-connector` head (now
+  including **PR #142**'s merge commit
+  `8514d74dba1e606c77489b84165e991b8d9c11da`), kept the PR diff limited to
+  the same ten Markdown planning/register files, and applied the AR-038
+  acceptance patch — see
+  [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+  (AR-038 row now **Accepted**, with an AR-038 Acceptance Note).
+- **This note is the current status and remains correct after PR #143 is
+  merged — treat it, not the "Proposed"/draft language in the entry below,
+  as authoritative.** **Merging PR #143 authorizes nothing.** No
+  implementation of any kind is authorized by the merge; the
+  customer-domain gate is **not** opened; **Task 011, 012, 013, 014, and
+  015 remain unauthorized**; **no usable implementation prompt is
+  issued**; decisions D1–D8 remain recommendations/decision inputs for a
+  future session, not final decisions.
+- **The next step after PR #143 merges is *not* implementation.** It is a
+  separate **Task 011 final-prompt / customer-domain gate-opening-proposal
+  session** (per
+  [`../07-implementation-plan/next-gate-readiness-roadmap.md`](../07-implementation-plan/next-gate-readiness-roadmap.md)
+  §2, deciding D1–D8 in §4 during its review), **plus a separate, distinct
+  ChatGPT decision on MBQ-05 branch B** — neither is performed by this
+  note, by PR #143's merge, or by this session.
+- **This session does not merge PR #143, does not start Task 011, does not
+  open any gate, and does not issue or draft any usable implementation
+  prompt.**
+
+### Project readiness master audit and final pre-implementation roadmap — post-PR #140 planning-closure package (2026-07-09)
+
+- **What happened:** a high-power audit session (explicitly authorized as
+  such; Fable acting as strategic auditor/planning finisher, not as the
+  implementation worker) first **verified PR #140 merged** into
+  `Shopify-connector` (merge commit
+  `0e138d9ad8e14a9d0766122f30beea2e19df549a`, merged 2026-07-09T19:00:34Z,
+  GitHub `pull_request_read` — the hard prerequisite for this session),
+  then reconstructed the full project state (PR #88–#140 merge line;
+  DEC-003–DEC-025 all Accepted; AR-001–AR-037 all Accepted; RA-001–RA-024
+  binding; TD-001 Resolved / TD-002 Open; all implementation gates
+  exhausted/closed; customer-domain gate criteria accepted as criteria
+  only, gate closed), audited the merged addon code read-only
+  (`shopify_connector_core` + `shopify_connector_product`, runtime-green
+  as recorded — 0 failed/0 errors; the record's per-module test-count
+  arithmetic is flagged as OP-43), verified the Task-011-relevant
+  official facts against
+  current Shopify/Odoo sources (2026-07-09), closed every safely-closable
+  docs-only status gap, and produced the pre-implementation planning
+  package below.
+- **New files (all docs-only):**
+  [`../08-release-readiness/project-readiness-master-audit.md`](../08-release-readiness/project-readiness-master-audit.md)
+  (master audit; answers the twelve readiness questions; self-review/
+  red-team record included);
+  [`../08-release-readiness/open-points-closure-register.md`](../08-release-readiness/open-points-closure-register.md)
+  (complete open-point register — every open point classified with
+  evidence, impact, owner, next action; six docs-only closures CL-1–CL-6
+  with proof; completeness cross-check statement);
+  [`../08-release-readiness/implementation-readiness-map.md`](../08-release-readiness/implementation-readiness-map.md)
+  (per-task/per-gate map; customer-domain criteria live table — 7/15
+  satisfied, criteria 3/4/5/9/12/13/14/15 remaining, all resolvable by one
+  final-prompt session plus the gate act);
+  [`../08-release-readiness/final-pre-implementation-roadmap.md`](../08-release-readiness/final-pre-implementation-roadmap.md)
+  (sequenced roadmap: audit-PR review → Task 011 final-prompt/gate-opening
+  session → explicit gate act → one Task 011 implementation session → per-
+  domain pre-pass pattern for Tasks 012/013/014/015 → Area 6 triggers → UI
+  chain → UAT waves → release; parallel tracks P1–P5);
+  [`../08-release-readiness/uat-readiness-gap-analysis.md`](../08-release-readiness/uat-readiness-gap-analysis.md)
+  (0 of 15 UAT scenarios executable; blockers U-1 runtime / U-2 VAL-B2 /
+  U-3 zero UI / U-4 no trigger call sites; two-wave path);
+  [`next-gate-readiness-roadmap.md`](../07-implementation-plan/next-gate-readiness-roadmap.md)
+  (the exact next session's outputs and the eight ChatGPT decisions D1–D8
+  with official-source decision inputs — thresholds, ambiguous-candidate
+  job/log fields, address handling, `is_company`, fallback-partner
+  mechanics, manifest dependency, GraphQL field list incl. the
+  `email`/`phone` → `defaultEmailAddress`/`defaultPhoneNumber` deprecation
+  finding, test files).
+- **Status patches (allowed registers only):**
+  `docs/05-qa/architecture-review-log.md` — new **AR-038** row
+  (**Proposed**) + **AR-037 Merge-Record Note** (PR #140 merge recorded;
+  gate still closed; nothing authorized);
+  `docs/05-qa/technical-debt-register.md` — TD-002 clarification note
+  (write-side fulfillment model already decided by DEC-011; the genuine
+  residual is the exact `*_fulfillment_orders` scope set, per the official
+  access-scopes page re-verified 2026-07-09; **TD-002 stays Open**);
+  `docs/05-qa/sync-engine-open-questions.md` — status-refresh revision
+  note 3 (Q5/Q29 answered by merged Task 006C; Q28 answered by history;
+  Q37's product instance closed by Task 010; everything else unchanged);
+  this handoff entry. One formatting-only repair: the AR-037 table row
+  contained a stray cell separator splitting its Review-decision column in
+  two (11 cells against a 10-column header), which made GFM drop the row's
+  `**Accepted**` Status cell when rendered — the stray `|` was removed
+  with the cell text preserved verbatim; no content changed.
+- **Key audit findings (all evidence-cited in the master audit):**
+  1. **[Fact]** The project is ready to resume implementation for exactly
+     one next task — Task 011 — via the established two-step pattern; no
+     research, code, or live-access blocker stands in that path.
+  2. **[Fact]** The 8 unsatisfied customer-domain criteria are all
+     final-prompt-resolvable; decision inputs for the two open scope
+     questions (address handling; company/person — Shopify `Customer` has
+     no person/company flag; Odoo 19 `res.partner.email` has no uniqueness
+     constraint) are assembled with official citations.
+  3. **[Fact]** Stale-status corrections: PR #140 merge recorded (CL-1);
+     TD-002 precision (CL-2); sync-engine question statuses (CL-3);
+     UAT/release re-baseline (CL-4). Register-drift items that are outside
+     this session's allowed files are routed, not edited: the MBQ-55
+     register row does not yet record the PR #136/#140 partial acceptances
+     (OP-24); the 04-decisions README stops at DEC-017, the
+     08-release-readiness README says "Empty", and several status preambles
+     lag merged history (OP-25).
+  4. **[Recommendation]** Authorize MBQ-05 branch B research now, in
+     parallel — docs-only, non-competing, on the wizard/OAuth/packaging/
+     release critical path, and the distribution choice carries
+     protected-customer-data Level 2 compliance consequences (OP-40)
+     cheaper to know before customer/order implementations harden
+     (routed via RA-003's revisit condition — evaluation, not adoption).
+  5. **[Fact]** Still open and untouched: VAL-B2 (needs human operator);
+     SRR-03/04/09 concurrency proofs (needs runtime); MBQ-55 order
+     portion, order/inventory/fulfillment gate criteria (future passes);
+     MBQ-56/MBQ-27/MBQ-32 (future ChatGPT decisions); Lite/Full framing
+     (Q27); Task 015 planning; UI/OAuth/webhook chain; blocked research
+     sources (OP-32).
+- **What this session does NOT do:** it does not open any gate (the
+  customer-domain gate remains **closed**); does not draft or issue any
+  implementation prompt (the D1–D8 list is decision *inputs*, not a
+  prompt); does not authorize Task 011/012/013/014/015, UI, OAuth,
+  webhook, or Lite/Full work; does not resolve VAL-B2, MBQ-05, MBQ-55's
+  order portion, TD-002, MBQ-56, MBQ-27, MBQ-32, or SRR-03/04/09; does not
+  merge anything; touches no code/XML/CSV/manifest/addon file
+  (`shopify_connector_core` and `shopify_connector_product` untouched);
+  `main` and plain `dev` untouched.
+- **Learning feedback loop:** (a) the audit re-confirmed, third time now,
+  that register drift concentrates in *status preambles and index files*
+  while the governing documents themselves stay accurate — routing a
+  small periodic docs-maintenance patch (OP-25) is cheaper than letting
+  drift accumulate to reviewer-confusion levels; (b) precision lesson from
+  TD-002: when a debt row names its blocking dependency, cite the decision
+  record that (partially) decides it, or later readers inherit an
+  overstated blocker — fixed via CL-2 this session; (c) verifying
+  version-sensitive API facts at audit time paid off twice
+  (`Customer.email` deprecation; the `*_fulfillment_orders` scope family)
+  — future domain passes should re-verify their exact field/scope lists at
+  drafting time as standing practice. No new rejected approach (checked —
+  nothing proposed here matches or re-proposes RA-001–RA-024). No new
+  technical debt (checked — nothing is deferred by this session that is
+  not already tracked; TD-002 note is a clarification, not new debt).
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked (above) · learning captured (above) · no new rejected
+  approach · no new technical debt · only allowed files touched (six new
+  docs + four register/handoff updates — validated by `git status` before
+  commit) · no code/XML/CSV/security/addon file changed · `main` and plain
+  `dev` untouched · draft PR only, no merge.
+- **Branch / PR:** `claude/shopify-connector-planning-ue8ew7`, base
+  `Shopify-connector`; **draft PR #143** opened for this docs-only
+  audit/planning-closure package. This session does not itself authorize
+  any next implementation task.
+- **Base-movement note:** while this session ran, ChatGPT merged
+  **PR #141** (`CHATGPT.md` operating guide + new-chat handover prompt,
+  merge commit `81b1f62`) and opened **PR #142** (draft, `CHATGPT.md`
+  learning-loop update — pending ChatGPT's own review, untouched by this
+  session). No file overlap with this package; the updated base was
+  merged into this branch; every audit finding stands unchanged against
+  the new HEAD (see the master audit §2.1 base-movement addendum).
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT reviews the docs-only project readiness master audit PR (branch
+claude/shopify-connector-planning-ue8ew7, base Shopify-connector) against:
+docs/08-release-readiness/project-readiness-master-audit.md,
+docs/08-release-readiness/open-points-closure-register.md,
+docs/08-release-readiness/implementation-readiness-map.md,
+docs/08-release-readiness/final-pre-implementation-roadmap.md,
+docs/08-release-readiness/uat-readiness-gap-analysis.md,
+docs/07-implementation-plan/next-gate-readiness-roadmap.md, and the
+status patches in docs/05-qa/architecture-review-log.md (AR-038 row +
+AR-037 merge-record note), docs/05-qa/technical-debt-register.md (TD-002
+clarification), docs/05-qa/sync-engine-open-questions.md (revision note
+3), and docs/01-research/research-handoff.md (this entry). Confirm: the
+diff is docs-only across exactly these files; no gate was opened; no
+implementation prompt was drafted as usable; Task 011/012 remain
+unauthorized; the six CL closures are evidence-backed; the OP register is
+complete and correctly classified. If accepted, merge the audit PR, then:
+(1) issue the Task 011 final-prompt/gate-opening-proposal session per
+docs/07-implementation-plan/next-gate-readiness-roadmap.md §2, deciding
+D1–D8 in §4 during its review; (2) separately decide whether to authorize
+the MBQ-05 branch B (scalable many-unrelated-customer distribution/auth)
+research task now as a parallel track, including the protected-customer-
+data Level 2 compliance dimension (OP-40); (3) optionally set the
+allowed-files list for the small docs-maintenance patch (OP-24/OP-25).
+Merging the audit PR authorizes nothing by itself — the customer-domain
+gate opens only via the distinct, explicit gate-opening act after the
+final-prompt session's outputs are accepted.
+```
+
 ### PR #140 content accepted by ChatGPT — merge not yet authorized (2026-07-09)
 
 - **What happened:** ChatGPT reviewed the revised PR #140 (entry directly

@@ -22,6 +22,34 @@
 > (they are cross-referenced by number from the evidence map and risk
 > register) — new questions are appended as 40+ within their most relevant
 > section rather than renumbering the whole document.
+>
+> **Status-refresh revision note (3), 2026-07-09 (AR-038 audit session —
+> question text below is preserved unchanged; this note records which
+> questions later merged work has since answered, each with proof):**
+> **Q5 and Q29 (job-claiming/acquisition design) — answered by merged
+> implementation:** the Task 006C sync-engine skeleton (PR #131, merge
+> `152b155`, AR-031 Decision A, closure AR-032) implements per-row
+> `try_lock_for_update()` claim/dispatch in
+> `shopify_connector_job_dispatch.py`, validated live (Odoo.sh green;
+> AR-032). The single-server design question is settled; the multi-server
+> sufficiency question remains open as Q41/Q43 (unchanged — still requires
+> live multi-server proof). **Q28 (which DEC-024 next-task candidate is
+> selected) — answered by history:** ChatGPT selected the sync-engine
+> gate (DEC-025/AR-030), executed through Task 006C and then Task 010
+> (PR #131–#138 merge line). **Q37's product-domain instance (first-sync
+> dedup thresholds) — closed by Task 010:** the accepted Task 010 final
+> prompt fixed the product-domain thresholds and PR #138 merged
+> runtime-green; the customer-domain instance of the same MBQ-59 residual
+> is now tracked as customer-domain gate criterion 5
+> (`../07-implementation-plan/customer-domain-gate-criteria-proposal.md`)
+> and `../08-release-readiness/open-points-closure-register.md` OP-10.
+> **Q6/Q21/Q27 (Lite/Full), Q4/Q26 (16-vs-17 `@idempotent` count),
+> Q10–Q16/Q40 (Shopify behavioral unknowns), Q17/Q18/Q30–Q32/Q41/Q43
+> (runtime-proof questions), Q23 (webhook PII field list), and Q36/Q38/Q39
+> (domain-task-routed items) remain open, unchanged** — see the
+> open-points register rows OP-23, OP-33, OP-34, OP-35, OP-36, OP-20,
+> OP-05 for current routing. Blocking Question 1 (MBQ-05) and Blocking
+> Question 2 (VAL-B2) remain open exactly as DEC-023/DEC-021 left them.
 
 ## Blocking questions before implementation
 
