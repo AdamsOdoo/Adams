@@ -334,6 +334,77 @@
   `CLAUDE.md` §7 rule 5, this is logged as an **open, unverified
   question**, not asserted as fact.
 
+## Task 011 customer-object research patch (2026-07-10)
+
+> **Customer-object section added by the AR-039 gate-readiness session**
+> — closing the reader-confirmed Tier-1 gap routed as OP-44 (this corpus
+> previously had no Customer-object section). All facts below were
+> fetched from official `shopify.dev` pages on **2026-07-10** (the
+> `latest` reference alias documented **API version 2026-07** at fetch
+> time), each load-bearing claim additionally re-verified by an
+> independent adversarial pass the same day. Full excerpts with quotes
+> and access statuses:
+> [`../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md`](../00-source-materials/shopify-customer-odoo19-partner-task-011-captures.md).
+> Facts only — no decision is recorded here.
+
+### Customer object (Admin GraphQL API)
+
+- **[Fact]** Reading `Customer` requires the `read_customers` access
+  scope; the page cautions that Shopify "will restrict access to scopes
+  for apps that don't have a legitimate use for the associated data"
+  (`objects/Customer`, Accessible 2026-07-10).
+- **[Fact]** **`Customer.email` and `Customer.phone` are deprecated**
+  (2026-07): deprecation reasons read "Use
+  `defaultEmailAddress.emailAddress` instead." and "Use
+  `defaultPhoneNumber.phoneNumber` instead." `defaultEmailAddress` is a
+  nullable `CustomerEmailAddress` (its `emailAddress` is `String!`);
+  `defaultPhoneNumber` is a nullable `CustomerPhoneNumber` (its
+  `phoneNumber` is `String!`). Both replacement objects themselves
+  require `read_customers`.
+- **[Fact]** **`Customer.addresses` is deprecated** ("Limited to 250
+  addresses. Use `addressesV2` for paginated access to all addresses.");
+  `addressesV2` is a `MailingAddressConnection!` with standard
+  `first`/`after`/`last`/`before`/`reverse` cursor pagination.
+  `defaultAddress` is a nullable `MailingAddress`.
+- **[Fact]** Core fields relevant to import: `id` (`ID!`), `firstName`/
+  `lastName` (`String`), `displayName` (`String!` — falls back to email,
+  then phone, when names are absent), `createdAt`/`updatedAt`
+  (`DateTime!`), `note`, `tags`, `verifiedEmail`, `state`
+  (`CustomerState!` — only meaningful with Classic Customer Accounts),
+  `numberOfOrders`, `amountSpent`, `locale`.
+- **[Fact]** The Customer object has **no person/company flag** — the
+  only company-adjacent signals are the free-text
+  `MailingAddress.company` string and the B2B
+  `companyContactProfiles` (`[CompanyContact!]!`; `CompanyContact` joins
+  a B2B `Company` to a customer record; B2B API resources are
+  plan/access-gated).
+- **[Fact]** `MailingAddress` carries `address1`, `address2`, `city`,
+  `zip`, `province`, `provinceCode`, `country`, `countryCodeV2`
+  (`CountryCode` enum; the older `countryCode` is deprecated),
+  `company`, `firstName`, `lastName`, `name`, `phone`, `formatted`.
+- **[Fact]** `QueryRoot.customers` is a `CustomerConnection!` with
+  arguments `first`/`after`/`last`/`before`/`query`/`reverse`/`sortKey`
+  (`CustomerSortKeys`, default `ID`; values include `UPDATED_AT`,
+  `CREATED_AT`, `ID`); the `query` filter supports `updated_at` with
+  comparators (`:>`, `:>=`, …) and ISO 8601 timestamp examples; GraphQL
+  cursor pagination retrieves at most 250 resources per request (usage/
+  pagination-graphql page). **[Open question]** the `updated_at` filter
+  description says "matching a whole day" while its own examples use
+  full timestamps — sub-day granularity must be verified empirically by
+  whichever future task implements enumeration.
+- **[Fact]** Customer data is protected customer data: name, address,
+  email, phone are **Level 2 protected customer fields**; public apps
+  require review for Level 1 and Level 2, custom apps have both "Always
+  available," admin-created custom apps' Level 2 "Varies by plan"
+  (protected-customer-data page, Accessible 2026-07-10; distribution
+  detail captured for MBQ-05 branch B in the capture file and
+  [`../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md`](../03-architecture/mbq-05-branch-b-distribution-auth-decision-brief.md)).
+- **[Fact]** Versioning/limits re-confirmed unchanged (2026-07-10):
+  quarterly releases, ≥12-month support, latest stable **2026-07**
+  (released July 1, 2026); GraphQL calculated-cost model with
+  `THROTTLED` signalled in the response body and cost telemetry under
+  `extensions` — consistent with this corpus's earlier sections.
+
 ## Source hierarchy and access date
 
 - **Tier 1 (used here):** official Shopify developer documentation, `shopify.dev`

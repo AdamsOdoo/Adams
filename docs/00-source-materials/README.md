@@ -22,5 +22,14 @@ URL + access status + date).
 
 ## Current status
 
-**Empty.** Capture begins during the competitor deep-dive sessions (after
-Research Sprint A), per `../01-research/research-methodology.md`.
+**Populated (status refreshed 2026-07-10, OP-25 docs-maintenance — the
+previous "Empty" status was stale).** This directory holds:
+`shopify-official.md` and `odoo-official.md` (official-platform captures),
+`competitor-source-notes.md` and `competitor-screenshot-inventory.md`
+(competitor captures), `source-access-notes.md`, the `screenshots/` tree,
+and — added 2026-07-10 per the OP-44 routing —
+`shopify-customer-odoo19-partner-task-011-captures.md` (the Task 011
+official-source excerpts: Shopify Customer/MailingAddress/B2B/protected
+customer data/access scopes/versioning/customers-query pagination; Odoo 19
+`res.partner` and `sale.order` source facts). Every capture carries its
+citation header (URL + access status + date) per this README's rules.
