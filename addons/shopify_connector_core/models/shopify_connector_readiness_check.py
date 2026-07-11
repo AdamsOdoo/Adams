@@ -71,6 +71,12 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         'fulfillment_domain_enabled',
     )
 
+    # D-R1-1 (Task CORE-R1): a queued job for this store that has never
+    # started (`started_at` unset) and is older than this threshold is a
+    # stalled-queue signal `_check_cron_queue_health` fails on. Named,
+    # tunable module constant -- never an inlined magic number.
+    READINESS_QUEUE_STALL_MINUTES = 60
+
     # ------------------------------------------------------------------
     # Public entry point
     # ------------------------------------------------------------------
@@ -319,37 +325,146 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
 
     @api.model
     def _check_webhook_hmac(self, store):
-        """Registered pending slot only -- no webhook implementation exists."""
+        """Capability-aware webhook-HMAC readiness (D-R1-1..5, D-R1-3).
+
+        The accepted MVP trigger architecture is manual/scheduled pull
+        synchronization; webhook intake is a later (W1) module. Until it
+        installs, HMAC verification is not applicable and passes -- the
+        W1 packet owns replacing this check via an `_inherit` override
+        with the real HMAC-configuration + subscription-state
+        verification. No webhook model, subscription, secret, or
+        configuration is implemented or read here (read-only, no Shopify
+        call, no secret).
+        """
         return self._check_result(
-            'webhook_hmac', self.ESSENTIAL, self.RESULT_NOT_PROVEN,
-            'Webhook HMAC verification is not implemented yet -- '
-            'registered as a pending check slot only.',
+            'webhook_hmac', self.ESSENTIAL, self.RESULT_PASS,
+            'Not applicable — webhook intake is not installed; '
+            'scheduled/manual sync is the active trigger mechanism.',
         )
 
     @api.model
     def _check_mapped_location(self, store):
-        """Registered pending slot only -- Location mapping is domain-owned.
+        """Capability-aware mapped-Location readiness (D-R1-2).
 
-        `shopify.connector.location` is a Shopify-side-only cache with no
-        mapped-Odoo-location or domain-enablement concept (see its own
-        docstring) -- that mapping is owned by a future inventory domain
-        module. Reporting this as anything but not_proven here would
-        require a domain-model dependency this task must not add.
+        Reads only the same core settings flag
+        `_check_domain_flag_enablement` already reads -- no
+        inventory-domain model dependency, no inventory-model access.
+        When the store's inventory domain is not enabled, mapped-Location
+        verification is not applicable and passes. When it IS enabled but
+        no inventory module has overridden this check with the real
+        verification, it stays fail-closed (`not_proven`): an
+        inventory-enabled store without the inventory module must not
+        activate. Task 013's inventory module replaces the evaluation via
+        an `_inherit` override.
         """
+        code = 'mapped_location'
+        settings = self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        if not settings or not settings.inventory_domain_enabled:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_PASS,
+                'Not applicable — the inventory domain is not enabled for '
+                'this store.',
+            )
         return self._check_result(
-            'mapped_location', self.ESSENTIAL, self.RESULT_NOT_PROVEN,
-            'Mapped-Location verification requires a future domain '
-            'module -- registered as a pending check slot only.',
+            code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
+            'Mapped-Location verification requires the inventory module, '
+            'which is not installed -- registered as a pending check slot '
+            'until the inventory domain provides it.',
         )
 
     @api.model
     def _check_cron_queue_health(self, store):
-        """Registered pending slot only -- no cron/queue implementation exists."""
-        return self._check_result(
-            'cron_queue_health', self.ESSENTIAL, self.RESULT_NOT_PROVEN,
-            'Cron/queue health verification is not implemented yet -- '
-            'registered as a pending check slot only.',
+        """Real, capability-aware scheduler/queue health (D-R1-1).
+
+        Passes only when the merged drain cron
+        (`ir_cron_shopify_connector_job_dispatch_drain`) exists and is
+        active, and no queued job for this store has stalled. Reads local
+        state only: the cron record through the one narrow, named
+        read-only `sudo()` elevation (`_drain_cron_active_state` --
+        connector groups hold no `ir.cron` ACL, so a non-elevated read
+        raises AccessError) and this store's own jobs. No Shopify call,
+        no secret. It does NOT require the Area-6 domain scan crons --
+        they do not exist yet; a future Area-6 `_inherit` may extend this
+        check to also verify enabled domains' scan crons.
+
+        Stall discriminator (exact): `state='queued' AND NOT started_at`
+        older than `READINESS_QUEUE_STALL_MINUTES`. `retry_count` counts
+        scheduled retries, not attempts, and is deliberately not used. A
+        job re-queued with a historical `started_at` is deliberately NOT
+        flagged here (its `started_at` is set) -- such stalls surface
+        through the Sync Center age columns, not readiness.
+        """
+        code = 'cron_queue_health'
+        cron_active = self._drain_cron_active_state()
+        if cron_active is None:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_FAIL,
+                'The job-dispatch drain cron is missing.',
+            )
+        if not cron_active:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_FAIL,
+                'The job-dispatch drain cron is inactive.',
+            )
+        stall_cutoff = fields.Datetime.subtract(
+            fields.Datetime.now(), minutes=self.READINESS_QUEUE_STALL_MINUTES,
         )
+        stalled_count = self.env['shopify.connector.job'].search_count([
+            ('store_id', '=', store.id),
+            ('state', '=', 'queued'),
+            ('started_at', '=', False),
+            ('create_date', '<', stall_cutoff),
+        ])
+        if stalled_count:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_FAIL,
+                '%d queued job(s) have stalled longer than %d minutes '
+                'without starting.' % (
+                    stalled_count, self.READINESS_QUEUE_STALL_MINUTES,
+                ),
+            )
+        return self._check_result(
+            code, self.ESSENTIAL, self.RESULT_PASS,
+            'The drain cron is active and no queued job has stalled.',
+        )
+
+    @api.model
+    def _drain_cron_active_state(self):
+        """The single new sanctioned read-only `sudo()` site of Task
+        CORE-R1 (D-R1-1) -- read the merged drain cron's `active` flag.
+
+        Connector groups hold no `ir.cron` ACL (base grants it to
+        `base.group_erp_manager` only), and readiness runs as the
+        invoking (connector-admin) user, so this record read raises
+        `AccessError` without elevation. The elevation is narrow (one
+        record, one field, read-only) and is deliberately isolated in
+        this own named helper rather than inlined into
+        `_check_cron_queue_health`, so the pre-existing
+        `test_readiness_check.py::test_source_level_no_check_method_
+        mutates_state` AST guard -- which forbids `.sudo()` inside any
+        `_check_*` method -- stays green. This is the third sanctioned
+        `.sudo()` site in `shopify_connector_core/models`; the two source
+        guards in `test_job_log_system_append.py` /
+        `test_credential_service.py` enforce the exact three-site
+        inventory (`shopify_connector_job_log.py`,
+        `shopify_connector_readiness_check.py`,
+        `shopify_connector_store_credential.py`), updated under CORE-R1
+        gate amendment `4948368039`; any fourth site still fails both
+        guards.
+
+        Returns None when the drain cron record does not exist; otherwise
+        the boolean value of its `active` field.
+        """
+        cron = self.env.ref(
+            'shopify_connector_core.'
+            'ir_cron_shopify_connector_job_dispatch_drain',
+            raise_if_not_found=False,
+        )
+        if not cron:
+            return None
+        return bool(cron.sudo().active)
 
     @api.model
     def _check_domain_flag_enablement(self, store):

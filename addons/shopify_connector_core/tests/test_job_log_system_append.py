@@ -86,8 +86,13 @@ class TestJobLogSystemAppend(TransactionCase):
         )
         self.assertEqual(row.store_id, job.store_id)
 
-    # 31. Source-level guard: exactly two sudo( occurrences in the whole diff.
-    def test_source_level_two_sudo_sites_total(self):
+    # 31. Source-level guard: exactly three sudo( occurrences in the whole
+    # diff. CORE-R1 (gate amendment `4948368039`) adds the third sanctioned,
+    # narrow, read-only site -- the readiness drain-cron read in
+    # `shopify_connector_readiness_check.py` (`_drain_cron_active_state`).
+    # Exact-list equality: any fourth model-layer sudo() still fails this
+    # guard.
+    def test_source_level_three_sudo_sites_total(self):
         models_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'models',
@@ -110,6 +115,7 @@ class TestJobLogSystemAppend(TransactionCase):
             sorted(sudo_call_sites),
             [
                 'shopify_connector_job_log.py',
+                'shopify_connector_readiness_check.py',
                 'shopify_connector_store_credential.py',
             ],
         )

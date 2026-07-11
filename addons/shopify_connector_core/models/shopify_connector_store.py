@@ -199,6 +199,21 @@ class ShopifyConnectorStore(models.Model):
                     )
                 ),
             })
+        else:
+            # D-R1-5 (Task CORE-R1): a fully successful test connection
+            # with no API-version fall-forward is the healthy API state --
+            # record 'normal' so the unchanged _check_api_version_health
+            # readiness check can pass on real evidence (no merged path
+            # wrote 'normal' before this, leaving the field NULL and
+            # readiness permanently fail-closed). Also clear any stale
+            # api_health_reason a prior fall-forward 'degraded' write left
+            # behind, so a recovered store never keeps contradictory,
+            # operator-facing degradation evidence. The 'degraded'
+            # fall-forward path above is untouched.
+            self.write({
+                'api_health_state': 'normal',
+                'api_health_reason': False,
+            })
         job.write({
             'state': 'succeeded',
             'finished_at': fields.Datetime.now(),
