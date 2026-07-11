@@ -140,10 +140,15 @@ no UI; no order-import work (Task 012 consumes this, later).
   (NEW — the `_inherit` field + compute only)
 - `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py`
   (ONLY `_find_active_candidates` + `_find_archived_candidates`
-  bodies; every other method untouched)
+  bodies **plus the class/method docstrings that describe the
+  full-scan design** — red-team round-2: the class docstring
+  hard-codes the old mechanism outside any method body and would
+  otherwise contradict the implementation; every other method's
+  logic untouched)
 - `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py`
   (NEW — equivalence corpus, routing regression, concurrency,
   benchmark harness)
+- `addons/shopify_connector_sale/tests/__init__.py` (one import line)
 - `docs/05-qa/task-011b-validation-results.md` (NEW)
 - `docs/05-qa/architecture-review-log.md` (append one AR row)
 - `docs/01-research/research-handoff.md` (top entry)
@@ -170,10 +175,15 @@ all other importer methods; `adams_base`; views/UI/webhooks/OAuth/CI;
 5. **Benchmark harness (D-011B-7)** — seeded 100k dataset; latency/
    throughput/backfill measurements emitted for the validation
    record; explicitly excluded from the standard CI pass.
-6. **Source guards** — `search([('email', '!=', False)])` no longer
-   appears in the importer (string scan); normalizer identity
+6. **Source guards (red-team-corrected round 2 — AST/domain-pattern,
+   not a literal string scan, which multi-line formatting defeats):**
+   an AST-level check that neither `_find_active_candidates` nor
+   `_find_archived_candidates` builds a search domain containing
+   `('email', '!=', False)` and that both search on
+   `shopify_connector_email_normalized`; normalizer identity
    (`email_normalize` + `strict=False`) asserted on both compute and
-   incoming sides.
+   incoming sides; stale full-scan docstrings updated (no code
+   comment may describe the removed mechanism as current).
 
 ## 6. Gate criteria (15-pattern, abbreviated)
 
@@ -218,8 +228,9 @@ Shopify-connector tip (STOP on drift). One session; draft PR; stop.
 ALLOWED FILES (exhaustive):
   addons/shopify_connector_sale/models/__init__.py                       (one import line)
   addons/shopify_connector_sale/models/shopify_connector_res_partner.py  (NEW — _inherit res.partner: shopify_connector_email_normalized stored computed indexed field + compute only)
-  addons/shopify_connector_sale/models/shopify_connector_customer_importer.py  (ONLY the _find_active_candidates and _find_archived_candidates bodies)
+  addons/shopify_connector_sale/models/shopify_connector_customer_importer.py  (ONLY the _find_active_candidates and _find_archived_candidates bodies + the stale full-scan class/method docstrings)
   addons/shopify_connector_sale/tests/test_customer_matching_scalability.py    (NEW)
+  addons/shopify_connector_sale/tests/__init__.py                              (one import line)
   docs/05-qa/task-011b-validation-results.md                             (NEW)
   docs/05-qa/architecture-review-log.md                                  (append one AR row)
   docs/01-research/research-handoff.md                                   (top entry)

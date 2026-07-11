@@ -340,6 +340,7 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_product/tests/{test_product_attribute_import.py,
     test_product_variant_generation.py, test_product_price_import.py,
     test_product_media_import.py, test_product_refresh_and_stale.py}                      (NEW)
+  addons/shopify_connector_product/tests/__init__.py                                      (import lines for the new files)
   docs/05-qa/task-010b-validation-results.md                                              (NEW)
   docs/05-qa/architecture-review-log.md                                                   (append one AR row)
   docs/01-research/research-handoff.md                                                    (top entry)

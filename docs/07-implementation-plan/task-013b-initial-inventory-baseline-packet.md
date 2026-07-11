@@ -195,6 +195,7 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_inventory/tests/{test_inventory_baseline_preview.py,
     test_inventory_baseline_guard.py, test_inventory_baseline_apply.py,
     test_inventory_baseline_run_model.py}                                            (NEW)
+  addons/shopify_connector_inventory/tests/__init__.py                               (import lines)
   docs/05-qa/task-013b-validation-results.md                                         (NEW)
   docs/05-qa/architecture-review-log.md                                              (append one AR row)
   docs/01-research/research-handoff.md                                               (top entry)

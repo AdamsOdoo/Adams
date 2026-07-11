@@ -20,8 +20,11 @@
    are the connected-store/domain-flag gates on transitions **to
    `running`** for business-source jobs and two `@api.constrains`
    (`trigger_origin`, `manual_review_subreason`)
-   (`shopify_connector_job.py` write(), lines 221–276). Consequence:
-   any operator-group user can, via RPC/ORM, set e.g.
+   (`shopify_connector_job.py` write(), lines 221–276; precision,
+   red-team-corrected 2026-07-11 round 2: the domain-flag gate runs
+   for **every** job — lines 243–247/265–275 — only the
+   connected-store gate is business-source-scoped, lines 259–264).
+   Consequence: any operator-group user can, via RPC/ORM, set e.g.
    `state='succeeded'` on a failed job, alter `retry_count`, or
    forge `error_class` — system-state mutation outside any sanctioned
    action, unaudited.
@@ -60,6 +63,14 @@ module-level constant on the job model, exhaustive:
 `draft→queued`; `queued→running|cancelled`;
 `running→succeeded|failed_final|skipped|retry_waiting|failed_retryable|blocked_manual_review`;
 `retry_waiting→running|cancelled`;
+**`draft|queued|retry_waiting→failed_retryable` (the merged
+blocked-start routing — red-team-corrected 2026-07-11 round 2: the
+dispatcher's `_start_running` catches the gating `ValidationError`
+and routes a still-`queued`/`retry_waiting`/`draft` job to
+`failed_retryable` via `odoo_validation_configuration`,
+`shopify_connector_job_dispatch.py` lines 186–200, asserted green by
+`test_job_dispatch.py` lines 238–286 — a matrix without these edges
+would break the merged dispatcher and its suite)**;
 `failed_retryable|failed_final|blocked_manual_review|skipped→queued`
 (manual retry — Area 6's allowed-from set, retry_count reset);
 non-terminal→`cancelled`. Everything else — including any
@@ -79,12 +90,27 @@ permission).
 writes through an internal `sudo()` after their own explicit
 permission checks). A non-su write touching any protected field
 raises `AccessError` with a message naming the sanctioned action to
-use. Rationale (flagged): context-flag guards were considered and
+use. **The guard applies equally at `create()` (red-team-corrected
+2026-07-11 round 2):** a non-su `create()` supplying protected fields
+beyond the enqueue-door defaults is refused — otherwise the §1 abuse
+channel merely moves to creation (an operator forging a
+`state='succeeded'` job or a binding row at create time); the named
+su-elevated creation doors are `enqueue()`, the readiness-check job
+creation, and the store-lifecycle audit/test-connection job creation
+(all in §5's allowlist), and the existing ACL-matrix tests that
+exercise direct creates are updated accordingly (named in §6).
+Rationale (flagged): context-flag guards were considered and
 rejected — RPC callers control context, so a context marker is
-spoofable; `env.su` is not. The dispatcher/enqueue/readiness code
-paths are adjusted to elevate exactly at their write sites (each
-elevation named in the packet's sudo inventory — extending the
-release plan's §2.8 audit list).
+spoofable; `env.su` is not. The dispatcher/enqueue/readiness **and
+store-lifecycle** code paths are adjusted to elevate exactly at
+their write sites (each elevation named in the packet's sudo
+inventory — extending the release plan's §2.8 audit list;
+red-team-corrected round 2: `shopify_connector_store.py` is itself a
+writer of protected job fields — test-connection job mirrors, the
+lifecycle audit jobs, and the disconnect cancellation sweep, lines
+108–205/233–248/351–364 — and is therefore in the §5 allowlist with
+those exact sites elevated; without this, Test Connection / Activate
+/ Disconnect / Reconnect would raise under the new guard).
 
 **D-SEC1-3 — Sanctioned methods (the only doors).** The public
 mutation surface for jobs becomes exactly: `enqueue()` (creation —
@@ -132,6 +158,14 @@ retain; documented recommendation 365) and a monthly cron
 (never deletes rows — audit history is append-only by design)
 PII-bearing snapshot fields and `payload_snapshot` PII keys on
 records older than the window, logging one summary row per sweep.
+**Discovery seam (red-team-added 2026-07-11 round 2 — core cannot
+depend on sale):** the binding mixin gains a `_pii_snapshot_fields()`
+hook returning `[]`; PII-bearing binding models override it (the
+customer binding returns its three snapshot field names — a
+two-line override in the sale binding file, added to §5); the core
+sweep iterates the registry for models inheriting the mixin and
+masks the declared fields — no core→sale dependency, no hardcoded
+model names.
 Export/data-request support (DEC-028 Rung-2 item (d) groundwork):
 a documented operator procedure (release-plan §2.5 doc set) using
 standard Odoo export on the reviewer-visible fields — no new code
@@ -172,8 +206,11 @@ core-task rule, with the exhaustive allowlist below.
   (protected-field guard, `action_override_binding`)
 - `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`,
   `shopify_connector_job_enqueue.py`,
-  `shopify_connector_readiness_check.py` (write-site su elevation
-  only — each elevation itemized)
+  `shopify_connector_readiness_check.py`,
+  `shopify_connector_store.py` (write-site su elevation only — each
+  elevation itemized; the store file's sites are the test-connection
+  job mirrors, lifecycle audit jobs, and disconnect sweep —
+  red-team round-2 F1)
 - `addons/shopify_connector_core/models/shopify_connector_store_settings.py`
   (retention field)
 - `addons/shopify_connector_core/models/shopify_connector_pii_retention.py`
@@ -181,15 +218,21 @@ core-task rule, with the exhaustive allowlist below.
 - `addons/shopify_connector_core/data/shopify_connector_pii_retention_cron.xml`
   (NEW, noupdate=1)
 - `addons/shopify_connector_sale/models/shopify_connector_customer_binding.py`
-  (field `groups=` + masked compute only)
+  (field `groups=` + masked compute + the two-line
+  `_pii_snapshot_fields()` override only)
 - `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py`
-  (snapshot-write su adjustment only)
+  (snapshot/binding-write su adjustment only — its binding-create
+  sites set protected identity fields)
 - `addons/shopify_connector_product/models/shopify_connector_product_importer.py`
   (snapshot/binding-write su adjustment only)
 - manifests (version bumps; core data entry);
-  `addons/shopify_connector_core/tests/test_security_hardening.py` (NEW);
-  `addons/shopify_connector_sale/tests/test_pii_least_privilege.py` (NEW);
-  existing ACL-matrix test files (named assertion updates only)
+  `addons/shopify_connector_core/tests/test_security_hardening.py` (NEW)
+  + `addons/shopify_connector_core/tests/__init__.py` (one import line);
+  `addons/shopify_connector_sale/tests/test_pii_least_privilege.py` (NEW)
+  + `addons/shopify_connector_sale/tests/__init__.py` (one import line);
+  existing ACL-matrix test files (named assertion updates only —
+  incl. the direct-create cells that now expect refusal per
+  D-SEC1-2's create-guard)
 - `docs/05-qa/task-sec1-validation-results.md` (NEW); AR-log row;
   handoff top entry.
 

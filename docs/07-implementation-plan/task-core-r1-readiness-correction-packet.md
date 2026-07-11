@@ -50,11 +50,24 @@ check.** Pass conditions, evaluated with no Shopify call and no
 secret: (a) the merged core drain cron
 (`ir_cron_shopify_connector_job_dispatch_drain`, the only cron that
 exists today — `data/shopify_connector_cron_drain.xml`) exists and is
-`active`; (b) no `queued` job for the store is older than the stall
-threshold (`READINESS_QUEUE_STALL_MINUTES = 60`, module constant,
-adjustable) without ever having been attempted. Fail with a named
-reason otherwise (`drain cron missing/inactive` or `N queued job(s)
-stalled > 60 min`). **Capability-aware rule:** the check verifies
+`active` — **read via a named, narrow `sudo()` elevation
+(red-team-added 2026-07-11 round 2): connector groups hold no
+`ir.cron` ACL (base grants it to `base.group_erp_manager` only —
+re-verify at gate), and readiness runs as the invoking user, so the
+cron-record read raises `AccessError` without elevation; this is a
+new sanctioned read-only sudo site, itemized for the release plan
+§2.8 inventory and flagged as part of this packet's acceptance**;
+(b) no `queued` job for the store is older than the stall threshold
+(`READINESS_QUEUE_STALL_MINUTES = 60`, module constant, adjustable)
+that has never started — **exact discriminator (red-team-corrected
+round 2): `state='queued' AND NOT started_at`** (`retry_count` counts
+scheduled retries, not attempts, and stays 0 after a first failed
+attempt — it must not be used; boundary stated honestly: a job
+re-queued by Area-6 manual retry keeps its historical `started_at`
+and is deliberately NOT flagged by this check — stalls of re-queued
+jobs surface through the Sync Center age columns, not readiness).
+Fail with a named reason otherwise (`drain cron missing/inactive` or
+`N queued job(s) stalled > 60 min`). **Capability-aware rule:** the check verifies
 only crons that are actually registered — it must NOT require the
 Area-6 domain scan crons (they do not exist yet); when Area 6 later
 ships them, its packet may extend this check via `_inherit` to also
@@ -94,9 +107,31 @@ capability is installed **and** enabled for that store. A Lite store
 with verified credential, granted read scopes, healthy API version,
 https base URL, ≥1 enabled domain, active drain cron, and no stalled
 queue **must aggregate to `pass`** and must be able to reach
-`connected` via `action_activate`. This is the mandatory regression
-test (§5) — the review's "eligible Lite store can reach `connected`"
+`connected` via `action_activate` — **with real merged behavior, not
+test-fixture force-writes**. This is the mandatory regression test
+(§5) — the review's "eligible Lite store can reach `connected`"
 requirement made executable.
+
+**D-R1-5 — The fourth never-passable slot: `api_version_health`
+(red-team round-2 BLOCKER fix — without this, D-R1-4 is
+unsatisfiable on real behavior).** **[Fact — merged code]**
+`_check_api_version_health` passes only on
+`api_health_state == 'normal'` and returns `not_proven` when unset
+(`shopify_connector_readiness_check.py` lines 264–284), but **no
+merged code path ever writes `'normal'`** — the only writer sets
+`'degraded'` on fall-forward (`shopify_connector_store.py` lines
+193–201) and the field has no default; a fully successful test
+connection leaves it NULL, so real readiness still aggregates `fail`
+even after D-R1-1..3. **Fix (one named store-file write site,
+flagged):** `action_test_connection` sets
+`api_health_state = 'normal'` on a fully successful, non-fallforward
+test connection (the state a healthy store is in); the `'degraded'`
+path is untouched. *Alternative considered (named, rejected as
+primary):* a readiness-file-only inference (pass when unset AND
+`last_test_connection_result == 'pass'`) — rejected because it makes
+the mirror field permanently meaningless; ChatGPT may choose it at
+acceptance if the store-file edit is judged out of bounds for this
+task.
 
 ## 4. Allowed / forbidden files (exhaustive)
 
@@ -108,35 +143,50 @@ requirement made executable.
   nothing else in the file (the file's own docstrings describe the
   slots as "registered pending check slot only", i.e. designed to be
   filled).
+- `addons/shopify_connector_core/models/shopify_connector_store.py`
+  — ONLY the one D-R1-5 write site inside `action_test_connection`
+  (`api_health_state='normal'` on full success without fall-forward);
+  nothing else in the file (red-team round-2 addition, flagged).
 - `addons/shopify_connector_core/tests/test_readiness_slot_closure.py` (NEW)
+  + `addons/shopify_connector_core/tests/__init__.py` (one import line)
 - `docs/05-qa/task-core-r1-validation-results.md` (NEW)
 - `docs/05-qa/architecture-review-log.md` (append one AR row)
 - `docs/01-research/research-handoff.md` (top entry)
 
 **Forbidden:** every other file — explicitly including
-`_get_checks()`, `_aggregate()`, `run_for_store()`, the store
-lifecycle methods, the job/dispatch/log models, ACL files, cron data
-files, all domain modules, all views, `adams_base`, CI/workflows,
-`main`, plain `dev`.
+`_get_checks()`, `_aggregate()`, `run_for_store()`, every other store
+lifecycle method and line, the job/dispatch/log models, ACL files,
+cron data files, all domain modules, all views, `adams_base`,
+CI/workflows, `main`, plain `dev`.
 
 ## 5. Tests (exact file: `test_readiness_slot_closure.py`)
 
 1. `cron_queue_health` passes with active drain cron + empty queue;
    fails with named reason when the cron record is deactivated; fails
-   when a `queued` job older than the threshold with zero attempts
-   exists; passes again when that job is dispatched or cancelled.
+   when a `queued` job older than the threshold with `started_at`
+   unset exists; passes again when that job is dispatched or
+   cancelled; the sudo-elevated cron read works for a
+   connector-admin (non-ERP-manager) user; a re-queued job with
+   historical `started_at` is not flagged (documented boundary).
 2. `mapped_location`: not-applicable pass when
    `inventory_domain_enabled=False`; `not_proven` (fail-closed) when
    True without an inventory override.
 3. `webhook_hmac`: not-applicable pass with the exact reason string.
-4. **BLOCKER regression (D-R1-4):** a fully configured Lite store
+4. **BLOCKER regression (D-R1-4):** a fully configured Lite store —
+   whose `api_health_state` became `'normal'` through the real
+   D-R1-5 test-connection path, not a fixture force-write —
    aggregates `pass` and reaches `connected` via `action_activate`;
    negative variant: the same store with a failing essential check
    (e.g. missing scope) still cannot activate — fail-closed behavior
    preserved.
-5. Source-level guards: no Shopify call and no credential read inside
-   any of the three check methods (string/AST scan); no change to any
-   other method in the file (diff-scope test note in the validation
+5. **D-R1-5:** successful non-fallforward test connection writes
+   `api_health_state='normal'`; the fall-forward path still writes
+   `'degraded'`; `_check_api_version_health` behavior itself is
+   unchanged (its file is not edited).
+6. Source-level guards: no Shopify call and no credential read inside
+   any of the three check methods (string/AST scan; the D-R1-1 cron
+   read is the one named sudo); no change to any other method in
+   either edited file (diff-scope test note in the validation
    record).
 
 ## 6. Gate criteria (15-pattern instantiated, abbreviated)
@@ -147,8 +197,10 @@ trigger/UI/webhook/domain scope ✅; 9 tests ✅(§5); 10 rollback ✅
 (single-PR revert returns the three placeholders — documented, no
 data loss; stores return to cannot-activate); 11 no live-Shopify
 dependency ✅ (checks read local state only); 12 gate-act
-reconfirmation (ChatGPT); 13 the webhook_hmac relaxation explicitly
-accepted (D-R1-3 — the one review call in this packet); 14 the
+reconfirmation (ChatGPT); 13 the three flagged calls explicitly
+accepted: the webhook_hmac relaxation (D-R1-3), the D-R1-5
+`api_health_state` write site (or its named readiness-inference
+alternative), and the D-R1-1 sudo-elevated cron read; 14 the
 capability-aware invariant stated ✅(D-R1-4); 15 fail-closed cases
 enumerated ✅(§5.2/§5.4).
 
@@ -173,7 +225,7 @@ ISSUES THIS PROMPT.
 Implement Task CORE-R1 — capability-aware readiness correction —
 exactly per
 docs/07-implementation-plan/task-core-r1-readiness-correction-packet.md
-(D-R1-1..4 binding). Branch from the verified current
+(D-R1-1..5 binding). Branch from the verified current
 Shopify-connector tip (STOP if it does not match the SHA ChatGPT
 states when issuing this prompt). One session; draft PR; stop.
 
@@ -182,23 +234,34 @@ ALLOWED FILES (exhaustive):
     (ONLY _check_webhook_hmac, _check_mapped_location,
     _check_cron_queue_health + the READINESS_QUEUE_STALL_MINUTES
     constant — nothing else in the file)
+  addons/shopify_connector_core/models/shopify_connector_store.py
+    (ONLY the D-R1-5 api_health_state='normal' write inside
+    action_test_connection on full non-fallforward success —
+    nothing else in the file)
   addons/shopify_connector_core/tests/test_readiness_slot_closure.py (NEW)
+  addons/shopify_connector_core/tests/__init__.py (one import line)
   docs/05-qa/task-core-r1-validation-results.md (NEW)
   docs/05-qa/architecture-review-log.md (append one AR row)
   docs/01-research/research-handoff.md (top entry)
 FORBIDDEN: everything else — incl. _get_checks/_aggregate/
-run_for_store, store lifecycle, job/dispatch/log models, ACLs, crons,
-domain modules, views, adams_base, CI, main, plain dev.
+run_for_store, every other store method/line, job/dispatch/log
+models, ACLs, crons, domain modules, views, adams_base, CI, main,
+plain dev.
 
-IMPLEMENT exactly: D-R1-1 real cron_queue_health (drain cron active +
-no stalled queued job > 60 min, named fail reasons, no scan-cron
-requirement); D-R1-2 mapped_location not-applicable pass when
-inventory_domain_enabled is False, not_proven when True without an
-inventory override; D-R1-3 webhook_hmac not-applicable pass with the
-exact packet reason string; D-R1-4 regression: a fully configured
-Lite store aggregates pass and reaches connected via action_activate,
-and fail-closed behavior is preserved for every real failure. No
-Shopify call, no credential read, in any check. All §5 tests.
+IMPLEMENT exactly: D-R1-1 real cron_queue_health (drain cron active —
+read via the ONE named sudo elevation — + no stalled queued job
+> 60 min using the exact discriminator state='queued' AND NOT
+started_at, named fail reasons, no scan-cron requirement); D-R1-2
+mapped_location not-applicable pass when inventory_domain_enabled is
+False, not_proven when True without an inventory override; D-R1-3
+webhook_hmac not-applicable pass with the exact packet reason string;
+D-R1-5 api_health_state='normal' on full non-fallforward
+test-connection success (degraded path untouched); D-R1-4
+regression: a fully configured Lite store — via real behavior, no
+fixture force-writes — aggregates pass and reaches connected via
+action_activate, and fail-closed behavior is preserved for every
+real failure. No Shopify call, no credential read, in any check.
+All §5 tests.
 
 Runtime: full Odoo.sh run green before merge review (verbatim quote;
 OP-43 rule). Stop condition: open the PR as DRAFT titled "Task

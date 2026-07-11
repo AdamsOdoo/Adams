@@ -392,17 +392,97 @@ S2-UX. No new RA rows (checked against the rejected-approaches log —
 no rejected approach reintroduced; RA-006/008/014/018/020/021
 explicitly honored in the new packets). No code changed.
 
-### 8.3 Second adversarial pass (fresh red-team, 2026-07-11) — see the dated subsection appended below after execution
+### 8.3 Second adversarial pass (fresh red-team, 2026-07-11) — method
 
-The fresh pass required by the review runs against: (1) the actual
-merged Task 010 limitations (verified by line-cited code inspection
-before drafting — §8.1 row 1); (2) actual merged Task 011 performance
+The fresh pass required by the review ran against: (1) the actual
+merged Task 010 limitations (line-cited code inspection **before**
+drafting — §8.1 row 1); (2) actual merged Task 011 performance
 behavior (same method — §8.1 row 2); (3) accepted DEC-003 scope
 (completed, not narrowed); (4) official Odoo 19 auto-install/
 dependency behavior (captures-11 §1); (5) the premium UI/UX
 objective; (6) accessibility/performance; (7) cross-document
 uninstall/downgrade consistency; (8) security/RPC mutation
 boundaries; (9) every "planning complete" statement; (10) every
-locked prompt's dependency chain. Its findings and fixes are recorded
-in §8.4 below once executed in this same session — nothing is
-reported as fixed merely because it was documented.
+locked prompt's dependency chain. Executed as: two pre-drafting
+code-inspection passes, an in-session grep/consistency sweep (stale
+D-A6-7 ownership, nine-card assertions, Lite/sale_stock inference,
+fixed-cap tolerance, autocreate default, planning-complete
+qualifications, cross-file link existence), a strict
+review-item-completeness audit over all eleven workstreams, and an
+adversarial merged-code-fidelity pass over the CORE-R1/010B/011B/
+SEC-1 packets. Nothing is reported as fixed merely because it was
+documented — §8.4 lists what the pass itself found wrong in the
+revision and how each finding was fixed in this same session.
+
+### 8.4 Second-pass findings and dispositions (all fixed in-session before push-final)
+
+**Blocker-class (3):**
+1. **SEC-1 missed a protected-field writer:** the merged
+   `shopify_connector_store.py` writes job `state`/`error_class`/
+   timestamps without sudo (test-connection mirrors, lifecycle audit
+   jobs, disconnect sweep — lines 108–205/233–248/351–364); under
+   D-SEC1-2 as first drafted, Test Connection/Activate/Disconnect/
+   Reconnect would raise. → Store file added to the §5 allowlist with
+   each elevation itemized.
+2. **SEC-1's transition matrix outlawed merged behavior:** the
+   dispatcher routes gate-blocked starts
+   `draft|queued|retry_waiting→failed_retryable`
+   (`job_dispatch.py` 186–200; green tests at
+   `test_job_dispatch.py` 238–286). → Blocked-start edges added to
+   D-SEC1-1 explicitly.
+3. **CORE-R1 was insufficient for its own regression:** a FOURTH
+   never-passable ESSENTIAL check exists — `api_version_health`
+   passes only on `api_health_state=='normal'`, and no merged path
+   ever writes `'normal'` (only `'degraded'` on fall-forward;
+   no default). → New D-R1-5: one named store-file write site
+   (`'normal'` on full non-fallforward test-connection success),
+   flagged, with a named rejected alternative; D-R1-4 regression
+   re-specified as real-behavior-only (no fixture force-writes).
+
+**Major (3):**
+4. SEC-1 create-vs-write guard inconsistency (forgery channel open at
+   `create()`; operator holds create on jobs and bindings) →
+   D-SEC1-2 now applies at `create()` with the named su-elevated
+   creation doors and the ACL-matrix test updates called out.
+5. CORE-R1's "never attempted" lacked a discriminator (`retry_count`
+   counts scheduled retries, not attempts) → fixed to
+   `state='queued' AND NOT started_at`, with the Area-6 re-queue
+   boundary stated honestly.
+6. CORE-R1's cron-record read requires an unstated `ir.cron` sudo
+   (connector groups hold no ir.cron ACL) → named, flagged read-only
+   sudo elevation added to D-R1-1 and the release-plan §2.8
+   inventory.
+
+**Minor (5), all fixed:** missing `tests/__init__.py` lines in five
+packets' allowlists; 011B's source guard was string-literal (defeated
+by multi-line formatting) and its file scope forbade updating the
+stale full-scan docstrings → AST/domain-pattern guard + docstring
+scope; SEC-1 §1 misattributed the domain-flag gate to business
+sources only (it runs for every job) → corrected; the SEC-1
+customer-importer allowlist wording omitted its binding-create sites
+→ "snapshot/binding-write"; D-SEC1-6's core sweep had no
+dependency-safe way to see sale-module PII fields → mixin-level
+`_pii_snapshot_fields()` declaration seam.
+
+**Also found by the completeness audit:** the lifecycle options table
+mapped two of the review's six named candidates into one option
+without saying so → explicit mapping note + a genuine sixth option
+(F: core-registered job types, rejected on the DEC-008/RA-013
+boundary). **Also found by the fidelity spot-checks:** Task 010B
+cited a nonexistent error class (`shopify_temporary_unavailable` →
+the merged `shopify_temporary_server_network`) and an unverified
+`price_source_of_truth` value set (now the exact merged selection);
+Task 013/015 gate criteria lacked the new 010B prerequisite; the §6
+verdict above lacked its superseded marker. **Factual note recorded
+for ChatGPT:** the review's item-4 premise that
+`ui-ux-final-design-spec.md` and `screen-inventory-and-navigation-map.md`
+do not exist is incorrect — both are present at
+`docs/02-product/…` (verified against the base branch tree); every
+reference is now an exact relative path so no search can miss them.
+
+**Open items surviving the second pass (by design):** the external
+validations (signoff §6), every ChatGPT call in master plan §1
+(A1–A11, B1–B10), the base-module `ir.cron` ACL re-verification at
+the CORE-R1 gate, and the named build-time verifications inside
+packets (dynamic-variant API, quant-adjustment API, staged-upload
+shape). No second-pass finding remains unfixed or unrecorded.

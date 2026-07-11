@@ -223,6 +223,7 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_product_export/tests/{test_media_binding_model.py,
     test_media_export_guard.py, test_media_export_pipeline.py,
     test_media_export_async_poll.py, test_media_source_of_truth.py}                          (NEW)
+  addons/shopify_connector_product_export/tests/__init__.py                                  (import lines)
   docs/05-qa/task-015b-validation-results.md                                                 (NEW)
   docs/05-qa/architecture-review-log.md                                                      (append one AR row)
   docs/01-research/research-handoff.md                                                       (top entry)
