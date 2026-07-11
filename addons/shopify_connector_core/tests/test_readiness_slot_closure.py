@@ -306,6 +306,36 @@ class TestReadinessSlotClosure(TransactionCase):
         self.assertEqual(store.last_test_connection_result, 'pass')
         self.assertEqual(store.api_health_state, 'degraded')
 
+    # 12b. Recovery regression: a store that fell forward to `degraded`
+    #      (with a populated reason) returns to `normal` on a subsequent
+    #      non-fall-forward success, and the stale reason is cleared --
+    #      both states reached through real test-connection behavior, no
+    #      force-writes.
+    def test_degraded_recovers_to_normal_and_clears_reason(self):
+        store = self._make_store('recovery')
+        self._set_token(store)
+        # 1) fall-forward success -> degraded with a non-empty reason.
+        self._run_test_connection(
+            store,
+            FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain),
+                headers={'X-Shopify-API-Version': '2026-10'},
+            ),
+        )
+        store.invalidate_recordset()
+        self.assertEqual(store.api_health_state, 'degraded')
+        self.assertTrue(store.api_health_reason)
+        # 2) subsequent non-fall-forward success -> normal, reason cleared.
+        self._run_test_connection(
+            store,
+            FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain)
+            ),
+        )
+        store.invalidate_recordset()
+        self.assertEqual(store.api_health_state, 'normal')
+        self.assertFalse(store.api_health_reason)
+
     # ==================================================================
     # D-R1-4 -- eligible Lite store reaches connected (real behavior)
     # ==================================================================

@@ -444,12 +444,15 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         `_check_cron_queue_health`, so the pre-existing
         `test_readiness_check.py::test_source_level_no_check_method_
         mutates_state` AST guard -- which forbids `.sudo()` inside any
-        `_check_*` method -- stays green. (This addition raises the
-        module-directory `.sudo()` count from two to three; the two
-        pre-existing "exactly two sudo sites" AST guards in
-        `test_credential_service.py` / `test_job_log_system_append.py`
-        must be updated to three under ChatGPT authorization -- see the
-        Task CORE-R1 validation record.)
+        `_check_*` method -- stays green. This is the third sanctioned
+        `.sudo()` site in `shopify_connector_core/models`; the two source
+        guards in `test_job_log_system_append.py` /
+        `test_credential_service.py` enforce the exact three-site
+        inventory (`shopify_connector_job_log.py`,
+        `shopify_connector_readiness_check.py`,
+        `shopify_connector_store_credential.py`), updated under CORE-R1
+        gate amendment `4948368039`; any fourth site still fails both
+        guards.
 
         Returns None when the drain cron record does not exist; otherwise
         the boolean value of its `active` field.
