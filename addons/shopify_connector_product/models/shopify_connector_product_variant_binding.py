@@ -39,6 +39,11 @@ class ShopifyConnectorProductVariantBinding(models.Model):
     shopify_compare_at_price_snapshot = fields.Float(readonly=True)
     shopify_last_imported_at = fields.Datetime(readonly=True)
     shopify_primary_image_url = fields.Char(readonly=True)
+    # D-010B-6 image ownership: the checksum of the image bytes the
+    # connector last wrote into product.product.image_variant_1920 for this
+    # binding. See shopify_connector_product_template_binding.py's own
+    # shopify_image_checksum field for the exact ownership semantics.
+    shopify_image_checksum = fields.Char(readonly=True)
 
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',

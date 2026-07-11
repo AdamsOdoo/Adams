@@ -1,5 +1,123 @@
 # Research Handoff (rolling)
 
+### Task 010B — Revision 1 (control-room static review `4950202231`, 2026-07-12)
+
+- **PR #151 stayed draft; first control-room static review (`4950202231`)
+  returned REVISE.** The revision corrects the overclaims on the SAME PR,
+  within the review's narrow file scope (the importer, the template-binding
+  model, four test files; the three docs). No new PR; still open/draft/
+  unmerged. Head advances from `1065cdf`.
+- **What changed:** (1) strict pagination shape validation — a
+  missing/null/wrong-type `variants.pageInfo`/`hasNextPage`/`nodes` is never
+  treated as a completed single page; all violations →
+  `data_shape_schema_mismatch`, writing nothing. (2) A **real `updatedAt`
+  short-circuit** via a new readonly `shopify_updated_at` template-binding
+  field, stamped only after full success; same-updatedAt skips media/DB
+  work; enqueue-level `payload_hash = updatedAt` is recorded as an **Area-6
+  obligation** (this task has no enqueue call site; no running job's payload
+  hash is mutated). (3) Same-URL image ownership now compares the **current
+  Odoo image checksum** vs the recorded connector checksum (merchant
+  edit/clear protected, not silently skipped). (4) **SVG/spoofed bodies
+  rejected** — SVG content-type rejected + Pillow raster validation, body
+  never exposed. (5) **Bounded media memory** — `SpooledTemporaryFile` +
+  `ExitStack` cleanup on every path (no dict of full byte strings). (6)
+  **`connector_owned` refresh** resolves the exact Shopify-name or exact
+  `"<name> (Shopify)"` line, fails closed if both exist. (7) The
+  **concurrency proof** now runs the real `_apply_import` path across two
+  genuinely independent PostgreSQL connections (`odoo.sql_db.db_connect`),
+  committed synthetic stores visible to both — B holds the lock, A's
+  concurrent full import gets `concurrency_race_conflict`, A retries and
+  reuses B's committed attribute (one attribute, both products bound,
+  durable cleanup). No shared `TestCursor` claimed as concurrency.
+- **Test methods 110 → 135.** Local `compileall`/`py_compile` clean; source
+  guards green (query-only, zero new `sudo()`, no forbidden model, savepoint
+  present, `list_price` write-locality, no token in media, media staged not
+  retained-as-bytes). **No Odoo.sh/live claim added** — Odoo.sh + dev-store
+  evidence remain outstanding (`task-010b-validation-results.md` §10). This
+  session stops for another ChatGPT static review; no other task started.
+- **Next-session prompt (for ChatGPT):** *"Re-review the Task 010B revision
+  on PR #151 against control-room comment `4950202231` (items 1-8) and the
+  updated validation record §0; if accepted, proceed to the Odoo.sh + dev-
+  store runtime validation session. Do not start any other task."*
+
+### Task 010B — Product Import Completeness (draft PR, implemented, 2026-07-11)
+
+- **Base verified (hard prerequisite):** `Shopify-connector` tip ==
+  `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (**exact, no drift**); PR #149
+  (CORE-R1) verified **merged** in GitHub; Task 010B gate comment
+  `4948723366` read verbatim (*"gate opened … Required base:
+  f9c3c5fd… One draft implementation PR only. All other task gates remain
+  closed."*). Branch `claude/product-import-completeness-010b-5l07ci`.
+- **What happened:** implemented Task 010B exactly per
+  `docs/07-implementation-plan/task-010b-product-import-completeness-packet.md`
+  (D-010B-1..12), completing the accepted DEC-003 product-import scope on
+  top of the narrow Task 010 slice. **D-010B-1** extended read-only query
+  with explicit `variants(first:100, after:$cursor)` pagination (loop to
+  exhaustion; 2,048 accumulated cap; malformed pageInfo / missing endCursor
+  → `data_shape_schema_mismatch`; never a mutation). **D-010B-2**
+  options→attributes→values→lines with the existing-attribute compatibility
+  gate (reuse only `create_variant=='dynamic'`; incompatible
+  `always`/`no_variant` → `product_import_attribute_conflict_mode` default
+  `manual_review`→`binding_conflict`, else `connector_owned` distinct
+  `"<name> (Shopify)"`; existing modes never changed) + a DB-backed global
+  serialization lock (NEW `shopify.connector.attribute.lock` singleton,
+  `noupdate=1` seed, `try_lock_for_update()` FOR UPDATE SKIP LOCKED before
+  any global attribute resolve/create; unavailable → `concurrency_race_
+  conflict`; a **real two-transaction test** proves exactly one attribute).
+  **D-010B-3** sparse variants via the verified
+  `product.template._create_product_variant` (Odoo≡Shopify variants, no
+  cartesian phantoms; structural mismatch → `binding_conflict`).
+  **D-010B-4** price gated on `price_source_of_truth=='shopify_
+  authoritative'` (single→`list_price`, multi→`min`+exact `price_extra`
+  decomposition via `float_compare`, undecomposable→`min`+note).
+  **D-010B-5** `shopify_compare_at_price` on `product.product`.
+  **D-010B-6** primary+variant images (HTTPS-only, redirect-HTTPS-only,
+  `image/*`, 20 MB streamed cap, bounded timeout, no credential on the
+  request; checksum-ownership merchant-image protection;
+  `product_import_media_enabled` default True; failures→`shopify_temporary_
+  server_network`). **D-010B-7** `product_import_refresh_mode`
+  (`snapshot_only` default | `shopify_fields`; structural adds in both;
+  `updatedAt` payload-hash dedup). **D-010B-8** null/ARCHIVED→binding
+  stale+note, Odoo master untouched; null-unbound→data error. **D-010B-9**
+  N+1 removed (prefetch map + batched candidate searches; match priority
+  unchanged, no name matching). **D-010B-10** one savepoint/product;
+  reads+downloads before write scope. **D-010B-12** job contract unchanged.
+- **Odoo 19 internals verified against the actual 19.0 source** before use
+  (`create_variant` selection/default/immutable write-guard;
+  `_create_product_variant(combination, log_warning=False)`; dynamic
+  `_create_variant_ids` = no cartesian; `price_extra`;
+  `image_1920`/`image_variant_1920`;
+  `try_lock_for_update(*, allow_referencing=False, limit=None)` =
+  `FOR UPDATE SKIP LOCKED`, returns locked subset / empty if already
+  locked). The SKIP-LOCKED (non-blocking) semantics **support the packet
+  design as written** (the "never proceed unprotected when the lock is
+  unavailable" branch); no architecture change, no STOP. Shopify 2026-07
+  fields verified from the accepted captures; `ProductVariant.image` is
+  **deprecated** but packet-named for a read (recorded).
+- **What this session does NOT do:** opens no further gate; starts no
+  011B/LC-1/012/Area-6/SEC-1/inventory/fulfillment/product-export/UI/
+  webhook/OAuth/PERF-1 work; no core/sale/`adams_base`/inventory file; no
+  mutation; touches no `main`/plain `dev`; PR kept **draft**, not merged.
+  Changed files: **21** (all inside the packet allowlist).
+- **Validation performed:** `python3 -m compileall` / `py_compile` clean on
+  every changed Python file; XML well-formed; source-guards green (no
+  mutation, no bypass flag, no customer/order/inventory/fulfilment model,
+  savepoint present, `list_price` write-locality, no token in media,
+  zero new `sudo()`); **110** static test methods (was 61). **No Odoo
+  runtime here** (`import odoo` → `ModuleNotFoundError`) → suite not
+  executed locally; **Odoo.sh + live/dev-store evidence NOT obtained this
+  session — recorded as outstanding in
+  `docs/05-qa/task-010b-validation-results.md` §10, not faked, not
+  waived.** Validation record + AR-044 + this entry written.
+- **Next-session prompt (for ChatGPT to issue, after review):** *"Task
+  010B validation-only session: on Odoo.sh at the draft-PR head, run the
+  full three-suite build and quote verbatim `0 failed, 0 error(s)`; then
+  capture the §7 read-only dev-store evidence (three-option sparse; >100-
+  variant; 2,048-variant timing probe; product+variant images with refresh
+  + merchant-image-protection; archived; deleted-bound; incompatible
+  same-name attribute). Update `task-010b-validation-results.md` §9/§10
+  with the results. Do not change code; do not start any other task."*
+
 ### CORE-R1 — Capability-Aware Readiness Correction (draft PR #149, implemented + focused correction, 2026-07-11)
 
 - **Base verified (hard prerequisite):** `Shopify-connector` tip ==

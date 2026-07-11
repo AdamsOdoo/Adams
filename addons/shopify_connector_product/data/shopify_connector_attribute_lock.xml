@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+      Task 010B, D-010B-2: the single global serialization-lock row.
+
+      Exactly one row exists for the whole database (product.attribute is
+      database-global, so the lock scope is database-global, not
+      per-store). Imports acquire this exact row with try_lock_for_update()
+      before any global attribute resolve/create. noupdate="1" so a module
+      update never rewrites or duplicates it.
+    -->
+    <record id="shopify_connector_attribute_lock_singleton"
+            model="shopify.connector.attribute.lock">
+        <field name="name">Shopify Connector Global Attribute Lock</field>
+    </record>
+</odoo>

@@ -1,11 +1,12 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.1.0.0',
+    'version': '19.0.2.0.0',
     'summary': (
-        'Shopify product import and variant binding (Task 010): '
-        'read-only Shopify product/variant import, template/variant '
-        'binding models, and the product_import_sync job type. No '
-        'product export, update, or write back to Shopify of any kind.'
+        'Shopify product import completeness (Task 010/010B): read-only '
+        'Shopify product/variant import with attributes, variants, '
+        'prices, and basic images; template/variant binding models; and '
+        'the product_import_sync job type. No product export, update, or '
+        'write back to Shopify of any kind.'
     ),
     'description': """
 Shopify Connector Product
@@ -36,6 +37,7 @@ logic. No UI, wizard, webhook, or OAuth file.
     'depends': ['shopify_connector_core', 'product'],
     'data': [
         'security/ir.model.access.csv',
+        'data/shopify_connector_attribute_lock.xml',
     ],
     'installable': True,
     'application': False,

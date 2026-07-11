@@ -318,12 +318,15 @@ class TestProductImportMatching(TransactionCase):
                         'title': 'Ambiguous Product',
                         'status': 'ACTIVE',
                         'featuredImage': None,
-                        'variants': {'nodes': [{
-                            'id': 'gid://shopify/ProductVariant/904',
-                            'sku': 'DUP-2', 'barcode': None,
-                            'price': None, 'compareAtPrice': None,
-                            'selectedOptions': [], 'image': None,
-                        }]},
+                        'variants': {
+                            'nodes': [{
+                                'id': 'gid://shopify/ProductVariant/904',
+                                'sku': 'DUP-2', 'barcode': None,
+                                'price': None, 'compareAtPrice': None,
+                                'selectedOptions': [], 'image': None,
+                            }],
+                            'pageInfo': {'hasNextPage': False, 'endCursor': None},
+                        },
                     },
                 },
             }
@@ -409,15 +412,18 @@ class TestProductImportMatching(TransactionCase):
                         'id': 'gid://shopify/Product/907',
                         'title': 'Fetched Product', 'status': 'ACTIVE',
                         'featuredImage': None,
-                        'variants': {'nodes': [{
-                            'id': 'gid://shopify/ProductVariant/907',
-                            'sku': 'SKU-907', 'barcode': None,
-                            'price': 9.99, 'compareAtPrice': None,
-                            'selectedOptions': [
-                                {'name': 'Size', 'value': 'M'},
-                            ],
-                            'image': None,
-                        }]},
+                        'variants': {
+                            'nodes': [{
+                                'id': 'gid://shopify/ProductVariant/907',
+                                'sku': 'SKU-907', 'barcode': None,
+                                'price': 9.99, 'compareAtPrice': None,
+                                'selectedOptions': [
+                                    {'name': 'Size', 'value': 'M'},
+                                ],
+                                'image': None,
+                            }],
+                            'pageInfo': {'hasNextPage': False, 'endCursor': None},
+                        },
                     },
                 },
             }
@@ -703,51 +709,258 @@ class TestProductImportMatching(TransactionCase):
             self.assertEqual(result['template_binding'].shopify_status, status)
 
     # ------------------------------------------------------------------
-    # 11. Silent variant truncation is blocked (control-room review,
-    # comment 4927037139, fix 4).
+    # 11. Variant pagination (D-010B-1). The former >100-variant
+    # truncation-blocking tests are now pagination tests: multi-page
+    # payloads import completely, and only genuinely malformed pagination
+    # (malformed pageInfo, missing endCursor, over-ceiling) is blocked.
     # ------------------------------------------------------------------
 
     def test_product_import_query_requests_page_info(self):
         self.assertIn('pageInfo', PRODUCT_IMPORT_QUERY)
         self.assertIn('hasNextPage', PRODUCT_IMPORT_QUERY)
+        self.assertIn('endCursor', PRODUCT_IMPORT_QUERY)
+        # first: is always explicit (no documented default page size).
+        self.assertIn('first: 100', PRODUCT_IMPORT_QUERY)
+        self.assertIn('$cursor', PRODUCT_IMPORT_QUERY)
 
-    def test_variant_pagination_truncation_blocked_unit(self):
-        templates_before = self.env['product.template'].search_count([])
-        payload = self._product_payload(
-            gid='gid://shopify/Product/980',
-            variants=[
-                self._variant_payload(
-                    'gid://shopify/ProductVariant/980', sku='SKU-980',
-                ),
-            ],
+    def _single_option_pages(self, product_gid, total, page_size=100):
+        """Build paged GraphQL responses for a one-option, `total`-variant
+        product (option 'Edition' with values E0..E{total-1})."""
+        option_values = [{'id': 'ov-%d' % i, 'name': 'E%d' % i} for i in range(total)]
+        nodes = [
+            {
+                'id': '%s/variant/%d' % (product_gid, i),
+                'sku': 'PAGED-%s-%d' % (product_gid.split('/')[-1], i),
+                'barcode': None, 'price': '10.00', 'compareAtPrice': None,
+                'selectedOptions': [{'name': 'Edition', 'value': 'E%d' % i}],
+                'image': None, 'inventoryItem': {'id': 'ii-%d' % i},
+            }
+            for i in range(total)
+        ]
+        pages = []
+        for start in range(0, total, page_size):
+            chunk = nodes[start:start + page_size]
+            has_next = (start + page_size) < total
+            end_cursor = 'cursor-%d' % (start // page_size) if has_next else None
+            pages.append((chunk, has_next, end_cursor))
+        return option_values, pages
+
+    def _paginated_execute(self, product_gid, title, option_values, pages):
+        def fake_execute(client_self, store, query, variables=None):
+            cursor = (variables or {}).get('cursor')
+            index = 0 if cursor is None else int(cursor.split('-')[1]) + 1
+            nodes, has_next, end_cursor = pages[index]
+            return {
+                'data': {
+                    'product': {
+                        'id': product_gid, 'title': title, 'status': 'ACTIVE',
+                        'descriptionHtml': '', 'vendor': '', 'productType': '',
+                        'tags': [], 'updatedAt': '2026-07-11T00:00:00Z',
+                        'featuredImage': None,
+                        'options': [{
+                            'id': 'opt-1', 'name': 'Edition', 'position': 1,
+                            'optionValues': option_values,
+                        }],
+                        'variants': {
+                            'nodes': nodes,
+                            'pageInfo': {
+                                'hasNextPage': has_next, 'endCursor': end_cursor,
+                            },
+                        },
+                    },
+                },
+            }
+        return fake_execute
+
+    def test_two_hundred_fifty_variants_across_pages_import_completely(self):
+        """A 250-variant product spanning three variant pages
+        (100+100+50) imports every variant -- none truncated."""
+        gid = 'gid://shopify/Product/1250'
+        option_values, pages = self._single_option_pages(gid, 250)
+        self.assertEqual(len(pages), 3)
+        fake_execute = self._paginated_execute(gid, 'Paged 250', option_values, pages)
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            result = self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(len(result['variant_bindings']), 250)
+        self.assertEqual(
+            self.VariantBinding.search_count([
+                ('product_template_binding_id', '=', result['template_binding'].id),
+            ]), 250,
         )
-        payload['variants_has_next_page'] = True
-        with self.assertRaises(JobHandlerError) as ctx:
-            self.Importer._apply_import(self.store, payload)
+        # Odoo instantiated exactly the 250 Shopify variants -- no more.
+        self.assertEqual(
+            len(result['template_binding'].product_template_id.product_variant_ids),
+            250,
+        )
+
+    def test_missing_end_cursor_with_has_next_page_blocked(self):
+        gid = 'gid://shopify/Product/1251'
+        pages = [
+            ([{
+                'id': '%s/variant/0' % gid, 'sku': 'MEC-0', 'barcode': None,
+                'price': '10.00', 'compareAtPrice': None,
+                'selectedOptions': [{'name': 'Edition', 'value': 'E0'}],
+                'image': None, 'inventoryItem': None,
+            }], True, None),  # hasNextPage True but endCursor None
+        ]
+        fake_execute = self._paginated_execute(
+            gid, 'Bad Cursor', [{'id': 'ov0', 'name': 'E0'}], pages,
+        )
+        templates_before = self.env['product.template'].search_count([])
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid)
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
         )
 
-    def test_variant_pagination_truncation_blocked_end_to_end(self):
-        templates_before = self.env['product.template'].search_count([])
+    # ------------------------------------------------------------------
+    # Strict pagination-shape validation (review 4950202231 item 1): a
+    # missing/null/wrong-type variants.pageInfo is NEVER treated as a
+    # completed single page (that would silently truncate). Each malformed
+    # shape routes to data_shape_schema_mismatch and writes nothing.
+    # ------------------------------------------------------------------
 
-        def fake_execute(self, store, query, variables=None):
+    def _one_page_execute(self, product_node):
+        def fake_execute(client_self, store, query, variables=None):
+            return {'data': {'product': product_node}}
+        return fake_execute
+
+    def _one_variant_product(self, gid, variants_connection):
+        return {
+            'id': gid, 'title': 'Shape Product', 'status': 'ACTIVE',
+            'featuredImage': None, 'options': [],
+            'variants': variants_connection,
+        }
+
+    def _assert_shape_blocked(self, gid, variants_connection):
+        templates_before = self.env['product.template'].search_count([])
+        product_node = self._one_variant_product(gid, variants_connection)
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(
+            type(Client), 'execute', self._one_page_execute(product_node),
+        ):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+
+    def _one_node(self):
+        return [{
+            'id': 'gid://shopify/ProductVariant/shape', 'sku': 'SHP-0',
+            'barcode': None, 'price': None, 'compareAtPrice': None,
+            'selectedOptions': [], 'image': None, 'inventoryItem': None,
+        }]
+
+    def test_page_info_missing_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1260', {'nodes': self._one_node()},
+        )
+
+    def test_page_info_null_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1261',
+            {'nodes': self._one_node(), 'pageInfo': None},
+        )
+
+    def test_page_info_wrong_type_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1262',
+            {'nodes': self._one_node(), 'pageInfo': ['not', 'a', 'mapping']},
+        )
+
+    def test_has_next_page_missing_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1263',
+            {'nodes': self._one_node(), 'pageInfo': {'endCursor': None}},
+        )
+
+    def test_has_next_page_wrong_type_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1264',
+            {'nodes': self._one_node(),
+             'pageInfo': {'hasNextPage': 'true', 'endCursor': 'c'}},
+        )
+
+    def test_nodes_wrong_type_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1265',
+            {'nodes': {'not': 'a list'},
+             'pageInfo': {'hasNextPage': False, 'endCursor': None}},
+        )
+
+    def test_variants_wrong_type_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1266', ['not', 'a', 'mapping'],
+        )
+
+    def test_has_next_page_true_empty_end_cursor_blocked(self):
+        self._assert_shape_blocked(
+            'gid://shopify/Product/1267',
+            {'nodes': self._one_node(),
+             'pageInfo': {'hasNextPage': True, 'endCursor': ''}},
+        )
+
+    def test_null_product_first_page_no_binding_is_data_error(self):
+        gid = 'gid://shopify/Product/1268'
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(
+            type(Client), 'execute', self._one_page_execute(None),
+        ):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+
+    def test_valid_single_page_shape_accepted(self):
+        gid = 'gid://shopify/Product/1269'
+        product_node = self._one_variant_product(gid, {
+            'nodes': [{
+                'id': '%s/v' % gid, 'sku': 'SHP-OK', 'barcode': None,
+                'price': None, 'compareAtPrice': None,
+                'selectedOptions': [], 'image': None, 'inventoryItem': None,
+            }],
+            'pageInfo': {'hasNextPage': False, 'endCursor': None},
+        })
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(
+            type(Client), 'execute', self._one_page_execute(product_node),
+        ):
+            result = self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(result['template_binding'].shopify_gid, gid)
+
+    def test_over_ceiling_variant_count_blocked(self):
+        """More than 2,048 accumulated variants (unreachable by the
+        platform) routes to the schema-mismatch hold."""
+        gid = 'gid://shopify/Product/1253'
+
+        def fake_execute(client_self, store, query, variables=None):
+            cursor = (variables or {}).get('cursor')
+            page = 0 if cursor is None else int(cursor.split('-')[1]) + 1
+            nodes = [
+                {
+                    'id': '%s/v/%d-%d' % (gid, page, i), 'sku': None,
+                    'barcode': None, 'price': None, 'compareAtPrice': None,
+                    'selectedOptions': [], 'image': None, 'inventoryItem': None,
+                }
+                for i in range(100)
+            ]
             return {
                 'data': {
                     'product': {
-                        'id': 'gid://shopify/Product/981',
-                        'title': 'Paginated Product', 'status': 'ACTIVE',
-                        'featuredImage': None,
+                        'id': gid, 'title': 'Huge', 'status': 'ACTIVE',
+                        'featuredImage': None, 'options': [],
                         'variants': {
-                            'nodes': [{
-                                'id': 'gid://shopify/ProductVariant/981',
-                                'sku': 'SKU-981', 'barcode': None,
-                                'price': 9.99, 'compareAtPrice': None,
-                                'selectedOptions': [], 'image': None,
-                            }],
+                            'nodes': nodes,
                             'pageInfo': {
-                                'hasNextPage': True, 'endCursor': 'abc123',
+                                'hasNextPage': True, 'endCursor': 'cursor-%d' % page,
                             },
                         },
                     },
@@ -757,34 +970,26 @@ class TestProductImportMatching(TransactionCase):
         Client = self.env['shopify.connector.api.client']
         with patch.object(type(Client), 'execute', fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(
-                    self.store, 'gid://shopify/Product/981',
-                )
+                self.Importer.import_product_sync(self.store, gid)
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
-        self.assertEqual(
-            self.env['product.template'].search_count([]), templates_before,
-        )
-        self.assertFalse(self.TemplateBinding.search([
-            ('store_id', '=', self.store.id),
-            ('shopify_gid', '=', 'gid://shopify/Product/981'),
-        ]))
 
-    def test_variant_no_next_page_not_blocked(self):
-        """Regression guard: hasNextPage=False (or absent) must not
-        block a normal, well-formed import."""
+    def test_variant_single_page_not_blocked(self):
+        """Regression guard: a normal single-page product (hasNextPage
+        False) imports cleanly."""
         def fake_execute(self, store, query, variables=None):
             return {
                 'data': {
                     'product': {
                         'id': 'gid://shopify/Product/982',
                         'title': 'Single Page Product', 'status': 'ACTIVE',
-                        'featuredImage': None,
+                        'featuredImage': None, 'options': [],
                         'variants': {
                             'nodes': [{
                                 'id': 'gid://shopify/ProductVariant/982',
                                 'sku': 'SKU-982', 'barcode': None,
-                                'price': 9.99, 'compareAtPrice': None,
+                                'price': '9.99', 'compareAtPrice': None,
                                 'selectedOptions': [], 'image': None,
+                                'inventoryItem': None,
                             }],
                             'pageInfo': {
                                 'hasNextPage': False, 'endCursor': None,

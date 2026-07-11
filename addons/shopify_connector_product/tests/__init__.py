@@ -2,3 +2,8 @@ from . import test_product_template_binding
 from . import test_product_variant_binding
 from . import test_product_import_matching
 from . import test_product_duplicate_prevention
+from . import test_product_attribute_import
+from . import test_product_variant_generation
+from . import test_product_price_import
+from . import test_product_media_import
+from . import test_product_refresh_and_stale
