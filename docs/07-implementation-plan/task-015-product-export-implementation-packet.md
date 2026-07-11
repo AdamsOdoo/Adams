@@ -143,8 +143,10 @@ the settings seam by this module, mirroring the accepted flag pattern;
 
 ## 3. Gate criteria (product-export domain, 15-pattern)
 
-1 Tasks 010 (bindings) + this packet's module boundary (ARCH PD-1)
-accepted; 2 naming: no new binding models — preview model name
+1 Tasks 010 (bindings) **and 010B (complete variant structures +
+the `shopify_compare_at_price` field this packet reads — added
+2026-07-11)** merged runtime-green + this packet's module boundary
+(ARCH PD-1) accepted; 2 naming: no new binding models — preview model name
 accepted (=D-015-5); 3 exact names ✅; 4 files ✅(§8); 5
 duplicate-gate + identifier idempotency fixed ✅(D-015-4); 6 no
 inventory quantities ✅ (structural + source guard); 7 no
@@ -229,7 +231,9 @@ withheld); 015B (media) → **fully planned successor packet**
 ```text
 DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS THIS PLANNING PACKAGE,
 EXPLICITLY OPENS THE PRODUCT-EXPORT GATE, VERIFIES THE CURRENT BASE
-SHA, AND ISSUES THIS PROMPT.
+SHA, AND ISSUES THIS PROMPT. (Prerequisite: Task 010B merged
+runtime-green — this task reads its variant structures and
+shopify_compare_at_price field.)
 
 Implement Task 015 — controlled product export/update — as the NEW
 module addons/shopify_connector_product_export, exactly per

@@ -127,11 +127,11 @@ represent the remote variant) routes to `blocked_manual_review` /
 `binding_conflict` with both structures in the evidence payload.
 
 **D-010B-4 — Base price import (real `list_price`).** Gated by the
-merged per-store `price_source_of_truth` setting: prices are written
-into Odoo **only** when Shopify is the recorded price authority for
-the store (the merged field's Shopify-authoritative value; exact
-merged selection values re-verified at build time — verify-don't-
-assume rule), else snapshots-only (today's behavior).
+merged per-store `price_source_of_truth` setting (verified merged
+selection: `odoo_authoritative` / `shopify_authoritative`, no
+default): prices are written into Odoo **only** when the store's
+value is `shopify_authoritative`; when unset or `odoo_authoritative`,
+snapshots-only (today's behavior).
 Write mechanics: single-variant template → `list_price = price`.
 Multi-variant → `list_price = min(variant prices)`; per-variant
 deltas decomposed onto `product.template.attribute.value.price_extra`
@@ -156,7 +156,8 @@ image + per-variant image** (the DEC-003 "basic" bar): download the
 `featuredImage.url` / variant `image.url` binary over HTTPS
 (content-type must be `image/*`; size cap constant 20 MB; timeout;
 redirects followed only to https; failures → job-log note +
-`shopify_temporary_unavailable` retry class, never a hold) and write
+`shopify_temporary_server_network` retry class (the exact merged
+registry name), never a hold) and write
 `product.template.image_1920` / `product.product.image_variant_1920`
 (both are core `product` fields — no new dependency). A checksum
 (`shopify_image_checksum` Char on each binding) prevents re-download/
@@ -355,9 +356,9 @@ lines + Default-Title special case; D-010B-3 dynamic-mode
 deterministic variant instantiation (verify the 19.0 dynamic-creation
 API against source before use — STOP and report if it differs; no
 phantom variants; structural mismatch -> binding_conflict);
-D-010B-4 price import gated on the merged price_source_of_truth
-(verify merged values at build time), min+price_extra exact
-decomposition with undecomposable fallback note; D-010B-5
+D-010B-4 price import gated on price_source_of_truth ==
+'shopify_authoritative' (verified merged selection), min+price_extra
+exact decomposition with undecomposable fallback note; D-010B-5
 shopify_compare_at_price on product.product (import-filled);
 D-010B-6 primary+variant image import with checksum skip,
 merchant-image protection, 20MB/https/image-type caps, media flag;

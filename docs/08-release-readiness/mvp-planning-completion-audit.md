@@ -245,6 +245,13 @@ the methodology caution).
 
 ## 6. Readiness verdict
 
+> **SUPERSEDED 2026-07-11:** ChatGPT's control-room review (comment
+> `4942966937`) found this verdict premature — eleven material gaps.
+> The operative verdict is the revised signoff's planning-complete
+> statement plus §8 below; the exact next step is **Task CORE-R1**,
+> not Task 012. This section is preserved unedited below as the
+> 2026-07-10 historical record.
+
 **Planning-complete per the session's §22 standard, as a proposal
 package** — see `mvp-planning-completion-signoff.md` for the ten
 answers and the exact statement. The repository now contains: the

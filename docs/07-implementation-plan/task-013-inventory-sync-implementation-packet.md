@@ -203,7 +203,9 @@ scope is completed, not narrowed.
 
 ## 3. Gate criteria (inventory domain, 15-pattern)
 
-1 Task 010 runtime-green ✅; 2 naming portion accepted (=D-013-1);
+1 Task 010 runtime-green ✅ **and Task 010B merged (added 2026-07-11
+— per-pair level bindings need the complete variant set to cover an
+ordinary catalog)**; 2 naming portion accepted (=D-013-1);
 3 exact names ✅; 4 files ✅(§8); 5 thresholds/CAS/idempotency fixed
 ✅(D-013-3); 6 no product-import/export scope ✅; 7 no
 order/fulfillment scope ✅ (structural: no dependency on sale); 8 no
