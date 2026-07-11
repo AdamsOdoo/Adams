@@ -1,5 +1,75 @@
 # Research Handoff (rolling)
 
+### AR-042 revision 3 — PR #148 final-convergence (comment `4947866018`) focused patch (2026-07-11)
+
+- **What happened:** ChatGPT's **final-convergence review** of
+  revision 2 at `1f61bdd` returned **REVISE** with six load-bearing
+  items found by checking the final packets against the merged code and
+  current official Odoo 19 / Shopify 2026-07 docs. This session applied
+  one focused **docs-only** patch to the same PR #148 closing each:
+  (1) **PERF-1** reworked to Odoo 19's official
+  `ir.cron._commit_progress()` per-job-savepoint model — the false "no
+  lock held across a network call" claim is withdrawn (merged claim is
+  `try_lock_for_update()`, transaction-scoped; the old packet held all
+  claimed locks across the whole pass); claim-one → savepoint →
+  `_commit_progress` → re-claim → time-budget return; per-job atomicity,
+  lock-release-between-jobs, and crash-survival proven; throughput
+  reframed as latency-bound (batch÷cadence = claim ceiling only), PB-19
+  measured against a representative latency profile; `max_in_flight`
+  **withdrawn** to the topology-B concurrency plan. (2) **Task 013B**
+  gains a **DB-backed apply lock** (`try_lock_for_update()` on
+  quant/level-binding/mapping/variant-binding rows) before the final
+  re-read (re-reading alone is not a race guard — `operation_scope_key`
+  serializes only connector jobs), fail-closed on un-lockable rows,
+  no-existing-quant case, and a **real concurrent-transaction test**.
+  (3) **Task 012** residual discounts now **preserve tax treatment**
+  (negative adjustment inherits the source line's `tax_ids`/inclusion,
+  or bucketed per tax signature; never a universal no-tax residual for
+  taxable lines — `TaxLine.priceSet` is post-discount), and the tax-rate
+  unit is **pinned** (query requests both `rate` and `ratePercentage`;
+  canonical key from `ratePercentage`; verify `rate×100==ratePercentage`;
+  mismatch/null → schema hold). (4) **Task 015B** removes **automatic
+  `fileDelete`** — official verification found the Shopify `File`
+  interface exposes **no reverse-reference query** (2025-07: 7 fields,
+  no `references`/`referencedBy`/`productMedia`), so the MVP posture is
+  **detach-only + retain** (`detached_orphan_candidate`; explicit manual
+  cleanup only). (5) **Task 010B** gains a **DB-backed serialization
+  lock** (`shopify.connector.attribute.lock` singleton +
+  `try_lock_for_update()`) preventing concurrent duplicate global
+  attributes at creation time (a savepoint does not serialize), with a
+  real concurrent-transaction test — no deferred reconciliation sweep.
+  (6) **SEC-1** override contract corrected (no model arg; id resolved
+  only in the declared comodel; impossible "wrong-model id" test
+  withdrawn) and **LC-1** cancellation no longer depends on SEC-1 code
+  sequenced later (uses the current merged `cancelled`-write + audit
+  path, forward-compatible with the future SEC-1 matrix).
+- **Official citations used (as the review required):** Odoo 19 cron —
+  `odoo/odoo` `19.0` `odoo/addons/base/models/ir_cron.py`:
+  `_commit_progress(self, processed=0, *, remaining=None,
+  deactivate=False) -> float` (returns remaining cron seconds; "If
+  called from outside the cron job, the progress function call will just
+  commit"; `_notify_progress` deprecated since 19.0). Shopify File
+  reverse-reference — **none exists**: Admin GraphQL `File` interface
+  (2025-07) = `alt/createdAt/fileErrors/fileStatus/id/preview/updatedAt`
+  only; final MVP media-deletion posture is **detach-only**.
+- **What this session does NOT do:** no code; no addon/XML/CSV/manifest/
+  migration/CI/Docker/requirements change; opens no gate (CORE-R1, U0,
+  PERF-1, LC-1, or any implementation gate); accepts no DEC/PD/D-item/
+  AR/packet; does not mark the PR ready or merge it; does not touch
+  `main` or plain `dev`. PR #148 stays **draft / open / unmerged**.
+- **Learning feedback loop:** the reinforced lesson — a planning packet
+  must match the *actual merged mechanism and the actual official API*,
+  not a plausible model: "no lock held", "re-read = race guard",
+  "savepoint serializes", a no-tax residual for taxable discounts, a
+  "fresh reference check" with no query behind it, and a "wrong-model id"
+  test that a bare integer cannot support were each *nearly* right and
+  each materially wrong. Verify against source (cron `_commit_progress`,
+  `File` interface fields, `try_lock_for_update`) before asserting a
+  mechanism.
+- **Stop condition:** push the final-convergence revision to PR #148 and
+  stop for ChatGPT review. Planning-complete remains **revision-pending**
+  until ChatGPT accepts.
+
 ### AR-042 revision 2 — PR #148 re-review (comment `4945129824`) focused convergence patch (2026-07-11)
 
 - **What happened:** ChatGPT's control-room **re-review** of the

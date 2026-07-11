@@ -102,8 +102,19 @@ to its closing artifact; the fresh adversarial pass in §8.3 records
 what was re-verified against merged code and official sources).
 **The subsequent control-room re-review (comment `4945129824`) found
 nine further load-bearing items; the focused docs-only convergence
-patch closes each at planning level — audit §8.5 maps them — and the
-package remains a revision-pending proposal until ChatGPT accepts it.**
+patch closes each at planning level — audit §8.5 maps them.**
+**The final-convergence review (comment `4947866018`) found six more
+load-bearing items — PERF-1's transaction/lock model (now the official
+Odoo 19 `ir.cron._commit_progress()` per-job-savepoint pattern; the
+false "no lock held" claim withdrawn; `max_in_flight` deferred to the
+concurrency plan), 013B's TOCTOU (now a `try_lock_for_update()` apply
+lock + concurrent test), 012's taxable-discount tax preservation +
+rate-unit pinning, 015B's detach-only posture (no reverse-reference API
+exists, so no automatic `fileDelete`), 010B's `try_lock_for_update()`
+attribute-creation serialization, and the SEC-1/LC-1 wording (no
+"wrong-model id" test; LC-1 not depending on later SEC-1 code) — each
+closed at planning level (audit §8.6). The package remains a
+revision-pending proposal until ChatGPT accepts it.**
 Specifically: every known planning item is closed, planned,
 explicitly deferred-with-a-name, or converted into a precisely
 defined external validation; the formerly-missing packets exist and

@@ -14,6 +14,14 @@
 > (`../03-architecture/performance-budgets.md`); design system
 > (`../03-architecture/premium-ui-ux-design-system.md`); lifecycle
 > (`../03-architecture/module-lifecycle-uninstall-design.md`).
+> **Final-convergence revision 2026-07-11 (comment `4947866018`):** the
+> critical-path sequence and gates are **unchanged**; six packets were
+> refined in place — PERF-1 (official `_commit_progress` transaction
+> model; `max_in_flight` deferred to the concurrency plan), 013B
+> (DB-backed apply lock), 012 (tax-preserving discount lines + rate-unit
+> pinning), 015B (detach-only, no automatic `fileDelete`), 010B
+> (`try_lock_for_update()` attribute serialization), SEC-1/LC-1 wording.
+> Closure map: audit §8.6.
 
 ## 1. Decisions ChatGPT makes when reviewing this PR (one review; carried-over calls A1–A11 + revision calls B1–B10)
 
@@ -77,10 +85,13 @@ noted):**
   UI-U1 stays locked until the prototype is accepted in a recorded
   act).
 - **B11** Accept the **Task PERF-1 packet** (core queue throughput
-  calibration — configurable batch/cadence, lock-safety, Shopify
-  backpressure) so PB-19 (≥ 600 jobs/hour) has a gated implementation
-  owner, sequenced before performance UAT (re-review `4945129824`
-  item 5).
+  calibration — the Odoo 19 `ir.cron._commit_progress()` per-job-savepoint
+  transaction model, configurable per-pass-cap/cadence, lock-safety,
+  Shopify backpressure; `max_in_flight`/overlap deferred to the
+  topology-B concurrency plan) so PB-19 (≥ 600 jobs/hour) has a gated
+  implementation owner, sequenced before performance UAT (re-review
+  `4945129824` item 5; transaction model corrected per final-convergence
+  `4947866018` item 1).
 
 Accepting the PR without naming exceptions accepts A1–A10 and
 B1–B9/B11 as proposed; A11 is optional; **B10 is an authorization act

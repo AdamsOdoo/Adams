@@ -754,6 +754,22 @@ stated. These are **observations for the release-hardening baseline**
 (SRR-01's savepoint-ceiling context), not pass/fail criteria — no
 performance number in this addendum is a target.
 
+**Task PERF-1 relationship (added — re-review `4945129824` item 5 /
+final-convergence `4947866018` item 1).** PB-19 (≥ 600 jobs/hour) is
+owned by **Task PERF-1**, which reworks `run_drain()` to Odoo 19's
+official `ir.cron._commit_progress()` per-job-savepoint pattern (locks
+released between committed jobs; completed jobs survive a later failure;
+throughput latency-bound, not the fixed 240/h claim ceiling) and proves
+it against a representative handler-latency profile. **Overlapping
+multi-pass execution and any `max_in_flight`-style overlap cap are
+explicitly this plan's scope (topology B, multi-worker), not PERF-1's:**
+PERF-1 keeps the single-worker cron sequential (per-job commit), and the
+withdrawn `max_in_flight` idea belongs here where committed per-job
+states and real multi-worker execution can define and validate it. This
+plan therefore remains the sole owner of cross-worker concurrency proof;
+PERF-1 owns the single-worker transaction model and the throughput
+calibration only.
+
 ### 13.3 Standing classification
 
 Until a session with a live Odoo.sh (topology A minimum, C preferred)

@@ -17,6 +17,15 @@
 > source-of-truth are mandatory here in the import direction too;
 > RA-020 is untouched (this is one-time and operator-driven, not
 > autonomous bidirectional logic).
+> **Revised 2026-07-11 per final-convergence comment `4947866018`
+> item 2:** the apply step now takes a **database-backed row lock**
+> (`try_lock_for_update()`) on the dependent `stock.quant`/level-
+> binding/location-mapping/variant-binding rows *before* its final
+> re-read (re-reading alone is not a race guard — a competing Odoo
+> transaction can change a quant/reservation in the TOCTOU window;
+> `operation_scope_key` serializes only connector jobs, not ordinary
+> stock moves), and a real concurrent-transaction test proves it
+> (D-013B-4, §4, §6).
 
 ## 1. Objective, scope, non-goals
 
@@ -103,14 +112,48 @@ method) and the reserved-quantity read are verified against the 19.0
 source in-session before use; STOP-and-report if either differs (no
 improvisation; same rule as Task 010B's D-010B-3).
 
-**Immediate re-read + drift abort (race protection).** The apply
-handler **re-reads, inside its savepoint, immediately before writing**,
-every quantity it depends on — on-hand, reserved, the mapping, the
-binding, and the level binding's `write_date` — and **aborts** (no
-write; `destructive_write_guard_blocked`) if any changed from the
-confirmed preview snapshot. A reservation created between preview and
-apply therefore never yields a silently wrong baseline; the operator
-re-previews.
+**Database-backed apply lock + re-read + drift abort (race protection —
+re-review `4947866018` item 2).** Re-reading alone is **not** a race
+guard: another Odoo transaction can change a quant or a reservation
+*after* the re-read and *before/during* the adjustment (a TOCTOU
+window), and the connector `operation_scope_key` serializes only
+connector jobs — it does **not** serialize ordinary Odoo stock
+moves/reservations. The apply contract is therefore **lock, then
+re-read, then verify, then write**, all inside the job's savepoint:
+1. **Acquire a database row lock** (`try_lock_for_update()` — Odoo 19's
+   official row-locking primitive, the same one the merged dispatcher
+   claims jobs with; the exact 19.0 method/equivalent is verified
+   against source at gate time) on **every row the adjustment depends
+   on**: the relevant `stock.quant` row(s) at the [product, location],
+   the `inventory.level.binding`, the `location.mapping`, and the
+   `variant.binding`. If **any** required row cannot be locked, the
+   apply **fails closed** (`destructive_write_guard_blocked`) and the
+   operator re-previews — the connector never proceeds on an
+   un-lockable row.
+2. **Re-read under the lock** every quantity it depends on — on-hand,
+   reserved, the mapping, the binding, and the level binding's
+   `write_date` — and **abort** (no write;
+   `destructive_write_guard_blocked`) if any value **or the quant
+   topology** (number/identity of quants at the pair) changed from the
+   confirmed preview snapshot. Because the rows are now locked, no
+   competing transaction can mutate them between this re-read and the
+   write.
+3. **No-existing-quant case (explicit):** when the pair has no
+   `stock.quant` row yet, the lock is taken on the level
+   binding/mapping/variant binding (the rows that exist) and the
+   adjustment **creates** the quant through the standard inventory-
+   adjustment API — the connector does **not** pre-insert a bare quant
+   row to lock (which would itself be race-prone); a quant appearing
+   concurrently is caught by the post-write `free_qty` verification
+   (D-013B-4 above) and rolled back.
+4. **Verify** `resulting_free_qty == desired_shopify_available` before
+   commit (D-013B-4); on failure roll back the savepoint →
+   `blocked_manual_review` / `binding_conflict`.
+The locks release when the job's savepoint/transaction commits (or on
+rollback). A reservation created between preview and apply is therefore
+either blocked from committing until the baseline commits, or caught by
+the under-lock re-read + topology check — never a silently wrong
+baseline.
 
 **Enumerated edge behavior (fail closed where a deterministic
 adjustment is not provable):**
@@ -125,7 +168,9 @@ adjustment is not provable):**
   `package_id` at the pair → fail closed (same reason); the connector
   does not adjust third-party-owned or packaged stock.
 - **In-flight moves / reservation changes between preview and apply:**
-  caught by the re-read + drift abort above.
+  caught by the **row lock + under-lock re-read + drift/topology abort**
+  above (a competing transaction cannot mutate the locked rows between
+  the re-read and the write).
 - **Lots/serials:** products with `tracking != 'none'` →
   `blocked_manual_review` / `binding_conflict` (adjusting lot-tracked
   stock needs operator judgement — named exclusion, unchanged).
@@ -186,11 +231,21 @@ scan; already-baselined pair excluded/refused without explicit
 override); `test_inventory_baseline_apply.py` (**counted-on-hand
 target = desired_available + reserved with post-write
 `free_qty == desired_available` verification**; **reservation present →
-target includes it, resulting free_qty correct**; **reservation
-created between preview and apply → drift abort
-(`destructive_write_guard_blocked`), no write**; **multiple quants at
-one [product, location] → fail closed**; **owner/package quant → fail
-closed**; quant adjustment with reference;
+target includes it, resulting free_qty correct**; **the apply lock:
+dependent quant/level-binding/mapping/variant-binding rows are locked
+with `try_lock_for_update()` before the final re-read; an un-lockable
+required row → fail closed (`destructive_write_guard_blocked`)**; **a
+real concurrent-transaction test — a competing transaction adds a
+reservation / changes the quant against the same pair while the apply
+runs → the baseline either serializes correctly or aborts on the
+under-lock drift/topology check, never a silently wrong `free_qty`**;
+**reservation created between preview and apply → drift abort
+(`destructive_write_guard_blocked`), no write**; **quant topology change
+(quant count/identity differs from preview) → abort**; **no-existing-
+quant case → lock the existing binding/mapping rows, create the quant
+via the adjustment API, post-write verification catches a concurrent
+quant**; **multiple quants at one [product, location] → fail closed**;
+**owner/package quant → fail closed**; quant adjustment with reference;
 prior/on-hand/reserved/new/delta evidence logged; clamp-to-0 note;
 lot-tracked → manual review; stamp written; replay collides;
 per-pair serialization vs push jobs); `test_inventory_baseline_run_model.py`
@@ -209,7 +264,10 @@ re-inclusion-override (D-013B-6); 14 quantity semantics correct —
 `available`↔`free_qty`, adjustment target
 `on_hand = desired_free + reserved`, post-write verification + drift
 abort ✅(D-013B-2/4, RA-021); 15 lot-tracked / multi-quant /
-owner-package fail-closed routing explicit ✅(D-013B-4).
+owner-package fail-closed routing explicit ✅(D-013B-4); 16 (added
+`4947866018`) database-backed apply lock (`try_lock_for_update()` on
+quant/binding/mapping rows before the final re-read) + real
+concurrent-transaction test explicit ✅(D-013B-4, §4/§6).
 
 ## 6. Odoo.sh + live validation
 
@@ -218,10 +276,11 @@ preview → confirm → apply cycle over ≥2 mapped pairs including **one
 pair carrying a live reservation (proving
 `target_on_hand = desired_available + reserved` yields the correct
 post-apply `free_qty`)**, one already-baselined replay refusal, one
-clamp case, and **one deliberate drift case (a reservation added
-between preview and apply → apply aborts)**; evidence (redacted) in the
-validation record; explicit recorded ChatGPT waiver is the only
-alternative.
+clamp case, and **one deliberate concurrent-drift case (a reservation
+added by a competing transaction between preview and apply → the apply
+lock + under-lock re-read causes it to abort, no wrong baseline
+written)**; evidence (redacted) in the validation record; explicit
+recorded ChatGPT waiver is the only alternative.
 
 ## 7. Acceptance criteria / DoD
 
@@ -289,10 +348,20 @@ for every write (the documented manual-undo path); quantity semantics
 and because an inventory adjustment sets COUNTED ON-HAND the target is
 on_hand = desired_available + current_reserved, verified after write by
 resulting free_qty == desired_available (else roll back to manual
-review); apply re-reads on-hand/reserved/mapping/binding immediately
-before writing and ABORTS on any drift from the confirmed preview;
-committed never written or read for writing (RA-018); concurrency
-caveat restated. Odoo.sh green + the §6 dev-store cycle
+review); the apply takes a DATABASE ROW LOCK (try_lock_for_update() —
+verify the exact 19.0 method against source before use) on the
+dependent stock.quant / level-binding / location-mapping /
+variant-binding rows BEFORE the final re-read, fails closed if any
+required row cannot be locked, then re-reads on-hand/reserved/mapping/
+binding UNDER THE LOCK and ABORTS on any value or quant-topology drift
+from the confirmed preview (re-reading alone is NOT a race guard —
+operation_scope_key serializes only connector jobs, not ordinary Odoo
+stock moves); the no-existing-quant case locks the existing
+binding/mapping rows and creates the quant via the adjustment API (never
+pre-inserts a bare quant to lock); a REAL concurrent-transaction test
+proves a competing reservation/quant change is either serialized or
+aborted, never a silently wrong free_qty; committed never written or
+read for writing (RA-018); concurrency caveat restated. Odoo.sh green + the §6 dev-store cycle
 evidence (or recorded explicit ChatGPT waiver). Stop condition:
 draft PR "Task 013B: controlled initial inventory baseline import";
 gate closes on draft-open; no other work.

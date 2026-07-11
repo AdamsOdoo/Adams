@@ -11,6 +11,15 @@
 > proposes the supported lifecycle. Evidence: merged core code
 > (job/log FK posture re-verified 2026-07-11) and captures 2026-07-11
 > §2 (`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`).
+> **Final-convergence revision 2026-07-11 per comment `4947866018`
+> item 6: LC-1's `non-terminal → cancelled` cancellation no longer
+> references "the SEC-1 legal edge" (LC-1 is sequenced before SEC-1 and
+> must not depend on code that has not landed). It uses the current
+> merged sanctioned mechanism — the same state-write-to-`cancelled` +
+> audit-log path the merged `action_disconnect` sweep uses (the merged
+> `write()` gate blocks only transitions *to* `running`) — and is
+> required to remain forward-compatible with the future SEC-1 matrix,
+> which keeps `non-terminal → cancelled` legal (§7, §7.1).**
 
 ## 1. The contradiction being resolved (verbatim, both sides)
 
@@ -180,10 +189,22 @@ edit beyond the two named importer one-liners; views/ACL/cron;
 
 **Historic-job conversion mechanics.** `_reassign_to_historic_job_type(self)`
 (a) **cancels any non-terminal job** with one audited
-`manual_action`-grade log row each (state → `cancelled` through the
-SEC-1 legal `non-terminal→cancelled` edge), then (b) sets
+`manual_action`-grade log row each, then (b) sets
 `job_type='historic_domain_job'` while `original_job_type` (populated
-at creation) preserves the real type for querying. Terminal jobs are
+at creation) preserves the real type for querying. **Cancellation
+mechanism (corrected per final-convergence comment `4947866018` item 6
+— LC-1 must not depend on SEC-1 code sequenced later):** the
+`non-terminal → cancelled` write uses the **current merged sanctioned
+mechanism** — a state write to `cancelled` plus a `_system_append`
+audit row, exactly the path the merged `action_disconnect` cancellation
+sweep already uses (the merged `write()` gate blocks only transitions
+*to* `running`, never *to* `cancelled`, so no SEC-1 matrix is required
+and none exists at LC-1's landing time). LC-1 **requires forward
+compatibility** with the future SEC-1 legal-transition matrix, which
+keeps `non-terminal → cancelled` as a legal edge (SEC-1 D-SEC1-1) — so
+when SEC-1 lands, LC-1's cancellation is already matrix-legal and
+needs no change; but LC-1 does **not** call any SEC-1 method or rely on
+any SEC-1 code. Terminal jobs are
 only retyped — history preserved, never unlinked; logs untouched. Each
 domain module's `selection_add` `ondelete` for its job type(s) is
 `lambda recs: recs._reassign_to_historic_job_type()`, so uninstalling
@@ -262,10 +283,16 @@ IMPLEMENT exactly: the permanent historic_domain_job job_type value;
 original_job_type Char filled for every job at creation + backfilled by
 the post-migration script (= job_type where null); the dispatcher
 refusing historic_domain_job (no handler); _reassign_to_historic_job_type
-which cancels non-terminal jobs (one audited log row each, via the
-legal non-terminal->cancelled transition) then retypes terminal jobs to
-historic_domain_job (logs untouched, original_job_type preserved); each
-named domain selection_add ondelete set to
+which cancels non-terminal jobs (one audited log row each) using the
+CURRENT merged sanctioned mechanism — a state write to cancelled + a
+_system_append audit row, the same path action_disconnect's cancellation
+sweep already uses (the merged write() gate blocks only transitions TO
+running, never TO cancelled), so LC-1 depends on NO SEC-1 code (SEC-1 is
+sequenced later); require forward compatibility with the future SEC-1
+matrix (which keeps non-terminal->cancelled legal) but call no SEC-1
+method — then retypes terminal jobs to historic_domain_job (logs
+untouched, original_job_type preserved); each named domain
+selection_add ondelete set to
 lambda recs: recs._reassign_to_historic_job_type(). All §7 tests incl.
 the honest uninstall-after-use success pair and the reinstall re-match
 determinism.

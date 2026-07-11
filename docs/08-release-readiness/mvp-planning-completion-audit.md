@@ -513,3 +513,30 @@ the external validations (signoff §6); every ChatGPT call in master
 plan §1 (A1–A11, B1–B11); the named build-time verifications inside
 packets. No re-review item remains unaddressed at planning level; PR
 #148 stays draft / open / unmerged and nothing is accepted.
+
+### 8.6 Final-convergence closure map — comment `4947866018` (2026-07-11)
+
+ChatGPT's **final-convergence review** of revision 2 at `1f61bdd`
+returned **REVISE** with six load-bearing items found by checking the
+final packets against the merged code and current official Odoo 19 /
+Shopify 2026-07 docs. This docs-only patch closes each at planning level
+(nothing accepted, no gate opened, PR remains draft). It **supersedes**
+the §8.5 rows where a mechanism was refined (015B row 3, 012 row 4,
+PERF-1 row 5, SEC-1 row 6, LC-1 row 7).
+
+| # | Final-convergence item | Closing artifact(s) — all Proposed, NOT accepted |
+| --- | --- | --- |
+| 1 | PERF-1 false transaction/lock model; not following Odoo 19 cron batching | `task-perf1-core-queue-throughput-calibration-packet.md` reworked: the merged claim is `try_lock_for_update()` (transaction-scoped), so the "no lock held across a network call" claim is **withdrawn**; `run_drain()` adopts the official `ir.cron._commit_progress()` per-job-savepoint loop (claim-one → savepoint → commit-progress → re-claim → time-budget return), proving per-job atomicity, lock-release-between-jobs, and crash-survival; throughput reframed latency-bound (batch÷cadence = claim ceiling), PB-19 measured against a representative latency profile; **`max_in_flight` withdrawn** to the topology-B concurrency plan. Odoo cite: `odoo/odoo` `19.0` `ir_cron.py` `_commit_progress(processed=0, *, remaining=None, deactivate=False) -> float` |
+| 2 | 013B TOCTOU: re-reading is not locking | `task-013b-initial-inventory-baseline-packet.md` D-013B-4: **DB-backed apply lock** (`try_lock_for_update()` on the dependent `stock.quant`/level-binding/mapping/variant-binding rows) before the final re-read; fail-closed on un-lockable rows; under-lock re-read + drift/topology abort; explicit no-existing-quant case; **real concurrent-transaction test** + dev-store concurrent-drift case |
+| 3 | 012 no-tax discount incorrect for taxable discounts | `task-012-order-import-implementation-packet.md` D-012-2/8: residual discount adjustment **inherits the source line's `tax_ids`/inclusion** (or one negative line per tax signature/bucket) — no universal no-tax residual for taxable lines (`TaxLine.priceSet` is post-discount); inconsistent allocations rejected, not tolerated; D-012-9 rate-unit pinning (query requests both `rate` and `ratePercentage`; canonical key from `ratePercentage`; verify `rate×100==ratePercentage`; mismatch/null → schema hold); tests + UAT |
+| 4 | 015B automatic `fileDelete` not backed by a reverse-reference API | `task-015b-product-media-export-packet.md` D-015B-2/6: **no automatic `fileDelete`** — verified the Shopify `File` interface (2025-07) exposes no reverse-reference connection (7 fields only); MVP posture is **detach-only + retain** (`detached_orphan_candidate`; explicit admin-gated manual cleanup only); tests + known-limitation + preview copy corrected |
+| 5 | 010B concurrent attribute creation still not prevented | `task-010b-product-import-completeness-packet.md` D-010B-2: **DB-backed serialization** — `shopify.connector.attribute.lock` singleton row taken with `try_lock_for_update()` before any global attribute resolve/create (a savepoint does not serialize), DB-global across stores; **real concurrent-transaction test** proving one attribute not two; prevention at creation time, no deferred reconciliation |
+| 6 | SEC-1 wrong-model claim + LC-1 depends on later SEC-1 code | `task-sec1-security-hardening-packet.md` D-SEC1-4/7: **no model argument**, id resolved only in the declared comodel, impossible "valid id of the wrong model" test **withdrawn**; `module-lifecycle-uninstall-design.md` §7/§7.1: LC-1 `non-terminal→cancelled` uses the **current merged sanctioned** `cancelled`-write + audit path (the `action_disconnect` precedent), forward-compatible with the future SEC-1 matrix, depending on **no** SEC-1 code |
+
+**Open items surviving this final-convergence patch (unchanged):** the
+external validations (signoff §6); every ChatGPT call in master plan §1;
+the named build-time verifications (now including the Odoo 19
+`_commit_progress` signature and, for any future guarded media deletion,
+a Shopify reverse-reference surface). No item remains unaddressed at
+planning level; PR #148 stays draft / open / unmerged, nothing accepted,
+and planning-complete is **revision-pending** until ChatGPT accepts.

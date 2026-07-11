@@ -13,6 +13,24 @@
 > `../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`).
 > Extends `shopify_connector_product_export` (PD-1 write-risk
 > boundary preserved — all catalog mutations stay in one module).
+> **Final-convergence revision 2026-07-11 per comment `4947866018`
+> item 4: the connector NEVER automatically calls `fileDelete`.**
+> Targeted official verification this session established that the
+> Shopify Admin GraphQL `File` interface (version 2025-07, the latest
+> stably-documented surface; re-verify at gate time against 2026-07)
+> exposes only `alt`, `createdAt`, `fileErrors`, `fileStatus`, `id`,
+> `preview`, `updatedAt` — **no `references`/`referencedBy`/`productMedia`
+> reverse connection exists**, so there is **no official, testable query
+> that proves a File is used by no other product/variant across the
+> store**. The prior "fresh reference/association check → `fileDelete`"
+> is therefore unsupported guesswork and is **withdrawn**. The MVP
+> posture is **detach-only + retain the File**: the connector detaches
+> its own product/variant association, retains the File asset, and marks
+> the binding `detached_orphan_candidate` for a later explicit/manual
+> cleanup capability. (If a future official reverse-reference surface is
+> documented and testable, guarded deletion may be reinstated at gate
+> time with the exact query/fields/pagination and a negative
+> reused-File live test — until then, no automatic `fileDelete`.)
 
 ## 1. Objective, scope, non-goals
 
@@ -49,13 +67,17 @@ connector did not create (hard guard); no publishing; no
   `productVariantDetachMedia` (both current). Primary-image ordering
   via `productReorderMedia` (async `Job`) only after association
   succeeds and only when the primary is not already first.
-- **Replacement/removal of connector-owned media:** `fileDelete`
-  (current) strictly limited to a **File GID** recorded in the
-  connector's media binding (D-015B-2) **and** proven by a fresh
-  reference/association read to carry no reference other than the
-  connector-owned one being removed — after preview enumeration and
-  confirmation. When exclusivity is not proven, the connector
-  **detaches only its own association and retains the File**.
+- **Replacement/removal of connector-owned media (detach-only —
+  re-review `4947866018` item 4):** the connector **detaches only its
+  own product/variant association** (`productVariantDetachMedia` and the
+  product-scope detach) and **retains the File asset**; it **never
+  automatically calls `fileDelete`**, because no official `File`
+  reverse-reference query exists to prove the File is unused elsewhere
+  (header note; §2 verified). The detached binding is marked
+  `detached_orphan_candidate` with evidence for a later explicit/manual
+  cleanup capability (D-015B-2/6). `fileDelete` is listed here only as
+  the *manual* cleanup primitive an operator may invoke after live
+  proof — it is not on any automatic apply path.
 - Scopes: `write_products` (already required by Task 015's readiness
   check; `productVariantDetachMedia` documented `write_products` —
   captures §10). Staged upload target interaction is plain HTTPS to
@@ -71,8 +93,9 @@ APIs use **distinct** identities, so the registry stores each
 separately (the ambiguous phrase "Media/File GID" is removed):
 - **`shopify_gid`** (mixin field) = the **File GID** — the
   `MediaImage`/File asset returned by `fileCreate` (the durable asset
-  in the store's Files; the identity `fileDelete` targets and the proof
-  the connector *created* it).
+  in the store's Files; the identity a *manual* `fileDelete` would
+  target and the proof the connector *created* it — never used for
+  automatic deletion, header note).
 - **`shopify_product_media_gid`** (Char ro) = the **Product Media GID**
   — the product-level media reference created when the File is
   associated to the product; the identity `productReorderMedia` and
@@ -87,38 +110,46 @@ Plus `product_template_binding_id` (required, restrict),
 images), `odoo_image_checksum` (Char required ro — SHA-256 of the
 exported binary), `media_role` (Selection `primary`/`variant`),
 `remote_status` (Selection uploaded/processing/ready/failed, ro),
+`detached_orphan_candidate` (Boolean ro — set when the connector
+detaches its association but retains the File because no reverse-
+reference proof exists; the queue for the later manual cleanup
+capability),
 `exported_at`/`last_verified_at` (Datetime ro). Uniqueness:
 `(store_id, shopify_gid)` +
 `(store_id, product_variant_binding_id, media_role)` where variant set,
 and `(store_id, product_template_binding_id, media_role)` for primary
 rows (one primary per template per store). **The registry is the
-destructive-guard boundary, but registry membership proves only that
-the connector *created* the File — not that the File is *exclusively*
-used now (D-015B-2/6): every `fileDelete` requires a fresh reference
-check.**
+ownership boundary, but registry membership proves only that the
+connector *created* the File — not that the File is *exclusively* used
+now, and no official reverse-reference query can prove exclusivity
+(header note). The connector therefore never auto-deletes: it detaches
+its own association and retains the File, marking
+`detached_orphan_candidate` (D-015B-2/6).**
 
-**D-015B-2 — Destructive-media guard.** Preview enumerates, per
-template: adds (no registry row, Odoo image present), updates
-(registry checksum ≠ current Odoo image checksum → replace = upload
-new + detach/delete old **connector-owned** GID), and no-ops.
-Merchant-uploaded media (remote media GIDs absent from the registry)
-are **never** touched, deleted, reordered past, or counted as
-replaceable — enumerated in the preview as "foreign media — left
-untouched". Empty Odoo image with an existing registry row →
-proposed removal of the connector-owned remote image, listed
-explicitly and applied only on confirmation (never implicit).
-**Fresh reference check before any `fileDelete` (re-review item 3):**
-registry ownership proves the connector *created* the File, not that
-it is *exclusively* used now — a merchant can reuse a connector-created
-File on another product. Before deleting a File the apply step performs
-a **fresh reference/association read** (the File's current
-product/variant references) and deletes **only** when the File is
-proven to have no reference other than the connector-owned association
-being removed. When exclusive use cannot be proven, the safe default
-is to **detach only the connector-owned association and retain the
-File** (never delete), recording a "retained — shared/foreign
-reference" note. This applies to both the preview enumeration and the
-apply guard.
+**D-015B-2 — Destructive-media guard (detach-only, no auto-delete).**
+Preview enumerates, per template: adds (no registry row, Odoo image
+present), updates (registry checksum ≠ current Odoo image checksum →
+replace = upload new + **detach** old **connector-owned** association),
+and no-ops. Merchant-uploaded media (remote media GIDs absent from the
+registry) are **never** touched, detached, reordered past, or counted
+as replaceable — enumerated in the preview as "foreign media — left
+untouched". Empty Odoo image with an existing registry row → proposed
+**detach** of the connector-owned remote association, listed explicitly
+and applied only on confirmation (never implicit).
+**No automatic `fileDelete` (re-review `4947866018` item 4):** registry
+ownership proves the connector *created* the File, not that it is
+*exclusively* used now — a merchant can reuse a connector-created File
+on another product — and the Shopify `File` interface exposes **no
+reverse-reference query** to prove exclusivity (header note; §2). The
+apply step therefore **detaches the connector-owned product/variant
+association and retains the File**, sets the binding
+`detached_orphan_candidate=True` with an evidence note ("detached —
+File retained; no reverse-reference proof available"), and **never
+calls `fileDelete` automatically**. A separate, explicit **manual
+cleanup capability** (operator-invoked, admin-gated, after live proof)
+is the only path that may ever call `fileDelete`, and it is out of the
+automatic preview/apply flow. This applies to both preview enumeration
+and apply.
 
 **D-015B-3 — Preview/confirm flow (reuse, not reinvent).** Media
 export rides the Task 015 preview mechanism: the
@@ -148,10 +179,11 @@ file with products):
 3. **On `READY` (phase 2 — association):** associate the File with the
    **product** (recording `shopify_product_media_gid`), then with the
    **variant** where applicable; **reorder** (primary first) only
-   **after** association succeeds; and **detach/retire old media only
-   after** the new association is proven (D-015B-6). Each step's
-   outcome is recorded on the row; the row is terminal only once its
-   role's association (and any needed reorder) has succeeded.
+   **after** association succeeds; and **detach the old connector-owned
+   association and retain the File (never `fileDelete`) only after** the
+   new association is proven (D-015B-6). Each step's outcome is recorded
+   on the row; the row is terminal only once its role's association (and
+   any needed reorder) has succeeded.
 Poll jobs are nonce-hashed (repeat-run pattern) and stop enqueueing
 when no non-terminal rows exist. Product/variant association is
 **never** submitted before `READY`; the packet claims no exception,
@@ -172,16 +204,17 @@ worst outcome; already-successful uploads are kept and reconciled by
 checksum on the next run (no duplicate uploads — verification read +
 APPEND_UUID naming makes duplicates detectable).
 
-**D-015B-6 — Update/replacement behavior (READY-gated,
-delete-after-proven).** Replacement order: upload new → **poll until
-`READY`** → associate new (product, then variant) → reorder (primary
-first) if needed → **only then** detach the old connector-owned
-association → **fresh reference check** on the old File →
-`fileDelete` the old File **only if** it is proven to carry no other
-reference (else detach-only + retain, D-015B-2). The product is never
-left imageless by a mid-sequence failure, and a shared/foreign-
-referenced File is never deleted; each step's outcome recorded.
-Reorder is an async `Job` tracked like D-015B-4.
+**D-015B-6 — Update/replacement behavior (READY-gated, detach-only).**
+Replacement order: upload new → **poll until `READY`** → associate new
+(product, then variant) → reorder (primary first) if needed → **only
+then** detach the old connector-owned association → mark the old
+binding `detached_orphan_candidate=True` and **retain** the old File
+(**no automatic `fileDelete`** — no reverse-reference proof exists,
+D-015B-2/header note). The product is never left imageless by a
+mid-sequence failure, and no File is ever automatically deleted; each
+step's outcome recorded. Reorder is an async `Job` tracked like
+D-015B-4. (A retained orphan File is only ever removed later through the
+explicit manual cleanup capability, never by this apply path.)
 
 **D-015B-7 — Interplay with import (no loops).** Task 010B's
 merchant-image protection uses checksums of connector **writes into
@@ -209,18 +242,21 @@ the settings seam; consumed per D-015B-7.
 GID**; read-only for auditor/operator, reviewer confirm-path, admin
 rwc, no unlink);
 `test_media_export_guard.py` (foreign media never touched — including
-the delete/detach/reorder code paths; removal only when enumerated +
-confirmed; **`fileDelete` runs only after a fresh reference/association
-check proves no other reference — a connector-created File reused on a
-second product is RETAINED (detach-only)**; preview media section
-completeness; source guards: `productCreateMedia`/`productDeleteMedia`
-strings absent, `fileDelete` call sites reachable only through the
-registry filter **and** the reference-check);
+the detach/reorder code paths; removal only when enumerated +
+confirmed; **the apply path NEVER calls `fileDelete` — replacement/
+removal detaches the connector-owned association and RETAINS the File,
+setting `detached_orphan_candidate=True`; a connector-created File
+reused on a second product survives (detach-only)**; preview media
+section completeness; source guards: `productCreateMedia`/
+`productDeleteMedia` strings absent, **`fileDelete` never reachable from
+the automatic preview/apply/poll code paths — only from the explicit
+admin-gated manual cleanup capability** (AST/string scan));
 `test_media_export_pipeline.py` (**two-phase: no association mutation
 before `READY`**; staged-upload → fileCreate (records File GID) →
 poll → associate product (records Product Media GID) → associate
 variant → reorder; replacement order leaves-no-imageless-gap and
-deletes the old File only after the new association is proven; checksum
+**detaches + retains the old File (marks `detached_orphan_candidate`),
+never deletes it**, only after the new association is proven; checksum
 no-op; verification-read adoption on ambiguous outcome — never blind
 retry; per-media partial-failure routing);
 `test_media_export_async_poll.py` (poll cron enqueue conditions;
@@ -239,11 +275,12 @@ publishing/gallery/video ✅; 8 no UI/webhook/OAuth ✅; 9 tests
 ✅(§5); 10 rollback ✅(§7); 11 live validation required (§7 —
 mutation task); 12 gate-act reconfirmation; 13 the flagged calls
 explicit: `media_source_of_truth` coordination rule (D-015B-7),
-connector-owned-only deletion boundary + fresh-reference check
-(D-015B-2), and the File-GID vs Product-Media-GID identity split
-(D-015B-1); 14 two-phase READY-gated pipeline + poll cadence explicit
-✅(D-015B-4); 15 foreign-media protection + retain-if-not-exclusive
-explicit ✅(D-015B-2).
+**detach-only posture — no automatic `fileDelete`, no reverse-reference
+API exists (D-015B-2, verified header note)**, and the File-GID vs
+Product-Media-GID identity split (D-015B-1); 14 two-phase READY-gated
+pipeline + poll cadence explicit ✅(D-015B-4); 15 foreign-media
+protection + detach-and-retain (`detached_orphan_candidate`) explicit
+✅(D-015B-2/6).
 
 ## 7. Odoo.sh + live validation / rollback
 
@@ -258,8 +295,9 @@ the additive media-binding table/columns may **remain inert/orphaned**
 in the database (a normal code revert does **not** drop them — no
 destructive schema cleanup is assumed; any cleanup is a separately
 tested migration, never part of the revert); remote media already
-exported to Shopify remains (documented manual cleanup list in the
-release plan, mirroring the existing Shopify-side rollback posture);
+exported to Shopify remains, **as do any retained
+`detached_orphan_candidate` Files** (documented manual cleanup list in
+the release plan, mirroring the existing Shopify-side rollback posture);
 import side and business data untouched.
 
 ## 8. Register impacts on acceptance
@@ -268,8 +306,14 @@ D-015-7's deferral → superseded (015B is a named, fully-planned MVP
 task before UAT/release); DEC-003 "basic image/media update/export
 where feasible" → feasibility established + planning-complete;
 release plan known-limitations row "no media export" is deleted in
-the same revision; UAT gains scenario §UAT-26. Deferred-with-names:
-015C gallery/video breadth.
+the same revision; **a new honest known-limitation is recorded — "the
+connector does not automatically delete remote Files; a replaced/removed
+connector image is detached and the File retained
+(`detached_orphan_candidate`) for a later explicit manual cleanup,
+because Shopify exposes no File reverse-reference query to prove
+exclusive use" (release plan + preview copy, `4947866018` item 4)**;
+UAT gains scenario §UAT-26. Deferred-with-names: 015C gallery/video
+breadth; the explicit manual orphan-cleanup capability (post-live-proof).
 
 **Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** the
 `media_export_status_poll` (and any media-export) `job_type`
@@ -307,26 +351,32 @@ ALLOWED FILES (exhaustive):
   docs/05-qa/architecture-review-log.md                                                      (append one AR row)
   docs/01-research/research-handoff.md                                                       (top entry)
 FORBIDDEN: every core/product/sale/inventory/fulfillment file;
-productCreateMedia; productDeleteMedia; any deletion/detach/reorder
-of media not in the connector registry; gallery/video/3D; publishing;
-inventoryQuantities; UI/webhooks/OAuth/CI; adams_base; main; plain dev.
+productCreateMedia; productDeleteMedia; ANY automatic fileDelete on the
+preview/apply/poll path; any deletion/detach/reorder of media not in the
+connector registry; gallery/video/3D; publishing; inventoryQuantities;
+UI/webhooks/OAuth/CI; adams_base; main; plain dev.
 
 HARD CONSTRAINTS: TWO-PHASE, READY-GATED pipeline —
 stagedUploadsCreate -> fileCreate (phase 1: record the File GID in
 shopify_gid) -> poll fileStatus/Media.status via the cron-enqueued
 poll job until READY (no in-job polling loops) -> ONLY THEN associate
 product (record shopify_product_media_gid) -> associate variant ->
-reorder -> detach/retire old media; NO association mutation before
+reorder -> DETACH old connector-owned association + RETAIN the File
+(mark detached_orphan_candidate=True); NO association mutation before
 READY (no exception unless fresh recorded official evidence proves it
 supported); store distinct identities (File GID vs Product Media GID —
 never the ambiguous "Media/File GID"); preview -> confirmation ->
 apply only (Task 015 machinery reused); foreign media untouched under
-all code paths (guard tests); fileDelete ONLY after a fresh
-reference/association read proves the connector-owned File has no other
-reference — else detach-only + retain the File; replacement order
-upload-new-and-associate-before-remove-old; verification read before
-any retry of an ambiguous mutation outcome (RA-014) — no blind retry,
-no @idempotent assumption; checksum no-op idempotency;
+all code paths (guard tests); NEVER call fileDelete automatically —
+Shopify exposes NO File reverse-reference query to prove exclusive use
+(verified: File interface = alt/createdAt/fileErrors/fileStatus/id/
+preview/updatedAt only), so replacement/removal DETACHES the
+connector-owned association and RETAINS the File; the only path that may
+ever call fileDelete is a separate explicit admin-gated manual cleanup
+capability (out of the automatic flow, after live proof); replacement
+order upload-new-and-associate-before-detach-old; verification read
+before any retry of an ambiguous mutation outcome (RA-014) — no blind
+retry, no @idempotent assumption; checksum no-op idempotency;
 media_source_of_truth required and enforced both directions (unset ->
 odoo_validation_configuration hold); no new error classes; concurrency
 caveat restated. Odoo.sh green + the §7

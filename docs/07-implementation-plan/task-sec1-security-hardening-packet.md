@@ -8,6 +8,14 @@
 > services) and before UI-U1** — the UI must wire buttons to an
 > already-hardened backend. Evidence: merged code re-read 2026-07-11;
 > captures 2026-07-11 §8 (`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`).
+> **Final-convergence revision 2026-07-11 per comment `4947866018`
+> item 6: the `action_override_binding` contract is corrected — no
+> model argument is accepted, the scalar id is resolved *only* in the
+> comodel fixed by `_odoo_binding_field_name()`, and the impossible
+> "valid id of the wrong model" test/claim is withdrawn (a bare integer
+> cannot be classified as belonging to another model); cross-model
+> safety comes from the fixed comodel plus the existence/company/
+> uniqueness checks (D-SEC1-4/7).**
 
 ## 1. The verified current exposure (facts, file:line)
 
@@ -158,15 +166,24 @@ returns `odoo_location_id`; level/media rely on the mixin default
 **Public method.** `action_override_binding(new_record_id, reason)`
 accepts a **scalar integer record ID** (not a recordset — RPC cannot
 safely convey a generic recordset argument contract) plus a
-**mandatory non-empty `reason`**. It:
+**mandatory non-empty `reason`**. **No model argument is accepted**
+(re-review `4947866018` item 6): the comodel is fixed by the binding
+via `_odoo_binding_field_name()`, and the id is resolved **only** in
+that declared comodel. It:
 1. resolves the target model from `_odoo_binding_field_name()`; a
    falsy return raises `UserError` ("this binding's identity is not
    overridable");
 2. validates `new_record_id` is a positive int and that the record
-   **exists** in the declared model (`browse(...).exists()`) — a
-   missing, malformed, or wrong-typed argument raises `UserError`,
-   never a silent write (rejects cross-model input and malformed RPC
-   args);
+   **exists in the declared comodel** (`browse(...).exists()`) — a
+   missing/non-existent, malformed, or non-int argument raises
+   `UserError`, never a silent write. **There is no "wrong-model"
+   check, because none is possible or needed:** the caller supplies no
+   model, and a bare integer that also happens to exist in some other
+   model is indistinguishable from a valid id — the id is simply
+   resolved in the fixed comodel, and if it does not exist *there* it is
+   rejected. Cross-model safety comes from the fixed comodel plus the
+   existence/company/uniqueness checks below, not from inspecting the
+   integer;
 3. validates store/company consistency where the target carries a
    company (e.g. `sale.order`/`stock.location` company must match the
    binding store's company) — mismatch raises `UserError`;
@@ -232,12 +249,16 @@ without inventing encryption (DEC-028 boundary respected).
 masked-field read, each sanctioned method with and without the
 required group, matrix-illegal transitions via sanctioned methods,
 and a sudo-path regression (dispatcher/importer still function).
-**`action_override_binding` negative RPC set (item 6):** non-int /
-malformed `new_record_id`; a valid id of the **wrong model**
-(cross-model reject); a non-existent id; a target violating
-store/company consistency; a value that would collide with another
-binding's uniqueness constraint; a call on a **non-overridable**
-binding (`_odoo_binding_field_name()` falsy — level/media binding);
+**`action_override_binding` negative RPC set (re-review `4947866018`
+item 6):** non-int / malformed `new_record_id`; a **non-existent id
+(absent from the declared comodel)** → reject (this replaces the
+withdrawn "valid id of the wrong model" test — no model argument is
+accepted, so a bare integer cannot be classified as belonging to a
+"wrong model"; it is resolved only in the fixed comodel and rejected
+iff it does not exist there); a target violating store/company
+consistency; a value that would collide with another binding's
+uniqueness constraint; a call on a **non-overridable** binding
+(`_odoo_binding_field_name()` falsy — level/media binding);
 missing/empty `reason`; and the same call by a non-reviewer group —
 each expecting `UserError`/`AccessError` and **no write**; plus the
 positive reviewer/admin path asserting old→new identity is recorded in
@@ -378,12 +399,15 @@ cancel, resolve-manual-review — group-checked, matrix-legal, audited,
 no bypass parameter); D-SEC1-4 binding identity su-protected + the
 _odoo_binding_field_name() mixin seam (each concrete binding declares
 its Odoo-record field per the enumerated table) +
-action_override_binding(new_record_id:int, reason) — resolve the model
-from the seam, validate the target exists + store/company consistency,
-reject cross-model/malformed/non-overridable input, enforce
-reviewer/admin, preserve uniqueness, record old->new identity in the
-audit trail, write through the sanctioned su path; the D-SEC1-7
-negative RPC set proves every rejection;
+action_override_binding(new_record_id:int, reason) — NO model argument
+is accepted; resolve the comodel from the seam and the id ONLY within
+that comodel; validate the target exists in the declared comodel +
+store/company consistency; reject malformed / non-existent-in-comodel /
+non-overridable input (there is NO wrong-model check — a bare int cannot
+be classified as belonging to another model); enforce reviewer/admin,
+preserve uniqueness, record old->new identity in the audit trail, write
+through the sanctioned su path; the D-SEC1-7 negative RPC set proves
+every rejection;
 D-SEC1-5 PII field groups= (reviewer/admin) + masked compute for
 operator/auditor; D-SEC1-6 retention setting + monthly masking sweep
 (mask, never delete rows) + admin-only audited

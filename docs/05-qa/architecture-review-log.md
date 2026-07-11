@@ -205,6 +205,47 @@ A1–A11 + B1–B11). Closure map:
 prompt becomes usable, no code changed (Markdown-only diff verified);
 PR #148 stays draft/open/unmerged pending ChatGPT's re-review._
 
+_**AR-042 revision-3 note (2026-07-11, PR #148 final-convergence —
+Proposed for ChatGPT review).** ChatGPT's **final-convergence review**
+of revision 2 at `1f61bdd` (PR #148 comment
+[`4947866018`](https://github.com/AdamsOdoo/Adams/pull/148#issuecomment-4947866018))
+returned **REVISE** with six load-bearing items found by checking the
+final packets against the merged code and current official Odoo 19 /
+Shopify 2026-07 docs. The same PR now carries a focused docs-only patch
+closing each: (1) **PERF-1** reworked to Odoo 19's official
+`ir.cron._commit_progress()` per-job-savepoint model — withdrawing the
+false "no lock held across a network call" claim (merged claim is
+`try_lock_for_update()`, transaction-scoped), adding claim-one →
+savepoint → `_commit_progress` → re-claim → time-budget return, per-job
+atomicity/lock-release/crash-survival proofs, a latency-bound throughput
+model (batch÷cadence = claim ceiling only), and **withdrawing
+`max_in_flight`** to the topology-B concurrency plan; (2) **013B**
+database-backed apply lock (`try_lock_for_update()` on
+quant/binding/mapping rows before the final re-read) + real
+concurrent-transaction test; (3) **012** tax-preserving residual
+discount lines (inherit source `tax_ids`/inclusion; no universal no-tax
+residual for taxable lines) + rate-unit pinning (both `rate` and
+`ratePercentage` requested, canonical key from `ratePercentage`,
+`rate×100==ratePercentage` verified); (4) **015B** no automatic
+`fileDelete` — the Shopify `File` interface has **no reverse-reference
+query** (verified 2025-07: 7 fields), so **detach-only + retain**
+(`detached_orphan_candidate`); (5) **010B** DB-backed
+`shopify.connector.attribute.lock` singleton + `try_lock_for_update()`
+preventing concurrent duplicate global attributes at creation time +
+real concurrent test; (6) **SEC-1** override contract corrected (no
+model arg; id resolved only in the declared comodel; impossible
+"wrong-model id" test withdrawn) and **LC-1** cancellation decoupled
+from later SEC-1 code (current merged `cancelled`-write + audit path,
+forward-compatible with the SEC-1 matrix). Official citations: Odoo 19
+`ir_cron.py` `_commit_progress(processed=0, *, remaining=None,
+deactivate=False) -> float` (`odoo/odoo` `19.0`); Shopify `File`
+interface (2025-07) has no reverse-reference surface → detach-only.
+Critical path unchanged (CORE-R1 → 010B → 011B → LC-1 → 012 → Area 6 →
+SEC-1 → U0∥ → U1 → 013/013B → 014 → 015/015B → U2/U3 → W1/W2 → PERF-1 →
+UAT → release). Everything remains **Proposed — NOT accepted**; no gate
+opens, no prompt becomes usable, no code changed (Markdown-only diff
+verified); PR #148 stays draft/open/unmerged pending ChatGPT's review._
+
 _**AR-039 Acceptance Note (2026-07-10) — PR #144 accepted by ChatGPT
 with two required fixes, both applied in the same PR**, via control-room
 review comment

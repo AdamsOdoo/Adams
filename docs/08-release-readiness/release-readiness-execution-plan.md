@@ -67,10 +67,15 @@ Lite is released implicitly (subset of the same artifacts).
    benchmarks are the measurement vehicles); **PB-19 (≥ 600 jobs/hour)
    is delivered by Task PERF-1 — core queue throughput calibration —
    merged before the performance UAT scenarios, because the accepted
-   5-min × batch-20 dispatch defaults cap at ~240/h**; every row
-   measured-pass, or carrying an explicit dated ChatGPT waiver —
-   silence is not a waiver; release hardening (Area 8) owns any
-   residual tuning.
+   5-min × batch-20 dispatch defaults *schedule* at most ~240 claims/h**
+   (final-convergence `4947866018` item 1: PERF-1 reworks `run_drain()`
+   to Odoo 19's official `ir.cron._commit_progress()` per-job-savepoint
+   model, so PB-19 is measured against a representative handler-latency
+   profile and `batch ÷ cadence` is treated as a claim ceiling, not
+   throughput; `max_in_flight`/overlap is the concurrency plan's
+   topology-B scope, not PERF-1's); every row measured-pass, or carrying
+   an explicit dated ChatGPT waiver — silence is not a waiver; release
+   hardening (Area 8) owns any residual tuning.
 8. **Security (REVISED 2026-07-11):** credential redaction suite
    green (existing); masked-entry/no-read-back re-verified in UI;
    no-encryption-claim copy audit (grep of views/copy decks); PII
@@ -115,8 +120,13 @@ Lite is released implicitly (subset of the same artifacts).
     duties/divergent orders skipped by policy;
     single-fulfillment-location; no refunds/payouts/B2B/Markets;
     media: basic image export only (015B — gallery/video are the
-    named 010C/015C candidates); uninstall: binding/mapping tables
-    lost on physical uninstall (DEC-030 matrix — export procedure
+    named 010C/015C candidates); **media deletion: the connector never
+    automatically deletes remote Files — a replaced/removed connector
+    image is detached and the File retained
+    (`detached_orphan_candidate`) for a later explicit manual cleanup,
+    because Shopify exposes no File reverse-reference query to prove
+    exclusive use (`4947866018` item 4)**; uninstall: binding/mapping
+    tables lost on physical uninstall (DEC-030 matrix — export procedure
     documented); concurrency proof status (whatever OP-22's state is
     at release — stated honestly); webhook posture. (The former
     "no media export" and "Lite orders gain no pickings" lines are

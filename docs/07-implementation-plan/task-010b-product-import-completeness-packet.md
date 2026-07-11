@@ -11,6 +11,17 @@
 > 2026-07-10 §5 and 2026-07-11 §5/§9
 > (`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`).
 > API version 2026-07 (ARCH PD-6).
+> **Final-convergence revision 2026-07-11 per comment `4947866018`
+> item 5: a savepoint does NOT serialize two concurrent transactions
+> (both can observe "no attribute" and each create one), so the
+> concurrent global-attribute race is now prevented by a DB-backed
+> serialization mechanism — a connector-owned singleton lock row taken
+> with `try_lock_for_update()` before any global attribute
+> resolve/create — not merely "mitigated" by a savepoint plus a
+> release-hardening reconciliation sweep. The mechanism is database-
+> global (works across stores, because `product.attribute` is
+> DB-global) and is proven by a real concurrent-transaction test
+> (D-010B-2, §5).**
 
 ## 1. Why this task exists (verified Task 010 limitations vs accepted scope)
 
@@ -122,16 +133,37 @@ write).
 option is `Title` with sole value `Default Title` is a true
 single-variant product → no attribute structure is created (bare
 template + singleton, exactly today's clean path).
-**Shared-master-data + concurrency note (flagged):**
-`product.attribute`/`.value` are database-global; concurrent imports
-could race duplicate creations (no uniqueness constraint exists
-upstream). Mitigation: the case-insensitive get-or-create **and the
-compatibility gate** run inside the product's savepoint (the mode is
-read on the row the get-or-create resolves, so a concurrently-created
-same-name attribute is evaluated for compatibility exactly like a
-pre-existing one — never blindly reused); the named concurrency caveat
-stands; a post-import reconciliation sweep is a release-hardening
-candidate, not in-scope.
+**Shared-master-data + DB-backed serialization (re-review
+`4947866018` item 5).** `product.attribute`/`.value` are
+database-global and carry no upstream uniqueness constraint, so two
+concurrent imports could each observe "no such attribute" and each
+create one — **a savepoint does not prevent this** (a savepoint isolates
+*rollback*, not *visibility*: two open transactions do not see each
+other's uncommitted rows, so both create duplicates). The race is
+therefore **prevented at creation time**, not reconciled afterwards, by
+a **DB-backed serialization lock**:
+- A NEW connector-owned **singleton lock model**
+  `shopify.connector.attribute.lock` (one seeded `noupdate=1` row) is
+  acquired with **`try_lock_for_update()`** (Odoo 19's official
+  row-locking primitive) **before** any global attribute resolve/create,
+  and released when the product's savepoint/transaction commits. Because
+  it is a **single global row** (not per-store), it serializes attribute
+  resolve/create across **all** stores — the correct scope, since
+  `product.attribute` is database-global.
+- Under the lock, the case-insensitive get-or-create **and the
+  compatibility gate** run, so the second transaction to acquire the
+  lock sees the first's committed attribute and reuses/evaluates it (per
+  the compatibility gate) instead of creating a duplicate.
+- The lock is held only across the (fast, in-DB) attribute
+  resolve/create — never across an image download or any Shopify
+  network call (those happen outside it) — so it does not serialize the
+  whole import, only the global-attribute critical section.
+Duplicate **prevention at creation time** is in-scope and tested
+(§5, a real concurrent-transaction test proving two imports of the same
+new option create **one** attribute, not two); it is **not** deferred to
+a release-hardening reconciliation sweep. The named concurrency caveat
+for actual multi-worker execution (which `TransactionCase` cannot fully
+exercise) still stands and is stated in the validation record.
 
 **D-010B-3 — Deterministic creation of ALL variants, `dynamic` mode.**
 Every attribute used by this path is `create_variant='dynamic'` — new
@@ -293,8 +325,12 @@ same-name `Color` with `create_variant='always'` → not reused, not
 mutated → `manual_review` default routes to `binding_conflict`, and
 under `connector_owned` creates `"Color (Shopify)"` dynamic; existing
 `Size` with `no_variant` → same incompatible handling; a compatible
-existing `dynamic` attribute → reused; concurrent
-get-or-create/compatibility evaluation of a same-name attribute; a
+existing `dynamic` attribute → reused; **a real concurrent-transaction
+test — two transactions importing the same new option race the
+global-attribute get-or-create; the `shopify.connector.attribute.lock`
+singleton row taken with `try_lock_for_update()` serializes them so
+exactly ONE `product.attribute` is created (not two), and the second
+transaction reuses/evaluates the first's committed attribute**; a
 brownfield database with a pre-existing `always` `Color` produces no
 phantom cartesian variants**);
 `test_product_variant_generation.py` (sparse-set determinism: Odoo
@@ -323,13 +359,17 @@ thresholds/pagination/caps fixed ✅(D-010B-1); 6 no export/inventory/
 publishing scope ✅; 7 no order/customer scope ✅; 8 no UI/webhook/
 OAuth ✅; 9 tests ✅(§5); 10 rollback ✅(§8); 11 live dependency =
 read-only dev-store validation (§7) — required, not waivable silently;
-12 gate-act reconfirmation; 13 the three flagged calls explicit:
+12 gate-act reconfirmation; 13 the flagged calls explicit:
 D-010B-2/3 dynamic-mode attribute strategy **incl. the
 existing-attribute compatibility gate + `attribute_conflict_mode`
-default `manual_review`**, D-010B-5 compare-at field relocation
+default `manual_review`** and **the DB-backed `try_lock_for_update()`
+singleton serialization lock preventing concurrent duplicate attributes
+(`4947866018` item 5)**, D-010B-5 compare-at field relocation
 (cross-packet), D-010B-6a gallery deferral; 14 refresh
 ownership set explicit ✅(D-010B-7); 15 archived/deleted semantics
-explicit ✅(D-010B-8).
+explicit ✅(D-010B-8); 16 (added `4947866018`) concurrent-attribute
+duplicate PREVENTION at creation time via the singleton lock + a real
+concurrent-transaction test ✅(D-010B-2, §5).
 
 ## 7. Odoo.sh + live-Shopify validation (both required)
 
@@ -356,6 +396,10 @@ per SoT, primary+variant images) atomically and idempotently; >100
 variants paginate; refresh is safe per mode; **an existing
 incompatible-mode same-name attribute is never reused or mutated and
 never yields phantom variants (routes per `attribute_conflict_mode`)**;
+**concurrent imports of the same new option create exactly one global
+attribute — prevented at creation time by the
+`try_lock_for_update()` singleton lock, proven by a real
+concurrent-transaction test, never a post-hoc reconciliation sweep**;
 deletion/archival → stale binding, Odoo data untouched; all suites +
 Odoo.sh green + dev-store evidence; validation record + AR row +
 handoff; draft PR; gate closes on draft-open. Rollback: revert the
@@ -374,6 +418,10 @@ The review's "Task 010 treated as complete" finding → closed by this
 packet at planning level. **Re-review `4945129824` item 1
 (existing-attribute compatibility) → closed by the D-010B-2
 compatibility gate + `product_import_attribute_conflict_mode`.**
+**Final-convergence `4947866018` item 5 (concurrent attribute creation
+not prevented) → closed by the D-010B-2 DB-backed
+`shopify.connector.attribute.lock` singleton + `try_lock_for_update()`
+serialization and its real concurrent-transaction test.**
 Task 012 packet prerequisite updated (010B before 012). Task 015
 packet updated (compare-at field relocation D-010B-5).
 `performance-budgets.md` §4 rows cite D-010B-11. Deferred-with-names:
@@ -398,8 +446,11 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_product/models/shopify_connector_product_variant_binding.py    (image-checksum field only)
   addons/shopify_connector_product/models/shopify_connector_product_product.py            (NEW — _inherit product.product: shopify_compare_at_price)
   addons/shopify_connector_product/models/shopify_connector_store_settings.py             (NEW — the §4 settings fields incl. product_import_attribute_conflict_mode)
+  addons/shopify_connector_product/models/shopify_connector_attribute_lock.py             (NEW — singleton DB-backed serialization lock model, D-010B-2)
+  addons/shopify_connector_product/data/shopify_connector_attribute_lock.xml              (NEW, noupdate=1 — seeds the single lock row)
+  addons/shopify_connector_product/security/ir.model.access.csv                           (one row for the lock model only)
   addons/shopify_connector_product/models/__init__.py                                     (import lines)
-  addons/shopify_connector_product/__manifest__.py                                        (version bump only)
+  addons/shopify_connector_product/__manifest__.py                                        (data entry + version bump)
   addons/shopify_connector_product/tests/{test_product_import_matching.py,
     test_product_duplicate_prevention.py}                                                 (named updates only)
   addons/shopify_connector_product/tests/{test_product_attribute_import.py,
@@ -424,7 +475,15 @@ is never reused or mutated -> product_import_attribute_conflict_mode:
 manual_review default routes to binding_conflict, connector_owned
 creates a distinctly-named "<name> (Shopify)" dynamic attribute; never
 change an attribute's mode; never generate phantom cartesian variants)
-+ attribute lines + Default-Title special case; D-010B-3 dynamic-mode
++ attribute lines + Default-Title special case; DB-BACKED SERIALIZATION
+— acquire the shopify.connector.attribute.lock singleton row with
+try_lock_for_update() BEFORE any global attribute resolve/create (a
+savepoint does NOT serialize concurrent transactions), single global
+row across all stores (product.attribute is DB-global), released at
+commit, held only over the attribute critical section (never across a
+network call); a real concurrent-transaction test proves one attribute
+is created, not two — duplicate PREVENTION at creation time, never a
+deferred reconciliation sweep; D-010B-3 dynamic-mode
 deterministic variant instantiation (verify the 19.0 dynamic-creation
 API against source before use — STOP and report if it differs; no
 phantom variants; structural mismatch -> binding_conflict);

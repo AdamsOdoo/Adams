@@ -236,14 +236,25 @@ resolved here.
 | ID / topic | 2026-07-11 status delta |
 | --- | --- |
 | RR-1 (010B existing-attribute compatibility) | **Closed at planning level:** D-010B-2 compatibility gate + `product_import_attribute_conflict_mode` (default `manual_review`) — reuse only `dynamic`, never mutate a mode, no phantom variants; tests + UAT fixture `UAT-P4` |
-| RR-2 (013B free/on-hand semantics) | **Closed:** `target_on_hand = desired_available + reserved`, post-write `free_qty == desired_available` check, re-read + drift abort, multi-quant / owner-package / lots / negative fail-closed |
-| RR-3 (015B READY-first + safe delete + identities) | **Closed:** File GID vs Product Media GID; two-phase READY-gated pipeline; `fileDelete` only after a fresh reference check, else detach-only + retain |
+| RR-2 (013B free/on-hand semantics) | **Closed:** `target_on_hand = desired_available + reserved`, post-write `free_qty == desired_available` check, re-read + drift abort, multi-quant / owner-package / lots / negative fail-closed **(apply lock hardened by FC-2, §3.12)** |
+| RR-3 (015B READY-first + safe delete + identities) | **Closed:** File GID vs Product Media GID; two-phase READY-gated pipeline; ~~`fileDelete` only after a fresh reference check~~ **→ superseded by FC-4 (§3.12): no automatic `fileDelete` at all (no reverse-reference API exists); detach-only + retain (`detached_orphan_candidate`)** |
 | RR-4 (012 tax key + discount math) | **Closed:** canonical decimal `shopify_rate_key` + decimal-safe match; cap-free component-sum bound + exact negative "Shopify Order Discount" lines |
 | RR-5 (PB-19 owner) | **Closed:** NEW Task PERF-1 packet; master plan step 16 (before performance UAT); review call B11 |
 | RR-6 (SEC-1 override RPC contract) | **Closed:** `_odoo_binding_field_name()` seam + enumerated bindings + scalar-id/reason `action_override_binding` + negative RPC tests |
 | RR-7 (LC-1 locked prompt) | **Closed:** full locked prompt (lifecycle §7.1); LC-1 sequenced before Task 012; adoption notes added to 012/013/013B/014/015/015B/Area-6 |
 | RR-8 (rollback/schema wording) | **Closed:** 010B/011B/015B/LC-1/PERF-1 rollback notes corrected (code revert removes behavior; additive schema may remain inert/orphaned; no destructive cleanup); release/packaging posture verified already-correct |
 | RR-9 (CORE-R1 D-R1 range) | **Closed:** `D-R1-1..5` in the CORE-R1 packet §3 heading, Area-6 D-A6-7 marker, audit §8.1, master-plan B1; repo-wide range sweep run |
+
+### 3.12 Final-convergence `4947866018` (2026-07-11, docs-only — Proposed)
+
+| Item | Closure (all Proposed, NOT accepted) |
+| --- | --- |
+| FC-1 (PERF-1 transaction/lock model) | **Closed at planning level:** PERF-1 reworked to the official Odoo 19 `ir.cron._commit_progress()` per-job-savepoint loop; the false "no lock held across a network call" claim withdrawn (merged claim is `try_lock_for_update()`, transaction-scoped); lock-release/atomicity/crash-survival proofs; throughput latency-bound (batch÷cadence = claim ceiling); `max_in_flight` withdrawn to the concurrency plan (topology B) |
+| FC-2 (013B TOCTOU) | **Closed:** D-013B-4 database-backed apply lock (`try_lock_for_update()` on quant/level-binding/mapping/variant-binding rows) before the final re-read; fail-closed; no-existing-quant case; real concurrent-transaction test + dev-store concurrent-drift case |
+| FC-3 (012 taxable-discount + rate unit) | **Closed:** D-012-2/8 residual line inherits source `tax_ids`/inclusion (or per-signature bucket) — no universal no-tax residual for taxable lines; inconsistent allocations rejected; D-012-9 both `rate`+`ratePercentage` requested, canonical key from `ratePercentage`, `rate×100==ratePercentage` verified, mismatch/null → schema hold |
+| FC-4 (015B automatic fileDelete) | **Closed:** no reverse-reference API exists (verified Shopify `File` interface 2025-07 = 7 fields); MVP posture detach-only + retain (`detached_orphan_candidate`); explicit admin-gated manual cleanup only; known-limitation + preview copy corrected |
+| FC-5 (010B concurrent attribute creation) | **Closed:** D-010B-2 `shopify.connector.attribute.lock` singleton + `try_lock_for_update()` before global attribute resolve/create (a savepoint does not serialize), DB-global across stores; real concurrent-transaction test; prevention at creation time |
+| FC-6 (SEC-1 wrong-model + LC-1 dependency) | **Closed:** D-SEC1-4/7 no model arg, id resolved only in the declared comodel, "wrong-model id" test withdrawn; LC-1 §7/§7.1 uses the current merged `cancelled`-write + audit path (the `action_disconnect` precedent), forward-compatible with the SEC-1 matrix, depending on no SEC-1 code |
 
 ## 4. Cross-check completeness statement
 

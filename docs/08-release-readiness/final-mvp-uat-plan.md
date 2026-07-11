@@ -45,7 +45,7 @@ recapped in the wave table §2). New scenarios added by this plan:
 | # | Scenario | Covers | Pass criteria (numeric/checkable) |
 | --- | --- | --- | --- |
 | 25 | Controlled inventory baseline: preview → confirm → apply; replay refused; audit complete | Task 013B | Run record + per-pair prior/new evidence; second run excluded/refused; unconfirmed apply provably blocked |
-| 26 | Basic media export: add + replace on a disposable product; foreign media survives everything | Task 015B | Foreign image untouched (before/after screenshots); replacement never leaves product imageless; FAILED status routes to review |
+| 26 | Basic media export: add + replace on a disposable product; foreign media survives everything; **replaced File is detached + retained, never auto-deleted** | Task 015B | Foreign image untouched (before/after screenshots); replacement never leaves product imageless; **the old connector File is detached and retained (`detached_orphan_candidate`), no `fileDelete` on the apply path** (`4947866018` item 4 — no reverse-reference API exists); FAILED status routes to review |
 | 27 | Dashboard performance + hierarchy | DESIGN SYSTEM §9; PB-2/PB-3 | First useful render ≤ 1.5 s p75 (RD-1) / ≤ 2.5 s (RD-2); interactions ≤ 200 ms p75; lead answer + ≤3-exception region present; no nine-card grid |
 | 28 | Long lists: Sync Center + Error Center at 10k and 100k jobs/logs | PB-4/PB-5/PB-9/PB-11 | Loads within budget at both scales; server pagination verified (no full-table fetch); filters responsive |
 | 29 | Keyboard & accessibility walkthrough | DESIGN SYSTEM §12; WCAG 2.2 rows (captures-11 §13) | Every primary flow completable keyboard-only; focus visible everywhere; contrast table pass; targets ≥ 24px |
@@ -103,12 +103,19 @@ gate — must route to `manual_review`, or create a connector-owned
 `UAT-INV1` a mapped variant×location pair carrying a **live
 reservation** (013B — proves `target_on_hand = desired_available +
 reserved` and the post-apply `free_qty == desired_available` check),
-plus a second pair whose reservation **changes between preview and
-apply** (drift abort); `UAT-MED1` a disposable product for the 015B
-**READY-first** media sequence (staged upload → fileCreate → poll to
-`READY` → associate → reorder → retire), plus a File the merchant
-**reuses on a second product** (proves `fileDelete` is skipped /
-detach-only when foreign use cannot be excluded).
+plus a second pair whose reservation is **changed by a competing
+transaction between preview and apply** (proves the
+`try_lock_for_update()` apply lock + under-lock re-read cause a drift
+abort, no wrong baseline — `4947866018` item 2); `UAT-MED1` a disposable
+product for the 015B **READY-first** media sequence (staged upload →
+fileCreate → poll to `READY` → associate → reorder → **detach + retain**
+the old File), plus a File the merchant **reuses on a second product**
+(proves the apply path **never calls `fileDelete`** — detach-only +
+retain, `detached_orphan_candidate`, because no reverse-reference API
+exists — `4947866018` item 4); `UAT-ORD-TAX1` a **taxable order with an
+order-level discount** whose residual carries the source line's tax so
+recomputed Odoo tax still matches `totalTaxSet` (proves the
+tax-preserving residual line, `4947866018` item 3).
 
 ## 4. Evidence template (per scenario)
 
@@ -182,10 +189,15 @@ records: scan-to-imported latency for a 50-order batch (vs PB-18/19),
 drain throughput (PB-19), dashboard load at RD-1/RD-2 (PB-2).
 **Task PERF-1 (core queue throughput calibration) must be merged
 before the PB-19 throughput measurement (re-review `4945129824`
-item 5):** the accepted 5-min × batch-20 dispatch defaults cap at
-~240/h, so PB-19 (≥ 600 jobs/hour) is measured against a
+item 5):** the accepted 5-min × batch-20 dispatch defaults *schedule*
+at most ~240 claims/h, so PB-19 (≥ 600 jobs/hour) is measured against a
 PERF-1-calibrated dispatcher, not the raw defaults — otherwise the
-scenario cannot pass and is not a valid acceptance signal.
+scenario cannot pass and is not a valid acceptance signal. **PERF-1
+adopts Odoo 19's official `ir.cron._commit_progress()` per-job-savepoint
+model (`4947866018` item 1), so the PB-19 measurement uses a
+representative handler-latency profile (not stub arithmetic) and the
+scenario also confirms per-job commit / lock-release-between-jobs /
+crash-survival; `batch ÷ cadence` is a claim ceiling, not throughput.**
 Concurrency: UAT runs after (or alongside) the concurrency plan's
 scenarios — UAT itself adds the two-operator double-retry case (same
 failed job retried by two users — one wins, one no-ops, audit shows

@@ -66,7 +66,7 @@
 | PB-16 | Product import incl. images (dev store, primary+variant) | ≤ 60 s per 100-variant product | [B] — D-010B-11 dev-store run |
 | PB-17 | Variant structure creation (attributes/values/lines/variants) for a 3-option, 50-variant product | ≤ 5 s | [B] — Task 010B suite timing |
 | PB-18 | Order scan throughput (Area 6 enumeration, excl. per-order import) | ≥ 500 orders enumerated+enqueued/min | [T] |
-| PB-19 | Drain throughput (dispatcher, topology A single worker) | ≥ 600 jobs/hour sustained. **Implementation owner (re-review `4945129824` item 5): Task PERF-1.** The merged constants (5-min cron × batch 20) cap at ~240/h, so PB-19 is **not reachable on the accepted defaults** — a mathematically known planning gap, not an external unknown. Rather than silently lower the onboarding bar, **Task PERF-1 — Core Queue Throughput Calibration** (`../07-implementation-plan/task-perf1-core-queue-throughput-calibration-packet.md`) makes dispatch batch/cadence configurable and lock-/throttle-safe and is **sequenced before performance UAT**. The budget stands so the 5k-customer onboarding import completes inside one working day (~8.3 h at 600/h), the operator-experience bar | [T] — Task PERF-1 + concurrency plan §13.2 |
+| PB-19 | Drain throughput (dispatcher, topology A single worker) | ≥ 600 jobs/hour sustained. **Implementation owner (re-review `4945129824` item 5): Task PERF-1.** The merged constants (5-min cron × batch 20) *schedule* at most ~240 claims/h; note (final-convergence `4947866018` item 1) `batch ÷ cadence` is only a **claim/scheduling ceiling**, not throughput for sequential network-bound handlers. **Task PERF-1 — Core Queue Throughput Calibration** (`../07-implementation-plan/task-perf1-core-queue-throughput-calibration-packet.md`) reworks `run_drain()` to Odoo 19's official `ir.cron._commit_progress()` per-job-savepoint pattern (locks released between committed jobs, completed jobs survive a later failure, throughput becomes latency-bound), makes the per-pass cap/cadence configurable and throttle-safe, and is **sequenced before performance UAT**. PB-19 is demonstrated against a **representative handler-latency profile**, not stub arithmetic. The budget stands so the 5k-customer onboarding import completes inside one working day (~8.3 h at 600/h), the operator-experience bar | [T] — Task PERF-1 + concurrency plan §13.2 |
 | PB-20 | Inventory push throughput | ≥ 300 level-pushes/hour sustained within Shopify throttle budget (client already paces on `throttleStatus`) | [T] — Task 013 dev-store run |
 | PB-21 | Baseline preview generation (013B) at 1k mapped pairs | ≤ 5 min | [B] |
 | PB-22 | Media export pipeline (015B): submit ≤ 5 s/image; READY within poll SLA of 30 min or FAILED routing | [B]+[T] |
@@ -77,9 +77,12 @@
 - Rows PB-13/14/23 are calibrated by Task 011B's benchmark; PB-15–17
   by Task 010B; PB-18 by the concurrency plan §13.2 + Area 6
   validation; **PB-19 is owned and calibrated by Task PERF-1** (core
-  queue throughput calibration — configurable batch/cadence,
-  lock-safety, Shopify backpressure), sequenced before performance
-  UAT; PB-20–22 by the Task 013/013B/015B dev-store runs; PB-1–12 by
+  queue throughput calibration — the `ir.cron._commit_progress()`
+  per-job-savepoint transaction model, configurable per-pass cap/cadence,
+  lock-safety, Shopify backpressure; `max_in_flight`/overlap deferred to
+  the multi-worker topology-B concurrency plan), sequenced before
+  performance UAT and measured against a representative latency profile;
+  PB-20–22 by the Task 013/013B/015B dev-store runs; PB-1–12 by
   the UI-U1 validation record + UAT scenarios 27–28.
 - Each calibration replaces "provisional" with "measured YYYY-MM-DD"
   in this file (dated edit; append-only history note).
