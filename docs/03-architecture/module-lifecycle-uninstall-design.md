@@ -70,11 +70,23 @@ downgraded, and removed safely.
 | C | **Archive/export before uninstall** | A pre-uninstall export (jobs/logs/bindings to attachment/CSV) offered as an operator step | Preserves evidence outside the DB (incl. manual matches) but does not by itself make uninstall succeed; complements B, cannot replace it |
 | D | **Move persistent identity (bindings) into a stable module** | Binding tables owned by core (or a never-uninstalled `_data` module) so they survive domain uninstall | Rejected: inverts PD-1's write-risk boundary (removing the export module must provably remove its capability *and* footprint), bloats core with domain schemas (RA-013's boundary logic), and contradicts the accepted per-domain module ownership (DEC-008/AR-019); identity is deterministically re-derivable (§2.5), so the cost buys little |
 | E | **Controlled migration scripts at uninstall** | `uninstall_hook` rewriting data before module removal | Odoo supports `uninstall_hook`; but hooks doing bulk data rewrites at uninstall are fragile (run inside the uninstall transaction) and duplicate what B achieves declaratively; kept only as the implementation vehicle **if** the selection-`ondelete` callable proves insufficient at build time (named fallback) |
+| F | **Core-registered job types (no domain `selection_add` at all)** | Core itself declares every domain job-type selection value, so uninstalling a domain never removes a selection value and never triggers any `ondelete` over jobs | Rejected: core would carry domain vocabulary it must not know (the DEC-008/RA-013 boundary — domain capability lives in domain modules); every future domain/add-on would require a core edit, inverting the sanctioned `selection_add` seam (ARCH §7.1); and uninstalled-domain jobs would keep a live-looking type with no handler — *worse* honesty than B's explicit `historic_domain_job` retyping |
+
+Mapping to the review's six named candidates (comment `4942966937`
+item 9), so none is silently dropped: *soft-degraded historical job
+types* and *a stable generic job-type code* are *evaluated as one
+combined mechanism* — **Option B** — because the former requires the
+latter (the retyping target IS the stable core-owned code
+`historic_domain_job`); *archive/export before uninstall* = Option C;
+*persistent audit/identity state in a stable module* = Option D
+(audit state already lives in core — §2.2; the option covers moving
+*binding* state there); *controlled migration* = Option E; *another
+Odoo-safe design* = Option F.
 
 Checked against `../05-qa/rejected-approaches-log.md`: no RA row
 covers uninstall mechanics; B does not reintroduce any rejected
 approach (RA-011/012/013 concern capability boundaries, preserved
-here).
+here — and F is rejected partly *on* RA-013's boundary logic).
 
 ## 4. Proposed decision (carried by DEC-030) — Recommendation
 
