@@ -1,5 +1,100 @@
 # Research Handoff (rolling)
 
+### Task 011B — Customer Matching Scalability (indexed normalized-email lookup) — draft PR into `Shopify-connector`, 2026-07-11
+
+- **Base verified (hard prerequisite):** `origin/Shopify-connector` tip ==
+  `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (no drift); PR #149 (CORE-R1)
+  **merged** 2026-07-11T20:50:22Z and its merge produced this exact base;
+  Task 011B gate act read (PR #149 comment `4948879507`, one session,
+  parallel-safe with Task 010B). Branch
+  `claude/task-011b-customer-matching-k5ux9b`.
+- **What happened:** implemented Task 011B exactly per
+  [`../07-implementation-plan/task-011b-customer-matching-scalability-packet.md`](../07-implementation-plan/task-011b-customer-matching-scalability-packet.md)
+  (D-011B-1..7). **D-011B-1** adds one connector-owned stored computed
+  indexed field on `res.partner` via `_inherit` —
+  `shopify_connector_email_normalized` (`fields.Char`, `store=True`,
+  `index=True` btree, `readonly=True`, `@api.depends('email')`, compute
+  `email_normalize(partner.email, strict=False) or False`) — the **exact
+  merged importer normalizer**; no override/inverse/search-method/
+  constraint/sudo. **D-011B-2** rewrites only the
+  `_find_active_candidates` and `_find_archived_candidates` bodies (and
+  their stale full-scan docstrings + the class recall-safety docstring
+  paragraph) to a single btree-indexed equality search on that column;
+  the archived path keeps `active_test=False` + `('active','=',False)`.
+  Every other importer method, all routing (existing-binding shortcut /
+  single-match bind / `ambiguous_match` / archived-only `duplicate_risk` /
+  blind-create block / `binding_conflict`), candidate ordering, the 20-cap
+  evidence payload, and the error taxonomy are **byte-untouched**.
+  **D-011B-3** the new test retains the old full-scan path as a test-only
+  reference and asserts `old_ids == new_ids` (active + archived) across a
+  pathological corpus. **D-011B-5/6** preserve duplicate/ambiguity and the
+  binding-layer `UNIQUE(store_id,·)` concurrency backstop — **no partner
+  uniqueness constraint added**. **D-011B-4/7** backfill via standard
+  stored-compute initialization + a deterministic seeded 100k benchmark
+  harness tagged `post_install,-standard`.
+- **Odoo 19 source verification (no local runtime — verified against
+  official `odoo/odoo` @ 19.0):** `email_normalize(text, strict=True)`
+  defaults to strict=True (importer + field both pass `strict=False`);
+  falsy input → `email_split_tuples` returns `[]` → `False` (compute is
+  safe on email-less partners at backfill); `strict=False` returns the
+  first of multiple addresses; `_normalize_email` lowercases ascii local
+  parts + always the domain. `store=True` → real column; `index=True` =
+  btree; `readonly=True` is UI-only so the compute still writes. Full
+  findings in [`../05-qa/task-011b-validation-results.md`](../05-qa/task-011b-validation-results.md) §3.
+- **Exact changed files (8 authorized):** `models/__init__.py` (+1 line),
+  `models/shopify_connector_res_partner.py` (new),
+  `models/shopify_connector_customer_importer.py` (two method bodies +
+  stale docstrings only), `tests/test_customer_matching_scalability.py`
+  (new), `tests/__init__.py` (+1 line),
+  `docs/05-qa/task-011b-validation-results.md` (new),
+  `docs/05-qa/architecture-review-log.md` (AR-044 row),
+  `docs/01-research/research-handoff.md` (this entry).
+- **What this session does NOT do:** opens no further gate; starts no
+  Task 010B/012/LC-1/Area-6/SEC-1/inventory/fulfillment/export/UI/webhook/
+  OAuth/PERF-1 work; does not read/copy/cherry-pick Task 010B code; does
+  not touch any core/product file, the binding model, store settings, any
+  other importer method, matching policy, `adams_base`, `main`, or plain
+  `dev`; adds no migration/hook; does not mark the PR ready or merge it.
+- **Validation performed:** `python3 -m py_compile` clean on all 5 changed
+  Python files; standalone AST replication of every source guard (no
+  full-scan domain in either method; both search the indexed column;
+  `email_normalize(strict=False)` on compute + incoming; depends-only-on-
+  email; only two methods touch the column; new partner file free of
+  override/constraint/sudo) → **all green**. **OUTSTANDING (no Odoo
+  runtime this session, per the packet's honesty clause — PR stays
+  draft):** full `core`/`product`/`sale` suites green on **Odoo.sh** with
+  verbatim stats; the **100k benchmark** latency (p95 ≤ 50 ms) /
+  throughput (≥ 20 cust/s) numbers; the **module-upgrade/backfill**
+  duration (≤ 10 min). No evidence invented.
+- **Parallel-session discipline:** this PR must not merge automatically or
+  simultaneously with Task 010B. Task 010B and Task 011B share only the
+  two append-only docs (`architecture-review-log.md`, this handoff); the
+  PR merged **second** must later update from the latest
+  `Shopify-connector`, reconcile only those append-only additions, leave
+  accepted Task 011B production/test content unchanged, and rerun Odoo.sh
+  on the reconciled head. AR-044 numbering may collide with a parallel
+  Task 010B row — reconciled append-only at second-merge, not now.
+- **Learning feedback loop:**
+  - New issues discovered: reusing Odoo's own `mail` `email_normalized`
+    field would have been unsafe (different concept, normalization
+    strictness not guaranteed to equal the importer's `strict=False`); a
+    connector-owned, namespaced column is required — matches D-011B-1.
+  - Repeated pattern: the equivalence-by-construction test design (retain
+    the removed path as a test-only reference and assert set-equality,
+    with **no** hard-coded normalizer output) makes the corpus self-
+    correcting to actual Odoo 19 behavior — reusable for any future
+    "replace a scan with an index" change.
+  - Next-session prompt (below) is a **review**, not a new implementation.
+- **Exact next-session prompt (ChatGPT review):** "Review draft PR
+  ‘Task 011B: customer matching scalability (indexed normalized lookup)’
+  into `Shopify-connector` at base `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`
+  (gate `4948879507`). Verify only the 8 authorized files changed;
+  confirm the field/lookup match D-011B-1/2 and the equivalence backstop;
+  confirm no matching-policy change and no partner uniqueness constraint;
+  then require the OUTSTANDING Odoo.sh run and the 100k benchmark/backfill
+  numbers before merge. Keep parallel-merge discipline with Task 010B. Do
+  not open any other gate."
+
 ### CORE-R1 — Capability-Aware Readiness Correction (draft PR #149, implemented + focused correction, 2026-07-11)
 
 - **Base verified (hard prerequisite):** `Shopify-connector` tip ==
