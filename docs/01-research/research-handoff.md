@@ -21,7 +21,16 @@
   016", UI U1, webhook W1; U2/U3+W2 prompts intentionally staged
   post-predecessor), 24-scenario UAT plan, release execution plan,
   master plan, completion audit, signoff; plus DEC-027 (pilot scope)
-  and DEC-028 (credential/PCD ladder) proposals and register addenda.
+  and DEC-028 (credential/PCD ladder) proposals and register addenda;
+  then a five-reviewer **adversarial red-team pass** over the whole
+  package against the merged code (audit §7): five blocker-class
+  findings — most notably that the merged core's three ESSENTIAL
+  readiness placeholder slots make it impossible for any store to
+  reach `connected` — all fixed in-session (the readiness fix is the
+  new Area-6 design item **D-A6-7**, itself an explicit ChatGPT
+  review call), plus major/consistency findings, all applied and
+  recorded; a second consistency pass then re-verified counts,
+  citations, and cross-references.
 - **Files changed:** all Markdown (verified via
   `git diff --name-only origin/Shopify-connector...HEAD` — no
   code/XML/CSV/manifest/security/migration/workflow/test file).
@@ -47,7 +56,12 @@
   own docs carry stale prose in two places (the 2026-07
   inventory-mutation page still mentions removed CAS fields; the
   bulk-ops page's rate-limit section) — recorded so future sessions
-  cite the schema, not the prose; repeated patterns — the append-only
+  cite the schema, not the prose; (3) planning drafted from documents
+  alone drifted from merged-code reality in five blocker-class ways
+  (audit §7.1) — the adversarial verify-against-source-code pass is
+  what caught them; lesson: every future packet-writing session must
+  include a read-the-merged-code verification step for any mechanism
+  a packet claims to reuse; repeated patterns — the append-only
   dated-note register convention followed throughout; the OP-43
   verbatim-quote rule baked into every packet's validation
   requirements; rejected approaches — none reintroduced

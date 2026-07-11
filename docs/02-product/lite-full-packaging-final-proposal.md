@@ -25,11 +25,13 @@ jobs — the answer is a **two-layer model**:
   received/installed. Enforcement is standard Odoo module packaging —
   no license-validation code, no entitlement records, no runtime
   license checks in MVP.
-- **The merged per-store domain flags remain the operational layer**
-  (`product_domain_enabled`, `sale_domain_enabled`,
-  `inventory_domain_enabled`, `fulfillment_domain_enabled` — merged,
-  enforced at job execution time). They answer "is this domain
-  switched on for this store right now," never "did the customer pay."
+- **The per-store domain flags remain the operational layer** (the
+  four merged flags `product_domain_enabled`, `sale_domain_enabled`,
+  `inventory_domain_enabled`, `fulfillment_domain_enabled`, enforced
+  at job execution time, **plus the fifth flag Task 015 adds via the
+  settings seam, `product_export_domain_enabled`** — exports stay
+  opt-in even inside Full). They answer "is this domain switched on
+  for this store right now," never "did the customer pay."
 
 This keeps the technical foundation undistorted (CHATGPT.md §1's
 requirement): no flag ever bypasses a safety guard, no giant module,
@@ -130,15 +132,24 @@ pattern.
 - **Lite → Full:** install the three Full modules; no migration, no
   data change; new menus/settings appear via their own modules' views;
   first-push guard + preview/confirmation protect the first writes.
+  **Known upgrade boundary (red-team-added):** sale orders imported
+  and confirmed while on Lite produced no delivery pickings
+  (`sale_stock` arrives with Full) — they do not gain pickings
+  retroactively and are therefore not fulfillable through Task 014;
+  documented in the release plan's known limitations.
 - **Full → Lite (or add-on removal):** the supported path is
   **disable, not uninstall** (MBQ-54/DEC-018): switch the domain flags
   off — all history, bindings, mappings, and logs survive; enqueue of
   new domain jobs is blocked at once (merged enforcement).
-  Uninstalling a Full module additionally drops its binding/mapping
-  tables and (via `selection_add` cascade) its historical domain jobs —
-  business data always survives (architecture doc §8). The release
-  plan's uninstall section documents this distinction verbatim for
-  operators.
+  **Uninstall reality (red-team-corrected):** uninstalling a domain
+  module that has ever executed a job **fails** on the append-only
+  job-log `ondelete='restrict'` FK (the `selection_add` cascade tries
+  to unlink the domain's jobs, and their audit logs block it) —
+  uninstall works only on databases where the domain never ran.
+  Disable-only is therefore the sole supported removal path once a
+  domain has run; business data is never at risk on any path
+  (architecture doc §8 carries the full mechanics and the future
+  soft-degrade option).
 - **Permissions/menus:** domain menus/screens are owned by their
   modules (PD-2), so Lite installs simply do not contain Full menus —
   no hidden-but-present surfaces; within an edition, the four merged
@@ -156,10 +167,13 @@ pattern.
   the state the repo is in today, so the Lite combination is
   continuously proven by construction until the Full modules merge.
 - Each Full-module task packet (013/014/015) requires an
-  install/uninstall/reinstall test cycle on Odoo.sh (module installs
-  cleanly on top of Lite; uninstall leaves business data; reinstall
-  re-matches deterministically) — carried as acceptance criteria in
-  the packets.
+  install-on-populated-Lite test cycle on Odoo.sh (module installs
+  cleanly on top of Lite with existing data), plus a
+  **fresh-database uninstall check** (uninstall before any domain job
+  has run leaves business data intact) and a documented-failure check
+  (uninstall after jobs have run fails on the audit-log FK exactly as
+  §5 states — asserting the disable-only posture) — carried as
+  acceptance criteria in the packets.
 - Release hardening (Area 8) adds the cross-edition matrix: Lite-only
   runtime; Full runtime; Full with individual domains flag-disabled;
   upgrade Lite→Full on a populated database.

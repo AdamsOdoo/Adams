@@ -18,8 +18,8 @@ first-push guard, and the Odoo→Shopify `available`-quantity push via
 `inventorySetQuantities` — Odoo is the standing source of truth
 (DEC-010). Includes the module's own trigger surfaces (stock-change
 `odoo_event` hook, scheduled push-scan cron, manual service methods)
-per the revised Area-6 split (`implementation-ready-master-plan.md`
-§3). **Non-goals:** no fulfillment logic or reads of anything
+per the revised Area-6 split
+(`area-6-sync-triggers-implementation-packet.md` D-A6-1). **Non-goals:** no fulfillment logic or reads of anything
 fulfillment-owned; no product import/export; no standing Shopify→Odoo
 inventory pull (one-time reviewed baseline import is **deferred out of
 Task 013** to a future explicitly-gated 013B — flagged decision
@@ -43,7 +43,11 @@ double-counting via subtree aggregation).
 (b) `shopify.connector.inventory.level.binding`
 (`shopify_connector_inventory_level_binding.py`) on the mixin
 (`shopify_gid` = InventoryLevel GID, set on activation/first read; may
-be empty before): `product_variant_binding_id` (M2o, required, index,
+be empty before — **which requires an explicit field override
+`shopify_gid = fields.Char(required=False, readonly=True, index=True)`
+in this model, red-team-added: the mixin declares it `required=True`,
+and this is the one deliberate deviation, called out in ARCH §3**):
+`product_variant_binding_id` (M2o, required, index,
 restrict), `location_mapping_id` (M2o, required, index, restrict),
 `shopify_inventory_item_gid` (Char required index ro — from
 `variant.inventoryItem`, the 1:1 direction that remains non-null,
@@ -85,14 +89,25 @@ locationId, quantity, changeFromQuantity}]` — **`changeFromQuantity` =
 `last_known_shopify_available`** (fresh-read value; the 2026-07 CAS
 shape — `compareQuantity`/`ignoreCompareQuantity` no longer exist,
 captures §3), and the mutation carries the **mandatory
-`@idempotent(key: "<uuid4>")` directive** (required as of 2026-04);
-the key is generated at enqueue, persisted on the job
-(`payload_hash`) and binding (`last_push_idempotency_key`), and
-**reused verbatim on every retry of the same attempt** — making this
-the accepted `@idempotent`-eligible auto-retry path (DEC-009).
+`@idempotent(key: "<uuid4>")` directive** (required as of 2026-04).
+**Key storage (red-team-corrected):** the `@idempotent` key lives on
+the **binding** only (`last_push_idempotency_key`), paired with a
+`last_push_params_hash` (hash of item|location|qty|changeFrom) — it is
+NOT stored in the job's `payload_hash` (whose merged contract reserves
+the nonce use for target-less job types and which feeds the job's
+immutable `idempotency_key`). At each dispatch attempt the handler
+compares the current computed params-hash with the stored one: equal →
+**reuse the stored key verbatim** (the safe ambiguous-outcome retry —
+the accepted `@idempotent`-eligible auto-retry path, DEC-009);
+different (e.g. after a CAS-stale fresh read) → generate + persist a
+new key/params pair. The job's own `payload_hash` is the content hash
+of the enqueue-time outbound payload (qty + CAS value), per the merged
+contract; the 5→3→5 same-payload edge is covered because the scan
+enqueues only deltas against `last_pushed_available` and an identical
+payload re-push is by definition redundant (collision = correct dedup).
 Error routing: `CHANGE_FROM_QUANTITY_STALE` →
-`concurrency_race_conflict` (auto-retry after fresh read, new CAS
-value, **new** idempotency key since parameters changed);
+`concurrency_race_conflict` (auto-retry; the handler's params-hash
+comparison yields the fresh CAS value and a new key on that attempt);
 `ITEM_NOT_STOCKED_AT_LOCATION` → run `inventoryActivate(item,
 location)` (available defaults 0) then re-set — activation is
 performed only for `first_push_state='confirmed'` rows;
@@ -100,7 +115,9 @@ performed only for `first_push_state='confirmed'` rows;
 `IDEMPOTENCY_CONCURRENT_REQUEST` → `concurrency_race_conflict`;
 `NON_MUTABLE_INVENTORY_ITEM` (bundles) → `blocked_manual_review` /
 `binding_conflict`. `InventoryItem.tracked = false` → job `skipped`
-with note (the connector never mutates `tracked`).
+with note via the `JobPolicySkip` dispatcher seam that Task 012 adds
+(sequencing guarantees it exists; the connector never mutates
+`tracked`).
 
 **D-013-4 — First-push guard flow (backend-only until UI).**
 Per-pair (per binding row): a preview run (`job_source =
@@ -126,13 +143,18 @@ gives no group create/write on the cache; the handler performs the
 upsert via a **named, narrow `sudo()` elevation** (the third sanctioned
 sudo in the codebase — explicitly flagged for ChatGPT approval as part
 of this packet; justification: system-populated cache by design,
-AR-019 §10 pattern). Readiness: via the `_get_checks()` append seam
-(first consumer), inventory adds one essential check active only when
-`inventory_domain_enabled`: `write_inventory` present in
-`granted_scopes` and ≥1 active `push_enabled` mapping exists —
-filling the merged "mapped_location" pending slot without editing core
-(`REQUIRED_MVP_SCOPES` untouched by this task; its TD-002 fix belongs
-to Task 014).
+AR-019 §10 pattern). Readiness (red-team-corrected — the append seam cannot replace a core
+check, and the merged `_check_mapped_location` placeholder returns
+essential/NOT_PROVEN unconditionally): this module (a) **overrides
+`_check_mapped_location` via `_inherit`** — returning PASS when
+`inventory_domain_enabled` is False (not applicable) and the real
+mapped-pair verification when True — building on the Area-6 core
+rework that first makes the placeholder not-applicable-pass for
+stores without the inventory domain (Area-6 packet D-A6-7); and (b)
+**appends** one additional essential check via the `_get_checks()`
+seam, active only when the domain is enabled: `write_inventory`
+present in `granted_scopes`. `REQUIRED_MVP_SCOPES` is untouched by
+this task; its TD-002 fix belongs to Task 014.
 
 **D-013-6 — Job granularity & triggers.** One push job per
 level-binding change (`res_model`/`res_id` → the binding row;
@@ -143,10 +165,16 @@ Triggers shipped in-module: (a) **odoo_event hook** — override
 (variant-binding × mapped-location) pairs (`job_source='odoo_event'`,
 `trigger_origin='inventory_stock_change'` — the accepted DEC-019
 value); (b) **scheduled push-scan** — ir.cron (15 min default,
-noupdate) job `inventory_push_scan` per store comparing current
-free_qty vs `last_pushed_available` and enqueueing deltas; (c)
-**manual** — `action_push_inventory_now()` on the store (operator+),
-and per-mapping selective push. Reconciliation (accepted backstop):
+noupdate) job `inventory_push_scan` per store
+(`job_source='scheduled_sync'`; per-run `payload_hash` **uuid4 nonce**
+— red-team-added: scan jobs are repeat-run jobs like the merged
+readiness pattern, and without a nonce the second run would collide
+on the never-cleared `idempotency_key`; the enqueued per-pair push
+jobs inherit `scheduled_sync`) comparing current free_qty vs
+`last_pushed_available` and enqueueing deltas; (c) **manual** —
+`action_push_inventory_now()` on the store (operator+;
+`job_source='manual_sync'`, propagated to the enqueued push jobs),
+and per-mapping selective push (`manual_sync`). Reconciliation (accepted backstop):
 the scan doubles as drift detection — before pushing, the fresh read's
 `available` is compared with `last_pushed_available`; unexplained
 Shopify-side drift (differs from both last push and current Odoo) is
@@ -190,6 +218,16 @@ scoped ✅(D-013-2/3); 15 ambiguous/unmapped handling ✅ (unmapped →
 `inventory_scheduled_sync_enabled` (Boolean default False),
 `inventory_last_push_scan_at` (Datetime ro — domain-owned checkpoint,
 ARCH PD-5).
+
+Job-type → domain-flag map (red-team-added, exhaustive): all four
+job types this module registers (`inventory_push_sync`,
+`inventory_push_scan`, `inventory_first_push_preview`,
+`inventory_location_sync`) map to `inventory_domain_enabled` via
+`_domain_flag_for_job_type()`. Logging: all free text this module
+composes routes through `_system_append` (core redaction); payloads
+carry GIDs/quantities/location names only — no customer PII exists in
+this domain (note recorded to satisfy the cross-packet redaction
+check).
 
 ## 5. Tests (exact files)
 
@@ -263,16 +301,20 @@ noupdate=1], tests/{__init__.py + the six §5 test files});
 docs/05-qa/task-013-inventory-sync-validation-results.md (NEW);
 docs/05-qa/architecture-review-log.md (append row);
 docs/01-research/research-handoff.md (top entry).
-FORBIDDEN: every core/product/sale file (readiness check joins via the
-_get_checks seam ONLY — REQUIRED_MVP_SCOPES is NOT touched, that fix
-is Task 014's); adams_base; views/UI/webhooks/OAuth/CI; any
-fulfillment or sale reference; inventoryAdjustQuantities; any
-Shopify->Odoo stock write (baseline import is deferred 013B).
+FORBIDDEN: every core/product/sale file (readiness integration is
+inheritance-only: the _get_checks append seam for the write_inventory
+check PLUS the _inherit override of _check_mapped_location per
+D-013-5 — REQUIRED_MVP_SCOPES is NOT touched, that fix is Task
+014's); adams_base; views/UI/webhooks/OAuth/CI; any fulfillment or
+sale reference; inventoryAdjustQuantities; any Shopify->Odoo stock
+write (baseline import is deferred 013B).
 
 HARD CONSTRAINTS: write target 'available' only; 'committed' never
 (source-guard test); every mutation carries @idempotent(key: uuid4)
-persisted+reused per attempt (2026-04+ requirement) and
-changeFromQuantity CAS (2026-07 shape); first-push guard per pair with
+stored on the binding with its params-hash and reused/regenerated per
+D-013-3 (2026-04+ requirement) and changeFromQuantity CAS (2026-07
+shape); scan jobs carry a per-run payload_hash nonce; job sources per
+D-013-6 (scheduled_sync/manual_sync/odoo_event+trigger_origin); first-push guard per pair with
 recorded confirmation; unmapped -> inventory_location_missing;
 negative -> clamp 0 + note; no flag bypasses any guard; concurrency
 caveat (SRR-03/04/09) restated not resolved; Odoo.sh green before

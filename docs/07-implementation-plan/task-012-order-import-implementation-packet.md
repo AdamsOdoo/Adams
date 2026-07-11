@@ -99,20 +99,32 @@ no flag bypasses it.
 
 **D-012-3 — Divergent-currency routing (DEC-020 residual) + policy
 skips.** A divergent order (`presentmentCurrencyCode !=
-currencyCode`), detected **before any SO creation**, transitions the
-job to **`skipped`** (terminal, policy — the same mechanism merged
-checkpoint-3 uses), with message "Automatic import not supported:
-divergent presentment currency (DEC-020)" and both currency codes +
-both `shopMoney`/`presentmentMoney` total sets captured in the log
-payload. Rationale: this is an eligibility/policy block, not a
-failure — it keeps the 16-class error registry intact (no 17th class,
-no core edit) and honors DEC-020's "blocked … before SO creation,
-independent of the total-check outcome." The same `skipped`-by-policy
-routing applies to: orders with non-null `currentTotalDutiesSet`
-(D-012-10), `test: true` orders when `order_import_include_test` is
-False (default), and orders already cancelled at first import
-(D-012-7). Skipped-by-policy jobs are visible in the Sync Center
-(UI packet adds the filter); idempotency keys prevent re-import storms.
+currencyCode`), detected **before any SO creation**, moves the job to
+**`skipped`** (terminal, policy), with message "Automatic import not
+supported: divergent presentment currency (DEC-020)" and both currency
+codes + both `shopMoney`/`presentmentMoney` total sets captured in the
+log payload. Mechanics (red-team-corrected against the merged
+dispatcher, which unconditionally marks a normally-returning handler
+`succeeded`): this task adds **one named additive core seam** — a
+`JobPolicySkip(message, technical_detail)` exception class in
+`shopify_connector_job_dispatch.py` plus one `except JobPolicySkip`
+branch in `_invoke_handler()` that calls the existing
+`job._transition_skipped(...)` — making policy-skip a first-class
+dispatcher outcome (reused verbatim by Task 013's `tracked=false`
+skip). This is an explicitly-flagged core edit (mirrors Task 014's
+TD-002 edit pattern; master plan §1 review call), with its own core
+test. Rationale: an eligibility/policy block is not a failure — the
+16-class error registry stays intact (no 17th class) and DEC-020's
+"blocked … before SO creation, independent of the total-check outcome"
+is honored. The same routing applies to: orders with non-null
+`currentTotalDutiesSet` (D-012-10), `test: true` orders when
+`order_import_include_test` is False (default), and orders already
+cancelled at first import (D-012-7). Skipped-by-policy jobs are
+visible in the Sync Center (UI packet adds the filter); the persisted
+`idempotency_key` (payload_hash = `updatedAt`; verified: the key is
+never cleared, incl. terminal states) prevents re-import storms — a
+re-enqueue for the same order+`updatedAt` collides; a genuinely
+updated order gets a new key and a fresh policy evaluation.
 
 **D-012-4 — Ambiguous customer = pre-creation hold (whole job).**
 `sale.order.partner_id` is required (captures §8), so an unresolved
@@ -125,6 +137,13 @@ survives a customer hold is the evidence capture, not a partial SO).
 Operator resolves the customer in the matching flow (creating the
 customer binding), then retries the job, which completes normally.
 This interpretation is flagged for explicit ChatGPT confirmation.
+**Skip-recovery note (red-team-added, applies to D-012-3):** a
+skipped-by-policy job keeps its `idempotency_key`, so a fresh enqueue
+for the same order+`updatedAt` collides by design; the operator
+recovery path after a policy change (e.g. enabling test-order import)
+is Area-6's `action_manual_retry`, whose allowed-from set includes
+`skipped` for exactly this reason (requeues the same record — no
+create collision).
 
 **D-012-5 — Customer resolution sequence (consumes Task 011 paths).**
 (1) `Order.customer` present → resolve via the customer binding:
@@ -163,8 +182,13 @@ are never mutated (Task 011 invariant).
 New store-settings field `order_import_confirmation_policy`
 (Selection `quotation`/`confirm`, default **`confirm`**): under
 `confirm`, `action_confirm()` runs inside the same savepoint (state
-requirements verified — captures §8), producing pickings for Task 014;
-under `quotation` the SO stays draft. Cancelled-at-import orders →
+requirements verified — captures §8). **Precision (red-team-added):**
+delivery-picking generation on confirmation is `sale_stock` behavior —
+present in Full (Task 014's manifest pulls `sale_stock`), absent in
+Lite, where confirmation simply yields a confirmed SO with no
+delivery (correct for Lite's read-only promise; the Lite→Full
+no-retroactive-pickings boundary is documented in the packaging
+proposal §5). Under `quotation` the SO stays draft. Cancelled-at-import orders →
 D-012-3 skip. Cancellation/closure detected on a later evidence
 refresh: snapshots update + one job-log note — the SO is **never**
 auto-cancelled (DEC-014 J); operator action is linked from the Error
@@ -207,9 +231,18 @@ match on (company, `type_tax_use='sale'`, `amount_type='percent'`,
 `amount = rate×100`, `price_include` per `Order.taxesIncluded`) —
 creating it if absent with name "Shopify Tax {percent}% ({incl/excl})"
 and `price_include_override` set accordingly (the 19.0-correct field,
-captures §8); attach via `tax_ids`. Odoo recomputes amounts; agreement
-with Shopify's per-line math is enforced by the D-012-2 guard, which
-is the accepted correctness backstop. Evidence for the ADR: Odoo 19
+captures §8); attach via `tax_ids`. **Accounting-config side effect,
+stated plainly (red-team-added):** this auto-creates `account.tax`
+master records — persistent accounting configuration, not just SO
+documents. It is gated by a new settings Boolean
+`order_tax_autocreate` (default True; when False, an unmatched rate →
+`odoo_validation_configuration` hold and the operator pre-provisions
+the tax); auto-created taxes carry default repartition (no custom
+accounts) — the account/repartition mapping is recorded as a named
+input to the Phase-2/3 accounting module, and the release-plan
+documentation tells accountants these taxes exist. Odoo recomputes
+amounts; agreement with Shopify's per-line math is enforced by the
+D-012-2 guard, which is the accepted correctness backstop. Evidence for the ADR: Odoo 19
 has **no supported order-level external-tax override**
 (`sale.order.tax_totals` compute-only — captures §8), so
 exact-amount forcing is impossible at SO level without core hacks
@@ -237,8 +270,9 @@ the shop currency → else `odoo_validation_configuration`
 (failed_retryable; operator creates/activates the pricelist —
 `currency_id` is pricelist-derived and not directly settable, captures
 §8). Sales team: optional `order_sales_team_id` (unset → Odoo
-default). Warehouse: not set by the connector (Odoo's own
-`warehouse_id` compute applies). Fiscal position: Odoo's own compute
+default). Warehouse: not set by the connector (when `sale_stock` is present —
+Full — Odoo's own `warehouse_id` compute applies; under Lite the
+field does not exist and nothing references it). Fiscal position: Odoo's own compute
 (no override). Timezone: all Shopify datetimes parsed as UTC (ISO
 8601) into naive-UTC Odoo datetimes. Metadata: `origin` +
 `client_order_ref` = `Order.name`; `Order.note` → SO note (plain-text
@@ -247,9 +281,12 @@ creation).
 
 **D-012-12 — Re-import/update & checkpoint hooks.**
 `order_import_sync(store, order_gid)` with an existing binding →
-evidence-refresh-only: update binding snapshots + one `state_change`…
-(`note`) log row when `displayFinancialStatus`/`displayFulfillmentStatus`
-/cancellation changed; **zero writes to the SO or its lines** —
+evidence-refresh-only: update binding snapshots + one
+`event_type='note'` log row (red-team-fixed: no job-state transition
+occurs, so `state_change` would be semantically wrong — the merged
+`_log_unresolved_address_code` `note` precedent applies) when
+`displayFinancialStatus`/`displayFulfillmentStatus`/cancellation
+changed; **zero writes to the SO or its lines** —
 enforced by a source-level guard test (the strongest DEC-014 J
 protection available pre-UI). Enumeration is Area 6's; this task pins
 the posture only (ARCH PD-5: `sortKey: UPDATED_AT`,
@@ -291,8 +328,16 @@ channelLiable } customAttributes { key value } } pageInfo { hasNextPage
 (`data_shape_schema_mismatch`), never truncate (Task 010 precedent).
 Read-only; zero mutations; scope: `read_orders` (already granted;
 customer sub-object needs `read_customers`, also granted). Job type
-`order_import_sync` via the three seams, gated `sale_domain_enabled`;
-`res_model`/`res_id` → the binding row (Tasks 010/011 precedent).
+`order_import_sync` via the three seams, gated `sale_domain_enabled`.
+**Job targeting (red-team-corrected):** `res_model='shopify.connector.store'`,
+`res_id=store`, `shopify_target_gid=<Order GID>` — a documented
+deviation from the bind-row precedent, because on first import the
+binding does not exist yet and the merged `operation_scope_key`
+clears itself when `res_model` is empty, which would leave exactly
+the SO-creating path unserialized (two racing first-import enqueues
+would both run). With this targeting the scope key serializes
+per-order from the first enqueue onward (mirrors Task 014's
+picking-targeting deviation and Area-6's scan targeting).
 
 ## 5. Idempotency, atomicity, logging, permissions
 
@@ -301,10 +346,17 @@ serializes same-order jobs; repeated webhook/scan enqueues collide on
 `idempotency_key` (payload-hash = `updatedAt`). One savepoint per
 order: partner/children + taxes + SO + lines + confirm + guard +
 binding commit together or not at all. Logging: every transition;
-PII-minimal messages (the redaction field list gains
-order-payload keys: email, phone, name parts, address fields —
-proposed as REDACTION_EXTENSION in the same module, feeding Q23's
-list); OP-43 verbatim-log rule in the validation record. ACL:
+PII-minimal messages. **Redaction mechanism (red-team-corrected):**
+the merged core `redact()` extends only by secret-*values*
+(`extra_secrets`), not by key names, so the order importer applies a
+**module-local pre-redaction pass** (`REDACTION_EXTENSION`: email,
+phone, name parts, address fields stripped/masked from any
+message/technical_detail/payload_snapshot it composes) **before**
+handing text to `_system_append` (which then applies the core
+`redact()` as usual). The shared PII key list migrates into the core
+tool at W1 (a core-owned task) — feeding Q23's list; until then it is
+module-local by design. OP-43 verbatim-log rule in the validation
+record. ACL:
 `ir.model.access.csv` rows for the binding — auditor/operator/reviewer
 read-only, admin rwc (no unlink), exactly the customer-binding
 pattern; no new groups.
@@ -380,7 +432,7 @@ tip (STOP if it does not match the SHA ChatGPT states when issuing
 this prompt). One session; draft PR; stop.
 
 Read first: docs/07-implementation-plan/task-012-order-import-implementation-packet.md
-(the accepted decisions D-012-1..12 are binding content),
+(the D-012-1..12 decisions — binding once this packet is accepted),
 docs/03-architecture/final-mvp-module-and-dependency-architecture.md
 §3–§7, docs/00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md
 §2/§8, and the merged shopify_connector_sale/product/core code.
@@ -391,23 +443,28 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_sale/models/shopify_connector_order_binding.py     (NEW)
   addons/shopify_connector_sale/models/shopify_connector_order_importer.py    (NEW — importer service + job seams + REDACTION_EXTENSION)
   addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py   (NEW — shopify_line_item_gid only)
-  addons/shopify_connector_sale/models/shopify_connector_store_settings.py    (order_import_confirmation_policy, order_import_include_test, order_company_id, order_pricelist_id, order_sales_team_id, sale_order_last_import_checkpoint_at — inert checkpoint)
+  addons/shopify_connector_sale/models/shopify_connector_store_settings.py    (order_import_confirmation_policy, order_import_include_test, order_tax_autocreate, order_company_id, order_pricelist_id, order_sales_team_id, sale_order_last_import_checkpoint_at — inert checkpoint)
   addons/shopify_connector_sale/security/ir.model.access.csv                  (binding rows only)
   addons/shopify_connector_sale/tests/{__init__.py, test_order_binding.py, test_order_import_mapping.py, test_order_totals_guard.py, test_order_duplicate_prevention.py, test_order_customer_resolution.py}  (NEW)
+  addons/shopify_connector_core/models/shopify_connector_job_dispatch.py      (THE ONE NAMED ADDITIVE CORE EDIT — JobPolicySkip exception class + one except-branch in _invoke_handler calling the existing _transition_skipped; nothing else in the file)
+  addons/shopify_connector_core/tests/test_job_dispatch.py                    (append the JobPolicySkip routing test only)
   docs/05-qa/task-012-order-import-validation-results.md                      (NEW)
   docs/05-qa/architecture-review-log.md                                       (append one AR row)
   docs/01-research/research-handoff.md                                        (top entry)
-FORBIDDEN: every shopify_connector_core and shopify_connector_product
-file; adams_base; any view/menu/wizard/webhook/OAuth/controller/CI/
-workflow/requirements/Docker file; any invoice/payment/refund/
-inventory/fulfillment model or logic; plain dev; main.
+FORBIDDEN: every OTHER shopify_connector_core file and every
+shopify_connector_product file; adams_base; any view/menu/wizard/
+webhook/OAuth/controller/CI/workflow/requirements/Docker file; any
+invoice/payment/refund/inventory/fulfillment model or logic; plain
+dev; main.
 
 IMPLEMENT exactly per the packet: D-012-1 binding schema (explicit
 _name+_inherit, models.Constraint, dual uniqueness); D-012-2 guard
 (totalPriceSet.shopMoney vs amount_total, tol = rounding × (SO lines +
 tax lines + 2) capped 1.00, rollback + financial_total_mismatch);
 D-012-3 skipped-by-policy routing (divergent currency, duties, test
-orders, pre-cancelled) — never a new error class, never a core edit;
+orders, pre-cancelled) via the ONE named additive core seam
+(JobPolicySkip + except-branch → _transition_skipped) — never a new
+error class, no other core change;
 D-012-4 ambiguous-customer pre-creation hold with Task 011 §8.2
 candidate JSON; D-012-5 resolution sequence incl. guest paths and the
 first sanctioned customer_fallback_partner_id consumption
@@ -419,14 +476,18 @@ never auto-cancelling an SO on refresh; D-012-8 line mapping
 (variant-binding resolution, whole-order-hold mapping_missing on
 unmatched, discountedUnitPrice + discount%, custom-item service
 product, gift-card note); D-012-9 shipping/tip lines + T-B rate-matched
-taxes (price_include_override, creation dedup, null-rate hold);
+taxes (price_include_override, creation dedup gated by
+order_tax_autocreate, null-rate hold);
 D-012-10/11 currency/pricelist/company/team resolution and UTC parsing;
-D-012-12 evidence-refresh-only re-import with the source-level
-no-SO-write guard test. Single ORDER_IMPORT_QUERY constant exactly as
-packet §4 (query-only, first:100 lines / first:10 shipping, hold on
-hasNextPage). Job type order_import_sync via the three seams gated on
-sale_domain_enabled; res_model/res_id -> binding row. One savepoint
-per order. Reuse the existing customer importer functions — do not
+D-012-12 evidence-refresh-only re-import (note-type log rows) with the
+source-level no-SO-write guard test + the module-local
+REDACTION_EXTENSION pre-redaction pass. Single ORDER_IMPORT_QUERY
+constant exactly as packet §4 (query-only, first:100 lines / first:10
+shipping, hold on hasNextPage). Job type order_import_sync via the
+three seams gated on sale_domain_enabled; job targeting
+res_model='shopify.connector.store' + shopify_target_gid=<Order GID>
+(packet §4 — the documented deviation that keeps operation_scope_key
+populated on first import). One savepoint per order. Reuse the existing customer importer functions — do not
 duplicate matching logic. All §6 test files with every named case,
 incl. negative matrix and source-level guards.
 

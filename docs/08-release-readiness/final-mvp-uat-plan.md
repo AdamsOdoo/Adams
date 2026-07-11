@@ -10,7 +10,10 @@
 > the executable end-state plan. Execution remains
 > **[External validation required]** — human reviewer + interactive
 > runtime + live store (blockers U-1..U-4; U-4 closes at Area 6, U-3
-> at U1/U3, U-2 at VAL-B2).
+> at U1/U3, U-2 at VAL-B2, and U-1 — no interactive runtime available
+to sessions — closes only when the human-operated Odoo.sh branch
+database session is actually convened for execution: an
+organizational act carried by the §6 entry criteria, not a merge).
 
 ## 1. Scenario catalogue (final: 24 scenarios)
 
@@ -26,7 +29,7 @@ recapped in the wave table §2). New scenarios added by this plan:
 | 20 | Inventory first-push guard: preview → confirm → push; unconfirmed pair provably blocked | inventory | D-013-4 (destructive_write_guard_blocked) |
 | 21 | Fulfillment ambiguous outcome: simulated timeout → verification read adopts the created fulfillment, no duplicate | fulfillment | D-014-7 (RA-014 mechanics) |
 | 22 | Controlled export: preview enumerates a would-be-deleted Shopify variant; apply blocked until explicitly confirmed | product_export | D-015-3/5 |
-| 23 | Lite/Full boundary: Lite install has no write surface (menus, jobs, scopes); installing Full modules on a populated Lite database adds them cleanly; flags-off disables enqueue | packaging | DEC-029 §6 matrix |
+| 23 | Lite/Full boundary: Lite install has no write surface (menus, jobs, scopes); installing Full modules on a populated Lite database adds them cleanly; flags-off disables enqueue | packaging | Packaging proposal §6 matrix (`../02-product/lite-full-packaging-final-proposal.md`, the DEC-029 carrier) |
 | 24 | Permission matrix: Auditor read-only everywhere; Operator cannot resolve manual-review; Reviewer cannot edit settings; Admin only sees credential entry (masked, no read-back) | cross | MBQ-44/45 enforcement |
 
 Per-scenario specification rule (applies to 16–24; 1–15 keep their
@@ -43,9 +46,9 @@ per §4.
 
 | Wave | Scenarios | Executable after |
 | --- | --- | --- |
-| 1 | 1, 2, 3, 4, 5, 12, 13, 14, 15, 16, 24 | Task 012 + Area 6 + UI-U1 merged; VAL-B2 passed; interactive runtime session |
+| 1 | 1, 2, 3, 4, 5, 12, 13, 14, 15, 24 | Task 012 + Area 6 + UI-U1 merged; VAL-B2 passed; interactive runtime session |
 | 2 | 6, 7, 8, 17, 18, 19 | (same — order scenarios need Task 012 which Wave 1 already requires) |
-| 3 | 9, 10, 11, 20, 21, 22, 23 | Tasks 013/014/015 + U3 screens merged |
+| 3 | 9, 10, 11, 16, 20, 21, 22, 23 | Tasks 013/014/015 + U3 screens merged (16 moved here from Wave 1 — its resolution step runs through the U3 matching center, which U1 alone does not ship) |
 
 (Wave 1/2 split is scheduling convenience — both unlock together;
 kept separate so order scenarios can be deferred if the reviewer's

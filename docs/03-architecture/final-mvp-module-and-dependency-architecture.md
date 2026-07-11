@@ -21,10 +21,20 @@
 | 2 | `shopify_connector_product` | **Merged** (import slice) | Yes | Lite + Full | `product` | core |
 | 3 | `shopify_connector_sale` | **Merged** (customer slice) | Yes | Lite + Full | `sale` *(added by Task 012 — see §1.2)* | core; **+ product (added by Task 012)** |
 | 4 | `shopify_connector_inventory` | No — created by Task 013 | Yes | **Full only** | `stock` | core + product |
-| 5 | `shopify_connector_fulfillment` | No — created by Task 014 | Yes | **Full only** | `stock_delivery` | core + sale |
+| 5 | `shopify_connector_fulfillment` | No — created by Task 014 | Yes | **Full only** | `stock_delivery`, **`sale_stock`** (red-team-added: `picking.sale_id`, `move.sale_line_id`, and SO-confirmation picking generation all live in the `sale_stock` bridge module — an undeclared hard dependency would leave fulfillment dead code) | core + sale |
 | 6 | `shopify_connector_product_export` | No — created by Task 015 | Yes (MVP write-back half of the product domain, DEC-003/PR #55) | **Full only** | — (inherits product's) | core + product — **[Proposed decision PD-1, §1.1]** |
 | 7 | `shopify_connector_accounting` / `_refund` / `_payout` / `_multi_store` | No | **No — Phase 2/3** (DEC-003 deferrals) | Future add-ons | t.b.d. | t.b.d. at their own architecture pass |
 | 8 | Public-app auth/compliance surfaces (working name `shopify_connector_oauth`) | No | **No — Phase 2+** (DEC-026, RA-003 not lifted) | Distribution layer, not an edition | t.b.d. | core |
+
+**Core's breadth is intentional (red-team-acknowledged):** core is the
+deliberate substrate hub — transport, credentials, store lifecycle,
+jobs/logs/dispatch, binding mixin, and (via the core-owned tasks) the
+shared UI surfaces, job-action services, readiness slots, and the W1
+webhook receiver. The accepted "no giant connector module" rule
+targets domain capability sprawl, not the substrate; domain logic
+never migrates into core, and core never contains domain
+mapping/matching/mutation logic — that boundary, not file count, is
+the enforced invariant.
 
 **UI ownership [Proposed decision PD-2]:** there is **no separate UI
 module**. Views/menus/actions live in the module that owns their
@@ -90,7 +100,7 @@ MVP Lite:   shopify_connector_core ──► shopify_connector_product ──►
                     ▲                        ▲                            (customer + order)
                     │                        │
 MVP Full adds:      ├── shopify_connector_inventory  (core + product + stock)
-                    ├── shopify_connector_fulfillment (core + sale + stock_delivery)
+                    ├── shopify_connector_fulfillment (core + sale + stock_delivery + sale_stock)
                     └── shopify_connector_product_export (core + product)
 Phase 2/3 add-ons: accounting / refund / payout / multi_store  (own future pass)
 Phase 2+ distribution: oauth/compliance surfaces (core)         (RA-003-gated)
@@ -125,8 +135,8 @@ no shadow copies, ambiguous matches never create rows).
 | `shopify.connector.product.variant.binding` | product | `product_variant_id` (+ required `product_template_binding_id`) | (store_id, shopify_gid) + (store_id, product_variant_id) | **Merged** |
 | `shopify.connector.customer.binding` | sale | `partner_id` | (store_id, shopify_gid) + (store_id, partner_id) | **Merged** |
 | `shopify.connector.order.binding` | sale (Task 012) | `sale_order_id` | (store_id, shopify_gid) + (store_id, sale_order_id) | Proposed (packet §7) |
-| `shopify.connector.location.mapping` | inventory (Task 013) | `odoo_location_id` ↔ `shopify_location_gid` | (store_id, odoo_location_id) + (store_id, shopify_location_gid) — one-to-one, non-inferred (DEC-010) | Proposed (packet §7) |
-| `shopify.connector.inventory.level.binding` | inventory (Task 013) | `product_variant_binding_id` + `location_mapping_id` | (store_id, shopify_inventory_item_gid, location_mapping_id); `shopify_gid` carries the InventoryLevel GID | Proposed (packet §7) |
+| `shopify.connector.location.mapping` | inventory (Task 013) | `odoo_location_id` ↔ mixin `shopify_gid` (= Shopify Location GID) | (store_id, odoo_location_id) + (store_id, shopify_gid) — one-to-one, non-inferred (DEC-010) | Proposed (packet §7) |
+| `shopify.connector.inventory.level.binding` | inventory (Task 013) | `product_variant_binding_id` + `location_mapping_id` | (store_id, shopify_inventory_item_gid, location_mapping_id); `shopify_gid` carries the InventoryLevel GID once known — **deliberate mixin deviation (red-team-confirmed): this one binding overrides `shopify_gid` to `required=False`** (the GID exists only after activation/first read; the mixin declares it required) and relies on the item+location key, not `(store, shopify_gid)`, as its identity | Proposed (packet §7) |
 | `shopify.connector.fulfillment.binding` | fulfillment (Task 014) | `picking_id` (`stock.picking`) | (store_id, shopify_gid = Fulfillment GID) + (store_id, picking_id) | Proposed (packet §7) |
 
 Deliberate non-bindings (unchanged): **no order-line binding model**
@@ -136,14 +146,23 @@ field `shopify_line_item_gid` on `sale.order.line` via `_inherit`,
 which is a reference field, not a binding model — flagged for review
 as part of the Task 012 packet, not silently assumed); **no partner
 shadow fields**; **no snapshot of authoritative Odoo data** in any
-binding. Fulfillment-binding keying note: the blueprint's role sketch
-said "keyed (store, FulfillmentOrder GID)"; that key breaks on a
-backorder chain (two pickings partially fulfilling one FulfillmentOrder
-would collide), so the anchor is the **created Fulfillment GID** plus
-`(store, picking)` uniqueness — each validated picking is an
-independent fulfillment event (DEC-011). FulfillmentOrder GIDs are
-carried as audit evidence on the row. This refinement is called out
-explicitly for ChatGPT review in the Task 014 packet (§7).
+binding. Fulfillment-binding keying note — **this is a proposed revision of
+accepted content, not the filling of an open detail**: the accepted
+blueprint (Part C, `[Accepted — DEC-006; DEC-011; Part A §C.8]`,
+`master-blueprint-inventory-fulfillment.md`) keys the fulfillment
+binding on "(store, Shopify FulfillmentOrder GID) (and the Fulfillment
+GID once created)". That accepted key breaks on a backorder chain: two
+pickings partially fulfilling one FulfillmentOrder would collide on
+FO-GID uniqueness, contradicting the equally-accepted rule that each
+validated picking (incl. backorder splits) is an independent
+fulfillment event (DEC-011). The proposed revision anchors on the
+**created Fulfillment GID** plus `(store, picking)` uniqueness, with
+FulfillmentOrder GIDs demoted to an audit field. Because this
+overrides part of DEC-006/DEC-011/Part-A-§C.8-accepted identity
+content, it is routed through architecture review explicitly (the
+AR-042 row names it; master plan §1 call 4 asks for the ratification;
+detail in the Task 014 packet §2, D-014-1) — ChatGPT is being asked
+to revise an acceptance, not merely to confirm a naming.
 
 ## 4. Sync-direction matrix (final, MVP)
 
@@ -211,8 +230,14 @@ sources: DEC-005/009/013, AR-019, merged core code (read 2026-07-10).
    bypass exists anywhere (merged invariant).
 8. **Duplicate prevention:** two accepted paths (interactive preview;
    automated two-tier MBQ-59 gate) + binding/idempotency constraints +
-   webhook `X-Shopify-Webhook-Id` dedup when webhooks arrive (Phase-2
-   slice).
+   webhook `X-Shopify-Webhook-Id` dedup when webhooks arrive (the W1
+   slice — MVP tail per the webhook packet).
+   **Dual-hook note (red-team-added):** validating one outgoing
+   delivery fires both the Task-013 stock-change push hook and the
+   Task-014 fulfillment hook — two independent jobs on one event with
+   no ordering contract; eventual consistency is by design
+   (absolute-set CAS pushes + each domain's reconciliation), and the
+   two domains share no state (the structural isolation holds).
 9. **Observability/audit:** job/log surface is the operator signal
    (`ir.cron._notify_admin` is a no-op by default — Q19 closed by
    confirming the documented assumption: the connector does not
@@ -259,10 +284,20 @@ re-checked quarterly.
    Area 6 trigger call sites);
 7. the binding mixin.
 
-No new seam is proposed. Domain modules never edit core/product files
-(pattern proven in Tasks 010/011); the single sanctioned exception
-remains the readiness `REQUIRED_MVP_SCOPES` fix, routed to Task 014
-(TD-002, packet §5).
+No new seam is proposed beyond the two named below. Core-touchpoint
+rule, stated precisely (red-team-corrected — the earlier
+"single sanctioned exception" wording undercounted): **domain-module
+tasks never edit existing core/product files**, with exactly **two**
+named exceptions in this package — Task 014's TD-002
+`REQUIRED_MVP_SCOPES` constant swap, and Task 012's additive
+`JobPolicySkip` dispatcher seam (new exception class + one
+except-branch; needed because the merged dispatcher marks any
+normally-returning handler `succeeded`, so no handler-reachable
+`skipped` path exists without it). **Core-owned tasks** (Area 6 /
+"Task 016" — job-action services + readiness-slot closure; W1 —
+webhook receiver; U1 — core views) add or edit core files **by
+design**, each with an exhaustive named allowlist in its packet; they
+are core work, not domain work.
 
 ## 8. Install / uninstall / data-survival contract
 
@@ -270,23 +305,29 @@ remains the readiness `REQUIRED_MVP_SCOPES` fix, routed to Task 014
   disablement is always the domain flags** (merged
   `*_domain_enabled`), never uninstall (MBQ-54/DEC-018 accepted
   posture, restated).
-- Uninstalling a domain module (admin act, discouraged) drops its
-  binding/mapping tables but **never** business data: partners,
-  products, sale orders, pickings, and stock survive as ordinary Odoo
-  records (`ondelete='restrict'` protects them while bindings exist;
-  table drop removes only connector metadata). Match history is the
-  one thing lost — reinstalling re-matches deterministically
-  (SKU/barcode/email) except manual matches, which must be redone.
-  This consequence is documented in the release plan's uninstall
-  section.
+- **Uninstall reality (red-team-corrected — the earlier "graceful
+  cascade" claim was mechanically false):** the merged domain modules
+  extend `job_type` with `selection_add … ondelete='cascade'`, and
+  Odoo's selection-unlink cascade tries to `unlink()` every job of
+  that type — but every executed job has append-only
+  `shopify.connector.job.log` children with **`ondelete='restrict'`**
+  (deliberate audit-history design). Uninstalling a domain module
+  that has ever executed a job therefore **fails on the FK
+  restriction**; it succeeds only on a database where that domain
+  never ran. Consequence, aligned with the already-accepted MBQ-54
+  posture: **disable-not-uninstall is the only supported removal path
+  once a domain has run.** Business data (partners, products, sale
+  orders, pickings, stock) is never at risk either way
+  (`ondelete='restrict'` links). A future core decision could relax
+  the `job_type` `ondelete` to a soft-degrade form to make uninstall
+  possible; that is a named non-MVP candidate, not assumed. The
+  packaging proposal §5/§6 and the release plan's uninstall section
+  carry this corrected posture.
 - Core is never uninstalled while a domain module is installed (Odoo
   dependency mechanics enforce this).
-- Job/log history lives in core and survives domain-module removal
-  (`job_type` rows of removed modules degrade gracefully via
-  `selection_add` `ondelete='cascade'` — cascade removes orphaned
-  domain jobs; this is the one documented data-loss vector, called out
-  in the packaging proposal §6 with the mitigation: disable, don't
-  uninstall).
+- Job/log history lives in core and is preserved under the
+  disable-path (nothing is deleted; jobs of a disabled domain simply
+  stop being enqueued — merged flag enforcement).
 
 ## 9. Proposed decisions in this document (summary for ChatGPT)
 

@@ -28,7 +28,9 @@ Lite is released implicitly (subset of the same artifacts).
    range on a populated database; settings/checkpoint fields additive
    (no migration scripts expected for MVP — any task introducing one
    invalidates this line and adds its own tested migration).
-3. **Uninstall/downgrade:** DEC-029 §5 walked exactly: flags-off path
+3. **Uninstall/downgrade:** packaging proposal §5
+   (`../02-product/lite-full-packaging-final-proposal.md`, the DEC-029
+   carrier document) walked exactly: flags-off path
    (everything survives); Full-module uninstall path (business data
    survives; binding/mapping tables + cascade-removed domain jobs
    documented as lost — screenshot evidence); reinstall re-match

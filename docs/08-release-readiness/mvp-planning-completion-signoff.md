@@ -4,7 +4,7 @@
 > Produced 2026-07-10 (AR-042 candidate) as the final answer sheet of
 > the planning-completion session. Claim classes per `CLAUDE.md` §8;
 > the completeness evidence is `mvp-planning-completion-audit.md`
-> (inventory §2, closure results §3, red-team §4).
+> (inventory §2, closure results §3, contradictions §4, red-team §7).
 
 **1. Is research complete enough for MVP implementation?** —
 **Yes [Inference from the audited inventory]**, with named residuals:
@@ -24,10 +24,10 @@ dependencies; no giant module.
 
 **3. Is product scope complete enough?** — **Yes.** DEC-003 (as
 PR-#55-corrected) remains the scope; this session adds no scope; the
-two explicit re-scopings requiring ChatGPT's eyes are D-015-7 (media
-export → 015B) and D-013-8 (baseline import → 013B), plus the webhook
-MVP-tail confirmation (master plan §1.8/.10). Lite/Full is fully
-proposed (DEC-029).
+two explicit re-scopings requiring ChatGPT's eyes are D-013-8
+(baseline import → 013B) and D-015-7 (media export → 015B), plus the
+webhook MVP-tail confirmation (master plan §1 items 6, 8, and 10
+respectively). Lite/Full is fully proposed (DEC-029).
 
 **4. Are Tasks 012–015 implementation-ready at planning level?** —
 **Yes as proposals.** Each packet contains every required section
@@ -66,10 +66,11 @@ dev-store evidence rule → merge reviews of 013/014/015; DEC-028
 Rung-2 + RA-003 lift + W5 → Phase-2+ B-1 only; 013B/015B → their own
 future gates.
 
-**9. What exact ChatGPT decisions remain?** — The eleven calls listed
-in `implementation-ready-master-plan.md` §1 (DEC-027/028/029,
-PD-1..6, the flagged D-confirmations, webhook MVP-tail scope, plus
-optional OP-42/AR-040 wording items).
+**9. What exact ChatGPT decisions remain?** — The eleven calls (ten
+binding + one optional) listed in
+`implementation-ready-master-plan.md` §1 (DEC-027/028/029, PD-1..6,
+the flagged D-confirmations incl. D-A6-7's readiness-slot closure,
+webhook MVP-tail scope, plus optional OP-42/AR-040 wording items).
 
 **10. What is the exact next implementation session after
 acceptance?** — Task 012 via its locked prompt (master plan §5).

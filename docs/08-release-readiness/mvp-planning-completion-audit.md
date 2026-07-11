@@ -4,10 +4,11 @@
 > document is the master audit of the 2026-07-10 MVP planning-completion
 > session (AR-042 candidate). It records (§1) the verified current
 > repository/GitHub state, (§2) the authoritative inventory of every
-> remaining planning item with a reconciliation verdict, and (§3–§6,
+> remaining planning item with a reconciliation verdict, and (§3–§7,
 > appended by later phases of the same session) the closure results,
-> contradictions found and corrected, evidence-quality assessment, and
-> the final readiness verdict. **Nothing in this document opens a gate,
+> contradictions found and corrected, evidence-quality assessment,
+> the final readiness verdict, and the adversarial red-team review
+> record. **Nothing in this document opens a gate,
 > issues a prompt, authorizes implementation, resolves a register row
 > beyond explicitly-cited documentary facts, or converts a
 > recommendation into a decision.** Claim classes per `CLAUDE.md` §8.
@@ -247,9 +248,97 @@ the methodology caution).
 **Planning-complete per the session's §22 standard, as a proposal
 package** — see `mvp-planning-completion-signoff.md` for the ten
 answers and the exact statement. The repository now contains: the
-reconciled state (§1), closure for every §2 item (§3), six proposed-
-decision records/points sets (DEC-027/028/029 + PD-1..6 + the packet
-D-items), seven implementation packets with locked prompts (012, 013,
-014, 015, Area 6, UI-U1, W1), the UAT and release plans, and one
-unambiguous next step (Task 012). Nothing herein is accepted, no gate
-is open, and no external validation is claimed to have occurred.
+reconciled state (§1), closure for every §2 item (§3), three proposed
+decision records (DEC-027/028/029), the six architecture proposed
+decisions (PD-1..PD-6), the packet-level flagged D-items, seven
+implementation packets with locked prompts (012, 013, 014, 015, Area
+6, UI-U1, W1), the UAT and release plans, and one unambiguous next
+step (Task 012). Nothing herein is accepted, no gate is open, and no
+external validation is claimed to have occurred.
+
+## 7. Adversarial red-team review record (session §21)
+
+Five independent adversarial reviewers (governance/scope, architecture
+vs merged code, engineering feasibility, packet cross-consistency,
+evidence/citation integrity) reviewed the full Phase-A–D output
+against the merged codebase and the registers. Findings and
+dispositions (all fixes applied in this same session, before the PR
+was opened; nothing was silently dropped):
+
+### 7.1 Blocker-class findings — all fixed
+
+1. **No store can reach `connected`.** The merged core registers three
+   ESSENTIAL readiness placeholder checks (`webhook_hmac`,
+   `mapped_location`, `cron_queue_health`) that return `not_proven`
+   unconditionally; the aggregate is fail-closed and
+   `action_activate` requires a pass/warning readiness result — so
+   every mutation task's dev-store validation was unreachable, and
+   `cron_queue_health` was owned by no packet at all. **Fix:** new
+   Area-6 design item D-A6-7 (readiness pending-slot closure) owns
+   all three slots, with the webhook_hmac relaxation explicitly
+   flagged as its own ChatGPT call; sequencing note added (Area 6
+   before any mutation task's dev-store validation); master plan §1
+   item 9 and §2 row 2 updated.
+2. **A normally-returning handler can never produce `skipped`.** The
+   merged dispatcher overwrites a normal handler return to
+   `succeeded`; Task 012's skip-by-policy design was unimplementable
+   as written. **Fix:** D-012-3 re-specified on the `JobPolicySkip`
+   dispatcher-exception seam (one named additive core edit, flagged);
+   recovery path = manual retry from `skipped` (D-A6-5 updated to
+   include `skipped` in its allowed-from set, with retry_count reset).
+3. **Area-6 scan jobs collided on `operation_scope_key`.** The merged
+   key excludes `job_type`, so two domains' scans for one store would
+   serialize against each other (and the original design's key would
+   never distinguish them). **Fix:** synthetic
+   `shopify_target_gid='scan:<domain>'` marker + per-run
+   `payload_hash` nonce; both now stated in the packet and its locked
+   prompt.
+4. **Undeclared `sale_stock` dependency.** Task 014's design consumes
+   `picking.sale_id`/`sale_line_id`, which live in the `sale_stock`
+   bridge module, absent from the declared dependency set. **Fix:**
+   dependency added to the fulfillment module row, the DAG, and the
+   Task-014 packet.
+5. **Uninstall claims contradicted the merged FK posture.**
+   `job_log.job_id` is `ondelete='restrict'`, so the documented
+   cascade-uninstall story would fail at the database. **Fix:**
+   architecture §8 and the packaging proposal rewritten to the
+   disable-only/documented-loss posture actually supported.
+
+### 7.2 Major findings — all fixed
+
+Inventory-level binding needs `shopify_gid` `required=False` (an
+explicit, documented mixin deviation — Task 013); the `@idempotent`
+retry key must persist on the binding (`last_push_idempotency_key` +
+params hash), not in `payload_hash` (Task 013); Task 015 omitted the
+`write_products` scope and its readiness/hold classes; the readiness
+`_get_checks()` append seam cannot *replace* a core check — Task 013's
+mapped-location integration re-specified as an `_inherit` override on
+the D-A6-7 baseline; FulfillmentOrder `status` is not a server-side
+query filter — selection re-specified client-side over
+OPEN/IN_PROGRESS; Task 014's pre-send dedup honesty (only
+`operation_scope_key` serialization is proven; stated as such);
+Area-6 §1 falsely claimed "no core edits" while its allowlist named
+core files — rewritten to the three named additive pieces; Task 014's
+`trigger_origin` value is an extension of the accepted DEC-019
+vocabulary and is now flagged as a review call (master plan §1 item
+7), as is Task 012's `sale.order.line` field (item 5).
+
+### 7.3 Consistency/citation findings — all fixed
+
+Ten-vs-eleven review-call count reconciled (eleven = ten binding + one
+optional, stated in master plan §1 and signoff §9); DEC-029 §5/§6
+citations in the release plan and UAT scenario 23 corrected to the
+packaging proposal (the DEC-029 decision record has no such sections);
+UAT scenario 16 moved Wave 1 → Wave 3 (needs the U3 matching center);
+U-1's closure condition stated in the UAT plan header; signoff §3
+citation corrected to master plan §1 items 6/8/10; §6 of this audit
+recounted; webhook phase labeling aligned (W1/W2 "MVP tail"
+everywhere; W1 row now names the D-A6-7 `webhook_hmac` slot
+handover).
+
+### 7.4 Open items surviving the red-team (by design, not oversight)
+
+The external-validation set (signoff §6) — VAL-B2, concurrency proof,
+dev-store empirical checks, UAT execution, webhook live delivery —
+plus every ChatGPT review call in master plan §1. No red-team finding
+remains unfixed and unrecorded.

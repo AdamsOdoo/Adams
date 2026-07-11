@@ -155,11 +155,32 @@ explicit ✅(D-015-5); 14 field allowlist + price-ownership rule
 explicit ✅(D-015-2); 15 destructive-delete containment explicit
 ✅(D-015-3).
 
+## 3.1 Scopes & readiness (red-team-added — previously unstated)
+
+Every mutation in this packet (`productSet`,
+`metafieldDefinitionCreate`) requires **`write_products`**; the SKU
+pre-search and fresh reads require `read_products` (already in
+`REQUIRED_MVP_SCOPES`). `write_products` is deliberately NOT added to
+`REQUIRED_MVP_SCOPES` (that set stays the Lite read baseline);
+instead this module appends (via the `_get_checks()` seam, the
+Task-013 pattern) one essential readiness check active only when
+`product_export_domain_enabled`: `write_products` present in
+`granted_scopes`. Hold-outcome classification (red-team-added): >3
+options and >100 variants → `data_shape_schema_mismatch`
+(`failed_retryable`, the Task-012 precedent); stale/expired preview
+at apply time → `destructive_write_guard_blocked`
+(`blocked_manual_review` — the guard refused). Logging: module-local
+pre-redaction is not needed (catalog data, no PII), all free text via
+`_system_append`.
+
 ## 4. Store settings added
 
 `product_export_domain_enabled` (Boolean default False),
 `product_export_binding_namespace_ready` (Boolean ro — metafield
 definition created marker).
+
+Job-type → flag map: `product_export_preview` and
+`product_export_apply` both map to `product_export_domain_enabled`.
 
 ## 5. Tests (exact files) + dev-store validation
 
@@ -236,8 +257,9 @@ HARD CONSTRAINTS: productSet only, synchronous, with the customId
 identifier on creates; full-variant-set payloads always; preview ->
 explicit confirmation -> apply, no other path, no auto-apply, no
 bypass; price fields only under odoo_authoritative; SKU pre-search
-duplicate gate before any create; DRAFT on create; concurrency caveat
-restated; Odoo.sh green + the two named dev-store empirical checks
+duplicate gate before any create; DRAFT on create; write_products
+readiness check per packet §3.1 and hold classes per §3.1;
+concurrency caveat restated; Odoo.sh green + the two named dev-store empirical checks
 (customId retry-safety; list-not-supplied != deleted) or a recorded
 explicit ChatGPT waiver. Stop condition: draft PR "Task 015:
 controlled product export/update (shopify_connector_product_export)";

@@ -10,7 +10,7 @@
 > (`final-mvp-uat-plan.md`), release
 > (`release-readiness-execution-plan.md`).
 
-## 1. Decisions ChatGPT makes when reviewing this PR (one review, ten calls)
+## 1. Decisions ChatGPT makes when reviewing this PR (one review, eleven calls: ten binding + one optional)
 
 1. **Accept/revise DEC-027** (branch-A pilot scope).
 2. **Accept/revise DEC-028** (credential/PCD posture ladder; also the
@@ -21,31 +21,44 @@
    names/keys incl. the fulfillment-keying refinement; checkpoint
    ownership; API 2026-07 pin).
 5. **Confirm the flagged Task-012 interpretations** (D-012-3
-   skipped-by-policy routing; D-012-4 ambiguous-customer pre-creation
-   hold; D-012-6 address children; D-012-9 T-B tax mechanism).
+   skipped-by-policy routing incl. its one named additive core seam —
+   the `JobPolicySkip` dispatcher exception; D-012-4
+   ambiguous-customer pre-creation hold; D-012-6 address children;
+   D-012-9 T-B tax mechanism; the `shopify_line_item_gid` field on
+   `sale.order.line` — the one MVP field added to a standard Odoo
+   model, which Task 014 then depends on).
 6. **Confirm D-013-5** (the third named sudo for the location cache)
    and **D-013-8** (baseline import deferred to 013B).
-7. **Confirm D-014-2** (TD-002 fix as the one named core edit) and
-   **D-014-6** (no fulfillmentOrderMove in MVP).
+7. **Confirm D-014-2** (TD-002 fix as the one named core edit),
+   **D-014-6** (no fulfillmentOrderMove in MVP), and the Task-014
+   `trigger_origin='fulfillment_tracking_change'` selection_add — an
+   extension of the accepted DEC-019 two-value vocabulary, flagged as
+   such in the packet.
 8. **Confirm D-015-7** (media deferred to 015B) — this re-scopes
    DEC-003's "basic image/media sync" for the export direction and
    must be an explicit call, not silent.
-9. **Confirm D-A6-1/D-A6-5** (Area-6 split; the additive core
-   job-actions file).
+9. **Confirm D-A6-1/D-A6-5/D-A6-7** (Area-6 split; the additive core
+   job-actions file incl. manual retry from `skipped` with
+   retry_count reset; the readiness pending-slot closure — the
+   red-team BLOCKER fix without which no store can reach `connected`,
+   incl. the explicitly flagged webhook_hmac not-applicable
+   relaxation).
 10. **Confirm the webhook MVP-tail scoping** (W1+W2 in MVP, W3–W5
     out) — or re-scope DEC-003's C-SYNC webhook rows explicitly.
 11. Optionally: the OP-42 one-line binding confirmation; the AR-040
     status-cell wording.
 
-Accepting the PR without naming exceptions accepts 1–10 as proposed
-(stated here so the review is one act, not eleven).
+Accepting the PR without naming exceptions accepts the ten binding
+calls (1–10) as proposed; item 11 is optional and lapses silently if
+unaddressed (stated here so the review is one act, not eleven
+separate ones).
 
 ## 2. Critical path (backend chain — each step: **gate act** → one implementation session → draft PR → **merge review** → runtime-green closure)
 
 | # | Step | Packet | Prereqs | Ready when |
 | --- | --- | --- | --- | --- |
 | 1 | **Task 012 order import** | task-012 packet §15 prompt | This PR merged | **Immediately after acceptance** — the first implementation session |
-| 2 | **Task 016 / Area 6 triggers** | area-6 packet §7 prompt | 012 merged | closes UAT blocker U-4 |
+| 2 | **Task 016 / Area 6 triggers** | area-6 packet §7 prompt | 012 merged | closes UAT blocker U-4; carries D-A6-7, without which no store reaches `connected` — hard prerequisite for steps 4–6 dev-store validation |
 | 3 | **UI Phase U1** | ui packet §6 prompt | Area 6 merged | closes most of U-3 |
 | 4 | **Task 013 inventory** | task-013 packet §8 prompt | 010 merged (fact); sequenced here per accepted order | first mutation task — dev-store evidence rule active |
 | 5 | **Task 014 fulfillment** | task-014 packet §8 prompt | 012 merged (order bindings + line GIDs) | carries the TD-002 fix |

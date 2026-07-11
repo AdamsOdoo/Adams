@@ -14,7 +14,11 @@
 
 Create `shopify_connector_fulfillment` (new module, Full edition;
 depends `['shopify_connector_core', 'shopify_connector_sale',
-'stock_delivery']` — MBQ-60 decided): validated outgoing pickings
+'stock_delivery', 'sale_stock']` — MBQ-60 decided for
+stock_delivery; **`sale_stock` red-team-added**: `picking.sale_id`,
+`move.sale_line_id`, and confirmation-time picking generation all
+live in that bridge module, and relying on it transitively would be
+luck, not architecture): validated outgoing pickings
 become Shopify fulfillments with tracking, exactly once, notification
 off by default. Includes its own triggers (picking-validation
 `odoo_event` hook, tracking-update hook, reconciliation scan, manual
@@ -78,8 +82,11 @@ yet — a documented deviation from the bind-row targeting precedent).
 
 **D-014-4 — Matching chain (consumes D-012's line GIDs).** picking →
 `sale_id` → order binding → order GID → query
-`order.fulfillmentOrders(first: 10, query: "status:open")` (+
-IN_PROGRESS — filtered client-side from the full set) → for each
+`order.fulfillmentOrders(first: 10)` **without a server-side status
+filter** (red-team-fixed: `query:"status:open"` would exclude
+IN_PROGRESS FOs, which are exactly the state of a partially-fulfilled
+backorder chain), selecting `status ∈ {OPEN, IN_PROGRESS}`
+client-side → for each
 picking move line: `move.sale_line_id.shopify_line_item_gid` → the FO
 line item whose `lineItem.id` matches; quantity = the move's done
 `quantity` (19.0 field — captures §8), must be ≤ `remainingQuantity`
@@ -121,13 +128,28 @@ shipped is the fact being recorded), with a job-log note.
 `fulfillment_tracking_update` job → `fulfillmentTrackingInfoUpdate
 (fulfillmentId, trackingInfoInput, notifyCustomer: persisted
 decision)` — updates in place, never a second fulfillment (captures
-§4).
+§4). **Job classification (red-team-added — the merged
+`trigger_origin` vocabulary has no value for this event):**
+`job_source='odoo_event'` with a **third trigger-origin value
+`fulfillment_tracking_change`, added via `selection_add` on the core
+`trigger_origin` Selection from this module** (the same field-extension
+pattern as `job_type`; no core file edit). Because DEC-019 accepted
+exactly two trigger-origin concepts at decision level, this third
+value is a **proposed DEC-019 vocabulary extension**, flagged as its
+own review item (master plan §1 call 7) — not silently assumed.
 
 **D-014-7 — Idempotency & ambiguous outcomes (RA-014 mechanics).**
 `fulfillmentCreate` is **NOT `@idempotent`** (verified — the 17-entry
 list is inventory/location/refund only, captures §4), so:
-(1) duplicate prevention pre-send: `UNIQUE(store_id, picking_id)`
-binding + `operation_scope_key` (store|stock.picking|id) serialization;
+(1) duplicate prevention — stated honestly (red-team-corrected): the
+binding row cannot exist before the mutation (its `shopify_gid` is
+the created Fulfillment GID and the mixin requires it), so
+**pre-send** protection is the `operation_scope_key`
+(store|stock.picking|id) serialization alone — a mechanism whose
+behavior under real concurrent workers is explicitly unproven (ARCH
+§5.12 caveat applies with full force here); `UNIQUE(store_id,
+picking_id)` catches any duplicate **after** the first success, and
+the verification read (below) is the recovery net between the two;
 (2) ambiguous outcome (timeout/unknown): **verification read before
 any retry** — re-query the order's `fulfillments(first: 50)` +
 FO `remainingQuantity`; a fulfillment whose `trackingInfo.number`
@@ -146,7 +168,9 @@ required but absent (settings flag `fulfillment_notification_confirmed`
 must be True when `notification_default_enabled` is True).
 
 **D-014-8 — Reconciliation & readiness.** Scan job
-(`fulfillment_reconciliation_check`, cron 60 min default): for bound
+(`fulfillment_reconciliation_check`, cron 60 min default;
+`job_source='reconciliation'`; per-run `payload_hash` uuid4 nonce —
+the repeat-run rule, as Task 013's scan): for bound
 pickings, re-read Fulfillment `status`/`trackingInfo` → snapshot
 updates + drift notes (status CANCELLED on Shopify side →
 `blocked_manual_review`/`binding_conflict`; nothing auto-changes in
@@ -175,6 +199,13 @@ handling explicit ✅(D-014-4/5).
 
 `fulfillment_notification_confirmed` (Boolean default False),
 `fulfillment_last_reconciliation_at` (Datetime ro, domain checkpoint).
+
+Job-type → flag map (exhaustive): `fulfillment_create_sync`,
+`fulfillment_tracking_update`, `fulfillment_reconciliation_check` all
+map to `fulfillment_domain_enabled`. Logging: all free text routes
+through `_system_append` (core redaction); tracking numbers and
+carrier names are operational data, not PII — but recipient names
+never appear in fulfillment log messages (source-guard test).
 
 ## 5. Tests (exact files)
 
@@ -233,7 +264,7 @@ Shopify-connector tip (STOP on drift). One session; draft PR; stop.
 
 ALLOWED FILES (exhaustive): addons/shopify_connector_fulfillment/**
 (NEW: __init__.py, __manifest__.py [depends shopify_connector_core,
-shopify_connector_sale, stock_delivery], models/{__init__.py,
+shopify_connector_sale, stock_delivery, sale_stock], models/{__init__.py,
 shopify_connector_fulfillment_binding.py,
 shopify_connector_fulfillment_service.py [service + seams + hooks],
 shopify_connector_store_settings.py}, security/ir.model.access.csv,
@@ -256,7 +287,11 @@ webhooks/OAuth/CI; adams_base.
 
 HARD CONSTRAINTS: FulfillmentOrder-based mutations exclusively
 (fulfillmentCreate / fulfillmentTrackingInfoUpdate); explicit line
-lists always; verification-read-before-retry, never blind (RA-014);
+lists always; FO selection client-side over OPEN+IN_PROGRESS (no
+server status filter — D-014-4); the tracking-update job uses
+odoo_event + the selection_add-extended trigger_origin
+'fulfillment_tracking_change' (D-014-6, a flagged DEC-019 vocabulary
+extension); verification-read-before-retry, never blind (RA-014);
 operation key + serialization via operation_scope_key; notifyCustomer
 persisted at enqueue, default off, never re-read (RA-009); unmatched
 picking never fulfilled by guess (RA-023); single-location Phase 1
