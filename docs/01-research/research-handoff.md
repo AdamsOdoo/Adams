@@ -1,5 +1,101 @@
 # Research Handoff (rolling)
 
+### U0 — Premium operator UI visual prototype (draft PR, design-artifacts-only, 2026-07-11)
+
+- **Gate & base (hard prerequisites, verified):** U0 gate comment
+  **`4948902516`** (the B10/U0 authorization act, posted on PR #148) — OPEN for
+  one parallel docs/design session; authorizes exactly `docs/09-ui-prototype/**`
+  (`.md`/`.html`/`.css`/`.png`) + one new top entry in this handoff, and grants
+  the narrow governance exception for self-contained static HTML/CSS. Base
+  verified: `Shopify-connector` tip ==
+  `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (no drift); **PR #149 merged**.
+  Branch `claude/u0-premium-operator-ui-prototype` cut from that exact commit
+  (not from Task 010B or 011B).
+- **Scope (design only — no Odoo implementation):** a reviewable, editable
+  visual prototype for the future operator UI — the ranked §9 command-center
+  dashboard (design-system §9, which supersedes the accepted nine-equal-card
+  grid *at ChatGPT’s review direction*), setup/readiness (token-paste connect,
+  test-connection outcome, grouped readiness results), the matching center
+  (customer exemplar), the S7 product diff/preview, and one Odoo-native
+  list+form exemplar. Built on the accepted corpus
+  (`ui-ux-final-design-spec.md`, `screen-inventory-and-navigation-map.md`,
+  `premium-ui-ux-design-system.md`, `performance-budgets.md`). Neither
+  `ui-ux-pro-max-skill` nor `frontend-design` skill was available (reported
+  honestly); no skill was installed/edited.
+- **Artifact index (all under `docs/09-ui-prototype/`):** `README.md` (index +
+  validation summary + the 10 ChatGPT decisions), `prototype-index.html`,
+  `traceability-matrix.md`, `assets/prototype.css` (token + component layer),
+  five screen folders each with a `.html` source + `-spec.md` + rendered PNGs,
+  and `accessibility/` (`contrast-table.md`, `visual-checklist.md`,
+  `keyboard-and-focus-notes.md`). **34 PNGs** cover all five dashboard states at
+  1366px, the primary resting state at 768px and 375px, one Arabic/RTL
+  dashboard at 1366px, and each other screen’s states at 1366px with 768/375
+  for its primary surface.
+- **Validation performed:** 6/6 HTML parse (strict `html.parser`); CSS braces
+  balanced (267/267); all local links resolve; **zero external URLs / CDNs /
+  fonts / `url()` / network deps**; **zero JavaScript**; no addon/Python/XML/
+  manifest/secret references; contrast — **32/32 WCAG 2.2 SC 1.4.3/1.4.11 pairs
+  pass** (one proposed token `--sc-border-strong #79839B` recorded); PNGs
+  rendered from the committed HTML via headless Chromium (2×). A visual
+  self-review + an independent adversarial QC pass drove three fix rounds
+  (mobile comparison-table reflow so the decision-critical column is never
+  hidden at 375px; corrected inline-SVG icon stroke rendering; mirrored RTL
+  breadcrumb chevron).
+- **Open visual decisions for ChatGPT (full list in README §6):** (1) dashboard
+  §9 hierarchy; (2) **optional sparkline** — U0 recommends *keep* (restrained,
+  severable); (3) contrast token split `--sc-border`/`--sc-border-strong`;
+  (4) setup/readiness composition + 6-chip step compression; (5) matching
+  composition; (6) product diff/preview composition; (7) Odoo-native token
+  treatment; (8) responsive + RTL behavior; (9) which surfaces use Owl later
+  (PD-7); (10) prototype fidelity as the U1 baseline.
+- **What this session does NOT do:** opens no gate; **UI-U1 remains CLOSED**
+  (and U2/U3, Task 012, LC-1, Area 6, SEC-1, inventory, fulfillment, export,
+  webhooks, OAuth, PERF-1 all remain closed); creates no Odoo code, view, menu,
+  model, ACL, or asset; touches no `addons/**`, `.claude/**`,
+  `docs/02..08` (except this handoff), `main`, or plain `dev`; does not mark the
+  PR ready or merge it.
+- **Parallel discipline:** Task 010B and Task 011B were **not touched, not
+  branched from, and not depended on**. U0 is design-artifact-only and shares no
+  production module with them. Because this handoff is append-only shared state,
+  **whichever of {U0, 010B, 011B} merges second/third must update from the
+  latest `Shopify-connector` and reconcile only the append-only handoff entries
+  — altering no accepted prototype content and no backend implementation
+  content, and broadening no file scope** — then rerun the validations
+  appropriate to that PR.
+- **Learning feedback loop:**
+  - New issues discovered: static, JS-free prototypes still need a *rendering
+    correctness* pass — an inline-SVG sprite referenced via `<use>` does **not**
+    inherit `fill`/`stroke` from the sprite’s wrapper `<g>`, so closed-shape
+    icons silently filled black until the stroke properties were moved onto the
+    `.sc-ico` host (an inherited-property boundary that crosses into the `<use>`
+    shadow tree). Captured so a future UI session sets icon paint on the host.
+  - Repeated issue pattern: no (first UI-prototype session).
+  - Rules/checklists updated: none unilaterally; the V-1..V-12 checklist was
+    completed honestly (10 Pass, 2 runtime-scoped Partials — performance
+    numbers and executable keyboard/tour tests are UI-U1-owned, not claimed
+    here).
+  - New rejected approaches: none.
+  - New technical debt: none (design artifacts only; rollback = single PR
+    revert, no schema/data/records).
+  - Self-verification: strict HTML parse, CSS brace balance, local-link
+    resolution, external-dependency/JS/secret greps, 32-pair contrast
+    computation, PNG dimension/size inventory, and an independent visual QC
+    subagent pass over all 34 renders.
+  - Should future prompts change? A UI-implementation prompt (U1) should require
+    the icon-paint-on-host note above and keep the mobile comparison-table
+    reflow rule.
+- **Quality gate confirmation:** handoff updated (this block) · feedback loop
+  checked · learning captured · forbidden files untouched · no new technical
+  debt · UI-U1 confirmed CLOSED.
+- **Next recommended session prompt (for ChatGPT to issue):** *“Review the U0
+  visual-design draft PR (branch `claude/u0-premium-operator-ui-prototype`, base
+  `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`) against
+  `docs/09-ui-prototype/README.md` and the accepted UI/UX corpus. Rule on the 10
+  listed decisions — especially the §9 dashboard hierarchy, the optional
+  sparkline, and the `--sc-border-strong` contrast token. Accept the prototype
+  (which then unlocks the UI-U1 gate for a separate session) or return visual
+  revisions. Do not open UI-U1 or any other gate in this review.”*
+
 ### CORE-R1 — Capability-Aware Readiness Correction (draft PR #149, implemented + focused correction, 2026-07-11)
 
 - **Base verified (hard prerequisite):** `Shopify-connector` tip ==
