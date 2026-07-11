@@ -163,25 +163,49 @@ source-level guard:
   unaffected (it scans only the two Task-006C files, both still sudo-free).
 
 Static test-method inventory (`grep -cE "^\s+def test_"`), for reference
-— **not** Odoo runtime counts: `test_readiness_slot_closure.py` = 20;
-`test_job_log_system_append.py` = 4; `test_credential_service.py` = 15;
-the whole `shopify_connector_core/tests` suite = **195** `def test_`
-methods across 12 files.
+— **not** Odoo runtime counts, and superseded by the runtime totals in
+the Odoo.sh section below: `test_readiness_slot_closure.py` = 20;
+`test_job_log_system_append.py` = 4; `test_credential_service.py` = 15.
 
-### Odoo.sh runtime result
+### Odoo.sh runtime result — GREEN
 
-**Not available in this session** — this environment has no Odoo/Odoo.sh
-or CI access, so no runtime pass/fail/error counts and no verbatim
-Odoo.sh log can be produced here. The live run executes on the Odoo.sh
-build the draft PR triggers and **must be quoted verbatim before any
-merge review** (OP-43). No runtime result is claimed that was not
-executed. **This build is no longer knowingly red:** the two sudo-count
-guards were updated to the three-site contract under amendment
-`4948368039` and match the actual inventory (AST-replicated green above);
-the D-R1-5 recovery fix is covered by a new real-behavior test. Per the
-review's own instruction, because Odoo.sh is unavailable in this
-environment the PR remains **draft** and this record reports the exact
-evidence rather than asserting an unrun result.
+Runtime evidence is now available (ChatGPT runtime review `4678716995`).
+The Odoo.sh platform build ran the accepted implementation head
+`e262738696dc18f775fcc42b5de0ef98c7b722ee` on build database
+`adamsmen-claude-task-core-r1-readiness-correction-t-34779589`. Verbatim
+test statistics:
+
+```text
+shopify_connector_core: 209 tests 1.61s 4046 queries
+shopify_connector_product: 61 tests 1.39s 2485 queries
+shopify_connector_sale: 56 tests 0.67s 1067 queries
+0 failed, 0 error(s) of 288 tests when loading database 'adamsmen-claude-task-core-r1-readiness-correction-t-34779589'
+```
+
+All **209** reported `shopify_connector_core` tests completed with **no
+failure and no error**; the final database result was **0 failed and 0
+error(s) of 288 tests** across the three connector modules. This
+satisfies OP-43 (Odoo.sh green, quoted verbatim). The build log
+explicitly executed:
+
+- `TestReadinessSlotClosure.test_eligible_lite_store_aggregates_pass` — the eligible Lite store aggregates readiness `pass`;
+- `TestReadinessSlotClosure.test_eligible_lite_store_reaches_connected` — that store reaches `connected` via `action_activate()`;
+- `TestReadinessSlotClosure.test_degraded_recovers_to_normal_and_clears_reason` — the D-R1-5 recovery regression (degraded→normal, `api_health_reason` cleared);
+- `TestJobLogSystemAppend.test_source_level_three_sudo_sites_total` — the three-site sudo guard;
+- `TestCredentialService.test_source_level_sanctioned_sudo_sites_guard` — the sanctioned sudo-sites guard;
+- the complete pre-existing `shopify_connector_core` test suite.
+
+So the Lite-store activation regression, the API-health recovery
+regression, and both exact-three-site sudo guards all executed and passed
+at runtime — confirming what §3–§4 describe. The `e262738…`
+implementation content is unchanged by the documentation-only closure
+that records this evidence.
+
+**Non-blocking pre-existing warning.** The build emits a documentation
+warning — `Unexpected indentation.` / `Block quote ends without a blank
+line; unexpected unindent.` — that is non-blocking (final result 0 failed
+/ 0 error) and is **not** attributed to any CORE-R1 file absent evidence;
+it is not addressed here (out of CORE-R1 scope).
 
 ## 6. Confirmations required by the review
 
@@ -247,9 +271,9 @@ status fields on an already-successful test connection).
 | --- | --- | --- |
 | 1 | Only allowed files changed (nine; packet allowlist + amendment `4948368039`) | ✅ |
 | 2 | D-R1-1..5 implemented exactly (incl. D-R1-5 stale-reason clear) | ✅ |
-| 3 | Every mandatory test present + recovery regression | ✅ (runtime execution on the platform build) |
-| 4 | All pre-existing core tests green | ✅ by construction — the only pre-existing tests this change touches are the two sudo guards, now updated to the matching three-site contract (AST-replicated green); full runtime confirmation is the Odoo.sh build |
-| 5 | Odoo.sh green, quoted verbatim | ⏳ pending the platform build (no CI in this env; §5). Not knowingly red. |
+| 3 | Every mandatory test present + recovery regression | ✅ — executed green on the Odoo.sh build (Lite activation + recovery + both sudo guards named in §5) |
+| 4 | All pre-existing core tests green | ✅ — the Odoo.sh build ran the full `shopify_connector_core` suite (209 tests) with 0 failed / 0 error; the two updated sudo guards executed and passed |
+| 5 | Odoo.sh green, quoted verbatim | ✅ — build DB `adamsmen-…-34779589`: `0 failed, 0 error(s) of 288 tests`; verbatim in §5 |
 | 6 | Validation record complete | ✅ (this file) |
 | 7 | Architecture-review log appended/updated | ✅ (AR-043) |
 | 8 | Handoff has a new top entry | ✅ |

@@ -47,17 +47,26 @@
   `adams_base`, no product/sale module; does not touch `main` or plain
   `dev`; does not mark PR #149 ready or merge it. Final changed-file
   count: **nine**.
-- **Validation performed (honest scope):** no Odoo runtime in this
-  environment (`import odoo` → `ModuleNotFoundError`). Ran
-  `python3 -m py_compile` on all changed Python files (clean) and a
-  standalone AST replication: both updated global sudo guards match the
-  exact three-site list (green); the three CORE-R1 source guards and the
-  pre-existing `_check_*`-mutation guard stay green;
-  `test_job_dispatch.py`'s new-file sudo guard is unaffected. **Live
-  Odoo.sh run pending** the platform build the PR triggers — to be quoted
-  verbatim before merge (OP-43); the build is **not** knowingly red.
-  Because Odoo.sh is unavailable in this environment, the PR stays draft
-  and this evidence is reported rather than an unrun result asserted.
+- **Validation performed:** local `python3 -m py_compile` on all changed
+  Python files (clean) and a standalone AST replication (both updated
+  global sudo guards match the exact three-site list; the three CORE-R1
+  source guards and the pre-existing `_check_*`-mutation guard stay green;
+  `test_job_dispatch.py`'s new-file sudo guard unaffected). **Odoo.sh
+  runtime is now GREEN and quoted verbatim (OP-43 satisfied)** — build DB
+  `adamsmen-claude-task-core-r1-readiness-correction-t-34779589` at head
+  `e262738`: `shopify_connector_core: 209 tests`,
+  `shopify_connector_product: 61 tests`, `shopify_connector_sale: 56
+  tests`, final `0 failed, 0 error(s) of 288 tests`. The build log
+  explicitly ran the Lite-store aggregate-`pass` and reach-`connected`
+  regressions, the D-R1-5 degraded→normal recovery regression, both
+  three-site sudo guards (`test_source_level_three_sudo_sites_total`,
+  `test_source_level_sanctioned_sudo_sites_guard`), and the complete
+  pre-existing `shopify_connector_core` suite. One non-blocking
+  pre-existing docs warning (Unexpected indentation / Block quote ends
+  without a blank line; unexpected unindent) is not attributed to a
+  CORE-R1 file and is left as-is. **CORE-R1 is implementation-complete,
+  pending ChatGPT's final merge review only; the PR stays draft (not
+  marked ready, not merged).**
 - **Learning feedback loop:**
   - New issues discovered: an accepted packet's exhaustive allowlist can
     omit the pre-existing "exactly N sudo sites" AST guards that a newly
@@ -90,14 +99,15 @@
   loop checked · learning captured · one repeated-issue pattern escalated
   and resolved via gate amendment · no new technical debt · forbidden
   files untouched.
-- **Next recommended session prompt (for ChatGPT to issue):** *"Re-review
-  the CORE-R1 draft PR #149 (branch
+- **Next recommended session prompt (for ChatGPT to issue):** *"Perform
+  the final merge review of the CORE-R1 draft PR #149 (branch
   `claude/task-core-r1-readiness-correction-trxl43`, base
   `2bdb07cf33045a696311c420e577cbbb09cdfb38`) against the packet
-  (D-R1-1..5), `task-core-r1-validation-results.md`, and the Odoo.sh build
-  it triggered; confirm the build is green (verbatim) with the three-site
-  sudo guards enforced, then perform the final merge review. Do not start
-  any other task."*
+  (D-R1-1..5) and `task-core-r1-validation-results.md`. The Odoo.sh build
+  for head `e262738` is green and quoted verbatim (`0 failed, 0 error(s)
+  of 288 tests`), with the three-site sudo guards and the Lite-store and
+  degraded→normal recovery regressions executed. Confirm and merge, or
+  return findings. Do not start any other task."*
 
 ### AR-042 revision 3 — PR #148 final-convergence (comment `4947866018`) focused patch (2026-07-11)
 
