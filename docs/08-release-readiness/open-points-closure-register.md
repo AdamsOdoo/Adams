@@ -170,6 +170,92 @@ resolved here.
 | Task 012 / 013 / 014 / 015 | **Not authorized.** Unaffected by this session in any way |
 | All other rows (OP-01–04/06–22/24–39/41–44) | Unchanged — not touched by this session |
 
+## 3.9 AR-042 planning-completion session addendum (2026-07-10)
+
+> Added by the MVP planning-completion session (docs-only; **Proposed
+> for ChatGPT review** except where a closure is purely documentary and
+> evidence-cited). §3.1–§3.8 texts above are preserved unchanged; this
+> addendum is the current delta. **Nothing here opens a gate, issues a
+> usable prompt, or converts a recommendation into a decision.** Master
+> record: [`mvp-planning-completion-audit.md`](./mvp-planning-completion-audit.md)
+> (its §3 table is the row-by-row source for the deltas below).
+
+| ID | 2026-07-10 status delta |
+| --- | --- |
+| OP-45 | **Research-closed this session:** the Partner Program Agreement's app fee schedule is public and fully sourced (0% first USD $1M lifetime / 15% above / $19 registration / 2.9% processing; 80/20 unregistered), and the "Enforcement of Shopify's Partner Program Policies" page is captured — [`../00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md`](../00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md) §6. Residual (named, non-blocking for MVP): App-Store review SLA undocumented; Partner-Dashboard-only operational limits unobservable (login wall). Row closes fully when ChatGPT accepts the capture as sufficient |
+| OP-46 | **Closure proposed:** [`../04-decisions/DEC-027-branch-a-pilot-customer-scope-proposal.md`](../04-decisions/DEC-027-branch-a-pilot-customer-scope-proposal.md) — Proposed, NOT accepted |
+| OP-40 / MBQ-04 | **Closure proposed:** [`../04-decisions/DEC-028-credential-pcd-posture-ladder-proposal.md`](../04-decisions/DEC-028-credential-pcd-posture-ladder-proposal.md) — Proposed, NOT accepted. Evidence update: encryption-at-rest is a PCD **Level 1** requirement per the current official page (captures §7) |
+| OP-23 | **Closure proposed:** [`../04-decisions/DEC-029-lite-full-packaging-proposal.md`](../04-decisions/DEC-029-lite-full-packaging-proposal.md) + [`../02-product/lite-full-packaging-final-proposal.md`](../02-product/lite-full-packaging-final-proposal.md) — Proposed, NOT accepted |
+| OP-14/15/16/17 | **Closure proposed** in [`../07-implementation-plan/task-012-order-import-implementation-packet.md`](../07-implementation-plan/task-012-order-import-implementation-packet.md) (D-012-1..12 incl. MBQ-55 order portion, MBQ-56 mechanics, MBQ-27 mechanism T-B, DEC-020-residual routing) |
+| OP-18/19 | **Closure proposed** in the Task 013 packet (D-013-1..8 incl. MBQ-32 residual = location-context `free_qty`, MBQ-38 = on-row confirmation record) |
+| OP-20 / OP-03 | **Closure proposed** in the Task 014 packet (exact scope set = merchant_managed family; TD-002 fix routed as the one named core edit) — TD-002 itself stays **Open** until that task merges |
+| OP-21 | **Closure proposed** in the Task 015 packet (module per ARCH PD-1; MBQ-23/24 residual closures; media → 015B deferred candidate, explicit ChatGPT call) |
+| OP-28 | **Closure proposed** in the Area-6 packet (Lite-trio retrofit split — supersedes the sequence doc's Area-6 description on acceptance) |
+| OP-26 | **Plan proposed:** UI phases U1–U3 with the MBQ-03 XML-ID scheme and MBQ-44 ACL plan ([`../07-implementation-plan/ui-implementation-phases-packet.md`](../07-implementation-plan/ui-implementation-phases-packet.md)) |
+| OP-27 / OP-36 | **Plan proposed:** W1–W5 ([`../07-implementation-plan/webhook-implementation-packets.md`](../07-implementation-plan/webhook-implementation-packets.md)); Q23's PII list proposed in its §3; W1+W2 proposed as MVP-tail (C-SYNC-01/02/03), W3–W5 deferred/Phase-2+ |
+| OP-29 / OP-30 | **Plans completed** ([`final-mvp-uat-plan.md`](./final-mvp-uat-plan.md) — 24 scenarios; [`release-readiness-execution-plan.md`](./release-readiness-execution-plan.md)); execution remains External-live |
+| OP-06 (VAL-B2) | **Plan completed** (val-b2-closure-plan §12 addendum: result template, cleanup, escalation); classified **External validation required** — not a research gap |
+| OP-22 | **Plan audited + performance capture added** (concurrency plan §13); classified **External validation required** |
+| OP-33 / Q4 / Q26 | **Dissolved by current evidence:** the official `@idempotent` list (page updated 2026-02-02) has 17 entries — inventory/location/refund mutations only; the 2026-01/2026-04 changes made the key mandatory for inventory set/adjust. No packet depends on the count; build-time re-verify rule stands |
+| OP-34 / OP-35 | Officially-documentable subset re-checked (bucket maxima confirmed unpublished-by-design; THROTTLED-in-200-body confirmed); empirical subset folded into VAL-B2 §12.5 + the mutation tasks' dev-store runs |
+| OP-37 | Re-verified: 2026-07 latest stable (until 2027-07-16); 2026-10 watch items named in the release plan §2.9 |
+| OP-05 / OP-31 / RA-003 | **Unchanged** — Phase 2+ under DEC-026; nothing in this session touches the gating |
+| OP-24/25/32/38/39/41/42/43/44 | **Unchanged** — restated where consumed; OP-25 residue still awaits its ChatGPT-authorized micro-patch (P-C) |
+| AR-040 status cell | Stale "draft, unmerged" wording reconciled via a dated documentary note in the AR log (facts only; wording call left to ChatGPT) |
+
+## 3.10 PR #148 revision addendum (2026-07-11) — control-room-review closure deltas
+
+> Added by the PR #148 revision session (docs-only; **Proposed for
+> ChatGPT review**). §3.1–§3.9 texts above are preserved unchanged;
+> this addendum is the current delta. **Nothing here opens a gate,
+> issues a usable prompt, or converts a recommendation into a
+> decision.** Master record: `mvp-planning-completion-audit.md` §8.
+
+| ID / topic | 2026-07-11 status delta |
+| --- | --- |
+| Review item 1 (Task 010 completeness) | **Closure proposed:** Task 010B locked packet (`../07-implementation-plan/task-010b-product-import-completeness-packet.md`) — precedes Task 012 in the revised critical path; DEC-003 scope completed, not narrowed |
+| Review item 2 (Task 011 scalability) | **Closure proposed:** Task 011B locked packet — precedes Task 012 |
+| Review item 3 (013B/015B) | **Closure proposed:** both are now complete locked packets before UAT/release; D-013-8/D-015-7 rewritten |
+| Review item 4 (premium UI) | **Closure proposed:** design system + PD-7 + rewritten UI packet + U0 prototype gate (B10 authorization pending) |
+| Review item 5 (readiness split) | **Closure proposed:** Task CORE-R1 packet; Area-6 D-A6-7 superseded |
+| Review item 6 (order-import safety) | **Closure proposed:** Task 012 packet revised in place (D-012-2/-7/-9/-11); packaging §2 Lite definition revised |
+| Review item 7 (security hardening) | **Closure proposed:** Task SEC-1 locked packet, after Area 6 / before U1 |
+| Review item 8 (DEC-028 Rung 1) | **Closure proposed:** production-entry criteria (DEC-028 point 2 revised); release plan §2.8 rows |
+| Review item 9 (lifecycle/uninstall) | **Closure proposed:** lifecycle design doc + DEC-030 + PD-8 + LC-1; release-plan §2.3 contradiction corrected |
+| Review item 10 (budgets) | **Closure proposed:** `../03-architecture/performance-budgets.md` (PB-1..23); ARCH §5.11 deferral withdrawn |
+| Review item 11 (UAT severity) | **Closure proposed:** S2-UX class + scenarios 25–36 + numeric §7 |
+| OP-14..21/28 rows (§3.9) | Unchanged in ownership; their packets carry the 2026-07-11 revisions noted in each file's header |
+| All other rows | Unchanged — re-verified against this revision; no silent closure |
+
+### 3.11 Re-review `4945129824` convergence (2026-07-11, docs-only — Proposed)
+
+> Focused convergence patch closing the nine re-review items. Master
+> record: `mvp-planning-completion-audit.md` §8.5. Nothing here opens a
+> gate, issues a usable prompt, or accepts anything.
+
+| ID / topic | 2026-07-11 status delta |
+| --- | --- |
+| RR-1 (010B existing-attribute compatibility) | **Closed at planning level:** D-010B-2 compatibility gate + `product_import_attribute_conflict_mode` (default `manual_review`) — reuse only `dynamic`, never mutate a mode, no phantom variants; tests + UAT fixture `UAT-P4` |
+| RR-2 (013B free/on-hand semantics) | **Closed:** `target_on_hand = desired_available + reserved`, post-write `free_qty == desired_available` check, re-read + drift abort, multi-quant / owner-package / lots / negative fail-closed **(apply lock hardened by FC-2, §3.12)** |
+| RR-3 (015B READY-first + safe delete + identities) | **Closed:** File GID vs Product Media GID; two-phase READY-gated pipeline; ~~`fileDelete` only after a fresh reference check~~ **→ superseded by FC-4 (§3.12): no automatic `fileDelete` at all (no reverse-reference API exists); detach-only + retain (`detached_orphan_candidate`)** |
+| RR-4 (012 tax key + discount math) | **Closed:** canonical decimal `shopify_rate_key` + decimal-safe match; cap-free component-sum bound + exact negative "Shopify Order Discount" lines |
+| RR-5 (PB-19 owner) | **Closed:** NEW Task PERF-1 packet; master plan step 16 (before performance UAT); review call B11 |
+| RR-6 (SEC-1 override RPC contract) | **Closed:** `_odoo_binding_field_name()` seam + enumerated bindings + scalar-id/reason `action_override_binding` + negative RPC tests |
+| RR-7 (LC-1 locked prompt) | **Closed:** full locked prompt (lifecycle §7.1); LC-1 sequenced before Task 012; adoption notes added to 012/013/013B/014/015/015B/Area-6 |
+| RR-8 (rollback/schema wording) | **Closed:** 010B/011B/015B/LC-1/PERF-1 rollback notes corrected (code revert removes behavior; additive schema may remain inert/orphaned; no destructive cleanup); release/packaging posture verified already-correct |
+| RR-9 (CORE-R1 D-R1 range) | **Closed:** `D-R1-1..5` in the CORE-R1 packet §3 heading, Area-6 D-A6-7 marker, audit §8.1, master-plan B1; repo-wide range sweep run |
+
+### 3.12 Final-convergence `4947866018` (2026-07-11, docs-only — Proposed)
+
+| Item | Closure (all Proposed, NOT accepted) |
+| --- | --- |
+| FC-1 (PERF-1 transaction/lock model) | **Closed at planning level:** PERF-1 reworked to the official Odoo 19 `ir.cron._commit_progress()` per-job-savepoint loop; the false "no lock held across a network call" claim withdrawn (merged claim is `try_lock_for_update()`, transaction-scoped); lock-release/atomicity/crash-survival proofs; throughput latency-bound (batch÷cadence = claim ceiling); `max_in_flight` withdrawn to the concurrency plan (topology B) |
+| FC-2 (013B TOCTOU) | **Closed:** D-013B-4 database-backed apply lock (`try_lock_for_update()` on quant/level-binding/mapping/variant-binding rows) before the final re-read; fail-closed; no-existing-quant case; real concurrent-transaction test + dev-store concurrent-drift case |
+| FC-3 (012 taxable-discount + rate unit) | **Closed:** D-012-2/8 residual line inherits source `tax_ids`/inclusion (or per-signature bucket) — no universal no-tax residual for taxable lines; inconsistent allocations rejected; D-012-9 both `rate`+`ratePercentage` requested, canonical key from `ratePercentage`, `rate×100==ratePercentage` verified, mismatch/null → schema hold |
+| FC-4 (015B automatic fileDelete) | **Closed:** no reverse-reference API exists (verified Shopify `File` interface 2025-07 = 7 fields); MVP posture detach-only + retain (`detached_orphan_candidate`); explicit admin-gated manual cleanup only; known-limitation + preview copy corrected |
+| FC-5 (010B concurrent attribute creation) | **Closed:** D-010B-2 `shopify.connector.attribute.lock` singleton + `try_lock_for_update()` before global attribute resolve/create (a savepoint does not serialize), DB-global across stores; real concurrent-transaction test; prevention at creation time |
+| FC-6 (SEC-1 wrong-model + LC-1 dependency) | **Closed:** D-SEC1-4/7 no model arg, id resolved only in the declared comodel, "wrong-model id" test withdrawn; LC-1 §7/§7.1 uses the current merged `cancelled`-write + audit path (the `action_disconnect` precedent), forward-compatible with the SEC-1 matrix, depending on no SEC-1 code |
+
 ## 4. Cross-check completeness statement
 
 Every open item named in: the PR #140 body's "Open blockers" list, the

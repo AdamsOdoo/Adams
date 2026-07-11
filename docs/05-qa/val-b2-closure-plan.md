@@ -326,3 +326,86 @@ authorize any code, and was not executed by this session — no Shopify account,
 Odoo instance, or real token was reachable from this documentation-only
 session. It is the procedure a future, appropriately-provisioned session (or
 human operator) should follow.
+
+## 12. Planning-completion addendum (2026-07-10, AR-042 session — plan audit; procedure above unchanged)
+
+> Appended by the MVP planning-completion session after auditing this
+> plan against the required VAL-B2 planning dimensions. **VAL-B2 is
+> hereby classified `[External validation required]` — a live-execution
+> item, not a research gap.** All research-closable planning is complete;
+> what remains needs a human operator with Shopify Partner/Dev Dashboard
+> access. Nothing below changes §1–§11's procedure or claims a pass.
+
+### 12.1 Status refresh against DEC-026 (2026-07-10)
+
+**[Verified repository state]** ChatGPT has since accepted DEC-026
+(strategic direction: branch A unchanged; B-1 public/limited-visibility
+is the Phase-2+ target; B-3 not the commercial-scale answer). This
+changes nothing in this plan: Path 1/Path 2 remain the branch-A
+one-store evidence paths exactly as DEC-023 accepted them. A proposed
+branch-A scope rule (single pilot by default, per-customer ChatGPT
+approval, soft ceiling of three) is now drafted as
+[`../04-decisions/DEC-027-branch-a-pilot-customer-scope-proposal.md`](../04-decisions/DEC-027-branch-a-pilot-customer-scope-proposal.md)
+— Proposed, not accepted; it does not alter this plan's one-store scope.
+
+### 12.2 Result template (copy into `task-003-validation-results.md` §VAL-B2 when executed)
+
+```text
+VAL-B2 execution record — <date>
+Operator: <human operator role — no personal data required>
+Path used (§3): <1 | 2 | 3> — reason: <why>
+Store: <dev store domain>   API version: <e.g. 2026-07>
+App type: <legacy admin custom app | custom-distribution app (cross-org)>
+Scopes granted (verbatim granted_scopes JSON): <redact nothing here — scope
+  handles are not secrets>
+Token type observed: <non-expiring offline | expiring (expires_in=…) | 24h client-credentials>
+--- Odoo-side observations (verbatim field values, §5) ---
+last_test_connection_result: <pass|fail>
+last_test_connection_reason: <empty|value>
+credential_last_verified_at: <ts>   granted_scopes_checked_at: <ts>
+credential_state: <present|invalid>
+job: state=<…> job_type=core_test_connection job_source=<…>
+job.log rows: <count + event_type list>
+Second run (§5.5): distinct job created without constraint collision: <yes|no>
+Readiness run (§5.6, optional): aggregate=<pass|warning|fail>; required_scopes check=<…>
+--- Verdict (§7/§8) ---
+VAL-B2: <PASS | FAIL | PARTIAL/QUALIFIED — reason>
+Path-2 cross-org authorization-code-grant hypothesis (DEC-023 §2): <succeeded|failed|not attempted>
+Anomalies / deviations from plan: <…>
+```
+
+### 12.3 Rollback / cleanup after execution
+
+1. If the run used a **temporary cross-org app** (Path 2): uninstall the
+   app from the test store and delete (or archive) the app registration
+   in the Dev Dashboard once evidence is recorded — do not leave an
+   unused credentialed app installed.
+2. In Odoo: either keep the store record for continued validation, or
+   run `action_disconnect()` (clears the token via the credential
+   service, cancels non-terminal business jobs, preserves history —
+   merged Task 005 behavior). **Never** delete job/job.log rows — they
+   are the audit trail.
+3. Rotate/invalidate the token in the Shopify admin if the store record
+   is being kept but active validation is finished.
+4. No repository rollback is needed — the plan requires zero code change;
+   if any code change was made to force a pass, the run is invalid (§8).
+
+### 12.4 Escalation path
+
+- **PASS** → record per §12.2; notify ChatGPT; VAL-B2's register rows
+  (OP-06; sync-engine Blocking Question 2) may then be closed by
+  ChatGPT, not by the executing session.
+- **FAIL / PARTIAL** (incl. only-24h-token obtainable) → escalate to
+  ChatGPT with the exact evidence per §10.5; expected consequence per
+  DEC-023 §3.2 is prioritizing the real-OAuth build inside the Phase-2+
+  B-1 path — not a hotfix to shipped code.
+- **Blocked precondition** (§1) → record which one; no substitute values.
+
+### 12.5 Follow-up empirical checks to piggyback on the same live session (optional, evidence-only)
+
+If time permits after §5, the same store/token may be used to close
+live-Shopify empirical unknowns (OP-34), each recorded as observations
+only: GraphQL cursor reuse after a pause (Q10); THROTTLED response-body
+shape (Q40 — requires deliberately exceeding cost limits; skip if
+impractical); `orders(query: "updated_at:>…")` sub-minute granularity
+behavior. None of these is required for the VAL-B2 verdict.

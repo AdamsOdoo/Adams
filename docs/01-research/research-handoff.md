@@ -1,5 +1,355 @@
 # Research Handoff (rolling)
 
+### AR-042 revision 3 — PR #148 final-convergence (comment `4947866018`) focused patch (2026-07-11)
+
+- **What happened:** ChatGPT's **final-convergence review** of
+  revision 2 at `1f61bdd` returned **REVISE** with six load-bearing
+  items found by checking the final packets against the merged code and
+  current official Odoo 19 / Shopify 2026-07 docs. This session applied
+  one focused **docs-only** patch to the same PR #148 closing each:
+  (1) **PERF-1** reworked to Odoo 19's official
+  `ir.cron._commit_progress()` per-job-savepoint model — the false "no
+  lock held across a network call" claim is withdrawn (merged claim is
+  `try_lock_for_update()`, transaction-scoped; the old packet held all
+  claimed locks across the whole pass); claim-one → savepoint →
+  `_commit_progress` → re-claim → time-budget return; per-job atomicity,
+  lock-release-between-jobs, and crash-survival proven; throughput
+  reframed as latency-bound (batch÷cadence = claim ceiling only), PB-19
+  measured against a representative latency profile; `max_in_flight`
+  **withdrawn** to the topology-B concurrency plan. (2) **Task 013B**
+  gains a **DB-backed apply lock** (`try_lock_for_update()` on
+  quant/level-binding/mapping/variant-binding rows) before the final
+  re-read (re-reading alone is not a race guard — `operation_scope_key`
+  serializes only connector jobs), fail-closed on un-lockable rows,
+  no-existing-quant case, and a **real concurrent-transaction test**.
+  (3) **Task 012** residual discounts now **preserve tax treatment**
+  (negative adjustment inherits the source line's `tax_ids`/inclusion,
+  or bucketed per tax signature; never a universal no-tax residual for
+  taxable lines — `TaxLine.priceSet` is post-discount), and the tax-rate
+  unit is **pinned** (query requests both `rate` and `ratePercentage`;
+  canonical key from `ratePercentage`; verify `rate×100==ratePercentage`;
+  mismatch/null → schema hold). (4) **Task 015B** removes **automatic
+  `fileDelete`** — official verification found the Shopify `File`
+  interface exposes **no reverse-reference query** (2025-07: 7 fields,
+  no `references`/`referencedBy`/`productMedia`), so the MVP posture is
+  **detach-only + retain** (`detached_orphan_candidate`; explicit manual
+  cleanup only). (5) **Task 010B** gains a **DB-backed serialization
+  lock** (`shopify.connector.attribute.lock` singleton +
+  `try_lock_for_update()`) preventing concurrent duplicate global
+  attributes at creation time (a savepoint does not serialize), with a
+  real concurrent-transaction test — no deferred reconciliation sweep.
+  (6) **SEC-1** override contract corrected (no model arg; id resolved
+  only in the declared comodel; impossible "wrong-model id" test
+  withdrawn) and **LC-1** cancellation no longer depends on SEC-1 code
+  sequenced later (uses the current merged `cancelled`-write + audit
+  path, forward-compatible with the future SEC-1 matrix).
+- **Official citations used (as the review required):** Odoo 19 cron —
+  `odoo/odoo` `19.0` `odoo/addons/base/models/ir_cron.py`:
+  `_commit_progress(self, processed=0, *, remaining=None,
+  deactivate=False) -> float` (returns remaining cron seconds; "If
+  called from outside the cron job, the progress function call will just
+  commit"; `_notify_progress` deprecated since 19.0). Shopify File
+  reverse-reference — **none exists**: Admin GraphQL `File` interface
+  (2025-07) = `alt/createdAt/fileErrors/fileStatus/id/preview/updatedAt`
+  only; final MVP media-deletion posture is **detach-only**.
+- **What this session does NOT do:** no code; no addon/XML/CSV/manifest/
+  migration/CI/Docker/requirements change; opens no gate (CORE-R1, U0,
+  PERF-1, LC-1, or any implementation gate); accepts no DEC/PD/D-item/
+  AR/packet; does not mark the PR ready or merge it; does not touch
+  `main` or plain `dev`. PR #148 stays **draft / open / unmerged**.
+- **Learning feedback loop:** the reinforced lesson — a planning packet
+  must match the *actual merged mechanism and the actual official API*,
+  not a plausible model: "no lock held", "re-read = race guard",
+  "savepoint serializes", a no-tax residual for taxable discounts, a
+  "fresh reference check" with no query behind it, and a "wrong-model id"
+  test that a bare integer cannot support were each *nearly* right and
+  each materially wrong. Verify against source (cron `_commit_progress`,
+  `File` interface fields, `try_lock_for_update`) before asserting a
+  mechanism.
+- **Stop condition:** push the final-convergence revision to PR #148 and
+  stop for ChatGPT review. Planning-complete remains **revision-pending**
+  until ChatGPT accepts.
+
+### AR-042 revision 2 — PR #148 re-review (comment `4945129824`) focused convergence patch (2026-07-11)
+
+- **What happened:** ChatGPT's control-room **re-review** of the
+  revised package at `10108b26` returned **REVISE** with nine focused,
+  load-bearing items. This session applied one focused **docs-only**
+  convergence patch to the same PR #148 (branch
+  `claude/odoo-shopify-mvp-planning-fdjlrk`) closing each at planning
+  level: (1) Task 010B existing-attribute **compatibility gate**
+  (`create_variant` reuse rule + `product_import_attribute_conflict_mode`,
+  no phantom variants); (2) Task 013B **quantity semantics** corrected
+  (`available`↔`free_qty`; counted-on-hand target
+  `desired_available + reserved`; post-write verify; re-read + drift
+  abort; fail-closed edges); (3) Task 015B **READY-first two-phase
+  pipeline**, File-GID vs Product-Media-GID identities, and
+  fresh-reference-check-before-`fileDelete`; (4) Task 012 **canonical
+  decimal tax key** + decimal-safe match, and **cap-free discount math**
+  with exact negative adjustment lines; (5) NEW **Task PERF-1** packet
+  (core queue throughput calibration — owns PB-19, before performance
+  UAT); (6) SEC-1 **exact RPC-safe override contract**
+  (`_odoo_binding_field_name()` seam + enumerated bindings +
+  scalar-id/reason method + negative RPC tests); (7) **full LC-1 locked
+  prompt** (lifecycle §7.1) + LC-1 resequenced before Task 012 +
+  adoption notes on 012/013/013B/014/015/015B/Area-6; (8) **rollback/
+  schema wording sweep** (code revert removes behavior; additive schema
+  may remain inert/orphaned; no destructive cleanup); (9) **CORE-R1
+  `D-R1-1..4` → `D-R1-1..5`** everywhere + repo-wide decision-range
+  sweep. Master closure map: `../08-release-readiness/mvp-planning-completion-audit.md`
+  §8.5. Revised critical path: CORE-R1 → 010B → 011B → **LC-1** → 012 →
+  Area 6 → SEC-1 → U0∥ → U1 → 013/013B → 014 → 015/015B → U2/U3 →
+  W1/W2 → **PERF-1** → UAT → release.
+- **High-power mode use:** small/targeted — one read-only reconnaissance
+  fan-out (5 agents) to extract exact edit anchors from the bulky global
+  docs; no new competitor/research sprint (the re-review forbade one);
+  targeted merged-code re-reads only where an exact mechanism had to be
+  corrected (dispatch batch/cron; binding field names; quant/free_qty).
+- **What this session does NOT do:** no code; no addon/XML/CSV/manifest/
+  migration/CI/Docker/requirements change; opens no gate (CORE-R1, U0,
+  PERF-1, LC-1, or any implementation gate); accepts no DEC/PD/D-item/
+  AR/packet; does not mark the PR ready or merge it; does not touch
+  `main` or plain `dev`. PR #148 stays **draft / open / unmerged**.
+- **Learning feedback loop:** the recurring lesson reinforced — a
+  planning packet must specify the *exact* mechanism, not a plausible
+  paraphrase: Float tax keys, `free_qty`-vs-on-hand, pre-`READY`
+  association, `D_lines × 0.5r`, and "columns drop on upgrade" were each
+  *nearly* right and each materially wrong. The convergence pattern
+  (canonical keys, explicit adjustment targets + verification, two-phase
+  READY gating, exact-representation-or-adjustment-line, additive-schema
+  rollback truth) is logged for reuse in future packets.
+- **Quality gate confirmation:** docs-only diff re-verified; every
+  claim classified; all nine re-review items mapped to a closing
+  artifact (audit §8.5); no locked prompt made usable; no gate opened.
+- **Stop condition:** push the focused revision to PR #148 and stop for
+  ChatGPT re-review.
+
+**Next-session prompt (exact):**
+
+```text
+Await ChatGPT's re-review of the PR #148 focused convergence patch
+(head = the new pushed SHA; closure map in
+docs/08-release-readiness/mvp-planning-completion-audit.md §8.5). Do
+NOT open any gate, accept any DEC/PD/packet, mark the PR ready, or
+merge. If the re-review returns REVISE, implement ONLY the exact items
+named, docs-only, on the same PR #148 branch
+(claude/odoo-shopify-mvp-planning-fdjlrk), and stop. If it ACCEPTS the
+package, the first implementation session is Task CORE-R1 (master plan
+§5): after the PR merges, perform the CORE-R1 gate act and issue the
+locked prompt from
+docs/07-implementation-plan/task-core-r1-readiness-correction-packet.md
+§8 verbatim in a new session, stating the verified base SHA. Task 012
+is step 5 (after CORE-R1, 010B, 011B, LC-1), not the next session.
+```
+
+---
+
+### AR-042 revision — PR #148 control-room-review convergence patch (2026-07-11)
+
+- **What happened:** ChatGPT's strict review of PR #148 (comment
+  `4942966937`) returned REVISE with eleven blocking items; this
+  session produced the full convergence patch on the same PR branch.
+  New locked packets: **CORE-R1** (capability-aware readiness
+  correction — split from Area-6 D-A6-7; the new first step of the
+  critical path), **Task 010B** (product-import completeness:
+  attributes/values/lines, deterministic sparse-set variants via
+  dynamic mode, variant pagination to the 2,048 platform limit, real
+  price + compare-at import, basic image import, safe refresh,
+  deletion/archival → stale binding, N+1 fix), **Task 011B**
+  (indexed normalized-email matching with a recall-equivalence proof
+  corpus, 100k-partner benchmark, backfill plan), **Task 013B**
+  (controlled initial inventory baseline: preview → reviewer
+  confirmation → audited quant adjustments, replay-guarded,
+  documented undo), **Task 015B** (basic media export on the current
+  fileCreate/stagedUploads/productUpdate/variant-media APIs, async
+  status polling, ownership registry + foreign-media guard,
+  media_source_of_truth coordination), **SEC-1** (server-side job
+  transition matrix, su-guarded protected fields, sanctioned
+  retry/cancel/resolve/override doors, PII field-groups + masking,
+  retention/deletion/export, negative RPC matrix), **LC-1**
+  (lifecycle enablement, spec in the new
+  `../03-architecture/module-lifecycle-uninstall-design.md` with
+  DEC-030 + the data-survival matrix — resolving the
+  architecture-vs-release-plan uninstall contradiction). New
+  architecture docs: `premium-ui-ux-design-system.md` (PD-7 selective
+  Owl, tokens/scales/icons/motion/accessibility/RTL/states, the
+  flagged dashboard-hierarchy revision, U0 prototype gate) and
+  `performance-budgets.md` (PB-1..23, binding-until-recalibrated).
+  In-place revisions: Task 012 (component-based tolerance with
+  currency-relative cap; sale_stock auto-install correction —
+  official 19.0 manifest quoted; no-default operator confirmation
+  policy; mapping-first taxes with `order_tax_autocreate` default
+  False), DEC-028 (Rung-1 production-entry evidence criteria),
+  DEC-029/packaging (Lite = "no connector write-back modules"),
+  Area-6/013/015/webhook packets (handovers), UAT plan (S2-UX
+  blocking severity class; scenarios 25–36; numeric performance
+  pass/fail), release plan, master plan (critical path CORE-R1 →
+  010B → 011B → 012 → Area 6 → SEC-1 → U0∥ → U1 → 013/013B/LC-1 →
+  014 → 015/015B → U2/U3 → W1/W2 → UAT → release; review calls
+  A1–A11 + B1–B10), signoff (planning-complete statement restated
+  honestly), open-points register §3.10, AR-042 revision note.
+  Fresh captures: `odoo19-shopify-official-captures-2026-07-11.md`
+  (Odoo 19 sale_stock/uninstall/HOOT+tours/Owl/attributes/precision/
+  security-page; Shopify variant limits/pagination/media APIs/money
+  precision; ISO 4217; WCAG 2.2/INP). The review's "nonexistent UI
+  design docs" premise was checked: both files exist at
+  `docs/02-product/…` — references made exact-path instead.
+- **High-power mode use (per CLAUDE.md):** authorized by the review
+  task itself; fan-out = 2 read-only code inspectors (merged Task
+  010/011/core reality before drafting — the audit §7 lesson applied)
+  + 3 targeted official-source verifiers + an end-of-session
+  adversarial pass; stop condition = structured cited findings;
+  all findings landed in the captures file and packets.
+- **What this session does NOT do:** accepts nothing; opens no gate;
+  issues no usable prompt (LC-1's prompt is deferred to its gate by
+  explicit design); implements nothing; does not execute VAL-B2/
+  concurrency/UAT/release; does not lift RA-003; does not merge or
+  mark PR #148 ready; `main`/plain `dev` untouched.
+- **Learning feedback loop:** new lessons — (1) planning claimed a
+  capability "complete" that the merged code implemented narrowly
+  (Task 010): the read-the-merged-code-first rule is now applied
+  *before* drafting, not only in red-team (both code inspections ran
+  before any packet was written); (2) an edition label must never be
+  used to infer platform behavior (`sale_stock` auto_install) —
+  captured as the ARCH §9 edition note; (3) a fixed-unit financial
+  tolerance is not defensible across currencies — tolerance must
+  derive from `res.currency.rounding` (captures-11 §6/§12); repeated
+  patterns — append-only dated notes, OP-43 verbatim-quote rule,
+  exhaustive allowlists; rejected approaches — none reintroduced
+  (RA-006/008/011/012/013/014/018/019/020/021/022/023 checked);
+  technical debt — none new; architecture concerns — every revision
+  of accepted content is flagged (dashboard §9, fulfillment keying
+  carry-over) and routed through the AR-042 revision note.
+- **Quality gate confirmation:** handoff updated (this entry) ·
+  feedback loop checked · learning captured · no new rejected
+  approach · no new technical debt · Markdown-only diff verified ·
+  no gate opened · PR #148 remains draft, not merged, not ready.
+- **Stop condition:** revision pushed to the PR #148 branch; session
+  stops. No implementation started.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT re-reviews draft PR #148 ("Complete remaining MVP research
+and implementation planning", revised 2026-07-11) against
+docs/08-release-readiness/mvp-planning-completion-audit.md §8 (the
+eleven-item closure map + second adversarial pass),
+mvp-planning-completion-signoff.md (revised), and
+implementation-ready-master-plan.md §1 (calls A1–A11 + B1–B10).
+Decide accept / revise / reject per call; merging the PR without
+named exceptions accepts A1–A10 and B1–B9 as proposed (A11 optional;
+B10 — the U0 visual-design session authorization — requires an
+explicit act). After merging: perform the CORE-R1 gate act and issue
+the locked prompt from
+docs/07-implementation-plan/task-core-r1-readiness-correction-packet.md
+§8 verbatim in a new session, stating the verified base SHA. In
+parallel, at ChatGPT's discretion: authorize the U0 session (B10),
+VAL-B2 execution, and the concurrency-plan execution. No other work
+is scoped or authorized by this entry.
+```
+
+---
+
+### AR-042 — MVP planning-completion package (2026-07-10)
+
+- **What happened:** the single authorized Fable planning-completion
+  session (docs-only, high-power research mode per the issued prompt)
+  produced the complete remaining-MVP planning package. Phases:
+  **A** baseline reconciliation (tip `21d59ec` verified; PRs
+  #145/#146/#147 confirmed merged from GitHub; AR-040 stale status
+  reconciled with a documentary note; full planning inventory built);
+  **B** research closure (fresh 2026-07-10 official-source captures for
+  Orders/Inventory/FulfillmentOrders/product-mutations/Partner-Program/
+  PCD+webhooks/Odoo-19-source/versioning-scopes-limits — 24/24
+  load-bearing claims adversarially re-verified + raw-HTML spot checks;
+  **OP-45's fee schedule turned out to be public and is now fully
+  sourced**; encryption-at-rest confirmed a PCD **Level 1**
+  requirement; VAL-B2 and concurrency plans completed as external
+  validations); **C** final architecture + packaging (module map with
+  PD-1..6; DEC-029 Lite/Full two-layer model); **D** implementation
+  packets with locked prompts (Tasks 012/013/014/015, Area 6 "Task
+  016", UI U1, webhook W1; U2/U3+W2 prompts intentionally staged
+  post-predecessor), 24-scenario UAT plan, release execution plan,
+  master plan, completion audit, signoff; plus DEC-027 (pilot scope)
+  and DEC-028 (credential/PCD ladder) proposals and register addenda;
+  then a five-reviewer **adversarial red-team pass** over the whole
+  package against the merged code (audit §7): five blocker-class
+  findings — most notably that the merged core's three ESSENTIAL
+  readiness placeholder slots make it impossible for any store to
+  reach `connected` — all fixed in-session (the readiness fix is the
+  new Area-6 design item **D-A6-7**, itself an explicit ChatGPT
+  review call), plus major/consistency findings, all applied and
+  recorded; a second consistency pass then re-verified counts,
+  citations, and cross-references.
+- **Files changed:** all Markdown (verified via
+  `git diff --name-only origin/Shopify-connector...HEAD` — no
+  code/XML/CSV/manifest/security/migration/workflow/test file).
+  New: captures (00-source-materials), DEC-027/028/029,
+  final-mvp-module-and-dependency-architecture,
+  lite-full-packaging-final-proposal, five task/area packets + UI +
+  webhook packets, final-mvp-uat-plan, release-readiness-execution-plan,
+  implementation-ready-master-plan, mvp-planning-completion-audit,
+  mvp-planning-completion-signoff. Updated (append-only notes):
+  architecture-review-log (AR-040 note + AR-042 row),
+  open-points-closure-register (§3.9), master-blueprint-open-questions
+  (session note), val-b2-closure-plan (§12), concurrency plan (§13),
+  this handoff.
+- **What this session does NOT do:** accepts nothing (every DEC/PD/
+  packet is Proposed, NOT accepted); opens no gate; issues no usable
+  prompt; implements nothing; does not lift RA-003; does not execute
+  VAL-B2/concurrency/UAT/release; does not claim concurrency safety or
+  live-Shopify evidence; `main`/plain `dev` untouched.
+- **Learning feedback loop:** new issues — (1) a WebFetch summarizer
+  hallucinated a "30%" PPA figure during research; caught by raw-HTML
+  grep — lesson recorded in the captures header: load-bearing quotes
+  must be raw-text-verified, never summarizer-trusted; (2) Shopify's
+  own docs carry stale prose in two places (the 2026-07
+  inventory-mutation page still mentions removed CAS fields; the
+  bulk-ops page's rate-limit section) — recorded so future sessions
+  cite the schema, not the prose; (3) planning drafted from documents
+  alone drifted from merged-code reality in five blocker-class ways
+  (audit §7.1) — the adversarial verify-against-source-code pass is
+  what caught them; lesson: every future packet-writing session must
+  include a read-the-merged-code verification step for any mechanism
+  a packet claims to reuse; repeated patterns — the append-only
+  dated-note register convention followed throughout; the OP-43
+  verbatim-quote rule baked into every packet's validation
+  requirements; rejected approaches — none reintroduced
+  (RA-003/006/009/013/014/018/019/020/022/023 each explicitly honored
+  in the packets); technical debt — none new (TD-002 fix routed to
+  Task 014); architecture concerns — the six PD points and the flagged
+  D-items are surfaced as explicit review calls rather than silent
+  choices.
+- **Quality gate confirmation:** handoff updated (this entry) ·
+  feedback loop checked · learning captured · no new rejected approach
+  · no new technical debt · Markdown-only diff verified · no gate
+  opened · draft PR only, not merged, not marked ready for review.
+- **Stop condition:** branch pushed; draft PR opened into
+  `Shopify-connector`; session stops. No implementation started.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT reviews the draft PR "Complete remaining MVP research and
+implementation planning" (AR-042 package) against
+docs/08-release-readiness/mvp-planning-completion-audit.md,
+mvp-planning-completion-signoff.md, and
+implementation-ready-master-plan.md §1's eleven review calls
+(DEC-027, DEC-028, DEC-029, ARCH PD-1..6, the flagged D-item
+confirmations for Tasks 012/013/014/015/Area 6, and the webhook
+MVP-tail scoping). Decide accept / revise / reject per item; merging
+the PR without named exceptions accepts them as proposed. After
+merging: perform the order-domain gate-opening act (including the
+criterion-12 point-in-time blocker reconfirmation), then issue the
+Task 012 locked prompt from
+docs/07-implementation-plan/task-012-order-import-implementation-packet.md
+§15 verbatim in a new session, stating the verified base SHA. In
+parallel, at ChatGPT's discretion: authorize VAL-B2 execution (human,
+val-b2-closure-plan §12) and the concurrency-plan execution (runtime,
+§13) — both external validations, independent of the Task 012 chain.
+No other work is scoped or authorized by this entry.
+```
+
 ### DEC-026 acceptance / status-refresh patch (2026-07-10)
 
 - **What happened:** ChatGPT explicitly decided to **accept DEC-026's
