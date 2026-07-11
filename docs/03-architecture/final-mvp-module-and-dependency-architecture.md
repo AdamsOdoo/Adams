@@ -248,10 +248,13 @@ sources: DEC-005/009/013, AR-019, merged core code (read 2026-07-10).
     extends the redaction field list for order payloads (packet §7);
     webhook payload PII list is proposed in the webhook packet
     (closes Q23 at planning level).
-11. **Performance budgets:** MVP explicitly defers hard budgets;
-    the concurrency plan's §13.2 performance captures (added this
-    session) establish the baseline; release hardening (Area 8) owns
-    budget-setting against real volumes.
+11. **Performance budgets (REVISED 2026-07-11 — the deferral is
+    withdrawn per PR #148 review item 10):** provisional, testable
+    budgets now exist **before implementation** in
+    [`performance-budgets.md`](./performance-budgets.md) (PB-1..23 +
+    the pagination/virtualization design rules); packets cite the
+    rows they must meet; UAT verifies numerically; release hardening
+    owns budget *tuning* with recorded evidence, not budget-setting.
 12. **Concurrency caveat (standing, verbatim requirement):** the
     claim/dispatch mechanism is **not proven under real
     concurrent-worker/multi-server execution** (SRR-03/04/09;
@@ -293,41 +296,46 @@ named exceptions in this package — Task 014's TD-002
 `JobPolicySkip` dispatcher seam (new exception class + one
 except-branch; needed because the merged dispatcher marks any
 normally-returning handler `succeeded`, so no handler-reachable
-`skipped` path exists without it). **Core-owned tasks** (Area 6 /
-"Task 016" — job-action services + readiness-slot closure; W1 —
-webhook receiver; U1 — core views) add or edit core files **by
-design**, each with an exhaustive named allowlist in its packet; they
-are core work, not domain work.
+`skipped` path exists without it). **Core-owned tasks** (CORE-R1 —
+readiness-slot closure, split out 2026-07-11; Area 6 / "Task 016" —
+job-action services; SEC-1 — transition/binding/PII hardening; LC-1 —
+lifecycle enablement; W1 — webhook receiver; U1 — core views +
+dashboard client action) add or edit core files **by design**, each
+with an exhaustive named allowlist in its packet; they are core work,
+not domain work.
 
-## 8. Install / uninstall / data-survival contract
+## 8. Install / uninstall / data-survival contract (REVISED 2026-07-11 — review item 9)
 
 - Editions install module sets (packaging proposal §4); **operational
-  disablement is always the domain flags** (merged
-  `*_domain_enabled`), never uninstall (MBQ-54/DEC-018 accepted
-  posture, restated).
-- **Uninstall reality (red-team-corrected — the earlier "graceful
-  cascade" claim was mechanically false):** the merged domain modules
-  extend `job_type` with `selection_add … ondelete='cascade'`, and
-  Odoo's selection-unlink cascade tries to `unlink()` every job of
-  that type — but every executed job has append-only
-  `shopify.connector.job.log` children with **`ondelete='restrict'`**
-  (deliberate audit-history design). Uninstalling a domain module
-  that has ever executed a job therefore **fails on the FK
-  restriction**; it succeeds only on a database where that domain
-  never ran. Consequence, aligned with the already-accepted MBQ-54
-  posture: **disable-not-uninstall is the only supported removal path
-  once a domain has run.** Business data (partners, products, sale
-  orders, pickings, stock) is never at risk either way
-  (`ondelete='restrict'` links). A future core decision could relax
-  the `job_type` `ondelete` to a soft-degrade form to make uninstall
-  possible; that is a named non-MVP candidate, not assumed. The
-  packaging proposal §5/§6 and the release plan's uninstall section
-  carry this corrected posture.
+  disablement is always the first-choice removal path** (merged
+  `*_domain_enabled` flags — MBQ-54/DEC-018 accepted posture,
+  restated).
+- **Uninstall mechanics (fact, unchanged):** on the merged code,
+  domain `job_type` `selection_add … ondelete='cascade'` collides
+  with the append-only `job_log` `ondelete='restrict'` FK, so
+  uninstall after a domain has run **fails today**. The earlier
+  release-plan text claiming a working cascade was mechanically false
+  and is corrected this session.
+- **Supported lifecycle (proposed — DEC-030):** "uninstall fails
+  after first use" is NOT the accepted end state. The full design —
+  options, recommendation (soft-degraded historical job types via
+  Task LC-1: core `historic_domain_job` + `original_job_type`
+  preservation + reassignment `ondelete` callable), the pre-uninstall
+  export step, and the complete data-survival matrix for every
+  add/disable/downgrade/remove/reinstall/upgrade transition — lives
+  in [`module-lifecycle-uninstall-design.md`](./module-lifecycle-uninstall-design.md)
+  (single source of truth; packaging proposal §5 and release plan
+  §2.3 cite it). Audit/job history is never the price of uninstalling;
+  the one platform-lost dataset (domain binding/mapping tables — Odoo
+  deletes module records on uninstall, official 19.0 docs) is
+  mitigated by export + deterministic re-match and stated as an
+  explicit product limitation for ChatGPT's acceptance in DEC-030.
+- Business data (partners, products, sale orders, pickings, stock) is
+  never at risk on any path (`ondelete='restrict'` links).
 - Core is never uninstalled while a domain module is installed (Odoo
   dependency mechanics enforce this).
-- Job/log history lives in core and is preserved under the
-  disable-path (nothing is deleted; jobs of a disabled domain simply
-  stop being enqueued — merged flag enforcement).
+- Job/log history lives in core and is preserved under both the
+  disable path and (post-LC-1) the uninstall path.
 
 ## 9. Proposed decisions in this document (summary for ChatGPT)
 
@@ -339,7 +347,19 @@ are core work, not domain work.
 | PD-4 | Exact binding-model names/keys for order / location-mapping / inventory-level / fulfillment (MBQ-55 remaining portions) | §3, packets §7 |
 | PD-5 | Domain-owned checkpoints; cursors never persisted; overlap-window re-read (closes Q7) | §5.5, Area 6 packet |
 | PD-6 | Pin API 2026-07 for Tasks 012–015 planning | §6, all packets |
+| PD-7 *(added 2026-07-11)* | Premium frontend architecture: standard Odoo views default; selective Owl client actions for exactly dashboard / setup-readiness / matching / diff-preview; no SPA; server-paginated large tables | [`premium-ui-ux-design-system.md`](./premium-ui-ux-design-system.md) §2, UI packet |
+| PD-8 *(added 2026-07-11)* | Module lifecycle: disable-first + LC-1 soft-degrade uninstall + export step + data-survival matrix (carried by DEC-030) | [`module-lifecycle-uninstall-design.md`](./module-lifecycle-uninstall-design.md), §8 |
+| PD-9 *(added 2026-07-11)* | Provisional performance budgets binding before implementation (PB-1..23) | [`performance-budgets.md`](./performance-budgets.md), §5.11 |
 
 Each is **Proposed for ChatGPT review — NOT accepted**; the task
 packets carry them as their planning basis and are unusable until this
 package is accepted.
+
+**Edition note (added 2026-07-11, review item 6a):** `sale_stock` is
+`auto_install: True` in official Odoo 19 (captures 2026-07-11 §1) —
+it can be present in ANY database whose installed apps pull it in,
+including a Lite-connector database. Module 5's declared dependency
+above is therefore about the *fulfillment module's* requirements, not
+an edition marker; no connector design may infer Odoo stock behavior
+from the connector edition (Task 012 D-012-7, packaging proposal §2 —
+both revised accordingly).

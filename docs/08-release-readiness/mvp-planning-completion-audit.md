@@ -342,3 +342,60 @@ The external-validation set (signoff §6) — VAL-B2, concurrency proof,
 dev-store empirical checks, UAT execution, webhook live delivery —
 plus every ChatGPT review call in master plan §1. No red-team finding
 remains unfixed and unrecorded.
+
+## 8. PR #148 revision record (2026-07-11) — control-room review closure map + second adversarial pass
+
+ChatGPT's control-room review (PR #148 comment `4942966937`) returned
+**REVISE** with eleven blocking items. §8.1 maps each to its closing
+artifact(s) in this same PR; a finding counts as closed at planning
+level only where the repo now contains a complete decision or
+implementation packet with exact sequence and acceptance criteria —
+not merely a mention (the review's own bar, applied).
+
+### 8.1 Review-item closure map
+
+| # | Review item | Closing artifact(s) — all Proposed, NOT accepted |
+| --- | --- | --- |
+| 1 | Product-import completeness must precede order import | `task-010b-product-import-completeness-packet.md` (locked; D-010B-1..12; grounded in the verified merged-code limitations §8.3.1); master plan step 2; Task 012 prerequisites revised; **no DEC-003 narrowing proposed — scope completed** |
+| 2 | Customer-matching scalability | `task-011b-customer-matching-scalability-packet.md` (locked; indexed normalized lookup, equivalence proof, 100k benchmark, migration/backfill, concurrency); master plan step 3, before 012 |
+| 3 | 013B/015B silently deferred | `task-013b-initial-inventory-baseline-packet.md` + `task-015b-product-media-export-packet.md` (both complete locked packets, sequenced before UAT/release; D-013-8/D-015-7 rewritten from "deferral" to "split") |
+| 4 | Premium UI/UX | `premium-ui-ux-design-system.md` (PD-7; tokens/scales/icons/motion/reduced-motion/responsive/RTL/states/accessibility/budgets/checklists/screenshot rules; §9 dashboard hierarchy replacing nine-equal-cards — flagged revision of accepted content); UI packet rewritten (U0 prototype gate blocking U1; selective Owl, no SPA; tours+HOOT mandatory; SEC-1 prerequisite); the two referenced design docs verified to EXIST at `docs/02-product/ui-ux-final-design-spec.md` and `docs/02-product/screen-inventory-and-navigation-map.md` (the review's "no such files" premise was checked and is factually incorrect — references are now exact relative paths so no future search can miss them) |
+| 5 | Split the readiness correction | `task-core-r1-readiness-correction-packet.md` (D-R1-1..4; capability-aware; drain-cron+stall health; Lite-reaches-`connected` regression); Area-6 packet revised (D-A6-7 superseded marker; prompt no longer touches the readiness file); master plan step 1 |
+| 6 | Order-import corrections | Task 012 packet revised in place: D-012-7 (sale_stock auto-install fact — captures-11 §1; no-retroactive-pickings withdrawn; no-default operator confirmation policy with hold), D-012-9 (mapping-model-first taxes; `order_tax_autocreate` default False, admin-gated + audited), D-012-2 (component-based tolerance, currency-relative 10×rounding cap, JPY/BHD test rows + named three-decimal dev-store check), D-012-11 warehouse wording; packaging proposal §2 Lite definition revised |
+| 7 | Security hardening missing | `task-sec1-security-hardening-packet.md` (D-SEC1-1..7: transition matrix binding even sudo; su-guarded protected fields; sanctioned doors incl. resolve; audited binding override; PII field-groups + masking; retention/deletion/export; negative RPC matrix) — sequenced after Area 6, before U1 |
+| 8 | DEC-028 Rung 1 too weak | DEC-028 revised: point 2 is now five named **production-entry criteria** with per-deployment recorded evidence, reviewed at Go/No-Go (encryption at rest; backup encryption or documented equivalent; access restrictions; retention/deletion; incident/access governance); no field-encryption invention, no certification claim; release plan §2.8 carries the rows |
+| 9 | Uninstall contradiction + lifecycle | `module-lifecycle-uninstall-design.md` (options A–E, recommendation, data-survival matrix, LC-1 task spec) + DEC-030 + PD-8; release plan §2.3 corrected (its cascade text was the false side); packaging §5/§6 and ARCH §8 revised to cite the matrix |
+| 10 | Performance budgets undefined | `performance-budgets.md` (PB-1..23 + pagination/virtualization rules; recalibration protocol; honesty note on the merged drain constants); ARCH §5.11 deferral withdrawn; release plan §2.7 requires the measured table |
+| 11 | UAT undervalues UX failures | UAT plan revised: S2-UX release-blocking class (health-status honesty, inaccessible actions, unusable recovery, responsive breakage, >2× budget miss, keyboard/contrast failures, misleading destructive preview); cosmetic copy stays S4; scenarios 25–36 added with pass/fail criteria; §7 numeric measurement |
+
+Master-plan/global corrections: critical path re-sequenced (CORE-R1
+→ 010B → 011B → 012 → Area 6 → SEC-1 → U0∥ → U1 → domains+B-tasks →
+W1/W2 → UAT → release); signoff §10 next-task = CORE-R1; every
+"planning complete" statement re-qualified (signoff, this §8,
+handoff); new review calls enumerated (master plan §1 B1–B10).
+
+### 8.2 New/changed identifiers this revision
+
+New packets: CORE-R1, 010B, 011B, 013B, 015B, SEC-1, LC-1 (spec in
+the lifecycle doc §7). New decision records: DEC-030. New ARCH
+proposed decisions: PD-7/PD-8/PD-9. New captures file:
+`odoo19-shopify-official-captures-2026-07-11.md`. New deferred names:
+010C, 015C, dark mode. New UAT scenarios: 25–36; new severity class
+S2-UX. No new RA rows (checked against the rejected-approaches log —
+no rejected approach reintroduced; RA-006/008/014/018/020/021
+explicitly honored in the new packets). No code changed.
+
+### 8.3 Second adversarial pass (fresh red-team, 2026-07-11) — see the dated subsection appended below after execution
+
+The fresh pass required by the review runs against: (1) the actual
+merged Task 010 limitations (verified by line-cited code inspection
+before drafting — §8.1 row 1); (2) actual merged Task 011 performance
+behavior (same method — §8.1 row 2); (3) accepted DEC-003 scope
+(completed, not narrowed); (4) official Odoo 19 auto-install/
+dependency behavior (captures-11 §1); (5) the premium UI/UX
+objective; (6) accessibility/performance; (7) cross-document
+uninstall/downgrade consistency; (8) security/RPC mutation
+boundaries; (9) every "planning complete" statement; (10) every
+locked prompt's dependency chain. Its findings and fixes are recorded
+in §8.4 below once executed in this same session — nothing is
+reported as fixed merely because it was documented.

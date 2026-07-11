@@ -1,101 +1,137 @@
 # Implementation-Ready Master Plan — Sequence, Gates, and What Starts After Acceptance
 
 > **Status: Proposed for ChatGPT review. NOT accepted. Docs-only.**
-> Produced 2026-07-10 (AR-042 candidate). This is the single sequenced
-> roadmap from acceptance of this planning PR to MVP release. Every
-> implementation step remains gated by its own distinct ChatGPT act;
-> **bold** marks ChatGPT acts. Packets: Task 012/013/014/015, Area 6
-> ("Task 016"), UI U1–U3, Webhooks W1–W5 (all in
-> `../07-implementation-plan/*-packet*.md`), UAT
-> (`final-mvp-uat-plan.md`), release
-> (`release-readiness-execution-plan.md`).
+> Produced 2026-07-10 (AR-042 candidate); **revised 2026-07-11** by
+> the PR #148 revision session per ChatGPT's control-room review
+> (comment `4942966937`) — the critical path no longer begins with
+> Task 012 (§2), the review calls are re-enumerated (§1), and the new
+> packets (CORE-R1, 010B, 011B, 013B, 015B, SEC-1, LC-1, U0) are
+> sequenced. Every implementation step remains gated by its own
+> distinct ChatGPT act; **bold** marks ChatGPT acts. Packets live in
+> `../07-implementation-plan/*-packet*.md`; UAT
+> (`final-mvp-uat-plan.md`, 36 scenarios); release
+> (`release-readiness-execution-plan.md`); budgets
+> (`../03-architecture/performance-budgets.md`); design system
+> (`../03-architecture/premium-ui-ux-design-system.md`); lifecycle
+> (`../03-architecture/module-lifecycle-uninstall-design.md`).
 
-## 1. Decisions ChatGPT makes when reviewing this PR (one review, eleven calls: ten binding + one optional)
+## 1. Decisions ChatGPT makes when reviewing this PR (one review; carried-over calls A1–A11 + revision calls B1–B10)
 
-1. **Accept/revise DEC-027** (branch-A pilot scope).
-2. **Accept/revise DEC-028** (credential/PCD posture ladder; also the
-   MBQ-04 register-wording upgrade).
-3. **Accept/revise DEC-029** (Lite/Full packaging) — carries ARCH
-   PD-1 (product_export module) and PD-2 (views in owning modules).
-4. **Ratify ARCH PD-3..PD-6** (sale manifest deltas; binding
-   names/keys incl. the fulfillment-keying refinement; checkpoint
-   ownership; API 2026-07 pin).
-5. **Confirm the flagged Task-012 interpretations** (D-012-3
-   skipped-by-policy routing incl. its one named additive core seam —
-   the `JobPolicySkip` dispatcher exception; D-012-4
-   ambiguous-customer pre-creation hold; D-012-6 address children;
-   D-012-9 T-B tax mechanism; the `shopify_line_item_gid` field on
-   `sale.order.line` — the one MVP field added to a standard Odoo
-   model, which Task 014 then depends on).
-6. **Confirm D-013-5** (the third named sudo for the location cache)
-   and **D-013-8** (baseline import deferred to 013B).
-7. **Confirm D-014-2** (TD-002 fix as the one named core edit),
-   **D-014-6** (no fulfillmentOrderMove in MVP), and the Task-014
-   `trigger_origin='fulfillment_tracking_change'` selection_add — an
-   extension of the accepted DEC-019 two-value vocabulary, flagged as
-   such in the packet.
-8. **Confirm D-015-7** (media deferred to 015B) — this re-scopes
-   DEC-003's "basic image/media sync" for the export direction and
-   must be an explicit call, not silent.
-9. **Confirm D-A6-1/D-A6-5/D-A6-7** (Area-6 split; the additive core
-   job-actions file incl. manual retry from `skipped` with
-   retry_count reset; the readiness pending-slot closure — the
-   red-team BLOCKER fix without which no store can reach `connected`,
-   incl. the explicitly flagged webhook_hmac not-applicable
-   relaxation).
-10. **Confirm the webhook MVP-tail scoping** (W1+W2 in MVP, W3–W5
-    out) — or re-scope DEC-003's C-SYNC webhook rows explicitly.
-11. Optionally: the OP-42 one-line binding confirmation; the AR-040
-    status-cell wording.
+**Carried over from the 2026-07-10 package (content unchanged unless
+noted):**
 
-Accepting the PR without naming exceptions accepts the ten binding
-calls (1–10) as proposed; item 11 is optional and lapses silently if
-unaddressed (stated here so the review is one act, not eleven
-separate ones).
+- **A1** Accept/revise DEC-027 (branch-A pilot scope).
+- **A2** Accept/revise DEC-028 — **now including the revised Rung-1
+  point-2 production-entry criteria** (review item 8).
+- **A3** Accept/revise DEC-029 (Lite/Full packaging — Lite definition
+  revised: "no connector write-back modules", never an Odoo-stock
+  statement) + ARCH PD-1/PD-2.
+- **A4** Ratify ARCH PD-3..PD-6.
+- **A5** Confirm the flagged Task-012 interpretations (D-012-3
+  `JobPolicySkip` seam; D-012-4 hold; D-012-6 address children;
+  `shopify_line_item_gid`) — **plus the 2026-07-11 revisions:
+  D-012-2 component tolerance, D-012-7 no-default confirmation
+  policy, D-012-9 mapping-first taxes with autocreate default False.**
+- **A6** Confirm D-013-5 (third named sudo) and D-013-8 — **which now
+  reads "split to the fully-planned Task 013B", not "deferred to a
+  candidate".**
+- **A7** Confirm D-014-2 (TD-002 fix), D-014-6, and the Task-014
+  `trigger_origin` selection_add.
+- **A8** Confirm D-015-7 — **now "media = fully-planned Task 015B",
+  not a deferral** — plus the D-010B-5 compare-at field relocation.
+- **A9** Confirm D-A6-1/D-A6-5 (Area-6 split + job-action services) —
+  **D-A6-7 moved to CORE-R1 (call B1).**
+- **A10** Confirm the webhook MVP-tail scoping (W1+W2 in MVP, W3–W5
+  out).
+- **A11** *(optional)* OP-42 wording; AR-040 status cell.
 
-## 2. Critical path (backend chain — each step: **gate act** → one implementation session → draft PR → **merge review** → runtime-green closure)
+**New calls created by this revision (each Proposed, NOT accepted):**
 
-| # | Step | Packet | Prereqs | Ready when |
+- **B1** Accept the **Task CORE-R1 packet** (D-R1-1..4) — incl. the
+  explicitly flagged `webhook_hmac` not-applicable relaxation
+  (D-R1-3).
+- **B2** Accept the **Task 010B packet** (D-010B-1..12) — incl. the
+  dynamic-variant strategy (D-010B-2/3) and the basic-media scope
+  with the 010C gallery deferral (D-010B-6/6a).
+- **B3** Accept the **Task 011B packet** (D-011B-1..7) — incl. the
+  one `res.partner` stored-field call (D-011B-1).
+- **B4** Accept the **Task 013B and 015B packets** — completing the
+  accepted DEC-003 scope (recommended) instead of narrowing it; incl.
+  D-013B-4/6 and D-015B-2/7 flagged calls.
+- **B5** Accept the **SEC-1 packet** (D-SEC1-1..7) — incl. the
+  su-guard-over-ACL-rows design choice and the matrix-binds-sudo rule.
+- **B6** Accept/revise **DEC-030** (lifecycle/uninstall; ARCH PD-8;
+  Task LC-1) — or choose its named Option-D alternative.
+- **B7** Accept **ARCH PD-7 + the premium design system** — incl. the
+  §9 dashboard-hierarchy revision of the accepted nine-card layout
+  and the severable §9.5 sparkline sub-call.
+- **B8** Accept **ARCH PD-9 / the performance-budget table**
+  (PB-1..23) as binding-until-recalibrated.
+- **B9** Accept the **revised UAT severity model** (S2-UX class) and
+  the 36-scenario catalogue.
+- **B10** **Authorize the U0 visual-design/prototype session** (its
+  allowed files incl. `docs/09-ui-prototype/**`; PNG+md default —
+  UI-U1 stays locked until the prototype is accepted in a recorded
+  act).
+
+Accepting the PR without naming exceptions accepts A1–A10 and B1–B9
+as proposed; A11 is optional; **B10 is an authorization act that must
+be explicit** (it schedules work). Every locked prompt remains
+unusable until its own gate act.
+
+## 2. Critical path (revised — each step: **gate act** → one implementation session → draft PR → **merge review** → runtime-green closure)
+
+| # | Step | Packet / prompt | Prereqs | Why here |
 | --- | --- | --- | --- | --- |
-| 1 | **Task 012 order import** | task-012 packet §15 prompt | This PR merged | **Immediately after acceptance** — the first implementation session |
-| 2 | **Task 016 / Area 6 triggers** | area-6 packet §7 prompt | 012 merged | closes UAT blocker U-4; carries D-A6-7, without which no store reaches `connected` — hard prerequisite for steps 4–6 dev-store validation |
-| 3 | **UI Phase U1** | ui packet §6 prompt | Area 6 merged | closes most of U-3 |
-| 4 | **Task 013 inventory** | task-013 packet §8 prompt | 010 merged (fact); sequenced here per accepted order | first mutation task — dev-store evidence rule active |
-| 5 | **Task 014 fulfillment** | task-014 packet §8 prompt | 012 merged (order bindings + line GIDs) | carries the TD-002 fix |
-| 6 | **Task 015 product export** | task-015 packet §8 prompt | 010 merged; DEC-029/PD-1 accepted | completes DEC-003 MVP scope (less 013B/015B deferrals) |
-| 7 | **UI U2 (wizard/readiness)** | ui packet §1 (prompt drafted post-U1) | U1 merged; VAL-B2 strongly recommended first | |
-| 8 | **UI U3 (domain screens)** | ui packet §1 (prompts per domain post-U1) | U1 + each domain merged | rolling — may interleave with 4–6 |
-| 9 | **W1 + W2 webhooks (MVP tail)** | webhook packet §6 (W1 prompt; W2 post-W1) | Area 6 + U1 merged | completes C-SYNC-01/02/03 |
-| 10 | **UAT waves 1–3** | final-mvp-uat-plan | per its §2/§6 entry criteria | human reviewer sessions |
-| 11 | **Release execution + Go/No-Go** | release-readiness-execution-plan | UAT exit | **the release act** |
+| 1 | **Task CORE-R1** readiness correction | task-core-r1 packet §8 | This PR merged | No store can reach `connected` today — everything live downstream needs this first |
+| 2 | **Task 010B** product import completeness | task-010b packet §10 | CORE-R1 merged | DEC-003 product-import scope must be real before orders consume variant bindings |
+| 3 | **Task 011B** customer matching scalability | task-011b packet §9 | Task 011 (fact) | Order import reuses matching at order volume; may run **in parallel with 010B** (disjoint modules) — kept as step 3 for review clarity |
+| 4 | **Task 012** order import | task-012 packet §15 | CORE-R1 + 010B + 011B merged | Revised prerequisites in-packet |
+| 5 | **Task 016 / Area 6** triggers | area-6 packet §7 | 012 merged | Closes UAT blocker U-4; D-A6-7 no longer here |
+| 6 | **Task SEC-1** security hardening | task-sec1 packet §9 | Area 6 merged | Hardens the substrate incl. Area-6's services **before any UI button exists** |
+| 7 | **U0 visual prototype gate** | ui packet §7 prompt | B10 authorization | Design-only; **may run in parallel from acceptance onward**; must be accepted before step 8 |
+| 8 | **UI Phase U1** | ui packet §6 prompt | Area 6 + SEC-1 merged; U0 accepted | Dashboard per design system §9 |
+| 9 | **Task 013** inventory → **Task 013B** baseline → **Task LC-1** lifecycle | task-013 §8 / task-013b §9 / lifecycle doc §7 | 010B merged (013); 013 merged (013B, LC-1) | First mutation task; dev-store evidence rule active; LC-1 before UAT wave 3 |
+| 10 | **Task 014** fulfillment | task-014 packet §8 | 012 merged | Carries the TD-002 fix |
+| 11 | **Task 015** product export → **Task 015B** media export | task-015 §8 / task-015b §9 | 010B merged (015 consumes complete variants + compare-at field); 015 merged (015B) | Completes DEC-003 catalog scope incl. media |
+| 12 | **UI U2** (wizard/readiness) | ui packet §1 (prompt post-U1) | U1 merged; VAL-B2 strongly recommended first | |
+| 13 | **UI U3** (domain screens) | ui packet §1 (prompts per domain post-U1) | U1 + each domain merged | Rolling — may interleave with 9–11 |
+| 14 | **W1 + W2** webhooks (MVP tail) | webhook packet §6 | Area 6 + U1 merged | W1 replaces the CORE-R1 webhook_hmac pass with the real check |
+| 15 | **UAT waves 1–4** | final-mvp-uat-plan (36 scenarios) | per its §2/§6 | Human reviewer sessions; numeric PB pass/fail |
+| 16 | **Release execution + Go/No-Go** | release plan | UAT exit; budgets table measured; DEC-028 point-2 evidence | **The release act** |
+
+Deviation note vs the review's expected order: identical through step
+8; steps 9–11 group the domain tasks with their B-completions
+(013→013B, 015→015B) and insert LC-1 (from DEC-030) before UAT wave
+3; U0 is marked parallelizable because it is design-only and gates
+only U1. Parallel-safe pairs are named in the table; nothing else may
+overlap.
 
 ## 3. Parallel external tracks (independent of the chain; start any time)
 
-- **P-A VAL-B2 execution** (human, live Shopify) —
-  `../05-qa/val-b2-closure-plan.md` incl. its new §12; unblocks U-2,
-  wizard honesty, UAT entry.
-- **P-B Concurrency plan execution** (runtime) —
-  `../05-qa/sync-engine-concurrency-validation-plan.md` incl. §13;
-  UAT entry criterion (or explicit waiver).
-- **P-C Docs-maintenance micro-patch** (OP-25 residue) — unchanged,
-  ChatGPT sets its allowed-files list.
-- **P-D Phase-2+ preparation (no implementation):** DEC-028 Rung-2
-  evidence gathering; B-1 planning under RA-003's own future lift act.
+Unchanged: **P-A** VAL-B2 execution (human, live store — also feeds
+010B/013/015 dev-store evidence); **P-B** concurrency plan execution
+(runtime — also measures PB-18/19); **P-C** docs-maintenance
+micro-patch (OP-25 residue); **P-D** Phase-2+ preparation (DEC-028
+Rung-2 evidence; B-1 planning under RA-003's own future lift act).
+New: **P-E** the U0 visual-design session (after B10).
 
 ## 4. Deferred-with-names (not lost)
 
-013B one-time inventory baseline import; 015B media/image export;
-W3/W4 webhook accelerations; add-on modules (accounting/refund/
-payout/multi-store); OAuth/B-1/App Store/billing/compliance (Phase
-2+); entitlement/licensing mechanics (Phase 2 commercial).
+010C product media gallery import; 015C media gallery/video export;
+W3/W4 webhook accelerations; add-on modules
+(accounting/refund/payout/multi-store); OAuth/B-1/App Store/billing/
+compliance (Phase 2+); entitlement/licensing mechanics (Phase 2
+commercial); dark mode (design system). **No longer deferred:** 013B
+and 015B (now steps 9/11); the readiness closure (step 1); budgets
+(exist now).
 
 ## 5. The exact next implementation session after acceptance
 
-**Task 012**, using the locked prompt at
-`../07-implementation-plan/task-012-order-import-implementation-packet.md`
-§15, issued verbatim by ChatGPT in a new session after: this PR merges,
-the order-domain gate act is performed (criterion-12 blocker
-reconfirmation included), and the base SHA is stated. No broad
-research or architecture exercise is required first — that is this
-package's completion claim, audited in
-`mvp-planning-completion-audit.md` §6.
+**Task CORE-R1**, using the locked prompt at
+`../07-implementation-plan/task-core-r1-readiness-correction-packet.md`
+§8, issued verbatim by ChatGPT in a new session after: this PR
+merges, the CORE-R1 gate act is performed, and the base SHA is
+stated. (Task 012 is step 4, not the next session — the 2026-07-10
+claim is superseded.) In parallel, at ChatGPT's discretion: the B10
+U0 authorization and the P-A/P-B external validations.

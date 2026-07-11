@@ -2,11 +2,21 @@
 
 > **Status: Proposed for ChatGPT review. NOT accepted. The locked
 > prompt in §15 is NOT usable.** Produced 2026-07-10 by the MVP
-> planning-completion session (AR-042 candidate). This packet closes
-> every remaining Task 012 planning decision (OP-14/15/16/17, MBQ-55
-> order portion, MBQ-56, MBQ-27, the DEC-020 residual) at proposal
-> level, defines the gate criteria, and carries the locked final
-> implementation prompt. Evidence: the 2026-07-10 captures
+> planning-completion session (AR-042 candidate); **revised
+> 2026-07-11** by the PR #148 revision session per ChatGPT's
+> control-room review (comment `4942966937`, item 6): (a) the
+> incorrect Lite/`sale_stock` assumption is removed — `sale_stock` is
+> `auto_install: True` in official Odoo 19 (2026-07-11 captures §1,
+> `../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`
+> — "captures-11" below) so stock behavior derives from installed
+> Odoo apps + explicit operator policy, never from connector edition
+> (D-012-7 revised); (b) `order_tax_autocreate` defaults to **False**
+> with explicit tax mapping preferred (D-012-9 revised); (c) the
+> total-check tolerance is now component-based with a
+> currency-relative cap (D-012-2 revised); (d) prerequisites now
+> include **CORE-R1, Task 010B, and Task 011B** (complete variant
+> bindings + scalable customer matching precede order import).
+> Original evidence: the 2026-07-10 captures
 > (`../00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md`
 > §2/§8/§9 — "captures" below) and the final architecture
 > (`../03-architecture/final-mvp-module-and-dependency-architecture.md`
@@ -44,12 +54,17 @@ beyond nothing (Error-Center extensions are UI-phase scope); no
 backfill is a documented setup limitation until a separately-approved
 scope request).
 
-**Dependency prerequisites (all satisfied as facts):** Tasks 002/003
-(client), 006C (dispatch), 010 (product/variant bindings), 011
-(customer binding/importer) merged and runtime-green. Gate
-prerequisites (ChatGPT acts): acceptance of this packet (incl. the
-D-012 decisions and ARCH PD-3/PD-4), the order-domain gate act, prompt
-issuance.
+**Dependency prerequisites:** Tasks 002/003 (client), 006C
+(dispatch), 010 (product/variant bindings), 011 (customer
+binding/importer) merged and runtime-green [facts]; **plus (added
+2026-07-11, revised critical path): CORE-R1 (stores can reach
+`connected` — required for live validation), Task 010B (complete
+variant bindings for ordinary multi-variant catalogs — order-line
+resolution starves without them), and Task 011B (indexed customer
+matching — this packet's D-012-5 guest path reuses it at
+order-import volume).** Gate prerequisites (ChatGPT acts): acceptance
+of this packet (incl. the D-012 decisions and ARCH PD-3/PD-4), the
+order-domain gate act, prompt issuance.
 
 ## 3. Decision closures (D-012-1 … D-012-12) — each Proposed, carried verbatim into the locked prompt
 
@@ -80,22 +95,50 @@ preserved); `sale.order.line` gains one indexed readonly Char
 `shopify_line_item_gid` via `_inherit` — a traceability/audit field,
 explicitly not a binding model (flagged per ARCH §3).
 
-**D-012-2 — Total-check guard mechanics (MBQ-56; OP-16).** Exact
-Shopify total field: **`Order.totalPriceSet.shopMoney.amount`**
-(captures §2 — non-null, includes taxes and discounts, before
-returns). Comparison: after building the full SO (lines + shipping
-line(s) + tip line, taxes attached per D-012-8/9 and T-B) inside the
-savepoint, compare `sale_order.amount_total` against that field.
-Tolerance: `tol = order_currency.rounding × (number of SO lines +
-number of distinct tax lines + 2)`, capped at 1.00 shop-currency unit
-(grounding: `res.currency.rounding` default 0.01, captures §8; the
-formula bounds accumulated per-line rounding drift). `|diff| > tol` →
-roll back the savepoint (no SO persists), classify
-`financial_total_mismatch` (existing class; CONSERVATIVE_NEVER_SILENT
-→ `failed_retryable`, never auto-retried), full component breakdown
-(each Shopify money field + each computed Odoo amount) in
-`job.log.technical_detail` JSON. The guard is mandatory and permanent;
-no flag bypasses it.
+**D-012-2 — Total-check guard mechanics (MBQ-56; OP-16) — REVISED
+2026-07-11 (review item 6c): component-based, currency-precision-
+derived, strict cap.** Exact Shopify total field:
+**`Order.totalPriceSet.shopMoney.amount`** (captures §2 — non-null,
+includes taxes and discounts, before returns). After building the
+full SO inside the savepoint, the guard evaluates **three component
+checks plus the total check** — a real mismatch in one component can
+no longer hide under aggregate slack:
+
+1. **Lines:** `|odoo_untaxed_lines_sum − shopify_lines_expected|
+   ≤ tol_lines`, where `shopify_lines_expected` = Σ per-line
+   `discountedUnitPriceSet × quantity` minus order-level
+   `discountAllocations`, and `tol_lines = r × (0.5 × N_lines +
+   D_lines × 0.5)` — `r` = the order currency's `res.currency.rounding`
+   (captures-11 §6: rounding drives `decimal_places`; default 0.01;
+   JPY 1.0; three-decimal currencies 0.001), `N_lines` = SO line
+   count, `D_lines` = lines carrying an Odoo `discount` % (each %
+   quantized at 2 dp contributes ≤ 0.5r allocation residual).
+2. **Taxes:** `|odoo_amount_tax − totalTaxSet.shopMoney| ≤ tol_tax =
+   r × 0.5 × N_tax_lines` (per-tax-group rounding bounded by r/2).
+3. **Shipping + tip:** exact to one rounding step each
+   (`≤ r` per component — single lines, no accumulation).
+4. **Total:** `|amount_total − totalPriceSet.shopMoney| ≤
+   min(tol_lines + tol_tax + 2r, CAP)` with **CAP = 10 × r —
+   currency-relative** (0.10 in 2 dp currencies, 10 JPY, 0.010 BHD),
+   replacing the old fixed 1.00-currency-unit cap, which could hide a
+   material mismatch (review finding — accepted).
+
+Any component or total breach → roll back the savepoint (no SO
+persists), classify `financial_total_mismatch` (existing class;
+CONSERVATIVE_NEVER_SILENT → `failed_retryable`, never auto-retried),
+full component breakdown (each Shopify money field, each computed
+Odoo amount, each tolerance term) in `job.log.technical_detail` JSON.
+The guard is mandatory and permanent; no flag bypasses it; tolerances
+are formula-fixed (no per-store tolerance setting exists).
+**Mandatory test matrix (review-required):** high line counts (100
+lines at cap), `taxesIncluded` true/false, line + order discounts,
+accumulated small rounding drift inside bounds (accepted), a real
+mismatch (missing line / wrong price — rejected at component level),
+zero-decimal (JPY, r=1.0) and three-decimal (BHD, r=0.001) currency
+orders (ISO 4217 minor units — captures-11 §12). Shopify-side
+three-decimal precision policy is officially undocumented
+(captures-11 §11) → one named dev-store empirical check before any
+three-decimal-currency store is onboarded.
 
 **D-012-3 — Divergent-currency routing (DEC-020 residual) + policy
 skips.** A divergent order (`presentmentCurrencyCode !=
@@ -153,10 +196,12 @@ the embedded customer payload (recall-safe email match → bind /
 confident-create → bind / ambiguous → D-012-4 / missing-email →
 fall through to (2) using order-level data). (2) **Guest orders**
 (`customer` null — captures §2) with non-null `Order.email`: recall-safe
-normalized-email partner match (no binding row — no Customer GID
-exists): exactly one active → use (`guest_email_match`); >1 →
-D-012-4 hold; none → create person partner from billing/shipping
-name + email (`guest_created`, Task 011 §8.3/§8.4 mapping rules).
+normalized-email partner match via the **Task 011B indexed lookup**
+(same semantics, no full scan — 011B is a prerequisite; no binding
+row — no Customer GID exists): exactly one active → use
+(`guest_email_match`); >1 → D-012-4 hold; none → create person
+partner from billing/shipping name + email (`guest_created`, Task 011
+§8.3/§8.4 mapping rules).
 (3) **Genuinely no PII** (`customer` null AND `email` null):
 `customer_fallback_partner_id` (the Posture A field — this task is its
 sanctioned first consumer) → used with `customer_resolution =
@@ -178,21 +223,38 @@ addresses). For fallback-partner orders the children carry the order
 name in their `name` for traceability. Existing partners' own fields
 are never mutated (Task 011 invariant).
 
-**D-012-7 — Odoo order lifecycle.** `date_order = processedAt` (UTC).
-New store-settings field `order_import_confirmation_policy`
-(Selection `quotation`/`confirm`, default **`confirm`**): under
-`confirm`, `action_confirm()` runs inside the same savepoint (state
-requirements verified — captures §8). **Precision (red-team-added):**
-delivery-picking generation on confirmation is `sale_stock` behavior —
-present in Full (Task 014's manifest pulls `sale_stock`), absent in
-Lite, where confirmation simply yields a confirmed SO with no
-delivery (correct for Lite's read-only promise; the Lite→Full
-no-retroactive-pickings boundary is documented in the packaging
-proposal §5). Under `quotation` the SO stays draft. Cancelled-at-import orders →
-D-012-3 skip. Cancellation/closure detected on a later evidence
-refresh: snapshots update + one job-log note — the SO is **never**
-auto-cancelled (DEC-014 J); operator action is linked from the Error
-Center (UI phase). `Order.closed`/`closedAt` → snapshot only.
+**D-012-7 — Odoo order lifecycle — REVISED 2026-07-11 (review items
+6a + 6d): stock behavior from installed apps + explicit operator
+policy, never from connector edition.** `date_order = processedAt`
+(UTC). **[Fact — captures-11 §1]** `sale_stock` is
+`auto_install: True` with `depends: ['sale', 'stock_account']` in
+official Odoo 19 — it is present in ANY database where those apps
+are installed, **including a Lite-connector database**; on
+`action_confirm()` it launches stock rules that create delivery
+pickings. The prior claim that "Lite" implies no `sale_stock`/no
+pickings is **withdrawn** (it inferred Odoo behavior from connector
+packaging); the no-retroactive-pickings assumption is withdrawn with
+it (whether and when pickings exist is standard Odoo behavior at
+confirmation time, not connector logic). Lite is defined as "no
+connector fulfillment write-back module" — packaging proposal §2,
+revised the same session.
+**Confirmation policy (operator-controlled, explicit):** store-settings
+field `order_import_confirmation_policy` (Selection
+`quotation`/`confirm`) — **no default**; the field is a required
+setup decision: while unset, order import holds
+(`odoo_validation_configuration`, `failed_retryable` — operator sets
+the policy, retries), and the readiness surface carries a warning.
+Setup/wizard copy states the consequence of each choice in plain
+words: `confirm` → confirmed SO; **if your Odoo has inventory apps
+installed (`sale_stock` present), Odoo will also create delivery
+pickings — standard Odoo behavior the operator is opting into**;
+`quotation` → draft SO, no stock documents, operator confirms
+manually. The connector never suppresses, deletes, or fakes pickings
+in either mode. Cancelled-at-import orders → D-012-3 skip.
+Cancellation/closure detected on a later evidence refresh: snapshots
+update + one job-log note — the SO is **never** auto-cancelled
+(DEC-014 J); operator action is linked from the Error Center (UI
+phase). `Order.closed`/`closedAt` → snapshot only.
 
 **D-012-8 — Lines, discounts, custom items.** One `sale.order.line`
 per LineItem: `product_id` via the **variant binding** (template
@@ -225,22 +287,38 @@ read `first: 10`, >10 → `data_shape_schema_mismatch`), service product
 discountedPriceSet.shopMoney.amount`, its `taxLines` mapped per T-B.
 Tips: `totalTipReceivedSet > 0` → one line, service product "Shopify
 Tip", no taxes. Duties: D-012-3 skip. **Taxes — proposed mechanism
-T-B ("rate-matched Odoo taxes under the guard"):** for each distinct
-`TaxLine` on a line/shipping line, resolve an `account.tax` by exact
-match on (company, `type_tax_use='sale'`, `amount_type='percent'`,
-`amount = rate×100`, `price_include` per `Order.taxesIncluded`) —
-creating it if absent with name "Shopify Tax {percent}% ({incl/excl})"
-and `price_include_override` set accordingly (the 19.0-correct field,
-captures §8); attach via `tax_ids`. **Accounting-config side effect,
-stated plainly (red-team-added):** this auto-creates `account.tax`
-master records — persistent accounting configuration, not just SO
-documents. It is gated by a new settings Boolean
-`order_tax_autocreate` (default True; when False, an unmatched rate →
-`odoo_validation_configuration` hold and the operator pre-provisions
-the tax); auto-created taxes carry default repartition (no custom
-accounts) — the account/repartition mapping is recorded as a named
-input to the Phase-2/3 accounting module, and the release-plan
-documentation tells accountants these taxes exist. Odoo recomputes
+T-B ("mapped-or-matched Odoo taxes under the guard") — REVISED
+2026-07-11 (review item 6b): ordinary order import must never
+silently create accounting configuration.** Resolution order for
+each distinct `TaxLine` on a line/shipping line:
+
+1. **Explicit tax mapping (preferred):** new model
+   `shopify.connector.tax.mapping` (store_id; `shopify_rate_percent`
+   Float; `price_include` Boolean; `account_tax_id` M2o `account.tax`
+   required restrict; UNIQUE(store_id, shopify_rate_percent,
+   price_include)) — admin-maintained (rwc admin, read others, no
+   unlink; settings-area UI in a later phase, shell/import until
+   then). A mapping hit resolves immediately.
+2. **Existing-tax rate match:** exact match on (company,
+   `type_tax_use='sale'`, `amount_type='percent'`,
+   `amount = rate×100`, price inclusion per `Order.taxesIncluded`
+   via `price_include_override`, the 19.0-correct field — captures
+   §8); attach via `tax_ids`.
+3. **Unmatched → hold, never create:**
+   `odoo_validation_configuration` (`failed_retryable`) naming the
+   exact rate/inclusion pair; the readiness surface carries a
+   standing warning listing unmapped rates observed in holds; the
+   operator adds a mapping (or the tax) and retries.
+4. **Auto-creation exists only as an explicit administrator opt-in:**
+   settings Boolean `order_tax_autocreate`, **default False**,
+   admin-gated, with warning copy stating plainly that enabling it
+   creates persistent `account.tax` master records with default
+   repartition (no custom accounts). When True, step 3 instead
+   creates "Shopify Tax {percent}% ({incl/excl})" as before, each
+   creation logged with a `manual_action`-grade audit line naming the
+   enabling admin setting. The release-plan documentation tells
+   accountants these taxes exist. The account/repartition mapping
+   remains a named input to the Phase-2/3 accounting module. Odoo recomputes
 amounts; agreement with Shopify's per-line math is enforced by the
 D-012-2 guard, which is the accepted correctness backstop. Evidence for the ADR: Odoo 19
 has **no supported order-level external-tax override**
@@ -270,9 +348,12 @@ the shop currency → else `odoo_validation_configuration`
 (failed_retryable; operator creates/activates the pricelist —
 `currency_id` is pricelist-derived and not directly settable, captures
 §8). Sales team: optional `order_sales_team_id` (unset → Odoo
-default). Warehouse: not set by the connector (when `sale_stock` is present —
-Full — Odoo's own `warehouse_id` compute applies; under Lite the
-field does not exist and nothing references it). Fiscal position: Odoo's own compute
+default). Warehouse: never set by the connector — whenever
+`sale_stock` is present (any database with sale + stock_account,
+regardless of connector edition — captures-11 §1), Odoo's own
+`warehouse_id` compute applies untouched; where it is absent the
+field does not exist and nothing references it (revised 2026-07-11 —
+edition-neutral wording). Fiscal position: Odoo's own compute
 (no override). Timezone: all Shopify datetimes parsed as UTC (ISO
 8601) into naive-UTC Odoo datetimes. Metadata: `origin` +
 `client_order_ref` = `Order.name`; `Order.note` → SO note (plain-text
@@ -368,9 +449,16 @@ uniqueness, restrict FKs); `tests/test_order_import_mapping.py`
 (happy path incl. confirm policy, lines/shipping/tip mapping, tax
 rate-match + creation + reuse, addresses/dedup, metadata, guest
 paths, custom/gift-card lines, UTC parsing);
-`tests/test_order_totals_guard.py` (guard math across components,
-tolerance boundary ±, mismatch → rollback + class, taxesIncluded
-variants); `tests/test_order_duplicate_prevention.py` (re-import
+`tests/test_order_totals_guard.py` (the full D-012-2 revised matrix:
+per-component checks and formulas; tolerance boundary ± at each
+component; 100-line high-count case; line + order discounts;
+accumulated in-bounds drift accepted; real mismatch rejected at
+component level; taxesIncluded variants; JPY zero-decimal and BHD
+three-decimal cases; currency-relative cap);
+`tests/test_order_tax_resolution.py` (mapping-first resolution;
+rate-match second; unmatched → configuration hold naming the pair;
+autocreate default-False; opt-in creation + audit line + dedup;
+mapping model schema/uniqueness/ACL); `tests/test_order_duplicate_prevention.py` (re-import
 no-dup, evidence-refresh-only incl. the **source-level
 no-SO-write-on-refresh guard test**, idempotency-key collision,
 divergent-currency/duties/test/cancelled skips);
@@ -424,7 +512,8 @@ MBQ-56/MBQ-27/DEC-020-residual → Resolved at decision level.
 ```text
 DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS THIS PLANNING PACKAGE,
 EXPLICITLY OPENS THE ORDER-DOMAIN GATE, VERIFIES THE CURRENT BASE SHA,
-AND ISSUES THIS PROMPT.
+AND ISSUES THIS PROMPT. (Prerequisites: CORE-R1, Task 010B, and
+Task 011B merged runtime-green — the revised critical path.)
 
 You are Claude Code implementing Task 012 — Shopify order import —
 in AdamsOdoo/Adams, branch from the CURRENT verified Shopify-connector
@@ -443,9 +532,10 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_sale/models/shopify_connector_order_binding.py     (NEW)
   addons/shopify_connector_sale/models/shopify_connector_order_importer.py    (NEW — importer service + job seams + REDACTION_EXTENSION)
   addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py   (NEW — shopify_line_item_gid only)
-  addons/shopify_connector_sale/models/shopify_connector_store_settings.py    (order_import_confirmation_policy, order_import_include_test, order_tax_autocreate, order_company_id, order_pricelist_id, order_sales_team_id, sale_order_last_import_checkpoint_at — inert checkpoint)
-  addons/shopify_connector_sale/security/ir.model.access.csv                  (binding rows only)
-  addons/shopify_connector_sale/tests/{__init__.py, test_order_binding.py, test_order_import_mapping.py, test_order_totals_guard.py, test_order_duplicate_prevention.py, test_order_customer_resolution.py}  (NEW)
+  addons/shopify_connector_sale/models/shopify_connector_store_settings.py    (order_import_confirmation_policy — NO default, unset holds imports; order_import_include_test; order_tax_autocreate — default False; order_company_id; order_pricelist_id; order_sales_team_id; sale_order_last_import_checkpoint_at — inert checkpoint)
+  addons/shopify_connector_sale/models/shopify_connector_tax_mapping.py       (NEW — shopify.connector.tax.mapping per D-012-9 step 1)
+  addons/shopify_connector_sale/security/ir.model.access.csv                  (binding + tax-mapping rows only)
+  addons/shopify_connector_sale/tests/{__init__.py, test_order_binding.py, test_order_import_mapping.py, test_order_totals_guard.py, test_order_tax_resolution.py, test_order_duplicate_prevention.py, test_order_customer_resolution.py}  (NEW)
   addons/shopify_connector_core/models/shopify_connector_job_dispatch.py      (THE ONE NAMED ADDITIVE CORE EDIT — JobPolicySkip exception class + one except-branch in _invoke_handler calling the existing _transition_skipped; nothing else in the file)
   addons/shopify_connector_core/tests/test_job_dispatch.py                    (append the JobPolicySkip routing test only)
   docs/05-qa/task-012-order-import-validation-results.md                      (NEW)
@@ -458,9 +548,12 @@ invoice/payment/refund/inventory/fulfillment model or logic; plain
 dev; main.
 
 IMPLEMENT exactly per the packet: D-012-1 binding schema (explicit
-_name+_inherit, models.Constraint, dual uniqueness); D-012-2 guard
-(totalPriceSet.shopMoney vs amount_total, tol = rounding × (SO lines +
-tax lines + 2) capped 1.00, rollback + financial_total_mismatch);
+_name+_inherit, models.Constraint, dual uniqueness); D-012-2 REVISED
+component-based guard (lines/taxes/shipping+tip component checks with
+the packet's exact tolerance formulas derived from
+res.currency.rounding, total check capped at 10 × rounding —
+currency-relative, never a fixed unit; rollback +
+financial_total_mismatch; JPY and BHD cases in the test matrix);
 D-012-3 skipped-by-policy routing (divergent currency, duties, test
 orders, pre-cancelled) via the ONE named additive core seam
 (JobPolicySkip + except-branch → _transition_skipped) — never a new
@@ -471,13 +564,20 @@ first sanctioned customer_fallback_partner_id consumption
 (odoo_validation_configuration when unset); D-012-6 address children
 with normalized-tuple dedup, explicit partner_invoice_id/
 partner_shipping_id writes, never mutating existing partners; D-012-7
-confirm-policy default confirm, date_order = processedAt UTC,
-never auto-cancelling an SO on refresh; D-012-8 line mapping
-(variant-binding resolution, whole-order-hold mapping_missing on
-unmatched, discountedUnitPrice + discount%, custom-item service
-product, gift-card note); D-012-9 shipping/tip lines + T-B rate-matched
-taxes (price_include_override, creation dedup gated by
-order_tax_autocreate, null-rate hold);
+REVISED lifecycle: confirmation policy is an explicit operator
+decision with NO default (unset -> odoo_validation_configuration
+hold + readiness warning); stock behavior follows installed Odoo
+apps (sale_stock is auto_install in Odoo 19 — captures-11 §1), never
+connector edition — no Lite/no-picking assumption anywhere in code,
+copy, or tests; date_order = processedAt UTC; never auto-cancelling
+an SO on refresh; D-012-8 line mapping (variant-binding resolution,
+whole-order-hold mapping_missing on unmatched, discountedUnitPrice +
+discount%, custom-item service product, gift-card note); D-012-9
+REVISED taxes: mapping-model-first, existing-rate-match second,
+unmatched -> configuration hold naming the rate (never silent
+creation), order_tax_autocreate default False and admin-gated with
+audited creations when explicitly enabled (price_include_override,
+null-rate hold);
 D-012-10/11 currency/pricelist/company/team resolution and UTC parsing;
 D-012-12 evidence-refresh-only re-import (note-type log rows) with the
 source-level no-SO-write guard test + the module-local

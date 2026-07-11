@@ -60,6 +60,19 @@ premium observability." Lite performs **zero** Shopify mutations; its
 scope set needs no write scope. This is a real, defensible edition
 boundary, not a crippled demo.
 
+**Definition precision (REVISED 2026-07-11 — review item 6a):** Lite
+means exactly "**no connector write-back modules installed**" (no
+Shopify mutation code exists in the database). It does **not** mean
+"no standard Odoo picking" or any other statement about Odoo's own
+stock behavior: `sale_stock` is `auto_install: True` in official
+Odoo 19 (captures 2026-07-11 §1,
+`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`)
+and may be present in a Lite database whenever the customer's
+installed Odoo apps pull it in — in which case confirmed imported
+orders create delivery pickings by **standard Odoo behavior**, under
+the operator's explicit Task 012 confirmation policy. Connector
+edition never determines Odoo stock behavior.
+
 ### Full — Lite + Odoo operates the store
 
 Modules: Lite + `shopify_connector_inventory` +
@@ -132,24 +145,30 @@ pattern.
 - **Lite → Full:** install the three Full modules; no migration, no
   data change; new menus/settings appear via their own modules' views;
   first-push guard + preview/confirmation protect the first writes.
-  **Known upgrade boundary (red-team-added):** sale orders imported
-  and confirmed while on Lite produced no delivery pickings
-  (`sale_stock` arrives with Full) — they do not gain pickings
-  retroactively and are therefore not fulfillable through Task 014;
-  documented in the release plan's known limitations.
-- **Full → Lite (or add-on removal):** the supported path is
-  **disable, not uninstall** (MBQ-54/DEC-018): switch the domain flags
-  off — all history, bindings, mappings, and logs survive; enqueue of
-  new domain jobs is blocked at once (merged enforcement).
-  **Uninstall reality (red-team-corrected):** uninstalling a domain
-  module that has ever executed a job **fails** on the append-only
-  job-log `ondelete='restrict'` FK (the `selection_add` cascade tries
-  to unlink the domain's jobs, and their audit logs block it) —
-  uninstall works only on databases where the domain never ran.
-  Disable-only is therefore the sole supported removal path once a
-  domain has run; business data is never at risk on any path
-  (architecture doc §8 carries the full mechanics and the future
-  soft-degrade option).
+  **(REVISED 2026-07-11:** the former "no-retroactive-pickings"
+  boundary note is withdrawn — it rested on the incorrect
+  Lite-implies-no-`sale_stock` assumption; whether pickings exist for
+  imported orders follows installed Odoo apps + the explicit Task 012
+  confirmation policy, on both editions. Fulfillability through
+  Task 014 depends on pickings existing — a fact of the customer's
+  Odoo configuration, documented as operator guidance, not an edition
+  boundary.)
+- **Full → Lite (or add-on removal) — REVISED 2026-07-11 (review
+  item 9):** **disable-first** (MBQ-54/DEC-018): switch the domain
+  flags off — all history, bindings, mappings, and logs survive;
+  enqueue of new domain jobs is blocked at once (merged enforcement).
+  **Permanent removal (uninstall) is a supported, designed path under
+  proposed DEC-030:** the full options analysis, the LC-1
+  soft-degrade mechanism (job history survives uninstall with
+  original types preserved), the pre-uninstall export step, and the
+  complete per-transition **data-survival matrix** live in
+  [`../03-architecture/module-lifecycle-uninstall-design.md`](../03-architecture/module-lifecycle-uninstall-design.md)
+  §5 — the single source of truth this section defers to. Business
+  data is never at risk on any path; domain binding/mapping tables
+  are the one platform-lost dataset on physical uninstall (Odoo
+  deletes module records — official 19.0 docs), mitigated by export +
+  deterministic re-match and stated as an explicit DEC-030 product
+  call.
 - **Permissions/menus:** domain menus/screens are owned by their
   modules (PD-2), so Lite installs simply do not contain Full menus —
   no hidden-but-present surfaces; within an edition, the four merged
@@ -170,10 +189,11 @@ pattern.
   install-on-populated-Lite test cycle on Odoo.sh (module installs
   cleanly on top of Lite with existing data), plus a
   **fresh-database uninstall check** (uninstall before any domain job
-  has run leaves business data intact) and a documented-failure check
-  (uninstall after jobs have run fails on the audit-log FK exactly as
-  §5 states — asserting the disable-only posture) — carried as
-  acceptance criteria in the packets.
+  has run leaves business data intact). **(REVISED 2026-07-11:** the
+  former documented-failure check — asserting uninstall-after-use
+  fails — is superseded by Task LC-1's **honest uninstall test pair**:
+  uninstall-after-use succeeds with history preserved and business
+  data intact — lifecycle design doc §7.)
 - Release hardening (Area 8) adds the cross-edition matrix: Lite-only
   runtime; Full runtime; Full with individual domains flag-disabled;
   upgrade Lite→Full on a populated database.

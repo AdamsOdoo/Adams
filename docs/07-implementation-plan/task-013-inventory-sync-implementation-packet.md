@@ -148,9 +148,11 @@ check, and the merged `_check_mapped_location` placeholder returns
 essential/NOT_PROVEN unconditionally): this module (a) **overrides
 `_check_mapped_location` via `_inherit`** — returning PASS when
 `inventory_domain_enabled` is False (not applicable) and the real
-mapped-pair verification when True — building on the Area-6 core
-rework that first makes the placeholder not-applicable-pass for
-stores without the inventory domain (Area-6 packet D-A6-7); and (b)
+mapped-pair verification when True — building on the **Task CORE-R1**
+baseline that first makes the placeholder not-applicable-pass for
+stores without the inventory domain (D-R1-2,
+`task-core-r1-readiness-correction-packet.md` — ownership moved from
+Area-6 D-A6-7, 2026-07-11); and (b)
 **appends** one additional essential check via the `_get_checks()`
 seam, active only when the domain is enabled: `write_inventory`
 present in `granted_scopes`. `REQUIRED_MVP_SCOPES` is untouched by
@@ -189,13 +191,15 @@ in-scope.
 API layer**; the local claim/dispatch caveat (ARCH §5.12) still
 applies and is restated in the prompt.
 
-**D-013-8 — Baseline import deferred.** The one-time reviewed
-Shopify→Odoo baseline import (accepted as an allowed exception,
-DEC-010) is **not** in Task 013: it needs its own preview/apply UX and
-would widen this task's write surface into Odoo stock
-(`stock.quant.inventory_quantity` adjustments). Routed as future task
-candidate 013B, gated separately. Flagged for ChatGPT (alternative:
-fold into 013 — rejected here for scope control).
+**D-013-8 — Baseline import split out (revised 2026-07-11).** The
+one-time reviewed Shopify→Odoo baseline import (accepted as an
+allowed exception, DEC-010) is **not** in Task 013 (scope control:
+its own preview/apply flow and its own Odoo stock write surface) —
+but it is **no longer an unnamed candidate**: it is fully planned as
+**Task 013B** (`task-013b-initial-inventory-baseline-packet.md`,
+locked packet, sequenced after this task and before final
+UAT/release), per the PR #148 review item 3. The accepted DEC-003
+scope is completed, not narrowed.
 
 ## 3. Gate criteria (inventory domain, 15-pattern)
 

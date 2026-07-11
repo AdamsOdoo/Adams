@@ -2,10 +2,18 @@
 
 > **Status: Proposed for ChatGPT review. NOT accepted. No scenario has
 > been executed; nothing here claims a pass.** Produced 2026-07-10
-> (AR-042 candidate). Supersedes-in-function the historical
-> `mvp-uat-scenarios.md` scenario *plan* (that file's 15 scenarios are
-> preserved by number and extended here; the file itself stays
-> unedited as the historical record) and advances
+> (AR-042 candidate); **revised 2026-07-11** by the PR #148 revision
+> session per ChatGPT's control-room review (comment `4942966937`,
+> item 11): severity rules now split cosmetic copy defects from
+> functional UX/accessibility/performance defects (§5 — the latter
+> can block release); twelve experience/coverage scenarios added
+> (§1.1, 25–36) with pass/fail criteria tied to
+> `../03-architecture/premium-ui-ux-design-system.md` ("DESIGN
+> SYSTEM") and `../03-architecture/performance-budgets.md` (PB rows);
+> §7's no-numeric-pass/fail posture is superseded. Supersedes-in-function
+> the historical `mvp-uat-scenarios.md` scenario *plan* (that file's
+> 15 scenarios are preserved by number and extended here; the file
+> itself stays unedited as the historical record) and advances
 > `uat-readiness-gap-analysis.md` from a 0/15 baseline re-baseline to
 > the executable end-state plan. Execution remains
 > **[External validation required]** — human reviewer + interactive
@@ -15,7 +23,7 @@ to sessions — closes only when the human-operated Odoo.sh branch
 database session is actually convened for execution: an
 organizational act carried by the §6 entry criteria, not a merge).
 
-## 1. Scenario catalogue (final: 24 scenarios)
+## 1. Scenario catalogue (final: 36 scenarios)
 
 Scenarios 1–15 stand as written in `mvp-uat-scenarios.md` (titles
 recapped in the wave table §2). New scenarios added by this plan:
@@ -32,7 +40,24 @@ recapped in the wave table §2). New scenarios added by this plan:
 | 23 | Lite/Full boundary: Lite install has no write surface (menus, jobs, scopes); installing Full modules on a populated Lite database adds them cleanly; flags-off disables enqueue | packaging | Packaging proposal §6 matrix (`../02-product/lite-full-packaging-final-proposal.md`, the DEC-029 carrier) |
 | 24 | Permission matrix: Auditor read-only everywhere; Operator cannot resolve manual-review; Reviewer cannot edit settings; Admin only sees credential entry (masked, no read-back) | cross | MBQ-44/45 enforcement |
 
-Per-scenario specification rule (applies to 16–24; 1–15 keep their
+### 1.1 Experience & coverage scenarios (added 2026-07-11, review item 11)
+
+| # | Scenario | Covers | Pass criteria (numeric/checkable) |
+| --- | --- | --- | --- |
+| 25 | Controlled inventory baseline: preview → confirm → apply; replay refused; audit complete | Task 013B | Run record + per-pair prior/new evidence; second run excluded/refused; unconfirmed apply provably blocked |
+| 26 | Basic media export: add + replace on a disposable product; foreign media survives everything | Task 015B | Foreign image untouched (before/after screenshots); replacement never leaves product imageless; FAILED status routes to review |
+| 27 | Dashboard performance + hierarchy | DESIGN SYSTEM §9; PB-2/PB-3 | First useful render ≤ 1.5 s p75 (RD-1) / ≤ 2.5 s (RD-2); interactions ≤ 200 ms p75; lead answer + ≤3-exception region present; no nine-card grid |
+| 28 | Long lists: Sync Center + Error Center at 10k and 100k jobs/logs | PB-4/PB-5/PB-9/PB-11 | Loads within budget at both scales; server pagination verified (no full-table fetch); filters responsive |
+| 29 | Keyboard & accessibility walkthrough | DESIGN SYSTEM §12; WCAG 2.2 rows (captures-11 §13) | Every primary flow completable keyboard-only; focus visible everywhere; contrast table pass; targets ≥ 24px |
+| 30 | Responsive layout + RTL smoke | DESIGN SYSTEM §10 | Usable at 375/768/1366 px, no horizontal scroll; primary answer visible at 360 px; Arabic-locale dashboard mirrors without breakage |
+| 31 | Reduced motion | DESIGN SYSTEM §8 | With prefers-reduced-motion: non-essential animation gone; state changes instant; spinners remain |
+| 32 | High-fidelity setup flow (wizard end-to-end) | U2; D-012-7 policy choice | Operator completes connect→readiness→policy choices without documentation; confirmation-policy is demanded (import provably holds while unset); no dishonest state shown |
+| 33 | Error Center recovery usability | Error contract; Area-6/SEC-1 services | An operator (not the developer) recovers each planted failure class from the screen alone: reason+fix+owner understood, retry/cancel/resolve round trips incl. `skipped` recovery; zero dead ends |
+| 34 | Large matching datasets | Task 011B; PB-13/14; U3 matching center | Match latency ≤ 50 ms p95 at 100k partners; matching center list behavior at 5k pending matches within PB-4-equivalent budget; ambiguity resolution round trip |
+| 35 | Visual consistency audit | DESIGN SYSTEM §13 checklist | V-1..V-12 executed against every shipped surface; zero violations or each explicitly waived with reason |
+| 36 | Lite/Full menus & permission behavior (extends 23/24) | Packaging §5; SEC-1 | Menus exactly match installed modules; flags-off empty states explain themselves; SEC-1 negative spot checks from the UI context (direct RPC state write denied) |
+
+Per-scenario specification rule (applies to 16–36; 1–15 keep their
 written steps): each is executed from the written Given/When/Then in
 its packet section (cross-referenced), with **prerequisites** (module
 set, store state, seeded data), **test data** (named fixtures below),
@@ -49,10 +74,11 @@ per §4.
 | 1 | 1, 2, 3, 4, 5, 12, 13, 14, 15, 24 | Task 012 + Area 6 + UI-U1 merged; VAL-B2 passed; interactive runtime session |
 | 2 | 6, 7, 8, 17, 18, 19 | (same — order scenarios need Task 012 which Wave 1 already requires) |
 | 3 | 9, 10, 11, 16, 20, 21, 22, 23 | Tasks 013/014/015 + U3 screens merged (16 moved here from Wave 1 — its resolution step runs through the U3 matching center, which U1 alone does not ship) |
+| 4 (experience) | 27, 28, 29, 30, 31, 33 after U1; 32 after U2; 34, 35, 36 after U3; 25 after 013B; 26 after 015B | Rolling — each scenario unlocks with its named prerequisite; all must complete before exit (§6) |
 
 (Wave 1/2 split is scheduling convenience — both unlock together;
 kept separate so order scenarios can be deferred if the reviewer's
-session is short.)
+session is short. Wave 4 interleaves with 1–3 as prerequisites land.)
 
 ## 3. Test data (named fixture set, seeded on the dev store + Odoo)
 
@@ -86,14 +112,38 @@ Pass rule: the reviewer executes the steps as written; a pass may only
 be recorded by the executing reviewer (unchanged rule). Evidence files
 land under `docs/05-qa/uat-evidence/` (created at execution time).
 
-## 5. Defect severity and gating
+## 5. Defect severity and gating (REVISED 2026-07-11 — UX failures can block release)
 
-S1 data loss/corruption/duplicate business record — release-blocking,
-immediate stop; S2 guard bypassed or silent failure — release-blocking;
-S3 wrong classification/status or missing audit trail — blocking
-unless ChatGPT explicitly waives with reason; S4 UX/copy/label —
-recorded, non-blocking. Any S1/S2 → the owning task reopens via a new
-gate act (never patched ad hoc).
+- **S1** — data loss/corruption/duplicate business record:
+  release-blocking, immediate stop.
+- **S2** — guard bypassed or silent failure: release-blocking.
+- **S2-UX (new class, release-blocking on the same footing as S2):**
+  functional experience failures for a product whose premium
+  operator experience is a primary differentiator —
+  (a) misleading health/status display (dashboard or readiness says
+  healthy when it is not, or vice versa);
+  (b) a primary action inaccessible (unreachable, permanently
+  disabled without explanation, or keyboard-unreachable);
+  (c) an unusable recovery flow (a planted failure an operator cannot
+  recover from the screen — scenario 33's bar);
+  (d) broken responsive layout (scenario 30's bar violated);
+  (e) severe performance degradation (a PB budget missed by > 2× with
+  no accepted waiver);
+  (f) broken keyboard operation or focus loss (scenario 29);
+  (g) contrast/accessibility failure against the DESIGN SYSTEM §12
+  acceptance rows;
+  (h) a misleading destructive-action preview (preview shows less
+  than the apply would do).
+- **S3** — wrong classification/status, missing audit trail, or a PB
+  budget missed by ≤ 2×: blocking unless ChatGPT explicitly waives
+  with reason.
+- **S4** — **cosmetic copy/label/visual-polish issues with no
+  functional or comprehension impact**: recorded, non-blocking.
+  (The old rule classed *all* UX issues S4 — superseded; only
+  genuinely cosmetic ones remain here.)
+
+Any S1/S2/S2-UX → the owning task reopens via a new gate act (never
+patched ad hoc).
 
 ## 6. Entry / exit criteria
 
@@ -106,12 +156,16 @@ executed waves has a recorded verdict; zero open S1/S2; S3s waived
 explicitly or fixed; evidence archive complete; UAT summary appended
 to the release checklist run.
 
-## 7. Performance & concurrency observations (during UAT, not gates)
+## 7. Performance & concurrency measurements (REVISED 2026-07-11 — numeric pass/fail)
 
-Wave-1 session records: scan-to-imported latency for a 50-order
-batch; drain throughput (jobs/pass); dashboard load with 1k jobs.
+Scenarios 27/28/34 carry numeric pass/fail against the named PB rows
+of `../03-architecture/performance-budgets.md` (the
+"no numeric pass/fail in UAT" posture is superseded — a missed budget
+is an S3, > 2× an S2-UX, per §5). The Wave-1 session additionally
+records: scan-to-imported latency for a 50-order batch (vs PB-18/19),
+drain throughput (PB-19), dashboard load at RD-1/RD-2 (PB-2).
 Concurrency: UAT runs after (or alongside) the concurrency plan's
-scenarios — UAT itself adds the two-operator double-retry case
-(same failed job retried by two users — one wins, one no-ops, audit
-shows both). These feed release-hardening budgets (ARCH §5.11); no
-numeric pass/fail in UAT.
+scenarios — UAT itself adds the two-operator double-retry case (same
+failed job retried by two users — one wins, one no-ops, audit shows
+both). All measurements land in the budgets file's calibration
+column (its §5 recalibration rule).

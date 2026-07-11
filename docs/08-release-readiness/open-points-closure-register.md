@@ -203,6 +203,30 @@ resolved here.
 | OP-24/25/32/38/39/41/42/43/44 | **Unchanged** — restated where consumed; OP-25 residue still awaits its ChatGPT-authorized micro-patch (P-C) |
 | AR-040 status cell | Stale "draft, unmerged" wording reconciled via a dated documentary note in the AR log (facts only; wording call left to ChatGPT) |
 
+## 3.10 PR #148 revision addendum (2026-07-11) — control-room-review closure deltas
+
+> Added by the PR #148 revision session (docs-only; **Proposed for
+> ChatGPT review**). §3.1–§3.9 texts above are preserved unchanged;
+> this addendum is the current delta. **Nothing here opens a gate,
+> issues a usable prompt, or converts a recommendation into a
+> decision.** Master record: `mvp-planning-completion-audit.md` §8.
+
+| ID / topic | 2026-07-11 status delta |
+| --- | --- |
+| Review item 1 (Task 010 completeness) | **Closure proposed:** Task 010B locked packet (`../07-implementation-plan/task-010b-product-import-completeness-packet.md`) — precedes Task 012 in the revised critical path; DEC-003 scope completed, not narrowed |
+| Review item 2 (Task 011 scalability) | **Closure proposed:** Task 011B locked packet — precedes Task 012 |
+| Review item 3 (013B/015B) | **Closure proposed:** both are now complete locked packets before UAT/release; D-013-8/D-015-7 rewritten |
+| Review item 4 (premium UI) | **Closure proposed:** design system + PD-7 + rewritten UI packet + U0 prototype gate (B10 authorization pending) |
+| Review item 5 (readiness split) | **Closure proposed:** Task CORE-R1 packet; Area-6 D-A6-7 superseded |
+| Review item 6 (order-import safety) | **Closure proposed:** Task 012 packet revised in place (D-012-2/-7/-9/-11); packaging §2 Lite definition revised |
+| Review item 7 (security hardening) | **Closure proposed:** Task SEC-1 locked packet, after Area 6 / before U1 |
+| Review item 8 (DEC-028 Rung 1) | **Closure proposed:** production-entry criteria (DEC-028 point 2 revised); release plan §2.8 rows |
+| Review item 9 (lifecycle/uninstall) | **Closure proposed:** lifecycle design doc + DEC-030 + PD-8 + LC-1; release-plan §2.3 contradiction corrected |
+| Review item 10 (budgets) | **Closure proposed:** `../03-architecture/performance-budgets.md` (PB-1..23); ARCH §5.11 deferral withdrawn |
+| Review item 11 (UAT severity) | **Closure proposed:** S2-UX class + scenarios 25–36 + numeric §7 |
+| OP-14..21/28 rows (§3.9) | Unchanged in ownership; their packets carry the 2026-07-11 revisions noted in each file's header |
+| All other rows | Unchanged — re-verified against this revision; no silent closure |
+
 ## 4. Cross-check completeness statement
 
 Every open item named in: the PR #140 body's "Open blockers" list, the

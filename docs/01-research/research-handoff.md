@@ -1,5 +1,111 @@
 # Research Handoff (rolling)
 
+### AR-042 revision — PR #148 control-room-review convergence patch (2026-07-11)
+
+- **What happened:** ChatGPT's strict review of PR #148 (comment
+  `4942966937`) returned REVISE with eleven blocking items; this
+  session produced the full convergence patch on the same PR branch.
+  New locked packets: **CORE-R1** (capability-aware readiness
+  correction — split from Area-6 D-A6-7; the new first step of the
+  critical path), **Task 010B** (product-import completeness:
+  attributes/values/lines, deterministic sparse-set variants via
+  dynamic mode, variant pagination to the 2,048 platform limit, real
+  price + compare-at import, basic image import, safe refresh,
+  deletion/archival → stale binding, N+1 fix), **Task 011B**
+  (indexed normalized-email matching with a recall-equivalence proof
+  corpus, 100k-partner benchmark, backfill plan), **Task 013B**
+  (controlled initial inventory baseline: preview → reviewer
+  confirmation → audited quant adjustments, replay-guarded,
+  documented undo), **Task 015B** (basic media export on the current
+  fileCreate/stagedUploads/productUpdate/variant-media APIs, async
+  status polling, ownership registry + foreign-media guard,
+  media_source_of_truth coordination), **SEC-1** (server-side job
+  transition matrix, su-guarded protected fields, sanctioned
+  retry/cancel/resolve/override doors, PII field-groups + masking,
+  retention/deletion/export, negative RPC matrix), **LC-1**
+  (lifecycle enablement, spec in the new
+  `../03-architecture/module-lifecycle-uninstall-design.md` with
+  DEC-030 + the data-survival matrix — resolving the
+  architecture-vs-release-plan uninstall contradiction). New
+  architecture docs: `premium-ui-ux-design-system.md` (PD-7 selective
+  Owl, tokens/scales/icons/motion/accessibility/RTL/states, the
+  flagged dashboard-hierarchy revision, U0 prototype gate) and
+  `performance-budgets.md` (PB-1..23, binding-until-recalibrated).
+  In-place revisions: Task 012 (component-based tolerance with
+  currency-relative cap; sale_stock auto-install correction —
+  official 19.0 manifest quoted; no-default operator confirmation
+  policy; mapping-first taxes with `order_tax_autocreate` default
+  False), DEC-028 (Rung-1 production-entry evidence criteria),
+  DEC-029/packaging (Lite = "no connector write-back modules"),
+  Area-6/013/015/webhook packets (handovers), UAT plan (S2-UX
+  blocking severity class; scenarios 25–36; numeric performance
+  pass/fail), release plan, master plan (critical path CORE-R1 →
+  010B → 011B → 012 → Area 6 → SEC-1 → U0∥ → U1 → 013/013B/LC-1 →
+  014 → 015/015B → U2/U3 → W1/W2 → UAT → release; review calls
+  A1–A11 + B1–B10), signoff (planning-complete statement restated
+  honestly), open-points register §3.10, AR-042 revision note.
+  Fresh captures: `odoo19-shopify-official-captures-2026-07-11.md`
+  (Odoo 19 sale_stock/uninstall/HOOT+tours/Owl/attributes/precision/
+  security-page; Shopify variant limits/pagination/media APIs/money
+  precision; ISO 4217; WCAG 2.2/INP). The review's "nonexistent UI
+  design docs" premise was checked: both files exist at
+  `docs/02-product/…` — references made exact-path instead.
+- **High-power mode use (per CLAUDE.md):** authorized by the review
+  task itself; fan-out = 2 read-only code inspectors (merged Task
+  010/011/core reality before drafting — the audit §7 lesson applied)
+  + 3 targeted official-source verifiers + an end-of-session
+  adversarial pass; stop condition = structured cited findings;
+  all findings landed in the captures file and packets.
+- **What this session does NOT do:** accepts nothing; opens no gate;
+  issues no usable prompt (LC-1's prompt is deferred to its gate by
+  explicit design); implements nothing; does not execute VAL-B2/
+  concurrency/UAT/release; does not lift RA-003; does not merge or
+  mark PR #148 ready; `main`/plain `dev` untouched.
+- **Learning feedback loop:** new lessons — (1) planning claimed a
+  capability "complete" that the merged code implemented narrowly
+  (Task 010): the read-the-merged-code-first rule is now applied
+  *before* drafting, not only in red-team (both code inspections ran
+  before any packet was written); (2) an edition label must never be
+  used to infer platform behavior (`sale_stock` auto_install) —
+  captured as the ARCH §9 edition note; (3) a fixed-unit financial
+  tolerance is not defensible across currencies — tolerance must
+  derive from `res.currency.rounding` (captures-11 §6/§12); repeated
+  patterns — append-only dated notes, OP-43 verbatim-quote rule,
+  exhaustive allowlists; rejected approaches — none reintroduced
+  (RA-006/008/011/012/013/014/018/019/020/021/022/023 checked);
+  technical debt — none new; architecture concerns — every revision
+  of accepted content is flagged (dashboard §9, fulfillment keying
+  carry-over) and routed through the AR-042 revision note.
+- **Quality gate confirmation:** handoff updated (this entry) ·
+  feedback loop checked · learning captured · no new rejected
+  approach · no new technical debt · Markdown-only diff verified ·
+  no gate opened · PR #148 remains draft, not merged, not ready.
+- **Stop condition:** revision pushed to the PR #148 branch; session
+  stops. No implementation started.
+
+**Next-session prompt (exact):**
+
+```text
+ChatGPT re-reviews draft PR #148 ("Complete remaining MVP research
+and implementation planning", revised 2026-07-11) against
+docs/08-release-readiness/mvp-planning-completion-audit.md §8 (the
+eleven-item closure map + second adversarial pass),
+mvp-planning-completion-signoff.md (revised), and
+implementation-ready-master-plan.md §1 (calls A1–A11 + B1–B10).
+Decide accept / revise / reject per call; merging the PR without
+named exceptions accepts A1–A10 and B1–B9 as proposed (A11 optional;
+B10 — the U0 visual-design session authorization — requires an
+explicit act). After merging: perform the CORE-R1 gate act and issue
+the locked prompt from
+docs/07-implementation-plan/task-core-r1-readiness-correction-packet.md
+§8 verbatim in a new session, stating the verified base SHA. In
+parallel, at ChatGPT's discretion: authorize the U0 session (B10),
+VAL-B2 execution, and the concurrency-plan execution. No other work
+is scoped or authorized by this entry.
+```
+
+---
+
 ### AR-042 — MVP planning-completion package (2026-07-10)
 
 - **What happened:** the single authorized Fable planning-completion

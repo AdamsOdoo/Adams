@@ -1,7 +1,16 @@
 # Area 6 — Manual & Scheduled Sync Triggers: Implementation-Ready Planning Packet
 
 > **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §7 is NOT usable.** Produced 2026-07-10 (AR-042 candidate).
+> prompt in §7 is NOT usable.** Produced 2026-07-10 (AR-042 candidate);
+> **revised 2026-07-11** by the PR #148 revision session per ChatGPT's
+> control-room review (comment `4942966937`, item 5): **D-A6-7 (the
+> readiness pending-slot closure) is split out of this task** into its
+> own tiny, independently gated core task —
+> `task-core-r1-readiness-correction-packet.md` (Task CORE-R1),
+> sequenced before Task 010B/012 live use. This packet keeps only the
+> trigger/enumeration/job-action scope; §2's D-A6-7 text is preserved
+> below as the historical design record with a superseded marker, and
+> the §7 prompt no longer touches the readiness file.
 > Closes OP-28 at proposal level. Evidence: ARCH §5.5 (PD-5
 > checkpoints), §7 (enqueue seam); merged core code. **Scope revision
 > to the original Area-6 concept (flagged decision D-A6-1):** the Full
@@ -11,6 +20,11 @@
 > sites, and the operator job-control services — for
 > product/customer/order import. This makes the merged backend
 > operator-invokable without waiting for (or requiring) any UI.
+> **Follow-on (2026-07-11):** when this task ships the three scan
+> crons, it MAY extend CORE-R1's real `cron_queue_health` check via
+> `_inherit` to also verify the scan crons of enabled domains
+> (CORE-R1 D-R1-1's capability-aware rule) — an additive check
+> extension, part of this packet's core-additive allowance.
 
 ## 1. Objective, scope, non-goals
 
@@ -19,17 +33,19 @@ working number) — **a core-plus-Lite-trio task, stated plainly
 (red-team-corrected: an earlier draft of this section claimed "no
 core edits," contradicting the allowlist)**. It touches
 `shopify_connector_product` and `shopify_connector_sale` (scan
-services + cron data files) **and core, by design, in three named
-additive pieces**: (a) the generic job-control services
-(`shopify_connector_job_actions.py`, NEW — D-A6-5); (b) the
-readiness pending-slot closure (D-A6-7 — edits
-`shopify_connector_readiness_check.py`, the file's three placeholder
-checks were designed to be filled); (c) one import line in
-`core/models/__init__.py`. **Non-goals:** no UI (services are called
-from shell/server actions until the UI phase wires buttons to them);
-no webhooks; no full-sync/backfill beyond the 60-day order window; no
-changes to import mapping/matching logic of any kind; no dispatcher/
-job-model logic changes beyond the named additive files.
+services + cron data files) **and core, by design, in two named
+additive pieces (revised 2026-07-11 — the former third piece, the
+D-A6-7 readiness closure, moved to Task CORE-R1)**: (a) the generic
+job-control services (`shopify_connector_job_actions.py`, NEW —
+D-A6-5) plus the optional D-R1-1 scan-cron check extension
+(`_inherit`, additive); (b) one import line in
+`core/models/__init__.py`. **Non-goals:** no readiness placeholder
+edits (CORE-R1's scope, already merged by this task's gate time); no
+UI (services are called from shell/server actions until the UI phase
+wires buttons to them); no webhooks; no full-sync/backfill beyond
+the 60-day order window; no changes to import mapping/matching logic
+of any kind; no dispatcher/job-model logic changes beyond the named
+additive files.
 
 ## 2. Design (D-A6-1 … D-A6-7) — each Proposed
 
@@ -114,8 +130,15 @@ the store gains computed helper fields (non-stored)
 `pending_job_count`/`failed_job_count` for shell/UI use. No
 dashboard work here.
 
-**D-A6-7 — Readiness pending-slot closure (core, red-team BLOCKER
-fix).** The merged core registers three placeholder readiness checks
+**D-A6-7 — Readiness pending-slot closure — SUPERSEDED 2026-07-11:
+moved to Task CORE-R1 (`task-core-r1-readiness-correction-packet.md`,
+D-R1-1..4), its own independently gated task sequenced before Task
+010B/012 live use, per the PR #148 review item 5. The text below is
+preserved as the historical design record; CORE-R1's packet is the
+operative version (differences: `cron_queue_health` verifies the
+merged drain cron + queue stall — NOT the Area-6 scan crons, which do
+not exist at CORE-R1 time; this task may later extend that check per
+the header follow-on note).** The merged core registers three placeholder readiness checks
 (`webhook_hmac`, `mapped_location`, `cron_queue_health`), all
 ESSENTIAL tier and permanently `not_proven`; the merged aggregate is
 fail-closed (an essential `not_proven` forces overall `fail`) and
@@ -192,49 +215,46 @@ task's allowlist includes one NEW core file
 core file edited) plus `tests/test_job_actions.py` in core — an
 explicitly-named additive core exception for generic operator
 services, consistent with core owning the job substrate. Flagged for
-ChatGPT.) D-A6-7 adds `tests/test_readiness_slot_closure.py` (NEW) in
-core. Coverage: one-scan-per-store-domain collision; checkpoint
+ChatGPT.) Coverage: one-scan-per-store-domain collision; checkpoint
 advance only after commit; overlap window applied; unchanged-object
 collision counted; manual/scheduled/source labeling; cron
 never-raises; retry/cancel state matrices incl. permission denials,
 no-bypass, `skipped`-recovery, and retry_count reset;
-selected-record sync; readiness slot closure (cron check pass/fail
-both ways; stalled-queue fail; mapped_location not-applicable pass
-vs inventory-enabled-without-module `not_proven`; webhook_hmac
-not-applicable pass; and the end-to-end BLOCKER regression: a Lite
-store with verified credential and passing checks **can now reach
-`connected`** via `action_activate`).
+selected-record sync. (Readiness-slot tests moved to CORE-R1's
+`test_readiness_slot_closure.py` — 2026-07-11; if this task extends
+`cron_queue_health` with the scan-cron verification, it appends the
+scan-cron pass/fail cases to that same core test file.)
 
 ## 4. Acceptance criteria / DoD
 
 Operator can (from shell/server action) trigger any Lite-domain sync,
 retry any failed or skipped job, cancel any stuck job — with every
-path audited, collision-safe, and permission-gated; a correctly
-configured Lite store can reach `connected` (D-A6-7 regression test
-green); zero mapping-logic changes (diff-level check); suites +
-Odoo.sh green; validation record + AR row + handoff; draft PR; gate
-closes on draft-open. Rollback: single-PR revert; no schema beyond
-settings fields + checkpoint fields; jobs already enqueued remain
-valid; reverting D-A6-7 returns stores to the
-cannot-reach-`connected` state (documented, not a data loss).
+path audited, collision-safe, and permission-gated; zero
+mapping-logic changes (diff-level check); suites + Odoo.sh green;
+validation record + AR row + handoff; draft PR; gate closes on
+draft-open. (The store-reaches-`connected` regression is CORE-R1's —
+already merged by this task's gate time — 2026-07-11.) Rollback:
+single-PR revert; no schema beyond settings fields + checkpoint
+fields; jobs already enqueued remain valid.
 
 ## 5. Register impacts on acceptance
 
 OP-28 → Resolved-by-packet (Lite trio; Full modules carry their own);
 UAT blocker U-4 closes when this merges; the sequence doc's Area-6
 description superseded (note); the red-team architecture BLOCKER
-"no store can reach `connected` / `cron_queue_health` owned by no
-packet" → owned and closed by D-A6-7 on merge (Tasks 013/014/015
-dev-store validations depend on it — sequencing note in D-A6-7).
+"no store can reach `connected`" → owned and closed by **Task
+CORE-R1** (revised 2026-07-11 — no longer this packet's; every
+mutation task's dev-store validation depends on CORE-R1, which
+precedes this task in the revised critical path).
 
 ## 6. Gate criteria
 
 The 15-pattern applies with: 1 = Task 012 merged runtime-green
-(order scan needs the order importer); 6/7 = no mapping-logic and no
-Full-domain scope; 13 = the D-A6-5 core-additive exception AND the
-D-A6-7 core-file edit (readiness slot closure, including the
-webhook_hmac not-applicable relaxation) each explicitly accepted;
-others as in prior packets.
+(order scan needs the order importer) AND CORE-R1 merged (readiness
+already corrected); 6/7 = no mapping-logic and no Full-domain scope;
+13 = the D-A6-5 core-additive exception explicitly accepted (the
+readiness edits are CORE-R1's own accepted scope — revised
+2026-07-11); others as in prior packets.
 
 ## 7. Locked final implementation prompt (Area 6 / "Task 016")
 
@@ -245,8 +265,10 @@ AND ISSUES THIS PROMPT.
 
 Implement the Area 6 trigger retrofit exactly per
 docs/07-implementation-plan/area-6-sync-triggers-implementation-packet.md
-(D-A6-1..7 binding). Branch from the verified current
-Shopify-connector tip (STOP on drift). One session; draft PR; stop.
+(D-A6-1..6 binding; D-A6-7 is Task CORE-R1's merged scope — do not
+touch the readiness file). Prerequisites: Task 012 AND CORE-R1 merged
+runtime-green. Branch from the verified current Shopify-connector tip
+(STOP on drift). One session; draft PR; stop.
 
 ALLOWED FILES (exhaustive):
 addons/shopify_connector_product/models/{__init__.py,
@@ -267,19 +289,19 @@ test_order_scan_triggers.py} (NEW),
 addons/shopify_connector_core/models/shopify_connector_job_actions.py
 (NEW — additive _inherit only: action_manual_retry, action_cancel),
 addons/shopify_connector_core/models/__init__.py (one import line),
-addons/shopify_connector_core/models/shopify_connector_readiness_check.py
-(D-A6-7 ONLY: the three placeholder check methods
-_check_webhook_hmac/_check_mapped_location/_check_cron_queue_health
-plus the stall-threshold constant — nothing else in the file),
+addons/shopify_connector_core/models/shopify_connector_scan_cron_health.py
+(NEW, OPTIONAL — additive _inherit extension of the CORE-R1
+cron_queue_health check adding scan-cron verification for enabled
+domains, per the packet header follow-on note; nothing else),
 addons/shopify_connector_core/tests/test_job_actions.py (NEW),
-addons/shopify_connector_core/tests/test_readiness_slot_closure.py (NEW),
+addons/shopify_connector_core/tests/test_readiness_slot_closure.py
+(append scan-cron cases ONLY, if the optional extension is built),
 docs/05-qa/task-016-sync-triggers-validation-results.md (NEW),
 docs/05-qa/architecture-review-log.md (append row),
 docs/01-research/research-handoff.md (top entry).
-FORBIDDEN: every other EXISTING core model file and every other part
-of the readiness file (the job-actions file is new+additive; existing
-core files may change only as itemized above: the one-line
-models/__init__.py import and the three D-A6-7 check methods); all
+FORBIDDEN: every other EXISTING core model file — explicitly
+including shopify_connector_readiness_check.py (CORE-R1's merged
+scope; this task extends via _inherit only, never edits); all
 importer/matching logic files' logic (scan services call them, never
 modify them); inventory/fulfillment/product_export anything;
 UI/webhooks/OAuth/CI; adams_base.
@@ -292,11 +314,10 @@ job_type — the marker is mandatory);
 scheduled sync opt-in per store; cron handlers never raise; job
 services carry no bypass and full audit logs (manual retry: allowed
 from failed_retryable/failed_final/blocked_manual_review/skipped,
-retry_count reset to 0); readiness slot closure exactly per D-A6-7
-(mapped_location/webhook_hmac not-applicable-pass conditions,
-cron_queue_health real check, fail-closed cases preserved, and the
-store-reaches-connected regression test); concurrency caveat
-restated. Odoo.sh green before merge review (verbatim quote). Stop
+retry_count reset to 0); the readiness file is NEVER edited (CORE-R1
+scope — the optional scan-cron check extension is _inherit-additive
+only); concurrency caveat restated. Odoo.sh green before merge
+review (verbatim quote). Stop
 condition: draft PR "Task 016: manual and scheduled sync triggers";
 gate closes on draft-open; no UI/webhook work.
 ```

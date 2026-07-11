@@ -3,7 +3,13 @@
 ## Status
 
 **Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-10 by the
-MVP planning-completion session (AR-042 candidate). Nothing below is
+MVP planning-completion session (AR-042 candidate); **Rung 1 revised
+2026-07-11** by the PR #148 revision session per ChatGPT's
+control-room review (comment `4942966937`, item 8): the
+hosting-encryption posture for production branch-A deployments that
+import protected customer data is upgraded from a
+documentation/recommendation statement to **named production-entry
+criteria** (point 2 below). Nothing below is
 binding until ChatGPT explicitly accepts this record. This proposal does
 not authorize any code change, does not modify the merged Task 002
 credential model, does not lift RA-003, does not weaken any accepted
@@ -75,21 +81,49 @@ hosting-neutral packaging story may claim.
    mandatory no-logging/redaction contract (all merged and
    suite-proven). No encryption claim may ever appear in product copy
    (existing accepted rule, reaffirmed).
-2. Customer PII imported by Tasks 011/012 is handled under the already
-   accepted rules: PII-minimal job logs (candidate payloads capped and
-   minimal; redaction applied at `_system_append`), no PII in server
-   logs, `ondelete='restrict'` audit trails. **New documentation rule
-   (docs-only):** the operator-facing installation guide (release
-   packet) must state that encryption at rest for the Odoo database is
-   the hosting layer's responsibility and recommend hosting with
-   disk-level encryption — a true, hosting-neutral statement that
-   claims nothing about Odoo field encryption.
+2. **Production-entry criteria (REVISED 2026-07-11 — binding
+   prerequisites, not documentation advice):** any **production**
+   branch-A deployment that imports protected customer data (i.e.
+   runs Task 011/011B/012 against real customers) requires, **before
+   go-live, recorded evidence of each of the following** — a named
+   per-deployment checklist row set in the release plan §2.8, each
+   row evidenced (platform statement capture, configuration
+   screenshot, or signed operator attestation) and reviewed at the
+   Go/No-Go gate:
+   (a) **database encryption at rest** for the production database —
+   satisfied at the hosting/infrastructure layer (e.g. Odoo.sh's
+   published AES-256 at-rest statement, captured 2026-07-11
+   (`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`
+   §7) — but evidenced **per deployment**, never assumed);
+   (b) **encrypted backups**, or an explicit documented equivalent
+   posture for that deployment (named storage, access, and rotation
+   controls) — silence is not equivalence;
+   (c) **staff/access restrictions** — who holds database/server and
+   Odoo-admin access, least-privilege confirmed, the connector's
+   four-group model actually assigned (no everyone-is-admin
+   deployment);
+   (d) **a retention/deletion policy** covering imported PII and
+   `payload_snapshot` rows (the SEC-1 D-SEC1-6 retention/masking
+   surface is the implementation vehicle);
+   (e) **incident/access governance appropriate to the deployment** —
+   a named incident contact + response note and an access log or
+   documented equivalent.
+   A deployment missing any row does not go to production with real
+   customer data — a test/staging store is the fallback until the
+   row is evidenced. The operator-facing installation guide carries
+   the same list (documentation follows the criteria; it no longer
+   substitutes for them).
 3. Because custom apps have PCD access "Always available" and the
-   compliance-webhook mandate is App-Store-scoped, **no PCD review,
-   compliance webhook, or code change is required for the branch-A
-   MVP** — while the Level 1/Level 2 *practices* (data minimization,
-   retention, staff-access discipline) are adopted as the project's
-   operating standard now, at documentation/process level.
+   compliance-webhook mandate is App-Store-scoped, **no PCD review or
+   compliance webhook is required for the branch-A MVP** — while the
+   Level 1/Level 2 *practices* (data minimization, retention,
+   staff-access discipline) are adopted as the project's operating
+   standard now: at process level plus the point-2 evidence gate and
+   the SEC-1 least-privilege/retention code surface. This decision
+   still claims **no Shopify certification of any kind** and invents
+   **no Odoo field-level encryption** (point 7 unchanged) — the
+   point-2 criteria may be satisfied by verified infrastructure
+   encryption.
 
 **Rung 2 — Phase 2+ public app (B-1), entry criteria (each blocks the
 future RA-003-lift act, none blocks any MVP task):**

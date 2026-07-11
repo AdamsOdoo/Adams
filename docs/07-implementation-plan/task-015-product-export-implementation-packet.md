@@ -16,11 +16,13 @@ preview-first, allowlisted, guard-protected Odoo→Shopify product
 create and update via `productSet`. **Non-goals:** no inventory
 quantities of any kind in export payloads (`inventoryQuantities` never
 supplied — the inventory ownership boundary; Task 013's domain); no
-media/image export (**deferred out of Task 015** — flagged decision
-D-015-7: `productCreateMedia` is deprecated and the current
-`fileCreate`+attach path is an async pipeline of its own; basic media
-sync remains accepted MVP scope, routed to follow-up candidate 015B
-unless ChatGPT re-scopes); no metafields authoring (only the PD-1
+media/image export in **this** task (D-015-7, revised 2026-07-11:
+`productCreateMedia` is deprecated and the current `fileCreate`+attach
+path is an async pipeline of its own — media export is **fully
+planned as Task 015B**, `task-015b-product-media-export-packet.md`,
+locked packet, sequenced after this task and before final
+UAT/release, per the PR #148 review item 3; the accepted DEC-003
+media scope is completed, not narrowed); no metafields authoring (only the PD-1
 `customId` binding metafield, D-015-4); no publishing/sales-channel
 management (`publishablePublish`/`write_publications` deferred with
 media — exported new products are created `DRAFT`, MBQ-25's accepted
@@ -46,10 +48,10 @@ per-template selection `shopify_export_status`, default DRAFT on
 create; UNLISTED unused); options — `productOptions` from Odoo
 attribute lines (≤3 options, else pre-send hold — captures §5 limit);
 variants — full desired set (D-015-3) with `optionValues`, `price`,
-`compareAtPrice` (from a template extension field
-`shopify_compare_at_price` on the variant? — no: compare-at is
-per-variant, sourced from `product.product` extension field
-`shopify_compare_at_price`, default unset → omitted), `barcode`,
+`compareAtPrice` (per-variant, sourced from the `product.product`
+field `shopify_compare_at_price` — **created by Task 010B, not this
+task** (D-010B-5 relocation, 2026-07-11): import fills it, this task
+reads it; unset → omitted), `barcode`,
 `inventoryItem: {sku}` (SKU lives on InventoryItem for writes —
 captures §5; weight/measurement **not** exported in MVP). Price
 export requires the merged `price_source_of_truth =
@@ -124,10 +126,11 @@ the allowlist, per-store price rule above) — always visible in the
 diff first. The import side (Task 010) continues to refresh snapshots;
 binding `status`/`manually_overridden` semantics unchanged.
 
-**D-015-7 — Deferred-from-015 register.** Media/images (015B
-candidate), publishing (`publishablePublish`), metafields beyond the
-binding key, weight/measurement, Markets, deletes. Each restated as
-deferred in the register update; none silently absorbed.
+**D-015-7 — Deferred-from-015 register (revised 2026-07-11).**
+Media/images → **Task 015B, fully planned** (no longer a candidate);
+publishing (`publishablePublish`), metafields beyond the binding key,
+weight/measurement, Markets, deletes remain deferred with names. None
+silently absorbed.
 
 **D-015-8 — Job/targeting.** `res_model/res_id` → template binding
 (existing rows) or `product.template` (create path, pre-binding) —
@@ -218,8 +221,8 @@ Rollback: single-PR revert — export capability disappears entirely
 OP-21 → Resolved-by-packet; MBQ-23 → Resolved (single-`productSet`
 strategy + allowlist); MBQ-24 → Resolved (exclusion + named empirical
 check); MBQ-25 residual → Resolved (DRAFT-on-create, publishing
-withheld); 015B (media) registered as the deferred successor
-candidate.
+withheld); 015B (media) → **fully planned successor packet**
+(revised 2026-07-11), sequenced before UAT/release.
 
 ## 8. Locked final implementation prompt (Task 015)
 
@@ -242,8 +245,10 @@ shopify_connector_product_export_preview.py,
 shopify_connector_product_export_service.py [payload builder, preview/
 apply handlers, seams, metafield-definition bootstrap],
 shopify_connector_product_template.py [shopify_export_enabled,
-shopify_export_status], shopify_connector_product_product.py
-[shopify_compare_at_price], shopify_connector_store_settings.py},
+shopify_export_status], shopify_connector_store_settings.py}
+(NOTE — revised 2026-07-11: shopify_compare_at_price lives on
+product.product in shopify_connector_product, created by Task 010B;
+this task READS it and creates no product.product extension),
 security/ir.model.access.csv, tests/{__init__.py + the five §5
 files}); docs/05-qa/task-015-product-export-validation-results.md
 (NEW); docs/05-qa/architecture-review-log.md (append row);

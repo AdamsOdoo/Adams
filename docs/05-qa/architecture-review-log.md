@@ -133,6 +133,46 @@ merged state as the source of truth for PR #145** and this row's Status
 cell as historical. No gate is opened, and no Task 012/013/014/015, UI,
 webhook, OAuth, or packaging work is authorized by this note._
 
+_**AR-042 revision note (2026-07-11, PR #148 revision session —
+Proposed for ChatGPT review).** ChatGPT's control-room review of the
+AR-042 package (PR #148 comment
+[`4942966937`](https://github.com/AdamsOdoo/Adams/pull/148#issuecomment-4942966937))
+returned **REVISE — substantial convergence patch required**, with
+eleven blocking items and an explicit preserve list. The same PR now
+carries the revision: new locked packets **CORE-R1** (readiness
+correction, split from Area-6 D-A6-7), **010B** (product-import
+completeness), **011B** (customer-matching scalability), **013B**
+(controlled initial inventory baseline), **015B** (basic media
+export), **SEC-1** (cross-cutting security hardening), **LC-1**
+(lifecycle enablement, spec'd in
+[`../03-architecture/module-lifecycle-uninstall-design.md`](../03-architecture/module-lifecycle-uninstall-design.md)
+§7); new proposed decision **DEC-030** (lifecycle/uninstall) and ARCH
+**PD-7/PD-8/PD-9** (premium frontend architecture; lifecycle;
+performance budgets); new architecture documents
+[`premium-ui-ux-design-system.md`](../03-architecture/premium-ui-ux-design-system.md)
+(incl. the flagged §9 revision of the accepted nine-card dashboard
+layout — a proposed revision of DEC-016/Part-A-§F.1 accepted content,
+made at ChatGPT's own review direction and routed through this note)
+and [`performance-budgets.md`](../03-architecture/performance-budgets.md);
+in-place revisions to the Task 012 packet (D-012-2 component
+tolerance, D-012-7 sale_stock/auto-install correction + no-default
+confirmation policy, D-012-9 tax-mapping-first with autocreate
+default False), DEC-028 (Rung-1 production-entry criteria), DEC-029,
+the packaging proposal (Lite = no connector write-back modules), the
+Area-6/013/015/webhook packets (cross-reference handovers), the UAT
+plan (S2-UX severity class; scenarios 25–36), the release plan
+(§2.3/§2.5/§2.7/§2.8/§2.14), the master plan (revised critical path
+CORE-R1 → 010B → 011B → 012 → Area 6 → SEC-1 → U0∥ → U1 → domains →
+W1/W2 → UAT → release; review calls A1–A11 + B1–B10), and the
+signoff (revised planning-complete statement). Fresh official-source
+captures:
+[`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`](../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md).
+Closure map + second adversarial pass:
+[`../08-release-readiness/mvp-planning-completion-audit.md`](../08-release-readiness/mvp-planning-completion-audit.md)
+§8. Everything remains **Proposed — NOT accepted**; no gate opens, no
+prompt becomes usable, no code changed (Markdown-only diff verified);
+PR #148 stays draft/unmerged pending ChatGPT's re-review._
+
 _**AR-039 Acceptance Note (2026-07-10) — PR #144 accepted by ChatGPT
 with two required fixes, both applied in the same PR**, via control-room
 review comment

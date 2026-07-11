@@ -3,7 +3,13 @@
 > **Status: Proposed for ChatGPT review. NOT accepted. Nothing here is
 > executed; the merged `mvp-release-readiness-checklist.md` remains the
 > item-level checklist — this plan sequences and operationalizes it.**
-> Produced 2026-07-10 (AR-042 candidate). Execution is
+> Produced 2026-07-10 (AR-042 candidate); **revised 2026-07-11** per
+> the PR #148 control-room review (comment `4942966937`): §2.3
+> uninstall corrected to the DEC-030/LC-1 lifecycle (the prior text
+> contradicted the merged FK mechanics), §2.7 now requires the
+> measured performance-budget table, §2.8 adds SEC-1 suites + the
+> DEC-028 point-2 production-entry evidence rows, §2.5/§2.14 updated
+> for 013B/015B and the corrected D-012-7. Execution is
 > **[External validation required]** end-to-end (runtime + live store
 > + human operator).
 
@@ -28,30 +34,53 @@ Lite is released implicitly (subset of the same artifacts).
    range on a populated database; settings/checkpoint fields additive
    (no migration scripts expected for MVP — any task introducing one
    invalidates this line and adds its own tested migration).
-3. **Uninstall/downgrade:** packaging proposal §5
-   (`../02-product/lite-full-packaging-final-proposal.md`, the DEC-029
-   carrier document) walked exactly: flags-off path
-   (everything survives); Full-module uninstall path (business data
-   survives; binding/mapping tables + cascade-removed domain jobs
-   documented as lost — screenshot evidence); reinstall re-match
-   (deterministic keys re-bind; manual matches redone).
+3. **Uninstall/downgrade (REVISED 2026-07-11 — the prior text
+   contradicted the merged FK mechanics; review item 9):** the
+   data-survival matrix of
+   `../03-architecture/module-lifecycle-uninstall-design.md` §5
+   (proposed DEC-030) walked exactly: flags-off path (everything
+   survives); pre-uninstall export step executed and archived;
+   Full-module uninstall path **via the merged Task LC-1 mechanism**
+   (business data survives; job/log history survives with
+   `historic_domain_job` retyping and `original_job_type` preserved;
+   binding/mapping tables lost per platform semantics — screenshot
+   evidence of each); reinstall re-match (deterministic keys re-bind;
+   manual matches redone or re-imported from the export). LC-1 merged
+   is a prerequisite for this section's execution.
 4. **Permissions:** UAT scenario 24 evidence + ACL-matrix suites green.
-5. **Documentation:** operator install/setup guide; the DEC-028 Rung-1
-   hosting-encryption statement; known-limitations page (§4); the
-   uninstall consequences; the 60-day order-window note; troubleshooting
-   (reading the Error Center; retry semantics).
+5. **Documentation:** operator install/setup guide (incl. the
+   Task 012 confirmation-policy choice and its stock consequences,
+   and the 013B baseline-before-first-push onboarding order); the
+   DEC-028 Rung-1 point-2 production-entry criteria list (the guide
+   carries the same list the Go/No-Go checks); known-limitations page
+   (§2.14); the DEC-030 uninstall consequences + export procedure;
+   the 60-day order-window note; the PII export/deletion operator
+   procedure (SEC-1 D-SEC1-6); troubleshooting (reading the Error
+   Center; retry semantics).
 6. **Support diagnostics:** the readiness check + job/log export
    (existing surfaces) documented as the support bundle; no new code.
-7. **Performance:** the concurrency plan §13.2 baseline + UAT §7
-   observations recorded against realistic volumes (1k products / 500
-   orders / 2 locations); budgets set (or explicitly deferred with
-   reasons) by ChatGPT at this step — release hardening (Area 8) owns
-   any resulting optimization tasks.
-8. **Security:** credential redaction suite green (existing);
-   masked-entry/no-read-back re-verified in UI; no-encryption-claim
-   copy audit (grep of views/copy decks); PII redaction lists in
-   place (Task 012 / W1); sudo inventory audit = exactly the named
-   sanctioned elevations (2 merged + D-013-5's third if accepted).
+7. **Performance (REVISED 2026-07-11 — budgets exist before
+   implementation, review item 10):** the full
+   `../03-architecture/performance-budgets.md` table measured
+   (concurrency plan §13.2 + UAT scenarios 27/28/34 + the packet
+   benchmarks are the measurement vehicles); every row measured-pass,
+   or carrying an explicit dated ChatGPT waiver — silence is not a
+   waiver; release hardening (Area 8) owns resulting tuning tasks.
+8. **Security (REVISED 2026-07-11):** credential redaction suite
+   green (existing); masked-entry/no-read-back re-verified in UI;
+   no-encryption-claim copy audit (grep of views/copy decks); PII
+   redaction lists in place (Task 012 / W1); **Task SEC-1 suites
+   green** (transition matrix, protected-field guards, binding
+   override audit, PII field-groups, retention sweep — the negative
+   RPC matrix re-run on the release build); sudo inventory audit =
+   exactly the named sanctioned elevations (2 merged + D-013-5's
+   third if accepted + the itemized SEC-1 write-site elevations);
+   **DEC-028 Rung-1 point-2 production-entry evidence rows completed
+   per receiving deployment** (encryption at rest; backup encryption
+   or documented equivalent; staff/access restrictions;
+   retention/deletion policy; incident/access governance) — each
+   evidenced, reviewed at Go/No-Go; a deployment missing a row does
+   not receive production customer data.
 9. **API versioning:** store pinned 2026-07; the quarterly re-check
    procedure (MBQ-52) recorded with the next check date (2026-10
    release: `FULFILLMENT_NOT_REQUIRED` enum + `ITEM_NOT_STOCKED_AT_
@@ -75,12 +104,18 @@ Lite is released implicitly (subset of the same artifacts).
     production install (operator doc); Shopify-side: no automatic
     un-doing — documented manual cleanup list (delete test
     fulfillments, etc.).
-14. **Release notes & known limitations:** generated from the AR log
-    rows of the release range; limitations at minimum: 60-day order
-    window; same-currency-only; duties/divergent orders skipped by
-    policy; single-fulfillment-location; no refunds/media-export/
-    payouts/B2B/Markets; concurrency proof status (whatever OP-22's
-    state is at release — stated honestly); webhook posture.
+14. **Release notes & known limitations (REVISED 2026-07-11):**
+    generated from the AR log rows of the release range; limitations
+    at minimum: 60-day order window; same-currency-only;
+    duties/divergent orders skipped by policy;
+    single-fulfillment-location; no refunds/payouts/B2B/Markets;
+    media: basic image export only (015B — gallery/video are the
+    named 010C/015C candidates); uninstall: binding/mapping tables
+    lost on physical uninstall (DEC-030 matrix — export procedure
+    documented); concurrency proof status (whatever OP-22's state is
+    at release — stated honestly); webhook posture. (The former
+    "no media export" and "Lite orders gain no pickings" lines are
+    deleted — superseded by Task 015B and the corrected D-012-7.)
 
 ## 3. Go/No-Go gate
 

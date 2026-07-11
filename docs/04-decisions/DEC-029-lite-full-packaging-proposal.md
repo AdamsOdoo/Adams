@@ -30,9 +30,17 @@ is authorized by it.
    `_payout`, `_multi_store` — each gated on its own future
    architecture pass; premium breadth (B2B/Markets/POS/gift
    cards/metafields) stays deferred per DEC-003.
-5. **Downgrade/removal = disable, not uninstall** (MBQ-54 posture
-   applied to editions); uninstall consequences documented, business
-   data always survives.
+5. **Downgrade/removal = disable-first; uninstall is a supported,
+   designed path (REVISED 2026-07-11):** MBQ-54's disable posture
+   remains the first choice; permanent removal follows the proposed
+   DEC-030 lifecycle (soft-degraded historical job types via Task
+   LC-1, pre-uninstall export, the data-survival matrix in
+   `../03-architecture/module-lifecycle-uninstall-design.md` §5);
+   business data always survives; job/log audit history survives
+   uninstall too. **Lite is defined as "no connector write-back
+   modules installed" — never as a statement about Odoo's own stock
+   behavior (`sale_stock` is auto-installed in Odoo 19; packaging
+   proposal §2, revised).**
 6. **No safety guard is ever edition- or flag-bypassable** (existing
    accepted rule, restated as a packaging invariant).
 7. Entitlement/license-key mechanics and any billing integration are
