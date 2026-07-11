@@ -1,5 +1,111 @@
 # Research Handoff (rolling)
 
+### CORE-R1 — Capability-Aware Readiness Correction implementation (draft PR, 2026-07-11)
+
+- **Base verified (hard prerequisite):** `Shopify-connector` tip ==
+  `2bdb07cf33045a696311c420e577cbbb09cdfb38` (remote + working branch,
+  no drift); PR #148 confirmed **merged** (2026-07-11T18:08:27Z); gate
+  comment `4948225529` read — **CORE-R1 OPEN for one implementation
+  session only**, D-R1-1..5 authorized, all other gates closed. Branch:
+  `claude/task-core-r1-readiness-correction-trxl43` cut from that SHA.
+- **What happened:** implemented Task CORE-R1 exactly per
+  `docs/07-implementation-plan/task-core-r1-readiness-correction-packet.md`,
+  touching only the packet's exhaustive allowlist. **D-R1-1**
+  `_check_cron_queue_health` is now a real capability-aware check: drain
+  cron exists + active (read via the ONE new named read-only `sudo()`
+  helper `_drain_cron_active_state`, because connector groups hold no
+  `ir.cron` ACL) and no queued job stalled > `READINESS_QUEUE_STALL_
+  MINUTES=60` using the exact discriminator `state='queued' AND NOT
+  started_at` (aged by `create_date`); named fail reasons; no Area-6
+  scan-cron requirement; re-queued-with-history boundary honored.
+  **D-R1-2** `_check_mapped_location` → not-applicable pass when
+  `inventory_domain_enabled` is False, else fail-closed `not_proven`
+  (reads only the core settings flag; no inventory-model dependency).
+  **D-R1-3** `_check_webhook_hmac` → not-applicable pass with the exact
+  packet reason. **D-R1-5** `action_test_connection` writes
+  `api_health_state='normal'` on full non-fall-forward success only
+  (`degraded` fall-forward path untouched). **D-R1-4** new
+  `tests/test_readiness_slot_closure.py` (18 methods covering the 16
+  mandatory cases) proves via real behavior that an eligible Lite store
+  aggregates readiness `pass` and reaches `connected` through
+  `action_activate()`, and that a genuine essential failure still blocks
+  activation. Validation record:
+  `docs/05-qa/task-core-r1-validation-results.md`; AR-043 appended.
+- **One flagged blocker (surfaced, not silently resolved):** the D-R1-1
+  sudo raises the `models/` `.sudo()` count from two to three, so the two
+  pre-existing "exactly two sudo sites" AST guards
+  (`test_job_log_system_append.py::test_source_level_two_sudo_sites_total`,
+  `test_credential_service.py::test_source_level_sanctioned_sudo_sites_guard`)
+  go stale/red. Both are **outside the packet's exhaustive allowlist** and
+  were deliberately left untouched (mirroring the Task 003 precedent and
+  CHATGPT.md §13). The DoD is thus internally unsatisfiable as written
+  ("only allowed files" vs "all pre-existing tests green"); requested
+  ChatGPT ruling: authorize the trivial 2→3 guard update (recommended),
+  accept the flagged-stale posture, or amend the packet. The sudo is
+  isolated in a named helper so the `_check_*`-mutation guard stays green
+  and only these two count-guards are affected (minimal blast radius).
+- **What this session does NOT do:** opens no further gate; starts no
+  Task 010B/011B/LC-1/012/Area-6/SEC-1/UI/webhook/PERF-1 work; touches no
+  `*.xml`/`*.csv`/manifest/security/data/cron/migration/CI file, no
+  `adams_base`, no product/sale module; does not touch `main` or plain
+  `dev`; does not mark the PR ready or merge it. The CORE-R1 gate closes
+  automatically the moment the draft PR opens.
+- **Validation performed (honest scope):** no Odoo runtime in this
+  environment (`import odoo` → `ModuleNotFoundError`) — same as every
+  prior session. Ran `python3 -m py_compile` on all changed Python files
+  (clean) and a standalone AST replication of every source-level guard
+  (three new guards pass; `_check_*`-mutation guard stays green; the two
+  count-guards confirmed 2→3). **Live Odoo.sh run pending** the platform
+  build the draft PR triggers — to be quoted verbatim before merge
+  (OP-43); no runtime result is claimed that was not executed.
+- **Learning feedback loop:**
+  - New issues discovered: an accepted implementation packet can mandate a
+    new sanctioned `sudo()` site while its exhaustive allowlist omits the
+    pre-existing "exactly N sudo sites" AST guards that the new site
+    invalidates — making the DoD internally unsatisfiable. This is the
+    *same* class of conflict Task 003 hit (single→two sites); it recurred
+    (two→three). **Escalation-worthy pattern:** any future task that adds
+    or removes a `sudo()` site in `shopify_connector_core/models` must add
+    both sudo-count guard test files
+    (`test_job_log_system_append.py`, `test_credential_service.py`) to its
+    allowlist, or the packet must pre-state the new expected count.
+  - Repeated issue pattern: yes — second occurrence of the sudo-count
+    guard-staleness conflict (Task 003, now CORE-R1). Recommended the
+    standing allowlist rule above for the next control-room prompt.
+  - Rules/checklists updated: none unilaterally (I hold no authority to
+    edit the forbidden guard files or expand the allowlist); the rule is
+    proposed here and in the validation record §7 for ChatGPT to adopt.
+  - New rejected approaches: dodging the sudo-count guard via
+    `with_user(SUPERUSER_ID)`/`with_env(su=True)` — rejected as deceptive
+    (contradicts the packet's explicit `sudo()` and defeats the guard's
+    purpose).
+  - New technical debt: none introduced by the change itself; the only
+    open item is the ChatGPT ruling on the two stale count-guards (§7 of
+    the validation record).
+  - Self-verification performed: `py_compile` (all changed .py, clean);
+    AST replication of the three new source-level guards (pass), the
+    `_check_*`-mutation guard (green), and the two count-guards (2→3
+    confirmed); full-file diff review confirming `_get_checks`/`_aggregate`/
+    `run_for_store` and every non-target method are byte-untouched and the
+    store change is exactly the D-R1-5 `else` write; exact webhook reason
+    string byte-compared to the packet (match).
+  - Should future prompts change? Yes — adopt the standing sudo-count
+    allowlist rule above.
+- **Quality gate confirmation:** handoff updated (this block) · feedback
+  loop checked · learning captured · one repeated-issue pattern escalated ·
+  no new technical debt · forbidden files untouched.
+- **Next recommended session prompt (for ChatGPT to issue):** *"Review the
+  CORE-R1 draft PR into `Shopify-connector` (branch
+  `claude/task-core-r1-readiness-correction-trxl43`, base
+  `2bdb07cf33045a696311c420e577cbbb09cdfb38`) against
+  `task-core-r1-readiness-correction-packet.md` D-R1-1..5 and
+  `task-core-r1-validation-results.md`. Rule on the flagged 2→3
+  sudo-count-guard reconciliation (§7): recommended — add
+  `test_job_log_system_append.py` + `test_credential_service.py` to the
+  CORE-R1 allowlist for the trivial two→three update, then require a green
+  Odoo.sh run (verbatim) before final merge review. Do not start any other
+  task."*
+
 ### AR-042 revision 3 — PR #148 final-convergence (comment `4947866018`) focused patch (2026-07-11)
 
 - **What happened:** ChatGPT's **final-convergence review** of
