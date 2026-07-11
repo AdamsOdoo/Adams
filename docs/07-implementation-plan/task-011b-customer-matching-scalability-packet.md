@@ -202,9 +202,12 @@ Task-012 `sale.order.line` precedent); 14 benchmark budgets stated
 Only §4 files changed; equivalence + regression + concurrency tests
 green locally and on Odoo.sh (verbatim quotes); benchmark numbers
 recorded; validation record + AR row + handoff; draft PR; gate closes
-on draft-open. Rollback: revert the single PR — the stored column is
-dropped with the field definition at module upgrade; matching returns
-to the merged full-scan path (slow but correct); no data loss.
+on draft-open. Rollback: revert the single PR — the matching **code
+path returns to the merged full-scan path** (slow but correct); the
+additive stored column may **remain inert/orphaned** in the database
+(a normal code revert / module upgrade does **not** drop it — no
+destructive schema cleanup is assumed; any cleanup is a separately
+tested migration); no business data is removed.
 
 ## 8. Register impacts on acceptance
 

@@ -227,6 +227,24 @@ resolved here.
 | OP-14..21/28 rows (§3.9) | Unchanged in ownership; their packets carry the 2026-07-11 revisions noted in each file's header |
 | All other rows | Unchanged — re-verified against this revision; no silent closure |
 
+### 3.11 Re-review `4945129824` convergence (2026-07-11, docs-only — Proposed)
+
+> Focused convergence patch closing the nine re-review items. Master
+> record: `mvp-planning-completion-audit.md` §8.5. Nothing here opens a
+> gate, issues a usable prompt, or accepts anything.
+
+| ID / topic | 2026-07-11 status delta |
+| --- | --- |
+| RR-1 (010B existing-attribute compatibility) | **Closed at planning level:** D-010B-2 compatibility gate + `product_import_attribute_conflict_mode` (default `manual_review`) — reuse only `dynamic`, never mutate a mode, no phantom variants; tests + UAT fixture `UAT-P4` |
+| RR-2 (013B free/on-hand semantics) | **Closed:** `target_on_hand = desired_available + reserved`, post-write `free_qty == desired_available` check, re-read + drift abort, multi-quant / owner-package / lots / negative fail-closed |
+| RR-3 (015B READY-first + safe delete + identities) | **Closed:** File GID vs Product Media GID; two-phase READY-gated pipeline; `fileDelete` only after a fresh reference check, else detach-only + retain |
+| RR-4 (012 tax key + discount math) | **Closed:** canonical decimal `shopify_rate_key` + decimal-safe match; cap-free component-sum bound + exact negative "Shopify Order Discount" lines |
+| RR-5 (PB-19 owner) | **Closed:** NEW Task PERF-1 packet; master plan step 16 (before performance UAT); review call B11 |
+| RR-6 (SEC-1 override RPC contract) | **Closed:** `_odoo_binding_field_name()` seam + enumerated bindings + scalar-id/reason `action_override_binding` + negative RPC tests |
+| RR-7 (LC-1 locked prompt) | **Closed:** full locked prompt (lifecycle §7.1); LC-1 sequenced before Task 012; adoption notes added to 012/013/013B/014/015/015B/Area-6 |
+| RR-8 (rollback/schema wording) | **Closed:** 010B/011B/015B/LC-1/PERF-1 rollback notes corrected (code revert removes behavior; additive schema may remain inert/orphaned; no destructive cleanup); release/packaging posture verified already-correct |
+| RR-9 (CORE-R1 D-R1 range) | **Closed:** `D-R1-1..5` in the CORE-R1 packet §3 heading, Area-6 D-A6-7 marker, audit §8.1, master-plan B1; repo-wide range sweep run |
+
 ## 4. Cross-check completeness statement
 
 Every open item named in: the PR #140 body's "Open blockers" list, the

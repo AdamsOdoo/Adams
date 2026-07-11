@@ -40,12 +40,14 @@ is fully proposed (DEC-029 as revised + DEC-030 lifecycle).
 
 **4. Are the domain tasks implementation-ready at planning level?** —
 **Yes as proposals:** CORE-R1, 010B, 011B, 012 (revised: component
-tolerance, no-default confirmation policy, mapping-first taxes),
+tolerance — now cap-free with exact negative discount lines; canonical
+decimal tax key; no-default confirmation policy; mapping-first taxes),
 013, 013B, 014, 015 (revised cross-references), 015B, SEC-1, LC-1,
-Area 6 (revised scope) — each with exact allowed/forbidden files,
-tests, rollback, DoD, and a locked prompt (LC-1's prompt deferred to
-its gate by explicit design, lifecycle doc §7). Readiness becomes
-actual when ChatGPT accepts the packets and performs each gate act.
+**PERF-1 (new)**, Area 6 (revised scope) — each with exact
+allowed/forbidden files, tests, rollback, DoD, and **a locked prompt
+(LC-1's full locked prompt is now in lifecycle doc §7.1 — no longer
+deferred; re-review `4945129824` item 7)**. Readiness becomes actual
+when ChatGPT accepts the packets and performs each gate act.
 
 **5. Are triggers, UI, webhooks, UAT, and release planned?** —
 **Yes:** Area 6 (locked prompt, D-A6-7 handed to CORE-R1); UI now
@@ -79,16 +81,18 @@ concurrency execution → UAT entry (or waiver); DEC-028 Rung-2 +
 RA-003 lift + W5 → Phase-2+ B-1 only.
 
 **9. What exact ChatGPT decisions remain?** — The §1 calls of the
-revised master plan: carried-over A1–A11 plus new B1–B10 (packets
-CORE-R1/010B/011B/013B/015B/SEC-1, DEC-030, PD-7/8/9, UAT severity,
-budgets, and the U0 authorization).
+revised master plan: carried-over A1–A11 plus new B1–B11 (packets
+CORE-R1/010B/011B/013B/015B/SEC-1/**PERF-1**, DEC-030, PD-7/8/9, UAT
+severity, budgets, the U0 authorization, and the PERF-1 throughput
+task).
 
 **10. What is the exact next implementation session after
 acceptance?** — **Task CORE-R1** via its locked prompt (master plan
 §5). The 2026-07-10 answer (Task 012 next) is superseded — Task 012
-is step 4 of the revised critical path.
+is now step 5 of the revised critical path (after CORE-R1, 010B, 011B,
+and LC-1).
 
-## Planning-complete statement (revised 2026-07-11)
+## Planning-complete statement (revised 2026-07-11; re-reviewed 2026-07-11)
 
 **Planning is complete as a revised proposal package, and the
 2026-07-10 completeness claim as originally stated was not — the
@@ -96,6 +100,10 @@ control-room review found eleven material gaps, and this revision
 closes each one at planning level** (audit §8 maps every review item
 to its closing artifact; the fresh adversarial pass in §8.3 records
 what was re-verified against merged code and official sources).
+**The subsequent control-room re-review (comment `4945129824`) found
+nine further load-bearing items; the focused docs-only convergence
+patch closes each at planning level — audit §8.5 maps them — and the
+package remains a revision-pending proposal until ChatGPT accepts it.**
 Specifically: every known planning item is closed, planned,
 explicitly deferred-with-a-name, or converted into a precisely
 defined external validation; the formerly-missing packets exist and

@@ -41,16 +41,21 @@ connector did not create (hard guard); no publishing; no
 - **Async processing:** "Files are processed asynchronously. You poll
   the `fileStatus` field until it's `READY`" (captures §10);
   media status enum UPLOADED/PROCESSING/READY/FAILED.
-- **Association:** product association via `productUpdate` media/files
-  input (the documented `productCreateMedia` replacement); variant
+- **Association (only after the File reaches `READY` — D-015B-4):**
+  product association via `productUpdate` media/files input (the
+  documented `productCreateMedia` replacement) yields the
+  **Product Media GID** (`shopify_product_media_gid`); variant
   association via `productVariantAppendMedia` /
   `productVariantDetachMedia` (both current). Primary-image ordering
-  via `productReorderMedia` (async `Job`) only when the primary is
-  not already first.
+  via `productReorderMedia` (async `Job`) only after association
+  succeeds and only when the primary is not already first.
 - **Replacement/removal of connector-owned media:** `fileDelete`
-  (current) strictly limited to media whose GID is recorded in the
-  connector's media binding (D-015B-2) — after preview enumeration
-  and confirmation.
+  (current) strictly limited to a **File GID** recorded in the
+  connector's media binding (D-015B-2) **and** proven by a fresh
+  reference/association read to carry no reference other than the
+  connector-owned one being removed — after preview enumeration and
+  confirmation. When exclusivity is not proven, the connector
+  **detaches only its own association and retains the File**.
 - Scopes: `write_products` (already required by Task 015's readiness
   check; `productVariantDetachMedia` documented `write_products` —
   captures §10). Staged upload target interaction is plain HTTPS to
@@ -59,20 +64,38 @@ connector did not create (hard guard); no publishing; no
 
 ## 3. Decision closures (D-015B-1 … D-015B-7) — each Proposed
 
-**D-015B-1 — Ownership registry (media binding).** New model
-`shopify.connector.product.media.binding` on the binding mixin
-(`shopify_gid` = Media/File GID): `product_template_binding_id`
-(required, restrict), `product_variant_binding_id` (optional,
-restrict — set for variant images), `odoo_image_checksum` (Char
-required ro — SHA-256 of the exported binary), `media_role`
-(Selection `primary`/`variant`), `remote_status` (Selection
-uploaded/processing/ready/failed, ro), `exported_at`/`last_verified_at`
-(Datetime ro). Uniqueness: `(store_id, shopify_gid)` +
-`(store_id, product_variant_binding_id, media_role)` where variant
-set, and `(store_id, product_template_binding_id, media_role)` for
-primary rows (one primary per template per store). **The registry is
-the destructive-guard boundary: the connector may replace/delete only
-GIDs present here.**
+**D-015B-1 — Ownership registry (media binding) — exact identities
+(re-review `4945129824` item 3).** New model
+`shopify.connector.product.media.binding` on the binding mixin. The
+APIs use **distinct** identities, so the registry stores each
+separately (the ambiguous phrase "Media/File GID" is removed):
+- **`shopify_gid`** (mixin field) = the **File GID** — the
+  `MediaImage`/File asset returned by `fileCreate` (the durable asset
+  in the store's Files; the identity `fileDelete` targets and the proof
+  the connector *created* it).
+- **`shopify_product_media_gid`** (Char ro) = the **Product Media GID**
+  — the product-level media reference created when the File is
+  associated to the product; the identity `productReorderMedia` and
+  product-scope detach operate on. Null until association succeeds
+  (D-015B-4).
+- **variant association identity** = the pair
+  (`product_variant_binding_id`, `shopify_gid`) — the argument shape
+  `productVariantAppendMedia`/`productVariantDetachMedia` require; no
+  separate GID exists for it.
+Plus `product_template_binding_id` (required, restrict),
+`product_variant_binding_id` (optional, restrict — set for variant
+images), `odoo_image_checksum` (Char required ro — SHA-256 of the
+exported binary), `media_role` (Selection `primary`/`variant`),
+`remote_status` (Selection uploaded/processing/ready/failed, ro),
+`exported_at`/`last_verified_at` (Datetime ro). Uniqueness:
+`(store_id, shopify_gid)` +
+`(store_id, product_variant_binding_id, media_role)` where variant set,
+and `(store_id, product_template_binding_id, media_role)` for primary
+rows (one primary per template per store). **The registry is the
+destructive-guard boundary, but registry membership proves only that
+the connector *created* the File — not that the File is *exclusively*
+used now (D-015B-2/6): every `fileDelete` requires a fresh reference
+check.**
 
 **D-015B-2 — Destructive-media guard.** Preview enumerates, per
 template: adds (no registry row, Odoo image present), updates
@@ -84,6 +107,18 @@ replaceable — enumerated in the preview as "foreign media — left
 untouched". Empty Odoo image with an existing registry row →
 proposed removal of the connector-owned remote image, listed
 explicitly and applied only on confirmation (never implicit).
+**Fresh reference check before any `fileDelete` (re-review item 3):**
+registry ownership proves the connector *created* the File, not that
+it is *exclusively* used now — a merchant can reuse a connector-created
+File on another product. Before deleting a File the apply step performs
+a **fresh reference/association read** (the File's current
+product/variant references) and deletes **only** when the File is
+proven to have no reference other than the connector-owned association
+being removed. When exclusive use cannot be proven, the safe default
+is to **detach only the connector-owned association and retain the
+File** (never delete), recording a "retained — shared/foreign
+reference" note. This applies to both the preview enumeration and the
+apply guard.
 
 **D-015B-3 — Preview/confirm flow (reuse, not reinvent).** Media
 export rides the Task 015 preview mechanism: the
@@ -93,18 +128,36 @@ refuse without a confirmed, unexpired preview. Media-only changes use
 the same two job types — no new preview machinery. Review-then-apply
 remains the only mode (MBQ-34).
 
-**D-015B-4 — Asynchronous pipeline.** Apply submits staged upload +
-`fileCreate` + association mutations, records media-binding rows with
-`remote_status='uploaded'`, and **finishes** (no in-job polling — the
-enqueue-never-inline spirit). A module cron
-(`media_export_status_poll`, 5 min, noupdate) enqueues one
-`media_export_status_poll` job per store with non-terminal media rows;
-the handler reads `fileStatus`/`Media.status`, updates rows;
-`FAILED` → `blocked_manual_review` / `binding_conflict` with the
-remote error payload; `READY` → variant association step if not yet
-applied (association requires READY media), then done. Poll jobs are
-nonce-hashed (repeat-run pattern) and stop enqueueing when no
-non-terminal rows exist.
+**D-015B-4 — Asynchronous pipeline (two-phase, READY-gated —
+re-review `4945129824` item 3).** The pipeline is explicitly split so
+**no association is ever submitted before the File is `READY`**
+(matching the captured official evidence: files are processed
+asynchronously; poll `fileStatus` until `READY`, *then* associate the
+file with products):
+1. **Apply phase 1 (submit):** `stagedUploadsCreate` → HTTP upload →
+   `fileCreate`; record the media-binding row with the returned
+   **File GID** (`shopify_gid`) and `remote_status='uploaded'`; then
+   **finish** (no in-job polling — enqueue-never-inline spirit). **No
+   association mutation runs in phase 1.**
+2. **Poll (module cron `media_export_status_poll`, 5 min, noupdate):**
+   enqueues one `media_export_status_poll` job per store with
+   non-terminal media rows; the handler reads `fileStatus`/
+   `Media.status` and updates `remote_status`; `FAILED` →
+   `blocked_manual_review` / `binding_conflict` with the remote error
+   payload.
+3. **On `READY` (phase 2 — association):** associate the File with the
+   **product** (recording `shopify_product_media_gid`), then with the
+   **variant** where applicable; **reorder** (primary first) only
+   **after** association succeeds; and **detach/retire old media only
+   after** the new association is proven (D-015B-6). Each step's
+   outcome is recorded on the row; the row is terminal only once its
+   role's association (and any needed reorder) has succeeded.
+Poll jobs are nonce-hashed (repeat-run pattern) and stop enqueueing
+when no non-terminal rows exist. Product/variant association is
+**never** submitted before `READY`; the packet claims no exception,
+and none is taken unless fresh official evidence explicitly proves
+pre-`READY` association is supported and that evidence is recorded in
+the captures packet.
 
 **D-015B-5 — Retry/idempotency.** No media mutation is `@idempotent`
 (captures 2026-07-10 §5 — zero product-write mutations carry it), so:
@@ -119,11 +172,16 @@ worst outcome; already-successful uploads are kept and reconciled by
 checksum on the next run (no duplicate uploads — verification read +
 APPEND_UUID naming makes duplicates detectable).
 
-**D-015B-6 — Update/replacement behavior.** Replacement order:
-upload new → associate new → (variant) detach old → delete old
-connector-owned file — so the product is never left imageless by a
-mid-sequence failure; each step's outcome recorded. Primary-image
-reorder runs only when needed (async Job tracked like D-015B-4).
+**D-015B-6 — Update/replacement behavior (READY-gated,
+delete-after-proven).** Replacement order: upload new → **poll until
+`READY`** → associate new (product, then variant) → reorder (primary
+first) if needed → **only then** detach the old connector-owned
+association → **fresh reference check** on the old File →
+`fileDelete` the old File **only if** it is proven to carry no other
+reference (else detach-only + retain, D-015B-2). The product is never
+left imageless by a mid-sequence failure, and a shared/foreign-
+referenced File is never deleted; each step's outcome recorded.
+Reorder is an async `Job` tracked like D-015B-4.
 
 **D-015B-7 — Interplay with import (no loops).** Task 010B's
 merchant-image protection uses checksums of connector **writes into
@@ -146,20 +204,29 @@ the settings seam; consumed per D-015B-7.
 
 ## 5. Tests (exact files)
 
-`test_media_binding_model.py` (schema/uniqueness/ACL — read-only for
-auditor/operator, reviewer confirm-path, admin rwc, no unlink);
+`test_media_binding_model.py` (schema/uniqueness/ACL — **distinct
+`shopify_gid` File GID vs `shopify_product_media_gid` Product Media
+GID**; read-only for auditor/operator, reviewer confirm-path, admin
+rwc, no unlink);
 `test_media_export_guard.py` (foreign media never touched — including
 the delete/detach/reorder code paths; removal only when enumerated +
-confirmed; preview media section completeness; source guards:
-`productCreateMedia`/`productDeleteMedia` strings absent, `fileDelete`
-call sites reachable only through the registry filter);
-`test_media_export_pipeline.py` (staged-upload → fileCreate →
-associate sequencing; replacement order leaves-no-imageless-gap;
-checksum no-op; verification-read adoption on ambiguous outcome —
-never blind retry; per-media partial-failure routing);
+confirmed; **`fileDelete` runs only after a fresh reference/association
+check proves no other reference — a connector-created File reused on a
+second product is RETAINED (detach-only)**; preview media section
+completeness; source guards: `productCreateMedia`/`productDeleteMedia`
+strings absent, `fileDelete` call sites reachable only through the
+registry filter **and** the reference-check);
+`test_media_export_pipeline.py` (**two-phase: no association mutation
+before `READY`**; staged-upload → fileCreate (records File GID) →
+poll → associate product (records Product Media GID) → associate
+variant → reorder; replacement order leaves-no-imageless-gap and
+deletes the old File only after the new association is proven; checksum
+no-op; verification-read adoption on ambiguous outcome — never blind
+retry; per-media partial-failure routing);
 `test_media_export_async_poll.py` (poll cron enqueue conditions;
 UPLOADED/PROCESSING/READY/FAILED transitions; FAILED → manual review
-with payload; READY-gated variant association; nonce payload_hash);
+with payload; **READY-gated association: product then variant, never
+before READY**; nonce payload_hash);
 `test_media_source_of_truth.py` (unset → configuration hold; odoo vs
 shopify gating both directions incl. the 010B interplay contract).
 
@@ -171,9 +238,11 @@ mechanics fixed ✅(D-015B-5); 6 no inventory/order scope ✅; 7 no
 publishing/gallery/video ✅; 8 no UI/webhook/OAuth ✅; 9 tests
 ✅(§5); 10 rollback ✅(§7); 11 live validation required (§7 —
 mutation task); 12 gate-act reconfirmation; 13 the flagged calls
-explicit: `media_source_of_truth` coordination rule (D-015B-7) and
-connector-owned-only deletion boundary (D-015B-2); 14 async pipeline
-+ poll cadence explicit ✅(D-015B-4); 15 foreign-media protection
+explicit: `media_source_of_truth` coordination rule (D-015B-7),
+connector-owned-only deletion boundary + fresh-reference check
+(D-015B-2), and the File-GID vs Product-Media-GID identity split
+(D-015B-1); 14 two-phase READY-gated pipeline + poll cadence explicit
+✅(D-015B-4); 15 foreign-media protection + retain-if-not-exclusive
 explicit ✅(D-015B-2).
 
 ## 7. Odoo.sh + live validation / rollback
@@ -184,10 +253,14 @@ disposable product, including a FAILED-status simulation (bad file)
 and proof that a manually-uploaded foreign image survives every
 connector operation; redacted evidence in the validation record;
 recorded explicit ChatGPT waiver is the only alternative. Rollback:
-revert the single PR — export capability and registry drop; remote
-media already exported remains (documented manual cleanup list in the
+revert the single PR — the export **code path/capability is removed**;
+the additive media-binding table/columns may **remain inert/orphaned**
+in the database (a normal code revert does **not** drop them — no
+destructive schema cleanup is assumed; any cleanup is a separately
+tested migration, never part of the revert); remote media already
+exported to Shopify remains (documented manual cleanup list in the
 release plan, mirroring the existing Shopify-side rollback posture);
-import side untouched.
+import side and business data untouched.
 
 ## 8. Register impacts on acceptance
 
@@ -197,6 +270,12 @@ where feasible" → feasibility established + planning-complete;
 release plan known-limitations row "no media export" is deleted in
 the same revision; UAT gains scenario §UAT-26. Deferred-with-names:
 015C gallery/video breadth.
+
+**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** the
+`media_export_status_poll` (and any media-export) `job_type`
+`selection_add` `ondelete` uses the LC-1 callable
+`_reassign_to_historic_job_type` from the start (LC-1 precedes Task 012
+— DEC-030 / lifecycle §7), so no later retrofit is needed.
 
 ## 9. Locked final implementation prompt (Task 015B)
 
@@ -232,16 +311,25 @@ productCreateMedia; productDeleteMedia; any deletion/detach/reorder
 of media not in the connector registry; gallery/video/3D; publishing;
 inventoryQuantities; UI/webhooks/OAuth/CI; adams_base; main; plain dev.
 
-HARD CONSTRAINTS: stagedUploadsCreate -> fileCreate -> associate,
-async with fileStatus/Media.status polling via the cron-enqueued poll
-job (no in-job polling loops); preview -> confirmation -> apply only
-(Task 015 machinery reused); foreign media untouched under all code
-paths (guard tests); replacement order upload-new-before-remove-old;
-verification read before any retry of an ambiguous mutation outcome
-(RA-014) — no blind retry, no @idempotent assumption; checksum no-op
-idempotency; media_source_of_truth required and enforced both
-directions (unset -> odoo_validation_configuration hold); no new
-error classes; concurrency caveat restated. Odoo.sh green + the §7
+HARD CONSTRAINTS: TWO-PHASE, READY-GATED pipeline —
+stagedUploadsCreate -> fileCreate (phase 1: record the File GID in
+shopify_gid) -> poll fileStatus/Media.status via the cron-enqueued
+poll job until READY (no in-job polling loops) -> ONLY THEN associate
+product (record shopify_product_media_gid) -> associate variant ->
+reorder -> detach/retire old media; NO association mutation before
+READY (no exception unless fresh recorded official evidence proves it
+supported); store distinct identities (File GID vs Product Media GID —
+never the ambiguous "Media/File GID"); preview -> confirmation ->
+apply only (Task 015 machinery reused); foreign media untouched under
+all code paths (guard tests); fileDelete ONLY after a fresh
+reference/association read proves the connector-owned File has no other
+reference — else detach-only + retain the File; replacement order
+upload-new-and-associate-before-remove-old; verification read before
+any retry of an ambiguous mutation outcome (RA-014) — no blind retry,
+no @idempotent assumption; checksum no-op idempotency;
+media_source_of_truth required and enforced both directions (unset ->
+odoo_validation_configuration hold); no new error classes; concurrency
+caveat restated. Odoo.sh green + the §7
 dev-store evidence (or recorded explicit ChatGPT waiver). Stop
 condition: draft PR "Task 015B: basic product media export
 (shopify_connector_product_export)"; gate closes on draft-open; no

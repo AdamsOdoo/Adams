@@ -47,9 +47,9 @@ noted):**
 
 **New calls created by this revision (each Proposed, NOT accepted):**
 
-- **B1** Accept the **Task CORE-R1 packet** (D-R1-1..4) — incl. the
+- **B1** Accept the **Task CORE-R1 packet** (D-R1-1..5) — incl. the
   explicitly flagged `webhook_hmac` not-applicable relaxation
-  (D-R1-3).
+  (D-R1-3) and the D-R1-5 `api_health_state='normal'` write site.
 - **B2** Accept the **Task 010B packet** (D-010B-1..12) — incl. the
   dynamic-variant strategy (D-010B-2/3) and the basic-media scope
   with the 010C gallery deferral (D-010B-6/6a).
@@ -61,7 +61,10 @@ noted):**
 - **B5** Accept the **SEC-1 packet** (D-SEC1-1..7) — incl. the
   su-guard-over-ACL-rows design choice and the matrix-binds-sudo rule.
 - **B6** Accept/revise **DEC-030** (lifecycle/uninstall; ARCH PD-8;
-  Task LC-1) — or choose its named Option-D alternative.
+  Task LC-1 — **now with a full locked prompt (lifecycle doc §7.1) and
+  sequenced before Task 012 so every new-job-type packet adopts the
+  `_reassign_to_historic_job_type` callable from day one**) — or
+  choose its named Option-D alternative.
 - **B7** Accept **ARCH PD-7 + the premium design system** — incl. the
   §9 dashboard-hierarchy revision of the accepted nine-card layout
   and the severable §9.5 sparkline sub-call.
@@ -73,11 +76,16 @@ noted):**
   allowed files incl. `docs/09-ui-prototype/**`; PNG+md default —
   UI-U1 stays locked until the prototype is accepted in a recorded
   act).
+- **B11** Accept the **Task PERF-1 packet** (core queue throughput
+  calibration — configurable batch/cadence, lock-safety, Shopify
+  backpressure) so PB-19 (≥ 600 jobs/hour) has a gated implementation
+  owner, sequenced before performance UAT (re-review `4945129824`
+  item 5).
 
-Accepting the PR without naming exceptions accepts A1–A10 and B1–B9
-as proposed; A11 is optional; **B10 is an authorization act that must
-be explicit** (it schedules work). Every locked prompt remains
-unusable until its own gate act.
+Accepting the PR without naming exceptions accepts A1–A10 and
+B1–B9/B11 as proposed; A11 is optional; **B10 is an authorization act
+that must be explicit** (it schedules work). Every locked prompt
+remains unusable until its own gate act.
 
 ## 2. Critical path (revised — each step: **gate act** → one implementation session → draft PR → **merge review** → runtime-green closure)
 
@@ -86,26 +94,31 @@ unusable until its own gate act.
 | 1 | **Task CORE-R1** readiness correction | task-core-r1 packet §8 | This PR merged | No store can reach `connected` today — everything live downstream needs this first |
 | 2 | **Task 010B** product import completeness | task-010b packet §10 | CORE-R1 merged | DEC-003 product-import scope must be real before orders consume variant bindings |
 | 3 | **Task 011B** customer matching scalability | task-011b packet §9 | Task 011 (fact) | Order import reuses matching at order volume; may run **in parallel with 010B** (disjoint modules) — kept as step 3 for review clarity |
-| 4 | **Task 012** order import | task-012 packet §15 | CORE-R1 + 010B + 011B merged | Revised prerequisites in-packet |
-| 5 | **Task 016 / Area 6** triggers | area-6 packet §7 | 012 merged | Closes UAT blocker U-4; D-A6-7 no longer here |
-| 6 | **Task SEC-1** security hardening | task-sec1 packet §9 | Area 6 merged | Hardens the substrate incl. Area-6's services **before any UI button exists** |
-| 7 | **U0 visual prototype gate** | ui packet §7 prompt | B10 authorization | Design-only; **may run in parallel from acceptance onward**; must be accepted before step 8 |
-| 8 | **UI Phase U1** | ui packet §6 prompt | Area 6 + SEC-1 merged; U0 accepted | Dashboard per design system §9 |
-| 9 | **Task 013** inventory → **Task 013B** baseline → **Task LC-1** lifecycle | task-013 §8 / task-013b §9 / lifecycle doc §7 | 010B merged (013); 013 merged (013B, LC-1) | First mutation task; dev-store evidence rule active; LC-1 before UAT wave 3 |
-| 10 | **Task 014** fulfillment | task-014 packet §8 | 012 merged | Carries the TD-002 fix |
-| 11 | **Task 015** product export → **Task 015B** media export | task-015 §8 / task-015b §9 | 010B merged (015 consumes complete variants + compare-at field); 015 merged (015B) | Completes DEC-003 catalog scope incl. media |
-| 12 | **UI U2** (wizard/readiness) | ui packet §1 (prompt post-U1) | U1 merged; VAL-B2 strongly recommended first | |
-| 13 | **UI U3** (domain screens) | ui packet §1 (prompts per domain post-U1) | U1 + each domain merged | Rolling — may interleave with 9–11 |
-| 14 | **W1 + W2** webhooks (MVP tail) | webhook packet §6 | Area 6 + U1 merged | W1 replaces the CORE-R1 webhook_hmac pass with the real check |
-| 15 | **UAT waves 1–4** | final-mvp-uat-plan (36 scenarios) | per its §2/§6 | Human reviewer sessions; numeric PB pass/fail |
-| 16 | **Release execution + Go/No-Go** | release plan | UAT exit; budgets table measured; DEC-028 point-2 evidence | **The release act** |
+| 4 | **Task LC-1** lifecycle enablement | lifecycle doc §7.1 | CORE-R1 merged | **Moved here (re-review item 7): the `_reassign_to_historic_job_type` callable + `original_job_type` must exist in core BEFORE any new `job_type` is registered, so Tasks 012/013/013B/014/015/015B/Area-6 adopt it from day one and the two merged job types are converted — no uncontrolled later retrofit** |
+| 5 | **Task 012** order import | task-012 packet §15 | CORE-R1 + 010B + 011B + LC-1 merged | Revised prerequisites in-packet; adopts the LC-1 callable |
+| 6 | **Task 016 / Area 6** triggers | area-6 packet §7 | 012 merged | Closes UAT blocker U-4; D-A6-7 no longer here |
+| 7 | **Task SEC-1** security hardening | task-sec1 packet §9 | Area 6 merged | Hardens the substrate incl. Area-6's services **before any UI button exists** |
+| 8 | **U0 visual prototype gate** | ui packet §7 prompt | B10 authorization | Design-only; **may run in parallel from acceptance onward**; must be accepted before step 9 |
+| 9 | **UI Phase U1** | ui packet §6 prompt | Area 6 + SEC-1 merged; U0 accepted | Dashboard per design system §9 |
+| 10 | **Task 013** inventory → **Task 013B** baseline | task-013 §8 / task-013b §9 | 010B merged (013); 013 merged (013B) | First mutation task; dev-store evidence rule active; both adopt the LC-1 callable (LC-1 already merged at step 4) |
+| 11 | **Task 014** fulfillment | task-014 packet §8 | 012 merged | Carries the TD-002 fix |
+| 12 | **Task 015** product export → **Task 015B** media export | task-015 §8 / task-015b §9 | 010B merged (015 consumes complete variants + compare-at field); 015 merged (015B) | Completes DEC-003 catalog scope incl. media |
+| 13 | **UI U2** (wizard/readiness) | ui packet §1 (prompt post-U1) | U1 merged; VAL-B2 strongly recommended first | |
+| 14 | **UI U3** (domain screens) | ui packet §1 (prompts per domain post-U1) | U1 + each domain merged | Rolling — may interleave with 10–12 |
+| 15 | **W1 + W2** webhooks (MVP tail) | webhook packet §6 | Area 6 + U1 merged | W1 replaces the CORE-R1 webhook_hmac pass with the real check |
+| 16 | **Task PERF-1** core queue throughput calibration | task-perf1 packet §9 | merged core dispatcher; domain tasks mergeable | **Before performance UAT (re-review item 5): calibrates the dispatcher to PB-19 (≥ 600 jobs/hour) — the accepted 5-min×20 defaults cap at ~240/h; may run ∥ the P-B concurrency plan** |
+| 17 | **UAT waves 1–4** | final-mvp-uat-plan (36 scenarios) | per its §2/§6; PERF-1 merged for the performance scenarios (27/28/34) | Human reviewer sessions; numeric PB pass/fail |
+| 18 | **Release execution + Go/No-Go** | release plan | UAT exit; budgets table measured; DEC-028 point-2 evidence | **The release act** |
 
-Deviation note vs the review's expected order: identical through step
-8; steps 9–11 group the domain tasks with their B-completions
-(013→013B, 015→015B) and insert LC-1 (from DEC-030) before UAT wave
-3; U0 is marked parallelizable because it is design-only and gates
-only U1. Parallel-safe pairs are named in the table; nothing else may
-overlap.
+Deviation note vs the review's expected order: identical through
+step 3; **LC-1 is pulled up to step 4 (before Task 012)** so the
+historic-job reassignment callable exists before any new `job_type`
+is registered (re-review item 7 — no later retrofit); steps 10 and 12
+group the domain tasks with their B-completions (013→013B, 015→015B);
+**Task PERF-1 is inserted at step 16, before the UAT performance
+scenarios** (re-review item 5); U0 is marked parallelizable because it
+is design-only and gates only U1. Parallel-safe pairs are named in the
+table; nothing else may overlap.
 
 ## 3. Parallel external tracks (independent of the chain; start any time)
 
@@ -123,7 +136,9 @@ W3/W4 webhook accelerations; add-on modules
 (accounting/refund/payout/multi-store); OAuth/B-1/App Store/billing/
 compliance (Phase 2+); entitlement/licensing mechanics (Phase 2
 commercial); dark mode (design system). **No longer deferred:** 013B
-and 015B (now steps 9/11); the readiness closure (step 1); budgets
+and 015B (now steps 10/12); the readiness closure (step 1); LC-1
+lifecycle enablement (now step 4, full locked prompt at lifecycle doc
+§7.1); PB-19 throughput (now owned by Task PERF-1, step 16); budgets
 (exist now).
 
 ## 5. The exact next implementation session after acceptance
@@ -132,6 +147,7 @@ and 015B (now steps 9/11); the readiness closure (step 1); budgets
 `../07-implementation-plan/task-core-r1-readiness-correction-packet.md`
 §8, issued verbatim by ChatGPT in a new session after: this PR
 merges, the CORE-R1 gate act is performed, and the base SHA is
-stated. (Task 012 is step 4, not the next session — the 2026-07-10
-claim is superseded.) In parallel, at ChatGPT's discretion: the B10
-U0 authorization and the P-A/P-B external validations.
+stated. (Task 012 is now step 5 — after CORE-R1, 010B, 011B, and LC-1
+— not the next session; the 2026-07-10 claim is superseded.) In
+parallel, at ChatGPT's discretion: the B10 U0 authorization and the
+P-A/P-B external validations.

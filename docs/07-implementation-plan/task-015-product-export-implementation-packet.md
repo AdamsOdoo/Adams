@@ -226,6 +226,11 @@ check); MBQ-25 residual → Resolved (DRAFT-on-create, publishing
 withheld); 015B (media) → **fully planned successor packet**
 (revised 2026-07-11), sequenced before UAT/release.
 
+**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** the
+product-export job-type `selection_add` `ondelete`(s) use the LC-1
+callable `_reassign_to_historic_job_type` from the start (LC-1 precedes
+Task 012 — DEC-030 / lifecycle §7), so no later retrofit is needed.
+
 ## 8. Locked final implementation prompt (Task 015)
 
 ```text

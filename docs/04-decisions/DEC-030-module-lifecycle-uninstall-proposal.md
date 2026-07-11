@@ -41,7 +41,11 @@ capability removal?
    of truth; packaging proposal §5/§6, architecture §8, and release
    plan §2.3 cite it (revised in the same PR).
 5. Implementation lands as **Task LC-1** (design doc §7), sequenced
-   with/after Task 013 and before UAT wave 3 — its own gate act.
+   **before Task 012** (re-review `4945129824` item 7 — so every
+   new-job-type packet adopts the `_reassign_to_historic_job_type`
+   callable from its first implementation, no uncontrolled later
+   retrofit), with its **full locked prompt now in design doc §7.1** —
+   its own gate act.
 6. If ChatGPT instead judges binding-table loss on uninstall
    unacceptable, the named alternative is the rejected-here Option D
    (core-owned identity store) with its stated architectural costs —

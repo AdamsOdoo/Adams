@@ -46,19 +46,31 @@ the Lite baseline set). Variants without a level binding (item not
 stocked at the mapped location) are enumerated in the preview as
 "absent remotely — no action" rows, never invented.
 
-**D-013B-2 — Preview (mandatory, first phase).** Job type
+**D-013B-2 — Preview (mandatory, first phase) — quantity semantics
+made explicit (re-review `4945129824` item 2).** Job type
 `inventory_baseline_preview` (`job_source='export_preview_dry_run'` —
-the merged read-only source, reused for this read-only run): produces
-a per-pair table — Shopify `available`, current Odoo quantity for the
-mapped location (same `free_qty`-with-location-context read Task 013
-pushes from, so both directions use one recorded quantity semantic —
-RA-021's recorded-equivalence rule), the delta, and the resulting
-adjustment — stored as the job-log payload and on a
+the merged read-only source, reused for this read-only run) produces a
+per-pair table with the correct semantics: Shopify `available` is an
+**available/free** quantity, matched to Odoo location-context
+**`free_qty`** (the same quantity Task 013 pushes from), where — by
+Odoo's model — `free_qty = on_hand − reserved` (RA-021's
+recorded-equivalence rule, **corrected**: the equivalence is
+`available`↔`free_qty`, **never** `available`↔on-hand). An inventory
+adjustment sets **counted on-hand** (`stock.quant`), not `free_qty`,
+so the preview records, per pair: Shopify `available`
+(= `desired_free`, after the D-013B-4 negative clamp); current Odoo
+`free_qty`; current Odoo on-hand; current **reserved** quantity; the
+**counted-on-hand target** `target_on_hand = desired_free + reserved`
+(D-013B-4); and the resulting on-hand delta the apply will book. It is
+stored as the job-log payload and on a
 `shopify.connector.inventory.baseline.run` record (store, state
-`previewed/confirmed/applied/expired`, per-pair JSON, created_by/at,
+`previewed/confirmed/applied/expired`, per-pair JSON **including the
+reserved-quantity snapshot used to compute the target**, created_by/at,
 confirmed_by/at, applied_by/at). Preview **expires** after 24 h or on
-any mapping/binding change (write_date comparison) — stale previews
-cannot be confirmed.
+any mapping/binding change (write_date comparison); and — because the
+target depends on reserved quantity — apply additionally re-reads and
+**aborts on any quantity/reservation drift** (D-013B-4). Stale
+previews cannot be confirmed.
 
 **D-013B-3 — Operator confirmation (explicit, recorded).**
 `action_confirm_baseline_run()` — reviewer/admin groups only —
@@ -67,25 +79,61 @@ refuses any run not `confirmed` → `destructive_write_guard_blocked`
 (the accepted six-sub-reason set; no new classes). No auto-apply path
 exists; no flag bypasses the guard (merged invariant restated).
 
-**D-013B-4 — Safe Odoo stock adjustment mechanism.** Apply job type
-`inventory_baseline_apply`, one job **per pair** (`res_model/res_id` →
-the level-binding row; `operation_scope_key` serializes per pair;
-collision with Task 013 push jobs on the same pair is intended —
-baseline and push for one pair never run concurrently). Mechanism:
-the standard Odoo 19 inventory-adjustment path on `stock.quant`
-(set the counted quantity for [product, location], apply with a
-reference note "Shopify baseline import — job <id>") — **named
-build-time verification:** the exact 19.0 quant-adjustment API
-(counted-quantity field + apply method) is verified against the 19.0
-source in-session before use; STOP-and-report if it differs (no
-improvisation; same rule as Task 010B's D-010B-3). Products with
-`tracking != 'none'` (lots/serials) → `blocked_manual_review` /
-`binding_conflict` with a named reason (adjusting lot-tracked stock
-needs operator judgement). Negative Shopify `available` values import
-as the true negative? **No** — clamped to 0 with a note (mirror of
-Task 013's clamp; Odoo can represent negative counted quantities but
-importing a remote oversell state as a negative baseline creates
-phantom debt; flagged call).
+**D-013B-4 — Safe Odoo stock adjustment mechanism (re-review
+`4945129824` item 2 — free/on-hand semantics corrected).** Apply job
+type `inventory_baseline_apply`, one job **per pair**
+(`res_model/res_id` → the level-binding row; `operation_scope_key`
+serializes per pair; collision with Task 013 push jobs on the same
+pair is intended — baseline and push for one pair never run
+concurrently). Mechanism: the standard Odoo 19 inventory-adjustment
+path on `stock.quant` sets **counted on-hand**, so the counted-on-hand
+target that yields the desired free/available quantity is
+
+    target_on_hand = desired_shopify_available + current_reserved_quantity
+
+booked with a reference note "Shopify baseline import — job <id>".
+After the adjustment the apply step **verifies**
+`resulting_free_qty == desired_shopify_available` (recomputed from the
+post-write quant state); if it does not hold, it rolls back the
+savepoint and routes to `blocked_manual_review` / `binding_conflict`
+with the full quantity breakdown — the connector never leaves a
+baseline it cannot prove correct. **Named build-time verification:**
+the exact 19.0 quant-adjustment API (counted-quantity field + apply
+method) and the reserved-quantity read are verified against the 19.0
+source in-session before use; STOP-and-report if either differs (no
+improvisation; same rule as Task 010B's D-010B-3).
+
+**Immediate re-read + drift abort (race protection).** The apply
+handler **re-reads, inside its savepoint, immediately before writing**,
+every quantity it depends on — on-hand, reserved, the mapping, the
+binding, and the level binding's `write_date` — and **aborts** (no
+write; `destructive_write_guard_blocked`) if any changed from the
+confirmed preview snapshot. A reservation created between preview and
+apply therefore never yields a silently wrong baseline; the operator
+re-previews.
+
+**Enumerated edge behavior (fail closed where a deterministic
+adjustment is not provable):**
+- **Existing reservations:** handled by the `+ reserved` term above;
+  the reserved quantity is snapshotted at preview and re-read at apply.
+- **Multiple quants at one [product, location]** (distinct
+  lot/owner/package rows): a single free/available number is **not
+  deterministically attributable** across them →
+  `blocked_manual_review` / `binding_conflict` (fail closed), never a
+  guessed split.
+- **Owner/package quants:** any quant with a non-empty `owner_id` or
+  `package_id` at the pair → fail closed (same reason); the connector
+  does not adjust third-party-owned or packaged stock.
+- **In-flight moves / reservation changes between preview and apply:**
+  caught by the re-read + drift abort above.
+- **Lots/serials:** products with `tracking != 'none'` →
+  `blocked_manual_review` / `binding_conflict` (adjusting lot-tracked
+  stock needs operator judgement — named exclusion, unchanged).
+- **Negative Shopify `available`:** **not** imported as a true
+  negative — clamped to 0 with a note (mirror of Task 013's clamp;
+  Odoo can represent negative counted quantities, but importing a
+  remote oversell state as a negative baseline creates phantom debt;
+  flagged call). With the clamp, `desired_free = max(0, available)`.
 
 **D-013B-5 — Audit evidence.** Every applied pair logs: prior Odoo
 quantity, Shopify value, adjustment delta, quant reference, actor,
@@ -128,13 +176,22 @@ binding gains `baseline_applied_at` (Datetime ro) +
 ## 4. Tests (exact files)
 
 `test_inventory_baseline_preview.py` (per-pair table math incl.
+**free_qty vs on-hand vs reserved columns and the
+`target_on_hand = desired_free + reserved` computation**;
 absent-remotely rows; expiry on time and on mapping change; read-only
 source guard — no mutation strings in the module additions);
 `test_inventory_baseline_guard.py` (unconfirmed → blocked; stale
 preview → blocked; permission matrix reviewer/admin; no-bypass source
 scan; already-baselined pair excluded/refused without explicit
-override); `test_inventory_baseline_apply.py` (quant adjustment with
-reference; prior/new/delta evidence logged; clamp-to-0 note;
+override); `test_inventory_baseline_apply.py` (**counted-on-hand
+target = desired_available + reserved with post-write
+`free_qty == desired_available` verification**; **reservation present →
+target includes it, resulting free_qty correct**; **reservation
+created between preview and apply → drift abort
+(`destructive_write_guard_blocked`), no write**; **multiple quants at
+one [product, location] → fail closed**; **owner/package quant → fail
+closed**; quant adjustment with reference;
+prior/on-hand/reserved/new/delta evidence logged; clamp-to-0 note;
 lot-tracked → manual review; stamp written; replay collides;
 per-pair serialization vs push jobs); `test_inventory_baseline_run_model.py`
 (schema/states/ACL — auditor/operator read, reviewer confirm, admin
@@ -148,16 +205,23 @@ pull, no push changes ✅; 7 no fulfillment/product scope ✅; 8 no
 UI/webhook ✅; 9 tests ✅(§4); 10 rollback ✅(D-013B-7); 11 live
 validation required (§6); 12 gate-act reconfirmation; 13 the two
 flagged calls explicit: negative-clamp (D-013B-4) and
-re-inclusion-override (D-013B-6); 14 quantity semantics recorded
-✅(D-013B-2, RA-021); 15 lot-tracked routing explicit ✅(D-013B-4).
+re-inclusion-override (D-013B-6); 14 quantity semantics correct —
+`available`↔`free_qty`, adjustment target
+`on_hand = desired_free + reserved`, post-write verification + drift
+abort ✅(D-013B-2/4, RA-021); 15 lot-tracked / multi-quant /
+owner-package fail-closed routing explicit ✅(D-013B-4).
 
 ## 6. Odoo.sh + live validation
 
 Odoo.sh: full suites green (verbatim quote). Dev store: one full
-preview → confirm → apply cycle over ≥2 mapped pairs including one
-already-baselined replay refusal and one clamp case; evidence
-(redacted) in the validation record; explicit recorded ChatGPT waiver
-is the only alternative.
+preview → confirm → apply cycle over ≥2 mapped pairs including **one
+pair carrying a live reservation (proving
+`target_on_hand = desired_available + reserved` yields the correct
+post-apply `free_qty`)**, one already-baselined replay refusal, one
+clamp case, and **one deliberate drift case (a reservation added
+between preview and apply → apply aborts)**; evidence (redacted) in the
+validation record; explicit recorded ChatGPT waiver is the only
+alternative.
 
 ## 7. Acceptance criteria / DoD
 
@@ -173,6 +237,12 @@ D-013-8's deferral → superseded by this packet (013B is now a named,
 fully-planned MVP task, not a candidate); DEC-003 C-INV "controlled
 initial stock import" → planning-complete; release plan §2 and UAT
 plan gain the corresponding rows/scenarios (updated this session).
+
+**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):**
+`inventory_baseline_preview`/`inventory_baseline_apply` register their
+`selection_add` `ondelete` with the LC-1 callable
+`_reassign_to_historic_job_type` from the start (LC-1 precedes Task 012
+— DEC-030 / lifecycle §7), so no later retrofit is needed.
 
 ## 9. Locked final implementation prompt (Task 013B)
 
@@ -211,12 +281,18 @@ apply, no other path, no auto-apply, no bypass; one baseline per pair
 with recorded re-inclusion override only; verify the 19.0
 stock.quant counted-quantity/apply API against source before use —
 STOP and report if it differs; clamp negative remote values to 0
-with a note; lot-tracked products -> blocked_manual_review; prior
-quantities recorded for every write (the documented manual-undo
-path); quantity semantics: Shopify 'available' vs the same
-location-context free_qty read Task 013 uses (RA-021 recorded
-equivalence); committed never written or read for writing (RA-018);
-concurrency caveat restated. Odoo.sh green + the §6 dev-store cycle
+with a note; lot-tracked products -> blocked_manual_review; multiple
+quants at a pair / owner or package quants -> fail closed
+(blocked_manual_review); prior on-hand + reserved quantities recorded
+for every write (the documented manual-undo path); quantity semantics
+(re-review item 2): Shopify 'available' == location-context free_qty,
+and because an inventory adjustment sets COUNTED ON-HAND the target is
+on_hand = desired_available + current_reserved, verified after write by
+resulting free_qty == desired_available (else roll back to manual
+review); apply re-reads on-hand/reserved/mapping/binding immediately
+before writing and ABORTS on any drift from the confirmed preview;
+committed never written or read for writing (RA-018); concurrency
+caveat restated. Odoo.sh green + the §6 dev-store cycle
 evidence (or recorded explicit ChatGPT waiver). Stop condition:
 draft PR "Task 013B: controlled initial inventory baseline import";
 gate closes on draft-open; no other work.

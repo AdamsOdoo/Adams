@@ -132,7 +132,7 @@ dashboard work here.
 
 **D-A6-7 — Readiness pending-slot closure — SUPERSEDED 2026-07-11:
 moved to Task CORE-R1 (`task-core-r1-readiness-correction-packet.md`,
-D-R1-1..4), its own independently gated task sequenced before Task
+D-R1-1..5), its own independently gated task sequenced before Task
 010B/012 live use, per the PR #148 review item 5. The text below is
 preserved as the historical design record; CORE-R1's packet is the
 operative version (differences: `cron_queue_health` verifies the
@@ -246,6 +246,12 @@ description superseded (note); the red-team architecture BLOCKER
 CORE-R1** (revised 2026-07-11 — no longer this packet's; every
 mutation task's dev-store validation depends on CORE-R1, which
 precedes this task in the revised critical path).
+
+**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** every
+Area-6 scan/enumeration `job_type` `selection_add` `ondelete` uses the
+LC-1 callable `_reassign_to_historic_job_type` from the start (LC-1
+precedes Task 012 — DEC-030 / lifecycle §7), so no later retrofit is
+needed.
 
 ## 6. Gate criteria
 

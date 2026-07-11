@@ -1,5 +1,79 @@
 # Research Handoff (rolling)
 
+### AR-042 revision 2 — PR #148 re-review (comment `4945129824`) focused convergence patch (2026-07-11)
+
+- **What happened:** ChatGPT's control-room **re-review** of the
+  revised package at `10108b26` returned **REVISE** with nine focused,
+  load-bearing items. This session applied one focused **docs-only**
+  convergence patch to the same PR #148 (branch
+  `claude/odoo-shopify-mvp-planning-fdjlrk`) closing each at planning
+  level: (1) Task 010B existing-attribute **compatibility gate**
+  (`create_variant` reuse rule + `product_import_attribute_conflict_mode`,
+  no phantom variants); (2) Task 013B **quantity semantics** corrected
+  (`available`↔`free_qty`; counted-on-hand target
+  `desired_available + reserved`; post-write verify; re-read + drift
+  abort; fail-closed edges); (3) Task 015B **READY-first two-phase
+  pipeline**, File-GID vs Product-Media-GID identities, and
+  fresh-reference-check-before-`fileDelete`; (4) Task 012 **canonical
+  decimal tax key** + decimal-safe match, and **cap-free discount math**
+  with exact negative adjustment lines; (5) NEW **Task PERF-1** packet
+  (core queue throughput calibration — owns PB-19, before performance
+  UAT); (6) SEC-1 **exact RPC-safe override contract**
+  (`_odoo_binding_field_name()` seam + enumerated bindings +
+  scalar-id/reason method + negative RPC tests); (7) **full LC-1 locked
+  prompt** (lifecycle §7.1) + LC-1 resequenced before Task 012 +
+  adoption notes on 012/013/013B/014/015/015B/Area-6; (8) **rollback/
+  schema wording sweep** (code revert removes behavior; additive schema
+  may remain inert/orphaned; no destructive cleanup); (9) **CORE-R1
+  `D-R1-1..4` → `D-R1-1..5`** everywhere + repo-wide decision-range
+  sweep. Master closure map: `../08-release-readiness/mvp-planning-completion-audit.md`
+  §8.5. Revised critical path: CORE-R1 → 010B → 011B → **LC-1** → 012 →
+  Area 6 → SEC-1 → U0∥ → U1 → 013/013B → 014 → 015/015B → U2/U3 →
+  W1/W2 → **PERF-1** → UAT → release.
+- **High-power mode use:** small/targeted — one read-only reconnaissance
+  fan-out (5 agents) to extract exact edit anchors from the bulky global
+  docs; no new competitor/research sprint (the re-review forbade one);
+  targeted merged-code re-reads only where an exact mechanism had to be
+  corrected (dispatch batch/cron; binding field names; quant/free_qty).
+- **What this session does NOT do:** no code; no addon/XML/CSV/manifest/
+  migration/CI/Docker/requirements change; opens no gate (CORE-R1, U0,
+  PERF-1, LC-1, or any implementation gate); accepts no DEC/PD/D-item/
+  AR/packet; does not mark the PR ready or merge it; does not touch
+  `main` or plain `dev`. PR #148 stays **draft / open / unmerged**.
+- **Learning feedback loop:** the recurring lesson reinforced — a
+  planning packet must specify the *exact* mechanism, not a plausible
+  paraphrase: Float tax keys, `free_qty`-vs-on-hand, pre-`READY`
+  association, `D_lines × 0.5r`, and "columns drop on upgrade" were each
+  *nearly* right and each materially wrong. The convergence pattern
+  (canonical keys, explicit adjustment targets + verification, two-phase
+  READY gating, exact-representation-or-adjustment-line, additive-schema
+  rollback truth) is logged for reuse in future packets.
+- **Quality gate confirmation:** docs-only diff re-verified; every
+  claim classified; all nine re-review items mapped to a closing
+  artifact (audit §8.5); no locked prompt made usable; no gate opened.
+- **Stop condition:** push the focused revision to PR #148 and stop for
+  ChatGPT re-review.
+
+**Next-session prompt (exact):**
+
+```text
+Await ChatGPT's re-review of the PR #148 focused convergence patch
+(head = the new pushed SHA; closure map in
+docs/08-release-readiness/mvp-planning-completion-audit.md §8.5). Do
+NOT open any gate, accept any DEC/PD/packet, mark the PR ready, or
+merge. If the re-review returns REVISE, implement ONLY the exact items
+named, docs-only, on the same PR #148 branch
+(claude/odoo-shopify-mvp-planning-fdjlrk), and stop. If it ACCEPTS the
+package, the first implementation session is Task CORE-R1 (master plan
+§5): after the PR merges, perform the CORE-R1 gate act and issue the
+locked prompt from
+docs/07-implementation-plan/task-core-r1-readiness-correction-packet.md
+§8 verbatim in a new session, stating the verified base SHA. Task 012
+is step 5 (after CORE-R1, 010B, 011B, LC-1), not the next session.
+```
+
+---
+
 ### AR-042 revision — PR #148 control-room-review convergence patch (2026-07-11)
 
 - **What happened:** ChatGPT's strict review of PR #148 (comment

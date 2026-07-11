@@ -94,6 +94,22 @@ store layout (2 Shopify locations, 1 mapped); `UAT-F1` partial
 delivery + backorder flow. Seeding steps are operator instructions in
 the execution session (dev store, Bogus Gateway), not code.
 
+**Added 2026-07-11 (re-review `4945129824`):** `UAT-P4` a brownfield
+product whose Shopify option `Color` collides with a pre-existing Odoo
+`Color` attribute in `create_variant='always'` mode, plus a `Size`
+option colliding with a `no_variant` attribute (010B compatibility
+gate — must route to `manual_review`, or create a connector-owned
+`"Color (Shopify)"` attribute, and generate **no** phantom variants);
+`UAT-INV1` a mapped variant×location pair carrying a **live
+reservation** (013B — proves `target_on_hand = desired_available +
+reserved` and the post-apply `free_qty == desired_available` check),
+plus a second pair whose reservation **changes between preview and
+apply** (drift abort); `UAT-MED1` a disposable product for the 015B
+**READY-first** media sequence (staged upload → fileCreate → poll to
+`READY` → associate → reorder → retire), plus a File the merchant
+**reuses on a second product** (proves `fileDelete` is skipped /
+detach-only when foreign use cannot be excluded).
+
 ## 4. Evidence template (per scenario)
 
 ```text
@@ -164,6 +180,12 @@ of `../03-architecture/performance-budgets.md` (the
 is an S3, > 2× an S2-UX, per §5). The Wave-1 session additionally
 records: scan-to-imported latency for a 50-order batch (vs PB-18/19),
 drain throughput (PB-19), dashboard load at RD-1/RD-2 (PB-2).
+**Task PERF-1 (core queue throughput calibration) must be merged
+before the PB-19 throughput measurement (re-review `4945129824`
+item 5):** the accepted 5-min × batch-20 dispatch defaults cap at
+~240/h, so PB-19 (≥ 600 jobs/hour) is measured against a
+PERF-1-calibrated dispatcher, not the raw defaults — otherwise the
+scenario cannot pass and is not a valid acceptance signal.
 Concurrency: UAT runs after (or alongside) the concurrency plan's
 scenarios — UAT itself adds the two-operator double-retry case (same
 failed job retried by two users — one wins, one no-ops, audit shows

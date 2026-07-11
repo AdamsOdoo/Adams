@@ -78,30 +78,68 @@ platform; guards a schema change). `first` is always explicit
 (no documented default page size — captures §9 open question 1).
 
 **D-010B-2 — Options → attributes → values → lines (the real Odoo
-structure).** For each Shopify option (in `position` order):
-resolve `product.attribute` by **case-insensitive exact name match**;
-create if absent with `create_variant='dynamic'` (D-010B-3 rationale).
-For each option value: resolve `product.attribute.value` under that
-attribute by case-insensitive exact name; create if absent. Build one
-`product.template.attribute.line` per option on the template with the
-used value set; on refresh, new remote values **extend** the line
-(additive; values are never detached automatically — a remote value
-disappearance is a review note, not a destructive write).
+structure), with an explicit existing-attribute compatibility rule
+(re-review `4945129824` item 1).** For each Shopify option (in
+`position` order): resolve `product.attribute` by **case-insensitive
+exact name match**.
+
+**Compatibility gate (deterministic — the review's blocker):** a
+same-name attribute is **reused only when its `create_variant` mode is
+compatible** with the sparse Shopify-variant strategy, i.e.
+`create_variant == 'dynamic'`. Modes `'always'` (would cartesian-
+generate phantom Odoo variants with no Shopify counterpart) and
+`'no_variant'` (would create no variants at all, unable to represent
+Shopify's set) are **incompatible**, and the mode is **immutable once
+used** — so the connector **never** changes an existing attribute's
+mode. Outcomes:
+- **No same-name attribute:** create it with `create_variant='dynamic'`
+  (D-010B-3 rationale) and use it.
+- **Same-name, compatible (`dynamic`):** reuse it.
+- **Same-name, incompatible (`always`/`no_variant`):** never reuse and
+  never mutate it. The deterministic safe outcome is governed by the
+  new per-store setting `product_import_attribute_conflict_mode`
+  (§4, Selection, **default `manual_review`**):
+  - `manual_review` (default, fail-closed): the product routes to
+    `blocked_manual_review` / `binding_conflict` naming the option, the
+    existing attribute, and its incompatible mode, so an operator maps
+    the Shopify option to a compatible attribute (or authorizes the
+    connector-owned path) — **no import proceeds on a guess**;
+  - `connector_owned`: the connector creates and uses a clearly named,
+    **connector-owned separate** attribute `"<name> (Shopify)"` with
+    `create_variant='dynamic'` (recorded as connector-owned), leaving
+    the merchant's same-name attribute untouched.
+  Under **no** setting is the merchant's attribute's mode changed, and
+  under **no** setting are phantom cartesian variants generated.
+
+For each option value: resolve `product.attribute.value` under the
+**resolved** attribute by case-insensitive exact name; create if
+absent. Build one `product.template.attribute.line` per option on the
+template with the used value set; on refresh, new remote values
+**extend** the line (additive; values are never detached automatically
+— a remote value disappearance is a review note, not a destructive
+write).
 **Special case (Shopify's default shape):** a product whose only
 option is `Title` with sole value `Default Title` is a true
 single-variant product → no attribute structure is created (bare
 template + singleton, exactly today's clean path).
-**Shared-master-data note (flagged):** `product.attribute`/`.value`
-are database-global; concurrent imports could race duplicate
-creations (no uniqueness constraint exists upstream). Mitigation:
-case-insensitive get-or-create inside the product's savepoint +
-the named concurrency caveat; a post-import reconciliation sweep is a
-release-hardening candidate, not in-scope.
+**Shared-master-data + concurrency note (flagged):**
+`product.attribute`/`.value` are database-global; concurrent imports
+could race duplicate creations (no uniqueness constraint exists
+upstream). Mitigation: the case-insensitive get-or-create **and the
+compatibility gate** run inside the product's savepoint (the mode is
+read on the row the get-or-create resolves, so a concurrently-created
+same-name attribute is evaluated for compatibility exactly like a
+pre-existing one — never blindly reused); the named concurrency caveat
+stands; a post-import reconciliation sweep is a release-hardening
+candidate, not in-scope.
 
 **D-010B-3 — Deterministic creation of ALL variants, `dynamic` mode.**
-Attributes are created `create_variant='dynamic'` so Odoo does **not**
-cartesian-generate variants; the importer then **explicitly
-instantiates exactly the variants Shopify has**: for each remote
+Every attribute used by this path is `create_variant='dynamic'` — new
+ones are created that way and reused ones are guaranteed `dynamic` by
+the D-010B-2 compatibility gate (an incompatible same-name attribute
+never reaches this step) — so Odoo does **not** cartesian-generate
+variants; the importer then **explicitly instantiates exactly the
+variants Shopify has**: for each remote
 variant, map its `selectedOptions` to the template's
 `product.template.attribute.value` combination and get-or-create the
 `product.product` for that combination via the template's dynamic
@@ -234,7 +272,10 @@ skip). No new error classes (fixed-16 registry intact).
 
 `product_import_media_enabled` (Boolean, default True);
 `product_import_refresh_mode` (Selection snapshot_only/shopify_fields,
-default snapshot_only).
+default snapshot_only);
+`product_import_attribute_conflict_mode` (Selection
+`manual_review`/`connector_owned`, **default `manual_review`** —
+D-010B-2 incompatible same-name attribute handling).
 
 ## 5. Tests (exact files)
 
@@ -247,7 +288,15 @@ via payload-hash collision).
 New: `test_product_attribute_import.py` (option→attribute/value/line
 construction incl. case-insensitive reuse, position order,
 Default-Title special case, additive value extension, dynamic mode
-set at creation, structural-mismatch → binding_conflict);
+set at creation, structural-mismatch → binding_conflict; **existing
+same-name `Color` with `create_variant='always'` → not reused, not
+mutated → `manual_review` default routes to `binding_conflict`, and
+under `connector_owned` creates `"Color (Shopify)"` dynamic; existing
+`Size` with `no_variant` → same incompatible handling; a compatible
+existing `dynamic` attribute → reused; concurrent
+get-or-create/compatibility evaluation of a same-name attribute; a
+brownfield database with a pre-existing `always` `Color` produces no
+phantom cartesian variants**);
 `test_product_variant_generation.py` (sparse-set determinism: Odoo
 variants ≡ Shopify variants exactly, no phantom combinations; ≥1
 case with 3 options; deterministic re-import idempotency; 150-variant
@@ -275,8 +324,10 @@ publishing scope ✅; 7 no order/customer scope ✅; 8 no UI/webhook/
 OAuth ✅; 9 tests ✅(§5); 10 rollback ✅(§8); 11 live dependency =
 read-only dev-store validation (§7) — required, not waivable silently;
 12 gate-act reconfirmation; 13 the three flagged calls explicit:
-D-010B-2/3 dynamic-mode attribute strategy, D-010B-5 compare-at field
-relocation (cross-packet), D-010B-6a gallery deferral; 14 refresh
+D-010B-2/3 dynamic-mode attribute strategy **incl. the
+existing-attribute compatibility gate + `attribute_conflict_mode`
+default `manual_review`**, D-010B-5 compare-at field relocation
+(cross-packet), D-010B-6a gallery deferral; 14 refresh
 ownership set explicit ✅(D-010B-7); 15 archived/deleted semantics
 explicit ✅(D-010B-8).
 
@@ -287,7 +338,12 @@ quote, OP-43). Dev store (read-only): import (a) a 3-option sparse
 multi-variant product, (b) a >100-variant product (pagination proof),
 (c) the one-time 2,048-variant timing probe, (d) an image-bearing
 product incl. refresh + merchant-image-protection check, (e) an
-archived and a deleted product. Redacted evidence in the validation
+archived and a deleted product, **(f) a product whose option name
+collides with a pre-existing incompatible-mode (`always`/`no_variant`)
+Odoo attribute — proving the compatibility gate routes to
+`manual_review` (or, under `connector_owned`, creates the distinctly
+named attribute) and generates no phantom variants (the UAT fixture)**.
+Redacted evidence in the validation
 record; prerequisite is the CORE-R1 `connected` path + VAL-B2
 credentials; if unavailable, ChatGPT explicitly waives at gate time
 with the fact recorded (flagged option, not assumed).
@@ -297,22 +353,31 @@ with the fact recorded (flagged option, not assumed).
 An ordinary multi-option Shopify product imports to a complete Odoo
 product (attributes, values, lines, exactly-matching variants, price
 per SoT, primary+variant images) atomically and idempotently; >100
-variants paginate; refresh is safe per mode; deletion/archival →
-stale binding, Odoo data untouched; all suites + Odoo.sh green +
-dev-store evidence; validation record + AR row + handoff; draft PR;
-gate closes on draft-open. Rollback: revert the single PR — bindings
-drop with module fields at upgrade; created products/attributes/
-values remain as ordinary master data (documented, harmless — they
-are real catalog records the merchant may keep or delete); no
-migration scripts.
+variants paginate; refresh is safe per mode; **an existing
+incompatible-mode same-name attribute is never reused or mutated and
+never yields phantom variants (routes per `attribute_conflict_mode`)**;
+deletion/archival → stale binding, Odoo data untouched; all suites +
+Odoo.sh green + dev-store evidence; validation record + AR row +
+handoff; draft PR; gate closes on draft-open. Rollback: revert the
+single PR — the import **code path/behavior is removed**; the additive
+binding table/columns may **remain inert/orphaned** in the database (a
+normal code revert does **not** drop them — no destructive schema
+cleanup is assumed; any cleanup is a separately tested migration, never
+part of the revert); created products/attributes/values remain as
+ordinary master data (documented, harmless — they are real catalog
+records the merchant may keep or delete); no migration scripts in the
+revert.
 
 ## 9. Register impacts on acceptance
 
 The review's "Task 010 treated as complete" finding → closed by this
-packet at planning level. Task 012 packet prerequisite updated
-(010B before 012). Task 015 packet updated (compare-at field
-relocation D-010B-5). `performance-budgets.md` §4 rows cite
-D-010B-11. Deferred-with-names: 010C media gallery.
+packet at planning level. **Re-review `4945129824` item 1
+(existing-attribute compatibility) → closed by the D-010B-2
+compatibility gate + `product_import_attribute_conflict_mode`.**
+Task 012 packet prerequisite updated (010B before 012). Task 015
+packet updated (compare-at field relocation D-010B-5).
+`performance-budgets.md` §4 rows cite D-010B-11. Deferred-with-names:
+010C media gallery.
 
 ## 10. Locked final implementation prompt (Task 010B)
 
@@ -332,7 +397,7 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_product/models/shopify_connector_product_template_binding.py   (image-checksum field only)
   addons/shopify_connector_product/models/shopify_connector_product_variant_binding.py    (image-checksum field only)
   addons/shopify_connector_product/models/shopify_connector_product_product.py            (NEW — _inherit product.product: shopify_compare_at_price)
-  addons/shopify_connector_product/models/shopify_connector_store_settings.py             (NEW — the two §4 settings fields)
+  addons/shopify_connector_product/models/shopify_connector_store_settings.py             (NEW — the §4 settings fields incl. product_import_attribute_conflict_mode)
   addons/shopify_connector_product/models/__init__.py                                     (import lines)
   addons/shopify_connector_product/__manifest__.py                                        (version bump only)
   addons/shopify_connector_product/tests/{test_product_import_matching.py,
@@ -352,8 +417,14 @@ plain dev.
 
 IMPLEMENT exactly per the packet: D-010B-1 paginated extended query
 (explicit first:100, cursors in-run only, 2048 defensive cap);
-D-010B-2 case-insensitive get-or-create attributes/values + attribute
-lines + Default-Title special case; D-010B-3 dynamic-mode
+D-010B-2 case-insensitive get-or-create attributes/values with the
+EXISTING-ATTRIBUTE COMPATIBILITY GATE (reuse only create_variant=
+'dynamic'; an incompatible 'always'/'no_variant' same-name attribute
+is never reused or mutated -> product_import_attribute_conflict_mode:
+manual_review default routes to binding_conflict, connector_owned
+creates a distinctly-named "<name> (Shopify)" dynamic attribute; never
+change an attribute's mode; never generate phantom cartesian variants)
++ attribute lines + Default-Title special case; D-010B-3 dynamic-mode
 deterministic variant instantiation (verify the 19.0 dynamic-creation
 API against source before use — STOP and report if it differs; no
 phantom variants; structural mismatch -> binding_conflict);

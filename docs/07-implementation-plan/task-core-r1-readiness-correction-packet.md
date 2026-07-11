@@ -43,7 +43,7 @@ no change to the aggregate algorithm, activation rules, store
 lifecycle, job model, dispatcher, ACLs, or any other core file; no UI;
 no Shopify calls added to any check.
 
-## 3. Decision closures (D-R1-1 … D-R1-4) — each Proposed
+## 3. Decision closures (D-R1-1 … D-R1-5) — each Proposed
 
 **D-R1-1 — `cron_queue_health` becomes a real, capability-aware
 check.** Pass conditions, evaluated with no Shopify call and no

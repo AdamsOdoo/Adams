@@ -12,10 +12,16 @@
 > Odoo apps + explicit operator policy, never from connector edition
 > (D-012-7 revised); (b) `order_tax_autocreate` defaults to **False**
 > with explicit tax mapping preferred (D-012-9 revised); (c) the
-> total-check tolerance is now component-based with a
-> currency-relative cap (D-012-2 revised); (d) prerequisites now
-> include **CORE-R1, Task 010B, and Task 011B** (complete variant
-> bindings + scalable customer matching precede order import).
+> total-check tolerance is now component-based (D-012-2 revised);
+> (d) prerequisites now include **CORE-R1, Task 010B, and Task 011B**
+> (complete variant bindings + scalable customer matching precede
+> order import). **Further revised 2026-07-11 per re-review comment
+> `4945129824` (items 4a/4b): the tax mapping is keyed on a canonical
+> decimal-string rate (`shopify_rate_key`, never a Float) with
+> decimal-safe existing-tax matching (D-012-9); and the discount math
+> drops the unsound `D_lines × 0.5r` term for a cap-free
+> component-sum bound plus exact negative "Shopify Order Discount"
+> adjustment lines (D-012-2/D-012-8).**
 > Original evidence: the 2026-07-10 captures
 > (`../00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md`
 > §2/§8/§9 — "captures" below) and the final architecture
@@ -107,21 +113,43 @@ no longer hide under aggregate slack:
 1. **Lines:** `|odoo_untaxed_lines_sum − shopify_lines_expected|
    ≤ tol_lines`, where `shopify_lines_expected` = Σ per-line
    `discountedUnitPriceSet × quantity` minus order-level
-   `discountAllocations`, and `tol_lines = r × (0.5 × N_lines +
-   D_lines × 0.5)` — `r` = the order currency's `res.currency.rounding`
-   (captures-11 §6: rounding drives `decimal_places`; default 0.01;
-   JPY 1.0; three-decimal currencies 0.001), `N_lines` = SO line
-   count, `D_lines` = lines carrying an Odoo `discount` % (each %
-   quantized at 2 dp contributes ≤ 0.5r allocation residual).
+   `discountAllocations`, and `tol_lines = r × 0.5 × L` — `r` = the
+   order currency's `res.currency.rounding` (captures-11 §6: rounding
+   drives `decimal_places`; default 0.01; JPY 1.0; three-decimal
+   currencies 0.001), `L` = the count of Odoo SO lines contributing to
+   the untaxed sum (product lines + shipping + tip + any explicit
+   negative discount-adjustment line — D-012-8). Each such line's
+   `price_subtotal` is Odoo-rounded to `r`, so it contributes at most
+   `0.5r` to the discrepancy. **There is no separate per-discount
+   tolerance term** — the old `D_lines × 0.5r` term is **withdrawn**
+   (review item 4b, accepted): a 2-dp `discount` % quantized by up to
+   0.005 percentage points produces a monetary error of
+   `gross_line_base × 5×10⁻⁵`, which **scales with the line base** and
+   exceeds `0.5r` on a high-value line, so a flat `0.5r`-per-discounted-
+   line bound is mathematically unsound. Instead, an order-level
+   allocation is written to a native Odoo `discount` % **only when that
+   percentage, quantized to the Discount precision, reproduces the
+   exact Shopify allocation for that line to within `0.5r`**; otherwise
+   the residual is carried by an explicit negative **"Shopify Order
+   Discount"** adjustment line at the exact amount (D-012-8), so no
+   discounted line can contribute more than its own `0.5r` rounding
+   step.
 2. **Taxes:** `|odoo_amount_tax − totalTaxSet.shopMoney| ≤ tol_tax =
    r × 0.5 × N_tax_lines` (per-tax-group rounding bounded by r/2).
-3. **Shipping + tip:** exact to one rounding step each
-   (`≤ r` per component — single lines, no accumulation).
-4. **Total:** `|amount_total − totalPriceSet.shopMoney| ≤
-   min(tol_lines + tol_tax + 2r, CAP)` with **CAP = 10 × r —
-   currency-relative** (0.10 in 2 dp currencies, 10 JPY, 0.010 BHD),
-   replacing the old fixed 1.00-currency-unit cap, which could hide a
-   material mismatch (review finding — accepted).
+3. **Shipping + tip:** carried as SO lines (counted in `L`); each is
+   exact to one rounding step (`≤ 0.5r`, single lines, no
+   accumulation).
+4. **Total:** `|amount_total − totalPriceSet.shopMoney| ≤ tol_lines +
+   tol_tax` — the bound is exactly the **sum of the legitimately-
+   derived per-line and per-tax rounding tolerances**, with **no
+   additional fixed or currency-relative cap** (both the original
+   1.00-unit cap and the interim `10×r` cap are withdrawn — any cap
+   either hides a material mismatch when loose or rejects a legitimate
+   high-value order when tight). Because discounts are exact by
+   construction (native-if-faithful, else the negative line), a
+   high-value discounted order stays inside this bound, while a missing
+   or wrong line shifts a subtotal by far more than `0.5r` and is
+   rejected.
 
 Any component or total breach → roll back the savepoint (no SO
 persists), classify `financial_total_mismatch` (existing class;
@@ -131,9 +159,15 @@ Odoo amount, each tolerance term) in `job.log.technical_detail` JSON.
 The guard is mandatory and permanent; no flag bypasses it; tolerances
 are formula-fixed (no per-store tolerance setting exists).
 **Mandatory test matrix (review-required):** high line counts (100
-lines at cap), `taxesIncluded` true/false, line + order discounts,
-accumulated small rounding drift inside bounds (accepted), a real
-mismatch (missing line / wrong price — rejected at component level),
+lines); a **high-value, many-line discounted order** whose faithful
+native-% representation would exceed `0.5r` — **accepted** via the
+exact negative "Shopify Order Discount" line (proving the withdrawn
+`D_lines × 0.5r` term is not relied on); a **pathological allocation**
+spread across many lines (each line's representation chosen by the
+faithfulness gate; total exact); `taxesIncluded` true/false (included-
+and excluded-tax); line + order discounts; accumulated small rounding
+drift inside bounds (accepted); a real mismatch (missing line / wrong
+price — **rejected at component level under the cap-free bound**);
 zero-decimal (JPY, r=1.0) and three-decimal (BHD, r=0.001) currency
 orders (ISO 4217 minor units — captures-11 §12). Shopify-side
 three-decimal precision policy is officially undocumented
@@ -262,12 +296,20 @@ binding alone is insufficient); `product_uom_qty = quantity`
 (`currentQuantity` is refund-adjusted — refunds are out of scope, the
 ordered quantity is imported; both captured in evidence);
 `price_unit = discountedUnitPriceSet.shopMoney.amount` (line-level
-discounts baked in — captures §2); order-level/code discounts (from
-`discountAllocations`) land in the Odoo `discount` % field computed at
-its 2-dp precision, residual drift absorbed by the D-012-2 tolerance;
-`originalUnitPriceSet` and all allocations preserved in the evidence
-payload; `shopify_line_item_gid` set; `name` = LineItem `title` (+
-`variantTitle`). **Unmatched product line** → whole-order-hold:
+discounts baked in — captures §2); **order-level/code discount
+allocations** (from `discountAllocations`) are applied per line by the
+**faithful-representation rule (D-012-2):** the allocation is written
+to the Odoo `discount` % field **only when** that percentage,
+quantized to the Discount precision (2 dp default), reproduces the
+exact allocated amount for the line to within `0.5r`; when it cannot
+(typically high-value lines, where a 2-dp % cannot hit the cent), the
+allocation is instead carried by an explicit negative **"Shopify Order
+Discount"** service line (auto-provisioned per store,
+`default_code SHOPIFY-ORDER-DISCOUNT`, `price_unit` = the exact
+negative residual amount, no tax) so the SO total reconciles exactly
+rather than relying on tolerance slack; `originalUnitPriceSet` and all
+allocations preserved in the evidence payload; `shopify_line_item_gid`
+set; `name` = LineItem `title` (+ `variantTitle`). **Unmatched product line** → whole-order-hold:
 `mapping_missing` → `failed_retryable` (accepted rule) naming the
 SKU/GID; binding arrives → retry completes. **Custom line items**
 (null `variant` — captures §2 inference, flagged): imported via a
@@ -293,17 +335,32 @@ silently create accounting configuration.** Resolution order for
 each distinct `TaxLine` on a line/shipping line:
 
 1. **Explicit tax mapping (preferred):** new model
-   `shopify.connector.tax.mapping` (store_id; `shopify_rate_percent`
-   Float; `price_include` Boolean; `account_tax_id` M2o `account.tax`
-   required restrict; UNIQUE(store_id, shopify_rate_percent,
-   price_include)) — admin-maintained (rwc admin, read others, no
-   unlink; settings-area UI in a later phase, shell/import until
-   then). A mapping hit resolves immediately.
-2. **Existing-tax rate match:** exact match on (company,
-   `type_tax_use='sale'`, `amount_type='percent'`,
-   `amount = rate×100`, price inclusion per `Order.taxesIncluded`
-   via `price_include_override`, the 19.0-correct field — captures
-   §8); attach via `tax_ids`.
+   `shopify.connector.tax.mapping` (store_id; **`shopify_rate_key`
+   Char** — the **canonical decimal-string percentage key, not a
+   Float**; `price_include` Boolean; `account_tax_id` M2o `account.tax`
+   required restrict; **UNIQUE(store_id, shopify_rate_key,
+   price_include)** on the canonical key). **Canonicalization
+   (documented, review item 4a):** Shopify sends tax rates as decimal
+   strings (`TaxLine.rate` fraction / `ratePercentage`); the connector
+   parses the percentage with `decimal.Decimal` (**never** `float`),
+   quantizes to 6 decimal places, strips trailing zeros and any
+   trailing separator, and stores the result as the key — so `0.05`,
+   `0.050`, and `5.00 %` all canonicalize to the single key `"5"`, and
+   `8.375 %` to `"8.375"`. A null/empty rate never produces a key (it
+   holds — step 3). Admin-maintained (rwc admin, read others, no
+   unlink; settings-area UI in a later phase, shell/import until then).
+   A mapping hit (same canonical key + `price_include`) resolves
+   immediately.
+2. **Existing-tax rate match:** **decimal-safe** match on (company,
+   `type_tax_use='sale'`, `amount_type='percent'`, price inclusion per
+   `Order.taxesIncluded` via `price_include_override`, the 19.0-correct
+   field — captures §8). The rate comparison is **never** a raw float
+   equality: the candidate `account.tax.amount` is canonicalized by the
+   same step-1 rule and compared to the Shopify canonical key
+   (equivalently `float_compare(tax.amount, rate_percent,
+   precision_digits=6) == 0`); attach via `tax_ids`. Because both a
+   mapping row and an existing tax resolve through the one canonical
+   key, they can never disagree on identity.
 3. **Unmatched → hold, never create:**
    `odoo_validation_configuration` (`failed_retryable`) naming the
    exact rate/inclusion pair; the readiness surface carries a
@@ -451,14 +508,23 @@ rate-match + creation + reuse, addresses/dedup, metadata, guest
 paths, custom/gift-card lines, UTC parsing);
 `tests/test_order_totals_guard.py` (the full D-012-2 revised matrix:
 per-component checks and formulas; tolerance boundary ± at each
-component; 100-line high-count case; line + order discounts;
-accumulated in-bounds drift accepted; real mismatch rejected at
-component level; taxesIncluded variants; JPY zero-decimal and BHD
-three-decimal cases; currency-relative cap);
+component; 100-line high-count case; **high-value discounted order
+accepted via the exact negative "Shopify Order Discount" line**;
+**pathological many-line allocation reconciles exactly**; line + order
+discounts; accumulated in-bounds drift accepted; real mismatch
+(missing line / wrong price) rejected at component level under the
+**cap-free** bound; taxesIncluded (included/excluded) variants; JPY
+zero-decimal and BHD three-decimal cases; **no fixed/currency-relative
+cap relied upon**);
 `tests/test_order_tax_resolution.py` (mapping-first resolution;
-rate-match second; unmatched → configuration hold naming the pair;
-autocreate default-False; opt-in creation + audit line + dedup;
-mapping model schema/uniqueness/ACL); `tests/test_order_duplicate_prevention.py` (re-import
+rate-match second via **decimal-safe comparison**; **canonical-key
+equivalence — `0.05`, `0.050`, and `5.00 %` all resolve to one mapping
+row; a fractional / `>2`-decimal percentage (`8.375 %`) keys and
+matches exactly; included- vs excluded-tax (`price_include`) variants
+key and resolve independently**; unmatched → configuration hold naming
+the pair; autocreate default-False; opt-in creation + audit line +
+dedup; mapping model schema/uniqueness/ACL on the canonical key);
+`tests/test_order_duplicate_prevention.py` (re-import
 no-dup, evidence-refresh-only incl. the **source-level
 no-SO-write-on-refresh guard test**, idempotency-key collision,
 divergent-currency/duties/test/cancelled skips);
@@ -507,6 +573,13 @@ UAT scenarios 6/7/8 map to this task. Register impacts on acceptance:
 OP-14/15/16/17 → Resolved-by-packet; MBQ-55 order portion → Accepted;
 MBQ-56/MBQ-27/DEC-020-residual → Resolved at decision level.
 
+**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** the
+`order_import_sync` `job_type` `selection_add` `ondelete` uses the LC-1
+callable `_reassign_to_historic_job_type` from the start (LC-1 precedes
+Task 012 — DEC-030 / lifecycle §7), so no later retrofit is needed.
+**SEC-1 override seam (item 6):** `shopify.connector.order.binding`
+declares `_odoo_binding_field_name()` returning `sale_order_id`.
+
 ## 15. Locked final implementation prompt (Task 012)
 
 ```text
@@ -551,9 +624,13 @@ IMPLEMENT exactly per the packet: D-012-1 binding schema (explicit
 _name+_inherit, models.Constraint, dual uniqueness); D-012-2 REVISED
 component-based guard (lines/taxes/shipping+tip component checks with
 the packet's exact tolerance formulas derived from
-res.currency.rounding, total check capped at 10 × rounding —
-currency-relative, never a fixed unit; rollback +
-financial_total_mismatch; JPY and BHD cases in the test matrix);
+res.currency.rounding; total bound = sum of the per-line and per-tax
+rounding tolerances with NO fixed or currency-relative cap; order-level
+discount allocations written to a native Odoo discount % only when
+faithful to within 0.5r, otherwise carried by an exact negative
+"Shopify Order Discount" line; rollback + financial_total_mismatch;
+high-value / pathological-allocation / JPY / BHD / included-excluded
+cases in the test matrix);
 D-012-3 skipped-by-policy routing (divergent currency, duties, test
 orders, pre-cancelled) via the ONE named additive core seam
 (JobPolicySkip + except-branch → _transition_skipped) — never a new
@@ -573,11 +650,15 @@ copy, or tests; date_order = processedAt UTC; never auto-cancelling
 an SO on refresh; D-012-8 line mapping (variant-binding resolution,
 whole-order-hold mapping_missing on unmatched, discountedUnitPrice +
 discount%, custom-item service product, gift-card note); D-012-9
-REVISED taxes: mapping-model-first, existing-rate-match second,
-unmatched -> configuration hold naming the rate (never silent
-creation), order_tax_autocreate default False and admin-gated with
-audited creations when explicitly enabled (price_include_override,
-null-rate hold);
+REVISED taxes: mapping-model-first on a CANONICAL decimal-string rate
+key (shopify_rate_key — Decimal-parsed, quantized to 6 dp, never a
+Float; UNIQUE(store_id, shopify_rate_key, price_include)),
+existing-rate-match second via decimal-safe comparison
+(float_compare / canonical key, never raw float equality), unmatched ->
+configuration hold naming the rate (never silent creation),
+order_tax_autocreate default False and admin-gated with audited
+creations when explicitly enabled (price_include_override, null-rate
+hold);
 D-012-10/11 currency/pricelist/company/team resolution and UTC parsing;
 D-012-12 evidence-refresh-only re-import (note-type log rows) with the
 source-level no-SO-write guard test + the module-local

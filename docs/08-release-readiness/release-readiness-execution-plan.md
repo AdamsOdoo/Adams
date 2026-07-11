@@ -60,12 +60,17 @@ Lite is released implicitly (subset of the same artifacts).
 6. **Support diagnostics:** the readiness check + job/log export
    (existing surfaces) documented as the support bundle; no new code.
 7. **Performance (REVISED 2026-07-11 — budgets exist before
-   implementation, review item 10):** the full
+   implementation, review item 10; PERF-1 owns throughput, re-review
+   `4945129824` item 5):** the full
    `../03-architecture/performance-budgets.md` table measured
    (concurrency plan §13.2 + UAT scenarios 27/28/34 + the packet
-   benchmarks are the measurement vehicles); every row measured-pass,
-   or carrying an explicit dated ChatGPT waiver — silence is not a
-   waiver; release hardening (Area 8) owns resulting tuning tasks.
+   benchmarks are the measurement vehicles); **PB-19 (≥ 600 jobs/hour)
+   is delivered by Task PERF-1 — core queue throughput calibration —
+   merged before the performance UAT scenarios, because the accepted
+   5-min × batch-20 dispatch defaults cap at ~240/h**; every row
+   measured-pass, or carrying an explicit dated ChatGPT waiver —
+   silence is not a waiver; release hardening (Area 8) owns any
+   residual tuning.
 8. **Security (REVISED 2026-07-11):** credential redaction suite
    green (existing); masked-entry/no-read-back re-verified in UI;
    no-encryption-claim copy audit (grep of views/copy decks); PII

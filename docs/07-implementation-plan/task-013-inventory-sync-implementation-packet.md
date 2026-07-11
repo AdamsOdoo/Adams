@@ -281,6 +281,16 @@ OP-18/OP-19 → Resolved-by-packet; MBQ-32 residual → Resolved (free_qty
 + location context + clamp); MBQ-38 → Resolved (confirmation record on
 binding row); MBQ-63 exclusion restated unchanged.
 
+**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):**
+`inventory_push_sync` / `inventory_first_push_preview` register their
+`selection_add` `ondelete` with the LC-1 callable
+`_reassign_to_historic_job_type` from the start (LC-1 precedes Task 012
+— DEC-030 / lifecycle §7), so no later retrofit is needed.
+**SEC-1 override seam (item 6):** `shopify.connector.location.mapping`
+declares `_odoo_binding_field_name()` returning `odoo_location_id`;
+`shopify.connector.inventory.level.binding` is non-overridable
+(composite identity — mixin default `False`).
+
 ## 8. Locked final implementation prompt (Task 013)
 
 ```text

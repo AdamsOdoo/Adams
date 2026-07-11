@@ -173,6 +173,38 @@ Closure map + second adversarial pass:
 prompt becomes usable, no code changed (Markdown-only diff verified);
 PR #148 stays draft/unmerged pending ChatGPT's re-review._
 
+_**AR-042 revision-2 note (2026-07-11, PR #148 re-review convergence —
+Proposed for ChatGPT review).** ChatGPT's control-room **re-review** of
+the revised package at `10108b26` (PR #148 comment
+[`4945129824`](https://github.com/AdamsOdoo/Adams/pull/148#issuecomment-4945129824))
+returned **REVISE** with nine focused, load-bearing items. The same PR
+now carries a focused docs-only convergence patch closing each:
+010B existing-attribute compatibility gate (reuse only `dynamic`;
+incompatible same-name attribute → `manual_review`/connector-owned; no
+phantom variants); 013B free/on-hand correction
+(`target_on_hand = desired_available + reserved` + post-write verify +
+re-read/drift abort + fail-closed edges); 015B READY-first two-phase
+pipeline, distinct File-GID/Product-Media-GID identities, and
+fresh-reference-check before `fileDelete` (else detach-only + retain);
+Task 012 canonical decimal tax key (`shopify_rate_key`, never Float) +
+decimal-safe match, and cap-free discount math with exact negative
+"Shopify Order Discount" lines; new **Task PERF-1** (core queue
+throughput calibration — owns PB-19, before performance UAT; review
+call B11); SEC-1 exact RPC-safe `action_override_binding` with the
+`_odoo_binding_field_name()` seam + enumerated bindings + negative RPC
+tests; the **full LC-1 locked prompt** (lifecycle §7.1) with LC-1
+resequenced before Task 012 and adoption notes on
+012/013/013B/014/015/015B/Area-6; rollback/schema wording corrected to
+the additive-schema-may-remain posture; and CORE-R1
+`D-R1-1..4 → D-R1-1..5` everywhere. Revised critical path: **CORE-R1 →
+010B → 011B → LC-1 → 012 → Area 6 → SEC-1 → U0∥ → U1 → 013/013B → 014 →
+015/015B → U2/U3 → W1/W2 → PERF-1 → UAT → release** (review calls
+A1–A11 + B1–B11). Closure map:
+[`../08-release-readiness/mvp-planning-completion-audit.md`](../08-release-readiness/mvp-planning-completion-audit.md)
+§8.5. Everything remains **Proposed — NOT accepted**; no gate opens, no
+prompt becomes usable, no code changed (Markdown-only diff verified);
+PR #148 stays draft/open/unmerged pending ChatGPT's re-review._
+
 _**AR-039 Acceptance Note (2026-07-10) — PR #144 accepted by ChatGPT
 with two required fixes, both applied in the same PR**, via control-room
 review comment

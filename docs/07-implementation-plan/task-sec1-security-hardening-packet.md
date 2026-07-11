@@ -125,19 +125,68 @@ explicit group check (`has_group`), matrix-legal transition, audit
 log row with actor, then su-elevated write. No force/bypass parameter
 exists anywhere (merged invariant restated).
 
-**D-SEC1-4 — Binding identity immutability + audited override.** On
-the binding mixin: identity fields (`store_id`, `shopify_gid`, the
+**D-SEC1-4 — Binding identity immutability + audited override
+(exact, RPC-safe contract — re-review `4945129824` item 6).** On the
+binding mixin: identity fields (`store_id`, `shopify_gid`, the
 per-model Odoo-record M2o, `match_key`) become su-protected exactly
-like D-SEC1-2. The sanctioned mutation is a new mixin method
-`action_override_binding(new_odoo_record, reason)` — reviewer/admin
-only; requires non-empty `reason`; writes the existing audit fields
-(`override_uid`, `override_at`, `override_previous_candidate` — now
-force-filled, not optional), sets `status='manually_overridden'`,
-appends one audited log row, and re-points the record link — all in
-one su write after the checks. Snapshot fields stay ordinarily
-writable by the importer only (they are already `readonly=True` in
-UI; importer writes are su per D-SEC1-2's importer adjustment).
-Unlink stays denied for every group (existing posture).
+like D-SEC1-2.
+
+**Mixin seam.** The abstract mixin declares
+`_odoo_binding_field_name()` returning the name of the concrete
+model's Odoo-record `Many2one` field (or a falsy value when the
+binding's identity is composite/derived, not a single Odoo record).
+The mixin default returns `False`; every concrete binding model
+declares its own (a one-line return). **Enumeration — every current
+and planned binding model:**
+
+| Binding model | `_odoo_binding_field_name()` | Comodel |
+| --- | --- | --- |
+| `shopify.connector.product.template.binding` | `product_template_id` | `product.template` |
+| `shopify.connector.product.variant.binding` | `product_variant_id` | `product.product` |
+| `shopify.connector.customer.binding` | `partner_id` | `res.partner` |
+| `shopify.connector.order.binding` (Task 012) | `sale_order_id` | `sale.order` |
+| `shopify.connector.location.mapping` (Task 013) | `odoo_location_id` | `stock.location` |
+| `shopify.connector.inventory.level.binding` (Task 013) | `False` (composite: variant-binding × location — re-derived deterministically, not overridable) | — |
+| `shopify.connector.product.media.binding` (Task 015B) | `False` (identity is the remote File GID, not an Odoo record — not overridable) | — |
+
+The four models that exist at the SEC-1 gate (product template/variant,
+customer, order) get the one-liner from **this task** (§5); the later
+bindings declare theirs in their own packets (Task 013 location.mapping
+returns `odoo_location_id`; level/media rely on the mixin default
+`False`), so no uncontrolled later retrofit is required.
+
+**Public method.** `action_override_binding(new_record_id, reason)`
+accepts a **scalar integer record ID** (not a recordset — RPC cannot
+safely convey a generic recordset argument contract) plus a
+**mandatory non-empty `reason`**. It:
+1. resolves the target model from `_odoo_binding_field_name()`; a
+   falsy return raises `UserError` ("this binding's identity is not
+   overridable");
+2. validates `new_record_id` is a positive int and that the record
+   **exists** in the declared model (`browse(...).exists()`) — a
+   missing, malformed, or wrong-typed argument raises `UserError`,
+   never a silent write (rejects cross-model input and malformed RPC
+   args);
+3. validates store/company consistency where the target carries a
+   company (e.g. `sale.order`/`stock.location` company must match the
+   binding store's company) — mismatch raises `UserError`;
+4. enforces reviewer/admin permission (`has_group`) — else
+   `AccessError`;
+5. checks the resulting `(store_id, <odoo field>)` **still satisfies
+   the model's uniqueness constraints** (no collision with another
+   binding) before writing;
+6. records **previous and new identity** in the audit trail
+   (`override_previous_candidate` = the previous record reference,
+   `override_uid`/`override_at` force-filled, one audited
+   `manual_action` log row naming old→new and the reason), sets
+   `status='manually_overridden'`, and re-points **only** the declared
+   Odoo-record field — all in one **su** write after the checks (the
+   sanctioned sudo path).
+
+Snapshot fields stay ordinarily writable by the importer only (they
+are already `readonly=True` in UI; importer writes are su per
+D-SEC1-2's importer adjustment). Unlink stays denied for every group
+(existing posture).
 
 **D-SEC1-5 — Least-privilege PII snapshots.** The customer-binding
 PII fields (`shopify_email_snapshot`, `shopify_phone_snapshot`,
@@ -183,9 +232,18 @@ without inventing encryption (DEC-028 boundary respected).
 masked-field read, each sanctioned method with and without the
 required group, matrix-illegal transitions via sanctioned methods,
 and a sudo-path regression (dispatcher/importer still function).
-Expected outcome per cell stated in the test (AccessError /
-ValidationError / success), mirroring the merged ACL-matrix test
-pattern.
+**`action_override_binding` negative RPC set (item 6):** non-int /
+malformed `new_record_id`; a valid id of the **wrong model**
+(cross-model reject); a non-existent id; a target violating
+store/company consistency; a value that would collide with another
+binding's uniqueness constraint; a call on a **non-overridable**
+binding (`_odoo_binding_field_name()` falsy — level/media binding);
+missing/empty `reason`; and the same call by a non-reviewer group —
+each expecting `UserError`/`AccessError` and **no write**; plus the
+positive reviewer/admin path asserting old→new identity is recorded in
+the audit trail. Expected outcome per cell stated in the test
+(AccessError / ValidationError / UserError / success), mirroring the
+merged ACL-matrix test pattern.
 
 ## 4. Why this is one cross-cutting task (not per-domain)
 
@@ -203,7 +261,17 @@ core-task rule, with the exhaustive allowlist below.
 - `addons/shopify_connector_core/models/shopify_connector_job.py`
   (matrix constant, write-guard, `action_resolve_manual_review`)
 - `addons/shopify_connector_core/models/shopify_connector_binding_mixin.py`
-  (protected-field guard, `action_override_binding`)
+  (protected-field guard, `action_override_binding`, and the
+  `_odoo_binding_field_name()` seam defaulting to `False`)
+- the concrete-binding `_odoo_binding_field_name()` one-liners on the
+  models existing at this gate:
+  `addons/shopify_connector_product/models/shopify_connector_product_template_binding.py`
+  (`return 'product_template_id'`),
+  `addons/shopify_connector_product/models/shopify_connector_product_variant_binding.py`
+  (`return 'product_variant_id'`),
+  `addons/shopify_connector_sale/models/shopify_connector_order_binding.py`
+  (`return 'sale_order_id'`) — one line each (the customer binding's
+  is added with its PII change below)
 - `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`,
   `shopify_connector_job_enqueue.py`,
   `shopify_connector_readiness_check.py`,
@@ -219,7 +287,8 @@ core-task rule, with the exhaustive allowlist below.
   (NEW, noupdate=1)
 - `addons/shopify_connector_sale/models/shopify_connector_customer_binding.py`
   (field `groups=` + masked compute + the two-line
-  `_pii_snapshot_fields()` override only)
+  `_pii_snapshot_fields()` override + the `_odoo_binding_field_name()`
+  one-liner returning `partner_id`)
 - `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py`
   (snapshot/binding-write su adjustment only — its binding-create
   sites set protected identity fields)
@@ -306,8 +375,15 @@ protected-field su guard on the job model (named field set; every
 internal elevation itemized in the validation record's sudo
 inventory); D-SEC1-3 sanctioned doors only (enqueue, manual retry,
 cancel, resolve-manual-review — group-checked, matrix-legal, audited,
-no bypass parameter); D-SEC1-4 binding identity su-protected +
-action_override_binding with forced audit fields and required reason;
+no bypass parameter); D-SEC1-4 binding identity su-protected + the
+_odoo_binding_field_name() mixin seam (each concrete binding declares
+its Odoo-record field per the enumerated table) +
+action_override_binding(new_record_id:int, reason) — resolve the model
+from the seam, validate the target exists + store/company consistency,
+reject cross-model/malformed/non-overridable input, enforce
+reviewer/admin, preserve uniqueness, record old->new identity in the
+audit trail, write through the sanctioned su path; the D-SEC1-7
+negative RPC set proves every rejection;
 D-SEC1-5 PII field groups= (reviewer/admin) + masked compute for
 operator/auditor; D-SEC1-6 retention setting + monthly masking sweep
 (mask, never delete rows) + admin-only audited

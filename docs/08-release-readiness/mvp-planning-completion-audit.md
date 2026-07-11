@@ -367,7 +367,7 @@ not merely a mention (the review's own bar, applied).
 | 2 | Customer-matching scalability | `task-011b-customer-matching-scalability-packet.md` (locked; indexed normalized lookup, equivalence proof, 100k benchmark, migration/backfill, concurrency); master plan step 3, before 012 |
 | 3 | 013B/015B silently deferred | `task-013b-initial-inventory-baseline-packet.md` + `task-015b-product-media-export-packet.md` (both complete locked packets, sequenced before UAT/release; D-013-8/D-015-7 rewritten from "deferral" to "split") |
 | 4 | Premium UI/UX | `premium-ui-ux-design-system.md` (PD-7; tokens/scales/icons/motion/reduced-motion/responsive/RTL/states/accessibility/budgets/checklists/screenshot rules; §9 dashboard hierarchy replacing nine-equal-cards — flagged revision of accepted content); UI packet rewritten (U0 prototype gate blocking U1; selective Owl, no SPA; tours+HOOT mandatory; SEC-1 prerequisite); the two referenced design docs verified to EXIST at `docs/02-product/ui-ux-final-design-spec.md` and `docs/02-product/screen-inventory-and-navigation-map.md` (the review's "no such files" premise was checked and is factually incorrect — references are now exact relative paths so no future search can miss them) |
-| 5 | Split the readiness correction | `task-core-r1-readiness-correction-packet.md` (D-R1-1..4; capability-aware; drain-cron+stall health; Lite-reaches-`connected` regression); Area-6 packet revised (D-A6-7 superseded marker; prompt no longer touches the readiness file); master plan step 1 |
+| 5 | Split the readiness correction | `task-core-r1-readiness-correction-packet.md` (D-R1-1..5; capability-aware; drain-cron+stall health; api_health_state normal; Lite-reaches-`connected` regression); Area-6 packet revised (D-A6-7 superseded marker; prompt no longer touches the readiness file); master plan step 1 |
 | 6 | Order-import corrections | Task 012 packet revised in place: D-012-7 (sale_stock auto-install fact — captures-11 §1; no-retroactive-pickings withdrawn; no-default operator confirmation policy with hold), D-012-9 (mapping-model-first taxes; `order_tax_autocreate` default False, admin-gated + audited), D-012-2 (component-based tolerance, currency-relative 10×rounding cap, JPY/BHD test rows + named three-decimal dev-store check), D-012-11 warehouse wording; packaging proposal §2 Lite definition revised |
 | 7 | Security hardening missing | `task-sec1-security-hardening-packet.md` (D-SEC1-1..7: transition matrix binding even sudo; su-guarded protected fields; sanctioned doors incl. resolve; audited binding override; PII field-groups + masking; retention/deletion/export; negative RPC matrix) — sequenced after Area 6, before U1 |
 | 8 | DEC-028 Rung 1 too weak | DEC-028 revised: point 2 is now five named **production-entry criteria** with per-deployment recorded evidence, reviewed at Go/No-Go (encryption at rest; backup encryption or documented equivalent; access restrictions; retention/deletion; incident/access governance); no field-encryption invention, no certification claim; release plan §2.8 carries the rows |
@@ -377,9 +377,11 @@ not merely a mention (the review's own bar, applied).
 
 Master-plan/global corrections: critical path re-sequenced (CORE-R1
 → 010B → 011B → 012 → Area 6 → SEC-1 → U0∥ → U1 → domains+B-tasks →
-W1/W2 → UAT → release); signoff §10 next-task = CORE-R1; every
-"planning complete" statement re-qualified (signoff, this §8,
-handoff); new review calls enumerated (master plan §1 B1–B10).
+W1/W2 → UAT → release; **further re-sequenced in §8.5 to insert LC-1
+before Task 012 and PERF-1 before performance UAT**); signoff §10
+next-task = CORE-R1; every "planning complete" statement re-qualified
+(signoff, this §8, handoff); new review calls enumerated (master plan
+§1 B1–B10, **plus B11 for PERF-1 — §8.5**).
 
 ### 8.2 New/changed identifiers this revision
 
@@ -486,3 +488,28 @@ validations (signoff §6), every ChatGPT call in master plan §1
 the CORE-R1 gate, and the named build-time verifications inside
 packets (dynamic-variant API, quant-adjustment API, staged-upload
 shape). No second-pass finding remains unfixed or unrecorded.
+
+### 8.5 Re-review closure map — control-room re-review comment `4945129824` (2026-07-11, focused convergence patch)
+
+ChatGPT's re-review of the revised package at `10108b26` returned
+**REVISE** with nine focused, load-bearing items (draft/open/unmerged
+confirmed). This focused, docs-only convergence patch closes each at
+planning level — nothing accepted, no gate opened, PR remains draft.
+
+| # | Re-review item | Closing artifact(s) — all Proposed, NOT accepted |
+| --- | --- | --- |
+| 1 | Task 010B existing-attribute compatibility | `task-010b-product-import-completeness-packet.md` D-010B-2 compatibility gate (reuse only `create_variant='dynamic'`; an incompatible `always`/`no_variant` same-name attribute is never reused or mutated → `product_import_attribute_conflict_mode` default `manual_review`, or a connector-owned `"<name> (Shopify)"` attribute; no phantom variants) + tests (Color=`always`, Size=`no_variant`, compatible dynamic, concurrent, brownfield) + UAT fixture + DoD + locked prompt |
+| 2 | Task 013B free/on-hand quantity semantics | `task-013b-initial-inventory-baseline-packet.md` D-013B-2/4: `available`↔`free_qty`; an adjustment sets counted on-hand, so `target_on_hand = desired_available + current_reserved`, verified post-write by `free_qty == desired_available`; immediate re-read + drift abort; multi-quant / owner-package / lots / in-flight / negative all fail-closed; tests + live evidence |
+| 3 | Task 015B READY-first pipeline + safe deletion + identities | `task-015b-product-media-export-packet.md` D-015B-1/2/4/6: distinct File GID (`shopify_gid`) vs Product Media GID (`shopify_product_media_gid`); two-phase READY-gated associate → reorder → retire; `fileDelete` only after a fresh reference check proves no foreign use, else detach-only + retain the File |
+| 4 | Task 012 tax key + discount math | `task-012-order-import-implementation-packet.md` D-012-2/8/9: canonical decimal-string tax key `shopify_rate_key` (Decimal, never Float) + decimal-safe existing-tax match; discounts drop the unsound `D_lines × 0.5r` term for a cap-free component-sum bound + exact negative "Shopify Order Discount" lines; high-value / allocation / JPY / BHD / included-excluded tests |
+| 5 | PB-19 throughput has no implementation owner | NEW `task-perf1-core-queue-throughput-calibration-packet.md` (configurable batch/cadence, lock-safety, Shopify backpressure, benchmark, budgets, tests, rollback, DoD, locked prompt); PB-19 gains this owner; master plan step 16 (before performance UAT); review call B11 |
+| 6 | SEC-1 override contract not RPC-safe | `task-sec1-security-hardening-packet.md` D-SEC1-4: `_odoo_binding_field_name()` mixin seam + enumerated binding table; `action_override_binding(new_record_id:int, reason)` — model resolved from the seam, existence/company validated, cross-model/malformed/non-overridable rejected, uniqueness preserved, su-audited old→new; the D-SEC1-7 negative RPC test set |
+| 7 | LC-1 has no locked prompt | `module-lifecycle-uninstall-design.md` §7.1 full locked prompt + the `_reassign_to_historic_job_type` callable; LC-1 sequenced before Task 012 (master plan step 4); adoption note added to Tasks 012/013/013B/014/015/015B/Area-6 this revision |
+| 8 | Rollback/schema "columns drop on upgrade" wording | corrected in Task 010B / 011B / 015B rollback notes + LC-1 / PERF-1: code revert removes behavior; additive columns/tables may remain inert/orphaned; no destructive cleanup assumed; optional cleanup = separately tested migration; uninstall follows DEC-030/LC-1; business data is never removed by a code rollback (release/packaging already carried the correct disable-only/documented-loss posture — verified) |
+| 9 | CORE-R1 `D-R1-1..4` stale | updated to `D-R1-1..5` in the CORE-R1 packet §3 heading, the Area-6 D-A6-7 marker, this audit §8.1 row 5, and master-plan call B1; repo-wide decision-range sweep run (result recorded in the handoff) |
+
+**Open items surviving this convergence patch (by design, unchanged):**
+the external validations (signoff §6); every ChatGPT call in master
+plan §1 (A1–A11, B1–B11); the named build-time verifications inside
+packets. No re-review item remains unaddressed at planning level; PR
+#148 stays draft / open / unmerged and nothing is accepted.

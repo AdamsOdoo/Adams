@@ -100,12 +100,17 @@ here — and F is rejected partly *on* RA-013's boundary logic).
    uninstalled domain are cancelled by the reassignment callable with
    one audit log row each).
 2. **Domain modules:** `selection_add` `ondelete` becomes the
-   reassignment callable (cancel-if-non-terminal → reassign to
-   `historic_domain_job`). Applies to `customer_import_sync` (merged,
-   changed by LC-1), `product_import_sync` (merged, changed by LC-1),
-   and every future domain job type (packets 012/013/014/015/Area-6
-   inherit this rule — one-line note added to each packet's next
-   revision on acceptance).
+   reassignment callable `lambda recs: recs._reassign_to_historic_job_type()`
+   (cancel-if-non-terminal → reassign to `historic_domain_job`).
+   Applies to `customer_import_sync` (merged, changed by LC-1),
+   `product_import_sync` (merged, changed by LC-1), and every future
+   domain job type. **Because LC-1 is sequenced before Task 012
+   (re-review `4945129824` item 7), the callable exists in core before
+   any new `job_type` is registered, so packets 012/013/013B/014/015/
+   015B/Area-6 adopt it from their first implementation — the one-line
+   adoption note is added to each packet in this same revision, not
+   deferred to acceptance, and no uncontrolled later retrofit is
+   required.**
 3. **Pre-uninstall export (operator step, release-plan §2.3):**
    documented procedure — export bindings/mappings (incl. manual
    matches and overrides) via standard Odoo export before uninstall;
@@ -143,26 +148,134 @@ plainly: a Full→Lite downgrade is safe and reversible except for
 manual-match labor, and audit history is never the price of leaving —
 which is a **sellable** lifecycle story, unlike "uninstall fails".
 
-## 7. Task LC-1 — lifecycle enablement (small core+domain task; sequenced with/after Task 013, before UAT wave 3)
+## 7. Task LC-1 — lifecycle enablement (small core+domain task; sequenced before Task 012 so every new-job-type packet adopts the callable from day one)
 
-**Allowed files:** core `shopify_connector_job.py`
-(`historic_domain_job` selection value, `original_job_type` field +
-creation fill), `shopify_connector_job_dispatch.py` (refuse-historic
-guard), sale + product importer files (the `ondelete` callable
-one-liners), new core `tests/test_lifecycle_uninstall.py`, validation
-record, AR row, handoff. **Forbidden:** everything else.
-**Tests:** original-type fill + backfill at upgrade; reassignment
-callable (terminal rows preserved + retyped; non-terminal cancelled
-with audit row); dispatcher refuses historic type; **the honest
-uninstall test pair** — uninstall-after-use now succeeds with history
-preserved (replacing the packaging proposal §6 documented-failure
-check), and business data intact; reinstall re-match determinism.
-**Rollback:** revert PR; `ondelete` returns to cascade (and with it
-the uninstall-fails posture — documented). **Locked prompt:** drafted
-at its gate (a two-file mechanical task; packet-level detail above is
-complete — flagged as the one packet in this package whose prompt is
-deferred to its gate act, since its diff is ~30 lines and fully
-specified here).
+**Prerequisite:** CORE-R1 merged runtime-green. **Sequencing (revised
+re-review `4945129824` item 7):** LC-1 runs **before Task 012** — the
+earliest packet that registers a *new* `job_type` — so the
+historic-job reassignment callable exists in core before any new
+selection value is added. This removes the "uncontrolled later
+retrofit" the review flagged: Tasks 012/013/013B/014/015/015B and
+Area 6 register their `selection_add` `ondelete` with the callable from
+their first implementation, and the two merged job types
+(`customer_import_sync`/`product_import_sync`) are converted by LC-1
+itself.
+
+**Allowed files (exhaustive):** core `shopify_connector_job.py`
+(permanent `historic_domain_job` selection value; `original_job_type`
+Char — indexed, readonly, filled for every job at creation from
+`job_type`; the public method `_reassign_to_historic_job_type(self)`),
+`shopify_connector_job_dispatch.py` (refuse-`historic_domain_job`
+guard — no handler), the sale + product importer files (the merged
+`customer_import_sync`/`product_import_sync` `selection_add` `ondelete`
+one-liners → the callable), a NEW core
+`migrations/<version>/post-migrate.py` (one-time `original_job_type`
+backfill — additive/idempotent), new core
+`tests/test_lifecycle_uninstall.py` + its `tests/__init__.py` import,
+the three manifests (version bumps), validation record, AR row,
+handoff. **Forbidden:** every other file; the append-only `job_log`
+posture; every business-data `ondelete='restrict'` link; any domain
+edit beyond the two named importer one-liners; views/ACL/cron;
+`adams_base`; CI; `main`; plain `dev`.
+
+**Historic-job conversion mechanics.** `_reassign_to_historic_job_type(self)`
+(a) **cancels any non-terminal job** with one audited
+`manual_action`-grade log row each (state → `cancelled` through the
+SEC-1 legal `non-terminal→cancelled` edge), then (b) sets
+`job_type='historic_domain_job'` while `original_job_type` (populated
+at creation) preserves the real type for querying. Terminal jobs are
+only retyped — history preserved, never unlinked; logs untouched. Each
+domain module's `selection_add` `ondelete` for its job type(s) is
+`lambda recs: recs._reassign_to_historic_job_type()`, so uninstalling
+a domain removes the selection value **without** unlinking any job or
+log. The dispatcher refuses `historic_domain_job` (no handler by
+design — terminal rows only).
+
+**`original_job_type` backfill.** New jobs fill it at creation; the
+post-migration script backfills pre-existing rows (`= job_type` where
+null) at the `-u` upgrade that ships LC-1 — additive and idempotent,
+never destructive (it is set-once, not a live compute, so retyping to
+`historic_domain_job` never overwrites the preserved original).
+
+**Tests (`test_lifecycle_uninstall.py`):** `original_job_type` filled
+at creation and backfilled at upgrade; the reassignment callable
+(terminal rows preserved + retyped; non-terminal cancelled with an
+audit row; logs untouched); dispatcher refuses the historic type; **the
+honest uninstall pair** — uninstall-after-use now **succeeds** with
+history preserved (replacing the packaging proposal §6 documented-
+failure check) and business data intact; **reinstall → deterministic
+re-match** (binding → SKU/barcode/email keys) rebuilds bindings while
+degraded history remains queryable by `original_job_type`.
+
+**Rollback.** Revert the single PR — the `ondelete` returns to
+`'cascade'` (and with it the uninstall-fails-after-use posture,
+documented); the additive `original_job_type` column and the
+`historic_domain_job` value may **remain inert/orphaned** (a normal
+code revert does **not** drop them — no destructive schema cleanup is
+assumed; any cleanup is a separately tested migration); no business or
+audit data is removed.
+
+**Definition of done.** Only the allowed files changed; all tests +
+Odoo.sh green (verbatim quote, OP-43); the honest-uninstall pair green;
+validation record + AR row + handoff updated; draft PR; the LC-1 gate
+closes on draft-open.
+
+### 7.1 Locked final implementation prompt (Task LC-1)
+
+```text
+DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS DEC-030 AND THIS DESIGN,
+EXPLICITLY OPENS THE LC-1 GATE, VERIFIES THE CURRENT BASE SHA, AND
+ISSUES THIS PROMPT. (Prerequisite: CORE-R1 merged runtime-green.)
+
+Implement Task LC-1 — module lifecycle enablement (soft-degraded
+historic job types) — exactly per
+docs/03-architecture/module-lifecycle-uninstall-design.md §4–§7 and
+DEC-030. Branch from the verified current Shopify-connector tip (STOP
+on drift). One session; draft PR; stop.
+
+ALLOWED FILES (exhaustive):
+  addons/shopify_connector_core/models/shopify_connector_job.py
+    (historic_domain_job selection value; original_job_type Char —
+    indexed, readonly, filled at creation from job_type;
+    _reassign_to_historic_job_type(self))
+  addons/shopify_connector_core/models/shopify_connector_job_dispatch.py
+    (refuse historic_domain_job — no handler)
+  addons/shopify_connector_sale/models/shopify_connector_customer_importer.py
+    (customer_import_sync selection_add ondelete -> the callable — one line)
+  addons/shopify_connector_product/models/shopify_connector_product_importer.py
+    (product_import_sync selection_add ondelete -> the callable — one line)
+  addons/shopify_connector_core/migrations/<version>/post-migrate.py
+    (NEW — original_job_type backfill; additive, idempotent)
+  addons/shopify_connector_core/tests/test_lifecycle_uninstall.py (NEW)
+  addons/shopify_connector_core/tests/__init__.py (one import line)
+  addons/shopify_connector_core/__manifest__.py (version bump)
+  addons/shopify_connector_sale/__manifest__.py (version bump)
+  addons/shopify_connector_product/__manifest__.py (version bump)
+  docs/05-qa/task-lc1-validation-results.md (NEW)
+  docs/05-qa/architecture-review-log.md (append one AR row)
+  docs/01-research/research-handoff.md (top entry)
+FORBIDDEN: every other file; the append-only job_log posture; every
+business-data ondelete='restrict' link; any domain edit beyond the two
+named importer one-liners; views/ACL/cron; adams_base; CI; main; plain dev.
+
+IMPLEMENT exactly: the permanent historic_domain_job job_type value;
+original_job_type Char filled for every job at creation + backfilled by
+the post-migration script (= job_type where null); the dispatcher
+refusing historic_domain_job (no handler); _reassign_to_historic_job_type
+which cancels non-terminal jobs (one audited log row each, via the
+legal non-terminal->cancelled transition) then retypes terminal jobs to
+historic_domain_job (logs untouched, original_job_type preserved); each
+named domain selection_add ondelete set to
+lambda recs: recs._reassign_to_historic_job_type(). All §7 tests incl.
+the honest uninstall-after-use success pair and the reinstall re-match
+determinism.
+
+Runtime: full Odoo.sh run green before merge review (verbatim quote;
+OP-43). Stop condition: open the PR as DRAFT titled "Task LC-1: module
+lifecycle enablement (historic job types)", update handoff + validation
+record + AR row, and stop. The LC-1 gate closes the moment the draft PR
+opens. Do not start any other task under any circumstance.
+```
 
 ## 8. Register impacts on acceptance
 
