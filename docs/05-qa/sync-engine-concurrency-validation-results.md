@@ -15,13 +15,25 @@
 
 **Executed. Baseline green. 9/9 scenarios classified.**
 
+> **Revision (2026-07-12, control-room review comment `4950314052`).**
+> Scenario 6 was **rerun faithfully using the real merged
+> `store.action_disconnect()`** (the first submission used a direct
+> `store.write({'state':'disconnected'})` substitute). Topology labels for
+> the process-level scenarios (2/3/6) and the Scenario 8 concurrent count
+> were corrected, and an `execution-method.md` reproduction record was
+> added. See §10 Scenario 6, §14, and the change log at the end of §10.
+
 - **7 PASS** (Scenarios 1, 2, 3, 4, 5, 7, 8)
-- **1 FAIL — genuine defect surfaced** (Scenario 6: the checkpoint-3
-  disconnect re-check does **not** observe a concurrently-committed
-  disconnect under Odoo's REPEATABLE READ isolation; this **confirms
-  SRR-03 is open**, consistent with the dispatcher's own docstring that
-  it *"narrows, but … never claims to close"* the race). No code was
-  changed to fix it (forbidden this session).
+- **1 FAIL vs the plan's expected result** (Scenario 6: an in-flight
+  business job is **not skipped/cancelled** when an operator calls the real
+  `action_disconnect()` concurrently — the disconnect **blocks on the job's
+  row lock**, the no-op handler runs to completion, the job `succeeds`, and
+  the disconnect then hits a serialization conflict and, via the RPC
+  `retrying()` layer, completes without cancelling the now-terminal job).
+  **This confirms SRR-03 remains open.** The originally-submitted
+  "checkpoint-3 fails to observe a *committed* disconnect" framing does
+  **not** hold for the real lifecycle method and has been corrected. No
+  code was changed to fix anything (forbidden this session).
 - **1 OBSERVATION ONLY** (Scenario 9: crash/interruption).
 
 This is not a project decision. It is runtime evidence for ChatGPT review.
@@ -58,7 +70,7 @@ Evidence: [`evidence/sync-engine-concurrency/environment.txt`](./evidence/sync-e
 | Python | 3.11.15 (venv) |
 | PostgreSQL | 16.14 (Ubuntu), single local cluster, `127.0.0.1:5433`, initdb'd this session |
 | Host | Linux 6.18.5, `nproc = 4` |
-| Databases | `pbtest` (baseline suite), `pbscen` (scenarios) — both freshly created this session, dropped at cleanup |
+| Databases | `pbtest` (baseline suite), `pbscen` (scenarios), `pbscen6` (Scenario-6 faithful rerun) — all freshly created disposable DBs, dropped at cleanup |
 | Shopify | **None.** No real credential, no token, no shop connection, no Admin API call anywhere. |
 
 ## 5. Odoo version
@@ -69,16 +81,26 @@ handshake on both Scenario-8 servers (`server_version: "19.0"`).
 
 ## 6. Runtime topology
 
-All three plan topologies were genuinely available and used:
+> **Terminology correction (review `4950314052`).** The process-level
+> scenarios did **not** use a deployed Odoo `--workers` topology. They used
+> **independent Odoo-library processes against one shared DB** — genuine
+> process-level concurrency (separate OS processes, separate PostgreSQL
+> connections), described below as a **process-level concurrency harness
+> (B-like, not a deployed Topology B)**. Only Scenario 8 uses genuine
+> deployed application-server instances (Topology C, single host).
 
 - **Topology A** — single Odoo instance, in-process. Used for baseline
   scenarios (1, 4, 5, 7) and as one arm of the concurrent scenarios.
-- **Topology B** — multiple genuinely separate OS **processes**, each its
-  own PostgreSQL connection, against one shared database. Every concurrent
-  worker is a separate `python driver.py` process invoking **only merged
-  methods** (`_claim_for_dispatch`, `_dispatch_one`, `run_drain`,
+- **Process-level concurrency harness (B-like, NOT a deployed `--workers`
+  Topology B)** — multiple genuinely separate OS **processes**, each an
+  independent Odoo-library process with its own PostgreSQL connection,
+  against one shared database. Each invokes **only merged methods**
+  (`_claim_for_dispatch`, `_dispatch_one`, `run_drain`,
   `try_lock_for_update`, `action_disconnect`) — no repo code modified,
-  monkeypatched, or mutated. Used for Scenarios 2, 3, 6.
+  monkeypatched, or mutated. Used for Scenarios 2, 3, 6. This is real
+  process-level concurrency, but it is not the plan's literal Topology B
+  (one deployed Odoo server with `--workers > 0` HTTP/cron worker
+  processes), and is not labelled as such.
 - **Topology C** — **two independent `odoo-bin` application-server
   daemons** (distinct PIDs, distinct HTTP ports 8169/8170, independently
   restartable — they *were* restarted independently mid-session) against
@@ -90,7 +112,9 @@ Genuine concurrency was enforced with a file barrier (all workers signal
 "ready", then are released together) so competing workers hit
 `_claim_for_dispatch` within ~1–2 ms of each other. No scenario used
 sequential shell calls, a single transaction, or `TransactionCase` thread
-simulation as concurrency evidence.
+simulation as concurrency evidence. The exact commands, transaction
+boundaries, and merged methods are recorded in
+[`evidence/sync-engine-concurrency/execution-method.md`](./evidence/sync-engine-concurrency/execution-method.md).
 
 ## 7. Database isolation proof
 
@@ -167,11 +191,13 @@ model, or field was created.
 - No real Shopify credential, token, order, product, email, or shop
   domain was used.
 
-For Scenario 8 only, the disposable DB's `admin` user was given a
+For the XML-RPC scenarios (Scenario 8 `run_drain`; Scenario 6 RPC-variant
+`action_disconnect`), the disposable DB's `admin` user was given a
 test-only password and added to the shipped
-`group_shopify_connector_admin` group so XML-RPC could invoke `run_drain`.
-Both changes lived only in `pbscen` and were destroyed when it was
-dropped.
+`group_shopify_connector_admin` group so XML-RPC could invoke the
+Admin-only methods. These changes lived only in the disposable DBs
+(`pbscen` / `pbscen6`) and were destroyed when they were dropped. No
+password value is recorded in any committed file.
 
 ## 10. Scenario-by-scenario results
 
@@ -194,10 +220,11 @@ dropped.
   `scenario-01-jobs-after.csv`, `scenario-01-job-logs.csv`,
   `scenario-01-redrain-empty.json`.
 
-### Scenario 2 — Concurrent cron workers, same DB — **PASS** (topology A/B)
+### Scenario 2 — Concurrent cron workers, same DB — **PASS** (process-level concurrency harness, B-like)
 
 - **Setup:** 30 queued business jobs (ids 7–36), store connected.
 - **Action (a) — 3 simultaneous workers:** three separate OS processes
+  (independent Odoo-library processes, one PostgreSQL connection each)
   (`wA`, `wB`, `wC`), barrier-released together, each running
   `run_drain`'s exact body (`_claim_for_dispatch(20)` then
   `_dispatch_one` per claimed job).
@@ -231,10 +258,11 @@ dropped.
   `scenario-02-partition-workerA/B.json`,
   `scenario-02-partition-jobs-after.csv`, `scenario-02-partition-logs.csv`.
 
-### Scenario 3 — Skipped locked rows — **PASS** (topology A/B)
+### Scenario 3 — Skipped locked rows — **PASS** (process-level concurrency harness, B-like)
 
-- **Setup:** 3 queued jobs (57, 58, 59); a separate process holds a real
-  uncommitted row lock on job **58** via `try_lock_for_update()`.
+- **Setup:** 3 queued jobs (57, 58, 59); a separate independent
+  Odoo-library process holds a real uncommitted row lock on job **58** via
+  `try_lock_for_update()`.
 - **Action:** while the lock is held, a second process runs `run_drain`.
 - **Observation:** PostgreSQL confirmed the holder backend `idle in
   transaction`; a probe `SELECT id … WHERE id=58 FOR UPDATE SKIP LOCKED`
@@ -280,65 +308,105 @@ dropped.
   `scenario-05-disconnect.json`, `scenario-05-try-enqueue.json`,
   `scenario-05-drain.json`, `scenario-05-jobs-after.csv`.
 
-### Scenario 6 — Disconnect between start and handler — **FAIL (defect surfaced)** (topology A/B)
+### Scenario 6 — Disconnect between start and handler — **FAIL vs plan expectation** (process-level concurrency harness, B-like)
 
-> **This is the one scenario whose runtime behavior differs from the
-> plan's stated expected result. It confirms SRR-03 is open and is
-> consistent with the dispatcher docstring's own "narrows, never closes"
-> wording — but it contradicts the plan's assumption that
-> `store.invalidate_recordset()` "forces a fresh read" that would skip the
-> job.** No fix was applied (forbidden this session).
+> **Reran faithfully with the real merged `store.action_disconnect()`**
+> (review `4950314052`, blocking issue 1). The competing transaction calls
+> the actual lifecycle method — not a `store.write()` substitute, not an
+> "equivalent" helper, not a monkeypatch. **The faithful result is
+> materially different from — and corrects — the first submission's
+> framing.** SRR-03 remains OPEN. No fix was applied (forbidden).
 
-Root cause established from source: **every Odoo 19 cursor runs at
-`ISOLATION_LEVEL_REPEATABLE_READ`** (snapshot isolation) —
-`odoo/sql_db.py:373`. The real `run_drain` claim→`_start_running`→
-`_invoke_handler` sequence is **one transaction with one snapshot** taken
-at the claim. `invalidate_recordset()` clears the ORM cache, but a
-re-`SELECT` within that transaction still returns snapshot data — so
-checkpoint-3 cannot observe a disconnect committed by another transaction
-**after** the drain's snapshot.
+**Setup:** one synthetic connected store; one queued business
+`core_dispatch_selftest` job; two genuinely independent transactions/
+connections. **Worker A** runs the real single-transaction dispatch
+(`_claim_for_dispatch(20)` → `_start_running` (checkpoint 2, `running`) →
+hold → `_invoke_handler` (checkpoint 3 + handler) → commit), holding the
+job row lock across the pause with **no intermediate commit**. **Worker
+B** calls the real `store.action_disconnect()` while A is paused.
 
-Three controlled variants, each a faithful single-transaction reproduction
-(no intermediate commit; only merged methods):
+**What actually happens (both variants — see the timeline evidence):**
 
-- **Variant A — genuine concurrent disconnect** (the real race): worker A
-  claims + `_start_running` (checkpoint 2, `running`), holds its open
-  transaction; worker B commits `action_disconnect`-equivalent store
-  disconnect; worker A's checkpoint-3 probe reads
-  `observed_store_state='connected'` (its snapshot) **1.1 s after the
-  disconnect committed**, does **not** skip, invokes the (no-op) handler,
-  and the job → **`succeeded`**. The committed store state was
-  `disconnected`. → **This is exactly the plan's own stated *failure
-  symptom*: "Handler invoked despite disconnect; job proceeds to
-  succeeded."**
-- **Variant B — same-transaction disconnect** (the merged unit test's own
-  mechanism, positive control): the disconnect is a self-write inside the
-  drain transaction, so it is visible; checkpoint-3 reads `disconnected`,
-  routes to `skipped`, handler **not** invoked (log `running→skipped`).
-  The skip code path itself is correct **when the disconnect is visible in
-  the snapshot**.
-- **Variant C — pre-snapshot disconnect** (committed before the claim):
-  checkpoint-2's business-start gate catches it; job →
-  `failed_retryable`; handler **not** invoked; `_invoke_handler` never
-  runs (mirrors `_dispatch_one`'s `if not _start_running: return`).
+`action_disconnect()` does far more than set the store state: it clears the
+credential, writes the store to `disconnected`, **searches every
+non-terminal business job and writes them to `cancelled`**, appends
+cancellation logs, and creates a lifecycle audit job. Under this race,
+Worker B's snapshot sees the job as `queued` (A's `running` is
+uncommitted), so B tries to cancel it — and **blocks on the job's row
+lock** held by Worker A (PostgreSQL evidence: B's backend
+`wait_event_type='Lock'`, `transactionid`, on a `FOR KEY SHARE` of
+`shopify_connector_job`). Worker A therefore reaches checkpoint-3 and reads
+the store as `connected` **because the disconnect has not committed — it is
+blocked**, not because a committed disconnect is invisible. A's handler
+runs, the job `succeeds`, A commits. Only then does B unblock — into a
+**serialization conflict**:
+
+- **Variant LIB** (Worker B = library call, **no** `retrying()` wrapper):
+  `action_disconnect()` raises `psycopg2 SerializationFailure` ("could not
+  serialize access due to concurrent update") and **rolls back**. Final
+  committed: **store `connected`** (disconnect discarded), **job
+  `succeeded`**, 2 log rows, **no cancellation, no audit job**. Raw
+  behavior: the operator's disconnect *fails* and must be retried.
+- **Variant RPC** (Worker B = `action_disconnect` via XML-RPC → Odoo's
+  service-layer `retrying()`): the server logs
+  `SERIALIZATION_FAILURE, 4 tries left, try again in 1.4222 sec...` and
+  **retries the whole call**; on the retry the job is already `succeeded`
+  (terminal), so the cancellation sweep finds nothing. Final committed:
+  **store `disconnected`**, **job `succeeded` (handler ran, NOT
+  cancelled)**, 2 log rows, lifecycle audit job = **"Store disconnected (0
+  non-terminal business job(s) cancelled)."** `action_disconnect` returned
+  HTTP 200.
+
+**Timeline (RPC variant):** A running `07:15:23.617` → B disconnect
+requested `07:15:24.090` → B blocked on job row → A checkpoint-3 observes
+`connected` `07:15:24.551` → A handler done / job `succeeded` / A commit
+`07:15:24.560` → B serialization failure + `retrying()` retry `07:15:24.560`
+→ B `action_disconnect` completes (0 cancelled) `07:15:25.001`. **The live
+handler runs before the disconnect completes; "disconnect requested" ≠
+"disconnect committed".**
 
 - **Expected (per plan):** job routed to `skipped`; handler never invoked.
-- **Actual (genuine concurrency, Variant A):** job `succeeded`; handler
-  invoked. → **FAIL** vs the plan's expected result.
-- **Consequence today:** **none in practice** — the only shipped handler
-  is a no-op with no live Shopify write, so a post-disconnect "success"
-  writes nothing external. **Consequence once a real domain handler
-  exists:** a live Shopify write could occur against a store an operator
-  just disconnected. This is precisely the SRR-03 risk, now **runtime-
-  confirmed as open** with its mechanism identified.
-- **Severity:** Medium (latent; no live-write handler exists yet).
-  **Do not fix this session** — remediation requires a separate
-  ChatGPT-controlled implementation gate (§14, §18).
-- **Evidence:** `scenario-06-variantA.json`, `scenario-06-variantB.json`
-  + `scenario-06-variantB-logs.csv`, `scenario-06-variantC.json` +
-  `scenario-06-variantC-logs.csv`, `scenario-06-odoo-isolation-level.txt`,
-  `scenario-06b-workerA-probe.json` (the instrumented probe showing
-  `observed_store_state:"connected"` post-disconnect).
+- **Actual (real `action_disconnect`):** the in-flight job is **not
+  skipped and not cancelled**; the handler runs; the job `succeeds`; the
+  disconnect is serialized *behind* the running job (blocks → serialization
+  → library raises / RPC retries and cancels nothing). → **FAIL vs the
+  plan's expected result.**
+- **Corrected mechanism:** the plan's "skip" is unreachable here. Under
+  single-transaction REPEATABLE READ dispatch, checkpoint-3 reads the same
+  snapshot as checkpoint-2, so it can never see a store-state change from a
+  concurrent transaction; additionally, the real disconnect cannot even
+  cancel the in-flight job (row-lock blocked) until the job commits. The
+  first submission's "checkpoint-3 fails to observe a *committed*
+  disconnect (probe read `connected` 1.1 s after commit)" describes only
+  the **direct-`store.write()` observation** (§ retained below), **not** the
+  real lifecycle path, and is no longer used to call any defect
+  runtime-confirmed.
+- **Consequence today:** none in practice (no-op handler; no live Shopify
+  write). **Once a real domain handler performs a live write:** the
+  in-flight job's live write completes even though an operator pressed
+  disconnect during it, and the disconnect only lands afterward. That
+  residual window is exactly SRR-03, which **remains OPEN**.
+- **Severity:** Medium, latent. **No fix applied**; remediation requires a
+  separate ChatGPT-controlled gate (§14, §18).
+- **Evidence:** `scenario-06-real-timeline.md`,
+  `scenario-06-real-lib-workerA.json` / `-workerB.json` / `-pglocks.txt` /
+  `-final-state.txt`, `scenario-06-real-rpc-workerA.json` / `-workerB.json`
+  / `-pglocks.txt` / `-server-retry.txt` / `-final-state.txt`.
+
+**Retained narrow observation (NOT the lifecycle result).** The earlier
+direct-`store.write({'state':'disconnected'})` experiment is kept only as a
+labelled **OBSERVATION** about REPEATABLE READ snapshot visibility: a drain
+transaction can continue to read its earlier snapshot (`connected`) after
+another transaction **directly commits** the store state to `disconnected`.
+That is a true statement about snapshot isolation, but it is **not** how the
+real `action_disconnect()` behaves (which blocks rather than commits ahead
+of checkpoint-3), and it must not be presented as the lifecycle-method
+result. Evidence: `scenario-06-variantA.json`, `scenario-06-variantB.json`
+(+ logs), `scenario-06-variantC.json` (+ logs),
+`scenario-06-odoo-isolation-level.txt`, `scenario-06b-workerA-probe.json`.
+Variant B (same-transaction self-write) and Variant C (pre-snapshot
+disconnect → checkpoint-2 `failed_retryable`) remain valid source/behavior
+controls.
 
 ### Scenario 7 — `blocked_manual_review` disconnect cancellation — **PASS** (topology A)
 
@@ -364,13 +432,22 @@ Three controlled variants, each a faithful single-transaction reproduction
   `odoo-bin` server daemons** (PIDs restarted mid-session to 3884/3885),
   HTTP ports 8169/8170, `--max-cron-threads=0`, both against the **one**
   shared `pbscen` database.
-- **Action:** barrier-synchronized XML-RPC `run_drain(20)` fired at **both
-  servers simultaneously** (`t_before` within ~1.4 ms), repeated until the
-  pool drained (2 concurrent rounds after an initial single-server probe).
-- **Observation:** all **40** pool jobs `succeeded`; **0** stuck in
-  `running`; **every** job has exactly **2** job-log rows (no cross-server
-  double-processing) and exactly **1** `queued→running` claim-attempt row
-  (claimed once); **0** `deadlock detected` anywhere in the PostgreSQL log.
+- **Action:** an initial **single-server probe** (`run_drain(5)` on port
+  8169) processed the first **5** jobs (ids 73–77, succeeded at 22:45:42);
+  then barrier-synchronized XML-RPC `run_drain(20)` fired at **both
+  servers simultaneously** (`t_before` within ~1.4 ms) across 2 concurrent
+  rounds, processing the remaining **35** jobs (ids 78–112, succeeded at
+  22:46:27).
+- **Observation (corrected counts — review `4950314052`, blocking issue
+  3):** **40 total pool jobs succeeded**; of these, **5 (73–77) were the
+  single-server probe** and **35 (78–112) were exercised by the successful
+  concurrent two-server rounds**. Across all 40 (and specifically across
+  the 35 concurrent jobs): **0** stuck in `running`; **every** job has
+  exactly **2** job-log rows (no cross-server double-processing) and
+  exactly **1** `queued→running` claim-attempt row (claimed once); **0**
+  `deadlock detected` anywhere in the PostgreSQL log. The concurrent
+  population that proves the cross-server no-double-processing property is
+  the **35**, not all 40.
 - **Expected:** no duplicate processing across servers; no deadlock; no
   stuck `running`; no duplicate `attempt` logs.
 - **Pass reasoning:** exact match. **Note on the PostgreSQL log:** the
@@ -384,7 +461,7 @@ Three controlled variants, each a faithful single-transaction reproduction
   `scenario-08-drain-rounds.txt`, `scenario-08-jobs-after.csv`,
   `scenario-08-job-logs.csv`, `scenario-08-pg-deadlock-scan.txt`.
 
-### Scenario 9 — Crash/interruption — **OBSERVATION ONLY** (topology A/B)
+### Scenario 9 — Crash/interruption — **OBSERVATION ONLY** (process-level concurrency harness, B-like)
 
 Two transaction-boundary cases, both run by claiming + `_start_running`,
 then `kill -9` of the worker process:
@@ -417,24 +494,45 @@ before per-job commits are adopted.
 
 ### Result matrix
 
-| # | Scenario | Result | Topology used |
+| # | Scenario | Result | Concurrency method used |
 | --- | --- | --- | --- |
-| 1 | Single drain baseline | **PASS** | A |
-| 2 | Concurrent cron workers | **PASS** | A/B (3 concurrent + staggered 2-worker) |
-| 3 | Skipped locked rows | **PASS** | A/B (2 concurrent + PG lock probe) |
-| 4 | `retry_waiting` due jobs | **PASS** | A |
-| 5 | Disconnect before claim | **PASS** | A |
-| 6 | Disconnect between start & handler | **FAIL (defect)** | A/B (cross-txn) |
-| 7 | `blocked_manual_review` cancellation | **PASS** | A |
-| 8 | Multi-server drain | **PASS** | C (two-instance, single host) |
-| 9 | Crash/interruption | **OBSERVATION ONLY** | A/B |
+| 1 | Single drain baseline | **PASS** | A (single in-process) |
+| 2 | Concurrent cron workers | **PASS** | process-level harness, B-like (3 concurrent + staggered 2-worker) |
+| 3 | Skipped locked rows | **PASS** | process-level harness, B-like (2 concurrent + PG lock probe) |
+| 4 | `retry_waiting` due jobs | **PASS** | A (single in-process) |
+| 5 | Disconnect before claim | **PASS** | A (single in-process) |
+| 6 | Disconnect between start & handler | **FAIL vs plan expectation** (real `action_disconnect`) | process-level harness, B-like (2 txns; LIB + RPC/`retrying()`) |
+| 7 | `blocked_manual_review` cancellation | **PASS** | A (single in-process) |
+| 8 | Multi-server drain | **PASS** | C — two `odoo-bin` instances, single host (5 probe + 35 concurrent) |
+| 9 | Crash/interruption | **OBSERVATION ONLY** | process-level harness, B-like |
+
+### Revision change log (2026-07-12, review `4950314052`)
+
+- **Scenario 6 rerun faithfully with the real `store.action_disconnect()`**
+  (library + RPC variants). Finding corrected: the in-flight job is not
+  skipped; the disconnect **blocks on the job row**, the handler completes,
+  and the disconnect serialization-retries (RPC) or fails (library),
+  cancelling nothing. The prior "checkpoint-3 misses a committed disconnect"
+  framing is retained only as a narrow snapshot OBSERVATION. Result stays
+  **FAIL vs plan expectation**; SRR-03 stays **OPEN**.
+- **Topology labels corrected:** Scenarios 2/3/6/9 relabelled "process-level
+  concurrency harness (B-like)", not deployed Topology B.
+- **Scenario 8 counts corrected:** 40 total = 5 single-server probe (ids
+  73–77) + 35 concurrent two-server (ids 78–112).
+- **Added** `evidence/.../execution-method.md` (reproducible, sanitized
+  method) and the Scenario-6 faithful-rerun evidence files.
+- No unrelated scenario's accepted evidence was changed except terminology.
 
 ## 11. Evidence index
 
 All under [`evidence/sync-engine-concurrency/`](./evidence/sync-engine-concurrency/):
 
+- **Method (reproducibility):** `execution-method.md` — exact commands,
+  transaction/commit boundaries, barrier/lock points, and the merged ORM
+  methods invoked.
 - **Environment / baseline / cleanup:** `environment.txt`,
-  `baseline-summary.txt`, `cleanup.txt`, `all-jobs-final-snapshot.csv`.
+  `baseline-summary.txt`, `cleanup.txt`, `all-jobs-final-snapshot.csv`,
+  `cleanup-scenario6-rerun.txt`.
 - **Scenario 1:** `scenario-01-*` (before/drain/after/logs/redrain).
 - **Scenario 2:** `scenario-02-*` (3 workers, before/after/logs, leftover
   drain, partition workers A/B + after + logs).
@@ -443,7 +541,13 @@ All under [`evidence/sync-engine-concurrency/`](./evidence/sync-engine-concurren
 - **Scenario 4:** `scenario-04-*` (before/drain/after).
 - **Scenario 5:** `scenario-05-*` (before, disconnect, try-enqueue, drain,
   after).
-- **Scenario 6:** `scenario-06-variantA/B/C*`,
+- **Scenario 6 (faithful real `action_disconnect` rerun):**
+  `scenario-06-real-timeline.md`, `scenario-06-real-lib-workerA.json` /
+  `-workerB.json` / `-pglocks.txt` / `-final-state.txt`,
+  `scenario-06-real-rpc-workerA.json` / `-workerB.json` / `-pglocks.txt` /
+  `-server-retry.txt` / `-final-state.txt`.
+- **Scenario 6 (retained narrow snapshot OBSERVATION, not the lifecycle
+  result):** `scenario-06-variantA/B/C*`,
   `scenario-06-odoo-isolation-level.txt`, `scenario-06b-workerA-probe.json`.
 - **Scenario 7:** `scenario-07-*` (before, disconnect, after, logs).
 - **Scenario 8:** `scenario-08-topology.md`, `scenario-08-drain-rounds.txt`,
@@ -455,19 +559,23 @@ All under [`evidence/sync-engine-concurrency/`](./evidence/sync-engine-concurren
 
 ## 12. Cleanup
 
-- Both `odoo-bin` server daemons stopped; no `odoo-bin` process remains.
-- All temporary worker processes ended; the deliberately held row lock
-  (Scenario 3) was released via rollback; crash workers (Scenario 9) were
-  killed; **0** idle-in-transaction backends remained against `pbscen`.
+- All `odoo-bin` server daemons stopped (original Scenario-8 pair, and the
+  Scenario-6-rerun RPC server); no `odoo-bin` process remains.
+- All temporary worker processes ended; the deliberately held row locks
+  (Scenario 3, and the Scenario-6 rerun) were released via rollback/commit;
+  crash workers (Scenario 9) were killed; **0** idle-in-transaction
+  backends remained.
 - The shipped drain cron was **never modified**; servers ran with
-  `--max-cron-threads=0` so it never auto-fired; both databases were then
+  `--max-cron-threads=0` so it never auto-fired; all databases were then
   dropped, so **no scheduled job remains armed**.
-- Both disposable databases dropped (`pb%` count → `0`), removing every
-  synthetic store/job/log and the test-only admin password + group grant.
+- All three disposable databases dropped (`pb%` count → `0`), removing
+  every synthetic store/job/log and the test-only admin password + group
+  grant.
 - No synthetic store, token, or credential remains in any persistent or
   shared database (none was ever used).
 
-Evidence: [`cleanup.txt`](./evidence/sync-engine-concurrency/cleanup.txt)
+Evidence: [`cleanup.txt`](./evidence/sync-engine-concurrency/cleanup.txt),
+[`cleanup-scenario6-rerun.txt`](./evidence/sync-engine-concurrency/cleanup-scenario6-rerun.txt)
 
 ## 13. Deviations from the plan
 
@@ -479,12 +587,16 @@ Evidence: [`cleanup.txt`](./evidence/sync-engine-concurrency/cleanup.txt)
   demonstrate a genuine disjoint **non-empty** partition (the plain
   3-worker simultaneous run degenerates to one winner per batch window —
   reported honestly, §10 Scenario 2).
-- **Scenario 6** was executed as three controlled variants (A concurrent /
-  B same-transaction / C pre-snapshot) to isolate the mechanism, rather
-  than a single ambiguous run. The concurrent variant is the one mapped to
-  the plan's pass/fail criteria.
+- **Scenario 6** was **rerun (2026-07-12) with the real merged
+  `store.action_disconnect()`** in the competing transaction — via a
+  library call (raw serialization behavior) and via XML-RPC (the
+  production `retrying()` path). The first submission's direct-`store.write`
+  experiment is retained only as a narrow snapshot-visibility OBSERVATION
+  (§10 Scenario 6). Two additional controls (same-transaction self-write;
+  pre-snapshot disconnect) remain.
 - **Scenario 8** used two same-host `odoo-bin` server instances (single
-  host); not a multi-VM/Odoo.sh topology (§17).
+  host); not a multi-VM/Odoo.sh topology (§17). Concurrent population was
+  35 jobs (the other 5 were a single-server probe).
 - The plan's performance-capture addendum (§13.2) was recorded only
   qualitatively (drain durations are in the per-worker JSON timestamps);
   no throughput target was measured (out of this session's scope; PB-19 /
@@ -492,23 +604,46 @@ Evidence: [`cleanup.txt`](./evidence/sync-engine-concurrency/cleanup.txt)
 
 ## 14. Defects observed
 
-**DEF-PB-1 (Scenario 6) — checkpoint-3 disconnect re-check is ineffective
-against a concurrently-committed disconnect under REPEATABLE READ.**
+**DEF-PB-1 (Scenario 6, CORRECTED) — a concurrent operator
+`action_disconnect()` does not skip or cancel an in-flight business job;
+the disconnect is serialized behind the running job and the handler runs to
+completion.**
 
-- **Reproduction:** faithful single-transaction drain (claim +
-  `_start_running`, held open) while a separate transaction commits a
-  store disconnect; checkpoint-3's `store.invalidate_recordset(); store.state`
-  reads the pre-disconnect snapshot value `connected`, so the job is not
-  skipped and the (no-op) handler runs → job `succeeded`. Deterministic
-  and repeated (Variant A, and the earlier `scenario-06b` probe).
+- **Faithful reproduction (real `store.action_disconnect()`):** Worker A
+  runs the real single-transaction drain and holds the job row lock at
+  `running`; Worker B calls the real `action_disconnect()`. B's snapshot
+  sees the job as `queued`, so its cancellation sweep tries to write the
+  job to `cancelled` and **blocks on A's row lock** (PostgreSQL
+  `wait_event_type='Lock'`, `FOR KEY SHARE` on `shopify_connector_job`). A
+  reaches checkpoint-3 (store reads `connected` — the disconnect is
+  *blocked, not committed*), the no-op handler runs, the job `succeeds`, A
+  commits. On unblock B hits `could not serialize access due to concurrent
+  update`: the **library** call raises + rolls back (store stays
+  `connected`); the **RPC** call is retried by `retrying()`
+  (`SERIALIZATION_FAILURE, 4 tries left…`) and then completes, disconnecting
+  the store and **cancelling 0 jobs** (the job is already terminal). Both
+  variants: **handler ran, job `succeeded`, in-flight job not cancelled.**
+- **Correction to the first submission:** the earlier claim — "checkpoint-3
+  fails to observe a *committed* disconnect (probe read `connected` 1.1 s
+  after commit)" — was produced with a **direct `store.write`** substitute,
+  not the lifecycle method, and does **not** describe real behavior. It is
+  retained only as a narrow snapshot-visibility OBSERVATION (§10 Scenario
+  6). The lifecycle method **blocks** rather than committing ahead of
+  checkpoint-3.
 - **Affected scenario:** 6. **Related risk:** SRR-03.
 - **Severity:** Medium, **latent** — no live-write handler exists yet, so
-  no external effect today; becomes real once a domain handler performs a
-  live Shopify write.
+  no external effect today (no-op handler). Becomes real once a domain
+  handler performs a live Shopify write: that write completes even though
+  an operator pressed disconnect during it, and the disconnect only lands
+  afterward.
 - **Not a contradiction of merged code claims:** `_invoke_handler`'s
   docstring says checkpoint-3 *"narrows, but … never claims to close"* the
-  race; SRR-03 is already open. This session supplies the missing runtime
-  evidence and the mechanism (REPEATABLE READ snapshot).
+  race; SRR-03 is already open. Source-level inference (separate from the
+  runtime result): under single-transaction REPEATABLE READ dispatch,
+  checkpoint-3 reads the same snapshot as checkpoint-2 and so cannot fire
+  for any concurrent disconnect; combined with the row-lock blocking above,
+  the plan's "skip" outcome is unreachable for a real concurrent
+  `action_disconnect()`.
 - **Action:** evidence preserved; **no code changed**; no fix commit; not
   broadened. Remediation (if any) requires a separate ChatGPT-controlled
   implementation gate.
@@ -540,18 +675,26 @@ input to Q7, not a bug in merged code.
 > is claimed closed.
 
 - **SRR-04 (cron job-acquisition concurrency under real load): propose
-  REDUCED.** Scenarios 2, 3, and 8 provide genuine multi-process and
-  two-instance evidence that `_claim_for_dispatch` / `try_lock_for_update`
-  (SKIP LOCKED) produces disjoint claimed sets, no double-processing, no
-  duplicate attempt logs, and no deadlock. Not proposed closed: only two
-  same-host instances and a 4-CPU host were exercised; higher worker
-  counts and sustained load were not.
-- **SRR-03 (disconnect / in-flight-job race): remains OPEN — now
-  runtime-confirmed, and arguably worse-characterised than before.**
-  Scenario 6 shows checkpoint-3 does **not** catch a concurrently-
-  committed disconnect (REPEATABLE READ). Propose SRR-03 stay **open**
-  with this session's evidence attached; ChatGPT to decide whether it
-  warrants a remediation gate before the first live-write domain handler.
+  REDUCED.** Scenarios 2 and 3 (independent Odoo-library processes, one
+  shared DB — a process-level concurrency harness, **not** a deployed
+  `--workers` Topology B) and Scenario 8 (two `odoo-bin` instances, single
+  host) provide genuine concurrent-process evidence that
+  `_claim_for_dispatch` / `try_lock_for_update` (SKIP LOCKED) produces
+  disjoint claimed sets, no double-processing, no duplicate attempt logs,
+  and no deadlock. Not proposed closed: no deployed multi-`--workers`
+  server, only two same-host instances, a 4-CPU host, and no sustained
+  load were exercised.
+- **SRR-03 (disconnect / in-flight-job race): remains OPEN.** The faithful
+  real-`action_disconnect()` rerun (Scenario 6) shows the in-flight
+  business job is **not** stopped by a concurrent operator disconnect: the
+  disconnect blocks on the job's row lock, the handler runs to completion,
+  and the disconnect then serialization-retries (RPC) or fails (library),
+  cancelling nothing. checkpoint-3 provides no protection here. Propose
+  SRR-03 stay **open** with this session's corrected evidence attached;
+  ChatGPT to decide whether it warrants a remediation gate before the first
+  live-write domain handler. (Note: the disconnect being *serialized behind*
+  a running no-op job is arguably acceptable today; the risk is the future
+  live-write handler.)
 - **SRR-09 (multi-server / load-balanced coordination): propose REDUCED
   (single-host two-instance evidence only), NOT closed.** Scenario 8 is
   genuine two-`odoo-bin`-instance topology C against one shared DB, but on
@@ -563,14 +706,23 @@ fully green (Scenario 6 FAIL).
 
 ## 17. Limitations
 
+- **Process-level harness, not a deployed `--workers` topology.** The
+  concurrency for Scenarios 2/3/6/9 came from independent Odoo-library
+  processes (separate OS processes, separate PostgreSQL connections)
+  against one shared DB — genuine process-level concurrency, but **not**
+  the plan's literal Topology B (one deployed Odoo server with
+  `--workers > 0`). The DB-level claim/lock/serialization semantics are the
+  same, but a deployed multi-worker HTTP/cron server was not run for these
+  scenarios. Only Scenario 8 used deployed application-server instances.
 - **Single physical host.** Scenario 8's "two servers" are two processes
   on one machine sharing one local cluster — not independent VMs/nodes,
   not a load balancer, not Odoo.sh. It exercises the DB-coordination
   semantics of SRR-09 but not network partitions, cross-node clock skew,
   or independent-node failure.
-- **Small scale.** 4 CPUs; batches of ≤40 jobs; up to 3 concurrent
-  library workers / 2 server instances. No sustained-load or
-  savepoint-ceiling (SRR-01) stress; no throughput/PB-19 measurement.
+- **Small scale.** 4 CPUs; batches of ≤40 jobs (35 concurrent in Scenario
+  8); up to 3 concurrent library processes / 2 server instances. No
+  sustained-load or savepoint-ceiling (SRR-01) stress; no throughput/PB-19
+  measurement.
 - **No live Shopify surface.** Every handler is the shipped no-op; the
   disconnect-race consequence (Scenario 6) is therefore latent, not
   demonstrated end-to-end against a real write.
@@ -583,12 +735,18 @@ fully green (Scenario 6 FAIL).
 
 ## 18. ChatGPT decisions required
 
-1. **SRR-03 / DEF-PB-1:** accept the Scenario 6 finding; decide whether a
+1. **SRR-03 / DEF-PB-1 (corrected):** accept the faithful
+   `action_disconnect()` Scenario 6 finding — an in-flight job is not
+   stopped by a concurrent operator disconnect (the disconnect blocks on
+   the job row, the handler completes, the disconnect then
+   serialization-retries/fails and cancels nothing). Decide whether a
    remediation gate is required (and its scope) **before** any live-write
-   domain handler is built. Options include making the drain re-check the
-   store outside the snapshot (fresh short transaction), or moving the
-   disconnect guard into the handler-commit boundary. **Do not treat this
-   session as authorizing any such change.**
+   domain handler is built. Design directions to weigh (not authorized
+   here): make the drain re-check the store in a fresh short transaction
+   outside its snapshot, put the disconnect guard at the handler-commit
+   boundary, or have `action_disconnect` explicitly signal/await in-flight
+   jobs rather than silently losing the cancellation on serialization.
+   **Do not treat this session as authorizing any such change.**
 2. **SRR-04:** accept/adjust the proposed **REDUCED**, or require higher-
    scale/load evidence first.
 3. **SRR-09:** accept the single-host two-instance evidence as **REDUCED**,
