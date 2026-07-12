@@ -7,3 +7,4 @@ from . import test_product_variant_generation
 from . import test_product_price_import
 from . import test_product_media_import
 from . import test_product_refresh_and_stale
+from . import test_product_runtime_performance
