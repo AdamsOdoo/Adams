@@ -2197,3 +2197,27 @@ yet authorized** and are gated on **CORE-R2 runtime-green** before live
 validation of a Shopify-calling domain handler. PR #151 stays
 **open/draft/unmerged**; this revision stops for another ChatGPT static
 review. No other task authorized._
+
+_**AR-044 revision note 4 (2026-07-12, control-room acceptance `4951264328`
+— Task 010B base-alignment + Odoo.sh validation session).** The four
+Revision-3 corrections were **accepted**; no further Task 010B code
+correction was requested. This is a **validation-only** session (no
+production/test code changed). **(a) Base alignment DONE:**
+`Shopify-connector` advanced to `65e915a` via merged PR #152 (U0 operator-UI
+visual prototype). That exact tip is merged into the branch with a normal
+merge commit `b0d8c7b` (no rebase/force); the only content overlap,
+`docs/01-research/research-handoff.md`, was resolved preserving **both** the
+U0 and the Task 010B entries; all U0 artifacts under `docs/09-ui-prototype/**`
+are added unchanged. The PR diff relative to `65e915a` contains **only Task
+010B-owned changes** (the `shopify_connector_product` addon + the four Task
+010B docs); no U0 file, no Task 011B / CORE-R2 / customer / order / sale file
+appears as a PR change. **(b) Odoo.sh three-suite run: NOT executed or
+observed in this session and NOT recorded** — this Git execution environment
+has no Odoo runtime (`import odoo` fails; no `odoo-bin`), no Odoo.sh access
+(no CLI/credentials), and the head carries no CI check-run/commit status
+(repo has no `.github/workflows`); no Odoo.sh output was provided to record.
+Per governance the verbatim three-suite summary is left **outstanding, not
+fabricated**; it must be run/observed on the Odoo.sh platform at head
+`b0d8c7b` and recorded in `task-010b-validation-results.md` §10. Live/dev-store
+Shopify fixtures remain gated on **CORE-R2 runtime-green**. PR #151 stays
+**open/draft/unmerged**; not marked ready, not merged. No other task started._

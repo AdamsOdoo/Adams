@@ -1,5 +1,42 @@
 # Research Handoff (rolling)
 
+### Task 010B — Base alignment + Odoo.sh validation session (control-room acceptance `4951264328`, 2026-07-12)
+
+- **Revision-3 corrections ACCEPTED; no further Task 010B code correction
+  requested.** This is a **validation-only** session — no production or test
+  code changed.
+- **Base alignment DONE:** `Shopify-connector` advanced to
+  `65e915aada32930a19a14c94d23dc9bd5e6fb517` via merged **PR #152** (U0
+  operator-UI visual prototype). Merged into the branch with a **normal merge
+  commit `b0d8c7be43e7d7e32d2344355b96cf0dd246f636`** (no rebase, no force).
+  The only conflict, `docs/01-research/research-handoff.md`, was resolved
+  **preserving both** the U0 entry and the Task 010B entries; all U0 artifacts
+  under `docs/09-ui-prototype/**` are added unchanged. The PR diff vs `65e915a`
+  is **Task-010B-only** (the `shopify_connector_product` addon + the four Task
+  010B docs); **no U0 file, no Task 011B / CORE-R2 / customer / order / sale
+  file** appears as a PR change.
+- **Odoo.sh three-suite run: NOT executed or observed here, NOT recorded.**
+  This Git session has **no Odoo runtime** (`import odoo` → `ModuleNotFoundError`;
+  no `odoo-bin`), **no Odoo.sh access** (no CLI/credentials), and the PR head
+  carries **no CI check-run/commit status** (no `.github/workflows`). No
+  Odoo.sh build output was provided to this session. Per governance the
+  verbatim summary is left **outstanding, not fabricated** — it must be
+  run/observed on the Odoo.sh platform at head `b0d8c7b` and recorded in
+  `../05-qa/task-010b-validation-results.md` §10.
+- **Still outstanding / separate gates:** Odoo.sh three-suite green (at
+  `b0d8c7b`); lock-hold/throughput + 100/2,048-variant performance
+  measurement; live/dev-store Shopify fixtures (**gated on CORE-R2
+  runtime-green**); Area-6 enqueue dedup; release readiness. **None claimed
+  complete.**
+- **PR #151 stays open/draft/unmerged** — not marked ready, not merged. No
+  live Shopify call was made. No other task started.
+- **Next-session prompt (for ChatGPT / operator):** *"On the Odoo.sh platform,
+  run the full `shopify_connector_core`, `shopify_connector_product`, and
+  `shopify_connector_sale` suites at PR #151 head `b0d8c7b`; capture the
+  verbatim `0 failed, 0 error(s)` totals + build identity and record them in
+  `task-010b-validation-results.md` §10. Do not run live/dev-store Shopify
+  fixtures (gated on CORE-R2). Keep PR #151 draft."*
+
 ### Task 010B — Revision 3 (control-room static review `4951145191`, 2026-07-12)
 
 - **PR #151 stayed draft; the third control-room static review

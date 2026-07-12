@@ -244,8 +244,21 @@ docs; plus a **base merge** of the current integration tip. Test methods
   `Shopify-connector` moved to
   `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` after PR #153 merged. That
   exact tip is merged into this branch with a normal merge commit (clean;
-  PR #153 evidence preserved — §0c). The current integration base for this
-  branch is therefore `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`.
+  PR #153 evidence preserved — §0c).
+- **Base advanced again (validation session, acceptance `4951264328`):**
+  `Shopify-connector` moved to
+  `65e915aada32930a19a14c94d23dc9bd5e6fb517` after PR #152 (U0 operator-UI
+  visual prototype) merged. That exact tip is merged into this branch with a
+  normal merge commit (`b0d8c7b…`, no rebase/force). The only content overlap
+  was `docs/01-research/research-handoff.md`, resolved to preserve **both**
+  the U0 entry and the Task 010B entries; all U0 artifacts under
+  `docs/09-ui-prototype/**` are added by the merge unchanged. The PR diff
+  relative to `65e915a` contains **only Task 010B-owned changes** (the
+  `shopify_connector_product` addon + the four Task 010B docs); no U0 file,
+  no Task 011B / CORE-R2 / customer / order / sale file appears as a PR
+  change. **The current integration base for this branch is
+  `65e915aada32930a19a14c94d23dc9bd5e6fb517`; the validated head is
+  `b0d8c7be43e7d7e32d2344355b96cf0dd246f636`.**
 - **`Shopify-connector` tip at original session start:**
   `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` — **exact match, no drift.**
 - **PR #149** (CORE-R1) verified **merged** via GitHub
@@ -556,11 +569,36 @@ protection, or atomicity.
 
 ## 10. Mandatory runtime/live evidence still outstanding (honest)
 
+**Validation session note (2026-07-12, acceptance `4951264328`).** The
+control-room review accepted the four Revision-3 corrections and authorized
+the **base-alignment + Odoo.sh runtime validation** session. In this session:
+
+- **Base alignment: DONE.** `Shopify-connector` (`65e915a`, PR #152) was
+  merged into the branch with a normal merge commit (`b0d8c7b`, no
+  rebase/force); the sole `research-handoff.md` conflict was resolved
+  preserving both the U0 and Task 010B entries; all U0 artifacts are added
+  unchanged; the PR diff vs `65e915a` is Task-010B-only (verified). Validated
+  head = `b0d8c7be43e7d7e32d2344355b96cf0dd246f636`.
+- **Odoo.sh three-suite run: NOT executed or observed in this session, and
+  therefore NOT recorded as evidence.** This Git execution environment has
+  **no Odoo runtime** (`import odoo` → `ModuleNotFoundError`; no
+  `odoo`/`odoo-bin` on PATH), **no Odoo.sh access** (no Odoo.sh CLI, no
+  credentials/env), and the PR head carries **no CI check-run or commit
+  status** (`get_check_runs` total 0; combined status has zero contexts; the
+  repo has no `.github/workflows`). No Odoo.sh build output was provided to
+  this session to record. Per project governance (no faked evidence), the
+  verbatim three-suite summary is **left blank and outstanding** rather than
+  fabricated. The Odoo.sh run must be executed/observed on the Odoo.sh
+  platform (by the control room / project owner) at head `b0d8c7b`, and its
+  verbatim `0 failed / 0 error(s)` totals + build identity recorded here.
+
 Not obtained this session and **required before merge acceptance**:
 
 - **Odoo.sh:** full three-suite run (`shopify_connector_core`,
   `shopify_connector_product`, `shopify_connector_sale`) with exact
-  verbatim totals, **0 failed / 0 error**.
+  verbatim totals, **0 failed / 0 error** — **at head `b0d8c7b`** (see the
+  validation-session note above: not executable/observable from this Git
+  session).
 - **Live/dev-store (read-only):** three-option sparse product; a >100-
   variant product; the one 2,048-variant timing probe; product + variant
   images with refresh + merchant-image-protection; an archived product; a
@@ -644,7 +682,12 @@ the revert. No destructive migration is part of this task.
       transaction test is named and described accurately (not "simultaneous").
 - [x] Validation record (this file) + AR row + handoff entry.
 - [x] Draft PR opened into `Shopify-connector`; session stops after.
-- [ ] **Odoo.sh green (verbatim)** — outstanding (§10).
+- [x] Base aligned to the current integration tip `65e915a` (PR #152) via a
+      normal merge commit `b0d8c7b` (no rebase/force); handoff conflict
+      resolved preserving both sides; PR diff Task-010B-only (§1, §10 note).
+- [ ] **Odoo.sh green (verbatim) at head `b0d8c7b`** — outstanding; **not
+      executable/observable from this Git session** (no Odoo runtime, no
+      Odoo.sh access, no CI status) — §10 validation-session note.
 - [ ] **Live/dev-store evidence** — outstanding; **live Shopify fixtures gated
       on CORE-R2 runtime-green** (§10).
 
