@@ -134,6 +134,77 @@ scenarios** (re-review item 5); U0 is marked parallelizable because it
 is design-only and gates only U1. Parallel-safe pairs are named in the
 table; nothing else may overlap.
 
+### 2.1 Proposed CORE-R2 dependency (under review — NOT an accepted reorder)
+
+> **Inserted 2026-07-12 by the CORE-R2 design session** (gate comment
+> PR #153 `4950413650`, docs-only). **Revised three times 2026-07-12** — per
+> review `4951115877` (broaden the dependency from Shopify *mutations* to
+> **any Shopify call including reads**), per review `4951237871`
+> (committed-lease quiescence; explicit `execute_business` boundary), and per
+> review `4680299311` (store-row lock atomic admission; `execute_business`
+> context manager; direction-C expired-lease rule; corrected controller
+> selection + `POLL_DELAY`; zero-holders rollback; CORE-R2 architecture-review
+> row renumbered **AR-045 → AR-047**).
+> **Base re-aligned 2026-07-12 (control-room base-sync amendment)** by
+> normal merge to `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (supersedes
+> `65e915a`; PR #152/U0 + PR #155/U0-closure preserved). This subsection
+> **adds a proposed dependency only** — it does **not** renumber or reorder
+> the accepted §2 steps. **CORE-R2 design is under review; no CORE-R2
+> implementation gate is open.**
+>
+> **Cross-module note (rev 4):** making INV-2 real requires **two named,
+> structural call-site edits** in existing domain importers —
+> `shopify_connector_product` (product import) and `shopify_connector_sale`
+> (customer import) — each wrapping its Shopify call **and the local
+> reconciliation that follows it** in a `with execute_business(job, …) as
+> result:` block (a re-indented region, not a one-line swap) so the admission
+> lease spans reconciliation. The CORE-R2 packet's future allowlist names
+> exactly those two call sites (call-site-scoped). This is an additional reason
+> CORE-R2 must land before those handlers are live-validated; ChatGPT sequences
+> the two edits vs Tasks 010B/011B at the CORE-R2 gate (D-CR2-E).
+
+**Task CORE-R2 — disconnect quiescence & in-flight job contract** remediates
+the **runtime-confirmed** DEF-PB-1 / SRR-03 (PR #153, accepted `4950408383`):
+a concurrent real `action_disconnect()` does **not** stop an already in-flight
+business handler. Design + packet:
+[`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md),
+[`../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`](../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md).
+
+Proposed placement (for ChatGPT to ratify — call **D-CR2-E**):
+
+- **CORE-R2 must be resolved (merged runtime-green) before UAT** (§2 step 17)
+  and before the Go/No-Go release act (step 18). It is a UAT prerequisite.
+- **The defect applies to ANY Shopify call, including reads** (the contract
+  promises "no further Shopify call", not merely "no further mutation").
+  Therefore CORE-R2 must be runtime-green **before merging, enabling, or
+  live-validating any domain handler that can call Shopify** — this includes
+  **Task 010B product-import live validation** (§2 step 2), **Task 011B
+  customer-import live validation** (step 3), **Task 012 order-import live
+  validation** (step 5), and **Tasks 013–015** (steps 10–12), as well as UAT.
+- **Handling the already-open Task 010B and Task 011B PRs:** their
+  development and review **may continue in parallel** with CORE-R2; only their
+  **final integration / live enablement / live Shopify validation** waits for
+  CORE-R2 to be merged runtime-green — **unless** a given handler path is
+  proven to contain **no Shopify call** (in which case it is unaffected and may
+  proceed). CORE-R2 is `shopify_connector_core`-only and independent of the
+  domain modules, so it can be developed and merged concurrently. Its external
+  validation is the **P-B concurrency track** (§3) that produced the runtime
+  evidence.
+- **Recommended sequencing:** run CORE-R2 **early — after CORE-R1 and in
+  parallel with 010B/011B** — so it is merged and proven before any domain
+  handler's live validation.
+- **Sequencing constraint:** the CORE-R2 packet adds one store state
+  (`disconnecting`), new store/job fields (incl. `connection_generation` /
+  `expected_connection_generation`), a new `shopify.connector.call.lease` model,
+  the store-row lock protocol (`FOR SHARE` admission vs `FOR NO KEY UPDATE`/`FOR
+  UPDATE` lifecycle), a dedicated quiesce-controller `ir.cron`, and the central
+  API-client context-manager gate; to avoid a later retrofit, land these
+  **before or with Task LC-1** (§2 step 4, the historic-job-type reassignment)
+  so they participate in that lifecycle from day one.
+
+No §2 step is moved by this note; the concrete insertion point is **D-CR2-E**
+at CORE-R2 gate time. Until then the CORE-R2 implementation gate is **closed**.
+
 ## 3. Parallel external tracks (independent of the chain; start any time)
 
 Unchanged: **P-A** VAL-B2 execution (human, live store — also feeds

@@ -46,6 +46,115 @@
   (`docs/09-ui-prototype/`) and swapping inline-SVG placeholders for the platform
   FontAwesome set (P9).”*
 
+### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR #154 into `Shopify-connector`, 2026-07-12, revision 4)
+
+- **Base (re-aligned by normal merge):** `Shopify-connector` tip ==
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (control-room base-sync
+  amendment; supersedes `65e915a`; PR #152/U0 and PR #155/U0-closure
+  merged into the branch; U0 artifacts + history preserved unchanged);
+  **PR #153 merged**; design gate comment **`4950413650`** (CORE-R2
+  **design** gate — OPEN, docs-only). Branch
+  `claude/core-r2-disconnect-quiescence-design`; **draft PR #154** (design
+  only). **Revision 4** applies control-room review **`4680299311`** (six
+  implementation-safety corrections; supersedes rev 3's `4951237871` and
+  rev 2's `4951115877`). **No CORE-R2 implementation gate is open.**
+- **Why:** PR #153 runtime-**confirmed** DEF-PB-1 / **SRR-03 stays OPEN**
+  (accepted `4950408383`): a concurrent real `store.action_disconnect()`
+  does **not** stop an already in-flight business handler — it blocks
+  behind the running job's row lock, the handler completes and the job
+  succeeds, then the disconnect serialization-fails (library) or is
+  retried by `retrying()` and completes cancelling **zero** jobs. Latent
+  only because every shipped handler is a no-op; a live-write defect once
+  a domain handler mutates Shopify.
+- **What this session did (design only, no code):** produced the
+  remediation analysis
+  [`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md)
+  (26 sections; runtime facts vs Odoo/PG source facts vs inferences vs
+  recommendations kept separate) and the future packet
+  [`../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`](../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md)
+  (allowed/forbidden files incl. the **API client, a new `call.lease` model,
+  and two named domain call sites**; executable tests of the real
+  `execute_business` gate + committed leases via the `_send` transport seam;
+  two-server tests; Odoo.sh; ordered rollback; DoD — **gate NOT opened**).
+  Normal-merged the integration tip (base re-aligned to
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d` per the control-room
+  base-sync amendment; resolved rolling-handoff top-entry conflicts by
+  keeping **both** sides — the incoming U0-acceptance-closure entry and
+  this CORE-R2 entry — and the U0 spec files/history unchanged). Updated
+  SRR-03/04/09 wording, the CORE-R2 architecture-review row (**now AR-047**,
+  renumbered AR-045 → AR-047 per control-room ID amendment `4680291189` —
+  repository allocation AR-044 = U0, AR-045 = Task 011B/PR #150, AR-046 =
+  Task 010B/PR #151, AR-047 = CORE-R2/PR #154; the reserved 045/046 rows
+  live in their own PRs and are never overwritten or combined here), the
+  master-plan **§2.1** CORE-R2 dependency, and this entry — for review
+  `4680299311`.
+- **Recommended architecture (rev 4, proposal, not decided): Option E,
+  lease-backed + store-row-lock-serialized.** **Rev 4 (review `4680299311`)**
+  makes rev 3 implementation-safe: **(A)** admission is atomic with disconnect via a
+  store-row **`FOR SHARE`** lock (gate read + token read + lease commit under it)
+  vs **`FOR NO KEY UPDATE`/`FOR UPDATE`** on every generation-changing transition —
+  the lock, not the bare lease commit, is the linearization point (both orders
+  proved; concurrent admissions preserved; `store→credential` order deadlock-free);
+  **(B)** `execute_business` is a **context manager** wrapping the call **and** its
+  local reconciliation (no early/forgotten release) — the two domain call sites
+  become structural `with` blocks; **(C)** **direction-C** expired-lease rule
+  (expired = unknown/live; `completed` needs zero rows; crashed holder → distinct
+  **`timed_out`**; cleanup only after `timed_out`); **(D)** corrected controller
+  selection `try_lock_for_update(limit=1)` = `FOR UPDATE SKIP LOCKED LIMIT 1`
+  (picks the next unlocked store) + **`POLL_DELAY`** cadence via delayed
+  `_trigger(at=…)` (no busy loop); **(E)** ordered rollback requires **zero
+  holders** (workers drained first) before code/model removal. The rev-3 baseline
+  follows. Rev 2's quiescence signal was **broken** — `run_drain` runs
+  `running`→handler→terminal in **one uncommitted transaction**, so
+  `state='running'` is **invisible cross-transaction** and a `running`-count
+  poll returns zero mid-handler. Rev 3: **(a)** INV-2 at an explicit
+  **`execute_business(job, store, query)`** boundary (mandatory `job`, no
+  `env.context`), fail-closed vs a persisted epoch
+  (`store.connection_generation` bumped on disconnect/reconnect/activate/
+  credential-replace vs enqueue-captured `job.expected_connection_generation`,
+  fresh-cursor read); **`execute_lifecycle(purpose=…)`** with a state matrix for
+  setup/diagnostic calls; public `execute()` removed. **Call-site inventory:**
+  core test-connection → lifecycle; **product + customer importers → business**,
+  needing **two named minimal call-site edits** in the domain modules (added to
+  the future allowlist). **(b)** INV-3 (quiescence) proven by a **committed
+  admission-lease** (`shopify.connector.call.lease`, side-cursor committed before
+  each call, released after local reconciliation, expiry+reaper crash recovery,
+  **multiple leases per store**) — NOT a `running` count. **(c)** admission is
+  **atomic with a single in-memory token snapshot** passed to
+  `_send(store, body, token)` (second credential lookup removed). **(d)**
+  **one-store-per-cron-invocation** controller (store-row SKIP LOCKED; no
+  main-cursor commit); the "dedicated worker slot / cannot starve" claim is
+  **removed** (priority 0 = prioritization; completion is an SLA under a healthy
+  scheduler; safety is immediate via the gate). **(e)** frozen **lifecycle
+  matrix** (disconnect one-way; lifecycle mutations refused during
+  `disconnecting`; epoch bumps on every successful activation/reconnect).
+  **(f)** **lease-based** timeout escalation on store fields (never a locked job
+  row). **(g)** **ordered rollback**. Advisory lock stays dropped (shared/
+  exclusive variant evaluated, rejected for lack of observability).
+  Source-verified: REPEATABLE READ (`odoo/sql_db.py:373`), one-transaction drain
+  commit (`odoo/addons/base/models/ir_cron.py:691`), `retrying()`
+  (`odoo/service/model.py:160`), non-blocking `FOR UPDATE SKIP LOCKED`
+  (`odoo/orm/models.py:5592`/`5564`), cron `_trigger`/priority
+  (`ir_cron.py:735`/`303`). The **API client + a new lease model + two domain
+  call sites join the CORE-R2 future allowlist.**
+- **Critical path (rev 2, proposal D-CR2-E):** the defect applies to **any
+  Shopify call including reads**, so CORE-R2 must merge runtime-green **before
+  UAT** and **before merging/enabling/live-validating any domain handler that
+  calls Shopify** — incl. **010B/011B/012 live validation** and Tasks 013–015.
+  Development/review of 010B/011B may continue in parallel; only their final
+  integration / live enablement waits for CORE-R2 (unless a handler path has
+  no Shopify call). Recommend sequencing early (∥ 010B/011B) and landing the
+  new state/fields/controller-cron/API-gate with Task LC-1.
+- **Risk status unchanged by design:** SRR-03 **OPEN**; SRR-04 & SRR-09
+  **REDUCED, not closed**. Live Odoo.sh + genuine two-server proof are
+  required (by the packet) before SRR-03 can move off OPEN.
+- **Next step:** ChatGPT reviews the draft PR and makes the six analysis
+  §26 calls (D-CR2-A…F). If accepted, a **separate, later** CORE-R2
+  implementation-gate act (naming the then-current base SHA + re-freezing
+  the packet's allowed-file list) authorizes the code session. **Do not
+  merge or mark ready without ChatGPT review.**
+
+
 ### U0 — Premium operator UI visual prototype (draft PR #152, design-artifacts-only, 2026-07-11 · revised 2026-07-12 · final semantic closure 2026-07-12)
 
 - **Final semantic closure (control-room review `4950432754`, 2026-07-12):** one
