@@ -361,6 +361,43 @@ class TestProductRefreshAndStale(TransactionCase):
         self.assertEqual(template.name, name_before)
         self.assertTrue(archived.get('stale'))
 
+    def test_archived_outranks_unchanged_short_circuit(self):
+        """Lifecycle status beats the unchanged-updatedAt optimization
+        (review 4951145191 item 3): an active binding whose archived payload
+        presents the exact same stored updatedAt must still go stale, with no
+        media download and no master write -- never returned as `unchanged`."""
+        self._settings(price_source_of_truth='shopify_authoritative',
+                       product_import_refresh_mode='shopify_fields')
+        gid = 'gid://shopify/Product/6210'
+        first = self.Importer._apply_import(self.store, self._payload(
+            gid, [self._variant('%s/v' % gid, 20.0, sku='AO1')],
+            updated_at='2026-07-12T09:00:00Z'))
+        binding = first['template_binding']
+        template = binding.product_template_id
+        self.assertEqual(binding.status, 'active')
+        self.assertEqual(binding.shopify_updated_at, '2026-07-12T09:00:00Z')
+        template.invalidate_recordset(['list_price'])
+        price_before = template.list_price
+
+        Importer = type(self.Importer)
+        with patch.object(Importer, '_prepare_media') as media:
+            # Archived payload with the EXACT same updatedAt and a decoy price.
+            result = self.Importer._apply_import(self.store, self._payload(
+                gid, [self._variant('%s/v' % gid, 999.0, sku='AO1')],
+                status='archived', updated_at='2026-07-12T09:00:00Z'))
+        media.assert_not_called()  # archived outranks media staging
+        self.assertFalse(result.get('unchanged'))  # not short-circuited
+        self.assertTrue(result.get('stale'))
+        binding.invalidate_recordset(['status'])
+        self.assertEqual(binding.status, 'stale')
+        self.assertTrue(result['variant_bindings'])
+        self.assertTrue(all(
+            vb.status == 'stale' for vb in result['variant_bindings']))
+        # Master data untouched -- the decoy 999 price was never written.
+        template.invalidate_recordset(['list_price'])
+        self.assertEqual(
+            float_compare(template.list_price, price_before, precision_digits=2), 0)
+
     def test_first_seen_archived_product_raises_mapping_missing(self):
         gid = 'gid://shopify/Product/6203-never-seen'
         with self.assertRaises(JobHandlerError) as ctx:

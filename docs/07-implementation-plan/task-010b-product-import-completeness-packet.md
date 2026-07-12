@@ -23,6 +23,37 @@
 > DB-global) and is proven by a real concurrent-transaction test
 > (D-010B-2, §5).**
 
+> **[Correction / supersession note — 2026-07-12, control-room static
+> review `4951145191` item 4. Does not rewrite the decision history above;
+> corrects a factual error in this packet's lock-lifetime wording.]** This
+> packet in places describes the `shopify.connector.attribute.lock`
+> singleton `try_lock_for_update()` (`FOR UPDATE SKIP LOCKED`) lock as
+> *"released when the product's savepoint/transaction commits"* and as
+> *"held only across the attribute critical section … not the whole
+> import"* (see §D-010B-2 and §10). **That lifetime description is wrong
+> and is superseded here.** The correct behaviour (verified against the
+> Odoo 19.0 source and implemented in the connector):
+> - The lock is **transaction-scoped**. PostgreSQL holds a `FOR UPDATE`
+>   row lock until the **outer transaction** commits or rolls back.
+> - **Releasing the per-product `savepoint` does NOT release it** — a
+>   `RELEASE SAVEPOINT` never frees a row lock; only the outer
+>   commit/rollback does.
+> - It therefore serializes not just the attribute resolve/create critical
+>   section but **the remaining database work of the holding transaction**,
+>   and in a multi-job `run_drain` transaction it can affect the remainder
+>   of that batch.
+> - The Shopify GraphQL request and any image download happen **before** the
+>   lock is acquired, never while it is held, so network latency is never
+>   inside the lock.
+> - The **correctness mechanism is unchanged and accepted** (exactly one
+>   attribute is created under contention). The **lock-hold duration and its
+>   throughput impact are an open runtime measurement obligation**
+>   (Odoo.sh / dev-store), not a closed performance claim. See
+>   `../05-qa/task-010b-validation-results.md` §0c/§10 and AR-044.
+> Every statement in this packet claiming savepoint-release, attribute-only
+> hold, or "the whole import is not serialized" is annotated inline as
+> **[superseded — see the 2026-07-12 correction note]**.
+
 ## 1. Why this task exists (verified Task 010 limitations vs accepted scope)
 
 **[Fact — merged repository state]** The merged importer
@@ -146,7 +177,10 @@ a **DB-backed serialization lock**:
   `shopify.connector.attribute.lock` (one seeded `noupdate=1` row) is
   acquired with **`try_lock_for_update()`** (Odoo 19's official
   row-locking primitive) **before** any global attribute resolve/create,
-  and released when the product's savepoint/transaction commits. Because
+  and released when the product's savepoint/transaction commits.
+  **[Superseded — see the 2026-07-12 correction note: the lock is
+  transaction-scoped; releasing the per-product savepoint does NOT release
+  it — only the outer transaction commit/rollback does.]** Because
   it is a **single global row** (not per-store), it serializes attribute
   resolve/create across **all** stores — the correct scope, since
   `product.attribute` is database-global.
@@ -158,6 +192,12 @@ a **DB-backed serialization lock**:
   resolve/create — never across an image download or any Shopify
   network call (those happen outside it) — so it does not serialize the
   whole import, only the global-attribute critical section.
+  **[Superseded — see the 2026-07-12 correction note: network calls do
+  happen before acquisition, but because the lock is transaction-scoped it
+  serializes the remaining DB work of the holding transaction — and, in a
+  multi-job `run_drain` transaction, potentially the rest of that batch —
+  not only the attribute critical section. Correctness is unchanged;
+  lock-hold/throughput is a runtime measurement obligation.]**
 Duplicate **prevention at creation time** is in-scope and tested
 (§5, a real concurrent-transaction test proving two imports of the same
 new option create **one** attribute, not two); it is **not** deferred to
@@ -481,9 +521,16 @@ try_lock_for_update() BEFORE any global attribute resolve/create (a
 savepoint does NOT serialize concurrent transactions), single global
 row across all stores (product.attribute is DB-global), released at
 commit, held only over the attribute critical section (never across a
-network call); a real concurrent-transaction test proves one attribute
-is created, not two — duplicate PREVENTION at creation time, never a
-deferred reconciliation sweep; D-010B-3 dynamic-mode
+network call) [SUPERSEDED — see the 2026-07-12 correction note near the
+top: the lock is transaction-scoped and held until the OUTER transaction
+commits/rolls back; releasing the per-product savepoint does not release
+it, so it serializes the remaining DB work of the holding transaction —
+and in a multi-job run_drain transaction potentially the rest of the
+batch — not only the attribute critical section; network calls do occur
+before acquisition; correctness unchanged, lock-hold/throughput is a
+runtime measurement obligation]; a real concurrent-transaction test
+proves one attribute is created, not two — duplicate PREVENTION at
+creation time, never a deferred reconciliation sweep; D-010B-3 dynamic-mode
 deterministic variant instantiation (verify the 19.0 dynamic-creation
 API against source before use — STOP and report if it differs; no
 phantom variants; structural mismatch -> binding_conflict);

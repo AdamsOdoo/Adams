@@ -87,6 +87,17 @@ PRODUCT_STATUS_VALUES = ('active', 'archived', 'draft', 'unlisted')
 # accepted data-shape/schema-mismatch hold.
 VARIANTS_PAGE_SIZE = 100
 MAX_ACCUMULATED_VARIANTS = 2048
+# Defensive page-iteration backstop (control-room review `4951145191` item 1).
+# It is never reached in practice: a continuing page (hasNextPage=true) must
+# carry at least one variant node (the zero-node-forward-progress rule), every
+# accumulated variant GID is unique (the duplicate-GID guard), and the
+# accumulated set may not exceed `MAX_ACCUMULATED_VARIANTS`; therefore every
+# continuing page adds >=1 unique accumulated variant and the variant cap fires
+# after at most `MAX_ACCUMULATED_VARIANTS + 1` continuing pages. This ceiling
+# sits just above that mathematical bound as a belt-and-suspenders backstop --
+# it is NOT a catalog cap (a real 2,048-variant product needs <=21 pages at
+# `first: 100`) and never limits a legitimate product.
+MAX_VARIANT_PAGES = MAX_ACCUMULATED_VARIANTS + 2
 
 # The Shopify default single-variant option shape -- a product whose only
 # option is `Title` with sole value `Default Title` is a true single-variant
@@ -235,30 +246,55 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         larger product).
 
         Forward-progress and identity guards prevent a malformed connection
-        from looping forever or importing an overlapping page:
+        from looping forever or importing an overlapping/torn page:
 
         * the pagination cursor must strictly advance -- an `endCursor` equal
           to the cursor just used, or equal to any cursor already seen in
-          this call, is rejected (so a response that repeatedly returns
-          `hasNextPage=true` with the same cursor and zero nodes cannot loop
-          forever);
+          this call, is rejected;
+        * a continuing page (`hasNextPage=true`) must carry at least one
+          variant node -- an empty `nodes` with `hasNextPage=true` makes no
+          data progress and is rejected (control-room review `4951145191`
+          item 1), so a response that returns `hasNextPage=true`, `nodes=[]`,
+          and a fresh non-empty cursor forever cannot loop;
         * every accumulated variant GID must be unique across all pages
           (a repeated GID within or across pages is a malformed connection,
           not a real 2,049th variant, and is rejected here rather than
           surfacing later as a database constraint error);
         * the returned product `id` on every non-null page must equal the
-          requested product GID.
+          requested product GID;
+        * the product `updatedAt` captured on the first page must be carried
+          unchanged -- same present/absent shape and same value -- on every
+          later page (control-room review `4951145191` item 2). A change
+          means the product was edited mid-pagination and this fetch would
+          otherwise splice first-page metadata onto later-page variants (a
+          torn read across two remote versions). This is an in-run torn-read
+          guard only -- NOT enqueue-level deduplication or `payload_hash`
+          ownership (that remains an Area-6 obligation).
 
-        All violations route to `data_shape_schema_mismatch`, and no product
-        or binding is written (this method runs entirely before
-        `_apply_import`).
+        Because every continuing page adds >=1 unique accumulated variant and
+        the accumulated set is capped at `MAX_ACCUMULATED_VARIANTS`, the loop
+        runs at most `MAX_ACCUMULATED_VARIANTS + 1` continuing pages;
+        `MAX_VARIANT_PAGES` is a defensive backstop above that bound. All
+        violations route to `data_shape_schema_mismatch`, and no product or
+        binding is written (this method runs entirely before `_apply_import`).
         """
         cursor = None
         product_node = None
         accumulated_variants = []
         seen_cursors = set()
         seen_variant_gids = set()
+        first_updated_present = False
+        first_updated_at = None
+        page_count = 0
         while True:
+            page_count += 1
+            if page_count > MAX_VARIANT_PAGES:
+                # Unreachable given the zero-node + unique-GID + variant-cap
+                # guards above; a pure defensive backstop, never a catalog cap.
+                raise self._schema_error(
+                    shopify_product_gid,
+                    'pagination exceeded the defensive page ceiling without '
+                    'terminating -- blocked as a malformed connection.')
             result = self._execute_query(store, shopify_product_gid, cursor)
             if not isinstance(result, dict):
                 raise self._schema_error(
@@ -284,8 +320,22 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                     shopify_product_gid,
                     'a page returned product GID %r, which does not match the '
                     'requested product.' % (page_product.get('id'),))
+            # Cross-page torn-read guard: the product's updatedAt must be
+            # identical (same present/absent shape and value) on every page.
+            page_updated_present = 'updatedAt' in page_product
+            page_updated_at = page_product.get('updatedAt')
             if product_node is None:
                 product_node = page_product
+                first_updated_present = page_updated_present
+                first_updated_at = page_updated_at
+            elif (
+                page_updated_present != first_updated_present
+                or page_updated_at != first_updated_at
+            ):
+                raise self._schema_error(
+                    shopify_product_gid,
+                    'the product updatedAt changed between pagination pages -- '
+                    'a torn read across two remote versions; nothing imported.')
             variants_connection = page_product.get('variants')
             if not isinstance(variants_connection, dict):
                 raise self._schema_error(
@@ -328,6 +378,13 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                     'variants.pageInfo.hasNextPage was not a Boolean.')
             if not has_next_page:
                 break
+            # Zero-node forward-progress guard: a continuing page must make
+            # data progress, or the loop could never terminate on nodes.
+            if not nodes:
+                raise self._schema_error(
+                    shopify_product_gid,
+                    'hasNextPage is true but the page carried zero variants -- '
+                    'no forward progress; blocked as a malformed connection.')
             next_cursor = page_info.get('endCursor')
             if not isinstance(next_cursor, str) or not next_cursor:
                 raise self._schema_error(
@@ -568,16 +625,19 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     def _apply_import(self, store, payload, job=None, requested_gid=None):
         """Map/create/bind one fully-paginated Shopify product payload.
 
-        Validates first. Then, before any media download or database write,
-        an `updatedAt` short-circuit (D-010B-7 / review `4950202231` item 2)
-        returns immediately when an active binding already records this
-        exact remote `updatedAt`.
+        Validates first. Then an ARCHIVED product is routed to
+        `_handle_archived_product` -- BEFORE the unchanged-`updatedAt`
+        short-circuit and before any media is staged (reviews `4950339305`
+        item 4 and `4951145191` item 3). Lifecycle status outranks the
+        refresh optimization: an active binding whose payload happens to
+        present the same stored `updatedAt` must still become stale when the
+        remote product is archived, so the archived decision cannot sit
+        behind `_unchanged_short_circuit`. A broken image URL likewise must
+        never be able to prevent an archived product from being marked stale.
 
-        An ARCHIVED product is then routed to `_handle_archived_product`
-        BEFORE any media is staged (review `4950339305` item 4): a broken
-        image URL must never be able to prevent an archived product from
-        being marked stale, and an archived product never triggers a master
-        write or a media download.
+        For a NON-archived product, an `updatedAt` short-circuit (D-010B-7 /
+        review `4950202231` item 2) then returns immediately when an active
+        binding already records this exact remote `updatedAt`.
 
         Otherwise images are staged over the network (D-010B-10: network out
         of the transaction) each into its own secure temporary file that is
@@ -592,14 +652,15 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         the savepoint commits.
         """
         self._validate_payload(payload)
+        # D-010B-8 / reviews `4950339305` item 4 + `4951145191` item 3:
+        # lifecycle status outranks the unchanged-refresh optimization and
+        # all media/master writes -- route an ARCHIVED product first.
+        if payload.get('status') == 'archived':
+            return self._handle_archived_product(store, payload, job)
         settings = self._store_settings(store)
         skipped = self._unchanged_short_circuit(store, payload)
         if skipped is not None:
             return skipped
-        # D-010B-8 / review `4950339305` item 4: resolve an ARCHIVED product
-        # before any media download or master write.
-        if payload.get('status') == 'archived':
-            return self._handle_archived_product(store, payload, job)
         notes = []
         with ExitStack() as media_stack:
             media = self._prepare_media(store, payload, settings, notes, media_stack)

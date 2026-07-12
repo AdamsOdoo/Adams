@@ -1187,3 +1187,149 @@ class TestProductImportMatching(TransactionCase):
         with patch.object(type(Client), 'execute', fake_execute):
             result = self.Importer.import_product_sync(self.store, gid)
         self.assertEqual(len(result['variant_bindings']), 2)
+
+    # ------------------------------------------------------------------
+    # 13. Zero-node forward progress (review 4951145191 item 1). A
+    # `hasNextPage=true` page carrying zero variants makes no data progress;
+    # combined with the unique-GID guard and the 2,048-variant cap it would
+    # otherwise loop forever behind ever-fresh cursors. It must be blocked.
+    # ------------------------------------------------------------------
+
+    def _empty_fresh_cursor_execute(self, gid, max_calls=25):
+        """Every page: `hasNextPage=true`, `nodes=[]`, and a brand-new,
+        never-repeating cursor. Without the zero-node guard this loops
+        forever (no cursor repeats, no variant accumulates, the 2,048 cap
+        never fires); the `max_calls` cap turns a regression into a FAILURE
+        rather than a hang."""
+        state = {'i': 0}
+
+        def fake_execute(client_self, store, query, variables=None):
+            state['i'] += 1
+            if state['i'] > max_calls:
+                raise AssertionError(
+                    'zero-node pagination did not terminate after %d calls -- '
+                    'the forward-progress guard did not stop it.' % (max_calls,))
+            return {
+                'data': {
+                    'product': {
+                        'id': gid, 'title': 'Empty Pages', 'status': 'ACTIVE',
+                        'updatedAt': '2026-07-12T00:00:00Z',
+                        'featuredImage': None, 'options': [],
+                        'variants': {
+                            'nodes': [],
+                            'pageInfo': {
+                                'hasNextPage': True,
+                                'endCursor': 'fresh-%d' % state['i'],
+                            },
+                        },
+                    },
+                },
+            }
+        return fake_execute
+
+    def test_zero_node_pages_with_fresh_cursors_blocked(self):
+        gid = 'gid://shopify/Product/1290'
+        templates_before = self.env['product.template'].search_count([])
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(
+            type(Client), 'execute', self._empty_fresh_cursor_execute(gid),
+        ):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+
+    # ------------------------------------------------------------------
+    # 14. Cross-page updatedAt torn-read guard (review 4951145191 item 2).
+    # Each page is a separate request; the product's updatedAt captured on
+    # page one must be carried unchanged (same present/absent shape and
+    # value) on every later page, or the fetch would splice one remote
+    # version's metadata onto another version's variants. Any change routes
+    # to data_shape_schema_mismatch before any write. In-run torn-read guard
+    # only -- not Area-6 enqueue deduplication.
+    # ------------------------------------------------------------------
+
+    def _two_page_updated_at_execute(
+        self, gid, first_updated, second_updated,
+        first_present=True, second_present=True,
+    ):
+        """Two-page product; page one carries `first_updated`, page two
+        `second_updated`. `*_present` toggles whether the `updatedAt` key is
+        present at all (to exercise the present/absent shape guard)."""
+        v0 = self._pnode(gid, 0)
+        v1 = self._pnode(gid, 1)
+
+        def product_node(updated, present, nodes, has_next, end_cursor):
+            node = {
+                'id': gid, 'title': 'TP', 'status': 'ACTIVE',
+                'featuredImage': None, 'options': [],
+                'variants': {
+                    'nodes': nodes,
+                    'pageInfo': {'hasNextPage': has_next, 'endCursor': end_cursor},
+                },
+            }
+            if present:
+                node['updatedAt'] = updated
+            return node
+
+        def fake_execute(client_self, store, query, variables=None):
+            cursor = (variables or {}).get('cursor')
+            if cursor is None:
+                return {'data': {'product': product_node(
+                    first_updated, first_present, [v0], True, 'c1')}}
+            return {'data': {'product': product_node(
+                second_updated, second_present, [v1], False, None)}}
+        return fake_execute
+
+    def _assert_cross_page_blocked(self, gid, fake_execute):
+        templates_before = self.env['product.template'].search_count([])
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+
+    def test_cross_page_identical_updated_at_accepted(self):
+        """Two pages carrying the same updatedAt accumulate both variants --
+        the torn-read guard does not reject a consistent product."""
+        gid = 'gid://shopify/Product/1291'
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(
+            type(Client), 'execute',
+            self._two_page_updated_at_execute(gid, 'U1', 'U1'),
+        ):
+            node = self.Importer._fetch_product_with_all_variant_pages(
+                self.store, gid)
+        self.assertEqual(len(node['variants']['nodes']), 2)
+
+    def test_cross_page_changed_updated_at_blocked(self):
+        gid = 'gid://shopify/Product/1292'
+        self._assert_cross_page_blocked(
+            gid, self._two_page_updated_at_execute(gid, 'U1', 'U2'))
+
+    def test_cross_page_first_missing_second_present_blocked(self):
+        gid = 'gid://shopify/Product/1293'
+        self._assert_cross_page_blocked(
+            gid,
+            self._two_page_updated_at_execute(
+                gid, None, 'U2', first_present=False, second_present=True),
+        )
+
+    def test_cross_page_first_present_second_missing_blocked(self):
+        gid = 'gid://shopify/Product/1294'
+        self._assert_cross_page_blocked(
+            gid,
+            self._two_page_updated_at_execute(
+                gid, 'U1', None, first_present=True, second_present=False),
+        )

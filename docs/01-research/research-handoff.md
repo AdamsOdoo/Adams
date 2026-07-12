@@ -1,5 +1,52 @@
 # Research Handoff (rolling)
 
+### Task 010B — Revision 3 (control-room static review `4951145191`, 2026-07-12)
+
+- **PR #151 stayed draft; the third control-room static review
+  (`4951145191`) accepted Revision 2 and required four final corrections at
+  head `8e3076e`.** All applied on the SAME PR (files: the importer,
+  `test_product_import_matching`, `test_product_refresh_and_stale`, the
+  authoritative packet, and the three docs) — plus a **base merge**. No new
+  PR; still open/draft/unmerged.
+- **Base updated (item 4):** `Shopify-connector` advanced to
+  `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (PR #153 merged its sync-engine
+  concurrency evidence). That exact tip is merged into this branch with a
+  normal merge commit — **clean** (PR #153 added only evidence files under
+  `docs/05-qa/evidence/sync-engine-concurrency/` + two new `docs/05-qa`
+  result/handoff files; no overlap with any Task 010B file), so **all PR #153
+  evidence is preserved unchanged** and no Task 010B code changed in the merge.
+- **What changed (code):** (1) **Zero-node forward progress** — a continuing
+  page (`hasNextPage=true`) carrying zero variants is rejected
+  (`data_shape_schema_mismatch`), closing the fresh-cursor/empty-node
+  infinite loop the seen-cursor set alone did not stop; a defensive
+  `MAX_VARIANT_PAGES` backstop is added and the loop proven bounded (zero-node
+  rule + duplicate-GID guard + 2,048 cap). (2) **Cross-page `updatedAt`
+  torn-read guard** — the first page's `updatedAt` (present/absent shape and
+  value) must be carried unchanged on every later page, else
+  `data_shape_schema_mismatch` before any write (in-run torn-read guard, not
+  Area-6 dedup). (3) **Archived outranks the unchanged short-circuit** —
+  `_apply_import` routes `ARCHIVED` immediately after `_validate_payload`,
+  before `_unchanged_short_circuit()` and media, so an active binding with the
+  same stored `updatedAt` still goes stale (first-seen unbound archived still
+  → `mapping_missing`). (4) **Authoritative packet corrected** — a dated
+  correction/supersession note plus inline **[superseded]** annotations on
+  every stale lock-lifetime statement (transaction-scoped; savepoint release
+  does not free it; held to outer commit; serializes the rest of the
+  transaction/`run_drain` batch; correctness unchanged; lock-hold/throughput a
+  runtime obligation).
+- **Test methods 155 → 161.** Local `compileall`/`py_compile` clean; source
+  guards green (query-only, zero new `sudo()`, no new error class, no forbidden
+  model, savepoint present, `list_price` write-locality, no token/path in
+  media). **No Odoo.sh/live claim added.** Runtime sequence: Odoo.sh next;
+  **live/dev-store Shopify fixtures NOT yet authorized — gated on CORE-R2
+  runtime-green** before live validation of a Shopify-calling domain handler.
+  This session stops for another ChatGPT static review; no other task started.
+- **Next-session prompt (for ChatGPT):** *"Re-review the Task 010B revision on
+  PR #151 against control-room comment `4951145191` (items 1-4) and the updated
+  validation record §0c; if clean, run the Odoo.sh full suites and quote the
+  exact result. Do NOT run the live/dev-store Shopify fixtures until CORE-R2 is
+  runtime-green. Do not start any other task."*
+
 ### Task 010B — Revision 2 (control-room static review `4950339305`, 2026-07-12)
 
 - **PR #151 stayed draft; the second control-room static review

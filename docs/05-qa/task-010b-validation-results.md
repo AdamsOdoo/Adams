@@ -167,10 +167,86 @@ methods **135 → 155**. Each correction, honestly scoped:
 
 ---
 
+## 0c. Revision 3 — control-room static review `4951145191` (2026-07-12)
+
+The third static review (PR stayed draft) accepted the Revision-2 work and
+found four final corrections before Odoo.sh runtime execution. **Files
+touched:** the importer, `test_product_import_matching`,
+`test_product_refresh_and_stale`, the authoritative packet, and the three
+docs; plus a **base merge** of the current integration tip. Test methods
+**155 → 161**.
+
+- **Base updated to the current integration tip.** `Shopify-connector`
+  advanced to `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (PR #153 merged
+  its sync-engine concurrency evidence). That exact tip is merged into this
+  published branch with a normal merge commit (no history rewrite); the
+  merge is clean (PR #153 added only evidence files under
+  `docs/05-qa/evidence/sync-engine-concurrency/` and two new `docs/05-qa`
+  result/handoff files — no overlap with any Task 010B file), so **all
+  PR #153 evidence is preserved unchanged** and no Task 010B code changed in
+  the merge.
+
+1. **Zero-node empty-page forward progress.** The seen-cursor guard rejected
+   only a *repeating* cursor; a malformed connection returning
+   `hasNextPage=true`, `nodes=[]`, and a **fresh** non-empty cursor forever
+   accumulated no variants, so the 2,048 cap never fired and it could loop
+   indefinitely. `_fetch_product_with_all_variant_pages` now rejects a
+   continuing page (`hasNextPage=true`) whose `nodes` is empty →
+   `data_shape_schema_mismatch`. A defensive `MAX_VARIANT_PAGES` backstop is
+   added, and the loop is proven bounded: every continuing page must add
+   ≥1 **unique** accumulated variant (zero-node rule + duplicate-GID guard),
+   and the accumulated set is capped at `MAX_ACCUMULATED_VARIANTS`, so at
+   most `MAX_ACCUMULATED_VARIANTS + 1` continuing pages run. Regression test
+   uses fresh cursors on empty pages with a strict call-count cap so a
+   regression fails rather than hangs, proving no write.
+2. **Cross-page `updatedAt` torn-read guard.** Each page is a separate
+   GraphQL request; the importer validated the product GID per page but did
+   not check whether the product was edited mid-pagination, so it could
+   splice first-page metadata onto later-page variants. It now captures the
+   first page's `updatedAt` (present/absent shape and value) and requires
+   every later non-null page to carry the exact same shape and value, else
+   raises `data_shape_schema_mismatch` before any write. Tests: identical
+   across two pages → accepted; changed on page two → blocked; first missing
+   / second present → blocked; first present / second missing → blocked.
+   This is an in-run torn-read guard only — **not** Area-6 enqueue
+   deduplication or `payload_hash` ownership.
+3. **ARCHIVED outranks the unchanged short-circuit.** `_apply_import` routed
+   `_unchanged_short_circuit()` **before** the archived check, so an active
+   binding whose archived payload presented the same stored `updatedAt`
+   could return `unchanged` instead of going stale. The order is now
+   `_validate_payload` → **archived route** → settings / unchanged
+   short-circuit → media / normal import. Lifecycle status wins. Regression
+   test: active bound product with a non-empty `updatedAt`, then an archived
+   payload with the exact same `updatedAt` → template + variant bindings
+   stale, result not `unchanged`, `_prepare_media` not called, and Odoo
+   master values (a decoy price) unchanged. First-seen unbound archived
+   still raises `mapping_missing` and creates nothing.
+4. **Authoritative packet lock wording corrected.**
+   `docs/07-implementation-plan/task-010b-product-import-completeness-packet.md`
+   still described the singleton lock as released with the product savepoint
+   and held only across the attribute critical section. A clearly dated
+   **correction/supersession note** is added near the top (decision history
+   not rewritten), and every stale statement (§D-010B-2, §10 locked prompt)
+   is annotated inline as **[superseded]**: the lock is transaction-scoped,
+   the savepoint release does not free it, it is held to the outer
+   commit/rollback and serializes the rest of the transaction (and, in a
+   `run_drain` batch, potentially the rest of the batch); network calls
+   precede acquisition; correctness is accepted; lock-hold/throughput is a
+   runtime measurement obligation.
+
+---
+
 ## 1. Base verification (hard prerequisite)
 
-- **Required base SHA:** `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`.
-- **`Shopify-connector` tip at session start:**
+- **Original required base SHA:** `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`
+  (PR #149 / CORE-R1 merge). The branch was created from it.
+- **Base advanced (Revision 3, review `4951145191` item 4):**
+  `Shopify-connector` moved to
+  `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` after PR #153 merged. That
+  exact tip is merged into this branch with a normal merge commit (clean;
+  PR #153 evidence preserved — §0c). The current integration base for this
+  branch is therefore `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`.
+- **`Shopify-connector` tip at original session start:**
   `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` — **exact match, no drift.**
 - **PR #149** (CORE-R1) verified **merged** via GitHub
   (`merged_at 2026-07-11T20:50:22Z`); its merge commit is the branch tip.
@@ -288,8 +364,15 @@ cite:
   (cursor in-run only) until `hasNextPage` is false; `first` always
   explicit; accumulated cap 2,048 → `data_shape_schema_mismatch`;
   malformed pageInfo / missing endCursor with `hasNextPage` →
-  `data_shape_schema_mismatch`. Never a mutation; client error taxonomy
-  preserved.
+  `data_shape_schema_mismatch`. **Forward-progress + identity guards
+  (§0b.1, §0c.1-2):** seen-cursor set rejects a repeated/non-progressing
+  cursor; a continuing page with **zero nodes** is rejected (no forward
+  progress); duplicate variant GIDs within/across pages and a product `id`
+  mismatch are rejected; the first page's `updatedAt` (present/absent shape
+  and value) must be carried unchanged on every later page (cross-page
+  torn-read guard); a defensive `MAX_VARIANT_PAGES` backstop bounds the
+  loop, which the zero-node rule + duplicate-GID guard + 2,048 cap already
+  make finite. Never a mutation; client error taxonomy preserved.
 - **D-010B-2 (attributes/values/lines + compatibility gate + lock):** for
   each option in position order, `product.attribute` resolved
   case-insensitively; reused **only** when `create_variant=='dynamic'`;
@@ -354,12 +437,15 @@ cite:
   mutated).
 - **D-010B-8 (archived/deleted):** null product for a bound GID →
   binding+variant bindings `stale` + note, Odoo master untouched. `ARCHIVED`
-  is routed **before any media download** (§0b.4): a **bound** product →
-  binding+variant bindings `stale` + audit-snapshot refresh, no media/master
-  write (a broken image URL cannot block stale marking); a **first-seen,
-  unbound** archived product creates **no** bare Odoo product/binding and
-  raises the existing `mapping_missing` class. Null product with no binding →
-  `data_shape_schema_mismatch`.
+  is routed **before the unchanged short-circuit and before any media
+  download** (§0b.4, §0c.3): lifecycle status outranks the refresh
+  optimization, so an active binding whose archived payload presents the
+  same stored `updatedAt` still goes stale (never returned `unchanged`). A
+  **bound** product → binding+variant bindings `stale` + audit-snapshot
+  refresh, no media/master write (a broken image URL cannot block stale
+  marking); a **first-seen, unbound** archived product creates **no** bare
+  Odoo product/binding and raises the existing `mapping_missing` class. Null
+  product with no binding → `data_shape_schema_mismatch`.
 - **D-010B-9 (duplicate prevention + N+1):** match priority unchanged
   (binding→SKU→barcode→manual; no name matching). Per-variant full-table
   scans replaced by one prefetched binding map + batched SKU/barcode
@@ -394,21 +480,24 @@ cite:
 | --- | --- |
 | test_product_template_binding.py (unchanged) | 7 |
 | test_product_variant_binding.py (unchanged) | 6 |
-| test_product_import_matching.py | 52 |
+| test_product_import_matching.py | 57 |
 | test_product_duplicate_prevention.py | 12 |
 | test_product_attribute_import.py | 16 |
 | test_product_variant_generation.py | 8 |
 | test_product_price_import.py | 9 |
 | test_product_media_import.py | 26 |
-| test_product_refresh_and_stale.py | 19 |
-| **Total** | **155** (135 at head `5688ec1`; 110 at `1065cdf`; 61 at CORE-R1) |
+| test_product_refresh_and_stale.py | 20 |
+| **Total** | **161** (155 at `8e3076e`; 135 at `5688ec1`; 110 at `1065cdf`; 61 at CORE-R1) |
 
-Coverage maps to every §21 named case plus reviews `4950202231` (items 1-8)
-and `4950339305` (items 1-5): pagination (250 across pages, 2,048 cap,
-malformed pageInfo, missing endCursor, no mutation; **forward-progress and
-identity** — repeated/zero-node cursor, cursor==current, replayed-seen
-cursor, duplicate variant GID within/across pages, non-mapping node,
-missing-GID node, product-GID mismatch, valid two-page accept);
+Coverage maps to every §21 named case plus reviews `4950202231` (items 1-8),
+`4950339305` (items 1-5), and `4951145191` (items 1-3): pagination (250
+across pages, 2,048 cap, malformed pageInfo, missing endCursor, no mutation;
+**forward-progress and identity** — repeated/zero-node cursor,
+**zero-node fresh-cursor loop**, cursor==current, replayed-seen cursor,
+duplicate variant GID within/across pages, non-mapping node, missing-GID
+node, product-GID mismatch, **cross-page updatedAt: identical accepted /
+changed / first-missing-second-present / first-present-second-missing
+blocked**, valid two-page accept);
 attributes (ci dynamic reuse, new dynamic, Default-Title, position,
 additive values, existing-`always`→manual-review, existing-`no_variant`→
 manual-review, connector_owned `"Color (Shopify)"` + refresh both modes +
@@ -427,10 +516,12 @@ one-open-at-a-time read, path removal after success/DB-failure/validation-
 failure, no path in error); refresh/stale (snapshot_only, shopify_fields,
 structural adds in both, real updatedAt short-circuit + stamp-after-success
 + no-advance-on-failure + empty-never-short-circuits; **archived routed
-before media** — bound→stale with no `_prepare_media`, broken-URL cannot
-block stale, bound master unchanged, first-seen unbound→`mapping_missing`
-creating nothing; deleted-bound→stale, deleted-unbound→data-error, no Odoo
-deletion, source-level declared-write guard).
+before media AND before the unchanged short-circuit** — bound→stale with no
+`_prepare_media`, broken-URL cannot block stale, bound master unchanged,
+**archived-outranks-unchanged (identical stored updatedAt still goes
+stale)**, first-seen unbound→`mapping_missing` creating nothing;
+deleted-bound→stale, deleted-unbound→data-error, no Odoo deletion,
+source-level declared-write guard).
 
 ## 8. Source-level guards, sudo inventory, network behaviour
 
@@ -481,6 +572,13 @@ Not obtained this session and **required before merge acceptance**:
   inside a multi-job `run_drain` transaction, and the DB-phase timing at 100
   and 2,048 variants. Throughput is **not** claimed proven here.
 
+**Runtime sequence (review `4951145191`):** (1) run the Odoo.sh full suites
+and quote the exact result; (2) the **live/dev-store Shopify fixtures are
+NOT yet authorized** — **CORE-R2 must be runtime-green before any live
+validation of a domain handler that calls Shopify**; (3) keep PR #151 draft
+and unmerged until the Odoo.sh evidence and the later authorized live-fixture
+evidence are reviewed.
+
 These are **not faked and not waived**. The PR is kept **draft**; a later
 validation-only session (or an explicit ChatGPT waiver recorded at gate
 time) closes them.
@@ -517,30 +615,38 @@ the revert. No destructive migration is part of this task.
 
 ## 12. Definition-of-done checklist
 
-- [x] Base SHA verified (`f9c3c5f…`); PR #149 merged; gate `4948723366` read.
-- [x] Only allowed files changed (21; no forbidden file).
+- [x] Original base SHA verified (`f9c3c5f…`); PR #149 merged; gate
+      `4948723366` read. **Base advanced to `fcbbb0b…` (PR #153) and merged
+      into this branch, clean, PR #153 evidence preserved (§0c).**
+- [x] Only allowed files changed (no forbidden file); Revision 3 touched the
+      importer, two test files, the packet, and three docs (+ the base merge).
 - [x] D-010B-1 … D-010B-12 implemented.
 - [x] Odoo 19 internals verified against actual 19.0 source before use.
 - [x] Shopify 2026-07 fields verified (variant-`image` deprecation noted).
-- [x] All required tests exist (155 methods; every §21 case + review
-      `4950202231` items 1-8 + review `4950339305` items 1-5).
+- [x] All required tests exist (161 methods; every §21 case + reviews
+      `4950202231` items 1-8, `4950339305` items 1-5, `4951145191` items 1-3).
 - [x] All locally executable checks pass (compileall, py_compile, XML,
       source guards).
 - [x] No Shopify mutation; no phantom Odoo variants; import atomic;
       merchant images protected; price writes respect SoT; archived/deleted
       never delete Odoo master data; a first-seen archived product creates
       no Odoo master data (`mapping_missing`).
-- [x] Pagination cannot loop forever or import an overlapping page
-      (forward-progress + variant/product identity guards).
+- [x] Pagination cannot loop forever (zero-node forward-progress + seen-cursor
+      + defensive page ceiling) or import an overlapping/torn page
+      (variant/product identity + cross-page `updatedAt` guards).
+- [x] Lifecycle status outranks the unchanged short-circuit (archived routed
+      before `_unchanged_short_circuit` and media).
 - [x] Media staging uses O(1) open handles / bounded RAM with deterministic
       unlink on every exit path; mid-stream network errors are classified.
 - [x] Attribute-lock behaviour unchanged; its transaction-scope wording
-      corrected everywhere; the overlapping-transaction test is named and
-      described accurately (not "simultaneous").
+      corrected everywhere including the **authoritative packet** (dated
+      supersession note, stale statements annotated); the overlapping-
+      transaction test is named and described accurately (not "simultaneous").
 - [x] Validation record (this file) + AR row + handoff entry.
 - [x] Draft PR opened into `Shopify-connector`; session stops after.
 - [ ] **Odoo.sh green (verbatim)** — outstanding (§10).
-- [ ] **Live/dev-store evidence** — outstanding (§10).
+- [ ] **Live/dev-store evidence** — outstanding; **live Shopify fixtures gated
+      on CORE-R2 runtime-green** (§10).
 
 All other task gates (011B, LC-1, 012, Area 6, SEC-1, inventory,
 fulfillment, product export, UI/Owl, webhooks, OAuth, PERF-1) stayed

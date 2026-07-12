@@ -2162,3 +2162,38 @@ Odoo.sh/dev-store measurement, not a closed performance claim. Test methods
 evidence remain outstanding (validation record §10). PR #151 stays
 **open/draft/unmerged**; this revision stops for another ChatGPT static
 review. No other task authorized._
+
+_**AR-044 revision note 3 (2026-07-12, control-room static review
+`4951145191` — Task 010B REVISE once more before Odoo.sh).** The third
+static review accepted Revision 2 and required four final corrections at head
+`8e3076e`, all applied on the same PR (files: the importer, two test files,
+the authoritative packet, three docs; plus a base merge): (0) **base
+updated** — `Shopify-connector` advanced to `fcbbb0b` (PR #153 sync-engine
+concurrency evidence) and is merged into this branch with a normal merge
+commit (clean; PR #153 evidence preserved unchanged; no Task 010B code
+changed by the merge); (1) **zero-node forward progress** — a continuing
+page (`hasNextPage=true`) carrying zero variants is rejected
+(`data_shape_schema_mismatch`), closing the fresh-cursor/empty-node infinite
+loop the seen-cursor set alone did not stop; a defensive `MAX_VARIANT_PAGES`
+backstop is added and the loop proven bounded by the zero-node rule +
+duplicate-GID guard + 2,048 variant cap; (2) **cross-page `updatedAt`
+torn-read guard** — the first page's `updatedAt` (present/absent shape and
+value) must be carried unchanged on every later page, else
+`data_shape_schema_mismatch` before any write (an in-run torn-read guard, not
+Area-6 dedup); (3) **archived outranks the unchanged short-circuit** —
+`_apply_import` now routes `ARCHIVED` immediately after `_validate_payload`,
+before `_unchanged_short_circuit()` and media, so an active binding whose
+archived payload presents the same stored `updatedAt` still goes stale
+(first-seen unbound archived still → `mapping_missing`, creating nothing);
+(4) **authoritative packet corrected** — a dated correction/supersession note
+is added and every stale lock-lifetime statement annotated
+**[superseded]**: the singleton lock is transaction-scoped, the savepoint
+release does not free it, it is held to the outer commit and serializes the
+rest of the transaction (and, in a `run_drain` batch, potentially the rest of
+the batch); correctness unchanged; lock-hold/throughput is a runtime
+obligation. Test methods 155 → **161**. **No runtime/live claim added** —
+Odoo.sh remains the next gate; the live/dev-store Shopify fixtures are **not
+yet authorized** and are gated on **CORE-R2 runtime-green** before live
+validation of a Shopify-calling domain handler. PR #151 stays
+**open/draft/unmerged**; this revision stops for another ChatGPT static
+review. No other task authorized._
