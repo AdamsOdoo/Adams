@@ -742,14 +742,14 @@ class TestProductImportMatching(TransactionCase):
 
     def _single_option_pages(self, product_gid, total, page_size=100):
         """Build paged GraphQL responses for a one-option, `total`-variant
-        product (option 'Edition' with values E0..E{total-1})."""
+        product (option 'SC010B Paged Edition' with values E0..E{total-1})."""
         option_values = [{'id': 'ov-%d' % i, 'name': 'E%d' % i} for i in range(total)]
         nodes = [
             {
                 'id': '%s/variant/%d' % (product_gid, i),
                 'sku': 'PAGED-%s-%d' % (product_gid.split('/')[-1], i),
                 'barcode': None, 'price': '10.00', 'compareAtPrice': None,
-                'selectedOptions': [{'name': 'Edition', 'value': 'E%d' % i}],
+                'selectedOptions': [{'name': 'SC010B Paged Edition', 'value': 'E%d' % i}],
                 'image': None, 'inventoryItem': {'id': 'ii-%d' % i},
             }
             for i in range(total)
@@ -775,7 +775,7 @@ class TestProductImportMatching(TransactionCase):
                         'tags': [], 'updatedAt': '2026-07-11T00:00:00Z',
                         'featuredImage': None,
                         'options': [{
-                            'id': 'opt-1', 'name': 'Edition', 'position': 1,
+                            'id': 'opt-1', 'name': 'SC010B Paged Edition', 'position': 1,
                             'optionValues': option_values,
                         }],
                         'variants': {
@@ -817,7 +817,7 @@ class TestProductImportMatching(TransactionCase):
             ([{
                 'id': '%s/variant/0' % gid, 'sku': 'MEC-0', 'barcode': None,
                 'price': '10.00', 'compareAtPrice': None,
-                'selectedOptions': [{'name': 'Edition', 'value': 'E0'}],
+                'selectedOptions': [{'name': 'SC010B Paged Edition', 'value': 'E0'}],
                 'image': None, 'inventoryItem': None,
             }], True, None),  # hasNextPage True but endCursor None
         ]

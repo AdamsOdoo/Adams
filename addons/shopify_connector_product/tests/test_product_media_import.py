@@ -574,14 +574,15 @@ class TestProductMediaImport(TransactionCase):
         gid = 'gid://shopify/Product/5041'
         payload = self._payload(
             gid, image_url='https://cdn.shopify.com/p.png',
-            options=[{'name': 'Color', 'position': 1, 'values': ['Red', 'Blue']}],
+            options=[{'name': 'SC010B Media Color', 'position': 1,
+                      'values': ['Red', 'Blue']}],
             variants=[
                 self._variant('%s/red' % gid, sku='OO-R',
                               image_url='https://cdn.shopify.com/a.png',
-                              selected=[{'name': 'Color', 'value': 'Red'}]),
+                              selected=[{'name': 'SC010B Media Color', 'value': 'Red'}]),
                 self._variant('%s/blue' % gid, sku='OO-B',
                               image_url='https://cdn.shopify.com/b.png',
-                              selected=[{'name': 'Color', 'value': 'Blue'}]),
+                              selected=[{'name': 'SC010B Media Color', 'value': 'Blue'}]),
             ],
         )
         with patch.object(self.ImporterType, '_read_staged', tracking_read):
@@ -613,14 +614,14 @@ class TestProductMediaImport(TransactionCase):
         # (primary + both variants) has been staged over the network.
         payload = self._payload(
             gid, image_url='https://cdn.shopify.com/db.png',
-            options=[{'name': 'Color', 'position': 1, 'values': ['Red']}],
+            options=[{'name': 'SC010B Media Color', 'position': 1, 'values': ['Red']}],
             variants=[
                 self._variant('%s/r' % gid, sku='DBR',
                               image_url='https://cdn.shopify.com/r.png',
-                              selected=[{'name': 'Color', 'value': 'Red'}]),
+                              selected=[{'name': 'SC010B Media Color', 'value': 'Red'}]),
                 self._variant('%s/x' % gid, sku='DBX',
                               image_url='https://cdn.shopify.com/x.png',
-                              selected=[{'name': 'Phantom', 'value': 'Z'}]),
+                              selected=[{'name': 'SC010B Media Phantom', 'value': 'Z'}]),
             ],
         )
         with fetch_patch:

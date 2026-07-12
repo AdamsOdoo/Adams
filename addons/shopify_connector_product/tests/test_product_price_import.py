@@ -98,12 +98,14 @@ class TestProductPriceImport(TransactionCase):
     def _size_payload(self, gid, s_price, m_price):
         return self._payload(
             gid,
-            options=[{'name': 'Size', 'position': 1, 'values': ['S', 'M']}],
+            options=[{'name': 'SC010B Price Size', 'position': 1, 'values': ['S', 'M']}],
             variants=[
                 self._variant('%s/s' % gid, s_price,
-                              [{'name': 'Size', 'value': 'S'}], sku='%s-S' % gid[-4:]),
+                              [{'name': 'SC010B Price Size', 'value': 'S'}],
+                              sku='%s-S' % gid[-4:]),
                 self._variant('%s/m' % gid, m_price,
-                              [{'name': 'Size', 'value': 'M'}], sku='%s-M' % gid[-4:]),
+                              [{'name': 'SC010B Price Size', 'value': 'M'}],
+                              sku='%s-M' % gid[-4:]),
             ],
         )
 
@@ -139,19 +141,19 @@ class TestProductPriceImport(TransactionCase):
         payload = self._payload(
             gid,
             options=[
-                {'name': 'Color', 'position': 1, 'values': ['Red', 'Blue']},
-                {'name': 'Size', 'position': 2, 'values': ['S', 'M']},
+                {'name': 'SC010B Price Color', 'position': 1, 'values': ['Red', 'Blue']},
+                {'name': 'SC010B Price Size', 'position': 2, 'values': ['S', 'M']},
             ],
             variants=[
                 self._variant('%s/rs' % gid, 20.0, [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'S'}], sku='RS6'),
+                    {'name': 'SC010B Price Color', 'value': 'Red'},
+                    {'name': 'SC010B Price Size', 'value': 'S'}], sku='RS6'),
                 self._variant('%s/rm' % gid, 25.0, [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'M'}], sku='RM6'),
+                    {'name': 'SC010B Price Color', 'value': 'Red'},
+                    {'name': 'SC010B Price Size', 'value': 'M'}], sku='RM6'),
                 self._variant('%s/bs' % gid, 23.0, [
-                    {'name': 'Color', 'value': 'Blue'},
-                    {'name': 'Size', 'value': 'S'}], sku='BS6'),
+                    {'name': 'SC010B Price Color', 'value': 'Blue'},
+                    {'name': 'SC010B Price Size', 'value': 'S'}], sku='BS6'),
             ],
         )
         result = self.Importer._apply_import(self.store, payload)
@@ -177,22 +179,22 @@ class TestProductPriceImport(TransactionCase):
         payload = self._payload(
             gid,
             options=[
-                {'name': 'Color', 'position': 1, 'values': ['Red', 'Blue']},
-                {'name': 'Size', 'position': 2, 'values': ['S', 'M']},
+                {'name': 'SC010B Price Color', 'position': 1, 'values': ['Red', 'Blue']},
+                {'name': 'SC010B Price Size', 'position': 2, 'values': ['S', 'M']},
             ],
             variants=[
                 self._variant('%s/rs' % gid, 20.0, [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'S'}], sku='URS'),
+                    {'name': 'SC010B Price Color', 'value': 'Red'},
+                    {'name': 'SC010B Price Size', 'value': 'S'}], sku='URS'),
                 self._variant('%s/rm' % gid, 25.0, [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'M'}], sku='URM'),
+                    {'name': 'SC010B Price Color', 'value': 'Red'},
+                    {'name': 'SC010B Price Size', 'value': 'M'}], sku='URM'),
                 self._variant('%s/bs' % gid, 23.0, [
-                    {'name': 'Color', 'value': 'Blue'},
-                    {'name': 'Size', 'value': 'S'}], sku='UBS'),
+                    {'name': 'SC010B Price Color', 'value': 'Blue'},
+                    {'name': 'SC010B Price Size', 'value': 'S'}], sku='UBS'),
                 self._variant('%s/bm' % gid, 40.0, [
-                    {'name': 'Color', 'value': 'Blue'},
-                    {'name': 'Size', 'value': 'M'}], sku='UBM'),
+                    {'name': 'SC010B Price Color', 'value': 'Blue'},
+                    {'name': 'SC010B Price Size', 'value': 'M'}], sku='UBM'),
             ],
         )
         result = self.Importer._apply_import(self.store, payload)

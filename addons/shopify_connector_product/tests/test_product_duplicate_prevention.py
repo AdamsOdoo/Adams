@@ -318,12 +318,15 @@ class TestProductDuplicatePrevention(TransactionCase):
     def test_structured_reimport_is_idempotent_no_duplicates(self):
         payload = self._structured_payload(
             'gid://shopify/Product/960',
-            options=[{'name': 'Color', 'position': 1, 'values': ['Red', 'Blue']}],
+            options=[{'name': 'SC010B Structured Color', 'position': 1,
+                      'values': ['Red', 'Blue']}],
             variants=[
                 self._svariant('gid://shopify/ProductVariant/960a',
-                               [{'name': 'Color', 'value': 'Red'}], sku='SR0'),
+                               [{'name': 'SC010B Structured Color', 'value': 'Red'}],
+                               sku='SR0'),
                 self._svariant('gid://shopify/ProductVariant/960b',
-                               [{'name': 'Color', 'value': 'Blue'}], sku='SB0'),
+                               [{'name': 'SC010B Structured Color', 'value': 'Blue'}],
+                               sku='SB0'),
             ],
         )
         first = self.Importer._apply_import(self.store, payload)
@@ -333,7 +336,7 @@ class TestProductDuplicatePrevention(TransactionCase):
         self.assertEqual(len(second['variant_bindings']), 2)
         template = first['template_binding'].product_template_id
         self.assertEqual(len(template.product_variant_ids), 2)
-        # Re-import creates no second Color attribute.
+        # Re-import creates no second same-name attribute.
         self.assertEqual(
             self.env['product.attribute'].search_count([]), attributes_after_first,
         )
@@ -351,13 +354,15 @@ class TestProductDuplicatePrevention(TransactionCase):
         products_before = self.env['product.product'].search_count([])
         payload = self._structured_payload(
             'gid://shopify/Product/961',
-            options=[{'name': 'Cut', 'position': 1, 'values': ['Slim']}],
+            options=[{'name': 'SC010B Structured Cut', 'position': 1,
+                      'values': ['Slim']}],
             variants=[
                 self._svariant('gid://shopify/ProductVariant/961a',
-                               [{'name': 'Cut', 'value': 'Slim'}], sku='CS1'),
+                               [{'name': 'SC010B Structured Cut', 'value': 'Slim'}],
+                               sku='CS1'),
                 # References an option absent from the product -> conflict.
                 self._svariant('gid://shopify/ProductVariant/961b',
-                               [{'name': 'Phantom', 'value': 'X'}], sku='CX1'),
+                               [{'name': 'SC010B Phantom', 'value': 'X'}], sku='CX1'),
             ],
         )
         with self.assertRaises(JobHandlerError) as ctx:

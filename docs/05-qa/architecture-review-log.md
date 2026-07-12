@@ -2276,3 +2276,41 @@ renumber; `Shopify-connector` (`cfdb057`) is an ancestor of the new head.
 validation remains the next gate (not executable/observable from this Git
 session); live/dev-store Shopify fixtures remain gated on **CORE-R2
 runtime-green**. PR #151 stays **open/draft/unmerged**; no other task started._
+
+_**AR-046 revision note 6 (2026-07-12, control-room runtime correction
+`4680380218` — Task 010B runtime fixture correction + base sync to `ce504f`).**
+The first observed Odoo.sh branch build
+(`adamsmen-claude-product-import-completeness-010b-5l-34797217`, Odoo 19.0)
+was **RED**: verbatim `1 failed, 4 error(s) of 329 tests`
+(`shopify_connector_product: 102 tests`; module summary `1 failures, 4 errors
+of 94 tests` — totals quoted verbatim, not reconciled). The suite **halted**
+after five failures, so the Task 010B **standard-runtime gate stays OPEN**.
+Root cause (single class): **non-isolated global `product.attribute` fixture
+names** — the Odoo test DB's demo data holds incompatible
+(`create_variant='always'`) `Color`/`Size`/`Material` attributes, so
+success-path fixtures naming them hit the accepted compatibility gate. The
+five: `test_case_insensitive_compatible_dynamic_reuse` (invalid absolute
+same-name count assertion — the `1 failed`), `test_option_position_order_preserved`,
+`test_sequential_reresolve_is_idempotent`,
+`test_structured_reimport_is_idempotent_no_duplicates`, and
+`test_only_one_staged_image_open_at_a_time` (the four `error(s)`). **Production
+policy is confirmed correct and unchanged** (reuse only `dynamic`; incompatible
+fails closed / connector-owned; merchant attribute never mutated) — no
+production file was touched. Correction: every fixture whose payload top-level
+`options` resolve into a `product.attribute` (success **and** intentional
+conflict) renamed to task-unique `SC010B ` names across **all seven** standard
+test files; value names, snapshot-only strings, pure-function inputs, and
+archived-unbound fixtures left unchanged; conflict tests still create their
+incompatible attribute in-test; the case-insensitive test now asserts a
+same-name **delta of zero** rather than an absolute count of one. Base was
+first aligned by a **normal merge** of the current `Shopify-connector` tip
+`ce504f42824807e215ee21df3dfd4eed9bb9a275` (PR #154, CORE-R2, **AR-047**) — the
+only conflict, this log, resolved keeping **both** the AR-046 and AR-047 rows
+in monotonic order (AR-043, AR-044, AR-046, AR-047; AR-045 reserved for
+Task 011B/PR #150 and absent here); `research-handoff.md` auto-merged
+preserving both the CORE-R2 and Task 010B histories. **No production file
+changed; test-method inventory unchanged (148 across the seven files);
+`py_compile` clean; no new file; no test-tag change; no live Shopify call.**
+The **Odoo.sh rerun is still pending — no green result is claimed.** PR #151
+stays **open/draft/unmerged**; no CORE-R2 implementation and no other task in
+this correction._

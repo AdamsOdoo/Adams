@@ -108,9 +108,10 @@ class TestProductRefreshAndStale(TransactionCase):
         gid = 'gid://shopify/Product/6004'
         first = self.Importer._apply_import(self.store, self._payload(
             gid,
-            options=[{'name': 'Color', 'position': 1, 'values': ['Red']}],
+            options=[{'name': 'SC010B Refresh Color', 'position': 1, 'values': ['Red']}],
             variants=[self._variant('%s/r' % gid, 10.0,
-                                    [{'name': 'Color', 'value': 'Red'}], sku='SR')],
+                                    [{'name': 'SC010B Refresh Color', 'value': 'Red'}],
+                                    sku='SR')],
         ))
         template = first['template_binding'].product_template_id
         self.assertEqual(len(template.product_variant_ids), 1)
@@ -118,12 +119,13 @@ class TestProductRefreshAndStale(TransactionCase):
         # applies even in snapshot_only mode.
         second = self.Importer._apply_import(self.store, self._payload(
             gid,
-            options=[{'name': 'Color', 'position': 1, 'values': ['Red', 'Blue']}],
+            options=[{'name': 'SC010B Refresh Color', 'position': 1,
+                      'values': ['Red', 'Blue']}],
             variants=[
                 self._variant('%s/r' % gid, 10.0,
-                              [{'name': 'Color', 'value': 'Red'}], sku='SR'),
+                              [{'name': 'SC010B Refresh Color', 'value': 'Red'}], sku='SR'),
                 self._variant('%s/b' % gid, 10.0,
-                              [{'name': 'Color', 'value': 'Blue'}], sku='SB'),
+                              [{'name': 'SC010B Refresh Color', 'value': 'Blue'}], sku='SB'),
             ],
         ))
         self.assertEqual(len(second['variant_bindings']), 2)
@@ -202,9 +204,10 @@ class TestProductRefreshAndStale(TransactionCase):
         gid = 'gid://shopify/Product/6103'
         first = self.Importer._apply_import(self.store, self._payload(
             gid,
-            options=[{'name': 'Color', 'position': 1, 'values': ['Red']}],
+            options=[{'name': 'SC010B Refresh Color', 'position': 1, 'values': ['Red']}],
             variants=[self._variant('%s/r' % gid, 10.0,
-                                    [{'name': 'Color', 'value': 'Red'}], sku='CR3')],
+                                    [{'name': 'SC010B Refresh Color', 'value': 'Red'}],
+                                    sku='CR3')],
             updated_at='t1',
         ))
         binding = first['template_binding']
@@ -214,12 +217,15 @@ class TestProductRefreshAndStale(TransactionCase):
         with self.assertRaises(JobHandlerError):
             self.Importer._apply_import(self.store, self._payload(
                 gid,
-                options=[{'name': 'Color', 'position': 1, 'values': ['Red']}],
+                options=[{'name': 'SC010B Refresh Color', 'position': 1,
+                          'values': ['Red']}],
                 variants=[
                     self._variant('%s/r' % gid, 10.0,
-                                  [{'name': 'Color', 'value': 'Red'}], sku='CR3'),
+                                  [{'name': 'SC010B Refresh Color', 'value': 'Red'}],
+                                  sku='CR3'),
                     self._variant('%s/x' % gid, 10.0,
-                                  [{'name': 'Phantom', 'value': 'Z'}], sku='CX3'),
+                                  [{'name': 'SC010B Refresh Phantom', 'value': 'Z'}],
+                                  sku='CX3'),
                 ],
                 updated_at='t2',
             ))

@@ -3,10 +3,14 @@
 > **Status: draft-PR validation record. Implementation session output,
 > awaiting ChatGPT review.** Produced 2026-07-11 by the Task 010B
 > implementation session against the OPEN gate (PR #149 comment
-> `4948723366`). **Revised 2026-07-12** per control-room static review
-> `4950202231` (see §0). Odoo.sh and live/dev-store evidence are **not**
-> part of this session (no Odoo runtime and no Shopify credentials are
-> available here) and remain mandatory before merge acceptance (§10 below).
+> `4948723366`). **Revised 2026-07-12** per control-room static reviews
+> `4950202231` (§0), `4950339305` (§0b), `4951145191` (§0c), and the
+> **runtime correction `4680380218`** (§0d — first Odoo.sh build RED from
+> non-isolated global attribute fixtures; fixtures corrected, rerun pending).
+> Odoo.sh and live/dev-store evidence are **not** part of this session (no
+> Odoo runtime and no Shopify credentials are available here) and remain
+> mandatory before merge acceptance (§10 below). The Odoo.sh standard-runtime
+> gate is **OPEN**.
 
 ---
 
@@ -233,6 +237,175 @@ docs; plus a **base merge** of the current integration tip. Test methods
    `run_drain` batch, potentially the rest of the batch); network calls
    precede acquisition; correctness is accepted; lock-hold/throughput is a
    runtime measurement obligation.
+
+---
+
+## 0d. Revision 4 — control-room runtime correction `4680380218` (2026-07-12)
+
+The first observed Odoo.sh branch build was **RED**. The control room
+classified the five failures as a **test-fixture isolation problem, not a
+production-policy defect**, and issued a REVISE. This session merges the
+current integration tip and corrects the fixtures. **The standard-runtime
+gate remains OPEN — no green result is claimed; a rerun is still pending.**
+
+### Failed build evidence (recorded verbatim, not reconciled)
+
+- **Build / database:** `adamsmen-claude-product-import-completeness-010b-5l-34797217`
+- **Odoo:** `19.0`
+- **Verbatim final result:**
+  `1 failed, 4 error(s) of 329 tests when loading database
+  'adamsmen-claude-product-import-completeness-010b-5l-34797217'`
+- **Product suite stat line (verbatim):**
+  `shopify_connector_product: 102 tests 4.04s 7407 queries`
+- **Product module summary (verbatim):**
+  `Module shopify_connector_product: 1 failures, 4 errors of 94 tests`
+- The three totals (`329`, `102`, `94`) are **quoted verbatim and NOT
+  reconciled** (standing OP-43 caution against synthesizing test totals). The
+  `shopify_connector_core` and `shopify_connector_sale` per-module stat lines
+  were **not supplied to this session and are not fabricated**.
+- **The suite halted after the five failures**, so tests ordered after them
+  (structured media-cleanup, variant-generation, pricing, refresh, and
+  rollback tests) never ran. The **Task 010B standard-runtime gate is OPEN.**
+
+### The five failures — confirmed against the real test + production source
+
+Root cause (single class): **non-isolated global `product.attribute` fixture
+names.** The Odoo test database's demo data already contains standard,
+incompatible (`create_variant='always'`) attributes named `Color`, `Size`,
+and `Material`. Any success-path fixture whose payload top-level `options`
+named one of them resolved that pre-existing incompatible attribute through
+the accepted compatibility gate.
+
+1. `TestProductAttributeImport.test_case_insensitive_compatible_dynamic_reuse`
+   — **the `1 failed`** (assertion). It created a compatible dynamic `Color`
+   but asserted an **absolute** same-name count of one; the standard `Color`
+   in the DB made the count ≥ 2. The production path still correctly selected
+   the test-created compatible dynamic attribute; only the absolute-count
+   assertion was invalid.
+2. `TestProductAttributeImport.test_option_position_order_preserved` — an
+   **error**. Success-path option names `Color` / `Size` hit the pre-existing
+   incompatible attributes → `binding_conflict` under the default
+   `manual_review` mode.
+3. `TestProductAttributeImport.test_sequential_reresolve_is_idempotent` — an
+   **error**. Success-path name `Material` collided with existing Odoo data.
+4. `TestProductDuplicatePrevention.test_structured_reimport_is_idempotent_no_duplicates`
+   — an **error**. Success-path name `Color`.
+5. `TestProductMediaImport.test_only_one_staged_image_open_at_a_time` — an
+   **error**. Success-path structured option `Color`.
+
+### Production policy is UNCHANGED (no production file touched)
+
+The accepted rule is confirmed correct and left byte-for-byte unchanged
+(`_resolve_or_create_attribute`, importer §991-1028): reuse a same-name
+attribute **only** when `create_variant=='dynamic'`; an incompatible
+same-name attribute fails closed (`binding_conflict`) under `manual_review`
+or yields a distinct `"<name> (Shopify)"` under `connector_owned`; a merchant
+attribute is never mutated. The failures proved the *tests* depended on
+global names, not that the *policy* was wrong. **No production behaviour was
+weakened to make tests pass.**
+
+### Correction — task-unique `SC010B `-prefixed fixtures
+
+Every fixture whose payload top-level `options` is resolved into a
+`product.attribute` (success-path **and** intentional-conflict) now uses a
+task-unique `SC010B ...` name that cannot collide with standard Odoo demo
+data. Value names (`Red`/`Blue`/`S`/`M`/…), snapshot-only strings,
+pure-function inputs, and archived-unbound fixtures are **left unchanged**.
+Intentional-conflict tests keep their genuine conflict by **explicitly
+creating the incompatible attribute in-test** under the new unique name, so
+the conflict no longer depends on (or is masked by) demo data.
+
+The five known failures corrected:
+
+- `test_case_insensitive_compatible_dynamic_reuse` → attribute
+  **`SC010B Color CI`** (dynamic); imported with the differently-cased
+  `sc010b color ci`. The assertion now (a) captures the same-name count
+  **immediately after** creating the controlled fixture, (b) proves the
+  template uses that **exact** attribute, and (c) proves the import added
+  **no** same-name attribute (**delta == 0**) — never an absolute global
+  count of one.
+- `test_option_position_order_preserved` → **`SC010B Position Color`** /
+  **`SC010B Position Size`**.
+- `test_sequential_reresolve_is_idempotent` → **`SC010B Material Resolve`**.
+- `test_structured_reimport_is_idempotent_no_duplicates` →
+  **`SC010B Structured Color`**.
+- `test_only_one_staged_image_open_at_a_time` → **`SC010B Media Color`**.
+
+### Full seven-file fixture-collision audit (result)
+
+All seven Task 010B standard test files were audited against the real
+importer flow. A test is collision-prone **iff** its payload top-level
+`options` names an attribute that reaches `_create_structured_template`
+(non-archived create/refresh success path or an intentional-conflict test).
+Additional collision-prone tests found and corrected beyond the five:
+
+- **`test_product_attribute_import.py`** — `test_create_new_dynamic_attribute_and_line`
+  (`Fabric`→`SC010B Attr Fabric`); `test_additive_value_reuses_existing_value_case_insensitive`
+  (`Shade`→`SC010B Attr Shade`); and the intentional-conflict / connector-owned
+  set made controlled+unambiguous: `test_existing_always_attribute_routes_manual_review_by_default`
+  (`SC010B Conflict Always`), `test_existing_no_variant_attribute_routes_manual_review_by_default`
+  (`SC010B Conflict NoVariant`), `test_connector_owned_creates_distinct_shopify_attribute`
+  (`SC010B Conflict Owned`), `test_brownfield_incompatible_attribute_makes_no_phantom_variants`
+  (`SC010B Conflict Brownfield`), the `_run_connector_owned_refresh` helper
+  (`SC010B Refresh Owned`), and `test_refresh_fails_closed_when_both_plain_and_shopify_lines_exist`
+  (`SC010B Ambiguous Color` + `SC010B Ambiguous Color (Shopify)`).
+- **`test_product_duplicate_prevention.py`** —
+  `test_structured_import_failure_rolls_back_new_attributes` (`Cut`→`SC010B
+  Structured Cut`; absent option `Phantom`→`SC010B Phantom`).
+- **`test_product_media_import.py`** —
+  `test_staged_media_paths_removed_after_database_failure` (`SC010B Media
+  Color`; absent option `SC010B Media Phantom`).
+- **`test_product_variant_generation.py`** — `test_sparse_two_option_set_no_cartesian_extras`,
+  `test_sparse_three_option_set_exact_equality`, `test_variant_bindings_map_to_correct_products`,
+  `test_reimport_is_idempotent_no_duplicate_variants`, `test_refresh_adds_new_remote_variant`
+  (`SC010B VG Color/Size/Fit`); `test_later_variant_failure_rolls_back_everything`
+  (`SC010B VG Color` + absent `SC010B VG Finish`); `test_one_hundred_fifty_variant_paginated_fixture`
+  (`SC010B VG Paginated`); the intentional-conflict `test_structural_mismatch_routes_to_binding_conflict`
+  (`SC010B VG Grade`, still created `always` in-test).
+- **`test_product_price_import.py`** — the `_size_payload` helper
+  (`SC010B Price Size`) and the two multi-option tests
+  (`SC010B Price Color/Size`); value names `S`/`M`/`Blue` (used by
+  `_ptav_extra`) unchanged.
+- **`test_product_refresh_and_stale.py`** —
+  `test_structural_additions_apply_in_snapshot_only_mode` and
+  `test_failed_changed_import_does_not_advance_updated_at`
+  (`SC010B Refresh Color`; absent `SC010B Refresh Phantom`).
+- **`test_product_import_matching.py`** — the shared `_single_option_pages` /
+  `_paginated_execute` pagination helpers (`Edition`→`SC010B Paged Edition`).
+
+**Deliberately left unchanged (verified genuinely safe — do not resolve an
+attribute):** `test_normalize_options_sorts_by_position` (pure-function sort
+of option dicts); `test_import_product_sync_only_issues_read_query_calls`
+(the `Size` name is a `shopify_option_values` **snapshot string** — the
+payload carries no top-level `options`, so nothing is resolved); and
+`test_first_seen_archived_creates_no_master_or_binding` (an archived, unbound
+product raises `mapping_missing` **before** any attribute resolution and
+asserts zero attributes are created). This was a per-fixture audit, **not** a
+blind global string replacement.
+
+### Scope, guards, and remaining gate
+
+- **Only the seven test files were authored-edited**, plus this validation
+  record, the AR log (revision note under AR-046), the research handoff, and
+  the PR body. **No production file changed** (`models/**`, `__manifest__.py`,
+  `data/**`, `security/**`, XML, CSV, migrations are byte-identical to the
+  post-merge head). No new file added. No test tag / base class changed. The
+  total test-method inventory across the seven files is unchanged
+  (16/12/57/26/9/20/8 = 148). `py_compile` clean on all seven.
+- **Base aligned first:** the current `Shopify-connector` tip
+  `ce504f42824807e215ee21df3dfd4eed9bb9a275` (PR #154, CORE-R2, AR-047) was
+  merged normally (no rebase/force/squash) before the fixture edits; the only
+  conflict was the shared `architecture-review-log.md`, resolved keeping both
+  the AR-046 and AR-047 rows in monotonic order (AR-043, AR-044, AR-046,
+  AR-047; AR-045 remains reserved for Task 011B / PR #150 and absent here);
+  `research-handoff.md` auto-merged preserving both the CORE-R2 and Task 010B
+  histories.
+- **Runtime rerun still PENDING.** The corrected suite has **not** been run on
+  Odoo.sh from this Git session (no Odoo runtime, no Odoo.sh access). No green
+  result is claimed. The control room / operator must rerun the three standard
+  suites at the corrected head and record the verbatim `0 failed / 0 error(s)`
+  totals before the standard-runtime gate can close. Live/dev-store Shopify
+  fixtures remain gated on CORE-R2 runtime-green.
 
 ---
 
@@ -583,6 +756,17 @@ protection, or atomicity.
 
 ## 10. Mandatory runtime/live evidence still outstanding (honest)
 
+**Runtime-correction note (2026-07-12, review `4680380218`).** The first
+observed Odoo.sh build (`…-34797217`, Odoo 19.0) was **RED** —
+`1 failed, 4 error(s) of 329 tests` — and the suite halted after five
+failures caused by **non-isolated global product-attribute fixture names**
+(§0d records the verbatim evidence, the five failures, the root cause, the
+unchanged production policy, the exact tests corrected, and the full
+seven-file audit). The fixtures are corrected in this session; **the Odoo.sh
+rerun is still pending and no green result is claimed.** Head references
+below (`b0d8c7b`) predate the CORE-R2 base merge (`ce504f`) and the fixture
+correction; the rerun must target the corrected head.
+
 **Validation session note (2026-07-12, acceptance `4951264328`).** The
 control-room review accepted the four Revision-3 corrections and authorized
 the **base-alignment + Odoo.sh runtime validation** session. In this session:
@@ -699,9 +883,19 @@ the revert. No destructive migration is part of this task.
 - [x] Base aligned to the current integration tip `65e915a` (PR #152) via a
       normal merge commit `b0d8c7b` (no rebase/force); handoff conflict
       resolved preserving both sides; PR diff Task-010B-only (§1, §10 note).
-- [ ] **Odoo.sh green (verbatim) at head `b0d8c7b`** — outstanding; **not
-      executable/observable from this Git session** (no Odoo runtime, no
-      Odoo.sh access, no CI status) — §10 validation-session note.
+- [x] **Base re-aligned to the current integration tip `ce504f` (PR #154,
+      CORE-R2, AR-047) via a normal merge; AR-046/AR-047 rows both preserved
+      in monotonic order; CORE-R2 + Task 010B handoff histories preserved
+      (§0d).**
+- [x] **Runtime fixture correction applied (§0d): the five failing fixtures
+      and every other collision-prone success/conflict fixture across the
+      seven test files renamed to task-unique `SC010B ` names; production
+      files byte-identical; test-method inventory unchanged (148); `py_compile`
+      clean.**
+- [ ] **Odoo.sh green (verbatim) at the corrected head** — **still OPEN**; the
+      first build (`…-34797217`) was RED and the corrected suite has **not**
+      been rerun from this Git session (no Odoo runtime / Odoo.sh access) —
+      §0d + §10 runtime-correction note.
 - [ ] **Live/dev-store evidence** — outstanding; **live Shopify fixtures gated
       on CORE-R2 runtime-green** (§10).
 

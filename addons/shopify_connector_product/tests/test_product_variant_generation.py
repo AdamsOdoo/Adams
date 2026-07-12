@@ -58,17 +58,17 @@ class TestProductVariantGeneration(TransactionCase):
         payload = self._payload(
             'gid://shopify/Product/3001',
             options=[
-                self._option('Color', ['Red', 'Blue'], position=1),
-                self._option('Size', ['S', 'M'], position=2),
+                self._option('SC010B VG Color', ['Red', 'Blue'], position=1),
+                self._option('SC010B VG Size', ['S', 'M'], position=2),
             ],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3001a', [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'S'},
+                    {'name': 'SC010B VG Color', 'value': 'Red'},
+                    {'name': 'SC010B VG Size', 'value': 'S'},
                 ], sku='RS'),
                 self._variant('gid://shopify/ProductVariant/3001b', [
-                    {'name': 'Color', 'value': 'Blue'},
-                    {'name': 'Size', 'value': 'M'},
+                    {'name': 'SC010B VG Color', 'value': 'Blue'},
+                    {'name': 'SC010B VG Size', 'value': 'M'},
                 ], sku='BM'),
             ],
         )
@@ -82,33 +82,33 @@ class TestProductVariantGeneration(TransactionCase):
             for product in template.product_variant_ids
         }
         self.assertEqual(combos, {
-            frozenset({('Color', 'Red'), ('Size', 'S')}),
-            frozenset({('Color', 'Blue'), ('Size', 'M')}),
+            frozenset({('SC010B VG Color', 'Red'), ('SC010B VG Size', 'S')}),
+            frozenset({('SC010B VG Color', 'Blue'), ('SC010B VG Size', 'M')}),
         })
 
     def test_sparse_three_option_set_exact_equality(self):
         payload = self._payload(
             'gid://shopify/Product/3002',
             options=[
-                self._option('Color', ['Red', 'Blue'], position=1),
-                self._option('Size', ['S', 'M'], position=2),
-                self._option('Fit', ['Slim', 'Loose'], position=3),
+                self._option('SC010B VG Color', ['Red', 'Blue'], position=1),
+                self._option('SC010B VG Size', ['S', 'M'], position=2),
+                self._option('SC010B VG Fit', ['Slim', 'Loose'], position=3),
             ],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3002a', [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'S'},
-                    {'name': 'Fit', 'value': 'Slim'},
+                    {'name': 'SC010B VG Color', 'value': 'Red'},
+                    {'name': 'SC010B VG Size', 'value': 'S'},
+                    {'name': 'SC010B VG Fit', 'value': 'Slim'},
                 ], sku='RSS'),
                 self._variant('gid://shopify/ProductVariant/3002b', [
-                    {'name': 'Color', 'value': 'Blue'},
-                    {'name': 'Size', 'value': 'M'},
-                    {'name': 'Fit', 'value': 'Loose'},
+                    {'name': 'SC010B VG Color', 'value': 'Blue'},
+                    {'name': 'SC010B VG Size', 'value': 'M'},
+                    {'name': 'SC010B VG Fit', 'value': 'Loose'},
                 ], sku='BML'),
                 self._variant('gid://shopify/ProductVariant/3002c', [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'M'},
-                    {'name': 'Fit', 'value': 'Slim'},
+                    {'name': 'SC010B VG Color', 'value': 'Red'},
+                    {'name': 'SC010B VG Size', 'value': 'M'},
+                    {'name': 'SC010B VG Fit', 'value': 'Slim'},
                 ], sku='RMS'),
             ],
         )
@@ -121,12 +121,12 @@ class TestProductVariantGeneration(TransactionCase):
     def test_variant_bindings_map_to_correct_products(self):
         payload = self._payload(
             'gid://shopify/Product/3003',
-            options=[self._option('Color', ['Red', 'Blue'])],
+            options=[self._option('SC010B VG Color', ['Red', 'Blue'])],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3003a',
-                              [{'name': 'Color', 'value': 'Red'}], sku='R'),
+                              [{'name': 'SC010B VG Color', 'value': 'Red'}], sku='R'),
                 self._variant('gid://shopify/ProductVariant/3003b',
-                              [{'name': 'Color', 'value': 'Blue'}], sku='B'),
+                              [{'name': 'SC010B VG Color', 'value': 'Blue'}], sku='B'),
             ],
         )
         result = self.Importer._apply_import(self.store, payload)
@@ -142,17 +142,17 @@ class TestProductVariantGeneration(TransactionCase):
         payload = self._payload(
             'gid://shopify/Product/3004',
             options=[
-                self._option('Color', ['Red', 'Blue'], position=1),
-                self._option('Size', ['S', 'M'], position=2),
+                self._option('SC010B VG Color', ['Red', 'Blue'], position=1),
+                self._option('SC010B VG Size', ['S', 'M'], position=2),
             ],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3004a', [
-                    {'name': 'Color', 'value': 'Red'},
-                    {'name': 'Size', 'value': 'S'},
+                    {'name': 'SC010B VG Color', 'value': 'Red'},
+                    {'name': 'SC010B VG Size', 'value': 'S'},
                 ], sku='RS4'),
                 self._variant('gid://shopify/ProductVariant/3004b', [
-                    {'name': 'Color', 'value': 'Blue'},
-                    {'name': 'Size', 'value': 'M'},
+                    {'name': 'SC010B VG Color', 'value': 'Blue'},
+                    {'name': 'SC010B VG Size', 'value': 'M'},
                 ], sku='BM4'),
             ],
         )
@@ -177,10 +177,10 @@ class TestProductVariantGeneration(TransactionCase):
         gid = 'gid://shopify/Product/3005'
         payload_1 = self._payload(
             gid,
-            options=[self._option('Color', ['Red'])],
+            options=[self._option('SC010B VG Color', ['Red'])],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3005a',
-                              [{'name': 'Color', 'value': 'Red'}], sku='R5'),
+                              [{'name': 'SC010B VG Color', 'value': 'Red'}], sku='R5'),
             ],
         )
         first = self.Importer._apply_import(self.store, payload_1)
@@ -189,12 +189,12 @@ class TestProductVariantGeneration(TransactionCase):
 
         payload_2 = self._payload(
             gid,
-            options=[self._option('Color', ['Red', 'Green'])],
+            options=[self._option('SC010B VG Color', ['Red', 'Green'])],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3005a',
-                              [{'name': 'Color', 'value': 'Red'}], sku='R5'),
+                              [{'name': 'SC010B VG Color', 'value': 'Red'}], sku='R5'),
                 self._variant('gid://shopify/ProductVariant/3005b',
-                              [{'name': 'Color', 'value': 'Green'}], sku='G5'),
+                              [{'name': 'SC010B VG Color', 'value': 'Green'}], sku='G5'),
             ],
         )
         second = self.Importer._apply_import(self.store, payload_2)
@@ -209,7 +209,7 @@ class TestProductVariantGeneration(TransactionCase):
         # A merchant template bound to this GID uses an 'always' attribute
         # that cannot represent the incoming sparse variant combination.
         attribute = self.env['product.attribute'].create({
-            'name': 'Grade', 'create_variant': 'always',
+            'name': 'SC010B VG Grade', 'create_variant': 'always',
         })
         template = self.env['product.template'].create({
             'name': 'Merchant Graded Product',
@@ -226,10 +226,10 @@ class TestProductVariantGeneration(TransactionCase):
         })
         payload = self._payload(
             'gid://shopify/Product/3006',
-            options=[self._option('Grade', ['A', 'B'])],
+            options=[self._option('SC010B VG Grade', ['A', 'B'])],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3006b',
-                              [{'name': 'Grade', 'value': 'B'}], sku='GB'),
+                              [{'name': 'SC010B VG Grade', 'value': 'B'}], sku='GB'),
             ],
         )
         with self.assertRaises(JobHandlerError) as ctx:
@@ -248,12 +248,12 @@ class TestProductVariantGeneration(TransactionCase):
         templates_before = self.env['product.template'].search_count([])
         payload = self._payload(
             'gid://shopify/Product/3007',
-            options=[self._option('Color', ['Red'])],
+            options=[self._option('SC010B VG Color', ['Red'])],
             variants=[
                 self._variant('gid://shopify/ProductVariant/3007a',
-                              [{'name': 'Color', 'value': 'Red'}], sku='OK7'),
+                              [{'name': 'SC010B VG Color', 'value': 'Red'}], sku='OK7'),
                 self._variant('gid://shopify/ProductVariant/3007b',
-                              [{'name': 'Finish', 'value': 'Matte'}], sku='BAD7'),
+                              [{'name': 'SC010B VG Finish', 'value': 'Matte'}], sku='BAD7'),
             ],
         )
         with self.assertRaises(JobHandlerError) as ctx:
@@ -283,7 +283,7 @@ class TestProductVariantGeneration(TransactionCase):
             {
                 'id': '%s/v/%d' % (gid, i), 'sku': 'F150-%d' % i, 'barcode': None,
                 'price': '5.00', 'compareAtPrice': None,
-                'selectedOptions': [{'name': 'Variant', 'value': 'V%d' % i}],
+                'selectedOptions': [{'name': 'SC010B VG Paginated', 'value': 'V%d' % i}],
                 'image': None, 'inventoryItem': None,
             }
             for i in range(total)
@@ -301,7 +301,7 @@ class TestProductVariantGeneration(TransactionCase):
                         'id': gid, 'title': '150 Variant', 'status': 'ACTIVE',
                         'featuredImage': None,
                         'options': [{
-                            'id': 'opt', 'name': 'Variant', 'position': 1,
+                            'id': 'opt', 'name': 'SC010B VG Paginated', 'position': 1,
                             'optionValues': option_values,
                         }],
                         'variants': {

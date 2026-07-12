@@ -66,16 +66,16 @@ class TestProductAttributeImport(TransactionCase):
     def test_create_new_dynamic_attribute_and_line(self):
         payload = self._payload(
             'gid://shopify/Product/2001',
-            options=[self._option('Fabric', ['Cotton', 'Wool'])],
+            options=[self._option('SC010B Attr Fabric', ['Cotton', 'Wool'])],
             variants=[
                 self._variant('gid://shopify/ProductVariant/2001a',
-                              [{'name': 'Fabric', 'value': 'Cotton'}], sku='F-COT'),
+                              [{'name': 'SC010B Attr Fabric', 'value': 'Cotton'}], sku='F-COT'),
                 self._variant('gid://shopify/ProductVariant/2001b',
-                              [{'name': 'Fabric', 'value': 'Wool'}], sku='F-WOOL'),
+                              [{'name': 'SC010B Attr Fabric', 'value': 'Wool'}], sku='F-WOOL'),
             ],
         )
         result = self.Importer._apply_import(self.store, payload)
-        attribute = self.Attribute.search([('name', '=', 'Fabric')])
+        attribute = self.Attribute.search([('name', '=', 'SC010B Attr Fabric')])
         self.assertEqual(len(attribute), 1)
         self.assertEqual(attribute.create_variant, 'dynamic')
         template = result['template_binding'].product_template_id
@@ -88,42 +88,51 @@ class TestProductAttributeImport(TransactionCase):
         self.assertEqual(len(result['variant_bindings']), 2)
 
     def test_case_insensitive_compatible_dynamic_reuse(self):
+        # Controlled, task-unique compatible dynamic attribute (SC010B-
+        # prefixed so it can never collide with a standard Odoo attribute).
         existing = self.Attribute.create({
-            'name': 'Color', 'create_variant': 'dynamic',
+            'name': 'SC010B Color CI', 'create_variant': 'dynamic',
         })
+        # Same-name count captured immediately AFTER creating the controlled
+        # fixture -- the reference the import must not increase.
+        same_name_before = self.Attribute.with_context(
+            active_test=False,
+        ).search_count([('name', '=ilike', 'sc010b color ci')])
         payload = self._payload(
             'gid://shopify/Product/2002',
-            options=[self._option('color', ['Red', 'Blue'])],  # different case
+            options=[self._option('sc010b color ci', ['Red', 'Blue'])],  # different case
             variants=[
                 self._variant('gid://shopify/ProductVariant/2002a',
-                              [{'name': 'color', 'value': 'Red'}], sku='CI-RED'),
+                              [{'name': 'sc010b color ci', 'value': 'Red'}], sku='CI-RED'),
                 self._variant('gid://shopify/ProductVariant/2002b',
-                              [{'name': 'color', 'value': 'Blue'}], sku='CI-BLUE'),
+                              [{'name': 'sc010b color ci', 'value': 'Blue'}], sku='CI-BLUE'),
             ],
         )
         result = self.Importer._apply_import(self.store, payload)
         template = result['template_binding'].product_template_id
+        # The import bound the EXACT controlled dynamic attribute (case-
+        # insensitive reuse), not a newly created one.
         self.assertEqual(template.attribute_line_ids.attribute_id, existing)
-        # No second Color attribute was created.
-        self.assertEqual(
-            self.Attribute.with_context(active_test=False).search_count(
-                [('name', '=ilike', 'color')]
-            ), 1,
-        )
+        # It created no additional same-name attribute (delta == 0) -- an
+        # isolation-safe assertion, never an absolute global count of one.
+        same_name_after = self.Attribute.with_context(
+            active_test=False,
+        ).search_count([('name', '=ilike', 'sc010b color ci')])
+        self.assertEqual(same_name_after, same_name_before)
 
     def test_additive_value_reuses_existing_value_case_insensitive(self):
         attribute = self.Attribute.create({
-            'name': 'Shade', 'create_variant': 'dynamic',
+            'name': 'SC010B Attr Shade', 'create_variant': 'dynamic',
         })
         self.AttributeValue.create({'name': 'Red', 'attribute_id': attribute.id})
         payload = self._payload(
             'gid://shopify/Product/2003',
-            options=[self._option('Shade', ['red', 'Green'])],  # 'red' reuses 'Red'
+            options=[self._option('SC010B Attr Shade', ['red', 'Green'])],  # 'red' reuses 'Red'
             variants=[
                 self._variant('gid://shopify/ProductVariant/2003a',
-                              [{'name': 'Shade', 'value': 'red'}], sku='SH-RED'),
+                              [{'name': 'SC010B Attr Shade', 'value': 'red'}], sku='SH-RED'),
                 self._variant('gid://shopify/ProductVariant/2003b',
-                              [{'name': 'Shade', 'value': 'Green'}], sku='SH-GRN'),
+                              [{'name': 'SC010B Attr Shade', 'value': 'Green'}], sku='SH-GRN'),
             ],
         )
         self.Importer._apply_import(self.store, payload)
@@ -159,14 +168,14 @@ class TestProductAttributeImport(TransactionCase):
         payload = self._payload(
             'gid://shopify/Product/2005',
             options=[
-                self._option('Size', ['S'], position=2),
-                self._option('Color', ['Red'], position=1),
+                self._option('SC010B Position Size', ['S'], position=2),
+                self._option('SC010B Position Color', ['Red'], position=1),
             ],
             variants=[
                 self._variant(
                     'gid://shopify/ProductVariant/2005',
-                    [{'name': 'Color', 'value': 'Red'},
-                     {'name': 'Size', 'value': 'S'}], sku='POS-1'),
+                    [{'name': 'SC010B Position Color', 'value': 'Red'},
+                     {'name': 'SC010B Position Size', 'value': 'S'}], sku='POS-1'),
             ],
         )
         # Pass options in position order (as _normalize_options would).
@@ -175,7 +184,7 @@ class TestProductAttributeImport(TransactionCase):
         template = result['template_binding'].product_template_id
         self.assertEqual(len(template.attribute_line_ids), 2)
         self.assertEqual(
-            template.attribute_line_ids[0].attribute_id.name, 'Color',
+            template.attribute_line_ids[0].attribute_id.name, 'SC010B Position Color',
         )
 
     def test_normalize_options_sorts_by_position(self):
@@ -203,17 +212,20 @@ class TestProductAttributeImport(TransactionCase):
         )
 
     def test_existing_always_attribute_routes_manual_review_by_default(self):
+        # Controlled, task-unique incompatible attribute created in-test so
+        # the conflict is deterministic (never dependent on standard Odoo data).
         merchant = self.Attribute.create({
-            'name': 'Color', 'create_variant': 'always',
+            'name': 'SC010B Conflict Always', 'create_variant': 'always',
         })
         templates_before = self.env['product.template'].search_count([])
-        payload = self._incompatible_payload('gid://shopify/Product/2006', 'Color')
+        payload = self._incompatible_payload(
+            'gid://shopify/Product/2006', 'SC010B Conflict Always')
         with self.assertRaises(JobHandlerError) as ctx:
             self.Importer._apply_import(self.store, payload)
         self.assertEqual(ctx.exception.error_class, 'binding_conflict')
         # Merchant attribute is never reused or mutated.
         self.assertEqual(merchant.create_variant, 'always')
-        self.assertEqual(merchant.name, 'Color')
+        self.assertEqual(merchant.name, 'SC010B Conflict Always')
         # No phantom variants / partial import.
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
@@ -221,9 +233,10 @@ class TestProductAttributeImport(TransactionCase):
 
     def test_existing_no_variant_attribute_routes_manual_review_by_default(self):
         merchant = self.Attribute.create({
-            'name': 'Size', 'create_variant': 'no_variant',
+            'name': 'SC010B Conflict NoVariant', 'create_variant': 'no_variant',
         })
-        payload = self._incompatible_payload('gid://shopify/Product/2007', 'Size')
+        payload = self._incompatible_payload(
+            'gid://shopify/Product/2007', 'SC010B Conflict NoVariant')
         with self.assertRaises(JobHandlerError) as ctx:
             self.Importer._apply_import(self.store, payload)
         self.assertEqual(ctx.exception.error_class, 'binding_conflict')
@@ -231,25 +244,29 @@ class TestProductAttributeImport(TransactionCase):
 
     def test_connector_owned_creates_distinct_shopify_attribute(self):
         merchant = self.Attribute.create({
-            'name': 'Color', 'create_variant': 'always',
+            'name': 'SC010B Conflict Owned', 'create_variant': 'always',
         })
         self._set_conflict_mode('connector_owned')
-        payload = self._incompatible_payload('gid://shopify/Product/2008', 'Color')
+        payload = self._incompatible_payload(
+            'gid://shopify/Product/2008', 'SC010B Conflict Owned')
         result = self.Importer._apply_import(self.store, payload)
-        connector_attr = self.Attribute.search([('name', '=', 'Color (Shopify)')])
+        connector_attr = self.Attribute.search(
+            [('name', '=', 'SC010B Conflict Owned (Shopify)')])
         self.assertEqual(len(connector_attr), 1)
         self.assertEqual(connector_attr.create_variant, 'dynamic')
         # Merchant attribute untouched.
         self.assertEqual(merchant.create_variant, 'always')
-        self.assertEqual(merchant.name, 'Color')
+        self.assertEqual(merchant.name, 'SC010B Conflict Owned')
         template = result['template_binding'].product_template_id
         self.assertEqual(template.attribute_line_ids.attribute_id, connector_attr)
         self.assertEqual(len(result['variant_bindings']), 2)
 
     def test_brownfield_incompatible_attribute_makes_no_phantom_variants(self):
-        self.Attribute.create({'name': 'Color', 'create_variant': 'always'})
+        self.Attribute.create(
+            {'name': 'SC010B Conflict Brownfield', 'create_variant': 'always'})
         products_before = self.env['product.product'].search_count([])
-        payload = self._incompatible_payload('gid://shopify/Product/2009', 'Color')
+        payload = self._incompatible_payload(
+            'gid://shopify/Product/2009', 'SC010B Conflict Brownfield')
         with self.assertRaises(JobHandlerError):
             self.Importer._apply_import(self.store, payload)
         self.assertEqual(
@@ -262,7 +279,9 @@ class TestProductAttributeImport(TransactionCase):
     # ------------------------------------------------------------------
 
     def _run_connector_owned_refresh(self, gid, refresh_mode):
-        self.Attribute.create({'name': 'Color', 'create_variant': 'always'})
+        # Controlled, task-unique incompatible merchant attribute.
+        self.Attribute.create(
+            {'name': 'SC010B Refresh Owned', 'create_variant': 'always'})
         self.Settings.create({
             'store_id': self.store.id,
             'product_import_attribute_conflict_mode': 'connector_owned',
@@ -270,22 +289,26 @@ class TestProductAttributeImport(TransactionCase):
         })
         first = self.Importer._apply_import(self.store, self._payload(
             gid,
-            options=[self._option('Color', ['Red'])],
+            options=[self._option('SC010B Refresh Owned', ['Red'])],
             variants=[self._variant('%s/r' % gid,
-                                    [{'name': 'Color', 'value': 'Red'}], sku='%s-R' % gid[-4:])],
+                                    [{'name': 'SC010B Refresh Owned', 'value': 'Red'}],
+                                    sku='%s-R' % gid[-4:])],
         ))
         template = first['template_binding'].product_template_id
-        connector_attr = self.Attribute.search([('name', '=', 'Color (Shopify)')])
+        connector_attr = self.Attribute.search(
+            [('name', '=', 'SC010B Refresh Owned (Shopify)')])
         self.assertEqual(template.attribute_line_ids.attribute_id, connector_attr)
-        # Refresh: a new remote value + variant must extend Color (Shopify).
+        # Refresh: a new remote value + variant must extend the (Shopify) attr.
         second = self.Importer._apply_import(self.store, self._payload(
             gid,
-            options=[self._option('Color', ['Red', 'Blue'])],
+            options=[self._option('SC010B Refresh Owned', ['Red', 'Blue'])],
             variants=[
                 self._variant('%s/r' % gid,
-                              [{'name': 'Color', 'value': 'Red'}], sku='%s-R' % gid[-4:]),
+                              [{'name': 'SC010B Refresh Owned', 'value': 'Red'}],
+                              sku='%s-R' % gid[-4:]),
                 self._variant('%s/b' % gid,
-                              [{'name': 'Color', 'value': 'Blue'}], sku='%s-B' % gid[-4:]),
+                              [{'name': 'SC010B Refresh Owned', 'value': 'Blue'}],
+                              sku='%s-B' % gid[-4:]),
             ],
         ))
         self.assertEqual(len(second['variant_bindings']), 2)
@@ -293,8 +316,8 @@ class TestProductAttributeImport(TransactionCase):
         self.assertEqual(
             set(connector_attr.value_ids.mapped('name')), {'Red', 'Blue'},
         )
-        # Merchant Color is never modified.
-        merchant = self.Attribute.search([('name', '=', 'Color')])
+        # Merchant attribute is never modified.
+        merchant = self.Attribute.search([('name', '=', 'SC010B Refresh Owned')])
         self.assertEqual(merchant.create_variant, 'always')
         self.assertFalse(merchant.value_ids)
 
@@ -305,9 +328,10 @@ class TestProductAttributeImport(TransactionCase):
         self._run_connector_owned_refresh('gid://shopify/Product/2021', 'shopify_fields')
 
     def test_refresh_fails_closed_when_both_plain_and_shopify_lines_exist(self):
-        color = self.Attribute.create({'name': 'Color', 'create_variant': 'dynamic'})
+        color = self.Attribute.create(
+            {'name': 'SC010B Ambiguous Color', 'create_variant': 'dynamic'})
         color_shopify = self.Attribute.create({
-            'name': 'Color (Shopify)', 'create_variant': 'dynamic',
+            'name': 'SC010B Ambiguous Color (Shopify)', 'create_variant': 'dynamic',
         })
         template = self.env['product.template'].create({
             'name': 'Ambiguous Color Lines',
@@ -326,9 +350,10 @@ class TestProductAttributeImport(TransactionCase):
         })
         payload = self._payload(
             'gid://shopify/Product/2022',
-            options=[self._option('Color', ['Red', 'Blue'])],
+            options=[self._option('SC010B Ambiguous Color', ['Red', 'Blue'])],
             variants=[self._variant('gid://shopify/ProductVariant/2022b',
-                                    [{'name': 'Color', 'value': 'Blue'}], sku='AMB-B')],
+                                    [{'name': 'SC010B Ambiguous Color', 'value': 'Blue'}],
+                                    sku='AMB-B')],
         )
         with self.assertRaises(JobHandlerError) as ctx:
             self.Importer._apply_import(self.store, payload)
@@ -483,11 +508,15 @@ class TestProductAttributeImport(TransactionCase):
     def test_sequential_reresolve_is_idempotent(self):
         """A second resolve of the same new option name (same transaction)
         reuses the first attribute -- the get-or-create is idempotent."""
-        first = self.Importer._resolve_or_create_attribute('Material', 'manual_review')
-        second = self.Importer._resolve_or_create_attribute('material', 'manual_review')
+        first = self.Importer._resolve_or_create_attribute(
+            'SC010B Material Resolve', 'manual_review')
+        second = self.Importer._resolve_or_create_attribute(
+            'sc010b material resolve', 'manual_review')
         self.assertEqual(first, second)
+        # Task-unique name: the count is exactly one because this test is the
+        # only source of it -- an isolation-safe, deterministic assertion.
         self.assertEqual(
             self.Attribute.with_context(active_test=False).search_count(
-                [('name', '=ilike', 'material')]
+                [('name', '=ilike', 'sc010b material resolve')]
             ), 1,
         )
