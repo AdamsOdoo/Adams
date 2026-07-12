@@ -1,5 +1,72 @@
 # Research Handoff (rolling)
 
+### CORE-R2 — Foundation Slice 1 IMPLEMENTATION (committed admission lease + business-call context; draft PR into `Shopify-connector`, 2026-07-12)
+
+- **Gate / base:** CORE-R2 **implementation** gate OPENED — control-room comment
+  **`4952145926`** (authorized base `Shopify-connector` @
+  **`ce504f42824807e215ee21df3dfd4eed9bb9a275`**, ratifying D-CR2-A…F). Branch
+  **`claude/core-r2-implementation-foundation`** (base `ce504f`); **draft PR into
+  `Shopify-connector`**. AR-047 (no new AR ID). Design of record: merged **PR
+  #154**, `../03-architecture/disconnect-quiescence-remediation-analysis.md`,
+  `../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`.
+- **What this session did (implementation — a strict SUBSET of the packet):**
+  delivered the **admission half** of the mechanism, dormant in production —
+  (1) persisted `store.connection_generation`; (2) enqueue-captured
+  `job.expected_connection_generation`; (3) the secret-free committed
+  `shopify.connector.call.lease` model (+ one minimal admin ACL); (4) atomic
+  store-row-`FOR SHARE`-locked `_admit` (owned side cursor → gate read → single
+  token read → committed lease → commit-releases-lock); (5) `execute_business`
+  as a real `@contextlib.contextmanager` (release on normal **and** exception
+  exit, no manual release); (6) token-read-once `_send(store, body, token)`;
+  (7) focused tests (authored, **not executed** — no Odoo runtime); (8) the
+  validation record `../05-qa/task-core-r2-validation-results.md` + AR-047/SRR-03
+  updates + this handoff. Only the 12 allowlisted addon files + 4 docs changed.
+- **Deliberately DEFERRED to later CORE-R2 slices (NOT done):** `disconnecting`
+  state; `action_disconnect` rewrite; the conflicting lifecycle update-lock
+  protocol (so admission-vs-disconnect linearization is **not yet closed end to
+  end**); disconnect controller + cron + `POLL_DELAY`; `timed_out`/`completed`
+  finalization + credential-clear; product/customer call-site migration; public
+  `execute()` removal / `execute_lifecycle`.
+- **Dormancy + compatibility:** no production call site enters `execute_business`;
+  legacy public `execute()` is byte-for-byte unchanged and remains the only live
+  caller; `_send`'s new `token=None` default preserves the two-arg transport seam
+  the existing (and forbidden-to-edit) tests patch.
+- **Static evidence (this session):** `py_compile` + `compileall` OK; manifest
+  (`ast`) + CSV parse OK; changed-file set == allowlist; no conflict markers; no
+  advisory lock / no main-cursor commit / no token in errors (grep). **No Odoo
+  runtime; no test executed; no green/live/remediation claim.**
+- **Adversarial review:** independent four-lens review (transactions/cursors;
+  token/secret; Odoo-19/test-runtime; scope/compat) — **no confirmed in-scope
+  defects**; future-slice notes only (missing-credential pre-check on the dormant
+  path; caller-contract self-block; both belong to the call-site/lifecycle slice).
+- **Learning feedback loop:** New issues discovered: the gate/task allowlist named
+  regression tests with a `test_shopify_connector_` prefix that the repo does not
+  use — reconciled to the real `test_api_client.py` / `test_job_enqueue.py`
+  (documented in the validation record §8). Odoo `TestCursor` shares the test
+  connection, so genuine independent-commit/concurrency proofs (13/14/15) were
+  written with real `db_connect` connections at the PostgreSQL-primitive level
+  (the production-path two-server proof stays the deferred T-19/SRR-09 runtime
+  item). Repeated pattern: concurrency-sensitive code must be Odoo.sh-validated
+  before any green claim (SRR-06) — honored (nothing claimed green). New rejected
+  approaches: none. New technical debt: none beyond the documented deferrals.
+  Rules/checklists updated unilaterally: none. Should future prompts change? A
+  future allowlist should reference the repo's actual test filenames.
+- **Quality gate confirmation:** handoff updated (this new top entry; older
+  entries untouched) · feedback loop checked · forbidden files untouched (no
+  `store_credential`/`job_dispatch`/product/sale/cron/master-plan) · SRR-03 kept
+  **OPEN**, no remediation/green claimed · additive/dormant, single-commit
+  rollback · draft PR only (not ready, not merged).
+- **Next recommended session prompt (for ChatGPT to issue):** *“CORE-R2 Slice 2
+  (still under gate `4952145926`, base = the merged Foundation Slice 1 tip): add
+  the `disconnecting` state + the conflicting lifecycle store-row update-lock
+  protocol (`FOR NO KEY UPDATE`/`FOR UPDATE`) with the `store → credential` order
+  and epoch bump, the two-phase `action_disconnect`, and the lifecycle matrix —
+  closing the admission-vs-disconnect linearization. Do NOT yet add the
+  controller cron, `timed_out`/`completed` finalization, or the call-site
+  migration. Keep SRR-03 OPEN; validate on Odoo.sh; draft PR into
+  `Shopify-connector`.”* Only after the mechanism is complete and Odoo.sh-green
+  may SRR-03 move off OPEN.
+
 ### U0 acceptance closure — visual baseline accepted & merged (documentation-only, 2026-07-12)
 
 - **Acceptance recorded (control-room comment `4951204357`, 2026-07-12 — “ACCEPT
