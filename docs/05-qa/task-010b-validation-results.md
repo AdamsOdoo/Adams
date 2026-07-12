@@ -409,6 +409,273 @@ blind global string replacement.
 
 ---
 
+## 0e. Revision 5 — parallel performance-closure session (control-room parallel authorization `4952270415`, architecture `AR-046`, 2026-07-12)
+
+This session ran **in parallel** with other Task 010B / CORE-R2 / Task 011B
+work under an explicit parallel-work contract: it owned PR #151, this
+file, and the PR body only; it froze
+`docs/05-qa/architecture-review-log.md`,
+`docs/01-research/research-handoff.md`,
+`docs/05-qa/sync-engine-risk-register.md`, and
+`docs/08-release-readiness/implementation-ready-master-plan.md`
+(no edit to any of the four); and it did not touch any CORE-R2 or Task
+011B branch or file. Its scope was test/performance **evidence**, not
+production code — no production semantics were in scope or changed.
+
+### LOOP 0 — state verification (exact match, no drift)
+
+- Existing branch `claude/product-import-completeness-010b-5l07ci`
+  checked out (no new branch, no rebase, no force-push).
+- **Starting head verified exact:** `21caaa68a2bc809f1158fcbafca3869b7e50195f`.
+- **Base verified exact:** `ce504f42824807e215ee21df3dfd4eed9bb9a275`
+  (`git merge-base HEAD ce504f4` == `ce504f4`, confirming ancestry).
+- **PR #151 verified:** `state=open`, `draft=true`, `merged=false`.
+- Working tree verified clean at session start.
+- **CORE-R2 check:** every CORE-R2-titled commit reachable from this
+  branch (`3186a5d`, `0f8ed87`, `58a4bbf`, `13434b3`, the `ce504f4` merge
+  of PR #154) touches only `docs/**` (design/handoff/AR-log/risk-register/
+  master-plan files) — zero `addons/**` or `models/**` paths in any of
+  their diffs (verified by `git show --name-only`). No CORE-R2
+  *implementation* commit has entered `Shopify-connector`.
+- This file, the packet, the PR body, and the seven corrected standard
+  test files were re-read in full before any new work.
+
+### LOOP 1 — runtime result discovery: NOT OBSERVABLE (unchanged from §0d/§10)
+
+Checked every source available to this environment for an automatic
+Odoo.sh run at the exact head `21caaa6`:
+
+- `pull_request_read(method=get_check_runs)` → `total_count: 0`.
+- `pull_request_read(method=get_status)` → `state: pending`, zero
+  contexts (no commit status of any kind at this SHA).
+- No `.github/workflows` directory in the repository.
+- No local Odoo runtime (`import odoo` → `ModuleNotFoundError`, same as
+  every prior session) and no local log file anywhere on the container
+  referencing this build, the database name pattern, or head `21caaa6`.
+
+**Result: runtime result not observable**, identical in substance to
+§0d/§10's finding. No commit identity was inferred from a database name.
+Per instruction, this did not stop the session — it proceeded to the
+performance-harness work. **The Odoo.sh standard-runtime gate remains
+OPEN; no green or red result is recorded by this session.**
+
+### LOOP 2/3 — performance harness authored
+
+New opt-in test module:
+`addons/shopify_connector_product/tests/test_product_runtime_performance.py`
+(class `TestProductRuntimePerformance`), registered the only permitted
+way — one import line in `tests/__init__.py` — with **no manifest
+change** (test discovery in this addon has never used the manifest; the
+existing nine test files are not manifest-listed either).
+
+**Tagging (verified, see LOOP 6):**
+`@tagged('post_install', '-at_install', '-standard', 'sc010b_performance')`
+resolves to a final `test_tags` of exactly `{'post_install',
+'sc010b_performance'}` — `post_install` present (no "neither at_install
+nor post_install" warning), `at_install` and `standard` both absent (a
+default/`+standard` CI or install-time run never selects this class),
+and the `sc010b_performance` tag (confirmed unique repository-wide) is
+the only way to opt in, e.g. `--test-tags sc010b_performance` or
+`--test-tags /shopify_connector_product:TestProductRuntimePerformance`,
+for a deliberate Odoo.sh performance run.
+
+No live network call and no media download anywhere in the file: every
+payload/variant carries `image_url=None` throughout, and the real
+importer's `_plan_one_image` returns `None` on its first line when `url`
+is falsy — verified in LOOP 6 to make `requests.get` structurally
+unreachable from every test in this file. Every fixture name is
+`SC010B`-prefixed and task-unique.
+
+**Four tests authored:**
+
+1. **`test_sc010b_perf_100_variant_db_phase_measurement`** (LOOP 3A) —
+   calls `_apply_import()` directly with a fully pre-normalized
+   100-variant, single-option payload (no HTTP, no media, no API-client
+   call reachable on this path — verified in LOOP 6). Asserts exactly
+   100 variant bindings, exactly 100 `product.product` records on the
+   template, no duplicate variant GID, and exactly one attribute
+   created. Elapsed wall-clock and (when `sql_log_count` is available)
+   the query-count delta are logged via `_logger.info(...)` under the
+   `SC010B_PERF_EVIDENCE` marker — captured as evidence, never asserted
+   against an invented latency threshold (none exists in the accepted
+   packet or `performance-budgets.md` for this exact scenario).
+2. **`test_sc010b_perf_2048_variant_db_phase_measurement`** (LOOP 3B) —
+   the same direct `_apply_import()` call at exactly the
+   `MAX_ACCUMULATED_VARIANTS` ceiling (2,048), using **two** options
+   (64 x 33 = 2,112 declared cartesian space) with a deterministic
+   injective mapping (`i % 64, i // 64` for `i` in `range(2048)`) onto a
+   proper subset of that grid, so the resulting equal
+   variant-count/template-variant-count (2,048 == 2,048, strictly less
+   than the declared 2,112) is a positive proof of sparse, explicit
+   variant creation — not a reversion to Odoo's `always`-mode cartesian
+   auto-generation (D-010B-3). No duplicate GID, one attribute created
+   per option, elapsed/query-count logged the same way as (1).
+3. **`test_sc010b_perf_lock_hold_and_competing_retry`** (LOOP 3C/3D
+   combined) — genuinely independent PostgreSQL connections via
+   `odoo.sql_db.db_connect(...).cursor()` (never
+   `self.registry.cursor()`), mirroring the already-accepted
+   `test_overlapping_transactions_serialize_to_one_global_attribute`
+   pattern in `test_product_attribute_import.py`. `first` runs the real
+   structured import to completion and stays uncommitted (still holding
+   the transaction-scoped singleton lock); `second` then attempts a
+   genuinely overlapping conflicting import and is classified
+   `concurrency_race_conflict` with an explicit assertion of **zero
+   partial residue** (no attribute, no binding) from its own
+   transaction; `first` commits, releasing the lock; `second` is retried
+   in a clean transaction and succeeds, reusing `first`'s committed
+   attribute. Final state: exactly one global attribute, both product
+   bindings present. Lock-hold duration, the blocked-attempt detection
+   time, and the retry's elapsed time are all captured and logged
+   (never asserted numerically). Every committed row is unlinked
+   through a third independent connection in a `finally` block.
+4. **`test_sc010b_perf_run_drain_two_structured_imports_one_transaction`**
+   (LOOP 3E) — **feasible and authored.** Source-verified precondition
+   (grep across both addons' non-test files): neither
+   `shopify_connector_job_dispatch.py` nor the product importer/handler
+   call chain (`run_drain` → `_dispatch_one` → `_invoke_handler` →
+   `_handle_product_import_sync` → `import_product_sync` →
+   `_apply_import`) ever calls `self.env.cr.commit()` — zero
+   occurrences. Two `product_import_sync` jobs (the second reusing the
+   first's brand-new option) are claimed and dispatched by one real
+   `run_drain()` call, with the `shopify.connector.api.client.execute`
+   seam mocked exactly as the already-accepted
+   `test_ambiguous_match_routes_job_to_blocked_manual_review` mocks it
+   for a single job in `test_product_import_matching.py` — no CORE-R2
+   call-site migration and no live Shopify call required. Because both
+   jobs run inside the SAME transaction, the second job's lock
+   acquisition is a same-transaction re-lock (PostgreSQL never
+   self-blocks a transaction on a row it already holds) and succeeds
+   immediately, reusing the first job's attribute — proving the batch
+   does not serialize against itself, only against a genuinely different
+   transaction (proven separately by test 3 above). Asserts both jobs
+   `succeeded`, exactly one attribute, both template bindings, no
+   duplicate. This is the one Task 010B evidence item every prior
+   session had left entirely unaddressed (§10 listed it only as an
+   outstanding obligation); it is now authored and ready to execute.
+
+### LOOP 4 — execution status: authored and statically validated, NOT executed
+
+**No Odoo runtime exists in this Git session** (unchanged fact,
+re-verified: `import odoo` → `ModuleNotFoundError`; no `odoo-bin`; no
+Odoo.sh CLI/credentials). Per instruction, the harness was authored and
+statically validated rather than claiming execution. **No pass/fail
+result, no elapsed-time number, and no query-count number from any of
+the four new tests is recorded in this file** — those are logged
+in-test for the eventual Odoo.sh run, not fabricated here. Exact
+commands for that run:
+
+```
+# Standard suites (unchanged from §10, corrected head 21caaa6 / this
+# session's head cfb9d39 — the fixture correction is identical, this
+# session added no standard-suite change):
+--test-tags /shopify_connector_core,/shopify_connector_product,/shopify_connector_sale
+
+# The opt-in performance harness (separate, deliberate run):
+--test-tags sc010b_performance
+# or: --test-tags /shopify_connector_product:TestProductRuntimePerformance
+```
+
+### LOOP 5 — static self-validation (clean)
+
+- `python3 -m py_compile` and `python3 -m compileall -q
+  addons/shopify_connector_product/` → clean, on both the new file and
+  the modified `__init__.py`.
+- **Exact changed-file allowlist:** `git status --porcelain` shows only
+  `addons/shopify_connector_product/tests/__init__.py` (modified, one
+  import line) and `addons/shopify_connector_product/tests/
+  test_product_runtime_performance.py` (new). No file outside the
+  allowlist.
+- **Zero production diff:** no change under `models/**`, `data/**`,
+  `security/**`, `__manifest__.py`, any XML/CSV, or any
+  `shopify_connector_core`/`shopify_connector_sale` file.
+- **Zero diff in the nine pre-existing test files** in this addon
+  (the seven Task 010B files plus the two unchanged legacy files).
+- Test-method inventory: **4 new methods**, all `test_sc010b_perf_`-
+  prefixed and confirmed non-colliding with any of the ~160 existing
+  method names in the same `tests/` directory. The seven-file inventory
+  from §0d (148 methods, byte-identical files) is unchanged.
+- No conflict markers; no network/credential/token string in code (the
+  one `requests.get()` grep hit is prose *describing* its
+  unreachability, not a call); no broad swallowed `except Exception`/
+  bare `except:`; exact `total = 100` / `total = 2048` counters present;
+  `cr.commit()` calls exist only on the explicit raw
+  `odoo.sql_db.db_connect(...)` cursors in the two setup/cleanup
+  helpers, never on `self.env.cr`.
+
+### LOOP 6 — adversarial review (one independent parallel review, 7 dimensions, all clean)
+
+Seven independent reviewer agents, each blind to the others' findings,
+each re-derived the relevant claim from source rather than trusting this
+file's own docstrings: timed-window isolation (network/media
+unreachability), 100/2,048-variant payload exactness (GID uniqueness,
+injective sparse mapping, no phantom-cartesian risk), CI-tag correctness
+(manual re-derivation of Odoo's `tagged()` set algebra), cleanup/
+transaction-independence (cursor discipline, FK-safe unlink order,
+residue-under-failure tracing), lock causal attribution (single raise
+site, control-flow trace to the exact guard clause, no-constraint-
+mediated-collision argument, binding distinctness), performance-test
+hygiene (zero machine-dependent latency/count assertions; bounded
+memory), and a literal-command adversarial diff review (byte-for-byte
+confirmation of the two-file, zero-production change set).
+
+**Result: all 7 dimensions reported `clean: true` — zero
+`defect`-severity findings.** Two `nit`-severity (non-blocking)
+observations:
+
+1. The lock-test cleanup helper's attribute search matched only the
+   exact option name, narrower than the `_cleanup_concurrency` precedent
+   it cites (which also matches a `"<name> (Shopify)"` connector-owned
+   variant). Harmless for this file's own fixtures (the conflict mode
+   never triggers a `connector_owned` attribute here), but **corrected**
+   for genuine defense-in-depth: the helper now matches both forms,
+   exactly mirroring its cited precedent. LOOP 5 was rerun after the fix
+   (clean).
+2. The two independent lock-test cursors are opened just before their
+   `try:` block, identical to the already-accepted precedent in
+   `test_product_attribute_import.py`; at most a leaked connection
+   object in a hypothetical cursor-creation failure, never a leaked row.
+   Left as-is (matches accepted precedent; not a residue risk).
+
+### Scope, commits, and outcome
+
+- Files touched (final): `addons/shopify_connector_product/tests/
+  __init__.py` (+1 import line), `addons/shopify_connector_product/
+  tests/test_product_runtime_performance.py` (new). **No production
+  file changed** (independently re-confirmed by the LOOP 6 diff-review
+  agent against the parent commit). No CORE-R2 or Task 011B file
+  touched. No edit to any of the four frozen shared-doc files.
+- Commits this session: `cfb9d39` (harness authored) then one narrow
+  fixup for the LOOP 6 nit #1 correction, both on
+  `claude/product-import-completeness-010b-5l07ci`.
+- **PR #151 kept open, draft, unmerged** throughout and after this
+  session.
+
+### What is still outstanding after this session (honest)
+
+- **Odoo.sh standard-runtime gate: still OPEN.** This session did not
+  and could not execute the corrected three-suite run (§0d/§10); that
+  remains the control room's/operator's action.
+- **All four new performance/evidence tests are authored and statically
+  validated, not executed.** No elapsed-time, query-count, or lock-hold-
+  duration number exists yet — those only exist once the harness runs on
+  Odoo.sh with `--test-tags sc010b_performance`.
+- **Live/dev-store Shopify fixtures:** unchanged — still gated on
+  CORE-R2 runtime-green, not touched by this session.
+- The multi-job `run_drain` evidence item, previously listed in §10 as
+  entirely outstanding with no test-side plan, now has an authored,
+  feasible, no-network test ready to run; it is not yet **executed**
+  evidence.
+
+### Rollback
+
+Rollback is one focused revert of the performance-harness commit(s)
+(`cfb9d39` + the LOOP 6 fixup). No production behaviour or schema is
+changed by this session, so the revert is a pure test-file removal: it
+deletes `test_product_runtime_performance.py` and its one import line
+in `tests/__init__.py`, with no other effect.
+
+---
+
 ## 1. Base verification (hard prerequisite)
 
 - **Original required base SHA:** `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`
@@ -807,6 +1074,15 @@ Not obtained this session and **required before merge acceptance**:
   competing import's retry/back-off behaviour, a structured product import
   inside a multi-job `run_drain` transaction, and the DB-phase timing at 100
   and 2,048 variants. Throughput is **not** claimed proven here.
+  **Update (§0e, parallel authorization `4952270415`):** an opt-in,
+  `sc010b_performance`-tagged harness now exists for every item in this
+  bullet — `addons/shopify_connector_product/tests/
+  test_product_runtime_performance.py` — authored, statically validated
+  (`py_compile`/`compileall` clean), and independently adversarially
+  reviewed (7/7 dimensions clean). It is **not yet executed**: run it on
+  Odoo.sh with `--test-tags sc010b_performance` to obtain the actual
+  elapsed-time, query-count, and lock-hold-duration numbers, which this
+  file does not yet contain.
 
 **Runtime sequence (review `4951145191`):** (1) run the Odoo.sh full suites
 and quote the exact result; (2) the **live/dev-store Shopify fixtures are
@@ -898,6 +1174,20 @@ the revert. No destructive migration is part of this task.
       §0d + §10 runtime-correction note.
 - [ ] **Live/dev-store evidence** — outstanding; **live Shopify fixtures gated
       on CORE-R2 runtime-green** (§10).
+- [x] **Opt-in performance/evidence harness authored (§0e, parallel
+      authorization `4952270415`):**
+      `test_product_runtime_performance.py` (4 tests: 100-variant and
+      2,048-variant DB-phase timing, lock-hold + competing-retry on
+      independent PostgreSQL connections, multi-job `run_drain`
+      feasibility), tagged `post_install`/`-at_install`/`-standard`/
+      `sc010b_performance` (never runs in a standard suite); registered
+      via `tests/__init__.py` only; zero production diff; `py_compile`/
+      `compileall` clean; independently adversarially reviewed (7/7
+      dimensions clean, one harmless nit corrected).
+- [ ] **Performance harness execution** — **still OPEN**; authored and
+      statically validated only, not run (no Odoo runtime in this Git
+      session); run with `--test-tags sc010b_performance` on Odoo.sh to
+      obtain the elapsed-time/query-count/lock-hold-duration evidence.
 
 All other task gates (011B, LC-1, 012, Area 6, SEC-1, inventory,
 fulfillment, product export, UI/Owl, webhooks, OAuth, PERF-1) stayed

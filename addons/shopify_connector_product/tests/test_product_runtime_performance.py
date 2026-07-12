@@ -279,7 +279,9 @@ class TestProductRuntimePerformance(TransactionCase):
             tbindings.unlink()
             templates.exists().unlink()  # cascades variants, lines, PTAVs
             env['product.attribute'].with_context(active_test=False).search(
-                [('name', '=', option_name)]).unlink()  # cascades its values
+                ['|', ('name', '=', option_name),
+                 ('name', '=ilike', '%s (Shopify)' % option_name)],
+            ).unlink()  # cascades its values; also catches a connector_owned variant
             env['shopify.connector.store.settings'].search(
                 [('store_id', 'in', store_ids)]).unlink()
             env['shopify.connector.store'].browse(store_ids).exists().unlink()
