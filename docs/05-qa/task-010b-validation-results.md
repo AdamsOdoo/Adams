@@ -636,6 +636,21 @@ observations:
    object in a hypothetical cursor-creation failure, never a leaked row.
    Left as-is (matches accepted precedent; not a residue risk).
 
+**Correction (§0f, control-room reviews `4680634735` / `4680644496`):**
+the "all 7 dimensions clean" result above is accurate for the specific
+checklist the 7 reviewer agents were given at the time, and that
+checklist did not include — because this session had not yet been told
+to check — three requirements control-room review subsequently raised:
+honest lock-hold/conflict-detection timing labels, bounded transaction-
+local cleanup timeouts with independent fresh-connection zero-residue
+verification, and deterministic `run_drain` isolation
+(precondition/postcondition proof against the dispatcher's own claimable
+domain, `limit=2` not `limit=20`). Framing this section as evidence that
+the session was complete and fully vetted was therefore **overstated** —
+those three items were genuine, unresolved gaps, not items the
+adversarial review had already checked and passed. See §0f for the
+exact corrections applied and re-validated.
+
 ### Scope, commits, and outcome
 
 - Files touched (final): `addons/shopify_connector_product/tests/
@@ -673,6 +688,161 @@ Rollback is one focused revert of the performance-harness commit(s)
 changed by this session, so the revert is a pure test-file removal: it
 deletes `test_product_runtime_performance.py` and its one import line
 in `tests/__init__.py`, with no other effect.
+
+---
+
+## 0f. Session 2 control-room correction (reviews `4680634735`, `4680644496`, 2026-07-12)
+
+**Head `a83304d` (the final head reported by §0e / the prior session's
+final report) did NOT yet satisfy control-room review.** Two reviews
+were posted against this branch after that report:
+
+- **Review `4680634735`** (against commit `cfb9d39`, the harness-
+  authoring commit): REVISE. Confirmed the branch/file discipline and
+  scope were correct (only the two allowed files changed, tags correct),
+  but required four corrections before acceptance: (1) do not claim/wait
+  on a background workflow — finish adversarial review and the session
+  synchronously; (2) correct the lock-timing evidence — the prior
+  `lock_hold_duration` metric started only after `first`'s import had
+  already completed, so it was not a full lock-hold duration; (3) rename
+  `second_blocked_detect_seconds` — `try_lock_for_update()`/`SKIP LOCKED`
+  is non-blocking, so this is conflict-detection latency, not a
+  blocked/wait duration; (4) strengthen cleanup with bounded transaction-
+  local `lock_timeout`/`statement_timeout` and a fresh-connection zero-
+  residue verification; (5) make `run_drain` isolation deterministic
+  (`limit=2`, not `20`, with claimable-domain proof); (6) complete/apply
+  the adversarial review's findings; (7)/(8) correct the docs/PR body and
+  push one focused follow-up.
+- **Review `4680644496`** (against commit `a83304d`, the session's
+  actual follow-up push): REVISE again. Found that the follow-up commit
+  had **not** implemented review `4680634735`'s required corrections —
+  `lock_hold_duration_seconds` still measured only the post-import
+  retention interval, `second_blocked_detect_seconds` still mislabeled
+  non-blocking `SKIP LOCKED` conflict detection as blocking, cleanup
+  still had no transaction-local timeouts or fresh-connection
+  verification, and `run_drain(20)` still permitted unrelated claimable
+  jobs with no isolation proof. It also found the docs/PR body overstated
+  completion and adversarial cleanliness despite these unchanged defects
+  (corrected inline in §0e above and here).
+
+**This session (Session 2) implements all four corrections in code,**
+in `addons/shopify_connector_product/tests/test_product_runtime_performance.py`
+only — no production file, no `tests/__init__.py` change (registration
+was already correct):
+
+1. **Honest timing semantics.** The lock/retry test now captures three
+   timestamps — `first_import_started_at` (before `first`'s
+   `_apply_import()` call), `first_import_completed_at` (immediately
+   after that call returns), and `first_commit_completed_at`
+   (immediately after `cr_first.commit()`) — and derives two honestly-
+   named durations, never asserted against any threshold:
+   - `first_import_to_commit_upper_bound_seconds` = commit − started. An
+     explicit **upper bound** covering the whole import (work before
+     and after the actual internal lock acquisition) plus the open-
+     transaction retention interval — documented as not a measurement of
+     the lock-hold duration alone.
+   - `post_import_lock_retention_seconds` = commit − import_completed.
+     A direct, honest proof that the row lock remains held strictly
+     **after** `first`'s per-product savepoint has already exited,
+     released only at the outer transaction's commit.
+   The docstring states explicitly that **no test-only hook exists at
+   the exact internal `try_lock_for_update()` call site**, so the true
+   instant of lock acquisition cannot be measured from outside the
+   importer — these are the honest bounds obtainable at the test
+   boundary. `second_blocked_detect_seconds` is renamed
+   `second_conflict_detection_seconds` (variable and log label both);
+   `SKIP LOCKED` is described as non-blocking everywhere in the file —
+   grepped for "block"/"wait" wording: every remaining occurrence is an
+   explicit negation ("non-blocking", "never waits or blocks", "never
+   self-blocks") or an unrelated reference to the pre-existing
+   `blocked_manual_review` job state / test name in another file.
+2. **Bounded, durable cleanup + fresh zero-residue verification.**
+   `_cleanup_lock_perf` now calls a new `_apply_bounded_timeouts()`
+   helper first — `SELECT set_config('lock_timeout', %s, true)` /
+   `SELECT set_config('statement_timeout', %s, true)` (parameterized,
+   transaction-local `SET LOCAL` semantics, 5 s / 30 s defaults) — before
+   any delete, on both the cleanup connection and a **new**
+   `_assert_zero_residue()` connection. `_assert_zero_residue()` opens
+   its cursor only **after** `_cleanup_lock_perf` has already committed
+   and closed its own connection, then asserts zero rows remain for:
+   template bindings by product GID, variant bindings by variant GID,
+   `product.product` by synthetic SKU, `product.template` by the fixture
+   title, both stores, both stores' settings, the synthetic attribute,
+   and its possible `"<name> (Shopify)"` counterpart. No exception is
+   caught/swallowed in either helper — a failed cleanup or a failed
+   verification fails the test loudly. A new `_open_paired_cursors()`
+   helper closes an already-opened first cursor if opening the second
+   raises, so a cursor-creation failure can never leak a connection.
+3. **Deterministic `run_drain` isolation.** A new `_claimable_job_domain()`
+   helper reproduces, verbatim in shape, the exact domain
+   `shopify.connector.job._claim_for_dispatch()` uses
+   (`state='queued'` OR (`state='retry_waiting'` AND
+   `next_retry_at<=now`)). The run_drain test now asserts that domain is
+   **empty before** creating any fixture, and **exactly**
+   `{job_1.id, job_2.id}` **after** creating the two jobs and before
+   draining. It calls `self.Dispatch.run_drain(2)` (not `20`). The mocked
+   `shopify.connector.api.client.execute` seam is instrumented with a
+   call list, asserted after the drain to be exactly 2 calls for exactly
+   `{gid_1, gid_2}`. `requests.sessions.Session.request` is additionally
+   patched to raise `AssertionError` if invoked at all during the drain
+   call — a structural guarantee, not an inference, that no network
+   transport can occur outside the patched `execute` seam. After the
+   drain: both jobs `succeeded`, the claimable domain is empty again, one
+   attribute exists (reused, not duplicated), and — new this session —
+   exactly one **variant** binding per variant GID is asserted (the prior
+   version asserted only template-binding counts). The real `run_drain()`
+   entry point is the only dispatcher call; no handler is called
+   directly (unchanged).
+4. **Synchronous self-review (no background workflow).** Per this
+   session's explicit instruction, review 4680634735 item 1 is honored
+   literally: no `Workflow` tool call was made this session. Each
+   checklist item was instead verified directly against the final code
+   (grep + manual trace), item by item: metric labels match what is
+   measured; `SKIP LOCKED` is never described as blocking; cleanup is
+   bounded; cleanup failures are never swallowed; fresh verification
+   genuinely proves zero residue (opened after cleanup's own connection
+   closed); cursor creation cannot leak an earlier cursor; `run_drain`
+   cannot consume an unrelated job (proven via the claimable-domain
+   pre/postcondition, not assumed); exactly 100 and 2,048 variants remain
+   (unchanged from §0e, re-confirmed); the class remains `post_install`
+   and excluded from `standard`/`at_install`; zero production diff
+   (re-confirmed, 0-line `git diff` against `models/data/security/
+   manifest`/core/sale); no live network call (structurally impossible in
+   the run_drain test now; the two DB-phase tests and the lock test never
+   touch `requests` at all); no arbitrary SLA (grepped: no assertion
+   compares any `_seconds`/`elapsed`/`query_count` variable against a
+   numeric threshold anywhere in the file — every one is only logged).
+5. **Static validation rerun clean** with the additional checks this
+   correction requires: `py_compile`/`compileall` clean; exact
+   changed-file allowlist (only `test_product_runtime_performance.py`
+   this commit; `tests/__init__.py` correctly left untouched, its
+   registration line was already present and correct); zero production
+   diff; no conflict markers; `set_config`/`lock_timeout`/
+   `statement_timeout` present; `_assert_zero_residue` present;
+   `run_drain(2)` present; `run_drain(20)` absent;
+   `second_blocked_detect_seconds` absent; `lock_hold_duration`/
+   `lock_hold_duration_seconds` absent; no credential/token string; no
+   raw `requests.get/post/put(` call (the one `requests.get()` mention
+   remaining is unchanged prose in the class docstring describing why it
+   is unreachable, not a call).
+
+**Honest status, unchanged by this correction:** the harness remains
+**authored, not runtime-executed** — no Odoo runtime exists in this Git
+session, so no elapsed-time, query-count, or duration number from any of
+the four tests is claimed here. The standard-suite Odoo.sh result remains
+**unobserved/OPEN** (§0d/§10, unchanged — this session did not check for
+a new build). The live/dev-store Shopify-fixture gate remains **OPEN**,
+still blocked on CORE-R2 runtime-green. **No production file was changed**
+by this session (`git diff` against `models/data/security/manifest`,
+`shopify_connector_core`, `shopify_connector_sale` is empty).
+
+### Rollback (§0f)
+
+One focused revert of this session's single correction commit. It only
+edits `test_product_runtime_performance.py` (no `__init__.py` change, no
+new file), so the revert is a pure code-level rollback of that one test
+file's content back to its §0e state — no production behaviour or schema
+is touched either way.
 
 ---
 
@@ -1074,12 +1244,14 @@ Not obtained this session and **required before merge acceptance**:
   competing import's retry/back-off behaviour, a structured product import
   inside a multi-job `run_drain` transaction, and the DB-phase timing at 100
   and 2,048 variants. Throughput is **not** claimed proven here.
-  **Update (§0e, parallel authorization `4952270415`):** an opt-in,
+  **Update (§0e/§0f, parallel authorization `4952270415`, corrected per
+  control-room reviews `4680634735`/`4680644496`):** an opt-in,
   `sc010b_performance`-tagged harness now exists for every item in this
   bullet — `addons/shopify_connector_product/tests/
   test_product_runtime_performance.py` — authored, statically validated
-  (`py_compile`/`compileall` clean), and independently adversarially
-  reviewed (7/7 dimensions clean). It is **not yet executed**: run it on
+  (`py_compile`/`compileall` clean), with honest lock-timing labels,
+  bounded/verified cleanup, and deterministic `run_drain` isolation (§0f).
+  It is **not yet executed**: run it on
   Odoo.sh with `--test-tags sc010b_performance` to obtain the actual
   elapsed-time, query-count, and lock-hold-duration numbers, which this
   file does not yet contain.
@@ -1174,16 +1346,17 @@ the revert. No destructive migration is part of this task.
       §0d + §10 runtime-correction note.
 - [ ] **Live/dev-store evidence** — outstanding; **live Shopify fixtures gated
       on CORE-R2 runtime-green** (§10).
-- [x] **Opt-in performance/evidence harness authored (§0e, parallel
-      authorization `4952270415`):**
+- [x] **Opt-in performance/evidence harness authored and control-room-
+      corrected (§0e/§0f, parallel authorization `4952270415`, reviews
+      `4680634735`/`4680644496`):**
       `test_product_runtime_performance.py` (4 tests: 100-variant and
-      2,048-variant DB-phase timing, lock-hold + competing-retry on
-      independent PostgreSQL connections, multi-job `run_drain`
+      2,048-variant DB-phase timing, lock-hold + honestly-labeled
+      timing/competing-retry on independent PostgreSQL connections with
+      bounded-timeout cleanup + fresh-connection zero-residue
+      verification, deterministically-isolated multi-job `run_drain(2)`
       feasibility), tagged `post_install`/`-at_install`/`-standard`/
       `sc010b_performance` (never runs in a standard suite); registered
-      via `tests/__init__.py` only; zero production diff; `py_compile`/
-      `compileall` clean; independently adversarially reviewed (7/7
-      dimensions clean, one harmless nit corrected).
+      via `tests/__init__.py` only; zero production diff.
 - [ ] **Performance harness execution** — **still OPEN**; authored and
       statically validated only, not run (no Odoo runtime in this Git
       session); run with `--test-tags sc010b_performance` on Odoo.sh to
