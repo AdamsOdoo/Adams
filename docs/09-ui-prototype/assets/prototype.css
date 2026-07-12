@@ -128,6 +128,9 @@ input:focus-visible, .sc-focusable:focus-visible {
   background: #FFFFFF; border-bottom: 1px solid var(--sc-border);
   padding: 0 var(--sc-space-3); overflow-x: auto;
 }
+/* items scroll WITHIN their own region if ever narrow, so they can never
+   overflow into (overlap) the persistent health indicator. */
+.sc-appbar__items { display: flex; align-items: center; gap: var(--sc-space-1); min-inline-size: 0; overflow-x: auto; }
 .sc-appbar__item {
   padding: var(--sc-space-3) var(--sc-space-3);
   font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary);
@@ -135,6 +138,17 @@ input:focus-visible, .sc-focusable:focus-visible {
 }
 .sc-appbar__item.is-active { color: var(--sc-accent); border-block-end-color: var(--sc-accent); font-weight: var(--sc-fw-label); }
 .sc-appbar__spacer { flex: 1 0 var(--sc-space-4); }
+/* compact mobile shell controls — hidden on desktop, shown <=640 (see media query) */
+.sc-appbar__menu, .sc-appbar__current { display: none; }
+.sc-appbar__menu {
+  align-items: center; gap: var(--sc-space-2); white-space: nowrap;
+  background: var(--sc-surface-1); border: 1px solid var(--sc-border-strong);
+  border-radius: 6px; color: var(--sc-text-primary); font: inherit;
+  font-size: var(--sc-fs-secondary); font-weight: var(--sc-fw-label);
+  min-block-size: 32px; padding: var(--sc-space-1) var(--sc-space-3); cursor: pointer;
+}
+.sc-appbar__current { align-items: center; font-size: var(--sc-fs-body);
+  font-weight: var(--sc-fw-label); color: var(--sc-accent); white-space: nowrap; }
 
 /* persistent connection-health indicator (always text + reinforcing color) */
 .sc-health {
@@ -142,9 +156,10 @@ input:focus-visible, .sc-focusable:focus-visible {
   font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary);
   padding-inline: var(--sc-space-2); white-space: nowrap;
 }
-.sc-health__dot { inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--sc-success-text); }
+.sc-health__dot { inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--sc-success-text); flex: none; }
 .sc-health--degraded .sc-health__dot { background: var(--sc-warning-text); }
 .sc-health--down .sc-health__dot { background: var(--sc-danger-text); }
+.sc-health__sm { display: none; }  /* compact health label — shown only on the mobile shell */
 
 /* breadcrumb */
 .sc-breadcrumb {
@@ -419,6 +434,8 @@ input:focus-visible, .sc-focusable:focus-visible {
 .sc-evidence tr:last-child td { border-block-end: 0; }
 .sc-match { display: inline-flex; align-items: center; gap: var(--sc-space-1); font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label); }
 .sc-match--yes { color: var(--sc-success-text); }
+.sc-match--same { color: var(--sc-success-text); }
+.sc-match--adv { color: var(--sc-text-secondary); font-weight: var(--sc-fw-body); }
 .sc-match--no  { color: var(--sc-danger-text); }
 .sc-match--partial { color: var(--sc-warning-text); }
 
@@ -446,6 +463,8 @@ input:focus-visible, .sc-focusable:focus-visible {
 .sc-diff__old { color: var(--sc-text-secondary); text-decoration: line-through; }
 .sc-diff tr.is-protected { background: var(--sc-warning-bg); }
 .sc-diff__protected { color: var(--sc-warning-text); font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label); display: inline-flex; gap: var(--sc-space-1); align-items:center;}
+.sc-diff tr.is-blocked td { background: var(--sc-danger-bg); }
+.sc-diff__blocked { color: var(--sc-danger-text); font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label); display: inline-flex; gap: var(--sc-space-1); align-items:center; }
 .sc-sot { display: inline-flex; align-items: center; gap: var(--sc-space-1); font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
 .sc-variant-row td { background: var(--sc-surface-0); }
 .sc-variant-row .sc-diff__field { padding-inline-start: var(--sc-space-5); font-weight: var(--sc-fw-body); }
@@ -551,6 +570,17 @@ input:focus-visible, .sc-focusable:focus-visible {
   .sc-cols { grid-template-columns: 1fr; }
   .sc-grid--3, .sc-grid--2 { grid-template-columns: 1fr; }
   .sc-fieldgroup { grid-template-columns: 1fr; }
+
+  /* Tablet & phone: collapse the 7-item bar to the compact Odoo-native shell so
+     the nav never overflows into the health indicator and no label is clipped
+     (review `4950255482` §4 — "collapse the nav"). The current section and the
+     persistent health state stay visible; the full menu lives behind ☰ Menu. */
+  .sc-appbar { overflow-x: visible; gap: var(--sc-space-2); padding-block: var(--sc-space-1); flex-wrap: nowrap; }
+  .sc-appbar__items { display: none; }
+  .sc-appbar__menu, .sc-appbar__current { display: inline-flex; flex: none; }
+  .sc-health { padding-inline: 0; flex: none; white-space: nowrap; }
+  .sc-health__lg { display: none; }
+  .sc-health__sm { display: inline; }
 }
 @media (max-width: 640px) {
   .sc-content { padding: var(--sc-space-4); }
@@ -561,6 +591,9 @@ input:focus-visible, .sc-focusable:focus-visible {
   .sc-exception__action .sc-btn { inline-size: 100%; }
   .sc-breadcrumb { padding-inline: var(--sc-space-4); }
   .sc-steps { gap: var(--sc-space-1); }
+
+  /* (The compact Odoo-native app shell is applied from the ≤900px tablet
+     breakpoint above, so phones inherit it here.) */
 
   /* Decision-critical comparison tables reflow to labelled stacked cards so the
      Result / source-of-truth column is never pushed off-screen (no page scroll,

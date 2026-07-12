@@ -1,7 +1,32 @@
 # Research Handoff (rolling)
 
-### U0 — Premium operator UI visual prototype (draft PR, design-artifacts-only, 2026-07-11)
+### U0 — Premium operator UI visual prototype (draft PR #152, design-artifacts-only, 2026-07-11 · revised 2026-07-12)
 
+- **Revision (control-room review `4950255482`, 2026-07-12):** applied one
+  focused U0 revision to the same draft **PR #152** (no new PR; base unchanged at
+  `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`; only the two authorized paths
+  touched). Corrected six semantic/mobile defects: (1) the **healthy dashboard**
+  now reads from one coherent all-clear state model (zero active exceptions /
+  retry / pending / held; a past incident labelled **resolved**) at 1366/768/375
+  + RTL, with a state-consistency table added to `dashboard-spec.md`;
+  (2) **customer ambiguity** now shows two Odoo contacts sharing the **exact
+  normalized email** `j.okafor@example.com` (the binding key), ambiguity from
+  advisory fields only — all fuzzy “same domain / similar name / partial” wording
+  removed; (3) the **blocked product preview** asserts no price authority and
+  computes no result (“Choose a price authority” / “Held until…”, no resulting
+  price, no source-of-truth check, no Confirm); (4) a **compact Odoo-native
+  mobile/tablet shell** (☰ Menu + current section + persistent health) at
+  ≤ 900px replaces the clipped/overlapping 7-item bar; (5) **manual review** now
+  uses the **danger** family per the accepted token map (`blocked_manual_review →
+  danger`), kept distinct from technical failure by hand icon + reviewer owner +
+  copy (not color), with the raw token removed from all UI surfaces and the §11
+  “warning family” prose flagged as a proposed correction (P12); (6) every PNG
+  regenerated from the final source and verified by a new **source-to-render
+  consistency check** (20 assertions + no-stale-PNG guard, all pass). Two
+  independent adversarial QC passes drove the revision; the only new regression
+  (768px nav/health overlap) was fixed by the compact shell. V-1…V-12
+  recomputed to **11 Pass / 1 Partial (V-11, runtime-scoped) / 0 Fail**.
+  **UI-U1 remains CLOSED**; PR stays draft/open/unmerged.
 - **Gate & base (hard prerequisites, verified):** U0 gate comment
   **`4948902516`** (the B10/U0 authorization act, posted on PR #148) — OPEN for
   one parallel docs/design session; authorizes exactly `docs/09-ui-prototype/**`

@@ -29,7 +29,11 @@ the fresh masked credential field; **success** = test-success / readiness-pass;
 ## Hierarchy
 A compressed 6-step indicator (Store · Credentials · Test · Readiness · Domains ·
 Review) sits above one centered content column with a single dominant action per
-step. Each step closes on an explicit “verified/saved” moment.
+step. Each step closes on an explicit “verified/saved” moment. On the connect
+step, **“Step 2 of 6” and “Credentials” are the current step** (verified by the
+source-to-render check). At ≤ 900px the app bar uses the **compact Odoo-native
+shell** (☰ Menu + current section + persistent health); `setup-readiness-pass`
+is rendered at 768px and 375px on that shell.
 
 ## Credential honesty rules (binding — MBQ-04)
 - One masked field; the value is **never read back** on any surface, for any

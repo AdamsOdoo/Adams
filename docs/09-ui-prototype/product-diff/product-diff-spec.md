@@ -34,7 +34,7 @@ screen’s center of gravity, not an interstitial.
 | State (five-state preview) | File | Behavior |
 | --- | --- | --- |
 | To update (success path) | `product-diff-update-1366.png` (+ `-768`, `-375`) | Full diff; 4 changes + 1 protected kept; confirm = “Confirm 4 changes”. |
-| Blocked | `product-diff-blocked-1366.png` | Price source-of-truth unset → danger band; primary action is the **fixer** (“Set price source of truth”), not a confirm; **no high-impact change pre-selected**. |
+| Blocked | `product-diff-blocked-1366.png` | Price source-of-truth unset → danger band. The Result column **asserts no authority and computes no outcome**: price/compare-at/variant-price rows read “Choose a price authority to calculate this”; the other changed rows read “Held until a price authority is chosen”; the table still shows the current Odoo & Shopify values for comparison. **No “Odoo is the price authority”, no resulting price, no source-of-truth check, no struck-through price, and no Confirm button** — the only primary action is the **fixer** (“Set price source of truth”); Cancel is secondary. No high-impact change is pre-selected (review `4950255482` §3). |
 | Loading | `product-diff-loading-1366.png` | Skeleton rows + “Computing the diff…”. |
 | Empty | `product-diff-empty-1366.png` | “Nothing staged to preview” + the next useful action. |
 | Manual review | (behavior defined) | Ambiguous items route to the matching center (S6); the diff itself is not a reviewer queue — stated, not invented. |
@@ -45,9 +45,10 @@ draft-pending-publish; skip/blocked reasons shown, never guessed).
 
 ## Tokens
 `--sc-info` for the normal preview band, `--sc-danger` for blocked; changed
-values in `--sc-text-primary`/500 with struck-through old value; protected rows
-in `--sc-warning-bg`; variant rows on `--sc-surface-0`; one `--sc-accent`
-primary.
+values in `--sc-text-primary`/500 with struck-through old value (**never in the
+blocked state**); protected rows in `--sc-warning-bg`; **blocked rows in
+`--sc-danger-bg` with a `--sc-danger-text` “Authority not set” marker**; variant
+rows on `--sc-surface-0`; one `--sc-accent` primary.
 
 ## Accessibility
 Column-header associations; changed state conveyed by struck old value + new

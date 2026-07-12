@@ -49,17 +49,67 @@ screenful, without a chart to interpret.
 | --- | --- | --- |
 | Loading | `dashboard-loading-1366.png` | Skeleton band + skeleton exception lines + honest line “Loading your dashboard…”. Never blank, never fake-instant. |
 | First-run / empty | `dashboard-empty-1366.png` | Info band “Store setup is incomplete”; a guided empty card names the **one** next action (“Connect your store”) + a 3-step what-happens-next. |
-| Healthy / success | `dashboard-success-1366.png` | Success band; exception region collapsed to one affirmative line; quiet chips; activity + severable trend. |
-| Degraded / error | `dashboard-error-1366.png` | Warning band “3 items need your attention”; three ranked exceptions (financial hold → unmatched product → first-push); chips go loud where non-zero. |
-| Manual review | `dashboard-manual-review-1366.png` | Warning band + **hand** icon “waiting on a decision”; reviewer-owned entries. **Visually distinct from error** (hand + decision language vs triangle + on-hold). |
+| Healthy / success | `dashboard-success-1366.png` | Success band; exception region collapsed to one affirmative line; **all chips read clear** (In sync / All clear / None / Idle / Complete); activity is all-success plus one **explicitly “resolved”** past incident; severable trend. No active exception, retry, pending, or held item anywhere on the screen. |
+| Degraded / error | `dashboard-error-1366.png` | **Danger** band “3 items need your attention” (the band takes the severity of the most-severe active item — a held order is `failed/held → danger`); three ranked exceptions (financial hold `danger` → unmatched product `warning` → first-push `warning`); chips go loud where non-zero; the held order also appears in activity. |
+| Manual review | `dashboard-manual-review-1366.png` | **Danger** band + **hand** icon “waiting on a decision” (`blocked_manual_review → danger` per the accepted token map); reviewer-owned entries; the only non-zero chip is Matching “2 to review”; activity shows the two items routed to review. **Distinct from technical error by hand icon + reviewer owner + decision language, not by color** (see §Manual-review semantics). |
+
+## State-consistency model (added per control-room review `4950255482` §1)
+
+The lead sentence, exception region, chips, recent activity, and trend on a given
+state must all describe **one** situation. The generator enforces this by driving
+each state from a single mode:
+
+| State | Lead band | Active exception count | Retry-waiting | First-push | Permitted recent-activity outcomes |
+| --- | --- | --- | --- | --- | --- |
+| **Healthy / success** | success (green) — “All systems normal” | **0** (region collapses to one affirmative line) | **None** | **Complete** | successes only, plus at most one incident explicitly labelled **“resolved”** (never an active/unresolved item) |
+| **Degraded / error** | danger (red) — “3 items need your attention” | 3 (1 danger held order + 2 warnings) | 5 (loud) | Pending (loud) | successes + the **active** held order that matches the top exception |
+| **Manual review** | danger (red) + hand — “2 items are waiting on a decision” | 2 (both `blocked_manual_review`, danger) | None | Complete | successes + the two items **flagged for review** (hand marker); no unrelated active failure |
+| **First-run / empty** | info (blue) — “Store setup is incomplete” | n/a (setup guidance) | n/a | n/a | none (nothing has synced) |
+| **Loading** | skeleton | n/a | n/a | n/a | skeleton |
+
+Rule: **the band color equals the severity of the most-severe *active* item**
+(`blocked_manual_review`/`failed`/held → danger; overdue/throttled/pending →
+warning; all-clear → success). A resolved incident is labelled resolved and is
+**not** counted as an active exception. The RTL healthy render
+(`dashboard-rtl-1366.png`) carries the same all-clear semantics in Arabic draft
+copy.
+
+## Manual-review semantics (aligned to the accepted token map — review `4950255482` §5)
+
+The accepted token map (design-system §6) maps **`blocked_manual_review → danger`**
+(and `failed → danger`). An earlier draft used the warning family for manual
+review; this revision **follows the token map — manual review is the danger
+family** — and keeps it distinct from a technical failure **without relying on
+color** (WCAG 1.4.1):
+
+| | Manual review (`blocked_manual_review`) | Technical error (`failed`) |
+| --- | --- | --- |
+| Color family | danger | danger |
+| Icon | **hand** (`hand`) | **triangle-exclamation** |
+| Owner | **a reviewer** | **the system** |
+| Language | “waiting on a decision” · “not a system failure” | “technical error” · “try again” |
+| Actions | Review & resolve / Compare candidates | Try again / View technical detail |
+
+> **Note on a corpus discrepancy (surfaced, not resolved silently):**
+> design-system **§6** maps `blocked_manual_review → danger`, while **§11**’s prose
+> describes manual review as the *warning family*. This prototype follows **§6’s
+> token map (danger)** per the control-room directive and records §11’s wording as
+> a **proposed correction** for ChatGPT (traceability P12). It is not changed
+> unilaterally.
 
 ## Responsive & RTL
 - `dashboard-success-768.png`, `dashboard-success-375.png`: the region order
   (band → exceptions → chips → activity → trend) is preserved on stack; the
   two-column activity/trend collapses to one column; no horizontal page scroll;
   the lead answer and each row’s primary identifier stay visible.
+- **Mobile shell (≤ 640px):** the 7-item app bar is replaced by a compact
+  Odoo-native shell — a **☰ Menu** overflow control + the **current section**
+  (fully visible, never clipped) + the **persistent connection-health** state
+  (dot + a compact word, e.g. “Connected” / “Throttled”). No horizontal scroll,
+  no clipped labels (review `4950255482` §4). Full walkthrough in
+  `../accessibility/keyboard-and-focus-notes.md` §Mobile shell.
 - `dashboard-rtl-1366.png`: full mirror via logical properties; Arabic draft
-  copy (MBQ-22).
+  copy (MBQ-22), including the Arabic Menu control (“القائمة”).
 
 ## Actions
 One primary action per state at most (e.g. “Connect your store” on first-run).
@@ -78,10 +128,15 @@ aggregates, never full recordsets; PB-8 ≤ 1,500 DOM nodes.
 
 ## Proposed vs inherited
 - **Inherited (accepted):** S3 surface; lead-answer-first; nine cards’
-  *information*; no-vanity-metrics; honest freshness; five states.
+  *information*; no-vanity-metrics; honest freshness; five states; the §6 token
+  map (which this revision now follows for manual review = danger).
 - **Proposed (needs acceptance):** the ranked §9 layout replacing the
   nine-equal-tile grid (design-system §9, ChatGPT-directed); the **optional
-  sparkline** (§9.5); secondary metrics as *chips* rather than cards.
+  sparkline** (§9.5); secondary metrics as *chips* rather than cards; the
+  **compact Odoo-native mobile shell** (Menu + current section + health);
+  the **band-color = most-severe-active-item** rule; and the §11 wording
+  correction so its “warning family” prose matches §6’s `blocked_manual_review →
+  danger` mapping (P12).
 
 ## Sparkline recommendation (the §9.5 severable call)
 **Recommendation: keep the sparkline, in its restrained form.** Failure *trend*

@@ -81,6 +81,35 @@ metric chips (each links to its filtered S4/S5 view) → 6. recent-activity link
 - The form statusbar exposes the current stage (`aria-current`); notebook tabs
   follow the ARIA APG tabs pattern; smart buttons are links with text labels.
 
+## 2a. Mobile shell (≤ 640px) — added per review `4950255482` §4
+
+At ≤ 640px the 7-item app bar is replaced by a compact Odoo-native shell so the
+operator navigation baseline stays usable and nothing critical scrolls off:
+
+- **`☰ Menu`** — a `<button aria-haspopup="true">` with the label “Open connector
+  menu — all sections” (Arabic “القائمة” on the RTL render). It represents the
+  overflow of the remaining sections. In production it opens the standard Odoo
+  menu; the static prototype does not simulate the open state (no JS).
+- **Current section** — carries `aria-current="page"`, is **always fully
+  visible** (never truncated/clipped), and names where the operator is.
+- **Persistent connection-health** — the dot + a **compact** label (“Connected”
+  / “Throttled” / “Reconnect”); the full label shows on desktop, the compact one
+  on the mobile shell (`.sc-health__lg` / `.sc-health__sm`). State is carried by
+  the **word**, not the dot color alone (WCAG 1.4.1).
+- No horizontal page scroll and no clipped labels at 375px, verified on
+  `dashboard-success-375`, `matching-ambiguous-375`, `product-diff-update-375`,
+  `setup-readiness-pass-375`, and `native-list-375` (plus the tightest case, the
+  “Throttled” degraded health, which keeps the section name whole).
+
+## 2b. Manual review is the danger family (token-map aligned)
+
+Per the accepted token map (`blocked_manual_review → danger`), manual-review
+surfaces use the **danger** color family, and are distinguished from a technical
+failure **without relying on color**: the **hand** icon, a **reviewer** owner
+chip, “waiting on a decision / not a system failure” copy, and decision actions
+(vs the triangle icon, “system” owner, and “try again” of a technical error).
+A screen-reader user hears the owner and the state word regardless of color.
+
 ## 3. Motion & reduced motion (WCAG 2.3.3 / design-system §8)
 
 - Durations are tokenised: 100ms state/hover, 150ms reveal/collapse, 250ms

@@ -45,7 +45,9 @@ rows), **manual review** (the “Waiting on a decision” row + reviewer routing
 `native-list-{768,375}.png`: at 375px the list uses Odoo’s **optional-column
 hiding** (Source / Reference / Age hidden) so the **primary answer — State +
 identifier + reason — stays visible**; no horizontal page scroll (design-system
-§10).
+§10). At ≤ 640px the app bar collapses to the **compact Odoo-native mobile
+shell** (☰ Menu + current section + persistent health), so the connection-health
+state stays visible and no menu label is clipped (review `4950255482` §4).
 
 ## Accessibility
 Native list/form keyboard behavior is inherited; the search facet is a removable
