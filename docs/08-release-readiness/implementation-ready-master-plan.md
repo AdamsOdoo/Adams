@@ -137,10 +137,14 @@ table; nothing else may overlap.
 ### 2.1 Proposed CORE-R2 dependency (under review — NOT an accepted reorder)
 
 > **Inserted 2026-07-12 by the CORE-R2 design session** (gate comment
-> PR #153 `4950413650`, docs-only). **Revised twice 2026-07-12** — per
+> PR #153 `4950413650`, docs-only). **Revised three times 2026-07-12** — per
 > review `4951115877` (broaden the dependency from Shopify *mutations* to
-> **any Shopify call including reads**) and per review `4951237871`
-> (committed-lease quiescence; explicit `execute_business` boundary).
+> **any Shopify call including reads**), per review `4951237871`
+> (committed-lease quiescence; explicit `execute_business` boundary), and per
+> review `4680299311` (store-row lock atomic admission; `execute_business`
+> context manager; direction-C expired-lease rule; corrected controller
+> selection + `POLL_DELAY`; zero-holders rollback; CORE-R2 architecture-review
+> row renumbered **AR-045 → AR-047**).
 > **Base re-aligned 2026-07-12 (control-room base-sync amendment)** by
 > normal merge to `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (supersedes
 > `65e915a`; PR #152/U0 + PR #155/U0-closure preserved). This subsection
@@ -148,15 +152,16 @@ table; nothing else may overlap.
 > the accepted §2 steps. **CORE-R2 design is under review; no CORE-R2
 > implementation gate is open.**
 >
-> **Cross-module note (rev 3):** making INV-2 real requires **two minimal,
-> named call-site edits** in existing domain importers —
+> **Cross-module note (rev 4):** making INV-2 real requires **two named,
+> structural call-site edits** in existing domain importers —
 > `shopify_connector_product` (product import) and `shopify_connector_sale`
-> (customer import) — to route their Shopify reads through the guarded
-> `execute_business(job, …)` entry. The CORE-R2 packet's future allowlist
-> names exactly those two call sites (call-site-only). This is an
-> additional reason CORE-R2 must land before those handlers are
-> live-validated; ChatGPT sequences the two edits vs Tasks 010B/011B at the
-> CORE-R2 gate (D-CR2-E).
+> (customer import) — each wrapping its Shopify call **and the local
+> reconciliation that follows it** in a `with execute_business(job, …) as
+> result:` block (a re-indented region, not a one-line swap) so the admission
+> lease spans reconciliation. The CORE-R2 packet's future allowlist names
+> exactly those two call sites (call-site-scoped). This is an additional reason
+> CORE-R2 must land before those handlers are live-validated; ChatGPT sequences
+> the two edits vs Tasks 010B/011B at the CORE-R2 gate (D-CR2-E).
 
 **Task CORE-R2 — disconnect quiescence & in-flight job contract** remediates
 the **runtime-confirmed** DEF-PB-1 / SRR-03 (PR #153, accepted `4950408383`):
@@ -190,8 +195,10 @@ Proposed placement (for ChatGPT to ratify — call **D-CR2-E**):
   handler's live validation.
 - **Sequencing constraint:** the CORE-R2 packet adds one store state
   (`disconnecting`), new store/job fields (incl. `connection_generation` /
-  `expected_connection_generation`), a dedicated quiesce-controller `ir.cron`,
-  and the central API-client gate; to avoid a later retrofit, land these
+  `expected_connection_generation`), a new `shopify.connector.call.lease` model,
+  the store-row lock protocol (`FOR SHARE` admission vs `FOR NO KEY UPDATE`/`FOR
+  UPDATE` lifecycle), a dedicated quiesce-controller `ir.cron`, and the central
+  API-client context-manager gate; to avoid a later retrofit, land these
   **before or with Task LC-1** (§2 step 4, the historic-job-type reassignment)
   so they participate in that lifecycle from day one.
 

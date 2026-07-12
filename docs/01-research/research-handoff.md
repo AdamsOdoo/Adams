@@ -46,7 +46,7 @@
   (`docs/09-ui-prototype/`) and swapping inline-SVG placeholders for the platform
   FontAwesome set (P9).”*
 
-### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR #154 into `Shopify-connector`, 2026-07-12, revision 3)
+### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR #154 into `Shopify-connector`, 2026-07-12, revision 4)
 
 - **Base (re-aligned by normal merge):** `Shopify-connector` tip ==
   `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (control-room base-sync
@@ -55,9 +55,9 @@
   **PR #153 merged**; design gate comment **`4950413650`** (CORE-R2
   **design** gate — OPEN, docs-only). Branch
   `claude/core-r2-disconnect-quiescence-design`; **draft PR #154** (design
-  only). **Revision 3** applies control-room review **`4951237871`** (nine
-  load-bearing points; supersedes rev 2's `4951115877`). **No CORE-R2
-  implementation gate is open.**
+  only). **Revision 4** applies control-room review **`4680299311`** (six
+  implementation-safety corrections; supersedes rev 3's `4951237871` and
+  rev 2's `4951115877`). **No CORE-R2 implementation gate is open.**
 - **Why:** PR #153 runtime-**confirmed** DEF-PB-1 / **SRR-03 stays OPEN**
   (accepted `4950408383`): a concurrent real `store.action_disconnect()`
   does **not** stop an already in-flight business handler — it blocks
@@ -81,13 +81,30 @@
   base-sync amendment; resolved rolling-handoff top-entry conflicts by
   keeping **both** sides — the incoming U0-acceptance-closure entry and
   this CORE-R2 entry — and the U0 spec files/history unchanged). Updated
-  SRR-03/04/09 wording, the CORE-R2 architecture-review row (**renumbered
-  AR-044 → AR-045** because the integration branch now assigns AR-044 to
-  the U0 acceptance closure — the two are never combined), the master-plan
-  **§2.1** CORE-R2 dependency, and this entry — for review `4951237871`
-  and the base-sync amendment.
-- **Recommended architecture (rev 3, proposal, not decided): Option E,
-  lease-backed.** Rev 2's quiescence signal was **broken** — `run_drain` runs
+  SRR-03/04/09 wording, the CORE-R2 architecture-review row (**now AR-047**,
+  renumbered AR-045 → AR-047 per control-room ID amendment `4680291189` —
+  repository allocation AR-044 = U0, AR-045 = Task 011B/PR #150, AR-046 =
+  Task 010B/PR #151, AR-047 = CORE-R2/PR #154; the reserved 045/046 rows
+  live in their own PRs and are never overwritten or combined here), the
+  master-plan **§2.1** CORE-R2 dependency, and this entry — for review
+  `4680299311`.
+- **Recommended architecture (rev 4, proposal, not decided): Option E,
+  lease-backed + store-row-lock-serialized.** **Rev 4 (review `4680299311`)**
+  makes rev 3 implementation-safe: **(A)** admission is atomic with disconnect via a
+  store-row **`FOR SHARE`** lock (gate read + token read + lease commit under it)
+  vs **`FOR NO KEY UPDATE`/`FOR UPDATE`** on every generation-changing transition —
+  the lock, not the bare lease commit, is the linearization point (both orders
+  proved; concurrent admissions preserved; `store→credential` order deadlock-free);
+  **(B)** `execute_business` is a **context manager** wrapping the call **and** its
+  local reconciliation (no early/forgotten release) — the two domain call sites
+  become structural `with` blocks; **(C)** **direction-C** expired-lease rule
+  (expired = unknown/live; `completed` needs zero rows; crashed holder → distinct
+  **`timed_out`**; cleanup only after `timed_out`); **(D)** corrected controller
+  selection `try_lock_for_update(limit=1)` = `FOR UPDATE SKIP LOCKED LIMIT 1`
+  (picks the next unlocked store) + **`POLL_DELAY`** cadence via delayed
+  `_trigger(at=…)` (no busy loop); **(E)** ordered rollback requires **zero
+  holders** (workers drained first) before code/model removal. The rev-3 baseline
+  follows. Rev 2's quiescence signal was **broken** — `run_drain` runs
   `running`→handler→terminal in **one uncommitted transaction**, so
   `state='running'` is **invisible cross-transaction** and a `running`-count
   poll returns zero mid-handler. Rev 3: **(a)** INV-2 at an explicit
