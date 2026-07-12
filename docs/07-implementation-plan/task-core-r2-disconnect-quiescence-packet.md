@@ -1,265 +1,298 @@
 # Task CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (Implementation Packet)
 
 > **Status: Proposed packet for ChatGPT review. THE CODE GATE IS NOT OPEN.**
-> This is a *locked future prompt*, not implementation authorization. It
-> becomes usable **only** when ChatGPT performs an explicit CORE-R2
-> implementation-gate act and issues the prompt verbatim in a new session with
-> a stated base SHA. Producing or accepting this packet does **not** authorize
-> any code change (CLAUDE.md §5/§9, CHATGPT.md §4/§7).
+> A *locked future prompt*, not implementation authorization. It becomes usable
+> only when ChatGPT performs an explicit CORE-R2 implementation-gate act and
+> issues the prompt verbatim in a new session with a stated base SHA. Producing
+> or accepting this packet does **not** authorize any code change (CLAUDE.md
+> §5/§9, CHATGPT.md §4/§7).
 >
-> Companion analysis (read first):
+> **Revision 2 (2026-07-12) — control-room review `4951115877`.** Enforcement
+> moved to the **central API client**; **connection epoch** persisted on the
+> job; complete in-flight taxonomy incl. **claimed-but-not-started** rows;
+> **dedicated trigger-driven controller**; **store-level timeout escalation**;
+> **advisory lock dropped**; critical path broadened to **any Shopify call**;
+> **executable** INV-2 tests. Companion analysis (read first):
 > [`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md).
 > Design base verified at authoring: `Shopify-connector` @
-> `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (PR #153 merged; gate comment
-> `4950413650`). The implementation session must re-verify the *then-current*
-> `Shopify-connector` tip stated in the gate act.
+> `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`.
 
 ---
 
 ## 1. Objective
 
 Remediate **DEF-PB-1 / SRR-03**: a concurrent operator `store.action_disconnect()`
-must **stop already in-flight business work** for that store — preventing any
-*new* Shopify side effect once disconnect is requested, clearing the credential
-only after in-flight handlers have quiesced (or a bounded timeout with
-escalation) — across multiple workers and multiple Odoo servers, without global
-serialization, unsafe explicit commits, starvation, or new deadlocks.
+must guarantee that **no business Shopify call is admitted** once disconnect is
+requested — enforced at the **central API-client boundary** against a **persisted
+connection epoch** — clearing the credential only after a **bounded** quiesce
+wait (or timeout with non-blocking escalation), across multiple workers and
+servers, with **no starvation**, **no unsafe explicit commit**, **no write to a
+locked job row**, and **no unbounded lock**.
 
 ## 2. Exact accepted problem (runtime-confirmed)
 
-From PR #153 (control-room accepted, comment `4950408383`): with the real
-`action_disconnect()`, a disconnect **blocks behind the running job's row
-lock**, the handler **completes**, the job **succeeds**, and the disconnect
-then **serialization-fails (library) or retries and completes cancelling zero
-jobs (RPC)**. The dispatcher's checkpoint-3 store re-check is **snapshot-blind**
-(single REPEATABLE READ transaction; `odoo/sql_db.py:373`) and cannot see a
-disconnect committed after the job was claimed. Latent only because all shipped
-handlers are no-ops. **SRR-03 stays OPEN until this packet is implemented and
-proven live.**
+PR #153 (accepted `4950408383`): with the real `action_disconnect()`, the
+disconnect blocks behind the running job's row lock, the handler completes, the
+job succeeds, and the disconnect serialization-fails (library) or is retried and
+completes cancelling zero jobs (RPC). Checkpoint-3 is **snapshot-blind** (one
+REPEATABLE READ transaction). Latent only because handlers are no-ops. **SRR-03
+stays OPEN until this packet is implemented and proven live.**
 
-## 3. Proposed binding decisions (to be ratified at the gate — NOT yet binding)
+## 3. Proposed binding decisions (ratified at the gate — NOT yet binding)
 
-- **DB-CR2-1:** Adopt the **hybrid (Option E)** remediation: `disconnecting`
-  state + generation token + cooperative fresh-transaction pre-side-effect
-  checkpoint + store-scoped coordination + two-phase disconnect with timeout
-  escalation.
-- **DB-CR2-2:** Coordination primitive = **transaction-scoped PostgreSQL
-  advisory lock keyed by store id** (`pg_advisory_xact_lock`), used only to
-  serialize disconnect/reconnect/quiesce per store; quiescence detection is by
-  **polling "no `running` business job for this store"**, not a block-wait
-  barrier. No session-scoped advisory lock; never combined with a
-  `LIMIT`-bounded query (SRR-09 hazard).
-- **DB-CR2-3:** Disconnect becomes **two-phase** and never calls
-  `cr.commit()` inside an RPC-dispatched method: phase 1 sets intent + enqueues
-  a core `core_disconnect_quiesce` job; phases 2–3 run under the existing
-  dispatcher (one transaction per pass), reschedule ASAP until quiesced.
-- **DB-CR2-4:** Ship the **handler cooperative-cancel contract as a core seam
-  now** (a read helper + documented protocol), so the first domain handler is
-  born compliant. No domain handler is written by this task.
-- **DB-CR2-5:** SRR-03 moves to OPEN → *remediated (pending live proof)* only
-  after Odoo.sh green; SRR-04/09 remain REDUCED (not closed).
+- **DB-CR2-1:** INV-2 (no post-epoch Shopify call) is enforced at the **central
+  API client** `execute()`, **fail-closed** — not by a voluntary per-handler
+  checkpoint.
+- **DB-CR2-2:** A persisted **`connection_generation`** (store) +
+  **`expected_connection_generation`** (job, captured at enqueue) is the epoch
+  contract; a business call proceeds only when a **fresh-cursor** read shows
+  `state=='connected'` AND generations match.
+- **DB-CR2-3:** The quiesce controller is a **dedicated, high-priority,
+  trigger-driven `ir.cron`** servicing `disconnecting` stores — **not** a drained
+  business job (no starvation; no "reschedule-self-marked-succeeded").
+- **DB-CR2-4:** Job cancellation is **non-blocking** (`try_lock_for_update()` +
+  SKIP LOCKED + bounded polling); the disconnect path performs **no** blocking
+  write to any running/claimed job row.
+- **DB-CR2-5:** Timeout escalation is recorded on **independently-writable
+  store-level fields** (incl. `disconnect_stuck_job_id` as a plain **Integer**) +
+  a new audit job — **never** on the locked running job row / its log, and
+  **never** by overloading `blocked_manual_review`.
+- **DB-CR2-6:** **Coordination = store-row optimistic state+generation under
+  `retrying()`**; the **advisory lock is dropped** (bounded
+  `pg_try_advisory_xact_lock` documented only as a rejected-unless-needed
+  fallback).
+- **DB-CR2-7:** Phase-1 RPC return = **request accepted**; completion =
+  `disconnected` + credential cleared + audit + epoch bumped.
+- **DB-CR2-8:** SRR-03 → OPEN → *remediated (pending live proof)* only after
+  Odoo.sh green; SRR-04/09 remain REDUCED (not closed).
 
-> These are **proposals**. ChatGPT accepts/revises them at the gate; until
-> then they carry no authority.
+> Proposals only. ChatGPT accepts/revises at the gate.
 
-## 4. Exhaustive future allowed files (for the implementation session — NOT this one)
+## 4. Exhaustive future allowed files (implementation session — NOT this one)
 
 When the gate opens, the implementation session may create/modify **only**:
 
+- `addons/shopify_connector_core/models/shopify_connector_api_client.py`
+  — **the central enforcement point**: a fail-closed business-call gate in
+  `execute()` (fresh-cursor state+epoch read; lifecycle exemption;
+  `ShopifyQuiescedError`); no change to `_send`'s transport contract; no secret
+  read/log added.
 - `addons/shopify_connector_core/models/shopify_connector_store.py`
-  (two-phase `action_disconnect`; `disconnecting` state; generation/requested-at/
-  requested-by fields; `_is_quiescing`/`_quiesce_key` read helpers;
-  advisory-lock acquire helper).
+  — `disconnecting` state; `connection_generation` + `disconnect_status`/
+  `_status_reason`/`_stuck_job_id` (Integer)/`_requested_at`/`_by`/
+  `_completed_at` fields; epoch bump in `action_disconnect`/`action_reconnect`/
+  `action_activate`/credential-replace; two-phase `action_disconnect`; the
+  dedicated-cron controller method `_run_disconnect_quiesce()`; a read-only
+  `_connection_epoch_ok(job)`/`_fresh_connection_epoch()` helper.
 - `addons/shopify_connector_core/models/shopify_connector_job.py`
-  (`core_disconnect_quiesce` `job_type`; `disconnecting` added to the
-  non-startable set in the `write→running` and claim gates; any state marker
-  for escalation).
+  — `expected_connection_generation` field captured at enqueue; `disconnecting`
+  added to the non-startable set in the claim + `write→running` gates.
 - `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`
-  (a `core_disconnect_quiesce` handler + the cooperative-cancel plumbing seam;
-  `JobQuiescedError`/routing to `skipped`; `DISCONNECT_QUIESCE_TIMEOUT`).
+  — set the **business-call context** (`shopify_business_job_id`) before invoking
+  a business handler; route `ShopifyQuiescedError` → `skipped`; the non-blocking
+  cancellation sweep helper; `DISCONNECT_QUIESCE_TIMEOUT`/`POLL_DELAY` constants.
+- `addons/shopify_connector_core/models/shopify_connector_job_enqueue.py`
+  — capture `expected_connection_generation` at enqueue (thin).
 - `addons/shopify_connector_core/models/shopify_connector_store_credential.py`
-  **only if** the credential-clear ordering needs a call-site change (no new
-  clear path; reuse `action_clear_token`).
-- `addons/shopify_connector_core/security/ir.model.access.csv` **only if** the
-  new `job_type`/state requires an ACL row (expected: none — both models exist).
-- `addons/shopify_connector_core/data/shopify_connector_cron_drain.xml` **only
-  if** the quiesce job needs a trigger/rescheduling hook (prefer reusing the
-  existing drain cron; change only if unavoidable).
-- Tests (new/modified): `addons/shopify_connector_core/tests/test_disconnect_quiescence.py`
-  (+ any existing dispatch/store lifecycle test files strictly for regressions).
-- `addons/shopify_connector_core/__manifest__.py` **only if** a new data file
+  — **only if** the credential-clear call-site ordering needs a change (reuse
+  `action_clear_token`; no new clear path).
+- `addons/shopify_connector_core/data/shopify_connector_cron_*.xml`
+  — one new `ir.cron` record for the dedicated quiesce controller (high
+  priority). Prefer a new file registered in the manifest over editing the drain
+  cron.
+- `addons/shopify_connector_core/security/ir.model.access.csv` — **only if** a
+  new record type requires an ACL row (expected: none).
+- `addons/shopify_connector_core/__manifest__.py` — **only if** a new data file
   must be registered.
-- Docs: this packet's validation record
-  `docs/05-qa/task-core-r2-validation-results.md` (new); the risk register,
-  handoff, and AR log updates that closure requires.
+- Tests: `addons/shopify_connector_core/tests/test_disconnect_quiescence.py`
+  (+ minimal regressions in existing dispatch/store/api-client test files).
+- Docs: `docs/05-qa/task-core-r2-validation-results.md` (new); the risk-register/
+  handoff/AR updates closure requires.
 
-**The exact allowed-file list is re-frozen in the gate act.** Anything outside
-it is forbidden and is scope-creep.
+**The exact allowed-file list is re-frozen in the gate act.** Anything outside it
+is scope-creep.
 
 ## 5. Forbidden files (implementation session)
 
-Every `addons/**` path **not** listed in §4; all other modules
-(`shopify_connector_product`/`_sale`/`_inventory`/`_fulfillment`/…); any
-domain handler; Task 010B / 011B / 012 / 013 / 013B / 014 / 015 / 015B /
-Area-6 / SEC-1 / LC-1 / U0 files (except a one-line compatibility touchpoint
-explicitly authorized in the gate act); `.claude/**`; CI; `main`; plain `dev`.
-No live Shopify call, credential, or token in any test. No monkeypatch of
-production behavior and no test-only hook to force timing — tests use **real**
-`action_disconnect()` and genuine concurrency (per PR #153 method).
+Every `addons/**` path **not** in §4; all other modules; any domain handler; Task
+010B/011B/012/013/013B/014/015/015B/Area-6/SEC-1/LC-1/U0 files (except a one-line
+compatibility touchpoint explicitly authorized in the gate act); `.claude/**`;
+CI; `main`; plain `dev`. No live Shopify call/credential/token in tests. **No
+monkeypatch of the lifecycle/state mechanism and no test-only timing hook** — use
+the real `execute()` gate and the existing `_send` transport seam.
 
 ## 6. Precise state & transaction behavior
 
-- **Phase 1 (`action_disconnect`, RPC, atomic, `retrying`-safe):** acquire the
-  store advisory lock; if `state == 'connected'` → write `state='disconnecting'`,
-  `disconnect_generation += 1`, `disconnect_requested_at/by`; enqueue one
-  `core_disconnect_quiesce` job (core source, never business-gated); return. If
-  `state in ('disconnecting','disconnected')` → audited no-op. **No job-row
-  writes in phase 1** (this is what removes the E-R6-3 block and E-R6-5/6
-  serialization failure). No `cr.commit()` in the method.
-- **Phase 2 (`core_disconnect_quiesce` handler, dispatcher, one txn/pass):**
-  cancel `queued`/`retry_waiting`/`blocked_manual_review` business jobs for the
-  store; count remaining `running` business jobs; if `>0` and within
-  `DISCONNECT_QUIESCE_TIMEOUT`, reschedule ASAP; else proceed to phase 3.
-- **Phase 3 (finalize):** clear credential via `action_clear_token`; write
-  `state='disconnected'`; create the lifecycle audit job with accurate counts;
-  if finalized on timeout with a job still `running`, escalate that job
-  (operator-visible marker/log) — never silently.
-- **In-flight handler (future domain code, contract only here):** before each
-  external side effect, `store._is_quiescing(claimed_generation)` (fresh
-  cursor); if true → raise `JobQuiescedError` → dispatcher routes to `skipped`.
+- **Phase 1 (`action_disconnect`, RPC, atomic, `retrying`-safe):** if
+  `state=='connected'` → write `state='disconnecting'`, `connection_generation +=
+  1`, `disconnect_status='requested'`, `disconnect_requested_at/by`; run **one**
+  non-blocking cancellation sweep (A/B rows; SKIP LOCKED); `controller_cron
+  ._trigger()`; return "request accepted". Idempotent no-op if already
+  `disconnecting`/`disconnected`. **No** job-row blocking write; **no**
+  `cr.commit()` in the method.
+- **Controller pass (`_run_disconnect_quiesce`, dedicated cron, one txn/pass,
+  per `disconnecting` store):** non-blocking sweep; count `running` business
+  jobs; **if 0** → finalize (clear credential, `state='disconnected'`,
+  `disconnect_status='completed'`, `disconnect_completed_at`, audit job); **elif
+  within timeout** → `disconnect_status='quiescing'`, `_trigger(now+POLL_DELAY)`;
+  **else** → finalize + escalation (§9). Writes only the **store row** + a **new**
+  audit job — never a running/claimed job row.
+- **Central gate (`execute()`):** business context → fresh-cursor read of
+  `state`+`connection_generation`; block on non-`connected` or epoch mismatch
+  (`ShopifyQuiescedError`); lifecycle context → allowed; neither → fail closed.
+- **In-flight handler (future domain code, contract only here):** Phase A gate
+  before each call; Phase B complete local reconciliation for an admitted call;
+  Phase C re-gate before the next call.
 
 ## 7. New field / model / state proposal
 
-- **State:** `shopify.connector.store.state` adds `disconnecting`.
-- **Fields (store):** `disconnect_generation` (Integer, default 0, readonly),
-  `disconnect_requested_at` (Datetime, readonly), `disconnect_requested_by`
-  (Many2one `res.users`, readonly). All non-secret.
-- **`job_type`:** add `core_disconnect_quiesce` (core/diagnostic; never a
-  business source; mirrors `core_manual_maintenance` gating exemption).
-- **Constant:** `DISCONNECT_QUIESCE_TIMEOUT` (named, tunable; default proposed
-  as a small bounded multiple of the drain interval — final value is D-CR2 /
-  Q-QS-5).
-- **Exception:** `JobQuiescedError` (cooperative abort; **not** an error class;
-  routes to `skipped`, never to the retry taxonomy).
+- **State:** store `state` adds `disconnecting`.
+- **Store fields:** `connection_generation` (Integer, default 0, readonly);
+  `disconnect_status` (Selection `none/requested/quiescing/completed/timed_out`,
+  default `none`); `disconnect_status_reason` (Char); `disconnect_stuck_job_id`
+  (**Integer**); `disconnect_requested_at`/`disconnect_completed_at` (Datetime);
+  `disconnect_requested_by` (Many2one `res.users`). All non-secret, written on the
+  store row.
+- **Job field:** `expected_connection_generation` (Integer, default 0, readonly,
+  captured at enqueue).
+- **Cron:** one dedicated high-priority (`priority=0`) `ir.cron` for the quiesce
+  controller.
+- **Constants:** `DISCONNECT_QUIESCE_TIMEOUT`, `POLL_DELAY` (named, tunable).
+- **Exception:** `ShopifyQuiescedError` (cooperative abort → `skipped`; not an
+  error class).
+- **Context key:** `shopify_business_job_id` (set by the dispatcher; read by the
+  gate).
 
 ## 8. No-new-job rules (during `disconnecting`)
 
-- `create()` business-job gate already requires `connected` → business enqueue
-  blocked while `disconnecting`. **Add** `disconnecting` to the non-startable
-  set so `_claim_for_dispatch` and `write→running` never start a business job
-  for a `disconnecting` store.
-- Core/diagnostic jobs (incl. `core_disconnect_quiesce` itself) remain allowed —
-  they are how quiescence completes.
+- `create()` business gate already requires `connected` → business enqueue
+  blocked while `disconnecting`. **Add** `disconnecting` to the non-startable set
+  so `_claim_for_dispatch` + `write→running` never start a business job for a
+  `disconnecting` store. Core/diagnostic jobs and the controller cron remain
+  allowed.
 
-## 9. Running-job behavior
+## 9. Running-job behavior & timeout escalation
 
-- A running handler that reaches its checkpoint **before** its external effect →
-  aborts to `skipped` (audited, no external call).
-- A running handler already **past** its external effect → completes naturally;
-  phase 3 waits (bounded).
-- Timed-out running handler → finalize + escalate (INV-4).
-- No running job is deleted; history preserved.
+- A/B → `cancelled` (non-blocking sweep). C → skipped-by-sweep, resolved by the
+  gate (`skipped`) or a later pass (`cancelled`). D → `skipped` at the gate. E/F →
+  natural terminal after local reconciliation.
+- **Timeout:** finalize + escalate on the **store row** only —
+  `disconnect_status='timed_out'`, `disconnect_status_reason`,
+  `disconnect_stuck_job_id` (Integer; **not** a Many2one, to avoid an FK KEY
+  SHARE lock on the job row) + a new `core_manual_maintenance` audit job. **Never**
+  write the locked running job row/log; **never** overload
+  `blocked_manual_review`. Bounded; credential cleared per contract; stuck job id
+  exposed; original running row preserved for later reconciliation.
 
 ## 10. Credential-clearing behavior
 
-- Cleared **only** in phase 3, via the existing `action_clear_token` (no second
-  path), after quiesce or timeout. Never in phase 1. Credential-history
-  preserved (DEC-022).
+Cleared only at finalize, via existing `action_clear_token`, after the bounded
+`running→0` wait or timeout. Never in Phase 1. Credential history preserved.
 
 ## 11. Timeout / escalation behavior
 
-- `DISCONNECT_QUIESCE_TIMEOUT` bounds phase 2. On expiry with a job still
-  `running`: finalize `disconnected` + clear credential, and escalate the stuck
-  job with an operator-visible marker + `_system_append` log. **[Open Q-QS-3]:**
-  reuse `blocked_manual_review` vs a new `interrupted` marker — resolved at the
-  gate.
+`DISCONNECT_QUIESCE_TIMEOUT` bounds the controller. On expiry with a running job:
+finalize `disconnected` + clear credential + store-level escalation (§9). No
+re-trigger after finalize.
 
 ## 12. Serialization & retry handling
 
-- Phase 1 avoids the running-job row lock, so the disconnect path **does not
-  generate** the E-R6-5/6 `serialization_failure` (regression asserted by T-8).
-- Quiesce-job writes rely on the normal dispatcher/`retrying()` boundaries.
-- `JobQuiescedError` never enters the retry taxonomy.
-- No `NOWAIT`/raw `FOR UPDATE` on the job row from the disconnect side.
+Phase 1 and the sweep never block on a job row → the disconnect path produces no
+`serialization_failure` against the running/claimed job (T-8). Lifecycle-command
+serialization is by the store-row write under `retrying()`. `ShopifyQuiescedError`
+never enters the retry taxonomy. No `NOWAIT`/raw `FOR UPDATE` on job rows from the
+disconnect side.
 
 ## 13. Source-level guards (to keep in the implementation)
 
-- No `cr.commit()` inside any RPC-dispatched model method (INV-7).
-- Advisory lock is transaction-scoped (`pg_advisory_xact_lock`), standalone,
-  never inside a `LIMIT`-bounded query (SRR-09).
-- The fresh-cursor read helper opens, reads, and closes its own cursor; it does
-  not mutate; it must not leak connections.
-- Reuse `_system_append` for all logs; reuse `action_clear_token` for the
-  credential; no new `sudo()` beyond the sanctioned inventory (respect the
-  CORE-R1 three-site sudo guard — do not add a model-layer `sudo()`).
-- Keep the store-state advisory key in a reserved key domain to avoid collision
-  with any other advisory-lock use.
+- No `cr.commit()` in any RPC-dispatched model method (INV-7).
+- The gate's fresh cursor is opened via a `with` block, read-only (two non-secret
+  columns), always rolled back + closed, never committed, no connection leak.
+- The gate reads **no secret**; the token stays on the `_get_access_token` path.
+  No new **model-layer mutating** `sudo()` (respect the CORE-R1 three-site
+  inventory); any elevated read is read-only and pinned by a guard/test.
+- `disconnect_stuck_job_id` is a plain Integer; the timeout path writes no job
+  row/log.
+- Advisory lock **not** used; if ever added, only bounded
+  `pg_try_advisory_xact_lock(CONNECTOR_NS, store_id)`, lifecycle-only, released at
+  txn end, never inside a `LIMIT` query, documented as not closing the call race.
+- Reuse `_system_append` for logs; reuse `action_clear_token` for the credential.
+- A **source-level test** asserts the dispatcher sets `shopify_business_job_id`
+  and that `execute()` fail-closes for a business call without it (RR-5).
 
-## 14. Genuine concurrent tests using the real `action_disconnect()`
+## 14. Genuine concurrent tests using the real `action_disconnect()` and the real `execute()` gate
 
-Mandatory (no monkeypatch, no timing hook; real method; genuine processes):
+Mandatory (real method + real gate; `_send` transport seam; no live Shopify; no
+monkeypatch of lifecycle/state; no timing hook):
 
-- **T-1** race, handler-before-checkpoint → `skipped`, no external call,
-  credential cleared after quiesce, accurate audit.
-- **T-2** race, handler-past-checkpoint → natural terminal, no double effect.
-- **T-3** timeout/escalation → bounded finalize + escalation marker.
-- **T-4** two-server (Topology C) → INV-2/INV-3 cross-server.
-- **T-5** multi-store isolation → disconnect X doesn't block Y (INV-5).
-- **T-6** idempotent re-disconnect; **T-7** reconnect after `disconnecting`.
-- **T-8** regression: disconnect path produces **no** `serialization_failure`
-  against the running job.
-- Reuse the PR #153 harness method (independent Odoo-library processes +
-  `pg_stat_activity` lock evidence + a two-`odoo-bin` instance for T-4);
-  record it in the validation doc, no committed executable driver (governance).
+- **T-1** stale epoch blocks before `_send`.
+- **T-2** `disconnecting` blocks before `_send`.
+- **T-3** reconnect (epoch +2) does not revive an old job.
+- **T-4** diagnostic `action_test_connection` still reaches `_send` when
+  intended.
+- **T-5** admitted first call completes local reconciliation (Phase B).
+- **T-6** second call blocked after disconnect (Phase C).
+- **T-7** genuine race: claimed-but-not-started (C) later starts but `execute()`
+  fail-closes → `skipped`, `_send` not called.
+- **T-8** no `serialization_failure` on the disconnect path (regression).
+- **T-9** controller does not starve behind a large `id asc` business backlog.
+- **T-10** timeout finalizes without writing the locked running job row/log
+  (asserts store-level escalation surface only).
+- **T-11** two-server (Topology C) cross-server INV-2/INV-3.
+- **T-12** multi-store isolation.
+- **T-13** idempotent re-disconnect; **T-14** reconnect after `disconnecting`.
+
+Record the sanitized method in the validation doc (no committed executable
+driver; governance).
 
 ## 15. Multi-process and two-server tests
 
-- At least one **two-`odoo-bin`-instance, one-DB** test (Topology C, single
-  host) proving cross-server INV-2/INV-3 (T-4).
-- Multi-process (independent library processes) for T-1/T-2/T-3/T-5.
-- **[Open]** True multi-host remains SRR-09 residual; name it as follow-up, do
-  not claim it.
+At least one two-`odoo-bin`-instance, one-DB test (Topology C, single host) for
+cross-server INV-2/INV-3 (T-11); independent-process races for T-7/T-9/T-10/T-12.
+**[Open]** true multi-host remains SRR-09 residual — name it, do not claim it.
 
 ## 16. Odoo.sh validation
 
-- Per SRR-06, the change is concurrency/timing-sensitive → **not trusted until
-  live Odoo.sh green**. The implementation session must capture a green Odoo.sh
-  build of the full `shopify_connector_core` suite (verbatim summary) in
-  `docs/05-qa/task-core-r2-validation-results.md`, exactly as CORE-R1 did.
+Per SRR-06, the change is concurrency/timing-sensitive → **not trusted until live
+Odoo.sh green**. Capture a verbatim green summary of the full
+`shopify_connector_core` suite in `docs/05-qa/task-core-r2-validation-results.md`,
+as CORE-R1 did.
 
 ## 17. Rollback
 
-- Revert the CORE-R2 PR. States/fields/`job_type` are **additive**; no data is
-  destroyed; a reverted store falls back to the merged `connected → disconnected`
-  path. No migration to undo (a `disconnect_generation` column left behind is
-  inert; document a follow-up drop if desired). No external effect to reverse.
+Revert the CORE-R2 PR. States/fields/`job_type`-free additions are **additive**;
+no data destroyed; a reverted store falls back to the merged `connected →
+disconnected` path. Inert leftover columns (e.g. `connection_generation`) are
+harmless; document an optional follow-up drop. No external effect to reverse.
 
 ## 18. Definition of done
 
-- All §14 tests exist and pass; T-8 regression green; Odoo.sh green captured.
-- INV-1…INV-9 demonstrably held by the tests.
-- Only §4 files changed; no domain code; no forbidden file touched.
-- No `cr.commit()` in an RPC-dispatched method; no session advisory lock; no new
-  model-layer `sudo()`; no live Shopify call/credential/token in tests.
+- All §14 tests exist and pass; T-7/T-8/T-9/T-10 green; Odoo.sh green captured.
+- INV-1…INV-9 demonstrated by the tests; INV-2 proven at the **real production
+  `execute()` gate** (not a documented seam alone).
+- Only §4 files changed; no domain handler; no forbidden file touched.
+- No `cr.commit()` in an RPC-dispatched method; no advisory lock; no new
+  model-layer mutating `sudo()`; no secret read/log; no live Shopify call in
+  tests; no monkeypatch/timing hook.
+- The timeout path writes no locked job row/log; escalation is store-level.
 - Validation record + risk-register/handoff/AR updates written.
 - SRR-03 recorded as *remediated (pending any residual multi-host proof)* only
-  after green; SRR-04/09 unchanged (REDUCED, not closed).
-- Draft PR into `Shopify-connector`; **not** merged, **not** marked ready
-  without ChatGPT review.
+  after green; SRR-04/09 unchanged.
+- Draft PR into `Shopify-connector`; not merged/ready without ChatGPT review.
 
 ## 19. Future PR requirements
 
-The eventual implementation PR body must include: the CORE-R2 gate act id; the
-verified base SHA; the exact changed files; the two-phase behavior and the
-invariant→test mapping; the genuine-concurrency method and the two-server
-evidence; the verbatim Odoo.sh green summary; the residual risks (RR-1…RR-6);
-confirmation that SRR-03 is only *remediated pending live proof* and
-SRR-04/09 stay REDUCED; and confirmation that no other gate is opened. Draft
-until ChatGPT review.
+The implementation PR body must include: the CORE-R2 gate act id; verified base
+SHA; exact changed files; the central-enforcement + epoch design; the
+invariant→test mapping incl. the claimed-but-not-started and timeout-without-
+locked-write cases; the genuine-concurrency method + two-server evidence; the
+verbatim Odoo.sh green summary; residual risks (RR-1…RR-6); confirmation SRR-03 is
+only *remediated pending live proof* and SRR-04/09 stay REDUCED; and confirmation
+no other gate is opened. Draft until ChatGPT review.
 
 ---
 
-> **Gate status: CLOSED.** This packet plans the work; it does not authorize
-> it. No file under `addons/**` may change until ChatGPT issues the CORE-R2
+> **Gate status: CLOSED.** This packet plans the work; it does not authorize it.
+> No file under `addons/**` may change until ChatGPT issues the CORE-R2
 > implementation-gate act naming the base SHA and re-freezing the allowed-file
 > list.

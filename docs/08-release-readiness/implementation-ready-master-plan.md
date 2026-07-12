@@ -135,7 +135,9 @@ table; nothing else may overlap.
 
 > **Inserted 2026-07-12 by the CORE-R2 design session** (gate comment
 > PR #153 `4950413650`, docs-only; verified base
-> `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`). This subsection **adds a
+> `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`). **Revised 2026-07-12 per
+> review `4951115877`** to broaden the dependency from Shopify *mutations*
+> to **any Shopify call including reads**. This subsection **adds a
 > proposed dependency only** — it does **not** renumber or reorder the
 > accepted §2 steps. **CORE-R2 design is under review; no CORE-R2
 > implementation gate is open.**
@@ -151,25 +153,31 @@ Proposed placement (for ChatGPT to ratify — call **D-CR2-E**):
 
 - **CORE-R2 must be resolved (merged runtime-green) before UAT** (§2 step 17)
   and before the Go/No-Go release act (step 18). It is a UAT prerequisite.
-- **CORE-R2 is a HARD prerequisite of every live Shopify *mutation* task** —
-  **Task 013 / 013B inventory** (§2 step 10), **Task 014 fulfillment**
-  (step 11), and **Task 015 / 015B product export** (step 12) — because the
-  defect only bites once a domain handler performs a real Shopify write; none
-  of those may ship on top of an unremediated disconnect race.
-- **CORE-R2 is NOT a hard blocker of Task 010B, Task 011B, or Task 012** —
-  product import, customer matching, and order import perform no live Shopify
-  mutation (they read from Shopify / write into Odoo), so the race is latent
-  for them. It is nonetheless **recommended to sequence CORE-R2 early** (it is
-  small, `shopify_connector_core`-only, and independent of the domain modules)
-  — e.g. **after CORE-R1 and in parallel with 010B/011B** — so it is merged
-  and proven well before the first mutation task (step 10). Its external
-  validation is the **P-B concurrency track** (§3) that already produced the
-  runtime evidence.
-- **Sequencing constraint:** the CORE-R2 packet adds one core `job_type`
-  (`core_disconnect_quiesce`) and one store state (`disconnecting`); to avoid a
-  later retrofit, register them **before or with Task LC-1** (§2 step 4, the
-  historic-job-type reassignment) so they participate in that lifecycle from
-  day one.
+- **The defect applies to ANY Shopify call, including reads** (the contract
+  promises "no further Shopify call", not merely "no further mutation").
+  Therefore CORE-R2 must be runtime-green **before merging, enabling, or
+  live-validating any domain handler that can call Shopify** — this includes
+  **Task 010B product-import live validation** (§2 step 2), **Task 011B
+  customer-import live validation** (step 3), **Task 012 order-import live
+  validation** (step 5), and **Tasks 013–015** (steps 10–12), as well as UAT.
+- **Handling the already-open Task 010B and Task 011B PRs:** their
+  development and review **may continue in parallel** with CORE-R2; only their
+  **final integration / live enablement / live Shopify validation** waits for
+  CORE-R2 to be merged runtime-green — **unless** a given handler path is
+  proven to contain **no Shopify call** (in which case it is unaffected and may
+  proceed). CORE-R2 is `shopify_connector_core`-only and independent of the
+  domain modules, so it can be developed and merged concurrently. Its external
+  validation is the **P-B concurrency track** (§3) that produced the runtime
+  evidence.
+- **Recommended sequencing:** run CORE-R2 **early — after CORE-R1 and in
+  parallel with 010B/011B** — so it is merged and proven before any domain
+  handler's live validation.
+- **Sequencing constraint:** the CORE-R2 packet adds one store state
+  (`disconnecting`), new store/job fields (incl. `connection_generation` /
+  `expected_connection_generation`), a dedicated quiesce-controller `ir.cron`,
+  and the central API-client gate; to avoid a later retrofit, land these
+  **before or with Task LC-1** (§2 step 4, the historic-job-type reassignment)
+  so they participate in that lifecycle from day one.
 
 No §2 step is moved by this note; the concrete insertion point is **D-CR2-E**
 at CORE-R2 gate time. Until then the CORE-R2 implementation gate is **closed**.

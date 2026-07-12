@@ -1,13 +1,15 @@
 # Research Handoff (rolling)
 
-### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR into `Shopify-connector`, 2026-07-12)
+### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR #154 into `Shopify-connector`, 2026-07-12, revision 2)
 
 - **Base verified (hard prerequisite):** `Shopify-connector` tip ==
   `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (no drift); **PR #153
   merged**; design gate comment **`4950413650`** (CORE-R2 disconnect/
   quiescence remediation **design** gate — OPEN, docs-only, one session).
-  Branch `claude/core-r2-disconnect-quiescence-design`; draft PR (design
-  only). **No CORE-R2 implementation gate is open.**
+  Branch `claude/core-r2-disconnect-quiescence-design`; **draft PR #154**
+  (design only). **Revision 2** applies control-room review
+  **`4951115877`** (nine blocking points). **No CORE-R2 implementation
+  gate is open.**
 - **Why:** PR #153 runtime-**confirmed** DEF-PB-1 / **SRR-03 stays OPEN**
   (accepted `4950408383`): a concurrent real `store.action_disconnect()`
   does **not** stop an already in-flight business handler — it blocks
@@ -22,30 +24,43 @@
   (26 sections; runtime facts vs Odoo/PG source facts vs inferences vs
   recommendations kept separate) and the future packet
   [`../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`](../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md)
-  (allowed/forbidden files, real-`action_disconnect()` concurrent + two-
-  server tests, Odoo.sh, rollback, DoD — **gate NOT opened**). Updated
-  SRR-03/04/09 wording, appended **AR-044**, inserted the master-plan
-  **§2.1** CORE-R2 dependency, and this entry.
-- **Recommended architecture (proposal, not decided): Option E hybrid** —
-  explicit `disconnecting` state + monotonic `disconnect_generation`
-  token (A) + cooperative **fresh-transaction pre-side-effect checkpoint**
-  that defeats REPEATABLE READ snapshot-blindness (C) + store-scoped
-  **transaction-scoped advisory lock** (`pg_advisory_xact_lock`) in a
-  **two-phase disconnect** (fast intent → dispatcher-run quiesce →
-  credential-clear/finalize) with **timeout + operator escalation** (B).
-  Rejected: C-only, force-`FOR UPDATE`-cancel, global lock, session
-  advisory lock, in-method `cr.commit()`, per-job-commit-alone (Option D →
-  PERF-1). Source-verified: REPEATABLE READ (`odoo/sql_db.py:373`),
-  `retrying()` (`odoo/service/model.py:160`), non-blocking
-  `try_lock_for_update`/`lock_for_update` (`odoo/orm/models.py:5592`/
-  `5564`), cron single-commit + `_commit_progress`
-  (`odoo/addons/base/models/ir_cron.py:671`/`846`).
-- **Critical path (proposal D-CR2-E):** CORE-R2 must merge runtime-green
-  **before UAT** and **before every live Shopify mutation task**
-  (013/013B inventory, 014 fulfillment, 015/015B export); **not** a hard
-  blocker of 010B/011B/012 (no live mutation there); recommend sequencing
-  early (∥ 010B/011B) and registering its new core `job_type`/state with
-  Task LC-1.
+  (allowed/forbidden files incl. the **API client**; executable INV-2 tests
+  via the real `execute()` gate + `_send` transport seam; two-server tests;
+  Odoo.sh; rollback; DoD — **gate NOT opened**). Updated SRR-03/04/09 wording,
+  revised **AR-044** (rev 2), the master-plan **§2.1** CORE-R2 dependency
+  (broadened to any Shopify call incl. reads), and this entry — all for
+  review `4951115877`.
+- **Recommended architecture (rev 2, proposal, not decided): Option E,
+  centrally enforced** — INV-2 ("no post-epoch Shopify call") is enforced
+  at the **central API client `execute()`, fail-closed** (not a voluntary
+  per-handler checkpoint), against a **persisted connection epoch**:
+  `store.connection_generation` (bumped on disconnect/reconnect/activate/
+  credential-replace) vs an **enqueue-captured
+  `job.expected_connection_generation`**, read in a **fresh cursor** so a
+  fast disconnect→reconnect cannot revive an old job. Complete **in-flight
+  taxonomy** now covers **claimed-but-not-started (row-locked)** jobs (rev 1's
+  "queued jobs are unlocked" claim was false); cancellation is **non-blocking**
+  (`try_lock_for_update()` + `SKIP LOCKED` + bounded polling); the quiesce
+  controller is a **dedicated, high-priority, trigger-driven `ir.cron`** (no
+  starvation; no "reschedule-self-marked-succeeded"); **timeout escalation is
+  on independently-writable store-level fields** (incl. `disconnect_stuck_job_id`
+  as a plain Integer) + a new audit job, never the locked job row; **the
+  advisory lock is DROPPED** for store-row optimistic state+epoch under
+  `retrying()`; Phase-1 RPC return = **request accepted** (not completed); a
+  **Phase A/B/C** contract preserves local reconciliation of an admitted call.
+  Source-verified: REPEATABLE READ (`odoo/sql_db.py:373`), `retrying()`
+  (`odoo/service/model.py:160`), non-blocking `FOR UPDATE SKIP LOCKED`
+  (`odoo/orm/models.py:5592`/`5564`), cron `_trigger`/priority + single-commit
+  + `_commit_progress` (`odoo/addons/base/models/ir_cron.py:735`/`303`/`671`/
+  `846`). The **API client joins the CORE-R2 allowlist.**
+- **Critical path (rev 2, proposal D-CR2-E):** the defect applies to **any
+  Shopify call including reads**, so CORE-R2 must merge runtime-green **before
+  UAT** and **before merging/enabling/live-validating any domain handler that
+  calls Shopify** — incl. **010B/011B/012 live validation** and Tasks 013–015.
+  Development/review of 010B/011B may continue in parallel; only their final
+  integration / live enablement waits for CORE-R2 (unless a handler path has
+  no Shopify call). Recommend sequencing early (∥ 010B/011B) and landing the
+  new state/fields/controller-cron/API-gate with Task LC-1.
 - **Risk status unchanged by design:** SRR-03 **OPEN**; SRR-04 & SRR-09
   **REDUCED, not closed**. Live Odoo.sh + genuine two-server proof are
   required (by the packet) before SRR-03 can move off OPEN.
