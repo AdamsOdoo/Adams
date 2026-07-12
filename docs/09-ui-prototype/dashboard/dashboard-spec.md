@@ -1,6 +1,11 @@
 # Screen spec — Command-center dashboard (S3)
 
-> **Status: U0 prototype spec. Proposed, not accepted.** Implements the
+> **Status: Accepted U0 visual baseline** (control-room comment `4951204357`,
+> 2026-07-12; merged via **PR #152** into `Shopify-connector` at merge commit
+> `65e915aada32930a19a14c94d23dc9bd5e6fb517`). History preserved — gate
+> `4948902516` → reviews `4950255482`, `4950432754` → acceptance `4951204357`.
+> **Implementation remains separately gated** — UI-U1/U2/U3 stay CLOSED and this
+> spec authorizes no code. Implements the
 > ranked §9 hierarchy of `../../03-architecture/premium-ui-ux-design-system.md`
 > (which supersedes the accepted nine-equal-card grid *at ChatGPT’s review
 > direction* — flagged, not silent). Inherits S3 / DEC-012 §3 / Part A §F.1
@@ -102,7 +107,7 @@ color** (WCAG 1.4.1):
   (band → exceptions → chips → activity → trend) is preserved on stack; the
   two-column activity/trend collapses to one column; no horizontal page scroll;
   the lead answer and each row’s primary identifier stay visible.
-- **Mobile shell (≤ 640px):** the 7-item app bar is replaced by a compact
+- **Mobile shell (≤ 900px):** the 7-item app bar is replaced by a compact
   Odoo-native shell — a **☰ Menu** overflow control + the **current section**
   (fully visible, never clipped) + the **persistent connection-health** state
   (dot + a compact word, e.g. “Connected” / “Throttled”). No horizontal scroll,
@@ -130,13 +135,14 @@ aggregates, never full recordsets; PB-8 ≤ 1,500 DOM nodes.
 - **Inherited (accepted):** S3 surface; lead-answer-first; nine cards’
   *information*; no-vanity-metrics; honest freshness; five states; the §6 token
   map (which this revision now follows for manual review = danger).
-- **Proposed (needs acceptance):** the ranked §9 layout replacing the
-  nine-equal-tile grid (design-system §9, ChatGPT-directed); the **optional
-  sparkline** (§9.5); secondary metrics as *chips* rather than cards; the
-  **compact Odoo-native mobile shell** (Menu + current section + health);
-  the **band-color = most-severe-active-item** rule; and the §11 wording
-  correction so its “warning family” prose matches §6’s `blocked_manual_review →
-  danger` mapping (P12).
+- **Proposed → accepted** (control-room comment `4951204357`, 2026-07-12): the
+  ranked §9 layout replacing the nine-equal-tile grid (**P1**, design-system §9);
+  the **optional sparkline** (**P2**, §9.5); secondary metrics as *chips* rather
+  than cards; the **compact Odoo-native mobile shell** (**P11**, Menu + current
+  section + health); the **band-color = most-severe-active-item** rule (**P13**);
+  and the §11 wording correction so its “warning family” prose matches §6’s
+  `blocked_manual_review → danger` mapping (**P12**). Accepted as the visual
+  baseline; the Owl implementation stays gated to UI-U1.
 
 ## Sparkline recommendation (the §9.5 severable call)
 **Recommendation: keep the sparkline, in its restrained form.** Failure *trend*

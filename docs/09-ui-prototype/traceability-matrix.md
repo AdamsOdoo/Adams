@@ -3,8 +3,11 @@
 > Maps every prototype surface and major component to the accepted UI/UX corpus,
 > the design-system sections, the state/error contracts it inherits, the new
 > proposals that require ChatGPT acceptance, and the future UI phase that would
-> implement it. **Proposals are never silently converted into accepted
-> requirements** — the “New proposal” column is the list ChatGPT must rule on.
+> implement it. **The proposals were ruled on and ACCEPTED** by control-room
+> comment `4951204357` (2026-07-12; §3), merged via **PR #152** at `65e915a` —
+> recorded here, not silently converted; the “New proposal” column is preserved as
+> the accepted decision record. Acceptance is visual only; implementation stays
+> phase-gated.
 >
 > Corpus keys: **DS** = `../03-architecture/premium-ui-ux-design-system.md`;
 > **SPEC** = `../02-product/ui-ux-final-design-spec.md`; **NAV** =
@@ -40,7 +43,13 @@
 | Error presentation | Part A §H nine-element contract; 16-class registry | SPEC §Error UX | reason→fix→owner; technical behind one disclosure |
 | Design tokens (color/space/type/surface/icon) | DS §4–§8 | DS §4–§8 | token-only; one proposed addition `--sc-border-strong` (decision 3) |
 
-## 3. New proposals requiring ChatGPT acceptance (consolidated)
+## 3. Proposals — ACCEPTED (control-room comment `4951204357`, 2026-07-12)
+
+**All proposals below (P1–P13) and the PD-7 selective-Owl scope are ACCEPTED** as
+the U0 visual baseline by control-room comment `4951204357`, merged via **PR #152**
+at `65e915a`. Acceptance is **visual only** — it opens no implementation gate;
+implementation details stay pending their UI phase (e.g. **P9** platform
+FontAwesome is required at U1). The rows below are the accepted decision record.
 
 | # | Proposal | Where | Severability |
 | --- | --- | --- | --- |
@@ -57,17 +66,22 @@
 | P11 | **Compact Odoo-native mobile/tablet shell** (☰ Menu + current section + persistent health) at ≤ 900px, replacing the 7-item bar | all screens (shell) | Responsive behavior (review `4950255482` §4) |
 | P12 | **Manual review = danger family** (follows the §6 token map `blocked_manual_review → danger`) with the **§11 “warning family” wording corrected** to match — applied on **every** surface that shows manual review, incl. the **native Sync Center list** rows | dashboard, matching, native list | Semantic-map alignment (review `4950255482` §5; native-list rows corrected per `4950432754` §2) |
 | P13 | **Lead-band color = severity of the most-severe *active* item** (a resolved incident is labelled, not counted); one coherent data model per dashboard state | dashboard | State-consistency rule (review `4950255482` §1) |
+| PD-7 | **Selective Owl scope** — dashboard, setup/readiness, matching, and diff use Owl; ordinary connector records stay Odoo-native | all surfaces | Architecture scope (accepted `4951204357`; implemented per UI phase) |
 
-## 4. Phase gating (all CLOSED — this matrix authorizes nothing)
+## 4. Phase gating — U0 COMPLETE & ACCEPTED; UI-U1/U2/U3 remain CLOSED
 
-- **U0 (this session):** design artifacts only. Produces the prototype + this
-  matrix. No Odoo code.
+- **U0:** **COMPLETE & ACCEPTED** — design artifacts only; accepted as the visual
+  baseline (control-room comment `4951204357`, 2026-07-12) and merged via
+  **PR #152** into `Shopify-connector` at `65e915a`. No Odoo code; the acceptance
+  opens **no** implementation gate.
 - **U1:** dashboard (Owl), sync/error centers, logs, settings, roles — standard
   Odoo views + the one dashboard Owl surface. Requires Area 6 + SEC-1 merged
-  **and the U0 prototype accepted**. **CLOSED.**
-- **U2:** setup wizard + readiness (Owl presentation). **CLOSED.**
+  **and the U0 prototype accepted** (U0 accepted ✓ 2026-07-12; Area 6 + SEC-1
+  still open). **CLOSED.**
+- **U2:** setup wizard + readiness (Owl presentation). **CLOSED** (behind U1).
 - **U3:** matching centers, product diff/preview, domain screens (Owl per PD-7).
-  **CLOSED.**
+  **CLOSED** (behind U1).
 
-No proposal above is accepted by producing this matrix; each is a ChatGPT
-decision (see `README.md`).
+The proposals above are **accepted** per control-room comment `4951204357` (see
+`README.md` §6). This matrix records that acceptance; it authorizes **no**
+implementation — each UI phase remains gated by its own act.
