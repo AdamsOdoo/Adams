@@ -1,0 +1,2 @@
+{"phase": "started", "job_id": 70, "claimed_ids": [70], "start_running_ok": false, "state_after_start": "failed_retryable", "at": "2026-07-11T22:39:24.325211Z"}
+{"phase": "handled", "job_id": 70, "final_state": "failed_retryable", "note": "checkpoint-2 blocked start; handler not invoked", "at": "2026-07-11T22:39:24.328897Z"}

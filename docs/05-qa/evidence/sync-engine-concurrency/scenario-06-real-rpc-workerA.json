@@ -1,0 +1,3 @@
+{"phase": "started", "job_id": 2, "claimed_ids": [2], "start_running_ok": true, "state_after_start": "running", "at": "2026-07-12T07:15:23.617344Z"}
+{"phase": "probe_checkpoint3", "job_id": 2, "observed_store_state": "connected", "self_disconnect": false, "at": "2026-07-12T07:15:24.551044Z"}
+{"phase": "handled", "job_id": 2, "final_state": "succeeded", "at": "2026-07-12T07:15:24.560939Z"}

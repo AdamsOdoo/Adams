@@ -1,0 +1,5 @@
+-- pg_stat_activity for open holder txn --
+25630|idle in transaction|t|SELECT "shopify_connector_job"."id" FROM "shopify_connector_
+-- probe: SELECT id FROM job WHERE id=58 FOR UPDATE SKIP LOCKED (expect EMPTY=locked) --
+-- probe: an unlocked candidate FOR UPDATE SKIP LOCKED (expect a row) --
+57

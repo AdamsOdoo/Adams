@@ -1,0 +1,26 @@
+# Scenario 6 faithful — library variant — final committed DB state
+captured_at_utc: 2026-07-12T07:14:15Z
+-- store 1 --
+ id |      name       |   state   | credential_present 
+----+-----------------+-----------+--------------------
+  1 | PB-S6REAL-STORE | connected | f
+(1 row)
+
+-- job 1 --
+ id | job_source  |   state   | cancel_reason |     started_at      |     finished_at     
+----+-------------+-----------+---------------+---------------------+---------------------
+  1 | manual_sync | succeeded |               | 2026-07-12 07:13:33 | 2026-07-12 07:13:34
+(1 row)
+
+-- job logs for job 1 --
+ id | event_type | from_state | to_state  |          message          |     occurred_at     
+----+------------+------------+-----------+---------------------------+---------------------
+  1 | attempt    | queued     | running   | Dispatch attempt started. | 2026-07-12 07:13:33
+  3 | attempt    | running    | succeeded | Dispatch succeeded.       | 2026-07-12 07:13:34
+(2 rows)
+
+-- any lifecycle audit jobs on store 1 (core_manual_maintenance) --
+ id | job_type | state | left 
+----+----------+-------+------
+(0 rows)
+

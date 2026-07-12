@@ -1,0 +1,3 @@
+id,job_id,event_type,from_state,to_state,message,technical_detail,occurred_at,actor_uid
+128,68,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:38:38,1
+129,68,state_change,running,skipped,Store is no longer connected immediately before dispatch -- skipped without invoking a handler.,,2026-07-11 22:38:38,1

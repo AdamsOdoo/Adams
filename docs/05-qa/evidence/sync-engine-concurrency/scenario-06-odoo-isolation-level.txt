@@ -1,0 +1,17 @@
+# Odoo 19 cursor isolation level — evidence for Scenario 6 (SRR-03)
+source: /opt/odoo/odoo/sql_db.py (Odoo 19.0 @ c5f1a963)
+
+        As a result of the above, we have selected ``REPEATABLE READ`` as
+        the default transaction isolation level for OpenERP cursors, as
+        it will be mapped to the desired ``snapshot isolation`` level for
+        all supported PostgreSQL version (>10).
+
+        # See the docstring of this class.
+        self.connection.set_isolation_level(ISOLATION_LEVEL_REPEATABLE_READ)
+        self.connection.set_session(readonly=pool.readonly)
+
+Consequence: every Odoo cursor (cron drain, RPC request) runs at PostgreSQL
+REPEATABLE READ (snapshot isolation). A single run_drain transaction takes ONE
+snapshot at its first read (the claim). invalidate_recordset() clears the ORM cache
+but a re-SELECT still returns snapshot data, so checkpoint-3 cannot observe a
+disconnect committed by another transaction AFTER the drain's snapshot.

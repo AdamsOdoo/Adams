@@ -1,0 +1,4 @@
+id,job_id,event_type,from_state,to_state,message,technical_detail,occurred_at,actor_uid
+215,113,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:48:34,1
+217,114,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:48:59,1
+218,114,attempt,running,succeeded,Dispatch succeeded.,,2026-07-11 22:48:59,1

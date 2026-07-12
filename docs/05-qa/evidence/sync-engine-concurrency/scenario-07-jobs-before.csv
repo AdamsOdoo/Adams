@@ -1,0 +1,2 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+71,10,manual_sync,core_dispatch_selftest,blocked_manual_review,,ambiguous_match,,,,,10|pb.synthetic.model|7000|gid://pb/blocked/7000,10|core_dispatch_selftest|pb.synthetic.model|7000|gid://pb/blocked/7000|pb-blocked-7000,,7000

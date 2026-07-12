@@ -1,0 +1,21 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+37,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2100|gid://pb/s2p/2100|pb-s2p-2100,,2100
+38,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2101|gid://pb/s2p/2101|pb-s2p-2101,,2101
+39,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2102|gid://pb/s2p/2102|pb-s2p-2102,,2102
+40,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2103|gid://pb/s2p/2103|pb-s2p-2103,,2103
+41,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2104|gid://pb/s2p/2104|pb-s2p-2104,,2104
+42,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2105|gid://pb/s2p/2105|pb-s2p-2105,,2105
+43,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2106|gid://pb/s2p/2106|pb-s2p-2106,,2106
+44,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2107|gid://pb/s2p/2107|pb-s2p-2107,,2107
+45,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2108|gid://pb/s2p/2108|pb-s2p-2108,,2108
+46,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:19,2026-07-11 22:28:19,,2|core_dispatch_selftest|pb.synthetic.model|2109|gid://pb/s2p/2109|pb-s2p-2109,,2109
+47,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2110|gid://pb/s2p/2110|pb-s2p-2110,,2110
+48,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2111|gid://pb/s2p/2111|pb-s2p-2111,,2111
+49,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2112|gid://pb/s2p/2112|pb-s2p-2112,,2112
+50,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2113|gid://pb/s2p/2113|pb-s2p-2113,,2113
+51,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2114|gid://pb/s2p/2114|pb-s2p-2114,,2114
+52,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2115|gid://pb/s2p/2115|pb-s2p-2115,,2115
+53,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2116|gid://pb/s2p/2116|pb-s2p-2116,,2116
+54,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2117|gid://pb/s2p/2117|pb-s2p-2117,,2117
+55,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2118|gid://pb/s2p/2118|pb-s2p-2118,,2118
+56,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:28:14,2026-07-11 22:28:14,,2|core_dispatch_selftest|pb.synthetic.model|2119|gid://pb/s2p/2119|pb-s2p-2119,,2119
