@@ -2,7 +2,10 @@
 
 > Completed against the design-system §13 checklist for the U0 prototype, and
 > **re-evaluated after control-room review `4950255482`**. **Status: U0
-> self-review evidence. Proposed, not accepted.** Result values are strictly
+> self-review evidence for the now **Accepted U0 visual baseline** (accepted by
+> control-room comment `4951204357`, 2026-07-12; merged via **PR #152** into
+> `Shopify-connector` at `65e915aada32930a19a14c94d23dc9bd5e6fb517`;
+> implementation remains separately gated).** Result values are strictly
 > **Pass / Partial / Fail** (nuances live in the Follow-up column so the totals
 > count cleanly). No item is Pass without evidence. A **Partial** means the item
 > is partly satisfiable in a static, JS-free prototype and its remainder is
@@ -33,4 +36,6 @@
   rows exactly** (the earlier “10 Pass, 2 Partial” mismatch is corrected).
 - Design proposals living inside a Pass (V-3 border split; V-5 icon placeholders →
   real FontAwesome at U1; V-8 compact shell; V-4/§6-vs-§11 manual-review danger)
-  are surfaced for ChatGPT in `README.md` §6 and `traceability-matrix.md` §3.
+  were **accepted** by control-room comment `4951204357` (2026-07-12) and are
+  recorded in `README.md` §6 and `traceability-matrix.md` §3. Acceptance is visual
+  only; the FontAwesome swap and any runtime work remain gated to UI-U1.

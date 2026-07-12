@@ -1,5 +1,51 @@
 # Research Handoff (rolling)
 
+### U0 acceptance closure — visual baseline accepted & merged (documentation-only, 2026-07-12)
+
+- **Acceptance recorded (control-room comment `4951204357`, 2026-07-12 — “ACCEPT
+  U0 visual baseline … ACCEPT AND MERGE”):** the U0 premium operator-UI visual
+  prototype is **accepted as the future visual baseline** and **PR #152 merged**
+  into `Shopify-connector` at merge commit
+  **`65e915aada32930a19a14c94d23dc9bd5e6fb517`** (parents `fcbbb0b` + `2c2648e`).
+  **P1–P13 and the PD-7 selective-Owl scope are accepted** (recorded in
+  `docs/09-ui-prototype/README.md` §6 + `traceability-matrix.md` §3 + the screen
+  specs, and `docs/05-qa/architecture-review-log.md` AR-044). **U0 is complete.**
+- **Current integration tip:** `Shopify-connector` == `65e915aada32930a19a14c94d23dc9bd5e6fb517`
+  (the PR #152 merge commit). This closure session branched
+  `claude/u0-acceptance-closure` from that exact tip.
+- **Gate posture (unchanged by the acceptance):** the acceptance is **visual
+  only** — it authorizes **no production code** and opens **no implementation
+  gate**. **UI-U1, U2, and U3 remain CLOSED**; UI-U1 stays dependent on its
+  existing prerequisites (Area 6 + SEC-1 merged; U0 accepted — now satisfied).
+  Every other gate (Task 010B, 011B, LC-1, Task 012, Area 6, SEC-1, inventory,
+  fulfillment, export, webhooks, OAuth, PERF-1) remains closed. The master plan
+  was updated to mark U0 complete/accepted; UI-U1 was **not** moved ahead of
+  Area 6 / SEC-1; U2/U3 stay closed; no unrelated task was reordered.
+- **This session (documentation only):** synchronized the accepted status across
+  the eleven allowed docs — the six screen specs + `visual-checklist.md` (status
+  headers → “Accepted U0 visual baseline”), `README.md` + `traceability-matrix.md`
+  (P1–P13 + PD-7 recorded accepted), `architecture-review-log.md` (AR-044),
+  `implementation-ready-master-plan.md` (U0 complete/accepted), and this handoff.
+  **No `*.html` / `*.css` / `*.png`, addon, test, or code file was changed; no new
+  file added; no visual design altered.** History preserved (gate `4948902516`;
+  reviews `4950255482`, `4950432754`; acceptance `4951204357`; PR #152).
+- **Learning feedback loop:** New issues discovered: none (docs-only status
+  synchronization). Repeated issue pattern: none. Rules/checklists updated: none
+  unilaterally. New rejected approaches: none. New technical debt: none (rollback
+  = single-PR revert of the doc edits; no schema/data/records/code). Should future
+  prompts change? A UI-U1 implementation prompt must still require its existing
+  prerequisites (Area 6 + SEC-1 merged) and the P9 platform-FontAwesome swap — U0
+  acceptance alone does not authorize it.
+- **Quality gate confirmation:** handoff updated (this new top entry; older
+  entries untouched) · feedback loop checked · forbidden files untouched · no new
+  technical debt · UI-U1/U2/U3 confirmed CLOSED.
+- **Next recommended session prompt (for ChatGPT to issue):** *“UI-U1 remains
+  gated — do not start it until Area 6 and SEC-1 are merged. When those
+  prerequisites are met, issue the UI-U1 dashboard implementation gate act per the
+  UI packet §6, consuming the accepted U0 visual baseline
+  (`docs/09-ui-prototype/`) and swapping inline-SVG placeholders for the platform
+  FontAwesome set (P9).”*
+
 ### Task 011B — Customer Matching Scalability (indexed normalized-email lookup) — draft PR #150 into `Shopify-connector`, 2026-07-11; three focused corrections + base re-alignment 2026-07-12
 
 - **Base-alignment session (2026-07-12, ChatGPT review `4680106356` — ACCEPTED the third correction; base-alignment set as the mandatory prerequisite before the Odoo.sh runtime gate; base-alignment + evidence documentation only, no code/test change):** re-aligned the branch onto the new integration tip **`65e915aada32930a19a14c94d23dc9bd5e6fb517`** (`Shopify-connector` after **U0 / PR #152** merged) via a **normal merge commit `19c0911b13e8a4b98845f741fbede9da6055594e`** (the new PR head; `65e915a…` is an ancestor). The only conflict was the shared append-only **this file** (both U0 and Task 011B prepend an entry); resolved by **preserving both sides completely** — the Task 011B entry **and** the U0 entry, shared `CORE-R1` tail once; git-verified **0 lines lost from either side**, no duplicated sections. **No `addons/**`/`tests/**`/Task 011B production/test file conflicted or changed.** PR diff vs `65e915a…` = **exactly the 8 Task 011B files**; no U0 / Task 010B / CORE-R2 artifact appears as a PR change; all U0 / PR #152 files + history preserved. **Standard Odoo.sh suites (`core`/`product`/`sale`, incl. the standard `test_customer_matching_scalability.py` tests) for the aligned head `19c0911` are OUTSTANDING and operator-run — this environment has no Odoo runtime and no commit status/check run is posted for `19c0911` (`get_status` total_count 0), so no build result is observed or claimed.** The two opt-in tags were **not** run; **no live/dev-store Shopify request** was made; live Shopify validation still depends on **CORE-R2**. PR stays open/draft/unmerged.
@@ -51,7 +97,7 @@
   stale docstrings only), `tests/test_customer_matching_scalability.py`
   (new), `tests/__init__.py` (+1 line),
   `docs/05-qa/task-011b-validation-results.md` (new),
-  `docs/05-qa/architecture-review-log.md` (AR-044 row),
+  `docs/05-qa/architecture-review-log.md` (AR-045 row),
   `docs/01-research/research-handoff.md` (this entry).
 - **What this session does NOT do:** opens no further gate; starts no
   Task 010B/012/LC-1/Area-6/SEC-1/inventory/fulfillment/export/UI/webhook/
@@ -76,7 +122,7 @@
   PR merged **second** must later update from the latest
   `Shopify-connector`, reconcile only those append-only additions, leave
   accepted Task 011B production/test content unchanged, and rerun Odoo.sh
-  on the reconciled head. AR-044 numbering may collide with a parallel
+  on the reconciled head. AR-045 numbering may collide with a parallel
   Task 010B row — reconciled append-only at second-merge, not now.
 - **Learning feedback loop:**
   - New issues discovered: reusing Odoo's own `mail` `email_normalized`
@@ -98,6 +144,7 @@
   then require the OUTSTANDING Odoo.sh run and the 100k benchmark/backfill
   numbers before merge. Keep parallel-merge discipline with Task 010B. Do
   not open any other gate."
+
 ### U0 — Premium operator UI visual prototype (draft PR #152, design-artifacts-only, 2026-07-11 · revised 2026-07-12 · final semantic closure 2026-07-12)
 
 - **Final semantic closure (control-room review `4950432754`, 2026-07-12):** one

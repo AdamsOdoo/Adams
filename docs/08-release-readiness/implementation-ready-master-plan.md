@@ -83,7 +83,10 @@ noted):**
 - **B10** **Authorize the U0 visual-design/prototype session** (its
   allowed files incl. `docs/09-ui-prototype/**`; PNG+md default —
   UI-U1 stays locked until the prototype is accepted in a recorded
-  act).
+  act). **✅ Done — the U0 session ran and the prototype was accepted
+  as the visual baseline (control-room comment `4951204357`,
+  2026-07-12) and merged via PR #152 at `65e915a`. UI-U1 remains locked
+  on its own prerequisites; this acceptance opens no implementation gate.**
 - **B11** Accept the **Task PERF-1 packet** (core queue throughput
   calibration — the Odoo 19 `ir.cron._commit_progress()` per-job-savepoint
   transaction model, configurable per-pass-cap/cadence, lock-safety,
@@ -109,13 +112,13 @@ remains unusable until its own gate act.
 | 5 | **Task 012** order import | task-012 packet §15 | CORE-R1 + 010B + 011B + LC-1 merged | Revised prerequisites in-packet; adopts the LC-1 callable |
 | 6 | **Task 016 / Area 6** triggers | area-6 packet §7 | 012 merged | Closes UAT blocker U-4; D-A6-7 no longer here |
 | 7 | **Task SEC-1** security hardening | task-sec1 packet §9 | Area 6 merged | Hardens the substrate incl. Area-6's services **before any UI button exists** |
-| 8 | **U0 visual prototype gate** | ui packet §7 prompt | B10 authorization | Design-only; **may run in parallel from acceptance onward**; must be accepted before step 9 |
-| 9 | **UI Phase U1** | ui packet §6 prompt | Area 6 + SEC-1 merged; U0 accepted | Dashboard per design system §9 |
+| 8 | **U0 visual prototype gate — ✅ COMPLETE & ACCEPTED** | ui packet §7 prompt | B10 authorization | Design-only; **accepted 2026-07-12** (comment `4951204357`) and **merged via PR #152** at `65e915a`. Satisfies the "U0 accepted" prerequisite of step 9; opens **no** implementation gate |
+| 9 | **UI Phase U1** *(CLOSED)* | ui packet §6 prompt | Area 6 + SEC-1 merged; U0 accepted (✓ 2026-07-12) | Dashboard per design system §9. **Still gated — Area 6 + SEC-1 not yet merged; U0 acceptance does not advance U1** |
 | 10 | **Task 013** inventory → **Task 013B** baseline | task-013 §8 / task-013b §9 | 010B merged (013); 013 merged (013B) | First mutation task; dev-store evidence rule active; both adopt the LC-1 callable (LC-1 already merged at step 4) |
 | 11 | **Task 014** fulfillment | task-014 packet §8 | 012 merged | Carries the TD-002 fix |
 | 12 | **Task 015** product export → **Task 015B** media export | task-015 §8 / task-015b §9 | 010B merged (015 consumes complete variants + compare-at field); 015 merged (015B) | Completes DEC-003 catalog scope incl. media |
-| 13 | **UI U2** (wizard/readiness) | ui packet §1 (prompt post-U1) | U1 merged; VAL-B2 strongly recommended first | |
-| 14 | **UI U3** (domain screens) | ui packet §1 (prompts per domain post-U1) | U1 + each domain merged | Rolling — may interleave with 10–12 |
+| 13 | **UI U2** (wizard/readiness) *(CLOSED — behind U1)* | ui packet §1 (prompt post-U1) | U1 merged; VAL-B2 strongly recommended first | Unchanged by U0 acceptance |
+| 14 | **UI U3** (domain screens) *(CLOSED — behind U1)* | ui packet §1 (prompts per domain post-U1) | U1 + each domain merged | Rolling — may interleave with 10–12; unchanged by U0 acceptance |
 | 15 | **W1 + W2** webhooks (MVP tail) | webhook packet §6 | Area 6 + U1 merged | W1 replaces the CORE-R1 webhook_hmac pass with the real check |
 | 16 | **Task PERF-1** core queue throughput calibration | task-perf1 packet §9 | merged core dispatcher; domain tasks mergeable | **Before performance UAT (re-review item 5): calibrates the dispatcher to PB-19 (≥ 600 jobs/hour) — the accepted 5-min×20 defaults cap at ~240/h; may run ∥ the P-B concurrency plan** |
 | 17 | **UAT waves 1–4** | final-mvp-uat-plan (36 scenarios) | per its §2/§6; PERF-1 merged for the performance scenarios (27/28/34) | Human reviewer sessions; numeric PB pass/fail |

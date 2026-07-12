@@ -1,11 +1,15 @@
 # U0 — Premium operator UI visual prototype
 
-> **Design artifacts only. No Odoo implementation. UI-U1 remains CLOSED.**
+> **Accepted U0 visual baseline — design artifacts only. Implementation remains
+> separately gated; UI-U1/U2/U3 stay CLOSED.**
 > Produced by the U0 visual-design session under gate comment **`4948902516`**
 > (the B10/U0 authorization act), branched from the verified `Shopify-connector`
-> base **`f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`** (PR #149 merged). This
-> package is a **proposal** for ChatGPT review; it accepts nothing and
-> authorizes no code.
+> base **`f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`** (PR #149). **Accepted** by
+> control-room comment **`4951204357`** (2026-07-12) and merged via **PR #152**
+> into `Shopify-connector` at merge commit
+> **`65e915aada32930a19a14c94d23dc9bd5e6fb517`**. This package is now the future
+> UI **visual baseline**; by itself it **authorizes no production code** and opens
+> no implementation gate.
 >
 > **Revision (control-room review `4950255482`):** this pass corrects six
 > load-bearing semantic issues — (1) the **healthy dashboard** now reads from one
@@ -33,6 +37,14 @@
 > new `Shopify-connector` tip **`fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`**
 > (PR #153 merged) by a normal merge — **no conflict**, and the PR #153
 > concurrency-evidence files were not modified.
+>
+> **Acceptance (control-room comment `4951204357`, 2026-07-12 — “ACCEPT U0 visual
+> baseline … ACCEPT AND MERGE”):** **P1–P13 and the PD-7 selective-Owl scope are
+> accepted** (recorded in §6 and `traceability-matrix.md` §3), **PR #152 merged**
+> at `65e915a`, and **U0 is complete**. The acceptance is **visual only** — it
+> **does not open UI-U1, U2, or U3** and authorizes no production implementation.
+> UI-U1 stays gated on its existing prerequisites (Area 6 + SEC-1 merged; U0
+> accepted); U2/U3 remain closed behind U1.
 
 The prototype demonstrates the future operator UI for the premium Odoo 19 ↔
 Shopify connector: strong hierarchy, Odoo-native familiarity, restrained color,
@@ -119,11 +131,13 @@ were rendered from these exact files with headless Chromium at a 2× device scal
   contract + 16-class registry, the five states, fixed job-state/error
   vocabularies rendered as words, the credential posture (masked, no read-back,
   no “encrypt”), honest freshness, no-vanity-metrics, and the copy voice rules.
-- **Proposed (needs ChatGPT acceptance)** — consolidated in
-  `traceability-matrix.md` §3 (P1–P13) and as the decision list in §6 below.
-  Chief among them: the ranked §9 dashboard replacing the nine-equal-tile grid
-  (a ChatGPT-directed revision of accepted content, flagged, not silent), the
-  optional sparkline, and the one contrast token addition.
+- **Proposed → ACCEPTED** (control-room comment `4951204357`, 2026-07-12) —
+  consolidated in `traceability-matrix.md` §3 (**P1–P13**) and as the decision
+  record in §6 below. Chief among them: the ranked §9 dashboard replacing the
+  nine-equal-tile grid (a ChatGPT-directed revision of accepted content, flagged,
+  not silent), the optional sparkline, and the one contrast token addition — all
+  now accepted as the visual baseline. Acceptance is visual only; implementation
+  stays phase-gated.
 
 ## 5. Deviations, assumptions, and unresolved questions
 
@@ -172,41 +186,55 @@ were rendered from these exact files with headless Chromium at a 2× device scal
   (MBQ-03), ACL rows (MBQ-44), and every domain packet remain open; U0 closes
   none of them.
 
-## 6. Decisions ChatGPT must make
+## 6. Decisions — ACCEPTED (control-room comment `4951204357`, 2026-07-12)
 
-1. **Dashboard hierarchy & state model** — accept/revise the ranked §9
-   implementation (lead band → ≤3 exceptions → quiet chips → activity) replacing
-   the nine-equal-card grid, **plus the state-consistency rule** (band color =
-   most-severe *active* item; resolved incidents labelled, not counted — P13).
-2. **Optional sparkline** — include or remove the 7-day activity/failure
-   sparkline (built severable). *U0 recommendation: keep it (restrained;
-   answers “is recovery working?”; see `dashboard-spec.md`).* 
-3. **Adjusted contrast tokens** — accept the `--sc-border`/`--sc-border-strong`
-   split and `#79839B`, or direct an alternative (contrast-table §5).
-4. **Setup / readiness composition** — accept/revise the token-paste connect
-   step, the test-connection outcome, and the three-group readiness layout
-   (Action required / Passed / Not applicable), plus the 6-chip step compression.
-5. **Matching-center composition** — accept/revise confidence-in-words, the
-   **binding-key vs advisory** evidence marks (exact normalized email is the
-   sole automatic key; no fuzzy verdict), the **success/audit presentation of the
-   two automatic Task-011 outcomes** (auto-bind / auto-create as non-decision
-   screens; manual review only for ambiguity), and the **manual-review-danger**
-   distinction from technical error (P6, P12).
-6. **Product diff/preview composition** — accept/revise the 4-column diff,
-   inline source-of-truth, protected-field treatment, and the **blocked-state
+All ten decision areas below were **accepted** as the U0 visual baseline by
+control-room comment `4951204357` (“ACCEPT U0 visual baseline … ACCEPT AND
+MERGE”), merged via **PR #152** at `65e915a`. The per-proposal acceptance map
+(**P1–P13 + PD-7**) is in `traceability-matrix.md` §3. **Acceptance is visual
+only — it opens no implementation gate and authorizes no production code.** The
+items are preserved as the decision record.
+
+1. **Dashboard hierarchy & state model — accepted (P1, P13).** The ranked §9
+   implementation (lead band → ≤3 exceptions → quiet chips → activity) replaces
+   the nine-equal-card grid, with the state-consistency rule (band color =
+   most-severe *active* item; resolved incidents labelled, not counted).
+2. **Optional sparkline — accepted (P2).** The restrained, severable 7-day
+   activity/failure sparkline is kept.
+3. **Adjusted contrast tokens — accepted (P3).** The `--sc-border` /
+   `--sc-border-strong #79839B` split (contrast-table §5).
+4. **Setup / readiness composition — accepted (P4, P5).** The token-paste connect
+   step, the test-connection outcome, the three-group readiness layout (Action
+   required / Passed / Not applicable), and the 6-chip step compression.
+5. **Matching-center composition — accepted (P6, P12).** Confidence-in-words, the
+   **binding-key vs advisory** evidence marks (exact normalized email is the sole
+   automatic key; no fuzzy verdict), the **success/audit presentation of the two
+   automatic Task-011 outcomes** (auto-bind / auto-create as non-decision screens;
+   manual review only for ambiguity), and the **manual-review-danger** distinction
+   from technical error.
+6. **Product diff/preview composition — accepted (P7).** The 4-column diff, inline
+   source-of-truth, protected-field treatment, and the **blocked-state fail-closed
    posture** (asserts no authority, computes no result, no Confirm).
-7. **Odoo-native token treatment** — accept/revise how restrained the connector
-   token layer is on standard Odoo list/form views.
-8. **Responsive, mobile shell & RTL** — accept/revise the **compact
-   Odoo-native mobile/tablet shell** (P11), the mobile table reflow (stacked
+7. **Odoo-native token treatment — accepted (P8).** The restrained connector token
+   layer on standard Odoo list/form views.
+8. **Responsive, mobile shell & RTL — accepted (P10, P11).** The **compact
+   Odoo-native mobile/tablet shell at ≤ 900px**, the mobile table reflow (stacked
    comparison cards; optional-column hiding), and the RTL mirroring.
-9. **Owl scope in later phases** — confirm the PD-7 surfaces that will use Owl
-   (dashboard, setup/readiness, matching, diff) vs stay Odoo-native.
-10. **Prototype fidelity as the U1 baseline** — accept this prototype as the
-    visual baseline U1 must match, or request revisions first.
+9. **Owl scope in later phases — accepted (PD-7).** The selective-Owl surfaces
+   (dashboard, setup/readiness, matching, diff) use Owl; ordinary records stay
+   Odoo-native. Implementation of each stays gated to its UI phase.
+10. **Prototype fidelity as the U1 baseline — accepted.** This prototype is the
+    accepted visual baseline U1 must match.
 
-**UI-U1 remains explicitly BLOCKED** until ChatGPT accepts this prototype in a
-recorded act. This README authorizes nothing.
+**Icon placeholders (P9) — accepted with condition.** Inline-SVGs are prototype
+placeholders only; the platform **FontAwesome** set is **required at
+implementation**.
+
+**Implementation remains separately gated.** U0 acceptance does **not** open
+UI-U1, U2, or U3 and authorizes no production code. UI-U1 stays blocked on its
+existing prerequisites (Area 6 + SEC-1 merged; U0 accepted — now satisfied);
+U2/U3 remain closed behind U1. This README records the acceptance; it authorizes
+no code.
 
 ## 7. Validation summary (§24)
 

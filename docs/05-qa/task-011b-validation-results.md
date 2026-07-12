@@ -70,7 +70,7 @@
 | 4 | `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py` | **NEW** — field/compute, equivalence corpus, routing regression, concurrency, source guards, benchmark harness |
 | 5 | `addons/shopify_connector_sale/tests/__init__.py` | one import line |
 | 6 | `docs/05-qa/task-011b-validation-results.md` | **NEW** — this record |
-| 7 | `docs/05-qa/architecture-review-log.md` | one appended AR row (AR-044) |
+| 7 | `docs/05-qa/architecture-review-log.md` | one appended AR row (AR-045; renumbered from AR-044 after the U0 acceptance closure was assigned AR-044) |
 | 8 | `docs/01-research/research-handoff.md` | one new top entry |
 
 No forbidden file changed: no `shopify_connector_core`/`shopify_connector_product` file, no customer-binding model, no store-settings, no other importer method, no matching-policy change, no partner uniqueness constraint, no migration/hook, no `*.xml`/`*.csv`/`__manifest__`/`security`/`data`/`.github/workflows`, no `adams_base`, no `main`, no plain `dev`.
@@ -264,5 +264,5 @@ Authored, PENDING runtime execution (not claimed complete):
 - [ ] Existing sale/core/product suites green on Odoo.sh — **PENDING** runtime.
 
 Documentation / PR:
-- [x] Validation record updated (this file); AR-044 updated; handoff top entry updated.
+- [x] Validation record updated (this file); AR-045 updated (renumbered); handoff top entry updated.
 - [x] One draft PR into `Shopify-connector`, kept open/draft/unmerged; Task 010B untouched; all other gates closed.
