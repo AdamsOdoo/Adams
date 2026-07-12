@@ -2,21 +2,31 @@
 
 Proves the indexed candidate lookup added by Task 011B is recall-
 equivalent to the merged O(n) full scan it replaces, that every Task 011
-routing outcome is unchanged, that duplicate/ambiguity/concurrency
-behaviour is preserved, and that the source-level guards (indexed domain,
-identical `email_normalize(strict=False)` on both sides, no new match
-key) hold. A separate `-standard`-excluded benchmark class carries the
-D-011B-7 100k performance harness.
+routing outcome is unchanged, that duplicate/ambiguity behaviour is
+preserved, and that the source-level guards (indexed domain, identical
+`email_normalize(strict=False)` on both sides, no new match key) hold.
+
+Two `-standard`-excluded classes carry the runtime-only work:
+`TestCustomerMatchingConcurrency` (D-011B-6, a genuine independent-
+transaction binding race through the real dispatcher) and
+`TestCustomerMatchingBenchmark` (D-011B-7, the deterministic 100k
+performance harness). Both are authored to run under an explicit test-tag
+invocation on a runtime host; neither runs in the standard CI pass.
 """
 
 import ast
 import json
 import os
-import random
+import threading
+import time
 import uuid
 from time import perf_counter
 from unittest.mock import patch
 
+import psycopg2
+
+from odoo import SUPERUSER_ID, api
+from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 from odoo.tools import email_normalize, mute_logger
@@ -470,11 +480,19 @@ class TestCustomerMatchingScalability(_CustomerMatchingScalabilityBase):
         ]))
 
     # ==================================================================
-    # Concurrency (tests 22-23) -- D-011B-6.
+    # Binding-uniqueness backstop + sequential stable outcome (D-011B-6
+    # supporting evidence). These are single-transaction tests: they prove
+    # the DB constraint fires and the post-commit stable route, but they
+    # are NOT the concurrency race. The genuine independent-transaction
+    # race is `TestCustomerMatchingConcurrency` below (opt-in, runtime).
     # ==================================================================
 
     @mute_logger('odoo.sql_db')
-    def test_existing_binding_uniqueness_prevents_duplicate_binding(self):
+    def test_binding_uniqueness_constraint_backstop(self):
+        """The two binding uniqueness constraints fire at the DB level --
+        a specific `psycopg2.IntegrityError`, not a broad Exception. This
+        is the constraint backstop the genuine race relies on; it does not
+        by itself prove concurrent behaviour."""
         partner_1 = self._make_partner('Uniq A')
         partner_2 = self._make_partner('Uniq B')
         self.CustomerBinding.create({
@@ -483,7 +501,7 @@ class TestCustomerMatchingScalability(_CustomerMatchingScalabilityBase):
             'partner_id': partner_1.id,
         })
         # UNIQUE(store_id, shopify_gid).
-        with self.assertRaises(Exception):
+        with self.assertRaises(psycopg2.IntegrityError):
             with self.env.cr.savepoint():
                 self.CustomerBinding.create({
                     'store_id': self.store.id,
@@ -491,7 +509,7 @@ class TestCustomerMatchingScalability(_CustomerMatchingScalabilityBase):
                     'partner_id': partner_2.id,
                 })
         # UNIQUE(store_id, partner_id).
-        with self.assertRaises(Exception):
+        with self.assertRaises(psycopg2.IntegrityError):
             with self.env.cr.savepoint():
                 self.CustomerBinding.create({
                     'store_id': self.store.id,
@@ -499,16 +517,21 @@ class TestCustomerMatchingScalability(_CustomerMatchingScalabilityBase):
                     'partner_id': partner_1.id,
                 })
 
-    @mute_logger('odoo.sql_db')
-    def test_colliding_import_attempts_leave_single_binding(self):
+    def test_sequential_second_import_after_commit_routes_binding_conflict(self):
+        """Sequential (NOT concurrent) stable outcome: once the first
+        binding is visible, a second Shopify customer that matches the same
+        partner is caught by the importer's app-level conflict guard and
+        raises `binding_conflict` before any DB write. This is exactly the
+        outcome the genuine race reaches only on its *retry* leg (see
+        `TestCustomerMatchingConcurrency`); the initial concurrent
+        collision is a uniqueness race that routes to
+        `unknown_system_error`/`retry_waiting` first, never directly to
+        `binding_conflict`."""
         partner = self._make_partner('Collide', email='collide@%s' % ROUTE_DOMAIN)
         first = self.Importer._apply_import(self.store, self._customer_payload(
             'gid://shopify/Customer/2202', email='collide@%s' % ROUTE_DOMAIN,
         ))
         self.assertEqual(first.partner_id, partner)
-        # A second, different Shopify customer that matches the same
-        # partner routes through the existing binding-conflict taxonomy --
-        # no second binding row, no duplicate.
         with self.assertRaises(JobHandlerError) as ctx:
             self.Importer._apply_import(self.store, self._customer_payload(
                 'gid://shopify/Customer/2203', email='collide@%s' % ROUTE_DOMAIN,
@@ -699,73 +722,129 @@ class TestCustomerMatchingBenchmark(_CustomerMatchingScalabilityBase):
     deterministically seeded so successive runs are comparable.
     """
 
+    # Deterministic composition (index-based allocation, not probabilistic).
     TARGET_PARTNERS = 100000
-    ARCHIVED_RATIO = 0.30
-    WRAPPED_RATIO = 0.10
-    SHARED_RATIO = 0.01
-    SEED = 20260711
+    SHARED_COUNT = 1500        # >= 1% shared normalized email
+    WRAPPED_COUNT = 10500      # >= 10% wrapped/display-name
+    ORDINARY_START = SHARED_COUNT + WRAPPED_COUNT  # 12000
+    # active = (idx % 10) >= 3  -> exactly 30% archived (idx%10 in {0,1,2}).
+    ARCHIVED_MIN = 30000
+    WRAPPED_MIN = 10000
+    SHARED_MIN = 1000
     BATCH = 5000
-    LATENCY_SAMPLES = 500
-    THROUGHPUT_CUSTOMERS = 1000
     SHARED_EMAIL = 'shared-benchmark@bench011b.example'
+    # Deterministic 1,000-probe matching mix (sums to 1,000).
+    PROBE_ACTIVE_HITS = 700
+    PROBE_ARCHIVED_HITS = 150
+    PROBE_MISSES = 100
+    PROBE_AMBIGUOUS = 50
+    PROBE_TOTAL = 1000
 
     def _emit(self, label, value):
         print('[TASK-011B-BENCHMARK] %s=%s' % (label, value))
 
+    # ------------------------------------------------------------------
+    # Deterministic index-based allocation (no randomness).
+    # ------------------------------------------------------------------
+
+    def _is_active_idx(self, idx):
+        return (idx % 10) >= 3
+
+    def _email_for_idx(self, idx):
+        if idx < self.SHARED_COUNT:
+            return self.SHARED_EMAIL
+        if idx < self.ORDINARY_START:
+            # Wrapped/display-name/mixed-case; normalizes to the same bare
+            # address as the ordinary form would for this idx.
+            return '"User %d" <User.%d@Bench011b.Example>' % (idx, idx)
+        return 'user.%d@bench011b.example' % idx
+
+    def _matching_probe(self, importer, raw_email):
+        """Test-only, non-production customer-matching probe: incoming
+        normalization + active lookup + archived fallback. No Shopify call,
+        no partner/binding creation. Returns (category, n_active,
+        n_archived)."""
+        normalized = importer._normalize_incoming_email(raw_email)
+        if not normalized:
+            return ('miss', 0, 0)
+        active = importer._find_active_candidates(normalized)
+        n_active = len(active)
+        if n_active > 1:
+            return ('ambiguous', n_active, 0)
+        if n_active == 1:
+            return ('active_hit', 1, 0)
+        archived = importer._find_archived_candidates(normalized)
+        n_archived = len(archived)
+        if n_archived:
+            return ('archived_hit', 0, n_archived)
+        return ('miss', 0, 0)
+
     def _generate_dataset(self):
-        """Deterministically create TARGET_PARTNERS partners:
-        >=30% archived, >=10% wrapped/display-name, >=1% shared normalized
-        email. Returns the wall-clock generation (create + stored-compute)
-        duration in seconds."""
-        rng = random.Random(self.SEED)
+        """Deterministically create exactly TARGET_PARTNERS partners via
+        index-based allocation and return (counters, id_bounds, seconds).
+
+        `counters` are exact by construction; `id_bounds` is the
+        (min_id, max_id) contiguous range of the generated rows, used to
+        isolate the generated corpus from any pre-existing DB contacts
+        (never the whole-DB partner count)."""
         Partner = self.env['res.partner']
-        created = 0
+        counters = {
+            'total': 0, 'active': 0, 'archived': 0,
+            'shared': 0, 'wrapped': 0, 'ordinary': 0,
+        }
+        min_id = max_id = None
+        idx = 0
         start = perf_counter()
-        while created < self.TARGET_PARTNERS:
+        while idx < self.TARGET_PARTNERS:
             chunk = []
-            batch_size = min(self.BATCH, self.TARGET_PARTNERS - created)
-            for offset in range(batch_size):
-                idx = created + offset
-                form = rng.random()
-                if form < self.SHARED_RATIO:
-                    email = self.SHARED_EMAIL
-                elif form < self.SHARED_RATIO + self.WRAPPED_RATIO:
-                    # Wrapped/display-name/mixed-case; normalizes to the
-                    # same bare address as the normal form for this idx.
-                    email = '"User %d" <User.%d@Bench011b.Example>' % (idx, idx)
-                else:
-                    email = 'user.%d@bench011b.example' % idx
-                active = rng.random() >= self.ARCHIVED_RATIO
+            batch_size = min(self.BATCH, self.TARGET_PARTNERS - idx)
+            for _ in range(batch_size):
+                active = self._is_active_idx(idx)
                 chunk.append({
                     'name': 'Bench Partner %d' % idx,
-                    'email': email,
+                    'email': self._email_for_idx(idx),
                     'active': active,
                 })
-            Partner.create(chunk)
-            created += batch_size
+                counters['total'] += 1
+                counters['active' if active else 'archived'] += 1
+                if idx < self.SHARED_COUNT:
+                    counters['shared'] += 1
+                elif idx < self.ORDINARY_START:
+                    counters['wrapped'] += 1
+                else:
+                    counters['ordinary'] += 1
+                idx += 1
+            records = Partner.create(chunk)
+            batch_ids = records.ids
+            min_id = batch_ids[0] if min_id is None else min(min_id, min(batch_ids))
+            max_id = max(batch_ids) if max_id is None else max(max_id, max(batch_ids))
         self.env.flush_all()
-        return perf_counter() - start
+        return counters, (min_id, max_id), perf_counter() - start
 
     def _measure_backfill_proxy(self):
-        """Proxy for the stored-compute backfill: force a full recompute
-        of the normalized column over every partner and time it. This
-        approximates the single-pass cost Odoo's stored-compute
-        initialization incurs at module upgrade; the AUTHORITATIVE upgrade
-        duration must still be measured by an actual module upgrade on a
-        runtime host (recorded separately in the validation record)."""
+        """Proxy for the stored-compute backfill: force a full recompute of
+        the normalized column over every partner and time it. This
+        APPROXIMATES the single-pass cost of Odoo's stored-compute
+        initialization; it does NOT replace the authoritative measure,
+        which is an actual 100k module upgrade on a runtime host.
+
+        Returns (seconds, None) on success, or (None, sanitized_error) on
+        failure -- the caller must treat a failure as an UNUSABLE benchmark
+        result, never as a silent pass."""
         Partner = self.env['res.partner']
-        field = Partner._fields['shopify_connector_email_normalized']
         everyone = Partner.with_context(active_test=False).search([])
-        self.env.invalidate_all()
-        start = perf_counter()
         try:
-            self.env.add_to_compute(field, everyone)
-            everyone._recompute_field(field)
+            self.env.invalidate_all()
+            everyone.modified(['email'])
+            start = perf_counter()
             self.env.flush_all()
-        except Exception as exc:  # pragma: no cover - version-guarded proxy
-            self._emit('backfill_proxy.error', repr(exc))
-            return None
-        return perf_counter() - start
+            # Materialize the recomputed values so the timing includes the
+            # full recompute+write pass, not only the flush of pending work.
+            everyone.mapped('shopify_connector_email_normalized')
+            duration = perf_counter() - start
+        except Exception as exc:  # noqa: BLE001 - reported, then fails the test
+            return None, '%s: %s' % (type(exc).__name__, exc)
+        return duration, None
 
     def _percentile(self, sorted_samples, pct):
         if not sorted_samples:
@@ -776,63 +855,354 @@ class TestCustomerMatchingBenchmark(_CustomerMatchingScalabilityBase):
         ))
         return sorted_samples[rank]
 
+    def _build_probe_mix(self):
+        """Deterministic 1,000-probe matching mix: active-unique hits,
+        archived-only hits, clean misses, and a small shared/ambiguous
+        subset. Ordinary active/archived indices are disjoint (by the
+        active rule) and each ordinary email is unique, so every probe's
+        category is deterministic."""
+        probes = []
+        # Active unique hits: ordinary, active, unique email -> 1 candidate.
+        idx, collected = self.ORDINARY_START, 0
+        while collected < self.PROBE_ACTIVE_HITS:
+            if self._is_active_idx(idx):
+                probes.append('user.%d@bench011b.example' % idx)
+                collected += 1
+            idx += 1
+        # Archived-only hits: ordinary, archived, unique email -> 0 active,
+        # 1 archived.
+        idx, collected = self.ORDINARY_START, 0
+        while collected < self.PROBE_ARCHIVED_HITS:
+            if not self._is_active_idx(idx):
+                probes.append('user.%d@bench011b.example' % idx)
+                collected += 1
+            idx += 1
+        # Clean misses: emails absent from the dataset.
+        for n in range(self.PROBE_MISSES):
+            probes.append('nobody.%d@bench011b.example' % n)
+        # Ambiguous: the shared normalized email (many active candidates).
+        for _ in range(self.PROBE_AMBIGUOUS):
+            probes.append(self.SHARED_EMAIL)
+        return probes
+
     def test_benchmark_100k_customer_matching(self):
-        generation_seconds = self._generate_dataset()
+        counters, (min_id, max_id), generation_seconds = self._generate_dataset()
         Partner = self.env['res.partner']
-        total = Partner.with_context(active_test=False).search_count([])
-        archived = Partner.with_context(active_test=False).search_count(
-            [('active', '=', False)],
-        )
-        non_null = Partner.with_context(active_test=False).search_count(
-            [('shopify_connector_email_normalized', '!=', False)],
-        )
-        self._emit('dataset.requested_partners', self.TARGET_PARTNERS)
-        self._emit('dataset.total_partners_in_db', total)
-        self._emit('dataset.archived_partners_in_db', archived)
-        self._emit('dataset.non_null_normalized', non_null)
+        generated = Partner.with_context(active_test=False)
+        in_range = [('id', '>=', min_id), ('id', '<=', max_id)]
+
+        # Exact generated-category counters (isolated to the generated id
+        # range -- never the whole-DB partner count).
+        for key in ('total', 'active', 'archived', 'shared', 'wrapped', 'ordinary'):
+            self._emit('dataset.generated_%s' % key, counters[key])
+        archived_in_db = generated.search_count(in_range + [('active', '=', False)])
+        non_null_in_db = generated.search_count(
+            in_range + [('shopify_connector_email_normalized', '!=', False)])
+        shared_in_db = generated.search_count(
+            in_range + [('shopify_connector_email_normalized', '=', self.SHARED_EMAIL)])
+        self._emit('dataset.archived_in_db', archived_in_db)
+        self._emit('dataset.non_null_normalized_in_db', non_null_in_db)
+        self._emit('dataset.shared_normalized_in_db', shared_in_db)
         self._emit('dataset.generation_seconds', round(generation_seconds, 3))
 
-        # (3) Backfill/recompute-pass duration proxy.
-        backfill_seconds = self._measure_backfill_proxy()
-        if backfill_seconds is not None:
-            self._emit('backfill_proxy.seconds', round(backfill_seconds, 3))
+        # Enforce the required composition on the ACTUAL generated corpus.
+        self.assertEqual(counters['total'], self.TARGET_PARTNERS)
+        self.assertGreaterEqual(counters['archived'], self.ARCHIVED_MIN)
+        self.assertGreaterEqual(counters['wrapped'], self.WRAPPED_MIN)
+        self.assertGreaterEqual(counters['shared'], self.SHARED_MIN)
+        # The stored index actually grouped the shared-normalized rows and
+        # populated a value for every generated partner.
+        self.assertEqual(shared_in_db, counters['shared'])
+        self.assertEqual(archived_in_db, counters['archived'])
+        self.assertEqual(non_null_in_db, counters['total'])
 
-        # (1) Single-customer indexed-match latency (cold cache each probe).
-        rng = random.Random(self.SEED + 1)
-        latencies = []
-        for _ in range(self.LATENCY_SAMPLES):
-            idx = rng.randrange(self.TARGET_PARTNERS)
-            normalized = 'user.%d@bench011b.example' % idx
+        # Matching-cost probe (incoming normalize + active + archived
+        # fallback), 1,000 deterministic probes, cold model cache each probe.
+        probes = self._build_probe_mix()
+        self.assertEqual(len(probes), self.PROBE_TOTAL)
+        importer = self.Importer
+        per_probe_seconds = []
+        tally = {'active_hit': 0, 'archived_hit': 0, 'miss': 0, 'ambiguous': 0}
+        for raw_email in probes:
             Partner.invalidate_model(['shopify_connector_email_normalized'])
             start = perf_counter()
-            self.Importer._find_active_candidates(normalized)
-            latencies.append((perf_counter() - start) * 1000.0)
-        latencies.sort()
-        self._emit('latency.samples', len(latencies))
-        self._emit('latency.p50_ms', round(self._percentile(latencies, 50), 3))
-        self._emit('latency.p95_ms', round(self._percentile(latencies, 95), 3))
-        self._emit('latency.max_ms', round(max(latencies), 3))
-        self._emit('latency.budget_p95_ms', 50)
+            category, _n_active, _n_archived = self._matching_probe(importer, raw_email)
+            per_probe_seconds.append(perf_counter() - start)
+            tally[category] += 1
 
-        # (2) Sequential matching throughput.
-        rng2 = random.Random(self.SEED + 2)
-        start = perf_counter()
-        for _ in range(self.THROUGHPUT_CUSTOMERS):
-            idx = rng2.randrange(self.TARGET_PARTNERS)
-            self.Importer._find_active_candidates(
-                'user.%d@bench011b.example' % idx,
-            )
-        throughput_seconds = perf_counter() - start
-        per_second = self.THROUGHPUT_CUSTOMERS / throughput_seconds if throughput_seconds else 0
-        self._emit('throughput.customers', self.THROUGHPUT_CUSTOMERS)
-        self._emit('throughput.total_seconds', round(throughput_seconds, 3))
+        latencies_ms = sorted(seconds * 1000.0 for seconds in per_probe_seconds)
+        total_matching_seconds = sum(per_probe_seconds)
+        per_second = (
+            self.PROBE_TOTAL / total_matching_seconds
+            if total_matching_seconds else 0
+        )
+        self._emit('probe.count', len(probes))
+        self._emit('probe.active_hit', tally['active_hit'])
+        self._emit('probe.archived_hit', tally['archived_hit'])
+        self._emit('probe.miss', tally['miss'])
+        self._emit('probe.ambiguous', tally['ambiguous'])
+        self._emit('latency.p50_ms', round(self._percentile(latencies_ms, 50), 3))
+        self._emit('latency.p95_ms', round(self._percentile(latencies_ms, 95), 3))
+        self._emit('latency.max_ms', round(max(latencies_ms), 3))
+        self._emit('latency.budget_p95_ms', 50)
+        self._emit(
+            'throughput.total_matching_seconds', round(total_matching_seconds, 3))
         self._emit('throughput.customers_per_second', round(per_second, 2))
         self._emit('throughput.budget_customers_per_second', 20)
 
-        # The harness asserts only that it produced a full, deterministic
-        # dataset; budget pass/fail is judged against the emitted numbers
-        # in the validation record (never asserted here, so a slow host
-        # cannot red the suite).
-        self.assertEqual(total >= self.TARGET_PARTNERS, True)
-        self.assertGreaterEqual(archived, int(self.TARGET_PARTNERS * self.ARCHIVED_RATIO * 0.9))
-        self.assertTrue(latencies)
+        # Backfill/recompute-pass proxy -- must NOT silently pass on failure.
+        backfill_seconds, backfill_error = self._measure_backfill_proxy()
+        if backfill_seconds is None:
+            self._emit('backfill_proxy.status', 'UNUSABLE')
+            self._emit('backfill_proxy.error', backfill_error)
+        else:
+            self._emit('backfill_proxy.status', 'measured')
+            self._emit('backfill_proxy.seconds', round(backfill_seconds, 3))
+        self._emit('backfill_proxy.budget_seconds', 600)
+        self._emit(
+            'backfill_authoritative',
+            'PENDING -- actual 100k module-upgrade duration must be measured '
+            'on a runtime host; the proxy does not replace it')
+
+        # Assertions: the intended probe mix was actually exercised, and the
+        # backfill proxy produced a usable measurement. Host-dependent timing
+        # budgets are emitted, never asserted, so a slow host cannot red the
+        # suite; budget pass/fail is judged from the emitted numbers.
+        self.assertEqual(tally['active_hit'], self.PROBE_ACTIVE_HITS)
+        self.assertEqual(tally['archived_hit'], self.PROBE_ARCHIVED_HITS)
+        self.assertEqual(tally['miss'], self.PROBE_MISSES)
+        self.assertEqual(tally['ambiguous'], self.PROBE_AMBIGUOUS)
+        self.assertEqual(sum(tally.values()), self.PROBE_TOTAL)
+        self.assertIsNotNone(
+            backfill_seconds,
+            'backfill recompute proxy failed -- benchmark result is UNUSABLE '
+            '(see [TASK-011B-BENCHMARK] backfill_proxy.error); the '
+            'authoritative 100k module-upgrade/backfill duration must be '
+            'measured separately on a runtime host')
+
+
+@tagged('post_install', '-standard', 'shopify_connector_customer_matching_concurrency')
+class TestCustomerMatchingConcurrency(TransactionCase):
+    """D-011B-6 -- genuine independent-transaction binding race.
+
+    Authored to run under an explicit tag on a runtime host; excluded from
+    the standard CI pass (``-standard``) because it opens independent
+    PostgreSQL connections, COMMITs synthetic fixtures, spawns a worker
+    thread, synchronizes deterministically on a real lock-wait, and durably
+    cleans up -- none of which fits ``TransactionCase``'s single
+    rolled-back transaction. It does NOT resolve the standing multi-server
+    claim/dispatch concurrency caveat (SRR-03/04/09); it proves only the
+    binding-layer duplicate-prevention route under a real two-transaction
+    race.
+
+    Expected two-stage outcome (recorded exactly by the assertions below):
+
+      1. First collision -- transaction B passes its pre-create checks
+         (it cannot see A's uncommitted binding), attempts the colliding
+         ``INSERT``, blocks on the ``UNIQUE(store_id, partner_id)`` index,
+         and -- once A commits -- fails with a uniqueness violation. The
+         importer savepoint rolls back and the dispatcher's fail-safe
+         boundary routes the job to ``unknown_system_error`` ->
+         ``retry_waiting`` (NOT directly to ``binding_conflict``).
+      2. Retry -- with A's binding now committed and visible, the
+         importer's app-level conflict guard raises ``binding_conflict``
+         -> ``blocked_manual_review``.
+      3. Exactly one binding survives (A's, first GID); no duplicate
+         partner or binding.
+    """
+
+    SHARED_EMAIL = 'race@concurrency011b.example'
+    GID_A = 'gid://shopify/Customer/race-A'
+    GID_B = 'gid://shopify/Customer/race-B'
+
+    def _fake_execute(self):
+        email = self.SHARED_EMAIL
+
+        def fake_execute(client_self, store, query, variables=None):
+            return {'data': {'customer': {
+                'id': (variables or {}).get('id'),
+                'firstName': 'Race', 'lastName': 'B', 'displayName': 'Race B',
+                'defaultEmailAddress': {'emailAddress': email},
+                'defaultPhoneNumber': None, 'defaultAddress': None,
+                'updatedAt': '2026-07-12T00:00:00Z',
+            }}}
+        return fake_execute
+
+    def _wait_until_lock_blocked(self, monitor_cr, pid, timeout=30.0):
+        """Deterministic synchronization: poll pg_stat_activity until the
+        backend `pid` is actually waiting on a lock (its colliding INSERT
+        blocked on the uncommitted unique row). Returns True once observed,
+        False on timeout."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            monitor_cr.execute(
+                'SELECT wait_event_type FROM pg_stat_activity WHERE pid = %s',
+                (pid,))
+            row = monitor_cr.fetchone()
+            monitor_cr.rollback()
+            if row and row[0] == 'Lock':
+                return True
+            time.sleep(0.05)
+        return False
+
+    def _durable_cleanup(self, dbname, store_id, partner_id, job_id):
+        if store_id is None:
+            return
+        cr = db_connect(dbname).cursor()
+        try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env['shopify.connector.job.log'].search(
+                [('job_id', '=', job_id)]).unlink()
+            job = env['shopify.connector.job'].browse(job_id).exists()
+            if job:
+                job.unlink()
+            env['shopify.connector.customer.binding'].search(
+                [('store_id', '=', store_id)]).unlink()
+            partner = env['res.partner'].browse(partner_id).exists()
+            if partner:
+                partner.unlink()
+            env['shopify.connector.store.settings'].search(
+                [('store_id', '=', store_id)]).unlink()
+            store = env['shopify.connector.store'].browse(store_id).exists()
+            if store:
+                store.unlink()
+            cr.commit()
+        except Exception:  # noqa: BLE001 - best-effort cleanup
+            cr.rollback()
+        finally:
+            cr.close()
+
+    @mute_logger('odoo.sql_db', 'odoo.addons.shopify_connector_core')
+    def test_genuine_independent_transaction_binding_race(self):
+        dbname = self.env.cr.dbname
+        client_cls = type(self.env['shopify.connector.api.client'])
+        fake_execute = self._fake_execute()
+
+        obs = {}
+        setup_cr = cr_a = cr_b = monitor_cr = None
+        store_id = partner_id = job_b_id = None
+        try:
+            # --- committed setup on an independent connection ---
+            setup_cr = db_connect(dbname).cursor()
+            setup_env = api.Environment(setup_cr, SUPERUSER_ID, {})
+            store = setup_env['shopify.connector.store'].create({
+                'name': 'Race Store',
+                'shop_domain': 'race-concurrency-011b.myshopify.com',
+                'api_version': '2026-07',
+            })
+            store.write({'state': 'connected'})
+            setup_env['shopify.connector.store.settings'].create({
+                'store_id': store.id, 'sale_domain_enabled': True,
+            })
+            partner = setup_env['res.partner'].create({
+                'name': 'Race Partner', 'email': self.SHARED_EMAIL,
+            })
+            job_b = setup_env['shopify.connector.job'].create({
+                'store_id': store.id, 'job_source': 'scheduled_sync',
+                'job_type': 'customer_import_sync', 'state': 'queued',
+                'payload_hash': uuid.uuid4().hex,
+                'shopify_target_gid': self.GID_B,
+            })
+            store_id, partner_id, job_b_id = store.id, partner.id, job_b.id
+            setup_cr.commit()
+
+            # --- Transaction A: create the first binding, hold uncommitted ---
+            cr_a = db_connect(dbname).cursor()
+            env_a = api.Environment(cr_a, SUPERUSER_ID, {})
+            payload_a = {
+                'gid': self.GID_A, 'first_name': None, 'last_name': None,
+                'display_name': 'Race A', 'email': self.SHARED_EMAIL,
+                'phone': None, 'address': None,
+            }
+            binding_a = env_a['shopify.connector.customer.importer']._apply_import(
+                env_a['shopify.connector.store'].browse(store_id), payload_a)
+            obs['binding_a_gid'] = binding_a.shopify_gid
+            env_a.flush_all()  # force the INSERT so the unique row is held
+
+            # --- Transaction B: dispatch job B in a worker thread; its
+            #     colliding INSERT blocks on the uniqueness index ---
+            cr_b = db_connect(dbname).cursor()
+            cr_b.execute('SELECT pg_backend_pid()')
+            pid_b = cr_b.fetchone()[0]
+            b_holder = {}
+
+            def run_b():
+                try:
+                    env_b = api.Environment(cr_b, SUPERUSER_ID, {})
+                    with patch.object(client_cls, 'execute', fake_execute):
+                        env_b['shopify.connector.job.dispatch']._dispatch_one(
+                            env_b['shopify.connector.job'].browse(job_b_id))
+                    cr_b.commit()
+                    b_holder['done'] = True
+                except Exception as exc:  # noqa: BLE001 - surfaced after join
+                    b_holder['error'] = '%s: %s' % (type(exc).__name__, exc)
+
+            worker = threading.Thread(target=run_b, name='race-B')
+            worker.start()
+
+            monitor_cr = db_connect(dbname).cursor()
+            obs['b_blocked'] = self._wait_until_lock_blocked(monitor_cr, pid_b)
+
+            # release A -> B's INSERT now fails on the uniqueness constraint
+            cr_a.commit()
+            worker.join(timeout=60)
+            obs['worker_alive_after_join'] = worker.is_alive()
+            obs['b_thread_error'] = b_holder.get('error')
+
+            # --- observe B's first-collision route (fresh read) ---
+            setup_cr.rollback()
+            job_b_after = setup_env['shopify.connector.job'].browse(job_b_id)
+            job_b_after.invalidate_recordset()
+            obs['first_state'] = job_b_after.state
+            obs['first_error_class'] = job_b_after.error_class
+
+            # --- retry leg: A's binding is committed & visible now ---
+            env_r = api.Environment(cr_a, SUPERUSER_ID, {})
+            job_b_r = env_r['shopify.connector.job'].browse(job_b_id)
+            job_b_r.invalidate_recordset()
+            with patch.object(client_cls, 'execute', fake_execute):
+                env_r['shopify.connector.job.dispatch']._dispatch_one(job_b_r)
+            cr_a.commit()
+            setup_cr.rollback()
+            job_b_retry = setup_env['shopify.connector.job'].browse(job_b_id)
+            job_b_retry.invalidate_recordset()
+            obs['retry_state'] = job_b_retry.state
+            obs['retry_subreason'] = job_b_retry.manual_review_subreason
+
+            # --- final invariants ---
+            bindings = setup_env['shopify.connector.customer.binding'].search(
+                [('store_id', '=', store_id), ('partner_id', '=', partner_id)])
+            obs['binding_count'] = len(bindings)
+            obs['surviving_gid'] = bindings.shopify_gid if len(bindings) == 1 else None
+            obs['partner_count'] = setup_env['res.partner'].with_context(
+                active_test=False).search_count(
+                [('shopify_connector_email_normalized', '=', self.SHARED_EMAIL)])
+        finally:
+            self._durable_cleanup(dbname, store_id, partner_id, job_b_id)
+            for cr in (cr_a, cr_b, monitor_cr, setup_cr):
+                if cr is not None:
+                    try:
+                        cr.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+
+        # Assertions run AFTER cleanup so a failure never leaks committed rows.
+        self.assertTrue(
+            obs.get('b_blocked'),
+            'transaction B never blocked on the uniqueness lock -- the race '
+            'did not occur; the test is inconclusive, not passing')
+        self.assertIsNone(
+            obs.get('b_thread_error'),
+            'the racing worker raised unexpectedly: %s' % obs.get('b_thread_error'))
+        self.assertFalse(obs.get('worker_alive_after_join'))
+        # First collision is the uniqueness race -> safety-net retry, NOT a
+        # direct binding_conflict.
+        self.assertEqual(obs['first_state'], 'retry_waiting')
+        self.assertEqual(obs['first_error_class'], 'unknown_system_error')
+        # Retry reaches the stable manual-review outcome.
+        self.assertEqual(obs['retry_state'], 'blocked_manual_review')
+        self.assertEqual(obs['retry_subreason'], 'binding_conflict')
+        # Exactly one binding survives (first GID); no duplicate partner.
+        self.assertEqual(obs['binding_count'], 1)
+        self.assertEqual(obs['surviving_gid'], self.GID_A)
+        self.assertEqual(obs['partner_count'], 1)

@@ -1,9 +1,20 @@
 # Task 011B — Customer Matching Scalability: Validation Record
 
-> **Status: implementation session complete; draft PR opened; awaiting
-> ChatGPT review. Runtime (Odoo.sh) and the 100k benchmark are recorded
-> honestly below — this environment has no Odoo runtime, so those are
-> marked OUTSTANDING, not claimed.** Produced 2026-07-11.
+> **Status: implementation authored; static + AST checks executed;
+> runtime tests, genuine concurrency proof, benchmark numbers, and the
+> authoritative module-upgrade/backfill duration are all PENDING runtime
+> execution (this environment has no Odoo runtime).** Produced 2026-07-11;
+> **focused correction 2026-07-12** addressing ChatGPT review
+> `4950230315` (genuine independent-transaction concurrency test;
+> deterministic 100k corpus with exact counters; full matching-cost
+> throughput probe; fail-loud backfill proxy; evidence wording no longer
+> overstates unexecuted results). The accepted Task 011B **production
+> design is unchanged** by the correction.
+>
+> **Nothing here claims a runtime pass.** Candidate-set equivalence, the
+> concurrency route, the benchmark budgets, the backfill duration, and the
+> Odoo.sh suites are **authored, not proven** — each is marked PENDING
+> until it actually runs green.
 
 ---
 
@@ -91,41 +102,57 @@ def _compute_shopify_connector_email_normalized(self):
 
 Incoming-email normalization, candidate ordering (`_build_candidate_payload` still sorts by `id` asc, caps at 20, reports true `candidate_count`), ambiguity/archived/blind-create/binding-conflict routing, and the error taxonomy are **byte-untouched**. No new fallback key; no name/phone/address matching.
 
-## 6. Equivalence corpus (D-011B-3)
+## 6. Equivalence corpus (D-011B-3) — authored, pending runtime execution
 
 The new test retains the **old full-scan path as a test-only reference** and asserts, for every corpus probe with a truthy normalized value, `set(old_ids) == set(new_ids)` — independently for active and archived. Corpus (stored as active **and** archived partners): normal lowercase, mixed case, leading/trailing whitespace, wrapped display-name, quoted display name, plus-addressing, unicode local part, uppercase domain, malformed, empty string, `False`, multiple-email string, comma-separated, semicolon-separated, duplicated normalized email across partners, and active+archived copies of one normalized email. The equivalence assertion hard-codes **no** expected normalizer output — it compares the two paths — so it self-corrects to whatever the merged Odoo 19 normalizer actually produces.
 
 ## 7. Routing regression, concurrency, source guards
 
-- **Routing (tests 15–21):** existing-binding shortcut; single active match binds `match_key='email'`; >1 active → `ambiguous_match` (no row); candidate-evidence cap = 20 with true `candidate_count`; archived-only → `duplicate_risk`; no-usable-email → blind-create block (`duplicate_risk`); single-candidate-already-bound → `binding_conflict`.
-- **Concurrency (D-011B-6, tests 22–23):** raw `UNIQUE(store_id, shopify_gid)` and `UNIQUE(store_id, partner_id)` collisions raise; two colliding import attempts on the same partner leave exactly **one** binding (second routes `binding_conflict`). No new lock/constraint/bypass/error class. The standing multi-server claim/dispatch concurrency caveat (SRR-03/04/09) is **restated, not resolved**.
-- **Source guards (tests 24–30):** AST-level — neither candidate method contains the old `('email','!=',False)` full-scan domain; both search `shopify_connector_email_normalized`; `email_normalize(strict=False)` asserted on both compute and incoming sides; the field depends only on `email`; **only** the two candidate methods reference the indexed column; the new partner file contains no override/constraint/sudo and a single `_inherit='res.partner'`.
+- **Routing (tests 15–21) — authored, pending runtime execution:** existing-binding shortcut; single active match binds `match_key='email'`; >1 active → `ambiguous_match` (no row); candidate-evidence cap = 20 with true `candidate_count`; archived-only → `duplicate_risk`; no-usable-email → blind-create block (`duplicate_risk`); single-candidate-already-bound → `binding_conflict`.
+- **Concurrency (D-011B-6) — GENUINE independent-transaction test authored; result PENDING runtime execution (corrected per review `4950230315`).** The prior two "concurrency" tests were sequential and are **no longer presented as a concurrency proof**: one is now an honestly-labeled DB constraint backstop (asserting a specific `psycopg2.IntegrityError`, no broad `Exception`), the other an honestly-labeled *sequential* stable-outcome test. The real proof is `TestCustomerMatchingConcurrency.test_genuine_independent_transaction_binding_race` (opt-in tag `shopify_connector_customer_matching_concurrency`, `-standard`): it opens **independent PostgreSQL connections** via `odoo.sql_db.db_connect` (never `self.registry.cursor()`), commits synthetic fixtures visible to both, runs transaction B's real dispatch in a worker thread, **synchronizes deterministically** by polling `pg_stat_activity` until B's colliding `INSERT` is actually lock-blocked, then commits A — and durably cleans up every committed row and closes every cursor in `finally`.
+  - **Expected (pending execution) two-stage route — NOT a direct `binding_conflict`:**
+    1. **First collision** → transaction B passes its pre-create checks (it cannot see A's uncommitted binding), its `INSERT` blocks on `UNIQUE(store_id, partner_id)`, and once A commits it fails with a uniqueness violation; the importer savepoint rolls back and the dispatcher's fail-safe boundary routes the job to **`unknown_system_error` → `retry_waiting`** (`SAFETY_NET_ERROR_CLASSES`, one retry). Verified from core source: `_invoke_handler`'s generic `except Exception` → `_route_failure('unknown_system_error', …)` → `_schedule_retry_or_fail` → `_transition_retry_waiting`.
+    2. **Retry** (A's binding now committed & visible) → the importer's app-level conflict guard raises **`binding_conflict` → `blocked_manual_review`** (`binding_conflict` is a `MANUAL_REVIEW_SUBREASON`).
+    3. **Exactly one binding survives** (A's, first GID); no duplicate partner or binding.
+  - No new lock/constraint/bypass/error class is introduced. The standing multi-server claim/dispatch concurrency caveat (SRR-03/04/09) is **restated, not resolved** — this test proves only the binding-layer duplicate-prevention route under one real two-transaction race.
+- **Source guards (tests 24–30) — executed statically this session:** AST-level — neither candidate method contains the old `('email','!=',False)` full-scan domain; both search `shopify_connector_email_normalized`; `email_normalize(strict=False)` asserted on both compute and incoming sides; the field depends only on `email`; **only** the two candidate methods reference the indexed column; the new partner file contains no override/constraint/sudo and a single `_inherit='res.partner'`.
 
-## 8. Benchmark method + numbers (D-011B-4 / D-011B-7)
+## 8. Benchmark method + numbers (D-011B-4 / D-011B-7) — corrected per review `4950230315`
 
-A deterministic, seeded 100k harness lives in `TestCustomerMatchingBenchmark`, tagged `post_install` + `-standard` + `shopify_connector_customer_matching_benchmark` so it is **excluded from the standard suite** and invoked explicitly:
+The harness lives in `TestCustomerMatchingBenchmark`, tagged `post_install` + `-standard` + `shopify_connector_customer_matching_benchmark` (excluded from the standard suite), invoked explicitly:
 
 ```
 odoo -d <db> -i shopify_connector_sale --test-enable --stop-after-init \
      --test-tags shopify_connector_customer_matching_benchmark
 ```
 
-Dataset (seed `20260711`): 100,000 partners, ≥30% archived, ≥10% wrapped/display-name, ≥1% shared normalized email. It emits, with the stable `[TASK-011B-BENCHMARK]` prefix: single-customer latency p50/p95/max (budget **p95 ≤ 50 ms**), sequential 1,000-customer throughput (budget **≥ 20 customers/s**, Shopify network excluded), and a stored-field recompute-pass duration proxy (budget **≤ 10 min for 100k**). The harness **never asserts a budget**, so a slow host cannot red the suite; pass/fail is judged against the emitted numbers here.
+**Deterministic corpus (no probability):** exactly **100,000** partners by index-based allocation — indices `0..1499` share one normalized email (**1,500 ≥ 1%**), `1500..11999` carry wrapped/display-name emails (**10,500 ≥ 10%**), `12000..99999` carry unique ordinary emails; `active = (idx % 10) >= 3` yields **exactly 30,000 archived (30%)**. The generator returns **exact category counters** — total, active, archived, shared, wrapped, ordinary — all emitted with the `[TASK-011B-BENCHMARK]` prefix, plus DB cross-checks restricted to the generated id range (never the whole-DB partner count): `archived_in_db`, `non_null_normalized_in_db`, `shared_normalized_in_db`. The test **asserts** `total == 100000`, `archived >= 30000`, `wrapped >= 10000`, `shared >= 1000`, and that the index actually grouped the shared rows (`shared_in_db == shared` counter). This composition math is validated standalone (pure Python) this session: `{total:100000, active:70000, archived:30000, shared:1500, wrapped:10500, ordinary:88000}`.
+
+**Matching-cost probe (not one SQL lookup):** a test-only `_matching_probe` runs the full customer-matching cost — `_normalize_incoming_email(raw)` (`email_normalize(strict=False)`), then `_find_active_candidates`, then `_find_archived_candidates` fallback when no active candidate — with no Shopify call and no partner/binding creation. A deterministic **1,000-probe mix** exercises **700 active-unique hits, 150 archived-only hits, 100 clean misses, 50 shared/ambiguous** probes; the test **asserts each tally exactly** (proving the intended mix ran), emits the active-hit/archived-hit/miss/ambiguous counts, latency p50/p95/max, and customers/second. Host-dependent timing budgets are **emitted, never asserted** (a slow host cannot red the suite). Probe-mix classification is validated standalone this session (tally `700/150/100/50`; the shared email yields 1,050 active candidates → ambiguous).
+
+**Backfill proxy integrity:** `_measure_backfill_proxy` forces a full recompute (`modified(['email'])` + `flush_all()` + materialize) and returns `(seconds, None)` or `(None, sanitized_error)`. On failure the test emits `backfill_proxy.status=UNUSABLE` + the sanitized error and **asserts `backfill_seconds is not None`** — a failed proxy **fails the benchmark**, never a silent pass. The proxy is explicitly labeled `backfill_authoritative=PENDING`: the authoritative 100k module-upgrade/backfill duration must be measured by an actual upgrade on a runtime host.
 
 | Measurement | Budget | Result |
 | --- | --- | --- |
-| Single-customer match p50 / p95 / max | p95 ≤ 50 ms | **OUTSTANDING — not run (no Odoo runtime this session)** |
-| Sequential 1,000-customer throughput | ≥ 20 cust/s | **OUTSTANDING — not run** |
-| Stored-field recompute-pass proxy (100k) | ≤ 10 min | **OUTSTANDING — not run** |
-| Module-upgrade/backfill duration (100k) | ≤ 10 min | **OUTSTANDING — authoritative measure is an actual module upgrade on a runtime host; the in-test proxy approximates the single-pass cost only** |
+| Single-customer match p50 / p95 / max | p95 ≤ 50 ms | **PENDING — not run (no Odoo runtime this session)** |
+| Matching-cost throughput (1,000-probe mix) | ≥ 20 cust/s | **PENDING — not run** |
+| Stored-field recompute-pass proxy (100k) | ≤ 10 min | **PENDING — not run** |
+| Module-upgrade/backfill duration (100k) | ≤ 10 min | **PENDING — authoritative measure is an actual module upgrade on a runtime host; the in-test proxy does not replace it** |
 
-Per the packet: no evidence is invented; these remain OUTSTANDING and the PR stays draft. If the measured upgrade exceeds 10 minutes, the batched-post-init-hook fallback is **not** implemented here — it requires explicit ChatGPT approval with the numbers in hand.
+No evidence is invented; these remain PENDING and the PR stays draft. If the measured upgrade exceeds 10 minutes, the batched-post-init-hook fallback is **not** implemented here — it requires explicit ChatGPT approval with the numbers in hand.
 
-## 9. Static / local checks performed this session
+## 9. Static / local checks actually executed
 
+Implementation session (2026-07-11):
 - `python3 -m py_compile` on all 5 changed/new Python files → **clean**.
 - Standalone AST replication of every source guard (tests 24–30) against the real source files → **all 22 assertions PASS** (no full-scan domain in either method; both search the indexed column; `email_normalize(strict=False)` on compute + incoming; depends-only-on-email; only two methods touch the column; new partner file free of override/constraint/sudo; single `_inherit='res.partner'`).
 - `git diff --stat` confirms the importer change is confined to the two methods + the recall-safety docstring paragraph.
+
+Focused-correction session (2026-07-12, review `4950230315`):
+- `python3 -m py_compile` on the rewritten `test_customer_matching_scalability.py` → **clean**.
+- AST source guards re-run against the (unchanged) production files → **still all 22 PASS**; `git diff` confirms **no production/model file changed** since reviewed head `e8126ec` — the only change is the test file.
+- Standalone simulation of the benchmark's deterministic allocation and probe-mix classification (pure Python, no Odoo) → counters `{total:100000, active:70000, archived:30000, shared:1500, wrapped:10500, ordinary:88000}`; probe tally `{active_hit:700, archived_hit:150, miss:100, ambiguous:50}` → **all assertions PASS**.
+- Core-source verification of the concurrency taxonomy (`shopify_connector_job_dispatch.py` `_invoke_handler`/`_route_failure`/`_schedule_retry_or_fail`; `shopify_connector_job.py` `MANUAL_REVIEW_SUBREASON_SELECTION`) confirms the expected two-stage route (`unknown_system_error`→`retry_waiting`, then `binding_conflict`→`blocked_manual_review`).
 
 ## 10. Odoo.sh runtime
 
@@ -133,9 +160,10 @@ Per the packet: no evidence is invented; these remain OUTSTANDING and the PR sta
 
 ## 11. Limitations (honest)
 
-1. No Odoo runtime in this environment → tests, the 100k benchmark, and the module-upgrade backfill were **not executed** here; correctness is argued from primary-source verification + static/AST checks + the self-validating equivalence design.
-2. The benchmark's backfill figure is a recompute-pass **proxy**; the authoritative upgrade duration must be measured by an actual module upgrade on a 100k DB.
-3. D-011B-6 does not resolve the standing multi-server claim/dispatch concurrency caveat — restated only.
+1. No Odoo runtime in this environment → the equivalence, routing, genuine-concurrency, and benchmark tests were **not executed** here. Every runtime result is marked **PENDING**; correctness so far is argued from primary-source verification + static/AST checks + standalone simulations + the self-validating equivalence design. None of these substitutes for the runtime closure.
+2. The genuine concurrency test commits synthetic fixtures on independent connections, spawns a worker thread, and cleans up in `finally`; it is authored to run under its explicit tag on a runtime host and is **excluded from standard CI**. Its two-stage taxonomy is the **expected** route (verified from core source), **not yet observed** at runtime. If it proves unexecutable under the actual Odoo test runner, D-011B-6 must be reported as unproven — this record makes no claim that it is proven.
+3. The benchmark's backfill figure is a recompute-pass **proxy**; the authoritative upgrade duration must be measured by an actual 100k module upgrade on a runtime host. A failed proxy fails the benchmark (never a silent pass).
+4. D-011B-6 does not resolve the standing multi-server claim/dispatch concurrency caveat — restated only (the core `_claim_for_dispatch` docstring already notes `TransactionCase` cannot exercise real multi-worker execution).
 
 ## 12. Rollback
 
@@ -143,15 +171,22 @@ Revert the single PR → the matching code path returns to the merged full-scan 
 
 ## 13. Definition-of-done checklist
 
+Implemented / executed (this + prior session):
 - [x] Exact base verified (`f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`); PR #149 merged; gate `4948879507` read.
-- [x] Only the 8 authorized files changed.
-- [x] D-011B-1 … D-011B-7 implemented (field, indexed lookup, equivalence backstop, duplicate/ambiguity preservation, concurrency test, benchmark harness; backfill via stored-compute init).
-- [x] Field uses the exact merged normalizer `email_normalize(strict=False)`.
-- [x] Candidate sets equivalent across the corpus (equivalence test is the acceptance backstop).
-- [x] Existing routing unchanged; no partner uniqueness constraint; no matching-policy change.
-- [x] New standard tests authored; static + AST checks pass.
-- [ ] **Existing sale/core/product tests green on Odoo.sh — OUTSTANDING (runtime).**
-- [ ] **Benchmark numbers measured — OUTSTANDING (runtime).**
-- [ ] **Backfill duration measured — OUTSTANDING (runtime).**
-- [x] Validation record complete (this file); AR log row added; handoff top entry added.
-- [x] One draft PR into `Shopify-connector`; Task 010B untouched; all other gates closed.
+- [x] Only the authorized files changed (implementation session: the 8-file allowlist; correction session: the test file only, within the 4-file revision allowlist).
+- [x] **Production design implemented & accepted for the static pass:** D-011B-1 field, D-011B-2 indexed lookup — unchanged by the correction.
+- [x] Field uses the exact merged normalizer `email_normalize(strict=False)` (static/AST verified).
+- [x] No partner uniqueness constraint; no matching-policy change (static/AST verified).
+- [x] Tests authored (equivalence, routing, genuine concurrency, deterministic benchmark, source guards); `py_compile` clean; AST source guards + benchmark simulation pass.
+
+Authored, PENDING runtime execution (not claimed complete):
+- [ ] Candidate-set equivalence proven — **authored; PENDING** the Odoo.sh run.
+- [ ] Routing regression green — **authored; PENDING** runtime.
+- [ ] Genuine independent-transaction concurrency route observed (`unknown_system_error`→`retry_waiting`, then `binding_conflict`) — **authored; PENDING** the opt-in runtime run.
+- [ ] Benchmark budgets (p95 ≤ 50 ms; ≥ 20 cust/s) measured — **authored; PENDING** runtime numbers.
+- [ ] Authoritative 100k module-upgrade/backfill duration measured — **PENDING** runtime.
+- [ ] Existing sale/core/product suites green on Odoo.sh — **PENDING** runtime.
+
+Documentation / PR:
+- [x] Validation record updated (this file); AR-044 updated; handoff top entry updated.
+- [x] One draft PR into `Shopify-connector`, kept open/draft/unmerged; Task 010B untouched; all other gates closed.
