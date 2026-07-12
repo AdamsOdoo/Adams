@@ -1,0 +1,29 @@
+# Environment & topology evidence — P-B sync-engine concurrency validation
+captured_at_utc: 2026-07-11T22:22:08Z
+
+## Repository / base
+branch: claude/sync-engine-concurrency-validation-92r4nc
+HEAD_sha: f9c3c5fd25af3f94ee71cc2ead3821e7da85443d
+verified_base_sha_required: f9c3c5fd25af3f94ee71cc2ead3821e7da85443d
+origin_Shopify-connector_sha: f9c3c5fd25af3f94ee71cc2ead3821e7da85443d
+working_tree_clean: no
+
+## Odoo
+Odoo Server 19.0
+odoo_source_branch: 19.0 @ c5f1a963e6c65cf67b56b7ca2d4b77de66140e78
+python: Python 3.11.15
+
+## PostgreSQL
+PostgreSQL 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+pg_listen: 127.0.0.1:5433 (single local cluster, unix socket /tmp)
+
+## Host
+nproc: 4
+kernel: Linux 6.18.5
+
+## Databases (disposable, created this session)
+pbscen|22 MB|2026-07-11 22:20:06+00
+pbtest|22 MB|2026-07-11 22:20:06+00
+
+pgdata_location: /opt/pgdata (fresh initdb this session, not production)
+isolation: local cluster, initdb'd this session, no external/customer connections, disposable

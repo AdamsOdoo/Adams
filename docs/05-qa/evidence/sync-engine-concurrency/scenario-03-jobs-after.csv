@@ -1,0 +1,4 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+57,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:29:21,2026-07-11 22:29:21,,2|core_dispatch_selftest|pb.synthetic.model|3000|gid://pb/s3/3000|pb-s3-3000,,3000
+58,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:29:45,2026-07-11 22:29:45,,2|core_dispatch_selftest|pb.synthetic.model|3001|gid://pb/s3/3001|pb-s3-3001,,3001
+59,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:29:21,2026-07-11 22:29:21,,2|core_dispatch_selftest|pb.synthetic.model|3002|gid://pb/s3/3002|pb-s3-3002,,3002

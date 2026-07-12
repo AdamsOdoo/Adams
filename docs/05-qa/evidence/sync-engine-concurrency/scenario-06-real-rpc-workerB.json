@@ -1,0 +1,1 @@
+{"port": "8171", "store_id": 2, "uid": 2, "b_start": "07:15:24.090981", "b_return": "07:15:25.001112", "result": "completed", "note": "action_disconnect returned None (normal); committed server-side"}

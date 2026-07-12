@@ -1,0 +1,3 @@
+# Scenario 6 faithful — RPC variant — pg lock evidence (server backend blocked)
+captured_at_utc: 2026-07-12T07:15:24Z
+5626|active|Lock|transactionid|INSERT INTO "shopify_connector_job_log" ("actor_uid", "create_date", "create_uid", "event_
