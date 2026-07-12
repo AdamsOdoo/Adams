@@ -1,6 +1,11 @@
 # Screen spec — Odoo-native list & form exemplar
 
-> **Status: U0 prototype spec. Proposed, not accepted.** Demonstrates that
+> **Status: Accepted U0 visual baseline** (control-room comment `4951204357`,
+> 2026-07-12; merged via **PR #152** into `Shopify-connector` at merge commit
+> `65e915aada32930a19a14c94d23dc9bd5e6fb517`). History preserved — gate
+> `4948902516` → reviews `4950255482`, `4950432754` → acceptance `4951204357`.
+> **Implementation remains separately gated** — UI-U1/U2/U3 stay CLOSED and this
+> spec authorizes no code. Demonstrates that
 > ordinary connector records (S4 sync center list; job form) stay **Odoo-native**
 > — the point PD-7 makes: selective Owl only for the four premium surfaces,
 > everything else standard Odoo views. Source: `list-form.html`. Copy

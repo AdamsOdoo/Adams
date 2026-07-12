@@ -78,7 +78,7 @@ test files; docs). Corrections, each honestly scoped:
    B's committed attribute (exactly one attribute; both products bound;
    durable cleanup). `TransactionCase`'s `registry.cursor()` (a shared
    `TestCursor`) is **not** presented as independent concurrency.
-8. **Documentation corrected** (this file, AR-044, handoff, PR body) to
+8. **Documentation corrected** (this file, AR-045, handoff, PR body) to
    remove the prior overclaims.
 
 ---
@@ -90,7 +90,7 @@ but found five remaining reliability blockers at head `5688ec1`. This
 revision corrects them on the same PR. **Files touched:** the importer, the
 attribute-lock model, and four test files (`test_product_import_matching`,
 `test_product_media_import`, `test_product_refresh_and_stale`,
-`test_product_attribute_import`); this doc, AR-044, handoff, PR body. Test
+`test_product_attribute_import`); this doc, AR-045, handoff, PR body. Test
 methods **135 → 155**. Each correction, honestly scoped:
 
 1. **Pagination forward-progress and identity guards.**
@@ -153,7 +153,7 @@ methods **135 → 155**. Each correction, honestly scoped:
    batch), not merely the attribute critical section. The prior
    docstring/PR wording ("held only across the attribute critical section")
    was factually wrong and is corrected in the lock-model docstring, the
-   importer comments, this doc, AR-044, the handoff, and the PR body.
+   importer comments, this doc, AR-045, the handoff, and the PR body.
    Network downloads occur **before** the lock is acquired. The concurrency
    test is renamed
    `test_overlapping_transactions_serialize_to_one_global_attribute` and its
@@ -256,9 +256,23 @@ docs; plus a **base merge** of the current integration tip. Test methods
   relative to `65e915a` contains **only Task 010B-owned changes** (the
   `shopify_connector_product` addon + the four Task 010B docs); no U0 file,
   no Task 011B / CORE-R2 / customer / order / sale file appears as a PR
-  change. **The current integration base for this branch is
-  `65e915aada32930a19a14c94d23dc9bd5e6fb517`; the validated head is
-  `b0d8c7be43e7d7e32d2344355b96cf0dd246f636`.**
+  change.
+- **Base advanced again (base-sync amendment, 2026-07-12):**
+  `Shopify-connector` moved to
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d` via merged **PR #155** (U0
+  acceptance closure). That exact tip is merged into this branch with a normal
+  merge commit (no rebase/force). PR #155's U0 closure records — a new handoff
+  top entry, the U0 **AR-044** row, the master-plan U0 status, and the
+  `docs/09-ui-prototype/**` updates — are preserved unchanged. The **AR-044
+  collision** (the Task 010B architecture-review row was also drafted as
+  AR-044) was resolved per control-room item 7 by renumbering the Task 010B
+  row + its four revision notes **AR-044 → AR-045**; U0 keeps AR-044 (not
+  overwritten or combined). The two shared-doc conflicts were resolved by
+  retaining both sides completely; **no addon or test file conflicted.** The
+  PR diff versus `cfdb057` remains **Task-010B-only** (the addon + the four
+  Task 010B docs) plus the AR renumber. **The current integration base is
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d`; the base-sync head carries no
+  code change from the `b0d8c7b` implementation head.**
 - **`Shopify-connector` tip at original session start:**
   `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` — **exact match, no drift.**
 - **PR #149** (CORE-R1) verified **merged** via GitHub

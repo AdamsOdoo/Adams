@@ -1,5 +1,39 @@
 # Research Handoff (rolling)
 
+### Task 010B — Base-synchronization amendment to `cfdb057` (control-room base-sync amendment, 2026-07-12)
+
+- **Base advanced again:** `Shopify-connector` moved to
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d` via merged **PR #155** (U0
+  acceptance closure). That exact tip is merged into the Task 010B branch
+  with a **normal merge commit** (no rebase, no force, no squash).
+- **PR #155 brought:** the U0 acceptance-closure records — a new
+  research-handoff top entry, the U0 **AR-044** architecture-review row, the
+  master-plan U0 status update, and `docs/09-ui-prototype/**` spec/README/
+  traceability updates. All are **preserved unchanged** by this merge.
+- **AR-044 collision resolved (control-room item 7):** the Task 010B
+  architecture-review row (and its four revision notes) had also been drafted
+  as **AR-044**. Because the control room assigned **AR-044 to the U0
+  acceptance closure**, the Task 010B row + its four revision notes were
+  **renumbered from AR-044 to AR-045** (the next free ID). U0's AR-044 was
+  **retained, not overwritten or combined.** Self-references to the Task 010B
+  AR row (`task-010b-validation-results.md`, the packet, this handoff) were
+  updated to **AR-045**; U0's AR-044 references are untouched. See the AR-log
+  "AR-045 renumber / base-sync note".
+- **Conflict resolution (shared docs only):** the two conflicts,
+  `research-handoff.md` and `architecture-review-log.md`, were resolved by
+  **retaining both sides completely** with chronological accuracy (both the
+  U0 and Task 010B entries/rows kept). **No addon or test file conflicted**
+  — had one, this session would have stopped and reported per the amendment.
+- **PR diff vs the new base is Task-010B-only** (the `shopify_connector_product`
+  addon + the four Task 010B docs) plus the AR-044→AR-045 renumber; no U0
+  file appears as a PR change; no Task 011B / CORE-R2 / customer / order /
+  sale file. `Shopify-connector` (`cfdb057`) is an ancestor of the new head.
+- **No code changed; no runtime run.** Odoo.sh three-suite validation remains
+  the next gate (not executable/observable from this Git session — see
+  `../05-qa/task-010b-validation-results.md` §10); live/dev-store Shopify
+  fixtures remain gated on **CORE-R2 runtime-green**. PR #151 stays
+  **open/draft/unmerged**; no other task started.
+
 ### Task 010B — Base alignment + Odoo.sh validation session (control-room acceptance `4951264328`, 2026-07-12)
 
 - **Revision-3 corrections ACCEPTED; no further Task 010B code correction
@@ -240,7 +274,9 @@
   executed locally; **Odoo.sh + live/dev-store evidence NOT obtained this
   session — recorded as outstanding in
   `docs/05-qa/task-010b-validation-results.md` §10, not faked, not
-  waived.** Validation record + AR-044 + this entry written.
+  waived.** Validation record + AR-045 (renumbered from AR-044 in the
+  2026-07-12 base-sync merge to `cfdb057`; see the AR-log renumber note) +
+  this entry written.
 - **Next-session prompt (for ChatGPT to issue, after review):** *"Task
   010B validation-only session: on Odoo.sh at the draft-PR head, run the
   full three-suite build and quote verbatim `0 failed, 0 error(s)`; then
@@ -249,6 +285,52 @@
   + merchant-image-protection; archived; deleted-bound; incompatible
   same-name attribute). Update `task-010b-validation-results.md` §9/§10
   with the results. Do not change code; do not start any other task."*
+
+### U0 acceptance closure — visual baseline accepted & merged (documentation-only, 2026-07-12)
+
+- **Acceptance recorded (control-room comment `4951204357`, 2026-07-12 — “ACCEPT
+  U0 visual baseline … ACCEPT AND MERGE”):** the U0 premium operator-UI visual
+  prototype is **accepted as the future visual baseline** and **PR #152 merged**
+  into `Shopify-connector` at merge commit
+  **`65e915aada32930a19a14c94d23dc9bd5e6fb517`** (parents `fcbbb0b` + `2c2648e`).
+  **P1–P13 and the PD-7 selective-Owl scope are accepted** (recorded in
+  `docs/09-ui-prototype/README.md` §6 + `traceability-matrix.md` §3 + the screen
+  specs, and `docs/05-qa/architecture-review-log.md` AR-044). **U0 is complete.**
+- **Current integration tip:** `Shopify-connector` == `65e915aada32930a19a14c94d23dc9bd5e6fb517`
+  (the PR #152 merge commit). This closure session branched
+  `claude/u0-acceptance-closure` from that exact tip.
+- **Gate posture (unchanged by the acceptance):** the acceptance is **visual
+  only** — it authorizes **no production code** and opens **no implementation
+  gate**. **UI-U1, U2, and U3 remain CLOSED**; UI-U1 stays dependent on its
+  existing prerequisites (Area 6 + SEC-1 merged; U0 accepted — now satisfied).
+  Every other gate (Task 010B, 011B, LC-1, Task 012, Area 6, SEC-1, inventory,
+  fulfillment, export, webhooks, OAuth, PERF-1) remains closed. The master plan
+  was updated to mark U0 complete/accepted; UI-U1 was **not** moved ahead of
+  Area 6 / SEC-1; U2/U3 stay closed; no unrelated task was reordered.
+- **This session (documentation only):** synchronized the accepted status across
+  the eleven allowed docs — the six screen specs + `visual-checklist.md` (status
+  headers → “Accepted U0 visual baseline”), `README.md` + `traceability-matrix.md`
+  (P1–P13 + PD-7 recorded accepted), `architecture-review-log.md` (AR-044),
+  `implementation-ready-master-plan.md` (U0 complete/accepted), and this handoff.
+  **No `*.html` / `*.css` / `*.png`, addon, test, or code file was changed; no new
+  file added; no visual design altered.** History preserved (gate `4948902516`;
+  reviews `4950255482`, `4950432754`; acceptance `4951204357`; PR #152).
+- **Learning feedback loop:** New issues discovered: none (docs-only status
+  synchronization). Repeated issue pattern: none. Rules/checklists updated: none
+  unilaterally. New rejected approaches: none. New technical debt: none (rollback
+  = single-PR revert of the doc edits; no schema/data/records/code). Should future
+  prompts change? A UI-U1 implementation prompt must still require its existing
+  prerequisites (Area 6 + SEC-1 merged) and the P9 platform-FontAwesome swap — U0
+  acceptance alone does not authorize it.
+- **Quality gate confirmation:** handoff updated (this new top entry; older
+  entries untouched) · feedback loop checked · forbidden files untouched · no new
+  technical debt · UI-U1/U2/U3 confirmed CLOSED.
+- **Next recommended session prompt (for ChatGPT to issue):** *“UI-U1 remains
+  gated — do not start it until Area 6 and SEC-1 are merged. When those
+  prerequisites are met, issue the UI-U1 dashboard implementation gate act per the
+  UI packet §6, consuming the accepted U0 visual baseline
+  (`docs/09-ui-prototype/`) and swapping inline-SVG placeholders for the platform
+  FontAwesome set (P9).”*
 
 ### U0 — Premium operator UI visual prototype (draft PR #152, design-artifacts-only, 2026-07-11 · revised 2026-07-12 · final semantic closure 2026-07-12)
 

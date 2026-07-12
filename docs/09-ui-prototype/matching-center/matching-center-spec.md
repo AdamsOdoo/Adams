@@ -1,6 +1,11 @@
 # Screen spec — Matching center (S6/S8)
 
-> **Status: U0 prototype spec. Proposed, not accepted.** Inherits S6/S8 /
+> **Status: Accepted U0 visual baseline** (control-room comment `4951204357`,
+> 2026-07-12; merged via **PR #152** into `Shopify-connector` at merge commit
+> `65e915aada32930a19a14c94d23dc9bd5e6fb517`). History preserved — gate
+> `4948902516` → reviews `4950255482`, `4950432754` → acceptance `4951204357`.
+> **Implementation remains separately gated** — UI-U1/U2/U3 stay CLOSED and this
+> spec authorizes no code. Inherits S6/S8 /
 > DEC-006 / DEC-012 §6 / Part D §11 and the fixed match-key order (customers:
 > binding → email (sole automatic key) → manual; name/phone advisory only) from
 > `../../02-product/ui-ux-final-design-spec.md`. Source: `matching-center.html`.
