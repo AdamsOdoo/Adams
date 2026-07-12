@@ -43,11 +43,19 @@ from odoo.addons.shopify_connector_core.tools.redaction import redact
 CORPUS_DOMAIN = 'corpus011b.example'
 ROUTE_DOMAIN = 't011b.example'
 
-# PostgreSQL table backing shopify.connector.customer.binding. Used only to
-# RECOGNISE the colliding binding INSERT in pg_stat_activity (a server-side
-# boolean), never to read or expose the raw active-query text (which carries
-# the email VALUES of the row being inserted).
+# PostgreSQL table backing shopify.connector.customer.binding.
 BINDING_TABLE = 'shopify_connector_customer_binding'
+
+# Server-side, case-insensitive, quote-tolerant POSIX regex proving the active
+# statement is specifically the customer-binding INSERT -- NOT a SELECT/UPDATE/
+# DELETE and NOT an unrelated mention of the table in a comment or a different
+# statement. Evaluated entirely inside PostgreSQL via `query ~* <regex>`; only
+# the resulting boolean is returned to Python, so the raw active-query text
+# (which carries the email VALUES of the row being inserted) never enters
+# Python, an assertion message, or the committed documentation.
+BINDING_INSERT_QUERY_REGEX = (
+    r'insert\s+into\s+"?' + BINDING_TABLE + r'"?'
+)
 
 
 def _sanitized_exception_diagnostic(exc):
@@ -58,13 +66,14 @@ def _sanitized_exception_diagnostic(exc):
     embeds partner emails, SQL ``VALUES``, connection paths, or access tokens
     in its message. This emits only the exception class name plus a fixed
     generic sentence, then runs the result through the connector redaction
-    helper as defence in depth. The harness still fails loudly on the
-    exception -- it simply never leaks the payload into an assertion message
-    or the committed documentation. The full unredacted trace remains in the
-    runtime host logs."""
+    helper as defence in depth. The harness **catches and suppresses** the
+    exception payload -- it fails loudly (the caller records this diagnostic
+    and asserts on it) but only the sanitized, type-only diagnostic is
+    guaranteed; the harness makes no claim to preserve an unredacted trace
+    anywhere."""
     return redact(
-        '%s (details suppressed to avoid leaking partner/SQL/credential '
-        'data; the full unredacted trace is only in the runtime host logs)'
+        '%s (payload suppressed to avoid leaking partner/SQL/credential '
+        'data; only this sanitized, type-only diagnostic is retained)'
         % type(exc).__name__
     )
 
@@ -755,6 +764,47 @@ class TestCustomerMatchingScalability(_CustomerMatchingScalabilityBase):
         self.assertNotIn(sentinel_token, diagnostic)
         self.assertNotIn('Key (email)=', diagnostic)
         self.assertNotIn(str(exc), diagnostic)
+        # The corrected wording no longer claims an unredacted trace survives.
+        self.assertNotIn('runtime host log', diagnostic)
+
+    # ==================================================================
+    # Binding-INSERT evidence predicate (standard CI). Evaluates the exact
+    # server-side regex the concurrency monitor uses (`query ~* <rx>`)
+    # against literal sample statements, proving it matches ONLY an
+    # INSERT INTO the binding table -- never a SELECT/UPDATE/DELETE, and
+    # never a bare mention of the table in a comment or another statement.
+    # ==================================================================
+
+    def test_binding_insert_predicate_matches_only_inserts(self):
+        cases = [
+            # (sample statement, expected predicate result)
+            ('INSERT INTO "shopify_connector_customer_binding" '
+             '(store_id, partner_id) VALUES (1, 2)', True),
+            ('insert into shopify_connector_customer_binding (a) values (1)',
+             True),
+            ('INSERT   INTO\n  "shopify_connector_customer_binding" DEFAULT '
+             'VALUES', True),
+            ('SELECT id FROM shopify_connector_customer_binding WHERE id = 1',
+             False),
+            ('UPDATE shopify_connector_customer_binding SET partner_id = 2',
+             False),
+            ('DELETE FROM shopify_connector_customer_binding WHERE id = 1',
+             False),
+            ('SELECT 1  -- touches shopify_connector_customer_binding in a note',
+             False),
+            ('INSERT INTO some_other_table (note) VALUES '
+             "('shopify_connector_customer_binding')", False),
+        ]
+        for statement, expected in cases:
+            self.env.cr.execute(
+                'SELECT %s ~* %s', (statement, BINDING_INSERT_QUERY_REGEX))
+            actual = self.env.cr.fetchone()[0]
+            # The sample statements are synthetic literals (no real data), so
+            # echoing which case failed leaks nothing.
+            self.assertEqual(
+                actual, expected,
+                'binding-INSERT predicate misclassified a %r statement'
+                % statement.split()[0])
 
 
 @tagged('post_install', '-standard', 'shopify_connector_customer_matching_benchmark')
@@ -1092,29 +1142,44 @@ class TestCustomerMatchingConcurrency(TransactionCase):
     (SRR-03/04/09); it proves only the binding-layer duplicate-prevention
     route under a real two-transaction race.
 
-    Execution-safety design (control-room review 4950353232):
+    Execution-safety design (control-room reviews 4950353232, 4951165587):
 
-      * Worker-owned cursor -- the worker thread itself calls
+      * Worker-owned, daemonized cursor -- the worker thread itself calls
         ``db_connect(dbname).cursor()``, reports its backend PID to the
         parent through a ``queue.Queue``, builds its own ``Environment``,
         runs the real dispatcher, commits on the handled outcome, rolls
         back on an unexpected exception, and closes its cursor in its own
         ``finally``. No Odoo cursor or ``Environment`` ever crosses the
         thread boundary; parent<->worker signalling is
-        ``threading.Event``/``queue.Queue`` only.
+        ``threading.Event``/``queue.Queue`` only. The thread is created
+        ``daemon=True`` purely as a last-resort process-liveness guard so a
+        wedged worker can never keep the Python/Odoo process alive after the
+        test fails -- it is NOT a substitute for the explicit cursor
+        rollback/close, the emergency barrier release, or the durable row
+        cleanup, all of which still run and are still asserted.
       * Attributed lock-wait proof -- synchronization does not accept "B is
-        waiting on some lock". It requires ``A_PID IN pg_blocking_pids(B)``
-        AND that B's active statement is the customer-binding ``INSERT`` (a
-        server-side boolean; the raw query text, which carries the row's
-        email VALUES, is never read into Python), and it proves the wait
-        CLEARS once A commits.
+        waiting on some lock", nor even "B's query mentions the binding
+        table". It requires ``A_PID IN pg_blocking_pids(B)`` AND that B's
+        active statement matches a server-side ``INSERT INTO`` +
+        binding-table regex (``query ~* BINDING_INSERT_QUERY_REGEX``, case/
+        quote tolerant) -- so a SELECT/UPDATE/DELETE of, or a mere mention
+        of, the table cannot satisfy it. Only the resulting boolean crosses
+        into Python; the raw query text (which carries the row's email
+        VALUES) is never read into Python. It also proves the wait CLEARS
+        once A commits.
       * Bounded everything -- worker-start, PID-received, lock-wait and
         join are all bounded; on a stuck worker the test releases the lock
         barrier, waits once more with a bounded emergency timeout, and
-        fails closed rather than hanging.
+        fails closed rather than hanging. Both the cleanup and verification
+        connections apply transaction-local PostgreSQL ``lock_timeout`` and
+        ``statement_timeout`` (``CLEANUP_*_TIMEOUT_MS``) before any ORM work,
+        so a leaked/competing lock cannot hang cleanup either.
       * Durable cleanup + verification -- all independent cursors are
         rolled back/closed BEFORE a fresh cleanup connection deletes every
-        synthetic row (FK-safe order); cleanup never swallows a failure,
+        synthetic row (FK-safe order); cleanup never swallows a failure and
+        re-raises it (the caller records a sanitized, type-only diagnostic
+        and asserts it is absent); best-effort emergency cursor rollback/
+        close failures are likewise captured (sanitized) and asserted empty;
         and a second fresh connection asserts zero synthetic rows remain.
 
     Expected two-stage outcome (asserted below; NOT YET OBSERVED at runtime
@@ -1142,6 +1207,11 @@ class TestCustomerMatchingConcurrency(TransactionCase):
     LOCK_WAIT_TIMEOUT = 30.0
     JOIN_TIMEOUT = 60.0
     EMERGENCY_TIMEOUT = 15.0
+    # Transaction-local PostgreSQL bounds (milliseconds) applied to the fresh
+    # cleanup + verification connections before any ORM work, so a leaked or
+    # competing lock can never hang cleanup. Finite and conservative.
+    CLEANUP_LOCK_TIMEOUT_MS = 5000
+    CLEANUP_STATEMENT_TIMEOUT_MS = 15000
 
     def setUp(self):
         super().setUp()
@@ -1174,13 +1244,19 @@ class TestCustomerMatchingConcurrency(TransactionCase):
     # ------------------------------------------------------------------
 
     def _blocking_evidence(self, monitor_cr, waiter_pid, blocker_pid):
+        """Return (blocked_by_blocker, query_is_binding_insert) as booleans
+        computed ENTIRELY inside PostgreSQL. `query_is_binding_insert` is
+        ``query ~* BINDING_INSERT_QUERY_REGEX`` -- true only for an
+        ``INSERT INTO`` of the binding table, never a SELECT/UPDATE/DELETE
+        or a bare mention. The raw ``query`` text is never selected out, so
+        the row's email VALUES never reach Python."""
         monitor_cr.execute(
             'SELECT '
             '  %(blocker)s = ANY(pg_blocking_pids(%(waiter)s)) AS blocked_by, '
-            '  COALESCE(position(%(tbl)s IN query) > 0, FALSE) AS is_binding '
+            '  COALESCE(query ~* %(rx)s, FALSE) AS is_binding_insert '
             'FROM pg_stat_activity WHERE pid = %(waiter)s',
             {'blocker': blocker_pid, 'waiter': waiter_pid,
-             'tbl': BINDING_TABLE})
+             'rx': BINDING_INSERT_QUERY_REGEX})
         row = monitor_cr.fetchone()
         monitor_cr.rollback()
         if not row:
@@ -1189,17 +1265,22 @@ class TestCustomerMatchingConcurrency(TransactionCase):
 
     def _wait_until_blocked_by(self, monitor_cr, waiter_pid, blocker_pid, timeout):
         """Poll until `waiter_pid` is lock-blocked SPECIFICALLY BY
-        `blocker_pid`. Returns (blocked_by_blocker, query_is_binding_path):
-        both booleans, captured the moment the block is first observed. A
-        bare ``wait_event_type='Lock'`` is NOT accepted as proof."""
+        `blocker_pid` AND its active statement is the binding ``INSERT``.
+        Returns (blocked_by_blocker, query_is_binding_insert): the success
+        condition requires BOTH -- a bare lock wait, a block that is not the
+        INSERT, or a non-INSERT statement referencing the table are all
+        rejected. On timeout the last-observed booleans are returned so the
+        caller's assertions fail with the specific unmet condition."""
         deadline = time.monotonic() + timeout
+        last_blocked = last_insert = False
         while time.monotonic() < deadline:
-            blocked_by, is_binding = self._blocking_evidence(
+            blocked_by, is_binding_insert = self._blocking_evidence(
                 monitor_cr, waiter_pid, blocker_pid)
-            if blocked_by:
-                return True, is_binding
+            last_blocked, last_insert = blocked_by, is_binding_insert
+            if blocked_by and is_binding_insert:
+                return True, True
             time.sleep(0.05)
-        return False, False
+        return last_blocked, last_insert
 
     def _wait_until_unblocked(self, monitor_cr, waiter_pid, blocker_pid, timeout):
         """Poll until `blocker_pid` no longer blocks `waiter_pid` (the wait
@@ -1217,12 +1298,31 @@ class TestCustomerMatchingConcurrency(TransactionCase):
     # Durable cleanup + independent verification (fresh connections).
     # ------------------------------------------------------------------
 
+    def _apply_cleanup_bounds(self, cr):
+        """Apply transaction-local PostgreSQL ``lock_timeout`` and
+        ``statement_timeout`` to `cr` BEFORE any ORM work.
+
+        ``set_config(..., is_local => true)`` scopes both bounds to the
+        current transaction only (never leaking to another user of a pooled
+        connection). With these set, a delete/search that blocks on a leaked
+        or competing lock is cancelled by PostgreSQL (``LockNotAvailable`` /
+        ``QueryCanceled``) instead of hanging forever -- the caller's
+        ``except`` then rolls back, closes, records a sanitized diagnostic,
+        and fails the test."""
+        cr.execute(
+            "SELECT set_config('lock_timeout', %s, true), "
+            "set_config('statement_timeout', %s, true)",
+            (str(self.CLEANUP_LOCK_TIMEOUT_MS),
+             str(self.CLEANUP_STATEMENT_TIMEOUT_MS)))
+
     def _durable_cleanup(self, dbname, store_id, partner_id, job_id):
-        """Delete every committed synthetic row in FK-safe order on a FRESH
-        connection. Re-raises on any failure -- the caller records and
-        asserts the outcome; a cleanup failure must never pass silently."""
+        """Delete every committed synthetic row in FK-safe order on a FRESH,
+        time-bounded connection. Re-raises on any failure (incl. a lock/
+        statement timeout) -- the caller records and asserts the outcome; a
+        cleanup failure must never pass silently."""
         cr = db_connect(dbname).cursor()
         try:
+            self._apply_cleanup_bounds(cr)
             env = api.Environment(cr, SUPERUSER_ID, {})
             env['shopify.connector.job.log'].search(
                 [('job_id', '=', job_id)]).unlink()
@@ -1248,10 +1348,13 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             cr.close()
 
     def _verify_cleanup(self, dbname, store_id, partner_id, job_id):
-        """On a fresh connection, count every synthetic row that should now
-        be gone. Returns a dict of remaining counts (all must be zero)."""
+        """On a second FRESH, time-bounded connection, count every synthetic
+        row that should now be gone. Returns a dict of remaining counts (all
+        must be zero). Re-raises on any failure (incl. a lock/statement
+        timeout) so verification can never hang or pass silently."""
         cr = db_connect(dbname).cursor()
         try:
+            self._apply_cleanup_bounds(cr)
             env = api.Environment(cr, SUPERUSER_ID, {})
             remaining = {
                 'logs': env['shopify.connector.job.log'].search_count(
@@ -1268,6 +1371,9 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             }
             cr.rollback()
             return remaining
+        except Exception:
+            cr.rollback()
+            raise
         finally:
             cr.close()
 
@@ -1358,8 +1464,14 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                             pass
                     done_evt.set()
 
+            # daemon=True is a LAST-RESORT process-liveness guard only: if the
+            # emergency rollback + bounded joins below cannot stop a wedged
+            # worker, daemonization stops it from keeping the Python/Odoo
+            # process alive after the test fails. It never substitutes for the
+            # worker's own cursor rollback/close or the durable row cleanup,
+            # which still run and are still asserted.
             worker = threading.Thread(
-                target=run_b, name='race-B-%s' % self.run_marker)
+                target=run_b, name='race-B-%s' % self.run_marker, daemon=True)
             worker.start()
 
             # Bounded: worker reached its body.
@@ -1371,15 +1483,16 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 pid_b = None
             obs['pid_received'] = pid_b is not None
 
-            # Bounded: B is blocked SPECIFICALLY BY A on the binding INSERT.
+            # Bounded: B is blocked SPECIFICALLY BY A AND its active statement
+            # is the binding INSERT (both required by _wait_until_blocked_by).
             monitor_cr = db_connect(dbname).cursor()
             if pid_b is not None:
-                blocked_by_a, is_binding = self._wait_until_blocked_by(
+                blocked_by_a, is_binding_insert = self._wait_until_blocked_by(
                     monitor_cr, pid_b, a_pid, self.LOCK_WAIT_TIMEOUT)
             else:
-                blocked_by_a, is_binding = False, False
+                blocked_by_a, is_binding_insert = False, False
             obs['b_blocked_by_a'] = blocked_by_a
-            obs['b_query_is_binding_path'] = is_binding
+            obs['b_query_is_binding_insert'] = is_binding_insert
 
             # Release the barrier: commit A -> B's INSERT fails on uniqueness.
             cr_a.commit()
@@ -1440,6 +1553,12 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 active_test=False).search_count(
                 [('shopify_connector_email_normalized', '=', self.shared_email)])
         finally:
+            # Best-effort emergency teardown must not silently swallow a
+            # failure that would invalidate the cleanup claim: capture a
+            # sanitized, type-only diagnostic for each and assert the list is
+            # empty after cleanup (never str(exc)/repr(exc)).
+            teardown_errors = []
+
             # 1. Ensure the worker has exited before touching cleanup. If it
             #    is still alive, release the lock barrier so its INSERT fails
             #    out (it then rolls back & closes its OWN cursor), then wait
@@ -1448,8 +1567,8 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 if cr_a is not None:
                     try:
                         cr_a.rollback()
-                    except Exception:
-                        pass
+                    except Exception as exc:  # noqa: BLE001 - recorded, asserted
+                        teardown_errors.append(_sanitized_exception_diagnostic(exc))
                 done_evt.wait(timeout=self.EMERGENCY_TIMEOUT)
                 worker.join(timeout=self.EMERGENCY_TIMEOUT)
             obs['worker_alive_final'] = bool(
@@ -1461,12 +1580,13 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 if cr is not None:
                     try:
                         cr.rollback()
-                    except Exception:
-                        pass
+                    except Exception as exc:  # noqa: BLE001 - recorded, asserted
+                        teardown_errors.append(_sanitized_exception_diagnostic(exc))
                     try:
                         cr.close()
-                    except Exception:
-                        pass
+                    except Exception as exc:  # noqa: BLE001 - recorded, asserted
+                        teardown_errors.append(_sanitized_exception_diagnostic(exc))
+            obs['cursor_teardown_errors'] = teardown_errors
 
             # 3. Durable cleanup + verification on FRESH connections -- only
             #    when the worker is confirmed gone (a lingering lock could
@@ -1505,9 +1625,9 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             'contained A) -- the intended uniqueness race did not occur; '
             'inconclusive')
         self.assertTrue(
-            obs.get('b_query_is_binding_path'),
-            "B's blocked statement was not the customer-binding INSERT -- the "
-            'observed wait is not the intended race')
+            obs.get('b_query_is_binding_insert'),
+            "B's blocked statement did not match the binding INSERT predicate "
+            '-- a table mention / SELECT / UPDATE is not the intended race')
         self.assertTrue(
             obs.get('b_wait_cleared'),
             "B's lock wait did not clear after A committed")
@@ -1534,10 +1654,16 @@ class TestCustomerMatchingConcurrency(TransactionCase):
         self.assertEqual(obs['binding_count'], 1)
         self.assertEqual(obs['surviving_gid'], self.gid_a)
         self.assertEqual(obs['partner_count'], 1)
-        # Cleanup actually ran and verifiably removed every synthetic row.
+        # No emergency cursor teardown failure was silently swallowed.
+        self.assertEqual(
+            obs.get('cursor_teardown_errors'), [],
+            'a parent-cursor rollback/close failed during teardown: %s'
+            % (obs.get('cursor_teardown_errors'),))
+        # Cleanup actually ran (bounded) and verifiably removed every row.
         self.assertIsNone(
             obs['cleanup_error'],
-            'durable cleanup failed: %s' % obs['cleanup_error'])
+            'durable cleanup failed (bounded lock/statement timeout or other): '
+            '%s' % obs['cleanup_error'])
         self.assertEqual(
             obs['cleanup_remaining'],
             {'logs': 0, 'jobs': 0, 'bindings': 0, 'settings': 0,
