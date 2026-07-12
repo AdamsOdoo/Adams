@@ -689,12 +689,29 @@ class TestProductImportMatching(TransactionCase):
             self.env['product.template'].search_count([]), templates_before,
         )
 
-    def test_well_formed_status_values_all_accepted(self):
-        """The four accepted statuses must NOT be rejected by the new
-        validation -- a regression guard against over-tightening."""
-        for index, status in enumerate(
-            ('active', 'archived', 'draft', 'unlisted')
-        ):
+    def test_well_formed_status_values_pass_validation(self):
+        """All four accepted statuses must pass payload validation -- a
+        regression guard against over-tightening. (An archived product then
+        follows its own D-010B-8 path; that is asserted in the refresh/stale
+        suite, not here.)"""
+        for status in ('active', 'archived', 'draft', 'unlisted'):
+            payload = self._product_payload(
+                gid='gid://shopify/Product/974-%s' % status, status=status,
+                variants=[
+                    self._variant_payload(
+                        'gid://shopify/ProductVariant/974-%s' % status,
+                        sku='SKU-VAL-%s' % status,
+                    ),
+                ],
+            )
+            # Does not raise data_shape_schema_mismatch for a valid status.
+            self.Importer._validate_payload(payload)
+
+    def test_non_archived_statuses_import_and_snapshot_status(self):
+        """A first-seen active/draft/unlisted product imports and snapshots
+        its Shopify status. (Archived is excluded: a first-seen archived
+        product creates no Odoo master data -- see D-010B-8.)"""
+        for index, status in enumerate(('active', 'draft', 'unlisted')):
             payload = self._product_payload(
                 gid='gid://shopify/Product/97%d' % (4 + index),
                 status=status,
@@ -1007,3 +1024,166 @@ class TestProductImportMatching(TransactionCase):
         self.assertEqual(
             result['template_binding'].shopify_gid, 'gid://shopify/Product/982',
         )
+
+    # ------------------------------------------------------------------
+    # 12. Pagination forward-progress and product/variant identity guards
+    # (review 4950339305 item 1). A connection that never advances its
+    # cursor, replays a seen cursor, repeats a variant GID, or returns a
+    # different product GID must route to data_shape_schema_mismatch and
+    # write nothing -- and must never spin in an infinite loop. Each fake
+    # below caps its call count so a regressed guard fails fast, never hangs.
+    # ------------------------------------------------------------------
+
+    def _pnode(self, gid, i):
+        """One raw variant node with a deterministic, unique-by-`i` GID."""
+        return {
+            'id': '%s/v/%d' % (gid, i), 'sku': None, 'barcode': None,
+            'price': None, 'compareAtPrice': None, 'selectedOptions': [],
+            'image': None, 'inventoryItem': None,
+        }
+
+    def _sequenced_execute(self, gid, responses, title='Seq', max_calls=12):
+        """Return `(nodes, has_next, end_cursor)` responses in call order,
+        independent of the cursor the importer echoes back. A hard
+        `max_calls` cap raises rather than allowing an unbounded loop, so a
+        regressed forward-progress guard makes the test FAIL instead of
+        hanging."""
+        state = {'i': 0}
+
+        def fake_execute(client_self, store, query, variables=None):
+            if state['i'] >= max_calls:
+                raise AssertionError(
+                    'pagination exceeded %d calls -- forward-progress guard '
+                    'did not stop it.' % (max_calls,))
+            nodes, has_next, end_cursor = responses[
+                min(state['i'], len(responses) - 1)
+            ]
+            state['i'] += 1
+            return {
+                'data': {
+                    'product': {
+                        'id': gid, 'title': title, 'status': 'ACTIVE',
+                        'featuredImage': None, 'options': [],
+                        'variants': {
+                            'nodes': nodes,
+                            'pageInfo': {
+                                'hasNextPage': has_next, 'endCursor': end_cursor,
+                            },
+                        },
+                    },
+                },
+            }
+        return fake_execute
+
+    def _assert_sequenced_blocked(self, gid, responses):
+        templates_before = self.env['product.template'].search_count([])
+        fake_execute = self._sequenced_execute(gid, responses)
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+
+    def test_repeated_cursor_zero_nodes_blocked(self):
+        """hasNextPage stays true with the same cursor and zero nodes -- the
+        classic infinite-loop shape. The forward-progress guard stops it."""
+        self._assert_sequenced_blocked(
+            'gid://shopify/Product/1280',
+            [([], True, 'stuck'), ([], True, 'stuck')],
+        )
+
+    def test_repeated_cursor_repeated_nodes_blocked(self):
+        gid = 'gid://shopify/Product/1281'
+        node = self._pnode(gid, 0)
+        self._assert_sequenced_blocked(
+            gid, [([node], True, 'c1'), ([node], True, 'c1')],
+        )
+
+    def test_cursor_equal_to_current_cursor_blocked(self):
+        gid = 'gid://shopify/Product/1282'
+        self._assert_sequenced_blocked(gid, [
+            ([self._pnode(gid, 0)], True, 'c1'),
+            ([self._pnode(gid, 1)], True, 'c1'),  # endCursor == cursor just used
+        ])
+
+    def test_previously_seen_cursor_replayed_blocked(self):
+        gid = 'gid://shopify/Product/1283'
+        self._assert_sequenced_blocked(gid, [
+            ([self._pnode(gid, 0)], True, 'c1'),
+            ([self._pnode(gid, 1)], True, 'c2'),
+            ([self._pnode(gid, 2)], True, 'c1'),  # c1 already seen
+        ])
+
+    def test_duplicate_variant_gid_across_pages_blocked(self):
+        gid = 'gid://shopify/Product/1284'
+        node = self._pnode(gid, 0)
+        self._assert_sequenced_blocked(gid, [
+            ([node], True, 'c1'),
+            ([node], False, None),  # same variant GID on a later page
+        ])
+
+    def test_duplicate_variant_gid_within_one_page_blocked(self):
+        gid = 'gid://shopify/Product/1285'
+        node = self._pnode(gid, 0)
+        self._assert_shape_blocked(gid, {
+            'nodes': [node, node],  # same GID twice in one page
+            'pageInfo': {'hasNextPage': False, 'endCursor': None},
+        })
+
+    def test_non_mapping_variant_node_blocked(self):
+        self._assert_shape_blocked('gid://shopify/Product/1286', {
+            'nodes': [None],
+            'pageInfo': {'hasNextPage': False, 'endCursor': None},
+        })
+
+    def test_variant_node_missing_gid_blocked(self):
+        self._assert_shape_blocked('gid://shopify/Product/1287', {
+            'nodes': [{'sku': 'NO-GID'}],  # a mapping, but no id
+            'pageInfo': {'hasNextPage': False, 'endCursor': None},
+        })
+
+    def test_returned_product_gid_mismatch_blocked(self):
+        requested = 'gid://shopify/Product/1288'
+        templates_before = self.env['product.template'].search_count([])
+        other_node = {
+            'id': 'gid://shopify/Product/DIFFERENT', 'title': 'Wrong Product',
+            'status': 'ACTIVE', 'featuredImage': None, 'options': [],
+            'variants': {
+                'nodes': [self._pnode(requested, 0)],
+                'pageInfo': {'hasNextPage': False, 'endCursor': None},
+            },
+        }
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(
+            type(Client), 'execute', self._one_page_execute(other_node),
+        ):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, requested)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(
+            self.env['product.template'].search_count([]), templates_before,
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', requested),
+        ]))
+
+    def test_valid_two_page_progressing_cursors_accepted(self):
+        """Regression guard: a genuine two-page product with distinct,
+        strictly progressing cursors and unique variant GIDs still imports
+        completely under the new forward-progress/identity guards."""
+        gid = 'gid://shopify/Product/1289'
+        option_values, pages = self._single_option_pages(gid, 2, page_size=1)
+        self.assertEqual(len(pages), 2)
+        fake_execute = self._paginated_execute(
+            gid, 'Two Page', option_values, pages,
+        )
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), 'execute', fake_execute):
+            result = self.Importer.import_product_sync(self.store, gid)
+        self.assertEqual(len(result['variant_bindings']), 2)

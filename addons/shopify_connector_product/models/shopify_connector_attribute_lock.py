@@ -41,10 +41,19 @@ class ShopifyConnectorAttributeLock(models.Model):
     a later attempt, acquires the lock, re-resolves, and reuses the first
     transaction's committed attribute instead of creating a duplicate.
 
-    The lock is held only across the fast, in-database attribute
-    resolve/create critical section -- never across a Shopify request or an
-    image download (those happen outside it) -- so it does not serialize
-    the whole import, only the global-attribute critical section.
+    The lock is transaction-scoped, not critical-section-scoped: PostgreSQL
+    holds a ``FOR UPDATE`` row lock until the acquiring transaction commits
+    or rolls back, and releasing the importer's per-product ``savepoint``
+    does NOT release it. Once acquired it therefore serializes the remaining
+    database work of the holding transaction against any other transaction
+    that needs the same row -- the global-attribute critical section and,
+    because a ``run_drain`` batch may run several jobs in one transaction,
+    potentially the rest of that batch. The Shopify request and any image
+    download always happen BEFORE the lock is acquired, never while it is
+    held, so network latency is never inside the lock. This is a
+    correctness-first choice (guaranteeing exactly one attribute); the
+    lock-hold duration and its throughput impact are an open runtime
+    measurement obligation (Odoo.sh / dev-store), not a proven property.
 
     Stateless of any business data: the single row is a pure mutex anchor.
     It is never created, written, or unlinked at runtime -- only the

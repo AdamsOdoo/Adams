@@ -1,6 +1,8 @@
 import base64
+import contextlib
 import io
 import os
+import tempfile
 from unittest.mock import patch
 
 import requests
@@ -21,37 +23,33 @@ def _png(color):
     return buffer.getvalue()
 
 
-class _TrackingFile(io.BytesIO):
-    """A BytesIO that records how many times it was closed (to prove
-    deterministic staged-media cleanup)."""
-
-    def __init__(self, data):
-        super().__init__(data)
-        self.close_count = 0
-
-    def close(self):
-        self.close_count += 1
-        super().close()
-
-
 class _FakeResponse:
-    def __init__(self, status_code=200, headers=None, chunks=None):
+    """A stand-in for a streamed `requests` response. `raise_exc`, when set,
+    is raised AFTER the chunks are yielded, to simulate a mid-stream network
+    failure while the importer iterates `iter_content()`."""
+
+    def __init__(self, status_code=200, headers=None, chunks=None, raise_exc=None):
         self.status_code = status_code
         self.headers = headers or {}
         self._chunks = chunks if chunks is not None else [b'imagebytes']
+        self._raise_exc = raise_exc
+        self.closed = False
 
     def iter_content(self, size):
         for chunk in self._chunks:
             yield chunk
+        if self._raise_exc is not None:
+            raise self._raise_exc
 
     def close(self):
-        pass
+        self.closed = True
 
 
 class TestProductMediaImport(TransactionCase):
-    """D-010B-6 + review 4950202231 items 3-6: primary + variant image
-    import with checksum-verified ownership, SVG/raster validation, and
-    bounded-memory staged download with deterministic cleanup."""
+    """D-010B-6 + reviews 4950202231 items 3-6 and 4950339305 items 2-3:
+    primary + variant image import with checksum-verified ownership,
+    SVG/raster validation, mid-stream network classification, and O(1)
+    closed-path staging with deterministic unlink on every exit path."""
 
     @classmethod
     def setUpClass(cls):
@@ -85,10 +83,35 @@ class TestProductMediaImport(TransactionCase):
             'options': options or [], 'variants': variants,
         }
 
+    # ------------------------------------------------------------------
+    # Staging helpers: the new contract stages each image to a CLOSED temp
+    # file and passes only its path. These helpers create real temp paths so
+    # the production `_stage_image`/`ExitStack` cleanup runs for real.
+    # ------------------------------------------------------------------
+
+    def _write_temp(self, data, prefix='shopify_test_media_'):
+        fd, path = tempfile.mkstemp(prefix=prefix)
+        with os.fdopen(fd, 'wb') as handle:
+            handle.write(data)
+        return path
+
     def _fetch_returns(self, png):
-        """Patch _fetch_image to return a fresh file object per call."""
-        return patch.object(self.ImporterType, '_fetch_image',
-                            lambda self, url: io.BytesIO(png))
+        """Patch `_fetch_image` to stage `png` to a fresh closed temp path
+        per call (mirroring the production return type: a path string)."""
+        def fake_fetch(inner_self, url):
+            return self._write_temp(png)
+        return patch.object(self.ImporterType, '_fetch_image', fake_fetch)
+
+    def _tracking_fetch(self, png):
+        """Like `_fetch_returns`, but records every staged path so a test can
+        assert deterministic unlink. Returns `(patch, paths)`."""
+        paths = []
+
+        def fake_fetch(inner_self, url):
+            path = self._write_temp(png)
+            paths.append(path)
+            return path
+        return patch.object(self.ImporterType, '_fetch_image', fake_fetch), paths
 
     # ------------------------------------------------------------------
     # Successful primary + variant image write.
@@ -129,9 +152,9 @@ class TestProductMediaImport(TransactionCase):
         )
         calls = []
 
-        def counting_fetch(self, url):
+        def counting_fetch(inner_self, url):
             calls.append(url)
-            return io.BytesIO(png)
+            return self._write_temp(png)
 
         with patch.object(self.ImporterType, '_fetch_image', counting_fetch):
             self.Importer._apply_import(self.store, payload)
@@ -175,7 +198,7 @@ class TestProductMediaImport(TransactionCase):
             variants=[self._variant('%s/v' % gid, sku='%s-sku' % gid[-4:])],
         )
         with patch.object(self.ImporterType, '_fetch_image',
-                          lambda self, u: calls.append(u) or io.BytesIO(b'x')):
+                          lambda inner, u: calls.append(u) or '/should/not/be/read'):
             result_2 = self.Importer._apply_import(self.store, payload)
         template.invalidate_recordset(['image_1920'])
         self.assertEqual(template.image_1920, merchant_stored)  # not overwritten
@@ -288,15 +311,29 @@ class TestProductMediaImport(TransactionCase):
         )
         calls = []
         with patch.object(self.ImporterType, '_fetch_image',
-                          lambda self, url: calls.append(url) or io.BytesIO(png)):
+                          lambda inner, url: calls.append(url) or self._write_temp(png)):
             result = self.Importer._apply_import(self.store, payload)
         self.assertFalse(calls)
         self.assertFalse(result['template_binding'].product_template_id.image_1920)
         self.assertFalse(result['template_binding'].shopify_image_checksum)
 
     # ------------------------------------------------------------------
-    # Network safety + SVG/raster validation (review items 4-5).
+    # Network safety + SVG/raster validation (review items 4-5) + mid-stream
+    # network classification (review 4950339305 item 3).
     # ------------------------------------------------------------------
+
+    def _track_mkstemp(self):
+        """Patch the importer's `mkstemp` to record every path it creates, so
+        a test can assert the partial file is unlinked. Returns `(patch,
+        paths)`."""
+        created = []
+        real_mkstemp = tempfile.mkstemp
+
+        def tracking_mkstemp(*args, **kwargs):
+            fd, path = real_mkstemp(*args, **kwargs)
+            created.append(path)
+            return fd, path
+        return patch.object(importer_mod.tempfile, 'mkstemp', tracking_mkstemp), created
 
     def test_non_https_url_rejected(self):
         with self.assertRaises(JobHandlerError) as ctx:
@@ -379,6 +416,38 @@ class TestProductMediaImport(TransactionCase):
                 self.Importer._fetch_image('https://cdn.shopify.com/x.png')
         self.assertEqual(ctx.exception.error_class, 'shopify_temporary_server_network')
 
+    def test_mid_stream_network_failure_classified(self):
+        """The response's `iter_content()` yields one valid chunk, then raises
+        a `ChunkedEncodingError` (review 4950339305 item 3). The importer
+        must classify it as `shopify_temporary_server_network`, close the
+        response, unlink the partial staged file, and never leak the body or
+        the temporary path into the error."""
+        valid = _png((3, 3, 3))
+        holder = {}
+
+        def fake_get(url, **kwargs):
+            response = _FakeResponse(
+                status_code=200, headers={'Content-Type': 'image/png'},
+                chunks=[valid],
+                raise_exc=requests.exceptions.ChunkedEncodingError('boom'),
+            )
+            holder['response'] = response
+            return response
+
+        track_patch, created = self._track_mkstemp()
+        with track_patch:
+            with patch.object(importer_mod.requests, 'get', fake_get):
+                with self.assertRaises(JobHandlerError) as ctx:
+                    self.Importer._fetch_image('https://cdn.shopify.com/x.png')
+        self.assertEqual(ctx.exception.error_class, 'shopify_temporary_server_network')
+        self.assertTrue(holder['response'].closed)  # response closed
+        self.assertTrue(created)
+        for path in created:
+            self.assertFalse(os.path.exists(path))  # partial file removed
+            self.assertNotIn(path, str(ctx.exception))
+            self.assertNotIn(path, ctx.exception.technical_detail or '')
+        self.assertNotIn('boom', str(ctx.exception))
+
     def test_valid_https_png_downloaded(self):
         png = _png((5, 5, 5))
 
@@ -389,12 +458,16 @@ class TestProductMediaImport(TransactionCase):
             )
 
         with patch.object(importer_mod.requests, 'get', fake_get):
-            staged = self.Importer._fetch_image('https://cdn.shopify.com/ok.png')
+            path = self.Importer._fetch_image('https://cdn.shopify.com/ok.png')
         try:
-            staged.seek(0)
-            self.assertEqual(staged.read(), png)
+            # `_fetch_image` returns a CLOSED path, not an open handle.
+            self.assertIsInstance(path, str)
+            self.assertTrue(os.path.exists(path))
+            with open(path, 'rb') as handle:
+                self.assertEqual(handle.read(), png)
         finally:
-            staged.close()
+            if os.path.exists(path):
+                os.unlink(path)
 
     def test_no_secret_in_media_request(self):
         captured = {}
@@ -409,7 +482,9 @@ class TestProductMediaImport(TransactionCase):
             )
 
         with patch.object(importer_mod.requests, 'get', fake_get):
-            self.Importer._fetch_image('https://cdn.shopify.com/ok.png').close()
+            path = self.Importer._fetch_image('https://cdn.shopify.com/ok.png')
+        if os.path.exists(path):
+            os.unlink(path)
         self.assertNotIn('headers', captured['kwargs'])
         self.assertNotIn('auth', captured['kwargs'])
 
@@ -424,7 +499,11 @@ class TestProductMediaImport(TransactionCase):
         self.assertNotIn('_get_access_token', content)
 
     # ------------------------------------------------------------------
-    # Bounded staging + deterministic cleanup (review item 6).
+    # O(1) closed-path staging + deterministic cleanup (review 4950339305
+    # item 2). Staged images are paths to CLOSED temp files -- not open
+    # handles -- so open FDs stay O(1) regardless of variant count, exactly
+    # one path is opened at a time for the write, and every path is unlinked
+    # on success and on failure.
     # ------------------------------------------------------------------
 
     def test_source_level_media_is_staged_not_retained_as_bytes(self):
@@ -434,56 +513,142 @@ class TestProductMediaImport(TransactionCase):
         )
         with open(path, 'r', encoding='utf-8') as source_file:
             content = source_file.read()
-        # Media is staged in a bounded-memory temp file, not returned as a
-        # full byte string retained in a dict.
-        self.assertIn('SpooledTemporaryFile', content)
+        # Secure temp creation, one-open-at-a-time read, deterministic unlink.
+        self.assertIn('mkstemp', content)
+        self.assertIn('_read_staged', content)
+        self.assertIn('_unlink_quietly', content)
         self.assertNotIn('return bytes(data)', content)
+        # The old many-open-handle design is gone (no per-image open handle
+        # retained across the transaction).
+        self.assertNotIn('SpooledTemporaryFile', content)
 
-    def test_staged_media_closed_after_successful_import(self):
+    def test_media_plan_retains_closed_paths_not_open_handles(self):
+        """`_prepare_media` returns only paths (or None), never open file
+        handles -- so open FDs stay O(1) -- and each staged path is a closed
+        file on disk that the ExitStack unlinks when it exits."""
+        png = _png((8, 8, 8))
+        notes = []
+        payload = self._payload(
+            'gid://shopify/Product/5040',
+            image_url='https://cdn.shopify.com/p.png',
+            variants=[
+                self._variant('gid://shopify/ProductVariant/5040a', sku='PL1',
+                              image_url='https://cdn.shopify.com/a.png'),
+                self._variant('gid://shopify/ProductVariant/5040b', sku='PL2',
+                              image_url='https://cdn.shopify.com/b.png'),
+            ],
+        )
+        with patch.object(self.ImporterType, '_fetch_image',
+                          lambda inner, url: self._write_temp(png)):
+            with contextlib.ExitStack() as stack:
+                media = self.Importer._prepare_media(
+                    self.store, payload,
+                    self.Importer._store_settings(self.store), notes, stack,
+                )
+                paths = [value for value in media.values() if value is not None]
+                self.assertEqual(len(paths), 3)  # 1 template + 2 variants
+                for value in media.values():
+                    self.assertTrue(value is None or isinstance(value, str))
+                for staged_path in paths:
+                    self.assertTrue(os.path.exists(staged_path))
+            # After the stack exits, every staged path is unlinked.
+            for staged_path in paths:
+                self.assertFalse(os.path.exists(staged_path))
+
+    def test_only_one_staged_image_open_at_a_time(self):
+        """Across a multi-image import, `_read_staged` is only ever entered
+        one call at a time -- never more than one staged file open for
+        reading simultaneously."""
+        png = _png((4, 4, 4))
+        concurrency = {'now': 0, 'max': 0}
+
+        def tracking_read(inner, staged_path):
+            concurrency['now'] += 1
+            concurrency['max'] = max(concurrency['max'], concurrency['now'])
+            try:
+                with open(staged_path, 'rb') as handle:
+                    return handle.read()
+            finally:
+                concurrency['now'] -= 1
+
+        gid = 'gid://shopify/Product/5041'
+        payload = self._payload(
+            gid, image_url='https://cdn.shopify.com/p.png',
+            options=[{'name': 'Color', 'position': 1, 'values': ['Red', 'Blue']}],
+            variants=[
+                self._variant('%s/red' % gid, sku='OO-R',
+                              image_url='https://cdn.shopify.com/a.png',
+                              selected=[{'name': 'Color', 'value': 'Red'}]),
+                self._variant('%s/blue' % gid, sku='OO-B',
+                              image_url='https://cdn.shopify.com/b.png',
+                              selected=[{'name': 'Color', 'value': 'Blue'}]),
+            ],
+        )
+        with patch.object(self.ImporterType, '_read_staged', tracking_read):
+            with patch.object(self.ImporterType, '_fetch_image',
+                              lambda inner, url: self._write_temp(png)):
+                self.Importer._apply_import(self.store, payload)
+        self.assertEqual(concurrency['max'], 1)  # 1 template + 2 variant reads
+
+    def test_staged_media_paths_removed_after_successful_import(self):
         png = _png((12, 34, 56))
-        tracked = []
-
-        def tracking_fetch(self, url):
-            handle = _TrackingFile(png)
-            tracked.append(handle)
-            return handle
-
+        fetch_patch, paths = self._tracking_fetch(png)
         payload = self._payload(
             'gid://shopify/Product/5030',
             image_url='https://cdn.shopify.com/s.png',
             variants=[self._variant('gid://shopify/ProductVariant/5030', sku='ST1')],
         )
-        with patch.object(self.ImporterType, '_fetch_image', tracking_fetch):
+        with fetch_patch:
             self.Importer._apply_import(self.store, payload)
-        self.assertEqual(len(tracked), 1)
-        self.assertGreaterEqual(tracked[0].close_count, 1)
+        self.assertTrue(paths)
+        for staged_path in paths:
+            self.assertFalse(os.path.exists(staged_path))
 
-    def test_staged_media_closed_after_database_failure(self):
+    def test_staged_media_paths_removed_after_database_failure(self):
         png = _png((21, 43, 65))
-        tracked = []
-
-        def tracking_fetch(self, url):
-            handle = _TrackingFile(png)
-            tracked.append(handle)
-            return handle
-
+        fetch_patch, paths = self._tracking_fetch(png)
+        gid = 'gid://shopify/Product/5031'
         # A structured product whose second variant references a phantom
-        # option -> binding_conflict inside the savepoint, after the primary
-        # image is staged over the network.
+        # option -> binding_conflict inside the savepoint, after every image
+        # (primary + both variants) has been staged over the network.
         payload = self._payload(
-            'gid://shopify/Product/5031',
-            image_url='https://cdn.shopify.com/db.png',
+            gid, image_url='https://cdn.shopify.com/db.png',
             options=[{'name': 'Color', 'position': 1, 'values': ['Red']}],
             variants=[
-                self._variant('%s/r' % 'gid://shopify/Product/5031', sku='DBR',
+                self._variant('%s/r' % gid, sku='DBR',
+                              image_url='https://cdn.shopify.com/r.png',
                               selected=[{'name': 'Color', 'value': 'Red'}]),
-                self._variant('%s/x' % 'gid://shopify/Product/5031', sku='DBX',
+                self._variant('%s/x' % gid, sku='DBX',
+                              image_url='https://cdn.shopify.com/x.png',
                               selected=[{'name': 'Phantom', 'value': 'Z'}]),
             ],
         )
-        with patch.object(self.ImporterType, '_fetch_image', tracking_fetch):
+        with fetch_patch:
             with self.assertRaises(JobHandlerError):
                 self.Importer._apply_import(self.store, payload)
-        self.assertTrue(tracked)
-        for handle in tracked:
-            self.assertGreaterEqual(handle.close_count, 1)
+        self.assertTrue(paths)
+        for staged_path in paths:
+            self.assertFalse(os.path.exists(staged_path))
+
+    def test_validation_failure_removes_temporary_path(self):
+        """A raster-validation failure unlinks its own partial temp file and
+        never surfaces the path in the operator-facing error."""
+        junk = b'still-not-an-image'
+
+        def fake_get(url, **kwargs):
+            return _FakeResponse(
+                status_code=200, headers={'Content-Type': 'image/png'},
+                chunks=[junk],
+            )
+
+        track_patch, created = self._track_mkstemp()
+        with track_patch:
+            with patch.object(importer_mod.requests, 'get', fake_get):
+                with self.assertRaises(JobHandlerError) as ctx:
+                    self.Importer._fetch_image('https://cdn.shopify.com/bad.png')
+        self.assertEqual(ctx.exception.error_class, 'shopify_temporary_server_network')
+        self.assertTrue(created)
+        for path in created:
+            self.assertFalse(os.path.exists(path))
+            self.assertNotIn(path, str(ctx.exception))
+            self.assertNotIn(path, ctx.exception.technical_detail or '')

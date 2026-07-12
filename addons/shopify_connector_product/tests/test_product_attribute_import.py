@@ -336,9 +336,12 @@ class TestProductAttributeImport(TransactionCase):
         self.assertTrue(binding.exists())
 
     # ------------------------------------------------------------------
-    # DB-backed global serialization lock (D-010B-2) -- proven on the REAL
-    # product-import path across two genuinely independent PostgreSQL
-    # transactions (review 4950202231 item 7), not a same-cursor test.
+    # DB-backed global serialization lock (D-010B-2) -- exercised on the REAL
+    # product-import path across two independent, OVERLAPPING PostgreSQL
+    # transactions (reviews 4950202231 item 7, 4950339305 item 5), not a
+    # same-cursor test and not simultaneous execution: transaction B finishes
+    # its import and stays uncommitted holding the lock, THEN transaction A
+    # runs and contends for it.
     # ------------------------------------------------------------------
 
     def test_attribute_lock_row_is_seeded(self):
@@ -378,10 +381,13 @@ class TestProductAttributeImport(TransactionCase):
         finally:
             cr.close()
 
-    def test_real_concurrent_full_imports_create_one_global_attribute(self):
-        """Two genuinely independent PostgreSQL transactions run the REAL
+    def test_overlapping_transactions_serialize_to_one_global_attribute(self):
+        """Two independent, OVERLAPPING PostgreSQL transactions run the REAL
         `_apply_import` path for two products that use the same brand-new
-        option name.
+        option name. This is deliberately NOT simultaneous full-import
+        execution: transaction B completes its import first and stays open
+        (uncommitted) holding the lock, and only THEN does transaction A run
+        and contend for it.
 
         A `TransactionCase` cannot use `self.registry.cursor()` for this: in
         test mode it returns a `TestCursor` layered on the one test
@@ -389,15 +395,18 @@ class TestProductAttributeImport(TransactionCase):
         test uses `odoo.sql_db.db_connect(...).cursor()` for separate PG
         backends, and a committed two-store setup visible to both.
 
-        Transaction B runs a full import to completion, holding the
-        singleton attribute lock (its per-product savepoint released but the
-        transaction not yet committed). Transaction A then runs its own full
-        import concurrently and cannot acquire the lock, so `_apply_import`
-        raises `concurrency_race_conflict` (no duplicate attribute). After B
-        commits, A is retried in a clean transaction, re-resolves, and
-        reuses B's committed attribute. Exactly ONE global `product.attribute`
-        exists, both product imports produce their bindings, and every
-        committed synthetic record is cleaned up durably.
+        Transaction B runs a full import to completion and remains
+        uncommitted, so it still holds the transaction-scoped singleton
+        attribute lock (its per-product savepoint has been released, but --
+        per review `4950339305` item 5 -- that does NOT release the row
+        lock, which PostgreSQL holds until B commits). Transaction A then
+        runs its own full import and cannot acquire the lock, so
+        `_apply_import` raises `concurrency_race_conflict` (no duplicate
+        attribute). After B commits and releases the lock, A is retried in a
+        clean transaction, re-resolves, and reuses B's committed attribute.
+        Exactly ONE global `product.attribute` exists, both product imports
+        produce their bindings, and every committed synthetic record is
+        cleaned up durably.
         """
         option_name = 'ConcFullImportShadeZZZ'
         gid_a = 'gid://shopify/Product/conc-a'
@@ -434,12 +443,14 @@ class TestProductAttributeImport(TransactionCase):
             importer_a = env_a['shopify.connector.product.importer']
             importer_b = env_b['shopify.connector.product.importer']
 
-            # B: full import runs to completion, holding the attribute lock.
+            # B: full import runs to completion FIRST and stays uncommitted,
+            # still holding the transaction-scoped attribute lock.
             result_b = importer_b._apply_import(
                 store_b, self._conc_payload(gid_b, option_name, 'CONC-B'))
             self.assertTrue(result_b['variant_bindings'])
 
-            # A: concurrent full import cannot acquire the lock B holds.
+            # A: its import now overlaps B's open transaction and cannot
+            # acquire the lock B still holds.
             with self.assertRaises(JobHandlerError) as ctx:
                 importer_a._apply_import(
                     store_a, self._conc_payload(gid_a, option_name, 'CONC-A'))

@@ -1,7 +1,8 @@
 import base64
 import hashlib
+import os
+import tempfile
 from contextlib import ExitStack
-from tempfile import SpooledTemporaryFile
 from urllib.parse import urljoin, urlsplit
 
 import requests
@@ -100,10 +101,16 @@ IMAGE_READ_TIMEOUT_SECONDS = 20
 IMAGE_MAX_REDIRECTS = 5
 IMAGE_CHUNK_BYTES = 65536
 _REDIRECT_STATUS = (301, 302, 303, 307, 308)
-# Per-image staging spills to a temp file above this in-memory threshold so
-# a large catalog never retains every full image byte string in RAM
-# (control-room review `4950202231` item 5). Bounded, named, tunable.
-IMAGE_SPOOL_THRESHOLD_BYTES = 1024 * 1024
+# Each image is streamed to its own secure on-disk temporary file that is
+# CLOSED immediately after download + raster validation; only the path is
+# retained in the media plan, and exactly one path is reopened (and closed)
+# for its Odoo write (control-room reviews `4950202231` item 5 and
+# `4950339305` item 2). This keeps open file handles O(1) and aggregate
+# process RAM bounded -- one 64 KiB chunk while streaming, one image while
+# writing -- independent of the variant count, with no arbitrary catalog cap.
+# The fixed prefix never carries a URL, token, or credential, and the path is
+# never surfaced in an operator-facing error.
+IMAGE_TEMPFILE_PREFIX = 'shopify_connector_img_'
 # Content-type values that are image/* but not a supported raster image --
 # rejected explicitly before download (SVG is script-capable markup, not a
 # raster). Any content-type containing "svg" is also rejected.
@@ -132,10 +139,20 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     seeded singleton lock row (`shopify.connector.attribute.lock`,
     D-010B-2) is the only serialization primitive: it is acquired with the
     verified Odoo 19 `try_lock_for_update()` (FOR UPDATE SKIP LOCKED)
-    before any global `product.attribute` resolve/create and released when
-    the product's outer transaction commits, so two concurrent imports of
-    the same new option create exactly one attribute (duplicate prevention
-    at creation time, not a post-hoc reconciliation sweep).
+    before any global `product.attribute` resolve/create. The lock is
+    transaction-scoped: releasing the per-product savepoint does NOT release
+    it -- PostgreSQL holds a `FOR UPDATE` row lock until the outer
+    transaction commits or rolls back. It therefore serializes not only the
+    attribute critical section but the remaining database work of the
+    holding transaction (and, in a `run_drain` batch whose transaction spans
+    several jobs, potentially the rest of that batch). This is a
+    correctness-first design -- it guarantees two overlapping transactions
+    importing the same new option create exactly one attribute (duplicate
+    prevention at creation time, not a post-hoc reconciliation sweep). The
+    Shopify request and any image download happen BEFORE the lock is
+    acquired, never while it is held. The lock-hold duration and its
+    throughput impact are an open runtime measurement obligation (Odoo.sh /
+    dev-store), not a closed performance claim.
 
     Match-key priority is unchanged (DEC-006, RA-006): existing binding,
     then SKU (`default_code`), then barcode, then manual review -- never
@@ -207,20 +224,40 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         on the first page (a possible remote deletion -- handled by the
         caller, D-010B-8). Cursors live only in memory for this call (PD-5).
 
-        Every page is strictly shape-validated (control-room review
-        `4950202231` item 1): `data`, `product` (unless null on page one),
-        `variants`, and `pageInfo` must be mappings; `variants.nodes` must
-        be a list; `hasNextPage` must be a real Boolean; and `endCursor`
-        must be a non-empty string when `hasNextPage` is true. A missing,
-        null, or wrong-type `pageInfo`/`hasNextPage` is a schema mismatch --
-        it is NEVER silently treated as a completed single page (which
-        would risk truncating a larger product). All violations route to
-        `data_shape_schema_mismatch`, and no product or binding is written
-        (this method runs entirely before `_apply_import`).
+        Every page is strictly shape-validated (control-room reviews
+        `4950202231` item 1 and `4950339305` item 1): `data`, `product`
+        (unless null on page one), `variants`, and `pageInfo` must be
+        mappings; `variants.nodes` must be a list of mappings; `hasNextPage`
+        must be a real Boolean; and `endCursor` must be a non-empty string
+        when `hasNextPage` is true. A missing, null, or wrong-type
+        `pageInfo`/`hasNextPage` is a schema mismatch -- it is NEVER silently
+        treated as a completed single page (which would risk truncating a
+        larger product).
+
+        Forward-progress and identity guards prevent a malformed connection
+        from looping forever or importing an overlapping page:
+
+        * the pagination cursor must strictly advance -- an `endCursor` equal
+          to the cursor just used, or equal to any cursor already seen in
+          this call, is rejected (so a response that repeatedly returns
+          `hasNextPage=true` with the same cursor and zero nodes cannot loop
+          forever);
+        * every accumulated variant GID must be unique across all pages
+          (a repeated GID within or across pages is a malformed connection,
+          not a real 2,049th variant, and is rejected here rather than
+          surfacing later as a database constraint error);
+        * the returned product `id` on every non-null page must equal the
+          requested product GID.
+
+        All violations route to `data_shape_schema_mismatch`, and no product
+        or binding is written (this method runs entirely before
+        `_apply_import`).
         """
         cursor = None
         product_node = None
         accumulated_variants = []
+        seen_cursors = set()
+        seen_variant_gids = set()
         while True:
             result = self._execute_query(store, shopify_product_gid, cursor)
             if not isinstance(result, dict):
@@ -241,6 +278,12 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             if not isinstance(page_product, dict):
                 raise self._schema_error(
                     shopify_product_gid, 'the product node was not a mapping.')
+            # Identity guard: every page must be for the requested product.
+            if page_product.get('id') != shopify_product_gid:
+                raise self._schema_error(
+                    shopify_product_gid,
+                    'a page returned product GID %r, which does not match the '
+                    'requested product.' % (page_product.get('id'),))
             if product_node is None:
                 product_node = page_product
             variants_connection = page_product.get('variants')
@@ -251,6 +294,22 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             if not isinstance(nodes, list):
                 raise self._schema_error(
                     shopify_product_gid, 'variants.nodes was not a list.')
+            for node in nodes:
+                if not isinstance(node, dict):
+                    raise self._schema_error(
+                        shopify_product_gid,
+                        'a variants.nodes element was not a mapping.')
+                node_gid = node.get('id')
+                if not node_gid:
+                    raise self._schema_error(
+                        shopify_product_gid,
+                        'a variant node is missing its Shopify variant GID.')
+                if node_gid in seen_variant_gids:
+                    raise self._schema_error(
+                        shopify_product_gid,
+                        'variant GID %r appeared more than once across the '
+                        'pagination pages.' % (node_gid,))
+                seen_variant_gids.add(node_gid)
             accumulated_variants.extend(nodes)
             if len(accumulated_variants) > MAX_ACCUMULATED_VARIANTS:
                 raise self._schema_error(
@@ -269,12 +328,21 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                     'variants.pageInfo.hasNextPage was not a Boolean.')
             if not has_next_page:
                 break
-            cursor = page_info.get('endCursor')
-            if not isinstance(cursor, str) or not cursor:
+            next_cursor = page_info.get('endCursor')
+            if not isinstance(next_cursor, str) or not next_cursor:
                 raise self._schema_error(
                     shopify_product_gid,
                     'hasNextPage is true but endCursor is missing or empty -- '
                     'cannot paginate safely.')
+            # Forward-progress guard: the cursor must strictly advance and
+            # never repeat, or the connection would loop forever.
+            if next_cursor == cursor or next_cursor in seen_cursors:
+                raise self._schema_error(
+                    shopify_product_gid,
+                    'pagination did not advance -- endCursor repeated a cursor '
+                    'already used in this fetch.')
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
         # Rewrite the accumulated variant set onto a single connection dict
         # so `_normalize_payload` consumes one product node uniformly.
         product_node['variants'] = {'nodes': accumulated_variants}
@@ -503,12 +571,20 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         Validates first. Then, before any media download or database write,
         an `updatedAt` short-circuit (D-010B-7 / review `4950202231` item 2)
         returns immediately when an active binding already records this
-        exact remote `updatedAt`. Otherwise images are staged over the
-        network (D-010B-10: network out of the transaction) into
-        bounded-memory temporary files managed by an `ExitStack` that closes
-        every staged file on any exit path. The entire write sequence --
-        attributes, values, lines, template, variants, prices, compare-at,
-        image bytes, bindings, stale status, and the `shopify_updated_at`
+        exact remote `updatedAt`.
+
+        An ARCHIVED product is then routed to `_handle_archived_product`
+        BEFORE any media is staged (review `4950339305` item 4): a broken
+        image URL must never be able to prevent an archived product from
+        being marked stale, and an archived product never triggers a master
+        write or a media download.
+
+        Otherwise images are staged over the network (D-010B-10: network out
+        of the transaction) each into its own secure temporary file that is
+        closed immediately, its path registered with an `ExitStack` that
+        unlinks every staged path on any exit path. The entire write
+        sequence -- attributes, values, lines, template, variants, prices,
+        compare-at, image bytes, bindings, and the `shopify_updated_at`
         stamp -- then runs inside one `self.env.cr.savepoint()` block: any
         failure rolls back every write this call made (so a later-variant
         failure never leaves a partial product and never advances
@@ -520,6 +596,10 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         skipped = self._unchanged_short_circuit(store, payload)
         if skipped is not None:
             return skipped
+        # D-010B-8 / review `4950339305` item 4: resolve an ARCHIVED product
+        # before any media download or master write.
+        if payload.get('status') == 'archived':
+            return self._handle_archived_product(store, payload, job)
         notes = []
         with ExitStack() as media_stack:
             media = self._prepare_media(store, payload, settings, notes, media_stack)
@@ -530,6 +610,63 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         self._emit_notes(job, notes)
         result['notes'] = notes
         return result
+
+    @api.model
+    def _handle_archived_product(self, store, payload, job):
+        """Handle an ARCHIVED Shopify product without any media download or
+        Odoo master write (D-010B-8 / review `4950339305` item 4).
+
+        A bound archived product marks its template binding and every variant
+        binding stale, refreshing only the binding's own audit snapshots; the
+        Odoo product, its variants, prices, attributes, values, and images
+        are left byte-for-byte untouched, and `_prepare_media` is never
+        called (so a broken image URL can never block the stale marking).
+
+        A first-seen, unbound archived product does not create a bare Odoo
+        product or a binding: it raises the existing `mapping_missing` class
+        (a conservative, never-silent stop-then-retry -- no master data is
+        invented for an archived product with no established mapping).
+        """
+        TemplateBinding = self.env['shopify.connector.product.template.binding']
+        binding = TemplateBinding.search([
+            ('store_id', '=', store.id), ('shopify_gid', '=', payload.get('gid')),
+        ], limit=1)
+        if not binding:
+            raise JobHandlerError(
+                'mapping_missing',
+                'Shopify product %s is archived and no Odoo mapping/binding '
+                'exists for it. The connector does not create Odoo master '
+                'data for an archived product; import it while it is active, '
+                'or map it manually.' % (payload.get('gid'),),
+            )
+        with self.env.cr.savepoint():
+            binding.write({
+                'shopify_title': payload.get('title') or False,
+                'shopify_status': payload.get('status') or False,
+                'shopify_primary_image_url': payload.get('image_url') or False,
+                'shopify_last_imported_at': fields.Datetime.now(),
+                'status': 'stale',
+            })
+            variant_bindings = self.env[
+                'shopify.connector.product.variant.binding'
+            ].search(
+                [('product_template_binding_id', '=', binding.id)], order='id',
+            )
+            variant_bindings.write({'status': 'stale'})
+        note = (
+            'Shopify product %s is ARCHIVED; its binding is marked stale for '
+            'review. The Odoo product is left untouched (never modified, '
+            'archived, or deleted) and no image was downloaded.' % (
+                payload.get('gid'),
+            )
+        )
+        self._emit_note(job, note)
+        return {
+            'template_binding': binding,
+            'variant_bindings': variant_bindings,
+            'stale': True,
+            'notes': [('remote_archived', note)],
+        }
 
     @api.model
     def _unchanged_short_circuit(self, store, payload):
@@ -572,31 +709,13 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _apply_within_savepoint(self, store, payload, settings, media, notes):
-        """All database writes for one product (inside the savepoint)."""
+        """All database writes for one non-archived product (inside the
+        savepoint). An ARCHIVED product never reaches here -- it is routed to
+        `_handle_archived_product` before any media download (review
+        `4950339305` item 4)."""
         template_binding, source, option_specs = self._resolve_template(
             store, payload, settings, notes,
         )
-
-        # D-010B-8: an ARCHIVED product marks the binding stale and leaves
-        # the Odoo master data untouched -- no variant/price/media writes.
-        if payload.get('status') == 'archived':
-            template_binding.status = 'stale'
-            existing_variants = self.env[
-                'shopify.connector.product.variant.binding'
-            ].search([('product_template_binding_id', '=', template_binding.id)])
-            existing_variants.write({'status': 'stale'})
-            notes.append((
-                'remote_archived',
-                'Shopify product %s is ARCHIVED; its binding is marked '
-                'stale. The Odoo product is left untouched.' % (
-                    payload.get('gid'),
-                ),
-            ))
-            return {
-                'template_binding': template_binding,
-                'variant_bindings': existing_variants,
-            }
-
         variant_bindings = self._resolve_variants(
             store, payload, template_binding, source, option_specs,
             settings, media, notes,
@@ -687,14 +806,11 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         # Confident no-match (DEC-014 point H). Build the real Odoo
         # structure when the product has real options; otherwise the clean
         # single-variant path (bare template + Odoo-generated singleton).
-        # A brand-new ARCHIVED product is never fully imported (D-010B-8:
-        # it becomes a stale binding), so it takes the bare path -- no
-        # attribute structure is built and the global attribute lock is
-        # never taken for it.
-        if (
-            self._needs_attribute_structure(payload)
-            and payload.get('status') != 'archived'
-        ):
+        # An ARCHIVED product never reaches this method (it is routed to
+        # `_handle_archived_product` earlier, review `4950339305` item 4), so
+        # no bare Odoo master data is created for a first-seen archived
+        # product.
+        if self._needs_attribute_structure(payload):
             template, option_specs = self._create_structured_template(
                 payload, settings, notes,
             )
@@ -744,8 +860,12 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         instantiated explicitly per Shopify variant in `_resolve_variants`.
         """
         conflict_mode = self._attribute_conflict_mode(settings)
-        # D-010B-2 serialization: hold the lock across the whole
-        # attribute/value critical section (fast, in-DB) for this product.
+        # D-010B-2 serialization: acquire the singleton lock before any
+        # global attribute resolve/create. The lock is transaction-scoped --
+        # releasing this product's savepoint does NOT release it; PostgreSQL
+        # holds it until the outer transaction commits or rolls back, so it
+        # serializes the rest of this transaction's DB work as well, not only
+        # the attribute critical section (review `4950339305` item 5).
         self.env['shopify.connector.attribute.lock']._acquire_or_raise()
 
         option_specs = []
@@ -1456,13 +1576,13 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         product.shopify_compare_at_price = compare_at or 0.0
         if not self._media_enabled(settings):
             return
-        staged = media.get(('variant', variant_payload.get('gid')))
-        if staged is None:
+        staged_path = media.get(('variant', variant_payload.get('gid')))
+        if staged_path is None:
             return
         if not self._should_write_shopify_owned_fields(source, settings):
             return
         self._apply_image(
-            product, 'image_variant_1920', binding, staged,
+            product, 'image_variant_1920', binding, staged_path,
             'Shopify variant %s image' % (variant_payload.get('gid'),), notes,
         )
 
@@ -1476,19 +1596,19 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     ):
         if not self._media_enabled(settings):
             return
-        staged = media.get('template')
-        if staged is None:
+        staged_path = media.get('template')
+        if staged_path is None:
             return
         if not self._should_write_shopify_owned_fields(source, settings):
             return
         self._apply_image(
             template_binding.product_template_id, 'image_1920',
-            template_binding, staged,
+            template_binding, staged_path,
             'Shopify product %s primary image' % (payload.get('gid'),), notes,
         )
 
     @api.model
-    def _apply_image(self, record, field_name, binding, staged, label, notes):
+    def _apply_image(self, record, field_name, binding, staged_path, label, notes):
         """Write a staged connector image with the D-010B-6 ownership guard
         -- the authoritative write-time check.
 
@@ -1497,8 +1617,12 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         is overwritten. A merchant-modified image, or a merchant image the
         connector never wrote (current stored checksum differs from -- or is
         present without -- our record), is never overwritten: a
-        `merchant_image_protected` note is recorded instead. Reads at most
-        one staged image fully into memory here for its Odoo write; the
+        `merchant_image_protected` note is recorded instead.
+
+        `staged_path` is the path to a closed temporary file. Exactly one
+        such file is opened here, read fully into memory for the single Odoo
+        write, and closed again (review `4950339305` item 2) -- never more
+        than one staged image is held open or in memory at a time. The
         stored-value checksum is updated only after a successful write."""
         current = record[field_name]
         current_checksum = self._image_checksum(current)
@@ -1506,8 +1630,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         if current and not (recorded and current_checksum == recorded):
             self._note_protected(notes, label)
             return
-        staged.seek(0)
-        image_bytes = staged.read()
+        image_bytes = self._read_staged(staged_path)
         record.write({field_name: base64.b64encode(image_bytes)})
         del image_bytes
         # Read the stored (post-processing) value back so the ownership
@@ -1515,6 +1638,13 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         record.flush_recordset([field_name])
         record.invalidate_recordset([field_name])
         binding.shopify_image_checksum = self._image_checksum(record[field_name])
+
+    @api.model
+    def _read_staged(self, staged_path):
+        """Open exactly one staged image path, read its bytes, and close it
+        (a context-managed open, so the handle never outlives the read)."""
+        with open(staged_path, 'rb') as handle:
+            return handle.read()
 
     @api.model
     def _image_checksum(self, value):
@@ -1542,12 +1672,14 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     def _prepare_media(self, store, payload, settings, notes, stack):
         """Stage the primary and per-variant images over the network, before
         the transaction's write scope (D-010B-10). Returns a map
-        `{'template': staged|None, ('variant', gid): staged|None}` whose
-        values are bounded-memory staged temp files (each registered with
-        `stack` for deterministic cleanup) or `None` (no image, an unchanged
-        connector image, or a merchant-protected image already noted). A
-        download/validation failure raises
-        `shopify_temporary_server_network` (auto-retry), never a hold."""
+        `{'template': path|None, ('variant', gid): path|None}` whose values
+        are paths to CLOSED temporary files (each path registered with
+        `stack` for a deterministic unlink on every exit path) or `None` (no
+        image, an unchanged connector image, or a merchant-protected image
+        already noted). Only a path -- never an open handle -- is retained,
+        so open file handles stay O(1) regardless of the variant count. A
+        download/validation failure raises `shopify_temporary_server_network`
+        (auto-retry), never a hold, and unlinks any partially staged file."""
         if not self._media_enabled(settings):
             return {}
         mode = self._refresh_mode(settings)
@@ -1570,9 +1702,9 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     def _plan_one_image(
         self, store, kind, gid, url, field_name, mode, notes, stack, label,
     ):
-        """Decide, for one image target, whether to download (return a staged
-        temp file registered with `stack`), protect (return `None` + note),
-        or skip (return `None`).
+        """Decide, for one image target, whether to download (return the path
+        to a closed staged temp file whose unlink is registered with
+        `stack`), protect (return `None` + note), or skip (return `None`).
 
         The skip decision compares the CURRENT Odoo image checksum against
         the recorded connector checksum (review `4950202231` item 3), so an
@@ -1634,28 +1766,50 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _stage_image(self, url, stack):
-        """Download one image into a bounded-memory staged temp file and
-        register it with `stack` so it is closed on every exit path."""
-        staged = self._fetch_image(url)
-        stack.callback(staged.close)
-        return staged
+        """Download one image to a CLOSED secure temporary file and register
+        its unlink with `stack` so it is removed on every exit path
+        (success, download failure, validation failure, DB failure, or a
+        classified importer failure). Returns the path (a string), never an
+        open handle -- so no staged file stays open across the transaction."""
+        path = self._fetch_image(url)
+        stack.callback(self._unlink_quietly, path)
+        return path
+
+    @api.model
+    def _unlink_quietly(self, path):
+        """Remove a staged temporary file, ignoring an already-removed path.
+        Never raises (cleanup must not mask the original outcome) and never
+        surfaces the path in an error."""
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
     @api.model
     def _fetch_image(self, url):
-        """Download one image over HTTPS into a bounded-memory staged temp
-        file (D-010B-6 / review `4950202231` items 4-6).
+        """Download one image over HTTPS into a secure temporary file, close
+        it, and return its path (D-010B-6 / reviews `4950202231` items 4-6
+        and `4950339305` items 2-3).
 
         HTTPS only; redirects followed manually and only to HTTPS; the
         response content-type must be `image/*` and never SVG; the body is
-        streamed to a `SpooledTemporaryFile` (in-memory up to
-        `IMAGE_SPOOL_THRESHOLD_BYTES`, then disk) capped at `MAX_IMAGE_BYTES`;
-        bounded connect/read timeouts; no credential, token, or connector
-        header is ever attached to the request. The downloaded bytes are
-        validated as a supported raster image via Pillow. Any failure raises
-        `shopify_temporary_server_network` (never exposing the body) and
-        closes the staged file; on success the caller registers the returned
-        file for cleanup."""
-        staged = SpooledTemporaryFile(max_size=IMAGE_SPOOL_THRESHOLD_BYTES)
+        streamed in 64 KiB chunks to a `tempfile.mkstemp` file (mode 0600,
+        created with `O_EXCL`) capped at `MAX_IMAGE_BYTES`, so only one chunk
+        is ever held in memory; bounded connect/read timeouts; no credential,
+        token, or connector header is ever attached to the request. The bytes
+        are validated as a supported raster image via Pillow before the file
+        is closed.
+
+        A `requests.exceptions.RequestException` -- whether raised by the
+        initial request OR mid-stream while iterating the response body
+        (`ReadTimeout`, `ConnectionError`, `ChunkedEncodingError`, ...) --
+        and every other failure raises `shopify_temporary_server_network`
+        (auto-retry), never exposing the body, the URL, or the temporary
+        path. On any failure the HTTP response is closed and the partial
+        temporary file is unlinked; on success the file is closed and the
+        caller registers its path for the final unlink."""
+        fd, path = tempfile.mkstemp(prefix=IMAGE_TEMPFILE_PREFIX)
+        staged = os.fdopen(fd, 'w+b')
         try:
             current = url
             for _hop in range(IMAGE_MAX_REDIRECTS + 1):
@@ -1707,28 +1861,42 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                             'image and was not imported.',
                         )
                     size = 0
-                    for chunk in response.iter_content(IMAGE_CHUNK_BYTES):
-                        if not chunk:
-                            continue
-                        size += len(chunk)
-                        if size > MAX_IMAGE_BYTES:
-                            raise JobHandlerError(
-                                'shopify_temporary_server_network',
-                                'The Shopify image exceeded the maximum '
-                                'allowed size and was not imported.',
-                            )
-                        staged.write(chunk)
+                    try:
+                        for chunk in response.iter_content(IMAGE_CHUNK_BYTES):
+                            if not chunk:
+                                continue
+                            size += len(chunk)
+                            if size > MAX_IMAGE_BYTES:
+                                raise JobHandlerError(
+                                    'shopify_temporary_server_network',
+                                    'The Shopify image exceeded the maximum '
+                                    'allowed size and was not imported.',
+                                )
+                            staged.write(chunk)
+                    except requests.exceptions.RequestException:
+                        # Mid-stream network failure while iterating the body
+                        # (review `4950339305` item 3) -- classify it the same
+                        # as an initial-request failure, never leak the body.
+                        raise JobHandlerError(
+                            'shopify_temporary_server_network',
+                            'The Shopify image download was interrupted before '
+                            'it completed -- this is usually temporary.',
+                        )
+                    staged.flush()
                     self._validate_raster(staged)
-                    staged.seek(0)
-                    return staged
+                    staged.close()
+                    return path
                 finally:
                     response.close()
             raise JobHandlerError(
                 'shopify_temporary_server_network',
                 'The Shopify image exceeded the maximum number of redirects.',
             )
-        except Exception:
+        except BaseException:
+            # Any failure: close the handle and remove the partial file, so a
+            # staged temporary never leaks. Re-raise the classified error.
             staged.close()
+            self._unlink_quietly(path)
             raise
 
     @api.model

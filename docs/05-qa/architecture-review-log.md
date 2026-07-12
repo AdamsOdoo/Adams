@@ -2123,3 +2123,42 @@ concurrency. Test methods 110 → **135**. **No runtime/live claim added** —
 Odoo.sh and dev-store evidence remain outstanding (validation record §10).
 PR #151 stays **open/draft/unmerged**; this revision stops for another
 ChatGPT static review. No other task authorized._
+
+_**AR-044 revision note 2 (2026-07-12, control-room static review
+`4950339305` — Task 010B REVISE again before Odoo.sh).** The second static
+review accepted Revision 1 and found five remaining reliability blockers at
+head `5688ec1`, all corrected on the same PR (files: the importer, the
+attribute-lock model, four test files; docs): (1) **pagination
+forward-progress + identity guards** — `_fetch_product_with_all_variant_
+pages` tracks seen cursors and rejects a repeated/non-progressing
+`endCursor` (so a `hasNextPage=true`/same-cursor/zero-node response cannot
+loop forever), requires every `nodes` element to be a mapping with a
+non-empty GID, rejects duplicate variant GIDs within/across pages, and
+requires each page's product `id` to equal the requested GID — all →
+`data_shape_schema_mismatch`, no write; (2) **O(1) media handles** —
+each image is streamed to its own secure `mkstemp` file, closed
+immediately, with only the path retained and exactly one path reopened at
+write time, and an `ExitStack` that unlinks every path on all exit paths
+(replacing the Revision-1 many-open-`SpooledTemporaryFile` design; O(1)
+open handles and bounded RAM at the 2,048-variant ceiling, no arbitrary
+cap); (3) **mid-stream network classification** — a `RequestException`
+raised while iterating `iter_content()` is caught, the response closed, the
+partial file unlinked, and re-raised as `shopify_temporary_server_network`
+(previously it escaped to `unknown_system_error`); (4) **archived routed
+before media** — a bound archived product marks bindings stale with no
+media/master write (a broken image URL cannot block stale marking), and a
+first-seen unbound archived product creates no bare Odoo product/binding,
+raising the existing `mapping_missing` class; (5) **lock/concurrency wording
+corrected** (no behaviour change) — the singleton row lock is
+transaction-scoped (savepoint release does not free it; held to outer
+commit; serializes the rest of the transaction and, in a `run_drain` batch,
+potentially the rest of the batch), the docstrings/comments/docs/PR body are
+corrected, and the test is renamed
+`test_overlapping_transactions_serialize_to_one_global_attribute` and
+described as two independent **overlapping** (not simultaneous)
+transactions; the lock-hold/throughput exposure is recorded as a mandatory
+Odoo.sh/dev-store measurement, not a closed performance claim. Test methods
+135 → **155**. **No runtime/live claim added** — Odoo.sh and dev-store
+evidence remain outstanding (validation record §10). PR #151 stays
+**open/draft/unmerged**; this revision stops for another ChatGPT static
+review. No other task authorized._

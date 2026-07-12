@@ -48,32 +48,122 @@ test files; docs). Corrections, each honestly scoped:
    whitelist), so SVG markup or junk labelled `image/png` is rejected
    (`shopify_temporary_server_network`), never exposing the body. Global
    Pillow config is untouched.
-5. **Bounded aggregate media memory.** Each image streams into a
-   `SpooledTemporaryFile` (in-memory up to 1 MB, then disk); an `ExitStack`
-   closes every staged file on success, download failure, validation
-   failure, DB failure, and classified failure. No dict of full image byte
-   strings is retained; at most one staged image is read fully into memory
-   for its Odoo write. The 20 MB cap, HTTPS/redirect restrictions, and the
-   "downloads before the savepoint, DB writes inside it" split are kept.
+5. **Bounded aggregate media memory.** *(Superseded by §0b.2: Revision 2
+   replaces the `SpooledTemporaryFile` handles with closed-path staging for
+   O(1) open handles at the 2,048-variant ceiling.)* Each image streamed
+   into a `SpooledTemporaryFile` (in-memory up to 1 MB, then disk); an
+   `ExitStack` closed every staged file on success, download failure,
+   validation failure, DB failure, and classified failure. No dict of full
+   image byte strings was retained; at most one staged image was read fully
+   into memory for its Odoo write. The 20 MB cap, HTTPS/redirect
+   restrictions, and the "downloads before the savepoint, DB writes inside
+   it" split are kept.
 6. **`connector_owned` refresh fixed.** Refresh resolves the one template
    line whose attribute name is exactly the Shopify option name OR exactly
    `"<name> (Shopify)"`; no candidate → `binding_conflict`; both present →
    `binding_conflict` (fail closed); the merchant attribute is never
    modified. New value/new variant on refresh now extends the connector
    attribute in both refresh modes.
-7. **Concurrency proof strengthened to the real import path.** The prior
-   test exercised the lock + direct attribute resolver only. The new
-   `test_real_concurrent_full_imports_create_one_global_attribute` runs the
-   REAL `_apply_import` for two products (same new option) across two
-   genuinely independent PostgreSQL connections (`odoo.sql_db.db_connect`),
-   with committed synthetic stores visible to both: B holds the lock via
-   its uncommitted transaction, A's concurrent full import gets
+7. **Concurrency proof strengthened to the real import path.** *(Wording
+   corrected in §0b.5: the test is renamed
+   `test_overlapping_transactions_serialize_to_one_global_attribute` and
+   described as overlapping, not simultaneous, execution.)* The prior test
+   exercised the lock + direct attribute resolver only. The strengthened
+   test runs the REAL `_apply_import` for two products (same new option)
+   across two genuinely independent PostgreSQL connections
+   (`odoo.sql_db.db_connect`), with committed synthetic stores visible to
+   both: B finishes its import first and stays uncommitted holding the
+   transaction-scoped lock, A then runs and gets
    `concurrency_race_conflict`, and after B commits A retries and reuses
    B's committed attribute (exactly one attribute; both products bound;
    durable cleanup). `TransactionCase`'s `registry.cursor()` (a shared
    `TestCursor`) is **not** presented as independent concurrency.
 8. **Documentation corrected** (this file, AR-044, handoff, PR body) to
    remove the prior overclaims.
+
+---
+
+## 0b. Revision 2 — control-room static review `4950339305` (2026-07-12)
+
+The second control-room static review (PR stayed draft) accepted Revision 1
+but found five remaining reliability blockers at head `5688ec1`. This
+revision corrects them on the same PR. **Files touched:** the importer, the
+attribute-lock model, and four test files (`test_product_import_matching`,
+`test_product_media_import`, `test_product_refresh_and_stale`,
+`test_product_attribute_import`); this doc, AR-044, handoff, PR body. Test
+methods **135 → 155**. Each correction, honestly scoped:
+
+1. **Pagination forward-progress and identity guards.**
+   `_fetch_product_with_all_variant_pages` now keeps a set of seen cursors
+   and rejects a repeated/non-progressing `endCursor` (equal to the current
+   cursor, or already seen) → `data_shape_schema_mismatch`, so a connection
+   that returns `hasNextPage=true` forever cannot loop. Every `nodes`
+   element must be a mapping with a non-empty variant GID; a duplicate
+   variant GID **within or across** pages is rejected here (not left to a
+   later DB constraint); and every non-null page's product `id` must equal
+   the requested GID. New no-write tests cover repeated/zero-node cursor,
+   repeated-node cursor, cursor==current, replayed-seen cursor, non-mapping
+   node, missing-GID node, duplicate GID within/across pages, product-GID
+   mismatch, and a valid two-page accept. Each fake caps its call count so a
+   regressed guard fails fast rather than hanging.
+2. **O(1) media handles + bounded RAM (closed-path staging).** The prior
+   design kept one open `SpooledTemporaryFile` per image until all DB writes
+   finished (up to 2,049 open handles / ~2 GiB spool at the ceiling). Each
+   image is now streamed in 64 KiB chunks to its **own secure `mkstemp`
+   file** (mode 0600) that is **closed immediately** after download +
+   raster validation; only the **path** is retained in the media plan, and
+   `_apply_image` opens exactly **one** path at a time via `_read_staged`.
+   Open file handles are therefore O(1) and aggregate RAM is bounded by one
+   chunk during staging plus one image at write time, independent of variant
+   count — with **no** arbitrary catalog cap. An `ExitStack` unlinks every
+   staged path deterministically on success, download failure, validation
+   failure, DB failure, and classified failure. The temp prefix carries no
+   URL/token, and no path is ever surfaced in an operator-facing error.
+   Downloads-before-savepoint / writes-inside-savepoint and the 20 MB cap
+   are kept. New tests prove: the plan holds paths (not open handles);
+   one-open-at-a-time reads; and removal of every path after success, DB
+   failure, and validation failure, with no path in the error.
+3. **Mid-stream network failure classification.** A
+   `requests.exceptions.RequestException` raised **while iterating**
+   `response.iter_content()` (`ReadTimeout`, `ConnectionError`,
+   `ChunkedEncodingError`) is now caught, the response closed, the partial
+   staged file unlinked, and re-raised as the sanitized
+   `shopify_temporary_server_network` (auto-retry) — never leaking the body
+   or path. Previously only the initial `requests.get()` was covered, so a
+   mid-stream failure escaped to `unknown_system_error`. New test: an
+   iterator that yields one chunk then raises `ChunkedEncodingError`.
+4. **Archived path routed before any media download.** `_apply_import` now
+   routes an `ARCHIVED` product to `_handle_archived_product` **before**
+   `_prepare_media`, so a broken image URL can never prevent stale marking
+   (the prior order staged all images first). A **bound** archived product
+   marks its template + variant bindings stale, refreshes only the binding's
+   own audit snapshots, and performs no media/master write. A **first-seen,
+   unbound** archived product no longer silently creates a bare Odoo
+   product/binding — it raises the existing `mapping_missing` class
+   (conservative, never-silent). New tests prove `_prepare_media` is not
+   called, a broken URL does not block stale marking, bound master values
+   are unchanged, and a first-seen archived product raises `mapping_missing`
+   and creates no template/variant/attribute/binding.
+5. **Lock-hold + concurrency wording corrected (no code behaviour change).**
+   The singleton row lock is **transaction-scoped**: releasing the
+   per-product savepoint does **not** release it — PostgreSQL holds the
+   `FOR UPDATE` row lock until the outer transaction commits/rolls back, so
+   it serializes the remaining DB work of that transaction (and, in a
+   `run_drain` batch spanning several jobs, potentially the rest of the
+   batch), not merely the attribute critical section. The prior
+   docstring/PR wording ("held only across the attribute critical section")
+   was factually wrong and is corrected in the lock-model docstring, the
+   importer comments, this doc, AR-044, the handoff, and the PR body.
+   Network downloads occur **before** the lock is acquired. The concurrency
+   test is renamed
+   `test_overlapping_transactions_serialize_to_one_global_attribute` and its
+   docstring now describes it accurately as two **independent, overlapping**
+   transactions (B finishes its import first and stays uncommitted holding
+   the lock; A then runs and gets `concurrency_race_conflict`; after B
+   commits, A retries and reuses the committed attribute) — **not**
+   simultaneous full-import execution. The lock-hold duration and throughput
+   impact are recorded as a **mandatory runtime measurement obligation**
+   (§10), not a closed performance claim.
 
 ---
 
@@ -242,10 +332,15 @@ cite:
   `image_1920`/`image_variant_1920`; **checksum ownership compares the
   current Odoo image checksum against the recorded connector checksum**
   (§0.3) so a same-URL merchant edit/clear is protected, not silently
-  skipped; each image streams into a `SpooledTemporaryFile` with
-  `ExitStack` cleanup (§0.5); per-store `product_import_media_enabled`
-  (default True). Any fetch/validation failure →
-  `shopify_temporary_server_network`, never a hold.
+  skipped; each image streams into its **own secure `mkstemp` file, closed
+  immediately** — only the path is retained, exactly one path is opened at a
+  time for the write, and an `ExitStack` unlinks every path on all exit
+  paths (O(1) open handles, bounded RAM — §0b.2, superseding the Revision-1
+  `SpooledTemporaryFile` design); a mid-stream `iter_content` network error
+  is classified `shopify_temporary_server_network` (§0b.3); per-store
+  `product_import_media_enabled` (default True). Any fetch/validation
+  failure → `shopify_temporary_server_network`, never a hold, and the
+  partial staged file is unlinked (no body/path in the error).
 - **D-010B-7 (safe refresh):** `product_import_refresh_mode`
   (`snapshot_only` default | `shopify_fields`). snapshot_only never
   overwrites merchant-editable Odoo fields; shopify_fields re-applies the
@@ -258,9 +353,13 @@ cite:
   has no enqueue call site; a running job's payload hash is never
   mutated).
 - **D-010B-8 (archived/deleted):** null product for a bound GID →
-  binding+variant bindings `stale` + note, Odoo master untouched;
-  `ARCHIVED` → binding `stale` + note, no master writes; null product with
-  no binding → `data_shape_schema_mismatch`.
+  binding+variant bindings `stale` + note, Odoo master untouched. `ARCHIVED`
+  is routed **before any media download** (§0b.4): a **bound** product →
+  binding+variant bindings `stale` + audit-snapshot refresh, no media/master
+  write (a broken image URL cannot block stale marking); a **first-seen,
+  unbound** archived product creates **no** bare Odoo product/binding and
+  raises the existing `mapping_missing` class. Null product with no binding →
+  `data_shape_schema_mismatch`.
 - **D-010B-9 (duplicate prevention + N+1):** match priority unchanged
   (binding→SKU→barcode→manual; no name matching). Per-variant full-table
   scans replaced by one prefetched binding map + batched SKU/barcode
@@ -295,30 +394,42 @@ cite:
 | --- | --- |
 | test_product_template_binding.py (unchanged) | 7 |
 | test_product_variant_binding.py (unchanged) | 6 |
-| test_product_import_matching.py | 41 |
+| test_product_import_matching.py | 52 |
 | test_product_duplicate_prevention.py | 12 |
 | test_product_attribute_import.py | 16 |
 | test_product_variant_generation.py | 8 |
 | test_product_price_import.py | 9 |
-| test_product_media_import.py | 22 |
-| test_product_refresh_and_stale.py | 14 |
-| **Total** | **135** (110 at head `1065cdf`; 61 at CORE-R1) |
+| test_product_media_import.py | 26 |
+| test_product_refresh_and_stale.py | 19 |
+| **Total** | **155** (135 at head `5688ec1`; 110 at `1065cdf`; 61 at CORE-R1) |
 
-Coverage maps to every §21 named case: pagination (250 across pages, 150
-fixture, 2,048 cap, malformed pageInfo, missing endCursor, no mutation);
+Coverage maps to every §21 named case plus reviews `4950202231` (items 1-8)
+and `4950339305` (items 1-5): pagination (250 across pages, 2,048 cap,
+malformed pageInfo, missing endCursor, no mutation; **forward-progress and
+identity** — repeated/zero-node cursor, cursor==current, replayed-seen
+cursor, duplicate variant GID within/across pages, non-mapping node,
+missing-GID node, product-GID mismatch, valid two-page accept);
 attributes (ci dynamic reuse, new dynamic, Default-Title, position,
 additive values, existing-`always`→manual-review, existing-`no_variant`→
-manual-review, connector_owned `"Color (Shopify)"`, merchant unchanged, no
-phantom, brownfield, **real concurrent transactions → one attribute**);
-variants (sparse 2- and 3-option, exact equality, no cartesian,
-deterministic re-import, structural mismatch → binding_conflict,
-later-variant rollback); price (SoT both ways, unset, single list_price,
-min, exact `price_extra`, undecomposable note, decimal precision);
-images (primary, variant, unchanged skip, merchant protection, switch off,
-HTTPS-only, redirect-to-non-HTTPS rejection, wrong content-type, oversized,
-timeout/network, no secret); refresh/stale (snapshot_only, shopify_fields,
-structural adds in both, unchanged-updatedAt idempotency collision,
-archived→stale, deleted-bound→stale, deleted-unbound→data-error, no Odoo
+manual-review, connector_owned `"Color (Shopify)"` + refresh both modes +
+fail-closed, merchant unchanged, no phantom, brownfield, **overlapping
+transactions → one attribute**); variants (sparse 2- and 3-option, exact
+equality, no cartesian, deterministic re-import, structural mismatch →
+binding_conflict, later-variant rollback); price (SoT both ways, unset,
+single list_price, min, exact `price_extra`, undecomposable note, decimal
+precision); images (primary, variant, unchanged skip, same-URL merchant
+edit/clear ownership on template+variant, changed-URL protect, switch off,
+HTTPS-only, redirect-to-non-HTTPS rejection, wrong content-type, **SVG
+reject**, **invalid-bytes-labelled-png reject**, oversized,
+timeout/network, **mid-stream `iter_content` failure**, no secret, no body
+in error; **staging** — plan holds closed paths not open handles,
+one-open-at-a-time read, path removal after success/DB-failure/validation-
+failure, no path in error); refresh/stale (snapshot_only, shopify_fields,
+structural adds in both, real updatedAt short-circuit + stamp-after-success
++ no-advance-on-failure + empty-never-short-circuits; **archived routed
+before media** — bound→stale with no `_prepare_media`, broken-URL cannot
+block stale, bound master unchanged, first-seen unbound→`mapping_missing`
+creating nothing; deleted-bound→stale, deleted-unbound→data-error, no Odoo
 deletion, source-level declared-write guard).
 
 ## 8. Source-level guards, sudo inventory, network behaviour
@@ -363,22 +474,36 @@ Not obtained this session and **required before merge acceptance**:
   variant product; the one 2,048-variant timing probe; product + variant
   images with refresh + merchant-image-protection; an archived product; a
   deleted bound product; an incompatible same-name Odoo attribute.
+- **Lock-hold / throughput measurement (review `4950339305` item 5):**
+  because the singleton attribute lock is transaction-scoped (held to outer
+  commit, §0b.5), measure on Odoo.sh / dev-store the lock-hold duration, a
+  competing import's retry/back-off behaviour, a structured product import
+  inside a multi-job `run_drain` transaction, and the DB-phase timing at 100
+  and 2,048 variants. Throughput is **not** claimed proven here.
 
 These are **not faked and not waived**. The PR is kept **draft**; a later
 validation-only session (or an explicit ChatGPT waiver recorded at gate
 time) closes them.
 
-**Concurrency-test isolation note (honest):** the real concurrent-
-transaction test opens a genuinely independent PostgreSQL connection with
+**Concurrency/lock accuracy note (honest, review `4950339305` item 5):** the
+lock is transaction-scoped — releasing the per-product savepoint does not
+release it; PostgreSQL holds the `FOR UPDATE` row lock until the outer
+transaction commits/rolls back, so it can serialize the rest of that
+transaction's DB work (and, in a `run_drain` batch spanning several jobs,
+the remainder of that batch), not merely the attribute critical section.
+Network downloads happen before the lock is acquired. The test
+`test_overlapping_transactions_serialize_to_one_global_attribute` opens a
+genuinely independent PostgreSQL connection with
 `odoo.sql_db.db_connect(...).cursor()` — **not** `self.registry.cursor()`,
-which in a `TransactionCase` returns a `TestCursor` layered on the same
-underlying connection (one PG session, no real `FOR UPDATE SKIP LOCKED`
-contention). With the independent connection the two backends genuinely
-contend on the singleton lock row, proving exactly one attribute is
-created. The committed attribute is cleaned up durably via a third
-independent connection. `TransactionCase` still cannot exercise true
-multi-worker/multi-server execution; that named caveat stands and is the
-subject of the dev-store validation.
+which in a `TransactionCase` returns a `TestCursor` on the same underlying
+connection (one PG session, no real `FOR UPDATE SKIP LOCKED` contention). It
+is deliberately **overlapping, not simultaneous**: transaction B finishes
+its import first and stays uncommitted holding the lock, then transaction A
+runs and receives `concurrency_race_conflict`; after B commits, A retries
+and reuses the committed attribute (exactly one attribute; both bound;
+durable cleanup via a third independent connection). `TransactionCase`
+cannot exercise true multi-worker/multi-server execution; that named caveat
+stands and is the subject of the dev-store validation.
 
 ## 11. Rollback
 
@@ -397,15 +522,21 @@ the revert. No destructive migration is part of this task.
 - [x] D-010B-1 … D-010B-12 implemented.
 - [x] Odoo 19 internals verified against actual 19.0 source before use.
 - [x] Shopify 2026-07 fields verified (variant-`image` deprecation noted).
-- [x] All required tests exist (135 methods; every §21 case + review
-      `4950202231` items 1-8).
+- [x] All required tests exist (155 methods; every §21 case + review
+      `4950202231` items 1-8 + review `4950339305` items 1-5).
 - [x] All locally executable checks pass (compileall, py_compile, XML,
       source guards).
 - [x] No Shopify mutation; no phantom Odoo variants; import atomic;
       merchant images protected; price writes respect SoT; archived/deleted
-      never delete Odoo master data.
-- [x] Concurrent attribute creation proven to yield one attribute (real
-      two-transaction test).
+      never delete Odoo master data; a first-seen archived product creates
+      no Odoo master data (`mapping_missing`).
+- [x] Pagination cannot loop forever or import an overlapping page
+      (forward-progress + variant/product identity guards).
+- [x] Media staging uses O(1) open handles / bounded RAM with deterministic
+      unlink on every exit path; mid-stream network errors are classified.
+- [x] Attribute-lock behaviour unchanged; its transaction-scope wording
+      corrected everywhere; the overlapping-transaction test is named and
+      described accurately (not "simultaneous").
 - [x] Validation record (this file) + AR row + handoff entry.
 - [x] Draft PR opened into `Shopify-connector`; session stops after.
 - [ ] **Odoo.sh green (verbatim)** — outstanding (§10).
