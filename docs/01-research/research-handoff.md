@@ -1,5 +1,60 @@
 # Research Handoff (rolling)
 
+### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR into `Shopify-connector`, 2026-07-12)
+
+- **Base verified (hard prerequisite):** `Shopify-connector` tip ==
+  `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (no drift); **PR #153
+  merged**; design gate comment **`4950413650`** (CORE-R2 disconnect/
+  quiescence remediation **design** gate — OPEN, docs-only, one session).
+  Branch `claude/core-r2-disconnect-quiescence-design`; draft PR (design
+  only). **No CORE-R2 implementation gate is open.**
+- **Why:** PR #153 runtime-**confirmed** DEF-PB-1 / **SRR-03 stays OPEN**
+  (accepted `4950408383`): a concurrent real `store.action_disconnect()`
+  does **not** stop an already in-flight business handler — it blocks
+  behind the running job's row lock, the handler completes and the job
+  succeeds, then the disconnect serialization-fails (library) or is
+  retried by `retrying()` and completes cancelling **zero** jobs. Latent
+  only because every shipped handler is a no-op; a live-write defect once
+  a domain handler mutates Shopify.
+- **What this session did (design only, no code):** produced the
+  remediation analysis
+  [`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md)
+  (26 sections; runtime facts vs Odoo/PG source facts vs inferences vs
+  recommendations kept separate) and the future packet
+  [`../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`](../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md)
+  (allowed/forbidden files, real-`action_disconnect()` concurrent + two-
+  server tests, Odoo.sh, rollback, DoD — **gate NOT opened**). Updated
+  SRR-03/04/09 wording, appended **AR-044**, inserted the master-plan
+  **§2.1** CORE-R2 dependency, and this entry.
+- **Recommended architecture (proposal, not decided): Option E hybrid** —
+  explicit `disconnecting` state + monotonic `disconnect_generation`
+  token (A) + cooperative **fresh-transaction pre-side-effect checkpoint**
+  that defeats REPEATABLE READ snapshot-blindness (C) + store-scoped
+  **transaction-scoped advisory lock** (`pg_advisory_xact_lock`) in a
+  **two-phase disconnect** (fast intent → dispatcher-run quiesce →
+  credential-clear/finalize) with **timeout + operator escalation** (B).
+  Rejected: C-only, force-`FOR UPDATE`-cancel, global lock, session
+  advisory lock, in-method `cr.commit()`, per-job-commit-alone (Option D →
+  PERF-1). Source-verified: REPEATABLE READ (`odoo/sql_db.py:373`),
+  `retrying()` (`odoo/service/model.py:160`), non-blocking
+  `try_lock_for_update`/`lock_for_update` (`odoo/orm/models.py:5592`/
+  `5564`), cron single-commit + `_commit_progress`
+  (`odoo/addons/base/models/ir_cron.py:671`/`846`).
+- **Critical path (proposal D-CR2-E):** CORE-R2 must merge runtime-green
+  **before UAT** and **before every live Shopify mutation task**
+  (013/013B inventory, 014 fulfillment, 015/015B export); **not** a hard
+  blocker of 010B/011B/012 (no live mutation there); recommend sequencing
+  early (∥ 010B/011B) and registering its new core `job_type`/state with
+  Task LC-1.
+- **Risk status unchanged by design:** SRR-03 **OPEN**; SRR-04 & SRR-09
+  **REDUCED, not closed**. Live Odoo.sh + genuine two-server proof are
+  required (by the packet) before SRR-03 can move off OPEN.
+- **Next step:** ChatGPT reviews the draft PR and makes the six analysis
+  §26 calls (D-CR2-A…F). If accepted, a **separate, later** CORE-R2
+  implementation-gate act (naming the then-current base SHA + re-freezing
+  the packet's allowed-file list) authorizes the code session. **Do not
+  merge or mark ready without ChatGPT review.**
+
 ### CORE-R1 — Capability-Aware Readiness Correction (draft PR #149, implemented + focused correction, 2026-07-11)
 
 - **Base verified (hard prerequisite):** `Shopify-connector` tip ==

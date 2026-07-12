@@ -131,6 +131,49 @@ scenarios** (re-review item 5); U0 is marked parallelizable because it
 is design-only and gates only U1. Parallel-safe pairs are named in the
 table; nothing else may overlap.
 
+### 2.1 Proposed CORE-R2 dependency (under review — NOT an accepted reorder)
+
+> **Inserted 2026-07-12 by the CORE-R2 design session** (gate comment
+> PR #153 `4950413650`, docs-only; verified base
+> `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`). This subsection **adds a
+> proposed dependency only** — it does **not** renumber or reorder the
+> accepted §2 steps. **CORE-R2 design is under review; no CORE-R2
+> implementation gate is open.**
+
+**Task CORE-R2 — disconnect quiescence & in-flight job contract** remediates
+the **runtime-confirmed** DEF-PB-1 / SRR-03 (PR #153, accepted `4950408383`):
+a concurrent real `action_disconnect()` does **not** stop an already in-flight
+business handler. Design + packet:
+[`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md),
+[`../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`](../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md).
+
+Proposed placement (for ChatGPT to ratify — call **D-CR2-E**):
+
+- **CORE-R2 must be resolved (merged runtime-green) before UAT** (§2 step 17)
+  and before the Go/No-Go release act (step 18). It is a UAT prerequisite.
+- **CORE-R2 is a HARD prerequisite of every live Shopify *mutation* task** —
+  **Task 013 / 013B inventory** (§2 step 10), **Task 014 fulfillment**
+  (step 11), and **Task 015 / 015B product export** (step 12) — because the
+  defect only bites once a domain handler performs a real Shopify write; none
+  of those may ship on top of an unremediated disconnect race.
+- **CORE-R2 is NOT a hard blocker of Task 010B, Task 011B, or Task 012** —
+  product import, customer matching, and order import perform no live Shopify
+  mutation (they read from Shopify / write into Odoo), so the race is latent
+  for them. It is nonetheless **recommended to sequence CORE-R2 early** (it is
+  small, `shopify_connector_core`-only, and independent of the domain modules)
+  — e.g. **after CORE-R1 and in parallel with 010B/011B** — so it is merged
+  and proven well before the first mutation task (step 10). Its external
+  validation is the **P-B concurrency track** (§3) that already produced the
+  runtime evidence.
+- **Sequencing constraint:** the CORE-R2 packet adds one core `job_type`
+  (`core_disconnect_quiesce`) and one store state (`disconnecting`); to avoid a
+  later retrofit, register them **before or with Task LC-1** (§2 step 4, the
+  historic-job-type reassignment) so they participate in that lifecycle from
+  day one.
+
+No §2 step is moved by this note; the concrete insertion point is **D-CR2-E**
+at CORE-R2 gate time. Until then the CORE-R2 implementation gate is **closed**.
+
 ## 3. Parallel external tracks (independent of the chain; start any time)
 
 Unchanged: **P-A** VAL-B2 execution (human, live store — also feeds
