@@ -1,5 +1,19 @@
 # Task 011B — Customer Matching Scalability: Validation Record
 
+> **Latest parallel session (2026-07-12, authorization `4952271013`):** the
+> branch was **base re-aligned by a normal merge** onto the current
+> `Shopify-connector` tip `ce504f42824807e215ee21df3dfd4eed9bb9a275` (**CORE-R2
+> / PR #154** disconnect-quiescence design merged; **AR-047** added, **AR-045**
+> Task 011B preserved, **AR-046** intentionally absent — Task 010B is still in
+> its own PR); the two **opt-in classes' tags were corrected** to explicit
+> `post_install` / `-at_install` / `-standard` (clearing Odoo's
+> at_install-XOR-post_install warning); and the control-room-**accepted**
+> standard Odoo.sh suite evidence (review `4680380669`) is carried forward.
+> Still **no Odoo runtime** in this environment — the opt-in concurrency and
+> 100k benchmark remain **execution-ready but PENDING**, with the exact
+> invocations recorded. See **§14** for the full session record. No production
+> code changed; no live Shopify request made.
+>
 > **Status: implementation authored; static + AST checks executed;
 > runtime tests, genuine concurrency proof, benchmark numbers, and the
 > authoritative module-upgrade/backfill duration are all PENDING runtime
@@ -52,9 +66,9 @@
 | --- | --- |
 | Task | 011B — Customer Matching Scalability (indexed normalized-email lookup) |
 | Original base SHA | `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (implementation + first two corrections) |
-| Current base SHA | `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (`Shopify-connector` tip after **U0 / PR #155 acceptance closure** merged; base-aligned via a normal merge commit `66b0023` this session, base-synchronization amendment). Prior alignments: `65e915a…` (U0 / PR #152), `fcbbb0b…` (PR #153), original `f9c3c5f…`. |
-| Aligned PR head | base-synchronization merge `66b0023` (`cfdb057…` is an ancestor); the PR head advances only by the evidence-doc commit recording this alignment. |
-| Base verification | `origin/Shopify-connector` tip == `cfdb057…` (no drift from the required integration tip); U0 / PR #155 acceptance-closure files + history **preserved unchanged**. Two shared append-only docs conflicted, both resolved by **preserving both sides completely**: `research-handoff.md` keeps the new U0 acceptance-closure top entry **and** the Task 011B entry (0 lines lost either side); in `architecture-review-log.md` **AR-044 is now the U0 acceptance closure** and the Task 011B row is **renumbered to AR-045** (cross-references updated). No `addons/**`/`tests/**`/Task 011B production/test file conflicted or changed. PR diff vs `cfdb057…` = **exactly the 8 Task 011B files**; no U0 / Task 010B / CORE-R2 file appears as a PR change. |
+| Current base SHA | `ce504f42824807e215ee21df3dfd4eed9bb9a275` (`Shopify-connector` tip after **CORE-R2 / PR #154** disconnect-quiescence design merged; base-aligned via a normal `--no-ff` merge commit **`9bc224e`** this parallel session, authorization `4952271013`). Prior alignments: `cfdb057…` (U0 / PR #155, merge `66b0023`), `65e915a…` (U0 / PR #152), `fcbbb0b…` (PR #153), original `f9c3c5f…`. |
+| Aligned PR head | base-alignment merge **`9bc224e`** (`ce504f…` is an ancestor; `merge-base(head, origin/Shopify-connector) == ce504f`); the PR head then advances only by the opt-in tag/harness/evidence-doc commit. |
+| Base verification | `origin/Shopify-connector` tip == `ce504f…` (no drift from the required integration tip). Exactly two shared append-only docs conflicted (no `addons/**`/`tests/**`/Task 011B production/test conflict — CORE-R2 is docs-only), both resolved by **preserving both sides completely** (git-verified **0 lines lost from either side**): in `architecture-review-log.md` the Task 011B **AR-045** row (ours) and the CORE-R2 **AR-047** row (theirs) are both kept after **AR-044** (U0) → order AR-043/044/045/047, **no AR-046**; in `research-handoff.md` the Task 011B entry (ours) and the CORE-R2 entry (theirs) are both kept below the shared U0-acceptance-closure top entry. PR diff vs `ce504f…` = **exactly the 8 Task 011B files**; no CORE-R2 / U0 / Task 010B file appears as a PR change; production `models/**` + `tests/__init__.py` **byte-identical to `b680e8a`** (the merge added only docs). |
 | Gate comment | `4948879507` (Task 011B gate-opening act on PR #149) |
 | Branch | `claude/task-011b-customer-matching-k5ux9b` |
 | Parallel task | Task 010B (`claude/task-010b-product-import-completeness`) — disjoint production module; **not read, copied, or modified** |
@@ -153,7 +167,7 @@ The new test retains the **old full-scan path as a test-only reference** and ass
 
 ## 8. Benchmark method + numbers (D-011B-4 / D-011B-7) — corrected per review `4950230315`
 
-The harness lives in `TestCustomerMatchingBenchmark`, tagged `post_install` + `-standard` + `shopify_connector_customer_matching_benchmark` (excluded from the standard suite), invoked explicitly:
+The harness lives in `TestCustomerMatchingBenchmark`, tagged `post_install` + `-at_install` + `-standard` + `shopify_connector_customer_matching_benchmark` (post_install-only, excluded from the standard suite; see §14.3 for the `-at_install` correction), invoked explicitly:
 
 ```
 odoo -d <db> -i shopify_connector_sale --test-enable --stop-after-init \
@@ -270,3 +284,199 @@ Authored, PENDING runtime execution (not claimed complete):
 Documentation / PR:
 - [x] Validation record updated (this file); AR-045 updated (renumbered); handoff top entry updated.
 - [x] One draft PR into `Shopify-connector`, kept open/draft/unmerged; Task 010B untouched; all other gates closed.
+
+## 14. Parallel base-alignment + opt-in tag/harness closure session (2026-07-12, authorization `4952271013`)
+
+This isolated parallel session owns **PR #150, the Task 011B tests,
+`task-011b-validation-results.md`, and the PR #150 body**. After the required
+base-conflict resolution the shared global docs
+(`architecture-review-log.md`, `research-handoff.md`,
+`sync-engine-risk-register.md`, master plan) are **frozen** — no new global
+closure note is appended in this parallel run; this validation record is the
+session handoff.
+
+### 14.1 Base alignment — DONE (LOOP 1)
+
+- **Normal merge, no rebase/squash/force-push:** `git merge --no-ff
+  origin/Shopify-connector` (`ce504f42824807e215ee21df3dfd4eed9bb9a275`,
+  `Shopify-connector` after **CORE-R2 / PR #154** disconnect-quiescence design
+  merged) → base-alignment merge commit **`9bc224e`** (starting head
+  `b680e8a`).
+- **Conflicts = exactly the two shared append-only docs** (CORE-R2 is
+  docs-only, so **no `addons/**`/`tests/**` conflict**). Both resolved by
+  **preserving both sides completely** (git-verified **0 lines lost from either
+  side**):
+  - `docs/05-qa/architecture-review-log.md` — kept **ours `AR-045`** (Task
+    011B) *and* **theirs `AR-047`** (CORE-R2), both after **`AR-044`** (U0);
+    resulting order **AR-043 → AR-044 → AR-045 → AR-047**. **`AR-046` is
+    intentionally NOT present** (reserved for Task 010B / PR #151, still in its
+    own PR — not fabricated here). Diff vs ours: 0 removed, +1 line (the AR-047
+    row); diff vs theirs: 0 removed.
+  - `docs/01-research/research-handoff.md` — kept **ours Task 011B entry** *and*
+    **theirs CORE-R2 entry**, both below the shared **U0-acceptance-closure**
+    top entry. Diff vs ours: 0 removed, +108 lines (the CORE-R2 entry block);
+    diff vs theirs: 0 removed.
+  - CORE-R2's own new files (`docs/03-architecture/disconnect-quiescence-
+    remediation-analysis.md`, `docs/07-implementation-plan/task-core-r2-
+    disconnect-quiescence-packet.md`) and its edits to
+    `sync-engine-risk-register.md` + `implementation-ready-master-plan.md`
+    merged cleanly.
+- **Post-merge invariants (git-verified):** `ce504f` is an **ancestor** of the
+  head; `merge-base(head, origin/Shopify-connector) == ce504f`; the PR **net
+  diff vs `ce504f` = exactly the 8 Task 011B-owned files**; **no CORE-R2 /
+  U0 / Task 010B file appears as a net PR change**; production `models/**` +
+  `tests/__init__.py` are **byte-identical to `b680e8a`** (the merge changed
+  only docs). Base merge committed **separately** from the opt-in correction.
+
+### 14.2 Standard Odoo.sh suite evidence — ACCEPTED, carried forward (LOOP 2)
+
+Recorded specifically as **operator-provided branch build evidence accepted by
+the control room** (review `4680380669`) — a **control-room attribution
+decision, NOT an independently cryptographically proven build-to-commit
+mapping** (the log did not itself print the SHA). For head `b680e8a` on
+database `adamsmen-claude-task-011b-customer-matching-k5ux9b-34795383`, Odoo
+**19.0**, verbatim:
+
+- `shopify_connector_core: 209 tests 1.70s 4046 queries`
+- `shopify_connector_product: 61 tests 1.46s 2485 queries`
+- `shopify_connector_sale: 90 tests 1.04s 1602 queries`
+- `0 failed, 0 error(s) of 320 tests when loading database
+  'adamsmen-claude-task-011b-customer-matching-k5ux9b-34795383'`
+
+Confirmed: **32 standard `TestCustomerMatchingScalability` methods ran**; the
+**benchmark class did not run**; the **concurrency class did not run**; the
+**11 SQL ERROR-level entries are expected negative constraint-test evidence**,
+not failures; **no standard failure** occurred.
+
+**Applicability to the new head:** the base-alignment merge (`9bc224e`) changed
+**only docs**, and the opt-in tag correction (§14.3) changes **only the two
+`-standard`-excluded opt-in decorators** — **no standard test method changed**.
+The 32-method standard suite is therefore behaviourally identical; a formal
+re-run on the new head would re-confirm the same result (not run here — no Odoo
+runtime). Only the STANDARD runtime gate is green; concurrency, benchmark,
+authoritative backfill, and live Shopify remain separate, still-open gates.
+
+### 14.3 Opt-in tag correction — DONE (LOOP 3)
+
+- **Defect:** both opt-in classes were `@tagged('post_install', '-standard',
+  <custom>)`. Odoo's `tagged` **unions** onto the class's inherited default
+  `test_tags` (`odoo/tests/common.py`, 19.0 — `BaseCase.__init_subclass__`
+  assigns `{'standard', 'at_install'}` when unset, and *"When using class
+  inheritance, the tags ARE inherited"*), and the decorator **warns** when
+  `not (at_install ^ post_install)`. So the effective set was
+  `{at_install, post_install, <custom>}` — carrying **both** phases and
+  tripping the *"A tests should be either at_install or post_install"* warning.
+- **Fix (test file only):** `@tagged('post_install', '-at_install',
+  '-standard', <custom>)` → effective set **exactly `{post_install, <custom>}`**
+  = post_install-only, `-standard` (never in ordinary CI), custom tag retained
+  and deliberately invocable, XOR warning cleared. **No test meaning changed.**
+  Verified by replicating the exact Odoo-19 `tagged` union+XOR logic against the
+  real decorators: both classes resolve to `{post_install, <custom>}` with the
+  warning off. The un-decorated `TestCustomerMatchingScalability` stays
+  `{standard, at_install}` — its **32 standard methods are unchanged (no
+  standard test-count reduction)**.
+
+### 14.4 Concurrency — preflight PASS; execution PENDING (LOOPS 4–5)
+
+An independent preflight audit this session re-confirmed **every accepted
+protection** with source line anchors (no defect found): worker **owns +
+closes its own** cursor (`cr_w` referenced only inside `run_b`); nothing but
+`threading.Event`/`queue.Queue` crosses the thread boundary; parent (A) and
+worker (B) use **separate PostgreSQL backends** (independent
+`db_connect(dbname).cursor()`, own `pg_backend_pid()`); A's first `INSERT` is
+forced (`flush_all`) and **held** until the barrier `cr_a.commit()`; the
+lock-wait proof requires **both** `A ∈ pg_blocking_pids(B)` **and** the
+server-side `INSERT INTO`-binding predicate (`query ~*
+BINDING_INSERT_QUERY_REGEX`), and the **raw `query` text never enters Python**;
+all waits/joins/queue-gets and the cleanup/verification SQL are **bounded**
+(finite timeouts + transaction-local `lock_timeout`/`statement_timeout`);
+`daemon=True` is a **last-resort** liveness guard with `worker_alive_final`
+asserted false; cleanup **re-raises** and a **fresh connection verifies zero
+residue**; per-run **uuid** markers; **type-only sanitized** diagnostics; the
+api-client `execute()` is **stubbed** (no live Shopify).
+
+**No Odoo runtime here → NOT executed.** Exact invocation on a runtime host:
+
+```
+odoo -d <db> -i shopify_connector_sale --test-enable --stop-after-init \
+     --test-tags shopify_connector_customer_matching_concurrency
+```
+
+Required observed sequence (asserted in the test; **still PENDING** runtime
+observation): (1) A creates the winning binding and holds it open; (2) B enters
+the real dispatcher; (3) B is attributed as blocked on its customer-binding
+`INSERT`; (4) A commits; (5) B continues; (6) first collision classified via the
+accepted safety-net retry path; (7) `retry_count == 1`; (8) `next_retry_at`
+populated; (9) attempt log exists; (10) `retry_waiting` state-change log exists;
+(11) forced clean-transaction retry reaches `binding_conflict`; (12) job becomes
+`blocked_manual_review`; (13) exactly one binding survives (`gid_a`); (14)
+durable cleanup leaves zero synthetic rows.
+
+### 14.5 Benchmark — preflight PASS; execution + authoritative backfill PENDING (LOOPS 6–7)
+
+Preflight audit + a standalone deterministic simulation this session
+re-confirmed the **exact corpus** — in-Python **and** via DB marker `=like`
+predicates (unique per-run marker domain; **no `min_id..max_id` range**):
+`total=100000 / active=70000 / archived=30000 / shared=1500 / wrapped=10500 /
+ordinary=88000 / non-null-normalized=100000`; the **exact 1,000-probe mix**
+(`700` active-hit / `150` archived-hit / `100` miss / `50` ambiguous; the shared
+email yields `1050` active candidates → ambiguous); a **full matching-cost**
+probe (incoming normalize + active lookup + archived fallback) over the
+**indexed** normalized column (no full scan); a **fail-loud** backfill proxy
+with a type-only diagnostic; timing budgets **emitted, never asserted**; and
+**no destructive cleanup** (the benchmark is a `TransactionCase` — its
+transaction rolls back, so there is no whole-table delete). No defect found.
+
+**No Odoo runtime here → NOT executed.** Exact invocation on a runtime host:
+
+```
+odoo -d <db> -i shopify_connector_sale --test-enable --stop-after-init \
+     --test-tags shopify_connector_customer_matching_benchmark
+```
+
+**Authoritative 100k module-upgrade/backfill duration remains PENDING** — it
+must be measured by an actual module upgrade on a runtime host; the in-test
+recompute proxy does **not** replace it (and fails the benchmark loudly if it
+cannot produce a usable measurement).
+
+### 14.6 Static + adversarial checks — DONE (LOOPS 8–9)
+
+`py_compile` + `compileall` **CLEAN**; **no conflict markers** anywhere; net PR
+diff = **exactly the 8 Task 011B files**; production `models/**` +
+`tests/__init__.py` **byte-identical to `b680e8a`**; **no new repository file**;
+**32 standard** methods (no reduction) + **2 opt-in** (both explicit
+`post_install`/`-at_install`/`-standard` + a unique custom tag); **349/349**
+relative links in the edited docs resolve. One independent **adversarial
+review** (41 protection checks across transaction independence, cursor
+ownership, lock attribution, false-positive blocked-query detection, retry
+taxonomy, cleanup reliability, daemon misuse, benchmark corpus/measurement
+honesty, hidden O(n)/index usage, sensitive-diagnostic leakage, shared-doc
+preservation, cross-branch contamination — plus the corpus/probe simulation) —
+**all upheld, zero confirmed test-or-production defects**, so no correction loop
+was required. **No live/dev-store Shopify request** was made.
+
+### 14.7 No production change; two independent reverts (rollback)
+
+**No production/model/core file changed this session** (byte-identical to
+`b680e8a`). Two independent reverts:
+
+1. **Base-alignment revert** — revert merge commit `9bc224e` → the branch
+   returns to head `b680e8a` (pre-CORE-R2 alignment); the shared docs return to
+   their prior (U0/PR-#155-aligned) state; the matching code path is unaffected.
+2. **Opt-in tag/harness/evidence revert** — revert the opt-in correction commit
+   → the two opt-in decorators return to `post_install`/`-standard` (which
+   re-introduces the at_install-XOR warning) and this §14 record is removed;
+   **no production behaviour changes** in this revert.
+
+### 14.8 Remaining Task 011B gates (unchanged by this session)
+
+- Full `core`/`product`/`sale` Odoo.sh suites green on the **new** head — the
+  standard content is unchanged from the accepted `b680e8a` run; a formal re-run
+  is PENDING (no runtime).
+- Genuine independent-transaction concurrency route **observed** — PENDING the
+  opt-in run.
+- 100k benchmark latency/throughput numbers + **authoritative** backfill
+  duration — PENDING runtime.
+- Live/dev-store Shopify validation — PENDING, depends on **CORE-R2** runtime.
+- ChatGPT final merge review — PENDING. PR #150 stays **open, draft,
+  unmerged**.

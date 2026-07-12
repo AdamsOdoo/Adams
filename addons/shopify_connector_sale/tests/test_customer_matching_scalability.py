@@ -807,7 +807,16 @@ class TestCustomerMatchingScalability(_CustomerMatchingScalabilityBase):
                 % statement.split()[0])
 
 
-@tagged('post_install', '-standard', 'shopify_connector_customer_matching_benchmark')
+# `-at_install` is REQUIRED, not cosmetic: Odoo's `tagged` unions onto the
+# inherited default `{'standard', 'at_install'}` (odoo/tests/common.py
+# `BaseCase.__init_subclass__`, 19.0), so without removing `at_install` this
+# class would carry BOTH `at_install` and `post_install` and trip the decorator's
+# "should be either at_install or post_install" warning (`not (at_install ^
+# post_install)`). Removing it leaves exactly `{post_install, <custom tag>}`:
+# post_install-only, `-standard` (never in ordinary CI), deliberately invocable
+# by the custom tag.
+@tagged('post_install', '-at_install', '-standard',
+        'shopify_connector_customer_matching_benchmark')
 class TestCustomerMatchingBenchmark(_CustomerMatchingScalabilityBase):
     """D-011B-7 performance benchmark harness (tests 31-33).
 
@@ -1128,7 +1137,13 @@ class TestCustomerMatchingBenchmark(_CustomerMatchingScalabilityBase):
             'measured separately on a runtime host')
 
 
-@tagged('post_install', '-standard', 'shopify_connector_customer_matching_concurrency')
+# `-at_install` is REQUIRED (see the note on TestCustomerMatchingBenchmark):
+# it removes the inherited default `at_install` so the effective tag set is
+# exactly `{post_install, <custom tag>}` — post_install-only, `-standard`
+# (excluded from ordinary CI), invocable deliberately by the custom tag, and no
+# longer tripping the decorator's at_install-XOR-post_install warning.
+@tagged('post_install', '-at_install', '-standard',
+        'shopify_connector_customer_matching_concurrency')
 class TestCustomerMatchingConcurrency(TransactionCase):
     """D-011B-6 -- genuine independent-transaction binding race.
 
