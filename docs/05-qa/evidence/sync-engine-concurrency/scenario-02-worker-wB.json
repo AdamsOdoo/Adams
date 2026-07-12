@@ -1,0 +1,1 @@
+{"worker_tag": "wB", "pid": 23656, "barrier_release": "2026-07-11T22:25:33.484287Z", "before_claim": "2026-07-11T22:25:33.484324Z", "claimed_ids": [], "after_claim": "2026-07-11T22:25:33.485817Z", "after_dispatch": "2026-07-11T22:25:33.485833Z", "after_commit": "2026-07-11T22:25:33.486017Z"}

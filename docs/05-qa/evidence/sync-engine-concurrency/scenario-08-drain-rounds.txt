@@ -1,0 +1,8 @@
+{"tag": "srv1-r1", "port": "8169", "server_version": "19.0", "uid": 2, "t_before": "22:46:27.260082", "t_after": "22:46:27.266900", "drain_ok": true, "note": "run_drain returned None (normal); committed server-side"}
+
+{"tag": "srv2-r1", "port": "8170", "server_version": "19.0", "uid": 2, "t_before": "22:46:27.258796", "t_after": "22:46:27.310719", "drain_ok": true, "note": "run_drain returned None (normal); committed server-side"}
+
+{"tag": "srv1-r2", "port": "8169", "server_version": "19.0", "uid": 2, "t_before": "22:46:27.862491", "t_after": "22:46:27.869702", "drain_ok": true, "note": "run_drain returned None (normal); committed server-side"}
+
+{"tag": "srv2-r2", "port": "8170", "server_version": "19.0", "uid": 2, "t_before": "22:46:27.860647", "t_after": "22:46:27.900583", "drain_ok": true, "note": "run_drain returned None (normal); committed server-side"}
+

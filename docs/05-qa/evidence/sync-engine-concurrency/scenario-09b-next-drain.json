@@ -1,0 +1,1 @@
+{"worker_tag": "s9b_next", "pid": 9168, "barrier_release": null, "before_claim": "2026-07-11T22:48:59.699566Z", "claimed_ids": [114], "after_claim": "2026-07-11T22:48:59.702635Z", "after_dispatch": "2026-07-11T22:48:59.711627Z", "after_commit": "2026-07-11T22:48:59.715019Z"}

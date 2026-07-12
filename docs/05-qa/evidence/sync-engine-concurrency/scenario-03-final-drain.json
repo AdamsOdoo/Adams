@@ -1,0 +1,1 @@
+{"worker_tag": "s3final", "pid": 26025, "barrier_release": null, "before_claim": "2026-07-11T22:29:45.500510Z", "claimed_ids": [58], "after_claim": "2026-07-11T22:29:45.503170Z", "after_dispatch": "2026-07-11T22:29:45.511725Z", "after_commit": "2026-07-11T22:29:45.516861Z"}

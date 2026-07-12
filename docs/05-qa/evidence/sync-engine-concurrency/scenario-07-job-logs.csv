@@ -1,0 +1,2 @@
+id,job_id,event_type,from_state,to_state,message,technical_detail,occurred_at,actor_uid
+133,71,state_change,blocked_manual_review,cancelled,Job cancelled: store disconnected.,,2026-07-11 22:40:10,1

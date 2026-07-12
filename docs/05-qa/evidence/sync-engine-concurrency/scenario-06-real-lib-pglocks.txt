@@ -1,0 +1,9 @@
+# Scenario 6 (faithful, library variant) — PostgreSQL lock evidence
+captured_at_utc: 2026-07-12T07:13:34Z
+Worker B's action_disconnect() backend WAITING on a Lock while Worker A holds the job row:
+4847|active|Lock|transactionid|INSERT INTO "shopify_connector_job_log" ("actor_uid", "create_date", "create_uid", "event_
+
+All pbscen6 backends:
+4827|idle in transaction|Client|ClientRead
+4847|active|Lock|transactionid
+4875|active||

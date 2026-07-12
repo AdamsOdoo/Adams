@@ -1,0 +1,3 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+60,2,manual_sync,core_dispatch_selftest,retry_waiting,,,1,2026-07-11 22:29:56.079890,,,2|pb.synthetic.model|4000|gid://pb/retry-due/4000,2|core_dispatch_selftest|pb.synthetic.model|4000|gid://pb/retry-due/4000|pb-retry-due-4000,,4000
+61,2,manual_sync,core_dispatch_selftest,retry_waiting,,,1,2026-07-12 04:30:01.892923,,,2|pb.synthetic.model|4001|gid://pb/retry-future/4001,2|core_dispatch_selftest|pb.synthetic.model|4001|gid://pb/retry-future/4001|pb-retry-future-4001,,4001

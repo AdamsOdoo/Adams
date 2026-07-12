@@ -1,0 +1,2 @@
+{"phase": "claimed", "worker_tag": "A", "pid": 24854, "claimed_at": "2026-07-11T22:28:13.375277Z", "claimed_ids": [37, 38, 39, 40, 41, 42, 43, 44, 45, 46]}
+{"phase": "committed", "worker_tag": "A", "claimed_ids": [37, 38, 39, 40, 41, 42, 43, 44, 45, 46], "committed_at": "2026-07-11T22:28:19.404305Z"}
