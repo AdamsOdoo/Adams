@@ -18,6 +18,70 @@ runtime status; (5) intentionally deferred Slice 2/3 items; (6) residual risks;
 
 ---
 
+## 0.1 Correction pass — control-room review `4680664964`
+
+Review `4680664964` (on head `3a8bfd5`) returned **REVISE** with three reliability
+blockers. All three are corrected on the same branch (no new branch, no merge, PR
+kept draft); only `models/shopify_connector_api_client.py` and
+`tests/test_disconnect_quiescence.py` changed for the fix (plus these docs).
+
+**Blocker 1 — `execute_business` did not preserve the API-client contract.** It
+called `_send` and yielded the raw transport object, bypassing `execute()`'s
+missing-config `UserError`, missing-token classification, `RequestException`
+mapping, and `_normalize_response`. A missing token even committed a lease and
+passed a false token to `_send`.
+*Correction (api_client.py):* `execute_business` now (a) raises the **same**
+`UserError` when `shop_domain`/`api_version` is missing, **before** admission/
+lease/`_send`; (b) `_admit` raises the accepted `ShopifyClientError(ERROR_AUTH,
+REASON_TOKEN_INVALID, credential_invalid=True)` on a missing/empty token **before**
+the lease insert and before `_send`, with no second credential read (never a
+`ShopifyQuiescedError`, never a lease); (c) maps `requests.RequestException` →
+`ShopifyClientError(ERROR_TEMPORARY, REASON_TEMPORARY, redact(str(exc)))`;
+(d) yields `_normalize_response(store, response)` — the **same normalized dict**
+`execute()` returns — so a domain call site can swap `result = client.execute(…)`
+for `with client.execute_business(job, store, …) as result:` with no contract
+change. The legacy two-arg `_send(store, body)` seam and `execute()` are
+unchanged; `execute_business` uses the explicit-token `_send(store, body, token)`.
+The lease is held across `_send` **and** `_normalize_response` **and** the caller
+`with`-body.
+
+**Blocker 2 — genuine tests did not exercise the production admission boundary.**
+The prior `TestGenuineConcurrencyPrimitives` used raw `FOR SHARE` + raw lease
+`INSERT`s, proving only PostgreSQL primitives.
+*Correction (tests):* replaced by **`TestGenuineRealAdmission`**, which invokes the
+**real** `execute_business`/`_admit`/lease-ORM/`_get_access_token`/`_release_lease`
+from genuine independent `db_connect` connections. Each worker owns a real main
+cursor + `Environment` created **after** fixtures commit; the production `_admit`'s
+own `registry.cursor()` side transaction is made genuinely independent (real
+pooled cursor → durable, cross-connection-observable commit) by patching the
+registry cursor factory for the bounded test window. Raw SQL is retained **only**
+for bounded observation and durable, fail-loud, zero-residue cleanup — never to
+create the lease under test. Proven: real single-admission lease committed
+**before** `_send` and visible in-context then released; **caller-rollback
+independence** (the committed lease survives the worker's own main-txn rollback);
+**two real concurrent admissions** committing two distinct-keyed leases with
+correct `job_id`s, then releasing.
+
+**Blocker 3 — a release failure could replace the caller/body exception.**
+*Correction (api_client.py):* the unconditional `finally` is replaced with
+deterministic precedence — `try: … yield …; except BaseException as primary_error:
+release; on release failure `raise primary_error from release_error` (chained,
+never substituted); re-raise primary; else: release`. So: admission failure →
+no release (no lease); body/`_send`/normalize failure with successful release →
+original propagates, release runs exactly once; successful body + release failure
+→ release error propagates; body error + release error → body error stays
+**primary**, release chained as `__cause__` (classification preserved). No double
+release; KeyboardInterrupt/SystemExit still attempt release.
+
+**Also fixed while correcting the tests (found by the synchronous review):** the
+test fixtures created a `connected` store and then called `action_set_token()`,
+which **demotes** a connected store to `reconnect_needed`
+(`shopify_connector_store_credential.py:106-107`) — so business enqueue and
+`_admit` would have refused. Both fixtures now re-assert `state='connected'` after
+`action_set_token` (the canonical pattern the existing dispatch/retry tests use).
+
+---
+
 ## 0. Scope of this slice (what the gate authorized vs. what this slice did)
 
 The gate (`4952145926`) authorizes the whole CORE-R2. This **Foundation Slice 1**
@@ -166,8 +230,8 @@ Required-proof → test mapping (numbers are the gate/packet proof list):
 | 10 | Lease independently visible inside the context | same (`count_in_body == 1`) |
 | 11 | Normal exit releases | `test_normal_exit_releases_lease` |
 | 12 | Exception exit releases + re-raises | `test_exception_exit_releases_and_reraises` |
-| 13 | Caller rollback cannot erase the committed lease | `test_committed_lease_survives_caller_rollback` (genuine connections) |
-| 14 | Two concurrent admissions both commit | `test_two_concurrent_admissions_commit_distinct_leases` (genuine connections) |
+| 13 | Caller rollback cannot erase the committed lease | `TestGenuineRealAdmission.test_real_admission_survives_caller_rollback` (**real** `execute_business`/`_admit`, genuine connections) |
+| 14 | Two concurrent admissions both commit | `test_two_real_concurrent_admissions_commit_distinct_leases` (**real** path, two worker threads) |
 | 15 | Concurrent leases have distinct keys | same |
 | 16 | `_send` receives the captured token | `test_token_read_once_and_passed_to_send` |
 | 17 | `_send` does not reread credentials | `test_send_reads_credential_only_when_token_absent` |
@@ -177,13 +241,28 @@ Required-proof → test mapping (numbers are the gate/packet proof list):
 | 21 | No advisory lock | `test_no_advisory_lock_in_client_source` |
 | 22 | No request/main cursor commit | `test_no_main_cursor_commit_in_client_source` |
 
-**Known test-framework limitation (honest):** proofs 13/14/15 are genuine
-cross-connection properties. Odoo's `TestCursor` makes the production `_admit`'s
-side commit share the test transaction, so those three are proven at the
-PostgreSQL-primitive level via real `db_connect` connections (the identical
-sequence `_admit` performs), **not** through the production `_admit` call. The
-full two-server, production-path proof (packet T-19) remains the deferred Odoo.sh
-runtime item (RR-4 / SRR-09).
+**Additional API-contract + precedence tests (correction review `4680664964`):**
+`TestBusinessAdmission` also proves — missing `shop_domain`/`api_version` → same
+`UserError`, no lease, no `_send`; missing credential → accepted
+`ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID, credential_invalid=True)`
+with exactly one credential read and no lease; success → the same normalized dict
+shape as `execute()` with the lease held through normalization and the body;
+`RequestException` → `ERROR_TEMPORARY` with the lease released and no
+token/header/body leak; GraphQL/auth error → `_normalize_response` taxonomy
+preserved with the lease released; and the four precedence cases (release-once on
+body failure; success + release failure propagates; body error + release error →
+body primary with release chained as `__cause__`).
+
+**Test-framework note (honest, updated for the correction):** Odoo's `TestCursor`
+makes a `registry.cursor()` side commit share the test transaction, so it is not
+cross-connection-observable. To exercise the **real** production
+`execute_business`/`_admit` cross-connection boundary (review `4680664964`,
+blocker 2), `TestGenuineRealAdmission` patches the registry cursor factory to hand
+out real pooled cursors for the bounded test window, so the production `_admit`'s
+own side transaction commits durably and is observed from independent
+`db_connect` connections. Raw SQL is used only for observation/cleanup, never to
+create the lease under test. The full **two-server** production-path proof
+(packet T-19) remains the deferred Odoo.sh runtime item (RR-4 / SRR-09).
 
 ---
 
@@ -279,6 +358,24 @@ scope/allowlist/compatibility) was run against the actual diff. Outcome:
   to `SET LOCAL statement_timeout` so it covers each cursor's single transaction
   and auto-resets at commit — no leak onto the pooled connection. Both are the
   control-room's to confirm at Odoo.sh runtime along with the rest of the suite.
+
+**Correction-pass synchronous review (review `4680664964`).** Two independent
+synchronous reviewers examined the correction diff. The API-contract/precedence
+reviewer confirmed **all three blocker corrections correct** (store-config
+`UserError` parity; missing-token `ShopifyClientError` before lease; `_send`
+`RequestException` mapping; `_normalize_response` parity; and the precise
+`raise primary_error from release_error` precedence that preserves contextlib's
+`exc is value` identity so the caller's exception is never suppressed) — no
+in-scope defects. The genuine-tests reviewer confirmed the real-boundary test
+mechanics sound (registry-cursor patch scope, REPEATABLE-READ snapshot timing,
+closure binding, caller-rollback independence, two-thread non-blocking
+concurrency, FK-ordered fail-loud cleanup, imports/collection, no live network)
+and found **one confirmed defect**: the fixtures created a `connected` store then
+called `action_set_token`, which demotes it to `reconnect_needed`, so enqueue/
+admission would refuse. **Fixed** by re-asserting `state='connected'` after
+`action_set_token` in both fixtures (and a minor two-thread cleanup/join race was
+hardened by joining workers before cleanup). Static validation (LOOP 6) re-run
+green after the fixes.
 
 ---
 

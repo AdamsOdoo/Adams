@@ -21,6 +21,26 @@
   (7) focused tests (authored, **not executed** — no Odoo runtime); (8) the
   validation record `../05-qa/task-core-r2-validation-results.md` + AR-047/SRR-03
   updates + this handoff. Only the 12 allowlisted addon files + 4 docs changed.
+- **Correction pass (control-room review `4680664964`, same branch/PR — draft,
+  unmerged):** three reliability blockers corrected — (1) `execute_business` now
+  preserves `execute()`'s response/error contract (same missing-config
+  `UserError`; missing token → `ShopifyClientError(ERROR_AUTH,
+  REASON_TOKEN_INVALID, credential_invalid=True)` **before** lease/`_send`;
+  `RequestException` → `ShopifyClientError(ERROR_TEMPORARY, …)`; yields
+  `_normalize_response(...)` not the raw response) while keeping the two-arg
+  `_send` seam and single captured token; (2) genuine independent-connection
+  tests now invoke the **real** `execute_business`/`_admit`/lease-ORM/credential/
+  `_release_lease` (registry-cursor factory patched to real pooled cursors for a
+  bounded window; raw SQL only for observation/cleanup) — real pre-`_send` lease
+  visibility, caller-rollback independence, two real concurrent admissions with
+  distinct leases; (3) deterministic exception precedence (body/`_send`/normalize
+  error stays primary; release failure chained via `raise … from …`, never
+  substituted). A pre-existing fixture bug (`action_set_token` demotes
+  `connected`→`reconnect_needed`) was also fixed. Synchronous adversarial review:
+  API corrections confirmed correct; genuine-test mechanics sound. Only
+  `models/shopify_connector_api_client.py` + `tests/test_disconnect_quiescence.py`
+  changed for the fix (plus these docs). Still dormant; SRR-03 OPEN; tests
+  authored, not executed.
 - **Deliberately DEFERRED to later CORE-R2 slices (NOT done):** `disconnecting`
   state; `action_disconnect` rewrite; the conflicting lifecycle update-lock
   protocol (so admission-vs-disconnect linearization is **not yet closed end to

@@ -1,44 +1,61 @@
-"""CORE-R2 foundation-slice tests (AR-047, gate `4952145926`).
+"""CORE-R2 foundation-slice tests (AR-047, gate `4952145926`; correction review
+`4680664964`).
 
 These tests exercise the *admission half* of the CORE-R2 disconnect-quiescence
 mechanism delivered in this slice: the committed `shopify.connector.call.lease`
-model, the `execute_business` context-manager, the `_admit` store-row-locked
-admission, `_release_lease`, the single-token `_send` contract, and the
-enqueue-time connection-epoch capture. They do NOT test the disconnect
+model, the `execute_business` context-manager (with its `execute()`-parity
+response/error contract and deterministic exception precedence), the `_admit`
+store-row-locked admission, `_release_lease`, the single-token `_send` contract,
+and the enqueue-time connection-epoch capture. They do NOT test the disconnect
 controller, `disconnecting` lifecycle, or `timed_out`/`completed` finalization —
 those are deliberately later CORE-R2 slices.
 
 Two test styles are used, on purpose:
 
-* `TransactionCase` tests drive the **real production** `execute_business`/
+* `TransactionCase` classes drive the **real production** `execute_business`/
   `_admit`/`_send`/`_release_lease` path. Under Odoo test mode the side cursor
   that `_admit` opens (`registry.cursor()`) is a `TestCursor` sharing the single
   test connection, so these prove the admission *logic* (gate, ordering,
-  token-once, release) but cannot prove genuine cross-connection independence.
-* `TestGenuineConcurrencyPrimitives` opens **genuine independent PostgreSQL
-  connections** via `odoo.sql_db.db_connect` (never `registry.cursor()`) to prove
-  the DB-level coordination primitives `_admit` relies on: an independently
-  committed lease survives a caller's rollback, two `FOR SHARE` admissions on one
-  store row do not conflict, and lease keys are distinct. Fixtures there are
-  committed and torn down with durable, fail-loud cleanup.
+  token-once, API-parity, precedence, release) but cannot prove genuine
+  cross-connection independence.
+* `TestGenuineRealAdmission` (correction review `4680664964`, blocker 2) invokes
+  the **real** `execute_business`/`_admit`/lease-ORM/credential/`_release_lease`
+  path from genuine independent connections (`odoo.sql_db.db_connect`, never
+  `registry.cursor()` for the worker/observer cursors). To let the production
+  `_admit`'s own `registry.cursor()` side transaction commit to the real database
+  — so an independent observer connection can see it — those tests patch the
+  registry cursor factory to hand out real pooled cursors for the bounded test
+  window. Raw SQL is used only for bounded observation and cleanup, never to
+  create the lease under test. Fixtures are committed and torn down with durable,
+  fail-loud, bounded cleanup and a fresh zero-residue verification.
 
-No live Shopify call is made; the only transport seam replaced is `_send`. No
+No live Shopify call is made; the only transport seam replaced is `_send` (plus,
+for the two exception-precedence tests, an injected `_release_lease` fault). No
 lifecycle/state monkeypatch and no test-only timing hook is used.
 """
 
 import inspect
 import re
+import threading
 import uuid
 from unittest.mock import patch
 
 from odoo import SUPERUSER_ID, api, fields
+from odoo.exceptions import UserError
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
 from ..models import shopify_connector_api_client as client_module
-from ..models.shopify_connector_api_client import ShopifyQuiescedError
+from ..models.shopify_connector_api_client import (
+    ERROR_AUTH,
+    ERROR_TEMPORARY,
+    REASON_TOKEN_INVALID,
+    ShopifyClientError,
+    ShopifyQuiescedError,
+)
+from .test_api_client import FakeResponse, _success_body
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 
@@ -61,17 +78,18 @@ MAGIC_FIELDS = {
 
 
 def _ok_send(captured):
-    """A fake `_send` that records what it was handed and returns a sentinel.
+    """A fake `_send` that records what it was handed and returns a real
+    `FakeResponse` (200 OK) so `execute_business`'s `_normalize_response` runs
+    exactly as it does for `execute()`.
 
-    Mirrors the transport-injection seam of the existing api-client tests: it
-    replaces ONLY `_send`, makes no network call, and never reads credentials.
+    Replaces ONLY `_send`, makes no network call, and never reads credentials.
     """
 
     def fake_send(self, store, body, token=None):
         captured.setdefault('calls', []).append(1)
         captured['token'] = token
         captured['body'] = body
-        return {'data': {'ok': True}, 'throttle_status': None}
+        return FakeResponse(200, json_body={'data': {'ok': True}})
 
     return fake_send
 
@@ -156,9 +174,20 @@ class TestCallLeaseModelSchema(TransactionCase):
             re.search(r'\bmutation\s*[\{\(]', inspect.getsource(client_module))
         )
 
+    # API-parity source guards (review 4680664964, blocker 1): execute_business
+    # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit
+    # captured token, and carries the RRequestException->temporary taxonomy.
+    def test_execute_business_source_normalizes_and_preserves_seam(self):
+        source = inspect.getsource(client_module)
+        self.assertIn('_normalize_response(store, response)', source)
+        self.assertIn('self._send(store, body)', source)          # legacy 2-arg
+        self.assertIn('self._send(store, body, token)', source)   # business 3-arg
+        self.assertIn('REASON_TEMPORARY', source)
+
 
 class TestBusinessAdmission(TransactionCase):
-    """The real `execute_business`/`_admit`/`_release_lease` admission path."""
+    """The real `execute_business`/`_admit`/`_release_lease` admission path,
+    including the `execute()`-parity contract and exception precedence."""
 
     @classmethod
     def setUpClass(cls):
@@ -174,6 +203,11 @@ class TestBusinessAdmission(TransactionCase):
         cls.env['shopify.connector.store.credential'].action_set_token(
             cls.store, DUMMY_TOKEN
         )
+        # action_set_token() demotes a `connected` store to `reconnect_needed`
+        # (a credential change invalidates the connected state); re-assert
+        # `connected` so business enqueue + admission gates pass, mirroring the
+        # canonical pattern in the existing dispatch/retry tests.
+        cls.store.write({'state': 'connected'})
         cls.env.flush_all()
 
     def _make_job(self, store=None):
@@ -187,7 +221,7 @@ class TestBusinessAdmission(TransactionCase):
         store = store or self.store
         return self.Lease.search_count([('store_id', '=', store.id)])
 
-    # --- Refusals (fail closed; no lease, no _send) ---------------------
+    # --- Gate refusals (fail closed; no lease, no _send) ---------------
 
     # 4. Missing job is refused.
     def test_missing_job_refused(self):
@@ -232,16 +266,146 @@ class TestBusinessAdmission(TransactionCase):
                 pass
         self.assertEqual(self._lease_count(), 0)
 
-    # --- Admission success + token + ordering + release ----------------
+    # --- execute()-parity contract (review 4680664964, blocker 1) ------
 
-    # 8/16. Token is read exactly once (at admission) and handed to _send.
+    # C1. Missing shop_domain/api_version -> same UserError as execute();
+    # no lease, no _send (checked before admission).
+    def test_missing_store_config_raises_user_error_before_admission(self):
+        job = self._make_job()
+        self.env.flush_all()
+
+        class _StubStore:
+            def __init__(self, shop_domain, api_version, sid):
+                self.shop_domain = shop_domain
+                self.api_version = api_version
+                self.id = sid
+
+        sent = []
+
+        def spy_send(self, store, body, token=None):
+            sent.append(1)
+            return FakeResponse(200, json_body={'data': {}})
+
+        with patch.object(type(self.Client), '_send', spy_send):
+            for stub in (
+                _StubStore(False, '2026-07', self.store.id),
+                _StubStore('x.myshopify.com', False, self.store.id),
+            ):
+                with self.assertRaises(UserError):
+                    with self.Client.execute_business(job, stub, 'q'):
+                        pass
+        self.assertEqual(sent, [])
+        self.assertEqual(self._lease_count(), 0)
+
+    # C2. Missing credential -> accepted ShopifyClientError taxonomy, before any
+    # lease or _send, with exactly one credential read.
+    def test_missing_credential_raises_shopify_client_error(self):
+        nocred = self.env['shopify.connector.store'].create({
+            'name': 'No Credential Store',
+            'shop_domain': 'nocred-%s.myshopify.com' % uuid.uuid4().hex,
+            'api_version': '2026-07',
+            'state': 'connected',
+        })
+        job = self._make_job(store=nocred)
+        Cred = type(self.env['shopify.connector.store.credential'])
+        reads = []
+        sent = []
+
+        def counting_empty(self, store):
+            reads.append(1)
+            return False
+
+        def spy_send(self, store, body, token=None):
+            sent.append(1)
+            return FakeResponse(200, json_body={'data': {}})
+
+        self.env.flush_all()
+        with patch.object(Cred, '_get_access_token', counting_empty):
+            with patch.object(type(self.Client), '_send', spy_send):
+                with self.assertRaises(ShopifyClientError) as caught:
+                    with self.Client.execute_business(job, nocred, 'q'):
+                        pass
+        exc = caught.exception
+        self.assertEqual(exc.error_class, ERROR_AUTH)
+        self.assertTrue(exc.credential_invalid)
+        self.assertEqual(exc.reason, REASON_TOKEN_INVALID)
+        self.assertEqual(sent, [])          # no _send
+        self.assertEqual(reads, [1])        # exactly one credential read
+        self.assertEqual(self._lease_count(nocred), 0)   # no lease
+
+    # C3. Success yields the SAME normalized dict shape as execute(); lease held
+    # through normalization and the caller body, released after.
+    def test_success_yields_normalized_dict_like_execute(self):
+        job = self._make_job()
+        success = _success_body(domain=self.store.shop_domain)
+
+        def ok_send(self, store, body, token=None):
+            return FakeResponse(200, json_body=success)
+
+        self.env.flush_all()
+        with patch.object(type(self.Client), '_send', ok_send):
+            with self.Client.execute_business(job, self.store, 'q') as result:
+                self.assertIn('data', result)
+                self.assertIn('throttle_status', result)
+                self.assertEqual(
+                    result['data']['shop']['myshopifyDomain'],
+                    self.store.shop_domain,
+                )
+                self.assertEqual(self._lease_count(), 1)   # held through body
+        self.assertEqual(self._lease_count(), 0)           # released after
+
+    # C4/#6. requests.RequestException -> ERROR_TEMPORARY; lease released (even
+    # on a pre-yield failure); no token/header/body in the raised error.
+    def test_request_exception_mapped_to_temporary_and_releases(self):
+        job = self._make_job()
+
+        def raising_send(self, store, body, token=None):
+            raise client_module.requests.exceptions.ConnectTimeout(
+                'net down token=%s' % DUMMY_TOKEN
+            )
+
+        self.env.flush_all()
+        with patch.object(type(self.Client), '_send', raising_send):
+            with self.assertRaises(ShopifyClientError) as caught:
+                with self.Client.execute_business(job, self.store, 'q'):
+                    pass
+        exc = caught.exception
+        self.assertEqual(exc.error_class, ERROR_TEMPORARY)
+        self.assertNotIn(DUMMY_TOKEN, str(exc))
+        self.assertNotIn(DUMMY_TOKEN, exc.technical_detail or '')
+        self.assertEqual(self._lease_count(), 0)           # released
+
+    # C5. GraphQL/auth error passes through _normalize_response; accepted
+    # ShopifyClientError taxonomy is preserved; lease released.
+    def test_graphql_error_normalized_taxonomy_preserved_and_releases(self):
+        job = self._make_job()
+
+        def denied_send(self, store, body, token=None):
+            return FakeResponse(200, json_body={
+                'errors': [{
+                    'message': 'x', 'extensions': {'code': 'ACCESS_DENIED'},
+                }],
+            })
+
+        self.env.flush_all()
+        with patch.object(type(self.Client), '_send', denied_send):
+            with self.assertRaises(ShopifyClientError) as caught:
+                with self.Client.execute_business(job, self.store, 'q'):
+                    pass
+        self.assertEqual(caught.exception.error_class, ERROR_AUTH)
+        self.assertTrue(caught.exception.credential_invalid)
+        self.assertEqual(self._lease_count(), 0)
+
+    # --- token-once / ordering / release -------------------------------
+
+    # 8/16. Token read exactly once (at admission) and handed to _send.
     def test_token_read_once_and_passed_to_send(self):
         job = self._make_job()
         Cred = type(self.env['shopify.connector.store.credential'])
         reads = []
         captured = {}
 
-        def counting_get(cred_self, store):
+        def counting_get(self, store):
             reads.append(1)
             return 'TOKEN_SNAPSHOT_XYZ'
 
@@ -250,12 +414,11 @@ class TestBusinessAdmission(TransactionCase):
             with patch.object(type(self.Client), '_send', _ok_send(captured)):
                 with self.Client.execute_business(job, self.store, 'q'):
                     pass
-        self.assertEqual(reads, [1])                       # exactly once
-        self.assertEqual(captured['token'], 'TOKEN_SNAPSHOT_XYZ')  # 16
+        self.assertEqual(reads, [1])                        # exactly once
+        self.assertEqual(captured['token'], 'TOKEN_SNAPSHOT_XYZ')
 
     # 17. _send does not reread credentials when given a token; reads when not.
     def test_send_reads_credential_only_when_token_absent(self):
-        from .test_api_client import FakeResponse
         Client = self.Client
         Cred = type(self.env['shopify.connector.store.credential'])
         posted = {}
@@ -266,7 +429,7 @@ class TestBusinessAdmission(TransactionCase):
 
         reads = []
 
-        def counting_get(cred_self, store):
+        def counting_get(self, store):
             reads.append(1)
             return 'TOKEN_FROM_CRED'
 
@@ -293,7 +456,7 @@ class TestBusinessAdmission(TransactionCase):
             seen['count_at_send'] = self.Lease.search_count(
                 [('store_id', '=', store.id)]
             )
-            return {'data': {}, 'throttle_status': None}
+            return FakeResponse(200, json_body={'data': {}})
 
         self.env.flush_all()
         with patch.object(type(self.Client), '_send', fake_send):
@@ -319,7 +482,7 @@ class TestBusinessAdmission(TransactionCase):
                 self.assertEqual(self._lease_count(), 1)
         self.assertEqual(self._lease_count(), 0)
 
-    # 12. Exception exit releases the lease and re-raises.
+    # 7/12. Caller-body exception releases the lease and re-raises unchanged.
     def test_exception_exit_releases_and_reraises(self):
         job = self._make_job()
 
@@ -333,6 +496,50 @@ class TestBusinessAdmission(TransactionCase):
                     self.assertEqual(self._lease_count(), 1)
                     raise Boom()
         self.assertEqual(self._lease_count(), 0)
+
+    # --- deterministic exception precedence (review 4680664964, blocker 3) ---
+
+    # C8. Successful body + release failure -> the release error propagates.
+    def test_release_failure_after_successful_body_propagates(self):
+        job = self._make_job()
+
+        class ReleaseBoom(Exception):
+            pass
+
+        def failing_release(self, lease_key):
+            raise ReleaseBoom('release failed')
+
+        self.env.flush_all()
+        with patch.object(type(self.Client), '_send', _ok_send({})):
+            with patch.object(type(self.Client), '_release_lease',
+                              failing_release):
+                with self.assertRaises(ReleaseBoom):
+                    with self.Client.execute_business(job, self.store,
+                                                      'q') as result:
+                        self.assertEqual(result['data'], {'ok': True})
+
+    # C9. Body error + release error -> body error stays primary; release error
+    # is chained as its cause (classification not replaced).
+    def test_body_error_with_release_failure_preserves_primary(self):
+        job = self._make_job()
+
+        class BodyBoom(Exception):
+            pass
+
+        class ReleaseBoom(Exception):
+            pass
+
+        def failing_release(self, lease_key):
+            raise ReleaseBoom('release failed')
+
+        self.env.flush_all()
+        with patch.object(type(self.Client), '_send', _ok_send({})):
+            with patch.object(type(self.Client), '_release_lease',
+                              failing_release):
+                with self.assertRaises(BodyBoom) as caught:
+                    with self.Client.execute_business(job, self.store, 'q'):
+                        raise BodyBoom('body failed')
+        self.assertIsInstance(caught.exception.__cause__, ReleaseBoom)
 
     # 18. Token never appears in any lease field.
     def test_token_never_appears_in_lease_rows(self):
@@ -352,154 +559,303 @@ class TestBusinessAdmission(TransactionCase):
 
 
 @tagged('post_install', '-at_install')
-class TestGenuineConcurrencyPrimitives(TransactionCase):
-    """DB-level coordination primitives via genuine independent connections.
+class TestGenuineRealAdmission(TransactionCase):
+    """Genuine independent-connection tests of the REAL execute_business/_admit
+    path (correction review `4680664964`, blocker 2).
 
-    These use `odoo.sql_db.db_connect` (real, pooled connections), never
-    `registry.cursor()` — which under test mode shares the single test
-    connection and therefore cannot demonstrate cross-transaction independence.
-    They exercise the exact PostgreSQL sequence `_admit` performs (store-row
-    `FOR SHARE`, lease `INSERT`, independent `COMMIT`), proving the guarantees
-    the admission relies on. The full two-server production-path proof (T-19)
-    remains the deferred Odoo.sh runtime item (SRR-09 / RR-4).
-
-    Fixtures are committed and torn down with durable, fail-loud cleanup; every
-    connection sets a bounded `statement_timeout` so a wrongly-blocking lock
-    fails the test rather than hanging.
+    Each worker owns a `db_connect` main cursor + Environment created AFTER the
+    fixtures commit (so, under Odoo's REPEATABLE READ snapshot, it sees them).
+    `execute_business`/`_admit`/the lease ORM/`_get_access_token`/`_release_lease`
+    are the REAL production code. The production `_admit` opens its own
+    `registry.cursor()` side transaction — the mechanism under test — which is
+    made genuinely independent (real pooled cursor, real commit, observable
+    cross-connection) by patching the registry cursor factory for the bounded
+    test window. Raw SQL is used only to OBSERVE committed leases and to clean up;
+    it never creates the lease under test. The full two-server production-path
+    proof (packet T-19) remains a deferred Odoo.sh runtime item (SRR-09 / RR-4).
     """
 
     STATEMENT_TIMEOUT_MS = 10000
+    LOCK_TIMEOUT_MS = 8000
+    BOUND_SECONDS = 20
 
-    def _real_cursor(self, dbname):
-        cr = db_connect(dbname).cursor()
-        # SET LOCAL (not session): the bound covers this cursor's single
-        # transaction (the potentially-blocking FOR SHARE + insert, up to its
-        # commit) and auto-resets at transaction end, so it never leaks onto the
-        # pooled connection for a later reuse.
-        cr.execute("SET LOCAL statement_timeout = %s" % self.STATEMENT_TIMEOUT_MS)
-        return cr
+    # --- genuine-connection helpers ------------------------------------
 
-    def _make_committed_store(self, dbname):
-        """Create a connected store on a genuine independent connection."""
-        setup_cr = db_connect(dbname).cursor()
+    def _real_registry_cursor(self, dbname):
+        """A registry.cursor() replacement handing out real pooled cursors, so
+        the production `_admit` side transaction commits to the real DB. Accepts
+        (and ignores) any registry.cursor() args (e.g. readonly=)."""
+        return lambda *args, **kwargs: db_connect(dbname).cursor()
+
+    def _commit_fixtures(self, dbname, n_jobs):
+        """On an independent connection, create+commit a connected store, its
+        credential, and `n_jobs` matching business jobs."""
+        setup = db_connect(dbname).cursor()
         try:
-            env = api.Environment(setup_cr, SUPERUSER_ID, {})
+            env = api.Environment(setup, SUPERUSER_ID, {})
             store = env['shopify.connector.store'].create({
-                'name': 'Genuine Concurrency Store',
-                'shop_domain': 'genuine-%s.myshopify.com' % uuid.uuid4().hex,
+                'name': 'Genuine Real Admission Store',
+                'shop_domain': 'genuine-real-%s.myshopify.com' % uuid.uuid4().hex,
                 'api_version': '2026-07',
                 'state': 'connected',
             })
+            env['shopify.connector.store.credential'].action_set_token(
+                store, DUMMY_TOKEN
+            )
+            # action_set_token() demotes `connected` -> `reconnect_needed`;
+            # re-assert `connected` before enqueue/admission (see setUpClass).
+            store.write({'state': 'connected'})
+            job_ids = []
+            for _ in range(n_jobs):
+                job = env['shopify.connector.job.enqueue'].enqueue(
+                    store, 'manual_sync', 'core_dispatch_selftest',
+                    payload_hash=uuid.uuid4().hex,
+                )
+                job_ids.append(job.id)
             store_id = store.id
-            setup_cr.commit()
-            return store_id
+            setup.commit()
+            return store_id, job_ids
         finally:
-            setup_cr.close()
+            setup.close()
 
-    def _raw_insert_lease(self, cr, store_id, lease_key, job_id=1):
-        cr.execute(
-            "INSERT INTO shopify_connector_call_lease "
-            "(store_id, lease_key, job_id, worker_ref, admitted_at, expires_at) "
-            "VALUES (%s, %s, %s, %s, (now() at time zone 'UTC'), "
-            "((now() at time zone 'UTC') + interval '300 seconds'))",
-            (store_id, lease_key, job_id, 'genuine-test'),
-        )
+    def _committed_lease_rows(self, dbname, store_id):
+        """Observe committed leases from a fresh independent connection."""
+        obs = db_connect(dbname).cursor()
+        try:
+            obs.execute(
+                "SET LOCAL statement_timeout = %d" % self.STATEMENT_TIMEOUT_MS)
+            obs.execute(
+                "SELECT lease_key, job_id FROM shopify_connector_call_lease "
+                "WHERE store_id = %s ORDER BY lease_key", (store_id,))
+            rows = obs.fetchall()
+            obs.rollback()
+            return rows
+        finally:
+            obs.close()
 
-    def _cleanup(self, dbname, store_id):
-        """Durable teardown; deliberately does NOT swallow failures."""
-        if not store_id:
+    def _cleanup(self, dbname, store_id, job_ids):
+        """Durable, bounded, fail-loud teardown + fresh zero-residue check."""
+        if store_id is None:
             return
         cr = db_connect(dbname).cursor()
         try:
             cr.execute(
-                "SET LOCAL statement_timeout = %s" % self.STATEMENT_TIMEOUT_MS
-            )
+                "SET LOCAL statement_timeout = %d" % self.STATEMENT_TIMEOUT_MS)
+            cr.execute("SET LOCAL lock_timeout = %d" % self.LOCK_TIMEOUT_MS)
+            if job_ids:
+                cr.execute(
+                    "DELETE FROM shopify_connector_job_log "
+                    "WHERE job_id = ANY(%s)", (list(job_ids),))
             cr.execute(
-                "DELETE FROM shopify_connector_call_lease WHERE store_id = %s",
-                (store_id,),
-            )
+                "DELETE FROM shopify_connector_call_lease "
+                "WHERE store_id = %s", (store_id,))
+            if job_ids:
+                cr.execute(
+                    "DELETE FROM shopify_connector_job WHERE id = ANY(%s)",
+                    (list(job_ids),))
             cr.execute(
-                "DELETE FROM shopify_connector_store WHERE id = %s", (store_id,)
-            )
+                "DELETE FROM shopify_connector_store_credential "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store WHERE id = %s", (store_id,))
             cr.commit()
         finally:
             cr.close()
+        self._assert_zero_residue(dbname, store_id, job_ids)
 
-    # 13. A committed lease survives the caller transaction's rollback.
-    def test_committed_lease_survives_caller_rollback(self):
-        dbname = self.env.cr.dbname
-        store_id = None
-        cursors = []
-        lease_key = uuid.uuid4().hex
+    def _assert_zero_residue(self, dbname, store_id, job_ids):
+        v = db_connect(dbname).cursor()
         try:
-            store_id = self._make_committed_store(dbname)
-            caller = self._real_cursor(dbname)
-            admit = self._real_cursor(dbname)
-            observer = self._real_cursor(dbname)
-            cursors = [caller, admit, observer]
-            # Caller opens a transaction (its own business work).
-            caller.execute(
-                "SELECT id FROM shopify_connector_store WHERE id = %s",
-                (store_id,),
-            )
-            caller.fetchone()
-            # Admission commits a lease on an INDEPENDENT transaction.
-            self._raw_insert_lease(admit, store_id, lease_key)
-            admit.commit()
-            # The caller then rolls its whole transaction back.
-            caller.rollback()
-            # A fresh observer transaction still sees the committed lease.
-            observer.execute(
+            v.execute(
                 "SELECT count(*) FROM shopify_connector_call_lease "
-                "WHERE lease_key = %s",
-                (lease_key,),
-            )
-            self.assertEqual(observer.fetchone()[0], 1)
-            observer.commit()
+                "WHERE store_id = %s", (store_id,))
+            assert v.fetchone()[0] == 0, 'lease residue after cleanup'
+            v.execute(
+                "SELECT count(*) FROM shopify_connector_store WHERE id = %s",
+                (store_id,))
+            assert v.fetchone()[0] == 0, 'store residue after cleanup'
+            v.execute(
+                "SELECT count(*) FROM shopify_connector_store_credential "
+                "WHERE store_id = %s", (store_id,))
+            assert v.fetchone()[0] == 0, 'credential residue after cleanup'
+            if job_ids:
+                v.execute(
+                    "SELECT count(*) FROM shopify_connector_job "
+                    "WHERE id = ANY(%s)", (list(job_ids),))
+                assert v.fetchone()[0] == 0, 'job residue after cleanup'
+            v.rollback()
         finally:
-            for cr in cursors:
-                cr.close()
-            self._cleanup(dbname, store_id)
+            v.close()
 
-    # 14/15. Two FOR SHARE admissions on one store both commit distinct leases.
-    def test_two_concurrent_admissions_commit_distinct_leases(self):
+    # B. Real single admission: lease committed before _send, visible in the
+    # context, and released on exit — all observed cross-connection.
+    def test_real_admission_visible_before_send_and_released(self):
         dbname = self.env.cr.dbname
         store_id = None
-        cursors = []
+        job_ids = []
+        worker_cr = None
         try:
-            store_id = self._make_committed_store(dbname)
-            worker_a = self._real_cursor(dbname)
-            worker_b = self._real_cursor(dbname)
-            observer = self._real_cursor(dbname)
-            cursors = [worker_a, worker_b, observer]
-            # Both take FOR SHARE on the SAME store row. If FOR SHARE
-            # self-conflicted, worker_b would block and its statement_timeout
-            # would fail the test rather than hang.
-            worker_a.execute(
-                "SELECT id FROM shopify_connector_store WHERE id = %s FOR SHARE",
-                (store_id,),
-            )
-            worker_a.fetchone()
-            worker_b.execute(
-                "SELECT id FROM shopify_connector_store WHERE id = %s FOR SHARE",
-                (store_id,),
-            )
-            worker_b.fetchone()
-            # Both insert their own lease under the shared lock and commit.
-            self._raw_insert_lease(worker_a, store_id, uuid.uuid4().hex)
-            self._raw_insert_lease(worker_b, store_id, uuid.uuid4().hex)
-            worker_a.commit()
-            worker_b.commit()
-            observer.execute(
-                "SELECT count(*), count(distinct lease_key) "
-                "FROM shopify_connector_call_lease WHERE store_id = %s",
-                (store_id,),
-            )
-            total, distinct = observer.fetchone()
-            self.assertEqual(total, 2)      # 14: both committed
-            self.assertEqual(distinct, 2)   # 15: distinct keys
-            observer.commit()
+            store_id, job_ids = self._commit_fixtures(dbname, n_jobs=1)
+            worker_cr = db_connect(dbname).cursor()
+            worker_env = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = worker_env['shopify.connector.store'].browse(store_id)
+            job = worker_env['shopify.connector.job'].browse(job_ids[0])
+            Client = worker_env['shopify.connector.api.client']
+            observed = {}
+
+            # `client_self` is the api-client recordset bound by `self._send(...)`;
+            # the test instance's `self` (for the observer helper) is captured by
+            # closure.
+            def observing_send(client_self, store_arg, body, token=None):
+                observed['token'] = token
+                observed['during_send'] = self._committed_lease_rows(
+                    dbname, store_id)
+                return FakeResponse(200, json_body={'data': {'ok': True}})
+
+            with patch.object(self.registry, 'cursor',
+                              self._real_registry_cursor(dbname)):
+                with patch.object(type(Client), '_send', observing_send):
+                    with Client.execute_business(
+                            job, store, 'query { shop { id } }') as result:
+                        observed['in_body'] = self._committed_lease_rows(
+                            dbname, store_id)
+                        observed['result'] = result
+            observed['after'] = self._committed_lease_rows(dbname, store_id)
+
+            self.assertEqual(len(observed['during_send']), 1)   # committed pre-send
+            key, jid = observed['during_send'][0]
+            self.assertEqual(jid, job_ids[0])
+            self.assertRegex(key, r'^[0-9a-f]{32}$')            # opaque
+            self.assertEqual(observed['token'], DUMMY_TOKEN)    # real snapshot
+            self.assertEqual(len(observed['in_body']), 1)       # visible in ctx
+            self.assertEqual(observed['result']['data'], {'ok': True})  # normalized
+            self.assertEqual(len(observed['after']), 0)         # released on exit
         finally:
-            for cr in cursors:
-                cr.close()
-            self._cleanup(dbname, store_id)
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_ids)
+
+    # C. Real caller-rollback independence: the committed lease survives the
+    # worker's own main-transaction rollback, then releases on context exit.
+    def test_real_admission_survives_caller_rollback(self):
+        dbname = self.env.cr.dbname
+        store_id = None
+        job_ids = []
+        worker_cr = None
+        try:
+            store_id, job_ids = self._commit_fixtures(dbname, n_jobs=1)
+            worker_cr = db_connect(dbname).cursor()
+            worker_env = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = worker_env['shopify.connector.store'].browse(store_id)
+            job = worker_env['shopify.connector.job'].browse(job_ids[0])
+            Client = worker_env['shopify.connector.api.client']
+            observed = {}
+
+            def ok_send(client_self, store_arg, body, token=None):
+                return FakeResponse(200, json_body={'data': {'ok': True}})
+
+            with patch.object(self.registry, 'cursor',
+                              self._real_registry_cursor(dbname)):
+                with patch.object(type(Client), '_send', ok_send):
+                    with Client.execute_business(
+                            job, store, 'query { shop { id } }'):
+                        # the caller's OWN main transaction rolls back mid-context
+                        worker_cr.rollback()
+                        observed['after_rollback'] = self._committed_lease_rows(
+                            dbname, store_id)
+            observed['after_exit'] = self._committed_lease_rows(dbname, store_id)
+
+            self.assertEqual(len(observed['after_rollback']), 1)  # independent
+            self.assertEqual(observed['after_rollback'][0][1], job_ids[0])
+            self.assertEqual(len(observed['after_exit']), 0)      # released
+        finally:
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_ids)
+
+    # D. Two REAL concurrent admissions on one store: both enter without
+    # blocking, both leases coexist with distinct keys and correct job ids, both
+    # release.
+    def test_two_real_concurrent_admissions_commit_distinct_leases(self):
+        dbname = self.env.cr.dbname
+        store_id = None
+        job_ids = []
+        release_gate = threading.Event()
+        t1 = t2 = None
+        try:
+            store_id, job_ids = self._commit_fixtures(dbname, n_jobs=2)
+            both_admitted = threading.Semaphore(0)
+            errors = []
+
+            def blocking_send(client_self, store_arg, body, token=None):
+                # this worker's _admit has already committed its lease
+                both_admitted.release()
+                if not release_gate.wait(timeout=self.BOUND_SECONDS):
+                    raise AssertionError('release_gate not set within bound')
+                return FakeResponse(200, json_body={'data': {'ok': True}})
+
+            def worker(job_id):
+                wcr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    wcr = db_connect(dbname).cursor()
+                    wenv = api.Environment(wcr, SUPERUSER_ID, {})
+                    store = wenv['shopify.connector.store'].browse(store_id)
+                    job = wenv['shopify.connector.job'].browse(job_id)
+                    client = wenv['shopify.connector.api.client']
+                    with client.execute_business(
+                            job, store, 'query { shop { id } }'):
+                        pass
+                except Exception as exc:                       # fail loud
+                    errors.append(exc)
+                finally:
+                    if wcr is not None:
+                        try:
+                            wcr.rollback()
+                            wcr.close()
+                        except Exception:
+                            pass
+
+            Client = self.env['shopify.connector.api.client']
+            rows = None
+            with patch.object(self.registry, 'cursor',
+                              self._real_registry_cursor(dbname)):
+                with patch.object(type(Client), '_send', blocking_send):
+                    t1 = threading.Thread(
+                        target=worker, args=(job_ids[0],), daemon=True)
+                    t2 = threading.Thread(
+                        target=worker, args=(job_ids[1],), daemon=True)
+                    t1.start()
+                    t2.start()
+                    got1 = both_admitted.acquire(timeout=self.BOUND_SECONDS)
+                    got2 = both_admitted.acquire(timeout=self.BOUND_SECONDS)
+                    self.assertTrue(
+                        got1 and got2,
+                        'both admissions did not overlap within bound '
+                        '(errors: %r)' % errors)
+                    # both leases coexist right now
+                    rows = self._committed_lease_rows(dbname, store_id)
+                    release_gate.set()
+                    t1.join(timeout=self.BOUND_SECONDS)
+                    t2.join(timeout=self.BOUND_SECONDS)
+                    self.assertFalse(
+                        t1.is_alive() or t2.is_alive(),
+                        'worker threads did not finish within bound')
+            after = self._committed_lease_rows(dbname, store_id)
+
+            self.assertFalse(errors, 'worker errors: %r' % errors)
+            self.assertEqual(len(rows), 2)                       # both committed
+            self.assertEqual(len({r[0] for r in rows}), 2)       # distinct keys
+            self.assertEqual({r[1] for r in rows}, set(job_ids))  # correct jobs
+            self.assertEqual(len(after), 0)                      # both released
+        finally:
+            # unblock any worker still parked at the _send seam, then JOIN both
+            # (bounded) before cleanup so a still-terminating worker cannot race
+            # the fixture DELETEs.
+            release_gate.set()
+            for t in (t1, t2):
+                if t is not None:
+                    t.join(timeout=self.BOUND_SECONDS)
+            self._cleanup(dbname, store_id, job_ids)

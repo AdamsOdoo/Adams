@@ -179,29 +179,85 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 payload = normalize(result)
                 apply_import(store, payload)      # local reconciliation
 
+        **API parity with `execute()` (control-room review `4680664964`).**
+        `execute_business` preserves the accepted API-client response/error
+        contract so a domain call site can replace ``result = client.execute(…)``
+        with ``with client.execute_business(job, store, …) as result:`` without
+        changing behaviour:
+
+        - the same missing-configuration `UserError` (no `shop_domain` /
+          `api_version`), raised **before** any admission, lease, or `_send`;
+        - a missing/empty credential raises the accepted
+          `ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID,
+          credential_invalid=True)` inside `_admit` **before** the lease insert
+          and before `_send` (never a `ShopifyQuiescedError`, never a lease);
+        - a `requests.RequestException` from `_send` is mapped to
+          `ShopifyClientError(ERROR_TEMPORARY, REASON_TEMPORARY, …)` (token/header/
+          body redacted);
+        - the yielded value is `_normalize_response(store, response)` — the same
+          normalized dict `execute()` returns, with the full HTTP/GraphQL/auth/
+          throttle/version taxonomy — **not** the raw transport object.
+
         `__enter__` performs the atomic admission of `_admit` (store-row
         `FOR SHARE` lock -> fresh state/generation gate -> single token read ->
-        committed lease), then issues the HTTP request via
-        `_send(store, body, token)` with that one token snapshot and yields the
-        transport result. The committed lease is **held for the whole `with`
-        body**, so it provably outlives the caller's local reconciliation. On
-        both normal and exception exit the lease is released exactly once, and
-        caller exceptions are never suppressed. A process crash inside the body
-        runs no release, leaving the committed lease for the (later-slice)
-        direction-C timeout path.
+        committed lease), issues the request via `_send(store, body, token)` with
+        that one token snapshot, normalizes it, and yields the dict. The committed
+        lease is **held for the whole `with` body** (through `_normalize_response`
+        and the caller's reconciliation), so it provably outlives reconciliation.
 
-        There is deliberately no value-returning form and no manual release: the
-        result is reachable only inside the protected `with` block. If admission
-        is refused, `__enter__` raises `ShopifyQuiescedError` before any lease or
-        call. **Dormant in this slice** — no production call site enters this
-        context yet.
+        **Deterministic exception precedence (review `4680664964`).** The
+        body/`_send`/normalization failure is always the **primary** exception; a
+        simultaneous release failure is **chained** (`raise primary from
+        release_error`), never replacing it — so the accepted `ShopifyClientError`
+        classification is preserved. On a successful body a release failure
+        propagates. The lease is released exactly once (never twice), on both
+        normal and exception exit; caller exceptions are never suppressed and
+        KeyboardInterrupt/SystemExit still attempt release. A process crash inside
+        the body runs no release, leaving the committed lease for the
+        (later-slice) direction-C timeout path.
+
+        There is deliberately no value-returning form and no manual release. If
+        admission is refused, `__enter__` raises before any lease or call.
+        **Dormant in this slice** — no production call site enters this context
+        yet.
         """
+        # Same configuration precondition as execute() -- fail before any
+        # admission, lease, or transport (no lease, no _send).
+        if not store.shop_domain or not store.api_version:
+            raise UserError(
+                'A shop domain and API version are required before '
+                'contacting Shopify.'
+            )
+        # _admit reads the token once and raises the accepted taxonomy on a
+        # missing credential (ShopifyClientError) or fails closed on the gate
+        # (ShopifyQuiescedError) -- in either case before any lease exists, so no
+        # release is owed here.
         lease_key, token = self._admit(job, store)
         try:
             body = {'query': query, 'variables': variables or {}}
-            result = self._send(store, body, token)
+            try:
+                response = self._send(store, body, token)
+            except ShopifyClientError:
+                raise
+            except requests.exceptions.RequestException as exc:
+                raise ShopifyClientError(
+                    error_class=ERROR_TEMPORARY,
+                    reason=REASON_TEMPORARY,
+                    technical_detail=redact(str(exc)),
+                )
+            result = self._normalize_response(store, response)
             yield result
-        finally:
+        except BaseException as primary_error:
+            # Precedence: the primary (body/send/normalization/caller) exception
+            # is preserved; a release failure is chained, never substituted.
+            try:
+                self._release_lease(lease_key)
+            except BaseException as release_error:
+                raise primary_error from release_error
+            raise primary_error
+        else:
+            # Body succeeded -> release normally; a release failure here has no
+            # prior exception to preserve, so it propagates.
             self._release_lease(lease_key)
 
     def _admit(self, job, store):
@@ -222,7 +278,10 @@ class ShopifyConnectorApiClient(models.AbstractModel):
           6. the store must be `connected`;
           7. the store generation must equal the job's captured
              `expected_connection_generation`;
-          8. read the access token exactly once (no second lookup anywhere);
+          8. read the access token exactly once (no second lookup anywhere); a
+             missing/empty credential raises `ShopifyClientError(ERROR_AUTH,
+             REASON_TOKEN_INVALID, credential_invalid=True)` here — before any
+             lease insert — never a `ShopifyQuiescedError`;
           9. generate an opaque lease key;
          10. insert the committed lease;
          11. commit — persists the lease and releases the `FOR SHARE` lock
@@ -276,6 +335,18 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             ]._get_access_token(
                 side_env['shopify.connector.store'].browse(store.id)
             )
+            if not token:
+                # A connected store with no usable credential is an
+                # authentication failure, not a quiescence refusal -- raise the
+                # accepted API-client taxonomy BEFORE any lease insert and before
+                # `_send`, and without a second credential read. The side txn is
+                # rolled back (releasing FOR SHARE) and closed by the handlers
+                # below, so no lease is committed.
+                raise ShopifyClientError(
+                    error_class=ERROR_AUTH,
+                    reason=REASON_TOKEN_INVALID,
+                    credential_invalid=True,
+                )
             lease_key = uuid.uuid4().hex
             admitted_at = fields.Datetime.now()
             side_env['shopify.connector.call.lease'].create({
