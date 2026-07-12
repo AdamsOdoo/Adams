@@ -134,13 +134,25 @@ table; nothing else may overlap.
 ### 2.1 Proposed CORE-R2 dependency (under review — NOT an accepted reorder)
 
 > **Inserted 2026-07-12 by the CORE-R2 design session** (gate comment
-> PR #153 `4950413650`, docs-only; verified base
-> `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`). **Revised 2026-07-12 per
-> review `4951115877`** to broaden the dependency from Shopify *mutations*
-> to **any Shopify call including reads**. This subsection **adds a
-> proposed dependency only** — it does **not** renumber or reorder the
-> accepted §2 steps. **CORE-R2 design is under review; no CORE-R2
-> implementation gate is open.**
+> PR #153 `4950413650`, docs-only). **Revised twice 2026-07-12** — per
+> review `4951115877` (broaden the dependency from Shopify *mutations* to
+> **any Shopify call including reads**) and per review `4951237871`
+> (committed-lease quiescence; explicit `execute_business` boundary;
+> base re-aligned by normal merge to
+> `65e915aada32930a19a14c94d23dc9bd5e6fb517`, U0/PR #152 preserved). This
+> subsection **adds a proposed dependency only** — it does **not** renumber
+> or reorder the accepted §2 steps. **CORE-R2 design is under review; no
+> CORE-R2 implementation gate is open.**
+>
+> **Cross-module note (rev 3):** making INV-2 real requires **two minimal,
+> named call-site edits** in existing domain importers —
+> `shopify_connector_product` (product import) and `shopify_connector_sale`
+> (customer import) — to route their Shopify reads through the guarded
+> `execute_business(job, …)` entry. The CORE-R2 packet's future allowlist
+> names exactly those two call sites (call-site-only). This is an
+> additional reason CORE-R2 must land before those handlers are
+> live-validated; ChatGPT sequences the two edits vs Tasks 010B/011B at the
+> CORE-R2 gate (D-CR2-E).
 
 **Task CORE-R2 — disconnect quiescence & in-flight job contract** remediates
 the **runtime-confirmed** DEF-PB-1 / SRR-03 (PR #153, accepted `4950408383`):
