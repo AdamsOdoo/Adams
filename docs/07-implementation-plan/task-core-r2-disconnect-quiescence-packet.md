@@ -15,7 +15,8 @@
 > rollback**. Companion analysis (read first):
 > [`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md).
 > Base after normal-merge of the integration tip: `Shopify-connector` @
-> `65e915aada32930a19a14c94d23dc9bd5e6fb517`.
+> `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (control-room base-sync
+> amendment; supersedes `65e915a`; PR #152/U0 + PR #155/U0-closure preserved).
 
 ---
 

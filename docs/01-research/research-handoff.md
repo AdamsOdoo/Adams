@@ -1,15 +1,63 @@
 # Research Handoff (rolling)
 
+### U0 acceptance closure — visual baseline accepted & merged (documentation-only, 2026-07-12)
+
+- **Acceptance recorded (control-room comment `4951204357`, 2026-07-12 — “ACCEPT
+  U0 visual baseline … ACCEPT AND MERGE”):** the U0 premium operator-UI visual
+  prototype is **accepted as the future visual baseline** and **PR #152 merged**
+  into `Shopify-connector` at merge commit
+  **`65e915aada32930a19a14c94d23dc9bd5e6fb517`** (parents `fcbbb0b` + `2c2648e`).
+  **P1–P13 and the PD-7 selective-Owl scope are accepted** (recorded in
+  `docs/09-ui-prototype/README.md` §6 + `traceability-matrix.md` §3 + the screen
+  specs, and `docs/05-qa/architecture-review-log.md` AR-044). **U0 is complete.**
+- **Current integration tip:** `Shopify-connector` == `65e915aada32930a19a14c94d23dc9bd5e6fb517`
+  (the PR #152 merge commit). This closure session branched
+  `claude/u0-acceptance-closure` from that exact tip.
+- **Gate posture (unchanged by the acceptance):** the acceptance is **visual
+  only** — it authorizes **no production code** and opens **no implementation
+  gate**. **UI-U1, U2, and U3 remain CLOSED**; UI-U1 stays dependent on its
+  existing prerequisites (Area 6 + SEC-1 merged; U0 accepted — now satisfied).
+  Every other gate (Task 010B, 011B, LC-1, Task 012, Area 6, SEC-1, inventory,
+  fulfillment, export, webhooks, OAuth, PERF-1) remains closed. The master plan
+  was updated to mark U0 complete/accepted; UI-U1 was **not** moved ahead of
+  Area 6 / SEC-1; U2/U3 stay closed; no unrelated task was reordered.
+- **This session (documentation only):** synchronized the accepted status across
+  the eleven allowed docs — the six screen specs + `visual-checklist.md` (status
+  headers → “Accepted U0 visual baseline”), `README.md` + `traceability-matrix.md`
+  (P1–P13 + PD-7 recorded accepted), `architecture-review-log.md` (AR-044),
+  `implementation-ready-master-plan.md` (U0 complete/accepted), and this handoff.
+  **No `*.html` / `*.css` / `*.png`, addon, test, or code file was changed; no new
+  file added; no visual design altered.** History preserved (gate `4948902516`;
+  reviews `4950255482`, `4950432754`; acceptance `4951204357`; PR #152).
+- **Learning feedback loop:** New issues discovered: none (docs-only status
+  synchronization). Repeated issue pattern: none. Rules/checklists updated: none
+  unilaterally. New rejected approaches: none. New technical debt: none (rollback
+  = single-PR revert of the doc edits; no schema/data/records/code). Should future
+  prompts change? A UI-U1 implementation prompt must still require its existing
+  prerequisites (Area 6 + SEC-1 merged) and the P9 platform-FontAwesome swap — U0
+  acceptance alone does not authorize it.
+- **Quality gate confirmation:** handoff updated (this new top entry; older
+  entries untouched) · feedback loop checked · forbidden files untouched · no new
+  technical debt · UI-U1/U2/U3 confirmed CLOSED.
+- **Next recommended session prompt (for ChatGPT to issue):** *“UI-U1 remains
+  gated — do not start it until Area 6 and SEC-1 are merged. When those
+  prerequisites are met, issue the UI-U1 dashboard implementation gate act per the
+  UI packet §6, consuming the accepted U0 visual baseline
+  (`docs/09-ui-prototype/`) and swapping inline-SVG placeholders for the platform
+  FontAwesome set (P9).”*
+
 ### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR #154 into `Shopify-connector`, 2026-07-12, revision 3)
 
 - **Base (re-aligned by normal merge):** `Shopify-connector` tip ==
-  `65e915aada32930a19a14c94d23dc9bd5e6fb517` (PR #152/U0 merged into the
-  branch; U0 artifacts preserved unchanged); **PR #153 merged**; design
-  gate comment **`4950413650`** (CORE-R2 **design** gate — OPEN, docs-only).
-  Branch `claude/core-r2-disconnect-quiescence-design`; **draft PR #154**
-  (design only). **Revision 3** applies control-room review
-  **`4951237871`** (nine load-bearing points; supersedes rev 2's
-  `4951115877`). **No CORE-R2 implementation gate is open.**
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (control-room base-sync
+  amendment; supersedes `65e915a`; PR #152/U0 and PR #155/U0-closure
+  merged into the branch; U0 artifacts + history preserved unchanged);
+  **PR #153 merged**; design gate comment **`4950413650`** (CORE-R2
+  **design** gate — OPEN, docs-only). Branch
+  `claude/core-r2-disconnect-quiescence-design`; **draft PR #154** (design
+  only). **Revision 3** applies control-room review **`4951237871`** (nine
+  load-bearing points; supersedes rev 2's `4951115877`). **No CORE-R2
+  implementation gate is open.**
 - **Why:** PR #153 runtime-**confirmed** DEF-PB-1 / **SRR-03 stays OPEN**
   (accepted `4950408383`): a concurrent real `store.action_disconnect()`
   does **not** stop an already in-flight business handler — it blocks
@@ -28,11 +76,16 @@
   and two named domain call sites**; executable tests of the real
   `execute_business` gate + committed leases via the `_send` transport seam;
   two-server tests; Odoo.sh; ordered rollback; DoD — **gate NOT opened**).
-  Normal-merged the integration tip `65e915a` (resolved one rolling-handoff
-  top-entry conflict by keeping both CORE-R2 and U0 entries; U0/PR #152
-  preserved). Updated SRR-03/04/09 wording, revised **AR-044** (rev 3), the
-  master-plan **§2.1** CORE-R2 dependency, and this entry — all for review
-  `4951237871`.
+  Normal-merged the integration tip (base re-aligned to
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d` per the control-room
+  base-sync amendment; resolved rolling-handoff top-entry conflicts by
+  keeping **both** sides — the incoming U0-acceptance-closure entry and
+  this CORE-R2 entry — and the U0 spec files/history unchanged). Updated
+  SRR-03/04/09 wording, the CORE-R2 architecture-review row (**renumbered
+  AR-044 → AR-045** because the integration branch now assigns AR-044 to
+  the U0 acceptance closure — the two are never combined), the master-plan
+  **§2.1** CORE-R2 dependency, and this entry — for review `4951237871`
+  and the base-sync amendment.
 - **Recommended architecture (rev 3, proposal, not decided): Option E,
   lease-backed.** Rev 2's quiescence signal was **broken** — `run_drain` runs
   `running`→handler→terminal in **one uncommitted transaction**, so
@@ -83,6 +136,7 @@
   implementation-gate act (naming the then-current base SHA + re-freezing
   the packet's allowed-file list) authorizes the code session. **Do not
   merge or mark ready without ChatGPT review.**
+
 
 ### U0 — Premium operator UI visual prototype (draft PR #152, design-artifacts-only, 2026-07-11 · revised 2026-07-12 · final semantic closure 2026-07-12)
 

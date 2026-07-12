@@ -5,8 +5,9 @@
 > accompanies this document. Authorized by the CORE-R2 design gate (PR #153
 > comment `4950413650`, docs-only). Base after normal-merge of the current
 > integration tip: `Shopify-connector` @
-> `65e915aada32930a19a14c94d23dc9bd5e6fb517` (PR #152/U0 merged; U0 artifacts
-> preserved).
+> `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (control-room base-sync
+> amendment; supersedes `65e915a`; PR #152/U0 and PR #155/U0-closure merged;
+> U0 artifacts preserved).
 >
 > **Revision 3 (2026-07-12) — control-room review `4951237871`.** Rev 2's
 > quiescence signal was **broken**: `run_drain` sets `running` and executes the
