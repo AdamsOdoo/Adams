@@ -52,8 +52,9 @@
 | --- | --- |
 | Task | 011B — Customer Matching Scalability (indexed normalized-email lookup) |
 | Original base SHA | `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (implementation + first two corrections) |
-| Current base SHA | `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (`Shopify-connector` tip after PR #153 merged; base-aligned via a normal merge commit in the third correction, review `4951165587`) |
-| Base verification | `origin/Shopify-connector` tip == `fcbbb0b…` (no drift from the required integration tip); PR #153 (concurrency-validation evidence) **merged**; its evidence is preserved unchanged; PR #149 (CORE-R1) merged earlier produced the original base |
+| Current base SHA | `65e915aada32930a19a14c94d23dc9bd5e6fb517` (`Shopify-connector` tip after **U0 / PR #152** merged; base-aligned via a normal merge commit `19c0911` this session, review `4680106356`). Prior alignment was `fcbbb0b…` (after PR #153). |
+| Aligned PR head | `19c0911b13e8a4b98845f741fbede9da6055594e` (the base-alignment merge commit; `65e915a…` is an ancestor). |
+| Base verification | `origin/Shopify-connector` tip == `65e915a…` (no drift from the required integration tip); U0 / PR #152 (UI-prototype design artifacts) **merged** and preserved unchanged; the only merge conflict was the shared append-only `research-handoff.md`, resolved by **preserving both sides completely** (0 lines lost from either; no duplicated sections); no `addons/**`/`tests/**`/Task 011B file conflicted or changed. PR diff vs `65e915a…` = **exactly the 8 Task 011B files**; no U0 / Task 010B / CORE-R2 file appears as a PR change. |
 | Gate comment | `4948879507` (Task 011B gate-opening act on PR #149) |
 | Branch | `claude/task-011b-customer-matching-k5ux9b` |
 | Parallel task | Task 010B (`claude/task-010b-product-import-completeness`) — disjoint production module; **not read, copied, or modified** |
@@ -208,7 +209,27 @@ Third focused-correction session (2026-07-12, review `4951165587`):
 
 ## 10. Odoo.sh runtime
 
-**OUTSTANDING — not run this session (no Odoo runtime available here).** Required before merge review: full `shopify_connector_core` + `shopify_connector_product` + `shopify_connector_sale` suites green on the reconciled head, with the standard Task 011B tests (1–30) passing and verbatim statistics quoted here. The `-standard`-tagged benchmark is not part of the standard run.
+### 10.1 Base-alignment session (2026-07-12, review `4680106356`)
+
+Review `4680106356` **ACCEPTED** the third focused correction and set base-alignment onto the current integration tip as the mandatory prerequisite before the Odoo.sh runtime gate. This session performed **only** base alignment + evidence documentation (no code/test change):
+
+- `git merge --no-ff origin/Shopify-connector` (`65e915aada32930a19a14c94d23dc9bd5e6fb517`, `Shopify-connector` after **U0 / PR #152** merged) → merge commit **`19c0911b13e8a4b98845f741fbede9da6055594e`** (the new PR head).
+- **Conflict handling:** the only conflict was the shared append-only `docs/01-research/research-handoff.md` (both U0 and Task 011B prepend an entry). Resolved by **preserving both sides completely** — the Task 011B entry **and** the U0 entry, with the shared `CORE-R1` tail retained once; verified programmatically that **0 lines were lost from either side** and no section header is duplicated. **No `addons/**`, `tests/**`, or Task 011B production/test file conflicted or changed** (had one, this session would have stopped and reported without resolving).
+- **Post-merge invariants (git-verified):** `65e915a…` is an ancestor of the new head; the PR diff vs `65e915a…` is **exactly the 8 Task 011B-owned files** (`models/__init__.py`, `shopify_connector_res_partner.py`, `shopify_connector_customer_importer.py`, `tests/__init__.py`, `tests/test_customer_matching_scalability.py`, `docs/01-research/research-handoff.md`, `docs/05-qa/architecture-review-log.md`, `docs/05-qa/task-011b-validation-results.md`); **no U0 / PR #152 artifact, no Task 010B file, and no CORE-R2 file appears as a PR change**. All U0 / PR #152 files and history are preserved.
+
+### 10.2 Standard Odoo.sh suites — OUTSTANDING (not executable/observable from this environment)
+
+**Not run this session.** This environment has **no Odoo runtime** (`import odoo` → `ModuleNotFoundError`, re-confirmed), so the standard suites cannot be executed locally. The aligned head was pushed (which is what triggers the operator's Odoo.sh build), but **no Odoo.sh commit status and no GitHub check run is posted for `19c0911`** (`get_status` → `state: pending, total_count: 0`; `get_check_runs` → `total_count: 0`), so **no build result is observable from this environment**. Consistent with the CORE-R1 and PR #153 precedent, Odoo.sh runtime evidence is **operator-provided** (the verbatim install log). No result is invented here.
+
+Required before merge review (to be run on the operator's Odoo.sh for head `19c0911`, and the verbatim output quoted here — `0 failed, 0 error(s)` for each):
+
+| Standard suite | Result |
+| --- | --- |
+| `shopify_connector_core` | **PENDING — operator Odoo.sh run (verbatim log)** |
+| `shopify_connector_product` | **PENDING — operator Odoo.sh run (verbatim log)** |
+| `shopify_connector_sale` (incl. the standard `test_customer_matching_scalability.py` tests: field/compute, equivalence, routing, source guards, INSERT-predicate + sanitized-diagnostic guards — **34** methods, of which the **2 opt-in** classes are `-standard`-excluded) | **PENDING — operator Odoo.sh run (verbatim log)** |
+
+The two opt-in tags (`shopify_connector_customer_matching_concurrency`, `shopify_connector_customer_matching_benchmark`) were **not** invoked this session, and **no live/dev-store Shopify request was made** (no credential, token, or Admin API call).
 
 ## 11. Limitations (honest)
 
