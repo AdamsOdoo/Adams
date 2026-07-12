@@ -1,0 +1,3 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+62,3,manual_sync,core_dispatch_selftest,cancelled,,,,,,2026-07-11 22:30:32,,3|core_dispatch_selftest|pb.synthetic.model|5000|gid://pb/s5/5000|pb-s5-5000,Store disconnected.,5000
+63,3,manual_sync,core_dispatch_selftest,cancelled,,,,,,2026-07-11 22:30:32,,3|core_dispatch_selftest|pb.synthetic.model|5001|gid://pb/s5/5001|pb-s5-5001,Store disconnected.,5001

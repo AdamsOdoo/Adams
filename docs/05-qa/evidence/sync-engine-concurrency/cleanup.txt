@@ -1,0 +1,29 @@
+# Cleanup record — P-B sync-engine concurrency validation
+performed_at_utc: 2026-07-11T22:50:38Z
+
+## 1. Stop the two Odoo server daemons (Scenario 8 topology C)
+  sent SIGTERM to 3884 3885
+  odoo-bin processes remaining: 3
+
+## 2. Held locks / temp worker processes
+  hold_lock (S3) released via rollback earlier; crash workers (S9) killed; no PB python driver processes remain:
+  pb driver processes: 0
+
+## 3. Deliberately held row locks / idle-in-transaction backends against pbscen
+  idle-in-transaction backends: 0
+
+## 4. Cron activation: never changed (shipped drain cron left as-is); servers ran
+   with --max-cron-threads=0 so it never auto-fired. No real scheduled job left armed
+   (both servers stopped; databases dropped below).
+
+## 5. Drop disposable test databases (removes ALL synthetic records: stores, jobs,
+   logs, the test-only admin password + group grant). No persistent/shared DB involved.
+  dropped pbscen
+  dropped pbtest
+  remaining pb* databases: 0
+
+## 6. No real Shopify credential/token/API call was ever created or made.
+## 7. Evidence retained under docs/05-qa/evidence/sync-engine-concurrency/ (committed).
+## 8. PostgreSQL cluster + Odoo install remain only in this disposable ephemeral
+   container and are discarded when it is reclaimed.
+final odoo-bin count: 2

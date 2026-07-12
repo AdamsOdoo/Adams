@@ -1,0 +1,1 @@
+{"created": false, "rejected": true, "error": "ValidationError", "message": "A business job (job_source='manual_sync') can only be created for a store in state 'connected'."}

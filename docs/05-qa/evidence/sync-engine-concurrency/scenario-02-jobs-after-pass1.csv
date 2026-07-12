@@ -1,0 +1,31 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+7,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2000|gid://pb/s2/2000|pb-s2-2000,,2000
+8,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2001|gid://pb/s2/2001|pb-s2-2001,,2001
+9,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2002|gid://pb/s2/2002|pb-s2-2002,,2002
+10,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2003|gid://pb/s2/2003|pb-s2-2003,,2003
+11,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2004|gid://pb/s2/2004|pb-s2-2004,,2004
+12,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2005|gid://pb/s2/2005|pb-s2-2005,,2005
+13,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2006|gid://pb/s2/2006|pb-s2-2006,,2006
+14,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2007|gid://pb/s2/2007|pb-s2-2007,,2007
+15,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2008|gid://pb/s2/2008|pb-s2-2008,,2008
+16,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2009|gid://pb/s2/2009|pb-s2-2009,,2009
+17,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2010|gid://pb/s2/2010|pb-s2-2010,,2010
+18,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2011|gid://pb/s2/2011|pb-s2-2011,,2011
+19,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2012|gid://pb/s2/2012|pb-s2-2012,,2012
+20,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2013|gid://pb/s2/2013|pb-s2-2013,,2013
+21,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2014|gid://pb/s2/2014|pb-s2-2014,,2014
+22,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2015|gid://pb/s2/2015|pb-s2-2015,,2015
+23,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2016|gid://pb/s2/2016|pb-s2-2016,,2016
+24,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2017|gid://pb/s2/2017|pb-s2-2017,,2017
+25,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2018|gid://pb/s2/2018|pb-s2-2018,,2018
+26,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:25:33,2026-07-11 22:25:33,,2|core_dispatch_selftest|pb.synthetic.model|2019|gid://pb/s2/2019|pb-s2-2019,,2019
+27,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2020|gid://pb/s2/2020,2|core_dispatch_selftest|pb.synthetic.model|2020|gid://pb/s2/2020|pb-s2-2020,,2020
+28,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2021|gid://pb/s2/2021,2|core_dispatch_selftest|pb.synthetic.model|2021|gid://pb/s2/2021|pb-s2-2021,,2021
+29,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2022|gid://pb/s2/2022,2|core_dispatch_selftest|pb.synthetic.model|2022|gid://pb/s2/2022|pb-s2-2022,,2022
+30,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2023|gid://pb/s2/2023,2|core_dispatch_selftest|pb.synthetic.model|2023|gid://pb/s2/2023|pb-s2-2023,,2023
+31,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2024|gid://pb/s2/2024,2|core_dispatch_selftest|pb.synthetic.model|2024|gid://pb/s2/2024|pb-s2-2024,,2024
+32,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2025|gid://pb/s2/2025,2|core_dispatch_selftest|pb.synthetic.model|2025|gid://pb/s2/2025|pb-s2-2025,,2025
+33,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2026|gid://pb/s2/2026,2|core_dispatch_selftest|pb.synthetic.model|2026|gid://pb/s2/2026|pb-s2-2026,,2026
+34,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2027|gid://pb/s2/2027,2|core_dispatch_selftest|pb.synthetic.model|2027|gid://pb/s2/2027|pb-s2-2027,,2027
+35,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2028|gid://pb/s2/2028,2|core_dispatch_selftest|pb.synthetic.model|2028|gid://pb/s2/2028|pb-s2-2028,,2028
+36,2,manual_sync,core_dispatch_selftest,queued,,,,,,,2|pb.synthetic.model|2029|gid://pb/s2/2029,2|core_dispatch_selftest|pb.synthetic.model|2029|gid://pb/s2/2029|pb-s2-2029,,2029

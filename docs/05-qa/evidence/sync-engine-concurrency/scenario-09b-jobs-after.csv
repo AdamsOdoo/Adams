@@ -1,0 +1,2 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+114,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:48:59,2026-07-11 22:48:59,,2|core_dispatch_selftest|pb.synthetic.model|9001|gid://pb/s9b/9001|pb-s9b-9001,,9001

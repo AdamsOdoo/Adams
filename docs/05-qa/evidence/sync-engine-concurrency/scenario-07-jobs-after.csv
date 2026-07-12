@@ -1,0 +1,2 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+71,10,manual_sync,core_dispatch_selftest,cancelled,,,,,,2026-07-11 22:40:10,,10|core_dispatch_selftest|pb.synthetic.model|7000|gid://pb/blocked/7000|pb-blocked-7000,Store disconnected.,7000
