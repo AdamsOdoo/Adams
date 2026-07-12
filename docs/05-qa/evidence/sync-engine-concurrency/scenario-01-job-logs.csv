@@ -1,0 +1,11 @@
+id,job_id,event_type,from_state,to_state,message,technical_detail,occurred_at,actor_uid
+1,2,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:24:14,1
+2,2,attempt,running,succeeded,Dispatch succeeded.,,2026-07-11 22:24:14,1
+3,3,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:24:14,1
+4,3,attempt,running,succeeded,Dispatch succeeded.,,2026-07-11 22:24:14,1
+5,4,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:24:14,1
+6,4,attempt,running,succeeded,Dispatch succeeded.,,2026-07-11 22:24:14,1
+7,5,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:24:14,1
+8,5,attempt,running,succeeded,Dispatch succeeded.,,2026-07-11 22:24:14,1
+9,6,attempt,queued,running,Dispatch attempt started.,,2026-07-11 22:24:14,1
+10,6,attempt,running,succeeded,Dispatch succeeded.,,2026-07-11 22:24:14,1

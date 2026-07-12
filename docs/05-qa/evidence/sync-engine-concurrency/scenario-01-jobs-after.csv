@@ -1,0 +1,6 @@
+id,store_id,job_source,job_type,state,error_class,manual_review_subreason,retry_count,next_retry_at,started_at,finished_at,operation_scope_key,idempotency_key,cancel_reason,res_id
+2,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:24:14,2026-07-11 22:24:14,,2|core_dispatch_selftest|pb.synthetic.model|1000|gid://pb/s1biz/1000|pb-s1biz-1000,,1000
+3,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:24:14,2026-07-11 22:24:14,,2|core_dispatch_selftest|pb.synthetic.model|1001|gid://pb/s1biz/1001|pb-s1biz-1001,,1001
+4,2,manual_sync,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:24:14,2026-07-11 22:24:14,,2|core_dispatch_selftest|pb.synthetic.model|1002|gid://pb/s1biz/1002|pb-s1biz-1002,,1002
+5,2,setup_readiness_check,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:24:14,2026-07-11 22:24:14,,2|core_dispatch_selftest|pb.synthetic.model|1010|gid://pb/s1core/1010|pb-s1core-1010,,1010
+6,2,setup_readiness_check,core_dispatch_selftest,succeeded,,,,,2026-07-11 22:24:14,2026-07-11 22:24:14,,2|core_dispatch_selftest|pb.synthetic.model|1011|gid://pb/s1core/1011|pb-s1core-1011,,1011

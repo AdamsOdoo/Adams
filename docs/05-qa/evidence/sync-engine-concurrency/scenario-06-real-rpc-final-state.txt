@@ -1,0 +1,27 @@
+# Scenario 6 faithful — RPC variant — final committed DB state
+captured_at_utc: 2026-07-12T07:15:46Z
+-- store 2 (expect: disconnected — action_disconnect completed via retry) --
+ id |     name      |    state     | credential_present 
+----+---------------+--------------+--------------------
+  2 | PB-S6REAL-RPC | disconnected | f
+(1 row)
+
+-- job 2 (expect: succeeded — handler ran; NOT cancelled) --
+ id | job_source  |   state   | cancel_reason |     started_at      |     finished_at     
+----+-------------+-----------+---------------+---------------------+---------------------
+  2 | manual_sync | succeeded |               | 2026-07-12 07:15:23 | 2026-07-12 07:15:24
+(1 row)
+
+-- job logs for job 2 --
+ id | event_type | from_state | to_state  |          message          
+----+------------+------------+-----------+---------------------------
+  4 | attempt    | queued     | running   | Dispatch attempt started.
+  6 | attempt    | running    | succeeded | Dispatch succeeded.
+(2 rows)
+
+-- lifecycle audit job created by action_disconnect on store 2 (expect '0 ... cancelled') --
+ id |        job_type         |   state   |                         audit_message                          
+----+-------------------------+-----------+----------------------------------------------------------------
+  3 | core_manual_maintenance | succeeded | Store disconnected (0 non-terminal business job(s) cancelled).
+(1 row)
+

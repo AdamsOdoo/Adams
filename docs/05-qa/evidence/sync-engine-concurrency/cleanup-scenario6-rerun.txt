@@ -1,0 +1,9 @@
+# Scenario 6 faithful rerun — cleanup record
+performed_at_utc: 2026-07-12T07:17:41Z
+-- stop RPC server (pid 5616) --
+sent SIGTERM
+odoo-bin remaining after kill: 2
+pbscen6 dropped: yes
+remaining pb% dbs: 0
+cleanup_completed_utc: 2026-07-12T07:17:53Z
+final_odoo_bin_count: 0

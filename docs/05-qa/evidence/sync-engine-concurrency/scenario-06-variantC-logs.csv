@@ -1,0 +1,2 @@
+id,job_id,event_type,from_state,to_state,message,technical_detail,occurred_at,actor_uid
+132,70,state_change,queued,failed_retryable,Job could not start: a start-time gating check blocked it (This business job's store is not 'connected' -- it cannot start.).,,2026-07-11 22:39:24,1

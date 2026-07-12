@@ -1,0 +1,24 @@
+# PostgreSQL log — deadlock/lock scan (P-B concurrency validation)
+## 'deadlock detected' occurrences:
+0
+0
+## Scenario 8 window (22:42-22:47) error/lock lines:
+2026-07-11 22:44:37.844 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:37.851 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:38.419 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:38.419 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:38.984 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:38.985 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:39.545 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:39.545 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:40.092 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:40.093 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:40.631 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:40.631 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:41.191 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:41.191 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:41.734 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:44:41.736 UTC [3901] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+2026-07-11 22:45:26.352 UTC [3899] ERROR:  argument of LIMIT must be type bigint, not type integer[] at character 306
+## The single 'could not obtain lock on ir_sequence' line (baseline test window 22:17, NOT a connector-job lock):
+2026-07-11 22:17:21.650 UTC [14138] ERROR:  could not obtain lock on row in relation "ir_sequence"

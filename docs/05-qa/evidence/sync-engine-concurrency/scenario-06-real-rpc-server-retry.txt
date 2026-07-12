@@ -1,0 +1,4 @@
+ERROR: could not serialize access due to concurrent update
+2026-07-12 07:15:24,560 5616 INFO pbscen6 odoo.service.model: SERIALIZATION_FAILURE, 4 tries left, try again in 1.4222 sec... 
+    return service_model.retrying(serve_func, env=self.env)
+  File "/opt/odoo/odoo/service/model.py", line 188, in retrying

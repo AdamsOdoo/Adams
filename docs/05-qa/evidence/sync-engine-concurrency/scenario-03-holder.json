@@ -1,0 +1,2 @@
+{"action": "hold_lock", "job_id": 58, "lock_acquired": true, "held_seconds": 8, "locked_at": "2026-07-11T22:29:20.379187Z", "pid": 25624}
+{"action": "lock_released", "released_at": "2026-07-11T22:29:28.379722Z"}
