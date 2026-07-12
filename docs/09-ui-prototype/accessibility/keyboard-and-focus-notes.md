@@ -53,15 +53,24 @@ metric chips (each links to its filtered S4/S5 view) → 6. recent-activity link
   passes; the disabled reason is stated in text, not implied by graying alone.
 
 ### Matching center (S6/S8)
-- **Candidates are a radio group** (`role="radiogroup"`, each card
-  `role="radio"` + `aria-checked`); arrow keys move selection, Space selects.
-  At most one is selected; with none selected, “Link” is `aria-disabled`.
+- **Automatic outcomes have no radio group.** The single-exact-match (bound
+  automatically) and no-candidate (created automatically) screens are completed
+  outcomes (merged Task 011): the outcome state is announced in words via the
+  green outcome chip, and the controls are plain navigation links (Open contact /
+  View audit trail / Back) — there is nothing to select or confirm.
+- **Manual review is a radio group.** Only the ambiguous state offers a choice:
+  `role="radiogroup"`, each card `role="radio"` + `aria-checked`; arrow keys move
+  selection, Space selects; at most one is selected; with none selected, “Link”
+  is `aria-disabled`.
 - **Evidence tables** use real `<th>` headers (Field / Shopify / Odoo / Result)
-  with header associations; each match verdict is a word (“Exact match”,
-  “Similar”, “Conflicts”) plus icon, never color alone.
-- **Ambiguous vs error:** ambiguous uses the warning family + hand icon + “a
-  person should decide”; technical error uses the danger family + “this is a
-  technical error, not an ambiguous match” — distinct to AT and to sight.
+  with header associations; each verdict is a word — **“Matched — binding key”**
+  (the sole automatic key), **“Same”**, or **“Differs — advisory”** — plus icon,
+  never color alone. There is no fuzzy/“Similar” verdict.
+- **Ambiguous vs error (both danger family):** ambiguous uses the **hand** icon +
+  a **reviewer** owner + “waiting on a decision / not a system failure”; technical
+  error uses the **triangle** icon + the **system** owner + “this is a technical
+  error, not an ambiguous match” — distinct to AT and to sight **without relying
+  on color** (per the accepted `blocked_manual_review → danger` map).
 
 ### Product diff / preview (S7)
 - **Diff table** has column headers (Field / Odoo value / Shopify value /
@@ -81,10 +90,11 @@ metric chips (each links to its filtered S4/S5 view) → 6. recent-activity link
 - The form statusbar exposes the current stage (`aria-current`); notebook tabs
   follow the ARIA APG tabs pattern; smart buttons are links with text labels.
 
-## 2a. Mobile shell (≤ 640px) — added per review `4950255482` §4
+## 2a. Mobile shell (≤ 900px) — added per review `4950255482` §4
 
-At ≤ 640px the 7-item app bar is replaced by a compact Odoo-native shell so the
-operator navigation baseline stays usable and nothing critical scrolls off:
+At ≤ 900px (tablet and phone) the 7-item app bar is replaced by a compact
+Odoo-native shell so the operator navigation baseline stays usable and nothing
+critical scrolls off:
 
 - **`☰ Menu`** — a `<button aria-haspopup="true">` with the label “Open connector
   menu — all sections” (Arabic “القائمة” on the RTL render). It represents the

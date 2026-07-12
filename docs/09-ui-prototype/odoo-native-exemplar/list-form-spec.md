@@ -39,15 +39,39 @@ platform-native list/search/filter and form/sheet/notebook patterns.
 The five canonical states are covered across the pair: **loading** (standard
 Odoo list/form load — not separately screenshotted), **empty**
 (`native-list-empty`), **success** (Done rows), **error** (on-hold form + tinted
-rows), **manual review** (the “Waiting on a decision” row + reviewer routing).
+rows), **manual review** (the Customers “Waiting on a decision” and Products
+“Needs review” rows + reviewer routing).
+
+### Row status → color family (token-map aligned)
+Every attention row in this list is either a **held/manual-review** state in the
+**danger** family or a **retry** state in the **info** family — there is **no
+non-blocking `warning` row** in this snapshot. Specifically:
+
+| Row | State word | Family | Why |
+| --- | --- | --- | --- |
+| Orders | On hold | **danger** | Financial mismatch — held for the operator |
+| Products | Needs review | **danger** | `blocked_manual_review` — a product waiting on a reviewer’s match decision |
+| Customers | Waiting on a decision | **danger** | `blocked_manual_review` — two contacts share the email; a reviewer must choose |
+| Inventory | Waiting to retry | info | `retry_waiting` — rate-limited, the system will retry |
+| Fulfillment / Products | Done | success | Completed |
+
+The two `blocked_manual_review` rows follow the accepted map
+(`blocked_manual_review → danger`, review `4950432754` §2); they are told apart
+from a **technical failure** by their **plain-language state + reason** (a
+reviewer decision, not a system fault) and reviewer routing — **not** by
+reverting to `warning`. The `warning` family is reserved for genuinely
+**non-blocking advisories** (e.g. “overdue but retrying”); none appears here, so
+none is mislabelled as manual review. The raw token `blocked_manual_review` is
+**never shown** — the State column shows plain words only.
 
 ## Responsive
 `native-list-{768,375}.png`: at 375px the list uses Odoo’s **optional-column
 hiding** (Source / Reference / Age hidden) so the **primary answer — State +
 identifier + reason — stays visible**; no horizontal page scroll (design-system
-§10). At ≤ 640px the app bar collapses to the **compact Odoo-native mobile
+§10). At **≤ 900px** the app bar collapses to the **compact Odoo-native mobile
 shell** (☰ Menu + current section + persistent health), so the connection-health
-state stays visible and no menu label is clipped (review `4950255482` §4).
+state stays visible and no menu label is clipped (review `4950255482` §4;
+breakpoint corrected to the actual ≤ 900px contract per review `4950432754` §3).
 
 ## Accessibility
 Native list/form keyboard behavior is inherited; the search facet is a removable

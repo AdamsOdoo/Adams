@@ -18,6 +18,21 @@
 > **danger** family per the accepted token map, distinguished from technical
 > failure without color; (6) every PNG is regenerated from the final source with
 > a **source-to-render consistency check** (§7).
+>
+> **Final semantic closure (control-room review `4950432754`):** this pass aligns
+> the matching screens to **merged Task 011** and fixes two residual mismatches —
+> (1) the **single exact match** and **no-candidate** screens are now the
+> **automatic** outcomes the backend actually produces (one active exact-email
+> contact **binds automatically**; a valid email with no active/archived match
+> **creates the contact automatically**) shown as **success/audit** states with
+> **no Link/Create decision**, leaving manual review for genuine ambiguity;
+> (2) the **native Sync Center list** now maps its `blocked_manual_review` rows
+> (Products “Needs review”, Customers “Waiting on a decision”) to the **danger**
+> family, matching the V-4 claim; (3) all stale **≤ 640px** breakpoint wording is
+> corrected to the actual **≤ 900px** contract. The U0 branch was updated from the
+> new `Shopify-connector` tip **`fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`**
+> (PR #153 merged) by a normal merge — **no conflict**, and the PR #153
+> concurrency-evidence files were not modified.
 
 The prototype demonstrates the future operator UI for the premium Odoo 19 ↔
 Shopify connector: strong hierarchy, Odoo-native familiarity, restrained color,
@@ -105,7 +120,7 @@ were rendered from these exact files with headless Chromium at a 2× device scal
   vocabularies rendered as words, the credential posture (masked, no read-back,
   no “encrypt”), honest freshness, no-vanity-metrics, and the copy voice rules.
 - **Proposed (needs ChatGPT acceptance)** — consolidated in
-  `traceability-matrix.md` §3 (P1–P10) and as the decision list in §6 below.
+  `traceability-matrix.md` §3 (P1–P13) and as the decision list in §6 below.
   Chief among them: the ranked §9 dashboard replacing the nine-equal-tile grid
   (a ChatGPT-directed revision of accepted content, flagged, not silent), the
   optional sparkline, and the one contrast token addition.
@@ -133,11 +148,23 @@ were rendered from these exact files with headless Chromium at a 2× device scal
 - **No backend invented.** No RPC method, model field, XML ID, ACL, permission,
   or mutation logic is asserted; the diff/matching field names are illustrative
   presentations of accepted contracts only.
-- **Manual review = danger family (token-map alignment).** Following review
-  `4950255482` §5, `blocked_manual_review` uses the **danger** family per
-  design-system §6; the §11 “warning family” prose is flagged as a **proposed
-  correction** (P12), not changed unilaterally. The internal token
+- **Manual review = danger family (token-map alignment).** Following reviews
+  `4950255482` §5 and `4950432754` §2, `blocked_manual_review` uses the **danger**
+  family per design-system §6 on **every** surface that shows it — the dashboard,
+  the matching center, **and the native Sync Center list** (Products “Needs
+  review”, Customers “Waiting on a decision”). It is told apart from a technical
+  failure by icon/owner/copy, not color; the §11 “warning family” prose is flagged
+  as a **proposed correction** (P12), not changed unilaterally. The internal token
   `blocked_manual_review` is never shown on a UI surface (specs only).
+- **Matching automatic outcomes (merged Task 011).** The single-exact-match and
+  no-candidate screens are the **automatic** results the backend produces — a
+  single active exact-email contact **binds automatically**; a valid email with
+  no active/archived match **creates the contact automatically** — rendered as
+  **success/audit** states (green outcome chips, `is-linked` card, navigation-only
+  actions), **not** “Link this contact?” / “Create new?” decisions. Manual review
+  is reserved for genuine ambiguity (and, per policy, archived-only duplicate
+  risk / missing-email / binding conflict). This aligns the prototype to accepted
+  behavior — it does not weaken the matching policy (review `4950432754` §1).
 - **Compact mobile/tablet shell (≤ 900px).** The 7-item app bar collapses to
   ☰ Menu + current section + persistent health — the reviewer’s “collapse the
   nav” option (P11) — replacing the clipped/overlapping full bar at 768/375.
@@ -161,8 +188,10 @@ were rendered from these exact files with headless Chromium at a 2× device scal
    (Action required / Passed / Not applicable), plus the 6-chip step compression.
 5. **Matching-center composition** — accept/revise confidence-in-words, the
    **binding-key vs advisory** evidence marks (exact normalized email is the
-   sole automatic key; no fuzzy verdict), the four-decision set, and the
-   **manual-review-danger** distinction from technical error (P12).
+   sole automatic key; no fuzzy verdict), the **success/audit presentation of the
+   two automatic Task-011 outcomes** (auto-bind / auto-create as non-decision
+   screens; manual review only for ambiguity), and the **manual-review-danger**
+   distinction from technical error (P6, P12).
 6. **Product diff/preview composition** — accept/revise the 4-column diff,
    inline source-of-truth, protected-field treatment, and the **blocked-state
    posture** (asserts no authority, computes no result, no Confirm).
@@ -186,18 +215,18 @@ created outside this directory).
 
 | Check | Command / method | Result |
 | --- | --- | --- |
-| Changed-file scope | `git status --short` | **Only** `docs/09-ui-prototype/**` (new) + one appended `docs/01-research/research-handoff.md` entry. Nothing else. |
-| Authorized paths | path filter over `git status` | All changes under the two authorized paths — **0 unauthorized**. |
+| Changed-file scope | `git status --short` | This correction touches **only** the review-authorized paths (`matching-center/**`, `odoo-native-exemplar/**`, `assets/prototype.css`, `README.md`, `traceability-matrix.md`, `accessibility/{visual-checklist,keyboard-and-focus-notes}.md`, `docs/01-research/research-handoff.md`). No `product-diff/**`, `dashboard/**`, or `setup-readiness/**` file changed; no new file added. |
+| Base update | normal merge of `origin/Shopify-connector` | Branch updated to the new tip `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (PR #153 merged) — **no conflict**; the PR #153 `docs/05-qa/evidence/sync-engine-concurrency/**` files were **not** modified. |
 | HTML validation | Python `html.parser` (strict) over all 6 HTML | **6/6 parse OK.** |
-| CSS syntax | brace-balance check on `prototype.css` | **Balanced** (281 `{` / 281 `}`). |
-| **Source-to-render consistency** | assert key visible-state text in the committed HTML + no stale PNG (mtime ≥ HTML+CSS) | **All 20 assertions pass** (see §7a). |
+| CSS syntax | brace-balance check on `prototype.css` | **Balanced** (283 `{` / 283 `}`). |
+| **Source-to-render consistency** | assert key visible-state text in the committed HTML + no stale PNG (mtime ≥ HTML+CSS) | **All 41 assertions pass** (see §7a). |
 | Local-link integrity | resolve every `href`/`src` to disk | **All local links resolve**; no broken references. |
 | External URLs | grep `https?://` link targets in HTML/CSS | **None** as link targets (only illustrative `*.myshopify.com`/`example.com` strings inside copy text). |
 | Network dependencies | grep `@import`, `url(`, `@font-face`, `cdn`, remote `src` | **None.** Platform system-font stack only. |
 | JavaScript | grep `<script`, `on*=`, `javascript:`, `addEventListener` | **None — zero JavaScript.** |
 | Addon / code refs | grep `addons/`, `__manifest__`, `import odoo`, `<record` | **None** — no Odoo code created. |
 | Secret-like values | grep `shpat_`/`Bearer`/keys/≥32-char | **None.** The only ≥32-char strings are the public base SHA in a CSS header comment and decorative comment rules — no tokens/secrets. |
-| PNG evidence | dims + sizes over 34 files | **34 PNGs, ~8.6 MB.** CSS widths 1366 (×24), 768 (×5), 375 (×5); rendered at 2× (2732 / 1536 / 750 physical). All regenerated from the final HTML/CSS this revision. |
+| PNG evidence | dims + sizes over 34 files | **34 PNGs, ~8.8 MB.** CSS widths 1366 (×24), 768 (×5), 375 (×5); rendered at 2× (2732 / 1536 / 750 physical). Regenerated in one deterministic pass from the final HTML/CSS; this correction changed **10** — `matching-single/none-1366` + `native-list-{1366,768,375}` (content) and `matching-ambiguous-{1366,768,375}`/`matching-error`/`matching-loading` (re-rendered from the changed `matching-center.html`). |
 | Contrast | WCAG luminance formula, 32 pairs | **All 32 pass** their SC 1.4.3 / 1.4.11 threshold (contrast-table.md). The revision added **no new color pair** (manual-review danger, blocked-row danger, advisory-neutral all reuse verified pairs). |
 | V-1…V-12 | honest self-review | **11 Pass · 1 Partial (V-11, runtime-scoped) · 0 Fail** (visual-checklist.md). |
 | Viewport rendering | headless Chromium at 1366/768/375 + RTL | No horizontal page scroll; the compact mobile/tablet shell shows Menu + current section + health with no clipped label or nav/health overlap; mobile comparison tables reflow to labelled cards; RTL mirrors. |
@@ -206,9 +235,10 @@ created outside this directory).
 ### 7a. Source-to-render consistency check (review `4950255482` §6/§8)
 
 Because every PNG is rendered from the committed HTML/CSS, consistency is proven
-deterministically: (a) **20 assertions** over the committed HTML confirm the key
-visible-state text, and (b) a **staleness guard** confirms every PNG’s mtime is
-≥ its source HTML **and** `prototype.css`. Verified this revision:
+deterministically: (a) **41 assertions** over the committed HTML/CSS confirm the
+key visible-state text, and (b) a **staleness guard** confirms every PNG’s mtime
+is ≥ its source HTML **and** `prototype.css`. Verified (carried forward + this
+correction):
 
 - **Setup:** connect step shows **“Step 2 of 6”** and **Credentials** is the
   current step; the word **“encrypt” appears nowhere** in the prototype.
@@ -217,11 +247,26 @@ visible-state text, and (b) a **staleness guard** confirms every PNG’s mtime i
   held order, and the incident is labelled **“resolved”**.
 - **Dashboard manual-review & degraded:** **danger** band; manual review carries
   the **hand** icon and shows **no raw `blocked_manual_review` token**.
-- **Matching ambiguous:** both candidates carry the **exact** incoming email
-  `j.okafor@example.com`; **no** `jane.okafor@…` and **no** “same domain / similar
-  name / partial match” wording; “advisory only” + “binding key” framing present.
-- **Blocked diff:** “Choose a price authority” / “Held until a price authority”;
-  **no** “Odoo is the price authority”; **no** Confirm button.
+- **Matching — single (auto-bind):** **success** band + “**Customer linked
+  automatically**”; “Linked automatically” chip; **no radio**; **no** Link /
+  Create / Leave / Reject; audit reads “**matched automatically by normalized
+  email**”; navigation-only actions; no raw token.
+- **Matching — no candidate (auto-create):** **success** band + “**New contact
+  created automatically**”; “Created automatically” chip; **no radio**; **no**
+  Create-new / Leave-for-review; audit reads “**created … because no active or
+  archived contact used this email**”.
+- **Matching ambiguous (still manual review):** both candidates carry the
+  **exact** incoming email `j.okafor@example.com`; **no** `jane.okafor@…` and
+  **no** fuzzy “same domain / similar name / partial” wording; keeps the radio +
+  **danger** band + “Link selected”.
+- **Native Sync Center list:** **no** `sc-status--warning`; **≥ 3 danger** rows;
+  the manual-review state words (“Needs review”, “Waiting on a decision”) with
+  reviewer-decision reasons; **no raw token**.
+- **Breakpoint:** the compact shell is `@media (max-width: 900px)`; **no** stale
+  “shown <=640” comment; the list-form spec and keyboard notes say **≤ 900px**
+  and contain **no** stale “≤ 640px”.
+- **Blocked diff (carried forward):** “Choose a price authority” / “Held until a
+  price authority”; **no** “Odoo is the price authority”; **no** Confirm button.
 - **Staleness:** 34/34 PNGs newer than their HTML+CSS source — no stale evidence.
 
 ### Confirmations

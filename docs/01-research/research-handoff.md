@@ -1,7 +1,36 @@
 # Research Handoff (rolling)
 
-### U0 — Premium operator UI visual prototype (draft PR #152, design-artifacts-only, 2026-07-11 · revised 2026-07-12)
+### U0 — Premium operator UI visual prototype (draft PR #152, design-artifacts-only, 2026-07-11 · revised 2026-07-12 · final semantic closure 2026-07-12)
 
+- **Final semantic closure (control-room review `4950432754`, 2026-07-12):** one
+  focused correction on the same draft **PR #152**, aligning the matching screens
+  to **merged Task 011** and closing three residual issues. (1) The **single
+  exact match** and **no-candidate** screens are now the **automatic** outcomes
+  the backend produces — one **active** exact-normalized-email contact **binds
+  automatically**; a **valid** email with **zero active and zero archived**
+  matches **creates the contact automatically** — rendered as **success/audit**
+  states (green outcome chips, `is-linked` outcome card, navigation-only actions:
+  Open contact / View audit trail / Back), with the radio and the Link / Create /
+  Leave / Reject decision sets **removed**; manual review stays only for ambiguity
+  (and, per policy, archived-only duplicate risk / missing-email / binding
+  conflict). (2) The **native Sync Center list** now maps its
+  `blocked_manual_review` rows (Products “Needs review”, Customers “Waiting on a
+  decision”) to the **danger** family — matching the V-4 claim — distinguished
+  from a technical failure by plain-language state/reason + reviewer routing, not
+  color; **no `warning` row** remains and the raw token is never shown. (3) All
+  stale **≤ 640px** compact-shell wording (CSS comment, `list-form-spec.md`,
+  keyboard notes) is corrected to the actual **≤ 900px** contract. **Base update:**
+  the branch was updated from the new `Shopify-connector` tip
+  **`fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f`** (PR #153 merged) by a **normal
+  merge — no conflict**; the PR #153 `sync-engine-concurrency` evidence files were
+  not modified. **Validation:** 6/6 HTML parse; CSS braces **283/283**; **zero
+  JS / external deps / addon-secret refs**; “encrypt” absent; `blocked_manual_review`
+  on **0** UI surfaces; **41/41** source-to-render assertions pass incl. the new
+  automatic-bind/create, native-list-danger, and ≤ 900px-breakpoint checks; 34
+  PNGs regenerated in one deterministic pass (10 changed, all under
+  `matching-center/**` + `odoo-native-exemplar/**`); scope limited to the
+  review-authorized paths, **no new file added**. **UI-U1 remains CLOSED**; PR
+  stays draft/open/unmerged.
 - **Revision (control-room review `4950255482`, 2026-07-12):** applied one
   focused U0 revision to the same draft **PR #152** (no new PR; base unchanged at
   `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`; only the two authorized paths

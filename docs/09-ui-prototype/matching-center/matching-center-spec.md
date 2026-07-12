@@ -8,33 +8,57 @@
 > illustrative (MBQ-22).
 
 ## Purpose
-Turn identity resolution into confirming, not detective work: show the incoming
-Shopify record, the candidate Odoo records, the **evidence** (which fields
-matched or conflicted), and let the operator decide — with the consequence
-visible before they act. **Nothing is guessed.**
+Show identity resolution honestly: the connector **resolves the automatic
+outcomes itself** (merged Task 011) and asks a person to decide **only** when
+the outcome is genuinely ambiguous. Every screen shows the incoming Shopify
+record, the **evidence** (which fields are the binding key vs advisory), and the
+**audit consequence** — for automatic outcomes as *what already happened*, for
+manual review as *what will happen once you choose*. **Nothing is guessed.**
+
+## Automatic outcomes vs human decisions (merged Task 011 — authoritative)
+The accepted customer matcher is **binding → exact normalized email → manual
+review**; name/phone are advisory only. That policy makes two outcomes
+**automatic** (no operator decision) and reserves manual review for real
+ambiguity:
+
+| Situation | Outcome | Screen |
+| --- | --- | --- |
+| Exactly **one active** contact with the exact normalized email | **Bind automatically** | Single exact match (success/audit) |
+| **Valid** normalized email, **zero active and zero archived** exact-email contacts | **Create the contact automatically** | No candidate (success/audit) |
+| **Multiple** exact-email contacts | **Manual review** | Ambiguous |
+| Archived-only / duplicate risk · missing/empty/unnormalizable email · binding conflict | **Manual review** | (policy — represented by the ambiguous exemplar) |
+
+The prototype does **not** weaken or redesign this policy; it renders it.
 
 ## Elements
 - **Incoming Shopify record** summary (`.sc-incoming`, key/value).
-- **Candidate Odoo records** (`.sc-candidate`) — each with a radio (**at most
-  one selected**), a title + reference, **confidence explained in words**
-  (never a bare score), and a **field-level evidence table**. The evidence
-  marks encode the **binding policy exactly**: the normalized **Email is the
-  binding key** (“Matched — binding key”); every other row is **advisory only**
-  (“Same” / “Differs — advisory”) — shown to help the human choose, **never used
-  to discover a candidate**. There is no “Similar”/fuzzy verdict (review
-  `4950255482` §2).
-- **Explicit decisions:** Link · Create new (where policy permits) · Leave for
-  review · Reject suggestion — the last kept apart from the primary.
-- **Audit consequence** (`.sc-consequence`) — “what happens after confirmation”
-  (binding created, order attached, decision recorded who/when/matched-by) is
-  visible **before** the action. No destructive merge tooling exists.
+- **Automatic-outcome card** (`.sc-candidate.is-linked`) — for the two automatic
+  results: a success badge + a “Linked” / “Created” chip, the bound/created Odoo
+  record, and its evidence or summary shown as a **completed outcome**. There is
+  **no radio and no selection** — the connector already acted.
+- **Candidate Odoo records** (`.sc-candidate`, manual review only) — each with a
+  radio (**at most one selected**), a title + reference, **confidence explained
+  in words** (never a bare score), and a **field-level evidence table**. The
+  evidence marks encode the **binding policy exactly**: the normalized **Email is
+  the binding key** (“Matched — binding key”); every other row is **advisory
+  only** (“Same” / “Differs — advisory”) — shown to help the human choose,
+  **never used to discover a candidate**. There is no “Similar”/fuzzy verdict
+  (review `4950255482` §2).
+- **Decisions appear only when a decision exists.** The automatic outcomes offer
+  **navigation only** (Open contact · View audit trail · Back). Manual review
+  offers Link (disabled until one candidate is chosen) · Create new · Leave for
+  review.
+- **Audit consequence** (`.sc-consequence`) — for automatic outcomes, *what
+  happened* (binding/contact created, order attached, recorded who/when/matched-by
+  or created-because); for manual review, *what happens once you choose*. Shown
+  before/with the outcome. No destructive merge tooling exists.
 
 ## States rendered
 | State | File | Behavior |
 | --- | --- | --- |
-| Single confident match | `matching-single-1366.png` | One candidate found by the **exact normalized email** (the only automatic key), pre-selected; just one Odoo contact uses this email, so no ambiguity; consequence + four decisions. |
-| Ambiguous / multiple | `matching-ambiguous-1366.png` (+ `-768`, `-375`) | **Both candidates share the exact same normalized incoming email** `j.okafor@example.com` (the binding key returned both); **none auto-selected**; “Link” disabled until one is chosen; **danger family + hand icon**, a “Waiting on a decision” status + reviewer owner, and “not a system failure”. Ambiguity comes only from **advisory** fields (name form, contact type, company, order history) — never fuzzy discovery. |
-| No candidate | `matching-none-1366.png` | Neutral band + empty card; email is the only automatic key; name/phone advisory; offers Create new / Leave for review. |
+| Single exact match — **bound automatically** | `matching-single-1366.png` | Exactly one **active** Odoo contact has the exact normalized email, so the connector **binds automatically** (merged Task 011). **Success band + green outcome chips** (“Linked automatically” · “Done by the connector” · “No decision needed”); an `is-linked` outcome card (no radio) with a “Linked” chip and the binding-key evidence; audit note (binding created, order #1043 attached, *matched automatically by normalized email*, master data not overwritten). Actions are **navigation only**: Open Odoo contact · View audit trail · Back. **No Link / Create / Leave / Reject.** |
+| No candidate — **contact created automatically** | `matching-none-1366.png` | A **valid** normalized email with **zero active and zero archived** exact-email contacts, so the connector **creates the contact automatically** (merged Task 011). **Success band + green outcome chips**; an `is-linked` card (no radio) with a “Created” chip and the new-contact summary (ref P-4102); audit note (contact + binding created, order attached, *created because no active or archived contact used this email*, no existing record changed). Actions are **navigation only**: Open new contact · View audit trail · Back. **No Create-new / Leave-for-review decision.** |
+| Ambiguous / multiple — **manual review** | `matching-ambiguous-1366.png` (+ `-768`, `-375`) | **Both candidates share the exact same normalized incoming email** `j.okafor@example.com` (the binding key returned both); **none auto-selected**; “Link” disabled until one is chosen; **danger family + hand icon**, a “Waiting on a decision” status + reviewer owner, and “not a system failure”. Ambiguity comes only from **advisory** fields (name form, contact type, company, order history) — never fuzzy discovery. This is the representative `blocked_manual_review` case. |
 | Loading | `matching-loading-1366.png` | Skeleton incoming + candidate cards + “Searching Odoo contacts by email…”. |
 | Technical error | `matching-error-1366.png` | Danger family; **explicitly labelled “a technical error, not an ambiguous match”**; owner = the system; nothing changed, order stays held. |
 
@@ -54,9 +78,12 @@ binding-key/“Same” rows and neutral (`--sc-text-secondary`) for advisory
 use `--sc-border-strong`.
 
 ## Accessibility
-Candidates are a `role="radiogroup"` (arrow-key selection, one `aria-checked`);
-evidence tables use real `<th>` associations; verdicts are words, not color
-alone; the consequence note is associated with the decision buttons. See
+In **manual review**, candidates are a `role="radiogroup"` (arrow-key selection,
+one `aria-checked`) and “Link” is `aria-disabled` until one is chosen. The
+**automatic outcomes have no radiogroup** — they are a completed result, so the
+outcome chip carries the state in words and the buttons are plain navigation.
+Evidence tables use real `<th>` associations; verdicts are words, not color
+alone; the consequence note is associated with the outcome. See
 `../accessibility/keyboard-and-focus-notes.md` §2.
 
 ## Performance (mapped)
@@ -65,17 +92,25 @@ indexed normalized-email path (the Task 011B budget); the UI reads a bounded
 candidate set (PB-10), never a full partner scan.
 
 ## Proposed vs inherited
-- **Inherited:** three distinct states (unmatched/ambiguous/duplicate-risk
-  never folded); the **binding → exact normalized email → manual review** key
+- **Inherited:** the **binding → exact normalized email → manual review** key
   order (email is the *sole* automatic key; name/phone/company advisory only);
-  evidence-first; blocking preview; audit; `blocked_manual_review → danger`.
+  **the automatic outcomes themselves** — one active exact-email match binds
+  automatically, and a valid email with no active/archived match creates the
+  contact automatically (merged Task 011); manual review reserved for ambiguity /
+  archived-only duplicate risk / missing-email / binding conflict; evidence-first;
+  audit; `blocked_manual_review → danger`.
 - **Proposed:** confidence-in-words phrasing; the field-level evidence-table
-  layout with the binding-key/advisory mark vocabulary; the explicit
-  four-decision button set with “Reject suggestion” separated; the
-  hand-icon/reviewer-owner distinction of ambiguity from technical error within
-  the shared danger family.
+  layout with the binding-key/advisory mark vocabulary; the **success/audit
+  presentation of the two automatic outcomes** (`is-linked` outcome card,
+  green outcome chips, navigation-only actions); the hand-icon/reviewer-owner
+  distinction of ambiguity from technical error within the shared danger family.
 - **Not invented / corrected:** no RPC, no scoring algorithm, no fuzzy/partial
-  matching, no new binding field. The prior ambiguous example (a
-  `jane.okafor@…` candidate justified by “same domain + similar name”) **could
-  never be returned by the exact-email lookup** and is removed — both candidates
-  now share the exact normalized incoming email (review `4950255482` §2).
+  matching, no new binding field. Two corrections applied on control-room review:
+  (a) the prior ambiguous example (a `jane.okafor@…` candidate justified by
+  “same domain + similar name”) **could never be returned by the exact-email
+  lookup** and was replaced by two contacts sharing the exact normalized email
+  (review `4950255482` §2); (b) the single-match and no-candidate screens, which
+  previously asked the operator to press **“Link to this contact”** / **“Create
+  new contact”**, are now the **automatic** success/audit outcomes the merged
+  Task 011 backend actually produces — those decision sets are removed (review
+  `4950432754` §1).
