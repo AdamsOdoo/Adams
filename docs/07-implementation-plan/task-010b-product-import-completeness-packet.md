@@ -49,9 +49,10 @@
 >   attribute is created under contention). The **lock-hold duration and its
 >   throughput impact are an open runtime measurement obligation**
 >   (Odoo.sh / dev-store), not a closed performance claim. See
->   `../05-qa/task-010b-validation-results.md` §0c/§10 and AR-045 (the Task
->   010B architecture-review row, renumbered from AR-044 in the 2026-07-12
->   base-sync merge because U0's acceptance closure was assigned AR-044).
+>   `../05-qa/task-010b-validation-results.md` §0c/§10 and AR-046 (the Task
+>   010B architecture-review row, renumbered off AR-044 in the 2026-07-12
+>   base-sync merge — U0's acceptance closure took AR-044 — and reconciled to
+>   AR-046 after the concurrent post-U0 allocation was settled).
 > Every statement in this packet claiming savepoint-release, attribute-only
 > hold, or "the whole import is not serialized" is annotated inline as
 > **[superseded — see the 2026-07-12 correction note]**.

@@ -10,22 +10,27 @@
   research-handoff top entry, the U0 **AR-044** architecture-review row, the
   master-plan U0 status update, and `docs/09-ui-prototype/**` spec/README/
   traceability updates. All are **preserved unchanged** by this merge.
-- **AR-044 collision resolved (control-room item 7):** the Task 010B
-  architecture-review row (and its four revision notes) had also been drafted
-  as **AR-044**. Because the control room assigned **AR-044 to the U0
-  acceptance closure**, the Task 010B row + its four revision notes were
-  **renumbered from AR-044 to AR-045** (the next free ID). U0's AR-044 was
-  **retained, not overwritten or combined.** Self-references to the Task 010B
-  AR row (`task-010b-validation-results.md`, the packet, this handoff) were
-  updated to **AR-045**; U0's AR-044 references are untouched. See the AR-log
-  "AR-045 renumber / base-sync note".
+- **AR-044 collision resolved (control-room item 7), then AR-allocation
+  reconciled to AR-046:** the Task 010B architecture-review row (and its four
+  revision notes) had also been drafted as **AR-044**. Because the control room
+  assigned **AR-044 to the U0 acceptance closure**, the Task 010B row + its four
+  revision notes were first renumbered **AR-044 → AR-045**; the control room then
+  reconciled the concurrent post-U0 allocation (reviews `4680290878` /
+  `4680322434`) — **AR-045** is reserved for Task 011B / PR #150 and **AR-047**
+  for CORE-R2 / PR #154 — so Task 010B was **ultimately assigned AR-046**. U0's
+  AR-044 was **retained, not overwritten or combined.** Self-references to the
+  Task 010B AR row (`task-010b-validation-results.md`, the packet, this handoff)
+  were updated to **AR-046**; U0's AR-044 references are untouched. **AR-045 is
+  intentionally absent from this branch** (it belongs to Task 011B / PR #150), so
+  a temporary AR-044 → AR-046 numeric gap is expected. See the AR-log "AR-046
+  renumber / base-sync + allocation-reconciliation note".
 - **Conflict resolution (shared docs only):** the two conflicts,
   `research-handoff.md` and `architecture-review-log.md`, were resolved by
   **retaining both sides completely** with chronological accuracy (both the
   U0 and Task 010B entries/rows kept). **No addon or test file conflicted**
   — had one, this session would have stopped and reported per the amendment.
 - **PR diff vs the new base is Task-010B-only** (the `shopify_connector_product`
-  addon + the four Task 010B docs) plus the AR-044→AR-045 renumber; no U0
+  addon + the four Task 010B docs) plus the AR-044→AR-046 renumber; no U0
   file appears as a PR change; no Task 011B / CORE-R2 / customer / order /
   sale file. `Shopify-connector` (`cfdb057`) is an ancestor of the new head.
 - **No code changed; no runtime run.** Odoo.sh three-suite validation remains
@@ -274,8 +279,9 @@
   executed locally; **Odoo.sh + live/dev-store evidence NOT obtained this
   session — recorded as outstanding in
   `docs/05-qa/task-010b-validation-results.md` §10, not faked, not
-  waived.** Validation record + AR-045 (renumbered from AR-044 in the
-  2026-07-12 base-sync merge to `cfdb057`; see the AR-log renumber note) +
+  waived.** Validation record + AR-046 (Task 010B; renumbered off AR-044 in the
+  2026-07-12 base-sync merge to `cfdb057`, then reconciled to AR-046 after the
+  concurrent post-U0 allocation was settled; see the AR-log renumber note) +
   this entry written.
 - **Next-session prompt (for ChatGPT to issue, after review):** *"Task
   010B validation-only session: on Odoo.sh at the draft-PR head, run the
