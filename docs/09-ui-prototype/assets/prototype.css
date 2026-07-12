@@ -1,0 +1,637 @@
+/* ==========================================================================
+   Premium Odoo 19 <-> Shopify Connector — Operator UI visual prototype
+   U0 session · gate comment 4948902516 · base f9c3c5fd25af3f94ee71cc2ead3821e7da85443d
+   --------------------------------------------------------------------------
+   Self-contained. No external font, CDN, image, tracker, or JavaScript.
+   Every color / spacing / radius / type value is a token from the accepted
+   design system (docs/03-architecture/premium-ui-ux-design-system.md §4–§8).
+   Direction-neutral: logical properties only (no left/right), so dir="rtl"
+   mirrors without any extra rule.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ tokens */
+:root {
+  /* Surfaces (§5) */
+  --sc-surface-0: #F8FAFC;   /* page background          */
+  --sc-surface-1: #FFFFFF;   /* card                     */
+  --sc-surface-2: #FFFFFF;   /* raised overlay (dialog)  */
+
+  /* Text (§6) */
+  --sc-text-primary:   #1F2937;
+  --sc-text-secondary: #475467;
+
+  /* Hairlines & boundaries (§5–§6, +U0 proposed border-strong) */
+  --sc-border:        #E4E7EC;  /* decorative grouping hairline (not a 1.4.11 control boundary) */
+  --sc-border-strong: #79839B;  /* PROPOSED (U0): interactive control boundary — 3.80:1 / 3.63:1 (SC 1.4.11) */
+
+  /* Interactive accent (§6) */
+  --sc-accent: #175CD3;
+  --sc-focus:  #175CD3;         /* focus ring = accent (5.99:1 on white) */
+
+  /* Semantic status (§6) — text/icon on tint or white only; never white-on-tint */
+  --sc-success-text: #067647;  --sc-success-bg: #ECFDF3;
+  --sc-warning-text: #B54708;  --sc-warning-bg: #FFFAEB;
+  --sc-danger-text:  #B42318;  --sc-danger-bg:  #FEF3F2;
+  --sc-info-text:    #175CD3;  --sc-info-bg:    #EFF8FF;
+  --sc-neutral-text: #475467;  --sc-neutral-bg: #F2F4F7;
+
+  /* Spacing scale (§4): 4 8 12 16 24 32 48 64 */
+  --sc-space-1: 4px;  --sc-space-2: 8px;  --sc-space-3: 12px; --sc-space-4: 16px;
+  --sc-space-5: 24px; --sc-space-6: 32px; --sc-space-7: 48px; --sc-space-8: 64px;
+
+  /* Type scale (§4) */
+  --sc-fs-caption: 0.75rem;  --sc-fs-secondary: 0.875rem; --sc-fs-body: 1rem;
+  --sc-fs-cardtitle: 1.125rem; --sc-fs-lead: 1.375rem;    --sc-fs-dominant: 1.75rem;
+  --sc-fw-body: 400; --sc-fw-label: 500; --sc-fw-dominant: 600;
+
+  /* Radius (§5) */
+  --sc-radius: 8px;
+
+  /* Motion (§8) */
+  --sc-motion-1: 100ms; --sc-motion-2: 150ms; --sc-motion-3: 250ms;
+  --sc-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Platform font stack only — no custom / external font */
+  --sc-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+             Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--sc-font);
+  font-size: var(--sc-fs-body);
+  line-height: 1.5;
+  color: var(--sc-text-primary);
+  background: var(--sc-surface-0);
+  font-variant-numeric: tabular-nums;
+}
+h1,h2,h3,h4,p,ul,ol,figure { margin: 0; }
+ul,ol { padding: 0; list-style: none; }
+a { color: var(--sc-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font-family: inherit; }
+
+/* Visible focus everywhere (WCAG 2.4.7) */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+input:focus-visible, .sc-focusable:focus-visible {
+  outline: 2px solid var(--sc-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------- gallery scaffolding
+   Only the .screen element is captured as a PNG. The caption is chrome that
+   stays out of the rendered evidence. */
+/* Full-bleed screens: each .screen equals the true viewport width, so a
+   1366/768/375 render is captured at exactly that width. Only chrome
+   (intro + captions) is padded. */
+.gallery { margin: 0; padding: 0 0 var(--sc-space-8); }
+.gallery__intro { margin-bottom: var(--sc-space-6); padding: var(--sc-space-6) var(--sc-space-5) 0; max-width: 900px; }
+.gallery__intro h1 { font-size: var(--sc-fs-dominant); font-weight: var(--sc-fw-dominant); }
+.gallery__intro p { color: var(--sc-text-secondary); margin-top: var(--sc-space-2); max-width: 72ch; }
+.gallery-item { margin-bottom: var(--sc-space-7); }
+.gallery-caption {
+  font-size: var(--sc-fs-secondary); font-weight: var(--sc-fw-label);
+  color: var(--sc-text-secondary); margin-bottom: var(--sc-space-2);
+  padding: 0 var(--sc-space-5);
+}
+.gallery-caption b { color: var(--sc-text-primary); }
+.screen {
+  background: var(--sc-surface-0);
+  border-block: 1px solid var(--sc-border);
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------- Odoo shell
+   Standard Odoo web-client chrome: top system bar + connector app bar +
+   breadcrumb. Kept deliberately Odoo-native (no foreign SPA frame). */
+.sc-topbar {
+  display: flex; align-items: center; gap: var(--sc-space-3);
+  background: #FFFFFF; border-bottom: 1px solid var(--sc-border);
+  padding: var(--sc-space-2) var(--sc-space-4); min-height: 44px;
+}
+.sc-topbar__apps { display: flex; align-items: center; gap: var(--sc-space-2);
+  color: var(--sc-text-secondary); font-size: var(--sc-fs-secondary); }
+.sc-topbar__brand { font-weight: var(--sc-fw-dominant); color: var(--sc-text-primary); }
+.sc-topbar__spacer { flex: 1; }
+.sc-topbar__user {
+  inline-size: 28px; block-size: 28px; border-radius: 50%;
+  background: var(--sc-neutral-bg); color: var(--sc-text-secondary);
+  display: grid; place-items: center; font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label);
+}
+
+/* connector app menu (the 7 accepted top entries) */
+.sc-appbar {
+  display: flex; align-items: center; gap: var(--sc-space-1);
+  background: #FFFFFF; border-bottom: 1px solid var(--sc-border);
+  padding: 0 var(--sc-space-3); overflow-x: auto;
+}
+/* items scroll WITHIN their own region if ever narrow, so they can never
+   overflow into (overlap) the persistent health indicator. */
+.sc-appbar__items { display: flex; align-items: center; gap: var(--sc-space-1); min-inline-size: 0; overflow-x: auto; }
+.sc-appbar__item {
+  padding: var(--sc-space-3) var(--sc-space-3);
+  font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary);
+  white-space: nowrap; border-block-end: 2px solid transparent;
+}
+.sc-appbar__item.is-active { color: var(--sc-accent); border-block-end-color: var(--sc-accent); font-weight: var(--sc-fw-label); }
+.sc-appbar__spacer { flex: 1 0 var(--sc-space-4); }
+/* compact mobile shell controls — hidden on desktop, shown <=900px (see media query) */
+.sc-appbar__menu, .sc-appbar__current { display: none; }
+.sc-appbar__menu {
+  align-items: center; gap: var(--sc-space-2); white-space: nowrap;
+  background: var(--sc-surface-1); border: 1px solid var(--sc-border-strong);
+  border-radius: 6px; color: var(--sc-text-primary); font: inherit;
+  font-size: var(--sc-fs-secondary); font-weight: var(--sc-fw-label);
+  min-block-size: 32px; padding: var(--sc-space-1) var(--sc-space-3); cursor: pointer;
+}
+.sc-appbar__current { align-items: center; font-size: var(--sc-fs-body);
+  font-weight: var(--sc-fw-label); color: var(--sc-accent); white-space: nowrap; }
+
+/* persistent connection-health indicator (always text + reinforcing color) */
+.sc-health {
+  display: inline-flex; align-items: center; gap: var(--sc-space-2);
+  font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary);
+  padding-inline: var(--sc-space-2); white-space: nowrap;
+}
+.sc-health__dot { inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--sc-success-text); flex: none; }
+.sc-health--degraded .sc-health__dot { background: var(--sc-warning-text); }
+.sc-health--down .sc-health__dot { background: var(--sc-danger-text); }
+.sc-health__sm { display: none; }  /* compact health label — shown only on the mobile shell */
+
+/* breadcrumb */
+.sc-breadcrumb {
+  display: flex; align-items: center; gap: var(--sc-space-2);
+  padding: var(--sc-space-3) var(--sc-space-5); font-size: var(--sc-fs-secondary);
+  color: var(--sc-text-secondary); background: var(--sc-surface-0);
+}
+.sc-breadcrumb b { color: var(--sc-text-primary); font-weight: var(--sc-fw-label); }
+.sc-breadcrumb__sep { color: var(--sc-border-strong); }
+
+/* page content region */
+.sc-content { padding: var(--sc-space-5); }
+.sc-content--reading { max-width: 72ch; }
+.sc-content--center { max-width: 640px; margin-inline: auto; }
+
+/* ---------------------------------------------------------- lead answer band
+   The single dominant element (§9 step 1). Full width, tinted per status,
+   1px border in the darker token, icon + sentence + optional single action. */
+.sc-band {
+  display: flex; align-items: center; gap: var(--sc-space-3);
+  padding: var(--sc-space-4) var(--sc-space-5);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface-1);
+}
+.sc-band__ico { flex: none; }
+.sc-band__text { flex: 1; min-inline-size: 0; }
+.sc-band__answer { font-size: var(--sc-fs-dominant); font-weight: var(--sc-fw-dominant); line-height: 1.2; }
+.sc-band__sub { color: var(--sc-text-secondary); font-size: var(--sc-fs-secondary); margin-top: var(--sc-space-1); }
+.sc-band--success { background: var(--sc-success-bg); border-color: var(--sc-success-text); }
+.sc-band--success .sc-band__ico { color: var(--sc-success-text); }
+.sc-band--warning { background: var(--sc-warning-bg); border-color: var(--sc-warning-text); }
+.sc-band--warning .sc-band__ico { color: var(--sc-warning-text); }
+.sc-band--danger  { background: var(--sc-danger-bg);  border-color: var(--sc-danger-text); }
+.sc-band--danger  .sc-band__ico { color: var(--sc-danger-text); }
+.sc-band--info    { background: var(--sc-info-bg);    border-color: var(--sc-info-text); }
+.sc-band--info    .sc-band__ico { color: var(--sc-info-text); }
+.sc-band--neutral { background: var(--sc-neutral-bg); border-color: var(--sc-border-strong); }
+.sc-band--neutral .sc-band__ico { color: var(--sc-neutral-text); }
+
+/* --------------------------------------------------------- section labelling */
+.sc-section { margin-top: var(--sc-space-6); }
+.sc-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sc-space-3); margin-bottom: var(--sc-space-3); }
+.sc-section__title { font-size: var(--sc-fs-lead); font-weight: var(--sc-fw-label); }
+.sc-section__meta { font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); }
+
+/* ------------------------------------------------- primary exception region
+   At most three entries (§9 step 2). Each: plain issue + count/scope + why +
+   one next action. Empty -> single affirmative line (collapses). */
+.sc-exceptions { display: flex; flex-direction: column; gap: var(--sc-space-3); }
+.sc-exception {
+  display: flex; align-items: flex-start; gap: var(--sc-space-3);
+  padding: var(--sc-space-4);
+  background: var(--sc-surface-1);
+  border: 1px solid var(--sc-border);
+  border-inline-start: 3px solid var(--sc-border-strong);
+  border-radius: var(--sc-radius);
+}
+.sc-exception--danger  { border-inline-start-color: var(--sc-danger-text); }
+.sc-exception--warning { border-inline-start-color: var(--sc-warning-text); }
+.sc-exception--info    { border-inline-start-color: var(--sc-info-text); }
+.sc-exception__ico { flex: none; margin-top: 2px; }
+.sc-exception--danger  .sc-exception__ico { color: var(--sc-danger-text); }
+.sc-exception--warning .sc-exception__ico { color: var(--sc-warning-text); }
+.sc-exception--info    .sc-exception__ico { color: var(--sc-info-text); }
+.sc-exception__body { flex: 1; min-inline-size: 0; }
+.sc-exception__title { font-weight: var(--sc-fw-label); font-size: var(--sc-fs-cardtitle); }
+.sc-exception__why { color: var(--sc-text-secondary); font-size: var(--sc-fs-secondary); margin-top: var(--sc-space-1); }
+.sc-exception__action { flex: none; align-self: center; }
+.sc-exception__count { font-variant-numeric: tabular-nums; }
+
+/* affirmative collapsed line (empty exception region) */
+.sc-affirm {
+  display: flex; align-items: center; gap: var(--sc-space-3);
+  padding: var(--sc-space-4) var(--sc-space-5);
+  background: var(--sc-success-bg); border: 1px solid var(--sc-success-text);
+  border-radius: var(--sc-radius); color: var(--sc-text-primary);
+}
+.sc-affirm__ico { color: var(--sc-success-text); flex: none; }
+
+/* ---------------------------------------------------- secondary metric chips
+   Quiet, compact — not cards (§9 step 3). Loud only when non-zero danger/warn. */
+.sc-chips { display: flex; flex-wrap: wrap; gap: var(--sc-space-2); }
+.sc-chip {
+  display: inline-flex; align-items: baseline; gap: var(--sc-space-2);
+  padding: var(--sc-space-2) var(--sc-space-3);
+  background: var(--sc-surface-1); border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius); font-size: var(--sc-fs-secondary);
+  color: var(--sc-text-secondary);
+}
+.sc-chip__value { font-weight: var(--sc-fw-label); color: var(--sc-text-primary); font-size: var(--sc-fs-body); }
+.sc-chip__label { color: var(--sc-text-secondary); }
+.sc-chip.is-warning { background: var(--sc-warning-bg); border-color: var(--sc-warning-text); }
+.sc-chip.is-warning .sc-chip__value { color: var(--sc-warning-text); }
+.sc-chip.is-danger  { background: var(--sc-danger-bg);  border-color: var(--sc-danger-text); }
+.sc-chip.is-danger  .sc-chip__value { color: var(--sc-danger-text); }
+
+/* --------------------------------------------------------------- recent activity
+   Human-readable timeline with relative freshness + honest cadence line. */
+.sc-activity { display: flex; flex-direction: column; }
+.sc-activity__item {
+  display: flex; align-items: flex-start; gap: var(--sc-space-3);
+  padding: var(--sc-space-3) 0; border-block-end: 1px solid var(--sc-border);
+}
+.sc-activity__item:last-child { border-block-end: 0; }
+.sc-activity__marker { flex: none; margin-top: 3px; color: var(--sc-text-secondary); }
+.sc-activity__marker.is-success { color: var(--sc-success-text); }
+.sc-activity__marker.is-danger  { color: var(--sc-danger-text); }
+.sc-activity__marker.is-info    { color: var(--sc-info-text); }
+.sc-activity__text { flex: 1; min-inline-size: 0; }
+.sc-activity__meta { display: block; color: var(--sc-text-secondary); font-size: var(--sc-fs-caption); margin-top: 2px; }
+.sc-cadence {
+  margin-top: var(--sc-space-3); padding-top: var(--sc-space-3);
+  border-top: 1px solid var(--sc-border);
+  color: var(--sc-text-secondary); font-size: var(--sc-fs-secondary);
+  display: flex; align-items: center; gap: var(--sc-space-2);
+}
+
+/* --------------------------------------------------------- restrained sparkline
+   Single 7-day activity/failure trend. Monochrome bars + danger accent on
+   failure days. Severable — never dominant. CSS bars only (no chart lib). */
+.sc-spark { display: flex; align-items: flex-end; gap: 3px; block-size: 44px; }
+.sc-spark__bar { inline-size: 10px; background: var(--sc-border-strong); border-radius: 2px 2px 0 0; }
+.sc-spark__bar.is-fail { background: var(--sc-danger-text); }
+.sc-spark__legend { display: flex; gap: var(--sc-space-4); margin-top: var(--sc-space-2);
+  font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
+.sc-spark__key { display: inline-flex; align-items: center; gap: var(--sc-space-1); }
+.sc-spark__swatch { inline-size: 10px; block-size: 10px; border-radius: 2px; }
+
+/* ------------------------------------------------------------------- cards
+   One card style only: radius 8, 1px border, no resting shadow, no nesting. */
+.sc-card {
+  background: var(--sc-surface-1); border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius); padding: var(--sc-space-5);
+}
+.sc-card--compact { padding: var(--sc-space-4); }
+.sc-grid { display: grid; gap: var(--sc-space-4); }
+.sc-grid--2 { grid-template-columns: 1fr 1fr; }
+.sc-grid--3 { grid-template-columns: 1fr 1fr 1fr; }
+.sc-cols { display: grid; grid-template-columns: 2fr 1fr; gap: var(--sc-space-5); align-items: start; }
+
+/* -------------------------------------------------------------- status chips
+   Inline state word — text ALWAYS present, color only reinforces (§1 law 3). */
+.sc-status {
+  display: inline-flex; align-items: center; gap: var(--sc-space-1);
+  padding: 2px var(--sc-space-2); border-radius: 6px;
+  font-size: var(--sc-fs-secondary); font-weight: var(--sc-fw-label); white-space: nowrap;
+}
+.sc-status--success { background: var(--sc-success-bg); color: var(--sc-success-text); }
+.sc-status--warning { background: var(--sc-warning-bg); color: var(--sc-warning-text); }
+.sc-status--danger  { background: var(--sc-danger-bg);  color: var(--sc-danger-text); }
+.sc-status--info    { background: var(--sc-info-bg);    color: var(--sc-info-text); }
+.sc-status--neutral { background: var(--sc-neutral-bg); color: var(--sc-neutral-text); }
+
+/* owner chip (who the item is waiting on) */
+.sc-owner {
+  display: inline-flex; align-items: center; gap: var(--sc-space-1);
+  font-size: var(--sc-fs-caption); color: var(--sc-text-secondary);
+  border: 1px solid var(--sc-border); border-radius: 6px; padding: 1px var(--sc-space-2);
+}
+
+/* ----------------------------------------------------------------- buttons
+   One primary per screen (filled accent); secondary outline; quiet text;
+   destructive danger-styled + never primary-positioned. Min target 24x24. */
+.sc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sc-space-2);
+  min-block-size: 36px; min-inline-size: 24px;
+  padding: var(--sc-space-2) var(--sc-space-4);
+  font-size: var(--sc-fs-secondary); font-weight: var(--sc-fw-label);
+  border-radius: 6px; border: 1px solid var(--sc-border-strong);
+  background: var(--sc-surface-1); color: var(--sc-text-primary); cursor: pointer;
+  transition: background var(--sc-motion-1) var(--sc-ease), border-color var(--sc-motion-1) var(--sc-ease);
+}
+.sc-btn--primary { background: var(--sc-accent); border-color: var(--sc-accent); color: #FFFFFF; }
+.sc-btn--secondary { background: var(--sc-surface-1); border-color: var(--sc-border-strong); color: var(--sc-text-primary); }
+.sc-btn--quiet { background: transparent; border-color: transparent; color: var(--sc-accent); padding-inline: var(--sc-space-2); }
+.sc-btn--danger { background: var(--sc-surface-1); border-color: var(--sc-danger-text); color: var(--sc-danger-text); }
+.sc-btn--sm { min-block-size: 30px; padding: var(--sc-space-1) var(--sc-space-3); }
+.sc-btn--block { inline-size: 100%; }
+.sc-btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.sc-btnrow { display: flex; flex-wrap: wrap; gap: var(--sc-space-3); align-items: center; }
+.sc-btnrow--end { justify-content: flex-end; }
+.sc-btnrow--split { justify-content: space-between; }
+
+/* -------------------------------------------------------------------- forms */
+.sc-field { display: block; margin-bottom: var(--sc-space-4); }
+.sc-label { display: block; font-size: var(--sc-fs-secondary); font-weight: var(--sc-fw-label); margin-bottom: var(--sc-space-2); }
+.sc-input {
+  inline-size: 100%; min-block-size: 40px;
+  padding: var(--sc-space-2) var(--sc-space-3);
+  font: inherit; font-size: var(--sc-fs-body); color: var(--sc-text-primary);
+  background: var(--sc-surface-1); border: 1px solid var(--sc-border-strong);
+  border-radius: 6px;
+}
+.sc-input::placeholder { color: var(--sc-text-secondary); }
+.sc-input[readonly] { background: var(--sc-surface-0); color: var(--sc-text-secondary); }
+.sc-input--mask { letter-spacing: 0.18em; }
+.sc-help { font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); margin-top: var(--sc-space-2); }
+.sc-help--error { color: var(--sc-danger-text); }
+
+/* -------------------------------------------------------------- wizard steps */
+.sc-steps { display: flex; flex-wrap: wrap; gap: var(--sc-space-2); margin-bottom: var(--sc-space-5); }
+.sc-step { display: inline-flex; align-items: center; gap: var(--sc-space-2);
+  font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); }
+.sc-step__num {
+  inline-size: 22px; block-size: 22px; border-radius: 50%;
+  display: grid; place-items: center; font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label);
+  border: 1px solid var(--sc-border-strong); background: var(--sc-surface-1); color: var(--sc-text-secondary);
+}
+.sc-step.is-done .sc-step__num { background: var(--sc-success-bg); border-color: var(--sc-success-text); color: var(--sc-success-text); }
+.sc-step.is-current .sc-step__num { background: var(--sc-accent); border-color: var(--sc-accent); color: #FFFFFF; }
+.sc-step.is-current { color: var(--sc-text-primary); font-weight: var(--sc-fw-label); }
+.sc-step__sep { color: var(--sc-border-strong); }
+
+/* ------------------------------------------------------------- readiness rows */
+.sc-ready-group { margin-bottom: var(--sc-space-5); }
+.sc-ready-group__head { display: flex; align-items: center; gap: var(--sc-space-2);
+  font-weight: var(--sc-fw-label); margin-bottom: var(--sc-space-3); }
+.sc-ready-group__count { color: var(--sc-text-secondary); font-weight: var(--sc-fw-body); font-size: var(--sc-fs-secondary); }
+.sc-ready {
+  display: grid; grid-template-columns: auto 1fr auto; gap: var(--sc-space-3);
+  align-items: start; padding: var(--sc-space-3) var(--sc-space-4);
+  border: 1px solid var(--sc-border); border-radius: var(--sc-radius);
+  background: var(--sc-surface-1); margin-bottom: var(--sc-space-2);
+}
+.sc-ready__ico { margin-top: 2px; }
+.sc-ready--pass .sc-ready__ico { color: var(--sc-success-text); }
+.sc-ready--fail .sc-ready__ico { color: var(--sc-danger-text); }
+.sc-ready--warn .sc-ready__ico { color: var(--sc-warning-text); }
+.sc-ready--na   .sc-ready__ico { color: var(--sc-neutral-text); }
+.sc-ready__name { font-weight: var(--sc-fw-label); }
+.sc-ready__result { color: var(--sc-text-secondary); font-size: var(--sc-fs-secondary); margin-top: 2px; }
+.sc-ready__fix {
+  margin-top: var(--sc-space-2); font-size: var(--sc-fs-secondary);
+  color: var(--sc-text-primary); background: var(--sc-danger-bg);
+  border-radius: 6px; padding: var(--sc-space-2) var(--sc-space-3);
+}
+.sc-ready__fix b { font-weight: var(--sc-fw-label); }
+.sc-ready__owner { align-self: center; }
+
+/* --------------------------------------------------------- matching candidate */
+.sc-incoming {
+  background: var(--sc-surface-1); border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius); padding: var(--sc-space-4); margin-bottom: var(--sc-space-4);
+}
+.sc-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--sc-space-1) var(--sc-space-4); font-size: var(--sc-fs-secondary); }
+.sc-kv dt { color: var(--sc-text-secondary); }
+.sc-kv dd { margin: 0; color: var(--sc-text-primary); }
+
+.sc-candidate {
+  display: flex; gap: var(--sc-space-3); align-items: flex-start;
+  border: 1px solid var(--sc-border); border-radius: var(--sc-radius);
+  padding: var(--sc-space-4); background: var(--sc-surface-1); margin-bottom: var(--sc-space-3);
+}
+.sc-candidate.is-selected { border-color: var(--sc-accent); box-shadow: inset 0 0 0 1px var(--sc-accent); }
+.sc-candidate__radio {
+  flex: none; inline-size: 18px; block-size: 18px; border-radius: 50%;
+  border: 2px solid var(--sc-border-strong); margin-top: 2px;
+}
+.sc-candidate.is-selected .sc-candidate__radio { border-color: var(--sc-accent); background:
+  radial-gradient(circle at center, var(--sc-accent) 0 5px, transparent 6px); }
+/* completed outcome card (automatic bind/create) — success framing, no radio */
+.sc-candidate.is-linked { border-color: var(--sc-success-text); box-shadow: inset 0 0 0 1px var(--sc-success-text); }
+.sc-candidate__badge { flex: none; inline-size: 20px; block-size: 20px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; margin-top: 1px;
+  color: var(--sc-success-text); background: var(--sc-success-bg); }
+.sc-candidate__body { flex: 1; min-inline-size: 0; }
+.sc-candidate__title { font-weight: var(--sc-fw-label); font-size: var(--sc-fs-cardtitle); }
+.sc-confidence { font-size: var(--sc-fs-secondary); margin-top: var(--sc-space-1); }
+.sc-confidence--strong { color: var(--sc-success-text); }
+.sc-confidence--partial { color: var(--sc-warning-text); }
+
+/* field-level evidence table */
+.sc-evidence { inline-size: 100%; border-collapse: collapse; margin-top: var(--sc-space-3); font-size: var(--sc-fs-secondary); }
+.sc-evidence th { text-align: start; color: var(--sc-text-secondary); font-weight: var(--sc-fw-label); padding: var(--sc-space-2) var(--sc-space-3); border-block-end: 1px solid var(--sc-border); }
+.sc-evidence td { padding: var(--sc-space-2) var(--sc-space-3); border-block-end: 1px solid var(--sc-border); vertical-align: top; }
+.sc-evidence tr:last-child td { border-block-end: 0; }
+.sc-match { display: inline-flex; align-items: center; gap: var(--sc-space-1); font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label); }
+.sc-match--yes { color: var(--sc-success-text); }
+.sc-match--same { color: var(--sc-success-text); }
+.sc-match--adv { color: var(--sc-text-secondary); font-weight: var(--sc-fw-body); }
+.sc-match--no  { color: var(--sc-danger-text); }
+.sc-match--partial { color: var(--sc-warning-text); }
+
+/* consequence-of-decision note */
+.sc-consequence {
+  margin-top: var(--sc-space-4); padding: var(--sc-space-3) var(--sc-space-4);
+  background: var(--sc-info-bg); border: 1px solid var(--sc-info-text); border-radius: var(--sc-radius);
+  font-size: var(--sc-fs-secondary); color: var(--sc-text-primary);
+  display: flex; gap: var(--sc-space-2); align-items: flex-start;
+}
+.sc-consequence__ico { color: var(--sc-info-text); flex: none; margin-top: 1px; }
+
+/* ------------------------------------------------------------------ diff table */
+.sc-diff { inline-size: 100%; border-collapse: collapse; font-size: var(--sc-fs-secondary); }
+.sc-diff th {
+  text-align: start; color: var(--sc-text-secondary); font-weight: var(--sc-fw-label);
+  padding: var(--sc-space-3); border-block-end: 1px solid var(--sc-border-strong); position: sticky; top: 0;
+  background: var(--sc-surface-1);
+}
+.sc-diff td { padding: var(--sc-space-3); border-block-end: 1px solid var(--sc-border); vertical-align: top; }
+.sc-diff__field { font-weight: var(--sc-fw-label); color: var(--sc-text-primary); }
+.sc-diff__tag { display: block; font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); margin-top: 2px; }
+.sc-diff tr.is-unchanged td { color: var(--sc-text-secondary); }
+.sc-diff tr.is-changed .sc-diff__new { color: var(--sc-text-primary); font-weight: var(--sc-fw-label); }
+.sc-diff__old { color: var(--sc-text-secondary); text-decoration: line-through; }
+.sc-diff tr.is-protected { background: var(--sc-warning-bg); }
+.sc-diff__protected { color: var(--sc-warning-text); font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label); display: inline-flex; gap: var(--sc-space-1); align-items:center;}
+.sc-diff tr.is-blocked td { background: var(--sc-danger-bg); }
+.sc-diff__blocked { color: var(--sc-danger-text); font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label); display: inline-flex; gap: var(--sc-space-1); align-items:center; }
+.sc-sot { display: inline-flex; align-items: center; gap: var(--sc-space-1); font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
+.sc-variant-row td { background: var(--sc-surface-0); }
+.sc-variant-row .sc-diff__field { padding-inline-start: var(--sc-space-5); font-weight: var(--sc-fw-body); }
+
+/* -------------------------------------------------------- Odoo-native list view */
+.sc-listbar { display: flex; align-items: center; gap: var(--sc-space-3); flex-wrap: wrap;
+  padding-bottom: var(--sc-space-3); }
+.sc-search {
+  display: flex; align-items: center; gap: var(--sc-space-2); flex: 1; min-inline-size: 220px;
+  border: 1px solid var(--sc-border-strong); border-radius: 6px; padding: var(--sc-space-2) var(--sc-space-3);
+  color: var(--sc-text-secondary); font-size: var(--sc-fs-secondary); background: var(--sc-surface-1);
+}
+.sc-facet { display: inline-flex; align-items: center; gap: var(--sc-space-1);
+  background: var(--sc-info-bg); border: 1px solid var(--sc-info-text); color: var(--sc-info-text);
+  border-radius: 6px; padding: 2px var(--sc-space-2); font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label); }
+.sc-list { inline-size: 100%; border-collapse: collapse; background: var(--sc-surface-1);
+  border: 1px solid var(--sc-border); border-radius: var(--sc-radius); overflow: hidden; }
+.sc-list th { text-align: start; font-size: var(--sc-fs-caption); text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--sc-text-secondary); font-weight: var(--sc-fw-label); padding: var(--sc-space-3) var(--sc-space-4);
+  border-block-end: 1px solid var(--sc-border-strong); background: var(--sc-surface-0); }
+.sc-list td { padding: var(--sc-space-3) var(--sc-space-4); border-block-end: 1px solid var(--sc-border); font-size: var(--sc-fs-secondary); }
+.sc-list tr:last-child td { border-block-end: 0; }
+.sc-list tr.has-exception td { background: var(--sc-danger-bg); }
+.sc-list__id { color: var(--sc-text-secondary); font-variant-numeric: tabular-nums; }
+.sc-list__pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sc-space-3);
+  margin-top: var(--sc-space-3); font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); }
+
+/* ------------------------------------------------------------- Odoo-native form */
+.sc-statusbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+  padding: var(--sc-space-3) var(--sc-space-4); background: var(--sc-surface-1);
+  border: 1px solid var(--sc-border); border-block-end: 0;
+  border-radius: var(--sc-radius) var(--sc-radius) 0 0; }
+.sc-statusbar__stage { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary);
+  padding: var(--sc-space-1) var(--sc-space-3); border-radius: 20px; }
+.sc-statusbar__stage.is-current { background: var(--sc-neutral-bg); color: var(--sc-text-primary); font-weight: var(--sc-fw-label); }
+.sc-statusbar__spacer { flex: 1; }
+.sc-sheet { background: var(--sc-surface-1); border: 1px solid var(--sc-border);
+  border-radius: 0 0 var(--sc-radius) var(--sc-radius); padding: var(--sc-space-5); }
+.sc-sheet__title { font-size: var(--sc-fs-lead); font-weight: var(--sc-fw-label); }
+.sc-smartbtns { display: flex; gap: var(--sc-space-2); flex-wrap: wrap; margin: var(--sc-space-4) 0; }
+.sc-smartbtn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  border: 1px solid var(--sc-border); border-radius: var(--sc-radius); padding: var(--sc-space-3) var(--sc-space-4);
+  min-inline-size: 120px; }
+.sc-smartbtn__value { font-weight: var(--sc-fw-label); display: inline-flex; align-items: center; gap: var(--sc-space-2); }
+.sc-smartbtn__label { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
+.sc-tabs { display: flex; gap: var(--sc-space-1); border-block-end: 1px solid var(--sc-border);
+  margin: var(--sc-space-4) 0 var(--sc-space-4); }
+.sc-tab { padding: var(--sc-space-2) var(--sc-space-3); font-size: var(--sc-fs-secondary);
+  color: var(--sc-text-secondary); border-block-end: 2px solid transparent; }
+.sc-tab.is-active { color: var(--sc-text-primary); border-block-end-color: var(--sc-accent); font-weight: var(--sc-fw-label); }
+.sc-fieldgroup { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sc-space-4) var(--sc-space-6); }
+.sc-fieldgroup .sc-field--full { grid-column: 1 / -1; }
+.sc-ro { font-size: var(--sc-fs-body); }
+.sc-ro__label { font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); margin-bottom: 2px; }
+
+/* --------------------------------------------------------------- empty states */
+.sc-empty { text-align: center; padding: var(--sc-space-8) var(--sc-space-5); }
+.sc-empty__ico { color: var(--sc-border-strong); margin-bottom: var(--sc-space-3); }
+.sc-empty__title { font-size: var(--sc-fs-lead); font-weight: var(--sc-fw-label); }
+.sc-empty__text { color: var(--sc-text-secondary); margin: var(--sc-space-2) auto var(--sc-space-4); max-width: 52ch; }
+
+/* ------------------------------------------------------------- loading (skeleton)
+   Skeleton lines, never a blank region (§11). Motion respects reduced-motion. */
+.sc-skel { background: var(--sc-neutral-bg); border-radius: 6px; block-size: 12px; }
+.sc-skel--line { margin-bottom: var(--sc-space-2); }
+.sc-skel--band { block-size: 64px; border-radius: var(--sc-radius); }
+.sc-skel--w40 { inline-size: 40%; } .sc-skel--w60 { inline-size: 60%; } .sc-skel--w80 { inline-size: 80%; }
+.sc-skel--wide { block-size: 88px; border-radius: var(--sc-radius); }
+.sc-loadingline { display: flex; align-items: center; gap: var(--sc-space-2);
+  color: var(--sc-text-secondary); font-size: var(--sc-fs-secondary); margin-top: var(--sc-space-3); }
+.sc-spinner { inline-size: 16px; block-size: 16px; border-radius: 50%;
+  border: 2px solid var(--sc-border); border-block-start-color: var(--sc-accent);
+  animation: sc-spin 800ms linear infinite; }
+@keyframes sc-spin { to { transform: rotate(360deg); } }
+
+/* dialog / raised overlay (surface-2) — the only elevation change (§5) */
+.sc-dialog { background: var(--sc-surface-2); border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius); box-shadow: 0 12px 32px rgba(16,24,40,0.16);
+  padding: var(--sc-space-5); max-width: 520px; }
+
+/* icons — inline-SVG placeholders for the accepted §7 FontAwesome glyphs.
+   fill/stroke are set here (inherited SVG props) so they reach the <use>
+   shadow tree; the sprite <g>'s attributes do not cross the <use> boundary.
+   Explicit fill="currentColor" on sub-shapes (e.g. the warn dot) still wins. */
+.sc-ico { inline-size: 16px; block-size: 16px; display: inline-block; vertical-align: -2px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sc-ico--20 { inline-size: 20px; block-size: 20px; stroke-width: 1.9; }
+.sc-ico--28 { inline-size: 28px; block-size: 28px; stroke-width: 1.7; }
+.sc-ico--40 { inline-size: 40px; block-size: 40px; stroke-width: 1.5; }
+
+/* utilities */
+.sc-muted { color: var(--sc-text-secondary); }
+.sc-mono { font-variant-numeric: tabular-nums; }
+.sc-mt2 { margin-top: var(--sc-space-2); } .sc-mt3 { margin-top: var(--sc-space-3); }
+.sc-mt4 { margin-top: var(--sc-space-4); } .sc-mt5 { margin-top: var(--sc-space-5); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* -------------------------------------------------------------- responsive
+   Dashboard order is preserved (band -> exceptions -> chips -> activity);
+   no horizontal page scroll; primary answer stays visible. */
+@media (max-width: 900px) {
+  .sc-cols { grid-template-columns: 1fr; }
+  .sc-grid--3, .sc-grid--2 { grid-template-columns: 1fr; }
+  .sc-fieldgroup { grid-template-columns: 1fr; }
+
+  /* Tablet & phone: collapse the 7-item bar to the compact Odoo-native shell so
+     the nav never overflows into the health indicator and no label is clipped
+     (review `4950255482` §4 — "collapse the nav"). The current section and the
+     persistent health state stay visible; the full menu lives behind ☰ Menu. */
+  .sc-appbar { overflow-x: visible; gap: var(--sc-space-2); padding-block: var(--sc-space-1); flex-wrap: nowrap; }
+  .sc-appbar__items { display: none; }
+  .sc-appbar__menu, .sc-appbar__current { display: inline-flex; flex: none; }
+  .sc-health { padding-inline: 0; flex: none; white-space: nowrap; }
+  .sc-health__lg { display: none; }
+  .sc-health__sm { display: inline; }
+}
+@media (max-width: 640px) {
+  .sc-content { padding: var(--sc-space-4); }
+  .sc-band { flex-wrap: wrap; }
+  .sc-band__answer { font-size: var(--sc-fs-lead); }
+  .sc-exception { flex-wrap: wrap; }
+  .sc-exception__action { align-self: stretch; inline-size: 100%; }
+  .sc-exception__action .sc-btn { inline-size: 100%; }
+  .sc-breadcrumb { padding-inline: var(--sc-space-4); }
+  .sc-steps { gap: var(--sc-space-1); }
+
+  /* (The compact Odoo-native app shell is applied from the ≤900px tablet
+     breakpoint above, so phones inherit it here.) */
+
+  /* Decision-critical comparison tables reflow to labelled stacked cards so the
+     Result / source-of-truth column is never pushed off-screen (no page scroll,
+     no hidden outcome). data-label supplies the row label. */
+  .sc-evidence, .sc-evidence tbody, .sc-evidence tr, .sc-evidence td,
+  .sc-diff, .sc-diff tbody, .sc-diff tr, .sc-diff td { display: block; inline-size: auto; }
+  .sc-evidence thead, .sc-diff thead { position: absolute; width: 1px; height: 1px;
+    margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sc-evidence tr, .sc-diff tr {
+    border: 1px solid var(--sc-border); border-radius: var(--sc-radius);
+    padding: var(--sc-space-2) var(--sc-space-3); margin-bottom: var(--sc-space-2); background: var(--sc-surface-1); }
+  .sc-diff tr.is-protected { background: var(--sc-warning-bg); }
+  .sc-variant-row td { background: transparent; }
+  .sc-evidence td, .sc-diff td {
+    border: 0 !important; padding: 3px 0 !important;
+    display: grid; grid-template-columns: 42% 1fr; gap: var(--sc-space-2); }
+  .sc-evidence td::before, .sc-diff td::before {
+    content: attr(data-label); color: var(--sc-text-secondary); font-weight: var(--sc-fw-label); }
+  .sc-diff th, .sc-diff td { padding: var(--sc-space-2); }
+  .sc-status { white-space: normal; }
+
+  /* Odoo-native list: hide optional columns (source/reference/age); keep the
+     primary answer — state + identifier + reason — visible at 375px. */
+  .sc-list .col-source, .sc-list .col-ref, .sc-list .col-age { display: none; }
+  .sc-list th, .sc-list td { padding: var(--sc-space-2) var(--sc-space-3); }
+}
+
+/* RTL: the bare ‹›-class chevron glyphs auto-mirror via Unicode bidi in an
+   rtl context, so no transform is applied (a scaleX flip would wrongly
+   un-mirror them). Verified: LTR renders "A › B", RTL renders "أ ‹ ب". */
+
+/* reduced motion (§8): collapse non-essential motion; spinners keep state */
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+  .sc-spinner { animation: none; border-block-start-color: var(--sc-accent); }
+}
