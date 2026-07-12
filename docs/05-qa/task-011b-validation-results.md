@@ -52,9 +52,9 @@
 | --- | --- |
 | Task | 011B — Customer Matching Scalability (indexed normalized-email lookup) |
 | Original base SHA | `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (implementation + first two corrections) |
-| Current base SHA | `65e915aada32930a19a14c94d23dc9bd5e6fb517` (`Shopify-connector` tip after **U0 / PR #152** merged; base-aligned via a normal merge commit `19c0911` this session, review `4680106356`). Prior alignment was `fcbbb0b…` (after PR #153). |
-| Aligned PR head | `19c0911b13e8a4b98845f741fbede9da6055594e` (the base-alignment merge commit; `65e915a…` is an ancestor). |
-| Base verification | `origin/Shopify-connector` tip == `65e915a…` (no drift from the required integration tip); U0 / PR #152 (UI-prototype design artifacts) **merged** and preserved unchanged; the only merge conflict was the shared append-only `research-handoff.md`, resolved by **preserving both sides completely** (0 lines lost from either; no duplicated sections); no `addons/**`/`tests/**`/Task 011B file conflicted or changed. PR diff vs `65e915a…` = **exactly the 8 Task 011B files**; no U0 / Task 010B / CORE-R2 file appears as a PR change. |
+| Current base SHA | `cfdb05703a65f82b34a9a11364aab6fc960cca9d` (`Shopify-connector` tip after **U0 / PR #155 acceptance closure** merged; base-aligned via a normal merge commit `66b0023` this session, base-synchronization amendment). Prior alignments: `65e915a…` (U0 / PR #152), `fcbbb0b…` (PR #153), original `f9c3c5f…`. |
+| Aligned PR head | base-synchronization merge `66b0023` (`cfdb057…` is an ancestor); the PR head advances only by the evidence-doc commit recording this alignment. |
+| Base verification | `origin/Shopify-connector` tip == `cfdb057…` (no drift from the required integration tip); U0 / PR #155 acceptance-closure files + history **preserved unchanged**. Two shared append-only docs conflicted, both resolved by **preserving both sides completely**: `research-handoff.md` keeps the new U0 acceptance-closure top entry **and** the Task 011B entry (0 lines lost either side); in `architecture-review-log.md` **AR-044 is now the U0 acceptance closure** and the Task 011B row is **renumbered to AR-045** (cross-references updated). No `addons/**`/`tests/**`/Task 011B production/test file conflicted or changed. PR diff vs `cfdb057…` = **exactly the 8 Task 011B files**; no U0 / Task 010B / CORE-R2 file appears as a PR change. |
 | Gate comment | `4948879507` (Task 011B gate-opening act on PR #149) |
 | Branch | `claude/task-011b-customer-matching-k5ux9b` |
 | Parallel task | Task 010B (`claude/task-010b-product-import-completeness`) — disjoint production module; **not read, copied, or modified** |
@@ -211,7 +211,11 @@ Third focused-correction session (2026-07-12, review `4951165587`):
 
 ### 10.1 Base-alignment session (2026-07-12, review `4680106356`)
 
-Review `4680106356` **ACCEPTED** the third focused correction and set base-alignment onto the current integration tip as the mandatory prerequisite before the Odoo.sh runtime gate. This session performed **only** base alignment + evidence documentation (no code/test change):
+Review `4680106356` **ACCEPTED** the third focused correction and set base-alignment onto the current integration tip as the mandatory prerequisite before the Odoo.sh runtime gate.
+
+**Superseding base-synchronization amendment (2026-07-12):** `Shopify-connector` advanced again to **`cfdb05703a65f82b34a9a11364aab6fc960cca9d`** (U0 / PR #155 acceptance closure). Re-aligned via a normal merge commit **`66b0023`** (`cfdb057…` is an ancestor). Two shared append-only docs conflicted (no addon/test conflict): `research-handoff.md` (resolved preserving both sides — the new U0 acceptance-closure top entry + the Task 011B entry) and `architecture-review-log.md` (**AR-044 reassigned to the U0 acceptance closure; the Task 011B row renumbered to AR-045**, cross-references updated). All U0 / PR #155 files + history preserved. The `65e915a…` alignment below was the prior step.
+
+The original base-alignment (review `4680106356`) performed **only** base alignment + evidence documentation (no code/test change):
 
 - `git merge --no-ff origin/Shopify-connector` (`65e915aada32930a19a14c94d23dc9bd5e6fb517`, `Shopify-connector` after **U0 / PR #152** merged) → merge commit **`19c0911b13e8a4b98845f741fbede9da6055594e`** (the new PR head).
 - **Conflict handling:** the only conflict was the shared append-only `docs/01-research/research-handoff.md` (both U0 and Task 011B prepend an entry). Resolved by **preserving both sides completely** — the Task 011B entry **and** the U0 entry, with the shared `CORE-R1` tail retained once; verified programmatically that **0 lines were lost from either side** and no section header is duplicated. **No `addons/**`, `tests/**`, or Task 011B production/test file conflicted or changed** (had one, this session would have stopped and reported without resolving).
