@@ -10,7 +10,10 @@
 > Odoo.sh and live/dev-store evidence are **not** part of this session (no
 > Odoo runtime and no Shopify credentials are available here) and remain
 > mandatory before merge acceptance (§10 below). The Odoo.sh standard-runtime
-> gate is **OPEN**.
+> gate is **OPEN**. **Base-aligned again 2026-07-13** to `Shopify-connector` @
+> `9128015` (PR #156, CORE-R2 Foundation Slice 1 — merged and
+> runtime-validated at its own head; SRR-03 stays fully OPEN) — base-alignment
+> session only, no runtime executed, no production behaviour changed (§0g).
 
 ---
 
@@ -846,6 +849,113 @@ is touched either way.
 
 ---
 
+## 0g. Base-alignment session — CORE-R2 Foundation Slice 1 merged (this session, 2026-07-13)
+
+**Scope: base alignment only.** No runtime test was executed in this
+session, no Task 010B production behaviour was changed, PR #151 was not
+merged and was not marked ready, and no live Shopify request was made.
+
+- **Starting head verified exact:** `7ade1f8e46880e6705a4dbd9053fce3c3d128cdf`
+  (matches the head PR #151 reported at the end of the prior — §0f — session,
+  confirmed via `pull_request_read` before any edit; PR #151 verified
+  `state=open`, `draft=true`, `merged=false`). Working tree verified clean
+  at session start.
+- **Integration tip verified exact:** `Shopify-connector` at
+  `912801508155c6358e8f5f1a7a0aaf01ae573675` — the merge commit for
+  **PR #156** ("CORE-R2 foundation: committed admission lease and business-
+  call context", AR-047), confirmed merged (`merged=true`) with parents
+  `ce504f42824807e215ee21df3dfd4eed9bb9a275` (the prior integration base —
+  §0d/§1) and `33505c120ea70206ffc13a499dd5e4d648454575` (PR #156's head).
+- **Normal base merge:** `912801508155c6358e8f5f1a7a0aaf01ae573675` merged
+  into `claude/product-import-completeness-010b-5l07ci` with a normal merge
+  commit `5aea659ff7ec09f6940e8eabdc29b1a5c7a9332b` (`git merge --no-ff`; no
+  rebase, no squash, no force-push, no new branch). PR #156's commits were
+  **not** cherry-picked individually.
+- **Conflicts:** exactly two, both inside the shared-document allowlist —
+  `docs/01-research/research-handoff.md` and
+  `docs/05-qa/architecture-review-log.md`. **Zero conflicts under `addons/**`**
+  (CORE-R2 only touches `shopify_connector_core`; Task 010B only touches
+  `shopify_connector_product` — disjoint file sets, confirmed by the clean
+  auto-merge of every `addons/shopify_connector_core/**` file from PR #156).
+  - `research-handoff.md`: both branches had prepended a new top entry since
+    the common ancestor `ce504f4`. Resolved by keeping **both** entries in
+    full — the CORE-R2 "Foundation Slice 1 EXACT-HEAD RUNTIME CLOSURE"
+    top entry (2026-07-13, newest) placed above the existing Task 010B
+    §0f/session-2 entry (2026-07-12), which is placed above the pre-existing
+    U0 entry. No line of either session's entry was dropped or edited.
+  - `architecture-review-log.md`: the AR-047 table row differed — this
+    branch still carried the earlier **design-only** AR-047 text (from the
+    prior `ce504f` base-sync, §0d), while `Shopify-connector` carried the
+    **same row revised in place** with PR #156's exact-head runtime-closure
+    addendum (build `34818964` @ `c0d4559`, `0 failed, 0 error(s) of 325`
+    fresh-install, post-init re-run counts, the seven `notification_type`
+    baseline-attribution note, SRR-03 OPEN). Resolved by keeping the
+    Task 010B **AR-046** row (unique to this branch, untouched) immediately
+    followed by the **newer, more complete AR-047 row from
+    `Shopify-connector`** — this is a strict superset of this branch's prior
+    AR-047 text (same row, later-revised), so no information was lost. AR-045
+    remains reserved and absent (Task 011B / PR #150 has not merged here).
+    Row order stays monotonic: AR-042, AR-043, AR-044, AR-046, AR-047. **No
+    AR row was renumbered, replaced, or overwritten.**
+- **Net-diff verification (`git diff origin/Shopify-connector HEAD`):**
+  23 files, 100% Task-010B-owned — 19 files under
+  `addons/shopify_connector_product/**` (byte-identical to the pre-merge
+  head `7ade1f8`, confirmed by `git diff 7ade1f8 HEAD -- addons/
+  shopify_connector_product/` returning empty — **this merge changed zero
+  bytes of Task 010B code**) plus the 4 Task 010B docs (`research-handoff.md`,
+  `architecture-review-log.md`, this file, and the implementation packet).
+  **Zero** `shopify_connector_core` or `shopify_connector_sale` files, **zero**
+  Task 011B / customer files, and **zero** `res.users`/`notification_type`
+  (issue #157) fixture files appear as a net PR change. `912801508155c6358e8f5f1a7a0aaf01ae573675`
+  is confirmed an ancestor of the new head via `git merge-base --is-ancestor`.
+  Neither `main` nor plain `dev` was touched, checked out, or referenced.
+- **Issue #157 stays separate.** The seven post-init `notification_type`
+  `setUpClass` errors documented in PR #156 / issue #157 are a base-Odoo-19
+  `mail` computed-field artifact confined to `res.users` fixture creation —
+  outside `shopify_connector_product`, outside this branch's allowed-files
+  list, and **not fixed, absorbed, or referenced as fixed by this session.**
+  They may still appear in any future post-init rerun of this branch's
+  suites; that is expected and tracked in issue #157, not here.
+- **CORE-R2 status carried forward (honest, from PR #156, not re-verified by
+  this session):** CORE-R2 Foundation Slice 1 is **merged** into
+  `Shopify-connector` and was **runtime-validated at its own exact head**
+  (Odoo.sh build `34818964` @ `c0d4559`: fresh-install `0 failed, 0
+  error(s) of 325 tests`; post-init CORE-R2 foundation classes green). This
+  is the **foundation admission mechanism only** — no production call-site
+  in `shopify_connector_product` or `shopify_connector_sale` uses
+  `execute_business` yet. **SRR-03 (disconnect-quiescence remediation)
+  remains fully OPEN**: the disconnect controller/cron, the conflicting
+  lifecycle update-lock/epoch bump, and Direction-C finalization are still
+  deferred (PR #156's own "Deliberate deferrals"). This session does **not**
+  claim CORE-R2 is fully complete, and does **not** claim Task 010B runtime
+  is green.
+- **Runtime/live gates — unchanged, still open, restated for this head:**
+  - **Odoo.sh three-suite run:** still **not executed or observed** in any
+    Git session (no Odoo runtime, no Odoo.sh access here). Must be rerun at
+    the new final aligned head (see below), not at the stale `7ade1f8`.
+  - **Opt-in performance harness (§0e/§0f):** still authored and statically
+    validated only; **not executed**. Run with `--test-tags
+    sc010b_performance`.
+  - **Live/dev-store (read-only) Shopify fixtures:** still **NOT authorized**
+    — remains gated on full end-to-end CORE-R2 runtime-green (SRR-03 closed),
+    which this session does not claim.
+- **Static validation performed this session:** `git merge-base
+  --is-ancestor 9128015… HEAD` → ancestor confirmed; `python3 -m py_compile`
+  clean on every `.py` file under `addons/shopify_connector_product/`
+  (unchanged from the pre-merge head — confirmed byte-identical); the exact
+  net-changed-file inventory above; `grep` for `^<<<<<<<`/`^=======`/
+  `^>>>>>>>` across the repository → zero matches; no production change
+  caused by this alignment session; PR #151 confirmed still `draft`/`open`/
+  `unmerged` after the push.
+- **PR #151 state:** kept **draft**, **open**, **unmerged**. Not marked
+  ready. Not merged. No Odoo test run. No other task started.
+- **Documentation commit:** this edit (§0g plus the §1/§10/§12 pointers
+  below) is committed separately from the merge commit
+  `5aea659ff7ec09f6940e8eabdc29b1a5c7a9332b`, since neither conflicted
+  during the merge.
+
+---
+
 ## 1. Base verification (hard prerequisite)
 
 - **Original required base SHA:** `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`
@@ -883,6 +993,20 @@ is touched either way.
   Task 010B docs) plus the AR renumber. **The current integration base is
   `cfdb05703a65f82b34a9a11364aab6fc960cca9d`; the base-sync head carries no
   code change from the `b0d8c7b` implementation head.**
+- **Base advanced again (runtime-fixture-correction session, §0d, 2026-07-12):**
+  `Shopify-connector` moved to `ce504f42824807e215ee21df3dfd4eed9bb9a275`
+  (PR #154, CORE-R2 design-only, AR-047) and was merged normally before the
+  fixture edits; AR-046/AR-047 rows both preserved in monotonic order.
+- **Base advanced again (base-alignment session, §0g, this session,
+  2026-07-13):** `Shopify-connector` moved to
+  `912801508155c6358e8f5f1a7a0aaf01ae573675` (merge commit for PR #156,
+  CORE-R2 **Foundation Slice 1** — committed admission lease + business-call
+  context, AR-047, merged and runtime-validated at its own head; **SRR-03
+  stays OPEN**). Merged normally into this branch with merge commit
+  `5aea659ff7ec09f6940e8eabdc29b1a5c7a9332b` (no rebase/force/squash); full
+  detail, conflict resolution, and net-diff proof in §0g. **The current
+  integration base is `912801508155c6358e8f5f1a7a0aaf01ae573675`; this
+  alignment changed zero bytes of Task 010B addon code.**
 - **`Shopify-connector` tip at original session start:**
   `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` — **exact match, no drift.**
 - **PR #149** (CORE-R1) verified **merged** via GitHub
@@ -1193,6 +1317,25 @@ protection, or atomicity.
 
 ## 10. Mandatory runtime/live evidence still outstanding (honest)
 
+**Base-alignment note (2026-07-13, this session — full detail in §0g).**
+The branch is now aligned to `Shopify-connector` @
+`912801508155c6358e8f5f1a7a0aaf01ae573675` (merge commit for PR #156,
+CORE-R2 Foundation Slice 1, merged and runtime-validated at its own head)
+via normal merge commit `5aea659ff7ec09f6940e8eabdc29b1a5c7a9332b`. **This
+was a base-alignment session only: no runtime test was executed here, no
+Task 010B production behaviour changed (§0g net-diff proof), and every gate
+below stays exactly as open as it already was.** Every head reference below
+(`b0d8c7b`, and the "corrected head" language from §0d) is now further
+downstream of the current branch tip; any future Odoo.sh rerun must target
+the current aligned head recorded in §0g, not `7ade1f8` or any earlier head.
+**Full SRR-03 (disconnect-quiescence) remediation remains OPEN** — CORE-R2
+Foundation Slice 1 only lands the dormant admission-lease mechanism, with no
+production call-site activation. **Issue #157** (seven post-init
+`res.users.notification_type` `setUpClass` errors) is a separate,
+base-Odoo-19 artifact tracked outside this PR and may still appear in any
+post-init rerun of this branch's suites — it is not fixed or absorbed here.
+**PR #151 remains draft and unmerged.**
+
 **Runtime-correction note (2026-07-12, review `4680380218`).** The first
 observed Odoo.sh build (`…-34797217`, Odoo 19.0) was **RED** —
 `1 failed, 4 error(s) of 329 tests` — and the suite halted after five
@@ -1361,6 +1504,17 @@ the revert. No destructive migration is part of this task.
       statically validated only, not run (no Odoo runtime in this Git
       session); run with `--test-tags sc010b_performance` on Odoo.sh to
       obtain the elapsed-time/query-count/lock-hold-duration evidence.
+- [x] **Base re-aligned to the current integration tip `9128015` (PR #156,
+      CORE-R2 **Foundation Slice 1**, merged and runtime-validated at its own
+      head, AR-047) via a normal merge commit `5aea659` (no rebase/force/
+      squash); AR-046/AR-047 rows both preserved in monotonic order;
+      CORE-R2 + Task 010B handoff histories preserved; net diff vs the new
+      tip stays Task-010B-only (23 files); zero bytes of Task 010B addon
+      code changed (§0g). Base-alignment only — no runtime executed, no
+      production behaviour changed this session.** The Odoo.sh-green and
+      live/dev-store items above now target this head, not `7ade1f8`.
+      **SRR-03 remains fully OPEN; issue #157 stays separate; PR #151
+      remains draft and unmerged.**
 
 All other task gates (011B, LC-1, 012, Area 6, SEC-1, inventory,
 fulfillment, product export, UI/Owl, webhooks, OAuth, PERF-1) stayed
