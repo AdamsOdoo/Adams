@@ -141,6 +141,31 @@ class TestJobEnqueue(TransactionCase):
     # No live Shopify call.
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # CORE-R2 (AR-047): enqueue captures the store's connection epoch.
+    # ------------------------------------------------------------------
+
+    def test_enqueue_captures_connection_generation(self):
+        self.store.write({'state': 'connected', 'connection_generation': 5})
+        job = self.Enqueue.enqueue(
+            self.store, 'manual_sync', 'core_dispatch_selftest',
+            payload_hash=str(uuid.uuid4()),
+        )
+        # Captured at enqueue from the store's live generation, not inferred.
+        self.assertEqual(job.expected_connection_generation, 5)
+
+    def test_directly_created_job_defaults_generation_to_zero(self):
+        # A job created outside the enqueue service (e.g. a core/diagnostic
+        # job) defaults to 0 — matching a never-cycled store (analysis §22).
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'core_test_connection',
+            'state': 'draft',
+            'payload_hash': str(uuid.uuid4()),
+        })
+        self.assertEqual(job.expected_connection_generation, 0)
+
     def test_enqueue_never_calls_shopify_api_client(self):
         Client = self.env['shopify.connector.api.client']
 

@@ -78,6 +78,19 @@ class ShopifyConnectorStore(models.Model):
     credential_last_failure_reason = fields.Char(readonly=True)
     granted_scopes = fields.Text(readonly=True)
     granted_scopes_checked_at = fields.Datetime(readonly=True)
+    # CORE-R2 (AR-047) persisted connection epoch. Monotonic per store; a
+    # business job captures it at enqueue (`expected_connection_generation`) and
+    # `execute_business` admission refuses any call whose captured epoch no longer
+    # matches this value. Additive and inert in this foundation slice: it is read
+    # by admission and captured at enqueue, but NO lifecycle transition bumps it
+    # yet and NO state change is introduced here — the disconnect/reconnect
+    # generation-bump protocol is a later CORE-R2 slice. Existing rows backfill to
+    # 0 (matching a never-cycled store, analysis §22).
+    connection_generation = fields.Integer(
+        default=0,
+        required=True,
+        readonly=True,
+    )
 
     _shop_domain_uniq = models.Constraint(
         'UNIQUE(shop_domain)',

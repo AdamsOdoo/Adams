@@ -1,5 +1,217 @@
 # Research Handoff (rolling)
 
+
+### CORE-R2 — Foundation Slice 1 EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34818964 @ `c0d4559`; draft PR #156, 2026-07-13)
+
+- **Session role:** runtime-closure operator. Re-ran the complete runtime matrix
+  inside the authorized Odoo.sh dev build for the **exact validated code SHA
+  `c0d455938b4a087407d6c712acbcc8bcf1b06feb`** (Odoo 19.0, build **34818964**, DB
+  `adamsmen-claude-core-r2-implementation-foundation-34818964`, base A/B
+  `ce504f4`). Build-to-commit proven by `git rev-parse HEAD` = `c0d4559` (working
+  tree clean; `ce504f` ancestor; PR scope = the known 16 files; no
+  Slice-2/controller/cron/lifecycle/call-site work). **No code was changed** —
+  docs-only evidence closure; the validated code SHA stays `c0d4559`.
+- **Fresh install (clean DB) — GREEN:** the build-time `-i` of all four modules
+  with `--test-enable` (+ demo) is **`0 failed, 0 error(s) of 325 tests`**; every
+  CORE-R2 class **and** every one of the seven `notification_type` classes runs
+  and passes on the fresh install.
+- **Post-init re-run matrix (`-u`/`--test-tags`, identical):** core `0 failed,
+  6 error(s) of 122` (+9 post = 131), product `0 failed, 0 of 53`, sale `0 failed,
+  1 of 41`. CORE-R2 classes green — `TestCallLeaseModelSchema` 7,
+  `TestBusinessAdmission` 18, `TestApiClient` 20, `TestJobEnqueue` 10,
+  `TestGenuineRealAdmission` 9 (**3/3 stable**, no deadlock). Real admission,
+  API-contract parity, exception precedence all observed; **no live Shopify
+  call**; zero synthetic residue; zero WARNING lines; no
+  token/credential/GraphQL/payload/worker-exception leakage.
+- **Seven `notification_type` errors — base/pre-existing, NOT CORE-R2:** they
+  appear only on post-init re-runs (not on the green fresh install); base Odoo-19
+  `mail` computed-field (`_compute_notification_type`) artifact with a 100%-base
+  traceback (zero CORE-R2 frames); the seven failing test files are byte-identical
+  on `ce504f` and the CORE-R2 diff never touches `res.users`. A literal
+  separate-DB `ce504f` run was not possible (no `createdb`, single-DB Odoo.sh
+  platform → RR-F). Non-CORE-R2 owner decides whether `_create_group_user` should
+  set `notification_type`.
+- **PR / gate state:** PR **#156** kept **draft, unmerged**; docs-only evidence
+  commit advances the branch head. Evidence:
+  `../05-qa/task-core-r2-validation-results.md` §4.1–4.4; AR-047 exact-head note;
+  SRR-03 factual-staleness correction. **SRR-03 remains OPEN** — the end-to-end
+  disconnect-quiescence remediation is not closed (later slices deferred).
+- **Exact next-session prompt (control room):** "Review PR #156's exact-head
+  runtime closure (validation-results §4.1–4.4, AR-047 exact-head note, this
+  handoff): validated code SHA `c0d4559`, build 34818964, fresh install green
+  (325/0), post-init matrix green apart from the seven base
+  `res_users.notification_type` post-init-rerun artifacts (byte-identical on
+  `ce504f`, zero CORE-R2 frames). Decide: (a) accept the runtime evidence and keep
+  SRR-03 OPEN pending Slice 2/3; (b) route the `notification_type` pre-existing
+  test-helper behavior to a separate non-CORE-R2 fix (or accept it); (c) whether a
+  literal separate-build `ce504f` A/B is required (RR-F); (d) whether to authorize
+  CORE-R2 Slice 2. Do not mark PR #156 ready or merge without an explicit
+  control-room act."
+
+### CORE-R2 — Foundation Slice 1 RUNTIME VALIDATION (first Odoo.sh execution; draft PR #156, 2026-07-13)
+
+- **Session role:** runtime operator. Ran the full runtime matrix **inside the
+  authorized Odoo.sh dev build** for this branch (SSH/browser auth not needed —
+  the session runs in the build itself). Build **34808200** *(superseded by the
+  2026-07-13 exact-head closure on build **34818964** @ `c0d4559` — see the top
+  entry)*, Odoo **19.0**, DB
+  `adamsmen-claude-core-r2-implementation-foundation-34808200`. Build-to-commit
+  proven by `git rev-parse HEAD` in the container + the build's own install.log
+  fresh-install record. GitHub API/`gh` is **not reachable** from the build
+  container (private repo, no token, SSH publickey denied) — repo state was
+  verified from the build's local git mirror (base `Shopify-connector` = `ce504f`;
+  PR head branch = the slice-1 head; exactly the known 16 files; no Slice-2 work).
+- **Result:** the foundation-slice tests were **executed for the first time** and
+  are green after four **test-only** corrections. After fixes (clean DB):
+  **core `0 failed, 6 error(s) of 131`; product `0 failed, 0 of 53`; sale
+  `0 failed, 1 of 41`.** CORE-R2 classes all pass — `TestCallLeaseModelSchema`
+  (7), `TestBusinessAdmission` (18), `TestGenuineRealAdmission` (9), `TestApiClient`
+  (20), `TestJobEnqueue` (10). Real admission, API-contract parity, and exception
+  precedence all observed; **no live Shopify call**; **zero synthetic residue**.
+- **Four defects found & fixed — ALL in the authorized `test_disconnect_quiescence.py`
+  only; NO production/model/transport code changed, NO invariant weakened:**
+  (1) `TestBusinessAdmission` now enters `registry_enter_test_mode()` so `_admit`'s
+  genuinely-independent side cursor sees the uncommitted fixture (was 12 `row is
+  None` `ShopifyQuiescedError`); (2) the bare-re-raise traceback check captures the
+  **live** exception (`assertRaises` strips `__traceback__`); (3) lease-key opacity
+  proven via `uuid4` version/variant instead of a flaky decimal-substring check;
+  (4) the two-concurrent-admissions test decouples its worker threads from the
+  reentrant `Registry._lock` that `ThreadedServer.run()` holds across post_install
+  (`service/server.py:706`) — otherwise a spawned thread's `api.Environment` →
+  `Registry.__new__` dead-locks and admission never runs (now ~0.1 s, distinct
+  leases, 3/3 stable). Pre-fix DB residue (5 stores/10 jobs/3 leases) from
+  deadlocked runs was scrubbed (their `finally` hit `_assert_workers_dead` before
+  `_cleanup`), restoring zero residue and clearing a transient pre-existing
+  `TestJobDispatch` pollution failure.
+- **Pre-existing, OUT OF SCOPE (not this PR, not corrected):** all 7 remaining
+  errors are pre-existing **non-CORE-R2** `res_users.notification_type` NOT-NULL
+  `setUpClass` failures (`TestConnectionLifecycle`, `TestCredentialAccess`,
+  `TestCredentialService`, `TestJobLogSystemAppend`, `TestReadinessSlotClosure`,
+  `TestTestConnection`, sale `TestCustomerBinding`) — per the 2026-07-13
+  exact-head closure a base Odoo-19 `mail` computed-field artifact appearing only
+  on post-init test re-runs (fresh install green, `0 of 325`), byte-identical on
+  `ce504f`, 100%-base traceback. Their shared `_create_group_user` helper
+  creates `res.users` without `notification_type`. These files are outside the PR
+  and outside this session's allowed-files list → left untouched. **Non-CORE-R2
+  owner action:** decide whether to set `notification_type` in that helper.
+- **PR / gate state:** PR **#156** stays **draft, unmerged**; the runtime fixes +
+  evidence are committed on `claude/core-r2-implementation-foundation` (branch head
+  advances by the fix commit — authorized by the task's failure-loop/commit
+  clause). Evidence: `../05-qa/task-core-r2-validation-results.md` §4.1–4.3;
+  AR-047 runtime-validation revision. **SRR-03 remains OPEN** — runtime-green of the
+  admission half does not close the disconnect-quiescence remediation.
+- **Exact next-session prompt (control room):** "Review PR #156's runtime-validation
+  revision (validation-results §4.1–4.3, AR-047, this handoff). Confirm the four
+  test-only fixes and the pre-existing non-CORE-R2 `res_users.notification_type`
+  finding. Decide: (a) accept the runtime evidence and keep SRR-03 OPEN pending
+  Slice 2/3; (b) whether the `notification_type` pre-existing test-helper defect is
+  routed to a separate non-CORE-R2 fix; (c) whether to authorize CORE-R2 Slice 2.
+  Do not mark PR #156 ready or merge without an explicit control-room act."
+
+### CORE-R2 — Foundation Slice 1 IMPLEMENTATION (committed admission lease + business-call context; draft PR into `Shopify-connector`, 2026-07-12)
+
+- **Gate / base:** CORE-R2 **implementation** gate OPENED — control-room comment
+  **`4952145926`** (authorized base `Shopify-connector` @
+  **`ce504f42824807e215ee21df3dfd4eed9bb9a275`**, ratifying D-CR2-A…F). Branch
+  **`claude/core-r2-implementation-foundation`** (base `ce504f`); **draft PR into
+  `Shopify-connector`**. AR-047 (no new AR ID). Design of record: merged **PR
+  #154**, `../03-architecture/disconnect-quiescence-remediation-analysis.md`,
+  `../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`.
+- **What this session did (implementation — a strict SUBSET of the packet):**
+  delivered the **admission half** of the mechanism, dormant in production —
+  (1) persisted `store.connection_generation`; (2) enqueue-captured
+  `job.expected_connection_generation`; (3) the secret-free committed
+  `shopify.connector.call.lease` model (+ one minimal admin ACL); (4) atomic
+  store-row-`FOR SHARE`-locked `_admit` (owned side cursor → gate read → single
+  token read → committed lease → commit-releases-lock); (5) `execute_business`
+  as a real `@contextlib.contextmanager` (release on normal **and** exception
+  exit, no manual release); (6) token-read-once `_send(store, body, token)`;
+  (7) focused tests (authored, **not executed** — no Odoo runtime); (8) the
+  validation record `../05-qa/task-core-r2-validation-results.md` + AR-047/SRR-03
+  updates + this handoff. Only the 12 allowlisted addon files + 4 docs changed.
+- **Correction pass (control-room review `4680664964`, same branch/PR — draft,
+  unmerged):** three reliability blockers corrected — (1) `execute_business` now
+  preserves `execute()`'s response/error contract (same missing-config
+  `UserError`; missing token → `ShopifyClientError(ERROR_AUTH,
+  REASON_TOKEN_INVALID, credential_invalid=True)` **before** lease/`_send`;
+  `RequestException` → `ShopifyClientError(ERROR_TEMPORARY, …)`; yields
+  `_normalize_response(...)` not the raw response) while keeping the two-arg
+  `_send` seam and single captured token; (2) genuine independent-connection
+  tests now invoke the **real** `execute_business`/`_admit`/lease-ORM/credential/
+  `_release_lease` (registry-cursor factory patched to real pooled cursors for a
+  bounded window; raw SQL only for observation/cleanup) — real pre-`_send` lease
+  visibility, caller-rollback independence, two real concurrent admissions with
+  distinct leases; (3) deterministic exception precedence (body/`_send`/normalize
+  error stays primary; release failure chained via `raise … from …`, never
+  substituted). A pre-existing fixture bug (`action_set_token` demotes
+  `connected`→`reconnect_needed`) was also fixed. Synchronous adversarial review:
+  API corrections confirmed correct; genuine-test mechanics sound. Only
+  `models/shopify_connector_api_client.py` + `tests/test_disconnect_quiescence.py`
+  changed for the fix (plus these docs). Still dormant; SRR-03 OPEN; tests
+  authored, not executed.
+- **Hardening pass (control-room review `4681564744`, same branch/PR — draft,
+  unmerged):** final reliability hardening, limited to `api_client.py` +
+  `test_disconnect_quiescence.py` (+ these docs) — (1) every genuine worker/
+  production side cursor is transaction-locally bounded (`statement_timeout` +
+  `lock_timeout` via parameterized `set_config(..., true)` through a new
+  `_open_bounded` helper that closes the cursor on setup failure); (2) worker
+  threads joined + **proven dead inside the registry-cursor patch** (before
+  restore) and again before cleanup — no live worker under the restored factory,
+  no cleanup with a live worker; (3) fail-loud **sanitized** worker diagnostics
+  (thread-safe queue, type-only: phase + exception type + safe `error_class`; no
+  raw exception/`str`/`repr`/`%r`/SQL/path/token; rollback + close surfaced
+  separately); (4) hardened zero-residue (bounded cursor, unittest assertions,
+  job-log residue checked, always closed); (5) `execute_business` successful
+  release now a **bare `raise`** (original identity + traceback preserved,
+  release once), dual-failure keeps `raise … from …`. Synchronous adversarial
+  review: **no confirmed defects.** Still dormant; SRR-03 OPEN; tests authored,
+  not executed.
+- **Deliberately DEFERRED to later CORE-R2 slices (NOT done):** `disconnecting`
+  state; `action_disconnect` rewrite; the conflicting lifecycle update-lock
+  protocol (so admission-vs-disconnect linearization is **not yet closed end to
+  end**); disconnect controller + cron + `POLL_DELAY`; `timed_out`/`completed`
+  finalization + credential-clear; product/customer call-site migration; public
+  `execute()` removal / `execute_lifecycle`.
+- **Dormancy + compatibility:** no production call site enters `execute_business`;
+  legacy public `execute()` is byte-for-byte unchanged and remains the only live
+  caller; `_send`'s new `token=None` default preserves the two-arg transport seam
+  the existing (and forbidden-to-edit) tests patch.
+- **Static evidence (this session):** `py_compile` + `compileall` OK; manifest
+  (`ast`) + CSV parse OK; changed-file set == allowlist; no conflict markers; no
+  advisory lock / no main-cursor commit / no token in errors (grep). **No Odoo
+  runtime; no test executed; no green/live/remediation claim.**
+- **Adversarial review:** independent four-lens review (transactions/cursors;
+  token/secret; Odoo-19/test-runtime; scope/compat) — **no confirmed in-scope
+  defects**; future-slice notes only (missing-credential pre-check on the dormant
+  path; caller-contract self-block; both belong to the call-site/lifecycle slice).
+- **Learning feedback loop:** New issues discovered: the gate/task allowlist named
+  regression tests with a `test_shopify_connector_` prefix that the repo does not
+  use — reconciled to the real `test_api_client.py` / `test_job_enqueue.py`
+  (documented in the validation record §8). Odoo `TestCursor` shares the test
+  connection, so genuine independent-commit/concurrency proofs (13/14/15) were
+  written with real `db_connect` connections at the PostgreSQL-primitive level
+  (the production-path two-server proof stays the deferred T-19/SRR-09 runtime
+  item). Repeated pattern: concurrency-sensitive code must be Odoo.sh-validated
+  before any green claim (SRR-06) — honored (nothing claimed green). New rejected
+  approaches: none. New technical debt: none beyond the documented deferrals.
+  Rules/checklists updated unilaterally: none. Should future prompts change? A
+  future allowlist should reference the repo's actual test filenames.
+- **Quality gate confirmation:** handoff updated (this new top entry; older
+  entries untouched) · feedback loop checked · forbidden files untouched (no
+  `store_credential`/`job_dispatch`/product/sale/cron/master-plan) · SRR-03 kept
+  **OPEN**, no remediation/green claimed · additive/dormant, single-commit
+  rollback · draft PR only (not ready, not merged).
+- **Next recommended session prompt (for ChatGPT to issue):** *“CORE-R2 Slice 2
+  (still under gate `4952145926`, base = the merged Foundation Slice 1 tip): add
+  the `disconnecting` state + the conflicting lifecycle store-row update-lock
+  protocol (`FOR NO KEY UPDATE`/`FOR UPDATE`) with the `store → credential` order
+  and epoch bump, the two-phase `action_disconnect`, and the lifecycle matrix —
+  closing the admission-vs-disconnect linearization. Do NOT yet add the
+  controller cron, `timed_out`/`completed` finalization, or the call-site
+  migration. Keep SRR-03 OPEN; validate on Odoo.sh; draft PR into
+  `Shopify-connector`.”* Only after the mechanism is complete and Odoo.sh-green
+  may SRR-03 move off OPEN.
+
 ### Task 010B — Runtime fixture correction + base sync to `ce504f` (control-room runtime correction `4680380218`, 2026-07-12)
 
 - **First Odoo.sh build was RED.** Build/database
@@ -345,6 +557,7 @@
   + merchant-image-protection; archived; deleted-bound; incompatible
   same-name attribute). Update `task-010b-validation-results.md` §9/§10
   with the results. Do not change code; do not start any other task."*
+
 
 ### U0 acceptance closure — visual baseline accepted & merged (documentation-only, 2026-07-12)
 
