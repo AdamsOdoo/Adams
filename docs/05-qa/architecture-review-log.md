@@ -2314,3 +2314,46 @@ changed; test-method inventory unchanged (148 across the seven files);
 The **Odoo.sh rerun is still pending — no green result is claimed.** PR #151
 stays **open/draft/unmerged**; no CORE-R2 implementation and no other task in
 this correction._
+
+_**AR-046 runtime-execution closure note (2026-07-13, runtime-operator session
+— exact-head Odoo.sh runtime matrix; no code change).** The full Task 010B
+runtime matrix was **executed for the first time** inside the authorized
+Odoo.sh dev build for the **exact validated code SHA
+`db534f833cf3636184681801dcd7e13636e09245`** (build **34828304**, Odoo 19.0, DB
+`adamsmen-claude-product-import-completeness-010b-5l-34828304`; build-to-commit
+proven by `git rev-parse HEAD` in the build container + the build's fresh-install
+`install.log`; integration base `9128015` confirmed ancestor; working tree clean).
+This closes the "opt-in performance harness **NOT executed**" gap (AR-046
+revision notes / validation §0e–§0g) and the "Odoo.sh three-suite run **NOT
+executed**" gap (validation §10). **Fresh build install (`-i … --test-enable`,
+all four modules + demo): GREEN `0 failed, 0 error(s) of 433 tests` (0
+`notification_type` violations).** Post-init standard suites (`-u`/`--test-tags`):
+core `0 failed, 6 error(s) of 131`, **product `0 failed, 0 error(s) of 161`
+(clean)**, sale `0 failed, 1 error(s) of 41` — **all 7 errors are the base
+Odoo-19 `res_users.notification_type` `setUpClass` artifact (issue #157),
+re-run-only, byte-identical helper, 100% base traceback, outside
+`shopify_connector_product` and this branch's allowed-files list; not fixed or
+absorbed here** (matches the AR-047 exact-head classification). **Opt-in
+`sc010b_performance` — all four tests GREEN** with verbatim `SC010B_PERF_EVIDENCE`:
+A (100-variant) `1.3845 s / 1673 q / 100 variants / 100 bindings / 1 attr`;
+B (2,048-variant) `23.8545 s / 28967 q / 2048 variants / 2048 bindings /
+declared_cartesian_space 2112 / 2 attrs` (no cartesian phantom; RSS ≈133 MB, 0
+major page faults, no network/media); C (lock/retry on genuine independent PG
+connections) `upper_bound 0.0869 / lock_retention 0.0094 / conflict_detection
+0.0071 / retry 0.0702 s` (`concurrency_race_conflict` via non-blocking SKIP
+LOCKED, one shared attribute, zero residue on a third connection); D (two-job
+`run_drain`) `0.1322 s / jobs 2 / api_calls 2 / 1 attr` (exactly two seam calls,
+no external network, no unrelated job consumed). **Stability: lock/retry 3/3
+(+1 combined = 4), run_drain 3/3 (+1 = 4)** — all PASS, no deadlock/serialization/
+timeout/residue, post-test query counts invariant (272 / 219). **Zero WARNING
+lines**; every SQL ERROR is either the #157 base artifact or an expected
+`assertRaises` negative-path constraint rejection in a passing test. **Zero
+synthetic residue** (fresh bounded verifier: all categories 0; 0 total jobs; 0
+store-credentials; no temp media; 0 idle DB sessions; no lingering worker); **no
+token/header/GraphQL/media-byte/temp-path/worker-exception leakage; no live
+Shopify call.** **Zero runtime defects → no code change (validated SHA stays
+`db534f8`); docs-only evidence commit.** **SRR-03 remains OPEN; live/dev-store
+Shopify evidence stays the only outstanding runtime gate (gated on CORE-R2
+runtime-green); PR #151 kept draft/open/unmerged, not marked ready, not merged.**
+Evidence: [`./task-010b-validation-results.md`](./task-010b-validation-results.md)
+§0h._

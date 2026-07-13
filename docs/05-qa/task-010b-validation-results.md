@@ -956,6 +956,262 @@ merged and was not marked ready, and no live Shopify request was made.
 
 ---
 
+## 0h. Runtime-execution closure session (2026-07-13, this session)
+
+> **Session role:** runtime-execution operator for Task 010B. This session is
+> the **first to actually execute** the Task 010B runtime matrix on the
+> authorized Odoo.sh dev build — closing the "opt-in performance harness
+> **NOT executed**" gap carried by §0e/§0f/§0g and the "Odoo.sh three-suite
+> run **NOT executed**" gap carried by §10, for the **exact validated code SHA
+> `db534f833cf3636184681801dcd7e13636e09245`**. **No production or test code
+> was changed** (zero runtime defects found); this is a docs-only evidence
+> commit. **SRR-03 remains OPEN; live/dev-store Shopify evidence stays the only
+> outstanding runtime gate; PR #151 stays draft/open/unmerged.**
+
+### Environment gate (all conditions satisfied)
+
+- **Exact HEAD:** `git rev-parse HEAD` = `db534f833cf3636184681801dcd7e13636e09245`
+  (working tree clean; detached at the exact tip of
+  `claude/product-import-completeness-010b-5l07ci` — local + `origin` refs both
+  at `db534f8`).
+- **Integration base:** `git merge-base --is-ancestor
+  912801508155c6358e8f5f1a7a0aaf01ae573675 HEAD` → **ancestor confirmed**.
+- **Build / DB:** Odoo.sh build **34828304**, Odoo **19.0** (`odoo-bin
+  --version` = "Odoo Server 19.0", `$ODOO_VERSION`=19.0), DB
+  `adamsmen-claude-product-import-completeness-010b-5l-34828304`, `ODOO_BUILD_URL`
+  populated. `odoo-bin` present at `/opt/odoo.sh/odoosh/bin/odoo-bin`.
+- **Build-to-commit proof:** the DB/`ODOO_BUILD_URL`/build-id all carry the
+  `…-34828304` build; `install.log` records the build's own fresh
+  `-i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale
+  --test-enable` for this same DB; `git rev-parse HEAD` inside the build
+  container = the required SHA.
+- **Single-DB platform reconciliation:** per the Odoo.sh contract the container
+  is linked to **one** database and must not create another; this dev build's
+  freshly-created DB **is** the isolated database for this exact SHA (the "fresh
+  isolated database" requirement is met by the build itself, not by a
+  hand-created DB).
+
+### Fresh-install / clean-load result
+
+- **Build-time fresh install (`install.log`, `-i … --test-enable`, all four
+  modules + demo): FULLY GREEN — `0 failed, 0 error(s) of 433 tests`, with
+  `0` `notification_type` violations.** The code installs and passes cleanly
+  from scratch at head `db534f8`.
+- **This session's clean `-u` reload of all four modules (no tests): exit 0,
+  zero WARNING/ERROR/Traceback**, registry rebuilt in 7.671 s. Confirmed
+  loaded: `shopify_connector_core/data/shopify_connector_cron_drain.xml`
+  (CORE-R2 drain cron `ir_cron_shopify_connector_job_dispatch_drain`, id 3,
+  active); `shopify_connector_product/data/shopify_connector_attribute_lock.xml`
+  (**attribute-lock singleton** `shopify_connector_attribute_lock_singleton`,
+  res_id 1); all 11 CORE-R2 `shopify_connector_*` tables present; security/data
+  files load.
+
+### Standard suites (post-init `-u <module> --test-enable --test-tags /<module>`)
+
+| Module | Result (verbatim) | Stats | Errors → cause |
+| --- | --- | --- | --- |
+| `shopify_connector_core` | `0 failed, 6 error(s) of 131 tests` | 159 tests, 1.54 s, 1986 queries | 6 `setUpClass` errors — **all issue #157** |
+| `shopify_connector_product` | **`0 failed, 0 error(s) of 161 tests`** | 179 tests, 12.23 s, 15075 queries | **none — clean** |
+| `shopify_connector_sale` | `0 failed, 1 error(s) of 41 tests` | 49 tests, 1.05 s, 873 queries | 1 `setUpClass` error — **issue #157** |
+
+All **7** errors are the **issue #157** `res.users.notification_type` NOT-NULL
+`setUpClass` artifact — the shared `_create_group_user` helper creates a
+`res.users` with minimal vals and the mail-provided default (`'email'`) is not
+applied by the ORM on the post-init update path, while the DB column is NOT
+NULL with **no DB default** (`information_schema` confirms `is_nullable=NO`,
+empty `column_default`). Affected classes: core `TestConnectionLifecycle`,
+`TestCredentialAccess`, `TestCredentialService`, `TestJobLogSystemAppend`,
+`TestReadinessSlotClosure`, `TestTestConnection`; sale `TestCustomerBinding`.
+This is **re-run-only** (the fresh `-i` build install above is green with 0
+such violations), a 100%-base-Odoo `mail` artifact, byte-identical helper on
+the integration base, **outside `shopify_connector_product` and this branch's
+allowed-files list**, consistent with the CORE-R2 classification (AR-047
+exact-head note; PR #156 / issue #157). **Not fixed, absorbed, or referenced as
+fixed here** (control-room instruction: do not fix #157 in this PR). **Zero
+connector / Task-010B defects.**
+
+### Task 010B coverage (all executed in the product run; focused re-run for isolation)
+
+The full product suite executed all 161 methods across the 9 010B classes; a
+focused re-run of the three highest-value classes
+(`TestProductAttributeImport` 16, `TestProductDuplicatePrevention` 12,
+`TestProductVariantGeneration` 8) returned `0 failed, 0 error(s) of 36 tests`.
+Required-area → executed-method mapping (all green):
+
+- **Pagination + malformed guards** → `TestProductImportMatching`
+  `test_cross_page_*`, `test_page_info_*_blocked`, `test_has_next_page_*`,
+  `test_missing_end_cursor_with_has_next_page_blocked`,
+  `test_previously_seen_cursor_replayed_blocked`, `test_repeated_cursor_*`,
+  `test_zero_node_pages_with_fresh_cursors_blocked`,
+  `test_duplicate_variant_gid_across_pages_blocked`,
+  `test_malformed_payload_*_blocked`, `test_nodes_wrong_type_blocked`,
+  `test_variants_wrong_type_blocked`, `test_non_mapping_variant_node_blocked`,
+  `test_over_ceiling_variant_count_blocked`,
+  `test_two_hundred_fifty_variants_across_pages_import_completely`.
+- **First-sync matching** → `test_import_creates_and_binds_template_and_variant`,
+  `test_sku_match_when_no_existing_binding`,
+  `test_barcode_match_when_no_sku_match`,
+  `test_existing_binding_takes_priority_over_sku_barcode`,
+  `test_ambiguous_match_never_creates`,
+  `test_ambiguous_match_routes_job_to_blocked_manual_review`.
+- **Duplicate prevention** → all 12 `TestProductDuplicatePrevention` methods
+  (`test_reimport_same_gid_binds_existing_never_duplicates`,
+  `test_blind_create_blocked_duplicate_risk_never_creates`,
+  `test_structured_reimport_is_idempotent_no_duplicates`, …).
+- **Global attribute reuse + conflict** → `TestProductAttributeImport`
+  `test_additive_value_reuses_existing_value_case_insensitive`,
+  `test_case_insensitive_compatible_dynamic_reuse`,
+  `test_overlapping_transactions_serialize_to_one_global_attribute`,
+  `test_connector_owned_creates_distinct_shopify_attribute`,
+  `test_existing_always_attribute_routes_manual_review_by_default`,
+  `test_attribute_lock_row_is_seeded`,
+  `test_brownfield_incompatible_attribute_makes_no_phantom_variants`.
+- **Sparse variant generation** → `TestProductVariantGeneration`
+  `test_sparse_two_option_set_no_cartesian_extras`,
+  `test_sparse_three_option_set_exact_equality`,
+  `test_one_hundred_fifty_variant_paginated_fixture`,
+  `test_structural_mismatch_routes_to_binding_conflict`.
+- **Price + price-extra** → all 9 `TestProductPriceImport` methods
+  (`test_exact_price_extra_decomposition_single_option`/`_two_options`,
+  `test_multi_variant_list_price_is_minimum`,
+  `test_undecomposable_price_falls_back_with_note`, …).
+- **Media staging/validation/cleanup** → all 26 `TestProductMediaImport`
+  methods (`test_staged_media_paths_removed_after_successful_import`/`…database_failure`,
+  `test_validation_failure_removes_temporary_path`,
+  `test_only_one_staged_image_open_at_a_time`, `test_oversized_response_rejected`,
+  `test_non_https_url_rejected`, `test_svg_content_type_rejected`, …).
+- **Refresh + archive/stale** → all 20 `TestProductRefreshAndStale` methods
+  (`test_archived_product_marks_binding_stale_without_touching_odoo`,
+  `test_deleted_bound_product_marks_binding_stale`,
+  `test_same_updated_at_short_circuits_before_any_work`, …).
+- **Rollback + idempotency** →
+  `test_atomic_rollback_leaves_no_partial_residue_on_later_variant_failure`,
+  `test_source_level_apply_import_uses_savepoint`,
+  `test_structured_import_failure_rolls_back_new_attributes`,
+  `TestProductVariantGeneration.test_later_variant_failure_rolls_back_everything`,
+  `test_reimport_is_idempotent_no_duplicate_variants`.
+- **Template + variant bindings** → all 7 `TestProductTemplateBinding` + all 6
+  `TestProductVariantBinding` methods (uniqueness, required fields, access
+  matrix, status default).
+- **Concurrency conflict + retry** →
+  `test_overlapping_transactions_serialize_to_one_global_attribute`,
+  `test_structural_mismatch_routes_to_binding_conflict`, plus the opt-in
+  performance harness lock/retry test below.
+
+### Opt-in performance harness `sc010b_performance` — all four tests (FIRST execution)
+
+`--test-tags sc010b_performance` → `0 failed, 0 error(s) of 4 tests` (6 tests,
+25.69 s, 31144 queries). Verbatim `SC010B_PERF_EVIDENCE`:
+
+- **A. 100-variant DB phase:** `elapsed_seconds=1.3845 query_count=1673
+  templates_created=1 variants_created=100 variant_bindings=100
+  attributes_created=1`. Proven: 100 supplied ≡ 100 Odoo variants ≡ 100 variant
+  bindings; no duplicate GIDs (`len(gids)==100`); exactly one attribute; no
+  network/media (`image_url=None` throughout); cleanup via rolled-back
+  `TransactionCase`.
+- **B. 2,048-variant DB phase:** `elapsed_seconds=23.8545 query_count=28967
+  templates_created=1 variants_created=2048 variant_bindings=2048
+  declared_cartesian_space=2112 attributes_created=2`. Proven: exactly 2,048
+  supplied ≡ 2,048 Odoo variants ≡ 2,048 bindings; **no cartesian phantom** (a
+  cartesian bug would yield 2,112, not 2,048); no duplicate GIDs; bounded
+  completion; cleanup succeeds. **Memory/process evidence (2,048 run alone
+  under `/usr/bin/time -v`):** Maximum RSS **136,748 kB (~133 MB)** for the
+  whole process, wall clock 0:35.90 (≈7 s registry load + 23.6 s DB phase),
+  user 22.60 s / sys 1.55 s, **0 major page faults** (no swapping); re-observed
+  `elapsed_seconds=23.6461 query_count=28964` (matches the combined run within
+  noise). No performance threshold is invented — measurements are reported
+  as-is.
+- **C. Lock-hold + competing retry (genuine independent PostgreSQL
+  connections):** `first_import_to_commit_upper_bound_seconds=0.0869
+  post_import_lock_retention_seconds=0.0094
+  second_conflict_detection_seconds=0.0071
+  second_retry_elapsed_seconds=0.0702`. Proven by in-test assertions: first
+  import retains its transaction-scoped lock; second import receives
+  `concurrency_race_conflict` (non-blocking `SKIP LOCKED` — **conflict
+  detection, never "waiting"/"blocked"**); no partial second-import residue;
+  first commits; clean retry succeeds; exactly one shared attribute; both
+  products/bindings exist; a **third**, freshly-opened bounded connection finds
+  zero residue after cleanup.
+- **D. Two-job `run_drain`:** `elapsed_seconds=0.1322 jobs=2 api_calls=2
+  attributes_created=1`. Proven: no unrelated claimable job before fixtures;
+  claimable set = exactly the two synthetic jobs; real `run_drain(2)` →
+  real claim/dispatcher/handler/reconciliation; exactly two patched
+  `api.client.execute` seam calls for `{gid_1, gid_2}`
+  (`requests.sessions.Session.request` patched to raise → **no external
+  network possible**); both jobs `succeeded`; correct template + variant
+  bindings; one shared attribute (reused, not duplicated); no unrelated job
+  consumed; zero residue after rollback.
+
+### Stability (≥3 clean repetitions each; `-u` + method-level `--test-tags`)
+
+- **Lock/conflict/retry — 3/3 PASS** (+1 combined = **4 clean runs**), each
+  `0 failed, 0 error(s) of 1 tests`, **0 anomaly lines** (no deadlock, no
+  serialization failure, no statement/lock timeout, no zero-residue failure,
+  no traceback); post-test **query count invariant at 272**. Metrics:
+  run 1 `0.0936/0.0103/0.0069/0.0748`, run 2 `0.1002/0.0083/0.0063/0.0693`,
+  run 3 `0.1168/0.0097/0.0075/0.0744`
+  (`upper_bound/retention/conflict_detection/retry`, seconds).
+- **Two-job `run_drain` — 3/3 PASS** (+1 combined = **4 clean runs**), each
+  `0 failed, 0 error(s) of 1 tests`, `jobs=2 api_calls=2 attributes_created=1`,
+  **0 anomaly lines**; post-test **query count invariant at 219**. Elapsed:
+  run 1 `0.1577 s`, run 2 `0.1830 s`, run 3 `0.1767 s`.
+
+### Warning / SQL-error inventory
+
+- **WARNING lines across every run log: ZERO.**
+- **SQL ERROR-level lines** fall into exactly two classes, both benign:
+  (a) **7** `res_users.notification_type` NOT-NULL lines = **issue #157**
+  (above); (b) **expected negative-path constraint assertions** in **passing**
+  tests wrapped in `assertRaises` — binding NOT-NULL rejections
+  (`store_id`/`shopify_gid`/`product_template_id`/`product_template_binding_id`
+  on the template/variant binding tables, from `test_requires_*`) and
+  `shopify_connector_customer_binding` unique-key rejections
+  (`…_store_shopify_gid_uniq`, `…_store_partner_uniq`, from customer
+  duplicate-prevention). Odoo logs the rejected INSERT at ERROR even though the
+  test catches the `IntegrityError` and passes (product suite = 0 errors
+  confirms). The only non-#157 module-level ERROR is the generic
+  "At least one test failed when loading the modules" umbrella, triggered by the
+  #157 `setUpClass` errors. **No Task-010B or connector-logic defect.**
+
+### Cleanup / leak proof (fresh bounded verifier, after all runs)
+
+- **Zero synthetic residue — all categories 0:** stores, store-settings,
+  template/variant bindings, attributes, attribute-values, product
+  templates/variants, jobs (**0 total** — all rolled back), job-logs,
+  attachments, connector-owned "(Shopify)" attributes, perf-lock stores,
+  store-credentials (**0** — no token ever persisted). No leftover temp media
+  files (filestore/`/tmp`). **0** other DB sessions (no idle sessions / leaked
+  cursors). No lingering `odoo-bin` worker process.
+- **Leak scan (all logs): clean.** `0` lines for `shpat_`, `Bearer `,
+  `X-Shopify-Access-Token`, `access_token`, `Authorization:`, `client_secret`,
+  `api_secret`, PEM headers, `data:image/`, `query {`, `mutation {`. The 2
+  "PNG" hits are media-test **method names**
+  (`test_valid_https_png_downloaded`, `test_invalid_bytes_labelled_png_rejected`),
+  not image bytes. No token/header/GraphQL-body/media-byte/temp-path/raw-worker-
+  exception leakage.
+
+### Runtime defects and corrections
+
+- **Zero runtime defects** in any connector / Task-010B / performance test →
+  **zero focused-correction cycles executed**; **no production or test file
+  changed**; validated code SHA stays `db534f8`.
+
+### Remaining gates (honest)
+
+- **Odoo.sh three-suite run + opt-in performance harness: now EXECUTED and
+  GREEN** at head `db534f8` (this section) — the §0e/§0f/§0g "NOT executed"
+  and §10 "three-suite run NOT executed" statuses are **closed for this head**
+  (subject to control-room review).
+- **Live/dev-store (read-only) Shopify evidence: STILL OUTSTANDING** — no live
+  Shopify request was made this session (none is authorized); it remains gated
+  on end-to-end CORE-R2 runtime-green (**SRR-03 closed**), which this session
+  does **not** claim.
+- **SRR-03 remains fully OPEN**; **issue #157 stays a separate, non-010B base
+  artifact**; **PR #151 stays draft / open / unmerged** (not marked ready, not
+  merged).
+
+---
+
 ## 1. Base verification (hard prerequisite)
 
 - **Original required base SHA:** `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`
@@ -1316,6 +1572,18 @@ are dev-store measurements deferred to the runtime validation session
 protection, or atomicity.
 
 ## 10. Mandatory runtime/live evidence still outstanding (honest)
+
+> **Runtime-closure update (2026-07-13, §0h).** The Odoo.sh three-suite run
+> **and** the opt-in performance harness were **executed on the authorized
+> Odoo.sh build 34828304 at the exact head `db534f8`** and are **GREEN** (see
+> §0h for verbatim results). The "Odoo.sh three-suite run: NOT executed" and
+> "opt-in performance harness: not executed" statuses recorded below are
+> therefore **closed for head `db534f8`** (subject to control-room review). The
+> only runtime evidence still outstanding is the **live/dev-store (read-only)
+> Shopify** set, which stays gated on CORE-R2 SRR-03 being closed. **SRR-03
+> remains OPEN; issue #157 stays separate; PR #151 stays draft/unmerged.** The
+> historical head references below (`b0d8c7b`, `7ade1f8`) predate §0h; the
+> validated head is `db534f8`.
 
 **Base-alignment note (2026-07-13, this session — full detail in §0g).**
 The branch is now aligned to `Shopify-connector` @
