@@ -249,12 +249,16 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             yield result
         except BaseException as primary_error:
             # Precedence: the primary (body/send/normalization/caller) exception
-            # is preserved; a release failure is chained, never substituted.
+            # is preserved; a release failure is chained, never substituted. On a
+            # successful release, a **bare** ``raise`` re-raises the in-flight
+            # exception with its ORIGINAL traceback (identity + classification +
+            # the caller-body raise site), adding no new raise frame (review
+            # `4681564744`).
             try:
                 self._release_lease(lease_key)
             except BaseException as release_error:
                 raise primary_error from release_error
-            raise primary_error
+            raise
         else:
             # Body succeeded -> release normally; a release failure here has no
             # prior exception to preserve, so it propagates.

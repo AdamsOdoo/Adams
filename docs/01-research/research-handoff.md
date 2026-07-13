@@ -41,6 +41,23 @@
   `models/shopify_connector_api_client.py` + `tests/test_disconnect_quiescence.py`
   changed for the fix (plus these docs). Still dormant; SRR-03 OPEN; tests
   authored, not executed.
+- **Hardening pass (control-room review `4681564744`, same branch/PR — draft,
+  unmerged):** final reliability hardening, limited to `api_client.py` +
+  `test_disconnect_quiescence.py` (+ these docs) — (1) every genuine worker/
+  production side cursor is transaction-locally bounded (`statement_timeout` +
+  `lock_timeout` via parameterized `set_config(..., true)` through a new
+  `_open_bounded` helper that closes the cursor on setup failure); (2) worker
+  threads joined + **proven dead inside the registry-cursor patch** (before
+  restore) and again before cleanup — no live worker under the restored factory,
+  no cleanup with a live worker; (3) fail-loud **sanitized** worker diagnostics
+  (thread-safe queue, type-only: phase + exception type + safe `error_class`; no
+  raw exception/`str`/`repr`/`%r`/SQL/path/token; rollback + close surfaced
+  separately); (4) hardened zero-residue (bounded cursor, unittest assertions,
+  job-log residue checked, always closed); (5) `execute_business` successful
+  release now a **bare `raise`** (original identity + traceback preserved,
+  release once), dual-failure keeps `raise … from …`. Synchronous adversarial
+  review: **no confirmed defects.** Still dormant; SRR-03 OPEN; tests authored,
+  not executed.
 - **Deliberately DEFERRED to later CORE-R2 slices (NOT done):** `disconnecting`
   state; `action_disconnect` rewrite; the conflicting lifecycle update-lock
   protocol (so admission-vs-disconnect linearization is **not yet closed end to

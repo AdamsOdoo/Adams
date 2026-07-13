@@ -34,9 +34,12 @@ for the two exception-precedence tests, an injected `_release_lease` fault). No
 lifecycle/state monkeypatch and no test-only timing hook is used.
 """
 
+import importlib
 import inspect
+import queue
 import re
 import threading
+import traceback
 import uuid
 from unittest.mock import patch
 
@@ -541,6 +544,40 @@ class TestBusinessAdmission(TransactionCase):
                         raise BodyBoom('body failed')
         self.assertIsInstance(caught.exception.__cause__, ReleaseBoom)
 
+    # C10. Successful release uses a BARE re-raise: the SAME caller exception
+    # object propagates with its ORIGINAL traceback (incl. the body raise site),
+    # release runs exactly once, and there is no chained cause (review
+    # `4681564744`).
+    def test_body_exception_bare_reraise_preserves_traceback_and_releases_once(
+            self):
+        job = self._make_job()
+
+        class Boom(Exception):
+            pass
+
+        raised = Boom('body failed')
+        releases = []
+        real_release = type(self.Client)._release_lease
+
+        def counting_release(client_self, lease_key):
+            releases.append(1)
+            return real_release(client_self, lease_key)
+
+        self.env.flush_all()
+        with patch.object(type(self.Client), '_send', _ok_send({})):
+            with patch.object(type(self.Client), '_release_lease',
+                              counting_release):
+                with self.assertRaises(Boom) as caught:
+                    with self.Client.execute_business(job, self.store, 'q'):
+                        raise raised
+        self.assertIs(caught.exception, raised)           # same object/identity
+        self.assertIsNone(caught.exception.__cause__)     # release ok -> no chain
+        self.assertEqual(releases, [1])                   # released exactly once
+        tb_text = ''.join(traceback.format_tb(caught.exception.__traceback__))
+        self.assertIn(                                    # body raise site kept
+            'test_body_exception_bare_reraise', tb_text)
+        self.assertEqual(self._lease_count(), 0)          # lease released
+
     # 18. Token never appears in any lease field.
     def test_token_never_appears_in_lease_rows(self):
         job = self._make_job()
@@ -581,16 +618,79 @@ class TestGenuineRealAdmission(TransactionCase):
 
     # --- genuine-connection helpers ------------------------------------
 
+    def _open_bounded(self, dbname):
+        """Open a genuine pooled cursor and apply BOTH transaction-local
+        PostgreSQL limits (statement_timeout + lock_timeout) via parameterized
+        `set_config(..., true)`. If the bound setup fails, close the cursor and
+        re-raise; return only after a successful setup — so no genuine worker or
+        production side cursor is ever left unbounded (review `4681564744`)."""
+        cr = db_connect(dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
     def _real_registry_cursor(self, dbname):
-        """A registry.cursor() replacement handing out real pooled cursors, so
-        the production `_admit` side transaction commits to the real DB. Accepts
-        (and ignores) any registry.cursor() args (e.g. readonly=)."""
-        return lambda *args, **kwargs: db_connect(dbname).cursor()
+        """A registry.cursor() replacement handing out **bounded** real pooled
+        cursors, so every production `_admit`/`_release_lease` side transaction is
+        time-bounded. Accepts/ignores any registry.cursor() args (e.g.
+        readonly=)."""
+        return lambda *args, **kwargs: self._open_bounded(dbname)
+
+    def _sanitize(self, exc, phase):
+        """A type-only, non-sensitive finding for a worker-thread failure.
+
+        Records ONLY the fixed `phase`, the exception TYPE NAME, and (when it is a
+        connector error) the safe fixed `error_class` enum — never `str`/`repr` of
+        the exception, SQL, paths, credentials, payloads, or tokens.
+        """
+        error_class = getattr(exc, 'error_class', None)
+        return {
+            'phase': phase,
+            'type': type(exc).__name__,
+            'error_class': error_class if isinstance(error_class, str) else None,
+        }
+
+    def _safe_worker_teardown(self, wcr, diagnostics):
+        """Roll back + close a worker cursor, surfacing (never swallowing) each
+        failure as a SEPARATE sanitized finding so one cannot hide the other."""
+        if wcr is None:
+            return
+        try:
+            wcr.rollback()
+        except BaseException as exc:
+            diagnostics.put(self._sanitize(exc, 'rollback'))
+        try:
+            wcr.close()
+        except BaseException as exc:
+            diagnostics.put(self._sanitize(exc, 'cursor_close'))
+
+    def _drain(self, diagnostics):
+        """Collect all sanitized findings from the thread-safe queue."""
+        findings = []
+        while True:
+            try:
+                findings.append(diagnostics.get_nowait())
+            except queue.Empty:
+                break
+        return findings
+
+    def _assert_workers_dead(self, threads):
+        """Fail loudly (fixed, non-sensitive message) if any worker is alive."""
+        alive = sum(1 for t in threads if t is not None and t.is_alive())
+        self.assertEqual(
+            alive, 0, 'worker thread still alive at the cleanup boundary')
 
     def _commit_fixtures(self, dbname, n_jobs):
-        """On an independent connection, create+commit a connected store, its
-        credential, and `n_jobs` matching business jobs."""
-        setup = db_connect(dbname).cursor()
+        """On an independent (bounded) connection, create+commit a connected
+        store, its credential, and `n_jobs` matching business jobs."""
+        setup = self._open_bounded(dbname)
         try:
             env = api.Environment(setup, SUPERUSER_ID, {})
             store = env['shopify.connector.store'].create({
@@ -619,11 +719,9 @@ class TestGenuineRealAdmission(TransactionCase):
             setup.close()
 
     def _committed_lease_rows(self, dbname, store_id):
-        """Observe committed leases from a fresh independent connection."""
-        obs = db_connect(dbname).cursor()
+        """Observe committed leases from a fresh, bounded independent connection."""
+        obs = self._open_bounded(dbname)
         try:
-            obs.execute(
-                "SET LOCAL statement_timeout = %d" % self.STATEMENT_TIMEOUT_MS)
             obs.execute(
                 "SELECT lease_key, job_id FROM shopify_connector_call_lease "
                 "WHERE store_id = %s ORDER BY lease_key", (store_id,))
@@ -634,14 +732,14 @@ class TestGenuineRealAdmission(TransactionCase):
             obs.close()
 
     def _cleanup(self, dbname, store_id, job_ids):
-        """Durable, bounded, fail-loud teardown + fresh zero-residue check."""
+        """Durable, bounded, fail-loud teardown + fresh zero-residue check.
+
+        Deletes job logs BEFORE jobs (FK `ondelete='restrict'`), then leases,
+        jobs, credential, store. DELETEs are not swallowed → fail-loud."""
         if store_id is None:
             return
-        cr = db_connect(dbname).cursor()
+        cr = self._open_bounded(dbname)
         try:
-            cr.execute(
-                "SET LOCAL statement_timeout = %d" % self.STATEMENT_TIMEOUT_MS)
-            cr.execute("SET LOCAL lock_timeout = %d" % self.LOCK_TIMEOUT_MS)
             if job_ids:
                 cr.execute(
                     "DELETE FROM shopify_connector_job_log "
@@ -664,25 +762,34 @@ class TestGenuineRealAdmission(TransactionCase):
         self._assert_zero_residue(dbname, store_id, job_ids)
 
     def _assert_zero_residue(self, dbname, store_id, job_ids):
-        v = db_connect(dbname).cursor()
+        """Fresh, bounded verifier: zero leases, stores, credentials, jobs, AND
+        job logs for the synthetic job ids. Uses unittest assertions with fixed,
+        non-sensitive messages; always closes the verifier cursor."""
+        v = self._open_bounded(dbname)
         try:
             v.execute(
                 "SELECT count(*) FROM shopify_connector_call_lease "
                 "WHERE store_id = %s", (store_id,))
-            assert v.fetchone()[0] == 0, 'lease residue after cleanup'
+            self.assertEqual(v.fetchone()[0], 0, 'lease residue after cleanup')
             v.execute(
                 "SELECT count(*) FROM shopify_connector_store WHERE id = %s",
                 (store_id,))
-            assert v.fetchone()[0] == 0, 'store residue after cleanup'
+            self.assertEqual(v.fetchone()[0], 0, 'store residue after cleanup')
             v.execute(
                 "SELECT count(*) FROM shopify_connector_store_credential "
                 "WHERE store_id = %s", (store_id,))
-            assert v.fetchone()[0] == 0, 'credential residue after cleanup'
+            self.assertEqual(
+                v.fetchone()[0], 0, 'credential residue after cleanup')
             if job_ids:
                 v.execute(
                     "SELECT count(*) FROM shopify_connector_job "
                     "WHERE id = ANY(%s)", (list(job_ids),))
-                assert v.fetchone()[0] == 0, 'job residue after cleanup'
+                self.assertEqual(v.fetchone()[0], 0, 'job residue after cleanup')
+                v.execute(
+                    "SELECT count(*) FROM shopify_connector_job_log "
+                    "WHERE job_id = ANY(%s)", (list(job_ids),))
+                self.assertEqual(
+                    v.fetchone()[0], 0, 'job-log residue after cleanup')
             v.rollback()
         finally:
             v.close()
@@ -696,7 +803,7 @@ class TestGenuineRealAdmission(TransactionCase):
         worker_cr = None
         try:
             store_id, job_ids = self._commit_fixtures(dbname, n_jobs=1)
-            worker_cr = db_connect(dbname).cursor()
+            worker_cr = self._open_bounded(dbname)
             worker_env = api.Environment(worker_cr, SUPERUSER_ID, {})
             store = worker_env['shopify.connector.store'].browse(store_id)
             job = worker_env['shopify.connector.job'].browse(job_ids[0])
@@ -745,7 +852,7 @@ class TestGenuineRealAdmission(TransactionCase):
         worker_cr = None
         try:
             store_id, job_ids = self._commit_fixtures(dbname, n_jobs=1)
-            worker_cr = db_connect(dbname).cursor()
+            worker_cr = self._open_bounded(dbname)
             worker_env = api.Environment(worker_cr, SUPERUSER_ID, {})
             store = worker_env['shopify.connector.store'].browse(store_id)
             job = worker_env['shopify.connector.job'].browse(job_ids[0])
@@ -783,11 +890,11 @@ class TestGenuineRealAdmission(TransactionCase):
         store_id = None
         job_ids = []
         release_gate = threading.Event()
+        diagnostics = queue.Queue()      # thread-safe, sanitized worker findings
         t1 = t2 = None
         try:
             store_id, job_ids = self._commit_fixtures(dbname, n_jobs=2)
             both_admitted = threading.Semaphore(0)
-            errors = []
 
             def blocking_send(client_self, store_arg, body, token=None):
                 # this worker's _admit has already committed its lease
@@ -800,7 +907,7 @@ class TestGenuineRealAdmission(TransactionCase):
                 wcr = None
                 try:
                     threading.current_thread().dbname = dbname
-                    wcr = db_connect(dbname).cursor()
+                    wcr = self._open_bounded(dbname)
                     wenv = api.Environment(wcr, SUPERUSER_ID, {})
                     store = wenv['shopify.connector.store'].browse(store_id)
                     job = wenv['shopify.connector.job'].browse(job_id)
@@ -808,17 +915,13 @@ class TestGenuineRealAdmission(TransactionCase):
                     with client.execute_business(
                             job, store, 'query { shop { id } }'):
                         pass
-                except Exception as exc:                       # fail loud
-                    errors.append(exc)
+                except BaseException as exc:     # fail loud, sanitized (type-only)
+                    diagnostics.put(self._sanitize(exc, 'worker_body'))
                 finally:
-                    if wcr is not None:
-                        try:
-                            wcr.rollback()
-                            wcr.close()
-                        except Exception:
-                            pass
+                    self._safe_worker_teardown(wcr, diagnostics)
 
             Client = self.env['shopify.connector.api.client']
+            got1 = got2 = False
             rows = None
             with patch.object(self.registry, 'cursor',
                               self._real_registry_cursor(dbname)):
@@ -829,33 +932,154 @@ class TestGenuineRealAdmission(TransactionCase):
                         target=worker, args=(job_ids[1],), daemon=True)
                     t1.start()
                     t2.start()
-                    got1 = both_admitted.acquire(timeout=self.BOUND_SECONDS)
-                    got2 = both_admitted.acquire(timeout=self.BOUND_SECONDS)
-                    self.assertTrue(
-                        got1 and got2,
-                        'both admissions did not overlap within bound '
-                        '(errors: %r)' % errors)
-                    # both leases coexist right now
-                    rows = self._committed_lease_rows(dbname, store_id)
-                    release_gate.set()
-                    t1.join(timeout=self.BOUND_SECONDS)
-                    t2.join(timeout=self.BOUND_SECONDS)
-                    self.assertFalse(
-                        t1.is_alive() or t2.is_alive(),
-                        'worker threads did not finish within bound')
+                    try:
+                        got1 = both_admitted.acquire(timeout=self.BOUND_SECONDS)
+                        got2 = both_admitted.acquire(timeout=self.BOUND_SECONDS)
+                        if got1 and got2:
+                            # both leases coexist right now (workers parked at seam)
+                            rows = self._committed_lease_rows(dbname, store_id)
+                    finally:
+                        # unblock, JOIN, and PROVE both dead BEFORE the patch is
+                        # restored — a live worker must never run under the
+                        # restored (shared test-cursor) registry factory.
+                        release_gate.set()
+                        t1.join(timeout=self.BOUND_SECONDS)
+                        t2.join(timeout=self.BOUND_SECONDS)
+                        self._assert_workers_dead((t1, t2))
             after = self._committed_lease_rows(dbname, store_id)
 
-            self.assertFalse(errors, 'worker errors: %r' % errors)
+            # Sanitized worker findings first (surfaces any worker error as
+            # type-only evidence), then the overlap/lease assertions.
+            findings = self._drain(diagnostics)
+            self.assertEqual(
+                findings, [], 'sanitized worker findings: %s' % findings)
+            self.assertTrue(
+                got1 and got2, 'both real admissions did not overlap within bound')
+            self.assertIsNotNone(rows, 'no coexisting-lease snapshot captured')
             self.assertEqual(len(rows), 2)                       # both committed
             self.assertEqual(len({r[0] for r in rows}), 2)       # distinct keys
             self.assertEqual({r[1] for r in rows}, set(job_ids))  # correct jobs
             self.assertEqual(len(after), 0)                      # both released
         finally:
-            # unblock any worker still parked at the _send seam, then JOIN both
-            # (bounded) before cleanup so a still-terminating worker cannot race
-            # the fixture DELETEs.
+            # repeat the termination guarantee after final joins, THEN clean up —
+            # cleanup must never begin while a worker may still be live.
             release_gate.set()
             for t in (t1, t2):
                 if t is not None:
                     t.join(timeout=self.BOUND_SECONDS)
+            self._assert_workers_dead((t1, t2))
             self._cleanup(dbname, store_id, job_ids)
+
+    # --- focused hardening tests (review 4681564744) -------------------
+
+    # H1/H2. Every genuine cursor (worker main + production side, via the factory)
+    # gets both transaction-local timeouts.
+    def test_open_bounded_applies_both_timeouts(self):
+        dbname = self.env.cr.dbname
+        cr = self._open_bounded(dbname)
+        try:
+            cr.execute("SELECT current_setting('statement_timeout'), "
+                       "current_setting('lock_timeout')")
+            statement_timeout, lock_timeout = cr.fetchone()
+            self.assertNotEqual(statement_timeout, '0')   # applied (non-default)
+            self.assertNotEqual(lock_timeout, '0')        # applied (non-default)
+            cr.rollback()
+        finally:
+            cr.close()
+        # The patched registry factory routes through the same bounded helper.
+        factory = self._real_registry_cursor(dbname)
+        side = factory()
+        try:
+            side.execute("SELECT current_setting('statement_timeout'), "
+                         "current_setting('lock_timeout')")
+            st2, lt2 = side.fetchone()
+            self.assertNotEqual(st2, '0')
+            self.assertNotEqual(lt2, '0')
+            side.rollback()
+        finally:
+            side.close()
+
+    # H3. A failure while configuring a cursor closes that cursor.
+    def test_open_bounded_closes_cursor_on_setup_failure(self):
+        closed = []
+
+        class _BoomCursor:
+            def execute(self, *args, **kwargs):
+                raise RuntimeError('boom during timeout setup')
+
+            def close(self):
+                closed.append(True)
+
+        class _Conn:
+            def cursor(self, *args, **kwargs):
+                return _BoomCursor()
+
+        mod = importlib.import_module(type(self).__module__)
+        with patch.object(mod, 'db_connect', lambda *a, **k: _Conn()):
+            with self.assertRaises(RuntimeError):
+                self._open_bounded('anydb')
+        self.assertEqual(closed, [True])   # the cursor was closed on failure
+
+    # H4/H5. Worker rollback AND close failures both reach the parent as
+    # SEPARATE, type-only sanitized findings — no raw text/SQL/paths/tokens.
+    def test_worker_teardown_surfaces_sanitized_rollback_and_close(self):
+        findings_q = queue.Queue()
+
+        class _BadCursor:
+            def rollback(self):
+                raise RuntimeError('rollback boom /var/lib shpat_SECRET SELECT 1')
+
+            def close(self):
+                raise RuntimeError('close boom /etc token=shpat_SECRET DELETE')
+
+        self._safe_worker_teardown(_BadCursor(), findings_q)
+        findings = self._drain(findings_q)
+        self.assertEqual({f['phase'] for f in findings},
+                         {'rollback', 'cursor_close'})   # both, separately
+        for finding in findings:
+            self.assertEqual(finding['type'], 'RuntimeError')
+            self.assertIsNone(finding['error_class'])
+            blob = repr(finding)
+            for leak in ('shpat_', 'SECRET', 'SELECT', 'DELETE', '/var', '/etc',
+                         'boom', 'token'):
+                self.assertNotIn(leak, blob)
+
+    # H5b. _sanitize is strictly type-only, including for a connector error.
+    def test_sanitize_is_type_only(self):
+        exc = ShopifyClientError(
+            error_class=ERROR_TEMPORARY,
+            reason='secret shpat_LEAK', technical_detail='SELECT * secret /path')
+        finding = self._sanitize(exc, 'worker_body')
+        self.assertEqual(finding['phase'], 'worker_body')
+        self.assertEqual(finding['type'], 'ShopifyClientError')
+        self.assertEqual(finding['error_class'], ERROR_TEMPORARY)  # safe enum
+        blob = repr(finding)
+        for leak in ('shpat_', 'LEAK', 'SELECT', 'secret', '/path'):
+            self.assertNotIn(leak, blob)
+
+    # H6. The termination guarantee fails loudly on a live worker.
+    def test_assert_workers_dead_fails_loud_on_live_worker(self):
+        gate = threading.Event()
+        thread = threading.Thread(target=gate.wait, daemon=True)
+        thread.start()
+        try:
+            with self.assertRaises(AssertionError):
+                self._assert_workers_dead((thread,))
+        finally:
+            gate.set()
+            thread.join(timeout=self.BOUND_SECONDS)
+        self._assert_workers_dead((thread,))   # now dead -> no raise
+
+    # H7. The fresh zero-residue verifier checks job-log rows (and cleanup deletes
+    # job logs before jobs). A runtime orphan job-log cannot exist (FK
+    # ondelete='restrict'), so this guards the verifier/cleanup shape statically.
+    def test_zero_residue_verifies_job_logs(self):
+        residue_src = inspect.getsource(type(self)._assert_zero_residue)
+        self.assertIn('shopify_connector_job_log', residue_src)
+        self.assertIn('job-log residue after cleanup', residue_src)
+        cleanup_src = inspect.getsource(type(self)._cleanup)
+        self.assertIn('shopify_connector_job_log', cleanup_src)
+        self.assertLess(
+            cleanup_src.index('shopify_connector_job_log'),
+            cleanup_src.index('DELETE FROM shopify_connector_job WHERE'),
+            'job logs must be deleted before jobs (FK restrict)')

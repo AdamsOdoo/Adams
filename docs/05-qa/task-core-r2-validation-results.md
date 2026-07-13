@@ -80,6 +80,57 @@ which **demotes** a connected store to `reconnect_needed`
 `_admit` would have refused. Both fixtures now re-assert `state='connected'` after
 `action_set_token` (the canonical pattern the existing dispatch/retry tests use).
 
+## 0.2 Hardening pass — control-room review `4681564744`
+
+Review `4681564744` (on head `ac34c2b`) confirmed the three original blockers
+resolved and returned **REVISE** for one final reliability-hardening pass. All
+five items are corrected, limited to `api_client.py` + `test_disconnect_quiescence.py`
+(+ these docs); PR kept draft/unmerged.
+
+1. **Every genuine DB cursor is bounded.** A new `_open_bounded(dbname)` helper
+   opens a real pooled cursor and applies **transaction-local**
+   `statement_timeout` + `lock_timeout` via parameterized
+   `set_config(..., true)` as the cursor's first statement, closing the cursor
+   and re-raising if the bound setup fails (returning only after success). The
+   patched `_real_registry_cursor` factory routes through it, so **every
+   production `_admit`/`_release_lease` side cursor** is bounded, as are the
+   fixture/worker-main/observer/cleanup/verifier cursors. No genuine cursor is
+   left unbounded.
+2. **Guaranteed thread termination before patch restore + cleanup.** In the
+   two-worker test, an inner `try/finally` **inside** the `with patch(registry.
+   cursor)` block unblocks (`release_gate.set()`), joins both workers (bounded),
+   and calls `_assert_workers_dead(...)` — so a live worker never runs under the
+   restored (shared test-cursor) factory. The outer `finally` re-joins and
+   re-asserts dead **before** `_cleanup`, so cleanup never begins with a live
+   worker. `daemon=True` is only a last-resort backstop; the bounded cursors +
+   `release_gate` make a >bound wedge unreachable (every worker DB op is
+   time-bounded and `_send` is unblocked).
+3. **Fail-loud, sanitized worker diagnostics.** Removed the `except Exception:
+   pass` teardown. Worker body, cursor rollback, and cursor close failures are
+   each surfaced as **separate** findings on a thread-safe `queue.Queue` via
+   `_sanitize` — **type-only**: `{phase, exception type name, safe connector
+   error_class or None}`. No raw exception object, `str`/`repr`/`%r`, SQL, path,
+   credential, payload, or token reaches the parent; the parent assertion uses
+   only these sanitized findings, and a cleanup error cannot hide an earlier
+   worker error.
+4. **Hardened zero-residue verification.** `_assert_zero_residue` runs on a
+   bounded cursor, uses `self.assertEqual` (not bare `assert`) with fixed
+   non-sensitive messages, always closes the verifier cursor, and verifies zero
+   **leases, stores, credentials, jobs, AND job-logs** for the synthetic job ids;
+   `_cleanup` deletes job-logs before jobs (FK `ondelete='restrict'`).
+5. **Original traceback preserved.** In `execute_business`'s outer handler the
+   successful-release path now ends in a **bare `raise`** (re-raises the same
+   in-flight exception with its original traceback + identity + classification,
+   adding no new raise frame); the dual-failure path keeps `raise primary_error
+   from release_error`. Release still runs exactly once.
+
+New focused tests prove: both timeouts applied to bounded/factory cursors; a
+setup failure closes the cursor; worker rollback+close failures surface as
+separate sanitized type-only findings; `_sanitize` leaks nothing; the
+termination guard fails loud on a live worker; the verifier checks job-logs;
+and the bare re-raise preserves the caller object/traceback with release-once.
+Synchronous adversarial review of this pass: **no confirmed defects.**
+
 ---
 
 ## 0. Scope of this slice (what the gate authorized vs. what this slice did)
@@ -376,6 +427,21 @@ admission would refuse. **Fixed** by re-asserting `state='connected'` after
 `action_set_token` in both fixtures (and a minor two-thread cleanup/join race was
 hardened by joining workers before cleanup). Static validation (LOOP 6) re-run
 green after the fixes.
+
+**Hardening-pass synchronous review (review `4681564744`).** A synchronous
+reviewer traced all nine hardening challenges (cursor timeout coverage;
+cursor-open-failure cleanup; thread lifetime vs registry-patch lifetime; worker
+cleanup-failure propagation; diagnostic leakage; zero-residue completeness;
+traceback preservation + double-release; new-test correctness; scope drift) and
+found **no confirmed defects** — every genuine cursor is transaction-locally
+bounded, setup-failure closes the cursor, workers are joined + proven dead before
+patch restore and before cleanup, diagnostics are strictly type-only, zero-residue
+covers job-logs with unittest assertions, and the outer handler's successful
+release uses a bare `raise` (identity + traceback preserved, release once,
+`from`-chained only on dual failure). The one non-blocking note (a worker wedged
+past the 20 s bound) is unreachable given the added cursor timeouts + the
+`release_gate` unblock, and would be a fail-loud test failure (never a false pass)
+if it somehow occurred.
 
 ---
 
