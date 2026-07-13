@@ -1406,7 +1406,43 @@ class TestCustomerMatchingConcurrency(TransactionCase):
         started_evt = threading.Event()
         done_evt = threading.Event()
         pid_queue = queue.Queue()
+        # Bounded, sanitized worker phase evidence: phase identifiers and
+        # exception CLASS names ONLY -- never raw SQL/email/payload/token/exc
+        # text. Lets a future failure pinpoint exactly how far the worker got
+        # (e.g. a stall at `before_api_environment` = the Registry._lock
+        # post_install deadlock, CORE-R2 §4.2 / review 4687443143).
+        phase_queue = queue.Queue()
+        obs['worker_phases'] = []
+
+        def _drain_phases():
+            while True:
+                try:
+                    obs['worker_phases'].append(phase_queue.get_nowait())
+                except queue.Empty:
+                    break
+
         result = {}
+        # --- Framework-lock decoupling for the SPAWNED worker (CORE-R2 §4.2 /
+        #     review 4687443143). Odoo's ThreadedServer.run() holds the reentrant
+        #     Registry._lock across the ENTIRE preload/post_install phase
+        #     (service/server.py), so the worker's api.Environment(cr_w, ...) ->
+        #     Registry(cr.dbname) -> Registry.__new__ -> `with cls._lock:` blocks
+        #     forever on a lock a different thread can never acquire (proven by the
+        #     diagnostic: the worker stalls at `before_api_environment`). A fresh
+        #     RLock for the bounded worker window lets the worker build its
+        #     Environment while PRESERVING (a) real mutual exclusion -- the registry
+        #     is fully built and only READ here (a cached registries[db] lookup,
+        #     never a rebuild), the same decoupling Odoo's own
+        #     _registry_test_mode_patches performs -- and (b) real INDEPENDENT
+        #     PostgreSQL connections (every cursor stays an unchanged
+        #     db_connect(dbname).cursor(); no TestCursor, no shared connection). The
+        #     `with cls._lock:` in Registry.__new__ releases the SAME object it
+        #     acquired, so restoring the class attribute below is safe even if the
+        #     worker is mid-Environment. Restored in `finally` once the worker has
+        #     terminated and closed its own cursor.
+        registry_cls = type(self.registry)
+        saved_registry_lock = registry_cls._lock
+        registry_cls._lock = threading.RLock()
         try:
             # --- committed setup on an independent connection ---
             setup_cr = db_connect(dbname).cursor()
@@ -1438,6 +1474,7 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             cr_a = db_connect(dbname).cursor()
             cr_a.execute('SELECT pg_backend_pid()')
             a_pid = cr_a.fetchone()[0]
+            obs['a_backend_pid'] = a_pid
             env_a = api.Environment(cr_a, SUPERUSER_ID, {})
             payload_a = {
                 'gid': self.gid_a, 'first_name': None, 'last_name': None,
@@ -1450,33 +1487,54 @@ class TestCustomerMatchingConcurrency(TransactionCase):
 
             # --- Transaction B: the worker OWNS its cursor start-to-finish ---
             def run_b():
+                phase_queue.put('worker_thread_entered')
                 started_evt.set()
                 cr_w = None
                 try:
                     cr_w = db_connect(dbname).cursor()
+                    phase_queue.put('cursor_opened')
                     cr_w.execute('SELECT pg_backend_pid()')
                     pid_queue.put(cr_w.fetchone()[0])
+                    phase_queue.put('backend_pid_obtained')
+                    # The spawned worker builds its OWN Environment here. Without
+                    # the parent's bounded-window Registry._lock decoupling this
+                    # call blocks forever on the main-thread-held reentrant
+                    # Registry._lock (CORE-R2 §4.2): a stall whose LAST phase is
+                    # `before_api_environment` is exactly that framework deadlock.
+                    phase_queue.put('before_api_environment')
                     env_w = api.Environment(cr_w, SUPERUSER_ID, {})
+                    phase_queue.put('after_api_environment')
                     try:
                         with patch.object(client_cls, 'execute', fake_execute):
+                            phase_queue.put('before_dispatch')
                             env_w['shopify.connector.job.dispatch']._dispatch_one(
                                 env_w['shopify.connector.job'].browse(job_b_id))
+                            phase_queue.put('after_dispatch')
+                        phase_queue.put('before_commit')
                         cr_w.commit()          # commit the handled outcome
+                        phase_queue.put('after_commit')
                         result['committed'] = True
                     except BaseException as exc:  # unexpected -> roll back
+                        phase_queue.put('worker_body_exc:%s' % type(exc).__name__)
                         try:
                             cr_w.rollback()
                         except Exception:
                             pass
                         result['error'] = _sanitized_exception_diagnostic(exc)
                 except BaseException as exc:   # cursor/setup failure
+                    phase_queue.put('worker_setup_exc:%s' % type(exc).__name__)
                     result['setup_error'] = _sanitized_exception_diagnostic(exc)
                 finally:
+                    phase_queue.put('worker_finally_entered')
                     if cr_w is not None:
                         try:
                             cr_w.close()
                         except Exception:
                             pass
+                    phase_queue.put('cursor_closed')
+                    # Put the terminal phase BEFORE signalling done, so the parent
+                    # observes a complete trail the moment done_evt fires.
+                    phase_queue.put('worker_done')
                     done_evt.set()
 
             # daemon=True is a LAST-RESORT process-liveness guard only: if the
@@ -1497,6 +1555,9 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             except queue.Empty:
                 pid_b = None
             obs['pid_received'] = pid_b is not None
+            obs['b_backend_pid'] = pid_b
+            obs['distinct_backend_pids'] = bool(
+                pid_b is not None and pid_b != a_pid)
 
             # Bounded: B is blocked SPECIFICALLY BY A AND its active statement
             # is the binding INSERT (both required by _wait_until_blocked_by).
@@ -1522,6 +1583,7 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             # Bounded join: the worker finishes and closes its own cursor.
             obs['worker_done'] = done_evt.wait(timeout=self.JOIN_TIMEOUT)
             worker.join(timeout=self.JOIN_TIMEOUT)
+            _drain_phases()
             obs['worker_alive_after_join'] = worker.is_alive()
             obs['worker_error'] = result.get('error') or result.get('setup_error')
 
@@ -1588,6 +1650,9 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 worker.join(timeout=self.EMERGENCY_TIMEOUT)
             obs['worker_alive_final'] = bool(
                 worker is not None and worker.is_alive())
+            _drain_phases()
+            obs['last_worker_phase'] = (
+                obs['worker_phases'][-1] if obs['worker_phases'] else None)
 
             # 2. Roll back / close every parent-owned cursor BEFORE cleanup so
             #    no held lock can block the cleanup transaction.
@@ -1602,6 +1667,13 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                     except Exception as exc:  # noqa: BLE001 - recorded, asserted
                         teardown_errors.append(_sanitized_exception_diagnostic(exc))
             obs['cursor_teardown_errors'] = teardown_errors
+
+            # Restore the framework Registry._lock now that the worker has
+            # terminated (steps 1-2) and every worker-owned cursor is closed. The
+            # durable cleanup below runs on the MAIN thread, which reacquires the
+            # original reentrant lock it already holds -- so restoring before
+            # cleanup keeps the patched window as narrow as possible and is safe.
+            registry_cls._lock = saved_registry_lock
 
             # 3. Durable cleanup + verification on FRESH connections -- only
             #    when the worker is confirmed gone (a lingering lock could
@@ -1620,20 +1692,61 @@ class TestCustomerMatchingConcurrency(TransactionCase):
         # ------------------------------------------------------------------
         # Assertions run AFTER cleanup so a failing assert never leaks rows.
         # ------------------------------------------------------------------
+        # Concise, sanitized phase trail -- phase identifiers + exception class
+        # names only. Retained (not debug noise) because it pinpoints how far the
+        # worker got on any future regression (e.g. a `before_api_environment`
+        # tail = the Registry._lock post_install deadlock).
+        phases = obs.get('worker_phases', [])
+        print('[TASK-011B-CONCURRENCY] worker_phases=%s last=%s' % (
+            phases, obs.get('last_worker_phase')))
+        # Sanitized race evidence (booleans, backend PIDs as ints, routing states,
+        # counts -- never any email/payload/token/SQL text).
+        print('[TASK-011B-CONCURRENCY] race_evidence '
+              'distinct_pids=%s a_pid=%s b_pid=%s blocked_by_a=%s '
+              'binding_insert=%s wait_cleared=%s first=%s/%s/retry=%s '
+              'retry=%s/%s bindings=%s partners=%s survivor_is_gid_a=%s '
+              'cleanup=%s' % (
+                  obs.get('distinct_backend_pids'), obs.get('a_backend_pid'),
+                  obs.get('b_backend_pid'), obs.get('b_blocked_by_a'),
+                  obs.get('b_query_is_binding_insert'), obs.get('b_wait_cleared'),
+                  obs.get('first_state'), obs.get('first_error_class'),
+                  obs.get('first_retry_count'), obs.get('retry_state'),
+                  obs.get('retry_subreason'), obs.get('binding_count'),
+                  obs.get('partner_count'),
+                  obs.get('surviving_gid') == self.gid_a,
+                  obs.get('cleanup_remaining')))
         # Thread-safety / liveness.
-        self.assertTrue(obs.get('worker_started'), 'worker thread never started')
-        self.assertTrue(obs.get('pid_received'), 'worker never reported its PID')
+        self.assertTrue(obs.get('worker_started'),
+                        'worker thread never started; phases=%s' % phases)
+        self.assertTrue(obs.get('pid_received'),
+                        'worker never reported its PID; phases=%s' % phases)
+        # The worker must build its OWN Environment on the spawned thread and
+        # reach the real dispatcher -- proving the Registry._lock post_install
+        # deadlock (CORE-R2 §4.2) is decoupled for the bounded window.
+        self.assertIn(
+            'after_api_environment', phases,
+            'worker never built its Environment on the spawned thread -- '
+            'Registry._lock post_install deadlock (CORE-R2 §4.2) not decoupled; '
+            'phases=%s' % phases)
+        self.assertIn(
+            'before_dispatch', phases,
+            'worker never entered the real dispatcher; phases=%s' % phases)
         self.assertTrue(
             obs.get('worker_done'),
-            'worker did not finish within the bounded join timeout')
+            'worker did not finish within the bounded join timeout; phases=%s'
+            % phases)
         self.assertFalse(
             obs.get('worker_alive_final'),
             'worker still alive after the emergency join -- inconclusive, '
-            'not passing')
+            'not passing; phases=%s' % phases)
         self.assertIsNone(
             obs.get('worker_error'),
             'the racing worker raised unexpectedly: %s' % obs.get('worker_error'))
         # Attributed lock-wait proof (not a bare "some lock" wait).
+        self.assertTrue(
+            obs.get('distinct_backend_pids'),
+            'A and B must use distinct PostgreSQL backends (a_pid=%s b_pid=%s)'
+            % (obs.get('a_backend_pid'), obs.get('b_backend_pid')))
         self.assertTrue(
             obs.get('b_blocked_by_a'),
             'B was never blocked specifically by A (pg_blocking_pids(B) never '
