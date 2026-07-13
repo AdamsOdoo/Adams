@@ -1,7 +1,21 @@
 # Task 011B — Customer Matching Scalability: Validation Record
 
-> **Latest parallel session (2026-07-12, authorization `4952271013`):** the
-> branch was **base re-aligned by a normal merge** onto the current
+> **Latest session (2026-07-13):** a further isolated base-alignment session
+> merged the branch (**one normal merge, no rebase/squash/force-push**) onto
+> the current `Shopify-connector` tip
+> `912801508155c6358e8f5f1a7a0aaf01ae573675` — **CORE-R2 Foundation Slice 1 /
+> PR #156 merged** into that tip. Aligned head:
+> `2316128d606e5e990ff6e2c026caf302d4146f7e`. **AR-045** (Task 011B)
+> preserved unchanged; **AR-047** (CORE-R2) carries forward its Foundation
+> Slice 1 revisions; **AR-046 still intentionally absent** — Task 010B / PR
+> #151 remains open, draft, and unmerged. Net PR diff vs the new tip remains
+> the same **8 Task 011B files**; production/test files remain byte-identical
+> to the prior head. **No Odoo runtime executed this session; no
+> runtime-green claimed on the new head; CORE-R2 full completion NOT
+> claimed (SRR-03 remains OPEN).** See **§15** for the full session record.
+>
+> **Prior parallel session (2026-07-12, authorization `4952271013`):** the
+> branch was **base re-aligned by a normal merge** onto the (then-current)
 > `Shopify-connector` tip `ce504f42824807e215ee21df3dfd4eed9bb9a275` (**CORE-R2
 > / PR #154** disconnect-quiescence design merged; **AR-047** added, **AR-045**
 > Task 011B preserved, **AR-046** intentionally absent — Task 010B is still in
@@ -12,7 +26,8 @@
 > Still **no Odoo runtime** in this environment — the opt-in concurrency and
 > 100k benchmark remain **execution-ready but PENDING**, with the exact
 > invocations recorded. See **§14** for the full session record. No production
-> code changed; no live Shopify request made.
+> code changed; no live Shopify request made. (**Superseded by the
+> 2026-07-13 session above** — `ce504f` is no longer the current base.)
 >
 > **Status: implementation authored; static + AST checks executed;
 > runtime tests, genuine concurrency proof, benchmark numbers, and the
@@ -66,9 +81,9 @@
 | --- | --- |
 | Task | 011B — Customer Matching Scalability (indexed normalized-email lookup) |
 | Original base SHA | `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (implementation + first two corrections) |
-| Current base SHA | `ce504f42824807e215ee21df3dfd4eed9bb9a275` (`Shopify-connector` tip after **CORE-R2 / PR #154** disconnect-quiescence design merged; base-aligned via a normal `--no-ff` merge commit **`9bc224e`** this parallel session, authorization `4952271013`). Prior alignments: `cfdb057…` (U0 / PR #155, merge `66b0023`), `65e915a…` (U0 / PR #152), `fcbbb0b…` (PR #153), original `f9c3c5f…`. |
-| Aligned PR head | base-alignment merge **`9bc224e`** (`ce504f…` is an ancestor; `merge-base(head, origin/Shopify-connector) == ce504f`); the PR head then advances only by the opt-in tag/harness/evidence-doc commit. |
-| Base verification | `origin/Shopify-connector` tip == `ce504f…` (no drift from the required integration tip). Exactly two shared append-only docs conflicted (no `addons/**`/`tests/**`/Task 011B production/test conflict — CORE-R2 is docs-only), both resolved by **preserving both sides completely** (git-verified **0 lines lost from either side**): in `architecture-review-log.md` the Task 011B **AR-045** row (ours) and the CORE-R2 **AR-047** row (theirs) are both kept after **AR-044** (U0) → order AR-043/044/045/047, **no AR-046**; in `research-handoff.md` the Task 011B entry (ours) and the CORE-R2 entry (theirs) are both kept below the shared U0-acceptance-closure top entry. PR diff vs `ce504f…` = **exactly the 8 Task 011B files**; no CORE-R2 / U0 / Task 010B file appears as a PR change; production `models/**` + `tests/__init__.py` **byte-identical to `b680e8a`** (the merge added only docs). |
+| Current base SHA | `912801508155c6358e8f5f1a7a0aaf01ae573675` (`Shopify-connector` tip after **CORE-R2 Foundation Slice 1 / PR #156** merged; base-aligned via a normal `--no-ff` merge commit **`2316128d606e5e990ff6e2c026caf302d4146f7e`** this base-alignment session, 2026-07-13). Prior alignments: `ce504f…` (CORE-R2 design / PR #154, merge `9bc224e`), `cfdb057…` (U0 / PR #155, merge `66b0023`), `65e915a…` (U0 / PR #152), `fcbbb0b…` (PR #153), original `f9c3c5f…`. |
+| Aligned PR head | base-alignment merge **`2316128d606e5e990ff6e2c026caf302d4146f7e`** (`9128015…` is an ancestor; `merge-base(head, origin/Shopify-connector) == 9128015…`); the PR head then advances only by this session's documentation commit, if any (see §15). |
+| Base verification | `origin/Shopify-connector` tip == `912801508155c6358e8f5f1a7a0aaf01ae573675` (no drift from the required integration tip). One conflict — `architecture-review-log.md` only (no `addons/**`/`tests/**`/Task 011B production/test conflict — CORE-R2 Foundation Slice 1 is confined to `addons/shopify_connector_core/**`, disjoint from Task 011B's `addons/shopify_connector_sale/**`), resolved by **preserving both sides completely** (git-verified **0 lines lost from either side**): the Task 011B **AR-045** row (ours) kept immediately followed by the updated CORE-R2 **AR-047** row (theirs) → order AR-043/044/045/047, **no AR-046**; `research-handoff.md` and `sync-engine-risk-register.md` auto-merged cleanly (disjoint insertion points, no conflict). PR diff vs `9128015…` = **exactly the 8 Task 011B files**; no CORE-R2 / U0 / Task 010B file appears as a PR change; production `models/**` + `tests/__init__.py` **byte-identical to `c234107`** (the merge added only docs). Full detail: **§15**. |
 | Gate comment | `4948879507` (Task 011B gate-opening act on PR #149) |
 | Branch | `claude/task-011b-customer-matching-k5ux9b` |
 | Parallel task | Task 010B (`claude/task-010b-product-import-completeness`) — disjoint production module; **not read, copied, or modified** |
@@ -480,3 +495,204 @@ was required. **No live/dev-store Shopify request** was made.
 - Live/dev-store Shopify validation — PENDING, depends on **CORE-R2** runtime.
 - ChatGPT final merge review — PENDING. PR #150 stays **open, draft,
   unmerged**.
+
+## 15. Base-alignment session — CORE-R2 Foundation Slice 1 tip (2026-07-13)
+
+This isolated parallel session performs **one clean base-alignment only**:
+a normal merge of the current `Shopify-connector` integration tip into the
+Task 011B branch. **No Odoo runtime executed in this session; no production
+or test behavior changed; no CORE-R2 or Task 010B code adopted.**
+
+### 15.1 Merge
+
+- **Prior head:** `c234107db1256f3cec33e16ee14760eba9afea5f` (the accepted
+  opt-in tag/harness/evidence commit — §14).
+- **Integration tip merged:** `912801508155c6358e8f5f1a7a0aaf01ae573675`
+  (`Shopify-connector` tip; **CORE-R2 Foundation Slice 1 / PR #156 merged**
+  into it via merge commit `9128015`).
+- **Normal merge, no rebase/squash/force-push, no cherry-pick:**
+  `git merge --no-ff origin/Shopify-connector` → base-alignment merge commit
+  **`2316128d606e5e990ff6e2c026caf302d4146f7e`**.
+- **Verified:** `912801508155c6358e8f5f1a7a0aaf01ae573675` is an **ancestor**
+  of the new head; `merge-base(HEAD, origin/Shopify-connector) ==
+  912801508155c6358e8f5f1a7a0aaf01ae573675`.
+
+### 15.2 Conflict — exactly one shared doc, resolved preserving both sides
+
+CORE-R2 Foundation Slice 1 (PR #156) is confined to
+`addons/shopify_connector_core/**` and docs; Task 011B is confined to
+`addons/shopify_connector_sale/**` and docs — **no `addons/**` conflict
+occurred** (git-verified: zero files under `addons/` show as unmerged).
+
+The only conflict was **`docs/05-qa/architecture-review-log.md`**, because
+this branch's (unchanged, inherited) AR-047 row sat immediately adjacent to
+the new AR-045 row this branch's earlier session inserted, with no
+intervening context line — git grouped the adjacent insertion and the
+tip-side row edit into one hunk. Resolved by **preserving both sides
+completely**: kept **ours** — the **AR-045** row (Task 011B, byte-unchanged)
+— immediately followed by **theirs** — the updated **AR-047** row (CORE-R2,
+now carrying the Foundation Slice 1 implementation/correction/hardening/
+runtime-validation/exact-head-closure revisions appended in-place under the
+same AR-047 id, per PR #156). Resulting order: **AR-043 → AR-044 (U0) →
+AR-045 (Task 011B) → AR-047 (CORE-R2)**. **AR-046 is intentionally NOT
+added** — Task 010B / PR #151 remains open, draft, and unmerged, so its
+reserved AR-046 id is not fabricated here. No row was renumbered or
+replaced; no line was lost from either side.
+
+`docs/01-research/research-handoff.md` and
+`docs/05-qa/sync-engine-risk-register.md` **auto-merged cleanly** (git
+`Auto-merging`, no conflict) — the two branches' edits landed at disjoint
+locations in both files, so both sides' content is fully preserved.
+
+### 15.3 Net-diff verification (git-verified)
+
+- Net PR diff vs `Shopify-connector` tip (`912801508155c6358e8f5f1a7a0aaf01ae573675`)
+  remains **exactly the 8 Task 011B-owned files** — unchanged from §2 (no
+  documentation-only alignment edit added a ninth file in this pass beyond
+  this record itself, which was already one of the 8):
+  `addons/shopify_connector_sale/models/__init__.py`,
+  `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py`,
+  `addons/shopify_connector_sale/models/shopify_connector_res_partner.py`,
+  `addons/shopify_connector_sale/tests/__init__.py`,
+  `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py`,
+  `docs/01-research/research-handoff.md`,
+  `docs/05-qa/architecture-review-log.md`,
+  `docs/05-qa/task-011b-validation-results.md` (this file).
+- **No CORE-R2 file** (none of the 16 PR #156 files, incl.
+  `shopify_connector_call_lease.py`, `test_disconnect_quiescence.py`,
+  `task-core-r2-validation-results.md`) **appears as a net PR change.**
+- **No Task 010B / PR #151 file** appears as a net PR change.
+- **No issue #157 fixture fix** (`res_users`/`notification_type`) appears as
+  a net PR change.
+- **No `main` or plain `dev` branch was read, checked out, or modified.**
+- The three production/test files
+  (`shopify_connector_res_partner.py`, `shopify_connector_customer_importer.py`,
+  `models/__init__.py`, `tests/__init__.py`,
+  `test_customer_matching_scalability.py`) are **byte-identical** to the
+  prior head `c234107` — **git-verified, empty diff** — confirming this
+  alignment session changed **no production or test behavior**.
+
+### 15.4 Status carried forward (not re-proven this session)
+
+**No runtime executed in this environment.** This session does **not**
+claim a runtime-green result on the newly aligned head, and does **not**
+claim CORE-R2 is fully complete — only that **CORE-R2 Foundation Slice 1
+(PR #156) is merged into `Shopify-connector` and was runtime-validated on
+its own exact head** (`c0d455938b4a087407d6c712acbcc8bcf1b06feb`, build
+`34818964`, per PR #156 / AR-047 — fresh install `0 failed, 0 error(s) of
+325 tests`; CORE-R2 admission/lease classes green) — that validation is
+CORE-R2's own evidence, carried by reference, not re-executed or re-claimed
+here.
+
+- **CORE-R2 Foundation Slice 1 is merged and runtime-validated** (its own
+  exact-head evidence, §15 above) — but it is a **strict, dormant subset**
+  of the CORE-R2 packet (no `disconnecting` state, no disconnect
+  controller/cron, no `timed_out`/`completed` finalization, no
+  product/customer call-site migration). **Full CORE-R2 completion is NOT
+  claimed.**
+- **SRR-03 (full disconnect-quiescence remediation) remains OPEN** —
+  Foundation Slice 1's runtime-green admission half does not close
+  admission-vs-disconnect linearization end to end.
+- **Task 011B standard-suite evidence already accepted historically**
+  (§14.2 — control-room review `4680380669`, head `b680e8a`, `320` standard
+  tests, `0 failed, 0 error(s)`) remains accepted as **operator-provided
+  branch build evidence**, not re-claimed as proof for the new head.
+- **Exact-head standard-suite rerun on the newly aligned head
+  (`2316128`) remains PENDING** — this session's merge changed only docs on
+  the Task 011B side (production/test files byte-identical to `c234107`),
+  so the standard content is unchanged, but a formal Odoo.sh rerun on the
+  exact new head has **not** been executed or observed here.
+- **Opt-in concurrency execution (`shopify_connector_customer_matching_concurrency`)
+  remains PENDING** — not run this session (no Odoo runtime).
+- **100,000-partner benchmark
+  (`shopify_connector_customer_matching_benchmark`) remains PENDING** — not
+  run this session.
+- **Authoritative normalized-email backfill/upgrade duration measurement
+  remains PENDING** — the in-test recompute proxy does not substitute for an
+  actual 100k module-upgrade measurement on a runtime host.
+- **Live Shopify validation remains blocked** — depends on the full CORE-R2
+  remediation (SRR-03 OPEN), not merely Foundation Slice 1.
+- **Issue #157** (`res_users.notification_type` post-init fixture artifact)
+  **remains a separate, out-of-scope issue** — not investigated, not fixed,
+  not absorbed into this alignment session or into Task 011B.
+- **PR #150 remains draft and unmerged** — not marked ready, not merged,
+  this session.
+
+### 15.5 Static + adversarial checks — this session
+
+See §16 (static validation) and §17 (adversarial review) below for the
+checks executed in this alignment session.
+
+## 16. Static validation — this base-alignment session
+
+- `git merge-base --is-ancestor 9128015 HEAD` → **true**;
+  `merge-base(HEAD, origin/Shopify-connector) == 912801508155c6358e8f5f1a7a0aaf01ae573675`
+  — ancestry **PASS**.
+- `python3 -m py_compile` on all 5 Task 011B Python files (both models +
+  `__init__.py`, both test files) → **CLEAN**.
+- `python3 -m compileall -q addons/shopify_connector_sale` → **CLEAN**.
+- Exact changed-file inventory (`git diff --name-status 9128015 HEAD`) →
+  **8 files**, matches §15.3 exactly (5 `addons/shopify_connector_sale/**`
+  Python files, 3 docs).
+- Repo-wide conflict-marker scan (`<<<<<<<`/`=======`/`>>>>>>>`) across all
+  `*.py`/`*.md` → **NONE FOUND**.
+- Task 011B's own addon diff vs the prior head `c234107`
+  (`git diff c234107 HEAD -- addons/shopify_connector_sale/`) → **empty** —
+  **no production or test behavior change** caused by this alignment
+  session. (`addons/shopify_connector_core/**` shows the expected CORE-R2
+  Foundation Slice 1 diff arriving via the merge — not a Task 011B change,
+  not net-owned by this PR per §15.3.)
+- **No CORE-R2 net-diff contamination** (§15.3 item 2) — **PASS**.
+- **No Task 010B contamination** (§15.3 item 3) — **PASS**.
+- **No issue #157 fixture fix** (§15.3 item 4) — **PASS**.
+- Relative Markdown link validation on the three edited docs
+  (`research-handoff.md`, `architecture-review-log.md`,
+  `task-011b-validation-results.md`) → **351/351 relative links resolve**.
+- PR #150 confirmed **open, draft, unmerged** throughout (re-checked via the
+  GitHub API before and after the merge) — no local action changed that
+  state.
+
+## 17. Synchronous adversarial review — this base-alignment session
+
+Performed in-session (not delegated to a background workflow), checking
+specifically for the failure modes named in the task brief:
+
+1. **Lost Task 011B history?** `git merge-base --is-ancestor c234107 HEAD`
+   → **true** (190 Task 011B commits all remain reachable). **No loss.**
+2. **Lost CORE-R2 history?** `git merge-base --is-ancestor 33505c1 HEAD`
+   → **true** (PR #156's own head is an ancestor of the new Task 011B
+   head). **No loss.**
+3. **AR ordering correct?** `AR-043 → AR-044 → AR-045 → AR-047`, verified
+   by direct grep of the resolved file. **Correct.**
+4. **AR-046 accidentally inserted?** Zero `| AR-046 |` rows exist; the only
+   `AR-046` occurrences are pre-existing prose inside the AR-047 row
+   describing the reserved (not-yet-used) allocation. **Not inserted.**
+5. **Stale base/head wording?** **FOUND AND CORRECTED** — the file's
+   opening blockquote and §1 table still framed `ce504f` (the prior
+   session's tip) as the "current" base. Corrected: the opening blockquote
+   now leads with the 2026-07-13 session and marks the `ce504f` blockquote
+   "superseded"; §1's `Current base SHA` / `Aligned PR head` / `Base
+   verification` rows now read `9128015…` / `2316128…` and the prior value
+   moved into the "Prior alignments" list. (The PR #150 body carried the
+   same defect — corrected in the same pass, see the pushed PR body.)
+6. **Production conflict resolution?** N/A — zero `addons/**` files
+   conflicted (CORE-R2 Foundation Slice 1 is confined to
+   `shopify_connector_core`, disjoint from Task 011B's
+   `shopify_connector_sale`). Nothing to adjudicate.
+7. **Task 010B contamination?** Net diff (§15.3) contains none of PR #151's
+   23 files; PR #151 was read only for its current body (contamination
+   avoidance), never merged, cherry-picked, or copied from. **Clean.**
+8. **Premature runtime, benchmark, or live claims?** §15.4 explicitly
+   states no runtime executed, no runtime-green claimed on the new head,
+   and CORE-R2 full completion is not claimed — only that Foundation Slice
+   1 (PR #156) is merged and was runtime-validated **on its own exact
+   head**, carried by reference. Concurrency, 100k benchmark, authoritative
+   backfill, and live Shopify are all explicitly marked PENDING/blocked.
+   **No premature claim found.**
+9. **Accidental implication that SRR-03 is closed?** §15.4 states verbatim
+   "SRR-03 (full disconnect-quiescence remediation) remains OPEN." No
+   wording in this session's edits states or implies otherwise. **Clean.**
+
+**Outcome: one confirmed documentation defect found (item 5, stale
+base/head wording) and corrected before push. No other defects found; no
+correction loop required.**
