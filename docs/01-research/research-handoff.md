@@ -1,10 +1,59 @@
 # Research Handoff (rolling)
 
+### CORE-R2 — Foundation Slice 1 EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34818964 @ `c0d4559`; draft PR #156, 2026-07-13)
+
+- **Session role:** runtime-closure operator. Re-ran the complete runtime matrix
+  inside the authorized Odoo.sh dev build for the **exact validated code SHA
+  `c0d455938b4a087407d6c712acbcc8bcf1b06feb`** (Odoo 19.0, build **34818964**, DB
+  `adamsmen-claude-core-r2-implementation-foundation-34818964`, base A/B
+  `ce504f4`). Build-to-commit proven by `git rev-parse HEAD` = `c0d4559` (working
+  tree clean; `ce504f` ancestor; PR scope = the known 16 files; no
+  Slice-2/controller/cron/lifecycle/call-site work). **No code was changed** —
+  docs-only evidence closure; the validated code SHA stays `c0d4559`.
+- **Fresh install (clean DB) — GREEN:** the build-time `-i` of all four modules
+  with `--test-enable` (+ demo) is **`0 failed, 0 error(s) of 325 tests`**; every
+  CORE-R2 class **and** every one of the seven `notification_type` classes runs
+  and passes on the fresh install.
+- **Post-init re-run matrix (`-u`/`--test-tags`, identical):** core `0 failed,
+  6 error(s) of 122` (+9 post = 131), product `0 failed, 0 of 53`, sale `0 failed,
+  1 of 41`. CORE-R2 classes green — `TestCallLeaseModelSchema` 7,
+  `TestBusinessAdmission` 18, `TestApiClient` 20, `TestJobEnqueue` 10,
+  `TestGenuineRealAdmission` 9 (**3/3 stable**, no deadlock). Real admission,
+  API-contract parity, exception precedence all observed; **no live Shopify
+  call**; zero synthetic residue; zero WARNING lines; no
+  token/credential/GraphQL/payload/worker-exception leakage.
+- **Seven `notification_type` errors — base/pre-existing, NOT CORE-R2:** they
+  appear only on post-init re-runs (not on the green fresh install); base Odoo-19
+  `mail` computed-field (`_compute_notification_type`) artifact with a 100%-base
+  traceback (zero CORE-R2 frames); the seven failing test files are byte-identical
+  on `ce504f` and the CORE-R2 diff never touches `res.users`. A literal
+  separate-DB `ce504f` run was not possible (no `createdb`, single-DB Odoo.sh
+  platform → RR-F). Non-CORE-R2 owner decides whether `_create_group_user` should
+  set `notification_type`.
+- **PR / gate state:** PR **#156** kept **draft, unmerged**; docs-only evidence
+  commit advances the branch head. Evidence:
+  `../05-qa/task-core-r2-validation-results.md` §4.1–4.4; AR-047 exact-head note;
+  SRR-03 factual-staleness correction. **SRR-03 remains OPEN** — the end-to-end
+  disconnect-quiescence remediation is not closed (later slices deferred).
+- **Exact next-session prompt (control room):** "Review PR #156's exact-head
+  runtime closure (validation-results §4.1–4.4, AR-047 exact-head note, this
+  handoff): validated code SHA `c0d4559`, build 34818964, fresh install green
+  (325/0), post-init matrix green apart from the seven base
+  `res_users.notification_type` post-init-rerun artifacts (byte-identical on
+  `ce504f`, zero CORE-R2 frames). Decide: (a) accept the runtime evidence and keep
+  SRR-03 OPEN pending Slice 2/3; (b) route the `notification_type` pre-existing
+  test-helper behavior to a separate non-CORE-R2 fix (or accept it); (c) whether a
+  literal separate-build `ce504f` A/B is required (RR-F); (d) whether to authorize
+  CORE-R2 Slice 2. Do not mark PR #156 ready or merge without an explicit
+  control-room act."
+
 ### CORE-R2 — Foundation Slice 1 RUNTIME VALIDATION (first Odoo.sh execution; draft PR #156, 2026-07-13)
 
 - **Session role:** runtime operator. Ran the full runtime matrix **inside the
   authorized Odoo.sh dev build** for this branch (SSH/browser auth not needed —
-  the session runs in the build itself). Build **34808200**, Odoo **19.0**, DB
+  the session runs in the build itself). Build **34808200** *(superseded by the
+  2026-07-13 exact-head closure on build **34818964** @ `c0d4559` — see the top
+  entry)*, Odoo **19.0**, DB
   `adamsmen-claude-core-r2-implementation-foundation-34808200`. Build-to-commit
   proven by `git rev-parse HEAD` in the container + the build's own install.log
   fresh-install record. GitHub API/`gh` is **not reachable** from the build
@@ -37,8 +86,10 @@
   errors are pre-existing **non-CORE-R2** `res_users.notification_type` NOT-NULL
   `setUpClass` failures (`TestConnectionLifecycle`, `TestCredentialAccess`,
   `TestCredentialService`, `TestJobLogSystemAppend`, `TestReadinessSlotClosure`,
-  `TestTestConnection`, sale `TestCustomerBinding`), reproduced on the pristine
-  slice head (`2 failed, 18 error(s)`). Their shared `_create_group_user` helper
+  `TestTestConnection`, sale `TestCustomerBinding`) — per the 2026-07-13
+  exact-head closure a base Odoo-19 `mail` computed-field artifact appearing only
+  on post-init test re-runs (fresh install green, `0 of 325`), byte-identical on
+  `ce504f`, 100%-base traceback. Their shared `_create_group_user` helper
   creates `res.users` without `notification_type`. These files are outside the PR
   and outside this session's allowed-files list → left untouched. **Non-CORE-R2
   owner action:** decide whether to set `notification_type` in that helper.

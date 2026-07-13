@@ -1,20 +1,38 @@
 # CORE-R2 — Foundation Slice 1 — Validation Results
 
-> **Status: draft implementation record for control-room review.** CORE-R2
-> **implementation** gate OPENED by control-room comment `4952145926`
+> **Status: runtime-validated implementation record for control-room review.**
+> CORE-R2 **implementation** gate OPENED by control-room comment `4952145926`
 > (authorized base `Shopify-connector` @
 > `ce504f42824807e215ee21df3dfd4eed9bb9a275`, ratifying D-CR2-A…F). This slice
 > implements a **strict subset** of the merged packet
 > ([`../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md`](../07-implementation-plan/task-core-r2-disconnect-quiescence-packet.md))
 > / analysis ([`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md)),
-> AR-047. **SRR-03 remains OPEN. No remediation and no runtime-green is claimed.**
-> Branch `claude/core-r2-implementation-foundation`; draft PR into
-> `Shopify-connector`; base `ce504f42824807e215ee21df3dfd4eed9bb9a275`.
+> AR-047.
+>
+> **Exact-head runtime closure (2026-07-13).** The full runtime matrix was
+> executed **inside the authorized Odoo.sh dev build for the exact validated
+> code SHA `c0d455938b4a087407d6c712acbcc8bcf1b06feb`** (Odoo **19.0**, build
+> **34818964**, DB `adamsmen-claude-core-r2-implementation-foundation-34818964`,
+> baseline A/B SHA `ce504f42824807e215ee21df3dfd4eed9bb9a275`). The **fresh
+> build-time install** of `adams_base` + the three connector modules with
+> `--test-enable` (demo data loaded) is **fully green — `0 failed, 0 error(s) of
+> 325 tests`**; every CORE-R2 class passes. The seven
+> `res_users.notification_type` `setUpClass` errors observed on *post-init test
+> re-runs* are a **base Odoo-19 `mail`** computed-field artifact (not CORE-R2;
+> the seven test files are byte-identical on base `ce504f`; the failing stack
+> never enters CORE-R2 code) — see §4.1/§4.3. **The Foundation-Slice-1 admission
+> half is runtime-validated on `c0d4559`.** **SRR-03 remains OPEN — no
+> remediation and no runtime-green of the end-to-end disconnect-quiescence fix
+> is claimed** (the later slices that would close the linearization are deferred;
+> §5). Branch `claude/core-r2-implementation-foundation`; PR **#156** kept
+> **draft/unmerged** into `Shopify-connector`; base
+> `ce504f42824807e215ee21df3dfd4eed9bb9a275`; docs-only evidence commit advances
+> the branch head (§4.4) while the validated **code** SHA remains `c0d4559`.
 
-This record deliberately separates: (1) implemented facts; (2) static evidence
-actually produced this session; (3) tests authored but **not** executed; (4)
-runtime status; (5) intentionally deferred Slice 2/3 items; (6) residual risks;
-(7) rollback.
+This record separates: (1) implemented facts; (2) static evidence; (3) the
+authored tests — **now executed & green on Odoo.sh `c0d4559`** (§4.1); (4)
+runtime status — **runtime-validated on `c0d4559`**; (5) intentionally deferred
+Slice 2/3 items; (6) residual risks; (7) rollback.
 
 ---
 
@@ -150,7 +168,7 @@ path). Everything disconnect/lifecycle/controller-related is a later slice.
 5. `execute_business` as a real context manager (`__enter__` admits + sends,
    `__exit__` releases on normal **and** exception exit).
 6. Token-read-once transport (`_send(store, body, token)`).
-7. Focused tests (authored, not executed).
+7. Focused tests (authored; **executed & green on Odoo.sh `c0d4559`** — §4.1).
 8. This validation record + shared AR-047/SRR-03/handoff updates.
 
 **Deliberately NOT implemented (deferred — see §5):** disconnect controller;
@@ -245,12 +263,14 @@ Run in this environment (no Odoo runtime; static tooling only):
 
 ---
 
-## 3. Tests authored but NOT executed `[Fact — authored] / [Open — unexecuted]`
+## 3. Tests authored — now EXECUTED & GREEN on Odoo.sh `[Fact — authored & executed]`
 
 `addons/shopify_connector_core/tests/test_disconnect_quiescence.py` (new), plus
 minimal regressions in `test_api_client.py` and `test_job_enqueue.py`. **These
-were NOT run — there is no Odoo runtime in this session.** They are authored to
-pass on a real Odoo 19 runtime and are the control-room's to execute (SRR-06).
+were authored in the earlier static sessions and are now EXECUTED and GREEN on
+the Odoo.sh dev build for the exact head `c0d4559` (build 34818964) — see
+§4.1.** The design intent below (test styles + required-proof mapping) is
+retained as the specification the passing tests satisfy.
 
 Two deliberate test styles:
 
@@ -317,57 +337,88 @@ create the lease under test. The full **two-server** production-path proof
 
 ---
 
-## 4. Runtime status `[Open]`
+## 4. Runtime status `[Fact — runtime-validated on Odoo.sh @ c0d4559]`
 
-**No Odoo runtime was exercised.** No test was run; no Odoo.sh green summary
-exists. Per SRR-06 the full `shopify_connector_core` suite (including these new
-tests) must be captured verbatim on Odoo.sh by the control-room before any
-runtime claim. **This session makes no runtime/green/live claim.**
+**The full runtime matrix was exercised on the authorized Odoo.sh dev build for
+the exact head `c0d4559` (build 34818964).** §4.1 is the exact-head matrix and
+per-class evidence; §4.2 records the earlier test-only fixes that made these
+tests green (authored into `c0d4559` itself); §4.3 is the base-vs-head
+attribution of the seven `res_users.notification_type` post-init-rerun artifacts;
+§4.4 is the evidence commit. **This closes RR-B for the Foundation admission
+slice. SRR-03 (the end-to-end disconnect-quiescence remediation) remains OPEN —
+the disconnect controller, the conflicting lifecycle update-lock/epoch bump, and
+Direction-C finalization are deferred (§5), so admission-vs-disconnect
+linearization is not closed end to end. No runtime-green of the remediation is
+claimed.**
 
-### 4.1 Runtime validation results — runtime-operator session `[Fact — verified this session, 2026-07-13]`
+### 4.1 Exact-head runtime validation — Odoo.sh build 34818964 @ `c0d4559` `[Fact — verified this session, 2026-07-13]`
 
-The runtime-operator session executed the full matrix **inside the authorized
-Odoo.sh dev build container** for this exact commit (SSH/browser auth not
-required — the session runs in the build itself; `odoo-bin`, the injected DB, and
-`git` are all local to the build).
+Executed the full matrix **inside the authorized Odoo.sh dev build for the exact
+head** (SSH/browser auth not required — the session runs in the build itself;
+`odoo-bin`, the injected DB, and `git` are all local to the build). This
+**supersedes** the earlier runtime-operator numbers (build `34808200`, an earlier
+branch head); those survive only as the §4.2 fix history.
 
 **Build identity / build-to-commit proof.**
 
-- Odoo version: **19.0** (`ODOO_VERSION`, install.log header).
-- Validated commit (`git rev-parse HEAD` inside the build container): the
-  slice-1 foundation head that the runtime run was taken against — the fixes in
-  §4.2 are committed **on top of** it, advancing the branch head (see §4.2).
-- Build DB / build id: `adamsmen-claude-core-r2-implementation-foundation-34808200`
-  (build **34808200**); `ODOO_BUILD_URL` and `PGDATABASE` tie the DB to branch
-  `claude/core-r2-implementation-foundation`.
+- Odoo version: **19.0** (`ODOO_VERSION`; `install.log` header).
+- Validated **code** SHA (`git rev-parse HEAD` inside the build container):
+  **`c0d455938b4a087407d6c712acbcc8bcf1b06feb`** — the current branch head. The
+  four §4.2 test-only fixes are **contained in this very commit** (message
+  "CORE-R2 foundation: runtime validation on Odoo.sh — test-only fixes +
+  evidence"), not committed on top of it. Working tree clean; base
+  `ce504f42824807e215ee21df3dfd4eed9bb9a275` is an ancestor; PR scope = the known
+  **16 files** (12 addon + 4 docs); no Slice-2 / controller / cron / lifecycle /
+  call-site work present.
+- Build DB / build id:
+  `adamsmen-claude-core-r2-implementation-foundation-34818964` (build
+  **34818964**); `ODOO_BUILD_URL`
+  (`https://adamsmen-claude-core-r2-implementation-foundation-34818964.dev.odoo.com`)
+  and `PGDATABASE` tie the DB to branch `claude/core-r2-implementation-foundation`
+  (branch ref → `c0d4559`).
 - The build's own `install.log` records the fresh install command
-  `odoo-bin --stop-after-init -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --log-level=test …` and
-  `Initializing database … loading … modules` — i.e. the **fresh install ran at
-  build time** with tests enabled.
+  `odoo-bin --stop-after-init … -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --log-level=test --test-tags /adams_base,/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,…` then `Initializing database … loading 47 modules …` and `Executed command: odoo-bin module force-demo` — i.e. the **fresh install ran at build time, with tests enabled and demo data** (§4.1-A).
 
-**A. Fresh install / upgrade — PASS.** All three modules are `installed`
-(`shopify_connector_core 19.0.1.6.0`, `_product 19.0.1.0.0`, `_sale
-19.0.1.0.0`). Re-running `odoo-bin -u <module> --test-enable --stop-after-init
---no-http` for each: registry loads; the `shopify.connector.call.lease`
-model/table loads; the store `connection_generation` and job
-`expected_connection_generation` columns exist; `ir.model.access.csv` (lease ACL)
-loads; model + test registration succeed. No install/upgrade failure.
+**A. Fresh install (clean database) — GREEN.** The build-time `-i
+adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale
+--test-enable` install on the freshly-initialized (demo) database is
+**`0 failed, 0 error(s) of 325 tests`** — the canonical clean-DB result. All three
+connector modules are `installed` (`shopify_connector_core 19.0.1.6.0`, `_product
+19.0.1.0.0`, `_sale 19.0.1.0.0`); the `shopify.connector.call.lease` model+table
+exist; the store `connection_generation` and job `expected_connection_generation`
+columns exist; the lease ACL row loads (`ir_model_access` ext-id
+`shopify_connector_core.access_shopify_connector_call_lease_admin`,
+`read=1,write=0,create=1,unlink=1`, Administrator group); model + test
+registration succeed. **On the fresh install every one of the "7 failing"
+`setUpClass` classes runs and passes** (build-time `install.log`:
+`TestConnectionLifecycle` 41 test-starts, `TestReadinessSlotClosure` 20,
+`TestCustomerBinding` 7, …). No install/upgrade error.
 
-**B. Standard suites (after §4.2 fixes; clean DB).** Verbatim final summaries:
+**B. Standard suites — post-init re-run on `c0d4559`.** Re-running each module's
+full suite against the already-built DB (`odoo-bin -u <module> --test-enable
+--stop-after-init --no-http`; standalone `--test-tags /<module>` gives identical
+counts). Verbatim per-module summaries on build 34818964:
 
-| Suite | Result | Stats |
+| Suite | Result | Stats (this build) |
 | --- | --- | --- |
-| `shopify_connector_core` | `0 failed, 6 error(s) of 131 tests` | 159 tests / 1.18s / 1986 queries |
-| `shopify_connector_product` | `0 failed, 0 error(s) of 53 tests` | 61 tests / 1.65s / 2472 queries |
-| `shopify_connector_sale` | `0 failed, 1 error(s) of 41 tests` | 49 tests / 0.75s / 873 queries |
+| `shopify_connector_core` | `0 failed, 6 error(s) of 122 tests` (+9 post-tests = 131 total) | core loaded 1.22s (incl. 1.01s test), 194 queries (+1783 test); 9 post-tests 0.13–0.25s / 203 queries |
+| `shopify_connector_product` | `0 failed, 0 error(s) of 53 tests` | 1.99s (incl. 1.77s test), +2472 test queries |
+| `shopify_connector_sale` | `0 failed, 1 error(s) of 41 tests` | 0.93s (incl. 0.79s test), +873 test queries |
 
-All **6 core + 1 sale remaining errors are PRE-EXISTING, non-CORE-R2** `setUpClass`
-failures (see §4.3) — none is a CORE-R2 test and none is in the 16-file PR.
+Combined cascade (`-u shopify_connector_core` updates its dependents):
+`0 failed, 7 error(s) of 225 tests`. All **6 core + 1 sale errors are the base
+Odoo-19 `res_users.notification_type` `setUpClass` artifacts of §4.3** — they do
+**not** occur on the fresh install (§4.1-A: `0 of 325`), only on post-init
+re-runs; none is a CORE-R2 test and none is in the 16-file PR.
 
-**C. CORE-R2 classes — executed and GREEN.** `TestCallLeaseModelSchema` (7),
-`TestBusinessAdmission` (18), `TestGenuineRealAdmission` (9), `TestApiClient`
-api-client regressions (20), `TestJobEnqueue` enqueue-generation regressions (10)
-— all pass.
+**C. CORE-R2 classes — executed and GREEN on `c0d4559`.** Verified by targeted
+per-class runs (`--test-tags /shopify_connector_core:<Class>`):
+`TestCallLeaseModelSchema` **7/7**, `TestBusinessAdmission` **18/18**,
+`TestApiClient` (api-client regressions) **20/20**, `TestJobEnqueue`
+(enqueue-generation regressions) **10/10**, and `TestGenuineRealAdmission`
+**9/9** — the concurrent-admission class was run **three times on clean state and
+is stable** (9/9 each; 0.19s / 0.25s / 0.15s; 203 queries each; no deadlock,
+no stray worker). Every per-method start is present in the run logs.
 
 **D. Real admission (TestGenuineRealAdmission, genuine independent connections).**
 Observed: lease committed **before** `_send` (cross-connection observer count = 1
@@ -396,26 +447,45 @@ releases **exactly once**.
 **No live Shopify request** was made in any run — every test replaces the `_send`
 transport seam (or `requests.post`) with an in-memory fake.
 
-**Warnings / SQL-ERROR classification.** No substantive `WARNING`-level lines in
-any suite. Every `ERROR`-level SQL line is one of: (a) the pre-existing
-`res_users.notification_type` NOT-NULL violations from §4.3; or (b) **expected**
-constraint-violation assertions in the duplicate-prevention tests
-(`TestProductDuplicatePrevention`;
-`shopify_connector_customer_binding_store_partner_uniq` /
-`…_store_shopify_gid_uniq` in the green customer-duplicate tests). No unexpected
-SQL error.
+**Warnings / SQL-ERROR classification (LOOP 5).** **Zero `WARNING`-level lines**
+in any suite (grep of the full logs returns 0). Every `ERROR`-level SQL line is
+exactly one of:
+- **(a) base artifact — 7× `res_users.notification_type` NOT-NULL** (`INSERT INTO
+  "res_users" … RETURNING "id"`, with no `notification_type` column) — the seven
+  `setUpClass` failures of §4.3; base Odoo-19 `mail`, not CORE-R2; post-init-rerun
+  only.
+- **(b) expected negative-test assertions — all in PASSING tests:** in
+  `TestProductDuplicatePrevention`, 6× NOT-NULL on
+  `shopify_connector_product_template_binding` (`product_template_id`,
+  `shopify_gid`, `store_id`) and `…_product_variant_binding`
+  (`product_template_binding_id`, `shopify_gid`, `store_id`); in
+  `TestCustomerDuplicatePrevention`, 2× duplicate-key on
+  `shopify_connector_customer_binding_store_shopify_gid_uniq` /
+  `…_store_partner_uniq` (plus, at fresh-install time, the same suite's 3×
+  required-field NOT-NULL on `shopify_connector_customer_binding`). Each is the DB
+  rejecting a deliberately-invalid insert — i.e. the assertion itself.
+- **No CORE-R2 (`call_lease`/admission) SQL error, and no unexpected SQL error.**
 
-**Cleanup proof.** After all suite runs, a fresh independent verifier reports
-**zero** rows in `shopify_connector_call_lease`, `…_job`, `…_store`, `…_job_log`,
-`…_store_credential` — zero synthetic residue.
+**Cleanup proof (LOOP 6).** After all suite/class runs, a fresh **bounded**
+verifier reports **zero** rows in `shopify_connector_call_lease`, `…_job`,
+`…_store`, `…_job_log`, `…_store_credential` — zero synthetic residue.
+`pg_stat_activity` shows **0** stray Odoo backends, **no** idle-in-transaction
+session, and no lingering `call_lease`/`FOR SHARE` cursor — no worker thread or
+open test cursor leaked. A leakage scan of every run log finds **no** `shpat_`
+token (incl. the test dummy), **no** `Authorization`/`X-Shopify-Access-Token`
+header, **no** GraphQL query/mutation body, **no** credential value, and **no**
+raw worker exception detail (the only `graphql`/`secret` log hits are test-method
+*names*, not values; worker diagnostics are type-only as designed).
 
 ### 4.2 Runtime defects found and corrected `[Fact — this session]`
 
-Four defects were found and corrected. **All four are in the single authorized
-test file `tests/test_disconnect_quiescence.py`; no production model/transport
-code was changed, and no invariant (locking, generation gate, token-read-once,
-lease durability, exception taxonomy, cursor bounds, thread containment, cleanup)
-was weakened.**
+Four defects were found and corrected **on the earlier build `34808200`; all
+four corrections are contained in the validated head `c0d4559`** and are
+re-verified green by the §4.1 exact-head run. **All four are in the single
+authorized test file `tests/test_disconnect_quiescence.py`; no production
+model/transport code was changed, and no invariant (locking, generation gate,
+token-read-once, lease durability, exception taxonomy, cursor bounds, thread
+containment, cleanup) was weakened.**
 
 1. **`TestBusinessAdmission` never entered registry test mode.** `_admit` opens a
    genuinely independent `self.env.registry.cursor()` (the durability invariant,
@@ -466,28 +536,79 @@ pre-existing `TestJobDispatch.test_extension_seam_…` pollution failure, which
 passes once the DB is clean. With defect 4 fixed, the genuine tests reach
 `_cleanup` normally and leave zero residue.
 
-### 4.3 Pre-existing, out-of-scope failures (NOT this PR, NOT corrected) `[Fact / Open]`
+### 4.3 The seven `notification_type` errors — base-vs-head attribution (LOOP 3) `[Fact / Open]`
 
-Seven `setUpClass` errors are **pre-existing** and reproduce on the **pristine
-slice-1 head** (baseline run: `2 failed, 18 error(s) of 131` core, of which 12 =
-defect 1, 1 = defect 4, and these 6). They live in files **not in the 16-file
-PR** and **outside this session's authorized files**, so they were left untouched:
+Seven `setUpClass` errors surface **only on post-init test re-runs** (both `-u
+<module> --test-enable` and standalone `--test-tags /<module>` reproduce them
+identically) and **never on the fresh install** (§4.1-A: `0 of 325`, with these
+same classes running and passing). They are:
 
-- Core: `TestConnectionLifecycle`, `TestCredentialAccess`, `TestCredentialService`,
-  `TestJobLogSystemAppend`, `TestReadinessSlotClosure`, `TestTestConnection`.
-- Sale: `TestCustomerBinding`.
+- Core (6): `TestConnectionLifecycle`, `TestCredentialAccess`,
+  `TestCredentialService`, `TestJobLogSystemAppend`, `TestReadinessSlotClosure`,
+  `TestTestConnection`.
+- Sale (1): `TestCustomerBinding`.
 
-Cause: their shared `_create_group_user` helper does
-`env['res.users'].create({...})` **without `notification_type`**, which violates a
-`NOT NULL` constraint on `res_users.notification_type` in this Odoo 19 build. This
-is unrelated to CORE-R2 (no admission/lease code involved) and is flagged for the
-appropriate non-CORE-R2 owner via the handoff.
+**Cause (empirically confirmed).** Each class's shared `_create_group_user`
+helper does `env['res.users'].create({name, login, group_ids})` **without
+`notification_type`**. `res.users.notification_type` is a **base `mail`
+computed-stored field** (`odoo/addons/mail/models/res_users.py:29-33`,
+`compute='_compute_notification_type'`, no plain `default=`) whose value derives
+from `group_ids`/`share`. It is populated correctly on a fresh `-i` install and
+in ordinary operation (an `odoo-bin shell` `res.users.create` with the same vals
+yields `notification_type='email'`), but the compute leaves it `NULL` for these
+bare fixtures on a post-init test re-run → base `NOT NULL` violation on
+`res_users.notification_type`. The **full traceback is 100% base Odoo**
+(`test_*.py setUpClass → _create_group_user → res.users.create →
+odoo/addons/base/models/res_users.py → odoo/orm/models.py:_create → cr.execute →
+NotNullViolation`) with **zero CORE-R2 frames**.
+
+**Base-vs-head A/B attribution.** A literal separate-DB `ce504f` suite run was
+**not physically possible** in this environment (the injected PostgreSQL role has
+no `createdb` privilege — `pg_roles`/`pg_database` are not even readable — and the
+Odoo.sh container is bound to a single injected database per platform contract;
+running `ce504f` code against the head DB would downgrade/corrupt the head schema
+and destroy the evidence environment). Attribution is instead established
+rigorously and variance-free by:
+
+1. **Byte-identity:** all seven failing test files are **byte-identical** between
+   `ce504f` and `c0d4559` (`git diff ce504f..c0d4559 -- <file>` empty for each;
+   re-checked in a detached `ce504f` worktree).
+2. **Causal disjointness:** the CORE-R2 production diff (`models/*.py`,
+   `security/ir.model.access.csv`, `__manifest__.py`) **never references**
+   `res.users` / `res_users` / `notification_type` / `_create_group_user` /
+   `group_ids` (grep empty).
+3. **Base mechanism:** the failing stack has zero CORE-R2 frames and the cause is
+   a base `mail`/`res.users` computed field + a base DB `NOT NULL` constraint —
+   present regardless of the branch.
+
+Because the failing test code is byte-identical on `ce504f` and the failure is
+produced entirely by CORE-R2-independent base Odoo code, **`ce504f` necessarily
+produces the identical seven errors under the same post-init-rerun method** — i.e.
+they are **base / pre-existing, not a CORE-R2 regression**. (This is code-identity
++ empirical-base-mechanism attribution, which removes the DB-variance a separate
+run would introduce; the residual that no literal second-DB `ce504f` run was
+performed is logged as **RR-F** for the control room to run on a separate build if
+a literal A/B is required.) The files are **outside the 16-file PR and this
+session's authorized files**, so they were left untouched and flagged for the
+appropriate non-CORE-R2 owner (decide whether `_create_group_user` should pass
+`notification_type`, or whether the base post-init-rerun behavior is accepted).
 
 **SRR-03 remains OPEN.** Runtime-green of the *foundation-slice* admission tests
 does not close SRR-03: the disconnect controller, the conflicting lifecycle
 update-lock/epoch bump, and Direction-C finalization are still deferred (§5), so
 the admission-vs-disconnect linearization is not closed end to end. No remediation
 is claimed.
+
+### 4.4 Evidence commit `[Fact]`
+
+No CORE-R2 defect was exposed by the exact-head runs, so **no production or test
+code was changed** in this closure session (LOOP 7 not triggered). The validated
+**code** SHA is and remains `c0d455938b4a087407d6c712acbcc8bcf1b06feb`. This
+closure commits **only the reconciled evidence documents** (this file, the AR-047
+exact-head note, the research-handoff top entry, and the SRR-03 factual-staleness
+correction); that docs-only commit advances the branch head but does **not** alter
+the validated code SHA, and its creation required no runtime execution. PR
+**#156** is kept **draft and unmerged**; Slice 2 is not started.
 
 ---
 
@@ -638,16 +759,29 @@ API-client/job-enqueue tests" the gate refers to.
 - **RR-A (linearization not yet closed):** the conflicting lifecycle update-lock
   is a later slice, so end-to-end admission-vs-disconnect atomicity is **not**
   demonstrated by this slice. The admission half is correct in isolation.
-- **RR-B (runtime unproven):** no Odoo runtime; tests unexecuted (SRR-06 / RR-7).
+- **RR-B (runtime — CLOSED for the admission slice):** the Foundation admission
+  tests are **executed and green on Odoo.sh `c0d4559`** (build 34818964; §4.1),
+  so RR-B no longer holds for this slice. The *remediation* runtime proof
+  (end-to-end + genuine two-server) remains open under RR-A / RR-C / SRR-03.
 - **RR-C (genuine two-server proof deferred):** proofs 13/14/15 are shown at the
   PG-primitive level with real connections; the production-path two-server proof
   is the deferred T-19 / SRR-09 / RR-4 item.
 - **RR-D (dormant ACL/user-identity):** the lease ACL is admin-only; when a
   production call site activates `execute_business`, the drain's actual execution
   identity must be re-checked against this ACL (later slice).
-- **RR-E (empty-credential on dormant path):** `_admit` does not pre-check a
-  missing token (unlike `execute()`); harmless while dormant, to be handled when
-  `execute()` is privatized.
+- **RR-E (missing token on the business path — HANDLED):** `execute_business`
+  raises the accepted `ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID,
+  credential_invalid=True)` on a missing/empty token **before** any lease or
+  `_send` (correction §0.1 blocker 1), runtime-proven by
+  `TestBusinessAdmission.test_missing_credential_raises_shopify_client_error`
+  (green, §4.1). The only residual is that this still-dormant path is not yet
+  reached by a production call site (a later call-site slice).
+- **RR-F (literal second-DB baseline not run):** the seven `notification_type`
+  errors are attributed to base/pre-existing by code-identity + empirical
+  base-mechanism (§4.3), not by a literal isolated `ce504f` suite run — which the
+  single-DB, no-`createdb` Odoo.sh platform does not permit here. If a literal
+  A/B is required, the control room can run `ce504f` on a separate build; the
+  expected result is the identical six core + one sale `setUpClass` errors.
 
 ---
 
@@ -675,5 +809,8 @@ API-client/job-enqueue tests" the gate refers to.
 - Base `ce504f42824807e215ee21df3dfd4eed9bb9a275`; only allowlisted files changed;
   no product/sale file, no cron, no controller, no `disconnecting` state, no
   `action_disconnect` change, no live Shopify call.
-- **SRR-03 remains OPEN.** No remediation claimed. No runtime/green/live claim.
+- **SRR-03 remains OPEN.** No *remediation* runtime-green is claimed. The
+  Foundation admission slice **is** runtime-validated on Odoo.sh `c0d4559` (build
+  34818964; §4.1); the seven `res_users.notification_type` errors are
+  base/pre-existing (§4.3), not CORE-R2.
 - Draft PR only — not marked ready, not merged; Slice 2 not begun.
