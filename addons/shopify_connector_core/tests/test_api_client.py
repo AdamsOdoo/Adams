@@ -263,7 +263,25 @@ class TestApiClient(TransactionCase):
             ).items()
             if callable(value) and not name.startswith('_')
         }
-        self.assertEqual(public_methods, {'execute'})
+        # CORE-R2 (AR-047) adds exactly one public entry point:
+        # `execute_business`, the committed-admission-lease context manager.
+        self.assertEqual(public_methods, {'execute', 'execute_business'})
+
+    # 20 (CORE-R2 regression). execute() preserves the two-arg `_send` seam.
+    # The token-snapshot change makes `_send(store, body, token=None)`; the
+    # legacy execute() path must still call it as `_send(store, body)` (reading
+    # the token itself), so the transport-seam tests that patch a two-arg
+    # `_send` keep working and existing execute() callers stay operational.
+    def test_execute_preserves_two_arg_send_seam(self):
+        received = {}
+
+        def fake_send(self, store, body, *extra):
+            received['extra'] = extra
+            return FakeResponse(200, json_body=_success_body())
+
+        result = self._execute_with(fake_send)
+        self.assertEqual(received['extra'], ())
+        self.assertEqual(result['data']['shop']['name'], 'Test Shop')
 
     # 19. No credential leak across every fixture used above.
     def test_no_credential_leak_across_fixtures(self):

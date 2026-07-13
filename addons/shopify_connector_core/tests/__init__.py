@@ -7,6 +7,7 @@
 # already-allowed models/__init__.py one-import-line pattern).
 from . import test_api_client
 from . import test_connection_lifecycle
+from . import test_disconnect_quiescence
 from . import test_credential_access
 from . import test_credential_service
 from . import test_job_dispatch

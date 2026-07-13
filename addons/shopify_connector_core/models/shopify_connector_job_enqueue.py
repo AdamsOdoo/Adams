@@ -43,6 +43,12 @@ class ShopifyConnectorJobEnqueue(models.AbstractModel):
             'job_type': job_type,
             'state': 'queued',
             'payload_hash': payload_hash or False,
+            # CORE-R2 (AR-047): capture the store's live connection epoch at
+            # enqueue so `execute_business` admission can later fail closed on a
+            # disconnect/reconnect cycle. Captured here, never inferred at
+            # dispatch time. Dormant until the business call sites migrate to
+            # `execute_business` in a later slice.
+            'expected_connection_generation': store.connection_generation,
         }
         if res_model:
             vals['res_model'] = res_model
