@@ -173,6 +173,17 @@ class ShopifyConnectorJob(models.Model):
     cancel_reason = fields.Char(readonly=True)
     started_at = fields.Datetime(readonly=True)
     finished_at = fields.Datetime(readonly=True)
+    # CORE-R2 (AR-047) connection epoch captured at business-job enqueue
+    # (`shopify.connector.job.enqueue`). `execute_business` admission compares it
+    # against the store's live `connection_generation` under a `FOR SHARE` lock
+    # and refuses the call on mismatch, so an old handler cannot resume across a
+    # future disconnect/reconnect cycle. Captured at enqueue, never inferred at
+    # dispatch time. Additive/inert in this slice; existing rows and
+    # directly-created (non-enqueued) jobs default to 0 (analysis §22).
+    expected_connection_generation = fields.Integer(
+        default=0,
+        readonly=True,
+    )
 
     _store_idempotency_key_uniq = models.Constraint(
         'UNIQUE(store_id, idempotency_key)',
