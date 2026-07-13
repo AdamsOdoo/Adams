@@ -1,5 +1,22 @@
 # Task 011B — Customer Matching Scalability: Validation Record
 
+> **RUNTIME CLOSURE (2026-07-13, Odoo.sh build `34844515`):** the exact-head
+> Odoo 19 runtime was **actually executed** for the first time on the
+> committed code SHA `9895919a6cc191cb24f694c1b601a0304fedda15`. Fresh install,
+> the full core/product/sale standard suites, the focused **32** standard
+> methods, the **100,000-partner benchmark**, the indexed-lookup **EXPLAIN**
+> evidence, and a genuine **single-DB module-upgrade backfill** all ran and are
+> recorded verbatim in **§18**. Two gates remain **OPEN** and are reported as
+> such (not hidden): the **genuine independent-transaction concurrency proof**
+> could not complete on this shared/pooled Odoo.sh dev database (deterministic
+> environment limitation — root-caused with a positive DB-semantics control in
+> §18.6), and the **fully-authoritative isolated base→head build upgrade**
+> could not be provisioned (single linked DB). **No Task 011B production or
+> test defect was found; no code changed** (LOOP 9 no-op). **Issue #157**
+> (`res_users.notification_type`) reproduced on `-u shopify_connector_core`
+> reruns only and is classified separately — **not fixed**. **PR #150 stays
+> open, draft, unmerged; no live Shopify request made; SRR-03 remains OPEN.**
+>
 > **Latest session (2026-07-13):** a further isolated base-alignment session
 > merged the branch (**one normal merge, no rebase/squash/force-push**) onto
 > the current `Shopify-connector` tip
@@ -696,3 +713,143 @@ specifically for the failure modes named in the task brief:
 **Outcome: one confirmed documentation defect found (item 5, stale
 base/head wording) and corrected before push. No other defects found; no
 correction loop required.**
+
+## 18. Authoritative exact-head Odoo.sh runtime closure (2026-07-13, build `34844515`)
+
+This is the **first actual Odoo runtime execution** of Task 011B — every
+prior session (§3–§17) was authored/static-only. All numbers below are
+observed on the live Odoo.sh dev build, not simulated. No production or test
+code was modified this session (LOOP 9 no-op — no in-scope defect proven).
+
+### 18.1 Build-to-commit identity (LOOP 0 gate — PASS)
+
+| Item | Value |
+| --- | --- |
+| Exact code SHA | `git rev-parse HEAD` = `9895919a6cc191cb24f694c1b601a0304fedda15` (re-confirmed 4×) |
+| Branch | tip of `claude/task-011b-customer-matching-k5ux9b` (detached HEAD at that tip; `origin/claude/task-011b-customer-matching-k5ux9b` decorates the same commit) |
+| Working tree | **clean** — 0 unstaged, 0 staged, 0 untracked (verified via `git diff --stat HEAD`, `git diff --cached`, `git ls-files --others`) |
+| Odoo.sh build ID | **34844515** |
+| Database | `adamsmen-claude-task-011b-customer-matching-k5ux9b-34844515` |
+| `ODOO_BUILD_URL` | `https://adamsmen-claude-task-011b-customer-matching-k5ux9b-34844515.dev.odoo.com` |
+| Odoo version | **19.0**; PostgreSQL **16.14** |
+| Integration base | `git merge-base --is-ancestor 912801508155c6358e8f5f1a7a0aaf01ae573675 HEAD` → **true** (ancestor) |
+| Net PR scope | `git diff --name-only 9128015 HEAD` = **exactly the 8 Task 011B files** (5 `addons/shopify_connector_sale/**`, 3 docs); no PR #151 file, no issue-157 fixture fix |
+
+### 18.2 Fresh install — GREEN (LOOP 1)
+
+The build-time fresh install (`/home/odoo/logs/install.log`) ran
+`odoo-bin -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --test-tags /adams_base,/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,…` and finished **`Modules loaded.`** with:
+
+- **`0 failed, 0 error(s) of 357 tests`** (build-time); per-module: core **252 tests / 1.92s / 4665 q**, product **61 / 1.67s / 2485 q**, sale **90 / 1.12s / 1602 q**; 9 post-tests.
+- **0 WARNING** lines; 23 ERROR-level lines = all expected negative-constraint SQL (binding/product NOT-NULL + UNIQUE `assertRaises`) + 1 cosmetic docutils RST `Unexpected indentation`. **No `res_users.notification_type` / issue-157 error at fresh install.**
+
+DB-schema facts (psql):
+
+- `ir_model_fields` `res.partner.shopify_connector_email_normalized`: **store=t, index=t, readonly=t**, ttype=char.
+- Physical column present (`character varying`, nullable); **btree** index `res_partner__shopify_connector_email_normalized_index` = `CREATE INDEX … USING btree (shopify_connector_email_normalized)`.
+- All 4 modules `installed` (sale 19.0.1.0.0, core 19.0.1.6.0, product 19.0.1.0.0, adams_base 19.0.1.0).
+- **CORE-R2 Foundation Slice 1 schema present**: `shopify_connector_call_lease`, `shopify_connector_location` (+ store/job/binding/credential/settings/log) — 10 `shopify_connector%` tables, 17 connector models; `customer_import_sync` `job_type` seam registered.
+- Standard/opt-in tag separation proven at build: **32** `TestCustomerMatchingScalability` methods ran; `TestCustomerMatchingBenchmark`/`TestCustomerMatchingConcurrency`/`[TASK-011B-BENCHMARK]` = **0** occurrences.
+
+**Fresh install (build-time `-i`) and the post-init `-u` reruns (§18.3) are recorded as distinct facts** — the fresh install is green with no #157; the `-u shopify_connector_core` rerun exposes the #157 artifact.
+
+### 18.3 Standard suites — reruns (LOOP 2)
+
+Each rerun: `odoo-bin -u <module> --test-enable --stop-after-init --no-http` (`-u` is required — `TestCustomerMatchingScalability` is an at_install class).
+
+| Suite | `odoo.tests.result` | stats | WARN | SQL bad-query | Classification |
+| --- | --- | --- | --- | --- | --- |
+| `shopify_connector_core` | **0 failed, 6 error(s) of 264** | 159 tests / 1.05s / 1986 q | 1 | 17 | **6 = issue-157**; 11 expected-neg |
+| `shopify_connector_product` | **0 failed, 0 error(s) of 53** | 61 / 1.45s / 2472 q | 0 | 6 | all expected-neg |
+| `shopify_connector_sale` (011B) | **0 failed, 0 error(s) of 80** | 90 / 1.09s / 1595 q | 0 | 5 | all expected-neg |
+
+Sale (Task 011B) rerun: **all 32** `TestCustomerMatchingScalability` methods ran; benchmark/concurrency correctly **absent** (0/0); **0 WARNING**; 5 expected-negative SQL — 2 UNIQUE dup-key (`store_partner_uniq`, `store_shopify_gid_uniq`) + 3 NOT-NULL (partner_id/shopify_gid/store_id) on `shopify_connector_customer_binding`, all traceable to `test_binding_uniqueness_constraint_backstop` and the binding-constraint tests (all passing `assertRaises`). Re-confirmed green **again** after all §18.6–§18.8 runtime operations: `0 failed, 0 error(s) of 80`, 32 methods, 0 warnings.
+
+### 18.4 Focused 32-method class (LOOP 2/3)
+
+`TestCustomerMatchingScalability` — **all 32** standard methods executed and passed (field store/index/readonly; compute `email_normalize(strict=False)`; create/change/clear/archived recompute; active + archived corpus equivalence vs the retained old-path reference; wrapped/mixed-case/unicode/shared-ambiguity recall; existing-binding shortcut; single-active bind; >1-active `ambiguous_match`; candidate cap 20; archived-only `duplicate_risk`; blind-create block; `binding_conflict`; uniqueness backstop; sequential post-commit conflict; 7 AST source guards; sanitized-diagnostic; INSERT-predicate). This directly proves LOOP 3's matching-correctness list (null/empty, wrapped display-name, mixed-case, non-ASCII, active lookup, archived fallback, ambiguous active/archived, exact candidate-set equivalence, indexed column usage, routing/binding-uniqueness identical, no full Python scan).
+
+### 18.5 Indexed-lookup EXPLAIN evidence (LOOP 3/6) — on a persistent 100k corpus
+
+A deterministic **committed** 100,000-partner corpus (`user.<idx>@bpersist011b.example`, 70k active / 30k archived) was created for meaningful plan evidence, `ANALYZE`d (honest stats: `reltuples=100044`, `relpages=5823`), then removed (§18.8).
+
+| Path (mirrors the importer domain) | Plan | Est/actual rows | Exec time | Buffers |
+| --- | --- | --- | --- | --- |
+| Active-hit (`= v AND active`) | **Index Scan** on `res_partner__shopify_connector_email_normalized_index` | 1 / 1 | **0.029–0.036 ms** | 4 pages |
+| Archived fallback (`= v AND NOT active`) | **Index Scan** (same index, `Filter: NOT active`) | 1 / 1 | **0.030 ms** | 4 pages |
+| Forced seq scan (the removed O(n) full scan) | Seq Scan, **Rows Removed by Filter: 100,043** | — / 1 | **28.564 ms** | 5823 pages |
+
+Planner cost: index scan **2.44** vs seq scan **5823** (~2400× cheaper). The candidate lookup uses the btree index and touches 4 pages — **no sequential full-partner scan** on the lookup path; the seq-scan contrast quantifies exactly the O(n) work Task 011B eliminated.
+
+### 18.6 Genuine independent-transaction concurrency — DETERMINISTIC FAIL, classified ENVIRONMENT LIMITATION (LOOP 4/5) — GATE OPEN
+
+Invocation: `odoo-bin -u shopify_connector_sale --test-enable --test-tags shopify_connector_customer_matching_concurrency --stop-after-init --no-http`. Tag isolation confirmed: only `test_genuine_independent_transaction_binding_race` runs (post_install, `-standard`, `-at_install`).
+
+**Result: 4/4 runs FAIL deterministically** at `assertTrue(obs['worker_done'])` — *"worker did not finish within the bounded join timeout"* — after ~180s of bounded-timeout exhaustion. This is **not** an intermittent failure hidden behind later passes; it is deterministic and reported as such.
+
+Root cause (proven, not inferred):
+
+- Worker B blocks and never completes; its transaction surfaces `ERROR: could not serialize access due to concurrent update` on `UPDATE shopify_connector_job … WHERE id=<job>` only at process shutdown (Odoo cursors run **REPEATABLE READ**). The job nonetheless reaches the **correct terminal state every run** — `blocked_manual_review` / `binding_conflict`, **exactly 1 surviving binding, 1 partner** — so the **Task 011B production matching/routing logic is correct**; only the harness's independent-transaction liveness fails.
+- **Not the drain cron:** `ir.cron` id 3 *"Shopify Connector: Job Dispatch Drain"* (5-min, background `dev=reload` server) was temporarily disabled (`active=false`) and the failure persisted identically.
+- **Not the registry-change signal:** re-running **without `-u`** (no *"Registry changed, signaling"* emitted) still failed identically.
+- **Not the database:** a standalone two-connection `psycopg2` **positive control** proved this DB fully supports the race — independent connections get **distinct backends** (A_pid≠B_pid), `pg_blocking_pids(B)` correctly attributes the block to **A**, and B unblocks with `UniqueViolation` the instant A commits (2.0s).
+- **Environment topology:** the odoo test process's DB backends are **invisible in `pg_stat_activity`** to any external monitor (both psql and psycopg2 — 0 non-webshell backends observed across a 95s live monitor), while my own connections are fully visible. The Odoo.sh dev DB fronts odoo's connections behind a pooler/namespace domain, so the harness's in-process `pg_blocking_pids`/`pg_stat_activity` lock-attribution across mutually-visible independent backends **cannot function**, and B never observes its release within the bounded window.
+
+**Classification: environment limitation.** The harness is explicitly *"authored to run under an explicit tag on a runtime host"* — a dedicated test DB with direct, mutually-visible backends. This shared/pooled Odoo.sh dev build is not that host. **No harness logic defect and no Task 011B production defect is implied** (positive DB-semantics control + correct final state). Per LOOP 9 the harness was **not modified** (no proven in-scope defect; modifying it to tolerate the pooled topology would be scope creep and could weaken the accepted genuine-race guarantees). **LOOP 5 three-clean-runs cannot be satisfied here; the concurrency gate remains OPEN for a dedicated runtime host**, consistent with the standing SRR-03/04/09 concurrency caveat the test docstring already restates.
+
+### 18.7 100,000-partner benchmark — PASS (LOOP 6)
+
+Invocation: `… --test-tags shopify_connector_customer_matching_benchmark`; **exit 0, `0 failed, 0 error(s)`**; ran 86.35s. (Being a single-transaction `TransactionCase`, it did **not** serialization-fail — confirming §18.6 is specific to the multi-connection machinery.)
+
+**Exact corpus (in-Python counters == marker-scoped DB cross-check, both asserted):** total **100000**, active **70000**, archived **30000**, shared **1500**, wrapped **10500**, ordinary **88000**, non-null normalized **100000**.
+
+**Exact 1,000-probe mix (asserted):** active-hit **700**, archived-hit **150**, miss **100**, ambiguous **50**.
+
+**Measurements (emitted, not asserted):** corpus generation **80.897s**; 1,000-probe total **0.445s** → avg **0.445 ms**, throughput **2249.09 cust/s**; latency **p50 0.328 ms / p95 0.934 ms / max 1.296 ms**; in-test recompute backfill proxy **4.44s** (`status=measured`); `backfill_authoritative=PENDING`. Budgets (p95 ≤ 50 ms, ≥ 20 cust/s, backfill ≤ 600 s) are emitted only and are all met with wide margin — no SLA is asserted or invented.
+
+### 18.8 Backfill / module-upgrade measurement (LOOP 7) — proxy + genuine single-DB `-u`; authoritative isolated-build GATE OPEN
+
+Three distinct, clearly-separated tiers:
+
+1. **In-test ORM recompute proxy:** **4.44s** (§18.7) — least authoritative (`modified()` + `flush_all()` + materialize).
+2. **Genuine single-DB module-upgrade backfill (real `-u`):** on the persistent 100k corpus the `shopify_connector_email_normalized` column (+ its index) was dropped, then `odoo-bin -u shopify_connector_sale` was run. Odoo's actual module lifecycle **recreated the column, recreated the btree index, and backfilled all 100,000 rows** (verified: `column_exists=1`, `index_exists=1`, `corpus_non_null_normalized=100000`, `corpus_null_normalized=0`, sample value correct). Sale-module load **4.93s / 1231 q** vs a no-backfill baseline **0.12s / 122 q** → **isolated backfill cost ≈ 4.81s** for column + index + 100k-row backfill. This **cross-validates** the recompute proxy (4.44s). It is a real `-u` backfill (not the proxy, not manufactured), but the source tree during the `-u` is HEAD with the column manually dropped, not a separate build at the base commit.
+3. **Fully-authoritative isolated base→head build upgrade: NOT PERFORMED — platform limitation.** The preferred method (a disposable build whose starting *code* is base `9128015`, advanced to head `9895919`, then `-u`) requires a second isolated Odoo.sh build/DB. This container is **linked to a single database and cannot create another** (AGENTS.md), and build provisioning is user/control-room-triggered, not agent-triggered. **This authoritative gate remains OPEN**, to be closed by the control room on a provisioned isolated build. Tier 2 is **not** claimed as a substitute; the requirement is not weakened or renamed.
+
+### 18.9 Warning inventory (LOOP 10)
+
+| Phase | WARNING lines |
+| --- | --- |
+| Fresh build install | **0** |
+| `-u shopify_connector_core` rerun | **1** — `odoo.schema: Missing not-null constraint on res.users.notification_type` (issue-157 schema-reconciliation, base `res.users`, out of scope) |
+| `-u shopify_connector_product` rerun | **0** |
+| `-u shopify_connector_sale` rerun (incl. final re-verify) | **0** |
+| 100k benchmark | **0** |
+
+### 18.10 SQL ERROR-level inventory (LOOP 10)
+
+All SQL `odoo.sql_db: bad query` ERROR lines are traced to a specific passing negative test or to issue-157:
+
+- **Expected negative-constraint SQL (passing `assertRaises`):** `shopify_connector_customer_binding` NOT-NULL (partner_id, shopify_gid, store_id) + UNIQUE (`store_partner_uniq`, `store_shopify_gid_uniq`) — from `test_binding_uniqueness_constraint_backstop` / binding-constraint tests; `shopify_connector_product_*_binding` NOT-NULL — product negative tests. Present in fresh install, sale rerun (5), product rerun (6), and inside the core rerun (11).
+- **Issue-157 (unexpected, known artifact):** 6× `null value in column "notification_type" of relation "res_users" violates not-null constraint`, only under `-u shopify_connector_core` (§18.11).
+- **Environment-limited concurrency (§18.6):** `could not serialize access due to concurrent update` + `current transaction is aborted` on the synthetic job / job_log at shutdown — job state metadata only, **no customer PII / token / GraphQL body** (leak audit §18.12).
+
+No SQL error is called "expected" without a passing negative test behind it.
+
+### 18.11 Issue #157 classification (separate, NOT fixed)
+
+The `-u shopify_connector_core` rerun produced **6 errors of 264** — all `setUpClass` failures with the identical root cause `psycopg2.errors.NotNullViolation: null value in column "notification_type" of relation "res_users"`, in six **core** test classes: `TestConnectionLifecycle`, `TestCredentialAccess`, `TestCredentialService`, `TestJobLogSystemAppend`, `TestReadinessSlotClosure`, `TestTestConnection`. Each calls `cls._create_group_user()` → `res.users.create({…})` without `notification_type`; on the `-u` schema-reconciliation the base `res.users` NOT-NULL column default is not applied (traceback preserved: `res_users.py:1357 → 580 → models.py:4711/4887`). This is **issue #157** — a base-Odoo `res.users` artifact in **core** test fixtures, exposed only by the core update lifecycle. It is **exclusive to `-u shopify_connector_core`** (product, sale, benchmark reruns had **0** notification_type errors — Task 011B is fully orthogonal). Classified as the **known issue-157 artifact**; **not fixed** (out of Task 011B scope; LOOP 9 forbids touching core). A green fresh install (§18.2, no #157) and this post-init `-u core` #157 artifact are recorded as **two distinct facts**.
+
+### 18.12 Cleanup + leak audit (LOOP 11) — CLEAN
+
+Environment controls applied and reverted: `ir.cron` id 3 was temporarily disabled during the concurrency/benchmark runs and **restored** (`active=true`, nextcall reset forward); the persistent 100k corpus was created and **deleted** (`VACUUM ANALYZE res_partner`). Post-run synthetic-residue sweep — **all zero**: corpus partners, benchmark partners, race partners/stores, customer bindings (0 total), `customer_import_sync` jobs, idle-in-transaction backends. Final DB size 164 MB.
+
+Leak audit across all run logs: **0** Shopify tokens / auth headers / bearer (excluding the intentional in-test sentinel), **0** email-like strings (no customer PII, synthetic or real), **0** GraphQL bodies (the 3 "graphql" hits are test-method names). The only raw SQL in any log is job/job_log state-transition metadata (4 INSERT + 4 UPDATE), carrying no PII/credentials — consistent with the harness's type-only sanitized-diagnostic design.
+
+### 18.13 Runtime corrections & gates
+
+- **Runtime defects found in Task 011B production/test code: NONE.** No code changed this session (LOOP 9 no-op). No correction commit.
+- **Concurrency gate: OPEN** — requires a dedicated runtime host (§18.6).
+- **Authoritative isolated base→head build backfill: OPEN** — requires a control-room-provisioned second build (§18.8 tier 3).
+- **Live Shopify validation: OPEN** — depends on CORE-R2 (no live request made).
+- **SRR-03: OPEN.** Full CORE-R2 completion **not** claimed.
+- **PR #150: open, draft, unmerged** — not marked ready, not merged.

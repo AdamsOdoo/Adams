@@ -1,5 +1,73 @@
 # Research Handoff (rolling)
 
+### Task 011B — EXACT-HEAD ODOO.SH RUNTIME CLOSURE (build 34844515 @ `9895919`; draft PR #150, 2026-07-13)
+
+- **Session role:** runtime-closure operator. Executed the Task 011B runtime
+  matrix **for the first time** inside the authorized Odoo.sh dev build for the
+  **exact validated code SHA `9895919a6cc191cb24f694c1b601a0304fedda15`** (Odoo
+  19.0, build **34844515**, DB
+  `adamsmen-claude-task-011b-customer-matching-k5ux9b-34844515`, PostgreSQL
+  16.14). Build-to-commit proven by `git rev-parse HEAD` = `9895919` (tree clean;
+  base `9128015` proven ancestor; net scope = exactly the 8 Task 011B files; no
+  PR #151 / issue-157 file). **No code changed** — docs-only evidence closure
+  (LOOP 9 no-op; no Task 011B defect found).
+- **Fresh install (build-time `-i`) — GREEN:** `0 failed, 0 error(s) of 357
+  tests`, **0 WARNING**; field `store/index/readonly=t/t/t` with a real
+  `character varying` column + a `USING btree` index
+  (`res_partner__shopify_connector_email_normalized_index`); CORE-R2 Foundation
+  schema present (`call_lease`, `location`); build-time standard/opt-in tag
+  separation proven (32 scalability methods ran; benchmark/concurrency = 0).
+- **Standard-suite `-u` reruns:** product `0/53`; **sale (011B) `0 failed, 0
+  error(s) of 80`, all 32 `TestCustomerMatchingScalability` methods, 0 WARNING**
+  (re-confirmed green again after all runtime ops). `-u shopify_connector_core`
+  = `0 failed, 6 error(s) of 264` — all six are the **issue-157**
+  `res_users.notification_type` NOT-NULL `setUpClass` artifact (base-Odoo
+  `res.users`, orthogonal to Task 011B), classified separately, **not fixed**.
+- **100k benchmark — PASS:** exact in-Python+DB corpus
+  `100000/70000/30000/1500/10500/88000/100000`, exact probe mix `700/150/100/50`;
+  p50 0.328 ms / p95 0.934 ms / max 1.296 ms; 2249 cust/s; recompute proxy 4.44 s.
+- **EXPLAIN (100k corpus):** Index Scan on
+  `res_partner__shopify_connector_email_normalized_index` (0.029 ms, 4 pages, cost
+  2.44) vs forced Seq Scan (28.6 ms, 100 043 rows removed, 5823 pages, cost 5823)
+  — no full-partner scan on the lookup path.
+- **Backfill:** genuine single-DB `-u shopify_connector_sale` after dropping the
+  column recreated column+index and **backfilled all 100 000 rows** (≈4.81 s
+  isolated; cross-validates the 4.44 s proxy). The **fully-authoritative isolated
+  base→head build upgrade is NOT available** (single linked DB; agent cannot
+  provision a second build) → that gate stays **OPEN**.
+- **Two OPEN gates (reported, not hidden):** (a) **genuine concurrency proof
+  deterministically fails (4/4)** — root-caused to an **environment limitation**
+  (Odoo backends invisible in `pg_stat_activity` on this shared/pooled dev DB; a
+  standalone `psycopg2` positive control proves the DB itself supports the race
+  with correct `pg_blocking_pids` attribution and lock-release-on-commit; the job
+  reaches the correct terminal `blocked_manual_review`/`binding_conflict` with
+  exactly one binding every run — Task 011B production logic is correct). The
+  harness (authored for a dedicated runtime host) was **not modified** (no proven
+  in-scope defect). (b) authoritative isolated-build backfill (above).
+- **Cleanup/leak:** zero synthetic residue (corpus/benchmark/race/bindings/jobs
+  all 0); `ir.cron` id 3 temporarily disabled during runs and **restored**; leak
+  audit clean (0 tokens, 0 customer emails, 0 GraphQL bodies; only job-metadata
+  SQL). No live Shopify request.
+- **PR / gate state:** PR **#150** kept **draft, unmerged, not ready**; docs-only
+  evidence commit advances the branch head. Evidence:
+  `../05-qa/task-011b-validation-results.md` §18; AR-045 exact-head note.
+  **SRR-03 remains OPEN; live Shopify validation not performed.**
+- **Exact next-session prompt (control room):** "Review PR #150's exact-head
+  runtime closure (validation-results §18, AR-045 note, this handoff): validated
+  code SHA `9895919`, build 34844515, fresh install green (357/0), sale suite
+  green (80/0, 32 methods), 100k benchmark PASS with exact corpus/probe mix,
+  EXPLAIN index-scan proof, genuine single-DB backfill ≈4.81 s. Decide: (a) accept
+  the runtime evidence and keep the concurrency gate OPEN pending a **dedicated
+  runtime host** (the shared/pooled Odoo.sh dev DB cannot run the genuine
+  independent-transaction proof — environment limitation, DB-semantics positive
+  control passed, Task 011B logic proven correct via correct terminal state); (b)
+  decide whether to provision an **isolated base→head build** for the
+  fully-authoritative 100k backfill duration; (c) route the pre-existing
+  `res_users.notification_type` issue-157 artifact to its non-Task-011B owner
+  (unchanged, out of scope); (d) whether to authorize the next task. Do not mark
+  PR #150 ready or merge, and do not perform live Shopify validation, without an
+  explicit control-room act."
+
 ### CORE-R2 — Foundation Slice 1 EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34818964 @ `c0d4559`; draft PR #156, 2026-07-13)
 
 - **Session role:** runtime-closure operator. Re-ran the complete runtime matrix
