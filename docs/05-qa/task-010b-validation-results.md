@@ -1,19 +1,27 @@
 # Task 010B — Product Import Completeness: Validation Results
 
-> **Status: draft-PR validation record. Implementation session output,
-> awaiting ChatGPT review.** Produced 2026-07-11 by the Task 010B
-> implementation session against the OPEN gate (PR #149 comment
-> `4948723366`). **Revised 2026-07-12** per control-room static reviews
-> `4950202231` (§0), `4950339305` (§0b), `4951145191` (§0c), and the
-> **runtime correction `4680380218`** (§0d — first Odoo.sh build RED from
-> non-isolated global attribute fixtures; fixtures corrected, rerun pending).
-> Odoo.sh and live/dev-store evidence are **not** part of this session (no
-> Odoo runtime and no Shopify credentials are available here) and remain
-> mandatory before merge acceptance (§10 below). The Odoo.sh standard-runtime
-> gate is **OPEN**. **Base-aligned again 2026-07-13** to `Shopify-connector` @
-> `9128015` (PR #156, CORE-R2 Foundation Slice 1 — merged and
-> runtime-validated at its own head; SRR-03 stays fully OPEN) — base-alignment
-> session only, no runtime executed, no production behaviour changed (§0g).
+> **Status: draft-PR validation record — exact-head Odoo.sh runtime
+> executed and green.** Produced 2026-07-11 by the Task 010B implementation
+> session against the OPEN gate (PR #149 comment `4948723366`). **Revised
+> 2026-07-12** per control-room static reviews `4950202231` (§0),
+> `4950339305` (§0b), `4951145191` (§0c), and the **runtime correction
+> `4680380218`** (§0d — first Odoo.sh build RED from non-isolated global
+> attribute fixtures; fixtures corrected). **Base-aligned again 2026-07-13**
+> to `Shopify-connector` @ `9128015` (PR #156, CORE-R2 Foundation Slice 1 —
+> merged and runtime-validated at its own head; SRR-03 stays fully OPEN) —
+> that base-alignment step ran no tests and changed no production behaviour
+> (§0g). **Runtime-executed 2026-07-13 (§0h; control-room runtime evidence
+> review `4684937290`):** the exact-head Odoo.sh runtime ran on **build
+> `34828304`** for **validated code SHA
+> `db534f833cf3636184681801dcd7e13636e09245`** — build-time fresh
+> installation is green (`0 failed, 0 error(s) of 433 tests`); the post-init
+> `shopify_connector_product` standard suite is green (`0 failed, 0
+> error(s) of 161 tests`); the opt-in `sc010b_performance` harness is
+> **executed and green** (`0 failed, 0 error(s) of 4 tests`; §9/§0h). Issue
+> **#157** (seven `res.users.notification_type` `setUpClass` errors in
+> core/sale) remains tracked **separately** and unfixed here. **Live/
+> dev-store Shopify evidence remains outstanding** and gated on CORE-R2 /
+> **SRR-03**, which **stays OPEN**. **PR #151 remains draft and unmerged.**
 
 ---
 
@@ -1563,120 +1571,174 @@ source-level declared-write guard).
 
 ## 9. Performance evidence
 
-Not measured in this session (no Odoo runtime, no dev store). The N+1
-per-variant full-table scans are removed by construction (one prefetch +
-batched candidate searches per product). The p95 budgets (100-variant
-≤10 s excl. images; ≤60 s incl. images) and the 2,048-variant timing probe
-are dev-store measurements deferred to the runtime validation session
-(§10). No optimization weakened duplicate protection, merchant-edit
-protection, or atomicity.
+> **Status: executed and GREEN (§0h; control-room runtime evidence review
+> `4684937290`).** The opt-in `sc010b_performance` harness ran on Odoo.sh
+> build `34828304` at validated code SHA
+> `db534f833cf3636184681801dcd7e13636e09245`: `0 failed, 0 error(s) of 4
+> tests` (6 tests, 25.69 s, 31144 queries). Verbatim per-test evidence is
+> recorded in §0h; this section is the current authoritative summary.
 
-## 10. Mandatory runtime/live evidence still outstanding (honest)
+- **100-variant DB-phase measurement:** `elapsed_seconds=1.3845`,
+  `query_count=1673`, 100 supplied variants ≡ 100 Odoo variants ≡ 100
+  variant bindings, one attribute created, no duplicate variant GIDs.
+- **2,048-variant DB-phase measurement:** `elapsed_seconds=23.8545`,
+  `query_count=28967`, 2,048 supplied variants ≡ 2,048 Odoo variants ≡
+  2,048 variant bindings, declared cartesian space **2,112** (two options,
+  64 × 33), **no cartesian phantom variants** (2,048 == 2,048, strictly
+  less than the declared 2,112 — a cartesian bug would have produced
+  2,112).
+- **Isolated-process observation** (2,048-variant run alone, `/usr/bin/time
+  -v`): maximum RSS **≈133 MB** (136,748 kB), **zero major page faults**
+  (no swapping), wall clock 0:35.90 (≈7 s registry load + ≈23.6 s DB
+  phase).
+- **Lock/conflict/retry:** **four clean runs total** (1 combined run + 3
+  stability repetitions), each `0 failed, 0 error(s) of 1 tests`, **zero**
+  deadlocks, serialization failures, statement/lock timeouts, or residue;
+  post-test query count invariant at 272.
+- **Two-job `run_drain`:** **four clean runs total** (1 combined run + 3
+  stability repetitions), each `0 failed, 0 error(s) of 1 tests`, **exactly
+  two jobs** and **exactly two** patched `api.client.execute` seam calls
+  per run, **no external network** possible
+  (`requests.sessions.Session.request` patched to raise if invoked), and
+  **zero residue** after each run (fresh bounded-connection verification);
+  post-test query count invariant at 219.
 
-> **Runtime-closure update (2026-07-13, §0h).** The Odoo.sh three-suite run
-> **and** the opt-in performance harness were **executed on the authorized
-> Odoo.sh build 34828304 at the exact head `db534f8`** and are **GREEN** (see
-> §0h for verbatim results). The "Odoo.sh three-suite run: NOT executed" and
-> "opt-in performance harness: not executed" statuses recorded below are
-> therefore **closed for head `db534f8`** (subject to control-room review). The
-> only runtime evidence still outstanding is the **live/dev-store (read-only)
-> Shopify** set, which stays gated on CORE-R2 SRR-03 being closed. **SRR-03
-> remains OPEN; issue #157 stays separate; PR #151 stays draft/unmerged.** The
-> historical head references below (`b0d8c7b`, `7ade1f8`) predate §0h; the
-> validated head is `db534f8`.
+**These are measurements, not performance SLAs.** No latency/throughput
+threshold is asserted or implied by any figure above — no `_seconds`/
+`elapsed`/`query_count` value is compared against a numeric threshold
+anywhere in the harness. **Live Shopify / dev-store timings remain
+unexecuted:** the numbers above come from the isolated Odoo.sh build only;
+end-to-end dev-store latency (including real network/API round-trips) is
+not measured here and remains part of the outstanding live/dev-store
+evidence in §10.
 
-**Base-alignment note (2026-07-13, this session — full detail in §0g).**
-The branch is now aligned to `Shopify-connector` @
-`912801508155c6358e8f5f1a7a0aaf01ae573675` (merge commit for PR #156,
-CORE-R2 Foundation Slice 1, merged and runtime-validated at its own head)
-via normal merge commit `5aea659ff7ec09f6940e8eabdc29b1a5c7a9332b`. **This
-was a base-alignment session only: no runtime test was executed here, no
-Task 010B production behaviour changed (§0g net-diff proof), and every gate
-below stays exactly as open as it already was.** Every head reference below
-(`b0d8c7b`, and the "corrected head" language from §0d) is now further
-downstream of the current branch tip; any future Odoo.sh rerun must target
-the current aligned head recorded in §0g, not `7ade1f8` or any earlier head.
-**Full SRR-03 (disconnect-quiescence) remediation remains OPEN** — CORE-R2
-Foundation Slice 1 only lands the dormant admission-lease mechanism, with no
-production call-site activation. **Issue #157** (seven post-init
-`res.users.notification_type` `setUpClass` errors) is a separate,
-base-Odoo-19 artifact tracked outside this PR and may still appear in any
-post-init rerun of this branch's suites — it is not fixed or absorbed here.
-**PR #151 remains draft and unmerged.**
+## 10. Runtime closure and remaining live evidence
 
-**Runtime-correction note (2026-07-12, review `4680380218`).** The first
-observed Odoo.sh build (`…-34797217`, Odoo 19.0) was **RED** —
-`1 failed, 4 error(s) of 329 tests` — and the suite halted after five
-failures caused by **non-isolated global product-attribute fixture names**
-(§0d records the verbatim evidence, the five failures, the root cause, the
-unchanged production policy, the exact tests corrected, and the full
-seven-file audit). The fixtures are corrected in this session; **the Odoo.sh
-rerun is still pending and no green result is claimed.** Head references
-below (`b0d8c7b`) predate the CORE-R2 base merge (`ce504f`) and the fixture
-correction; the rerun must target the corrected head.
+> **CLOSED FOR `db534f8`** (§0h; control-room runtime evidence review
+> `4684937290` accepts the Odoo.sh runtime execution itself as strong and
+> authoritative for this exact validated code SHA):
+>
+> - fresh installation — build-time `-i` of all four modules + demo:
+>   `0 failed, 0 error(s) of 433 tests`;
+> - core/product/sale post-init execution and classification — product:
+>   **`0 failed, 0 error(s) of 161 tests`**; core `0 failed, 6 error(s) of
+>   131 tests` and sale `0 failed, 1 error(s) of 41 tests`, all seven errors
+>   independently classified as the separate **issue #157**
+>   `res.users.notification_type` artifact, zero Task 010B defects;
+> - Task 010B focused tests — `0 failed, 0 error(s) of 36 tests` (focused
+>   re-run of the three highest-value classes; the full 161-method product
+>   suite executed green);
+> - 100-variant measurement (§9);
+> - 2,048-variant measurement (§9);
+> - lock/conflict/retry stability — four clean runs total (§9);
+> - two-job `run_drain` stability — four clean runs total (§9);
+> - cleanup and leakage verification — zero synthetic residue across every
+>   category and zero credential/token/GraphQL-body/media-byte leakage
+>   across every run log (§0h).
+>
+> **STILL OPEN:**
+>
+> - live/dev-store read-only Shopify fixtures — no live Shopify request has
+>   been made in any session; remains unauthorized until CORE-R2 is
+>   runtime-green;
+> - end-to-end CORE-R2 / **SRR-03** prerequisite — **SRR-03 remains fully
+>   OPEN**; CORE-R2 Foundation Slice 1 lands only the dormant admission-
+>   lease mechanism, with no production call-site activation yet;
+> - **issue #157** separate investigation — the seven post-init
+>   `res.users.notification_type` `setUpClass` errors are tracked outside
+>   this PR, not fixed or absorbed here;
+> - final merge authorization — **PR #151 remains draft and unmerged**; this
+>   record makes **no** claim that full CORE-R2 is complete and **no** claim
+>   that Task 010B may merge yet.
+>
+> The historical head references retained below (`b0d8c7b`, `7ade1f8`)
+> predate §0h; the validated head is `db534f8`.
 
-**Validation session note (2026-07-12, acceptance `4951264328`).** The
-control-room review accepted the four Revision-3 corrections and authorized
-the **base-alignment + Odoo.sh runtime validation** session. In this session:
+**Base-alignment note (2026-07-13, full detail in §0g).** The branch is
+aligned to `Shopify-connector` @ `912801508155c6358e8f5f1a7a0aaf01ae573675`
+(merge commit for PR #156, CORE-R2 Foundation Slice 1, merged and
+runtime-validated at its own head) via normal merge commit
+`5aea659ff7ec09f6940e8eabdc29b1a5c7a9332b`. That base-alignment session ran
+no runtime test and changed no Task 010B production behaviour (§0g net-diff
+proof). *(Historical record — superseded by §0h: that session's "every gate
+below stays exactly as open as it already was" framing predates the runtime
+execution. The Odoo.sh runtime gate has since executed and closed for head
+`db534f8`; the live/dev-store gate and SRR-03 were, and remain, open.)*
+**Full SRR-03 (disconnect-quiescence) remediation remains OPEN.** **Issue
+#157** is a separate, base-Odoo-19 artifact tracked outside this PR and may
+still appear in any post-init rerun of this branch's suites — it is not
+fixed or absorbed here. **PR #151 remains draft and unmerged.**
+
+**Historical record — superseded by §0h. Runtime-correction note
+(2026-07-12, review `4680380218`).** The first observed Odoo.sh build
+(`…-34797217`, Odoo 19.0) was **RED** — `1 failed, 4 error(s) of 329 tests`
+— and the suite halted after five failures caused by **non-isolated global
+product-attribute fixture names** (§0d records the verbatim evidence, the
+five failures, the root cause, the unchanged production policy, the exact
+tests corrected, and the full seven-file audit). The fixtures were
+corrected in that session; at the time, the Odoo.sh rerun was still pending
+and no green result was claimed. **The rerun has since executed at head
+`db534f8` and is GREEN (§0h).** The head reference in this note (`b0d8c7b`)
+predates the CORE-R2 base merge (`ce504f`), the fixture correction, and the
+further base-alignment to `9128015`; it is retained only as historical
+context.
+
+**Historical record — superseded by §0h. Validation session note
+(2026-07-12, acceptance `4951264328`).** The control-room review accepted
+the four Revision-3 corrections and authorized the base-alignment + Odoo.sh
+runtime validation session. In that session:
 
 - **Base alignment: DONE.** `Shopify-connector` (`65e915a`, PR #152) was
   merged into the branch with a normal merge commit (`b0d8c7b`, no
   rebase/force); the sole `research-handoff.md` conflict was resolved
   preserving both the U0 and Task 010B entries; all U0 artifacts are added
-  unchanged; the PR diff vs `65e915a` is Task-010B-only (verified). Validated
-  head = `b0d8c7be43e7d7e32d2344355b96cf0dd246f636`.
-- **Odoo.sh three-suite run: NOT executed or observed in this session, and
-  therefore NOT recorded as evidence.** This Git execution environment has
-  **no Odoo runtime** (`import odoo` → `ModuleNotFoundError`; no
-  `odoo`/`odoo-bin` on PATH), **no Odoo.sh access** (no Odoo.sh CLI, no
-  credentials/env), and the PR head carries **no CI check-run or commit
-  status** (`get_check_runs` total 0; combined status has zero contexts; the
-  repo has no `.github/workflows`). No Odoo.sh build output was provided to
-  this session to record. Per project governance (no faked evidence), the
-  verbatim three-suite summary is **left blank and outstanding** rather than
-  fabricated. The Odoo.sh run must be executed/observed on the Odoo.sh
-  platform (by the control room / project owner) at head `b0d8c7b`, and its
-  verbatim `0 failed / 0 error(s)` totals + build identity recorded here.
+  unchanged; the PR diff vs `65e915a` was Task-010B-only (verified).
+  Validated head at that time = `b0d8c7be43e7d7e32d2344355b96cf0dd246f636`.
+- **Odoo.sh three-suite run: at that time, NOT executed or observed in
+  that session**, for the reasons recorded verbatim at the time (no Odoo
+  runtime, no Odoo.sh access, no CI check-run/commit status in this Git
+  execution environment). **This has since been executed and is GREEN at
+  head `db534f8` (§0h).** The head `b0d8c7b` referenced in this note is
+  superseded by every later base-alignment (§0d, §0g) and by the runtime
+  execution itself.
 
-Not obtained this session and **required before merge acceptance**:
+**Runtime evidence — current status:**
 
-- **Odoo.sh:** full three-suite run (`shopify_connector_core`,
-  `shopify_connector_product`, `shopify_connector_sale`) with exact
-  verbatim totals, **0 failed / 0 error** — **at head `b0d8c7b`** (see the
-  validation-session note above: not executable/observable from this Git
-  session).
-- **Live/dev-store (read-only):** three-option sparse product; a >100-
-  variant product; the one 2,048-variant timing probe; product + variant
-  images with refresh + merchant-image-protection; an archived product; a
-  deleted bound product; an incompatible same-name Odoo attribute.
+- **Odoo.sh:** the full three-suite run (`shopify_connector_core`,
+  `shopify_connector_product`, `shopify_connector_sale`) has been
+  **executed** at the validated head `db534f8`, build `34828304`, with
+  verbatim totals recorded in §0h — product green (`0 failed, 0 error(s)
+  of 161 tests`); the seven core/sale errors are the separate issue #157
+  artifact, not a Task 010B defect. *(Historical: this bullet previously
+  read "NOT obtained this session... at head `b0d8c7b`"; superseded by
+  §0h.)*
+- **Live/dev-store (read-only): still outstanding.** Three-option sparse
+  product; a >100-variant product; the one 2,048-variant timing probe;
+  product + variant images with refresh + merchant-image-protection; an
+  archived product; a deleted bound product; an incompatible same-name
+  Odoo attribute. None of this has been executed against a live Shopify
+  store or dev store in any session; it remains gated on CORE-R2 /
+  **SRR-03** runtime-green.
 - **Lock-hold / throughput measurement (review `4950339305` item 5):**
-  because the singleton attribute lock is transaction-scoped (held to outer
-  commit, §0b.5), measure on Odoo.sh / dev-store the lock-hold duration, a
-  competing import's retry/back-off behaviour, a structured product import
-  inside a multi-job `run_drain` transaction, and the DB-phase timing at 100
-  and 2,048 variants. Throughput is **not** claimed proven here.
-  **Update (§0e/§0f, parallel authorization `4952270415`, corrected per
-  control-room reviews `4680634735`/`4680644496`):** an opt-in,
-  `sc010b_performance`-tagged harness now exists for every item in this
-  bullet — `addons/shopify_connector_product/tests/
-  test_product_runtime_performance.py` — authored, statically validated
-  (`py_compile`/`compileall` clean), with honest lock-timing labels,
-  bounded/verified cleanup, and deterministic `run_drain` isolation (§0f).
-  It is **not yet executed**: run it on
-  Odoo.sh with `--test-tags sc010b_performance` to obtain the actual
-  elapsed-time, query-count, and lock-hold-duration numbers, which this
-  file does not yet contain.
+  **executed and recorded (§9/§0h).** The opt-in `sc010b_performance`
+  harness (`test_product_runtime_performance.py`) ran on Odoo.sh and
+  produced the honest lock-hold/conflict-detection/retry timings and the
+  100-/2,048-variant DB-phase timings now recorded in §9. *(Historical:
+  this bullet previously read "not yet executed... which this file does
+  not yet contain"; superseded by §9/§0h — the numbers now exist.)*
+  Throughput under live/dev-store network conditions is still **not**
+  claimed proven here.
 
-**Runtime sequence (review `4951145191`):** (1) run the Odoo.sh full suites
-and quote the exact result; (2) the **live/dev-store Shopify fixtures are
-NOT yet authorized** — **CORE-R2 must be runtime-green before any live
-validation of a domain handler that calls Shopify**; (3) keep PR #151 draft
-and unmerged until the Odoo.sh evidence and the later authorized live-fixture
-evidence are reviewed.
+**Runtime sequence (review `4951145191`):** (1) **done** — the Odoo.sh full
+suites executed and the exact verbatim result is quoted in §0h; (2) the
+**live/dev-store Shopify fixtures are still NOT yet authorized** — CORE-R2
+must be runtime-green (SRR-03 closed) before any live validation of a
+domain handler that calls Shopify; (3) **PR #151 stays draft and unmerged**
+until the later authorized live-fixture evidence is obtained and reviewed.
 
 These are **not faked and not waived**. The PR is kept **draft**; a later
-validation-only session (or an explicit ChatGPT waiver recorded at gate
-time) closes them.
+live/dev-store-fixture session (or an explicit ChatGPT waiver recorded at
+gate time) closes the remaining gate.
 
 **Concurrency/lock accuracy note (honest, review `4950339305` item 5):** the
 lock is transaction-scoped — releasing the per-product savepoint does not
@@ -1751,12 +1813,14 @@ the revert. No destructive migration is part of this task.
       seven test files renamed to task-unique `SC010B ` names; production
       files byte-identical; test-method inventory unchanged (148); `py_compile`
       clean.**
-- [ ] **Odoo.sh green (verbatim) at the corrected head** — **still OPEN**; the
-      first build (`…-34797217`) was RED and the corrected suite has **not**
-      been rerun from this Git session (no Odoo runtime / Odoo.sh access) —
-      §0d + §10 runtime-correction note.
+- [x] **Odoo.sh green (verbatim) at the validated head `db534f8`** — the
+      first build (`…-34797217`) was historically RED (superseded, §10); the
+      corrected suite has since been **executed and is GREEN** at head
+      `db534f8`, build `34828304` (§0h): product `0 failed, 0 error(s) of
+      161 tests`; core/sale errors classified as the separate issue #157
+      artifact, zero Task 010B defects.
 - [ ] **Live/dev-store evidence** — outstanding; **live Shopify fixtures gated
-      on CORE-R2 runtime-green** (§10).
+      on CORE-R2 runtime-green / SRR-03** (§10).
 - [x] **Opt-in performance/evidence harness authored and control-room-
       corrected (§0e/§0f, parallel authorization `4952270415`, reviews
       `4680634735`/`4680644496`):**
@@ -1768,10 +1832,10 @@ the revert. No destructive migration is part of this task.
       feasibility), tagged `post_install`/`-at_install`/`-standard`/
       `sc010b_performance` (never runs in a standard suite); registered
       via `tests/__init__.py` only; zero production diff.
-- [ ] **Performance harness execution** — **still OPEN**; authored and
-      statically validated only, not run (no Odoo runtime in this Git
-      session); run with `--test-tags sc010b_performance` on Odoo.sh to
-      obtain the elapsed-time/query-count/lock-hold-duration evidence.
+- [x] **Performance harness execution** — **executed and GREEN** at head
+      `db534f8` (§0h/§9): `0 failed, 0 error(s) of 4 tests`; elapsed-time,
+      query-count, and lock-hold/conflict-detection-duration evidence
+      recorded in §9.
 - [x] **Base re-aligned to the current integration tip `9128015` (PR #156,
       CORE-R2 **Foundation Slice 1**, merged and runtime-validated at its own
       head, AR-047) via a normal merge commit `5aea659` (no rebase/force/
