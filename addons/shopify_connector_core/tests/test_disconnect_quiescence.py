@@ -213,6 +213,26 @@ class TestBusinessAdmission(TransactionCase):
         cls.store.write({'state': 'connected'})
         cls.env.flush_all()
 
+    def setUp(self):
+        super().setUp()
+        # CORE-R2 admission runs its gate/lease insert on a side transaction it
+        # opens itself via `self.env.registry.cursor()` (durable, independent —
+        # the invariant proven cross-connection by TestGenuineRealAdmission). A
+        # plain TransactionCase does NOT patch the registry, so that call returns
+        # a genuinely independent connection which cannot see this class's
+        # *uncommitted* fixture store/job — `_admit`'s `SELECT ... FOR SHARE`
+        # then finds `row is None` and fails closed with ShopifyQuiescedError.
+        # `enter_registry_test_mode` (Odoo's sanctioned mechanism) makes every
+        # `registry.cursor()` reuse the single test connection as a TestCursor,
+        # so the fixture and the committed lease are visible cross-cursor — the
+        # exact "TestCursor sharing the single test connection" this module's
+        # docstring relies on to prove the admission *logic*. It changes no
+        # production behaviour (real stores are committed) and is auto-left on
+        # teardown; genuine cross-connection independence stays proven by
+        # TestGenuineRealAdmission.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     def _make_job(self, store=None):
         store = store or self.store
         return self.env['shopify.connector.job.enqueue'].enqueue(
@@ -470,10 +490,18 @@ class TestBusinessAdmission(TransactionCase):
                 self.assertEqual(result['data'], {})
         self.assertEqual(seen['count_at_send'], 1)   # 9: committed before send
         self.assertEqual(seen['count_in_body'], 1)   # 10: visible in context
-        # 3b: opaque key (uuid4 hex; carries no store/job/token substring).
+        # 3b: opaque key. It is a genuine random uuid4 (version nibble == 4,
+        # RFC-4122 variant), so it encodes no store id, job id, or token and
+        # carries no recoverable business identity. NOTE: a decimal id such as
+        # `str(store.id)` (e.g. '15') can appear inside a random 32-char hex key
+        # purely by chance, so a substring assertion on the id is mathematically
+        # unsound and intermittently fails — the uuid4-version/variant check is
+        # the correct, deterministic opacity proof. The token is long and random,
+        # so its non-containment remains a valid (security-critical) guard.
         self.assertRegex(seen['key'], r'^[0-9a-f]{32}$')
-        self.assertNotIn(str(self.store.id), seen['key'])
-        self.assertNotIn(str(job.id), seen['key'])
+        parsed_key = uuid.UUID(seen['key'])
+        self.assertEqual(parsed_key.version, 4)
+        self.assertEqual(parsed_key.variant, uuid.RFC_4122)
         self.assertNotIn(DUMMY_TOKEN, seen['key'])
 
     # 11. Normal exit releases the lease.
@@ -564,18 +592,31 @@ class TestBusinessAdmission(TransactionCase):
             return real_release(client_self, lease_key)
 
         self.env.flush_all()
+        captured_exc = None
+        captured_tb_text = ''
         with patch.object(type(self.Client), '_send', _ok_send({})):
             with patch.object(type(self.Client), '_release_lease',
                               counting_release):
-                with self.assertRaises(Boom) as caught:
+                try:
                     with self.Client.execute_business(job, self.store, 'q'):
                         raise raised
-        self.assertIs(caught.exception, raised)           # same object/identity
-        self.assertIsNone(caught.exception.__cause__)     # release ok -> no chain
+                except Boom as exc:
+                    # Capture the LIVE exception + traceback in the real handler.
+                    # unittest's assertRaises stores the exception via
+                    # `with_traceback(None)`, which would strip __traceback__ and
+                    # make the "body raise site kept" assertion vacuous (it always
+                    # sees ''). Capturing here proves the bare re-raise preserved
+                    # the SAME object AND its ORIGINAL traceback (incl. the body
+                    # raise site) — a stronger check than the assertRaises form.
+                    captured_exc = exc
+                    captured_tb_text = ''.join(
+                        traceback.format_tb(exc.__traceback__))
+        self.assertIsNotNone(captured_exc, 'Boom did not propagate')
+        self.assertIs(captured_exc, raised)               # same object/identity
+        self.assertIsNone(captured_exc.__cause__)         # release ok -> no chain
         self.assertEqual(releases, [1])                   # released exactly once
-        tb_text = ''.join(traceback.format_tb(caught.exception.__traceback__))
         self.assertIn(                                    # body raise site kept
-            'test_body_exception_bare_reraise', tb_text)
+            'test_body_exception_bare_reraise', captured_tb_text)
         self.assertEqual(self._lease_count(), 0)          # lease released
 
     # 18. Token never appears in any lease field.
@@ -923,7 +964,24 @@ class TestGenuineRealAdmission(TransactionCase):
             Client = self.env['shopify.connector.api.client']
             got1 = got2 = False
             rows = None
-            with patch.object(self.registry, 'cursor',
+            # DEADLOCK FIX (pre-existing, framework-level). Odoo's ThreadedServer
+            # holds the reentrant `Registry._lock` for the ENTIRE preload /
+            # post_install phase (service/server.py `run`: `with Registry._lock:
+            # ... preload_registries()`, which runs this suite). A spawned worker's
+            # `api.Environment(wcr, ...)` calls `Registry(cr.dbname)` ->
+            # `Registry.__new__` -> `with cls._lock:`, which blocks forever on that
+            # main-thread-held lock (a different thread cannot acquire it). The
+            # single-threaded genuine tests above avoid this only because they build
+            # the Environment in the MAIN thread, reentrantly reacquiring the lock it
+            # already owns. Decouple the worker threads with a fresh registry lock
+            # for the bounded window: the registry is fully built and stable here
+            # (workers only do a cached read-only `registries[db_name]` lookup, never
+            # a rebuild), so this preserves real mutual exclusion among the test
+            # threads and weakens nothing — it is the same lock decoupling Odoo's own
+            # `_registry_test_mode_patches` performs. Without it the REAL admission
+            # code under test never even runs (workers die at Environment creation).
+            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+                 patch.object(self.registry, 'cursor',
                               self._real_registry_cursor(dbname)):
                 with patch.object(type(Client), '_send', blocking_send):
                     t1 = threading.Thread(

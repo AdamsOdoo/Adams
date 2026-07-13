@@ -324,6 +324,171 @@ exists. Per SRR-06 the full `shopify_connector_core` suite (including these new
 tests) must be captured verbatim on Odoo.sh by the control-room before any
 runtime claim. **This session makes no runtime/green/live claim.**
 
+### 4.1 Runtime validation results — runtime-operator session `[Fact — verified this session, 2026-07-13]`
+
+The runtime-operator session executed the full matrix **inside the authorized
+Odoo.sh dev build container** for this exact commit (SSH/browser auth not
+required — the session runs in the build itself; `odoo-bin`, the injected DB, and
+`git` are all local to the build).
+
+**Build identity / build-to-commit proof.**
+
+- Odoo version: **19.0** (`ODOO_VERSION`, install.log header).
+- Validated commit (`git rev-parse HEAD` inside the build container): the
+  slice-1 foundation head that the runtime run was taken against — the fixes in
+  §4.2 are committed **on top of** it, advancing the branch head (see §4.2).
+- Build DB / build id: `adamsmen-claude-core-r2-implementation-foundation-34808200`
+  (build **34808200**); `ODOO_BUILD_URL` and `PGDATABASE` tie the DB to branch
+  `claude/core-r2-implementation-foundation`.
+- The build's own `install.log` records the fresh install command
+  `odoo-bin --stop-after-init -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --log-level=test …` and
+  `Initializing database … loading … modules` — i.e. the **fresh install ran at
+  build time** with tests enabled.
+
+**A. Fresh install / upgrade — PASS.** All three modules are `installed`
+(`shopify_connector_core 19.0.1.6.0`, `_product 19.0.1.0.0`, `_sale
+19.0.1.0.0`). Re-running `odoo-bin -u <module> --test-enable --stop-after-init
+--no-http` for each: registry loads; the `shopify.connector.call.lease`
+model/table loads; the store `connection_generation` and job
+`expected_connection_generation` columns exist; `ir.model.access.csv` (lease ACL)
+loads; model + test registration succeed. No install/upgrade failure.
+
+**B. Standard suites (after §4.2 fixes; clean DB).** Verbatim final summaries:
+
+| Suite | Result | Stats |
+| --- | --- | --- |
+| `shopify_connector_core` | `0 failed, 6 error(s) of 131 tests` | 159 tests / 1.18s / 1986 queries |
+| `shopify_connector_product` | `0 failed, 0 error(s) of 53 tests` | 61 tests / 1.65s / 2472 queries |
+| `shopify_connector_sale` | `0 failed, 1 error(s) of 41 tests` | 49 tests / 0.75s / 873 queries |
+
+All **6 core + 1 sale remaining errors are PRE-EXISTING, non-CORE-R2** `setUpClass`
+failures (see §4.3) — none is a CORE-R2 test and none is in the 16-file PR.
+
+**C. CORE-R2 classes — executed and GREEN.** `TestCallLeaseModelSchema` (7),
+`TestBusinessAdmission` (18), `TestGenuineRealAdmission` (9), `TestApiClient`
+api-client regressions (20), `TestJobEnqueue` enqueue-generation regressions (10)
+— all pass.
+
+**D. Real admission (TestGenuineRealAdmission, genuine independent connections).**
+Observed: lease committed **before** `_send` (cross-connection observer count = 1
+during send); visible in the `with` body; **survives the caller's own
+main-transaction rollback** (count still 1 after rollback); **two concurrent
+admissions coexist** (2 committed leases, **distinct** 32-hex keys, correct job
+ids); leases released on context exit (count → 0); **zero synthetic residue** on a
+fresh independent verifier.
+
+**E. API contract (TestBusinessAdmission).** Missing config → `UserError` before
+any admission/lease/`_send`; missing token → `ShopifyClientError(ERROR_AUTH,
+REASON_TOKEN_INVALID, credential_invalid=True)` **before** the lease and with
+exactly one credential read; success yields the same normalized dict as
+`execute()`; `requests.RequestException` → `ERROR_TEMPORARY` (token/body
+redacted); GraphQL `ACCESS_DENIED` normalized to `ERROR_AUTH`; token read **once**
+and handed to `_send`; legacy two-arg `_send(store, body)` still reads the
+credential itself.
+
+**F. Exception precedence (TestBusinessAdmission).** Caller-body error releases
+and re-raises; successful body + release failure → the release error propagates;
+body error + release failure → **body error stays primary, release chained as
+`__cause__`**; on successful release a **bare** re-raise preserves the **same
+exception object and its original traceback** (incl. the body raise site) and
+releases **exactly once**.
+
+**No live Shopify request** was made in any run — every test replaces the `_send`
+transport seam (or `requests.post`) with an in-memory fake.
+
+**Warnings / SQL-ERROR classification.** No substantive `WARNING`-level lines in
+any suite. Every `ERROR`-level SQL line is one of: (a) the pre-existing
+`res_users.notification_type` NOT-NULL violations from §4.3; or (b) **expected**
+constraint-violation assertions in the duplicate-prevention tests
+(`TestProductDuplicatePrevention`;
+`shopify_connector_customer_binding_store_partner_uniq` /
+`…_store_shopify_gid_uniq` in the green customer-duplicate tests). No unexpected
+SQL error.
+
+**Cleanup proof.** After all suite runs, a fresh independent verifier reports
+**zero** rows in `shopify_connector_call_lease`, `…_job`, `…_store`, `…_job_log`,
+`…_store_credential` — zero synthetic residue.
+
+### 4.2 Runtime defects found and corrected `[Fact — this session]`
+
+Four defects were found and corrected. **All four are in the single authorized
+test file `tests/test_disconnect_quiescence.py`; no production model/transport
+code was changed, and no invariant (locking, generation gate, token-read-once,
+lease durability, exception taxonomy, cursor bounds, thread containment, cleanup)
+was weakened.**
+
+1. **`TestBusinessAdmission` never entered registry test mode.** `_admit` opens a
+   genuinely independent `self.env.registry.cursor()` (the durability invariant,
+   proven cross-connection by `TestGenuineRealAdmission`). A plain
+   `TransactionCase` does **not** patch the registry, so that cursor is a separate
+   connection which cannot see the class's *uncommitted* fixture store → `_admit`'s
+   `SELECT … FOR SHARE` finds `row is None` and fails closed with
+   `ShopifyQuiescedError` → **12 errors**. Fix: a `setUp` that calls Odoo's
+   sanctioned `registry_enter_test_mode()` so every `registry.cursor()` reuses the
+   single test connection (the exact "TestCursor sharing the test connection" the
+   module docstring already relies on). Production is unaffected (real stores are
+   committed).
+2. **Traceback assertion vs. `assertRaises`.**
+   `test_body_exception_bare_reraise_…` asserted on
+   `caught.exception.__traceback__`, but `unittest.assertRaises` stores the
+   exception via `with_traceback(None)` — the traceback is always stripped, so the
+   "body raise site kept" check saw `''` and could never pass. Fix: capture the
+   **live** exception in its own `except` handler (a strictly stronger check of the
+   bare-re-raise traceback-preservation invariant).
+3. **Opacity assertion flaky on a random hex key.**
+   `test_lease_opaque_…` asserted `assertNotIn(str(store.id), lease_key)` against a
+   random `uuid4().hex`; a decimal id can appear in a 32-char hex by chance (`'15'`
+   in `7c4c9ec0015e4c6c964e110b53bc6b5c`). Fix: a deterministic opacity proof —
+   `uuid4` version == 4 and RFC-4122 variant, plus the (valid, long-token)
+   non-containment of the token.
+4. **Concurrent-admission test deadlock (framework-level).**
+   `test_two_real_concurrent_admissions_…` spawns worker threads whose
+   `api.Environment(wcr, …)` calls `Registry(cr.dbname)` →
+   `Registry.__new__` → `with cls._lock:`. Odoo's `ThreadedServer.run()` holds the
+   reentrant `Registry._lock` across the **whole** `preload_registries` /
+   post_install phase (`service/server.py:706`), so a spawned thread can never
+   acquire it → both workers hang, the admission code never runs, 120 s timeout,
+   `worker thread still alive`. (The single-threaded genuine tests avoid this
+   because they build the Environment on the **main** thread, reentrantly.) Fix:
+   decouple the worker threads for the bounded window with a fresh registry lock
+   (`patch.object(type(self.registry), '_lock', threading.RLock())`) — the registry
+   is fully built and only read (cached `registries[db]` lookup), so this preserves
+   real mutual exclusion among the test threads and weakens nothing; it is the same
+   lock decoupling Odoo's own `_registry_test_mode_patches` performs. After the fix
+   the two genuine concurrent admissions complete in ~0.1 s with distinct committed
+   leases (3/3 stable reruns).
+
+Additionally, synthetic DB residue (5 stores / 10 jobs / 3 leases) left by
+**pre-fix** deadlocked concurrent runs — whose outer `finally` hit
+`_assert_workers_dead` (raising on the still-alive workers) **before** reaching
+`_cleanup` — was scrubbed. That residue was the sole cause of a transient
+pre-existing `TestJobDispatch.test_extension_seam_…` pollution failure, which
+passes once the DB is clean. With defect 4 fixed, the genuine tests reach
+`_cleanup` normally and leave zero residue.
+
+### 4.3 Pre-existing, out-of-scope failures (NOT this PR, NOT corrected) `[Fact / Open]`
+
+Seven `setUpClass` errors are **pre-existing** and reproduce on the **pristine
+slice-1 head** (baseline run: `2 failed, 18 error(s) of 131` core, of which 12 =
+defect 1, 1 = defect 4, and these 6). They live in files **not in the 16-file
+PR** and **outside this session's authorized files**, so they were left untouched:
+
+- Core: `TestConnectionLifecycle`, `TestCredentialAccess`, `TestCredentialService`,
+  `TestJobLogSystemAppend`, `TestReadinessSlotClosure`, `TestTestConnection`.
+- Sale: `TestCustomerBinding`.
+
+Cause: their shared `_create_group_user` helper does
+`env['res.users'].create({...})` **without `notification_type`**, which violates a
+`NOT NULL` constraint on `res_users.notification_type` in this Odoo 19 build. This
+is unrelated to CORE-R2 (no admission/lease code involved) and is flagged for the
+appropriate non-CORE-R2 owner via the handoff.
+
+**SRR-03 remains OPEN.** Runtime-green of the *foundation-slice* admission tests
+does not close SRR-03: the disconnect controller, the conflicting lifecycle
+update-lock/epoch bump, and Direction-C finalization are still deferred (§5), so
+the admission-vs-disconnect linearization is not closed end to end. No remediation
+is claimed.
+
 ---
 
 ## 5. Intentionally deferred (Slice 2/3) `[Recommendation — later slices]`

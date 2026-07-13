@@ -1,5 +1,61 @@
 # Research Handoff (rolling)
 
+### CORE-R2 — Foundation Slice 1 RUNTIME VALIDATION (first Odoo.sh execution; draft PR #156, 2026-07-13)
+
+- **Session role:** runtime operator. Ran the full runtime matrix **inside the
+  authorized Odoo.sh dev build** for this branch (SSH/browser auth not needed —
+  the session runs in the build itself). Build **34808200**, Odoo **19.0**, DB
+  `adamsmen-claude-core-r2-implementation-foundation-34808200`. Build-to-commit
+  proven by `git rev-parse HEAD` in the container + the build's own install.log
+  fresh-install record. GitHub API/`gh` is **not reachable** from the build
+  container (private repo, no token, SSH publickey denied) — repo state was
+  verified from the build's local git mirror (base `Shopify-connector` = `ce504f`;
+  PR head branch = the slice-1 head; exactly the known 16 files; no Slice-2 work).
+- **Result:** the foundation-slice tests were **executed for the first time** and
+  are green after four **test-only** corrections. After fixes (clean DB):
+  **core `0 failed, 6 error(s) of 131`; product `0 failed, 0 of 53`; sale
+  `0 failed, 1 of 41`.** CORE-R2 classes all pass — `TestCallLeaseModelSchema`
+  (7), `TestBusinessAdmission` (18), `TestGenuineRealAdmission` (9), `TestApiClient`
+  (20), `TestJobEnqueue` (10). Real admission, API-contract parity, and exception
+  precedence all observed; **no live Shopify call**; **zero synthetic residue**.
+- **Four defects found & fixed — ALL in the authorized `test_disconnect_quiescence.py`
+  only; NO production/model/transport code changed, NO invariant weakened:**
+  (1) `TestBusinessAdmission` now enters `registry_enter_test_mode()` so `_admit`'s
+  genuinely-independent side cursor sees the uncommitted fixture (was 12 `row is
+  None` `ShopifyQuiescedError`); (2) the bare-re-raise traceback check captures the
+  **live** exception (`assertRaises` strips `__traceback__`); (3) lease-key opacity
+  proven via `uuid4` version/variant instead of a flaky decimal-substring check;
+  (4) the two-concurrent-admissions test decouples its worker threads from the
+  reentrant `Registry._lock` that `ThreadedServer.run()` holds across post_install
+  (`service/server.py:706`) — otherwise a spawned thread's `api.Environment` →
+  `Registry.__new__` dead-locks and admission never runs (now ~0.1 s, distinct
+  leases, 3/3 stable). Pre-fix DB residue (5 stores/10 jobs/3 leases) from
+  deadlocked runs was scrubbed (their `finally` hit `_assert_workers_dead` before
+  `_cleanup`), restoring zero residue and clearing a transient pre-existing
+  `TestJobDispatch` pollution failure.
+- **Pre-existing, OUT OF SCOPE (not this PR, not corrected):** all 7 remaining
+  errors are pre-existing **non-CORE-R2** `res_users.notification_type` NOT-NULL
+  `setUpClass` failures (`TestConnectionLifecycle`, `TestCredentialAccess`,
+  `TestCredentialService`, `TestJobLogSystemAppend`, `TestReadinessSlotClosure`,
+  `TestTestConnection`, sale `TestCustomerBinding`), reproduced on the pristine
+  slice head (`2 failed, 18 error(s)`). Their shared `_create_group_user` helper
+  creates `res.users` without `notification_type`. These files are outside the PR
+  and outside this session's allowed-files list → left untouched. **Non-CORE-R2
+  owner action:** decide whether to set `notification_type` in that helper.
+- **PR / gate state:** PR **#156** stays **draft, unmerged**; the runtime fixes +
+  evidence are committed on `claude/core-r2-implementation-foundation` (branch head
+  advances by the fix commit — authorized by the task's failure-loop/commit
+  clause). Evidence: `../05-qa/task-core-r2-validation-results.md` §4.1–4.3;
+  AR-047 runtime-validation revision. **SRR-03 remains OPEN** — runtime-green of the
+  admission half does not close the disconnect-quiescence remediation.
+- **Exact next-session prompt (control room):** "Review PR #156's runtime-validation
+  revision (validation-results §4.1–4.3, AR-047, this handoff). Confirm the four
+  test-only fixes and the pre-existing non-CORE-R2 `res_users.notification_type`
+  finding. Decide: (a) accept the runtime evidence and keep SRR-03 OPEN pending
+  Slice 2/3; (b) whether the `notification_type` pre-existing test-helper defect is
+  routed to a separate non-CORE-R2 fix; (c) whether to authorize CORE-R2 Slice 2.
+  Do not mark PR #156 ready or merge without an explicit control-room act."
+
 ### CORE-R2 — Foundation Slice 1 IMPLEMENTATION (committed admission lease + business-call context; draft PR into `Shopify-connector`, 2026-07-12)
 
 - **Gate / base:** CORE-R2 **implementation** gate OPENED — control-room comment
