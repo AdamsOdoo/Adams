@@ -1481,12 +1481,26 @@ cite:
   savepoint. A later-variant failure leaves no partial structure
   (including no orphan attribute).
 - **D-010B-11 (performance):** N+1 removed; page-at-a-time processing;
-  budgets not measured here (no runtime — §10).
+  Odoo.sh DB-phase performance measurements were **executed** at validated
+  code SHA `db534f8` on build `34828304` — the 100-variant and
+  2,048-variant measurements are recorded in **§9** and **§0h**. No
+  performance SLA is inferred from these measurements. Only live/dev-store
+  end-to-end network timings remain outstanding (§10).
 - **D-010B-12 (job contract):** same job type `product_import_sync`, same
   handler/domain-flag/target, same error taxonomy, same retry behaviour.
   No new job type/flag/error class; no mutation.
 
-## 6. Commands executed and local/static results
+## 6. Commands executed during the original implementation/static session (historical)
+
+> **Historical context.** This section records the original Task 010B
+> implementation session's local, static-only checks. That Git session had
+> **no local Odoo runtime** available, so at that time it could perform
+> only compile/static checks — it did **not** execute the test suite.
+> **Exact-head Odoo.sh runtime was later executed successfully** (§0h) for
+> validated code SHA `db534f8` on build `34828304`, and is now the
+> authoritative current runtime evidence (§0h, §9, §10). The no-runtime
+> limitation described below is historical and **is no longer a current
+> project gate**.
 
 - `git fetch` state verified; branch at base SHA; working tree clean at start.
 - `python3 -m compileall -q addons/shopify_connector_product/` → **clean**
@@ -1495,9 +1509,10 @@ cite:
 - XML well-formedness check on `data/shopify_connector_attribute_lock.xml`
   → well-formed.
 - Source-guard greps (see §7).
-- **No Odoo runtime is available in this environment** (`import odoo` →
-  `ModuleNotFoundError`, same as the CORE-R1 session), so the test suite
-  was **not executed here**; Odoo.sh execution is the runtime gate (§10).
+- **At that time**, no Odoo runtime was available in that environment
+  (`import odoo` → `ModuleNotFoundError`, same as the CORE-R1 session), so
+  the test suite was **not executed in that original session**. The
+  runtime gate has since **closed for head `db534f8`** (§0h, §10).
 
 ## 7. Test inventory (static method counts, not Odoo test counts)
 
