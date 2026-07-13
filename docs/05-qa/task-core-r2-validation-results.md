@@ -18,9 +18,14 @@
 > `--test-enable` (demo data loaded) is **fully green — `0 failed, 0 error(s) of
 > 325 tests`**; every CORE-R2 class passes. The seven
 > `res_users.notification_type` `setUpClass` errors observed on *post-init test
-> re-runs* are a **base Odoo-19 `mail`** computed-field artifact (not CORE-R2;
-> the seven test files are byte-identical on base `ce504f`; the failing stack
-> never enters CORE-R2 code) — see §4.1/§4.3. **The Foundation-Slice-1 admission
+> re-runs* carry a **high-confidence baseline attribution** to a base Odoo-19
+> `mail` computed-field artifact (not CORE-R2) — the seven fixture files are
+> byte-identical on base `ce504f`, the CORE-R2 diff is causally disjoint, and the
+> failing traceback stays entirely in the fixture/base Odoo `res.users` path; the
+> fresh installation is green. A literal separate-database `ce504f` A/B run was
+> **not executed** (**RR-F remains open**; **issue #157** tracks the literal
+> reproduction and separate fix decision) — see §4.1/§4.3. **The
+> Foundation-Slice-1 admission
 > half is runtime-validated on `c0d4559`.** **SRR-03 remains OPEN — no
 > remediation and no runtime-green of the end-to-end disconnect-quiescence fix
 > is claimed** (the later slices that would close the linearization are deferred;
@@ -64,7 +69,7 @@ The lease is held across `_send` **and** `_normalize_response` **and** the calle
 `with`-body.
 
 **Blocker 2 — genuine tests did not exercise the production admission boundary.**
-The prior `TestGenuineConcurrencyPrimitives` used raw `FOR SHARE` + raw lease
+The prior genuine-connection test class used raw `FOR SHARE` + raw lease
 `INSERT`s, proving only PostgreSQL primitives.
 *Correction (tests):* replaced by **`TestGenuineRealAdmission`**, which invokes the
 **real** `execute_business`/`_admit`/lease-ORM/`_get_access_token`/`_release_lease`
@@ -279,11 +284,17 @@ Two deliberate test styles:
   (`registry.cursor()`) is a `TestCursor` sharing the single test connection, so
   these prove admission *logic* (gate, ordering, token-once, release) but not
   genuine cross-connection independence.
-- **`TestGenuineConcurrencyPrimitives`** opens **genuine independent PostgreSQL
-  connections** via `odoo.sql_db.db_connect` (never `registry.cursor()`), commits
-  a store fixture, and exercises the exact PostgreSQL sequence `_admit` relies on
-  (store-row `FOR SHARE`, lease `INSERT`, independent `COMMIT`) with bounded
-  `statement_timeout` and durable, fail-loud cleanup.
+- **`TestGenuineRealAdmission`** invokes the **real** production boundary —
+  `execute_business`, real `_admit`, the ORM `shopify.connector.call.lease`
+  model, and real `_release_lease` — from **genuine independent PostgreSQL
+  connections** (`odoo.sql_db.db_connect`), with the registry cursor factory
+  patched for the bounded test window so `_admit`'s own side transaction is a
+  real pooled cursor rather than a shared `TestCursor`. Raw SQL is used **only**
+  for bounded observation and durable, fail-loud, zero-residue cleanup — never
+  to create the lease under test. This proves genuine **in-process
+  cross-connection** admission behavior: a committed lease visible before
+  `_send`, caller-rollback independence, and two concurrent real admissions
+  committing distinct leases.
 
 Required-proof → test mapping (numbers are the gate/packet proof list):
 
@@ -581,14 +592,15 @@ rigorously and variance-free by:
    a base `mail`/`res.users` computed field + a base DB `NOT NULL` constraint —
    present regardless of the branch.
 
-Because the failing test code is byte-identical on `ce504f` and the failure is
-produced entirely by CORE-R2-independent base Odoo code, **`ce504f` necessarily
-produces the identical seven errors under the same post-init-rerun method** — i.e.
-they are **base / pre-existing, not a CORE-R2 regression**. (This is code-identity
-+ empirical-base-mechanism attribution, which removes the DB-variance a separate
-run would introduce; the residual that no literal second-DB `ce504f` run was
-performed is logged as **RR-F** for the control room to run on a separate build if
-a literal A/B is required.) The files are **outside the 16-file PR and this
+Because the failing test code is byte-identical on `ce504f`, the CORE-R2 diff is
+causally disjoint from the failure path, and the traceback stays entirely in the
+fixture/base Odoo `res.users` path, this is a **high-confidence baseline
+attribution**: the seven errors are treated as base/pre-existing, not a CORE-R2
+regression. This is code-identity + empirical-base-mechanism attribution, not a
+literal reproduction — **a literal separate-database `ce504f` A/B run was not
+executed** (the single-DB, no-`createdb` Odoo.sh platform did not permit one
+here). **RR-F remains open**; **issue #157** tracks the literal reproduction and
+the separate fix decision. The files are **outside the 16-file PR and this
 session's authorized files**, so they were left untouched and flagged for the
 appropriate non-CORE-R2 owner (decide whether `_create_group_user` should pass
 `notification_type`, or whether the base post-init-rerun behavior is accepted).
@@ -682,10 +694,16 @@ scope/allowlist/compatibility) was run against the actual diff. Outcome:
   main-cursor commit. Only allowlisted files changed; legacy `execute()` and the
   three forbidden-to-edit `_send`-patching test files remain compatible; slice is
   dormant (no production call site enters `execute_business`).
-- **Noted as future-slice (not defects here):** no missing-credential pre-check on
-  the dormant `execute_business` path; a caller that already holds a conflicting
-  store-row update lock on its main cursor before entering `execute_business`
-  could self-block — both belong to the later call-site/lifecycle slice.
+- **Verified (not a gap):** a missing/empty credential on the `execute_business`
+  path raises the accepted `ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID,
+  credential_invalid=True)` **before** lease creation and before `_send`
+  (correction §0.1 blocker 1) — runtime-proven by
+  `TestBusinessAdmission.test_missing_credential_raises_shopify_client_error`
+  (§4.1.E). Production call-site activation remains deferred to a later slice.
+- **Noted as future-slice (not a defect here):** a caller that already holds a
+  conflicting store-row update lock on its main cursor before entering
+  `execute_business` could self-block — belongs to the later
+  call-site/lifecycle slice.
 - **Two runtime assumptions the tests rest on (documented, both expected to
   hold):** (a) the `TestBusinessAdmission` class opens a nested side
   `registry.cursor()` while the test cursor is live — this relies on Odoo's
@@ -763,9 +781,13 @@ API-client/job-enqueue tests" the gate refers to.
   tests are **executed and green on Odoo.sh `c0d4559`** (build 34818964; §4.1),
   so RR-B no longer holds for this slice. The *remediation* runtime proof
   (end-to-end + genuine two-server) remains open under RR-A / RR-C / SRR-03.
-- **RR-C (genuine two-server proof deferred):** proofs 13/14/15 are shown at the
-  PG-primitive level with real connections; the production-path two-server proof
-  is the deferred T-19 / SRR-09 / RR-4 item.
+- **RR-C (genuine two-server / multi-worker deployment proof deferred):** proofs
+  13/14/15 were executed through the **real in-process production admission
+  boundary** (`execute_business`/`_admit`/ORM lease/`_release_lease`) using
+  **genuine independent PostgreSQL connections**, proving committed lease
+  visibility before `_send` and two concurrent real admissions with distinct
+  leases (§4.1.D). Only the genuine **two-server / deployed multi-worker**
+  production proof remains deferred, under T-19 / SRR-09 / RR-4.
 - **RR-D (dormant ACL/user-identity):** the lease ACL is admin-only; when a
   production call site activates `execute_business`, the drain's actual execution
   identity must be re-checked against this ACL (later slice).
@@ -776,12 +798,15 @@ API-client/job-enqueue tests" the gate refers to.
   `TestBusinessAdmission.test_missing_credential_raises_shopify_client_error`
   (green, §4.1). The only residual is that this still-dormant path is not yet
   reached by a production call site (a later call-site slice).
-- **RR-F (literal second-DB baseline not run):** the seven `notification_type`
-  errors are attributed to base/pre-existing by code-identity + empirical
-  base-mechanism (§4.3), not by a literal isolated `ce504f` suite run — which the
-  single-DB, no-`createdb` Odoo.sh platform does not permit here. If a literal
-  A/B is required, the control room can run `ce504f` on a separate build; the
-  expected result is the identical six core + one sale `setUpClass` errors.
+- **RR-F (literal second-DB baseline run — OPEN):** the seven `notification_type`
+  errors carry a **high-confidence baseline attribution** — byte-identical
+  fixture files, a causally disjoint CORE-R2 diff, and a traceback confined to
+  the fixture/base Odoo `res.users` path (§4.3) — but **a literal isolated
+  `ce504f` A/B run was not executed**; the single-DB, no-`createdb` Odoo.sh
+  platform did not permit one here. **RR-F remains open.** **Issue #157** tracks
+  the literal reproduction and the separate fix decision; if a literal A/B is
+  run, the six core + one sale `setUpClass` errors are expected to reproduce
+  identically.
 
 ---
 
@@ -811,6 +836,10 @@ API-client/job-enqueue tests" the gate refers to.
   `action_disconnect` change, no live Shopify call.
 - **SRR-03 remains OPEN.** No *remediation* runtime-green is claimed. The
   Foundation admission slice **is** runtime-validated on Odoo.sh `c0d4559` (build
-  34818964; §4.1); the seven `res_users.notification_type` errors are
-  base/pre-existing (§4.3), not CORE-R2.
+  34818964; §4.1); the seven `res_users.notification_type` errors carry a
+  **high-confidence baseline attribution** (not CORE-R2) — byte-identical
+  fixtures, a causally disjoint diff, and a base-only traceback (§4.3). A
+  literal separate-database `ce504f` A/B run was **not executed**; **RR-F
+  remains open**; **issue #157** tracks the literal reproduction and separate
+  fix decision.
 - Draft PR only — not marked ready, not merged; Slice 2 not begun.
