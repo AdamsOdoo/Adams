@@ -11,7 +11,7 @@
 > and the implementation packet — **pending ChatGPT control-room acceptance**
 > (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
 > 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` +
-> `4692656343`),
+> `4692656343` + `4693694894`),
 > not direct PR merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
 > bindings; protected/guarded customer import + indexed normalized-email matching;
 > no unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
@@ -114,13 +114,17 @@ because Odoo 19 `sale.order`/`sale.order.line` have no supported external
 tax-amount inverse (`price_tax` is compute-only; the `manual_tax_amounts`
 override exists only in `account.move`/invoice flows — re-verified against
 odoo/odoo 19.0), Shopify tax is represented by an **explicit operator mapping to
-an `account.tax`** keyed by a **hashed tax-evidence fingerprint** (the full,
-untruncated normalized `ratePercentage`+`title`+`source`+`channelLiable`+inclusion
-tuple; `price_include_override` on `account.tax` per `taxesIncluded`), letting the
+a leaf `amount_type=='percent'` `account.tax`** keyed by a **versioned SHA-256
+tax-evidence fingerprint** (`v1:<hex>`, `SHOPIFY_TAX_FINGERPRINT_VERSION=1`, of the
+full normalized `ratePercentage`+`title`+`source`+`channelLiable`+inclusion tuple —
+**Unicode-NFC only, case and whitespace preserved, no folding, no truncation**;
+`price_include_override` on `account.tax` per `taxesIncluded`), letting the
 **standard Odoo 19 `account.tax` engine** recompute under the total-check guard —
 **no custom connector tax engine, no automatic rate fallback, and no tax
 auto-creation** in MVP (review `4692656343`: a same-rate Odoo tax is an operator
-*suggestion* only; `order_tax_autocreate` is removed) — **proposed, pending
+*suggestion* only; `order_tax_autocreate` is removed). **Group/fixed/division and
+base-affecting compound structures fail closed** (`unsupported_tax_structure`,
+deferred — review `4693694894` item 6). **Proposed, pending
 control-room acceptance**. A
 gateway → Odoo `account.journal` classification mapping is a
 partially-resolved, classification-only concept (MBQ-30) — it triggers no
@@ -135,39 +139,53 @@ against Shopify's own reported order total. A mismatch beyond a
 to-be-defined tolerance is classified `financial total mismatch` —
 conservative, never silent, never auto-retried, requires explicit human
 review. **Exact tolerance mechanism and Shopify total field — proposed
-resolution 2026-07-14 (rounds 3–6, reviews `4691067575` + `4691408835` +
-`4691931971` + `4692656343`)** in the decision-closure §6 / packet D-012-2:
-`totalPriceSet.shopMoney.amount` is the total comparand; each product line's
+resolution 2026-07-14 (rounds 3–7, reviews `4691067575` + `4691408835` +
+`4691931971` + `4692656343` + `4693694894`)** in the decision-closure §6 / packet
+D-012-2: `totalPriceSet.shopMoney.amount` is the total comparand; each product line's
 **exact** pre-tax net is the official `priceAfterAllDiscountsBeforeTaxesSet` field
 (never `quantity × discountedUnitPriceSet`, which is an *approximate* unit price),
 reproduced in Odoo **through the actual Odoo 19 tax engine** (engine
 `total_excluded`; `price_include_override` is on `account.tax` not the SO line;
 price-included residuals derived via the engine, not gross subtraction; money
-fields are binary floats). **Six fail-closed pre-creation gates** (out of MVP
-scope → policy skip, never `financial_total_mismatch`): refunded/removed **product**
-quantities; refunded/removed/modified **shipping**; **duty-first** duties/additional-
-fees precedence (a duty-only order reaches `unsupported_duties`; the skip fires
-from the **aggregate** `currentTotalAdditionalFeesSet`/`currentTotalDutiesSet` —
-`Order.additionalFees` detail is **not queried** and `AdditionalFee.name` is never
-requested/stored/logged, review `4692656343`); **nonzero cash rounding**; and
-**nonzero tips fail closed** (`unsupported_tip_tax_treatment` — tip tax treatment
-undocumented, no untaxed Tip line). The query uses **one `edges{ cursor node }`
-shape for all three connections**, carries every current-state/tax-evidence
-field the gates consume, and is **data-minimized** — `note`/`tags`/`sourceName`/
-`customAttributes`/`vendor`/`displayName`/`defaultAddress` are removed (no MVP
-consumer, per a field-consumption matrix). All money equality/zero tests are
-**Decimal-numeric** (currency-code match + parsed-`Decimal` value, never lexical
-strings — `10.0 == 10.00`). Tax mapping is keyed by the **hashed evidence
-fingerprint `shopify_tax_evidence_key`** (the full untruncated
-rate+title+source+channelLiable+inclusion tuple; a rate-only or truncated-title
-key could yield a correct total with the wrong tax/account, or collide two long
-titles; unmapped/colliding → hold). The tolerance is a canonical single-count ledger (`U_ex = M + H` with `T=0`;
-always tax-exclusive; shipping tax backed out once when inclusive) with a
-currency-rounding bound, **per-tax-signature reconciliation on the tax-engine
-excluded base before any tax tolerance** (currency-rounded equality is necessary
-but not sufficient — an **engine-derived `tax_delta_bound`** is carried, 0 only
-when the engine proves it), and a **proposed conditional `tol_tax = 0.5r·(S+O)`**
-whose platform-rounding premise is a labelled inference, with **no** money cap.
+fields are binary floats). **Seven fail-closed pre-creation gates** (out of MVP
+scope → policy skip, never `financial_total_mismatch`): **order edits**
+(`Order.edited == true` → `unsupported_order_edit`, evaluated first — quantity/total
+checks alone miss price-only/offsetting edits, review `4693694894` item 2);
+refunded/removed **product** quantities (**with the exact nullable-`totalTaxSet`
+rule** — a null original tax is normalized to a canonical zero MoneyBag in the
+order currencies and must `money_equal` the non-null `currentTotalTaxSet`, else fail
+closed; review `4693694894` item 3); refunded/removed/modified **shipping**;
+**duty-first** duties/additional-fees precedence (a duty-only order reaches
+`unsupported_duties`; the skip fires from the **aggregate**
+`currentTotalAdditionalFeesSet`/`currentTotalDutiesSet` — `Order.additionalFees`
+detail is **not queried**, though the field **does** expose list/pagination/filter
+args and is omitted for **data minimization** (review `4693694894` item 1), and
+`AdditionalFee.name` is never requested/stored/logged); **nonzero cash rounding**;
+and **nonzero tips fail closed** (`unsupported_tip_tax_treatment` — tip tax
+treatment undocumented, no untaxed Tip line). The query uses **one `edges{ cursor
+node }` shape for all three connections**, carries every current-state/tax-evidence
+field the gates consume (including `Order.edited`), and is **data-minimized** —
+`note`/`tags`/`sourceName`/`customAttributes`/`vendor`/`displayName`/
+`defaultAddress`/**`DiscountCodeApplication.code`/`ShippingLine.code`/
+`ShippingLine.custom`** are removed (no MVP consumer, per a field-consumption
+matrix; retained `ShippingLine.title` is bounded SO-description free text). All
+money equality/zero tests are **Decimal-numeric** (currency-code match +
+parsed-`Decimal` value, never lexical strings — `10.0 == 10.00`). Tax mapping is
+keyed by the **versioned SHA-256 evidence fingerprint `shopify_tax_evidence_key`**
+(`v1:<hex>`, the full untruncated rate+title+source+channelLiable+inclusion tuple,
+**NFC-only — case and whitespace preserved, no folding**; a rate-only, truncated,
+or case/whitespace-folded key could yield a correct total with the wrong
+tax/account, or collide distinct evidence; unmapped/colliding → hold). The
+tolerance is a canonical single-count ledger (`U_ex = M + H` with `T=0`; always
+tax-exclusive; shipping tax backed out once when inclusive) with a currency-rounding
+bound, **per-tax-signature reconciliation on the tax-engine excluded base before
+any tax tolerance**, and **one global tax tolerance `tol_tax_total = Σ_σ
+tax_delta_bound(σ) + 0.5r·(S+O)`** where the MVP requires `tax_delta_bound(σ) = 0`
+for every admitted signature (a leaf percent tax's engine excluded base reconciles
+exactly, else fail closed) — so `tax_delta_total ≡ 0` and the operative bound is
+`0.5r·(S+O)`, but the formula is stated with the delta term so no document calls
+`0.5r(S+O)` "complete" while a nonzero delta is permitted (review `4693694894` item
+7); its platform-rounding premise is a labelled inference, with **no** money cap.
 This is **proposed, pending control-room acceptance** (MBQ-56 stays open until
 then).
 
