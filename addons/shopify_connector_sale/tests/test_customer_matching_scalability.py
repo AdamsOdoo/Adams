@@ -57,6 +57,29 @@ BINDING_INSERT_QUERY_REGEX = (
     r'insert\s+into\s+"?' + BINDING_TABLE + r'"?'
 )
 
+# CORE-R2 Slice 2B: the customer importer now issues its one Shopify Admin
+# call through the admission-gated `execute_business` lease, so `_admit`
+# reads a credential and checks the connection generation. A non-secret
+# placeholder token lets the real admission gate pass; the transport is
+# always the injected `_send` seam, so it never reaches a network call.
+DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+
+class _RaceFakeResponse:
+    """Minimal stand-in for a `requests.Response` for the `_send()`
+    transport-injection seam (no network call). `execute_business`'s
+    `_normalize_response` turns this `{'data': ...}` body into the
+    normalized dict the importer's `_normalize_payload` consumes."""
+
+    def __init__(self, status_code, json_body=None, headers=None):
+        self.status_code = status_code
+        self.headers = headers or {}
+        self._json_body = json_body
+        self.text = json.dumps(json_body) if json_body is not None else ''
+
+    def json(self):
+        return self._json_body
+
 
 def _sanitized_exception_diagnostic(exc):
     """Type-only, data-free diagnostic for an exception surfaced from a
@@ -1238,18 +1261,25 @@ class TestCustomerMatchingConcurrency(TransactionCase):
         self.gid_a = 'gid://shopify/Customer/race-A-%s' % marker
         self.gid_b = 'gid://shopify/Customer/race-B-%s' % marker
 
-    def _fake_execute(self):
+    def _fake_send(self):
+        """CORE-R2 Slice 2B: replace the `_send` transport seam (not the
+        removed `execute`) so the REAL admission-gated `execute_business`
+        context manager, `_admit`, and the committed lease all run through
+        the race. Returns a 200 `_RaceFakeResponse` whose body
+        `_normalize_response` turns into the Race-B customer payload the
+        importer then reconciles (the colliding binding INSERT)."""
         email = self.shared_email
 
-        def fake_execute(client_self, store, query, variables=None):
-            return {'data': {'customer': {
-                'id': (variables or {}).get('id'),
+        def fake_send(client_self, store, body, token=None):
+            gid = ((body or {}).get('variables') or {}).get('id')
+            return _RaceFakeResponse(200, json_body={'data': {'customer': {
+                'id': gid,
                 'firstName': 'Race', 'lastName': 'B', 'displayName': 'Race B',
                 'defaultEmailAddress': {'emailAddress': email},
                 'defaultPhoneNumber': None, 'defaultAddress': None,
                 'updatedAt': '2026-07-12T00:00:00Z',
-            }}}
-        return fake_execute
+            }}})
+        return fake_send
 
     # ------------------------------------------------------------------
     # Deterministic, ATTRIBUTED lock-wait synchronization. Evidence is
@@ -1341,6 +1371,12 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             env = api.Environment(cr, SUPERUSER_ID, {})
             env['shopify.connector.job.log'].search(
                 [('job_id', '=', job_id)]).unlink()
+            # CORE-R2 Slice 2B: execute_business releases its lease on both the
+            # collision (exception) and forced-retry paths, so none should
+            # remain -- but sweep any residue (e.g. a killed worker) before the
+            # job/store FK targets are removed, since the lease references both.
+            env['shopify.connector.call.lease'].search(
+                [('store_id', '=', store_id)]).unlink()
             job = env['shopify.connector.job'].browse(job_id).exists()
             if job:
                 job.unlink()
@@ -1396,7 +1432,7 @@ class TestCustomerMatchingConcurrency(TransactionCase):
     def test_genuine_independent_transaction_binding_race(self):
         dbname = self.env.cr.dbname
         client_cls = type(self.env['shopify.connector.api.client'])
-        fake_execute = self._fake_execute()
+        fake_send = self._fake_send()
 
         obs = {}
         setup_cr = cr_a = monitor_cr = None
@@ -1451,7 +1487,17 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 'name': 'Race Store %s' % self.run_marker,
                 'shop_domain': 'race-%s.myshopify.com' % self.run_marker,
                 'api_version': '2026-07',
+                'state': 'connected',
             })
+            # CORE-R2 Slice 2B: the importer now issues its Shopify call
+            # through the admission-gated execute_business lease, so worker B's
+            # _admit reads a credential and checks the connection generation.
+            # Provision a (non-secret placeholder) credential and re-assert
+            # connected (action_set_token demotes + bumps the generation), and
+            # capture the job's expected generation from the committed store so
+            # admission matches.
+            setup_env['shopify.connector.store.credential'].action_set_token(
+                store, DUMMY_TOKEN)
             store.write({'state': 'connected'})
             setup_env['shopify.connector.store.settings'].create({
                 'store_id': store.id, 'sale_domain_enabled': True,
@@ -1465,6 +1511,7 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 'job_type': 'customer_import_sync', 'state': 'queued',
                 'payload_hash': uuid.uuid4().hex,
                 'shopify_target_gid': self.gid_b,
+                'expected_connection_generation': store.connection_generation,
             })
             store_id, partner_id, job_b_id = store.id, partner.id, job_b.id
             setup_cr.commit()
@@ -1505,7 +1552,7 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                     env_w = api.Environment(cr_w, SUPERUSER_ID, {})
                     phase_queue.put('after_api_environment')
                     try:
-                        with patch.object(client_cls, 'execute', fake_execute):
+                        with patch.object(client_cls, '_send', fake_send):
                             phase_queue.put('before_dispatch')
                             env_w['shopify.connector.job.dispatch']._dispatch_one(
                                 env_w['shopify.connector.job'].browse(job_b_id))
@@ -1609,7 +1656,7 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             env_r = api.Environment(cr_a, SUPERUSER_ID, {})
             job_r = env_r['shopify.connector.job'].browse(job_b_id)
             job_r.invalidate_recordset()
-            with patch.object(client_cls, 'execute', fake_execute):
+            with patch.object(client_cls, '_send', fake_send):
                 env_r['shopify.connector.job.dispatch']._dispatch_one(job_r)
             cr_a.commit()
             setup_cr.rollback()
