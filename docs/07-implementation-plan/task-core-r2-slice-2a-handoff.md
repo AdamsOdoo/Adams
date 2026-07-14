@@ -347,3 +347,48 @@ exact-head record. Full detail:
   separate and untouched.** **SRR-03 remains OPEN.** PR #160 stays
   **draft/unmerged**; Slice 2B not begun. No runtime-green of the corrected head
   is claimed. Await control-room review.
+
+## 11. Exact-head Odoo.sh runtime validation of the test-only correction — session 2026-07-14 `[Fact]`
+
+The new exact-head build + full revalidation that §10 required is **done and GREEN**.
+Ran **inside the Odoo.sh build for the exact corrected head**
+`6e89138712ba4fc3c7899db19a8d6629b177591a` (build **34879305**, Odoo **19.0**,
+PostgreSQL **16.14**, DB `adamsmen-claude-core-r2-foundation-slice-2a-mr7uwq-34879305`).
+Full evidence: `docs/05-qa/task-core-r2-validation-results.md` §RTX.0–RTX.13.
+
+- **Build-to-commit gate:** HEAD == `6e89138…`; clean tree; branch belongs to PR #160
+  (remote tip identical); base `1494b97d…` is an ancestor; `79dbfc0` ancestor; modules
+  `adams_base 19.0.1.0`, `shopify_connector_core 19.0.1.7.2`, `_product`/`_sale 19.0.1.0.0`.
+- **Test-only diff `79dbfc0 → 6e89138`:** exactly the 2 test files + 2 docs; core
+  production tree, manifest, both cron XML, and the issue-157 files all **byte-identical**;
+  product/sale/adams_base untouched.
+- **Fresh install (authoritative build `install.log`):** `0 failed, 0 error(s) of 408`
+  — **the four RT.3 source-guard failures are GONE**; connector crons installed exactly once.
+- **AST guards (in-session):** `TestSourceGuardDetectors` 5/5 (each detector fires on
+  real unsafe code, ignores docstring), `TestDisconnectSourceGuards` 6/6,
+  `TestLifecycleAdmissionSourceGuards` 10/10; guard A (`TestCredentialService`) green on
+  the fresh `-i` build (masked under `-u` only by issue #157). No guard weakened.
+- **Genuine service-retry ×3 (distinct processes, all 0/0):** real `odoo.service.model`
+  retry catches a **genuine SQLSTATE 40001** (`could not serialize access due to concurrent
+  update`) and converges on **exactly one** transport. RT.8 gap **closed**.
+- **Prior 5 genuine classes ×3 (15 executions, all 0/0):** admission, credential-replacement
+  race, controller selection, lifecycle-admission race, public-clear race — all green.
+- **Full core suite:** BEFORE (fresh `-i`) `0 failed, 0 of 408`; AFTER (`-u`, ×2 identical)
+  **`0 failed, 6 error(s) of 203`** — **0 source-guard failures**, 20 post-tests green; the
+  6 errors are the **issue #157** `notification_type` `setUpClass` artifact on the 6 known
+  user-creating classes, out of scope and **not fixed**.
+- **Controller/lifecycle regression:** `TestDisconnectPhase1` 11/11, `TestQuiescenceController`
+  12/12, `TestLifecycleRaceCorrections` 3/3, `TestLifecycleProbeSupersession` 6/6.
+- **Cleanup / leak / secret:** zero residue (stores/creds/leases/jobs/logs); 0 connector cron
+  triggers; 0 idle-in-transaction / 0 leaked worker backend; crons active exactly once; no
+  `shpat_` token / `Authorization`/`Bearer` / GraphQL body / PII in any log.
+- **Upgrade:** no `createdb`/second DB (permission denied for `pg_database`/`pg_roles`) — the
+  base→head genuine upgrade was **not performed**; **gate stays OPEN**.
+- **Runtime defects:** none; no production/test code changed this session (frozen).
+- **Evidence commit:** docs-only; advances the branch head but **not** the validated code SHA
+  (`6e89138`), and is **itself NOT runtime-tested**. gh/token unavailable → PR-body text
+  provided for the control room.
+
+**Issue #157 remains separate and untouched. Slice 2B not begun. Base→head upgrade gate
+OPEN. SRR-03 remains OPEN. PR #160 stays open/draft/unmerged — not marked ready, not merged.
+No live Shopify request, no real credential.** Await control-room review.

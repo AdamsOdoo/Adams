@@ -1862,3 +1862,200 @@ loop:
 OPEN.** No runtime-green of the corrected head is claimed; the corrected head must
 be validated by a **new** Odoo.sh build. PR #160 stays **draft/unmerged**; Slice 2B
 not begun; no live Shopify request.
+
+---
+
+# CORE-R2 — Foundation Slice 2A — EXACT-HEAD ODOO.SH RUNTIME VALIDATION of the test-only correction (build 34879305 @ `6e89138`)
+
+> `[Fact — runtime-verified 2026-07-14 inside the authorized Odoo.sh dev build for
+> the exact corrected head.]` This section is the **new exact-head build + full
+> revalidation from RT.1** that §S2A-C.0/§S2A-C.4(1) required for the test-only
+> correction `4692156428`. It runs **inside the Odoo.sh build for the exact head**
+> `6e89138712ba4fc3c7899db19a8d6629b177591a` (build **34879305**). The four RT.3
+> fresh-install source-guard failures are now **GONE**, the RT.8 gap is **closed**
+> by a genuine runtime-green service-retry proof, and all prior genuine classes
+> remain green across three distinct processes each. **No production, XML, manifest,
+> security, or cron file changed** (add-on tree byte-identical to `79dbfc0`).
+> **Issue #157 is separated, not fixed. The base→head upgrade gate stays OPEN.
+> SRR-03 stays OPEN. PR #160 stays open/draft/unmerged.** This evidence commit is
+> **docs-only and is itself NOT runtime-tested.**
+
+## RTX.0 Build-to-commit gate `[Fact]`
+
+- `git rev-parse HEAD` = **`6e89138712ba4fc3c7899db19a8d6629b177591a`** (exact required head).
+- Ref: detached HEAD; the commit is the tip of local + `origin/claude/core-r2-foundation-slice-2a-mr7uwq` (`git show-ref` → both at `6e89138`); branch belongs to **PR #160**.
+- `git status --porcelain` — **clean** working tree.
+- Ancestry: `git merge-base --is-ancestor 1494b97d… HEAD` → **yes** (merge-base == `1494b97d…`); previously-validated production SHA `79dbfc00…` is also an ancestor. Both objects present.
+- Odoo **19.0**; PostgreSQL **16.14** (Ubuntu 16.14-0ubuntu0.24.04.1).
+- `ODOO_BUILD_URL` = `https://adamsmen-claude-core-r2-foundation-slice-2a-mr7uwq-34879305.dev.odoo.com`; Odoo.sh build **34879305**; DB `adamsmen-claude-core-r2-foundation-slice-2a-mr7uwq-34879305`.
+- Installed module versions: `adams_base 19.0.1.0`, `shopify_connector_core 19.0.1.7.2`, `shopify_connector_product 19.0.1.0.0`, `shopify_connector_sale 19.0.1.0.0` (all `installed`).
+- (gh CLI + GitHub token are **unavailable** in this build, so the PR-body edit is provided as text for the control room — see RTX.13.)
+
+## RTX.1 Test-only diff proof `79dbfc0 → 6e89138` `[Fact]`
+
+`git diff --name-status 79dbfc0 6e89138` = exactly four files: `M
+tests/test_credential_service.py` (+26/−6), `M tests/test_disconnect_quiescence.py`
+(+497/−21), `M docs/05-qa/task-core-r2-validation-results.md` (+380/−0), `M
+docs/07-implementation-plan/task-core-r2-slice-2a-handoff.md` (+91/−0). Proven
+byte-identical (empty diff / equal blob or tree hashes):
+
+- **Core production tree** `models/ + data/ + security/ + views/ + controllers/` → identical `sha256` of `git ls-tree -r` (`1aae155f…`).
+- `__manifest__.py`, both cron XML (`shopify_connector_cron_drain.xml`, `…_disconnect.xml`), and the **issue-157 files** (`shopify_connector_job_dispatch.py`, `shopify_connector_job.py`, `tests/test_job_dispatch.py`) → identical blob hashes.
+- `shopify_connector_product/**`, `shopify_connector_sale/**`, `adams_base/**` → **no** changed path.
+- No product/sale file, no XML/manifest/security/cron data, no non-test `.py` changed.
+
+## RTX.2 Fresh install (authoritative = build `install.log`) — GREEN `[Fact]`
+
+The build DB was created by a **fresh `-i` install with tests** of the exact head.
+Exact command (`install.log`):
+
+```
+odoo-bin --stop-after-init --log-db <db> --http-interface=127.0.0.1 \
+  -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale \
+  --test-enable --log-level=test \
+  --test-tags /adams_base,/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,<standard base-tour exclusions>
+```
+
+Result: **`0 failed, 0 error(s) of 408 tests`** (stats: core **361**, product **61**,
+sale **56**; **20** post-tests). **The four RT.3 source-guard failures are GONE** —
+each of the four guard methods
+(`test_mutate_token_locks_store_before_credential_source`,
+`test_source_level_sanctioned_sudo_sites_guard`,
+`test_lifecycle_lock_is_blocking_for_no_key_update`,
+`test_store_then_credential_clear_order`, `test_admit_lifecycle_creates_no_lease`)
+**ran once and passed** on the fresh install, and `TestCredentialService` had **24**
+clean method-starts with **0** `notification_type` errors (issue #157 does **not**
+strike the fresh `-i` build). No install / XML / registry / manifest error.
+**Connector crons installed exactly once** (see RTX.11).
+
+## RTX.3 AST source-guard validation (in-session, build 34879305) `[Fact]`
+
+Targeted per-class `-u … --test-tags /shopify_connector_core:<Class>`:
+
+| Class | Result | Notes |
+| --- | --- | --- |
+| `TestSourceGuardDetectors` | **0 failed, 0 error(s) of 5** | detector self-tests: `sudo`, `SKIP LOCKED`, `clear`, `call.lease`, `limit=1`-kwarg — each **FIRES on real unsafe executable code** and **IGNORES a docstring-only mention** |
+| `TestDisconnectSourceGuards` | **0 failed, 0 error(s) of 6** | guards B (`FOR NO KEY UPDATE`/no `SKIP LOCKED`) and C (`_clear_token_under_store_lock`, not `action_clear_token`; `try_lock_for_update(limit=1)`) |
+| `TestLifecycleAdmissionSourceGuards` | **0 failed, 0 error(s) of 10** | guard D (`_admit_lifecycle` creates no lease) |
+| `TestCredentialService` (guard A) | green on the **fresh `-i` build** (RTX.2); in-session `-u` shows only the issue-#157 `setUpClass` artifact (RTX.6), **not** a guard failure | guard A = `test_mutate_token_locks_store_before_credential_source` + `test_source_level_sanctioned_sudo_sites_guard` |
+
+Detectors prove real unsafe examples are detected, docstring-only mentions ignored,
+and **no guard was weakened to always-pass** (a substring-scan regression would fail
+the detector self-tests). **All four historical false-positive failures are closed.**
+
+## RTX.4 Genuine REPEATABLE-READ service-retry — three distinct processes `[Fact]`
+
+`TestLifecycleServiceRetryGenuine.test_repeatable_read_serialization_retry_issues_one_transport`
+(`post_install`), each a separate `odoo-bin` process:
+
+| Run | PID | Elapsed | Result |
+| --- | --- | --- | --- |
+| 1 | 584 | 9 s | `0 failed, 0 error(s) of 1` |
+| 2 | 601 | 10 s | `0 failed, 0 error(s) of 1` |
+| 3 | 616 | 12 s | `0 failed, 0 error(s) of 1` |
+
+Direct log evidence (every run): the post-network revalidation
+`SELECT state, connection_generation FROM shopify_connector_store WHERE id=<n> FOR
+NO KEY UPDATE` raises a **genuine SQLSTATE 40001** — `ERROR: could not serialize
+access due to concurrent update` (not injected) — and the **real** Odoo service
+retry logs `odoo.service.model: SERIALIZATION_FAILURE, 4 tries left, try again in
+0.0000 sec…`. The connection pool closes cleanly (`ConnectionPool(…used=0/count=0):
+Closed 3 connections`). The test's 18 in-body assertions (main cursor REPEATABLE
+READ; ≥2 attempts; exactly one transport; first transport uses only the dummy
+token; disconnect on a **distinct** backend PID; 40001 captured from
+`OperationalError.pgcode`; second attempt matrix-refused with zero transport; final
+state `disconnecting`; generation `+1`; no `pass`/`fail` mirror;
+`credential_last_verified_at` empty; credential present; zero leases; all cursors
+closed; zero residue; final safe `UserError`; no raw serialization escape) all hold
+— a green result proves each. **Production isolation was not weakened; only the
+retry backoff was patched.**
+
+## RTX.5 Prior five genuine classes — three distinct processes each (15 executions, all green) `[Fact]`
+
+| Class (tests/run) | run1 | run2 | run3 |
+| --- | --- | --- | --- |
+| `TestGenuineRealAdmission` (9) | ✓ pid635 | ✓ pid754 | ✓ pid897 |
+| `TestCredentialReplacementRaceGenuine` (2) | ✓ pid661 | ✓ pid780 | ✓ pid946 |
+| `TestDisconnectControllerSelectionGenuine` (2) | ✓ pid684 | ✓ pid803 | ✓ pid993 |
+| `TestLifecycleAdmissionRaceGenuine` (4) | ✓ pid707 | ✓ pid826 | ✓ pid1033 |
+| `TestPublicClearAdmissionRaceGenuine` (2) | ✓ pid731 | ✓ pid860 | ✓ pid1075 |
+
+Every one of the 15 executions = **`0 failed, 0 error(s)`**. `TestLifecycleAdmissionRaceGenuine`
+emits its intended **lock-timeout** SQL log (`FOR SHARE` vs lifecycle `FOR NO KEY
+UPDATE` → `canceling statement due to lock timeout`) — an **expected
+negative-constraint log**, not a defect (result stays 0/0).
+
+## RTX.6 Complete core suite (before / after the isolated genuine tests) + issue-#157 separation `[Fact]`
+
+- **BEFORE (pristine baseline = build `install.log` fresh `-i`):** `0 failed, 0 error(s) of 408` — the full suite (incl. every genuine `post_install` class) ran during the build, before any in-session isolated run.
+- **AFTER (in-session `-u shopify_connector_core --test-enable --test-tags /shopify_connector_core`, run twice, identical):** **`0 failed, 6 error(s) of 203 tests`**; **0** source-guard `FAIL` lines; **20** post-tests green. Re-running gave the **identical** result → no residue accumulation.
+
+**PR #160 result: GREEN (0 failures).** **Known issue #157 result: 6 `setUpClass`
+errors**, on exactly `TestConnectionLifecycle`, `TestCredentialAccess`,
+`TestCredentialService`, `TestJobLogSystemAppend`, `TestReadinessSlotClosure`,
+`TestTestConnection` — the `res_users.notification_type` NOT-NULL base-fixture
+artifact that appears **only** on the `-u` at_install re-run (the `mail`-supplied
+default is not yet in the registry when `shopify_connector_core`'s at_install tests
+run), **never** on the fresh `-i` build. This is the documented **issue #157**,
+explicitly out of scope and **not fixed** here. **Combined raw Odoo summary: `0
+failed, 6 error(s) of 203 tests`.** No registry-test-mode leak, no `Registry._lock`
+leak, no cursor/worker leak (RTX.11).
+
+## RTX.7 Controller & lifecycle regression `[Fact]`
+
+`TestDisconnectPhase1` **11/11**, `TestQuiescenceController` **12/12**,
+`TestLifecycleRaceCorrections` **3/3**, `TestLifecycleProbeSupersession` **6/6**
+(all in-session `-u`, 0/0), plus the RTX.5 genuine classes. Coverage confirmed
+green for: disconnect request; exactly-one generation bump; repeated-disconnect
+idempotency; `completed` vs `timed_out`; live & expired lease handling; delayed
+polling; one-store controller selection; all-locked safe no-op; credential clear
+only at finalization; public-clear two-phase routing; activation/reconnect race
+protection; lifecycle exact-token snapshot; post-network supersession.
+`TestConnectionLifecycle` (activation/reconnect state machine; #157-masked under
+`-u`) ran **43** method-starts green on the fresh `-i` build.
+
+## RTX.8 Cleanup / leak / secret audit `[Fact]`
+
+- Residue: **0** stores, **0** credentials, **0** call leases, **0** jobs, **0** job logs.
+- Cron triggers: **0** connector triggers (the 6 `ir_cron_trigger` rows are all base `base.autovacuum_job` framework housekeeping).
+- Backends: **1** active (the audit `psql`), **0** idle-in-transaction, **0** `odoo`-named backends → no worker/cursor leak.
+- `Registry._lock`: no leak — no leak indicator in any run log; every subsequent run passes (the fresh RLock is restored after each bounded window).
+- Crons active exactly once: id 3 `Shopify Connector: Job Dispatch Drain`, id 4 `Shopify Connector: Disconnect Quiescence Controller`.
+- **Secret scan across all 28 in-session run logs:** **no** `shpat_` token (not even the dummy — it is never emitted), **no** `Authorization`/`Bearer`/`X-Shopify-Access-Token`, **no** raw GraphQL query/mutation body, **no** customer email/address PII.
+
+## RTX.9 Warnings / SQL-error inventory (expected negatives separated from defects) `[Fact]`
+
+Every `ERROR`-level SQL line during the runs is **expected**, none a defect:
+- **(a) genuine SQLSTATE 40001** — `… FOR NO KEY UPDATE` → `could not serialize access due to concurrent update`, the **intended** retry driver of `TestLifecycleServiceRetryGenuine` (RTX.4).
+- **(b) lock timeout** — `FOR SHARE` vs lifecycle `FOR NO KEY UPDATE` → `canceling statement due to lock timeout`, the intended conflict of `TestLifecycleAdmissionRaceGenuine` (RTX.5).
+- **(c) NOT-NULL / duplicate-key** on product/customer binding tables — deliberately-invalid inserts in passing negative-constraint tests.
+- **(d) `res_users.notification_type` NOT-NULL** — the `-u`-only issue-#157 env artifact (RTX.6), out of scope.
+No CORE-R2 (`call_lease`/admission/lifecycle) SQL error, and no unexpected error.
+
+## RTX.10 Base→head genuine upgrade — EXACT LIMITATION (not performed) `[Fact / Open]`
+
+A genuine isolated base-installed second database is **not available**: the injected
+PostgreSQL role gets `permission denied` for both `pg_database` and `pg_roles`
+(cannot create or enumerate databases — `odoo-bin` itself logs "skipping
+auto-creation: permission denied for table pg_database"), and the Odoo.sh dev build
+is bound to a **single injected DB**. No substitute (same-head `-u`, fresh install,
+schema inspection) was used. **The upgrade gate remains OPEN** (RT.4 / RR-F).
+
+## RTX.11 Registry / lock / cron-once safety `[Fact]`
+
+No registry-test-mode leak, no `Registry._lock` replacement leak, no cursor or
+worker backend leak (RTX.8). The two connector crons remain active exactly once.
+
+## RTX.12 Runtime defects / corrections `[Fact]`
+
+**None.** No PR #160 defect was exposed by any run; **no production or test code was
+changed** in this validation session (the §11 failure policy was not triggered).
+Production files remain frozen. The only failure policy items observed are the
+expected negative logs (RTX.9) and the out-of-scope issue #157 (RTX.6).
+
+## RTX.13 Evidence commit, PR state, remaining gates `[Fact]`
+
+- **Validated CODE SHA: `6e89138712ba4fc3c7899db19a8d6629b177591a`** (add-on tree byte-identical to `79dbfc0`). This section is a **docs-only evidence commit** that advances the branch head but does **not** alter the validated code SHA, and **is itself NOT runtime-tested**.
+- **PR #160 stays open, draft, unmerged.** Not marked ready; not merged. gh CLI/token unavailable in the build → the PR-body update text is handed to the control room (mirrors this section's headline result).
+- **Remaining gates (unchanged):** base→head genuine upgrade on a two-DB runtime (RTX.10) — **OPEN**; optional Section 7/8 assertion tightening + stale `_admit` docstring (RT.7/RT.13).
+- **Issue #157 remains separate and untouched. Slice 2B not begun. No live Shopify request, no real credential. SRR-03 remains OPEN** — no end-to-end disconnect-quiescence remediation runtime-green is claimed.
