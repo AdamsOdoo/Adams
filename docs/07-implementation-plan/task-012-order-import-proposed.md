@@ -3,8 +3,15 @@
 > Planning-only future implementation task spec, part of the MVP domain
 > implementation-slicing sequence
 > ([`mvp-domain-implementation-sequence.md`](./mvp-domain-implementation-sequence.md),
-> Area 3). Describes scope/boundary/approach only — MBQ-55/MBQ-56/MBQ-27
-> remain open.
+> Area 3). Describes scope/boundary/approach only.
+> **Decision-closure update 2026-07-14 (docs-only, no gate/code/live-call):**
+> MBQ-27, MBQ-56, and the DEC-020 divergent-currency residual now have a
+> **proposed** resolution in
+> [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
+> and the implementation packet — **pending ChatGPT control-room acceptance**
+> (not accepted here). The critical path is now **CORE-R2 full SRR-03
+> remediation + PR #151 (Task 010B) + PR #150 (Task 011B) + Task LC-1**,
+> all merged runtime-green, before this task may be gated.
 
 ## Status
 
@@ -93,7 +100,16 @@ engine recomputing it is genuinely open (**MBQ-27**) — an official-doc
 check against Odoo 19 accounting/taxes documentation found no documented
 supported mechanism for externally-supplied tax amounts on `sale.order`;
 the register states this "requires a dedicated ADR + ChatGPT decision"
-and explicitly blocks the order-import slice, not the core gate. A
+and explicitly blocks the order-import slice, not the core gate.
+**Proposed resolution 2026-07-14** (decision-closure §5 / packet D-012-9):
+because Odoo 19 `sale.order`/`sale.order.line` have no supported external
+tax-amount inverse (`price_tax` is compute-only; the `manual_tax_amounts`
+override exists only in `account.move`/invoice flows — re-verified against
+odoo/odoo 19.0), Shopify tax is represented by **mapping/matching an
+`account.tax`** (canonical decimal-string rate key; `price_include_override`
+per `taxesIncluded`; `order_tax_autocreate` default False), letting Odoo
+recompute under the total-check guard — **proposed, pending control-room
+acceptance**. A
 gateway → Odoo `account.journal` classification mapping is a
 partially-resolved, classification-only concept (MBQ-30) — it triggers no
 automatic journal entry, posting, or reconciliation.
@@ -106,9 +122,14 @@ totals + tax evidence + shipping evidence − discount evidence, compared
 against Shopify's own reported order total. A mismatch beyond a
 to-be-defined tolerance is classified `financial total mismatch` —
 conservative, never silent, never auto-retried, requires explicit human
-review. **Exact tolerance value and exact Shopify total field remain open
-(MBQ-56)** — the register states this "blocks the order-import task" and
-must be fixed by this task's own final §9 prompt, not assumed.
+review. **Exact tolerance mechanism and Shopify total field — proposed
+resolution 2026-07-14** in the decision-closure §6 / packet D-012-2:
+`totalPriceSet.shopMoney.amount` is the total comparand; the tolerance is a
+component-based, currency-rounding-derived bound (`tol_lines = r×0.5×L`,
+`tol_tax = r×0.5×K` with `K` read from the company's actual
+`tax_calculation_rounding_method`), with **no** arbitrary money cap. This is
+**proposed, pending control-room acceptance** (MBQ-56 stays open in the
+register until then).
 
 ## Same-currency-only rule (DEC-020 / MBQ-64)
 
@@ -126,10 +147,15 @@ shop-currency values "might not sum perfectly to totals"). Both
 `shopMoney` and `presentmentMoney` amounts, plus
 `Order.presentmentCurrencyCode`, are captured as audit/reconciliation
 evidence in every case, whether or not a sale order is created.
-Presentment-currency-denominated Odoo orders remain non-MVP. **The exact
-error-class/sub-reason mapping for a blocked divergent-currency order
-remains open** — DEC-020 explicitly declines to force this without a
-named, deliberate decision.
+Presentment-currency-denominated Odoo orders remain non-MVP. **Exact
+error-class/sub-reason mapping — proposed resolution 2026-07-14**
+(decision-closure §10 / packet D-012-3): a divergent order routes to the
+terminal `skipped` state as a **policy skip with NO error class**
+(`skip_reason="divergent_presentment_currency"` in `technical_detail`),
+reached via the one named additive `JobPolicySkip` core seam — so it never
+overloads `financial_total_mismatch` and adds no 17th error class. Both
+currencies and both `shopMoney`/`presentmentMoney` totals are captured. This
+is **proposed, pending control-room acceptance**.
 
 ## Manual review/blocking cases
 

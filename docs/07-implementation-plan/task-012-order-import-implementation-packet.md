@@ -1,7 +1,24 @@
 # Task 012 — Order Import: Implementation-Ready Planning Packet
 
 > **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §15 is NOT usable.** Produced 2026-07-10 by the MVP
+> prompt in §15 is NOT usable.**
+> **Decision-closure update 2026-07-14 (Task 012 decision-closure session,
+> docs-only, no gate/code/live-call):** the companion decision-closure
+> [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
+> finalizes this packet against fresh official Shopify 2026-07 and Odoo 19.0
+> sources and **supersedes this packet where they differ**. Three corrections
+> are folded in below: **(1) money is stored losslessly as `Char` (exact
+> Shopify `Decimal` string), never Odoo `Float`** — Shopify `MoneyV2.amount`
+> is *"serialized as a string … arbitrary precision"* (D-012-1 revised);
+> **(2) the three order-level connections (`lineItems`, `shippingLines`,
+> `discountApplications`) are fully paginated with a bounded cursor loop, not
+> rejected at one page** (§4 revised); **(3) the total-check tax-tolerance
+> count `K` is derived from the company's actual
+> `tax_calculation_rounding_method`, whose Odoo-19 default is `round_globally`**
+> (D-012-2 revised). Divergent-currency routing (D-012-3) is confirmed as
+> `skipped`-policy with **no** error class (never overloading
+> `financial_total_mismatch`).
+> Produced 2026-07-10 by the MVP
 > planning-completion session (AR-042 candidate); **revised
 > 2026-07-11** by the PR #148 revision session per ChatGPT's
 > control-room review (comment `4942966937`, item 6): (a) the
@@ -99,14 +116,27 @@ readonly snapshots `shopify_order_name` (Char),
 int4 Integer), `shopify_processed_at` (Datetime),
 `shopify_updated_at_snapshot` (Datetime),
 `shopify_currency_code`/`shopify_presentment_currency_code` (Char),
+`shopify_taxes_included` (Boolean),
 `shopify_financial_status_snapshot`/`shopify_fulfillment_status_snapshot`
 (Char — raw enum strings; `displayFinancialStatus` is nullable, store
 empty as False), `shopify_cancelled_at` (Datetime),
-`shopify_order_total` (Float — `totalPriceSet.shopMoney.amount`),
+`shopify_cancel_reason` (Char); **money snapshots are `Char` holding the
+exact Shopify decimal string, NEVER `Float` — REVISED 2026-07-14 (closure
+§3.1): Shopify `MoneyV2.amount` is the `Decimal!` scalar "serialized as a
+string" with arbitrary precision, so `Float` is lossy; guard math parses
+these Char strings with `decimal.Decimal`.** Money fields:
+`shopify_order_total_amount` (Char — `totalPriceSet.shopMoney.amount`),
+`shopify_order_total_presentment` (Char —
+`totalPriceSet.presentmentMoney.amount`, DEC-020 dual-currency audit),
+`shopify_subtotal_amount`/`shopify_total_tax_amount`/
+`shopify_total_discounts_amount`/`shopify_total_shipping_amount`/
+`shopify_total_tip_amount` (Char, lossless component evidence);
 `customer_resolution` (Selection: existing_binding / email_match /
 created / guest_email_match / guest_created / fallback / manual —
 readonly; the fallback audit marker), `shopify_last_imported_at`
-(Datetime). Constraints (models.Constraint):
+(Datetime), `shopify_last_evidence_refresh_at` (Datetime). The binding
+stores **no** customer PII (name/email/phone/address live on `res.partner`,
+Task 011 — privacy boundary). Constraints (models.Constraint):
 `UNIQUE(store_id, shopify_gid)` + `UNIQUE(store_id, sale_order_id)`.
 `match_key` used: `existing_binding`/`manual` only — orders are never
 auto-matched to pre-existing sale orders; import always creates.
@@ -156,7 +186,16 @@ no longer hide under aggregate slack:
    leave Odoo's taxable base — and therefore its computed tax — too high
    and wrongly trip the tax component check below.
 2. **Taxes:** `|odoo_amount_tax − totalTaxSet.shopMoney| ≤ tol_tax =
-   r × 0.5 × N_tax_lines` (per-tax-group rounding bounded by r/2).
+   r × 0.5 × K`. **REVISED 2026-07-14 (closure §6):** `K` is the number of
+   independent Odoo tax-rounding events, **read from the company's actual
+   `res.company.tax_calculation_rounding_method`** — `K = (distinct tax
+   groups on the order)` when `round_globally` (the **Odoo-19 default**,
+   confirmed against odoo/odoo 19.0 `account/models/company.py`), or
+   `K = (taxed line × tax-line pairs)` when `round_per_line`. Shopify computes
+   tax per line, so deriving `K` from the *configured* method (not a fixed
+   `N_tax_lines`) keeps the bound tight and correct under both; the readiness
+   surface warns which method is active. The connector reads this setting,
+   never changes it.
 3. **Shipping + tip:** carried as SO lines (counted in `L`); each is
    exact to one rounding step (`≤ 0.5r`, single lines, no
    accumulation).
@@ -367,7 +406,8 @@ normally.
 
 **D-012-9 — Shipping, tips, taxes (MBQ-27 closure; OP-17).**
 Shipping: one SO line per `shippingLines` node (paginated connection —
-read `first: 10`, >10 → `data_shape_schema_mismatch`), service product
+`first: 50`, fully looped on `hasNextPage`/`endCursor` per §4, never
+truncated), service product
 "Shopify Shipping" (auto-provisioned, per store), `price_unit =
 discountedPriceSet.shopMoney.amount`, its `taxLines` mapped per T-B.
 Tips: `totalTipReceivedSet > 0` → one line, service product "Shopify
@@ -501,11 +541,11 @@ currencyCode } } subtotalPriceSet { …both… } totalTaxSet { …both… }
 totalDiscountsSet { …both… } totalShippingPriceSet { …both… }
 totalTipReceivedSet { …both… } currentTotalDutiesSet { shopMoney {
 amount } } taxLines { title rate ratePercentage priceSet { shopMoney {
-amount } } channelLiable } shippingLines(first: 10) { nodes { id title
+amount } } channelLiable } shippingLines(first: 50) { nodes { id title
 code custom discountedPriceSet { shopMoney { amount } } taxLines {
 title rate ratePercentage priceSet { shopMoney { amount } } } } pageInfo {
-hasNextPage } } discountApplications(first: 20) { nodes { allocationMethod
-targetSelection targetType } pageInfo { hasNextPage } } lineItems(first:
+hasNextPage endCursor } } discountApplications(first: 50) { nodes { index allocationMethod
+targetSelection targetType } pageInfo { hasNextPage endCursor } } lineItems(first:
 100) { nodes { id name title quantity currentQuantity sku isGiftCard
 requiresShipping taxable variantTitle vendor variant { id }
 product { id } originalUnitPriceSet { shopMoney { amount } }
@@ -513,8 +553,23 @@ discountedUnitPriceSet { shopMoney { amount } } discountAllocations {
 allocatedAmountSet { shopMoney { amount } } discountApplication {
 targetType } } taxLines { title rate ratePercentage priceSet { shopMoney { amount } }
 channelLiable } customAttributes { key value } } pageInfo { hasNextPage
-} }` — >100 line items or >10 shipping lines → hold
-(`data_shape_schema_mismatch`), never truncate (Task 010 precedent).
+endCursor } }`. **Pagination — REVISED 2026-07-14 (closure §4.2): the three
+order-level connections are FULLY PAGINATED, not rejected at one page.**
+`lineItems`, `shippingLines`, and `discountApplications` are GraphQL
+connections (page-size max 250; the query uses `first: 100`/`first: 50`,
+well under the 1,000-point single-query cost cap); the importer loops
+`while pageInfo.hasNextPage` with `after: endCursor`, accumulating `nodes`,
+**cursors used only within this one order read and never persisted**
+(cursor durability is officially undocumented). A large legitimate order
+(e.g. 150 lines) is NOT a malformed payload and must not be rejected as
+one; the earlier "hold on `hasNextPage`" stance is withdrawn. A hard
+page-count ceiling `ORDER_PAGE_LIMIT` (default 50 pages) backstops runaway
+loops → `data_shape_schema_mismatch` **with a log line naming the ceiling**
+(no silent truncation). The line-level `discountAllocations`, `taxLines`,
+and `customAttributes` are plain lists (no nested pagination); `Order.taxLines`
+is likewise a plain list. Genuinely malformed pages (missing `pageInfo`,
+null where non-null expected) → `data_shape_schema_mismatch`; the
+total-check guard (§D-012-2) remains the mathematical backstop.
 Read-only; zero mutations; scope: `read_orders` (already granted;
 customer sub-object needs `read_customers`, also granted). Job type
 `order_import_sync` via the three seams, gated `sale_domain_enabled`.
@@ -632,8 +687,11 @@ fields and the SOL field are additive (no migration).
 
 Sequencing/master plan: `../08-release-readiness/implementation-ready-master-plan.md`.
 UAT scenarios 6/7/8 map to this task. Register impacts on acceptance:
-OP-14/15/16/17 → Resolved-by-packet; MBQ-55 order portion → Accepted;
-MBQ-56/MBQ-27/DEC-020-residual → Resolved at decision level.
+OP-14/15/16/17 → Resolved-by-packet (proposed); MBQ-55 order portion →
+proposed via D-012-1; MBQ-56/MBQ-27/DEC-020-residual → **proposed
+resolution** in the decision-closure and this packet, **pending control-room
+acceptance** (the MBQ register records proposed-resolution status only, not
+acceptance).
 
 **Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** the
 `order_import_sync` `job_type` `selection_add` `ondelete` uses the LC-1
@@ -645,26 +703,50 @@ declares `_odoo_binding_field_name()` returning `sale_order_id`.
 ## 15. Locked final implementation prompt (Task 012)
 
 ```text
-DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS THIS PLANNING PACKAGE,
-EXPLICITLY OPENS THE ORDER-DOMAIN GATE, VERIFIES THE CURRENT BASE SHA,
-AND ISSUES THIS PROMPT. (Prerequisites: CORE-R1, Task 010B, and
-Task 011B merged runtime-green — the revised critical path.)
+DO NOT USE UNTIL A SEPARATE CHATGPT CONTROL-ROOM GATE REVIEWS AND ACCEPTS
+THIS PLANNING PACKAGE AND THE DECISION-CLOSURE, EXPLICITLY OPENS THE
+ORDER-DOMAIN GATE, VERIFIES THE CURRENT BASE SHA, AND ISSUES THIS PROMPT.
+This prompt is UNUSABLE until that gate act. Accepting this packet or the
+closure does NOT open the gate.
+
+DEPENDENCY-COMPLETE PRECONDITIONS — ALL must be MERGED runtime-green before
+this prompt may be issued (none is merged as of the 2026-07-14 closure):
+  1. CORE-R2 full SRR-03 disconnect-quiescence remediation (only
+     "Foundation Slice 1" is merged today; the register FORBIDS
+     merging/enabling/live-validating any Shopify-calling domain handler
+     until the full fix is runtime-green — parallel development is allowed).
+  2. PR #151 — Task 010B (complete variant bindings) merged.
+  3. PR #150 — Task 011B (indexed shopify_connector_email_normalized lookup)
+     merged — the guest customer path reuses it at order-import volume.
+  4. Task LC-1 merged (DEC-030 accepted) — so the core callable
+     _reassign_to_historic_job_type exists for this job_type's ondelete.
+  5. CORE-R1 (stores reach `connected`) merged — required for live validation.
+STOP if any precondition is unmet or if the Shopify-connector tip does not
+match the SHA ChatGPT states when issuing this prompt.
 
 You are Claude Code implementing Task 012 — Shopify order import —
 in AdamsOdoo/Adams, branch from the CURRENT verified Shopify-connector
-tip (STOP if it does not match the SHA ChatGPT states when issuing
-this prompt). One session; draft PR; stop.
+tip. One session; draft PR; stop.
 
-Read first: docs/07-implementation-plan/task-012-order-import-implementation-packet.md
+NO LIVE SHOPIFY REQUEST occurs during implementation or its tests: the
+importer is read-only toward Shopify and every test uses fixtures/mocks at
+the merged API seam (VAL-B2 live validation stays independent and is NOT
+part of this task).
+
+Read first: docs/03-architecture/task-012-order-import-decision-closure.md
+(the finalized decisions — authoritative where it and this packet differ),
+docs/07-implementation-plan/task-012-order-import-implementation-packet.md
 (the D-012-1..12 decisions — binding once this packet is accepted),
 docs/03-architecture/final-mvp-module-and-dependency-architecture.md
 §3–§7, docs/00-source-materials/shopify-orders-inventory-fulfillment-product-partner-captures-2026-07-10.md
-§2/§8, and the merged shopify_connector_sale/product/core code.
+§2/§8, and the merged shopify_connector_sale/product/core code (esp.
+execute_business, _transition_skipped, operation_scope_key, idempotency_key,
+redact/_system_append).
 
 ALLOWED FILES (exhaustive):
   addons/shopify_connector_sale/__manifest__.py           (depends += shopify_connector_product, sale; version bump)
   addons/shopify_connector_sale/models/__init__.py
-  addons/shopify_connector_sale/models/shopify_connector_order_binding.py     (NEW)
+  addons/shopify_connector_sale/models/shopify_connector_order_binding.py     (NEW — money snapshots are Char/exact-decimal-string, never Float; shop+presentment totals + component snapshots; no customer PII on the binding)
   addons/shopify_connector_sale/models/shopify_connector_order_importer.py    (NEW — importer service + job seams + REDACTION_EXTENSION)
   addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py   (NEW — shopify_line_item_gid only)
   addons/shopify_connector_sale/models/shopify_connector_store_settings.py    (order_import_confirmation_policy — NO default, unset holds imports; order_import_include_test; order_tax_autocreate — default False; order_company_id; order_pricelist_id; order_sales_team_id; sale_order_last_import_checkpoint_at — inert checkpoint)
@@ -682,11 +764,17 @@ webhook/OAuth/controller/CI/workflow/requirements/Docker file; any
 invoice/payment/refund/inventory/fulfillment model or logic; plain
 dev; main.
 
-IMPLEMENT exactly per the packet: D-012-1 binding schema (explicit
-_name+_inherit, models.Constraint, dual uniqueness); D-012-2 REVISED
+IMPLEMENT exactly per the packet and closure: D-012-1 binding schema (explicit
+_name+_inherit, models.Constraint, dual uniqueness; ALL money snapshots as
+Char/exact Shopify decimal string parsed with decimal.Decimal, NEVER Float;
+shop AND presentment total snapshots per DEC-020; no customer PII stored on
+the binding); D-012-2 REVISED
 component-based guard (lines/taxes/shipping+tip component checks with
 the packet's exact tolerance formulas derived from
-res.currency.rounding; total bound = sum of the per-line and per-tax
+res.currency.rounding; the tax-tolerance count K is read from the company's
+actual tax_calculation_rounding_method — distinct tax groups under
+round_globally (the Odoo-19 default), taxed line×tax pairs under
+round_per_line; total bound = sum of the per-line and per-tax
 rounding tolerances with NO fixed or currency-relative cap; order-level
 discount allocations written to a native Odoo discount % only when
 faithful to within 0.5r, otherwise carried by an exact negative
@@ -736,8 +824,14 @@ D-012-10/11 currency/pricelist/company/team resolution and UTC parsing;
 D-012-12 evidence-refresh-only re-import (note-type log rows) with the
 source-level no-SO-write guard test + the module-local
 REDACTION_EXTENSION pre-redaction pass. Single ORDER_IMPORT_QUERY
-constant exactly as packet §4 (query-only, first:100 lines / first:10
-shipping, hold on hasNextPage). Job type order_import_sync via the
+constant exactly as packet §4 (query-only, read-only); the three order-level
+connections (lineItems first:100, shippingLines/discountApplications first:50)
+are FULLY PAGINATED with a bounded cursor loop on hasNextPage/endCursor —
+never reject a large legitimate order; cursors are used only within one order
+read and never persisted; ORDER_PAGE_LIMIT (default 50 pages) backstops
+runaway loops -> data_shape_schema_mismatch naming the ceiling (no silent
+truncation); line-level lists (discountAllocations/taxLines/customAttributes)
+and Order.taxLines are plain lists (no nested pagination). Job type order_import_sync via the
 three seams gated on sale_domain_enabled; job targeting
 res_model='shopify.connector.store' + shopify_target_gid=<Order GID>
 (packet §4 — the documented deviation that keeps operation_scope_key
@@ -745,12 +839,21 @@ populated on first import). One savepoint per order. Reuse the existing customer
 duplicate matching logic. All §6 test files with every named case,
 incl. negative matrix and source-level guards.
 
-HARD CONSTRAINTS: read-only toward Shopify — zero mutation anywhere;
-no blind retry of anything; no new error class; no force/bypass flag;
-PII-minimal logs via redact() + REDACTION_EXTENSION; email remains the
-sole automatic customer key; VAL-B2 / MBQ-05 / TD-002 / SRR-03/04/09 /
-Lite-Full untouched; the claim/dispatch concurrency caveat is restated,
-not resolved. Runtime: full Odoo.sh run must be green before merge
+HARD CONSTRAINTS: read-only toward Shopify — zero mutation anywhere, NO
+live Shopify request in code or tests (fixtures/mocks only);
+no blind retry of anything (RA-014); no new error class (the 16-class
+registry is untouched; divergent-currency/duties/test/pre-cancelled route to
+`skipped` policy with NO error class, never overloading
+financial_total_mismatch); no force/bypass flag; every Shopify read runs
+inside `with execute_business(job, store, query, variables)`;
+PII-minimal logs via redact() + REDACTION_EXTENSION; NO raw GraphQL payload
+or token persisted anywhere; email remains the
+sole automatic customer key (RA-006); existing partners' own fields never
+mutated (only invoice/delivery child rows added); VAL-B2 / MBQ-05 / TD-002 /
+SRR-03/04/09 / Lite-Full untouched; the claim/dispatch concurrency caveat and
+the SRR-03/disconnect race are restated, not resolved (Task 012 does NOT wire
+ShopifyQuiescedError->skipped — that is a later CORE-R2 slice). Runtime: full
+Odoo.sh run must be green before merge
 review (quote the result verbatim; OP-43 rule). Static: py_compile,
 pyflakes, docutils-clean docstrings, AST single-execute guard.
 
