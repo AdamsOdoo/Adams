@@ -41,22 +41,28 @@ import re
 import threading
 import traceback
 import uuid
+from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import SUPERUSER_ID, api, fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
 from ..models import shopify_connector_api_client as client_module
+from ..models import shopify_connector_store as store_module
 from ..models.shopify_connector_api_client import (
     ERROR_AUTH,
     ERROR_TEMPORARY,
     REASON_TOKEN_INVALID,
     ShopifyClientError,
     ShopifyQuiescedError,
+)
+from ..models.shopify_connector_job_dispatch import (
+    DISCONNECT_QUIESCE_TIMEOUT,
+    POLL_DELAY,
 )
 from .test_api_client import FakeResponse, _success_body
 
@@ -1141,3 +1147,698 @@ class TestGenuineRealAdmission(TransactionCase):
             cleanup_src.index('shopify_connector_job_log'),
             cleanup_src.index('DELETE FROM shopify_connector_job WHERE'),
             'job logs must be deleted before jobs (FK restrict)')
+
+
+# ======================================================================
+# CORE-R2 Foundation Slice 2A — disconnect lifecycle, quiescence
+# controller, timeout finalization, credential-clear ordering.
+#
+# These classes exercise the Slice-2A production path: the two-phase
+# `action_disconnect`, the `_run_disconnect_quiesce` controller + one-store
+# selection, direction-C lease interpretation, `completed`/`timed_out`
+# finalization + credential-clear ordering, and the delayed re-poll. The
+# TransactionCase classes drive the real production methods (single
+# connection); genuine cross-connection controller *selection* (locked-first
+# / all-locked) is proven by `TestDisconnectControllerSelectionGenuine` using
+# independent `db_connect` connections, mirroring `TestGenuineRealAdmission`.
+# No live Shopify call, no lifecycle/state monkeypatch, no test-only timing
+# hook (timeout is exercised by writing `disconnect_requested_at` -- a data
+# value, not a clock fake).
+# ======================================================================
+
+
+class _DisconnectHelpers:
+    """Shared fixtures/helpers for the Slice 2A tests (mixin, not a TestCase)."""
+
+    def _make_store(self, state='connected', **vals):
+        base = {
+            'name': 'Disc Store',
+            'shop_domain': 'disc-%s.myshopify.com' % uuid.uuid4().hex,
+            'api_version': '2026-07',
+            'state': state,
+        }
+        base.update(vals)
+        return self.env['shopify.connector.store'].create(base)
+
+    def _connected_with_token(self):
+        store = self._make_store(state='connected')
+        # action_set_token demotes a connected store to reconnect_needed; re-
+        # assert connected (the canonical fixture pattern used across the suite).
+        self.env['shopify.connector.store.credential'].action_set_token(
+            store, DUMMY_TOKEN
+        )
+        store.write({'state': 'connected'})
+        return store
+
+    def _credential(self, store):
+        return self.env['shopify.connector.store.credential'].search(
+            [('store_id', '=', store.id)], limit=1
+        )
+
+    def _disconnecting_store(self, requested_at=None, with_credential=False):
+        store = (
+            self._connected_with_token() if with_credential
+            else self._make_store(state='connected')
+        )
+        store.write({
+            'state': 'disconnecting',
+            'disconnect_status': 'requested',
+            'disconnect_requested_at': requested_at or fields.Datetime.now(),
+        })
+        return store
+
+    def _make_lease(self, store, admitted_at=None, expires_at=None, job_id=1):
+        now = fields.Datetime.now()
+        return self.env['shopify.connector.call.lease'].create({
+            'store_id': store.id,
+            'lease_key': uuid.uuid4().hex,
+            'job_id': job_id,
+            'admitted_at': admitted_at or now,
+            'expires_at': expires_at or (now + timedelta(seconds=300)),
+        })
+
+    def _lease_count(self, store):
+        return self.env['shopify.connector.call.lease'].search_count(
+            [('store_id', '=', store.id)]
+        )
+
+    def _audit_jobs(self, store):
+        return self.env['shopify.connector.job'].search([
+            ('store_id', '=', store.id),
+            ('job_source', '=', 'setup_readiness_check'),
+            ('job_type', '=', 'core_manual_maintenance'),
+        ])
+
+    def _disconnect_cron(self):
+        return self.env.ref(
+            'shopify_connector_core.ir_cron_shopify_connector_disconnect_quiesce'
+        )
+
+    def _cron_triggers(self, cron):
+        return self.env['ir.cron.trigger'].search([('cron_id', '=', cron.id)])
+
+
+class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
+    """Phase-1 two-phase `action_disconnect` + lifecycle request matrix."""
+
+    # 1. connected -> disconnecting request (NOT disconnected; credential kept).
+    def test_connected_moves_to_disconnecting(self):
+        store = self._connected_with_token()
+        store.action_disconnect()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnecting')
+        self.assertEqual(store.disconnect_status, 'requested')
+        self.assertTrue(store.disconnect_requested_at)
+        self.assertEqual(store.disconnect_requested_by, self.env.user)
+        # Credential is NOT cleared in Phase 1 (analysis §15).
+        self.assertTrue(store.credential_present)
+        self.assertTrue(self._credential(store).access_token)
+        self.assertFalse(store.disconnect_completed_at)
+
+    # 2. generation increments exactly once.
+    def test_disconnect_bumps_generation_exactly_once(self):
+        store = self._make_store(state='connected')
+        self.assertEqual(store.connection_generation, 0)
+        store.action_disconnect()
+        store.invalidate_recordset()
+        self.assertEqual(store.connection_generation, 1)
+
+    # 3. repeated disconnect is an audited idempotent no-op.
+    def test_repeated_disconnect_is_audited_noop(self):
+        store = self._make_store(state='connected')
+        store.action_disconnect()
+        store.invalidate_recordset()
+        gen_after_first = store.connection_generation
+        audits_after_first = len(self._audit_jobs(store))
+        # Second call: no state change, NO second generation bump, one more
+        # audited no-op.
+        store.action_disconnect()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnecting')
+        self.assertEqual(store.connection_generation, gen_after_first)
+        self.assertEqual(len(self._audit_jobs(store)), audits_after_first + 1)
+        # A third call on an already-disconnected store is also a no-op.
+        store.write({'state': 'disconnected'})
+        store.action_disconnect()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnected')
+        self.assertEqual(store.connection_generation, gen_after_first)
+
+    # Phase-1 A/B sweep cancels queued/retry_waiting business jobs only.
+    def test_phase1_sweeps_queued_and_retry_waiting_only(self):
+        store = self._make_store(state='connected')
+        Job = self.env['shopify.connector.job']
+        queued = Job.create({
+            'store_id': store.id, 'job_source': 'manual_sync',
+            'job_type': 'core_dispatch_selftest', 'state': 'queued',
+            'payload_hash': uuid.uuid4().hex,
+        })
+        retry = Job.create({
+            'store_id': store.id, 'job_source': 'webhook',
+            'job_type': 'core_dispatch_selftest', 'state': 'draft',
+            'payload_hash': uuid.uuid4().hex,
+        })
+        retry.write({
+            'state': 'retry_waiting', 'next_retry_at': fields.Datetime.now(),
+            'retry_count': 1,
+        })
+        store.action_disconnect()
+        for job in (queued, retry):
+            job.invalidate_recordset()
+            self.assertEqual(job.state, 'cancelled')
+            self.assertEqual(job.cancel_reason, 'Store disconnecting.')
+
+    # 18. Phase-1 sweep never writes a running/claimed business job row.
+    def test_phase1_sweep_never_writes_running_job(self):
+        store = self._make_store(state='connected')
+        running = self.env['shopify.connector.job'].create({
+            'store_id': store.id, 'job_source': 'scheduled_sync',
+            'job_type': 'core_dispatch_selftest', 'state': 'running',
+            'payload_hash': uuid.uuid4().hex,
+            'started_at': fields.Datetime.now(),
+        })
+        store.action_disconnect()
+        running.invalidate_recordset()
+        # The running row is not a sweep candidate (domain is queued/
+        # retry_waiting) -> left untouched, never cancelled, never written.
+        self.assertEqual(running.state, 'running')
+        self.assertFalse(running.cancel_reason)
+
+    # 19. disconnecting is non-startable for business jobs.
+    def test_disconnecting_business_job_not_startable(self):
+        store = self._make_store(state='connected')
+        job = self.env['shopify.connector.job'].create({
+            'store_id': store.id, 'job_source': 'manual_sync',
+            'job_type': 'core_dispatch_selftest', 'state': 'queued',
+            'payload_hash': uuid.uuid4().hex,
+        })
+        # Move to disconnecting WITHOUT the Phase-1 sweep, so the job survives to
+        # attempt a start.
+        store.write({'state': 'disconnecting'})
+        with self.assertRaises(ValidationError):
+            job.write({'state': 'running'})
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'queued')
+
+    # 20. action_test_connection is refused while disconnecting.
+    def test_action_test_connection_refused_while_disconnecting(self):
+        store = self._connected_with_token()
+        store.write({'state': 'disconnecting'})
+        with self.assertRaises(UserError):
+            store.action_test_connection()
+        # No audit/test job was created by the refused attempt.
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'core_test_connection'),
+        ]))
+
+    # 20. execute_lifecycle refuses test connection during disconnecting.
+    def test_execute_lifecycle_refuses_test_connection_while_disconnecting(self):
+        store = self._connected_with_token()
+        store.write({'state': 'disconnecting'})
+        Client = self.env['shopify.connector.api.client']
+        with self.assertRaises(UserError):
+            Client.execute_lifecycle(
+                store, 'query { shop { id } }', purpose='test_connection'
+            )
+        # An unknown purpose also fails closed.
+        with self.assertRaises(UserError):
+            Client.execute_lifecycle(store, 'q', purpose='not_a_purpose')
+
+    # Activation and reconnect lifecycle operations are refused during
+    # disconnecting (matrix §8).
+    def test_activate_and_reconnect_refused_while_disconnecting(self):
+        store = self._connected_with_token()
+        store.write({'state': 'disconnecting'})
+        with self.assertRaises(UserError):
+            store.action_activate()
+        with self.assertRaises(UserError):
+            store.action_reconnect()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnecting')
+
+    # A successful activation bumps the generation exactly once (matrix §8).
+    def test_activation_bumps_generation(self):
+        store = self._connected_with_token()
+        store.write({'state': 'reconnect_needed'})
+        now = fields.Datetime.now()
+        store.write({
+            'last_test_connection_result': 'pass',
+            'last_readiness_result': 'pass',
+            'credential_last_verified_at': now,
+            'last_readiness_at': now,
+        })
+        gen_before = store.connection_generation
+        store.action_activate()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'connected')
+        self.assertEqual(store.connection_generation, gen_before + 1)
+
+
+class TestQuiescenceController(_DisconnectHelpers, TransactionCase):
+    """The `_run_disconnect_quiesce` controller + direction-C finalization."""
+
+    # 5 / 23. zero leases -> completed -> credential cleared -> disconnected.
+    def test_zero_leases_completes_clears_credential(self):
+        store = self._connected_with_token()
+        store.action_disconnect()                    # -> disconnecting
+        self.assertEqual(self._lease_count(store), 0)
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnected')
+        self.assertEqual(store.disconnect_status, 'completed')
+        self.assertTrue(store.disconnect_completed_at)
+        self.assertFalse(store.credential_present)
+        self.assertFalse(self._credential(store).access_token)
+        self.assertEqual(self._credential(store).credential_state, 'absent')
+
+    # 4. credential remains present while leases exist before timeout.
+    def test_credential_present_while_leases_before_timeout(self):
+        store = self._disconnecting_store(
+            requested_at=fields.Datetime.now(), with_credential=True
+        )
+        self._make_lease(store)
+        store._process_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnecting')
+        self.assertEqual(store.disconnect_status, 'quiescing')
+        self.assertTrue(store.credential_present)
+        self.assertTrue(self._credential(store).access_token)
+
+    # 6. one live lease -> quiescing, no credential clear, snapshot written.
+    def test_one_live_lease_quiescing(self):
+        store = self._disconnecting_store(
+            requested_at=fields.Datetime.now(), with_credential=True
+        )
+        self._make_lease(store)
+        store._process_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.disconnect_status, 'quiescing')
+        self.assertEqual(store.disconnect_open_lease_count, 1)
+        self.assertTrue(store.disconnect_oldest_admitted_at)
+        self.assertTrue(store.credential_present)
+
+    # 7. one EXPIRED, unreleased lease still -> quiescing before timeout
+    # (direction C: expired = unknown/live, still counts).
+    def test_expired_lease_still_quiescing_before_timeout(self):
+        store = self._disconnecting_store(
+            requested_at=fields.Datetime.now(), with_credential=True
+        )
+        now = fields.Datetime.now()
+        self._make_lease(
+            store,
+            admitted_at=now - timedelta(seconds=600),
+            expires_at=now - timedelta(seconds=1),      # already expired
+        )
+        store._process_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.disconnect_status, 'quiescing')
+        self.assertEqual(store.disconnect_open_lease_count, 1)
+        self.assertTrue(store.credential_present)       # never reaped -> no clear
+        self.assertNotEqual(store.disconnect_status, 'completed')
+
+    # 8 / 24. lease rows at the deadline -> timed_out, never completed, distinct.
+    def test_leases_at_deadline_timed_out(self):
+        store = self._disconnecting_store(
+            requested_at=(
+                fields.Datetime.now()
+                - DISCONNECT_QUIESCE_TIMEOUT - timedelta(minutes=1)
+            ),
+            with_credential=True,
+        )
+        self._make_lease(store)
+        store._process_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.disconnect_status, 'timed_out')
+        self.assertEqual(store.state, 'disconnected')
+        self.assertNotEqual(store.disconnect_status, 'completed')
+
+    # 9. timed_out finalization clears the credential.
+    def test_timed_out_clears_credential(self):
+        store = self._disconnecting_store(
+            requested_at=(
+                fields.Datetime.now()
+                - DISCONNECT_QUIESCE_TIMEOUT - timedelta(minutes=1)
+            ),
+            with_credential=True,
+        )
+        self._make_lease(store)
+        store._process_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertFalse(store.credential_present)
+        self.assertFalse(self._credential(store).access_token)
+
+    # 10. timed_out lease cleanup occurs ONLY AFTER finalization.
+    def test_timed_out_cleans_leases_only_after_finalize(self):
+        store = self._disconnecting_store(
+            requested_at=(
+                fields.Datetime.now()
+                - DISCONNECT_QUIESCE_TIMEOUT - timedelta(minutes=1)
+            ),
+            with_credential=True,
+        )
+        self._make_lease(store)
+        self._make_lease(store, job_id=2)
+        self.assertEqual(self._lease_count(store), 2)
+        store._process_disconnect_quiesce()
+        store.invalidate_recordset()
+        # Snapshot recorded the outstanding count BEFORE cleanup...
+        self.assertEqual(store.disconnect_open_lease_count, 2)
+        self.assertEqual(store.disconnect_status, 'timed_out')
+        # ...and the residual rows are cleaned up only after timed_out finalize.
+        self.assertEqual(self._lease_count(store), 0)
+
+    # 23. `completed` requires exactly zero lease rows.
+    def test_completed_requires_zero_lease_rows(self):
+        store = self._disconnecting_store(
+            requested_at=fields.Datetime.now(), with_credential=True
+        )
+        self._make_lease(store)
+        store._process_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertNotEqual(store.disconnect_status, 'completed')
+        self.assertNotEqual(store.state, 'disconnected')
+
+    # 11 / 12. still-quiescing store schedules a DELAYED re-poll
+    # (at >= now + POLL_DELAY), never an immediate/busy re-trigger.
+    def test_quiescing_schedules_delayed_repoll(self):
+        store = self._disconnecting_store(requested_at=fields.Datetime.now())
+        self._make_lease(store)
+        cron = self._disconnect_cron()
+        self._cron_triggers(cron).unlink()          # isolate this pass's trigger
+        before = fields.Datetime.now()
+        store._process_disconnect_quiesce()
+        after = fields.Datetime.now()
+        triggers = self._cron_triggers(cron)
+        self.assertTrue(triggers, 'a delayed re-poll trigger must be scheduled')
+        for trig in triggers:
+            # delayed by >= POLL_DELAY (no immediate same-store re-trigger)...
+            self.assertGreaterEqual(trig.call_at, before + POLL_DELAY)
+            # ...and not further out than one POLL_DELAY from this pass.
+            self.assertLessEqual(
+                trig.call_at, after + POLL_DELAY + timedelta(seconds=5)
+            )
+
+    # 14. exactly one store is processed per controller invocation.
+    def test_one_store_per_invocation(self):
+        now = fields.Datetime.now()
+        store_a = self._disconnecting_store(
+            requested_at=now - timedelta(seconds=20)     # older -> selected first
+        )
+        store_b = self._disconnecting_store(
+            requested_at=now - timedelta(seconds=5)
+        )
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
+        store_a.invalidate_recordset()
+        store_b.invalidate_recordset()
+        self.assertEqual(store_a.state, 'disconnected')  # processed (0 leases)
+        self.assertEqual(store_b.state, 'disconnecting')  # untouched this pass
+
+    # 16. duplicate controller invocation is idempotent (no double-finalize).
+    def test_controller_duplicate_invocation_idempotent(self):
+        store = self._connected_with_token()
+        store.action_disconnect()
+        Controller = self.env['shopify.connector.store']
+        Controller._run_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.disconnect_status, 'completed')
+        completed_at = store.disconnect_completed_at
+        audits_before = len(self._audit_jobs(store))
+        # A second pass must not re-finalize the now-disconnected store.
+        Controller._run_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.disconnect_status, 'completed')
+        self.assertEqual(store.disconnect_completed_at, completed_at)
+        self.assertEqual(len(self._audit_jobs(store)), audits_before)
+
+    # 22. no token/credential enters the disconnect status/snapshot/audit.
+    def test_no_secret_in_disconnect_fields_and_audit(self):
+        store = self._disconnecting_store(
+            requested_at=(
+                fields.Datetime.now()
+                - DISCONNECT_QUIESCE_TIMEOUT - timedelta(minutes=1)
+            ),
+            with_credential=True,
+        )
+        self._make_lease(store)
+        store._process_disconnect_quiesce()            # -> timed_out, snapshot
+        store.invalidate_recordset()
+        self.assertEqual(store.disconnect_status, 'timed_out')
+        # Store char/text fields carry no token...
+        for fname, field in store._fields.items():
+            if field.type in ('char', 'text') and store[fname]:
+                self.assertNotIn(DUMMY_TOKEN, store[fname])
+        # ...nor do the audit jobs/logs for this store.
+        jobs = self.env['shopify.connector.job'].search(
+            [('store_id', '=', store.id)]
+        )
+        logs = self.env['shopify.connector.job.log'].search(
+            [('job_id', 'in', jobs.ids)]
+        )
+        for recs in (jobs, logs):
+            for rec in recs:
+                for fname, field in rec._fields.items():
+                    if field.type in ('char', 'text') and rec[fname]:
+                        self.assertNotIn(DUMMY_TOKEN, rec[fname])
+
+
+class TestDisconnectSourceGuards(_DisconnectHelpers, TransactionCase):
+    """Source-level guards for the Slice 2A store controller/lifecycle."""
+
+    # 17. No explicit request/main-cursor commit anywhere in the store model.
+    def test_no_main_cursor_commit_in_store_source(self):
+        src = inspect.getsource(store_module)
+        self.assertNotIn('self.env.cr.commit', src)
+        self.assertNotIn('self._cr.commit', src)
+        self.assertNotIn('self.env.cr.rollback', src)
+        self.assertNotIn('.commit()', src)
+
+    # Controller selection is the corrected FOR UPDATE SKIP LOCKED LIMIT 1.
+    def test_controller_uses_skip_locked_limit_one(self):
+        src = inspect.getsource(
+            store_module.ShopifyConnectorStore._run_disconnect_quiesce
+        )
+        self.assertIn('try_lock_for_update(limit=1)', src)
+
+    # The generation-changing lifecycle lock is a BLOCKING FOR NO KEY UPDATE
+    # (never SKIP LOCKED -- a lifecycle transition must wait, not be skipped).
+    def test_lifecycle_lock_is_blocking_for_no_key_update(self):
+        src = inspect.getsource(
+            store_module.ShopifyConnectorStore._lock_store_for_lifecycle
+        )
+        self.assertIn('FOR NO KEY UPDATE', src)
+        self.assertNotIn('SKIP LOCKED', src)
+
+    # Delayed re-poll uses _trigger(at=...); no immediate same-store re-trigger
+    # from a quiescing pass; no busy loop / sleep anywhere.
+    def test_delayed_repoll_and_no_busy_loop(self):
+        proc_src = inspect.getsource(
+            store_module.ShopifyConnectorStore._process_disconnect_quiesce
+        )
+        self.assertIn('POLL_DELAY', proc_src)
+        trig_src = inspect.getsource(
+            store_module.ShopifyConnectorStore._trigger_disconnect_controller
+        )
+        self.assertIn('_trigger(at=at)', trig_src)
+        module_src = inspect.getsource(store_module)
+        self.assertNotIn('while True', module_src)
+        self.assertNotIn('time.sleep', module_src)
+        self.assertNotIn('import time', module_src)
+
+    # 21. Credential clear follows the store -> credential lock order: the
+    # controller takes the store FOR UPDATE (selection) BEFORE any finalize
+    # calls action_clear_token; Phase 1 never clears the credential.
+    def test_store_then_credential_clear_order(self):
+        controller_src = inspect.getsource(
+            store_module.ShopifyConnectorStore._run_disconnect_quiesce
+        )
+        self.assertIn('try_lock_for_update(limit=1)', controller_src)
+        for name in (
+            '_finalize_disconnect_completed', '_finalize_disconnect_timed_out',
+        ):
+            fsrc = inspect.getsource(
+                getattr(store_module.ShopifyConnectorStore, name)
+            )
+            self.assertIn('action_clear_token', fsrc)
+        phase1 = inspect.getsource(
+            store_module.ShopifyConnectorStore.action_disconnect
+        )
+        self.assertNotIn('action_clear_token', phase1)
+
+    # The controller / finalization make NO Shopify call.
+    def test_controller_makes_no_shopify_call(self):
+        for name in (
+            '_run_disconnect_quiesce', '_process_disconnect_quiesce',
+            '_finalize_disconnect_completed', '_finalize_disconnect_timed_out',
+        ):
+            src = inspect.getsource(
+                getattr(store_module.ShopifyConnectorStore, name)
+            )
+            for forbidden in (
+                '_send', 'requests', '.execute(', 'execute_business',
+                'execute_lifecycle',
+            ):
+                self.assertNotIn(forbidden, src)
+
+
+@tagged('post_install', '-at_install')
+class TestDisconnectControllerSelectionGenuine(TransactionCase):
+    """Genuine cross-connection controller selection (proofs 13 + 15).
+
+    A locked first store must not block a later unlocked one, and an all-locked
+    set must be a safe no-op. Both need a *second* connection to hold a real
+    row lock, so this uses independent `db_connect` connections (mirroring
+    `TestGenuineRealAdmission`): fixtures are committed on a bounded connection,
+    one/both stores are locked `FOR UPDATE` on a second bounded connection, the
+    real `_run_disconnect_quiesce` runs on a worker connection, results are
+    observed on a fresh connection, and teardown is bounded + fail-loud.
+    """
+
+    STATEMENT_TIMEOUT_MS = 10000
+    LOCK_TIMEOUT_MS = 8000
+
+    def _open_bounded(self, dbname):
+        cr = db_connect(dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
+    def _commit_two_disconnecting_stores(self, dbname):
+        setup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(setup, SUPERUSER_ID, {})
+            now = fields.Datetime.now()
+            ids = []
+            # store_a is the OLDER request -> ordered first by the controller.
+            for offset in (20, 5):
+                store = env['shopify.connector.store'].create({
+                    'name': 'Genuine Disc Store',
+                    'shop_domain': 'genuine-disc-%s.myshopify.com'
+                    % uuid.uuid4().hex,
+                    'api_version': '2026-07',
+                    'state': 'disconnecting',
+                    'disconnect_status': 'requested',
+                    'disconnect_requested_at': now - timedelta(seconds=offset),
+                })
+                env['shopify.connector.call.lease'].create({
+                    'store_id': store.id,
+                    'lease_key': uuid.uuid4().hex,
+                    'job_id': 1,
+                    'admitted_at': now,
+                    'expires_at': now + timedelta(seconds=300),
+                })
+                ids.append(store.id)
+            setup.commit()
+            return ids
+        finally:
+            setup.close()
+
+    def _status(self, dbname, store_id):
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT disconnect_status FROM shopify_connector_store "
+                "WHERE id = %s", (store_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return row[0] if row else None
+        finally:
+            obs.close()
+
+    def _cleanup(self, dbname, store_ids):
+        if not store_ids:
+            return
+        cr = self._open_bounded(dbname)
+        try:
+            cr.execute(
+                "DELETE FROM ir_cron_trigger WHERE cron_id IN "
+                "(SELECT res_id FROM ir_model_data WHERE module = "
+                "'shopify_connector_core' AND name = "
+                "'ir_cron_shopify_connector_disconnect_quiesce')")
+            cr.execute(
+                "DELETE FROM shopify_connector_call_lease "
+                "WHERE store_id = ANY(%s)", (list(store_ids),))
+            cr.execute(
+                "DELETE FROM shopify_connector_store WHERE id = ANY(%s)",
+                (list(store_ids),))
+            cr.commit()
+        finally:
+            cr.close()
+        verifier = self._open_bounded(dbname)
+        try:
+            verifier.execute(
+                "SELECT count(*) FROM shopify_connector_store "
+                "WHERE id = ANY(%s)", (list(store_ids),))
+            self.assertEqual(
+                verifier.fetchone()[0], 0, 'store residue after cleanup')
+            verifier.execute(
+                "SELECT count(*) FROM shopify_connector_call_lease "
+                "WHERE store_id = ANY(%s)", (list(store_ids),))
+            self.assertEqual(
+                verifier.fetchone()[0], 0, 'lease residue after cleanup')
+            verifier.rollback()
+        finally:
+            verifier.close()
+
+    def _run_controller_worker(self, dbname):
+        worker = self._open_bounded(dbname)
+        try:
+            wenv = api.Environment(worker, SUPERUSER_ID, {})
+            wenv['shopify.connector.store']._run_disconnect_quiesce()
+            worker.commit()
+        finally:
+            worker.close()
+
+    # 13. A locked first store does not block a later unlocked store.
+    def test_locked_first_store_does_not_block_later(self):
+        dbname = self.env.cr.dbname
+        store_ids = []
+        lock_cr = None
+        try:
+            store_ids = self._commit_two_disconnecting_stores(dbname)
+            id_a, id_b = store_ids
+            # Hold FOR UPDATE on the FIRST (older) store on an independent
+            # connection.
+            lock_cr = self._open_bounded(dbname)
+            lock_cr.execute(
+                "SELECT id FROM shopify_connector_store WHERE id = %s "
+                "FOR UPDATE", (id_a,))
+            lock_cr.fetchone()
+            # The controller must skip the locked A and process B.
+            self._run_controller_worker(dbname)
+            self.assertEqual(self._status(dbname, id_b), 'quiescing')  # processed
+            self.assertEqual(self._status(dbname, id_a), 'requested')  # skipped
+        finally:
+            if lock_cr is not None:
+                lock_cr.rollback()
+                lock_cr.close()
+            self._cleanup(dbname, store_ids)
+
+    # 15. All eligible stores locked -> the controller is a safe no-op.
+    def test_all_locked_is_safe_noop(self):
+        dbname = self.env.cr.dbname
+        store_ids = []
+        lock_cr = None
+        try:
+            store_ids = self._commit_two_disconnecting_stores(dbname)
+            lock_cr = self._open_bounded(dbname)
+            lock_cr.execute(
+                "SELECT id FROM shopify_connector_store WHERE id = ANY(%s) "
+                "FOR UPDATE", (list(store_ids),))
+            lock_cr.fetchall()
+            # Every eligible row is locked -> this pass processes nothing.
+            self._run_controller_worker(dbname)
+            for sid in store_ids:
+                self.assertEqual(self._status(dbname, sid), 'requested')
+        finally:
+            if lock_cr is not None:
+                lock_cr.rollback()
+                lock_cr.close()
+            self._cleanup(dbname, store_ids)
