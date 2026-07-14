@@ -8,6 +8,59 @@
 > control-room action and is **not** modified here (that file is outside this
 > session's allowed-files list).
 
+## 0-e. Round-6 correction — 2026-07-14 (control-room review `4692656343`)
+
+A sixth REVISE (docs-only, same five files; PR #159 stays draft/unmerged):
+
+1. **AdditionalFee contract + minimal-privacy design** — official schema corrected
+   to `AdditionalFee{ id:ID! name:String! price:MoneyBag! taxLines:[TaxLine!]! }`;
+   every "name is the only differentiator / safe non-PII category label" statement
+   removed. Task 012 MVP **does not query `Order.additionalFees` at all** — the
+   aggregate `currentTotalAdditionalFeesSet`/`currentTotalDutiesSet` drives the
+   skip; no `AdditionalFee.name`/price/`taxLines` is requested, stored, or logged;
+   evidence = reason + aggregate amount + currency. `AdditionalFee.id` is
+   acknowledged as the post-MVP identifier. (closure §4.1/§6.0.3; packet §4)
+2. **Collision-safe hashed evidence fingerprint** — `shopify_tax_evidence_key` is
+   now a **cryptographic hash of the FULL, untruncated** normalized tuple
+   (`ratePercentage`, `title`, null-safe `source`, `channelLiable` tri-state,
+   inclusion), serialized deterministically; **no truncation before hashing**.
+   Separate **redacted/truncated** `title_preview`/`source_preview` display fields
+   exist for the protected operator UI only; raw title/source never enter ordinary
+   logs. `title`/`source`/`channelLiable` are called an **evidence fingerprint**,
+   not officially stable identifiers; changed evidence → a new, unmapped
+   fingerprint. (closure §5.2a)
+3. **Explicit-mapping-only tax policy** — automatic rate-only resolution removed.
+   Every distinct fingerprint requires an explicit `shopify.connector.tax.mapping`
+   row (zero → hold; >1 → defect/hold; must resolve to one active `sale` tax in the
+   correct company; fiscal-position revalidated; one fingerprint can never silently
+   change its Odoo tax). A same-rate Odoo tax may be shown as a **non-binding
+   operator suggestion**, never auto-chosen. (closure §5.2 step 2; packet D-012-8)
+4. **Tax auto-creation removed from MVP** — `order_tax_autocreate` and the
+   `"Shopify Tax {percent}%"` generator deleted from scope. Reasons recorded
+   (same-rate fingerprints ≠ same jurisdiction/accounting; unsafe default
+   repartition/accounts; generic-name collision; Odoo tax-name uniqueness;
+   operator-owned accounting). Operator flow: create/verify tax → create mapping →
+   retry. Auto-create relocated to a separately-accepted post-MVP scope. (closure
+   §5.2b; packet D-012-9)
+5. **GraphQL data-minimization** — a field-consumption matrix (query constant,
+   consumer, persistence/validation purpose, privacy class, necessity) justifies
+   every requested field; `note`, `tags`, `sourceName`, line `customAttributes`,
+   line `vendor`, `customer.displayName`, `customer.defaultAddress` are removed (no
+   MVP consumer). (closure §4.4; packet §4)
+6. **Decimal-numeric money equality** — every `MoneyV2`/`MoneyBag` equality/zero
+   test uses `money_equal`/`is_zero`: currency-code match + parsed `decimal.Decimal`
+   value comparison (never through `float`, never lexical strings), original strings
+   kept only as evidence; `Decimal("10.0") == Decimal("10.00")`, a currency
+   mismatch is never equal. Applied to totals/current totals, tax totals, shipping
+   original/current, presentment evidence, and the duty/fee/tip/cash-rounding gates.
+   (closure §3.1a)
+7. **Standard-Odoo-tax-engine terminology** — "no tax engine (rate-matching only)"
+   replaced everywhere with *"No custom connector tax engine. The standard Odoo 19
+   `account.tax` engine is authoritative for excluded base, included total, tax
+   breakdown, group and repartition behaviour."* (closure §14; packet §2)
+
+Fixtures 106–117; §17 adversarial rows 50–56.
+
 ## 0-d. Round-5 correction — 2026-07-14 (control-room review `4691931971`)
 
 A fifth REVISE (docs-only, same five files; PR #159 stays draft/unmerged):
@@ -247,9 +300,17 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   docs establish only that it applies to `totalReceived`/`totalRefunded`; Task 012
   **fails closed** on any nonzero adjustment (`unsupported_cash_rounding`) until
   the relationship is proven representable.
-- **`AdditionalFee` has no category enum** — duty-vs-import-fee is only the
-  free-text `name` [Fact]; the fee gate holds on the **nonzero amount** regardless
-  of kind, recording `name` as bounded non-PII evidence.
+- **`AdditionalFee.name` is arbitrary merchant free text (potentially PII), not a
+  category label** [Fact — round-6]; the fee gate holds on the **nonzero aggregate
+  amount** regardless of kind, and Task 012 **does not query `Order.additionalFees`
+  at all** (evidence = reason + aggregate amount + currency; no name). If a
+  post-MVP feature ever needs per-fee detail it keys on the stable
+  `AdditionalFee.id`.
+- **Tax-evidence fingerprint hash choice + Odoo tax-name-uniqueness scope**
+  [Open question — round-6] — the exact hash function (e.g. SHA-256) and canonical
+  serialization delimiting, and the precise company/country/type-of-use scope of
+  Odoo 19's tax-name uniqueness constraint, are build-time confirmations; the
+  design does not depend on a specific hash beyond "fixed, collision-resistant."
 - Empirical confirmation of the per-tax-signature **exact base equality** (§6.4a)
   and the `OC` attribution on a real mixed-discount order → named dev-store check.
 - `res.partner.company_name` as the sink for `MailingAddress.company` (confirm
@@ -270,8 +331,12 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   fixtures 66–83, §17 rows 31–39, base alignment §0.2; **round-5** all-three
   edges/cursor §4.1/§4.2, duty-first + fee-privacy §6.0.3, composite tax key
   §5.2a, tip gate §6.0.6, tax-engine rebuild §6.2/§6.4a, fixtures 84–105, §17 rows
-  40–49)
-- `docs/07-implementation-plan/task-012-decision-closure-handoff.md`
+  40–49; **round-6** additionalFees-detail-not-queried §4.1/§6.0.3, field-consumption
+  matrix §4.4, hashed fingerprint §5.2a, explicit-mapping-only §5.2, auto-create
+  removed §5.2b, Decimal-numeric equality §3.1a, tax-engine terminology §14,
+  fixtures 106–117, §17 rows 50–56)
+- `docs/07-implementation-plan/task-012-decision-closure-handoff.md` (**round-6**
+  §0-e)
 - `docs/07-implementation-plan/task-012-order-import-implementation-packet.md`
   (money→Char, canonical ledger, Option-A pagination, cost posture, tax-mapping
   safety, conditional skip seam, locked prompt; round-3 exact-line-total
@@ -279,10 +344,16 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   guards; round-4 current-state query fields, shipping gate + edge-cursor,
   fee/duty/cash-rounding gates, exact base equality, MERGED PR-#158 deps;
   **round-5** all-three edges/cursor, duty-first + fee-privacy, composite tax key,
-  tip fail-closed, tax-engine residual rebuild, locked prompt)
-- `docs/07-implementation-plan/task-012-order-import-proposed.md`
+  tip fail-closed, tax-engine residual rebuild, locked prompt; **round-6** §2
+  terminology, D-012-2 Decimal-numeric gates, D-012-8/9 hashed fingerprint +
+  explicit-mapping-only + auto-create removed, query minimization + additionalFees
+  removed, §6 test list, locked prompt)
+- `docs/07-implementation-plan/task-012-order-import-proposed.md` (**round-6**
+  MBQ-27 resolution + total-check note: hashed fingerprint, explicit-mapping-only,
+  no auto-create, data-minimization, Decimal-numeric equality, standard tax engine)
 - `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-27/56/64
-  proposed-resolution status + links only — **not** marked accepted)
+  proposed-resolution status + links only — **not** marked accepted; **round-6**
+  note refresh)
 
 ## 7. Learning feedback loop
 
@@ -366,6 +437,31 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   untaxed, trusting the rounding envelope to catch a taxed tip — but a small taxed
   difference fits inside it. *Lesson: when a component's tax treatment is unproven,
   fail closed rather than hoping the total guard absorbs it.*
+- **Don't fetch what you don't consume — especially free text.** The packet queried
+  `Order.additionalFees` (an unbounded plain list of arbitrary `name` text), plus
+  `note`/`tags`/`customAttributes`/`vendor`/`displayName`/`defaultAddress`, none of
+  which any gate or ledger read; an aggregate field already drove the skip. *Lesson:
+  build a field-consumption matrix — every requested field needs a named consumer;
+  remove the rest; retention limits do not bound what the API returns.*
+- **Hash the whole identity; never truncate before the key.** The evidence key
+  truncated the title before constructing uniqueness, so two long titles sharing a
+  prefix could collide. *Lesson: normalize and hash the FULL tuple for identity;
+  keep truncation only for human-readable display fields, never in the key.*
+- **A single-attribute match is not a whole-evidence match; auto-create is an
+  accounting decision.** Odoo `account.tax` has no Shopify source/liability, so a
+  same-rate match can't prove the right tax/account, and generating taxes by
+  `percent` collides names and picks unsafe repartition. *Lesson: require explicit
+  operator mapping for anything non-trivial; offer same-rate taxes only as a
+  suggestion; keep accounting-config creation operator-owned and out of MVP.*
+- **Compare money by value, not by string.** Lexical equality of Shopify's
+  arbitrary-precision decimal strings would reject `10.0` vs `10.00`. *Lesson:
+  parse both amounts with `decimal.Decimal`, require a currency-code match, compare
+  values, and keep the raw string only as evidence.*
+- **Name the boundary you own vs the engine that's authoritative.** Calling the
+  design "no tax engine (rate-matching only)" contradicted the fact that the
+  standard Odoo `account.tax` engine does all base/breakdown/repartition work.
+  *Lesson: state precisely "no CUSTOM connector tax engine; the standard Odoo 19
+  engine is authoritative" so the boundary is unambiguous.*
 
 ## 8. Exact next-session prompt (control-room to issue)
 
@@ -391,15 +487,24 @@ Decide per D-012 item: accept / revise / reject. In particular rule on:
 (c) the four-query Option-A contract with **all three connections in one
     `edges{ cursor node }` shape**, every current-state/tax-evidence guard field in
     the query, the shipping refund/removal gate, the `execute_business` AST guards,
-    and provisional page sizes + cost telemetry;
-(d) MBQ-27 mapped/matched-account.tax under the guard with the §5.5 safety **and
-    the composite `shopify_tax_evidence_key`** (rate+title+source+channelLiable+
-    inclusion; collision → hold — a rate-only key gives correct total/wrong tax);
+    provisional page sizes + cost telemetry, and the **data-minimized** field set
+    (field-consumption matrix §4.4; `note`/`tags`/`sourceName`/`customAttributes`/
+    `vendor`/`displayName`/`defaultAddress` removed; **`Order.additionalFees` detail
+    NOT queried** — the aggregate drives the fee skip, no `AdditionalFee.name`);
+(d) MBQ-27 **explicit-mapping-only** account.tax resolution under the standard Odoo
+    tax engine + the guard, with the §5.5 safety **and the hashed evidence
+    fingerprint `shopify_tax_evidence_key`** (full untruncated
+    rate+title+source+channelLiable+inclusion tuple; zero/>1/collision → hold; a
+    same-rate tax is an operator suggestion only, never auto-chosen; **no
+    `order_tax_autocreate` / no tax auto-create** — operator creates tax + mapping +
+    retries); and **Decimal-numeric money equality** (`money_equal`: currency match +
+    parsed-Decimal value, not lexical strings);
 (e) the closed policy-skip set — divergent currency; refunded/removed **product**;
     refunded/removed/modified **shipping**; **duty-first** duties then additional
-    fees (fee-name potentially-PII); **nonzero** cash rounding; **nonzero tip**
-    (`unsupported_tip_tax_treatment`); test; pre-cancelled — via the
-    conditional/coordinated core skip seam (terminal-state-respect guard recommended).
+    fees (**aggregate-only evidence, no fee name queried**); **nonzero** cash
+    rounding; **nonzero tip** (`unsupported_tip_tax_treatment`); test; pre-cancelled
+    — via the conditional/coordinated core skip seam (terminal-state-respect guard
+    recommended).
 
 Do NOT open the order-domain gate or issue the locked prompt until the
 CAPABILITY prerequisites (§0.1 / §4) hold in Shopify-connector — SRR-03 CLOSED;
