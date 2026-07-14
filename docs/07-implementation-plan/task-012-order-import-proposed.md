@@ -3,8 +3,23 @@
 > Planning-only future implementation task spec, part of the MVP domain
 > implementation-slicing sequence
 > ([`mvp-domain-implementation-sequence.md`](./mvp-domain-implementation-sequence.md),
-> Area 3). Describes scope/boundary/approach only — MBQ-55/MBQ-56/MBQ-27
-> remain open.
+> Area 3). Describes scope/boundary/approach only.
+> **Decision-closure update 2026-07-14 (docs-only, no gate/code/live-call):**
+> MBQ-27, MBQ-56, and the DEC-020 divergent-currency residual now have a
+> **proposed** resolution in
+> [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
+> and the implementation packet — **pending ChatGPT control-room acceptance**
+> (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
+> 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` +
+> `4692656343` + `4693694894` + `4694311215` + `4695589297` + `4696391869`),
+> not direct PR merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
+> bindings; protected/guarded customer import + indexed normalized-email matching;
+> no unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
+> accepted — delivered via the **MERGED CORE-R2 Slice-2B integration-staging
+> strategy (PR #158, review `4691064435`; merged at `Shopify-connector` tip
+> `1494b97`)**; the current unprotected PR #150/#151 heads are **not** directly
+> mergeable. **CORE-R1 is already merged** (satisfied, not pending). This branch
+> is base-aligned onto `1494b97` (round-4).
 
 ## Status
 
@@ -28,9 +43,23 @@ binding as the sole idempotency anchor.
 
 ## Preconditions
 
-- Task 010 and Task 011 merged and reviewed (product and customer
-  bindings must already resolve).
-- Foundation Tasks 002/003 merged and gate-opened.
+**Capability-based (corrected round-2, reaffirmed round-9 review `4695589297`
+item 4 — NOT direct PR merges):** the prior "Task 010 and Task 011 merged and
+reviewed" precondition is **withdrawn** (the current unprotected PR #150/#151 heads
+are not directly mergeable into `Shopify-connector`). Task 012 depends on the
+**capabilities**, however delivered:
+
+- **SRR-03 closed** (CORE-R2 disconnect quiescence proven runtime-green);
+- **protected/guarded product import + complete product/variant bindings** present
+  on `Shopify-connector` (order lines resolve; product Shopify calls run through
+  `execute_business`);
+- **protected/guarded customer import + indexed normalized-email matching** present
+  on `Shopify-connector` (guest path reuses the indexed lookup);
+- **no unguarded product/customer Shopify call remains** (the public generic
+  `execute` entry is closed);
+- these capabilities integrated via the **accepted CORE-R2 Slice-2B integration-staging
+  strategy** (PR #158), with PR #150/#151 then closed as merged or subsumed;
+- CORE-R1 is already merged (satisfied, not a pending prerequisite).
 - The "sale domain gate" (also named by
   [`ui-ux-implementation-task-map.md`](./ui-ux-implementation-task-map.md)
   Group 12 for the order-touchpoint UI extensions) explicitly opened.
@@ -93,7 +122,28 @@ engine recomputing it is genuinely open (**MBQ-27**) — an official-doc
 check against Odoo 19 accounting/taxes documentation found no documented
 supported mechanism for externally-supplied tax amounts on `sale.order`;
 the register states this "requires a dedicated ADR + ChatGPT decision"
-and explicitly blocks the order-import slice, not the core gate. A
+and explicitly blocks the order-import slice, not the core gate.
+**Proposed resolution 2026-07-14** (decision-closure §5 / packet D-012-9):
+because Odoo 19 `sale.order`/`sale.order.line` have no supported external
+tax-amount inverse (`price_tax` is compute-only; the `manual_tax_amounts`
+override exists only in `account.move`/invoice flows — re-verified against
+odoo/odoo 19.0), Shopify tax is represented by an **explicit operator mapping to
+a leaf `amount_type=='percent'` `account.tax`** keyed by a **versioned SHA-256
+tax-evidence fingerprint** (`v1:<hex>`, `SHOPIFY_TAX_FINGERPRINT_VERSION=1`, of the
+full normalized `ratePercentage`+`title`+`source`+`channelLiable`+inclusion tuple —
+**Unicode-NFC only, case and whitespace preserved, no folding, no truncation**;
+`price_include_override` on `account.tax` per `taxesIncluded`), letting the
+**standard Odoo 19 `account.tax` engine** recompute under the total-check guard —
+the price-included recompute uses a **seed + bounded §6.2b whole-order solver read
+back from the actual engine** (`special_mode='total_excluded'` is a seed, **not** an
+exact inverse — Odoo 19 symmetry holds only with an unrounded `price_unit` +
+`round_globally`, and `price_unit` is `Float`; review `4694311215` item 1) —
+**no custom connector tax engine, no automatic rate fallback, and no tax
+auto-creation** in MVP (review `4692656343`: a same-rate Odoo tax is an operator
+*suggestion* only; `order_tax_autocreate` is removed). **Group/fixed/division and
+base-affecting compound structures fail closed** (`unsupported_tax_structure`,
+deferred — review `4693694894` item 6). **Proposed, pending
+control-room acceptance**. A
 gateway → Odoo `account.journal` classification mapping is a
 partially-resolved, classification-only concept (MBQ-30) — it triggers no
 automatic journal entry, posting, or reconciliation.
@@ -106,9 +156,91 @@ totals + tax evidence + shipping evidence − discount evidence, compared
 against Shopify's own reported order total. A mismatch beyond a
 to-be-defined tolerance is classified `financial total mismatch` —
 conservative, never silent, never auto-retried, requires explicit human
-review. **Exact tolerance value and exact Shopify total field remain open
-(MBQ-56)** — the register states this "blocks the order-import task" and
-must be fixed by this task's own final §9 prompt, not assumed.
+review. **Exact tolerance mechanism and Shopify total field — proposed
+resolution 2026-07-14 (rounds 3–7, reviews `4691067575` + `4691408835` +
+`4691931971` + `4692656343` + `4693694894`)** in the decision-closure §6 / packet
+D-012-2: `totalPriceSet.shopMoney.amount` is the total comparand; each product line's
+**exact** pre-tax net is the official `priceAfterAllDiscountsBeforeTaxesSet` field
+(never `quantity × discountedUnitPriceSet`, which is an *approximate* unit price),
+reproduced in Odoo **through the actual Odoo 19 tax engine** (engine
+`total_excluded`; `price_include_override` is on `account.tax` not the SO line;
+price-included residuals derived via a **seed + bounded §6.2b whole-order solver
+recomputed through the actual engine** — `special_mode='total_excluded'` is a **seed,
+not an exact inverse** (Odoo 19 guarantees symmetry only with an unrounded `price_unit`
++ `round_globally`; `price_unit` is `Float`), accepted only from the engine readback,
+else fail closed — review `4694311215` item 1; `price_unit` crosses a Python-`float`
+ORM boundary — its column is an unconstrained NUMERIC, no fixed scale, `fields_numeric.py`).
+**Six fail-closed pre-creation gate families** (out of MVP scope → policy skip,
+never `financial_total_mismatch`; §6.0.4 is a pointer into the duty-first §6.0.3
+gate, not a seventh — review `4694311215`): **order edits** (`Order.edited == true`
+→ `unsupported_order_edit`, evaluated first — quantity/total checks alone miss
+price-only/offsetting edits, review `4693694894` item 2); refunded/removed
+**product** quantities (**with the fail-closed nullable-`totalTaxSet` rule** — a
+null original tax **fails closed** `data_shape_schema_mismatch` (no SO/binding);
+Shopify does not document that null means zero, so the round-7 canonical-zero
+construction is **withdrawn**; review `4694311215` item 3); refunded/removed/modified
+**shipping**;
+**duty-first** duties/additional-fees precedence (a duty-only order reaches
+`unsupported_duties`; the skip fires from the **aggregate**
+`currentTotalAdditionalFeesSet`/`currentTotalDutiesSet` — `Order.additionalFees`
+detail is **not queried**, though the field **does** expose list/pagination/filter
+args and is omitted for **data minimization** (review `4693694894` item 1), and
+`AdditionalFee.name` is never requested/stored/logged); **nonzero cash rounding**;
+and **nonzero tips fail closed** (`unsupported_tip_tax_treatment` — tip tax
+treatment undocumented, no untaxed Tip line). The query uses **one `edges{ cursor
+node }` shape for all three connections**, carries every current-state/tax-evidence
+field the gates consume (including `Order.edited`), and is **data-minimized** —
+`note`/`tags`/`sourceName`/`customAttributes`/`vendor`/`displayName`/
+`defaultAddress`/**`DiscountCodeApplication.code`/`ShippingLine.code`/
+`ShippingLine.custom`** are removed (no MVP consumer, per a field-consumption
+matrix; retained `ShippingLine.title` is bounded SO-description free text). All
+money equality/zero tests are **Decimal-numeric** (currency-code match +
+parsed-`Decimal` value, never lexical strings — `10.0 == 10.00`). Tax mapping is
+keyed by the **versioned SHA-256 evidence fingerprint `shopify_tax_evidence_key`**
+(`v1:<hex>`, the full untruncated rate+title+source+channelLiable+inclusion tuple,
+**NFC-only — case and whitespace preserved, no folding**; a rate-only, truncated,
+or case/whitespace-folded key could yield a correct total with the wrong
+tax/account, or collide distinct evidence; unmapped/colliding → hold). The
+tolerance is a canonical single-count ledger (`U_ex = M + H` with `T=0`; always
+tax-exclusive; shipping tax backed out once when inclusive) with a currency-rounding
+bound, **per-tax-signature quantized reconciliation on the tax-engine raw excluded
+base (`raw_base_amount_currency`) before any tax tolerance** (a full minor-unit base
+error fails closed), and **one global tax tolerance `tol_tax_total = Σ_σ
+tax_delta_bound(σ) + 0.5r·(S+O)`** where `tax_delta_bound(σ) = base_delta(σ)×rate/100`
+is the **actual** engine raw-base-delta term (`base_delta(σ) = |base_odoo_raw(σ) −
+base_src(σ)|`, valid for leaf percentages only) — **carried in full, not assumed
+zero and not reduced to `0.5r(S+O)`** (it is `0` only when the raw base matches
+exactly; a no-candidate signature fails closed); `O` is counted from the sale-order
+tax-details computation (leaf-tax grouping keys / taxed-line×leaf-tax pairs),
+**never** invoice repartition rows (reviews `4693694894` item 7 + `4694311215` items
+1–2); its platform-rounding premise is a labelled inference, with **no** money cap.
+**Order-level acceptance (round-9, review `4695589297` item 1):** the guard
+accepts/rejects **only after the complete `sale.order._compute_amounts` batch is
+recomputed** (all priced lines + any early-payment-discount lines →
+`_add_tax_details_in_base_lines` → `_round_base_lines_tax_details` →
+`_get_tax_totals_summary`, official `sale_order.py` L512–528) and compares Shopify
+evidence to the **actual** `sale.order.amount_untaxed`/`amount_tax`/`amount_total` +
+batch tax evidence — **never** summed line subtotals (which differ under
+`round_globally`); a line candidate is rejected by the order recompute; `O` = distinct
+batch grouping keys. **Payment term (round-9, review `4695589297` item 2):** a
+proposed store setting `order_payment_term_id` the importer assigns **explicitly**
+(never inheriting `partner_id.property_payment_term_id`); readiness blocks import
+when unset; a term that would add EPD base lines
+(`_add_base_lines_for_early_payment_discount`, `sale_order.py` L530–573) fails closed
+`odoo_validation_configuration` / `unsupported_early_payment_discount_payment_term`
+(never `financial_total_mismatch`). **Solver (round-9, review `4695589297` item 3;
+FROZEN round-10, review `4696391869`):** the price-included residual uses one
+**deterministic whole-order** search on the Product-Price-precision **lattice** `Λ_p`
+(`price_unit` is `_digits=False` ⇒ an unconstrained PostgreSQL `numeric` column with a
+Python-`float` ORM boundary, `fields_numeric.py` L114–169 — **not** a binary-float
+column; the lattice is **infinite**, only the per-line **window** (`≤2K+1`) and the
+bounded candidate set are finite; the lattice is never assumed = currency rounding).
+**Locked bounds** `K=2`, `M=2` (max solver-dependent lines/order), `C_max=25` (max
+candidate vectors); one `_compute_amounts` per vector under a savepoint, accept-first
+tie-break; **fail closed** on `|D|>M` / `C_max`-exhaustion / non-representable lattice.
+Line-level `line_base_src(i)`/`line_base_odoo_raw(i)` vs aggregate
+`base_src(σ)`/`base_odoo_raw(σ)` (three-stage validation, closure §6.4a). This is
+**proposed, pending control-room acceptance** (MBQ-56 stays open until then).
 
 ## Same-currency-only rule (DEC-020 / MBQ-64)
 
@@ -126,10 +258,22 @@ shop-currency values "might not sum perfectly to totals"). Both
 `shopMoney` and `presentmentMoney` amounts, plus
 `Order.presentmentCurrencyCode`, are captured as audit/reconciliation
 evidence in every case, whether or not a sale order is created.
-Presentment-currency-denominated Odoo orders remain non-MVP. **The exact
-error-class/sub-reason mapping for a blocked divergent-currency order
-remains open** — DEC-020 explicitly declines to force this without a
-named, deliberate decision.
+Presentment-currency-denominated Odoo orders remain non-MVP. **Exact
+error-class/sub-reason mapping — proposed resolution 2026-07-14**
+(decision-closure §10 / packet D-012-3): a divergent order routes to the
+terminal `skipped` state as a **policy skip with NO error class**
+(`skip_reason="divergent_presentment_currency"` in `technical_detail`),
+reached via a **conditional, CORE-R2-coordinated** handler-reachable core skip
+seam (recommended: a terminal-state-respect dispatcher guard so Task 012 needs
+**no** core edit; else a `JobPolicySkip` exception) — so it never overloads
+`financial_total_mismatch` and adds no 17th error class. The same policy-skip
+routing covers (duty-first) **nonzero** duties, **nonzero additional fees**,
+**nonzero cash rounding**, **nonzero tips** (`unsupported_tip_tax_treatment`),
+refunded/removed-quantity orders, refunded/removed/modified **shipping**, test
+orders, and pre-cancelled orders (all out of MVP scope, fail closed,
+`skip_reason`-labelled — closure §6.0). Both currencies and both
+`shopMoney`/`presentmentMoney` totals are captured. This
+is **proposed, pending control-room acceptance**.
 
 ## Manual review/blocking cases
 
