@@ -2200,9 +2200,24 @@ tables exactly at baseline (`res_partner`=44, `product_template`=34,
 `shpat_DUMMYDUMMY…` sentinel; no `myshopify.com`/GraphQL/HTTP egress); no
 credential/token/header/request-body leakage in any log.
 
-## RTC.7 Governance state `[Fact]`
+## RTC.7 Governance state + push mechanism `[Fact / control-room decision needed]`
 
-- One **draft** PR (correction branch → `claude/core-r2-slice-2b-integration`), **not merged**, awaiting control-room review.
-- PR #150 (`10d0034…`) / PR #151 (`e4669aa…`): verified present, **not touched**.
-- `Shopify-connector` unchanged (`dd6ecb8…`). `main` / plain `dev` untouched. Task 012 docs untouched.
+- **Push mechanism (platform-forced deviation from the separate-branch / draft-PR
+  model):** the Odoo.sh dev container's only push mechanism is `odoosh-push`,
+  which — by Odoo.sh security design — **forces the push onto the build's bound
+  branch, `claude/core-r2-slice-2b-integration`** ("you are forced to push on the
+  branch your build is currently linked to; you cannot deactivate this
+  behavior"). A separate correction branch **cannot** be pushed from this
+  container, and `gh` is unavailable to open a PR (the project's established
+  pattern — prior sessions' "evidence commit advances the branch head"). The
+  correction therefore landed as a **single, clean, fast-forward commit on
+  `claude/core-r2-slice-2b-integration`** (`63d10fb…` → the correction head).
+  **No force-push, no rebase, no amend.** It is one well-scoped reviewable unit
+  (allowed-list files only) that the control room can review in place, branch a
+  review PR from, or reset the integration head to `63d10fb…`. **This session did
+  NOT promote onward to `Shopify-connector` and did not self-authorize any gate
+  transition.**
+- PR #150 (`10d0034…`) / PR #151 (`e4669aa…`): present, **not touched**.
+- `Shopify-connector` unchanged (`dd6ecb8…`) — **no promotion**. `main` / plain
+  `dev` untouched. Task 012 docs untouched.
 - **Prompt E remains BLOCKED. SRR-03 remains OPEN pending control-room review.**

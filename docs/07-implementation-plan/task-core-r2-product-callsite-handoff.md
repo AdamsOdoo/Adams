@@ -522,6 +522,8 @@ baseline (independently-verified cron-trigger residue = 0, was +4/run). Producti
 fix is the common core dispatcher retry boundary
 (`shopify_connector_job_dispatch.py`). **Product lifecycle tag `0 failed/0 error
 of 4`, ×3; zero product/attribute + cron-trigger residue. No live Shopify request.
-SRR-03 OPEN. Prompt E BLOCKED. Draft correction PR only — not merged. PR #150/#151
+SRR-03 OPEN. Prompt E BLOCKED. Pushed via `odoosh-push` to the build-bound branch
+`claude/core-r2-slice-2b-integration` (separate branch impossible from the dev
+container; no force-push); NOT promoted to `Shopify-connector`. PR #150/#151
 untouched.** See `../05-qa/task-core-r2-validation-results.md` §RTC and
 `../05-qa/task-core-r2-product-callsite-validation.md` §12.

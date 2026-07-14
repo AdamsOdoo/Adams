@@ -455,5 +455,8 @@ Runtime-validated on Odoo.sh build **34912503** from staging `63d10fb` on branch
 - **Runtime: product callsite lifecycle tag `0 failed, 0 error(s) of 4`, three
   consecutive green runs; zero product/template/variant/attribute/value + zero
   cron-trigger residue (independently inspected).**
-- **No live Shopify call. SRR-03 remains OPEN. Prompt E remains BLOCKED. Draft
-  correction PR only — not merged.**
+- **No live Shopify call. SRR-03 remains OPEN. Prompt E remains BLOCKED. The
+  correction was pushed via `odoosh-push` to the build's bound branch
+  `claude/core-r2-slice-2b-integration` (a separate branch is not possible from
+  the dev container; no force-push); NOT promoted to `Shopify-connector`;
+  awaiting control-room review (see `task-core-r2-validation-results.md` §RTC.7).**

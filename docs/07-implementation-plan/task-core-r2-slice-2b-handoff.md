@@ -573,8 +573,10 @@ quality gate, commit/push to the designated branch, then STOP.
   non-blocking partial-registry artifact (unchanged). **Runtime:** fresh-install
   precedent 574/574; product 174, sale 93 green; core ×3 (6 notif-artifacts
   only); customer lifecycle ×3 and product lifecycle ×3 all `0 failed/0 error`;
-  independent residue audit clean (incl. cron-trigger delta 0). One **draft**
-  correction PR into `claude/core-r2-slice-2b-integration`; **not merged. No code,
-  no gate transition, no live Shopify request. SRR-03 OPEN. Prompt E BLOCKED. PR
-  #150/#151 untouched; `Shopify-connector` unchanged.** See
+  independent residue audit clean (incl. cron-trigger delta 0). Pushed via
+  `odoosh-push` to the build's bound branch `claude/core-r2-slice-2b-integration`
+  (a separate branch cannot be pushed from the dev container; no force-push), as
+  a single clean fast-forward correction commit; **NOT promoted to
+  `Shopify-connector`. No gate transition, no live Shopify request. SRR-03 OPEN.
+  Prompt E BLOCKED. PR #150/#151 untouched; `Shopify-connector` unchanged.** See
   `../05-qa/task-core-r2-validation-results.md` §RTC.
