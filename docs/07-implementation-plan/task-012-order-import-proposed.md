@@ -11,7 +11,7 @@
 > and the implementation packet — **pending ChatGPT control-room acceptance**
 > (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
 > 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` +
-> `4692656343` + `4693694894` + `4694311215` + `4695589297`),
+> `4692656343` + `4693694894` + `4694311215` + `4695589297` + `4696391869`),
 > not direct PR merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
 > bindings; protected/guarded customer import + indexed normalized-email matching;
 > no unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
@@ -134,9 +134,9 @@ full normalized `ratePercentage`+`title`+`source`+`channelLiable`+inclusion tupl
 **Unicode-NFC only, case and whitespace preserved, no folding, no truncation**;
 `price_include_override` on `account.tax` per `taxesIncluded`), letting the
 **standard Odoo 19 `account.tax` engine** recompute under the total-check guard —
-the price-included recompute uses a **seed + finite §6.2b solver read back from the
-actual engine** (`special_mode='total_excluded'` is a seed, **not** an exact
-inverse — Odoo 19 symmetry holds only with an unrounded `price_unit` +
+the price-included recompute uses a **seed + bounded §6.2b whole-order solver read
+back from the actual engine** (`special_mode='total_excluded'` is a seed, **not** an
+exact inverse — Odoo 19 symmetry holds only with an unrounded `price_unit` +
 `round_globally`, and `price_unit` is `Float`; review `4694311215` item 1) —
 **no custom connector tax engine, no automatic rate fallback, and no tax
 auto-creation** in MVP (review `4692656343`: a same-rate Odoo tax is an operator
@@ -164,11 +164,12 @@ D-012-2: `totalPriceSet.shopMoney.amount` is the total comparand; each product l
 (never `quantity × discountedUnitPriceSet`, which is an *approximate* unit price),
 reproduced in Odoo **through the actual Odoo 19 tax engine** (engine
 `total_excluded`; `price_include_override` is on `account.tax` not the SO line;
-price-included residuals derived via a **seed + finite §6.2b solver recomputed
-through the actual engine** — `special_mode='total_excluded'` is a **seed, not an exact
-inverse** (Odoo 19 guarantees symmetry only with an unrounded `price_unit` +
-`round_globally`; `price_unit` is `Float`), accepted only from the engine readback,
-else fail closed — review `4694311215` item 1; money fields are binary floats).
+price-included residuals derived via a **seed + bounded §6.2b whole-order solver
+recomputed through the actual engine** — `special_mode='total_excluded'` is a **seed,
+not an exact inverse** (Odoo 19 guarantees symmetry only with an unrounded `price_unit`
++ `round_globally`; `price_unit` is `Float`), accepted only from the engine readback,
+else fail closed — review `4694311215` item 1; `price_unit` crosses a Python-`float`
+ORM boundary — its column is an unconstrained NUMERIC, no fixed scale, `fields_numeric.py`).
 **Six fail-closed pre-creation gate families** (out of MVP scope → policy skip,
 never `financial_total_mismatch`; §6.0.4 is a pointer into the duty-first §6.0.3
 gate, not a seventh — review `4694311215`): **order edits** (`Order.edited == true`
@@ -227,12 +228,19 @@ proposed store setting `order_payment_term_id` the importer assigns **explicitly
 when unset; a term that would add EPD base lines
 (`_add_base_lines_for_early_payment_discount`, `sale_order.py` L530–573) fails closed
 `odoo_validation_configuration` / `unsupported_early_payment_discount_payment_term`
-(never `financial_total_mismatch`). **Solver (round-9, review `4695589297` item 3):**
-the price-included residual uses a **finite deterministic** search on the
-Product-Price-precision grid (`price_unit` is an unrounded `Float`; grid never assumed
-= currency rounding), ≤`2K+1` candidates, full-order recompute per candidate, **fail
-closed** on exhaustion / no-safe-grid. This is **proposed, pending control-room
-acceptance** (MBQ-56 stays open until then).
+(never `financial_total_mismatch`). **Solver (round-9, review `4695589297` item 3;
+FROZEN round-10, review `4696391869`):** the price-included residual uses one
+**deterministic whole-order** search on the Product-Price-precision **lattice** `Λ_p`
+(`price_unit` is `_digits=False` ⇒ an unconstrained PostgreSQL `numeric` column with a
+Python-`float` ORM boundary, `fields_numeric.py` L114–169 — **not** a binary-float
+column; the lattice is **infinite**, only the per-line **window** (`≤2K+1`) and the
+bounded candidate set are finite; the lattice is never assumed = currency rounding).
+**Locked bounds** `K=2`, `M=2` (max solver-dependent lines/order), `C_max=25` (max
+candidate vectors); one `_compute_amounts` per vector under a savepoint, accept-first
+tie-break; **fail closed** on `|D|>M` / `C_max`-exhaustion / non-representable lattice.
+Line-level `line_base_src(i)`/`line_base_odoo_raw(i)` vs aggregate
+`base_src(σ)`/`base_odoo_raw(σ)` (three-stage validation, closure §6.4a). This is
+**proposed, pending control-room acceptance** (MBQ-56 stays open until then).
 
 ## Same-currency-only rule (DEC-020 / MBQ-64)
 

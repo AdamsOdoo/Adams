@@ -129,9 +129,11 @@
 > 19 guarantees symmetrical accuracy **only** with an unrounded `price_unit` and
 > `round_globally`, and `sale.order.line.price_unit` is a **`Float`**, so
 > `special_mode` yields a **candidate/seed, not proof of exact representation**.
-> The design now: seed → **deterministic bounded solver** (refined in round-9 to
-> the finite Product-Price-precision grid contract §6.2b — **not** an open
-> "currency-valid" search) → **recompute through the actual Odoo tax engine** (real
+> The design now: seed → **deterministic bounded solver** (refined in round-9 and
+> **frozen round-10** to the whole-order §6.2b contract — a finite candidate
+> **window** on the Product-Price-precision **lattice** `Λ_p`, **not** an open
+> "currency-valid" search and **not** the infinite lattice itself) → **recompute
+> through the actual Odoo tax engine** (real
 > company rounding method, real `account.tax`, real inclusion, real base
 > preparation) → **read back** the engine outputs (`raw_total_excluded_currency`,
 > `total_excluded_currency`, per-tax `raw_base_amount_currency`,
@@ -184,18 +186,45 @@
 > `_add_base_lines_for_early_payment_discount()` **fails closed**
 > (`odoo_validation_configuration` / `unsupported_early_payment_discount_payment_term`,
 > never `financial_total_mismatch`). (3) **Implementation-exact solver** (new §6.2b)
-> — replaces "bounded solver over currency-valid candidates" with a finite,
-> deterministic, source-supported contract; because `price_unit` is an **unrounded
-> `Float`** (`min_display_digits='Product Price'` is a display hint, **not** a
-> storage grid), the solver restricts candidates to a finite **Product-Price-precision
-> grid** in a bounded window and **fails closed** (narrowed MVP scope) when no
-> candidate reconciles the **order-level** amounts. (4) **Five-document
+> — replaces "bounded solver over currency-valid candidates" with a
+> deterministic, source-supported contract; because `price_unit` is a **`Float`**
+> (`min_display_digits='Product Price'` is a display hint, **not** a storage grid —
+> storage facts corrected in round-10), the solver restricts candidates to a bounded
+> **window** on the **Product-Price-precision lattice** and **fails closed** (narrowed
+> MVP scope) when no candidate reconciles the **order-level** amounts. *(Round-10
+> freezes this as one whole-order algorithm with locked bounds — see the round-10
+> block below and §6.2b.)* (4) **Five-document
 > consistency** — capability-based prerequisites (no "Task 010/011 merged"), the
 > ambiguous-customer path creates **no partial SO/binding** (job →
 > `blocked_manual_review`, atomic retry after resolution), no stale "mappings open"
 > where the closure proposes them, and no statement attributes the **order**
 > `amount_tax` to the line-level compute. `Shopify-connector` tip unchanged at
 > `a3fd6cd`; no base-alignment merge needed this round.
+>
+> **Round-10 decision-freeze (control-room review `4696391869`, 2026-07-14):** the
+> final freeze of the §6.2b solver (no other correctly-closed area reopened).
+> (1) **Corrected Float storage facts** — with `min_display_digits` and no `digits=`,
+> `Float.__init__` sets `_digits=False`, so the column is an **unconstrained PostgreSQL
+> `numeric`** (all significant digits) and the ORM cache/write boundary is a **Python
+> `float`** with no fixed scale [`odoo/orm/fields_numeric.py` L114–169]; the round-9
+> "binary-float column" wording is corrected while the no-guaranteed-grid conclusion
+> stands. (2) **Terminology** — the decimal lattice `Λ_p = {k·10^(−p)}` is
+> **infinite**; only the per-line **window** (`2K+1`) and the bounded candidate set are
+> finite. (3) **Locked bounds** — `K = 2`, `M = 2` (max solver-dependent lines),
+> `C_max = 25`; every "provisional/pending-fixtures/choose-later" phrase is removed.
+> (4) **One deterministic whole-order algorithm** — replaces the per-line "all other
+> lines fixed" pass: fixed line order (source GID), seed vector, whole-order
+> candidate-vector enumeration by non-decreasing L1 distance then odometer, a savepoint
+> and exactly one `_compute_amounts` per vector, accept-first terminal tie-break, and
+> fail closed on `|D|>M` / `C_max` / non-representable lattice; no coordinate descent,
+> no uncontrolled backtracking, no tolerance widening. (5) **Line-vs-aggregate
+> terminology** — `line_base_src(i)`/`line_base_odoo_raw(i)` (one line) vs
+> `base_src(σ)`/`base_odoo_raw(σ)` (aggregate), with an explicit three-stage validation
+> sequence (§6.4a). Round-9's order-level acceptance surface, explicit payment-term
+> posture, EPD fail-closed, no-partial-SO ambiguous-customer path, capability
+> prerequisites, no-tax-auto-create, explicit tax mapping, MBQ-27/MBQ-56 proposed/open,
+> and **SRR-03 OPEN** are **preserved unchanged**. `Shopify-connector` tip still
+> `a3fd6cd`.
 
 ---
 
@@ -205,7 +234,7 @@
 | --- | --- | --- | --- |
 | `Shopify-connector` **merge-base (round-8)** | current tip `a3fd6cd` | after the **round-8 base-alignment merge** (§0.2), this branch's merge-base with `origin/Shopify-connector` is now exactly `a3fd6cdfcb6f3654ae81a48a7f4e694994d4762b` and the branch is **zero commits behind**; the PR #159 three-dot diff is computed against it and is exactly the five docs files | [Fact — repo] |
 | `Shopify-connector` **live tip** | `a3fd6cd` | `origin/Shopify-connector` HEAD is `a3fd6cd` (**PR #160 CORE-R2 Slice 2A merged** at review `4693862195`, 2026-07-14); round-8 **merged that tip into this branch with a normal merge commit** (no rebase/squash/force), so the branch now carries the full PR #160/Slice-2B history and is `mergeable_state: clean`, zero-behind | [Fact — repo] |
-| PR #159 (this PR) | open, draft, unmerged | `state:open, draft:true, merged:false`, `mergeable_state:clean`; base `Shopify-connector` (merge-base `a3fd6cd`, branch **zero behind** — the tip did **not** advance this round, so **no base-alignment merge was needed** in round-9); round-9 correction (reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` + `4692656343` + `4693694894` + `4694311215` + `4695589297`); head per PR body | [Fact — repo] |
+| PR #159 (this PR) | open, draft, unmerged | `state:open, draft:true, merged:false`, `mergeable_state:clean`; base `Shopify-connector` (merge-base `a3fd6cd`, branch **zero behind** — the tip did **not** advance this round, so **no base-alignment merge was needed** in round-9); round-9 correction (reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` + `4692656343` + `4693694894` + `4694311215` + `4695589297`) + round-10 decision-freeze (review `4696391869`); head per PR body | [Fact — repo] |
 | PR #150 (Task 011B) | not modified | left as-is (open/draft) — **not a direct-merge prerequisite**; subsumed by the merged Slice-2B strategy | [Fact — repo] |
 | PR #151 (Task 010B) | not modified | left as-is (open/draft) — **not a direct-merge prerequisite** | [Fact — repo] |
 | CORE-R2 / SRR-03 | remediation open | Foundation Slice 1 merged; **SRR-03 remains OPEN**; **Slice-2B call-site-activation packet (PR #158) is MERGED** (review `4691064435`; merge base `1494b97`); **Slice 2A (PR #160) is now MERGED** (review `4693862195`) as the accepted dormant foundation — neither modified by this PR | [Fact — repo] |
@@ -346,7 +375,8 @@ decision]**, and a **[Proposed Task 012 decision]** is never presented as an
 | shopify.dev changelog: 60-day order access | Accessible | *"public apps will no longer be able to access a merchant's orders older than 60 days with the current `read_orders` or `write_orders` access scopes"* |
 | raw.githubusercontent.com/odoo/odoo/19.0 addons/sale/models/sale_order.py, sale_order_line.py | Accessible | `partner_id` required; `partner_invoice_id`/`partner_shipping_id` writable computes; `currency_id` compute-only (pricelist→company); `fiscal_position_id` + line `tax_ids` via `map_tax`; `discount` = "Discount (%)"; `price_tax` compute-only |
 | **raw.githubusercontent.com/odoo/odoo/19.0 addons/sale/models/sale_order.py (retrieved 2026-07-14, round-9)** | Accessible | **`amount_untaxed`/`amount_tax`/`amount_total` = `fields.Monetary(compute='_compute_amounts', store=True)` (L232–234); `_compute_amounts` (L512–528, `@api.depends('order_line.price_subtotal','currency_id','company_id','payment_term_id')`): `base_lines = [line._prepare_base_line_for_taxes_computation() for line in order._get_priced_lines()] + order._add_base_lines_for_early_payment_discount()`; `AccountTax._add_tax_details_in_base_lines` → `_round_base_lines_tax_details` → `_get_tax_totals_summary`; `amount_untaxed = tax_totals['base_amount_currency']`, `amount_tax = ['tax_amount_currency']`, `amount_total = ['total_amount_currency']`. `_compute_payment_term_id` (L430–434, `@api.depends('partner_id')`): `payment_term_id = partner_id.property_payment_term_id`. `_add_base_lines_for_early_payment_discount` (L530–573): fires when `payment_term_id.early_discount and early_pay_discount_computation=='mixed' and discount_percentage`; adds ± base lines that alter the taxed base** |
-| **raw.githubusercontent.com/odoo/odoo/19.0 addons/sale/models/sale_order_line.py (retrieved 2026-07-14, round-9)** | Accessible | **`price_unit = fields.Float(compute='_compute_price_unit', min_display_digits='Product Price', store=True, …)` (L177–181) — `min_display_digits` is a **display** hint, NOT a storage-rounding `digits=` grid, so the stored value is an unrounded binary float. `_compute_amount` (L852–862, `@api.depends('product_uom_qty','discount','price_unit','tax_ids')`): per-line `AccountTax._add_tax_details_in_base_line` → `_round_base_lines_tax_details([base_line])`; `price_subtotal = tax_details['total_excluded_currency']`, `price_total = ['total_included_currency']` — LINE-LEVEL only. `_prepare_base_line_for_taxes_computation` (L824–845)** |
+| **raw.githubusercontent.com/odoo/odoo/19.0 addons/sale/models/sale_order_line.py (retrieved 2026-07-14, round-9)** | Accessible | **`price_unit = fields.Float(compute='_compute_price_unit', min_display_digits='Product Price', store=True, …)` (L177–181) — `min_display_digits` is a **display** hint, and there is **no `digits=`** argument, so `_digits=False` (storage/ORM contract in the `fields_numeric.py` row below: an unconstrained NUMERIC column with a Python-float ORM boundary, **not** a binary-float column). `_compute_amount` (L852–862, `@api.depends('product_uom_qty','discount','price_unit','tax_ids')`): per-line `AccountTax._add_tax_details_in_base_line` → `_round_base_lines_tax_details([base_line])`; `price_subtotal = tax_details['total_excluded_currency']`, `price_total = ['total_included_currency']` — LINE-LEVEL only. `_prepare_base_line_for_taxes_computation` (L824–845)** |
+| **raw.githubusercontent.com/odoo/odoo/19.0 odoo/orm/fields_numeric.py (retrieved 2026-07-14, round-10)** | Accessible | **`Float.__init__` (L114–123): passing only `min_display_digits` (no `digits=`) sets `_digits = False`. `Float._column_type` (L125–133): returns `('numeric','numeric')` when `_digits is not None` — and `False is not None` is **True** — so the column is an **unconstrained PostgreSQL `numeric`** (source comment: *"falsy digits (0, False) … a NUMERIC field with no fixed precision … saved in the database with all significant digits"*); `('float8','double precision')` is used **only** when `_digits is None`. Therefore `price_unit`'s column is NOT float8/binary-float and NOT `numeric(p,s)`. `convert_to_column` (L155–163) and `convert_to_cache` (L165–169): both coerce with `float(value or 0.0)` and apply **no** `float_round` (because `get_digits()` is the falsy `False`) — the ORM cache/write boundary is a **Python `float`** with no fixed scale. `get_min_display_digits` (L142–145): `min_display_digits='Product Price'` → `decimal.precision.precision_get('Product Price')`, exposed only via the field description ⇒ **display hint**. Net: no fixed decimal storage scale; the value crosses a Python-float boundary so Decimal exactness is not assumable; Odoo provides **no guaranteed price-unit candidate grid**** |
 | raw.githubusercontent.com/odoo/odoo/19.0 addons/account/models/account_tax.py, company.py | Accessible | `amount_type∈{group,fixed,percent,division}`, `amount:Float(16,4)`; `price_include_override∈{tax_included,tax_excluded}` writable, `price_include` compute-only; `res.company.tax_calculation_rounding_method` default **`round_globally`** |
 | **raw.githubusercontent.com/odoo/odoo/19.0 addons/account/models/account_tax.py (retrieved 2026-07-14, round-9)** | Accessible | **`_get_tax_details` docstring (L1138–1170): "accurate symmetrical taxes computation with **not rounded `price_unit`** as input and **`round_globally`**… Otherwise, it's not guaranteed." `_add_tax_details_in_base_line` (L1739–1811): `rounding_method = … or company.tax_calculation_rounding_method`; emits `raw_total_excluded_currency`/`raw_tax_amount_currency`/`raw_base_amount_currency` (unrounded), rounds only under `round_per_line`. `_add_tax_details_in_base_lines` (L1813, batch). `_round_tax_details_tax_amounts` (L1896–1927): `round_globally` **grouping key = {tax, currency, is_refund, is_reverse_charge, price_include, computation_key}**, aggregate-then-round-then-distribute-delta. `_round_base_lines_tax_details` (L2184+). `_get_tax_totals_summary` (L2715+): returns `base_amount_currency`/`tax_amount_currency`/`total_amount_currency`** |
 | raw.githubusercontent.com/odoo/odoo/19.0 odoo/addons/base/models/res_currency.py | Accessible | `rounding:Float(12,6) default 0.01`; `decimal_places = ceil(log10(1/rounding))`; `round/compare_amounts/is_zero` use `float_round/float_compare/float_is_zero(precision_rounding=rounding)` |
@@ -717,7 +747,7 @@ duplication**). Every page (header first-pages included) is validated:
   `id`** [Fact — official]). No node is accumulated twice;
 - **enforce an independent per-connection page ceiling**
   (`LINE_ITEMS_PAGE_LIMIT`, `SHIPPING_LINES_PAGE_LIMIT`,
-  `DISCOUNT_APPLICATIONS_PAGE_LIMIT` — named provisional defaults, §4.3);
+  `DISCOUNT_APPLICATIONS_PAGE_LIMIT` — named, telemetry-tunable defaults, §4.3);
   exceeding → `data_shape_schema_mismatch` **naming the ceiling** (no silent
   truncation);
 - **no Odoo business write occurs** until **every** connection is fully
@@ -766,7 +796,7 @@ ever written; cursors are discarded.
 ### 4.3 GraphQL cost posture, throttling, deleted/missing, 60-day scope (task §8)
 
 - **Cost [Proposed Task 012 decision — corrected: no unsupported "well under"
-  claim]:** `first:100`/`first:50` are **named provisional defaults**
+  claim]:** `first:100`/`first:50` are **named, telemetry-tunable defaults**
   (`LINE_ITEMS_PAGE_SIZE`, `SHIPPING_LINES_PAGE_SIZE`,
   `DISCOUNT_APPLICATIONS_PAGE_SIZE`), **not** asserted to be under Shopify's
   1,000-point single-query cap without evidence. The importer **captures
@@ -1593,9 +1623,12 @@ can prove zero (§6.4a).
 **Field ownership [Fact — Odoo 19 source].** `account.tax` carries
 `price_include_override` (`tax_included`/`tax_excluded`/blank→company default);
 `sale.order.line` carries `tax_ids` (M2m `account.tax`), `price_unit`
-(`fields.Float`, `min_display_digits='Product Price'` — a **display** hint, **not**
-a storage `digits=` grid, so the stored value is an **unrounded binary float**),
-`product_uom_qty`, and `discount` (Float, "Discount (%)"). `sale.order.line`
+(`fields.Float(min_display_digits='Product Price')`, **no `digits=`** — see the
+corrected storage/ORM contract in §6.2b: the column is an **unconstrained PostgreSQL
+`numeric`** (all significant digits) while the ORM cache/write boundary is a **Python
+`float`** with **no fixed decimal scale**, so no candidate grid is guaranteed —
+`min_display_digits` is a **display** hint only), `product_uom_qty`, and `discount`
+(Float, "Discount (%)"). `sale.order.line`
 computes `price_subtotal`/`price_total`/`price_tax` via `_compute_amount`
 (`sale_order_line.py` L852–862) — `_prepare_base_line_for_taxes_computation()` →
 `AccountTax._add_tax_details_in_base_line()` → `AccountTax._round_base_lines_tax_details([base_line])`,
@@ -1638,8 +1671,8 @@ excluded base for the (line + residual) to reconcile with the Shopify source
 (§6.4a). The residual's own `price_unit` is a `float`; it is chosen so the engine
 result reconciles, not assumed to store a Decimal exactly.
 
-**C. Tax-included signatures — seed + finite §6.2b solver, no exact-inversion claim
-(reviews `4694311215` item 1, `4695589297` item 3).** **Do not** subtract the pre-tax `PAAD` target from
+**C. Tax-included signatures — seed + bounded §6.2b whole-order solver, no exact-inversion claim
+(reviews `4694311215` item 1, `4695589297` item 3, `4696391869`).** **Do not** subtract the pre-tax `PAAD` target from
 a gross line amount, **and do not treat `special_mode='total_excluded'` as an exact
 inverse.** `special_mode='total_excluded'` is an **analytic computation mode**;
 Odoo 19 explicitly warns that **symmetrical accuracy is guaranteed only with an
@@ -1650,11 +1683,11 @@ of an exactly representable gross `price_unit`**. The construction is therefore:
 
 1. **Seed** — generate an initial gross-residual candidate through the mapped
    leaf-percent Odoo tax engine (the analytic `total_excluded` seed).
-2. **Finite, source-supported solver (§6.2b)** — where the seed does not reconcile,
-   search the **finite Product-Price-precision candidate grid** in a **bounded
-   window** around the seed exactly as specified in **§6.2b** (not an open search
-   over "currency-valid" values — `price_unit` has no source-guaranteed storage
-   grid, §6.2b).
+2. **Bounded whole-order solver (§6.2b)** — where the seed vector does not reconcile,
+   search a **finite candidate window** (`2K+1` points) on the Product-Price-precision
+   **decimal lattice** around each solver-dependent line's seed, exactly as specified in
+   **§6.2b** (not an open search over "currency-valid" values, and **not** the infinite
+   lattice itself — `price_unit` has no source-guaranteed storage grid, §6.2b).
 3. **Recompute through the actual engine** — recompute **every** candidate through
    the real Odoo tax engine using the **store company's actual
    `tax_calculation_rounding_method`**, the **actual `account.tax` records**, the
@@ -1746,77 +1779,154 @@ by `_add_tax_details_in_base_line` across the batch. **`O` never counts
 invoice/accounting repartition rows** (repartition is an `account.move` concept, not
 part of this `sale.order` computation).
 
-### 6.2b Implementation-exact bounded solver contract (round-9, review `4695589297` item 3)
+### 6.2b Implementation-exact bounded whole-order solver contract (round-9 review `4695589297` item 3; **finalized round-10, review `4696391869`**)
 
 **[Proposed Task 012 decision]** The round-8 phrase "bounded solver over
-currency-valid `price_unit` candidates" is **replaced** by the following executable
-contract. **Motivation:** `sale.order.line.price_unit` is `fields.Float` with only
-`min_display_digits='Product Price'` (a display hint) — Odoo 19 does **not** round
-the stored value to any grid [Fact — Odoo 19 source, `sale_order_line.py` L177–181],
-so there is **no source-proven finite storage grid** and the candidate grid **must
-not** be assumed equal to currency rounding. The contract is therefore a **finite,
-deterministic search on the operator-facing Product-Price precision, with fail-closed
-narrowing**:
+currency-valid `price_unit` candidates" is **replaced** by the following executable,
+**frozen** contract. Round-10 corrects the Float storage facts, fixes the
+lattice-vs-window terminology, **locks all bounds** (no provisional value remains),
+and defines **one deterministic whole-order algorithm** (not a per-line greedy pass).
 
-1. **Canonical Decimal source representation** — the target is the exact Decimal
-   `source_line_untaxed_exact_i` (from the lossless Char snapshot, §3.1), and the
-   order targets are the exact Decimal `U_ex`/`totalTaxSet`/`totalPriceSet`.
-2. **Verified `price_unit` precision/grid** — candidates are drawn from the finite
-   grid `G = { k · 10^(−p) : k ∈ ℤ }` where **`p = decimal precision of the
-   'Product Price' `decimal.precision`** (the operator-facing unit-price precision
-   the field references via `min_display_digits`; read at runtime, not hard-coded).
-   This is a **deliberate scope restriction**, not a claim that Odoo enforces it.
-3. **Decimal→Float conversion boundary** — each grid candidate is a Decimal quantized
-   to `p`; it is converted to Python `float` **once**, at the single write boundary
-   (§6.2), when assigned to `price_unit`. No Decimal exactness is assumed to survive
-   in the stored Float.
-4. **Seed generation** — the seed `u₀ ∈ G` is the analytic `special_mode='total_excluded'`
-   value (§6.2-C step 1) quantized to `p`.
-5. **Candidate ordering** — candidates are enumerated by **non-decreasing absolute
-   distance `|u − u₀|`** on `G`.
-6. **Positive/negative search sequence** — at each distance `d = m · 10^(−p)`
-   (`m = 0,1,2,…`), evaluate `u₀` first (`d=0`), then `u₀ − d` **before** `u₀ + d`
-   (a fixed, deterministic order).
-7. **Maximum distance from the seed** — `d ≤ D_max = K · 10^(−p)` with a **named,
-   small `K`** (proposed default `K = 8`, provisional pending fixtures); the seed's
-   analytic proximity makes a small window sufficient for admitted orders.
-8. **Maximum candidate count** — at most `2K + 1` candidates per line; the search is
-   **finite by construction**.
-9. **Deterministic tie-breaker** — if two candidates at the same distance both pass
-   (only possible for `u₀ ± d`), the **`u₀ − d` (lower) candidate wins** (fixed rule).
-10. **Exact engine functions invoked per candidate** — construct the candidate
-    `sale.order.line`, then run the **line** engine (`_prepare_base_line_for_taxes_computation`
-    → `_add_tax_details_in_base_line` → `_round_base_lines_tax_details`) to read the
-    line evidence, **and then the full-order `_compute_amounts` batch** (§6.2a) for
-    acceptance.
-11. **Exact raw and rounded outputs read** — per candidate: `raw_base_amount_currency`,
-    `raw_tax_amount_currency`, `raw_total_excluded_currency`, `total_excluded_currency`,
-    `tax_amount_currency`; and the **order** `amount_untaxed`/`amount_tax`/`amount_total`.
-12. **Line-level rejection conditions** — a candidate is discarded (search continues)
-    if its line `q(base_src(σ)) ≠ q(base_odoo_raw(σ))` (§6.4a) for the line's signature.
-13. **Mandatory full-order recomputation after constructing every line** — a candidate
-    that passes the line check is accepted **only** if, with all other lines fixed,
-    the **order-level** batch (§6.2a) satisfies every §6.4 bound. The order recompute
-    is authoritative.
-14. **Behavior when two candidates pass** — the deterministic tie-breaker (9) selects
-    one; the result is **not** ambiguous.
-15. **Behavior when no candidate passes** — the line, and therefore the order, **fails
-    closed** `financial_total_mismatch`; no SO/binding persists.
-16. **Bound-exhaustion behavior** — reaching `D_max` without a passing candidate is a
-    **fail-closed** outcome (identical to 15), logged with the exhausted `K`, seed,
-    and per-candidate order-level deltas (numbers only).
-17. **Behavior when a safe finite grid cannot be justified** — if the store's
-    'Product Price' precision or currency makes the finite grid unable to represent
-    the exact order targets (e.g. a source amount finer than `10^(−p)`), the order
-    **fails closed** `financial_total_mismatch` — the MVP is **narrowed** to
-    grid-representable orders rather than inventing an unbounded/continuous search.
-18. **No grid == currency-rounding assumption** — the contract never claims `G`
-    equals `res.currency.round`; `G` is the operator-facing unit-price grid and the
-    **order-level engine recomputation** is the sole acceptance authority.
+**Corrected Float storage/ORM contract [Fact — Odoo 19 source, `odoo/orm/fields_numeric.py`
+L114–169].** `price_unit = fields.Float(min_display_digits='Product Price')` passes
+**no `digits=`**, so `Float.__init__` sets `_digits = False`. Therefore:
 
-This is a **finite (≤ `2K+1` candidates/line), deterministic, source-supported**
-algorithm; where it cannot reconcile, it **fails closed**. It does not invent an
-algorithm unsupported by the Float/precision behaviour above.
+- **Database column** — `Float._column_type` returns `('numeric','numeric')` because
+  `_digits is not None` is **True** for `False`: an **unconstrained PostgreSQL
+  `numeric`** column storing *all significant digits* (source comment: *"a NUMERIC
+  field with no fixed precision"*). It is **not** `float8`/`double precision` (that
+  path is taken **only** when `_digits is None`) and **not** a fixed-scale
+  `numeric(p,s)`. The round-9 "binary-float column" description was wrong and is
+  corrected here.
+- **ORM cache/write boundary** — `convert_to_column` and `convert_to_cache` both
+  coerce with `float(value or 0.0)` and apply **no** `float_round` (because
+  `get_digits()` returns the falsy `False`); the value crosses a **Python `float`
+  (binary double)** boundary with **no fixed decimal scale enforced by the field**.
+- **`min_display_digits='Product Price'`** resolves (via `get_min_display_digits`) to
+  `decimal.precision.precision_get('Product Price')` and is surfaced only through the
+  field description — a **display/UI precision hint**, not a storage/write constraint.
+- **Net (conclusion preserved from round-9):** because the value is serialized
+  through a Python float before storage, **Decimal exactness cannot be assumed** at
+  the boundary, and **Odoo provides no guaranteed price-unit candidate grid**. Any
+  finite candidate set the connector evaluates is an **explicit MVP design
+  restriction**, not an Odoo storage guarantee.
+
+**Three distinct sets — do not conflate (round-10, review `4696391869` item 2).**
+
+- **Decimal lattice** `Λ_p = { k · 10^(−p) : k ∈ ℤ }` — every Decimal expressible at
+  the 'Product Price' precision `p`. It is **infinite** (unbounded both directions);
+  it is the representation grid the connector restricts itself to, **not** a candidate
+  set. Round-9's description of `G = {k·10^(−p)}` as a *finite grid* was wrong and is
+  corrected here.
+- **Per-line candidate window** `W_i = { u₀_i + j · 10^(−p) : j ∈ ℤ, |j| ≤ K }` — a
+  **finite** set of exactly `2K+1` lattice points centred on line `i`'s seed `u₀_i`.
+- **Per-line bounded candidate set** `C_i = W_i ∩ { u : u ≥ 0 }`, enumerated in the
+  deterministic order below (`|C_i| ≤ 2K+1`) — the actual set evaluated for line `i`.
+
+**Frozen constants (locked — no provisional / pending-fixtures / choose-later value).**
+
+| Symbol | Locked value | Meaning / rationale |
+| --- | --- | --- |
+| `p` | `decimal.precision.precision_get('Product Price')` at import time | Product-Price scale; **data-driven** (read at runtime, fixed per store), never hard-coded. |
+| `K` | **2** | Window half-width ⇒ `≤ 2K+1 = 5` candidates/line. The seed `u₀_i` is the exact analytic unit price quantized to `p`; a reconciling value differs from it by at most one lattice step in the ordinary case, and `K = 2` gives a symmetric two-step safety margin. A **frozen MVP bound**, not an Odoo guarantee; outside it → fail closed. |
+| `M` | **2** | Maximum **solver-dependent lines** per order (defined below). `\|D\| > M` ⇒ fail closed (MVP scope narrowing). |
+| `C_max` | **`(2K+1)^M = 25`** | Maximum candidate **vectors** recomputed per order. Reaching `C_max` without acceptance ⇒ fail closed. |
+
+**Deterministic line ordering.** All priced candidate lines — products, then
+shipping, then any attributable residual-adjustment lines — are ordered by ascending
+**source Shopify line GID** (a stable, unique, opaque string); shipping and residual
+lines sort after the product GIDs by their stable synthetic key. Assign index
+`i = 0 … n−1`. This order is independent of dict/hash iteration and fixes every
+enumeration below.
+
+**Seed vector `v₀`.** For every line `i`, the seed `u₀_i ∈ Λ_p` is the analytic
+`special_mode='total_excluded'` unit price (§6.2-C step 1) quantized to `p` with
+`float_round` ROUND_HALF_UP (the rounding the precision uses). `v₀ = (u₀_0, …,
+u₀_{n−1})` — every line at its seed.
+
+**Per-line candidate enumeration order (within `C_i`).** By non-decreasing distance
+`d = m · 10^(−p)` for `m = 0,1,…,K`; at each `d`, `u₀_i` first (`d=0`), then
+`u₀_i − d` **before** `u₀_i + d`; any `u < 0` is skipped. Yields
+`C_i = [c_{i,0}=u₀_i, c_{i,1}, …]`.
+
+**Solver-dependent line set `D` (line-vs-line, never line-vs-aggregate — review
+`4696391869` item 5).** Install `v₀`; run **one** full `sale.order._compute_amounts`
+(§6.2a). Line `i` is **solver-dependent** iff, at the seed, its **own** engine raw
+excluded base does not currency-quantize-equal its **own** exact source base:
+
+    q(line_base_odoo_raw(i)) ≠ q(line_base_src(i))        (§6.4a line-level names)
+
+`D = { i : line i solver-dependent }`. Lines **not** in `D` are **pinned at their
+seed** for the whole solve — they carry no residual to absorb, and moving them off
+their exact lattice point would only inject base error (an explicit MVP conservatism).
+This test compares a line to **its own** target; a single candidate line is **never**
+compared against an aggregate signature total.
+
+**Fail-closed pre-check.** If `|D| > M` ⇒ `financial_total_mismatch`, roll back, no
+SO/binding (the order needs more independent adjustments than the frozen budget
+allows).
+
+**Candidate-vector enumeration (whole-order, deterministic, exhaustive within
+budget).** Only lines in `D` vary; each `i ∈ D` ranges over its ordered `C_i`; every
+other line stays at `u₀`. Candidate vectors are the Cartesian product `∏_{i∈D} C_i`,
+enumerated in a **fixed total order**: primary key = ascending total L1 distance
+`Σ_{i∈D} |u_i − u₀_i|`; ties broken by **odometer order** over `D` ascending by line
+index, each position advancing through its `C_i` in the per-line order above (so
+`u₀−d` precedes `u₀+d`, lower unit price first). `v₀` is always first. At most `C_max`
+vectors are enumerated.
+
+**Per-vector evaluation.** For each vector `v` in that order:
+
+1. open a database **savepoint**;
+2. write every line's `price_unit` from `v` (the single Decimal→float boundary);
+3. run **exactly one** `sale.order._compute_amounts` batch (§6.2a) — no per-line
+   partial acceptance;
+4. read back the **actual order** `amount_untaxed`/`amount_tax`/`amount_total` and the
+   batch tax evidence (`raw_base_amount_currency`/`raw_tax_amount_currency`/
+   `base_amount_currency`/`tax_amount_currency` per grouping key);
+5. **aggregate per-signature validation (§6.4a) on the installed vector** — for every
+   `σ`, `q(base_src(σ)) == q(base_odoo_raw(σ))` (aggregate-vs-aggregate) and record
+   `base_delta(σ)`/`tax_delta_bound(σ)`;
+6. **order-level financial acceptance (§6.2a/§6.4/§6.5)** — the three order bounds
+   under `tol_tax_total`;
+7. if **all** of (5)+(6) hold ⇒ `v` is the solution: **release** the savepoint (keep
+   `v` installed) and **stop**;
+8. otherwise **roll back to the savepoint** (discard `v` entirely) and try the next
+   vector.
+
+**Terminal acceptance = whole-order tie-breaker.** Because vectors are ordered by
+non-decreasing total L1 distance then a fixed odometer, the **first** passing vector
+is by construction the unique minimum-distance / lowest-odometer solution — so
+**accept-first is the tie-breaker**; there is no second pass and no ambiguity. A
+vector is accepted **only as a whole** (all lines evaluated together in one
+`_compute_amounts`); **no candidate line is ever retained because it passed under a
+different vector** — each rejected vector is fully rolled back before the next.
+
+**Fail-closed boundaries (each ⇒ `financial_total_mismatch`, full rollback, no
+SO/binding).**
+
+- `|D| > M` (too many solver-dependent lines);
+- all enumerated vectors (≤ `C_max = 25`) evaluated, none passing;
+- the 'Product Price' precision/currency cannot represent the order's exact targets on
+  `Λ_p` (a source amount finer than `10^(−p)`) — MVP narrowed to lattice-representable
+  orders, **not** an unbounded/continuous search;
+- a signature whose `q(base_src(σ)) ≠ q(base_odoo_raw(σ))` that no remaining vector
+  repairs.
+
+**Explicitly prohibited.** Hidden coordinate descent (whole vectors are evaluated,
+never one line optimized against a "best so far" for the others); uncontrolled
+backtracking (the enumeration is a fixed finite list, fully rolled back between
+vectors); widening any tolerance to force acceptance (bounds are fixed by
+§6.4/§6.4a/§6.5); mixing lines accepted under different vectors.
+
+**No path-dependence.** The accepted solution depends only on the order evidence and
+the frozen `(p, K, M)` plus the fixed enumeration — never on the incidental order in
+which vectors were tried, because the first passing vector in the total order is
+always selected.
+
+This is a **bounded (`≤ C_max = 25` whole-order recomputations), deterministic,
+source-supported** algorithm; where it cannot reconcile it **fails closed**. It
+invents no behaviour unsupported by the corrected Float/precision facts above.
 
 ### 6.3 Tax-inclusive orders (`taxesIncluded = true`) (task §5)
 
@@ -1940,6 +2050,21 @@ plus a distinguished **untaxed** signature. Five quantities are tracked
 **separately** per `σ` (currency-rounded equality of one does **not** imply
 equality of another):
 
+**Line-level vs aggregate base terminology (round-10, review `4696391869` item 5).**
+Two **line-level** contributions are defined **per candidate line `i`** and are
+**never** compared against an aggregate signature total:
+
+- **`line_base_src(i)`** = the exact pre-tax source base of **one** Shopify line `i`
+  (`priceAfterAllDiscountsBeforeTaxesSet_i`, or `source_shipping_untaxed_exact_s` for a
+  shipping line) — an exact Decimal.
+- **`line_base_odoo_raw(i)`** = the tax engine's **`raw_base_amount_currency`** for
+  **that one** candidate Odoo line `i` (read back per §6.2-A/C step 4), unrounded.
+
+The per-signature **aggregates** below are the sums of these line contributions over
+the lines mapped to `σ`:
+`base_src(σ) = Σ_{i ∈ σ} line_base_src(i)` and
+`base_odoo_raw(σ) = Σ_{i ∈ σ} line_base_odoo_raw(i)`.
+
 - **`base_src(σ)`** (source target base) = Σ of the exact pre-tax sources
   (`priceAfterAllDiscountsBeforeTaxesSet_i`, `source_shipping_untaxed_exact_s`)
   mapped to `σ`. Each summand is a reported MoneyV2 (or an exact Decimal
@@ -1971,6 +2096,25 @@ equality of another):
 
 Let **`q(x) = res.currency.round(x)`** (Odoo's real `res_currency.round`, a
 `float_round` at precision `r` — returning a **float**, [Fact — Odoo source]).
+
+**Validation sequence — three stages, never collapsed (round-10, review `4696391869`
+item 5).** The line-level check and the aggregate per-signature check are **distinct**;
+a single candidate line is **never** compared against an aggregate `base_*(σ)`:
+
+1. **Candidate-level (line-vs-line).** For a candidate line `i`: `u ≥ 0`, `u ∈ Λ_p`,
+   the line's leaf-percent signature is admitted, and
+   `q(line_base_src(i)) == q(line_base_odoo_raw(i))` — **one line against its own
+   target**. This is exactly the solver-dependent test of §6.2b; it decides whether
+   line `i` still needs adjustment, **not** whether a signature is acceptable.
+2. **Aggregate per-signature (σ-vs-σ) — only after the complete candidate vector is
+   installed and one `_compute_amounts` has run.** For every `σ`,
+   `q(base_src(σ)) == q(base_odoo_raw(σ))` on the **aggregates**, recording
+   `base_delta(σ)` and `tax_delta_bound(σ)`.
+3. **Order-level financial acceptance (§6.2a).** The actual
+   `amount_untaxed`/`amount_tax`/`amount_total` under the §6.4/§6.5 bounds.
+
+Acceptance requires **all three** stages; failure at any stage ⇒ fail closed
+(`financial_total_mismatch`), full rollback, no SO/binding.
 
 **Base requirement (mandatory, before any tax tolerance):** for **every** `σ`,
 
@@ -2966,8 +3110,8 @@ acceptance is claimed here** — this is the required matrix.
 | 96 | rate-collision under old key | two Shopify tax lines that collided under `(rate, price_include)` now stay distinct under the composite key → correct Odoo tax each |
 | 97 | correct total, wrong Odoo tax candidate | a same-rate different-tax candidate is **ambiguous → held**; never silently mapped (right total, wrong account rejected) |
 | 98 | tax-excluded residual via engine | engine `total_excluded` drives the residual; qty-1 adjustment recomputed through the engine; base reconciles |
-| 99 | tax-included residual via engine | residual gross derived through the mapped engine (`special_mode='total_excluded'` seed + finite §6.2b solver), **not** gross/pre-tax subtraction; engine recompute verifies excluded base + tax |
-| 100 | binary-float boundary | a Decimal target not representable exactly as a float is handled via the engine reconcile + `tax_delta_bound`, never assumed stored exactly |
+| 99 | tax-included residual via engine | residual gross derived through the mapped engine (`special_mode='total_excluded'` seed + bounded §6.2b whole-order solver), **not** gross/pre-tax subtraction; engine recompute verifies excluded base + tax |
+| 100 | float ORM boundary (NUMERIC column) | `price_unit` (`_digits=False`) is stored in an unconstrained PostgreSQL `numeric` column but written through a **Python-float** ORM boundary (`fields_numeric.py` L114–169); a Decimal target not exactly float-representable is handled via the engine reconcile + `tax_delta_bound`, never assumed stored exactly |
 | 101 | sub-minor-unit pre-rounding delta, equal rounded bases | `q(base_src)==q(base_odoo)` but `delta_engine(σ) != 0` → the engine-derived `tax_delta_bound` is applied, not zero |
 | 102 | multi-repartition **leaf percent** tax (supported) | a leaf percent tax with multiple invoice tax-repartition rows reconciles via the actual engine; `O` counts the **grouping key once** (round_globally `O=1`), **not** each repartition row; `tax_delta_bound` is the actual raw-base-delta term, never `rate × base_delta` of a full mismatch; guard passes (Example R) |
 | 103 | no valid residual solution | inclusive/rounded case where no §6.2b grid residual yields the required excluded base + tax (order-level recompute) → `financial_total_mismatch`, fail closed |
@@ -3019,20 +3163,27 @@ acceptance is claimed here** — this is the required matrix.
 | 149 | linear delta never used for deferred structures | a group/fixed/division/base-affecting structure is **held** `unsupported_tax_structure` (§5.5) — the linear `base_delta×rate/100` term is **never** computed for it; the linear form is valid only for independent leaf percentages |
 | 150 | line-level cannot substitute for order recompute | acceptance uses `sale.order.amount_untaxed`/`amount_tax`/`amount_total` from `_compute_amounts` (batch), **not** summed line `price_subtotal`/`price_tax`; a case where `round_globally` makes the order `amount_tax` differ from `Σ round(line tax)` is accepted only via the order-level value (§6.2a) |
 | 151 | multiple lines sharing a tax validated through the batch | two+ lines with the same mapped leaf tax → **one** `round_globally` grouping key; the guard reconciles `amount_tax` from the batch summary, and `O` counts the key **once** (§6.2a/§6.4) |
-| 152 | order-level recompute rejects a line-level candidate | a `price_unit` candidate that passes its **line** §6.4a check but breaks the **order** `amount_tax`/`amount_total` bound after full `_compute_amounts` → **rejected**, search continues / fails closed (§6.2a/§6.2b step 13) |
+| 152 | order-level recompute rejects a line-level candidate | a `price_unit` candidate that passes its **line** §6.4a check but breaks the **order** `amount_tax`/`amount_total` bound after full `_compute_amounts` → the whole vector is **rejected** and rolled back, the search continues / fails closed (§6.2a/§6.2b per-vector evaluation) |
 | 153 | repartition rows do not widen O (order-level) | a supported leaf percent tax with multiple invoice tax-repartition rows keeps `round_globally` `O = 1` at the **order** batch grouping key; tolerance does not grow (§6.2a/§6.4, Example R) |
 | 154 | payment term explicitly assigned, never inherited | importer sets `payment_term_id = store.order_payment_term_id`; the compute default `partner_id.property_payment_term_id` is overridden (§5.6) |
 | 155 | readiness blocks unset payment term | `order_payment_term_id` unset → **order import blocked at readiness**; no order imported (§5.4/§5.6) |
 | 156 | EPD-mixed term fails closed | configured term with `early_discount and early_pay_discount_computation=='mixed' and discount_percentage` → `_add_base_lines_for_early_payment_discount()` would add base lines → **fail closed** `odoo_validation_configuration` / `unsupported_early_payment_discount_payment_term` **before** any SO/binding; **never** `financial_total_mismatch` (§5.6) |
 | 157 | non-EPD term imports normally | a plain term (no early discount, or non-'mixed' computation, or zero `discount_percentage`) adds **no** EPD base lines → import proceeds (§5.6) |
 | 158 | partner property term cannot override store term | a matched customer whose `property_payment_term_id` is an EPD-mixed term does **not** apply — the importer's explicit `order_payment_term_id` assignment wins; if the **store** term is EPD-mixed it fails closed (§5.6) |
-| 159 | solver is finite + deterministic | §6.2b search enumerates ≤ `2K+1` Product-Price-precision candidates by non-decreasing `|u−u₀|`, `u₀−d` before `u₀+d`; two-pass tie → lower candidate; determinate result (§6.2b 5–9/14) |
-| 160 | solver: seed passes immediately | seed `u₀` reconciles line + order → accepted at `d=0` (tax-excluded and tax-included cases) (§6.2b) |
-| 161 | solver: seed needs adjustment | seed fails, a candidate within `D_max` reconciles the order → accepted; readback from actual engine (§6.2b) |
-| 162 | solver: no candidate / bound exhaustion | no candidate within `D_max = K·10^(−p)` reconciles the order → **fail closed** `financial_total_mismatch`, logged with `K`/seed/deltas (§6.2b 15–16) |
-| 163 | solver: no safe finite grid | source amount finer than `10^(−p)` (Product-Price precision) cannot be represented on the grid → **fail closed** (narrowed MVP scope, §6.2b 17); grid is **never** assumed equal to currency rounding (§6.2b 18) |
+| 159 | solver window is finite + deterministic | each solver-dependent line's **window** `W_i` holds ≤ `2K+1 = 5` lattice candidates (`K=2` locked) enumerated by non-decreasing `|u−u₀|`, `u₀−d` before `u₀+d`; whole-order **vectors** are enumerated by non-decreasing L1 distance then odometer; **accept-first** is the tie-break → determinate result (§6.2b) |
+| 160 | solver: seed vector passes immediately | seed vector `v₀` (every line at `u₀`) reconciles all lines + order → accepted at total L1 distance 0 (tax-excluded and tax-included) (§6.2b) |
+| 161 | solver: seed vector needs adjustment | a solver-dependent line's seed fails; a whole-order candidate vector within the frozen window reconciles the order → accepted; readback from the actual engine (§6.2b) |
+| 162 | solver: no vector / budget exhaustion | all ≤ `C_max = 25` candidate vectors evaluated with none passing (or `|D| > M = 2`) → **fail closed** `financial_total_mismatch`, logged with `K`/`M`/seed/deltas (§6.2b) |
+| 163 | solver: lattice cannot represent order | a source amount finer than `10^(−p)` (Product-Price precision) cannot be represented on the **infinite** lattice `Λ_p` → **fail closed** (narrowed MVP scope, §6.2b); the lattice is **never** assumed equal to currency rounding |
 | 164 | solver covers currency shapes | tax-excluded, tax-included, zero-decimal (JPY), three-decimal (BHD) currencies each exercised through §6.2b + order-level acceptance |
 | 165 | ambiguous customer creates no partial SO | ambiguous/unresolved customer → remote evidence captured/validated, **no partial `sale.order`, no binding**; job → `blocked_manual_review`; after operator resolution, the complete order creates **atomically** on retry (§8/§8.1) |
+| 166 | Float column is NUMERIC, not binary-float | doc states `price_unit` (`_digits=False`) is an **unconstrained PostgreSQL `numeric`** column with a **Python-float** ORM boundary [`fields_numeric.py` L114–169]; no "binary-float column"/`float8`/`numeric(p,s)` claim survives; the no-guaranteed-grid conclusion is preserved (review `4696391869` item 1) |
+| 167 | lattice infinite, window finite | `Λ_p = {k·10^(−p)}` is labelled **infinite**; only the window `W_i` (`2K+1`) and the bounded candidate set are called finite; no "finite grid" for `Λ_p` remains anywhere (review `4696391869` item 2) |
+| 168 | all solver bounds locked | `K=2`, `M=2`, `C_max=25` are fixed constants; **no** "provisional/pending-fixtures/proposed default K/choose later/small enough/configurable-during-implementation" phrase remains in any of the five docs (review `4696391869` item 3) |
+| 169 | whole-order, not greedy per-line | the solver evaluates whole candidate **vectors** (one `_compute_amounts` each) accept-first over a fixed total order; **no** coordinate descent, **no** "all other lines fixed" greedy selection, **no** uncontrolled backtracking, **no** tolerance widening (review `4696391869` item 4) |
+| 170 | savepoint per vector, full rollback on reject | each evaluated vector runs under a DB savepoint; a rejected vector is fully rolled back before the next; **no** line is retained because it passed under a different vector (§6.2b) |
+| 171 | `\|D\| > M` fails closed | an order needing more than `M = 2` solver-dependent lines → **fail closed** before enumeration; MVP scope narrowing, never a larger search (§6.2b) |
+| 172 | line-vs-line ≠ line-vs-aggregate | the candidate-level check compares `line_base_src(i)` to `line_base_odoo_raw(i)` (one line); the per-signature check compares aggregates `base_src(σ)`/`base_odoo_raw(σ)` only after the full vector is installed; a single line is **never** compared to an aggregate (review `4696391869` item 5; §6.4a three-stage sequence) |
 
 Source-level guards (AST) — **REBUILT 2026-07-14 (review `4691067575` item 4;
 Task 012 has four query constants and multiple paginated calls, not one
@@ -3083,7 +3234,10 @@ losslessness, solver recomputation, repartition-widening, null-tax acceptance,
 gate-count, linear-delta leakage, stale ancestry, authorization re-check); rows
 74–80 = round-9 (review `4695589297` — line-vs-order acceptance, silent EPD payment
 term, vague solver, ambiguous-customer partial import, stale prerequisites,
-line-attributed order tax, authorization re-check).
+line-attributed order tax, authorization re-check); rows 81–85 = round-10 (review
+`4696391869` — Float NUMERIC storage facts, infinite-lattice/finite-window
+terminology, locked solver bounds, deterministic whole-order algorithm,
+line-vs-aggregate base terminology).
 
 | # | Risk | Verdict | Resolution |
 | --- | --- | --- | --- |
@@ -3098,7 +3252,7 @@ line-attributed order tax, authorization re-check).
 | 9 | tax from the wrong company | **CONFIRMED → FIXED** | `account_tax_id.company_id == order_company_id` enforced at mapping create, resolution, and via `order_company_id` immutability (§5.5) |
 | 10 | ambiguous tax selected silently | **CONFIRMED → FIXED** | >1 candidate → ambiguous configuration hold; zero → hold; first never chosen silently (§5.2/§5.5) |
 | 11 | stale CORE-R2 dependency sequence | **CONFIRMED → FIXED** | prerequisites now capability-based; #150/#151 direct-merge requirement withdrawn; CORE-R1 recorded satisfied; staging strategy documented (§0.1) |
-| 12 | unsupported query-cost claim | **CONFIRMED → FIXED** | "well under the cap" removed; page sizes are named provisional defaults; cost telemetry + dev-store live-read before tuning (§4.3) |
+| 12 | unsupported query-cost claim | **CONFIRMED → FIXED** | "well under the cap" removed; page sizes are named, telemetry-tunable defaults; cost telemetry + dev-store live-read before tuning (§4.3) |
 | 13 | `float_compare` "preserves Decimal precision" claim | **CONFIRMED → FIXED** | Decimal/string canonicalization is the identity layer; `float_compare` is only the boundary comparison to Odoo's existing Float `amount` (§5.2, §6.2) |
 | 14 | money in lossy Float | **CONFIRMED (round 1) → FIXED** | Char/exact-decimal-string snapshots + Decimal math; single Decimal→Odoo write boundary (§3.1, §6.2) |
 | 15 | divergent currency enters Odoo | MITIGATED | blocked before SO creation → `skipped` policy, no error class (§10) |
@@ -3162,11 +3316,16 @@ line-attributed order tax, authorization re-check).
 | 73 | accidental implementation authorization (re-checked round-8) | NOT-A-PROBLEM | closure + packet still deny gate/code/live-call; prompt unusable-until-gate; SRR-03 OPEN; capability prerequisites unmet; only the five docs changed (§0/§16/§19) |
 | 74 | financial acceptance from isolated line computation | **CONFIRMED → FIXED (round-9)** | acceptance is the **order-level `_compute_amounts` batch** (`amount_untaxed`/`amount_tax`/`amount_total` from `_get_tax_totals_summary`), never summed line subtotals; under `round_globally` the two differ (`account_tax.py` L1896–1927); a line candidate is rejected by the order recompute (review `4695589297` item 1; §6.2a, fixtures 150–153) |
 | 75 | silently-inherited early-payment-discount payment term altering `amount_tax` | **CONFIRMED → FIXED (round-9)** | importer assigns `payment_term_id` explicitly from `order_payment_term_id`, never the partner default; an EPD-mixed term (which `_add_base_lines_for_early_payment_discount` would expand) **fails closed** `unsupported_early_payment_discount_payment_term` before any SO; readiness blocks an unset term (review `4695589297` item 2; §5.6, fixtures 154–158) |
-| 76 | vague "bounded solver over currency-valid candidates" | **CONFIRMED → FIXED (round-9)** | replaced by the finite, deterministic §6.2b contract on the Product-Price-precision grid (`price_unit` is an unrounded `Float`; no grid==currency-rounding assumption); ≤`2K+1` candidates, deterministic order/tie-break, full-order recompute per candidate, **fail closed** on exhaustion / no-safe-grid (review `4695589297` item 3; §6.2b, fixtures 159–164) |
+| 76 | vague "bounded solver over currency-valid candidates" | **CONFIRMED → FIXED (round-9; frozen round-10)** | replaced by the deterministic §6.2b contract on the Product-Price-precision **lattice** `Λ_p` (`price_unit` is `_digits=False` → NUMERIC column / Python-float boundary; the lattice is **never** assumed equal to currency rounding); round-10 locks it to a **whole-order** algorithm with a finite per-line window (`2K+1`), locked `K=2`/`M=2`/`C_max=25`, and **fail closed** on exhaustion / non-representable lattice (reviews `4695589297` item 3, `4696391869`; §6.2b, fixtures 159–172) |
 | 77 | ambiguous customer yielding a partial import | **CONFIRMED → FIXED (round-9)** | ambiguous/unresolved customer → evidence captured/validated, **no partial SO, no binding**; job → `blocked_manual_review`; after operator resolution the whole order creates **atomically** on retry; the "rest of order import proceeds" phrasing removed (review `4695589297` item 4; §8/§8.1, fixture 165) |
 | 78 | stale PR-based prerequisites ("Task 010/011 merged") | **CONFIRMED → FIXED (round-9)** | prerequisites are **capability-based** (SRR-03 closed; protected product/customer import + bindings + indexed matching present on `Shopify-connector`; no unguarded product/customer calls; delivered via the accepted CORE-R2 Slice-2B strategy) across all five docs; no direct-merge PR prerequisite remains (review `4695589297` item 4; §0.1) |
 | 79 | order `amount_tax` attributed to `sale.order.line._compute_amount` | **CONFIRMED → FIXED (round-9)** | every statement attributing the **order** `amount_tax` to the line-level compute is corrected: line `_compute_amount` sets one line's `price_subtotal`/`price_tax`; the order `amount_tax` is from `_compute_amounts`/`_get_tax_totals_summary` (§6.2a) |
 | 80 | accidental implementation authorization (re-checked round-9) | NOT-A-PROBLEM | closure + packet still deny gate/code/live-call; `order_payment_term_id`/solver are `[Proposed Task 012 decision]`, not implemented; SRR-03 OPEN; capability prerequisites unmet; only the five docs changed (§0/§16/§19) |
+| 81 | `price_unit` mis-described as a stored binary float | **CONFIRMED → FIXED (round-10)** | corrected against `odoo/orm/fields_numeric.py` L114–169: `_digits=False` ⇒ `_column_type=('numeric','numeric')` (unconstrained NUMERIC, all significant digits), NOT float8/binary-float/`numeric(p,s)`; ORM cache/write boundary is Python `float` (no scale). No-guaranteed-grid conclusion preserved (review `4696391869` item 1; §2, §6.2b) |
+| 82 | infinite lattice `{k·10^(−p)}` called a "finite grid" | **CONFIRMED → FIXED (round-10)** | `Λ_p` is now explicitly **infinite**; only the per-line window `W_i` (`2K+1`) and the bounded candidate set are finite; consistent across all five docs (review `4696391869` item 2; §6.2b) |
+| 83 | solver bound `K` left provisional/pending fixtures | **CONFIRMED → FIXED (round-10)** | `K=2`, `M=2`, `C_max=25` **locked** as frozen constants; the unsupported "analytic proximity" justification is replaced by an explicit MVP-conservatism rationale + fail-closed; **no** provisional/choose-later phrase remains (review `4696391869` item 3; §6.2b) |
+| 84 | multi-line solver undefined (greedy / path-dependent) | **CONFIRMED → FIXED (round-10)** | one deterministic **whole-order** algorithm: fixed source-GID line order, seed vector, whole-order vector enumeration (L1 distance → odometer), savepoint + one `_compute_amounts` per vector, accept-first tie-break, `|D|>M`/`C_max`/non-representable fail-closed; no coordinate descent / backtracking / tolerance widening (review `4696391869` item 4; §6.2b) |
+| 85 | one line's raw base compared to an aggregate signature target | **CONFIRMED → FIXED (round-10)** | line-level `line_base_src(i)`/`line_base_odoo_raw(i)` vs aggregate `base_src(σ)`/`base_odoo_raw(σ)`; explicit three-stage validation sequence (candidate line-vs-line → aggregate σ-vs-σ after full install → order-level); a single line is never compared to an aggregate (review `4696391869` item 5; §6.4a) |
 
 **Rejected-approach guardrails re-checked (all revisit conditions UNMET, none
 re-proposed):** RA-006 (name/fuzzy matching — email-only kept), RA-010
@@ -3225,15 +3384,20 @@ integration PR (§0.1). **CORE-R1 is already merged (satisfied, not pending).**
 - **Order-level acceptance is authoritative [round-9]** — financial acceptance uses
   the actual `sale.order._compute_amounts` batch (`amount_untaxed`/`amount_tax`/
   `amount_total` from `_get_tax_totals_summary`), **not** summed line subtotals
-  (§6.2a). The isolated-iteration bound `K` for the §6.2b solver and the exact
-  order-level reconciliation on real many-line `round_globally` orders are
-  **build-time fixtures**, validated before onboarding.
-- **`price_unit` has no source-guaranteed finite grid [round-9]** — it is
-  `fields.Float(min_display_digits='Product Price')`; the §6.2b solver **restricts**
-  candidates to the operator-facing Product-Price precision grid and **fails closed**
-  (narrowed MVP scope) when an order cannot be represented on it — the grid is
-  **never** assumed equal to currency rounding (review `4695589297` item 3). Whether
-  the default `K`/precision suffices for a given store is a dev-store confirmation.
+  (§6.2a). The §6.2b solver bounds `K = 2`, `M = 2`, `C_max = 25` are **locked**
+  (round-10); the only remaining open item is **empirical confirmation** that these
+  frozen bounds admit a target store's real many-line `round_globally` orders (a
+  dev-store check before onboarding) — **not** a choice of value. Orders outside the
+  frozen bounds **fail closed**; the bounds are never widened at runtime.
+- **`price_unit` has no source-guaranteed candidate grid [round-9; storage facts
+  corrected round-10]** — `fields.Float(min_display_digits='Product Price')` ⇒
+  `_digits=False` ⇒ an **unconstrained PostgreSQL `numeric`** column with a **Python
+  `float`** ORM boundary and no fixed scale [`odoo/orm/fields_numeric.py` L114–169].
+  The §6.2b solver **restricts** candidates to a finite **window** (`2K+1`) on the
+  Product-Price-precision **decimal lattice** `Λ_p` (which is itself **infinite**) and
+  **fails closed** (narrowed MVP scope) when an order cannot be represented on it — the
+  lattice is **never** assumed equal to currency rounding (reviews `4695589297` item 3,
+  `4696391869` items 1–2).
 - **Payment-term posture [round-9]** — the MVP requires an explicit store
   `order_payment_term_id` that produces **no** early-payment-discount base lines
   (`_add_base_lines_for_early_payment_discount`); an EPD-mixed term fails closed
