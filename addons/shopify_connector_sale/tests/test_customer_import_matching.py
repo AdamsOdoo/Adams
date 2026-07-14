@@ -7,11 +7,54 @@ from unittest.mock import patch
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
+    ShopifyClientError,
+    ShopifyQuiescedError,
+)
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
 
 from ..models.shopify_connector_customer_importer import CUSTOMER_IMPORT_QUERY
+
+# A non-secret placeholder token. The transport is always the injected
+# `_send` seam, so this value never reaches a network call; it exists only
+# so the real `execute_business`/`_admit` admission gate can read a
+# credential (CORE-R2 Slice 2B: the importer no longer stubs `execute`).
+DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+
+class _FakeResponse:
+    """Minimal stand-in for a `requests.Response` for the `_send()`
+    transport-injection seam -- no network call is ever made. Mirrors the
+    CORE-R2 core-test `FakeResponse` so `execute_business`'s
+    `_normalize_response` runs exactly as it does in production, turning
+    this `{'data': ...}` body into the normalized dict the importer's
+    `_normalize_payload` consumes."""
+
+    def __init__(self, status_code, json_body=None, headers=None):
+        self.status_code = status_code
+        self.headers = headers or {}
+        self._json_body = json_body
+        self.text = json.dumps(json_body) if json_body is not None else ''
+
+    def json(self):
+        return self._json_body
+
+
+def _ok_send(json_body):
+    """Build a fake `_send` returning a 200 `_FakeResponse(json_body)`.
+
+    Replaces ONLY `_send` (never `execute_business`/`_admit`/lease): the
+    real admission-gated context manager, the committed lease
+    create/release, and `_normalize_response` all still run -- exactly the
+    CORE-R2 Slice 2B seam (packet §5.2, "use the real execute_business gate
+    + the _send transport-injection seam")."""
+
+    def fake_send(self, store, body, token=None):
+        return _FakeResponse(200, json_body=json_body)
+
+    return fake_send
 
 
 class TestCustomerImportMatching(TransactionCase):
@@ -48,6 +91,40 @@ class TestCustomerImportMatching(TransactionCase):
         if email is not None:
             vals['email'] = email
         return self.env['res.partner'].create(vals)
+
+    # ------------------------------------------------------------------
+    # CORE-R2 Slice 2B seam helpers: the importer now issues its one
+    # Shopify Admin call through the admission-gated `execute_business`
+    # context manager, so the end-to-end tests need a connected,
+    # credentialed store, a generation-matched job, and registry test mode
+    # (so `_admit`'s independent side cursor can see the uncommitted
+    # fixtures). Matching-only tests keep calling `_apply_import` directly
+    # and are untouched by this.
+    # ------------------------------------------------------------------
+
+    def _connect_store_with_credential(self):
+        self.env['shopify.connector.store.credential'].action_set_token(
+            self.store, DUMMY_TOKEN,
+        )
+        # action_set_token demotes a connected store to `reconnect_needed`
+        # and bumps the connection generation; re-assert `connected` so the
+        # business admission gate passes (mirrors the CORE-R2
+        # TestBusinessAdmission setup).
+        self.store.write({'state': 'connected'})
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    def _make_business_job(self, gid):
+        return self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'customer_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': gid,
+            'expected_connection_generation':
+                self.store.connection_generation,
+        })
 
     # ------------------------------------------------------------------
     # 1. Existing-binding match takes priority over email.
@@ -211,38 +288,31 @@ class TestCustomerImportMatching(TransactionCase):
         module."""
         self._make_partner('Dup C', email='dupc@example.com')
         self._make_partner('Dup D', email='dupc@example.com')
-        self.store.write({'state': 'connected'})
+        self._connect_store_with_credential()
         self.Settings.create({
             'store_id': self.store.id, 'sale_domain_enabled': True,
         })
-        job = self.Job.create({
-            'store_id': self.store.id,
-            'job_source': 'scheduled_sync',
-            'job_type': 'customer_import_sync',
-            'state': 'queued',
-            'payload_hash': str(uuid.uuid4()),
-            'shopify_target_gid': 'gid://shopify/Customer/908',
-        })
+        job = self._make_business_job('gid://shopify/Customer/908')
+        self.env.flush_all()
 
-        def fake_execute(self, store, query, variables=None):
-            return {
-                'data': {
-                    'customer': {
-                        'id': 'gid://shopify/Customer/908',
-                        'firstName': 'Dup', 'lastName': 'C',
-                        'displayName': 'Dup C',
-                        'defaultEmailAddress': {
-                            'emailAddress': 'dupc@example.com',
-                        },
-                        'defaultPhoneNumber': None,
-                        'defaultAddress': None,
-                        'updatedAt': '2026-07-10T00:00:00Z',
+        body = {
+            'data': {
+                'customer': {
+                    'id': 'gid://shopify/Customer/908',
+                    'firstName': 'Dup', 'lastName': 'C',
+                    'displayName': 'Dup C',
+                    'defaultEmailAddress': {
+                        'emailAddress': 'dupc@example.com',
                     },
+                    'defaultPhoneNumber': None,
+                    'defaultAddress': None,
+                    'updatedAt': '2026-07-10T00:00:00Z',
                 },
-            }
+            },
+        }
 
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with patch.object(type(Client), '_send', _ok_send(body)):
             self.Dispatch.run_drain(20)
         job.invalidate_recordset()
         self.assertEqual(job.state, 'blocked_manual_review')
@@ -321,44 +391,37 @@ class TestCustomerImportMatching(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_unresolved_country_logs_informational_note_via_job_path(self):
-        self.store.write({'state': 'connected'})
+        self._connect_store_with_credential()
         self.Settings.create({
             'store_id': self.store.id, 'sale_domain_enabled': True,
         })
-        job = self.Job.create({
-            'store_id': self.store.id,
-            'job_source': 'scheduled_sync',
-            'job_type': 'customer_import_sync',
-            'state': 'queued',
-            'payload_hash': str(uuid.uuid4()),
-            'shopify_target_gid': 'gid://shopify/Customer/920',
-        })
+        job = self._make_business_job('gid://shopify/Customer/920')
+        self.env.flush_all()
 
-        def fake_execute(self, store, query, variables=None):
-            return {
-                'data': {
-                    'customer': {
-                        'id': 'gid://shopify/Customer/920',
-                        'firstName': 'Un', 'lastName': 'Resolved',
-                        'displayName': 'Un Resolved',
-                        'defaultEmailAddress': {
-                            'emailAddress': 'unresolved-country@example.com',
-                        },
-                        'defaultPhoneNumber': {
-                            'phoneNumber': '+15551234567',
-                        },
-                        'defaultAddress': {
-                            'address1': '1 Test St', 'address2': None,
-                            'city': 'Testville', 'zip': '99999',
-                            'provinceCode': 'ZZ', 'countryCodeV2': 'ZZ',
-                        },
-                        'updatedAt': '2026-07-10T00:00:00Z',
+        body = {
+            'data': {
+                'customer': {
+                    'id': 'gid://shopify/Customer/920',
+                    'firstName': 'Un', 'lastName': 'Resolved',
+                    'displayName': 'Un Resolved',
+                    'defaultEmailAddress': {
+                        'emailAddress': 'unresolved-country@example.com',
                     },
+                    'defaultPhoneNumber': {
+                        'phoneNumber': '+15551234567',
+                    },
+                    'defaultAddress': {
+                        'address1': '1 Test St', 'address2': None,
+                        'city': 'Testville', 'zip': '99999',
+                        'provinceCode': 'ZZ', 'countryCodeV2': 'ZZ',
+                    },
+                    'updatedAt': '2026-07-10T00:00:00Z',
                 },
-            }
+            },
+        }
 
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with patch.object(type(Client), '_send', _ok_send(body)):
             self.Dispatch.run_drain(20)
         job.invalidate_recordset()
         self.assertEqual(job.state, 'succeeded')
@@ -381,42 +444,35 @@ class TestCustomerImportMatching(TransactionCase):
         self.assertEqual(note.technical_detail, 'country_code=ZZ')
 
     def test_unresolved_state_logs_informational_note_via_job_path(self):
-        self.store.write({'state': 'connected'})
+        self._connect_store_with_credential()
         self.Settings.create({
             'store_id': self.store.id, 'sale_domain_enabled': True,
         })
-        job = self.Job.create({
-            'store_id': self.store.id,
-            'job_source': 'scheduled_sync',
-            'job_type': 'customer_import_sync',
-            'state': 'queued',
-            'payload_hash': str(uuid.uuid4()),
-            'shopify_target_gid': 'gid://shopify/Customer/921',
-        })
+        job = self._make_business_job('gid://shopify/Customer/921')
+        self.env.flush_all()
 
-        def fake_execute(self, store, query, variables=None):
-            return {
-                'data': {
-                    'customer': {
-                        'id': 'gid://shopify/Customer/921',
-                        'firstName': 'State', 'lastName': 'Unresolved',
-                        'displayName': 'State Unresolved',
-                        'defaultEmailAddress': {
-                            'emailAddress': 'unresolved-state@example.com',
-                        },
-                        'defaultPhoneNumber': None,
-                        'defaultAddress': {
-                            'address1': '2 Test Ave', 'address2': None,
-                            'city': 'Testburg', 'zip': '88888',
-                            'provinceCode': 'ZZ', 'countryCodeV2': 'US',
-                        },
-                        'updatedAt': '2026-07-10T00:00:00Z',
+        body = {
+            'data': {
+                'customer': {
+                    'id': 'gid://shopify/Customer/921',
+                    'firstName': 'State', 'lastName': 'Unresolved',
+                    'displayName': 'State Unresolved',
+                    'defaultEmailAddress': {
+                        'emailAddress': 'unresolved-state@example.com',
                     },
+                    'defaultPhoneNumber': None,
+                    'defaultAddress': {
+                        'address1': '2 Test Ave', 'address2': None,
+                        'city': 'Testburg', 'zip': '88888',
+                        'provinceCode': 'ZZ', 'countryCodeV2': 'US',
+                    },
+                    'updatedAt': '2026-07-10T00:00:00Z',
                 },
-            }
+            },
+        }
 
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with patch.object(type(Client), '_send', _ok_send(body)):
             self.Dispatch.run_drain(20)
         job.invalidate_recordset()
         self.assertEqual(job.state, 'succeeded')
@@ -454,32 +510,34 @@ class TestCustomerImportMatching(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_created_partner_is_person_even_with_raw_company_string(self):
-        def fake_execute(self, store, query, variables=None):
-            return {
-                'data': {
-                    'customer': {
-                        'id': 'gid://shopify/Customer/912',
-                        'firstName': 'Acme', 'lastName': 'Rep',
-                        'displayName': 'Acme Rep',
-                        'defaultEmailAddress': {
-                            'emailAddress': 'acme-rep@example.com',
-                        },
-                        'defaultPhoneNumber': None,
-                        'defaultAddress': {
-                            'address1': '1 Biz Ave', 'address2': None,
-                            'city': 'Bizville', 'zip': '11111',
-                            'provinceCode': None, 'countryCodeV2': None,
-                            'company': 'Acme Corp',
-                        },
-                        'updatedAt': '2026-07-10T00:00:00Z',
+        self._connect_store_with_credential()
+        job = self._make_business_job('gid://shopify/Customer/912')
+        self.env.flush_all()
+        body = {
+            'data': {
+                'customer': {
+                    'id': 'gid://shopify/Customer/912',
+                    'firstName': 'Acme', 'lastName': 'Rep',
+                    'displayName': 'Acme Rep',
+                    'defaultEmailAddress': {
+                        'emailAddress': 'acme-rep@example.com',
                     },
+                    'defaultPhoneNumber': None,
+                    'defaultAddress': {
+                        'address1': '1 Biz Ave', 'address2': None,
+                        'city': 'Bizville', 'zip': '11111',
+                        'provinceCode': None, 'countryCodeV2': None,
+                        'company': 'Acme Corp',
+                    },
+                    'updatedAt': '2026-07-10T00:00:00Z',
                 },
-            }
+            },
+        }
 
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with patch.object(type(Client), '_send', _ok_send(body)):
             binding = self.Importer.import_customer_sync(
-                self.store, 'gid://shopify/Customer/912',
+                self.store, 'gid://shopify/Customer/912', job=job,
             )
         partner = binding.partner_id
         self.assertFalse(partner.is_company)
@@ -492,26 +550,28 @@ class TestCustomerImportMatching(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_null_email_and_null_address_tolerated(self):
-        def fake_execute(self, store, query, variables=None):
-            return {
-                'data': {
-                    'customer': {
-                        'id': 'gid://shopify/Customer/913',
-                        'firstName': None, 'lastName': None,
-                        'displayName': 'No Email Customer',
-                        'defaultEmailAddress': None,
-                        'defaultPhoneNumber': None,
-                        'defaultAddress': None,
-                        'updatedAt': '2026-07-10T00:00:00Z',
-                    },
+        self._connect_store_with_credential()
+        job = self._make_business_job('gid://shopify/Customer/913')
+        self.env.flush_all()
+        body = {
+            'data': {
+                'customer': {
+                    'id': 'gid://shopify/Customer/913',
+                    'firstName': None, 'lastName': None,
+                    'displayName': 'No Email Customer',
+                    'defaultEmailAddress': None,
+                    'defaultPhoneNumber': None,
+                    'defaultAddress': None,
+                    'updatedAt': '2026-07-10T00:00:00Z',
                 },
-            }
+            },
+        }
 
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with patch.object(type(Client), '_send', _ok_send(body)):
             with self.assertRaises(JobHandlerError) as ctx:
                 self.Importer.import_customer_sync(
-                    self.store, 'gid://shopify/Customer/913',
+                    self.store, 'gid://shopify/Customer/913', job=job,
                 )
         # Tolerated, not a malformed-payload error -- routed through the
         # ordinary missing-email rule (5), never data_shape_schema_mismatch.
@@ -598,69 +658,85 @@ class TestCustomerImportMatching(TransactionCase):
         self.assertNotIn('mutation', CUSTOMER_IMPORT_QUERY.lower())
 
     def test_import_customer_sync_only_issues_read_query_calls(self):
+        self._connect_store_with_credential()
+        job = self._make_business_job('gid://shopify/Customer/916')
+        self.env.flush_all()
         calls = []
-
-        def fake_execute(self, store, query, variables=None):
-            calls.append(query)
-            return {
-                'data': {
-                    'customer': {
-                        'id': 'gid://shopify/Customer/916',
-                        'firstName': 'Fetched', 'lastName': 'Customer',
-                        'displayName': 'Fetched Customer',
-                        'defaultEmailAddress': {
-                            'emailAddress': 'fetched@example.com',
-                        },
-                        'defaultPhoneNumber': None,
-                        'defaultAddress': None,
-                        'updatedAt': '2026-07-10T00:00:00Z',
+        body = {
+            'data': {
+                'customer': {
+                    'id': 'gid://shopify/Customer/916',
+                    'firstName': 'Fetched', 'lastName': 'Customer',
+                    'displayName': 'Fetched Customer',
+                    'defaultEmailAddress': {
+                        'emailAddress': 'fetched@example.com',
                     },
+                    'defaultPhoneNumber': None,
+                    'defaultAddress': None,
+                    'updatedAt': '2026-07-10T00:00:00Z',
                 },
-            }
+            },
+        }
+
+        def recording_send(self, store, req_body, token=None):
+            calls.append(req_body.get('query'))
+            return _FakeResponse(200, json_body=body)
 
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with patch.object(type(Client), '_send', recording_send):
             result = self.Importer.import_customer_sync(
-                self.store, 'gid://shopify/Customer/916',
+                self.store, 'gid://shopify/Customer/916', job=job,
             )
         self.assertTrue(calls)
         for query in calls:
             self.assertNotIn('mutation', query.lower())
         self.assertEqual(result.shopify_email_snapshot, 'fetched@example.com')
 
-    def test_source_level_single_execute_call_uses_fixed_query_constant(self):
-        """Confirms exactly one Shopify API-client call exists in the
-        whole module, and it always passes the fixed
+    def test_source_level_single_execute_business_call_uses_fixed_query_constant(self):
+        """CORE-R2 Slice 2B: the importer's single Shopify Admin business
+        call now flows through the admission-gated `execute_business()`
+        context manager -- never the legacy value-returning `execute()`.
+
+        Confirms exactly one `execute_business` API-client call exists in
+        the whole module, that no bare `execute(` call survives the
+        migration, and that the one call still passes the fixed
         `CUSTOMER_IMPORT_QUERY` constant -- never a dynamically-built or
         second operation string that could be a mutation.
 
-        Parses the source with `ast` rather than matching a raw
-        substring (control-room review, comment `4934627954`): the
-        prior `'CUSTOMER_IMPORT_QUERY, variables='` substring
-        assertion broke on a purely cosmetic line-wrap with no
-        functional effect (`execute(store, CUSTOMER_IMPORT_QUERY,` /
-        `variables={...})` split across lines) -- this rewrite proves
-        the identical safety property independent of whitespace/
-        line-wrapping/argument formatting.
+        Parses the source with `ast` (control-room review `4934627954`) so
+        the property holds independent of whitespace/line-wrapping/argument
+        formatting.
         """
         path = self._importer_source_path()
         with open(path, 'r', encoding='utf-8') as source_file:
             content = source_file.read()
         tree = ast.parse(content, filename=path)
 
-        execute_calls = [
+        business_calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'execute_business'
+        ]
+        legacy_calls = [
             node for node in ast.walk(tree)
             if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
             and node.func.attr == 'execute'
         ]
-        # 1. Exactly one Shopify API-client execute() call exists.
+        # 1. Exactly one execute_business() call exists, and the legacy
+        # value-returning execute() call is gone.
         self.assertEqual(
-            len(execute_calls), 1,
-            'exactly one Shopify API-client execute() call must exist '
-            'in the importer module',
+            len(business_calls), 1,
+            'exactly one Shopify API-client execute_business() call must '
+            'exist in the importer module',
         )
-        call = execute_calls[0]
+        self.assertEqual(
+            len(legacy_calls), 0,
+            'the legacy value-returning execute() call must be gone after '
+            'the CORE-R2 Slice 2B call-site migration',
+        )
+        call = business_calls[0]
 
         # 2. That one call uses the fixed CUSTOMER_IMPORT_QUERY
         # constant -- a plain Name reference among its arguments,
@@ -673,7 +749,7 @@ class TestCustomerImportMatching(TransactionCase):
         }
         self.assertIn(
             'CUSTOMER_IMPORT_QUERY', referenced_names,
-            'the execute() call must reference the fixed '
+            'the execute_business() call must reference the fixed '
             'CUSTOMER_IMPORT_QUERY constant',
         )
 
@@ -684,14 +760,14 @@ class TestCustomerImportMatching(TransactionCase):
         for argument in list(call.args) + [kw.value for kw in call.keywords]:
             self.assertNotIsInstance(
                 argument, ast.JoinedStr,
-                'execute() must never receive a dynamically-built '
+                'execute_business() must never receive a dynamically-built '
                 '(f-string) query argument',
             )
             if isinstance(argument, ast.Constant) and isinstance(
                 argument.value, str,
             ):
                 self.fail(
-                    'execute() must never receive a literal string '
+                    'execute_business() must never receive a literal string '
                     'argument -- the query must always be the named '
                     'CUSTOMER_IMPORT_QUERY constant'
                 )
@@ -728,3 +804,488 @@ class TestCustomerImportMatching(TransactionCase):
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'models', 'shopify_connector_customer_importer.py',
         )
+
+
+class TestCustomerCallsiteExecuteBusiness(TransactionCase):
+    """CORE-R2 Slice 2B -- the customer importer's call-site migration to the
+    admission-gated `execute_business()` lease (AR-047; packet §5.2 RD-C).
+
+    These tests exercise the REAL production
+    `execute_business`/`_admit`/`_release_lease` path with the `_send`
+    transport-injection seam (no `execute`/lifecycle monkeypatch), proving:
+
+      * the single lease covers transport -> normalization -> full
+        reconciliation -> flush -> return, releasing only after
+        reconciliation (§6 B);
+      * `ShopifyClientError` still maps to the DEC-009 `JobHandlerError`,
+        every failure path releases the lease exactly once, and a
+        fail-closed `ShopifyQuiescedError` propagates uncaught with no
+        transport and no leaked lease (§6 C);
+      * source-level guards: no bare `execute(`, `execute_business` receives
+        a real `job`, no explicit commit, no manual lease/transport access,
+        and no `result` escapes the context (§6 A).
+
+    No Task 011/011B matching behaviour is changed here; matching regression
+    stays proven by `TestCustomerImportMatching` and the scalability suite.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Client = cls.env['shopify.connector.api.client']
+        cls.Lease = cls.env['shopify.connector.call.lease']
+        cls.Importer = cls.env['shopify.connector.customer.importer']
+        cls.CustomerBinding = cls.env['shopify.connector.customer.binding']
+        cls.Job = cls.env['shopify.connector.job']
+        cls.store = cls.env['shopify.connector.store'].create({
+            'name': 'Customer Callsite Store',
+            'shop_domain': 'customer-callsite-%s.myshopify.com' % (
+                uuid.uuid4().hex,
+            ),
+            'api_version': '2026-07',
+            'state': 'connected',
+        })
+        cls.env['shopify.connector.store.credential'].action_set_token(
+            cls.store, DUMMY_TOKEN,
+        )
+        # action_set_token demotes connected -> reconnect_needed and bumps
+        # the generation; re-assert connected for the admission gate.
+        cls.store.write({'state': 'connected'})
+        cls.env.flush_all()
+
+    def setUp(self):
+        super().setUp()
+        # `_admit` opens its gate/lease insert on an independent
+        # `registry.cursor()` side transaction; registry test mode makes it a
+        # TestCursor sharing the single test connection so the uncommitted
+        # fixtures and the committed lease are visible cross-cursor (the
+        # sanctioned CORE-R2 TestBusinessAdmission mechanism).
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    # ------------------------------------------------------------------
+    # Fixtures / helpers.
+    # ------------------------------------------------------------------
+
+    def _job(self, gid, generation=None):
+        return self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'customer_import_sync',
+            'state': 'queued',
+            'payload_hash': uuid.uuid4().hex,
+            'shopify_target_gid': gid,
+            'expected_connection_generation': (
+                self.store.connection_generation
+                if generation is None else generation
+            ),
+        })
+
+    def _partner(self, name, email=None):
+        vals = {'name': name}
+        if email is not None:
+            vals['email'] = email
+        return self.env['res.partner'].create(vals)
+
+    def _customer_body(self, gid, email=None, display_name=None):
+        return {'data': {'customer': {
+            'id': gid, 'firstName': None, 'lastName': None,
+            'displayName': display_name or gid,
+            'defaultEmailAddress': (
+                {'emailAddress': email} if email else None
+            ),
+            'defaultPhoneNumber': None, 'defaultAddress': None,
+            'updatedAt': '2026-07-12T00:00:00Z',
+        }}}
+
+    def _lease_count(self):
+        return self.Lease.search_count([('store_id', '=', self.store.id)])
+
+    def _release_spy(self):
+        releases = []
+        orig = type(self.Client)._release_lease
+
+        def spy(client_self, lease_key):
+            releases.append(lease_key)
+            return orig(client_self, lease_key)
+
+        return releases, spy
+
+    def _counting_send(self, json_body=None):
+        calls = []
+
+        def spy(client_self, store, body, token=None):
+            calls.append(1)
+            return _FakeResponse(200, json_body=json_body or {
+                'data': {'customer': None},
+            })
+
+        return calls, spy
+
+    def _importer_source(self):
+        import os
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'models', 'shopify_connector_customer_importer.py',
+        )
+        with open(path, 'r', encoding='utf-8') as source_file:
+            return path, source_file.read()
+
+    def _importer_ast(self):
+        path, content = self._importer_source()
+        return ast.parse(content, filename=path)
+
+    def _find_func(self, tree, name):
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == name:
+                return node
+        return None
+
+    # ==================================================================
+    # A. Static guards.
+    # ==================================================================
+
+    def test_guard_no_bare_execute_call_remains(self):
+        tree = self._importer_ast()
+        bare = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'execute'
+        ]
+        self.assertEqual(
+            bare, [],
+            'no legacy value-returning api-client execute() call may remain '
+            'in the customer importer after the Slice 2B migration',
+        )
+
+    def test_guard_execute_business_call_passes_real_job(self):
+        tree = self._importer_ast()
+        calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'execute_business'
+        ]
+        self.assertEqual(len(calls), 1)
+        call = calls[0]
+        self.assertTrue(
+            call.args,
+            'execute_business must be called with job as its first '
+            'positional argument',
+        )
+        first = call.args[0]
+        self.assertIsInstance(first, ast.Name)
+        self.assertEqual(
+            first.id, 'job',
+            'execute_business must receive the handler `job` (never a '
+            'literal or None) as its admission credential',
+        )
+
+    def test_guard_no_explicit_commit(self):
+        tree = self._importer_ast()
+        commits = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'commit'
+        ]
+        self.assertEqual(
+            commits, [],
+            'the importer must not issue an explicit commit -- the lease '
+            'contract ends at flush, and the outer transaction boundary '
+            'commits',
+        )
+
+    def test_guard_no_manual_lease_or_transport_access(self):
+        tree = self._importer_ast()
+        forbidden = {
+            '_admit', '_admit_lifecycle', '_release_lease', '_send',
+            '_send_lifecycle',
+        }
+        called = {
+            node.func.attr for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+        }
+        self.assertFalse(
+            called & forbidden,
+            'the importer must not touch the private admission/lease/'
+            'transport seam directly: %r' % (called & forbidden),
+        )
+        _path, content = self._importer_source()
+        for token in ('shopify.connector.call.lease', 'lease_key'):
+            self.assertNotIn(
+                token, content,
+                'the importer must not manually handle leases (%r)' % token,
+            )
+
+    def test_guard_result_never_escapes_execute_business_context(self):
+        tree = self._importer_ast()
+        fn = self._find_func(tree, 'import_customer_sync')
+        self.assertIsNotNone(fn)
+        target_with = None
+        bound_name = None
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.With):
+                continue
+            for item in node.items:
+                ce = item.context_expr
+                if (
+                    isinstance(ce, ast.Call)
+                    and isinstance(ce.func, ast.Attribute)
+                    and ce.func.attr == 'execute_business'
+                ):
+                    target_with = node
+                    self.assertIsNotNone(
+                        item.optional_vars,
+                        'execute_business must be entered as a context '
+                        'manager with an `as` target',
+                    )
+                    self.assertIsInstance(item.optional_vars, ast.Name)
+                    bound_name = item.optional_vars.id
+        self.assertIsNotNone(
+            target_with,
+            'the importer must open an execute_business with-block',
+        )
+        within = {id(node) for node in ast.walk(target_with)}
+        # Every load of the bound `result` name is inside the with-block.
+        for node in ast.walk(fn):
+            if (
+                isinstance(node, ast.Name)
+                and node.id == bound_name
+                and isinstance(node.ctx, ast.Load)
+            ):
+                self.assertIn(
+                    id(node), within,
+                    'the execute_business result must not escape its context',
+                )
+        # Every return sits inside the with-block, so the value is
+        # constructed and returned before the lease releases.
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Return):
+                self.assertIn(
+                    id(node), within,
+                    'import_customer_sync must return inside the '
+                    'execute_business context (before the lease releases)',
+                )
+
+    # ==================================================================
+    # B. Success -- one lease, held through reconciliation, released after.
+    # ==================================================================
+
+    def test_single_context_lease_through_reconciliation_and_release(self):
+        gid = 'gid://shopify/Customer/cs-success-1'
+        partner = self._partner('Solo Match', email='solo@callsite.example')
+        job = self._job(gid)
+        body = self._customer_body(
+            gid, email='solo@callsite.example', display_name='Solo Match',
+        )
+        self.env.flush_all()
+
+        send_lease_counts = []
+        apply_lease_counts = []
+        release_binding_present = []
+        releases = []
+        orig_release = type(self.Client)._release_lease
+        orig_apply = type(self.Importer)._apply_import
+
+        def spy_send(client_self, store, req_body, token=None):
+            # The committed lease exists BEFORE the transport call.
+            send_lease_counts.append(self._lease_count())
+            return _FakeResponse(200, json_body=body)
+
+        def spy_apply(imp_self, store, payload, job=False):
+            # The lease is still held DURING the local reconciliation.
+            apply_lease_counts.append(self._lease_count())
+            return orig_apply(imp_self, store, payload, job=job)
+
+        def spy_release(client_self, lease_key):
+            # At release time (context exit, after reconciliation + flush)
+            # the binding is already persisted.
+            release_binding_present.append(self.CustomerBinding.search_count([
+                ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+            ]))
+            releases.append(lease_key)
+            return orig_release(client_self, lease_key)
+
+        with patch.object(type(self.Client), '_send', spy_send), \
+                patch.object(type(self.Importer), '_apply_import', spy_apply), \
+                patch.object(type(self.Client), '_release_lease', spy_release):
+            result = self.Importer.import_customer_sync(
+                self.store, gid, job=job,
+            )
+
+        # Return value is the (matched) binding.
+        self.assertEqual(result._name, 'shopify.connector.customer.binding')
+        self.assertEqual(result.partner_id, partner)
+        self.assertEqual(result.match_key, 'email')
+        # Exactly one context: one transport, one reconciliation, one release.
+        self.assertEqual(len(send_lease_counts), 1)
+        self.assertEqual(len(apply_lease_counts), 1)
+        self.assertEqual(len(releases), 1)
+        # Lease held before transport and through reconciliation.
+        self.assertEqual(
+            send_lease_counts[0], 1, 'lease must be held before the transport',
+        )
+        self.assertEqual(
+            apply_lease_counts[0], 1, 'lease must be held through reconciliation',
+        )
+        # Reconciliation (and flush) completed before the lease released.
+        self.assertEqual(
+            release_binding_present[0], 1,
+            'the binding must be materialized before the lease releases',
+        )
+        # Lease released after reconciliation.
+        self.assertEqual(self._lease_count(), 0, 'lease must release after')
+
+    # ==================================================================
+    # C. Error behaviour -- classification, release-once, quiesced uncaught.
+    # ==================================================================
+
+    def test_shopify_client_error_maps_to_job_handler_error_releases_once(self):
+        gid = 'gid://shopify/Customer/cs-401'
+        job = self._job(gid)
+        self.env.flush_all()
+        releases, spy_release = self._release_spy()
+
+        def auth_send(client_self, store, body, token=None):
+            return _FakeResponse(401, json_body={'errors': [{'message': 'x'}]})
+
+        with patch.object(type(self.Client), '_send', auth_send), \
+                patch.object(type(self.Client), '_release_lease', spy_release):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_customer_sync(self.store, gid, job=job)
+        # DEC-009 classification is preserved from the ShopifyClientError.
+        self.assertEqual(
+            ctx.exception.error_class, 'shopify_permission_scope_auth',
+        )
+        self.assertEqual(len(releases), 1, 'lease released exactly once')
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_normalization_failure_releases_lease_once(self):
+        gid = 'gid://shopify/Customer/cs-normfail'
+        job = self._job(gid)
+        body = self._customer_body(gid, email='n@callsite.example')
+        self.env.flush_all()
+        releases, spy_release = self._release_spy()
+
+        def boom_normalize(imp_self, result):
+            raise JobHandlerError(
+                'data_shape_schema_mismatch', 'simulated normalize failure',
+            )
+
+        with patch.object(type(self.Client), '_send', _ok_send(body)), \
+                patch.object(
+                    type(self.Importer), '_normalize_payload', boom_normalize,
+                ), \
+                patch.object(type(self.Client), '_release_lease', spy_release):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_customer_sync(self.store, gid, job=job)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(len(releases), 1, 'lease released exactly once')
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_ambiguity_failure_releases_lease_once(self):
+        gid = 'gid://shopify/Customer/cs-amb'
+        self._partner('Amb One', email='amb@callsite.example')
+        self._partner('Amb Two', email='amb@callsite.example')
+        job = self._job(gid)
+        body = self._customer_body(gid, email='amb@callsite.example')
+        self.env.flush_all()
+        releases, spy_release = self._release_spy()
+
+        with patch.object(type(self.Client), '_send', _ok_send(body)), \
+                patch.object(type(self.Client), '_release_lease', spy_release):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_customer_sync(self.store, gid, job=job)
+        self.assertEqual(ctx.exception.error_class, 'ambiguous_match')
+        self.assertEqual(len(releases), 1, 'lease released exactly once')
+        self.assertEqual(self._lease_count(), 0)
+        # No binding row was created on the blocked path.
+        self.assertFalse(self.CustomerBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+
+    def test_binding_conflict_failure_releases_lease_once(self):
+        partner = self._partner('Bound Already', email='bc@callsite.example')
+        self.CustomerBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Customer/cs-bc-existing',
+            'partner_id': partner.id,
+            'match_key': 'manual',
+        })
+        gid = 'gid://shopify/Customer/cs-bc-new'
+        job = self._job(gid)
+        body = self._customer_body(gid, email='bc@callsite.example')
+        self.env.flush_all()
+        releases, spy_release = self._release_spy()
+
+        with patch.object(type(self.Client), '_send', _ok_send(body)), \
+                patch.object(type(self.Client), '_release_lease', spy_release):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_customer_sync(self.store, gid, job=job)
+        self.assertEqual(ctx.exception.error_class, 'binding_conflict')
+        self.assertEqual(len(releases), 1, 'lease released exactly once')
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_partner_write_failure_releases_lease_once(self):
+        gid = 'gid://shopify/Customer/cs-pwfail'
+        job = self._job(gid)
+        body = self._customer_body(gid, email='confident@callsite.example')
+        self.env.flush_all()
+        releases, spy_release = self._release_spy()
+
+        def boom_create(imp_self, shopify_gid, payload, job=False):
+            raise RuntimeError('simulated partner write failure')
+
+        with patch.object(type(self.Client), '_send', _ok_send(body)), \
+                patch.object(
+                    type(self.Importer), '_create_partner', boom_create,
+                ), \
+                patch.object(type(self.Client), '_release_lease', spy_release):
+            with self.assertRaises(RuntimeError):
+                self.Importer.import_customer_sync(self.store, gid, job=job)
+        self.assertEqual(len(releases), 1, 'lease released exactly once')
+        self.assertEqual(self._lease_count(), 0)
+        self.assertFalse(self.CustomerBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+
+    def test_quiesced_error_propagates_uncaught_no_transport_no_lease(self):
+        gid = 'gid://shopify/Customer/cs-quiesced'
+        # Force a generation mismatch so _admit fails closed at admission.
+        job = self._job(gid, generation=self.store.connection_generation + 7)
+        self.env.flush_all()
+        send_calls, spy_send = self._counting_send()
+        releases, spy_release = self._release_spy()
+
+        with patch.object(type(self.Client), '_send', spy_send), \
+                patch.object(type(self.Client), '_release_lease', spy_release):
+            with self.assertRaises(ShopifyQuiescedError):
+                self.Importer.import_customer_sync(self.store, gid, job=job)
+        # Fail-closed: no transport, no lease, no release, and NOT remapped
+        # to a ShopifyClientError/JobHandlerError.
+        self.assertEqual(send_calls, [], 'no Shopify call on a quiesced refusal')
+        self.assertEqual(releases, [], 'no lease to release on a refusal')
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_disconnected_store_fails_closed_uncaught_no_transport(self):
+        gid = 'gid://shopify/Customer/cs-disc'
+        job = self._job(gid)
+        # A PRE-ADMISSION refusal (unit-level, registry test mode): the store is
+        # not `connected` at admission, so _admit fails closed before any Shopify
+        # call. This is NOT Race A -- it does not exercise the concurrent
+        # action_disconnect vs admission ordering. The GENUINE independent-
+        # connection Race A proof (a real action_disconnect racing a real
+        # admission across distinct backends) is TestCustomerCallsiteRaceAGenuine
+        # in test_customer_matching_scalability.py.
+        self.store.write({'state': 'disconnected'})
+        self.env.flush_all()
+        send_calls, spy_send = self._counting_send()
+
+        with patch.object(type(self.Client), '_send', spy_send):
+            with self.assertRaises(ShopifyQuiescedError):
+                self.Importer.import_customer_sync(self.store, gid, job=job)
+        self.assertEqual(send_calls, [], 'no Shopify call on a fail-closed store')
+        self.assertEqual(self._lease_count(), 0)
