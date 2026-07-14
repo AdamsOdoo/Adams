@@ -8,8 +8,19 @@
 **Date:** 2026-07-14.
 **Branch:** `claude/core-r2-customer-callsite`.
 **Draft PR base:** `claude/core-r2-slice-2b-integration`.
-**Architecture:** AR-047. **Packet:** `task-core-r2-slice-2b-callsite-runtime-packet.md` §5.2/§9.
+**Architecture:** AR-047. **Packet:** `task-core-r2-slice-2b-callsite-runtime-packet.md` §5.2/§5.6/§9.
 **Companion:** `docs/05-qa/task-core-r2-customer-callsite-validation.md`.
+
+**Revision 2 (2026-07-14) — control-room review `4695664662` (REVISE).** The
+structurally-correct production migration is preserved (frozen). The correction
+adds the missing **genuine independent-connection** lifecycle proofs (M1/M2
+committed-lease visibility; Race A / M8 both orderings; Race B / M18) using real
+`db_connect` connections, the real `action_disconnect`/admission lock protocol,
+and the real `_run_disconnect_quiesce` controller; makes the concurrency cleanup
+**fail-loud** on a lease leak; and corrects the evidence wording (a pre-set-state
+test is **not** Race A; the PR is a **five-file** change). No production importer
+change was needed (no genuine test surfaced a production defect). SRR-03 stays
+OPEN; Prompt E stays blocked.
 
 ---
 
@@ -26,13 +37,17 @@
 
 ---
 
-## 2. Exact changed files (3)
+## 2. Exact changed files — the five-file PR scope
 
-1. `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py` — production call-site migration.
-2. `addons/shopify_connector_sale/tests/test_customer_import_matching.py` — adapted transport-stub tests + rewritten AST guard + new `TestCustomerCallsiteExecuteBusiness`.
-3. `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py` — adapted opt-in genuine-race concurrency test.
+1. `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py` — production call-site migration (unchanged since Revision 1; frozen).
+2. `addons/shopify_connector_sale/tests/test_customer_import_matching.py` — adapted transport-stub tests + rewritten AST guard + `TestCustomerCallsiteExecuteBusiness` (unit lease guards; the disconnected-store test reclassified as a **pre-admission refusal**, not Race A).
+3. `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py` — fail-loud lease-leak cleanup on the existing genuine race **plus** the new genuine independent-connection lifecycle proofs (`_CustomerGenuineHelpers` + M1/M2/Race A/Race B classes).
+4. `docs/05-qa/task-core-r2-customer-callsite-validation.md` — validation record.
+5. `docs/07-implementation-plan/task-core-r2-customer-callsite-handoff.md` — this handoff.
 
-No core/product/manifest/XML/security/data/CI/shared-handoff file changed.
+No core/product/manifest/XML/security/data/CI/shared-handoff file changed. (The
+earlier "(3)" wording counted only the code/test files; corrected to the true
+five-file PR scope per review `4695664662` #5.)
 
 ---
 
@@ -90,25 +105,50 @@ the unchanged Task 011/011B suites (`TestCustomerImportMatching`,
 
 ## 8. Static results
 
-py_compile OK; compileall OK; no conflict markers; 3 allowed files only; AST
-invariant scan 16/16 PASS; secret/PII scan clean (placeholder token + reserved
-domains only); 0 assertions weakened. (Validation §7.)
+**Revision 1 (migration):** py_compile OK; compileall OK; no conflict markers;
+AST invariant scan 16/16 PASS; secret/PII scan clean; 0 assertions weakened.
+
+**Revision 2 (this correction):** py_compile OK; compileall OK; no conflict
+markers; **four files changed** (the two customer test files + these two docs);
+the **production importer is frozen** (unchanged — the 16/16 AST invariants still
+pass); secret/PII scan clean (placeholder token + reserved `@…example` domains
+only); the three new genuine classes are tagged
+`-standard`/`shopify_connector_customer_callsite_lifecycle`. (Validation §7/§8.)
 
 ---
 
 ## 9. Adversarial self-review
 
-A parallel diverse-lens adversarial review (five independent reviewers:
-lease-boundary, exception-routing, matching-unchanged, test-correctness,
-scope-contamination), each reading the actual diff, importer,
-`shopify_connector_api_client.py`, and test files, with an independent
-adversarial verification pass on any finding.
+**Revision 1 (migration).** A parallel five-lens adversarial review
+(lease-boundary, exception-routing, matching-unchanged, test-correctness,
+scope-contamination) with an independent verification pass returned **0 findings**.
 
-**Result: 0 raw findings, 0 confirmed findings.** Every reviewer returned an
-empty finding set after substantive analysis (each with a genuine multi-tool
-read of the code). This is in addition to the author's own AST invariant scan
-(16/16 PASS), `py_compile`/`compileall`, conflict-marker scan, secret/PII scan,
-and changed-assertion review.
+**Revision 2 (this correction).** The genuine independent-connection tests were
+verified by the author against the real production code and the PostgreSQL
+row-lock conflict matrix; a subagent adversarial pass was also launched but was
+**cut short by a session/API limit before completing** (an infrastructure
+interruption, not a finding). The load-bearing lock reasoning was checked
+directly:
+
+- admission `FOR SHARE` does **not** conflict with the pause-holder's
+  `FOR KEY SHARE` on the store → admission succeeds while the reconciliation is
+  paused;
+- `action_disconnect`'s `FOR NO KEY UPDATE` does **not** conflict with a
+  `FOR KEY SHARE` → the disconnect returns without waiting for the paused
+  reconciliation (Race B);
+- the controller's `try_lock_for_update` is `FOR UPDATE SKIP LOCKED`, which
+  **skips** a `FOR KEY SHARE`-locked in-flight store → genuine deferral, no
+  premature `completed`; it finalizes only once the call releases its lease and
+  key-share;
+- `_finalize_disconnect_completed` → `_clear_token_under_store_lock` sets
+  `credential_present=False` and `access_token=False` (verified in the credential
+  model) → the M18 credential-cleared assertion holds;
+- every genuine connection is bounded (statement+lock timeout); worker threads are
+  daemon, bounded-joined, and `_assert_workers_dead`; cleanup is durable,
+  fail-loud, and zero-residue (incl. leases).
+
+Because these genuine proofs were **not executed** here (no Odoo runtime — §10),
+their runtime confirmation is captured on the integration-staging host.
 
 **Key adversarial checks — all clear:**
 

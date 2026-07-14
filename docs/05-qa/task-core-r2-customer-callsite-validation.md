@@ -47,19 +47,26 @@ at the required head, per the explicit task instruction.)
 
 ---
 
-## 2. Exact changed files (3, all allowed)
+## 2. Exact changed files — the five-file PR scope
 
-**[Fact — static result]** `git diff --stat` against the starting head:
+**[Fact — static result]** The PR (`claude/core-r2-customer-callsite` →
+`claude/core-r2-slice-2b-integration`) changes **exactly five files**: one
+production importer, two customer test files, and these two domain-specific
+evidence documents. `git diff --stat` against the starting head:
 
 | File | Kind | Change |
 | --- | --- | --- |
 | `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py` | Production | Call-site migration (`import_customer_sync`) + docstring accuracy |
-| `addons/shopify_connector_sale/tests/test_customer_import_matching.py` | Tests | Adapt 6 transport-stub tests + rewrite AST guard + new `TestCustomerCallsiteExecuteBusiness` (A/B/C) |
-| `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py` | Tests | Adapt the opt-in genuine-race concurrency test to the `_send` seam + credential/generation + defensive lease cleanup |
+| `addons/shopify_connector_sale/tests/test_customer_import_matching.py` | Tests | Adapt 6 transport-stub tests + rewrite AST guard + new `TestCustomerCallsiteExecuteBusiness` (unit lease guards; the disconnected-store test is a **pre-admission refusal**, not Race A) |
+| `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py` | Tests | Fail-loud lease-leak cleanup on the existing genuine race; **new genuine independent-connection lifecycle proofs** (`_CustomerGenuineHelpers` + M1/M2/Race A/Race B classes) |
+| `docs/05-qa/task-core-r2-customer-callsite-validation.md` | Docs | This validation record |
+| `docs/07-implementation-plan/task-core-r2-customer-callsite-handoff.md` | Docs | The session handoff |
 
 **No other file changed.** No `shopify_connector_core`, `shopify_connector_product`,
 manifest, XML, security, data, migration, CI, or shared handoff/AR file is in the
-diff. Confirmed by `git diff --name-only`.
+diff. Confirmed by `git diff --name-only`. (The earlier "(3)" wording counted only
+the code/test files and is corrected here to the true five-file PR scope, per
+review `4695664662` #5.)
 
 ---
 
@@ -206,31 +213,86 @@ Odoo runtime-green.**
 
 ---
 
-## 8. New / adapted tests (§6 A/B/C/D)
+## 8. Tests — four distinct layers (corrected per review `4695664662`)
 
-New class `TestCustomerCallsiteExecuteBusiness` (in `test_customer_import_matching.py`),
-driving the real `execute_business`/`_admit`/`_release_lease` path via the `_send`
-seam (no `execute`/lifecycle monkeypatch):
+The customer proofs are now cleanly separated into four layers; the earlier
+mislabelling of a pre-set-state test as "Race A" is corrected.
 
-- **A. Static guards:** no bare `execute(`; `execute_business` receives a real
-  `job`; no explicit commit; no manual lease/transport seam access; `result` never
-  escapes the context and every `return` is inside it.
-- **B. Success:** one context (one transport, one reconciliation, one release);
-  lease held before transport and through reconciliation; binding materialized
-  before the lease releases; return value is the matched binding; lease released
-  after.
-- **C. Error:** `ShopifyClientError` → `JobHandlerError` (DEC-009 class preserved),
-  release-once; normalization failure release-once; ambiguity release-once (no
-  binding created); binding_conflict release-once; partner-write failure
-  release-once; `ShopifyQuiescedError` propagates uncaught with **no transport**
-  and **no leaked lease**; disconnected-store fail-closed (Race A) with no
-  transport.
-- **D. Regression:** the existing Task 011/011B suites above, unchanged.
+### 8.1 Unit lease guards — `TestCustomerCallsiteExecuteBusiness` (standard CI)
+
+In `test_customer_import_matching.py`, driving the real
+`execute_business`/`_admit`/`_release_lease` path via the `_send` seam under
+registry test mode (a single shared connection):
+
+- **Static guards:** no bare `execute(`; `execute_business` receives a real `job`;
+  no explicit commit; no manual lease/transport seam access; `result` never
+  escapes the context; every `return` is inside it.
+- **Success:** one context (one transport, one reconciliation, one release); lease
+  observed before transport and during reconciliation; binding materialized before
+  the lease releases; return value is the matched binding; lease released after.
+- **Error:** `ShopifyClientError` → `JobHandlerError` (DEC-009 class preserved),
+  release-once; normalization/ambiguity/binding_conflict/partner-write failures
+  each release once; `ShopifyQuiescedError` propagates uncaught with **no
+  transport** and **no leaked lease**.
+- **Pre-admission refusals (NOT Race A):** `test_quiesced_error_propagates_…`
+  (generation mismatch) and `test_disconnected_store_fails_closed_…` (store not
+  `connected`) prove the **pre-admission/fail-closed refusal** only. They are
+  explicitly **not** the concurrent disconnect-vs-admission ordering — that is the
+  genuine Race A below. The test comments and this record now say so.
+
+These are unit lease counts under registry test mode; per the validation plan they
+are *supporting* evidence and **cannot** prove committed-lease visibility on an
+independent connection.
+
+### 8.2 Genuine independent-connection lifecycle proofs (opt-in, runtime)
+
+**New** in `test_customer_matching_scalability.py` — `_CustomerGenuineHelpers` +
+three classes tagged
+`('post_install','-at_install','-standard','shopify_connector_customer_callsite_lifecycle')`,
+authored to run on a genuine multi-connection PostgreSQL runtime host (like the
+existing `TestCustomerMatchingConcurrency`). They use real `db_connect`
+connections (bounded statement/lock timeouts, distinct backend PIDs), the REAL
+`execute_business`/`_admit`/`_release_lease` path, the REAL
+`action_disconnect`/admission lock protocol, and the REAL
+`_run_disconnect_quiesce` controller. Only `_send` is the transport seam;
+production lifecycle/state is never monkeypatched. The reconciliation pause is a
+genuine `UNIQUE(store,partner)` index wait (a second connection holds an
+uncommitted binding, then **rolls back** so the admitted call succeeds).
+
+| Class / test | Proves |
+| --- | --- |
+| `TestCustomerCallsiteLeaseVisibilityGenuine.test_m1_…` | **M1** — the committed lease is visible on an independent connection **before** `_send`, carries the real captured token, and releases on context exit. |
+| `…LeaseVisibilityGenuine.test_m2_…` | **M2** — the same single lease is held while `_apply_import` is genuinely **paused mid-reconciliation**, then released only after reconciliation completes. |
+| `TestCustomerCallsiteRaceAGenuine.test_race_a_disconnect_first_…` | **Race A / M8 (disconnect-first)** — a real `action_disconnect` committed before admission makes `_admit` read the fresh committed state and raise `ShopifyQuiescedError`; **zero transport, no lease, no binding**. |
+| `…RaceAGenuine.test_race_a_admission_first_…` | **Race A / M8 (admission-first)** — `_admit` commits the lease + token first; a real disconnect committed during the call returns; the admitted call continues with its **old in-memory token** and binds; lease releases; credential preserved. |
+| `TestCustomerCallsiteRaceBGenuine.test_race_b_…` | **Race B / M18** — a real `action_disconnect` landing after a committed admission **returns without waiting** for the paused reconciliation (the disconnect's `FOR NO KEY UPDATE` does not conflict with the in-flight binding's `FOR KEY SHARE`); the controller **defers** finalization while the lease is open (its `FOR UPDATE SKIP LOCKED` safely skips the in-flight store) and finalizes `completed` + clears the credential **only after** the call releases its lease. |
+
+### 8.3 Cleanup correction (review `4695664662` #4)
+
+`TestCustomerMatchingConcurrency` now captures the committed lease count on an
+**independent connection before any cleanup**, asserts it is zero (a release
+regression is fail-loud and cannot be masked by the cleanup's own lease sweep),
+and includes a `leases` entry in the independent verification map.
+
+### 8.4 Regression
+
+The existing Task 011/011B suites are unchanged (§6); `0` existing assertions were
+removed or weakened.
 
 The `execute`→`execute_business` AST guard
-(`test_source_level_single_execute_business_call_uses_fixed_query_constant`) now
+(`test_source_level_single_execute_business_call_uses_fixed_query_constant`)
 asserts exactly one `execute_business` call, **zero** `execute` calls, and the
 fixed `CUSTOMER_IMPORT_QUERY` constant.
+
+### 8.5 Which tests were executed
+
+**[Runtime pending]** No Odoo runtime was available in this session. **None of the
+above tests were executed here.** They are authored and pass `py_compile` /
+`compileall` only. The unit lease guards (§8.1) run in standard CI; the genuine
+lifecycle proofs (§8.2) are `-standard` and run explicitly on the runtime host via
+`--test-tags shopify_connector_customer_callsite_lifecycle`. Execution is captured
+on the integration-staging head after merge-back (§9). **No test is claimed to
+have passed.**
 
 ---
 
