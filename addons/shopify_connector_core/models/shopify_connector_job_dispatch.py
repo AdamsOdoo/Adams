@@ -3,6 +3,7 @@ import random
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
+from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY, retrying
 
 from ..tools.redaction import redact
 from .shopify_connector_job import BUSINESS_JOB_SOURCES, MANUAL_REVIEW_SUBREASON_SELECTION
@@ -131,11 +132,107 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
     @api.model
     def run_drain(self, limit=DISPATCH_BATCH_SIZE):
-        """Claim and dispatch up to `limit` jobs -- the `ir.cron` target."""
-        Job = self.env['shopify.connector.job']
-        claimed = Job._claim_for_dispatch(limit)
-        for job in claimed:
-            self._dispatch_one(job)
+        """Claim and dispatch up to ``limit`` jobs -- the ``ir.cron`` target.
+
+        Each job is dispatched inside the REAL Odoo concurrency-retry
+        boundary (``odoo.service.model.retrying``) and committed on its
+        own. A genuine PostgreSQL serialization/deadlock/lock failure
+        (SQLSTATE 40001/40P01/55P03) therefore rolls the transaction back,
+        resets the environment, re-browses the job/store by id and retries
+        under the real Odoo policy (``MAX_TRIES_ON_CONCURRENCY_FAILURE``) --
+        it is never caught and re-issued as an ORM write inside the
+        already-aborted transaction (which would fail as
+        ``InFailedSqlTransaction``). Per-job commit keeps one racing (or
+        failing) job from rolling back the work of jobs already dispatched
+        in the same drain, and keeps a rolled-back first attempt from
+        re-exposing an already-transported job to a duplicate call: on the
+        reset retry an already-disconnecting/disconnected store is refused
+        before any second transport (the ``write()``-time store-state gate
+        and the pre-handler re-check). Jobs are claimed one at a time so
+        each claim's row lock is scoped to that job's own committed
+        outcome -- a later per-job rollback can never un-claim or re-expose
+        a job already processed in this pass.
+        """
+        for _slot in range(limit):
+            if not self._drain_one():
+                break
+
+    @api.model
+    def _drain_one(self):
+        """Claim and dispatch a single job through the real Odoo
+        concurrency-retry boundary.
+
+        Returns ``True`` when a job was claimed and processed (whether it
+        succeeded, was refused, retried or routed), ``False`` when no
+        claimable job remains so ``run_drain`` can stop early.
+        """
+        claimed = self.env['shopify.connector.job']._claim_for_dispatch(1)
+        if not claimed:
+            return False
+        job_id = claimed.id
+
+        def _attempt():
+            # Re-browse by id on EVERY attempt: after ``retrying`` rolls
+            # back and resets the environment, the reset attempt reads the
+            # job and its store fresh, so it observes the current committed
+            # state (e.g. a store a concurrent disconnect moved to
+            # ``disconnecting`` -> refused before any transport).
+            job = self.env['shopify.connector.job'].browse(job_id)
+            if job.exists():
+                self._dispatch_one(job)
+
+        if not self._concurrency_retry_supported():
+            # The shared in-test transaction cursor forbids commit/rollback,
+            # so the real Odoo retry boundary (which commits on success)
+            # cannot run here. The standard suite exercises normal dispatch
+            # and classified-failure routing; a genuine PostgreSQL
+            # serialization failure cannot occur on its single shared
+            # connection anyway. The genuine independent-connection lifecycle
+            # tests drive the real boundary below on real pooled cursors.
+            _attempt()
+            return True
+
+        try:
+            # retrying() calls _attempt in a loop: on a genuine 40001/40P01/
+            # 55P03 it rolls the transaction back, resets the environment and
+            # re-invokes (re-browsing the job/store) -- bounded by the real
+            # Odoo policy -- and commits this job on its own on success, so a
+            # later job's rollback can never undo it (batch integrity; no
+            # duplicate transport of an already-committed job).
+            retrying(_attempt, self.env)
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            # The bounded Odoo retry budget was exhausted while the conflict
+            # persisted (retrying has already rolled back and reset). Route
+            # the job once, in this now-clean transaction, to the existing
+            # bounded auto-retry path -- never leave a raw serialization
+            # error as the outcome and never stop the rest of the drain.
+            self.env.cr.rollback()
+            job = self.env['shopify.connector.job'].browse(job_id)
+            if job.exists():
+                self._route_failure(
+                    job, 'concurrency_race_conflict',
+                    'A concurrent-update conflict persisted after the '
+                    'bounded transaction-retry budget; scheduled for retry.',
+                )
+            self.env.cr.commit()
+        return True
+
+    @api.model
+    def _concurrency_retry_supported(self):
+        """Whether the real Odoo concurrency-retry boundary can run on the
+        current cursor.
+
+        :func:`odoo.service.model.retrying` commits on success; the Odoo test
+        runner replaces the shared ``TransactionCase`` cursor's ``commit``
+        with a guard that raises. So the boundary runs on production and on
+        the genuine independent-connection lifecycle tests (real pooled
+        ``db_connect`` cursors), and is bypassed on the shared in-test
+        cursor. Detected by the forbidden-commit guard rather than
+        ``in_test_mode()``, because the genuine tests are themselves in test
+        mode yet legitimately commit on their own real cursors.
+        """
+        commit = getattr(self.env.cr, 'commit', None)
+        return getattr(commit, '__name__', '') != 'forbidden'
 
     # ------------------------------------------------------------------
     # Registry / domain-extension seam (Decision B)
@@ -258,6 +355,19 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         try:
             handler(job)
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            # A genuine PostgreSQL concurrency failure (SQLSTATE
+            # 40001/40P01/55P03) has aborted the transaction. It must NEVER
+            # be caught and routed through an ORM write here: that write
+            # would run inside the already-aborted transaction and fail as
+            # InFailedSqlTransaction, masking the real conflict. Re-raise it
+            # unchanged so the drain's ``retrying`` boundary rolls back,
+            # resets the environment, re-browses the job/store and retries
+            # under the real Odoo concurrency-retry policy. (Classified
+            # handler conflicts that a handler can detect BEFORE poisoning
+            # the transaction still raise ``JobHandlerError(
+            # 'concurrency_race_conflict', ...)`` and route below.)
+            raise
         except JobHandlerError as exc:
             self._route_failure(
                 job, exc.error_class, exc.reason, exc.technical_detail,

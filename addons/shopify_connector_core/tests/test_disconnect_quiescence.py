@@ -3694,3 +3694,128 @@ class TestLifecycleServiceRetryGenuine(_GenuineRaceHelpers, TransactionCase):
         finally:
             service_logger.setLevel(prior_level)
             self._cleanup(dbname, store_id)
+
+    def test_scheduled_run_drain_serialization_retry_refuses_after_disconnect(self):
+        """Phase-5 companion proof (runtime finding #2): the SAME genuine
+        40001-driven retry as ``test_repeatable_read_serialization_retry_...``, but
+        through the REAL SCHEDULED job-dispatch entrypoint ``run_drain`` -- the
+        single shared CORE retry mechanism the customer AND product call sites
+        both rely on, proven once here at the dispatcher layer.
+
+        A representative business handler admits + transports, then a real
+        post-network store-row revalidation (``_lock_store_for_lifecycle``,
+        ``FOR NO KEY UPDATE``) raises a genuine SQLSTATE 40001 once a concurrent
+        real ``action_disconnect`` has committed on an INDEPENDENT backend. The
+        dispatcher NEVER re-issues an ORM write inside the aborted transaction:
+        ``run_drain``'s real ``odoo.service.model.retrying`` boundary rolls back,
+        the lease releases, the environment resets + re-browses, and the reset
+        attempt is refused (store ``disconnecting``) BEFORE any second transport
+        -- exactly one transport (DUMMY_TOKEN), the job in a safe retryable state,
+        no raw concurrency error as the outcome, credential retained until the
+        controller finalizes, and zero residue. Only ``_send`` (the network seam)
+        and the handler registry are patched; ``run_drain`` / ``_dispatch_one`` /
+        ``_invoke_handler`` / ``execute_business`` / ``_admit`` / ``_release_lease``
+        / ``action_disconnect`` / the retry boundary are the REAL production code.
+        """
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        disc_info = {}
+        retry_handler = _RetryLogCapture()
+        service_logger = logging.getLogger('odoo.service.model')
+        prior_level = service_logger.level
+        try:
+            store_id, shop_domain, job_id = self._commit_connected_fixture(
+                dbname, with_job=True)
+            ClientCls = type(self.env['shopify.connector.api.client'])
+            DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+
+            def racing_send(client_self, s, body, token=None):
+                # Admission committed the lease + token snapshot; a REAL one-way
+                # disconnect now commits ONCE on an INDEPENDENT backend.
+                send_tokens.append(token)
+                if 'pid' not in disc_info:
+                    disc = self._open_bounded(dbname)
+                    try:
+                        denv = api.Environment(disc, SUPERUSER_ID, {})
+                        disc_info['pid'] = self._backend_pid(disc)
+                        denv['shopify.connector.store'].browse(
+                            store_id).action_disconnect()
+                        disc.commit()
+                    finally:
+                        disc.close()
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def racing_selftest(job):
+                # Representative business handler: REAL admission + transport, then
+                # a REAL post-network store-row revalidation that raises a genuine
+                # 40001 under REPEATABLE READ once the disconnect has committed.
+                # Nothing about the admission, lease, or the serialization failure
+                # is caught or mocked here.
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    job.store_id._lock_store_for_lifecycle()
+
+            drain_cr = self._open_bounded(dbname)      # production REPEATABLE READ
+            try:
+                drain_cr.execute("SHOW transaction_isolation")
+                self.assertEqual(
+                    drain_cr.fetchone()[0], 'repeatable read',
+                    'the drain cursor must run at the production isolation')
+                drain_pid = self._backend_pid(drain_cr)
+                drain_env = api.Environment(drain_cr, SUPERUSER_ID, {})
+                service_logger.setLevel(logging.DEBUG)
+                service_logger.addHandler(retry_handler)
+                try:
+                    with patch.object(self.registry, 'cursor',
+                                      self._real_registry_cursor(dbname)), \
+                         patch.object(ClientCls, '_send', racing_send), \
+                         patch.object(
+                             DispatchCls, '_get_handlers',
+                             lambda self: {
+                                 'core_dispatch_selftest': racing_selftest}), \
+                         self._no_retry_backoff():
+                        drain_env[
+                            'shopify.connector.job.dispatch'].run_drain(1)
+                finally:
+                    service_logger.removeHandler(retry_handler)
+            finally:
+                drain_cr.close()
+
+            # ---- retry-boundary assertions (cross-connection observed) ----
+            self.assertEqual(
+                len(send_tokens), 1,
+                'exactly one transport across the admitted attempt + refused retry')
+            self.assertEqual(send_tokens[0], DUMMY_TOKEN)
+            self.assertTrue(
+                retry_handler.mentions_serialization(),
+                'the REAL service retry loop must report the 40001-driven retry; '
+                'log=%s' % retry_handler.messages)
+            self.assertIn('pid', disc_info)
+            self.assertNotEqual(
+                disc_info['pid'], drain_pid,
+                'the disconnect committed on a distinct backend PID')
+            # Aborted attempt released its lease; store superseded; credential
+            # retained (the controller finalizes later); job in a safe state.
+            self.assertEqual(self._lease_count(dbname, store_id), 0)
+            state, _gen, _ltc, _clv, cred_present = self._observe_store(
+                dbname, store_id)
+            self.assertEqual(state, 'disconnecting')
+            self.assertTrue(cred_present)
+            obs_job = self._open_bounded(dbname)
+            try:
+                obs_job.execute(
+                    "SELECT state FROM shopify_connector_job WHERE id = %s",
+                    (job_id,))
+                job_state = obs_job.fetchone()[0]
+                obs_job.rollback()
+            finally:
+                obs_job.close()
+            self.assertEqual(
+                job_state, 'failed_retryable',
+                'the superseded job must end in a safe retryable state, not a raw '
+                'concurrency error; saw %s' % job_state)
+        finally:
+            service_logger.setLevel(prior_level)
+            self._cleanup(dbname, store_id)

@@ -36,7 +36,9 @@ synchronization barrier; production lifecycle/state is never monkeypatched.
 """
 
 import ast
+import contextlib
 import json
+import logging
 import os
 import queue
 import threading
@@ -48,6 +50,7 @@ from unittest.mock import patch
 import psycopg2
 
 from odoo import SUPERUSER_ID, api
+import odoo.service.model as service_model
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
@@ -1981,6 +1984,53 @@ class _CustomerGenuineHelpers:
         genuinely independent AND time-bounded (never unbounded/hangable)."""
         return lambda *args, **kwargs: self._open_bounded(dbname)
 
+    @staticmethod
+    @contextlib.contextmanager
+    def _instant_retry_backoff():
+        """Make the REAL `odoo.service.model.retrying` loop's inter-try backoff
+        instantaneous WITHOUT touching its retry decision or exception
+        classification -- patch only the jitter (`random.uniform` -> 0.0) and the
+        wait (`time.sleep` -> no-op), tolerant of the module's import form. If a
+        hook is absent the only effect is one short real sleep -- still correct."""
+        patches = []
+        if hasattr(service_model, 'time') and hasattr(service_model.time, 'sleep'):
+            patches.append(patch.object(service_model.time, 'sleep',
+                                        lambda *a, **k: None))
+        if hasattr(service_model, 'random') and hasattr(
+                service_model.random, 'uniform'):
+            patches.append(patch.object(service_model.random, 'uniform',
+                                        lambda *a, **k: 0.0))
+        with contextlib.ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            yield
+
+    @contextlib.contextmanager
+    def _capture_service_retry(self):
+        """Capture the REAL `odoo.service.model` retry log so a genuine SQLSTATE
+        40001 that drove the production retry can be evidenced (never injected).
+        Process-global logging, so a retry logged from a worker thread is
+        captured too."""
+        records = []
+
+        class _Capture(logging.Handler):
+            def emit(self_handler, record):
+                try:
+                    records.append(record.getMessage())
+                except Exception:
+                    pass
+
+        logger = logging.getLogger('odoo.service.model')
+        handler = _Capture()
+        prior_level = logger.level
+        logger.setLevel(logging.DEBUG)
+        logger.addHandler(handler)
+        try:
+            yield records
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(prior_level)
+
     def _sanitize(self, exc, phase):
         error_class = getattr(exc, 'error_class', None)
         return {
@@ -2100,6 +2150,18 @@ class _CustomerGenuineHelpers:
             obs.execute(
                 "SELECT access_token FROM shopify_connector_store_credential "
                 "WHERE store_id = %s", (store_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return row[0] if row else None
+        finally:
+            obs.close()
+
+    def _observe_job_state(self, dbname, job_id):
+        """The committed `state` of a job, observed on a fresh connection."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT state FROM shopify_connector_job WHERE id = %s", (job_id,))
             row = obs.fetchone()
             obs.rollback()
             return row[0] if row else None
@@ -2606,24 +2668,34 @@ class TestCustomerCallsiteRaceAGenuine(_CustomerGenuineHelpers, TransactionCase)
         dbname = self.env.cr.dbname
         ids = None
         worker_cr = None
+        disc = None
         send_calls = []
-        pids = []
         trigger_baseline = self._trigger_baseline(dbname)
         try:
             ids = self._fixture(dbname, 'raa-%s' % uuid.uuid4().hex[:10])
-            # Real one-way disconnect commits FIRST on an independent backend.
+            # Real one-way disconnect commits FIRST on an independent backend --
+            # and that connection is kept CHECKED OUT AND OPEN while the worker
+            # connection is opened, so the backend PIDs are genuinely distinct by
+            # construction, not by pool timing. (An earlier version closed the
+            # disconnect connection before opening the worker; Odoo's LIFO
+            # connection pool may then legitimately hand the worker the same
+            # backend, which invalidated the distinct-PID proof under pooled
+            # reuse -- runtime finding #1.)
             disc = self._open_bounded(dbname)
-            try:
-                denv = api.Environment(disc, SUPERUSER_ID, {})
-                pids.append(self._backend_pid(disc))
-                denv['shopify.connector.store'].browse(
-                    ids['store_id']).action_disconnect()
-                disc.commit()
-            finally:
-                disc.close()
+            denv = api.Environment(disc, SUPERUSER_ID, {})
+            disc_pid = self._backend_pid(disc)
+            denv['shopify.connector.store'].browse(
+                ids['store_id']).action_disconnect()
+            disc.commit()
 
+            # Worker connection opened WHILE the disconnect connection is still
+            # open -> a genuinely distinct backend.
             worker_cr = self._open_bounded(dbname)
             worker_pid = self._backend_pid(worker_cr)
+            self.assertNotEqual(
+                worker_pid, disc_pid,
+                'the worker and the committed disconnect must run on distinct '
+                'PostgreSQL backends (genuine independent connections)')
             wenv = api.Environment(worker_cr, SUPERUSER_ID, {})
             Importer = wenv['shopify.connector.customer.importer']
             Client = wenv['shopify.connector.api.client']
@@ -2651,14 +2723,21 @@ class TestCustomerCallsiteRaceAGenuine(_CustomerGenuineHelpers, TransactionCase)
             self.assertEqual(self._binding_count(dbname, ids['store_id']), 0)
             self.assertEqual(
                 self._partner_count(dbname, ids['email']), 1)  # only the fixture P
-            self.assertGreaterEqual(len(set(pids + [worker_pid])), 2)
         finally:
+            # Cleanup-first, fail-loud: close both genuine connections safely,
+            # then delete every committed fixture row and assert zero residue.
             if worker_cr is not None:
                 try:
                     worker_cr.rollback()
                 except Exception:
                     pass
                 worker_cr.close()
+            if disc is not None:
+                try:
+                    disc.rollback()
+                except Exception:
+                    pass
+                disc.close()
             self._cleanup(dbname, ids, trigger_baseline)
 
     # B. Admission wins FIRST: `_admit` commits the lease + token snapshot; a real
@@ -2781,11 +2860,34 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
     # lease, writes `disconnect_open_lease_count`, and moves to the non-finalized
     # `quiescing` posture WITHOUT clearing the credential -- the exact path the
     # binding-key-share/SKIP-LOCKED scenario below can never reach.
-    def test_m18_lease_count_controller_observes_open_lease_then_finalizes(self):
+    def test_m18_lease_count_then_serialization_retry_refuses_after_disconnect(
+            self):
+        """Corrected M18 contract (runtime finding #2): lease-count observation
+        PLUS a genuine serialization retry-then-refuse, driven through the REAL
+        scheduled ``run_drain`` entrypoint.
+
+        The admitted customer call parks pre-FK (allowed ``_apply_import``
+        observe-and-delegate barrier) holding one committed lease; a concurrent
+        real ``action_disconnect`` returns without waiting; the real controller
+        LOCKS the store, records ``disconnect_open_lease_count = 1``, goes
+        ``quiescing`` and retains the credential. On release the reconciliation's
+        binding INSERT touches the store row the disconnect committed and raises a
+        genuine SQLSTATE 40001; ``run_drain``'s real ``odoo.service.model.
+        retrying`` boundary rolls back, the lease releases, the environment
+        resets and re-browses, and the reset attempt is refused (store
+        ``disconnecting``) BEFORE any second transport. Net: exactly one
+        transport, zero binding from the aborted attempt, the job in a safe
+        retryable state, no raw concurrency exception as the outcome, and the
+        controller finalizes + clears the credential only after the lease
+        releases. (Was `..._observes_open_lease_then_finalizes`, whose
+        "reconciliation binds after the disconnect" outcome was invalid under the
+        real REPEATABLE READ serialization behaviour -- runtime finding #2.)
+        """
         dbname = self.env.cr.dbname
         ids = None
         monitor_cr = None
         worker_thread = None
+        send_tokens = []
         registry_cls = type(self.registry)
         saved_lock = registry_cls._lock
         ImporterCls = type(self.env['shopify.connector.customer.importer'])
@@ -2805,7 +2907,8 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
             Client = self.env['shopify.connector.api.client']
 
             def fake_send(client_self, s, body, token=None):
-                token_q.put(token)
+                # One entry per transport invocation (total across all attempts).
+                send_tokens.append(token)
                 return _RaceFakeResponse(200, json_body=self._payload_body(ids))
 
             def observing_apply(self_imp, store, payload, job=False):
@@ -2827,8 +2930,10 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
                     wcr = self._open_bounded(dbname)
                     pid_q.put(self._backend_pid(wcr))
                     wenv = api.Environment(wcr, SUPERUSER_ID, {})
-                    job = wenv['shopify.connector.job'].browse(ids['job_id'])
-                    wenv['shopify.connector.job.dispatch']._dispatch_one(job)
+                    # Drive the REAL scheduled entrypoint so the production
+                    # concurrency-retry boundary applies end to end (claims this
+                    # job, dispatches it under odoo.service.model.retrying).
+                    wenv['shopify.connector.job.dispatch'].run_drain(1)
                     wcr.commit()
                     result['ok'] = True
                 except BaseException as exc:
@@ -2877,7 +2982,9 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
                     time.sleep(0.05)
                 return last
 
-            with patch.object(registry_cls, '_lock', threading.RLock()), \
+            with self._capture_service_retry() as retry_log, \
+                    self._instant_retry_backoff(), \
+                    patch.object(registry_cls, '_lock', threading.RLock()), \
                     patch.object(self.registry, 'cursor',
                                  self._real_registry_cursor(dbname)), \
                     patch.object(type(Client), '_send', fake_send), \
@@ -2893,10 +3000,9 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
                 obs['worker_pid'] = pid_b
                 # The worker reached the reconciliation pause BEFORE any FK write.
                 obs['worker_parked'] = parked_evt.wait(timeout=self.BOUND_SECONDS)
-                try:
-                    obs['token'] = token_q.get_nowait()
-                except queue.Empty:
-                    obs['token'] = None
+                # Transport #1 (the admitted send) happened before the pre-FK
+                # pause; its token is the first (and, proven below, only) one.
+                obs['token'] = send_tokens[0] if send_tokens else None
                 # The committed lease is observable; the worker holds no store lock.
                 obs['lease_parked'] = self._lease_count(dbname, ids['store_id'])
                 pre = self._observe_store(dbname, ids['store_id'])
@@ -2936,6 +3042,13 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
                 obs['cred_present_quiescing'] = bool(q[3])
                 obs['token_quiescing'] = self._observe_credential_token(
                     dbname, ids['store_id'])
+                # Controller backends observed WHILE the worker is still parked
+                # (holding its backend): these are provably distinct from the
+                # worker. Later finalize passes run after the worker releases its
+                # backend, which the LIFO pool may legitimately reuse -- so the
+                # distinctness claim is scoped to this parked window.
+                obs['controller_pids_quiescing'] = list(
+                    obs.get('controller_pids') or [])
 
                 # Release the pause -> the admitted call delegates to the REAL
                 # `_apply_import`, binds, and releases the lease on context exit.
@@ -2954,6 +3067,12 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
                 obs['cred_present_final'] = bool(fin[3])
                 obs['token_final'] = self._observe_credential_token(
                     dbname, ids['store_id'])
+                obs['transport_count'] = len(send_tokens)
+                obs['retry_serialization_logged'] = any(
+                    'serial' in m.lower() or '40001' in m for m in retry_log)
+                obs['retry_log_sample'] = list(retry_log)[:6]
+                obs['job_state_final'] = self._observe_job_state(
+                    dbname, ids['job_id'])
             registry_cls._lock = saved_lock
             obs['findings'] = self._drain(diag_q)
             obs['phases'] = self._drain(phase_q)
@@ -3007,8 +3126,10 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
             obs.get('worker_pid'), obs.get('disc_pid'),
             'the disconnect must run on a distinct backend from the parked worker')
         self.assertNotIn(
-            obs.get('worker_pid'), obs.get('controller_pids') or [],
-            'the controller must run on a distinct backend from the parked worker')
+            obs.get('worker_pid'), obs.get('controller_pids_quiescing') or [],
+            'the controller pass that observed the open lease must run on a '
+            'backend distinct from the still-parked worker (a later finalize '
+            'pass, after the worker frees its backend, may reuse it via the pool)')
         # The disconnect returned without waiting; worker still parked, lease open.
         self.assertTrue(obs.get('disc_returned_within_bound'))
         self.assertEqual(obs.get('state_after_disc'), 'disconnecting')
@@ -3025,10 +3146,26 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
         self.assertEqual(obs.get('lease_quiescing'), 1)
         self.assertTrue(obs.get('cred_present_quiescing'))
         self.assertEqual(obs.get('token_quiescing'), DUMMY_TOKEN)
-        # Reconciliation resumed via the real `_apply_import`, bound, and released.
+        # On release the reconciliation's binding INSERT raised a genuine 40001
+        # (the store row was committed-superseded by the disconnect): the real
+        # retry boundary rolled the attempt back (no binding), released the lease,
+        # and the reset attempt was refused before any second transport.
         self.assertTrue(obs.get('worker_done'), 'worker did not finish in bound')
         self.assertEqual(obs.get('lease_after_release'), 0)
-        self.assertEqual(obs.get('binding_after_release'), 1)
+        self.assertEqual(
+            obs.get('binding_after_release'), 0,
+            'the superseded (retried-then-refused) attempt must leave no binding')
+        self.assertEqual(
+            obs.get('transport_count'), 1,
+            'exactly one transport across the admitted attempt + refused retry')
+        self.assertTrue(
+            obs.get('retry_serialization_logged'),
+            'a genuine SQLSTATE 40001 must have driven the real service retry '
+            'boundary; service-retry log sample: %s' % obs.get('retry_log_sample'))
+        self.assertEqual(
+            obs.get('job_state_final'), 'failed_retryable',
+            'the superseded job must end in a safe retryable state, not a raw '
+            'concurrency error; saw %s' % obs.get('job_state_final'))
         # Only AFTER release does the controller finalize: completed + cred cleared.
         self.assertEqual(obs.get('state_final'), 'disconnected')
         self.assertEqual(obs.get('status_final'), 'completed')

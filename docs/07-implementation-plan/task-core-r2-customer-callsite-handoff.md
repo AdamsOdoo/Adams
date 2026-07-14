@@ -489,3 +489,18 @@ occurred). Nothing in this session touched a test's expected behavior.
 - **No live Shopify request** was made at any point.
 - **PR #150 and PR #151 remain open, draft, and unmerged** (re-verified
   after all merges completed).
+
+## Runtime CORRECTION addendum (2026-07-14)
+
+Runtime-validated on Odoo.sh build **34912503** from staging `63d10fb` (branch
+`claude/core-r2-slice-2b-runtime-correction`). The customer disconnect-first PID
+proof (finding #1) and the customer M18 concurrent-disconnect serialization
+(finding #2) are closed: the disconnect connection is held open for genuinely
+distinct backends, and the M18 test drives the REAL scheduled `run_drain`,
+proving the retry-then-refuse contract (one transport, zero binding,
+`failed_retryable`, 40001 evidenced). Production fix is the common core dispatcher
+retry boundary (`shopify_connector_job_dispatch.py`). **Customer lifecycle tag `0
+failed/0 error of 6`, ×3; zero residue. No live Shopify request. SRR-03 OPEN.
+Prompt E BLOCKED. Draft correction PR only — not merged. PR #150/#151 untouched.**
+See `../05-qa/task-core-r2-validation-results.md` §RTC and
+`../05-qa/task-core-r2-customer-callsite-validation.md` §12.

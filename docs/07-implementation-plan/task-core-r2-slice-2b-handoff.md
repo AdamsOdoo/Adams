@@ -558,3 +558,23 @@ quality gate, commit/push to the designated branch, then STOP.
   subsumed, not individually merged (§7.3; C9). Prompt E made capability-based; all
   PR #160 references made capability-based (head unpinned). No code, no gate,
   SRR-03 OPEN. Next: PR #160 runtime-green + merge, then the staging sequence.
+- **CORE-R2 Slice 2B runtime CORRECTION — (2026-07-14):** one controlled
+  correction session on Odoo.sh build **34912503** from staging `63d10fb`, branch
+  `claude/core-r2-slice-2b-runtime-correction`. Closed the three adjudicated
+  runtime findings: (1) customer disconnect-first PID proof made genuinely
+  distinct by holding the disconnect connection open; (2) the customer & product
+  M18 concurrent-disconnect reconciliations now retry-then-refuse through the REAL
+  scheduled `run_drain` under `odoo.service.model.retrying` — the smallest
+  common-layer production fix in `shopify_connector_job_dispatch.py` (never
+  re-issues an ORM write in an aborted transaction; genuine 40001 → rollback →
+  re-browse → refuse-before-second-transport → `failed_retryable`); (3) product
+  lifecycle cron-trigger residue closed via per-test baseline ownership. Added a
+  core Phase-5 `run_drain` retry proof. `notification_type` kept as an accepted
+  non-blocking partial-registry artifact (unchanged). **Runtime:** fresh-install
+  precedent 574/574; product 174, sale 93 green; core ×3 (6 notif-artifacts
+  only); customer lifecycle ×3 and product lifecycle ×3 all `0 failed/0 error`;
+  independent residue audit clean (incl. cron-trigger delta 0). One **draft**
+  correction PR into `claude/core-r2-slice-2b-integration`; **not merged. No code,
+  no gate transition, no live Shopify request. SRR-03 OPEN. Prompt E BLOCKED. PR
+  #150/#151 untouched; `Shopify-connector` unchanged.** See
+  `../05-qa/task-core-r2-validation-results.md` §RTC.

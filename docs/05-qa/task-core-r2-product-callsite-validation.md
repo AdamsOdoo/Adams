@@ -425,3 +425,35 @@ future live activation follows the packet §17 zero-holders rule.
 - **Stop condition:** this session ends after pushing the child branch and
   opening the draft PR into `claude/core-r2-slice-2b-integration`. No merge, no
   runtime run, no live Shopify request, no real token. Await ChatGPT review.
+
+---
+
+## 12. Runtime CORRECTION (2026-07-14) — product findings closed `[Fact]`
+
+Runtime-validated on Odoo.sh build **34912503** from staging `63d10fb` on branch
+`claude/core-r2-slice-2b-runtime-correction`. See
+`task-core-r2-validation-results.md` §RTC for the full record. Product-specific:
+
+- **Finding #2 (concurrent-disconnect terminal reconciliation aborts under
+  REPEATABLE READ):** the product M18 test now drives the REAL scheduled
+  `run_drain` and is renamed
+  `test_race_b_terminal_reconciliation_retry_refuses_after_disconnect` — it proves
+  the accepted **retry-then-refuse** contract (one terminal transport with
+  `DUMMY_TOKEN`, lease held then released, genuine 40001 from the real
+  service-retry log, **zero binding** from the aborted attempt, job
+  `failed_retryable`, controller finalizes + clears the credential only after
+  release). No assertion weakened; the fixture now enables
+  `product_domain_enabled` so the real dispatch start-gate admits the job.
+- **Finding #3 (product lifecycle left disconnect-controller cron-trigger
+  residue):** the product genuine class now owns its connector-cron
+  `ir_cron_trigger` rows via a per-test `setUp` baseline, deleting only the
+  test-created delta and asserting a zero delta (mirrors the accepted customer
+  pattern). **Independently inspected: connector cron-trigger residue after the
+  product runs is 0** (was +4/run).
+- Production fix is the common **core** dispatcher retry boundary
+  (`shopify_connector_job_dispatch.py`), not per-domain logic.
+- **Runtime: product callsite lifecycle tag `0 failed, 0 error(s) of 4`, three
+  consecutive green runs; zero product/template/variant/attribute/value + zero
+  cron-trigger residue (independently inspected).**
+- **No live Shopify call. SRR-03 remains OPEN. Prompt E remains BLOCKED. Draft
+  correction PR only — not merged.**
