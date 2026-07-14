@@ -24,6 +24,20 @@ class TestTestConnection(TransactionCase):
             'admin', 'group_shopify_connector_admin'
         )
 
+    def setUp(self):
+        super().setUp()
+        # CORE-R2 (review 4691182306 #1): `action_test_connection` now routes
+        # through `_admit_lifecycle`, which captures its one-token snapshot in an
+        # OWNED `registry.cursor()` side transaction (store-row FOR SHARE), exactly
+        # like business `_admit`. A plain TransactionCase side cursor is a
+        # genuinely independent connection that cannot see this class's uncommitted
+        # fixture; entering registry test mode makes every `registry.cursor()`
+        # reuse the single test connection as a TestCursor so the fixture is
+        # visible cross-cursor -- the sanctioned mechanism `TestBusinessAdmission`
+        # already uses. Packet-§4 seam-compat: no assertion changed.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     @classmethod
     def _create_group_user(cls, label, group_xmlid):
         group = cls.env.ref('shopify_connector_core.%s' % group_xmlid)
@@ -52,6 +66,11 @@ class TestTestConnection(TransactionCase):
             order='id desc', limit=1,
         )
 
+    # CORE-R2 (review 4690804619 #1): the lifecycle probe now binds to one
+    # credential snapshot and calls `_send(store, body, token)`, so the
+    # transport-seam fakes below accept the token argument (they ignore its value;
+    # only the arity changed). This is the packet-§4 minimal seam-compat migration
+    # of this existing api-client test -- no assertion changed.
     def _run_test_connection(self, fake_send):
         Client = self.env['shopify.connector.api.client']
         with patch.object(type(Client), '_send', fake_send):
@@ -63,7 +82,7 @@ class TestTestConnection(TransactionCase):
         response = FakeResponse(
             200, json_body=_success_body(domain=self.store.shop_domain)
         )
-        self._run_test_connection(lambda self, store, body: response)
+        self._run_test_connection(lambda self, store, body, token=None: response)
         self.store.invalidate_recordset()
         self.assertEqual(self.store.last_test_connection_result, 'pass')
         self.assertTrue(self.store.last_test_connection_at)
@@ -93,7 +112,7 @@ class TestTestConnection(TransactionCase):
             json_body=_success_body(domain='different-shop.myshopify.com'),
         )
         credential_before = self._get_credential().credential_state
-        self._run_test_connection(lambda self, store, body: response)
+        self._run_test_connection(lambda self, store, body, token=None: response)
         self.store.invalidate_recordset()
         self.assertEqual(self.store.last_test_connection_result, 'fail')
         job = self._latest_job()
@@ -107,7 +126,7 @@ class TestTestConnection(TransactionCase):
     def test_missing_credential_raises_before_any_send(self):
         send_calls = []
 
-        def fake_send(self, store, body):
+        def fake_send(self, store, body, token=None):
             send_calls.append(1)
             return FakeResponse(200, json_body=_success_body())
 
@@ -131,7 +150,7 @@ class TestTestConnection(TransactionCase):
                 'extensions': {'code': 'ACCESS_DENIED'},
             }],
         })
-        self._run_test_connection(lambda self, store, body: response)
+        self._run_test_connection(lambda self, store, body, token=None: response)
         job = self._latest_job()
         self.assertEqual(job.state, 'failed_final')
         self.assertEqual(job.error_class, 'shopify_permission_scope_auth')
@@ -160,7 +179,9 @@ class TestTestConnection(TransactionCase):
         for response in fixtures:
             self._set_token()
             credential_before = self._get_credential().credential_state
-            self._run_test_connection(lambda self, store, body, r=response: r)
+            self._run_test_connection(
+                lambda self, store, body, token=None, r=response: r
+            )
             job = self._latest_job()
             self.assertEqual(job.state, 'failed_final')
             self.assertEqual(job.error_class, 'shopify_permission_scope_auth')
@@ -175,7 +196,7 @@ class TestTestConnection(TransactionCase):
             200, json_body=_success_body(domain=self.store.shop_domain),
             headers={'X-Shopify-API-Version': '2026-10'},
         )
-        self._run_test_connection(lambda self, store, body: response)
+        self._run_test_connection(lambda self, store, body, token=None: response)
         self.store.invalidate_recordset()
         self.assertEqual(self.store.last_test_connection_result, 'pass')
         self.assertEqual(self.store.api_health_state, 'degraded')
@@ -187,8 +208,8 @@ class TestTestConnection(TransactionCase):
         response = FakeResponse(
             200, json_body=_success_body(domain=self.store.shop_domain)
         )
-        self._run_test_connection(lambda self, store, body: response)
-        self._run_test_connection(lambda self, store, body: response)
+        self._run_test_connection(lambda self, store, body, token=None: response)
+        self._run_test_connection(lambda self, store, body, token=None: response)
         jobs = self.env['shopify.connector.job'].search([
             ('store_id', '=', self.store.id),
             ('job_type', '=', 'core_test_connection'),
@@ -202,7 +223,7 @@ class TestTestConnection(TransactionCase):
         response = FakeResponse(
             200, json_body=_success_body(domain=self.store.shop_domain)
         )
-        self._run_test_connection(lambda self, store, body: response)
+        self._run_test_connection(lambda self, store, body, token=None: response)
         job = self._latest_job()
         logs = self.env['shopify.connector.job.log'].search(
             [('job_id', '=', job.id)]

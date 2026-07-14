@@ -57,6 +57,19 @@ REASON_UNKNOWN = (
     'and contact support if it persists.'
 )
 
+# CORE-R2 (AR-047; analysis §9.1) lifecycle-call purpose -> allowed store
+# states. `_admit_lifecycle` (snapshot/gate) and `_send_lifecycle` (transport)
+# are the private guarded entry for setup/diagnostic Shopify calls; each
+# `purpose` carries a fixed allowed-state matrix (not a generic bypass). A call
+# outside its matrix fails closed, and NO lifecycle call is permitted while the
+# store is `disconnecting` -- none of the purposes below lists it (frozen
+# lifecycle matrix, analysis §8).
+LIFECYCLE_PURPOSE_STATES = {
+    'test_connection': ('setup_incomplete', 'connected', 'reconnect_needed'),
+    'readiness_probe': ('setup_incomplete', 'connected', 'reconnect_needed'),
+    'reconnect_probe': ('reconnect_needed', 'disconnected'),
+}
+
 
 class ShopifyClientError(Exception):
     """Normalized error raised by `shopify.connector.api.client.execute()`.
@@ -158,6 +171,166 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         body = {'query': query, 'variables': variables or {}}
         try:
             response = self._send(store, body)
+        except ShopifyClientError:
+            raise
+        except requests.exceptions.RequestException as exc:
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail=redact(str(exc)),
+            )
+        return self._normalize_response(store, response)
+
+    @api.model
+    def _admit_lifecycle(self, store, purpose):
+        """Atomically bind one lifecycle probe to ONE credential snapshot in a
+        short independent side transaction (CORE-R2, AR-047; analysis §9.1;
+        reviews 4690804619 #1 + 4691182306 #1).
+
+        **Private on purpose.** `purpose` is a fixed enum selected by the two
+        trusted store callers only (`action_test_connection` -> `test_connection`,
+        `action_reconnect` -> `reconnect_probe`, both via the store's shared
+        `_run_connection_probe`). It is deliberately **not** a public/RPC-exposed
+        method, so an arbitrary caller can never drive a caller-controlled purpose
+        through RPC (the public API-client surface stays exactly
+        `{execute, execute_business}`).
+
+        **Atomic admission (review 4691182306 #1).** The snapshot is captured in
+        one owned side transaction so the store-row ``SELECT … FOR SHARE`` lock
+        **linearizes** this admission against any generation-changing lifecycle
+        transition's ``FOR NO KEY UPDATE`` (disconnect / activation / reconnect /
+        connected credential-replace) -- the **same** mechanism as the business
+        `_admit`, minus any lease. If ``action_disconnect`` wins first, this
+        admission's ``FOR SHARE`` reads the fresh ``disconnecting``/new-generation
+        row **before** any network call and refuses; if this admission commits
+        first, a later disconnect is caught by the post-network revalidation. The
+        ``FOR SHARE`` is **committed (released) before** `_send_lifecycle` runs --
+        **no lock spans the network call** -- and **no `call.lease` is created**
+        (this is the setup/diagnostic counterpart, not a business admission).
+
+        Sequence (mirrors `_admit`): open an owned ``registry.cursor()`` side
+        transaction; ``SELECT state, connection_generation … FOR SHARE`` on the
+        store row; **freshly** re-check the fixed purpose->state matrix under that
+        lock (no purpose lists ``disconnecting``); read the access token **exactly
+        once** (the one sanctioned `_get_access_token`); capture the credential row
+        id + version (``id``, ``write_date``); ``commit`` (persists nothing,
+        releases the ``FOR SHARE``, completes the admission linearization); close.
+        Returns the non-persisted snapshot the caller passes to
+        `_send_lifecycle(store, body, token)` (so the transport re-reads **no**
+        credential) and later revalidates via `_lifecycle_probe_superseded`.
+
+        Fails closed exactly like the read-only contract: an unknown/absent purpose
+        or a state outside the matrix (freshly read under the lock) raises
+        `UserError` -- the caller treats a post-pre-check matrix refusal as a probe
+        superseded before send; a missing/empty credential raises
+        `ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID,
+        credential_invalid=True)` -- both before any network. Any side-transaction
+        failure rolls back and closes the cursor; no request/main-cursor commit and
+        no token is ever logged/persisted.
+        """
+        allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
+        if allowed_states is None:
+            raise UserError(
+                'An unknown lifecycle purpose was requested; the Shopify '
+                'call is refused.'
+            )
+        # Flush the caller's pending ORM writes (store + credential) so the
+        # independent side cursor's raw locking SELECT and the side-env credential
+        # reads observe the current state/generation/token. In production the store
+        # and credential rows are long committed, so this is effectively a no-op
+        # for the side cursor's reads (it sees committed data); it is required for
+        # correctness only when the caller created/wrote them within this same
+        # transaction (e.g. under registry test mode).
+        self.env.flush_all()
+        side_cr = self.env.registry.cursor()
+        try:
+            side_cr.execute(
+                "SELECT state, connection_generation "
+                "FROM shopify_connector_store WHERE id = %s FOR SHARE",
+                (store.id,),
+            )
+            row = side_cr.fetchone()
+            if row is None:
+                # The store row is not available on an independent transaction
+                # (e.g. deleted mid-probe) -- fail closed before any network.
+                raise UserError(
+                    'This store is no longer available; the Shopify call is '
+                    'refused.'
+                )
+            state, generation = row
+            # Fresh matrix re-check UNDER the FOR SHARE lock (defense in depth
+            # atop the store's pre-check + the linearization point): a disconnect
+            # that won before this lock is observed here and refused before send.
+            if state not in allowed_states:
+                raise UserError(
+                    'This diagnostic is not available while the store is "%s"; '
+                    'the Shopify call is refused.' % state
+                )
+            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
+            side_credential = side_env['shopify.connector.store.credential']
+            side_store = side_env['shopify.connector.store'].browse(store.id)
+            # Single token read under the lock (the one sanctioned
+            # `_get_access_token` sudo -- no new sudo introduced here).
+            token = side_credential._get_access_token(side_store)
+            if not token:
+                # A store still inside the matrix but with no usable credential
+                # (e.g. a raced direct clear) is an authentication failure -- the
+                # accepted API-client taxonomy, before any lease/network.
+                raise ShopifyClientError(
+                    error_class=ERROR_AUTH,
+                    reason=REASON_TOKEN_INVALID,
+                    credential_invalid=True,
+                )
+            # Credential id + write_date baseline captured under the same locked
+            # snapshot (lock=False: the store FOR SHARE is the linearization
+            # primitive; the post-network revalidation takes the credential lock).
+            version = side_credential._lifecycle_credential_version(
+                side_store, lock=False
+            )
+            snapshot = {
+                'token': token,
+                'credential_id': version[0] if version else False,
+                'credential_version': version[1] if version else False,
+                'generation': generation,
+                'allowed_states': allowed_states,
+            }
+            # Commit the short admission side transaction: persists NO business
+            # data (no lease, no write), releases the FOR SHARE lock, and
+            # completes the lifecycle-admission linearization -- all BEFORE the
+            # network call in `_send_lifecycle`.
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return snapshot
+
+    @api.model
+    def _send_lifecycle(self, store, query, token, variables=None):
+        """Issue one lifecycle probe using the exact snapshot token (CORE-R2,
+        AR-047; review 4690804619 #1).
+
+        The transport half of the lifecycle path. Receives the single token
+        snapshot from `_admit_lifecycle` and passes it straight to
+        `_send(store, body, token)` -- so the request uses **exactly** that
+        snapshot and the transport re-reads **no** credential (unlike the former
+        `execute()` delegation, which pre-checked the token and then let `_send`
+        read it again). Preserves the accepted read-only contract: the same
+        missing-configuration `UserError` (raised before any transport), the
+        `RequestException` -> `ShopifyClientError(ERROR_TEMPORARY, REASON_TEMPORARY)`
+        mapping, and the shared `_normalize_response` taxonomy. No lock is held
+        here; the post-network revalidation lives in the store's probe. Public
+        `execute()` (still the two-arg `_send(store, body)` seam) is unchanged.
+        """
+        if not store.shop_domain or not store.api_version:
+            raise UserError(
+                'A shop domain and API version are required before '
+                'contacting Shopify.'
+            )
+        body = {'query': query, 'variables': variables or {}}
+        try:
+            response = self._send(store, body, token)
         except ShopifyClientError:
             raise
         except requests.exceptions.RequestException as exc:

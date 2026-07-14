@@ -30,6 +30,24 @@ RETRY_WINDOW_HOURS = 24
 # than the general auto-retry classes below.
 SAFETY_NET_MAX_ATTEMPTS = 1
 
+# CORE-R2 Slice 2A (AR-047; analysis §14/§16, packet §7/§13) disconnect
+# quiescence controller cadence + timeout. Named, tunable constants
+# [Open -- tuning only, analysis §26]; a future retuning session can change
+# these without an architecture change. The disconnect controller
+# (`shopify_connector_store.py::_run_disconnect_quiesce`) imports them.
+#
+# * DISCONNECT_QUIESCE_TIMEOUT is measured from `store.disconnect_requested_at`
+#   and MUST exceed the admission lease lifetime
+#   (`shopify_connector_api_client._CALL_LEASE_LIFETIME_SECONDS`, 300s) so a
+#   genuinely-live-but-slow admitted call inside its own lifetime is never
+#   force-finalized as `timed_out` before it can release its lease.
+# * POLL_DELAY is the still-`quiescing` re-poll cadence, scheduled via a
+#   delayed `_trigger(at=now+POLL_DELAY)` (never an immediate same-store
+#   re-trigger, no busy loop). It is >= 1 minute -- the `ir_cron._trigger`
+#   scheduling granularity floor (analysis §14, `ir_cron.py:735`).
+DISCONNECT_QUIESCE_TIMEOUT = timedelta(minutes=15)
+POLL_DELAY = timedelta(minutes=1)
+
 # DEC-009 §E retry-class taxonomy, applied to the fixed ERROR_CLASS_
 # SELECTION registry already encoded in shopify_connector_job.py. This
 # module does not introduce a 17th class or alter the registry -- it

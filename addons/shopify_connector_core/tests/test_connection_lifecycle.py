@@ -31,6 +31,23 @@ class TestConnectionLifecycle(TransactionCase):
         cls.JobLog = cls.env['shopify.connector.job.log']
         cls.Credential = cls.env['shopify.connector.store.credential']
 
+    def setUp(self):
+        super().setUp()
+        # CORE-R2 (review 4691182306 #1): `action_test_connection` /
+        # `action_reconnect` now route through `_admit_lifecycle`, which captures
+        # its one-token snapshot in an OWNED `registry.cursor()` side transaction
+        # (store-row FOR SHARE), exactly like business `_admit`. A plain
+        # TransactionCase side cursor is a genuinely independent connection that
+        # cannot see this class's uncommitted fixture; entering registry test mode
+        # makes every `registry.cursor()` reuse the single test connection as a
+        # TestCursor so the fixture is visible cross-cursor -- the sanctioned
+        # mechanism `TestBusinessAdmission` already uses. Packet-§4 seam-compat
+        # (transport-seam contract change): no assertion changed. Genuine
+        # cross-connection admission-vs-disconnect behaviour is proven by the
+        # genuine lifecycle-race classes in test_disconnect_quiescence.py.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     @classmethod
     def _create_group_user(cls, label, group_xmlid):
         group = cls.env.ref('shopify_connector_core.%s' % group_xmlid)
@@ -79,11 +96,24 @@ class TestConnectionLifecycle(TransactionCase):
         ])
 
     def _run_test_connection(self, response):
+        # CORE-R2 (review 4690804619 #1): the lifecycle probe passes its one token
+        # snapshot to `_send(store, body, token)`, so the transport-seam fake
+        # accepts the token argument.
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), '_send', lambda self, store, body: response):
+        with patch.object(
+            type(Client), '_send',
+            lambda self, store, body, token=None: response,
+        ):
             return self._store().action_test_connection()
 
-    def _run_reconnect(self, test_connection_response, readiness_result, call_log=None):
+    def _run_reconnect(self, test_connection_response, readiness_result,
+                       call_log=None, entry_state='reconnect_needed'):
+        # CORE-R2 (AR-047; review 4690639375 #2): action_reconnect probes via the
+        # INTERNAL purpose 'reconnect_probe', whose frozen matrix permits only
+        # reconnect_needed / disconnected. Put the store in a valid reconnect
+        # entry state first (default reconnect_needed; pass 'disconnected' to
+        # exercise reconnect after a completed disconnect).
+        self.store.write({'state': entry_state})
         Client = self.env['shopify.connector.api.client']
         ReadinessCheck = self.env['shopify.connector.readiness.check']
         if call_log is None:
@@ -98,7 +128,8 @@ class TestConnectionLifecycle(TransactionCase):
             return {'job': None, 'overall_result': readiness_result, 'checks': []}
 
         with patch.object(
-            type(Client), '_send', lambda self, store, body: test_connection_response
+            type(Client), '_send',
+            lambda self, store, body, token=None: test_connection_response,
         ), patch.object(
             type(ReadinessCheck), 'run_for_store', fake_run_for_store
         ):
@@ -201,7 +232,11 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
 
+        # CORE-R2 (AR-047): two-phase disconnect -> `disconnecting`, then the
+        # controller finalizes -> `disconnected` and clears the credential. The
+        # last_test_connection_result/last_readiness_result mirrors are NOT reset.
         self._store().action_disconnect()
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'disconnected')
         self.assertFalse(self.store.credential_present)
@@ -349,40 +384,56 @@ class TestConnectionLifecycle(TransactionCase):
     # not via action_disconnect())
     # ------------------------------------------------------------------
 
-    def test_credential_service_clear_token_sets_state_disconnected_directly(self):
-        # Calls the credential service's action_clear_token() directly
-        # -- not action_disconnect() -- to prove the state invalidation
-        # lives in the credential service itself, not only in
-        # action_disconnect()'s own follow-up write.
+    def test_credential_service_clear_token_on_connected_requests_disconnect(self):
+        # CORE-R2 (reviews 4690804619 #2 + 4690807427): calling the credential
+        # service's action_clear_token() directly on a `connected` store must NOT
+        # clear immediately -- an admitted lease can outlive admission's brief
+        # FOR SHARE. It routes through the accepted two-phase disconnect
+        # (state -> disconnecting, credential still present, one epoch bump); the
+        # quiescence controller performs the actual clear at `completed`.
         self._set_token()
         self._seed_verified_evidence()
         self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
-        jobs_before = self.Job.search_count([])
-        logs_before = self.JobLog.search_count([])
+        gen_before = self.store.connection_generation
 
         self.Credential.with_user(self.user_admin).action_clear_token(
             self.store
         )
         self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.disconnect_status, 'requested')
+        self.assertTrue(self.store.credential_present)   # not cleared yet
+        self.assertEqual(self.store.connection_generation, gen_before + 1)
+
+        # The controller finalizes (zero committed leases) and clears then.
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
+        self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'disconnected')
         self.assertFalse(self.store.credential_present)
-        self.assertEqual(self.Job.search_count([]), jobs_before)
-        self.assertEqual(self.JobLog.search_count([]), logs_before)
 
     # ------------------------------------------------------------------
     # action_disconnect
     # ------------------------------------------------------------------
 
     def test_disconnect_clears_credential_value(self):
+        # CORE-R2 (AR-047): two-phase disconnect -- Phase 1 keeps the credential
+        # (state -> disconnecting); the quiescence controller clears it at the
+        # `completed` finalize once the store has zero committed call leases.
         self._set_token()
+        self.store.write({'state': 'connected'})
         self._store().action_disconnect()
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertTrue(self.store.credential_present)      # not cleared in Phase 1
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
         credential = self._get_credential()
         self.assertFalse(credential.access_token)
         self.assertEqual(credential.credential_state, 'absent')
         self.store.invalidate_recordset()
         self.assertFalse(self.store.credential_present)
+        self.assertEqual(self.store.state, 'disconnected')
 
     def test_disconnect_preserves_credential_row(self):
         self._set_token()
@@ -399,28 +450,47 @@ class TestConnectionLifecycle(TransactionCase):
         self.assertEqual(self.store.credential_last_replaced_at, replaced_at)
 
     def test_disconnect_sets_state_disconnected(self):
+        # CORE-R2 (AR-047): Phase 1 moves the store to `disconnecting`; the
+        # quiescence controller finalizes it to `disconnected`.
         self.store.write({'state': 'connected'})
         self._store().action_disconnect()
         self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.disconnect_status, 'requested')
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
+        self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'disconnected')
+        self.assertEqual(self.store.disconnect_status, 'completed')
 
     def test_disconnect_cancels_non_terminal_business_jobs(self):
+        # CORE-R2 (AR-047): the two-phase Phase-1 sweep is the non-blocking A/B
+        # sweep -- it cancels only the queued/retry_waiting business jobs (the
+        # cancellable rows) with reason 'Store disconnecting.', and never writes
+        # a running/claimed row (that row is represented by its admission lease
+        # and handled by the controller/timeout).
         self.store.write({'state': 'connected'})
-        jobs = [
-            self._create_job('manual_sync', state='draft'),
-            self._create_job('webhook', state='queued'),
-            self._create_job('scheduled_sync', state='running'),
-        ]
+        queued = self._create_job('webhook', state='queued')
+        retry = self._create_job('manual_sync', state='draft')
+        retry.write({
+            'state': 'retry_waiting', 'next_retry_at': fields.Datetime.now(),
+            'retry_count': 1,
+        })
+        running = self._create_job('scheduled_sync', state='running')
         self._store().action_disconnect()
-        for job in jobs:
+        for job in (queued, retry):
             job.invalidate_recordset()
             self.assertEqual(job.state, 'cancelled')
-            self.assertEqual(job.cancel_reason, 'Store disconnected.')
+            self.assertEqual(job.cancel_reason, 'Store disconnecting.')
             self.assertTrue(job.finished_at)
             logs = self._logs_for(job)
             cancel_logs = logs.filtered(lambda l: l.to_state == 'cancelled')
             self.assertTrue(cancel_logs)
             self.assertEqual(cancel_logs[0].event_type, 'state_change')
+        # The running job is not an A/B candidate -> left untouched, never
+        # written (no locked running-job row write).
+        running.invalidate_recordset()
+        self.assertEqual(running.state, 'running')
+        self.assertFalse(running.cancel_reason)
 
     def test_disconnect_does_not_cancel_core_jobs(self):
         self.store.write({'state': 'setup_incomplete'})
@@ -455,24 +525,29 @@ class TestConnectionLifecycle(TransactionCase):
             self.assertFalse(job.cancel_reason)
 
     def test_disconnect_is_idempotent(self):
+        # CORE-R2 (AR-047): a repeated disconnect while already `disconnecting`
+        # is an audited idempotent no-op -- no re-sweep of the already-cancelled
+        # job, no second generation bump, exactly one more audit job.
         self.store.write({'state': 'connected'})
-        job = self._create_job('manual_sync', state='draft')
+        job = self._create_job('manual_sync', state='queued')
         self._store().action_disconnect()
         job.invalidate_recordset()
         self.assertEqual(job.state, 'cancelled')
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        gen_after_first = self.store.connection_generation
         logs_after_first = self._logs_for(job)
         audit_count_after_first = len(self._audit_jobs())
 
         # Second call must not raise, must not re-touch the already-
-        # cancelled job, and must not corrupt the credential mirror.
+        # cancelled job, and must not re-bump the generation.
         self._store().action_disconnect()
         self.store.invalidate_recordset()
-        self.assertEqual(self.store.state, 'disconnected')
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.connection_generation, gen_after_first)
         job.invalidate_recordset()
         self.assertEqual(job.state, 'cancelled')
         self.assertEqual(len(self._logs_for(job)), len(logs_after_first))
-        credential = self._get_credential()
-        self.assertFalse(credential.access_token)
         # The second call is an audited no-op: exactly one more audit
         # job is recorded, nothing errors.
         self.assertEqual(len(self._audit_jobs()), audit_count_after_first + 1)
@@ -736,6 +811,34 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'reconnect_needed')
         self.assertEqual(len(self._audit_jobs()), 1)
+
+    # ------------------------------------------------------------------
+    # CORE-R2 (AR-047; review 4690639375 #2): reconnect_probe vs test_connection
+    # ------------------------------------------------------------------
+
+    def test_reconnect_from_completed_disconnected_connects(self):
+        # Reconnect after a completed disconnect (state 'disconnected', a
+        # credential re-entered) must work via purpose='reconnect_probe'.
+        self._set_token()
+        response = FakeResponse(
+            200, json_body=_success_body(domain=self.store.shop_domain)
+        )
+        self._run_reconnect(response, 'pass', entry_state='disconnected')
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'connected')
+
+    def test_test_connection_refused_from_disconnected(self):
+        # Ordinary Test Connection uses purpose='test_connection', whose matrix
+        # excludes 'disconnected' -> refused (Reconnect is the recovery path).
+        self._set_token()
+        self.store.write({'state': 'disconnected'})
+        with self.assertRaises(UserError):
+            self._store().action_test_connection()
+        # No dangling test-connection job was created by the refused attempt.
+        self.assertFalse(self.Job.search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_test_connection'),
+        ]))
 
     # ------------------------------------------------------------------
     # No secret leakage across lifecycle actions

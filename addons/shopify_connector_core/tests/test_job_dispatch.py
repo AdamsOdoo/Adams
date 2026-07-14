@@ -349,23 +349,28 @@ class TestJobDispatch(TransactionCase):
             self.assertIsNone(Job._domain_flag_for_job_type(job_type))
 
     # ------------------------------------------------------------------
-    # Disconnect cancels/blocks jobs reachable via the new dispatcher
-    # states -- extends test_disconnect_cancels_non_terminal_business_
-    # jobs; action_disconnect() itself is unmodified.
+    # CORE-R2 (AR-047): the two-phase Phase-1 disconnect sweep is the
+    # non-blocking A/B sweep -- it cancels ONLY queued/retry_waiting business
+    # jobs (the cancellable rows). A failed_retryable / blocked_manual_review
+    # business job is NOT an A/B row: it is left intact (history preserved), is
+    # inert while the store is `disconnecting`, and can never start.
     # ------------------------------------------------------------------
 
-    def test_disconnect_cancels_business_jobs_in_new_dispatch_states(self):
-        self.store.write({'state': 'connected'})
-        scenarios = (
-            ('retry_waiting', {
+    def test_disconnect_sweeps_only_ab_business_jobs_across_dispatch_states(self):
+        cancellable = ('retry_waiting',)
+        preserved = ('failed_retryable', 'blocked_manual_review')
+        extras = {
+            'retry_waiting': {
                 'next_retry_at': fields.Datetime.now(), 'retry_count': 1,
-            }),
-            ('failed_retryable', {}),
-            ('blocked_manual_review', {
+            },
+            'failed_retryable': {},
+            'blocked_manual_review': {
                 'manual_review_subreason': 'ambiguous_match',
-            }),
-        )
-        for state, extra in scenarios:
+            },
+        }
+        for state in cancellable + preserved:
+            # Reset the store to connected between scenarios (the prior
+            # scenario left it `disconnecting`).
             self.store.write({'state': 'connected'})
             job = self.Job.create({
                 'store_id': self.store.id,
@@ -374,15 +379,17 @@ class TestJobDispatch(TransactionCase):
                 'state': 'draft',
                 'payload_hash': str(uuid.uuid4()),
             })
-            job.write(dict({'state': state}, **extra))
+            job.write(dict({'state': state}, **extras[state]))
             self.store.action_disconnect()
             job.invalidate_recordset()
-            self.assertEqual(job.state, 'cancelled', state)
-            # A job cancelled out of blocked_manual_review must not keep
-            # carrying manual_review_subreason -- action_disconnect()'s
-            # own constraint (_check_manual_review_subreason_required)
-            # would otherwise reject this exact transition.
-            self.assertFalse(job.manual_review_subreason, state)
+            if state in cancellable:
+                self.assertEqual(job.state, 'cancelled', state)
+                # A job cancelled out of an A/B state must not keep a
+                # manual_review_subreason (none applies to queued/retry_waiting).
+                self.assertFalse(job.manual_review_subreason, state)
+            else:
+                # Non-A/B business job left intact by the two-phase sweep.
+                self.assertEqual(job.state, state, state)
 
     # ------------------------------------------------------------------
     # Logs appended through sanctioned path only + no direct
