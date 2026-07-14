@@ -166,9 +166,9 @@
 
 | Item | Required | Verified state | Class |
 | --- | --- | --- | --- |
-| `Shopify-connector` **merge-base** | `1494b97d0e2117af05b954dabde92a9e497ac2c3` | this branch's merge-base with `origin/Shopify-connector` is exactly `1494b97…c2c3` (§0.2); the PR #159 three-dot diff is computed against it and is unaffected by later base advances | [Fact — repo] |
-| `Shopify-connector` **live tip** | advanced by later merges | `origin/Shopify-connector` HEAD is now `a3fd6cd` (**PR #160 CORE-R2 Slice 2A merged** at review `4693862195`, 2026-07-14); this branch is behind the live tip **only** by that unrelated merge, `mergeable_state: clean`, no code conflict — **not rebased** (keeps head `8f33b8e` and the 1494b97 merge-base, docs-only diff intact) | [Fact — repo] |
-| PR #159 (this PR) | open, draft, unmerged | `state:open, draft:true, merged:false`, `mergeable_state:clean`; base recorded `Shopify-connector @ 1494b97`; round-7 correction (reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` + `4692656343` + `4693694894`); head per PR body | [Fact — repo] |
+| `Shopify-connector` **merge-base (round-8)** | current tip `a3fd6cd` | after the **round-8 base-alignment merge** (§0.2), this branch's merge-base with `origin/Shopify-connector` is now exactly `a3fd6cdfcb6f3654ae81a48a7f4e694994d4762b` and the branch is **zero commits behind**; the PR #159 three-dot diff is computed against it and is exactly the five docs files | [Fact — repo] |
+| `Shopify-connector` **live tip** | `a3fd6cd` | `origin/Shopify-connector` HEAD is `a3fd6cd` (**PR #160 CORE-R2 Slice 2A merged** at review `4693862195`, 2026-07-14); round-8 **merged that tip into this branch with a normal merge commit** (no rebase/squash/force), so the branch now carries the full PR #160/Slice-2B history and is `mergeable_state: clean`, zero-behind | [Fact — repo] |
+| PR #159 (this PR) | open, draft, unmerged | `state:open, draft:true, merged:false`, `mergeable_state:clean`; base `Shopify-connector` (merge-base now `a3fd6cd`); round-8 correction (reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` + `4692656343` + `4693694894` + `4694311215`); head per PR body | [Fact — repo] |
 | PR #150 (Task 011B) | not modified | left as-is (open/draft) — **not a direct-merge prerequisite**; subsumed by the merged Slice-2B strategy | [Fact — repo] |
 | PR #151 (Task 010B) | not modified | left as-is (open/draft) — **not a direct-merge prerequisite** | [Fact — repo] |
 | CORE-R2 / SRR-03 | remediation open | Foundation Slice 1 merged; **SRR-03 remains OPEN**; **Slice-2B call-site-activation packet (PR #158) is MERGED** (review `4691064435`; merge base `1494b97`); **Slice 2A (PR #160) is now MERGED** (review `4693862195`) as the accepted dormant foundation — neither modified by this PR | [Fact — repo] |
@@ -237,16 +237,20 @@ implementation gate is opened. The merge-base with `Shopify-connector` is exactl
 
 **Round-7 note (2026-07-14):** after that base alignment, `Shopify-connector`
 advanced again to `a3fd6cd` when **PR #160 (CORE-R2 Slice 2A) merged** (an
-unrelated `addons/**` change). This branch is therefore now **behind the live
-`Shopify-connector` tip** by exactly those PR #160 commits — but its **merge-base
-is still `1494b97`**, GitHub reports `mergeable_state: clean` (no conflict), and
-the PR #159 three-dot diff is unchanged (still the same five docs-only files).
-The branch is **deliberately not rebased**: the round-7 correction must start from
-the required head `8f33b8e` on the `1494b97` merge-base, and rebasing would move
-the head off `8f33b8e` and pull PR #160's code into a docs-only PR. A base
-re-alignment (normal merge, no rebase) is left to a later control-room-directed
-step if desired; it is **not** required for this docs-only correction and would
-touch no Task 012 content.
+unrelated `addons/**` change). During round-7 the branch was **deliberately not
+rebased** (the round-7 correction started from the required head `8f33b8e` on the
+`1494b97` merge-base), and base re-alignment was left to a later step.
+
+**Round-8 base alignment (2026-07-14, review `4694311215` item 4):** after the
+round-8 documentation corrections, this branch is **base-aligned onto the current
+`Shopify-connector` tip `a3fd6cd`** with a **normal merge commit** (no rebase, no
+squash, no force-push), preserving the full five-file Task-012 Round-1–8 history
+**plus** the merged PR #160/Slice-2A and PR #158/Slice-2B history and issue #157
+separation. PR #160's advance is `addons/**` + CORE-R2 QA docs only, so **no
+`addons/**` conflict arises** and the merge touches no Task 012 content; the
+branch is now **zero commits behind** `Shopify-connector`, the **merge-base is now
+`a3fd6cd`**, and the PR #159 three-dot diff is still exactly the five docs-only
+files. **SRR-03 remains OPEN** and no implementation gate is opened.
 
 **Merged CORE-R2 primitives Task 012 may rely on [Fact — repo code]:**
 `execute_business(job, store, query, variables=None)` context-manager
