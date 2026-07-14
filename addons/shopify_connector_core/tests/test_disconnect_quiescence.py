@@ -35,8 +35,10 @@ lifecycle/state monkeypatch and no test-only timing hook is used.
 """
 
 import ast
+import contextlib
 import importlib
 import inspect
+import logging
 import queue
 import re
 import textwrap
@@ -47,9 +49,12 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import psycopg2
+import psycopg2.errorcodes
 
+import odoo.service.model as service_model
 from odoo import SUPERUSER_ID, api, fields
 from odoo.exceptions import UserError, ValidationError
+from odoo.service.model import retrying
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
@@ -3468,4 +3473,224 @@ class TestPublicClearAdmissionRaceGenuine(_GenuineRaceHelpers, TransactionCase):
             self.assertEqual(
                 self._observe_credential_token(dbname, store_id), DUMMY_TOKEN)
         finally:
+            self._cleanup(dbname, store_id)
+
+
+class _RetryLogCapture(logging.Handler):
+    """Collects `odoo.service.model` log records so a test can prove the REAL
+    `retrying` loop reported a serialization-failure retry (best-effort textual
+    corroboration; the definitive cause evidence is the captured pgcode)."""
+
+    def __init__(self):
+        super().__init__(level=logging.DEBUG)
+        self.messages = []
+
+    def emit(self, record):
+        try:
+            self.messages.append(record.getMessage())
+        except Exception:
+            self.messages.append(
+                record.msg if isinstance(record.msg, str) else '')
+
+    def mentions_serialization(self):
+        needles = ('serialization', 'serialize', '40001')
+        return any(
+            any(n in m.lower() for n in needles) for m in self.messages)
+
+
+@tagged('post_install', '-at_install')
+class TestLifecycleServiceRetryGenuine(_GenuineRaceHelpers, TransactionCase):
+    """CORE-R2 Section 9 / RT.8 (control-room review 4692156428) -- GENUINE proof
+    that a default-REPEATABLE-READ lifecycle probe, driven through the REAL Odoo
+    service retry boundary `odoo.service.model.retrying(func, env)`, converges on
+    EXACTLY ONE Shopify transport when a concurrent disconnect (committed on an
+    INDEPENDENT PostgreSQL backend) forces the post-network store-row
+    revalidation to raise a real SQLSTATE 40001 serialization failure.
+
+    This is the missing companion to `TestLifecycleAdmissionRaceGenuine`: that
+    class opens its worker cursor READ COMMITTED so it can observe the
+    supersession WITHOUT the production retry; this class keeps the NORMAL Odoo
+    isolation (REPEATABLE READ) and exercises the genuine retry loop end to end.
+
+    The serialization failure originates from PostgreSQL, never from an injected
+    exception: the first attempt establishes its REPEATABLE READ snapshot before
+    the disconnect commits, so the post-network `_lifecycle_probe_superseded` ->
+    `_lock_store_for_lifecycle` `SELECT ... FOR NO KEY UPDATE` on the row the
+    disconnect changed cannot serialize and raises 40001. Odoo's `retrying`
+    catches it (SERIALIZATION_FAILURE is in PG_CONCURRENCY_ERRORS_TO_RETRY),
+    rolls back, resets the transaction, and re-invokes the callable; the second
+    attempt re-browses the store, sees the committed `disconnecting` row, and is
+    refused by the frozen matrix BEFORE transport -- so total transport stays
+    exactly one and the final safe outcome is the normal lifecycle refusal
+    (UserError). No raw serialization error escapes.
+
+    Guarantees (Section 6/9): production isolation is NOT weakened (the main
+    cursor runs REPEATABLE READ, asserted), no serialization exception is
+    injected, no fake local retry loop is used, no production lock/exception
+    handling is touched, and only the retry BACKOFF (jitter/sleep) is patched --
+    never the retry decision or exception classification. One main retry
+    cursor/env; one INDEPENDENT connection for the disconnect; a patched `_send`
+    transport seam; a dummy token only; no live Shopify request. Raw SQL only
+    commits the fixture, observes, and cleans up (fresh zero-residue check)."""
+
+    @staticmethod
+    @contextlib.contextmanager
+    def _no_retry_backoff():
+        """Make the REAL `retrying` loop's backoff instantaneous WITHOUT touching
+        its retry decision or exception classification: patch only the jitter
+        (`random.uniform` -> 0.0) and the wait (`time.sleep` -> no-op), tolerant
+        of the module's import form. If a hook is absent the only effect is one
+        short real sleep -- still correct."""
+        patches = []
+        if hasattr(service_model, 'time') and hasattr(
+                service_model.time, 'sleep'):
+            patches.append(patch.object(
+                service_model.time, 'sleep', lambda *a, **k: None))
+        elif hasattr(service_model, 'sleep'):
+            patches.append(patch.object(
+                service_model, 'sleep', lambda *a, **k: None))
+        if hasattr(service_model, 'random') and hasattr(
+                service_model.random, 'uniform'):
+            patches.append(patch.object(
+                service_model.random, 'uniform', lambda *a, **k: 0.0))
+        elif hasattr(service_model, 'uniform'):
+            patches.append(patch.object(
+                service_model, 'uniform', lambda *a, **k: 0.0))
+        with contextlib.ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            yield
+
+    def test_repeatable_read_serialization_retry_issues_one_transport(self):
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []           # one entry per transport invocation (total)
+        attempt_send_counts = []   # len(send_tokens) at the START of each attempt
+        attempt_pgcodes = []       # OperationalError.pgcode observed per attempt
+        disc_info = {}             # backend PID where the disconnect committed
+        retry_handler = _RetryLogCapture()
+        service_logger = logging.getLogger('odoo.service.model')
+        prior_level = service_logger.level
+        try:
+            store_id, shop_domain, _job = self._commit_connected_fixture(dbname)
+            initial_gen = self._observe_store(dbname, store_id)[1]
+
+            # The retry transaction: a GENUINE pooled cursor at the NORMAL Odoo
+            # isolation (REPEATABLE READ) -- deliberately NOT read_committed --
+            # so the post-network FOR NO KEY UPDATE revalidation raises a real
+            # 40001 that the production retry must handle. `_open_bounded`'s first
+            # statement establishes this snapshot BEFORE the disconnect commits.
+            retry_cr = self._open_bounded(dbname)
+            try:
+                retry_cr.execute("SHOW transaction_isolation")
+                self.assertEqual(
+                    retry_cr.fetchone()[0], 'repeatable read',
+                    'the main retry cursor must run at the production isolation')
+                retry_pid = self._backend_pid(retry_cr)
+                retry_env = api.Environment(retry_cr, SUPERUSER_ID, {})
+                Client = retry_env['shopify.connector.api.client']
+
+                def racing_send(client_self, s, body, token=None):
+                    # Transport seam: the admission FOR SHARE snapshot is already
+                    # committed/released. A REAL one-way disconnect now commits on
+                    # an INDEPENDENT backend, bumping the generation and moving the
+                    # store to `disconnecting`. Committed exactly once (first
+                    # attempt); the second attempt is refused before transport.
+                    send_tokens.append(token)
+                    if 'pid' not in disc_info:
+                        disc = self._open_bounded(dbname)
+                        try:
+                            denv = api.Environment(disc, SUPERUSER_ID, {})
+                            disc_info['pid'] = self._backend_pid(disc)
+                            denv['shopify.connector.store'].browse(
+                                store_id).action_disconnect()
+                            disc.commit()
+                        finally:
+                            disc.close()
+                    return FakeResponse(
+                        200, json_body=_success_body(domain=shop_domain))
+
+                def func():
+                    # Re-browse the store from the retry environment on EVERY
+                    # attempt (fresh snapshot each try). Observe -- never
+                    # reclassify -- the serialization pgcode, then re-raise so the
+                    # REAL `retrying` makes the retry decision.
+                    attempt_send_counts.append(len(send_tokens))
+                    store = retry_env['shopify.connector.store'].browse(store_id)
+                    try:
+                        return store.action_test_connection()
+                    except psycopg2.OperationalError as exc:
+                        attempt_pgcodes.append(getattr(exc, 'pgcode', None))
+                        raise
+
+                service_logger.setLevel(logging.DEBUG)
+                service_logger.addHandler(retry_handler)
+                try:
+                    with patch.object(
+                            self.registry, 'cursor',
+                            self._recording_registry_cursor(dbname, [])), \
+                         patch.object(type(Client), '_send', racing_send), \
+                         self._no_retry_backoff():
+                        # Stale first attempt -> real 40001 -> retrying rolls
+                        # back/resets and retries; the reset second attempt is
+                        # matrix-refused (disconnecting) BEFORE transport. The
+                        # final safe outcome is the normal lifecycle UserError.
+                        with self.assertRaises(UserError):
+                            retrying(func, retry_env)
+                finally:
+                    service_logger.removeHandler(retry_handler)
+                retry_cr.rollback()
+            finally:
+                retry_cr.close()
+
+            # ---- retry-boundary assertions ----
+            self.assertGreaterEqual(
+                len(attempt_send_counts), 2,
+                'the callable must be attempted at least twice (a genuine retry)')
+            self.assertEqual(
+                len(send_tokens), 1,
+                'exactly one transport across the attempt + retry')
+            self.assertEqual(
+                send_tokens[0], DUMMY_TOKEN,
+                'the first transport used the captured dummy token')
+            # The second attempt issued ZERO transport (matrix-refused before
+            # send): its start-of-attempt send count already equals the single
+            # total, so it added none.
+            self.assertEqual(attempt_send_counts[0], 0)
+            self.assertEqual(attempt_send_counts[1], 1)
+            # A genuine PostgreSQL serialization failure (SQLSTATE 40001) drove
+            # the retry -- captured directly from the OperationalError, and
+            # corroborated by the service retry log.
+            self.assertIn(
+                psycopg2.errorcodes.SERIALIZATION_FAILURE, attempt_pgcodes,
+                'the first attempt must fail with a real 40001; saw %s'
+                % attempt_pgcodes)
+            self.assertTrue(
+                retry_handler.messages,
+                'the real service retry loop must log its retry')
+            self.assertTrue(
+                retry_handler.mentions_serialization()
+                or psycopg2.errorcodes.SERIALIZATION_FAILURE in attempt_pgcodes,
+                'SERIALIZATION_FAILURE must be evidenced as the retry cause '
+                '(log=%s; pgcodes=%s)'
+                % (retry_handler.messages, attempt_pgcodes))
+            # ---- distinct backend for the disconnect ----
+            self.assertIn('pid', disc_info)
+            self.assertNotEqual(
+                disc_info['pid'], retry_pid,
+                'the disconnect committed on a distinct backend PID')
+            # ---- final committed state (fresh connection) ----
+            state, gen, ltc, clv, cred_present = self._observe_store(
+                dbname, store_id)
+            self.assertEqual(state, 'disconnecting')   # disconnect won, one-way
+            self.assertEqual(gen, initial_gen + 1)     # generation bumped once
+            self.assertNotEqual(ltc, 'pass')           # no pass result written
+            self.assertFalse(ltc)                      # no stale first-attempt fail
+            self.assertFalse(clv)                      # credential_last_verified_at empty
+            self.assertTrue(cred_present)              # credential preserved
+            self.assertEqual(
+                self._observe_credential_token(dbname, store_id), DUMMY_TOKEN)
+            self.assertEqual(self._lease_count(dbname, store_id), 0)  # no lease
+        finally:
+            service_logger.setLevel(prior_level)
             self._cleanup(dbname, store_id)
