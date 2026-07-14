@@ -9,7 +9,17 @@
 every proof below is now stated against the **final integration-staging head**
 (`claude/core-r2-slice-2b-integration`, packet §7), with new proofs for
 loop-owned context ownership, no-result-escape, no-public-generic-`execute()`,
-`execute_lifecycle` for setup/diagnostic, and precise flush semantics.
+lifecycle diagnostics via the store actions, and precise flush semantics.
+**Revision 3 (2026-07-14):** corrected per control-room review **`4690831454`** —
+(1) **M16/M17** rewritten so the lifecycle diagnostic path proves a **private**
+API-client lifecycle transport reached only through the trusted store actions
+(fixed internal purpose), **not** a public `execute_lifecycle`; (2) **M8/M18**
+rewritten as the **Race A** (disconnect-vs-admission before lease commit) and
+**Race B** (disconnect after committed admission — `action_disconnect` returns
+without waiting for the context) model (packet §5.6), with the deployed
+multi-worker sequence aligned; (3) the integration-PR evidence framed against the
+**true net diff** (packet §7.3). PR #160 is referenced by **capability**, not its
+moving draft head.
 **Architecture:** AR-047.
 
 Companion to
@@ -32,11 +42,16 @@ public-`execute()` closure), **never** on an isolated domain head:
 - the **customer** Admin-API call uses `execute_business`;
 - **no `execute_business` result escapes its context** before the required page
   work / terminal reconciliation completes (M14);
-- **no public generic `execute()` entry remains** on the API-client model (M16);
-- **test-connection / reconnect use `execute_lifecycle`** (M17);
+- **no public generic `execute()` entry remains** on the API-client model, and
+  **no public `execute_lifecycle` was invented** (M16);
+- **test-connection / reconnect route through a private lifecycle transport** via
+  the trusted store actions with a fixed internal purpose (M17);
+- a disconnect **racing an uncommitted admission linearizes through the short
+  `FOR SHARE` window** (Race A — M8);
+- a disconnect **after a committed admission returns without waiting** for the
+  context; the admitted call finishes with its in-memory token and the controller
+  defers `completed` until the lease releases (Race B — M18);
 - a disconnect **between product pages blocks the next page** (M9);
-- a disconnect **after terminal admission permits terminal reconciliation to
-  finish** with the in-memory token (M8/M18);
 - **customer reconciliation holds the lease through the flush** (M2);
 - **no explicit main-cursor commit**; `flush_all` materializes SQL in the main
   transaction only (M15);
@@ -77,7 +92,7 @@ call issued through `execute_business` (for products, *each page*).
 | M5 | **Lease releases after a normalization exception.** A payload that makes normalization/validation raise leaves no lease. | Malformed page/product → `data_shape_schema_mismatch` inside the context → released; `count==0`. | Malformed customer payload → `data_shape_schema_mismatch` inside the context → released; `count==0`. |
 | M6 | **Lease releases after a local business-record exception.** A reconciliation failure (ambiguous/duplicate/binding-conflict/Odoo `ValidationError`) leaves no lease. | Force `ambiguous_match`/`duplicate_risk` in `_apply_import` → released; `count==0`; the JobHandlerError keeps its class. | Force `binding_conflict`/`ambiguous_match` → released; `count==0`; class preserved. |
 | M7 | **Disconnect winning before admission blocks transport.** If the store is not `connected` / generation-bumped before `__enter__`, admission raises `ShopifyQuiescedError` and no `_send` runs. | Set store `disconnecting`/bump generation before the (first) page → `ShopifyQuiescedError`, fake `_send` never called, no lease, no write. | Same for the single call. |
-| M8 | **Admission winning before disconnect lets the current call finish.** A call admitted (lease committed) before the disconnect's update-lock proceeds runs to completion under the observed lease. | With a lease held, a concurrent `action_disconnect` (Slice 2A) waits on the store-row update-lock until the page context releases. | Same for the single call. |
+| M8 | **Race A — disconnect vs admission before lease commit.** Admission (`FOR SHARE`) and `action_disconnect` (`FOR NO KEY UPDATE`) linearize through the **short admission window** only. If admission wins, it commits the lease + token snapshot before the disconnect proceeds. If disconnect wins, it bumps generation/state first and the later `_admit` **fails closed**. **No untracked admitted call is possible.** | Force each order on the (first) page: (a) admission-first → lease committed, page `_send` proceeds; (b) disconnect-first → next `_admit` re-reads new generation/state under `FOR SHARE` → `ShopifyQuiescedError`, no `_send`, no lease. Assert the disconnect only ever contends on the short `FOR SHARE` window, never on the `_send`/reconciliation body. | Same for the single call. |
 | M9 | **No second Shopify call after a disconnect request.** Once the gate observes the disconnect, no further business call is issued. | After a disconnect between page k and k+1, page k+1's `_admit` fails closed; fake `_send` call-count does not increase. | Not applicable beyond M7 (single call), but assert the fake `_send` is called exactly once on the happy path and zero times on a pre-admission refusal. |
 | M10 | **Generation mismatch fails closed.** `store.connection_generation != job.expected_connection_generation` at admission → `ShopifyQuiescedError`, no call, no write. | Bump the store generation after enqueue; assert every page admission refuses. | Bump after enqueue; assert the call refuses. |
 | M11 | **No duplicate binding is introduced.** The activated path creates exactly the same one binding per template/variant/customer as the pre-migration path. | Re-run a product import twice; assert exactly one template binding + N variant bindings; no phantom/duplicate. | Re-run a customer import twice; assert exactly one customer binding + one partner. |
@@ -85,9 +100,9 @@ call issued through `execute_business` (for products, *each page*).
 | M13 | **No token / PII leakage.** No token, Authorization header, GraphQL body, media byte, partner email/address, or product data appears in a lease row, a job log, or a server log. | Assert lease rows carry only `store_id/lease_key/job_id(Integer)/worker_ref/admitted_at/expires_at`; assert redaction on any error path; media bytes never logged. | Assert lease rows secret-free; the §8.2 candidate `technical_detail` shape is unchanged and carries no new PII. |
 | M14 | **No `execute_business` result escapes its context.** No method returns a `result` (or a value derived from it before reconciliation) out of the `with` block; the loop owns the context (RD-P). | Source-level guard: no product-importer method returns an `execute_business` `result`; runtime guard: reconciliation observes a held lease (M2), impossible if the result had escaped a closed context. | Source-level guard: the single wrap keeps `result` inside the `with`; runtime M2 confirms the lease is held during reconciliation. |
 | M15 | **No explicit main-cursor commit; flush materializes only.** `self.env.flush_all()` sends pending SQL to PostgreSQL in the current main transaction; it does not commit and does not make the write visible to another transaction. | Source-level guard: no `self.env.cr.commit(` in the product importer; assert the reconciliation is **not** visible on an independent connection until the natural handler-transaction commit (post-return). | Same guards for the customer importer. |
-| M16 | **No public generic `execute()` entry remains** (closure, Prompt E). The API-client public surface is exactly `{execute_business, execute_lifecycle}`. | Source-level guard: `dir()`/public-method assertion on `shopify.connector.api.client` finds no public `execute`; no reachable `api.client.execute(` in any product file. | Same guard for any reachable `api.client.execute(` in the customer file. |
-| M17 | **Test-connection / reconnect use `execute_lifecycle`.** The store lifecycle diagnostic calls route through `execute_lifecycle(purpose=…)`, never the business path and never a public `execute()`. | N/A (product domain) — asserted once at the core level: `action_test_connection`/reconnect call `execute_lifecycle`. | N/A (customer domain) — asserted once at the core level. |
-| M18 | **Disconnect after terminal admission permits terminal reconciliation to finish.** A disconnect that lands *after* the terminal page is admitted (lease committed) does not abort the in-flight reconciliation; it completes with the in-memory token and releases its lease, and the controller finalizes only then. | On the terminal page: admit → commit lease → begin `_apply_import`; then a concurrent `action_disconnect` bumps generation but **waits** on the store-row update-lock / the controller counts the open lease; reconciliation finishes; lease releases; then finalize. | Same for the single customer call: an admitted call finishes reconciliation despite a concurrent disconnect. |
+| M16 | **No public generic `execute()` entry remains; no public `execute_lifecycle` invented** (closure, Prompt E). No public generic execute entry; no production caller reaches a generic unguarded transport method; the connector-owned public API-client **business** entry remains `execute_business`; the lifecycle transport remains **private** behind the trusted store actions. | Source-level guard: public-method assertion on `shopify.connector.api.client` finds no public `execute` and no public `execute_lifecycle`; no reachable `api.client.execute(` in any product file. | Same guard for any reachable `api.client.execute(` in the customer file. |
+| M17 | **Test-connection / reconnect use the private lifecycle transport via the store actions.** `action_test_connection` / `action_reconnect` **select a fixed internal purpose** through the trusted store methods and invoke the **private** (underscore-prefixed) lifecycle transport path; **no arbitrary purpose is RPC-callable**; **no business lease is created for lifecycle diagnostics**. | N/A (product domain) — asserted once at the core level: the store actions route through the private lifecycle helper with fixed purposes; no lifecycle diagnostic inserts a `call.lease`. | N/A (customer domain) — asserted once at the core level. |
+| M18 | **Race B — disconnect after committed admission does not wait for the context.** A disconnect that lands *after* a call is admitted (lease committed) does **not** block on the network/reconciliation body: `action_disconnect` acquires the update-lock (uncontended — `FOR SHARE` already released), bumps generation, sets `disconnecting`, and **returns**; the admitted call finishes with its in-memory token and releases its lease; the controller counts the open lease, keeps the store `quiescing`, preserves the credential, and finalizes `completed` only after release (or `timed_out` if still held at timeout). | Terminal page: admit → commit lease → begin `_apply_import`; a concurrent `action_disconnect` bumps generation and **returns without waiting**; reconciliation finishes with the in-memory token; lease releases; a later controller pass finalizes. Assert the disconnect did not block on the context. | Same for the single customer call: an admitted call finishes reconciliation despite a concurrent disconnect that returned immediately. |
 
 **[Recommendation]** M1–M10, M14–M18 are new **activation** tests authored in the
 new per-domain files (`test_product_callsite_execute_business.py` /
@@ -109,10 +124,11 @@ covered by re-running existing classes (§1.3) plus targeted new assertions.
   does — a `TransactionCase` single cursor cannot prove committed-lease
   visibility. Reuse that harness pattern; do **not** invent a lifecycle
   monkeypatch.
-- **Generation-mismatch (M10), disconnect-ordering (M7/M8/M9/M18), and
-  `execute_lifecycle` (M17)** require the Slice 2A generation bump + disconnect
-  controller + `execute_lifecycle`. Under the corrected integration-staging
-  strategy these are **always present** in the tree under test, because the
+- **Generation-mismatch (M10), disconnect-ordering (M7/M8/M9/M18 — Race A/Race B),
+  and the lifecycle diagnostic path (M17)** require the Slice 2A generation bump +
+  disconnect controller + the private lifecycle transport behind the store actions.
+  Under the corrected integration-staging strategy these are **always present** in
+  the tree under test, because the
   staging branch is cut from a `Shopify-connector` that already merged Slice 2A
   (packet §5.4 hard prerequisite, §7 step 1). A run against a tree lacking Slice
   2A is **not** a valid Slice-2B validation and must not be recorded as one.
@@ -176,8 +192,9 @@ analysis's T-19 (Topology C) and the CORE-R2 packet's "two-server" proof
 `task-core-r2-disconnect-quiescence-packet.md` §15/§18). It runs on the **final
 `claude/core-r2-slice-2b-integration` head** (packet §7 step 7) — the integrated
 Slice 1 + Slice 2A + both call-site migrations + the public-`execute()` closure
-(both call sites activated; the generation bump + disconnect controller +
-`execute_lifecycle` present; no public generic `execute()` remaining).
+(both call sites activated; the generation bump + disconnect controller + the
+private lifecycle transport behind the store actions present; no public generic
+`execute()` remaining, and no public `execute_lifecycle` invented).
 
 ### 2.1 Objective (the fourteen assertions: twelve deployed + two integrity)
 
@@ -190,8 +207,14 @@ deployed runtime:
 2. **A committed lease is visible from B** — a second worker/server B, on an
    independent connection, `SELECT`s the committed `call.lease` row A wrote before
    its `_send`.
-3. **B requests disconnect** — B runs the real `action_disconnect` (Slice 2A):
-   store → `disconnecting`, generation bumped, under the store-row update-lock.
+3. **B requests disconnect and returns immediately (Race B)** — B runs the real
+   `action_disconnect` (Slice 2A): it acquires the store-row update-lock
+   (uncontended — A's admission side transaction already committed and released
+   `FOR SHARE`), bumps generation, sets `disconnecting`, stamps the requester,
+   sweeps queued/retry jobs, wakes the controller, and **returns without waiting**
+   for A's in-flight call. Assert B does **not** block on A's `execute_business`
+   context, and that A's committed lease and the credential both still exist at
+   the instant B returns.
 4. **No new admission occurs** — after B's disconnect request, any new
    `execute_business.__enter__` for that store fails closed (`ShopifyQuiescedError`,
    generation/state gate); observe zero new lease inserts.
@@ -347,12 +370,15 @@ SRR-03 stays **OPEN**.
 - [ ] **C4 — Multi-worker / multi-server proof green.** §2 deployed plan passes
       all fourteen assertions, in both topologies, ×3 stable (§2.8), on the
       integration-staging head.
-- [ ] **C5 — Public-`execute()` closure complete (Prompt E).** The
-      public-`execute()` is removed/privatized on the staging branch (packet §6b);
-      the API-client public surface is exactly `{execute_business,
-      execute_lifecycle}`; `action_test_connection`/reconnect use `execute_lifecycle`
-      (M17); static guards prove zero reachable `api.client.execute(` in any
-      production file and a `_`-prefixed transport seam (M16). This is a **Slice-2B**
+- [ ] **C5 — Legacy generic-`execute()` closure complete (Prompt E).** The
+      public generic `execute()` is removed/privatized on the staging branch
+      (packet §6b); the connector-owned public API-client **business** entry
+      remains `execute_business`; **no public `execute_lifecycle` was invented** and
+      the lifecycle transport stays **private** behind the trusted store actions;
+      `action_test_connection`/`action_reconnect` select fixed internal purposes and
+      route through that private helper (M17); static guards prove zero reachable
+      `api.client.execute(` in any production file, a `_`-prefixed transport seam,
+      and no RPC-callable arbitrary-purpose method (M16). This is a **Slice-2B**
       deliverable, not a deferred item.
 - [ ] **C6 — No unguarded Shopify business call site.** Every credentialed
       Admin-API call flows through `execute_business` (admission-gated). Media CDN
@@ -366,13 +392,17 @@ SRR-03 stays **OPEN**.
       (`task-core-r2-disconnect-quiescence-packet.md` §17; step 4 asserts
       `count(call.lease)==0` **and** no worker inside an `execute_business`
       context) is demonstrated/tested where feasible.
-- [ ] **C9 — Single controlled integration merge; PR #150/#151 subsumed.** The
-      protected, validated `claude/core-r2-slice-2b-integration` head reaches
-      `Shopify-connector` via **one** integration PR (packet §7 step 8);
-      **PR #150/#151 were never merged directly into `Shopify-connector`** while
-      unguarded, and are closed as subsumed/merged **only after** that integration
-      PR is accepted and merged. No unguarded domain handler ever landed on
-      `Shopify-connector`; no shared CORE-R2 commit was double-applied; no
+- [ ] **C9 — Single controlled integration merge; PR #150/#151 subsumed
+      honestly.** The protected, validated `claude/core-r2-slice-2b-integration`
+      head reaches `Shopify-connector` via **one** integration PR whose **true net
+      diff** carries the complete product + customer domains plus both call-site
+      migrations plus the core execute closure (packet §7.3 — the base does **not**
+      already contain the domain PRs). Its review is decomposed by
+      merge-history / file-group / evidence (§7.3). **PR #150/#151 were never
+      merged directly into `Shopify-connector`** while unguarded, and are closed as
+      **superseded/subsumed** — **not** marked individually merged — **only after**
+      the integration PR is accepted and merged. No unguarded domain handler ever
+      landed on `Shopify-connector`; no shared CORE-R2 commit was double-applied; no
       sibling-branch history was duplicated; no explicit main-cursor commit exists
       (M15).
 - [ ] **C10 — Final live-read validation authorized separately.** Live/dev-store
@@ -402,9 +432,11 @@ separate investigation throughout.
 - `docs/05-qa/task-010b-validation-results.md` (@ `e4669aa`);
   `docs/05-qa/task-011b-validation-results.md` (@ `10d0034`) — historical,
   supporting-only.
-- PR #160 (`b3d23cb`, Slice 2A, draft, no runtime-green claimed — hard
-  prerequisite); control-room review `4690659767` (REVISE — the correction driving
-  Revision 2).
+- PR #160 (Slice 2A, draft, no runtime-green claimed — **capability-based** hard
+  prerequisite; its moving draft head/surface is not pinned here); control-room
+  reviews `4690659767` (REVISE — drove Revision 2) and `4690831454` (REVISE — drove
+  Revision 3: private lifecycle boundary / M16-M17, Race A/Race B / M8-M18, true
+  integration-PR net scope).
 - Companion:
   `docs/07-implementation-plan/task-core-r2-slice-2b-callsite-runtime-packet.md`;
   `docs/07-implementation-plan/task-core-r2-slice-2b-handoff.md`.

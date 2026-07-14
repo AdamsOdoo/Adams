@@ -15,29 +15,41 @@ questions and adversarial findings are load-bearing.
 
 ## Session summary
 
-**Revision 2 — correction session** driven by control-room review
-**`4690659767` (REVISE)** on PR #158. Revision 1 built the Slice-2B packet
-(call-site inventory, change design, integration strategy, test matrix,
-multi-worker plan, SRR-03 closure). Revision 2 corrects five defects the review
-identified, in the three existing packet files:
+**Revision 3 — correction session** driven by control-room review **`4690831454`
+(REVISE)** on PR #158, following Revision 2 (review `4690659767`). Revision 1 built
+the Slice-2B packet; Revision 2 replaced the rejected direct-merge "Option B" with
+the integration-staging strategy, made RD-P loop-owned, corrected flush semantics,
+and resolved the public-`execute()` closure into Slice 2B. **Revision 3 corrects
+three remaining architecture defects, in the same three packet files:**
 
-1. **Rejected the direct-merge "Option B"** (which merged PR #150/#151 into
-   `Shopify-connector` *before* protecting their unguarded `execute()` call
-   sites — reversing the gate) and replaced it with an **eight-step
-   integration-staging strategy** (packet §7).
-2. **Made RD-P structurally executable** — the pagination loop **itself owns each
-   `execute_business` context**; the `_execute_query` helper that returned
-   `result` is dissolved; no API result escapes its context before reconciliation
-   (packet §5.1).
-3. **Corrected flush semantics** — `flush_all()` materializes SQL in the main
-   transaction; it does **not** commit and does **not** create cross-transaction
-   durability; no explicit main-cursor commit (packet §5, §5.3; validation M15).
-4. **Resolved the public-`execute()` closure** into Slice 2B as a final
-   integration step (packet §6b; Prompt E, §9c), given Slice 2A / PR #160 now
-   delivers `execute_lifecycle`.
-5. **Rebased future Prompts P/C on the staging branch** and added **Prompt E**
-   (packet §8/§9/§9c; validation plan §1.0/§1.4/§2/§3).
+1. **Lifecycle API boundary (no public `execute_lifecycle`).** The packet no longer
+   assumes Slice 2A delivers a *public* API-client `execute_lifecycle`. The
+   RPC-facing lifecycle surface is the **store actions** (`action_test_connection`,
+   `action_reconnect`), which select a **fixed internal purpose** and call a
+   **private** (underscore-prefixed) API-client lifecycle transport. The
+   connector-owned public API-client business entry stays `execute_business`; no
+   public generic transport and no RPC-callable arbitrary-purpose method remain.
+   Prompt E inspects the **final merged** Slice-2A code and **preserves** that
+   private boundary rather than inventing a public method (packet §6b, §9c;
+   validation M16/M17).
+2. **Admission-vs-disconnect timing (Race A / Race B).** `_admit` holds `FOR SHARE`
+   only for the **short admission side transaction** and **releases it at that
+   commit**; the committed **lease** (not a store-row lock) represents the holder
+   across `_send`/reconciliation. A disconnect after a committed admission does
+   **not** wait for the context — it bumps generation, sets `disconnecting`, and
+   returns (Race B); only a disconnect racing the still-uncommitted admission
+   touches the `FOR SHARE` window (Race A). M8/M18 and every "disconnect waits for
+   the context" claim are rewritten (packet §5.6; validation M8/M18, §2.1).
+3. **Integration-PR net scope.** The final staging→`Shopify-connector` PR carries
+   the **complete net product + customer domains** plus both call-site migrations
+   plus the core execute closure — because PR #150/#151 are **never** merged into
+   the target base. The false "diff is only migrations/closure over a base that
+   already contains the domains" wording is replaced with the true net diff and a
+   merge-history/file-group/evidence review decomposition; PR #150/#151 are closed
+   **superseded/subsumed, not marked individually merged** (packet §7.3;
+   validation C9).
 
+PR #160 is now referenced by **capability**, not by its moving draft head/surface.
 **This session opened no implementation gate and authorized no code.**
 
 ## Branch and commits
@@ -46,8 +58,9 @@ identified, in the three existing packet files:
   development branch; the brief's "preferred" `claude/core-r2-slice-2b-packet`
   differs only by the session-id suffix — see "What ChatGPT should review").
 - **Base:** `Shopify-connector` @ `912801508155c6358e8f5f1a7a0aaf01ae573675`.
-- **Commits:** Revision 1 = `df7118a` (three files created); Revision 2 = one
-  docs-only correction commit editing the same three files. PR #158 stays
+- **Commits:** Revision 1 = `df7118a` (three files created); Revision 2 = `d255a02`
+  (correction per review `4690659767`); Revision 3 = one docs-only correction commit
+  per review `4690831454`, editing the same three files. PR #158 stays
   open/draft/unmerged throughout.
 
 ## Files created or updated
@@ -56,21 +69,27 @@ The **same exact three files** (no additional file created or modified):
 
 1. `docs/07-implementation-plan/task-core-r2-slice-2b-callsite-runtime-packet.md`
    — state verification; product + customer call-site inventory (base and PR-head);
-   change design (RD-P **loop-owned**, RD-C); **integration-staging strategy**
-   (§7, 8 steps); public-`execute()` closure design (§6b); future prompts **P, C,
-   and E**.
+   change design (RD-P **loop-owned**, RD-C); the **admission-vs-disconnect timing
+   model (§5.6, Race A / Race B)**; **integration-staging strategy** (§7, 8 steps)
+   + the **true integration-PR net scope & review decomposition (§7.3)**; the
+   **private-lifecycle-boundary** public-`execute()` closure design (§6b, no public
+   `execute_lifecycle`); future prompts **P, C, and E** (E capability-based).
 2. `docs/05-qa/task-core-r2-slice-2b-validation-plan.md`
-   — regression + runtime test matrix (M1–M18 per domain); deployed
-   multi-worker/multi-server plan (14 assertions, Topology C, ×3 stability), on
-   the integration-staging head; SRR-03 closure checklist (C1–C10).
+   — regression + runtime test matrix (M1–M18 per domain; M8/M18 = Race A/Race B;
+   M16/M17 = private lifecycle boundary); deployed multi-worker/multi-server plan
+   (14 assertions, Topology C, ×3 stability), on the integration-staging head;
+   SRR-03 closure checklist (C1–C10).
 3. `docs/07-implementation-plan/task-core-r2-slice-2b-handoff.md` (this file).
 
-## What changed (Revision 2)
+## What changed (Revision 3)
 
 New/corrected governance documentation only. No code, schema, test, manifest, CI,
 or non-allowlisted doc changed. **No PR #150, #151, or #160 body or branch
 touched.** No shared handoff, AR log, risk register, or rejected-approaches log
-modified (explicitly out of this session's allowlist).
+modified (explicitly out of this session's allowlist). Revision 3 edited only the
+three packet files, correcting the lifecycle API boundary, the admission-vs-
+disconnect timing model, and the integration-PR net scope (details in the session
+summary and adversarial findings AF-14…AF-16).
 
 ## Evidence and citations added
 
@@ -79,18 +98,24 @@ governance docs. Access status: all sources **Accessible** on 2026-07-14 (local
 working tree + `git show` at PR head SHAs + GitHub PR/issue/review metadata). No
 external web source used.
 
-Verified state this session: PR #158 open/draft @ `df7118a`, base `912801508…`,
-exactly 3 files; PR #150 open/draft @ `10d0034…`; PR #151 open/draft @ `e4669aa…`;
-**PR #160 (Slice 2A) open/draft @ `b3d23cb…`, no runtime-green claimed
-(static-only)**; issue #157 open (separate); working tree clean. Review
-`4690659767` (REVISE) read in full.
+Verified state this session (Revision 3): PR #158 open/draft @ `d255a02` (the
+Revision-2 head), base `912801508…`, exactly 3 files; PR #150 open/draft @
+`10d0034…`; PR #151 open/draft @ `e4669aa…`; **PR #160 (Slice 2A) open/draft, no
+runtime-green claimed (static-only) — its head has moved (observed `415c05c…`,
+distinct from the `b3d23cb…` in its own body), which is exactly why this packet now
+references it by capability, not by a pinned head/surface**; issue #157 open
+(separate); working tree clean. Reviews `4690659767` and `4690831454` (both REVISE)
+read in full.
 
 ## Assumptions
 
 - **[Fact — now confirmed]** "Slice 2A" is PR #160 (disconnect controller,
-  `disconnecting` state, generation bump, direction-C, `execute_lifecycle`). PR
-  #160's body states it **removes neither the public `execute()`** and claims **no
-  runtime-green** (static validation only).
+  `disconnecting` state, generation bump, direction-C, and a **private
+  fixed-purpose lifecycle transport** behind the trusted store actions — PR #160's
+  correction direction uses a private `_execute_lifecycle`, not a public method, so
+  this packet references the **capability**, not the name). PR #160's body states
+  it **removes neither the public `execute()`** and claims **no runtime-green**
+  (static validation only).
 - **[Fact — corrected]** The integration target is the dedicated **staging
   branch** `claude/core-r2-slice-2b-integration`, cut from a post-Slice-2A
   `Shopify-connector`, into which PR #151/#150 heads are merged — **not**
@@ -104,9 +129,11 @@ exactly 3 files; PR #150 open/draft @ `10d0034…`; PR #151 open/draft @ `e4669a
 
 - **[Resolved] OQ-1 — public-`execute()` closure placement.** Now **owned by
   Slice 2B** as the final integration-closure step (packet §6b; Prompt E). Slice
-  2A/PR #160 supplies `execute_lifecycle` and migrates `action_test_connection`;
-  Slice 2B removes the public `execute()` after both call sites migrate. Satisfies
-  closure item C5.
+  2A/PR #160 supplies a **private** fixed-purpose lifecycle transport (reached
+  through the store actions) and migrates `action_test_connection` onto it; Slice
+  2B removes the legacy public generic `execute()` after both call sites migrate
+  and **preserves** the private lifecycle boundary (no public `execute_lifecycle`
+  invented). Satisfies closure item C5.
 - **[Resolved] OQ-2 — 2A-before-2B ordering.** Firmed into a **hard
   prerequisite**: Slice 2A (PR #160) must be runtime-green, control-room accepted,
   and merged into `Shopify-connector` **before** the staging branch is created
@@ -179,7 +206,9 @@ design; corrections were applied.
   §5, §5.3; validation M15). The stale "durable within the handler transaction"
   wording was removed.
 - **AF-7 — Public `execute()` bypass remaining?** Closed by Prompt E (§6b): the
-  public surface becomes exactly `{execute_business, execute_lifecycle}`; the
+  legacy public generic `execute()` is removed/fail-closed; the connector-owned
+  public **business** entry stays `execute_business`; the lifecycle transport stays
+  **private** behind the store actions (no public `execute_lifecycle`); the
   transport seam is `_`-prefixed; static guards prove zero reachable
   `api.client.execute(` and no RPC arbitrary-purpose bypass (validation M16/M17;
   closure item C5).
@@ -206,12 +235,43 @@ design; corrections were applied.
   the "CODE GATE IS NOT OPEN / SRR-03 OPEN / documentation only" banner; Prompts
   P/C/E are explicitly GATED and paste-ready for **future** authorized sessions.
 
-**Corrections applied this revision:** rejected Option B; rewrote §7 as the
-integration-staging strategy; rewrote RD-P for loop-owned context ownership and
-withdrew the umbrella alternative; corrected all flush wording; added §6b and
-Prompt E resolving the public-`execute()` closure; rebased Prompts P/C on the
-staging head; added validation matrix rows M14–M18 and reframed §1.4/§2/§3 to the
-integration-staging head.
+**Revision 3 findings (review `4690831454`):**
+
+- **AF-14 — Invented public `execute_lifecycle` / RPC-callable lifecycle bypass?**
+  Removed. The packet no longer assumes a public API-client `execute_lifecycle`.
+  The RPC-facing lifecycle surface is the **store actions**, which select a fixed
+  internal purpose and call a **private** `_`-prefixed lifecycle transport; no
+  public generic transport and no caller-supplied-purpose method remain. Prompt E
+  inspects the merged Slice-2A code and **preserves** the private boundary rather
+  than exposing a new public method (packet §6b, §9c; validation M16/M17;
+  closure C5).
+- **AF-15 — Store-row lock held across the HTTP/reconciliation body / disconnect
+  blocking on the context?** Corrected. `_admit` holds `FOR SHARE` only for the
+  short admission side transaction and releases it at that commit; the committed
+  **lease** (not a store-row lock) spans the body. A disconnect after a committed
+  admission returns **without waiting** for the context (Race B); only a
+  disconnect racing the uncommitted admission touches the `FOR SHARE` window
+  (Race A). M8/M18 and all "disconnect waits for the context" wording were
+  rewritten (packet §5.6; validation M8/M18, §2.1 assertion 3). The
+  lease-through-reconciliation contract is preserved (it is the lease row, not a
+  lock, that spans the body).
+- **AF-16 — Fictitious integration base / domain PR marked individually merged?**
+  Corrected. The final integration PR's **true net diff** carries the complete
+  product + customer domains plus both call-site migrations plus the core closure
+  (the base does not already contain the domain PRs); review is decomposed by
+  merge-history / file-group / evidence; PR #150/#151 are closed **superseded/
+  subsumed, not marked individually merged** (packet §7.3; validation C9). The
+  false "diff is only migrations/closure over a base that already contains the
+  domains" claim was withdrawn.
+
+**Corrections applied this revision (Revision 3):** removed the public-
+`execute_lifecycle` assumption and rewrote §6b/§9c around the private
+fixed-purpose lifecycle boundary; added §5.6 (Race A / Race B) and rewrote M8/M18
++ §2.1 assertion 3; added §7.3 (true integration-PR net scope + review
+decomposition) and rewrote validation C9/C5; made Prompt E capability-based and
+made all PR #160 references capability-based (unpinned its moving draft head);
+updated the classification table, the §11 adversarial summary (AF-1…AF-16), and
+the references in all three files.
 
 ## Learning feedback loop
 
@@ -224,7 +284,16 @@ review".)*
   protecting them — a category error the review caught; corrected via the
   staging-branch strategy. A helper that enters a context manager and returns its
   `result` silently releases the lease before caller reconciliation — a real
-  correctness trap now explicitly forbidden.
+  correctness trap now explicitly forbidden. **Revision 3 added three more:** (a)
+  assuming a *public* API-client `execute_lifecycle` when Slice 2A keeps the
+  lifecycle transport **private** behind trusted store actions — a surface the
+  packet must not invent; (b) describing the store-row `FOR SHARE` lock as held
+  across the HTTP/reconciliation body (it is released at the short admission
+  commit; the committed lease spans the body), which made "disconnect waits for
+  the context" wrong — corrected to the Race A / Race B model; (c) describing the
+  final integration PR's diff as "only the migrations/closure over a base that
+  already contains the domains" — false, because PR #150/#151 never merge into
+  `Shopify-connector`; the true net diff carries both whole domains.
 - **Repeated issue patterns:** (a) base-vs-PR-head anchor drift (OQ-4); (b)
   conflating a "protection is planned later" plan with "merge the unsafe code
   first" — the gate must be held at the integration branch, not deferred. Guard
@@ -232,8 +301,15 @@ review".)*
 - **Rules/checklists updated:** none modified this session (allowlist forbids it);
   **recommended** rules for ChatGPT: "never merge a frozen domain PR into the
   integration branch while it retains an unguarded transport call site — protect
-  on a staging branch first"; and "a context-manager migration must be reviewed
-  for any helper that returns the yielded value out of the `with`."
+  on a staging branch first"; "a context-manager migration must be reviewed for
+  any helper that returns the yielded value out of the `with`"; and (Revision 3)
+  "depend on a prerequisite PR by **capability**, never by a moving draft head or
+  method name — document a public API surface only after inspecting the *merged*
+  code, and never invent a public entry the merged code keeps private"; "state
+  the `FOR SHARE`/lease lock window precisely — the store-row lock is released at
+  the admission commit; the committed lease, not a lock, spans the body"; "for an
+  integration PR, state the **true GitHub net diff** against the actual base, and
+  close subsumed PRs as superseded, never as individually merged."
 - **New rejected approaches:** the **direct-merge Option B** (merge PR #150/#151
   into `Shopify-connector` before call-site protection) — recommended for the
   rejected-approaches log with revisit condition "never (gate reversal)"; and the
@@ -248,10 +324,16 @@ review".)*
   merged analysis.
 - **Tests or review gates needed:** the M1–M18 activation matrix; the §2 deployed
   proof (×3); static guards proving no reachable `api.client.execute(`, no result
-  escaping a context, and no main-cursor commit.
-- **Should future prompts change? Yes** — done this revision: Prompt P is
+  escaping a context, and no main-cursor commit; **(Revision 3)** the Race A /
+  Race B disconnect-timing tests (M8/M18), the private-lifecycle-boundary guards
+  (M16/M17 — no public `execute_lifecycle`, no RPC-callable arbitrary purpose,
+  `_`-prefixed transport), and the §2.1 assertion that `action_disconnect` returns
+  without blocking on an admitted call's context.
+- **Should future prompts change? Yes** — done across revisions: Prompt P is
   loop-owned RD-P against the PR #151 head; Prompts P/C start from the staging
-  head; Prompt E added for the closure.
+  head with Race A/Race B tests; Prompt E is now **capability-based** (inspect the
+  merged Slice-2A code, preserve its private lifecycle boundary, add no public
+  `execute_lifecycle`); all PR #160 references are capability-based.
 
 ## What ChatGPT should review
 
@@ -260,12 +342,23 @@ review".)*
 2. **Confirm the loop-owned RD-P** design (packet §5.1) and the withdrawal of the
    umbrella-lease alternative.
 3. **Confirm the flush semantics** (materialize-not-commit; no main-cursor commit).
-4. **Approve the public-`execute()` closure** as a Slice-2B deliverable (packet
-   §6b; Prompt E).
-5. **Prerequisite tracking:** PR #160 (Slice 2A) must reach exact-head
-   runtime-green + control-room acceptance before step 1. This packet does not and
-   cannot advance PR #160.
-6. **Governance deviations to bless:** (a) this session did **not** update the
+4. **Approve the public-`execute()` closure** as a Slice-2B deliverable, with the
+   **private** lifecycle boundary preserved and **no public `execute_lifecycle`
+   invented** (packet §6b; Prompt E, capability-based). *(Revision 3.)*
+5. **Confirm the admission-vs-disconnect timing model** — `FOR SHARE` released at
+   the admission commit; the committed lease (not a store-row lock) spans the body;
+   Race A (pre-commit) vs Race B (`action_disconnect` returns without waiting)
+   (packet §5.6; validation M8/M18, §2.1). *(Revision 3.)*
+6. **Confirm the true integration-PR net scope** (complete both domains + both
+   migrations + closure over a base that contains only Slice 2A) and the
+   merge-history/file-group/evidence review decomposition, and that PR #150/#151
+   are closed **superseded/subsumed, not individually merged** (packet §7.3;
+   validation C9). *(Revision 3.)*
+7. **Prerequisite tracking:** PR #160 (Slice 2A) must reach exact-head
+   runtime-green + control-room acceptance before step 1; its head is moving
+   (observed `415c05c`, distinct from its body's `b3d23cb`) — hence capability-based
+   references. This packet does not and cannot advance PR #160.
+8. **Governance deviations to bless:** (a) this session did **not** update the
    shared `research-handoff.md` or the shared `quality-feedback-loop.md`, because
    the allowlist is exactly the three packet files — this conflicts with
    `CLAUDE.md` §12; raised here rather than silently resolved. (b) The branch used
@@ -299,8 +392,11 @@ do NOT merge PR #150/#151 into Shopify-connector.
 Read first: CLAUDE.md; docs/03-architecture/disconnect-quiescence-remediation-analysis.md
 (§6 Phase A/B/C, §8, §9.1-9.3, §10, §13, §14, §16, §23, §24); docs/07-implementation-plan/
 task-core-r2-disconnect-quiescence-packet.md; the three Slice-2B packet files
-(callsite-runtime packet incl. §5.1 loop-owned RD-P, §6b public-execute closure,
-§7 integration-staging strategy; validation plan; this handoff); PR #160.
+(callsite-runtime packet incl. §5.1 loop-owned RD-P, §5.6 Race A/Race B timing,
+§6b public-execute closure with the private lifecycle boundary, §7 integration-
+staging strategy, §7.3 true integration-PR net scope; validation plan incl.
+M8/M18 Race A/B and M16/M17; this handoff); the MERGED Slice-2A code (do not rely
+on PR #160's draft head/surface).
 
 Scope: (1) drive PR #160 to exact-head Odoo.sh runtime-green (full core suite +
 the two migrated tests + genuine locked-first/all-locked selection), capturing
@@ -317,7 +413,13 @@ Shopify-connector; PR #150/#151 closed as subsumed only after that merge.
 
 Do NOT: merge PR #150/#151 directly into Shopify-connector; introduce an umbrella
 lease; let any execute_business result escape its context; add a main-cursor
-commit; run live Shopify validation; mark SRR-03 closed.
+commit; invent a public execute_lifecycle (preserve Slice 2A's private
+fixed-purpose lifecycle transport behind the store actions); assume action_disconnect
+blocks on an admitted call's context (it returns without waiting — Race B); depend
+on PR #160's moving draft head/method names (use capability, inspect the merged
+code); describe the integration PR as a diff over a base that already contains
+PR #150/#151, or mark those PRs individually merged; run live Shopify validation;
+mark SRR-03 closed.
 
 End: run the learning review, update the handoff + validation record, confirm the
 quality gate, commit/push to the designated branch, then STOP.
@@ -350,5 +452,14 @@ quality gate, commit/push to the designated branch, then STOP.
   RD-P (§5.1); flush = materialize-not-commit (§5/M15); public-`execute()` closure
   into Slice 2B (§6b, Prompt E); Prompts P/C rebased on the staging head + Prompt E
   added; validation M14–M18 and integration-staging-head framing. PR #160 (Slice
-  2A) is the hard prerequisite. No code, no gate, SRR-03 OPEN. Next: PR #160
-  runtime-green + merge, then the staging sequence.
+  2A) is the hard prerequisite. No code, no gate, SRR-03 OPEN.
+- **CORE-R2 Slice 2B packet — Revision 3 (2026-07-14):** corrected per review
+  `4690831454`. (1) Private fixed-purpose lifecycle boundary behind the store
+  actions — no public `execute_lifecycle` (§6b, §9c; M16/M17). (2) Race A / Race B
+  admission-vs-disconnect timing — `FOR SHARE` released at admission commit, the
+  committed lease spans the body, `action_disconnect` returns without waiting
+  (§5.6; M8/M18, §2.1). (3) True integration-PR net scope + merge-history/
+  file-group/evidence review decomposition; PR #150/#151 closed superseded/
+  subsumed, not individually merged (§7.3; C9). Prompt E made capability-based; all
+  PR #160 references made capability-based (head unpinned). No code, no gate,
+  SRR-03 OPEN. Next: PR #160 runtime-green + merge, then the staging sequence.
