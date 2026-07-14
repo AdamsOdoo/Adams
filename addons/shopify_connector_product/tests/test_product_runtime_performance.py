@@ -13,6 +13,31 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 
 _logger = logging.getLogger(__name__)
 
+# CORE-R2 Slice 2B: the product importer now issues every Shopify Admin page
+# call through the core `execute_business` admission-lease context manager
+# (`_send` transport seam), not the legacy value-returning `execute()`. The
+# run_drain feasibility test below drives the REAL admission gate; `DUMMY_TOKEN`
+# is a non-secret test constant (never a live token). This class also holds a
+# genuine separate-connection concurrency test, so registry test mode is entered
+# ONLY inside the run_drain test that needs it -- never class-wide -- to leave
+# the concurrency test's independent PostgreSQL connections untouched.
+DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+
+class _FakeSendResponse:
+    """Minimal `requests.Response` stand-in for the `_send` transport seam;
+    `_normalize_response` reads `.status_code`, `.json()`, `.headers` and
+    `.text` only, and the JSON body is the accepted Task 010B fixture dict."""
+
+    def __init__(self, body, status_code=200, headers=None):
+        self._body = body
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.text = ''
+
+    def json(self):
+        return self._body
+
 
 @tagged('post_install', '-at_install', '-standard', 'sc010b_performance')
 class TestProductRuntimePerformance(TransactionCase):
@@ -597,6 +622,21 @@ class TestProductRuntimePerformance(TransactionCase):
             '&', ('state', '=', 'retry_waiting'), ('next_retry_at', '<=', now),
         ]
 
+    def _patch_send(self, fake_execute):
+        """Route an accepted normalized-response `fake_execute(self, store,
+        query, variables=None)` fixture through the real `execute_business`
+        gate by patching only the `_send` transport seam (never the network)."""
+        Client = self.env['shopify.connector.api.client']
+
+        def fake_send(client_self, store, body, token=None):
+            body = body or {}
+            outcome = fake_execute(
+                client_self, store, body.get('query'), body.get('variables'),
+            )
+            return _FakeSendResponse(outcome)
+
+        return patch.object(type(Client), '_send', fake_send)
+
     def test_sc010b_perf_run_drain_two_structured_imports_one_transaction(self):
         """LOOP 3E: real-dispatcher feasibility check, deterministically
         isolated (control-room reviews `4680634735` / `4680644496`).
@@ -648,7 +688,22 @@ class TestProductRuntimePerformance(TransactionCase):
         separately by `test_sc010b_perf_lock_hold_and_competing_retry`
         above. This test calls only the real `run_drain()` entry point --
         it never calls a handler directly.
+
+        CORE-R2 Slice 2B: each job's product import now flows through the
+        `execute_business` admission gate + `_send` transport seam. The store is
+        given a credential (while `setup_incomplete`, so generation stays 0) and
+        registry test mode is entered (only here) so the admission side cursor
+        observes the fixture. The `_send` seam is stubbed and
+        `requests.sessions.Session.request` is still asserted never to fire --
+        so no live Shopify transport occurs.
         """
+        # Seed the credential BEFORE connecting so no generation bump occurs;
+        # jobs then admit at generation 0. Enter registry test mode for this
+        # test only (this class also runs a genuine separate-connection test).
+        self.env['shopify.connector.store.credential'].action_set_token(
+            self.store, DUMMY_TOKEN,
+        )
+        self.registry_enter_test_mode()
         self.store.write({'state': 'connected'})
         self.Settings.create({
             'store_id': self.store.id,
@@ -715,13 +770,15 @@ class TestProductRuntimePerformance(TransactionCase):
         claimable_before = self.Job.search(self._claimable_job_domain())
         self.assertEqual(set(claimable_before.ids), {job_1.id, job_2.id})
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute), patch(
+        # Flush so the admission side cursor (registry test mode) sees the
+        # connected store, settings, and both queued jobs.
+        self.env.flush_all()
+        with self._patch_send(fake_execute), patch(
             'requests.sessions.Session.request',
             side_effect=AssertionError(
                 'unexpected network transport during the sc010b_performance '
-                'run_drain test -- only the patched api.client.execute '
-                'seam is permitted'
+                'run_drain test -- only the patched api.client._send '
+                'transport seam is permitted'
             ),
         ):
             started = time.perf_counter()
