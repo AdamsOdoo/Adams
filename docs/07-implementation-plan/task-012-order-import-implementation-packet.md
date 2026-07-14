@@ -18,6 +18,27 @@
 > (D-012-2 revised). Divergent-currency routing (D-012-3) is confirmed as
 > `skipped`-policy with **no** error class (never overloading
 > `financial_total_mismatch`).
+> **Correction round 2026-07-14 (control-room review `4690680028`, docs-only):**
+> (a) **dependencies are now capability-based**, not direct-merge of PR #150/#151
+> (revised CORE-R2 Slice-2B integration-staging strategy; CORE-R1 already merged)
+> — §2, §15; (b) the total-check is a **canonical single-count ledger**
+> `U_ex = M + H + T` with tax-inclusive handling and the **proven** tax bound
+> `tol_tax = 0.5r(S+O)` (replacing the invalid `K=distinct groups`), with worked
+> examples incl. a many-small-lines counterexample — D-012-2; (c) **pagination is
+> Option A** (a header query + three independent per-connection cursor page
+> queries) with `Order.id`/`updatedAt` verification, cursor-progress + node dedup,
+> torn-read → `concurrency_race_conflict`, and no SO write until all connections
+> are collected — §4; (d) **GraphQL page sizes are named provisional defaults**
+> (no "well under the cap" claim; cost telemetry + dev-store live-read before
+> tuning) — §4; (e) **tax-mapping safety**: company match to `order_company_id`,
+> active/sale/percent/inclusion checks, fiscal-position validation, ambiguous
+> (>1) → hold, first-never-silently — D-012-9; (f) the Decimal/string canonical
+> key is the identity layer — `float_compare` is only the boundary to Odoo's
+> existing Float `amount`, not a Decimal-precision guarantee — D-012-9; (g) the
+> divergent-currency skip seam is **reconsidered and conditional** (recommended:
+> a terminal-state-respect guard in the corrected CORE-R2 dispatcher; Task 012
+> may need **no** core edit) — D-012-3/§15. The decision-closure §4–§18 is
+> authoritative where it and this packet differ.
 > Produced 2026-07-10 by the MVP
 > planning-completion session (AR-042 candidate); **revised
 > 2026-07-11** by the PR #148 revision session per ChatGPT's
@@ -30,9 +51,9 @@
 > (D-012-7 revised); (b) `order_tax_autocreate` defaults to **False**
 > with explicit tax mapping preferred (D-012-9 revised); (c) the
 > total-check tolerance is now component-based (D-012-2 revised);
-> (d) prerequisites now include **CORE-R1, Task 010B, and Task 011B**
-> (complete variant bindings + scalable customer matching precede
-> order import). **Further revised 2026-07-11 per re-review comment
+> (d) prerequisites (this 2026-07-11 list is **superseded by the 2026-07-14
+> capability-based prerequisites** at the top of this header and in §2 —
+> CORE-R1 is already merged; PR #150/#151 need not merge directly). **Further revised 2026-07-11 per re-review comment
 > `4945129824` (items 4a/4b): the tax mapping is keyed on a canonical
 > decimal-string rate (`shopify_rate_key`, never a Float) with
 > decimal-safe existing-tax matching (D-012-9); and the discount math
@@ -91,17 +112,26 @@ beyond nothing (Error-Center extensions are UI-phase scope); no
 backfill is a documented setup limitation until a separately-approved
 scope request).
 
-**Dependency prerequisites:** Tasks 002/003 (client), 006C
-(dispatch), 010 (product/variant bindings), 011 (customer
-binding/importer) merged and runtime-green [facts]; **plus (added
-2026-07-11, revised critical path): CORE-R1 (stores can reach
-`connected` — required for live validation), Task 010B (complete
-variant bindings for ordinary multi-variant catalogs — order-line
-resolution starves without them), and Task 011B (indexed customer
-matching — this packet's D-012-5 guest path reuses it at
-order-import volume).** Gate prerequisites (ChatGPT acts): acceptance
-of this packet (incl. the D-012 decisions and ARCH PD-3/PD-4), the
-order-domain gate act, prompt issuance.
+**Dependency prerequisites — CAPABILITY-BASED (REVISED 2026-07-14, review
+`4690680028`; supersedes the earlier direct-merge list):** Tasks 002/003
+(client) and 006C (dispatch) merged [facts]; **plus the capabilities below in
+`Shopify-connector`, however they arrive** (direct merges of PR #150/#151 **or**
+a single subsuming CORE-R2 Slice-2B integration PR — the corrected CORE-R2
+strategy stages #150/#151 heads, migrates their product/customer Shopify calls
+to `execute_business`, closes the public generic `execute`, passes integrated
+suites + three-run multi-worker evidence, then lands one controlled integration
+PR; #150/#151 may then close as merged or subsumed):
+(1) **SRR-03 CLOSED** (disconnect quiescence runtime-green — the register forbids
+merging/enabling/live-validating any Shopify-calling domain handler until then);
+(2) **protected/guarded product import + complete product/variant bindings**
+present (order-line resolution; product Shopify calls guarded);
+(3) **protected/guarded customer import + indexed normalized-email matching**
+present (D-012-5 guest path reuses the indexed lookup at volume);
+(4) **no unguarded product/customer Shopify call remains**;
+(5) **Task LC-1 merged + DEC-030 accepted**.
+**CORE-R1 is already merged (satisfied historical foundation, not a pending
+dependency).** Gate prerequisites (ChatGPT acts): acceptance of this packet + the
+decision-closure, the order-domain gate act, prompt issuance.
 
 ## 3. Decision closures (D-012-1 … D-012-12) — each Proposed, carried verbatim into the locked prompt
 
@@ -154,62 +184,47 @@ full SO inside the savepoint, the guard evaluates **three component
 checks plus the total check** — a real mismatch in one component can
 no longer hide under aggregate slack:
 
-1. **Lines:** `|odoo_untaxed_lines_sum − shopify_lines_expected|
-   ≤ tol_lines`, where `shopify_lines_expected` = Σ per-line
-   `discountedUnitPriceSet × quantity` minus order-level
-   `discountAllocations`, and `tol_lines = r × 0.5 × L` — `r` = the
-   order currency's `res.currency.rounding` (captures-11 §6: rounding
-   drives `decimal_places`; default 0.01; JPY 1.0; three-decimal
-   currencies 0.001), `L` = the count of Odoo SO lines contributing to
-   the untaxed sum (product lines + shipping + tip + any explicit
-   negative discount-adjustment line — D-012-8). Each such line's
-   `price_subtotal` is Odoo-rounded to `r`, so it contributes at most
-   `0.5r` to the discrepancy. **There is no separate per-discount
-   tolerance term** — the old `D_lines × 0.5r` term is **withdrawn**
-   (review item 4b, accepted): a 2-dp `discount` % quantized by up to
-   0.005 percentage points produces a monetary error of
-   `gross_line_base × 5×10⁻⁵`, which **scales with the line base** and
-   exceeds `0.5r` on a high-value line, so a flat `0.5r`-per-discounted-
-   line bound is mathematically unsound. Instead, an order-level
-   allocation is written to a native Odoo `discount` % **only when that
-   percentage, quantized to the Discount precision, reproduces the
-   exact Shopify allocation for that line to within `0.5r`**; otherwise
-   the residual is carried by an explicit negative **tax-preserving
-   adjustment line** at the exact amount (D-012-8) that **inherits the
-   discounted source line's `tax_ids` and price-inclusion** (or is
-   bucketed per identical tax signature), so no discounted line can
-   contribute more than its own `0.5r` rounding step **and** the
-   taxable base is reduced correctly. **A single universal no-tax
-   residual line is used only for genuinely untaxed source lines**
-   (review item 3): because Shopify `TaxLine.priceSet` is the tax amount
-   *after* discounts, a no-tax residual against a *taxable* line would
-   leave Odoo's taxable base — and therefore its computed tax — too high
-   and wrongly trip the tax component check below.
-2. **Taxes:** `|odoo_amount_tax − totalTaxSet.shopMoney| ≤ tol_tax =
-   r × 0.5 × K`. **REVISED 2026-07-14 (closure §6):** `K` is the number of
-   independent Odoo tax-rounding events, **read from the company's actual
-   `res.company.tax_calculation_rounding_method`** — `K = (distinct tax
-   groups on the order)` when `round_globally` (the **Odoo-19 default**,
-   confirmed against odoo/odoo 19.0 `account/models/company.py`), or
-   `K = (taxed line × tax-line pairs)` when `round_per_line`. Shopify computes
-   tax per line, so deriving `K` from the *configured* method (not a fixed
-   `N_tax_lines`) keeps the bound tight and correct under both; the readiness
-   surface warns which method is active. The connector reads this setting,
-   never changes it.
-3. **Shipping + tip:** carried as SO lines (counted in `L`); each is
-   exact to one rounding step (`≤ 0.5r`, single lines, no
-   accumulation).
-4. **Total:** `|amount_total − totalPriceSet.shopMoney| ≤ tol_lines +
-   tol_tax` — the bound is exactly the **sum of the legitimately-
-   derived per-line and per-tax rounding tolerances**, with **no
-   additional fixed or currency-relative cap** (both the original
-   1.00-unit cap and the interim `10×r` cap are withdrawn — any cap
-   either hides a material mismatch when loose or rejects a legitimate
-   high-value order when tight). Because discounts are exact by
-   construction (native-if-faithful, else the negative line), a
-   high-value discounted order stays inside this bound, while a missing
-   or wrong line shifts a subtotal by far more than `0.5r` and is
-   rejected.
+**REBUILT 2026-07-14 (review `4690680028` items 2 & 3) — the canonical
+single-count ledger + proven tax bound live in closure §6, authoritative.** In
+`Decimal` on `shopMoney` (no intermediate rounding until the single write
+boundary, closure §6.2): product merchandise net `M = Σ_i (discountedTotalSet_i
+− OC_i)` where `OC_i` = **order-level/code allocations only**
+(`discountApplication.targetSelection == ALL` or code-based — exactly what
+`discountedTotalSet` excludes; line-level allocations already inside it are
+NEVER re-subtracted — no double subtraction, closure §6.1-A/§7); shipping net
+`H = Σ_s discountedPriceSet_s` (shipping discounts already netted, not
+re-subtracted); tips `T = totalTipReceivedSet` (once). `G = M + H + T`.
+
+1. **Lines:** `|amount_untaxed − U_ex| ≤ tol_lines`, where `U_ex = G` when
+   `taxesIncluded=false` and **`U_ex = G − totalTaxSet`** when `taxesIncluded=true`
+   (tax-inclusive prices → back out the reported tax exactly once; closure §6.3).
+   `tol_lines = 0.5 r L` (tax-excl) or `0.5 r (L + S)` (tax-incl, since `U_ex`
+   carries `totalTaxSet`'s `S` roundings); `L` = Odoo untaxed-contributing lines
+   (product + shipping + tip + adjustment). Discounts are **exact by
+   construction** — native `discount %` only when faithful to `0.5r`, else an
+   exact negative **tax-preserving** adjustment line inheriting the source line's
+   `tax_ids` + `price_include_override` (or one per tax signature); a no-tax
+   residual only for genuinely untaxed lines; an inconsistent allocation →
+   `financial_total_mismatch` (closure §7).
+2. **Taxes:** `|amount_tax − totalTaxSet.shopMoney| ≤ tol_tax = 0.5 r (S + O)`.
+   **REBUILT (review item 3):** `S` = Shopify per-line/per-shipping tax rounding
+   events (`Σ|taxLines_i| + Σ|taxLines_s|`); `O` = Odoo tax rounding events under
+   the actual `res.company.tax_calculation_rounding_method` — distinct global
+   tax/repartition groups under `round_globally` (the Odoo-19 default), or taxed
+   line×tax pairs under `round_per_line`. **Proof (closure §6.4):** both
+   `totalTaxSet` and `amount_tax` are roundings of the same exact tax `Θ`, so by
+   the triangle inequality `|amount_tax − totalTaxSet| ≤ 0.5rS + 0.5rO`. The old
+   `K = distinct tax groups` bound **omitted the `S` term** and false-rejects a
+   many-small-line order under `round_globally` (closure Example I). A loose
+   `tol_tax` cannot hide a missing/wrong line — merchandise shifts are caught by
+   the tight `tol_lines`, and wrong rates by the canonical-key mapping.
+3. **Total:** `|amount_total − totalPriceSet.shopMoney| ≤ tol_lines + tol_tax`
+   — the **sum of the proven per-component bounds**, with **no** fixed or
+   currency-relative cap. A mandatory **ledger self-check** also requires
+   `|Total_ex − totalPriceSet| ≤ tol_total` where `Total_ex = U_ex + totalTaxSet`
+   (catches any `OC`-classification error before the order is trusted; closure
+   §6.1-F). A missing/wrong line shifts a subtotal far beyond `0.5r` and is
+   rejected at the lines and total level.
 
 Any component or total breach → roll back the savepoint (no SO
 persists), classify `financial_total_mismatch` (existing class;
@@ -241,7 +256,16 @@ zero-decimal (JPY, r=1.0) and three-decimal (BHD, r=0.001) currency
 orders (ISO 4217 minor units — captures-11 §12). Shopify-side
 three-decimal precision policy is officially undocumented
 (captures-11 §11) → one named dev-store empirical check before any
-three-decimal-currency store is onboarded.
+three-decimal-currency store is onboarded. **Added 2026-07-14 (review
+item 3):** an **adversarial many-small-lines / one-group / `round_globally`
+counterexample** (closure Example I) that the proven `tol_tax = 0.5r(S+O)`
+accepts while `K=distinct groups` would false-reject — and a missing line in
+the same order still rejected by the tight lines component; **fully worked
+tax-inclusive** ordinary and order-discount cases (closure Examples G/H);
+multiple taxes on one line; multiple global groups; shipping-tax rounding;
+line-level allocation not double-subtracted; order-level allocation subtracted
+once; shipping discount not double-subtracted; ambiguous (>1) tax candidate →
+hold; tax company mismatch → rejected.
 
 **D-012-3 — Divergent-currency routing (DEC-020 residual) + policy
 skips.** A divergent order (`presentmentCurrencyCode !=
@@ -249,18 +273,26 @@ currencyCode`), detected **before any SO creation**, moves the job to
 **`skipped`** (terminal, policy), with message "Automatic import not
 supported: divergent presentment currency (DEC-020)" and both currency
 codes + both `shopMoney`/`presentmentMoney` total sets captured in the
-log payload. Mechanics (red-team-corrected against the merged
-dispatcher, which unconditionally marks a normally-returning handler
-`succeeded`): this task adds **one named additive core seam** — a
-`JobPolicySkip(message, technical_detail)` exception class in
-`shopify_connector_job_dispatch.py` plus one `except JobPolicySkip`
-branch in `_invoke_handler()` that calls the existing
-`job._transition_skipped(...)` — making policy-skip a first-class
-dispatcher outcome (reused verbatim by Task 013's `tracked=false`
-skip). This is an explicitly-flagged core edit (mirrors Task 014's
-TD-002 edit pattern; master plan §1 review call), with its own core
-test. Rationale: an eligibility/policy block is not a failure — the
-16-class error registry stays intact (no 17th class) and DEC-020's
+log payload. **Seam mechanics — RECONSIDERED 2026-07-14 (review
+`4690680028` item on JobPolicySkip; closure §10):** reaching terminal
+`skipped` from a handler needs core to provide a handler-reachable skip
+path (the merged dispatcher unconditionally marks a normally-returning
+handler `succeeded`). Two candidate core designs: **(1) RECOMMENDED —
+terminal-state-respect guard:** `_invoke_handler` writes `succeeded`
+**only if the job is still non-terminal**, so the handler calls the
+existing `job._transition_skipped(skip_reason, …)` and returns; no new
+class, composes with the CORE-R2 `ShopifyQuiescedError → _transition_skipped`
+routing (no collision, distinct `skip_reason`); **(2) `JobPolicySkip`
+exception + one `except` branch.** Because **CORE-R2 Slice 2A/2B is itself
+correcting the dispatcher**, the exact seam is settled with the CORE-R2 owner
+at integration; **if the corrected dispatcher already respects handler-set
+terminal states, Task 012 needs NO core edit** (it just calls
+`_transition_skipped`) — so the dispatcher edit in §15 is **conditional**.
+Either way Task-012 behaviour is identical (terminal `skipped`, no error
+class, `skip_reason` label; permitted skips are the closed set:
+`divergent_presentment_currency`, `unsupported_duties`, `test_order_excluded`,
+`order_pre_cancelled`). Rationale: an eligibility/policy block is not a
+failure — the 16-class error registry stays intact (no 17th class) and DEC-020's
 "blocked … before SO creation, independent of the total-check outcome"
 is honored. The same routing applies to: orders with non-null
 `currentTotalDutiesSet` (D-012-10), `test: true` orders when
@@ -442,16 +474,29 @@ each distinct `TaxLine` on a line/shipping line:
    unlink; settings-area UI in a later phase, shell/import until then).
    A mapping hit (same canonical key + `price_include`) resolves
    immediately.
-2. **Existing-tax rate match:** **decimal-safe** match on (company,
-   `type_tax_use='sale'`, `amount_type='percent'`, price inclusion per
-   `Order.taxesIncluded` via `price_include_override`, the 19.0-correct
-   field — captures §8). The rate comparison is **never** a raw float
-   equality: the candidate `account.tax.amount` is canonicalized by the
-   same step-1 rule and compared to the Shopify canonical key
-   (equivalently `float_compare(tax.amount, rate_percent,
-   precision_digits=6) == 0`); attach via `tax_ids`. Because both a
-   mapping row and an existing tax resolve through the one canonical
-   key, they can never disagree on identity.
+2. **Existing-tax rate match:** candidate filter (**SAFETY — REVISED
+   2026-07-14, review `4690680028`; closure §5.5**): `account.tax` with
+   **`company_id == order_company_id`**, `type_tax_use='sale'`,
+   **`active`**, `amount_type='percent'`, and `price_include_override`
+   matching `Order.taxesIncluded` (the 19.0-correct inclusion field —
+   `price_include` is compute-only). **Ambiguity is never resolved
+   silently:** **zero** candidates → configuration hold; **more than one**
+   → **ambiguous** configuration hold naming all candidates; the first is
+   **never** chosen. The **fiscal-position result is validated** — after
+   Odoo's `fiscal_position.map_tax(...)`, the connector re-checks the mapped
+   tax still satisfies the rate/inclusion/company invariants, else holds.
+   **Decimal framing (correction):** the canonical **decimal-string** key is
+   the identity/evidence layer; the candidate's `account.tax.amount` is a
+   genuine Odoo `Float(16,4)`, so `float_compare(tax.amount, rate_percent,
+   precision_digits=6) == 0` is only the **boundary comparison to that
+   existing Float field** — it does **not** "preserve Shopify Decimal
+   precision." Attach via `tax_ids`.
+   **Company-scope decision (documented):** the mapping model keeps `store_id`
+   (no redundant `company_id` column); safety = an `@api.constrains` that
+   `account_tax_id.company_id == store_id.order_company_id` at mapping
+   create/write **+** `order_company_id` immutability once any order binding
+   or tax mapping exists **+** the resolution-time company re-check above —
+   equivalent structural safety without duplicating derivable data.
 3. **Unmatched → hold, never create:**
    `odoo_validation_configuration` (`failed_retryable`) naming the
    exact rate/inclusion pair; the readiness surface carries a
@@ -526,7 +571,13 @@ Area 6 code later — inert here, mirroring the Posture-A precedent).
 
 ## 4. API surface (exact, version 2026-07)
 
-Single query constant `ORDER_IMPORT_QUERY` — `order(id:)` requesting
+**REVISED 2026-07-14 (Option A, closure §4.2): the single-constant
+`ORDER_IMPORT_QUERY` is replaced by four query constants — `ORDER_HEADER_QUERY`
+(the field set below, including the first page of each of the three
+connections) plus `ORDER_LINE_ITEMS_PAGE_QUERY` /
+`ORDER_SHIPPING_LINES_PAGE_QUERY` / `ORDER_DISCOUNT_APPLICATIONS_PAGE_QUERY`
+(each advancing one connection by `after:$cursor`, re-fetching `id`+`updatedAt`
+for verification).** The header field set — `order(id:)` requesting
 exactly: `id name legacyResourceId createdAt processedAt updatedAt
 test currencyCode presentmentCurrencyCode taxesIncluded confirmed
 closed closedAt cancelledAt cancelReason displayFinancialStatus
@@ -544,32 +595,42 @@ amount } } taxLines { title rate ratePercentage priceSet { shopMoney {
 amount } } channelLiable } shippingLines(first: 50) { nodes { id title
 code custom discountedPriceSet { shopMoney { amount } } taxLines {
 title rate ratePercentage priceSet { shopMoney { amount } } } } pageInfo {
-hasNextPage endCursor } } discountApplications(first: 50) { nodes { index allocationMethod
+hasNextPage endCursor } } discountApplications(first: 50) { nodes { __typename index allocationMethod
 targetSelection targetType } pageInfo { hasNextPage endCursor } } lineItems(first:
 100) { nodes { id name title quantity currentQuantity sku isGiftCard
 requiresShipping taxable variantTitle vendor variant { id }
-product { id } originalUnitPriceSet { shopMoney { amount } }
-discountedUnitPriceSet { shopMoney { amount } } discountAllocations {
+product { id } originalUnitPriceSet { shopMoney { amount } } originalTotalSet { shopMoney { amount } }
+discountedUnitPriceSet { shopMoney { amount } } discountedTotalSet { shopMoney { amount } } discountAllocations {
 allocatedAmountSet { shopMoney { amount } } discountApplication {
-targetType } } taxLines { title rate ratePercentage priceSet { shopMoney { amount } }
+__typename targetType targetSelection ... on DiscountCodeApplication { code } } } taxLines { title rate ratePercentage priceSet { shopMoney { amount } }
 channelLiable } customAttributes { key value } } pageInfo { hasNextPage
-endCursor } }`. **Pagination — REVISED 2026-07-14 (closure §4.2): the three
-order-level connections are FULLY PAGINATED, not rejected at one page.**
-`lineItems`, `shippingLines`, and `discountApplications` are GraphQL
-connections (page-size max 250; the query uses `first: 100`/`first: 50`,
-well under the 1,000-point single-query cost cap); the importer loops
-`while pageInfo.hasNextPage` with `after: endCursor`, accumulating `nodes`,
-**cursors used only within this one order read and never persisted**
-(cursor durability is officially undocumented). A large legitimate order
-(e.g. 150 lines) is NOT a malformed payload and must not be rejected as
-one; the earlier "hold on `hasNextPage`" stance is withdrawn. A hard
-page-count ceiling `ORDER_PAGE_LIMIT` (default 50 pages) backstops runaway
-loops → `data_shape_schema_mismatch` **with a log line naming the ceiling**
-(no silent truncation). The line-level `discountAllocations`, `taxLines`,
-and `customAttributes` are plain lists (no nested pagination); `Order.taxLines`
-is likewise a plain list. Genuinely malformed pages (missing `pageInfo`,
-null where non-null expected) → `data_shape_schema_mismatch`; the
-total-check guard (§D-012-2) remains the mathematical backstop.
+endCursor } }`. **Pagination — REBUILT 2026-07-14 (review `4690680028` item 4;
+closure §4.2), Option A: separate query constants with independent cursors.**
+`ORDER_HEADER_QUERY` fetches scalars + all money sets + order-level `taxLines`
++ customer/addresses + the **first page** of each of the three connections
+(with `pageInfo{hasNextPage endCursor}`), capturing `id` and the initial
+`updatedAt` (`updatedAt₀`); `ORDER_LINE_ITEMS_PAGE_QUERY`,
+`ORDER_SHIPPING_LINES_PAGE_QUERY`, `ORDER_DISCOUNT_APPLICATIONS_PAGE_QUERY`
+advance **one connection each** by `after: endCursor` (the header first-pages
+are never re-fetched → no first-page duplication). Every page (via
+`execute_business`) verifies `Order.id == GID` and `updatedAt == updatedAt₀`
+(a change → **torn read** → `concurrency_race_conflict` AUTO_RETRY, lease
+released, no SO/binding), requires `pageInfo` (and `endCursor` when
+`hasNextPage`), enforces **cursor progress** (repeated/empty cursor →
+`data_shape_schema_mismatch`), **dedups node ids/indexes** (duplicate →
+`data_shape_schema_mismatch`), and an **independent per-connection page ceiling**
+(`LINE_ITEMS_PAGE_LIMIT` / `SHIPPING_LINES_PAGE_LIMIT` /
+`DISCOUNT_APPLICATIONS_PAGE_LIMIT` — named provisional defaults) → exceed →
+`data_shape_schema_mismatch` naming the ceiling. **No Odoo business write occurs
+until all three connections are fully collected and validated.** Page sizes
+(`first:100`/`first:50`) are **named provisional defaults — NOT asserted "well
+under" the 1,000-point cap**; the importer captures `requestedQueryCost` /
+`actualQueryCost` from `extensions` + `throttleStatus` (never the raw payload),
+does not auto-expand, and requires authorized dev-store live-read cost evidence
+before production tuning (closure §4.3). `discountAllocations`/`taxLines`/
+`customAttributes` and `Order.taxLines` are plain lists (no nested pagination).
+Cursors are never persisted. The total-check guard (D-012-2) is the backstop,
+not the primary mechanism.
 Read-only; zero mutations; scope: `read_orders` (already granted;
 customer sub-object needs `read_customers`, also granted). Job type
 `order_import_sync` via the three seams, gated `sale_domain_enabled`.
@@ -709,19 +770,26 @@ ORDER-DOMAIN GATE, VERIFIES THE CURRENT BASE SHA, AND ISSUES THIS PROMPT.
 This prompt is UNUSABLE until that gate act. Accepting this packet or the
 closure does NOT open the gate.
 
-DEPENDENCY-COMPLETE PRECONDITIONS — ALL must be MERGED runtime-green before
-this prompt may be issued (none is merged as of the 2026-07-14 closure):
-  1. CORE-R2 full SRR-03 disconnect-quiescence remediation (only
-     "Foundation Slice 1" is merged today; the register FORBIDS
-     merging/enabling/live-validating any Shopify-calling domain handler
-     until the full fix is runtime-green — parallel development is allowed).
-  2. PR #151 — Task 010B (complete variant bindings) merged.
-  3. PR #150 — Task 011B (indexed shopify_connector_email_normalized lookup)
-     merged — the guest customer path reuses it at order-import volume.
-  4. Task LC-1 merged (DEC-030 accepted) — so the core callable
+CAPABILITY-BASED PRECONDITIONS — ALL must hold in Shopify-connector before
+this prompt may be issued (CORRECTED 2026-07-14, review 4690680028; these are
+capabilities, not specific PR merges — they may arrive via direct merges of
+PR #150/#151 OR via one subsuming CORE-R2 Slice-2B integration PR):
+  1. SRR-03 CLOSED — CORE-R2 disconnect quiescence proven runtime-green (the
+     register FORBIDS merging/enabling/live-validating any Shopify-calling
+     domain handler until then; parallel development is allowed).
+  2. Protected/guarded product import + complete product/variant bindings
+     present (order-line resolution; product Shopify calls run through
+     execute_business).
+  3. Protected/guarded customer import + indexed normalized-email matching
+     present (guest path reuses the indexed lookup at volume; customer Shopify
+     calls guarded).
+  4. No unguarded product/customer Shopify call remains (public generic
+     execute entry closed).
+  5. Task LC-1 merged (DEC-030 accepted) — so the core callable
      _reassign_to_historic_job_type exists for this job_type's ondelete.
-  5. CORE-R1 (stores reach `connected`) merged — required for live validation.
-STOP if any precondition is unmet or if the Shopify-connector tip does not
+  CORE-R1 is ALREADY MERGED (satisfied historical foundation — NOT a pending
+  precondition; do not list it as unmet).
+STOP if any capability is unmet or if the Shopify-connector tip does not
 match the SHA ChatGPT states when issuing this prompt.
 
 You are Claude Code implementing Task 012 — Shopify order import —
@@ -753,8 +821,8 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_sale/models/shopify_connector_tax_mapping.py       (NEW — shopify.connector.tax.mapping per D-012-9 step 1)
   addons/shopify_connector_sale/security/ir.model.access.csv                  (binding + tax-mapping rows only)
   addons/shopify_connector_sale/tests/{__init__.py, test_order_binding.py, test_order_import_mapping.py, test_order_totals_guard.py, test_order_tax_resolution.py, test_order_duplicate_prevention.py, test_order_customer_resolution.py}  (NEW)
-  addons/shopify_connector_core/models/shopify_connector_job_dispatch.py      (THE ONE NAMED ADDITIVE CORE EDIT — JobPolicySkip exception class + one except-branch in _invoke_handler calling the existing _transition_skipped; nothing else in the file)
-  addons/shopify_connector_core/tests/test_job_dispatch.py                    (append the JobPolicySkip routing test only)
+  addons/shopify_connector_core/models/shopify_connector_job_dispatch.py      (CONDITIONAL core seam, coordinated with CORE-R2 — IF the corrected CORE-R2 dispatcher already respects handler-set terminal states, DO NOT edit this file; ELSE add the minimal terminal-state-respect guard [recommended] or a JobPolicySkip exception + one except-branch calling the existing _transition_skipped; nothing else)
+  addons/shopify_connector_core/tests/test_job_dispatch.py                    (append the skip-routing test ONLY if Task 012 adds the core seam, not if CORE-R2 provides it)
   docs/05-qa/task-012-order-import-validation-results.md                      (NEW)
   docs/05-qa/architecture-review-log.md                                       (append one AR row)
   docs/01-research/research-handoff.md                                        (top entry)
@@ -768,29 +836,35 @@ IMPLEMENT exactly per the packet and closure: D-012-1 binding schema (explicit
 _name+_inherit, models.Constraint, dual uniqueness; ALL money snapshots as
 Char/exact Shopify decimal string parsed with decimal.Decimal, NEVER Float;
 shop AND presentment total snapshots per DEC-020; no customer PII stored on
-the binding); D-012-2 REVISED
-component-based guard (lines/taxes/shipping+tip component checks with
-the packet's exact tolerance formulas derived from
-res.currency.rounding; the tax-tolerance count K is read from the company's
-actual tax_calculation_rounding_method — distinct tax groups under
-round_globally (the Odoo-19 default), taxed line×tax pairs under
-round_per_line; total bound = sum of the per-line and per-tax
-rounding tolerances with NO fixed or currency-relative cap; order-level
-discount allocations written to a native Odoo discount % only when
-faithful to within 0.5r, otherwise carried by an exact negative
-TAX-PRESERVING adjustment line that INHERITS the source line's tax_ids
-and price-inclusion (or one negative line per tax signature/bucket) —
-never a single universal no-tax residual for a taxable line (Shopify
-TaxLine.priceSet is post-discount, so a no-tax residual would leave the
-taxable base too high); an inconsistent allocation not attributable to a
-source line's tax signature is REJECTED (financial_total_mismatch),
-never absorbed by tolerance; rollback + financial_total_mismatch;
-high-value / taxable-discount / mixed-taxed-untaxed / pathological-
-allocation / JPY / BHD / included-excluded cases in the test matrix);
-D-012-3 skipped-by-policy routing (divergent currency, duties, test
-orders, pre-cancelled) via the ONE named additive core seam
-(JobPolicySkip + except-branch → _transition_skipped) — never a new
-error class, no other core change;
+the binding); D-012-2 REBUILT guard (closure §6, authoritative) — the
+canonical single-count Decimal ledger U_ex = M + H + T, with M =
+Sum_i(discountedTotalSet_i - OC_i) where OC_i is order-level/code allocations
+ONLY (targetSelection==ALL or DiscountCodeApplication — exactly what
+discountedTotalSet excludes; line-level allocations are NEVER re-subtracted =
+no double subtraction), H = Sum shippingLines.discountedPriceSet (shipping
+discounts not re-subtracted), T = totalTipReceivedSet once;
+taxesIncluded=true -> U_ex = G - totalTaxSet (back out tax exactly once);
+lines tol = 0.5r*L (tax-excl) or 0.5r*(L+S) (tax-incl); TAX tol = 0.5r*(S+O),
+PROVEN via triangle inequality (S = Shopify per-line tax rounding events; O =
+Odoo tax rounding events under the ACTUAL tax_calculation_rounding_method:
+distinct groups under round_globally [Odoo-19 default], line×tax pairs under
+round_per_line) — the old K=distinct-groups bound is WITHDRAWN (omits S,
+false-rejects the many-small-lines counterexample); total tol = lines+tax,
+NO cap; a ledger self-check (Total_ex==totalPriceSet) catches OC
+misclassification; order-level allocations -> native discount % only when
+faithful to 0.5r, else an exact negative TAX-PRESERVING adjustment line that
+INHERITS the source line's tax_ids and price_include_override (or one per tax
+signature) — never a universal no-tax residual for a taxable line; an
+inconsistent allocation -> REJECTED (financial_total_mismatch), never
+absorbed; do all source arithmetic in Decimal with ONE Decimal->Odoo write
+boundary; test matrix incl. the many-small-lines/global-rounding
+counterexample and the fully worked tax-inclusive cases;
+D-012-3 skipped-by-policy routing (divergent currency, duties, test orders,
+pre-cancelled — the closed skip_reason set) via the CONDITIONAL core skip
+seam coordinated with CORE-R2 (recommended: a terminal-state-respect guard so
+the handler calls _transition_skipped and Task 012 needs NO core edit; else
+JobPolicySkip) — never a new error class, terminal `skipped` with a
+skip_reason label, no other core change;
 D-012-4 ambiguous-customer pre-creation hold with Task 011 §8.2
 candidate JSON; D-012-5 resolution sequence incl. guest paths and the
 first sanctioned customer_fallback_partner_id consumption
@@ -814,8 +888,16 @@ ratePercentage within 6-dp precision and routes any disagreement or
 null/empty to a data_shape_schema_mismatch hold (never key a bare
 0.05 whose unit is ambiguous); mapping-model-first on shopify_rate_key
 (UNIQUE(store_id, shopify_rate_key, price_include)),
-existing-rate-match second via decimal-safe comparison
-(float_compare / canonical key, never raw float equality), unmatched ->
+existing-rate-match second with SAFETY (closure §5.5): candidate must have
+company_id==order_company_id, active, type_tax_use='sale',
+amount_type='percent', price_include_override matching taxesIncluded; validate
+the fiscal-position map_tax result; ZERO candidates -> configuration hold,
+>1 -> AMBIGUOUS configuration hold, first never chosen silently; the
+Decimal/string canonical key is the IDENTITY layer and float_compare is ONLY
+the boundary comparison to Odoo's existing Float amount (do NOT claim
+float_compare preserves Decimal precision); mapping model keeps store_id with
+an @api.constrains that account_tax_id.company_id==store_id.order_company_id
+plus order_company_id immutability once bindings/mappings exist; unmatched ->
 configuration hold naming the rate (never silent creation),
 order_tax_autocreate default False and admin-gated with audited
 creations when explicitly enabled (price_include_override, null-rate
@@ -823,15 +905,25 @@ hold);
 D-012-10/11 currency/pricelist/company/team resolution and UTC parsing;
 D-012-12 evidence-refresh-only re-import (note-type log rows) with the
 source-level no-SO-write guard test + the module-local
-REDACTION_EXTENSION pre-redaction pass. Single ORDER_IMPORT_QUERY
-constant exactly as packet §4 (query-only, read-only); the three order-level
-connections (lineItems first:100, shippingLines/discountApplications first:50)
-are FULLY PAGINATED with a bounded cursor loop on hasNextPage/endCursor —
-never reject a large legitimate order; cursors are used only within one order
-read and never persisted; ORDER_PAGE_LIMIT (default 50 pages) backstops
-runaway loops -> data_shape_schema_mismatch naming the ceiling (no silent
-truncation); line-level lists (discountAllocations/taxLines/customAttributes)
-and Order.taxLines are plain lists (no nested pagination). Job type order_import_sync via the
+REDACTION_EXTENSION pre-redaction pass. Pagination — Option A (closure §4.2),
+read-only: ORDER_HEADER_QUERY + ORDER_LINE_ITEMS_PAGE_QUERY +
+ORDER_SHIPPING_LINES_PAGE_QUERY + ORDER_DISCOUNT_APPLICATIONS_PAGE_QUERY, each
+connection with its OWN cursor loop (header first-pages never re-fetched -> no
+first-page duplication); every page verifies Order.id==GID and
+updatedAt==updatedAt0 (change -> TORN READ -> concurrency_race_conflict
+AUTO_RETRY, lease released normally, NO SO/binding), requires pageInfo
+(endCursor when hasNextPage), enforces cursor progress + node-id/index dedup,
+independent per-connection page ceilings (LINE_ITEMS/SHIPPING_LINES/
+DISCOUNT_APPLICATIONS_PAGE_LIMIT, named provisional defaults) -> exceed ->
+data_shape_schema_mismatch naming the ceiling; NO Odoo write until all three
+connections are collected+validated; cursors never persisted; the query also
+requests originalTotalSet, discountedTotalSet and discountApplication
+__typename/targetSelection (+ code) for the OC classification; page sizes
+(first:100/50) are NAMED PROVISIONAL DEFAULTS, NOT asserted under the
+1000-point cap — capture requestedQueryCost/actualQueryCost + throttleStatus
+from extensions (never the raw payload), do not auto-expand, dev-store
+live-read cost evidence before any tuning; line-level lists and Order.taxLines
+are plain lists (no nested pagination). Job type order_import_sync via the
 three seams gated on sale_domain_enabled; job targeting
 res_model='shopify.connector.store' + shopify_target_gid=<Order GID>
 (packet §4 — the documented deviation that keeps operation_scope_key

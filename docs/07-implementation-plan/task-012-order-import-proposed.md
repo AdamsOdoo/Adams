@@ -9,9 +9,14 @@
 > **proposed** resolution in
 > [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
 > and the implementation packet — **pending ChatGPT control-room acceptance**
-> (not accepted here). The critical path is now **CORE-R2 full SRR-03
-> remediation + PR #151 (Task 010B) + PR #150 (Task 011B) + Task LC-1**,
-> all merged runtime-green, before this task may be gated.
+> (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
+> 2026-07-14, review `4690680028`), not direct PR merges:** SRR-03 CLOSED;
+> protected/guarded product import + complete variant bindings; protected/
+> guarded customer import + indexed normalized-email matching; no unguarded
+> product/customer Shopify call remaining; LC-1 merged + DEC-030 accepted —
+> **however those capabilities arrive** (direct merges of PR #150/#151 or a
+> subsuming CORE-R2 Slice-2B integration PR). **CORE-R1 is already merged**
+> (satisfied, not pending).
 
 ## Status
 
@@ -125,9 +130,11 @@ conservative, never silent, never auto-retried, requires explicit human
 review. **Exact tolerance mechanism and Shopify total field — proposed
 resolution 2026-07-14** in the decision-closure §6 / packet D-012-2:
 `totalPriceSet.shopMoney.amount` is the total comparand; the tolerance is a
-component-based, currency-rounding-derived bound (`tol_lines = r×0.5×L`,
-`tol_tax = r×0.5×K` with `K` read from the company's actual
-`tax_calculation_rounding_method`), with **no** arbitrary money cap. This is
+canonical single-count ledger (`U_ex = M + H + T`, each of product/shipping/
+tip/discount counted once, tax-inclusive handled by `U_ex = G − totalTaxSet`)
+with a currency-rounding-derived bound (`tol_lines = 0.5r·L` or `0.5r·(L+S)`
+tax-incl; **proven `tol_tax = 0.5r·(S+O)`** from both systems' rounding events,
+replacing the invalid `K=distinct groups`), with **no** money cap. This is
 **proposed, pending control-room acceptance** (MBQ-56 stays open in the
 register until then).
 
