@@ -57,6 +57,18 @@ REASON_UNKNOWN = (
     'and contact support if it persists.'
 )
 
+# CORE-R2 (AR-047; analysis §9.1) lifecycle-call purpose -> allowed store
+# states. `execute_lifecycle` is the guarded entry for setup/diagnostic
+# Shopify calls; each `purpose` carries a fixed allowed-state matrix (not a
+# generic bypass). A call outside its matrix fails closed, and NO lifecycle
+# call is permitted while the store is `disconnecting` -- none of the purposes
+# below lists it (frozen lifecycle matrix, analysis §8).
+LIFECYCLE_PURPOSE_STATES = {
+    'test_connection': ('setup_incomplete', 'connected', 'reconnect_needed'),
+    'readiness_probe': ('setup_incomplete', 'connected', 'reconnect_needed'),
+    'reconnect_probe': ('reconnect_needed', 'disconnected'),
+}
+
 
 class ShopifyClientError(Exception):
     """Normalized error raised by `shopify.connector.api.client.execute()`.
@@ -167,6 +179,43 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 technical_detail=redact(str(exc)),
             )
         return self._normalize_response(store, response)
+
+    @api.model
+    def execute_lifecycle(self, store, query, variables=None, purpose=None):
+        """Guarded entry for setup/diagnostic Shopify calls (CORE-R2, AR-047;
+        analysis §9.1).
+
+        A **plain** method -- no admission lease, no context manager: a lifecycle
+        *call* is a diagnostic, not a generation-changing transition (the
+        generation-changing write that may *follow* a successful probe --
+        activation / reconnect success -- is what takes the store-row update lock
+        and bumps the epoch, in `shopify.connector.store`). `purpose` is a fixed
+        enum, each with an allowed store-state matrix (`LIFECYCLE_PURPOSE_STATES`,
+        analysis §9.1): a call outside its matrix fails closed with a `UserError`,
+        and **no lifecycle call is permitted while the store is `disconnecting`**
+        (no purpose lists it -- frozen lifecycle matrix, §8). An unknown/absent
+        purpose also fails closed.
+
+        On an allowed state it routes through the **same** transport and
+        normalization as the pre-existing `execute()` (missing-config `UserError`,
+        missing-token classification, `RequestException` mapping, and
+        `_normalize_response`), so the accepted read-only response/error contract
+        is unchanged. Public `execute()` remains until a later CORE-R2 slice
+        privatizes it; `execute_lifecycle` is the sanctioned lifecycle wrapper the
+        core store test-connection call site migrates to now (analysis §9.3).
+        """
+        allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
+        if allowed_states is None:
+            raise UserError(
+                'An unknown lifecycle purpose was requested; the Shopify '
+                'call is refused.'
+            )
+        if store.state not in allowed_states:
+            raise UserError(
+                'This diagnostic is not available while the store is "%s"; '
+                'the Shopify call is refused.' % store.state
+            )
+        return self.execute(store, query, variables=variables)
 
     @contextmanager
     def execute_business(self, job, store, query, variables=None):

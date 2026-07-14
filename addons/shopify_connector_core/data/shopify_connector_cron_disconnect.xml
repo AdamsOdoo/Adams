@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- CORE-R2 (AR-047; analysis §14, packet §7/§13): the disconnect
+             quiescence controller cron. Processes exactly ONE `disconnecting`
+             store per invocation/transaction via
+             `shopify.connector.store._run_disconnect_quiesce`
+             (`search(order=...).try_lock_for_update(limit=1)` -> the next
+             unlocked store), with NO explicit main-cursor commit. `priority` 0
+             gives prioritization in the cron selection order (not a dedicated
+             worker slot); the epoch/admission safety guarantee is immediate on
+             Phase-1 commit regardless of controller latency. The regular
+             `interval` is the crash/restart-recovery heartbeat (a durable
+             `disconnecting` store is re-selected even if delayed trigger rows
+             were lost); the per-store `POLL_DELAY` cadence is driven by the
+             delayed `_trigger(at=now+POLL_DELAY)` a still-quiescing pass
+             schedules. Runs as the superuser so the finalize's credential-clear
+             (Admin-only credential model) and lease cleanup succeed. Data only:
+             no view, menu, or action accompanies this record. -->
+        <record id="ir_cron_shopify_connector_disconnect_quiesce" model="ir.cron">
+            <field name="name">Shopify Connector: Disconnect Quiescence Controller</field>
+            <field name="model_id" ref="model_shopify_connector_store"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="state">code</field>
+            <field name="code">model._run_disconnect_quiesce()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="priority">0</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>
