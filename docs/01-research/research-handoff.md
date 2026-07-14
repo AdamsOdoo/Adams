@@ -1,5 +1,75 @@
 # Research Handoff (rolling)
 
+
+### Task 010B — Product Import Completeness EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34828304 @ `db534f8`; draft PR #151, 2026-07-13)
+
+- **Session role:** runtime-execution operator. Ran the **complete Task 010B
+  runtime matrix for the first time** inside the authorized Odoo.sh dev build
+  for the **exact validated code SHA
+  `db534f833cf3636184681801dcd7e13636e09245`** (Odoo 19.0, build **34828304**,
+  DB `adamsmen-claude-product-import-completeness-010b-5l-34828304`). Build-to-
+  commit proven by `git rev-parse HEAD` = `db534f8` (working tree clean; detached
+  at the exact tip of `claude/product-import-completeness-010b-5l07ci`;
+  integration base `9128015` confirmed ancestor). This closes the "opt-in
+  performance harness / three-suite run **NOT executed**" gaps carried by
+  validation §0e–§0g/§10. **No code changed** — docs-only evidence closure;
+  validated SHA stays `db534f8`.
+- **Fresh install (clean DB) — GREEN:** the build-time `-i` of all four modules
+  with `--test-enable` (+ demo) is **`0 failed, 0 error(s) of 433 tests`** (0
+  `notification_type` violations). Clean `-u` reload of all four: exit 0, zero
+  WARNING/ERROR, attribute-lock singleton (id 1) + CORE-R2 drain cron (id 3) +
+  all 11 CORE-R2 tables load.
+- **Standard suites (post-init `-u`/`--test-tags`):** core `0 failed, 6
+  error(s) of 131`, **product `0 failed, 0 error(s) of 161` (clean)**, sale
+  `0 failed, 1 error(s) of 41`. **All 7 errors = base Odoo-19
+  `res_users.notification_type` `setUpClass` artifact (issue #157)** — re-run-
+  only (absent on the green fresh install), byte-identical `_create_group_user`
+  helper, 100%-base traceback, DB column NOT NULL with no default, outside
+  `shopify_connector_product` and this branch's allowed-files list. **Not fixed
+  or absorbed here** (control-room instruction). Matches the CORE-R2 (AR-047)
+  classification. **Zero connector/Task-010B defects.**
+- **Opt-in `sc010b_performance` — all four tests GREEN** (`0 failed, 0
+  error(s) of 4 tests`): A (100-var) `1.3845 s / 1673 q`; B (2,048-var)
+  `23.8545 s / 28967 q`, exactly 2048 variants ≡ 2048 bindings,
+  `declared_cartesian_space=2112` (no cartesian phantom), RSS ≈133 MB / 0 major
+  page faults / no network/media; C (lock/retry, genuine independent PG
+  connections) `upper_bound 0.0869 / lock_retention 0.0094 / conflict_detection
+  0.0071 / retry 0.0702 s` (`concurrency_race_conflict` via non-blocking SKIP
+  LOCKED; one shared attribute; zero residue on a third connection); D (two-job
+  `run_drain`) `0.1322 s / jobs 2 / api_calls 2 / 1 attr` (exactly two seam
+  calls; network patched to raise; no unrelated job consumed).
+- **Stability:** lock/retry **3/3 (+1 combined = 4)**, run_drain **3/3 (+1 =
+  4)** — all PASS, no deadlock/serialization/timeout/residue, post-test query
+  counts invariant (272 / 219).
+- **Audit:** zero WARNING lines; every SQL ERROR is either #157 or an expected
+  `assertRaises` negative-path constraint rejection in a passing test; **zero
+  synthetic residue** (all verifier categories 0; 0 jobs; 0 store-credentials;
+  no temp media; 0 idle DB sessions; no lingering worker); **no
+  token/header/GraphQL/media-byte/temp-path/worker-exception leakage; no live
+  Shopify call.**
+- **PR / gate state:** PR **#151** kept **draft, open, unmerged** (not marked
+  ready). Docs-only evidence commit advances the branch head. Evidence:
+  `../05-qa/task-010b-validation-results.md` §0h; AR-046 runtime-execution
+  closure note. **SRR-03 remains OPEN; issue #157 stays separate; live/dev-store
+  Shopify evidence is the only outstanding runtime gate (gated on CORE-R2
+  runtime-green).** `gh` CLI unavailable in the build → PR #151 body not edited
+  here; the complete PR addendum is provided in the session final report for the
+  control room.
+- **Exact next-session prompt (control room):** "Review PR #151's exact-head
+  Task 010B runtime closure (validation-results §0h, AR-046 runtime-execution
+  closure note, this handoff): validated code SHA `db534f8`, Odoo.sh build
+  34828304, fresh install GREEN (433/0), post-init suites green apart from the 7
+  base `res_users.notification_type` post-init-rerun artifacts (issue #157), all
+  four `sc010b_performance` tests green with measurements, lock/retry and
+  run_drain 3/3 stable, zero residue/leaks/warnings, zero runtime defects (no
+  code change). Decide: (a) accept the runtime evidence and keep PR #151 draft
+  pending live/dev-store Shopify evidence; (b) route issue #157 to a separate
+  non-010B owner (or accept it); (c) whether the live/dev-store read-only
+  Shopify set may be authorized now or stays gated on CORE-R2 SRR-03 closure;
+  (d) apply the provided PR #151 body addendum. Do not mark PR #151 ready or
+  merge without an explicit control-room act; do not begin another task; do not
+  perform a live Shopify request."
+
 ### CORE-R2 — Foundation Slice 1 EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34818964 @ `c0d4559`; draft PR #156, 2026-07-13)
 
 - **Session role:** runtime-closure operator. Re-ran the complete runtime matrix
@@ -210,6 +280,353 @@
   migration. Keep SRR-03 OPEN; validate on Odoo.sh; draft PR into
   `Shopify-connector`.”* Only after the mechanism is complete and Odoo.sh-green
   may SRR-03 move off OPEN.
+
+### Task 010B — Runtime fixture correction + base sync to `ce504f` (control-room runtime correction `4680380218`, 2026-07-12)
+
+- **First Odoo.sh build was RED.** Build/database
+  `adamsmen-claude-product-import-completeness-010b-5l-34797217` (Odoo 19.0)
+  returned verbatim `1 failed, 4 error(s) of 329 tests`
+  (`shopify_connector_product: 102 tests`; module summary `1 failures, 4
+  errors of 94 tests` — totals quoted verbatim, **not** reconciled). The
+  suite **halted** after the five failures, so the Task 010B
+  **standard-runtime gate stays OPEN**.
+- **Root cause: non-isolated global product-attribute fixture names.** The
+  Odoo test DB's demo data holds incompatible (`create_variant='always'`)
+  `Color`/`Size`/`Material` attributes; success-path fixtures naming them hit
+  the accepted compatibility gate (`binding_conflict`), and the
+  case-insensitive test asserted an invalid absolute same-name count. The
+  five: `test_case_insensitive_compatible_dynamic_reuse` (the `1 failed`),
+  `test_option_position_order_preserved`,
+  `test_sequential_reresolve_is_idempotent`,
+  `test_structured_reimport_is_idempotent_no_duplicates`,
+  `test_only_one_staged_image_open_at_a_time`.
+- **Production policy unchanged.** Reuse a same-name attribute only when
+  `create_variant=='dynamic'`; incompatible fails closed (`manual_review`) or
+  yields `"<name> (Shopify)"` (`connector_owned`); merchant attributes never
+  mutated. **No production file was touched** — this was a test-isolation
+  defect, not a production defect.
+- **Correction:** every fixture whose payload top-level `options` resolve into
+  a `product.attribute` (success **and** intentional-conflict) renamed to
+  task-unique `SC010B ` names across **all seven** standard test files; value
+  names, snapshot-only strings, pure-function inputs, and archived-unbound
+  fixtures left unchanged; conflict tests still create their incompatible
+  attribute in-test; the case-insensitive test now asserts a same-name
+  **delta of zero** (never an absolute count of one). An independent
+  adversarial pass confirmed zero missed collisions and full option/selected/
+  assertion consistency.
+- **Base aligned first:** the current `Shopify-connector` tip
+  `ce504f42824807e215ee21df3dfd4eed9bb9a275` (PR #154, CORE-R2, **AR-047**)
+  was merged **normally** (no rebase/force/squash) before the fixture edits.
+  The only conflict — the AR log — was resolved keeping **both** the AR-046
+  and AR-047 rows in monotonic order (AR-043, AR-044, AR-046, AR-047; AR-045
+  reserved for Task 011B / PR #150, absent here); this handoff auto-merged,
+  preserving both the CORE-R2 and Task 010B histories.
+- **Scope guards:** no production file changed; test-method inventory
+  unchanged (148 across the seven files); `py_compile` clean; no new file; no
+  test-tag / base-class change; no live Shopify call; no CORE-R2
+  implementation. **Odoo.sh rerun still pending — no green claimed.** PR #151
+  stays **open / draft / unmerged**. AR-046 revision note 6 records this.
+- **Next-session prompt (for the control room):** *"Rerun the three
+  `shopify_connector_*` standard Odoo.sh suites at the corrected PR #151 head
+  and record the verbatim `0 failed / 0 error(s)` totals + build identity in
+  `docs/05-qa/task-010b-validation-results.md` §10; then resume review. Keep
+  PR #151 draft; live/dev-store Shopify fixtures remain gated on CORE-R2
+  runtime-green."*
+
+---
+
+### Task 010B — Base-synchronization amendment to `cfdb057` (control-room base-sync amendment, 2026-07-12)
+
+- **Base advanced again:** `Shopify-connector` moved to
+  `cfdb05703a65f82b34a9a11364aab6fc960cca9d` via merged **PR #155** (U0
+  acceptance closure). That exact tip is merged into the Task 010B branch
+  with a **normal merge commit** (no rebase, no force, no squash).
+- **PR #155 brought:** the U0 acceptance-closure records — a new
+  research-handoff top entry, the U0 **AR-044** architecture-review row, the
+  master-plan U0 status update, and `docs/09-ui-prototype/**` spec/README/
+  traceability updates. All are **preserved unchanged** by this merge.
+- **AR-044 collision resolved (control-room item 7), then AR-allocation
+  reconciled to AR-046:** the Task 010B architecture-review row (and its four
+  revision notes) had also been drafted as **AR-044**. Because the control room
+  assigned **AR-044 to the U0 acceptance closure**, the Task 010B row + its four
+  revision notes were first renumbered **AR-044 → AR-045**; the control room then
+  reconciled the concurrent post-U0 allocation (reviews `4680290878` /
+  `4680322434`) — **AR-045** is reserved for Task 011B / PR #150 and **AR-047**
+  for CORE-R2 / PR #154 — so Task 010B was **ultimately assigned AR-046**. U0's
+  AR-044 was **retained, not overwritten or combined.** Self-references to the
+  Task 010B AR row (`task-010b-validation-results.md`, the packet, this handoff)
+  were updated to **AR-046**; U0's AR-044 references are untouched. **AR-045 is
+  intentionally absent from this branch** (it belongs to Task 011B / PR #150), so
+  a temporary AR-044 → AR-046 numeric gap is expected. See the AR-log "AR-046
+  renumber / base-sync + allocation-reconciliation note".
+- **Conflict resolution (shared docs only):** the two conflicts,
+  `research-handoff.md` and `architecture-review-log.md`, were resolved by
+  **retaining both sides completely** with chronological accuracy (both the
+  U0 and Task 010B entries/rows kept). **No addon or test file conflicted**
+  — had one, this session would have stopped and reported per the amendment.
+- **PR diff vs the new base is Task-010B-only** (the `shopify_connector_product`
+  addon + the four Task 010B docs) plus the AR-044→AR-046 renumber; no U0
+  file appears as a PR change; no Task 011B / CORE-R2 / customer / order /
+  sale file. `Shopify-connector` (`cfdb057`) is an ancestor of the new head.
+- **No code changed; no runtime run.** Odoo.sh three-suite validation remains
+  the next gate (not executable/observable from this Git session — see
+  `../05-qa/task-010b-validation-results.md` §10); live/dev-store Shopify
+  fixtures remain gated on **CORE-R2 runtime-green**. PR #151 stays
+  **open/draft/unmerged**; no other task started.
+
+### Task 010B — Base alignment + Odoo.sh validation session (control-room acceptance `4951264328`, 2026-07-12)
+
+- **Revision-3 corrections ACCEPTED; no further Task 010B code correction
+  requested.** This is a **validation-only** session — no production or test
+  code changed.
+- **Base alignment DONE:** `Shopify-connector` advanced to
+  `65e915aada32930a19a14c94d23dc9bd5e6fb517` via merged **PR #152** (U0
+  operator-UI visual prototype). Merged into the branch with a **normal merge
+  commit `b0d8c7be43e7d7e32d2344355b96cf0dd246f636`** (no rebase, no force).
+  The only conflict, `docs/01-research/research-handoff.md`, was resolved
+  **preserving both** the U0 entry and the Task 010B entries; all U0 artifacts
+  under `docs/09-ui-prototype/**` are added unchanged. The PR diff vs `65e915a`
+  is **Task-010B-only** (the `shopify_connector_product` addon + the four Task
+  010B docs); **no U0 file, no Task 011B / CORE-R2 / customer / order / sale
+  file** appears as a PR change.
+- **Odoo.sh three-suite run: NOT executed or observed here, NOT recorded.**
+  This Git session has **no Odoo runtime** (`import odoo` → `ModuleNotFoundError`;
+  no `odoo-bin`), **no Odoo.sh access** (no CLI/credentials), and the PR head
+  carries **no CI check-run/commit status** (no `.github/workflows`). No
+  Odoo.sh build output was provided to this session. Per governance the
+  verbatim summary is left **outstanding, not fabricated** — it must be
+  run/observed on the Odoo.sh platform at head `b0d8c7b` and recorded in
+  `../05-qa/task-010b-validation-results.md` §10.
+- **Still outstanding / separate gates:** Odoo.sh three-suite green (at
+  `b0d8c7b`); lock-hold/throughput + 100/2,048-variant performance
+  measurement; live/dev-store Shopify fixtures (**gated on CORE-R2
+  runtime-green**); Area-6 enqueue dedup; release readiness. **None claimed
+  complete.**
+- **PR #151 stays open/draft/unmerged** — not marked ready, not merged. No
+  live Shopify call was made. No other task started.
+- **Next-session prompt (for ChatGPT / operator):** *"On the Odoo.sh platform,
+  run the full `shopify_connector_core`, `shopify_connector_product`, and
+  `shopify_connector_sale` suites at PR #151 head `b0d8c7b`; capture the
+  verbatim `0 failed, 0 error(s)` totals + build identity and record them in
+  `task-010b-validation-results.md` §10. Do not run live/dev-store Shopify
+  fixtures (gated on CORE-R2). Keep PR #151 draft."*
+
+### Task 010B — Revision 3 (control-room static review `4951145191`, 2026-07-12)
+
+- **PR #151 stayed draft; the third control-room static review
+  (`4951145191`) accepted Revision 2 and required four final corrections at
+  head `8e3076e`.** All applied on the SAME PR (files: the importer,
+  `test_product_import_matching`, `test_product_refresh_and_stale`, the
+  authoritative packet, and the three docs) — plus a **base merge**. No new
+  PR; still open/draft/unmerged.
+- **Base updated (item 4):** `Shopify-connector` advanced to
+  `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (PR #153 merged its sync-engine
+  concurrency evidence). That exact tip is merged into this branch with a
+  normal merge commit — **clean** (PR #153 added only evidence files under
+  `docs/05-qa/evidence/sync-engine-concurrency/` + two new `docs/05-qa`
+  result/handoff files; no overlap with any Task 010B file), so **all PR #153
+  evidence is preserved unchanged** and no Task 010B code changed in the merge.
+- **What changed (code):** (1) **Zero-node forward progress** — a continuing
+  page (`hasNextPage=true`) carrying zero variants is rejected
+  (`data_shape_schema_mismatch`), closing the fresh-cursor/empty-node
+  infinite loop the seen-cursor set alone did not stop; a defensive
+  `MAX_VARIANT_PAGES` backstop is added and the loop proven bounded (zero-node
+  rule + duplicate-GID guard + 2,048 cap). (2) **Cross-page `updatedAt`
+  torn-read guard** — the first page's `updatedAt` (present/absent shape and
+  value) must be carried unchanged on every later page, else
+  `data_shape_schema_mismatch` before any write (in-run torn-read guard, not
+  Area-6 dedup). (3) **Archived outranks the unchanged short-circuit** —
+  `_apply_import` routes `ARCHIVED` immediately after `_validate_payload`,
+  before `_unchanged_short_circuit()` and media, so an active binding with the
+  same stored `updatedAt` still goes stale (first-seen unbound archived still
+  → `mapping_missing`). (4) **Authoritative packet corrected** — a dated
+  correction/supersession note plus inline **[superseded]** annotations on
+  every stale lock-lifetime statement (transaction-scoped; savepoint release
+  does not free it; held to outer commit; serializes the rest of the
+  transaction/`run_drain` batch; correctness unchanged; lock-hold/throughput a
+  runtime obligation).
+- **Test methods 155 → 161.** Local `compileall`/`py_compile` clean; source
+  guards green (query-only, zero new `sudo()`, no new error class, no forbidden
+  model, savepoint present, `list_price` write-locality, no token/path in
+  media). **No Odoo.sh/live claim added.** Runtime sequence: Odoo.sh next;
+  **live/dev-store Shopify fixtures NOT yet authorized — gated on CORE-R2
+  runtime-green** before live validation of a Shopify-calling domain handler.
+  This session stops for another ChatGPT static review; no other task started.
+- **Next-session prompt (for ChatGPT):** *"Re-review the Task 010B revision on
+  PR #151 against control-room comment `4951145191` (items 1-4) and the updated
+  validation record §0c; if clean, run the Odoo.sh full suites and quote the
+  exact result. Do NOT run the live/dev-store Shopify fixtures until CORE-R2 is
+  runtime-green. Do not start any other task."*
+
+### Task 010B — Revision 2 (control-room static review `4950339305`, 2026-07-12)
+
+- **PR #151 stayed draft; the second control-room static review
+  (`4950339305`) accepted Revision 1 and returned REVISE for five remaining
+  reliability blockers at head `5688ec1`.** All corrected on the SAME PR,
+  within the review's file scope (the importer, the attribute-lock model,
+  four test files: `test_product_import_matching`, `test_product_media_import`,
+  `test_product_refresh_and_stale`, `test_product_attribute_import`; the three
+  docs). No new PR; still open/draft/unmerged. Head advances from `5688ec1`.
+- **What changed:** (1) **Pagination forward-progress + identity guards** —
+  seen-cursor set rejects a repeated/non-progressing `endCursor` (no infinite
+  loop), every `nodes` element must be a mapping with a non-empty GID,
+  duplicate variant GIDs (within/across pages) are rejected, and each page's
+  product `id` must equal the requested GID — all →
+  `data_shape_schema_mismatch`, no write. (2) **O(1) media handles** — each
+  image streams to its own secure `mkstemp` file, closed immediately; only the
+  path is retained; exactly one path is reopened at write time; an `ExitStack`
+  unlinks every path on all exit paths (replaces the Revision-1 many-open-
+  `SpooledTemporaryFile` design; O(1) handles, bounded RAM at the
+  2,048-variant ceiling, no arbitrary cap; no path in any error). (3)
+  **Mid-stream network classification** — a `RequestException` while iterating
+  `iter_content()` is caught, the response closed, the partial file unlinked,
+  and re-raised as `shopify_temporary_server_network` (was escaping to
+  `unknown_system_error`). (4) **Archived routed before media** — a bound
+  archived product marks bindings stale with no media/master write (broken URL
+  cannot block stale marking); a first-seen unbound archived product raises
+  the existing `mapping_missing` class and creates no Odoo master data. (5)
+  **Lock/concurrency wording corrected** (no behaviour change) — the singleton
+  lock is transaction-scoped (savepoint release does not free it; held to
+  outer commit; serializes the rest of the transaction, and in a `run_drain`
+  batch potentially the rest of the batch); the docstrings/comments/docs/PR
+  body are corrected; the test is renamed
+  `test_overlapping_transactions_serialize_to_one_global_attribute` and
+  described as overlapping (not simultaneous) transactions; the lock-hold/
+  throughput exposure is logged as a mandatory Odoo.sh/dev-store measurement.
+- **Test methods 135 → 155.** Local `compileall`/`py_compile` clean; source
+  guards green (query-only, zero new `sudo()`, no forbidden model, savepoint
+  present, `list_price` write-locality, no token/path in media errors, media
+  staged as closed paths not open handles). **No Odoo.sh/live claim added** —
+  Odoo.sh + dev-store evidence (incl. the new lock-hold/throughput
+  measurement) remain outstanding (`task-010b-validation-results.md` §10).
+  This session stops for another ChatGPT static review; no other task started.
+- **Next-session prompt (for ChatGPT):** *"Re-review the Task 010B revision on
+  PR #151 against control-room comment `4950339305` (items 1-5) and the
+  updated validation record §0b; if accepted, proceed to the Odoo.sh +
+  dev-store runtime validation session (including the lock-hold/throughput
+  measurement). Do not start any other task."*
+
+### Task 010B — Revision 1 (control-room static review `4950202231`, 2026-07-12)
+
+- **PR #151 stayed draft; first control-room static review (`4950202231`)
+  returned REVISE.** The revision corrects the overclaims on the SAME PR,
+  within the review's narrow file scope (the importer, the template-binding
+  model, four test files; the three docs). No new PR; still open/draft/
+  unmerged. Head advances from `1065cdf`.
+- **What changed:** (1) strict pagination shape validation — a
+  missing/null/wrong-type `variants.pageInfo`/`hasNextPage`/`nodes` is never
+  treated as a completed single page; all violations →
+  `data_shape_schema_mismatch`, writing nothing. (2) A **real `updatedAt`
+  short-circuit** via a new readonly `shopify_updated_at` template-binding
+  field, stamped only after full success; same-updatedAt skips media/DB
+  work; enqueue-level `payload_hash = updatedAt` is recorded as an **Area-6
+  obligation** (this task has no enqueue call site; no running job's payload
+  hash is mutated). (3) Same-URL image ownership now compares the **current
+  Odoo image checksum** vs the recorded connector checksum (merchant
+  edit/clear protected, not silently skipped). (4) **SVG/spoofed bodies
+  rejected** — SVG content-type rejected + Pillow raster validation, body
+  never exposed. (5) **Bounded media memory** — `SpooledTemporaryFile` +
+  `ExitStack` cleanup on every path (no dict of full byte strings). (6)
+  **`connector_owned` refresh** resolves the exact Shopify-name or exact
+  `"<name> (Shopify)"` line, fails closed if both exist. (7) The
+  **concurrency proof** now runs the real `_apply_import` path across two
+  genuinely independent PostgreSQL connections (`odoo.sql_db.db_connect`),
+  committed synthetic stores visible to both — B holds the lock, A's
+  concurrent full import gets `concurrency_race_conflict`, A retries and
+  reuses B's committed attribute (one attribute, both products bound,
+  durable cleanup). No shared `TestCursor` claimed as concurrency.
+- **Test methods 110 → 135.** Local `compileall`/`py_compile` clean; source
+  guards green (query-only, zero new `sudo()`, no forbidden model, savepoint
+  present, `list_price` write-locality, no token in media, media staged not
+  retained-as-bytes). **No Odoo.sh/live claim added** — Odoo.sh + dev-store
+  evidence remain outstanding (`task-010b-validation-results.md` §10). This
+  session stops for another ChatGPT static review; no other task started.
+- **Next-session prompt (for ChatGPT):** *"Re-review the Task 010B revision
+  on PR #151 against control-room comment `4950202231` (items 1-8) and the
+  updated validation record §0; if accepted, proceed to the Odoo.sh + dev-
+  store runtime validation session. Do not start any other task."*
+
+### Task 010B — Product Import Completeness (draft PR, implemented, 2026-07-11)
+
+- **Base verified (hard prerequisite):** `Shopify-connector` tip ==
+  `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (**exact, no drift**); PR #149
+  (CORE-R1) verified **merged** in GitHub; Task 010B gate comment
+  `4948723366` read verbatim (*"gate opened … Required base:
+  f9c3c5fd… One draft implementation PR only. All other task gates remain
+  closed."*). Branch `claude/product-import-completeness-010b-5l07ci`.
+- **What happened:** implemented Task 010B exactly per
+  `docs/07-implementation-plan/task-010b-product-import-completeness-packet.md`
+  (D-010B-1..12), completing the accepted DEC-003 product-import scope on
+  top of the narrow Task 010 slice. **D-010B-1** extended read-only query
+  with explicit `variants(first:100, after:$cursor)` pagination (loop to
+  exhaustion; 2,048 accumulated cap; malformed pageInfo / missing endCursor
+  → `data_shape_schema_mismatch`; never a mutation). **D-010B-2**
+  options→attributes→values→lines with the existing-attribute compatibility
+  gate (reuse only `create_variant=='dynamic'`; incompatible
+  `always`/`no_variant` → `product_import_attribute_conflict_mode` default
+  `manual_review`→`binding_conflict`, else `connector_owned` distinct
+  `"<name> (Shopify)"`; existing modes never changed) + a DB-backed global
+  serialization lock (NEW `shopify.connector.attribute.lock` singleton,
+  `noupdate=1` seed, `try_lock_for_update()` FOR UPDATE SKIP LOCKED before
+  any global attribute resolve/create; unavailable → `concurrency_race_
+  conflict`; a **real two-transaction test** proves exactly one attribute).
+  **D-010B-3** sparse variants via the verified
+  `product.template._create_product_variant` (Odoo≡Shopify variants, no
+  cartesian phantoms; structural mismatch → `binding_conflict`).
+  **D-010B-4** price gated on `price_source_of_truth=='shopify_
+  authoritative'` (single→`list_price`, multi→`min`+exact `price_extra`
+  decomposition via `float_compare`, undecomposable→`min`+note).
+  **D-010B-5** `shopify_compare_at_price` on `product.product`.
+  **D-010B-6** primary+variant images (HTTPS-only, redirect-HTTPS-only,
+  `image/*`, 20 MB streamed cap, bounded timeout, no credential on the
+  request; checksum-ownership merchant-image protection;
+  `product_import_media_enabled` default True; failures→`shopify_temporary_
+  server_network`). **D-010B-7** `product_import_refresh_mode`
+  (`snapshot_only` default | `shopify_fields`; structural adds in both;
+  `updatedAt` payload-hash dedup). **D-010B-8** null/ARCHIVED→binding
+  stale+note, Odoo master untouched; null-unbound→data error. **D-010B-9**
+  N+1 removed (prefetch map + batched candidate searches; match priority
+  unchanged, no name matching). **D-010B-10** one savepoint/product;
+  reads+downloads before write scope. **D-010B-12** job contract unchanged.
+- **Odoo 19 internals verified against the actual 19.0 source** before use
+  (`create_variant` selection/default/immutable write-guard;
+  `_create_product_variant(combination, log_warning=False)`; dynamic
+  `_create_variant_ids` = no cartesian; `price_extra`;
+  `image_1920`/`image_variant_1920`;
+  `try_lock_for_update(*, allow_referencing=False, limit=None)` =
+  `FOR UPDATE SKIP LOCKED`, returns locked subset / empty if already
+  locked). The SKIP-LOCKED (non-blocking) semantics **support the packet
+  design as written** (the "never proceed unprotected when the lock is
+  unavailable" branch); no architecture change, no STOP. Shopify 2026-07
+  fields verified from the accepted captures; `ProductVariant.image` is
+  **deprecated** but packet-named for a read (recorded).
+- **What this session does NOT do:** opens no further gate; starts no
+  011B/LC-1/012/Area-6/SEC-1/inventory/fulfillment/product-export/UI/
+  webhook/OAuth/PERF-1 work; no core/sale/`adams_base`/inventory file; no
+  mutation; touches no `main`/plain `dev`; PR kept **draft**, not merged.
+  Changed files: **21** (all inside the packet allowlist).
+- **Validation performed:** `python3 -m compileall` / `py_compile` clean on
+  every changed Python file; XML well-formed; source-guards green (no
+  mutation, no bypass flag, no customer/order/inventory/fulfilment model,
+  savepoint present, `list_price` write-locality, no token in media,
+  zero new `sudo()`); **110** static test methods (was 61). **No Odoo
+  runtime here** (`import odoo` → `ModuleNotFoundError`) → suite not
+  executed locally; **Odoo.sh + live/dev-store evidence NOT obtained this
+  session — recorded as outstanding in
+  `docs/05-qa/task-010b-validation-results.md` §10, not faked, not
+  waived.** Validation record + AR-046 (Task 010B; renumbered off AR-044 in the
+  2026-07-12 base-sync merge to `cfdb057`, then reconciled to AR-046 after the
+  concurrent post-U0 allocation was settled; see the AR-log renumber note) +
+  this entry written.
+- **Next-session prompt (for ChatGPT to issue, after review):** *"Task
+  010B validation-only session: on Odoo.sh at the draft-PR head, run the
+  full three-suite build and quote verbatim `0 failed, 0 error(s)`; then
+  capture the §7 read-only dev-store evidence (three-option sparse; >100-
+  variant; 2,048-variant timing probe; product+variant images with refresh
+  + merchant-image-protection; archived; deleted-bound; incompatible
+  same-name attribute). Update `task-010b-validation-results.md` §9/§10
+  with the results. Do not change code; do not start any other task."*
+
 
 ### U0 acceptance closure — visual baseline accepted & merged (documentation-only, 2026-07-12)
 

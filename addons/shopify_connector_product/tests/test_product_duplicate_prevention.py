@@ -291,3 +291,86 @@ class TestProductDuplicatePrevention(TransactionCase):
                 ('shopify_gid', '=', 'gid://shopify/Product/957'),
             ]), 1,
         )
+
+    # ------------------------------------------------------------------
+    # 7. Structured (multi-option) import atomicity and idempotency
+    # (D-010B-2/3/10): the new attribute/variant path is atomic and
+    # idempotent too.
+    # ------------------------------------------------------------------
+
+    def _svariant(self, gid, selected, sku=None):
+        return {
+            'gid': gid, 'sku': sku, 'barcode': None, 'price': None,
+            'compare_at_price': None, 'selected_options': selected,
+            'option_values': ' / '.join(
+                '%s: %s' % (s['name'], s['value']) for s in selected
+            ) or None,
+            'image_url': None,
+        }
+
+    def _structured_payload(self, gid, options, variants):
+        return {
+            'gid': gid, 'title': 'Structured Product', 'status': 'active',
+            'updated_at': None, 'image_url': None,
+            'options': options, 'variants': variants,
+        }
+
+    def test_structured_reimport_is_idempotent_no_duplicates(self):
+        payload = self._structured_payload(
+            'gid://shopify/Product/960',
+            options=[{'name': 'SC010B Structured Color', 'position': 1,
+                      'values': ['Red', 'Blue']}],
+            variants=[
+                self._svariant('gid://shopify/ProductVariant/960a',
+                               [{'name': 'SC010B Structured Color', 'value': 'Red'}],
+                               sku='SR0'),
+                self._svariant('gid://shopify/ProductVariant/960b',
+                               [{'name': 'SC010B Structured Color', 'value': 'Blue'}],
+                               sku='SB0'),
+            ],
+        )
+        first = self.Importer._apply_import(self.store, payload)
+        attributes_after_first = self.env['product.attribute'].search_count([])
+        second = self.Importer._apply_import(self.store, payload)
+        self.assertEqual(first['template_binding'], second['template_binding'])
+        self.assertEqual(len(second['variant_bindings']), 2)
+        template = first['template_binding'].product_template_id
+        self.assertEqual(len(template.product_variant_ids), 2)
+        # Re-import creates no second same-name attribute.
+        self.assertEqual(
+            self.env['product.attribute'].search_count([]), attributes_after_first,
+        )
+        self.assertEqual(
+            self.VariantBinding.search_count([
+                ('product_template_binding_id', '=', first['template_binding'].id),
+            ]), 2,
+        )
+
+    def test_structured_import_failure_rolls_back_new_attributes(self):
+        """A structured import that fails on a later variant rolls back the
+        attributes/values/lines it created too -- no orphan global
+        attribute is left behind."""
+        attributes_before = self.env['product.attribute'].search_count([])
+        products_before = self.env['product.product'].search_count([])
+        payload = self._structured_payload(
+            'gid://shopify/Product/961',
+            options=[{'name': 'SC010B Structured Cut', 'position': 1,
+                      'values': ['Slim']}],
+            variants=[
+                self._svariant('gid://shopify/ProductVariant/961a',
+                               [{'name': 'SC010B Structured Cut', 'value': 'Slim'}],
+                               sku='CS1'),
+                # References an option absent from the product -> conflict.
+                self._svariant('gid://shopify/ProductVariant/961b',
+                               [{'name': 'SC010B Phantom', 'value': 'X'}], sku='CX1'),
+            ],
+        )
+        with self.assertRaises(JobHandlerError) as ctx:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(ctx.exception.error_class, 'binding_conflict')
+        self.assertEqual(
+            self.env['product.attribute'].search_count([]), attributes_before,
+        )
+        self.assertEqual(
+            self.env['product.product'].search_count([]), products_before,
+        )
