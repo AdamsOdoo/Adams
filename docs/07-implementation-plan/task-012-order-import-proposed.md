@@ -10,12 +10,13 @@
 > [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
 > and the implementation packet — **pending ChatGPT control-room acceptance**
 > (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
-> 2026-07-14, review `4690680028`), not direct PR merges:** SRR-03 CLOSED;
-> protected/guarded product import + complete variant bindings; protected/
-> guarded customer import + indexed normalized-email matching; no unguarded
-> product/customer Shopify call remaining; LC-1 merged + DEC-030 accepted —
-> **however those capabilities arrive** (direct merges of PR #150/#151 or a
-> subsuming CORE-R2 Slice-2B integration PR). **CORE-R1 is already merged**
+> 2026-07-14, reviews `4690680028` + `4691067575`), not direct PR merges:**
+> SRR-03 CLOSED; protected/guarded product import + complete variant bindings;
+> protected/guarded customer import + indexed normalized-email matching; no
+> unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
+> accepted — delivered via the **accepted CORE-R2 Slice-2B integration-staging
+> strategy (PR #158, review `4691064435`)**; the current unprotected PR
+> #150/#151 heads are **not** directly mergeable. **CORE-R1 is already merged**
 > (satisfied, not pending).
 
 ## Status
@@ -128,15 +129,22 @@ against Shopify's own reported order total. A mismatch beyond a
 to-be-defined tolerance is classified `financial total mismatch` —
 conservative, never silent, never auto-retried, requires explicit human
 review. **Exact tolerance mechanism and Shopify total field — proposed
-resolution 2026-07-14** in the decision-closure §6 / packet D-012-2:
-`totalPriceSet.shopMoney.amount` is the total comparand; the tolerance is a
-canonical single-count ledger (`U_ex = M + H + T`, each of product/shipping/
-tip/discount counted once, tax-inclusive handled by `U_ex = G − totalTaxSet`)
-with a currency-rounding-derived bound (`tol_lines = 0.5r·L` or `0.5r·(L+S)`
-tax-incl; **proven `tol_tax = 0.5r·(S+O)`** from both systems' rounding events,
-replacing the invalid `K=distinct groups`), with **no** money cap. This is
-**proposed, pending control-room acceptance** (MBQ-56 stays open in the
-register until then).
+resolution 2026-07-14 (round-3, review `4691067575`)** in the decision-closure
+§6 / packet D-012-2: `totalPriceSet.shopMoney.amount` is the total comparand;
+each product line's **exact** pre-tax net is the official
+`priceAfterAllDiscountsBeforeTaxesSet` field (never `quantity ×
+discountedUnitPriceSet`, which is an *approximate* unit price); refunds/removed
+quantities are **out of scope and fail closed** (`currentQuantity == quantity`
+gate); the tolerance is a canonical single-count ledger (`U_ex = M + H + T`, each
+of product/shipping/tip counted once and always tax-exclusive; shipping tax
+backed out once only when inclusive) with a currency-rounding-derived bound
+(`tol_lines = 0.5r·L` or `0.5r·(L+S_ship)` tax-incl), **per-tax-signature base
+reconciliation before any tax tolerance** (a global `amount_untaxed` match is not
+sufficient), and a **proposed conditional `tol_tax = 0.5r·(S+O)`** whose
+platform-rounding premise is labelled as an inference (not an official Shopify
+guarantee) and fails closed for undocumented-rounding currencies — replacing the
+invalid `K=distinct groups`, with **no** money cap. This is **proposed, pending
+control-room acceptance** (MBQ-56 stays open in the register until then).
 
 ## Same-currency-only rule (DEC-020 / MBQ-64)
 
@@ -159,8 +167,12 @@ error-class/sub-reason mapping — proposed resolution 2026-07-14**
 (decision-closure §10 / packet D-012-3): a divergent order routes to the
 terminal `skipped` state as a **policy skip with NO error class**
 (`skip_reason="divergent_presentment_currency"` in `technical_detail`),
-reached via the one named additive `JobPolicySkip` core seam — so it never
-overloads `financial_total_mismatch` and adds no 17th error class. Both
+reached via a **conditional, CORE-R2-coordinated** handler-reachable core skip
+seam (recommended: a terminal-state-respect dispatcher guard so Task 012 needs
+**no** core edit; else a `JobPolicySkip` exception) — so it never overloads
+`financial_total_mismatch` and adds no 17th error class. The same policy-skip
+routing covers duties, test orders, pre-cancelled orders, and
+**refunded/removed-quantity orders** (out of MVP scope, fail closed). Both
 currencies and both `shopMoney`/`presentmentMoney` totals are captured. This
 is **proposed, pending control-room acceptance**.
 

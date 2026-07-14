@@ -8,6 +8,40 @@
 > control-room action and is **not** modified here (that file is outside this
 > session's allowed-files list).
 
+## 0-b. Round-3 correction — 2026-07-14 (control-room review `4691067575`)
+
+A second REVISE (docs-only, same five files; PR #159 stays draft/unmerged)
+corrected the remaining decision-packet defects review `4691067575` flagged:
+
+1. **Query contract reconciled to four-query Option-A** across all five docs —
+   there is no single `ORDER_IMPORT_QUERY` and no single API call anywhere
+   (`ORDER_HEADER_QUERY` + three per-connection page queries). (closure §4)
+2. **Exact per-line financial source** — the product-line invariant is the
+   official `priceAfterAllDiscountsBeforeTaxesSet` (exact, after all discounts,
+   pre-tax, current-quantity); the approximate `discountedUnitPriceSet × quantity`
+   construction is withdrawn (Shopify documents that unit price as *approximate*).
+   (closure §6.1-A/§6.2)
+3. **Fail-closed refund/removed-quantity posture** — `currentQuantity == quantity`
+   per line + `totalPriceSet == currentTotalPriceSet` cross-check; any mismatch →
+   policy skip `refunded_or_removed_quantity` before any SO, non-PII evidence, no
+   refund reconstruction. (closure §6.0)
+4. **Per-tax-signature base reconciliation** before any tax tolerance — a global
+   `amount_untaxed` match is not sufficient; a signature-base mismatch fails first.
+   (closure §6.4a)
+5. **Honest tax bound** — `tol_tax = 0.5r(S+O)` reframed as a *proposed
+   conditional* bound with explicit assumptions; the Shopify-event rounding
+   premise labelled separately (inference, not an official guarantee);
+   undocumented-rounding currencies fail closed. (closure §6.5)
+6. **Shipping/tip precision** — exact shipping pre-tax source (tax backed out once
+   only when inclusive); tip untaxed labelled an inference, fail-closed via the
+   total self-check. (closure §6.1-B/C)
+7. **`execute_business` AST guards** replace the stale single-`execute()` guard
+   (every call via `execute_business`, no generic public `execute()` reachable, no
+   result escapes its context). (closure §15)
+8. **Dependency reference** aligned to the **accepted** PR #158 Slice-2B
+   integration-staging strategy (review `4691064435`); the current unprotected
+   PR #150/#151 heads are not directly mergeable. (closure §0.1)
+
 ## 0. Correction round — 2026-07-14 (control-room review `4690680028`)
 
 The initial closure was REVISED (docs-only) for four load-bearing corrections
@@ -16,17 +50,20 @@ plus consistency items; PR #159 stays draft/unmerged:
 1. **Dependency contract → capability-based** (not direct-merge of PR #150/#151):
    SRR-03 CLOSED; protected/guarded product import + complete variant bindings;
    protected/guarded customer import + indexed email matching; no unguarded
-   product/customer Shopify call; LC-1 + DEC-030 — however they arrive
-   (direct merge or a subsuming CORE-R2 Slice-2B integration PR). **CORE-R1 is
-   already merged (satisfied, not pending).** (closure §0.1)
+   product/customer Shopify call; LC-1 + DEC-030 — delivered via the accepted
+   CORE-R2 Slice-2B integration-staging strategy (PR #158, review `4691064435`;
+   the unprotected #150/#151 heads are not directly mergeable — round-3, §0-b).
+   **CORE-R1 is already merged (satisfied, not pending).** (closure §0.1)
 2. **Financial ledger rebuilt** into one canonical single-count equation
-   `U_ex = M + H + T` (product/shipping/tip/discount each once; `OC` =
-   order-level/code allocations only, proven no double subtraction), with
-   **tax-inclusive** handling (`U_ex = G − totalTaxSet`) and a fully worked
-   tax-inclusive example. (closure §6.1/§6.3)
-3. **Tax bound proven** `tol_tax = 0.5r(S+O)` from both systems' rounding
-   events, replacing the invalid `K = distinct groups`; added the
-   many-small-lines / `round_globally` counterexample (Example I). (closure §6.4)
+   `U_ex = M + H + T` (product/shipping/tip each once). *(Superseded by round-3,
+   §0-b: `M` now comes from the exact `priceAfterAllDiscountsBeforeTaxesSet` field,
+   there is no global `U_ex = G − totalTaxSet` back-out, and a per-tax-signature
+   base reconciliation was added.)* (closure §6.1/§6.3)
+3. **Tax bound** `tol_tax = 0.5r(S+O)` from both systems' rounding events,
+   replacing the invalid `K = distinct groups`; added the many-small-lines /
+   `round_globally` counterexample (Example I). *(Reframed in round-3, §0-b, as a
+   proposed **conditional** bound with an explicitly-labelled platform-rounding
+   premise.)* (closure §6.4/§6.5)
 4. **Pagination made implementation-exact** (Option A — a header query + three
    independent per-connection cursor page queries; `Order.id`/`updatedAt`
    verification; cursor progress; node dedup; torn-read →
@@ -80,7 +117,8 @@ prerequisites hold. Specifically:
 | --- | --- |
 | Money stored as Odoo `Float` (lossy) | All binding money snapshots → **`Char`** (exact Shopify `Decimal` string), parsed via `decimal.Decimal`; shop + presentment + component snapshots |
 | Line-item / nested-connection pagination could reject large orders | **Full cursor pagination** of `lineItems`/`shippingLines`/`discountApplications`; cursors never persisted; page-limit backstop; the "reject >100 lines" stance withdrawn |
-| Tax tolerance ignored Odoo-19 `round_globally` default | Corrected in the round-2 pass: **proven `tol_tax = 0.5r(S+O)`** from both systems' rounding events (the round-1 `K=distinct groups` was insufficient) + counterexample |
+| Tax tolerance ignored Odoo-19 `round_globally` default | Round-2: `tol_tax = 0.5r(S+O)` from both systems' rounding events (the round-1 `K=distinct groups` was insufficient) + counterexample. Round-3: reframed as a **proposed conditional** bound with a labelled platform-rounding premise + mandatory per-tax-signature base reconciliation first |
+| Approximate unit price / refunds not addressed (round-3) | `M` now from the exact `priceAfterAllDiscountsBeforeTaxesSet` field (never `quantity × discountedUnitPriceSet`); refunds/removed quantities fail closed (`currentQuantity == quantity`); four-query Option-A everywhere; `execute_business` AST guards replace the single-`execute()` guard |
 | Divergent-currency routing risk of overloading `financial_total_mismatch` | Confirmed as terminal `skipped` **policy** (no error class); the core skip seam is now **conditional/coordinated with CORE-R2** (recommended: terminal-state-respect guard; may be no core edit) |
 
 ## 3. Proposed decisions (all NOT accepted — control-room review required)
@@ -110,17 +148,23 @@ catalogue (§15).
 6. Control-room acceptance of this closure + packet, the order-domain gate act,
    and prompt issuance.
 
-These arrive via direct merges of PR #150/#151 **or** a subsuming CORE-R2
-Slice-2B integration PR. **CORE-R1 is already merged (satisfied, not pending).**
+These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
+(PR #158, review `4691064435`)** — the current unprotected PR #150/#151 heads are
+**not** directly mergeable. **CORE-R1 is already merged (satisfied, not pending).**
 
 ## 5. Open questions carried
 
 - Verbatim GraphQL `THROTTLED` error-code string (docs show only `200 Throttled`).
-- Shopify three-decimal-currency rounding policy (undocumented) → named
-  dev-store empirical check before onboarding such a store.
-- Empirical confirmation of the `OC` line-vs-order classification
-  (`targetSelection==ALL`/code) on a real mixed-discount order → named
-  dev-store check.
+- Shopify three-decimal-currency rounding policy (undocumented) → the `tol_tax`
+  platform-rounding premise fails closed until a named authorized dev-store
+  empirical check confirms the convention.
+- **Tip tax treatment is undocumented in the Admin API** (no `TipLine`); "tips
+  untaxed" is an inference backstopped by the total self-check → dev-store
+  confirmation before a taxed-tip store.
+- **No LineItem field distinguishes refunded from removed units** — not needed
+  (the §6.0 gate fails closed on the aggregate), logged for rationale.
+- Empirical confirmation of the per-tax-signature base reconciliation (§6.4a) and
+  the `OC` attribution on a real mixed-discount order → named dev-store check.
 - `res.partner.company_name` as the sink for `MailingAddress.company` (confirm
   at build; `is_company` stays False regardless).
 - The exact core skip seam (terminal-state-respect guard vs `JobPolicySkip`) is
@@ -131,11 +175,15 @@ Slice-2B integration PR. **CORE-R1 is already merged (satisfied, not pending).**
 ## 6. Files changed this session (docs-only)
 
 - `docs/03-architecture/task-012-order-import-decision-closure.md` (round-1 new;
-  round-2 rebuilt §0/§4/§5/§6/§7/§10/§14/§15/§17/§18)
+  round-2 rebuilt §0/§4/§5/§6/§7/§10/§14/§15/§17/§18; **round-3** four-query §4,
+  exact-source + refund gate §6.0/§6.1/§6.2, per-signature §6.4a, conditional
+  bound §6.5, tip/shipping §6.1-B/C, guards §15, deps §0.1)
 - `docs/07-implementation-plan/task-012-decision-closure-handoff.md`
 - `docs/07-implementation-plan/task-012-order-import-implementation-packet.md`
-  (money→Char, canonical ledger + `tol_tax=0.5r(S+O)`, Option-A pagination,
-  cost posture, tax-mapping safety, conditional skip seam, locked prompt)
+  (money→Char, canonical ledger, Option-A pagination, cost posture, tax-mapping
+  safety, conditional skip seam, locked prompt; **round-3** exact-line-total
+  source, refund gate, per-signature reconciliation, conditional `tol_tax`,
+  `execute_business` guards, PR-#158 deps)
 - `docs/07-implementation-plan/task-012-order-import-proposed.md`
 - `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-27/56/64
   proposed-resolution status + links only — **not** marked accepted)
@@ -169,6 +217,22 @@ Slice-2B integration PR. **CORE-R1 is already merged (satisfied, not pending).**
   prerequisites. *Lesson: express cross-task prerequisites as required
   capabilities in the integration branch, indifferent to which PR delivers
   them.*
+- **Use the exact official field, not a plausible derivation.** The round-2
+  ledger multiplied an *approximate* unit price (`discountedUnitPriceSet`) by
+  quantity and assumed it equalled the discounted total — which Shopify does not
+  guarantee. The API has an exact all-discounts-before-tax line-total field
+  (`priceAfterAllDiscountsBeforeTaxesSet`); reading the field descriptions
+  verbatim (it also *excludes refunded/removed quantities*) surfaced both the
+  exact invariant and the refund/removed eligibility gate at once. *Lesson: for a
+  financial invariant, find the exact field and read its full description — do not
+  reconstruct it from unit-price × quantity.*
+- **A rounding bound is conditional on premises the schema may not state.** The
+  `0.5r(S+O)` bound is only valid once the per-signature bases reconcile and each
+  platform rounds within `0.5r` — and Shopify's rounding convention is
+  undocumented. *Lesson: label the platform-rounding premise separately as an
+  inference, discharge the base-equality assumption with an explicit
+  per-signature reconciliation step, and fail closed where the premise is
+  unverified.*
 
 ## 8. Exact next-session prompt (control-room to issue)
 
@@ -183,21 +247,28 @@ claude/task-012-decision-closure-mb88sn → Shopify-connector):
 
 Decide per D-012 item: accept / revise / reject. In particular rule on:
 (a) money snapshots as Char/exact-decimal-string (not Float/Monetary);
-(b) the canonical single-count ledger U_ex = M + H + T (incl. tax-inclusive
-    U_ex = G − totalTaxSet) and the proven tax bound tol_tax = 0.5r(S+O);
-(c) Option-A pagination (three independent cursors, torn-read handling) and the
-    provisional page sizes + cost telemetry;
+(b) the exact per-line source `priceAfterAllDiscountsBeforeTaxesSet` (not
+    quantity × discountedUnitPriceSet), the canonical ledger U_ex = M + H + T
+    (always tax-exclusive; shipping tax backed out once when inclusive), the
+    fail-closed refund/removed gate (currentQuantity==quantity), the
+    per-tax-signature base reconciliation (§6.4a), and the conditional bound
+    tol_tax = 0.5r(S+O) with its labelled platform-rounding premise;
+(c) the four-query Option-A contract + pagination (three independent cursors,
+    torn-read handling), the `execute_business` AST guards, and the provisional
+    page sizes + cost telemetry;
 (d) MBQ-27 mapped/matched-account.tax-under-the-guard with the §5.5 tax-mapping
     safety (company match, ambiguous hold, fiscal-position validation);
-(e) divergent currency → skipped policy via the conditional/coordinated core
-    skip seam (terminal-state-respect guard recommended).
+(e) divergent currency / refunds-removed / duties / test / pre-cancelled →
+    skipped policy via the conditional/coordinated core skip seam
+    (terminal-state-respect guard recommended).
 
 Do NOT open the order-domain gate or issue the locked prompt until the
 CAPABILITY prerequisites (§0.1 / §4) hold in Shopify-connector — SRR-03 CLOSED;
 protected/guarded product import + variant bindings; protected/guarded customer
 import + indexed email matching; no unguarded product/customer Shopify call;
-LC-1 + DEC-030 — however they arrive (direct #150/#151 merges or a subsuming
-CORE-R2 Slice-2B integration PR). CORE-R1 is already merged. If accepting,
+LC-1 + DEC-030 — delivered via the accepted CORE-R2 Slice-2B integration-staging
+strategy (PR #158, review 4691064435; the unprotected #150/#151 heads are NOT
+directly mergeable). CORE-R1 is already merged. If accepting,
 record it in architecture-review-log.md and mark the MBQ-27/56/64 rows
 resolved; the locked prompt stays unusable until the separate gate act. Also
 coordinate the core skip seam with the CORE-R2 owner (PR #158/#160).
