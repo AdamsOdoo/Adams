@@ -22,6 +22,32 @@ test is **not** Race A; the PR is a **five-file** change). No production importe
 change was needed (no genuine test surfaced a production defect). SRR-03 stays
 OPEN; Prompt E stays blocked.
 
+**Revision 3 (2026-07-14) — control-room review `4696393942` (REVISE).** The
+production importer stays **frozen** (no runtime test proved a production defect;
+16/16 AST invariants still pass). This revision (customer test file + these two
+docs only) closes the remaining evidence issues:
+
+1. **Primary lease-count M18 proof** — a new genuine test
+   (`TestCustomerCallsiteRaceBGenuine.test_m18_lease_count_controller_observes_open_lease_then_finalizes`)
+   parks the admitted call **before any FK write** via the allowed `_apply_import`
+   observe-and-delegate barrier, so the worker holds **no store-row lock**. The real
+   `_run_disconnect_quiesce` controller therefore genuinely **locks the store**,
+   reaches the **lease-count branch**, writes `disconnect_open_lease_count=1`, moves
+   to `quiescing`, and does not finalize/clear while the lease is open; a later pass
+   finalizes `completed` + clears the credential after release. The prior
+   binding-key-share `FOR UPDATE SKIP LOCKED` scenario is **retained, reclassified
+   as lock-skip coverage** (`test_race_b_binding_keyshare_controller_skip_locked_coverage`).
+2. **Scoped cron-trigger cleanup** — the globally-destructive whole-cron trigger
+   delete is replaced with a **pre-test baseline + delete-only-delta** cleanup; no
+   pre-existing trigger is ever deleted; zero-residue verifies the trigger delta.
+3. **Cleanup-first threaded teardown** — the threaded genuine tests capture worker
+   liveness as evidence, run cleanup only when no worker owns locks, and assert
+   liveness fail-loud **after** cleanup (no cleanup-aborting pre-assert).
+4. **Stale docstring corrected** — the module docstring now lists all runtime-only
+   classes and the exact selection tag.
+
+SRR-03 stays OPEN; Prompt E stays blocked; no live Shopify call; no runtime-green.
+
 ---
 
 ## 1. Heads
@@ -41,7 +67,7 @@ OPEN; Prompt E stays blocked.
 
 1. `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py` — production call-site migration (unchanged since Revision 1; frozen).
 2. `addons/shopify_connector_sale/tests/test_customer_import_matching.py` — adapted transport-stub tests + rewritten AST guard + `TestCustomerCallsiteExecuteBusiness` (unit lease guards; the disconnected-store test reclassified as a **pre-admission refusal**, not Race A).
-3. `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py` — fail-loud lease-leak cleanup on the existing genuine race **plus** the new genuine independent-connection lifecycle proofs (`_CustomerGenuineHelpers` + M1/M2/Race A/Race B classes).
+3. `addons/shopify_connector_sale/tests/test_customer_matching_scalability.py` — fail-loud lease-leak cleanup on the existing genuine race; genuine independent-connection lifecycle proofs (`_CustomerGenuineHelpers` + M1/M2/Race A/Race B classes) including the **primary lease-count M18 proof** (Rev 3) and the retained lock-skip coverage; **test-owned (baseline-delta) cron-trigger cleanup** (Rev 3); **cleanup-first threaded teardown** (Rev 3); corrected module docstring (Rev 3).
 4. `docs/05-qa/task-core-r2-customer-callsite-validation.md` — validation record.
 5. `docs/07-implementation-plan/task-core-r2-customer-callsite-handoff.md` — this handoff.
 
@@ -108,12 +134,26 @@ the unchanged Task 011/011B suites (`TestCustomerImportMatching`,
 **Revision 1 (migration):** py_compile OK; compileall OK; no conflict markers;
 AST invariant scan 16/16 PASS; secret/PII scan clean; 0 assertions weakened.
 
-**Revision 2 (this correction):** py_compile OK; compileall OK; no conflict
+**Revision 2 (correction):** py_compile OK; compileall OK; no conflict
 markers; **four files changed** (the two customer test files + these two docs);
 the **production importer is frozen** (unchanged — the 16/16 AST invariants still
 pass); secret/PII scan clean (placeholder token + reserved `@…example` domains
 only); the three new genuine classes are tagged
 `-standard`/`shopify_connector_customer_callsite_lifecycle`. (Validation §7/§8.)
+
+**Revision 3 (this correction):** py_compile OK (importer + both customer test
+files); compileall OK (`addons/shopify_connector_sale`); **one test file + these
+two docs changed** — the **production importer is frozen this session** (`git diff
+e18e68f -- …customer_importer.py` is empty; 16/16 AST invariants still pass);
+AST audit of the test file — every `patch.object` target is one of
+`{_send, _apply_import, cursor, _lock}` (no `action_disconnect`/`_admit`/
+`_release_lease`/`_run_disconnect_quiesce`/lease-ORM/`connection_generation`/store
+state monkeypatch); the new `observing_apply` wrapper **delegates to the real
+`_apply_import`** (`return real_apply(...)`, AST-verified); no
+globally-destructive cron delete remains (`_trigger_baseline`/`_trigger_delta_ids`
+present); secret/PII scan clean. **No Odoo runtime** (no `odoo` module; no
+PostgreSQL server) — no test executed, no runtime-green claimed. (Validation
+§7/§8.)
 
 ---
 
@@ -146,6 +186,46 @@ directly:
 - every genuine connection is bounded (statement+lock timeout); worker threads are
   daemon, bounded-joined, and `_assert_workers_dead`; cleanup is durable,
   fail-loud, and zero-residue (incl. leases).
+
+**Revision 3 (this correction).** The new **primary lease-count M18** design was
+verified directly against the production code, closing the exact gap the review
+named (the SKIP-LOCKED scenario proves the skip path, not the lease-count branch):
+
+- **The pause is before any store lock.** `execute_business.__enter__ → _admit`
+  takes its store-row `FOR SHARE` on an **owned side cursor** and **commits+releases
+  it together with the lease** before returning (api-client `_admit`: "`_send` runs
+  *after* this returns, so no lock is ever held across the network call"). The
+  `_apply_import` observe-and-delegate barrier parks **before** the reconciliation
+  savepoint / binding INSERT — so the worker's main transaction holds the committed
+  lease but **no** store-row lock. `_dispatch_one`/the job-start gate take **no**
+  store-row lock either (grep: the dispatcher has zero `FOR UPDATE/SHARE/NO KEY`).
+- **Therefore the controller reaches the lease-count branch.** With the store
+  unlocked, `_run_disconnect_quiesce`'s `try_lock_for_update` (`FOR UPDATE SKIP
+  LOCKED`) **succeeds**, `_process_disconnect_quiesce` counts the one committed
+  lease, writes `disconnect_open_lease_count=1`, and (count>0, within timeout) sets
+  `disconnect_status='quiescing'` **without** `_finalize_disconnect_completed` —
+  credential preserved. After release (lease deleted by `_release_lease`), a later
+  pass counts 0 → `_finalize_disconnect_completed` → `disconnected`/`completed` +
+  `_clear_token_under_store_lock` clears the credential. Assertions match each step.
+- **The barrier preserves real reconciliation** — `observing_apply` only signals +
+  waits, then `return real_apply(self, store, payload, job=job)` (the unpatched
+  method captured before the patch; AST-verified it delegates). Matching/create/bind
+  behaviour is unchanged.
+- **Controller selection robustness** — because the controller processes one
+  `disconnecting` store per pass, the test drives it in a **bounded loop** until our
+  store reaches the target status, so an unrelated `disconnecting` store cannot make
+  the single pass miss ours (and a genuine miss fails loud, never hangs).
+- **Cron scoping** — the baseline is captured **before `_fixture`** so any
+  fixture/disconnect/controller-scheduled trigger is in the delta; `current−baseline`
+  can never include a pre-existing id (set difference), so no pre-existing trigger is
+  deletable; `= ANY(%s)` array binds are guarded (`if delta_ids`) against the empty
+  case.
+- **Cleanup-first** — liveness is evidence, not a pre-cleanup assert; cleanup runs
+  only when `not worker_alive_final`; the fail-loud liveness assert is after cleanup.
+
+A subagent adversarial pass was **not run** this revision (the Rev-2 attempt hit a
+session limit); the load-bearing lock/branch reasoning above was checked directly
+against the production sources cited.
 
 Because these genuine proofs were **not executed** here (no Odoo runtime — §10),
 their runtime confirmation is captured on the integration-staging host.
