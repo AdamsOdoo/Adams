@@ -256,3 +256,51 @@ mark the PR ready; merge it; begin Slice 2B (call-site migration); remove public
 shared handoff / architecture-review-log / risk-register. **SRR-03 remains OPEN**
 and no runtime-green is claimed. Await ChatGPT control-room review — including
 ratification of the two migrated test files (§S2A.3 of the validation record).
+
+## 9. Exact-head Odoo.sh runtime validation — session 2026-07-14 `[Fact]`
+
+Full runtime record: `docs/05-qa/task-core-r2-validation-results.md` §RT.0–RT.14.
+
+- **Validated code SHA:** `79dbfc00428802da8c98c97d3e6d7eb6025ea74e` (tree clean;
+  base `1494b97…` is the merge's 2nd parent). **Build 34872373**, DB
+  `adamsmen-…-34872373`, Odoo 19.0 / PostgreSQL 16.14 / ORM cursor **REPEATABLE READ**.
+- **Docs-only evidence commit:** this handoff + the RT section are committed **after**
+  the validated SHA and are **not themselves runtime-tested** (evidence only).
+- **Scope:** exactly the 15 accepted files; no product/sale/010B/011B/#157 change; no
+  live token in the diff.
+- **Fresh install (build `install.log`, authoritative):** core `4 failures / 0 errors
+  of 282` + `19 post-tests, 0 failed`. The **4 failures are TEST DEFECTS** — naive
+  `assertNotIn(token, getsource(...))` source-guards matching the method's own
+  **docstring** (`sudo(`, `SKIP LOCKED`, `action_clear_token`, `call.lease`); a
+  non-invasive AST proof shows `ALL_PRODUCTION_CODE_CLEAN = True` (tokens only in
+  docstrings). Production behaviour is correct.
+- **Genuine `post_install` classes ×3 (all green):** `TestGenuineRealAdmission` (9),
+  `TestCredentialReplacementRaceGenuine` (2), `TestDisconnectControllerSelectionGenuine`
+  (2), `TestLifecycleAdmissionRaceGenuine` (4), `TestPublicClearAdmissionRaceGenuine`
+  (2) — 15 distinct processes, `0 failed, 0 errors` each. Sections 7/8/10/11 race,
+  controller/timeout, and registry test-mode assertions verified as non-vacuous.
+- **Issue #157 confirmed, NOT a PR #160 defect:** the `res.users.notification_type`
+  NOT-NULL errors seen only on the `-u` at-install re-run are exactly the known
+  **issue #157** base-fixture / post-init-rerun artifact (§1, §4). Proven: fresh `-i`
+  build had 0 such errors; `odoo-bin shell` creates users fine; it strikes **non-PR**
+  classes (`test_credential_access`, `test_job_log_system_append`) identically.
+  **Not fixed** (out of scope, per the task).
+- **Section 9 (isolation/retry):** REPEATABLE READ proven at runtime; the deterministic
+  READ COMMITTED supersession test is green ×3; Odoo 19's `service/model.py:retrying`
+  (SERIALIZATION_FAILURE, MAX_TRIES=5) verified from **official source**. Open: no
+  connector test forces a REPEATABLE READ 40001 + framework retry (b/c/e) — a
+  narrowly-scoped test in `tests/test_disconnect_quiescence.py` would close it.
+- **Cleanup/leak:** zero store/credential/lease/job/job_log residue; 0 idle-in-tx
+  backends; 0 connector cron-trigger residue; disconnect+drain crons active once;
+  secret scan of all logs clean.
+- **Base→head genuine upgrade:** NOT performed — single-DB container, restricted role
+  (no `CREATEDB`), 1 GB cap; additive-safety analysis provided instead (not a
+  substitute). REMAINING GATE.
+
+**Remaining gates (control-room-gated; none producible this session — webhook held):**
+(1) test-only fix of the 4 source-guard docstring false-positives; (2) genuine base→head
+upgrade on a multi-DB runtime; (3) optional Section-9 REPEATABLE READ/40001 retry test;
+(4) optional Section 7/8 assertion tightening + stale `_admit` docstring.
+
+**SRR-03 remains OPEN.** PR #160 stays **draft/unmerged**; Slice 2B not begun; no live
+Shopify request; issue #157 untouched. Await control-room decision.
