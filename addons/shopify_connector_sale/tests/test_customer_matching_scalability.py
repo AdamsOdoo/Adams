@@ -6,12 +6,33 @@ routing outcome is unchanged, that duplicate/ambiguity behaviour is
 preserved, and that the source-level guards (indexed domain, identical
 `email_normalize(strict=False)` on both sides, no new match key) hold.
 
-Two `-standard`-excluded classes carry the runtime-only work:
-`TestCustomerMatchingConcurrency` (D-011B-6, a genuine independent-
-transaction binding race through the real dispatcher) and
-`TestCustomerMatchingBenchmark` (D-011B-7, the deterministic 100k
-performance harness). Both are authored to run under an explicit test-tag
-invocation on a runtime host; neither runs in the standard CI pass.
+Several `-standard`-excluded classes carry the runtime-only work; none run
+in the standard CI pass, each is invocable under an explicit test tag on a
+runtime host:
+
+  * `TestCustomerMatchingConcurrency` (D-011B-6, a genuine independent-
+    transaction binding race through the real dispatcher) and
+    `TestCustomerMatchingBenchmark` (D-011B-7, the deterministic 100k
+    performance harness) -- tags
+    `shopify_connector_customer_matching_concurrency` /
+    `shopify_connector_customer_matching_benchmark`.
+  * The CORE-R2 Slice 2B genuine independent-connection customer call-site
+    lifecycle proofs, all tagged
+    `shopify_connector_customer_callsite_lifecycle`:
+      - `TestCustomerCallsiteLeaseVisibilityGenuine` -- M1/M2 committed-lease
+        visibility (single-threaded M1; threaded paused-reconciliation M2);
+      - `TestCustomerCallsiteRaceAGenuine` -- Race A / M8 admission-vs-
+        disconnect ordering, both orderings (single-threaded);
+      - `TestCustomerCallsiteRaceBGenuine` -- Race B / M18: the PRIMARY
+        lease-count proof (the controller genuinely locks the store, observes
+        the open lease, transitions to `quiescing` without finalizing, then
+        finalizes after release) PLUS the retained binding-key-share
+        `FOR UPDATE SKIP LOCKED` lock-skip coverage (both threaded).
+
+All genuine lifecycle classes use real `db_connect` PostgreSQL connections
+(bounded, distinct backend PIDs). Only `_send` is the transport seam and a
+domain `_apply_import` observe-and-delegate wrapper is the reconciliation
+synchronization barrier; production lifecycle/state is never monkeypatched.
 """
 
 import ast
@@ -2085,6 +2106,21 @@ class _CustomerGenuineHelpers:
         finally:
             obs.close()
 
+    def _store_open_lease_count(self, dbname, store_id):
+        """The controller-written `disconnect_open_lease_count` snapshot field on
+        the store (distinct from the live COUNT(*) of lease rows): proves the
+        controller reached the lease-count path and recorded the count it saw."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT disconnect_open_lease_count "
+                "FROM shopify_connector_store WHERE id = %s", (store_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return row[0] if row else None
+        finally:
+            obs.close()
+
     def _binding_count(self, dbname, store_id, gid=None):
         obs = self._open_bounded(dbname)
         try:
@@ -2169,22 +2205,91 @@ class _CustomerGenuineHelpers:
             cr.close()
             raise
 
+    # --- test-owned cron-trigger ownership (review 4696393942 #2) ------
+    #
+    # `action_disconnect` and every quiescing controller pass schedule
+    # `ir_cron_trigger` rows on the connector's disconnect-quiesce cron (and the
+    # job path may schedule the drain cron). Those trigger rows carry no store_id,
+    # so they cannot be scoped by store -- which is why the earlier cleanup
+    # deleted EVERY trigger for those crons. That is globally destructive: a
+    # pre-existing trigger from the base DB or a concurrent process would be
+    # deleted too. Ownership is instead established by a per-test BASELINE:
+    # `_trigger_baseline` snapshots the connector-cron trigger ids that exist
+    # BEFORE the test; cleanup deletes ONLY the ids that appeared AFTER that
+    # snapshot (`current - baseline`) -- exactly the rows this test created --
+    # and `_assert_zero_residue` recomputes the same delta to prove none remain.
+    # No baseline (pre-existing) id is ever in the delete set.
+
+    _CONNECTOR_CRON_XMLIDS = (
+        'shopify_connector_core.ir_cron_shopify_connector_disconnect_quiesce',
+        'shopify_connector_core.ir_cron_shopify_connector_job_dispatch_drain',
+    )
+
+    def _connector_cron_ids(self, cr):
+        """Resolve the connector cron record ids (`ir_cron.id`) from their xmlids
+        on `cr`. A missing xmlid (stripped registry) is tolerated and omitted, so
+        the trigger cleanup degrades to a no-op rather than failing."""
+        env = api.Environment(cr, SUPERUSER_ID, {})
+        ids = []
+        for xmlid in self._CONNECTOR_CRON_XMLIDS:
+            cron = env.ref(xmlid, raise_if_not_found=False)
+            if cron:
+                ids.append(cron.id)
+        return ids
+
+    def _trigger_baseline(self, dbname):
+        """Snapshot (frozenset) the connector-cron `ir_cron_trigger` ids that
+        exist BEFORE the test, establishing test ownership: any id NOT in this
+        baseline is a trigger THIS test created and is the only kind cleanup may
+        delete. Captured on a bounded, read-only (rolled-back) connection."""
+        cr = self._open_bounded(dbname)
+        try:
+            cron_ids = self._connector_cron_ids(cr)
+            if not cron_ids:
+                cr.rollback()
+                return frozenset()
+            cr.execute(
+                "SELECT id FROM ir_cron_trigger WHERE cron_id = ANY(%s)",
+                (cron_ids,))
+            baseline = frozenset(row[0] for row in cr.fetchall())
+            cr.rollback()
+            return baseline
+        finally:
+            cr.close()
+
+    def _trigger_delta_ids(self, cr, baseline):
+        """The connector-cron trigger ids created since `baseline` (the test-owned
+        delta) on `cr` -- `sorted(current - baseline)`. By construction this never
+        contains a baseline/pre-existing id, so a pre-existing trigger can never be
+        deleted or reported as residue."""
+        cron_ids = self._connector_cron_ids(cr)
+        if not cron_ids:
+            return []
+        cr.execute(
+            "SELECT id FROM ir_cron_trigger WHERE cron_id = ANY(%s)",
+            (cron_ids,))
+        current = frozenset(row[0] for row in cr.fetchall())
+        return sorted(current - baseline)
+
     # --- durable, fail-loud teardown + zero-residue --------------------
 
-    def _cleanup(self, dbname, ids):
+    def _cleanup(self, dbname, ids, trigger_baseline):
+        """Delete every committed row this test created, on a bounded connection,
+        then assert zero residue. `trigger_baseline` is the pre-test connector-cron
+        trigger snapshot: only the trigger ids created AFTER it (the test-owned
+        delta) are deleted, so no pre-existing trigger is ever removed."""
         store_id = ids.get('store_id') if ids else None
         if store_id is None:
             return
         cr = self._open_bounded(dbname)
         try:
-            # Remove cron triggers scheduled by action_disconnect / the
-            # quiescing controller / job enqueue so no trigger residue survives.
-            cr.execute(
-                "DELETE FROM ir_cron_trigger WHERE cron_id IN "
-                "(SELECT res_id FROM ir_model_data WHERE module = "
-                "'shopify_connector_core' AND name IN "
-                "('ir_cron_shopify_connector_disconnect_quiesce', "
-                "'ir_cron_shopify_connector_job_dispatch_drain'))")
+            # Scoped, test-owned cron-trigger cleanup: delete ONLY the connector-
+            # cron trigger ids that appeared after the pre-test baseline -- never a
+            # pre-existing trigger, never a whole-cron wipe.
+            delta_ids = self._trigger_delta_ids(cr, trigger_baseline)
+            if delta_ids:
+                cr.execute(
+                    "DELETE FROM ir_cron_trigger WHERE id = ANY(%s)", (delta_ids,))
             cr.execute(
                 "DELETE FROM shopify_connector_job_log WHERE job_id IN "
                 "(SELECT id FROM shopify_connector_job WHERE store_id = %s)",
@@ -2212,9 +2317,9 @@ class _CustomerGenuineHelpers:
             cr.commit()
         finally:
             cr.close()
-        self._assert_zero_residue(dbname, ids)
+        self._assert_zero_residue(dbname, ids, trigger_baseline)
 
-    def _assert_zero_residue(self, dbname, ids):
+    def _assert_zero_residue(self, dbname, ids, trigger_baseline):
         store_id = ids['store_id']
         v = self._open_bounded(dbname)
         try:
@@ -2240,6 +2345,11 @@ class _CustomerGenuineHelpers:
                     (ids['partner_id'],))
                 self.assertEqual(
                     v.fetchone()[0], 0, 'partner residue after cleanup')
+            # No test-created cron-trigger delta may remain (and, by construction,
+            # every baseline/pre-existing trigger is untouched).
+            self.assertEqual(
+                self._trigger_delta_ids(v, trigger_baseline), [],
+                'cron-trigger delta residue after cleanup')
             v.rollback()
         finally:
             v.close()
@@ -2259,6 +2369,9 @@ class TestCustomerCallsiteLeaseVisibilityGenuine(
         dbname = self.env.cr.dbname
         ids = None
         worker_cr = None
+        # Pre-test connector-cron trigger baseline (test ownership): cleanup
+        # deletes only trigger ids created after this snapshot.
+        trigger_baseline = self._trigger_baseline(dbname)
         try:
             ids = self._fixture(dbname, 'm1-%s' % uuid.uuid4().hex[:10])
             worker_cr = self._open_bounded(dbname)
@@ -2304,7 +2417,7 @@ class TestCustomerCallsiteLeaseVisibilityGenuine(
                 except Exception:
                     pass
                 worker_cr.close()
-            self._cleanup(dbname, ids)
+            self._cleanup(dbname, ids, trigger_baseline)
 
     # M2: the SAME committed lease remains held (exactly one) while
     # `_apply_import` is genuinely paused mid-reconciliation on a real
@@ -2324,6 +2437,7 @@ class TestCustomerCallsiteLeaseVisibilityGenuine(
         done_evt = threading.Event()
         result = {}
         obs = {'phases': []}
+        trigger_baseline = self._trigger_baseline(dbname)
         try:
             ids = self._fixture(dbname, 'm2-%s' % uuid.uuid4().hex[:10])
             locker_gid = 'gid://shopify/Customer/locker-%s' % uuid.uuid4().hex[:8]
@@ -2416,6 +2530,11 @@ class TestCustomerCallsiteLeaseVisibilityGenuine(
                 dbname, ids['store_id'], ids['gid'])
         finally:
             registry_cls._lock = saved_lock
+            # Cleanup-first teardown (review 4696393942 #3): release the barrier
+            # and roll back the locker so a parked worker can exit, bounded-join
+            # (normal then emergency), and capture worker liveness as EVIDENCE --
+            # never an assertion here, which could abort the cleanup path.
+            done_evt.set()
             if locker_cr is not None:
                 try:
                     locker_cr.rollback()
@@ -2425,19 +2544,33 @@ class TestCustomerCallsiteLeaseVisibilityGenuine(
                     locker_cr.close()
                 except Exception:
                     pass
-            done_evt.set()
+                locker_cr = None
             if worker_thread is not None:
                 worker_thread.join(timeout=self.BOUND_SECONDS)
-                self._assert_workers_dead((worker_thread,))
+                if worker_thread.is_alive():
+                    worker_thread.join(timeout=self.BOUND_SECONDS)  # emergency
+            obs['worker_alive_final'] = bool(
+                worker_thread is not None and worker_thread.is_alive())
             if monitor_cr is not None:
                 try:
                     monitor_cr.rollback()
                 except Exception:
                     pass
                 monitor_cr.close()
-            self._cleanup(dbname, ids)
+            # Durable, zero-residue cleanup runs ONLY when no worker still owns DB
+            # locks; a still-alive worker skips cleanup (recorded) and fails loud
+            # below rather than acting against still-owned locks.
+            if not obs['worker_alive_final']:
+                self._cleanup(dbname, ids, trigger_baseline)
+            else:
+                obs['cleanup_skipped_worker_alive'] = True
 
         print('[SLICE2B-CUSTOMER-M2] %s' % obs)
+        # Fail loud if a worker survived bounded recovery (cleanup was skipped to
+        # avoid acting against still-owned locks) -- inconclusive, never passing.
+        self.assertFalse(
+            obs.get('worker_alive_final'),
+            'worker still alive after bounded recovery; cleanup skipped')
         self.assertTrue(obs.get('pid_received'), 'worker never reported its PID')
         self.assertTrue(obs.get('distinct_pids'), 'backends must be distinct')
         self.assertTrue(
@@ -2475,6 +2608,7 @@ class TestCustomerCallsiteRaceAGenuine(_CustomerGenuineHelpers, TransactionCase)
         worker_cr = None
         send_calls = []
         pids = []
+        trigger_baseline = self._trigger_baseline(dbname)
         try:
             ids = self._fixture(dbname, 'raa-%s' % uuid.uuid4().hex[:10])
             # Real one-way disconnect commits FIRST on an independent backend.
@@ -2525,7 +2659,7 @@ class TestCustomerCallsiteRaceAGenuine(_CustomerGenuineHelpers, TransactionCase)
                 except Exception:
                     pass
                 worker_cr.close()
-            self._cleanup(dbname, ids)
+            self._cleanup(dbname, ids, trigger_baseline)
 
     # B. Admission wins FIRST: `_admit` commits the lease + token snapshot; a real
     # action_disconnect then commits on a distinct backend DURING the call
@@ -2539,6 +2673,7 @@ class TestCustomerCallsiteRaceAGenuine(_CustomerGenuineHelpers, TransactionCase)
         send_calls = []
         captured = {}
         pids = []
+        trigger_baseline = self._trigger_baseline(dbname)
         try:
             ids = self._fixture(dbname, 'rab-%s' % uuid.uuid4().hex[:10])
             worker_cr = self._open_bounded(dbname, read_committed=True)
@@ -2602,21 +2737,311 @@ class TestCustomerCallsiteRaceAGenuine(_CustomerGenuineHelpers, TransactionCase)
                 except Exception:
                     pass
                 worker_cr.close()
-            self._cleanup(dbname, ids)
+            self._cleanup(dbname, ids, trigger_baseline)
 
 
 @tagged('post_install', '-at_install', '-standard',
         'shopify_connector_customer_callsite_lifecycle')
 class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase):
     """Race B / M18 -- a disconnect landing AFTER a committed admission does not
-    wait for the reconciliation body (review 4695664662 #2). Genuine: the
-    admitted customer call parks mid-reconciliation on a real
-    UNIQUE(store,partner) index wait (lease committed + observable); a concurrent
-    real action_disconnect returns without waiting; the real controller defers
-    while the lease is open and finalizes only after the admitted call releases
-    it."""
+    wait for the reconciliation body, and the quiescence controller defers
+    finalization while an admission lease is open (reviews 4695664662 #2 +
+    4696393942). Two complementary genuine proofs, both on real independent
+    `db_connect` connections with distinct backend PIDs:
 
-    def test_race_b_disconnect_after_admission_does_not_wait_controller_defers(self):
+      1. `test_m18_lease_count_...` -- the PRIMARY LEASE-COUNT proof. The admitted
+         customer call parks BEFORE any FK/business write (via the allowed
+         `_apply_import` observe-and-delegate synchronization barrier), so the
+         worker holds NO store-row lock. A concurrent real `action_disconnect`
+         returns without waiting; then the real `_run_disconnect_quiesce`
+         controller genuinely LOCKS the store (its `FOR UPDATE SKIP LOCKED`
+         succeeds), reaches the lease-count branch, records
+         `disconnect_open_lease_count = 1`, transitions to `quiescing`, and does
+         NOT clear the credential while the lease exists. Only after the call
+         releases the lease does a later pass finalize `completed` + clear the
+         credential.
+
+      2. `test_race_b_binding_keyshare_controller_skip_locked_coverage` -- retained
+         LOCK-SKIP coverage (NOT the primary lease-count proof). Here the call
+         parks ON the binding INSERT, whose `FOR KEY SHARE` on the store makes the
+         controller's `FOR UPDATE SKIP LOCKED` legitimately SKIP the row and defer
+         by skip. This exercises the skip path but never reaches the lease-count
+         branch, so it cannot stand in for proof #1.
+    """
+
+    # -- PRIMARY M18 lease-count proof (review 4696393942) -----------------
+    # Pause the admitted call via the allowed `_apply_import` observe-and-delegate
+    # wrapper BEFORE the reconciliation savepoint / any FK write. At that point the
+    # lease is already committed (admission ran in `execute_business.__enter__`) but
+    # the worker's main transaction holds NO store-row lock -- `_admit`'s FOR SHARE
+    # was committed+released together with the lease on its own side cursor
+    # (api-client `_admit`, "no lock is ever held across the network call"). So the
+    # controller's `FOR UPDATE SKIP LOCKED` on the store SUCCEEDS, it reaches the
+    # LEASE-COUNT branch (`_process_disconnect_quiesce`), observes the one open
+    # lease, writes `disconnect_open_lease_count`, and moves to the non-finalized
+    # `quiescing` posture WITHOUT clearing the credential -- the exact path the
+    # binding-key-share/SKIP-LOCKED scenario below can never reach.
+    def test_m18_lease_count_controller_observes_open_lease_then_finalizes(self):
+        dbname = self.env.cr.dbname
+        ids = None
+        monitor_cr = None
+        worker_thread = None
+        registry_cls = type(self.registry)
+        saved_lock = registry_cls._lock
+        ImporterCls = type(self.env['shopify.connector.customer.importer'])
+        real_apply = ImporterCls._apply_import
+        pid_q = queue.Queue()
+        token_q = queue.Queue()
+        phase_q = queue.Queue()
+        diag_q = queue.Queue()
+        parked_evt = threading.Event()
+        release_evt = threading.Event()
+        done_evt = threading.Event()
+        result = {}
+        obs = {}
+        trigger_baseline = self._trigger_baseline(dbname)
+        try:
+            ids = self._fixture(dbname, 'm18lc-%s' % uuid.uuid4().hex[:10])
+            Client = self.env['shopify.connector.api.client']
+
+            def fake_send(client_self, s, body, token=None):
+                token_q.put(token)
+                return _RaceFakeResponse(200, json_body=self._payload_body(ids))
+
+            def observing_apply(self_imp, store, payload, job=False):
+                # SYNCHRONIZATION BARRIER (the allowed observe-and-delegate
+                # wrapper): the lease is already committed (admission ran in
+                # `__enter__`) and NO business/FK write has happened yet, so the
+                # worker holds no store-row lock here. Signal parked, wait for
+                # release, then delegate to the REAL reconciliation unchanged
+                # (real matching/create/bind behaviour is preserved).
+                phase_q.put('apply_entered')
+                parked_evt.set()
+                release_evt.wait(timeout=self.BOUND_SECONDS)
+                phase_q.put('apply_delegating')
+                return real_apply(self_imp, store, payload, job=job)
+
+            def worker():
+                wcr = None
+                try:
+                    wcr = self._open_bounded(dbname)
+                    pid_q.put(self._backend_pid(wcr))
+                    wenv = api.Environment(wcr, SUPERUSER_ID, {})
+                    job = wenv['shopify.connector.job'].browse(ids['job_id'])
+                    wenv['shopify.connector.job.dispatch']._dispatch_one(job)
+                    wcr.commit()
+                    result['ok'] = True
+                except BaseException as exc:
+                    if wcr is not None:
+                        try:
+                            wcr.rollback()
+                        except Exception:
+                            pass
+                    diag_q.put(self._sanitize(exc, 'worker'))
+                finally:
+                    if wcr is not None:
+                        try:
+                            wcr.close()
+                        except Exception:
+                            pass
+                    done_evt.set()
+
+            def run_controller_pass():
+                cc = self._open_bounded(dbname)
+                try:
+                    obs.setdefault('controller_pids', []).append(
+                        self._backend_pid(cc))
+                    cenv = api.Environment(cc, SUPERUSER_ID, {})
+                    cenv['shopify.connector.store']._run_disconnect_quiesce()
+                    cc.commit()
+                finally:
+                    cc.close()
+
+            def drive_controller_until(target_status, timeout):
+                # The controller processes ONE `disconnecting` store per pass, so
+                # in the (unlikely, in sequential test execution) presence of
+                # another disconnecting store OUR store may need more than one
+                # pass. Loop bounded passes until our store's disconnect_status
+                # reaches `target_status`, returning the final observation either
+                # way (a miss fails loud in the assertions). Re-processing a store
+                # already at the target is idempotent.
+                deadline = time.monotonic() + timeout
+                last = self._observe_store(dbname, ids['store_id'])
+                while time.monotonic() < deadline:
+                    if last[2] == target_status:
+                        return last
+                    run_controller_pass()
+                    last = self._observe_store(dbname, ids['store_id'])
+                    if last[2] == target_status:
+                        return last
+                    time.sleep(0.05)
+                return last
+
+            with patch.object(registry_cls, '_lock', threading.RLock()), \
+                    patch.object(self.registry, 'cursor',
+                                 self._real_registry_cursor(dbname)), \
+                    patch.object(type(Client), '_send', fake_send), \
+                    patch.object(ImporterCls, '_apply_import', observing_apply):
+                worker_thread = threading.Thread(
+                    target=worker, name='m18lc-worker', daemon=True)
+                worker_thread.start()
+                try:
+                    pid_b = pid_q.get(timeout=self.BOUND_SECONDS)
+                except queue.Empty:
+                    pid_b = None
+                obs['pid_received'] = pid_b is not None
+                obs['worker_pid'] = pid_b
+                # The worker reached the reconciliation pause BEFORE any FK write.
+                obs['worker_parked'] = parked_evt.wait(timeout=self.BOUND_SECONDS)
+                try:
+                    obs['token'] = token_q.get_nowait()
+                except queue.Empty:
+                    obs['token'] = None
+                # The committed lease is observable; the worker holds no store lock.
+                obs['lease_parked'] = self._lease_count(dbname, ids['store_id'])
+                pre = self._observe_store(dbname, ids['store_id'])
+                obs['state_before_disc'] = pre[0]
+
+                # A concurrent real disconnect lands after the committed admission
+                # and must return without waiting for the parked reconciliation.
+                disc_start = time.monotonic()
+                disc = self._open_bounded(dbname)
+                try:
+                    denv = api.Environment(disc, SUPERUSER_ID, {})
+                    obs['disc_pid'] = self._backend_pid(disc)
+                    denv['shopify.connector.store'].browse(
+                        ids['store_id']).action_disconnect()
+                    disc.commit()
+                finally:
+                    disc.close()
+                obs['disc_returned_within_bound'] = (
+                    time.monotonic() - disc_start) < self.BOUND_SECONDS
+                after_disc = self._observe_store(dbname, ids['store_id'])
+                obs['state_after_disc'] = after_disc[0]
+                obs['gen_bumped'] = after_disc[1] > pre[1]
+                obs['cred_present_after_disc'] = bool(after_disc[3])
+                obs['worker_alive_after_disc'] = worker_thread.is_alive()
+
+                # THE LEASE-COUNT PATH: the worker holds NO store lock at the
+                # pre-FK pause, so the controller's FOR UPDATE SKIP LOCKED SUCCEEDS,
+                # counts the one open lease, writes disconnect_open_lease_count, and
+                # transitions to `quiescing` -- it does NOT finalize/clear while the
+                # lease exists.
+                q = drive_controller_until('quiescing', self.BOUND_SECONDS)
+                obs['state_quiescing'] = q[0]
+                obs['status_quiescing'] = q[2]
+                obs['open_lease_count_field'] = self._store_open_lease_count(
+                    dbname, ids['store_id'])
+                obs['lease_quiescing'] = self._lease_count(dbname, ids['store_id'])
+                obs['cred_present_quiescing'] = bool(q[3])
+                obs['token_quiescing'] = self._observe_credential_token(
+                    dbname, ids['store_id'])
+
+                # Release the pause -> the admitted call delegates to the REAL
+                # `_apply_import`, binds, and releases the lease on context exit.
+                release_evt.set()
+                obs['worker_done'] = done_evt.wait(timeout=self.BOUND_SECONDS)
+                worker_thread.join(timeout=self.BOUND_SECONDS)
+                obs['lease_after_release'] = self._lease_count(
+                    dbname, ids['store_id'])
+                obs['binding_after_release'] = self._binding_count(
+                    dbname, ids['store_id'], ids['gid'])
+
+                # A later controller pass now sees zero leases -> finalizes.
+                fin = drive_controller_until('completed', self.BOUND_SECONDS)
+                obs['state_final'] = fin[0]
+                obs['status_final'] = fin[2]
+                obs['cred_present_final'] = bool(fin[3])
+                obs['token_final'] = self._observe_credential_token(
+                    dbname, ids['store_id'])
+            registry_cls._lock = saved_lock
+            obs['findings'] = self._drain(diag_q)
+            obs['phases'] = self._drain(phase_q)
+        finally:
+            registry_cls._lock = saved_lock
+            # Cleanup-first teardown (review 4696393942 #3): release the barrier so
+            # a parked worker can exit, bounded-join (normal then emergency),
+            # capture worker liveness as EVIDENCE (never asserted here), and run
+            # durable cleanup only when no worker still owns DB locks.
+            release_evt.set()
+            done_evt.set()
+            if worker_thread is not None:
+                worker_thread.join(timeout=self.BOUND_SECONDS)
+                if worker_thread.is_alive():
+                    worker_thread.join(timeout=self.BOUND_SECONDS)  # emergency
+            obs['worker_alive_final'] = bool(
+                worker_thread is not None and worker_thread.is_alive())
+            if monitor_cr is not None:
+                try:
+                    monitor_cr.rollback()
+                except Exception:
+                    pass
+                monitor_cr.close()
+            if not obs['worker_alive_final']:
+                self._cleanup(dbname, ids, trigger_baseline)
+            else:
+                obs['cleanup_skipped_worker_alive'] = True
+
+        print('[SLICE2B-CUSTOMER-M18-LEASECOUNT] %s' % obs)
+        # Fail loud if a worker survived bounded recovery (cleanup was skipped).
+        self.assertFalse(
+            obs.get('worker_alive_final'),
+            'worker still alive after bounded recovery; cleanup skipped')
+        # Genuine setup: worker admitted + parked BEFORE any FK write, one committed
+        # lease observed, real token snapshot, distinct backends.
+        self.assertTrue(obs.get('pid_received'), 'worker never reported its PID')
+        self.assertTrue(obs.get('worker_parked'),
+                        'worker never reached the pre-FK reconciliation pause')
+        self.assertEqual(obs.get('findings'), [],
+                         'worker findings: %s' % obs.get('findings'))
+        self.assertEqual(obs.get('lease_parked'), 1)
+        self.assertEqual(obs.get('token'), DUMMY_TOKEN)
+        self.assertEqual(obs.get('state_before_disc'), 'connected')
+        # Genuine distinct backends: the worker holds its own connection open across
+        # the whole race, so its backend PID is provably distinct from the (pooled)
+        # disconnect and controller connections the parent opens. (disc/controller
+        # connections are opened+closed and MAY share a pooled backend with each
+        # other -- only worker-vs-others distinctness is the meaningful claim.)
+        self.assertIsNotNone(obs.get('worker_pid'), 'worker backend PID missing')
+        self.assertNotEqual(
+            obs.get('worker_pid'), obs.get('disc_pid'),
+            'the disconnect must run on a distinct backend from the parked worker')
+        self.assertNotIn(
+            obs.get('worker_pid'), obs.get('controller_pids') or [],
+            'the controller must run on a distinct backend from the parked worker')
+        # The disconnect returned without waiting; worker still parked, lease open.
+        self.assertTrue(obs.get('disc_returned_within_bound'))
+        self.assertEqual(obs.get('state_after_disc'), 'disconnecting')
+        self.assertTrue(obs.get('gen_bumped'))
+        self.assertTrue(obs.get('worker_alive_after_disc'),
+                        'the disconnect must not have waited for reconciliation')
+        self.assertTrue(obs.get('cred_present_after_disc'))
+        # THE LEASE-COUNT PATH REACHED: the controller LOCKED the store, counted the
+        # open lease, wrote disconnect_open_lease_count=1, set `quiescing`, and did
+        # NOT finalize/clear the credential while the lease existed.
+        self.assertEqual(obs.get('state_quiescing'), 'disconnecting')
+        self.assertEqual(obs.get('status_quiescing'), 'quiescing')
+        self.assertEqual(obs.get('open_lease_count_field'), 1)
+        self.assertEqual(obs.get('lease_quiescing'), 1)
+        self.assertTrue(obs.get('cred_present_quiescing'))
+        self.assertEqual(obs.get('token_quiescing'), DUMMY_TOKEN)
+        # Reconciliation resumed via the real `_apply_import`, bound, and released.
+        self.assertTrue(obs.get('worker_done'), 'worker did not finish in bound')
+        self.assertEqual(obs.get('lease_after_release'), 0)
+        self.assertEqual(obs.get('binding_after_release'), 1)
+        # Only AFTER release does the controller finalize: completed + cred cleared.
+        self.assertEqual(obs.get('state_final'), 'disconnected')
+        self.assertEqual(obs.get('status_final'), 'completed')
+        self.assertFalse(obs.get('cred_present_final'))
+        self.assertFalse(obs.get('token_final'))
+
+    # -- Retained LOCK-SKIP coverage (NOT the primary lease-count proof) ---
+    # Here the admitted call parks ON the binding INSERT, whose FOR KEY SHARE on the
+    # store row makes the controller's FOR UPDATE SKIP LOCKED legitimately SKIP the
+    # store and defer BY SKIP -- it never reaches the lease-count branch, so it is
+    # complementary skip-path coverage, not the primary M18 lease-count proof (which
+    # is `test_m18_lease_count_controller_observes_open_lease_then_finalizes`).
+    def test_race_b_binding_keyshare_controller_skip_locked_coverage(self):
         dbname = self.env.cr.dbname
         ids = None
         locker_cr = monitor_cr = None
@@ -2630,6 +3055,7 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
         done_evt = threading.Event()
         result = {}
         obs = {}
+        trigger_baseline = self._trigger_baseline(dbname)
         try:
             ids = self._fixture(dbname, 'rb-%s' % uuid.uuid4().hex[:10])
             locker_gid = 'gid://shopify/Customer/locker-%s' % uuid.uuid4().hex[:8]
@@ -2741,7 +3167,9 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
                 # genuine deferral: no `completed`, no `disconnected`, lease still
                 # open, credential preserved. (The lease-count-based `quiescing`
                 # transition needs the store lockable -- no in-flight key-share --
-                # and is covered by the core quiescence-controller classes.)
+                # and is proven directly by the PRIMARY lease-count test
+                # `test_m18_lease_count_controller_observes_open_lease_then_finalizes`
+                # above; this method is complementary skip-path coverage only.)
                 run_controller_pass()
                 d1 = self._observe_store(dbname, ids['store_id'])
                 obs['state_deferred'] = d1[0]
@@ -2773,6 +3201,12 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
             obs['findings'] = self._drain(diag_q)
         finally:
             registry_cls._lock = saved_lock
+            # Cleanup-first teardown (review 4696393942 #3): release the barrier
+            # and roll back the locker so a parked worker can exit, bounded-join
+            # (normal then emergency), capture worker liveness as EVIDENCE (never
+            # asserted here), and run durable cleanup only when no worker still
+            # owns DB locks.
+            done_evt.set()
             if locker_cr is not None:
                 try:
                     locker_cr.rollback()
@@ -2782,19 +3216,29 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
                     locker_cr.close()
                 except Exception:
                     pass
-            done_evt.set()
+                locker_cr = None
             if worker_thread is not None:
                 worker_thread.join(timeout=self.BOUND_SECONDS)
-                self._assert_workers_dead((worker_thread,))
+                if worker_thread.is_alive():
+                    worker_thread.join(timeout=self.BOUND_SECONDS)  # emergency
+            obs['worker_alive_final'] = bool(
+                worker_thread is not None and worker_thread.is_alive())
             if monitor_cr is not None:
                 try:
                     monitor_cr.rollback()
                 except Exception:
                     pass
                 monitor_cr.close()
-            self._cleanup(dbname, ids)
+            if not obs['worker_alive_final']:
+                self._cleanup(dbname, ids, trigger_baseline)
+            else:
+                obs['cleanup_skipped_worker_alive'] = True
 
-        print('[SLICE2B-CUSTOMER-M18] %s' % obs)
+        print('[SLICE2B-CUSTOMER-M18-LOCKSKIP] %s' % obs)
+        # Fail loud if a worker survived bounded recovery (cleanup was skipped).
+        self.assertFalse(
+            obs.get('worker_alive_final'),
+            'worker still alive after bounded recovery; cleanup skipped')
         # Genuine setup.
         self.assertTrue(obs.get('pid_received'), 'worker never reported its PID')
         self.assertTrue(obs.get('distinct_pids'), 'backends must be distinct')
@@ -2816,9 +3260,12 @@ class TestCustomerCallsiteRaceBGenuine(_CustomerGenuineHelpers, TransactionCase)
         self.assertEqual(obs.get('lease_after_disc'), 1)      # still open
         self.assertEqual(obs.get('binding_after_disc'), 0)    # not yet bound
         self.assertTrue(obs.get('cred_present_after_disc'))   # credential kept
-        # Controller defers finalization while the lease/key-share is held: the
-        # store stays `disconnecting` (never `disconnected`/`completed`), the
-        # lease is still open, and the credential is preserved.
+        # Controller defers finalization BY SKIP while the binding key-share is
+        # held: it SKIPS the store row (never reaching the lease-count branch), so
+        # the store stays `disconnecting` (never `disconnected`/`completed`), the
+        # lease is still open, and the credential is preserved. (The lease-count
+        # branch -- store lockable, `quiescing`, disconnect_open_lease_count -- is
+        # asserted in the primary lease-count test, not here.)
         self.assertEqual(obs.get('state_deferred'), 'disconnecting')
         self.assertNotEqual(obs.get('status_deferred'), 'completed')
         self.assertEqual(obs.get('lease_deferred'), 1)
