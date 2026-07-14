@@ -1273,8 +1273,13 @@ class TestCustomerCallsiteExecuteBusiness(TransactionCase):
     def test_disconnected_store_fails_closed_uncaught_no_transport(self):
         gid = 'gid://shopify/Customer/cs-disc'
         job = self._job(gid)
-        # A disconnect landing before admission (Race A): the store leaves
-        # `connected`, so the next _admit refuses before any Shopify call.
+        # A PRE-ADMISSION refusal (unit-level, registry test mode): the store is
+        # not `connected` at admission, so _admit fails closed before any Shopify
+        # call. This is NOT Race A -- it does not exercise the concurrent
+        # action_disconnect vs admission ordering. The GENUINE independent-
+        # connection Race A proof (a real action_disconnect racing a real
+        # admission across distinct backends) is TestCustomerCallsiteRaceAGenuine
+        # in test_customer_matching_scalability.py.
         self.store.write({'state': 'disconnected'})
         self.env.flush_all()
         send_calls, spy_send = self._counting_send()
