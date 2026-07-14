@@ -23,8 +23,9 @@
 > (revised CORE-R2 Slice-2B integration-staging strategy; CORE-R1 already merged)
 > — §2, §15; (b) the total-check is a **canonical single-count ledger**
 > `U_ex = M + H + T` with tax-inclusive handling and the **proven** tax bound
-> `tol_tax_total = tax_delta_total + 0.5r(S+O)` (round-7; `tax_delta_total ≡ 0` for
-> admitted orders; replacing the invalid `K=distinct groups`), with worked
+> `tol_tax_total = tax_delta_total + 0.5r(S+O)` (round-8; `tax_delta_total = Σ_σ
+> tax_delta_bound(σ)` is the **actual** engine raw-base-delta term, carried in full;
+> replacing the invalid `K=distinct groups`), with worked
 > examples incl. a many-small-lines counterexample — D-012-2; (c) **pagination is
 > Option A** (a header query + three independent per-connection cursor page
 > queries) with `Order.id`/`updatedAt` verification, cursor-progress + node dedup,
@@ -49,8 +50,9 @@
 > currentTotalPriceSet` → policy skip `refunded_or_removed_quantity`) — D-012-2/-8;
 > (k) **mandatory per-tax-signature base reconciliation** before any tax tolerance
 > (a global `amount_untaxed` match is not sufficient) and the tax bound reframed as
-> a **proposed conditional** `tol_tax_total = tax_delta_total + 0.5r(S+O)` (round-7;
-> `tax_delta_total ≡ 0` for admitted orders) with its platform-rounding
+> a **proposed conditional** `tol_tax_total = tax_delta_total + 0.5r(S+O)` (round-8;
+> `tax_delta_total` = the actual engine raw-base-delta term, carried in full) with
+> its platform-rounding
 > premise labelled an inference (fail-closed for undocumented-rounding currencies)
 > — D-012-2; (l) the stale single-`execute()` AST guard is replaced by
 > **`execute_business` guards** (no result escapes its context) — §6, §15; (m)
@@ -110,7 +112,9 @@
 > edits) — D-012-2/§6.0.0; (c7) **nullable `totalTaxSet`** — null normalized to a
 > canonical zero MoneyBag (shop+presentment) and `money_equal`'d to non-null
 > `currentTotalTaxSet`, else fail closed; the "null OR equals" rule withdrawn —
-> D-012-2/§6.0.1; (d7) **versioned fold-free fingerprint** —
+> D-012-2/§6.0.1 *(the canonical-zero-from-null construction of (c7) is
+> **superseded by round-8 (d8)** — a null `totalTaxSet` now fails closed
+> `data_shape_schema_mismatch`)*; (d7) **versioned fold-free fingerprint** —
 > `SHOPIFY_TAX_FINGERPRINT_VERSION=1`, fixed **SHA-256**, length-prefixed UTF-8
 > incl. version, `v1:<hex>`; `title`/`source` **NFC-only** (case+whitespace
 > preserved; no folding); migration posture — §5.2a/D-012-9; (e7) **data
@@ -121,9 +125,33 @@
 > **fail closed** (`unsupported_tax_structure`), advanced deferred — §5.5/D-012-9;
 > (g7) **one global tax tolerance** — `tol_tax_total = Σ_σ tax_delta_bound(σ) +
 > 0.5r(S+O)` with `tax_delta_bound(σ)=0` required for every admitted MVP signature
-> (else fail closed), so `tax_delta_total ≡ 0` — D-012-2/§6.4a. The decision-closure
-> §4–§18 remains authoritative where it and this packet differ. (Round-6 (a6)–(g6)
-> and round-4 (n)/round-5 (u)(v) remain as recorded; round-7 refines them.)
+> (else fail closed), so `tax_delta_total ≡ 0` — D-012-2/§6.4a. *(The
+> `tax_delta_bound(σ)=0` clause of (g7) is **superseded by round-8** below.)* The
+> decision-closure §4–§18 remains authoritative where it and this packet differ.
+> (Round-6 (a6)–(g6) and round-4 (n)/round-5 (u)(v) remain as recorded; round-7
+> refines them.)
+> **Round-8 correction (control-room review `4694311215`, docs-only):** (a8)
+> **tax-engine contract honesty** — the claim that `special_mode='total_excluded'`
+> is an **exact inverse** for price-included percentage taxes is **withdrawn**
+> (Odoo 19 guarantees symmetry only with an unrounded `price_unit` + `round_globally`;
+> `price_unit` is `Float`); it is a **seed** → bounded solver → **recompute through
+> the actual engine** → read back `raw_total_excluded_currency`/
+> `total_excluded_currency`/`raw_base_amount_currency`/`raw_tax_amount_currency`/
+> `tax_amount_currency` → **accept only from engine outputs**, else fail closed —
+> D-012-2/§6.2; (b8) **actual raw-base delta** — no longer claims `delta_engine==0`;
+> records `base_delta(σ)=|base_odoo_raw(σ)−base_src(σ)|` and carries the **linear**
+> `tax_delta_bound(σ)=base_delta(σ)×rate/100` (leaf percentages only) in
+> `tax_delta_total`; `tol_tax_total = tax_delta_total + 0.5r(S+O)` used consistently,
+> **not** reduced to `0.5r(S+O)` — D-012-2/§6.4a; (c8) **`O` corrected** —
+> `amount_tax` comes from the SO tax-details computation, so `O` counts leaf-tax
+> grouping keys (`round_globally`) / taxed-line×leaf-tax pairs (`round_per_line`),
+> **never** invoice repartition rows — D-012-2/§6.4; (d8) **nullable `totalTaxSet`
+> fails closed** — the round-7 canonical-zero-from-null construction is **withdrawn**;
+> null → **no SO, no binding**, `data_shape_schema_mismatch` (Shopify does not
+> document null==zero) — D-012-2/§6.0.1; (e8) **six gate families** — order edits,
+> product refund/removal, shipping, duties & additional fees (duty-first), cash
+> rounding, tip; §6.0.4 is a pointer into §6.0.3, not a seventh — D-012-2/§6.0. The
+> decision-closure §4–§18 remains authoritative where it and this packet differ.
 > Produced 2026-07-10 by the MVP
 > planning-completion session (AR-042 candidate); **revised
 > 2026-07-11** by the PR #148 revision session per ChatGPT's
@@ -284,21 +312,22 @@ no longer hide under aggregate slack:
 **REBUILT 2026-07-14 (review `4690680028` items 2 & 3, then review `4691067575`
 items 2 & 3) — the canonical single-count ledger, per-tax-signature base
 reconciliation, and conditional tax bound live in closure §6, authoritative.**
-**Pre-creation gates (closure §6.0 — SEVEN fail-closed gates, reviews `4691408835`
-+ `4691931971` + `4693694894`):** before any SO write — (0) **`Order.edited ==
+**Pre-creation gates (closure §6.0 — SIX fail-closed gate families, reviews
+`4691408835` + `4691931971` + `4693694894` + `4694311215`; §6.0.4 is a pointer into
+the duty-first §6.0.3 gate, not a seventh):** before any SO write — (0) **`Order.edited ==
 true` → `unsupported_order_edit`** (order edits out of MVP; evaluated **first**;
 quantity/total checks alone miss price-only and offsetting edits — review
 `4693694894` item 2; evidence = order GID + `edited=true` + `updatedAt` only, no
 edit-history reconstruction); (1) every line `currentQuantity == quantity` **and**
 `money_equal(totalPriceSet, currentTotalPriceSet)` **and** the price⇄current-tax
 rule — when `totalTaxSet` is **non-null**, `money_equal(totalTaxSet,
-currentTotalTaxSet)`; when `totalTaxSet` is **null**, build a **canonical zero
-MoneyBag** in the order's shop+presentment currencies and require
-`money_equal(canonical_zero, currentTotalTaxSet)` in both legs (a nonzero
-`currentTotalTaxSet` fails), and missing/contradictory currency →
-`data_shape_schema_mismatch` (the round-6 "`totalTaxSet` null OR equals" rule is
-**withdrawn** — null must not bypass the check, review `4693694894` item 3)
-(`refunded_or_removed_quantity`); (2) every shipping line
+currentTotalTaxSet)`; when `totalTaxSet` is **null**, **fail closed — no SO, no
+binding —** `data_shape_schema_mismatch` (Shopify documents `totalTaxSet` as
+nullable but **not** that null means zero, so the round-7 canonical-zero-from-null
+construction is **withdrawn** — review `4694311215` item 3; evidence = order GID +
+`currentTotalTaxSet` amount/currency + absence of original tax; a later
+evidence-backed decision may normalize null→zero, §18)
+(`refunded_or_removed_quantity` for the non-null unequal case); (2) every shipping line
 `isRemoved == false` and `currentDiscountedPriceSet == discountedPriceSet` (both
 currencies) and consistent with `currentShippingPriceSet`
 (`refunded_or_removed_shipping`); (3) **duty-first precedence** — if
@@ -345,56 +374,68 @@ round-4 untaxed-Tip-line posture is **withdrawn**, review `4691931971` item 6).
    `total_excluded`/`total_included`/tax breakdown, add a qty-1 residual carrying
    the same tax signature, **recompute through the engine**, and require the engine
    excluded base to reconcile; for tax-included taxes the residual **gross** is
-   derived **through the engine** (`special_mode='total_excluded'`/bounded solver),
-   **never** by gross/pre-tax subtraction; **no valid residual → fail closed**.
+   derived **through the engine** — `special_mode='total_excluded'` is a **seed,
+   NOT an exact inverse** (Odoo 19 guarantees symmetry only with an unrounded
+   `price_unit` + `round_globally`; `price_unit` is `Float` — review `4694311215`
+   item 1), so a **deterministic bounded solver** over currency-valid `price_unit`
+   candidates recomputes through the actual engine and **accepts only from the
+   engine readback** (`raw_total_excluded_currency`/`total_excluded_currency`/
+   `raw_base_amount_currency`/`raw_tax_amount_currency`/`tax_amount_currency`),
+   **never** by gross/pre-tax subtraction; **no valid candidate → fail closed**.
    Money fields are binary `float`, so the residual is **not** assumed to store a
    Decimal exactly — it is chosen so the engine result reconciles, read back and
    re-checked (closure §6.2).
-2. **Per-tax-signature base — engine excluded base, quantized (closure §6.4a) —
+2. **Per-tax-signature base — engine raw excluded base, quantized (closure §6.4a) —
    BEFORE any tax tolerance:** for each signature (the hashed `shopify_tax_evidence_key`
-   fingerprint, §5.2a) require `res.currency.round(base_src(σ)) == res.currency.round(base_odoo(σ))`,
-   where `base_odoo(σ)` is the **tax engine's returned excluded base**
-   (`total_excluded`/`base_amount`) — **not** a hand `price_unit×qty×(1−discount)`
-   formula and **not** the displayed `amount_untaxed`. A **global `amount_untaxed`
-   match is NOT sufficient**; any nonzero quantized difference →
-   `financial_total_mismatch`. **Currency-rounded equality is necessary but not a
-   proof of exact pre-rounding equality** — the engine's own `delta_engine(σ)`
-   records the residue, so the tax check carries an **engine-derived
-   `tax_delta_bound(σ)`**, not an assumed zero.
-3. **Taxes (one global formula — review `4693694894` item 7):**
-   `|amount_tax − totalTaxSet.shopMoney| ≤ tol_tax_total`, where **`tol_tax_total =
-   tax_delta_total + 0.5r(S + O)`** and **`tax_delta_total = Σ_σ tax_delta_bound(σ)`**.
-   **MVP requires `tax_delta_bound(σ) = 0` for every admitted signature** — since
-   MVP supports only **leaf percent** taxes (§5.5) and the §6.2 engine residual
-   reconciles a percentage tax's excluded base exactly, every admitted signature
-   has `delta_engine(σ)=0` and `q(base_src)==q(base_odoo)`, so `tax_delta_bound(σ)=0`
-   by construction; a signature that cannot reach zero delta **fails closed**
-   (never widening the tolerance). Therefore **`tax_delta_total ≡ 0`** for admitted
-   orders and `tol_tax_total = 0.5r(S+O)` — but the formula is stated with the
-   `tax_delta_total` term so **no document calls `0.5r(S+O)` "complete" while a
-   nonzero delta is permitted** (the general `tax_delta_bound(σ)` — the mapped tax
-   function's own non-linear result, **never** `rate × base_difference` — is
-   retained only for a separately-accepted future scope; group/compound/base-
-   affecting structures are deferred and fail closed, §5.5). A **proposed
-   conservative** rounding bound valid **only** under
+   fingerprint, §5.2a) require `res.currency.round(base_src(σ)) == res.currency.round(base_odoo_raw(σ))`,
+   where `base_odoo_raw(σ)` is the **tax engine's returned `raw_base_amount_currency`**
+   — **not** a hand `price_unit×qty×(1−discount)` formula and **not** the displayed
+   `amount_untaxed`. A **global `amount_untaxed` match is NOT sufficient**; any
+   nonzero quantized difference (a **full minor-unit** base error) →
+   `financial_total_mismatch`. **Currency-quantized equality is necessary but not a
+   proof of exact pre-rounding equality** — the **actual** raw residue
+   `base_delta(σ) = |base_odoo_raw(σ) − base_src(σ)|` is **recorded**, and the tax
+   check carries its linear leaf-percent impact `tax_delta_bound(σ) =
+   base_delta(σ)×rate/100`, **not an assumed zero** (review `4694311215` items 1–2).
+3. **Taxes (one global formula — reviews `4693694894` item 7, `4694311215` items
+   1–2):** `|amount_tax − totalTaxSet.shopMoney| ≤ tol_tax_total`, where
+   **`tol_tax_total = tax_delta_total + 0.5r(S + O)`** and **`tax_delta_total = Σ_σ
+   tax_delta_bound(σ)`**. `tax_delta_bound(σ) = base_delta(σ)×rate/100` is the
+   **actual** engine-derived raw-base-delta term (valid because MVP taxes are
+   independent **leaf percentages**, §5.5 — never applied to a deferred complex
+   structure); it is **not assumed zero**, and `tax_odoo(σ)` is compared using the
+   engine's **actual `tax_amount_currency`** readback. It is `0` only when the raw
+   base matches exactly (the clean 2-decimal case). A signature for which the §6.2
+   solver finds **no** currency-valid candidate satisfying the base + tax checks
+   **fails closed** (never widening the tolerance). The formula carries the
+   `tax_delta_total` term **in full** so **no document reduces it to `0.5r(S+O)`
+   while a nonzero delta is possible** (the linear `base_delta×rate/100` form is the
+   MVP form for leaf percentages; a **non-linear** delta would arise only for a
+   deferred group/compound/base-affecting structure, which is held/fails closed,
+   §5.5 — the linear form is **never** applied to it). A **proposed conservative**
+   rounding bound valid **only** under
    explicit assumptions (bases reconciled at the engine §6.4a; rates match; each
    Shopify/Odoo event rounds within `0.5r`; complete `O`). The **Shopify-event
    rounding premise is
    labelled separately (Inference, not an official guarantee** — the schema does
    not state the convention); undocumented-rounding currencies **fail closed**
    pending authorized dev-store evidence. `S` = Shopify per-line/per-shipping tax
-   rounding events; `O` = Odoo tax rounding events under the actual
-   `tax_calculation_rounding_method` (distinct groups under `round_globally` [the
-   Odoo-19 default], line×tax pairs under `round_per_line`). **Conditional proof
-   (closure §6.5):** on the **exactly-equal** bases both totals round the same exact
-   `Θ` → triangle inequality → `≤ 0.5r(S+O)`. The formula distinguishes **base
-   mismatch** (`tax_delta_bound`, 0 or proven), **Shopify rounding** (`0.5r·S`) and
-   **Odoo rounding** (`0.5r·O`). The old `K = distinct tax groups` bound **omitted
-   `S`** and false-rejects a many-small-line order under `round_globally` (closure
-   Example I). It is **not** described as "tight and correct."
+   rounding events; `O` = **sale-order** tax rounding events under the actual
+   `tax_calculation_rounding_method` (distinct **leaf-tax grouping keys** under
+   `round_globally` [the Odoo-19 default], taxed-line×leaf-tax pairs under
+   `round_per_line`) — **never** invoice repartition rows (review `4694311215`
+   item 2). **Conditional proof (closure §6.5):** per signature the exact taxes
+   differ by `tax_delta_bound(σ)` (leaf-percent × `base_delta`), and each system
+   rounds within `0.5r` per event → summing gives `≤ tax_delta_total + 0.5r(S+O) =
+   tol_tax_total`. The formula distinguishes the **actual base residue**
+   (`tax_delta_bound`), **Shopify rounding** (`0.5r·S`) and **Odoo rounding**
+   (`0.5r·O`). The old `K = distinct tax groups` bound **omitted `S`** and
+   false-rejects a many-small-line order under `round_globally` (closure Example I).
+   It is **not** described as "tight and correct."
 4. **Total:** `|amount_total − totalPriceSet.shopMoney| ≤ tol_lines + tol_tax_total`
-   (with `tax_delta_total ≡ 0` for admitted orders, so `= tol_lines + 0.5r(S+O)` in
-   practice), with **no** fixed or currency-relative cap. A mandatory **ledger self-check**
+   (the `tax_delta_total` term is carried **in full** — the actual engine raw-base-
+   delta term, `0` only when the raw base matches exactly), with **no** fixed or
+   currency-relative cap. A mandatory **ledger self-check**
    requires `|Total_ex − totalPriceSet| ≤ tol_total` where `Total_ex = U_ex +
    totalTaxSet` (closure §6.1-F). A missing/wrong line shifts a subtotal/base far
    beyond `0.5r` and is rejected at the lines/§6.4a/total level.
@@ -440,8 +481,9 @@ closure Example K); **per-tax-signature base reconciliation** (equal global
 `amount_untaxed` but value shifted taxed↔untaxed or rate↔rate → rejected before
 the tax tolerance, closure Example E/§6.4a). **Added earlier (review item 3):** an
 **adversarial many-small-lines / one-group / `round_globally` counterexample**
-(closure Example I) that the conditional `tol_tax_total = 0.5r(S+O)` (zero
-`tax_delta_total`) accepts while `K=distinct groups` would false-reject; **fully
+(closure Example I) that the conditional `tol_tax_total = tax_delta_total +
+0.5r(S+O)` (here `base_delta=0` so `tax_delta_total=0`) accepts while `K=distinct
+groups` would false-reject; **fully
 worked tax-inclusive** ordinary and order-discount cases (closure Examples G/H —
 product source pre-tax, shipping back-out only); multiple taxes on one line;
 multiple distinct percent taxes (round_globally buckets); shipping-tax
@@ -767,15 +809,17 @@ Resolution order for each distinct `TaxLine` on a line/shipping/order tax line:
    position revalidated). **Multiple independent mapped percentage taxes may apply
    to one line.** A target whose `amount_type ∈ {'group', 'fixed', 'division'}`, or
    any **base-affecting compound** structure (`include_base_amount` /
-   `is_base_affected`, or a sequence the §6.2 engine proof cannot reconcile),
+   `is_base_affected`, or a sequence the §6.2 engine solver cannot reconcile),
    **fails closed** — `odoo_validation_configuration` (`unsupported_tax_structure`),
    never imported and **never counted** in `O`. Advanced tax structures are
    **[Deferred / non-MVP]**, a separately accepted post-MVP scope. This resolves the
    prior contradiction (percent-required vs group-supported): group children are
    **not** claimed or counted. Consistent with this, the §6.4a per-signature check
-   requires `tax_delta_bound(σ) = 0` for every admitted signature (a percent tax's
-   engine excluded base reconciles exactly, §6.2), else fail closed — so
-   `tax_delta_total ≡ 0` (D-012-2 item 3). Odoo recomputes
+   requires quantized base equality `q(base_src(σ))==q(base_odoo_raw(σ))` and records
+   the **actual** engine raw-base delta `base_delta(σ)`, carrying its **linear**
+   `tax_delta_bound(σ)=base_delta(σ)×rate/100` in `tol_tax_total` (valid for leaf
+   percentages only; **not assumed zero** — review `4694311215` items 1–2), else
+   fail closed (D-012-2 item 3). Odoo recomputes
 amounts; agreement with Shopify's per-line math is enforced by the
 D-012-2 guard, which is the accepted correctness backstop. Evidence for the ADR: Odoo 19
 has **no supported order-level external-tax override**
@@ -1009,21 +1053,28 @@ discounts; accumulated in-bounds drift accepted; real mismatch
 (missing line / wrong price) rejected at component level under the
 **cap-free** bound; taxesIncluded (included/excluded) variants; JPY
 zero-decimal and BHD three-decimal cases; **no fixed/currency-relative
-cap relied upon**; **per-signature base equality (`q(base_src)==q(base_odoo)`)
-on the tax-**engine** excluded base (not the displayed `amount_untaxed`) before
-the tax tolerance; the base-delta adversarial case fails closed (Example L)**;
-**round-5 engine cases (review `4691931971` item 5) — tax-excluded residual via the
-engine; tax-included residual derived THROUGH the engine (`special_mode='total_excluded'`/
-bounded solver), never gross/pre-tax subtraction; binary-float boundary;
-multi-repartition **leaf percent** delta via the actual tax function (never `rate ×
-base_delta`); no-valid-residual → fail closed; same displayed subtotal but
-different engine base → engine base governs; `price_include_override` on
-`account.tax` not the SO line**; **round-7 one-tolerance-formula (review
-`4693694894` item 7) — admitted order has `tax_delta_bound(σ)=0 ∀σ` ⇒
-`tax_delta_total=0` ⇒ `tol_tax_total = 0.5r(S+O)`; the same `tol_tax_total` is used
-in per-signature/`amount_tax`/`amount_total` bounds; a signature that can only
-reconcile with a nonzero engine delta FAILS CLOSED (Example L), so no admitted path
-calls `0.5r(S+O)` "complete" while a nonzero delta is permitted**);
+cap relied upon**; **per-signature quantized base equality
+(`q(base_src)==q(base_odoo_raw)`) on the tax-**engine** raw excluded base
+(`raw_base_amount_currency`, not the displayed `amount_untaxed`) before the tax
+tolerance; a **full minor-unit** base-delta adversarial case fails closed (Example
+L)**; **round-5 engine cases (review `4691931971` item 5) — tax-excluded residual
+via the engine; tax-included residual derived THROUGH the engine (seed + bounded
+solver, **not** an exact-inverse claim), never gross/pre-tax subtraction;
+binary-float boundary; multi-repartition **leaf percent** case where `O` counts the
+grouping key **once** (never per repartition row); no-valid-candidate → fail closed;
+same displayed subtotal but different engine base → engine base governs;
+`price_include_override` on `account.tax` not the SO line**; **round-8
+tax-engine/tolerance corrections (review `4694311215`) — `special_mode` is a
+**seed** not an exact inverse (Odoo symmetry only with unrounded `price_unit` +
+`round_globally`; `price_unit` is `Float`); every candidate recomputed through the
+actual engine and accepted only from readback (`raw_base_amount_currency`/
+`tax_amount_currency`), else fail closed; the **actual** `base_delta(σ)` is recorded
+and its linear `tax_delta_bound(σ)=base_delta×rate/100` is carried in `tol_tax_total
+= tax_delta_total + 0.5r(S+O)` (Example Q — nonzero delta admitted; NOT reduced to
+`0.5r(S+O)`); `O` from SO tax-details grouping keys, never invoice repartition rows
+(Example R); the same `tol_tax_total` in per-signature/`amount_tax`/`amount_total`
+bounds; a full-minor-unit base mismatch or no-candidate signature FAILS CLOSED
+(Example L)**);
 `tests/test_order_tax_resolution.py` (**explicit-mapping-only** resolution on the
 **versioned `shopify_tax_evidence_key`** (`v1:<sha256 hex>`, full untruncated
 tuple); **rate-unit pinning — the query carries both `rate` and `ratePercentage`;
@@ -1062,10 +1113,13 @@ total, and `edited==true` while every `currentQuantity==quantity`; bounded non-P
 evidence only), **the fail-closed refund/removed-quantity skip** (fully/partially
 refunded line, removed line, mixed eligible/ineligible order → whole order skipped
 before any SO write, `totalPriceSet != currentTotalPriceSet` cross-check, **plus
-the round-7 nullable-`totalTaxSet` rule** (review `4693694894` item 3 — null tax +
-current zero passes; null tax + current nonzero fails; null tax + currency mismatch
-→ `data_shape_schema_mismatch`; non-null `10.0` vs `10.00` equal; non-null unequal
-fails)), **the round-4 fail-closed skips** — refunded/partially-refunded/removed
+the round-8 fail-closed nullable-`totalTaxSet` rule** (review `4694311215` item 3 —
+**null `totalTaxSet` → `data_shape_schema_mismatch` in ALL cases** (current-zero,
+current-nonzero, currency-mismatch): the round-7 canonical-zero-from-null
+construction is **withdrawn**, since Shopify does not document null==zero; non-null
+`10.0` vs `10.00` equal; non-null unequal fails; evidence = order GID +
+`currentTotalTaxSet` + absence of original tax)), **the round-4 fail-closed skips**
+— refunded/partially-refunded/removed
 **shipping** (`isRemoved`/`currentDiscountedPriceSet != discountedPriceSet`, product
 qty unchanged), **nullable shipping-id + no-DiscountApplication-id** edge-cursor
 pagination (all three connections edges/cursor; duplicate cursor / conflicting
@@ -1218,19 +1272,22 @@ IMPLEMENT exactly per the packet and closure: D-012-1 binding schema (explicit
 _name+_inherit, models.Constraint, dual uniqueness; ALL money snapshots as
 Char/exact Shopify decimal string parsed with decimal.Decimal, NEVER Float;
 shop AND presentment total snapshots per DEC-020; no customer PII stored on
-the binding); SEVEN FAIL-CLOSED PRE-CREATION GATES (closure §6.0) BEFORE any SO,
-each a terminal policy skip (never financial_total_mismatch): (0) Order.edited==true
+the binding); SIX FAIL-CLOSED PRE-CREATION GATE FAMILIES (closure §6.0; §6.0.4 is a
+POINTER into the duty-first §6.0.3 gate, NOT a seventh gate — review 4694311215)
+BEFORE any SO, each a terminal policy skip (never financial_total_mismatch): (0)
+Order.edited==true
 -> unsupported_order_edit (order edits out of MVP; evaluated FIRST; quantity/total
 checks alone miss price-only/offsetting edits — review 4693694894 item 2; evidence =
 order GID + edited=true + updatedAt only, no edit-history reconstruction); (1) every
 line currentQuantity==quantity AND money_equal(totalPriceSet,currentTotalPriceSet)
 AND the price⇄current-tax rule — if totalTaxSet is NON-NULL,
-money_equal(totalTaxSet,currentTotalTaxSet); if totalTaxSet is NULL, build a
-CANONICAL ZERO MoneyBag in the order's shop+presentment currencies and require
-money_equal(canonical_zero,currentTotalTaxSet) in BOTH legs (nonzero current tax
-FAILS), and missing/contradictory currency -> data_shape_schema_mismatch (the round-6
-"totalTaxSet null OR equals" rule is WITHDRAWN — null must NOT bypass the check,
-review 4693694894 item 3) -> refunded_or_removed_quantity; (2) every shipping
+money_equal(totalTaxSet,currentTotalTaxSet); if totalTaxSet is NULL, FAIL CLOSED —
+NO SO, NO binding — data_shape_schema_mismatch (Shopify documents totalTaxSet as
+nullable but NOT that null means zero, so the round-7 canonical-zero-from-null
+construction is WITHDRAWN — review 4694311215 item 3; evidence = order GID +
+currentTotalTaxSet amount/currency + absence of original tax; NEVER reinterpret null
+as zero; a later evidence-backed decision may normalize null->zero); the non-null
+unequal case -> refunded_or_removed_quantity; (2) every shipping
 line isRemoved==false AND currentDiscountedPriceSet==discountedPriceSet (both
 currencies) AND consistent with currentShippingPriceSet ->
 refunded_or_removed_shipping; (3) DUTY-FIRST PRECEDENCE — if currentTotalDutiesSet
@@ -1257,35 +1314,48 @@ assume quantity × discountedUnitPriceSet == any total; discountedUnitPriceSet i
 shipping taxLines if taxesIncluded else 0) (exact shipping, back out tax once only
 when inclusive); U_ex is ALWAYS tax-exclusive (NO global G−totalTaxSet back-out);
 lines tol = 0.5r*L (tax-excl) or 0.5r*(L+S_ship) (tax-incl, only shipping back-out
-roundings; no tip line in L); PER-TAX-SIGNATURE BASE — ENGINE EXCLUDED BASE,
-QUANTIZED (closure §6.4a, REBUILT review 4691931971 item 5) BEFORE the tax
-tolerance — for each signature (the VERSIONED shopify_tax_evidence_key, v1:<sha256
-hex>) require res.currency.round(base_src(σ)) == res.currency.round(base_odoo(σ))
-where base_odoo = the tax ENGINE's returned total_excluded/base_amount (NOT a hand
+roundings; no tip line in L); TAX-INCLUDED RESIDUAL VIA SEED + BOUNDED SOLVER, NOT
+EXACT INVERSION (closure §6.2-C, review 4694311215 item 1) — special_mode=
+'total_excluded' is a SEED, NOT an exact inverse (Odoo 19 guarantees symmetry only
+with an unrounded price_unit + round_globally; sale.order.line.price_unit is Float),
+so a deterministic bounded solver over currency-valid price_unit candidates
+RECOMPUTES through the ACTUAL engine (real tax_calculation_rounding_method, real
+account.tax, real inclusion, real base prep) and ACCEPTS ONLY from the engine
+readback (raw_total_excluded_currency/total_excluded_currency/raw_base_amount_currency/
+raw_tax_amount_currency/tax_amount_currency), else FAIL CLOSED (no candidate ->
+financial_total_mismatch); PER-TAX-SIGNATURE BASE — ENGINE RAW EXCLUDED BASE,
+QUANTIZED (closure §6.4a) BEFORE the tax tolerance — for each signature (the
+VERSIONED shopify_tax_evidence_key, v1:<sha256 hex>) require
+res.currency.round(base_src(σ)) == res.currency.round(base_odoo_raw(σ)) where
+base_odoo_raw = the tax ENGINE's returned raw_base_amount_currency (NOT a hand
 price_unit×qty×(1−discount) formula, NOT the displayed amount_untaxed); a GLOBAL
-amount_untaxed match is NOT sufficient; ANY nonzero quantized base diff ->
-financial_total_mismatch first; ONE GLOBAL TAX TOLERANCE (review 4693694894 item 7):
-tol_tax_total = tax_delta_total + 0.5r*(S+O), tax_delta_total = Σ_σ tax_delta_bound(σ);
-MVP REQUIRES tax_delta_bound(σ)=0 FOR EVERY ADMITTED SIGNATURE — leaf percent taxes
-reconcile the engine excluded base exactly (§6.2), so delta_engine(σ)=0 and
-q(base_src)==q(base_odoo); a signature that can only reconcile with a NONZERO delta
-FAILS CLOSED (never widen the tolerance), so tax_delta_total ≡ 0 and tol_tax_total =
-0.5r*(S+O) — but state the formula WITH the tax_delta_total term so NO doc calls
-0.5r(S+O) "complete" while a nonzero delta is permitted (the general tax_delta_bound
-via the mapped tax function — never rate×base_diff — is retained only for a
-separately-accepted future scope; group/fixed/division/base-affecting compound are
-DEFERRED and fail closed); it is
-a PROPOSED CONSERVATIVE bound under EXPLICIT assumptions (bases reconciled at the
-engine with zero delta; rates match; each Shopify/Odoo event rounds ≤0.5r; complete O) — the
+amount_untaxed match is NOT sufficient; ANY nonzero quantized base diff (a FULL
+minor-unit base error) -> financial_total_mismatch first; ONE GLOBAL TAX TOLERANCE
+(reviews 4693694894 item 7 + 4694311215 items 1-2): tol_tax_total = tax_delta_total
++ 0.5r*(S+O), tax_delta_total = Σ_σ tax_delta_bound(σ); tax_delta_bound(σ) =
+base_delta(σ)×rate/100 is the ACTUAL engine-derived raw-base-delta term
+(base_delta(σ) = |base_odoo_raw(σ)−base_src(σ)|), NOT assumed zero — RECORD the
+actual raw delta, CARRY its linear leaf-percent tax term in the bound, and compare
+the FINAL ACTUAL engine tax_amount_currency with Shopify evidence; it is 0 only when
+the raw base matches exactly (clean 2-decimal). The linear form is valid ONLY for
+independent leaf percentages — NEVER applied to a deferred group/fixed/division/
+base-affecting structure (those are HELD unsupported_tax_structure). A signature for
+which the solver finds NO currency-valid candidate satisfying the base+tax checks
+FAILS CLOSED (never widen the tolerance). State/use tol_tax_total WITH the
+tax_delta_total term EVERYWHERE (per-signature/amount_tax/amount_total/examples/
+tests) so NO doc reduces it to 0.5r(S+O) while a nonzero delta is possible; it is a
+PROPOSED CONSERVATIVE bound under EXPLICIT assumptions (bases reconciled at the
+engine via readback; rates match; each Shopify/Odoo event rounds ≤0.5r; complete O) — the
 Shopify-event rounding premise is LABELLED SEPARATELY (Inference, not an official
 guarantee; the schema does not state the convention), undocumented-rounding
 currencies FAIL CLOSED pending authorized dev-store evidence; S = Shopify
-per-line/per-shipping tax rounding events; O = Odoo tax rounding events under the
-ACTUAL tax_calculation_rounding_method (one per distinct mapped LEAF PERCENT tax
-under round_globally [Odoo-19 default] — group children are DEFERRED/fail-closed and
-NOT counted, review 4693694894 item 6; line×tax pairs under round_per_line); the old
-K=distinct-groups bound is WITHDRAWN (omits S); total tol = lines + tol_tax_total,
-NO cap; a ledger self-check
+per-line/per-shipping tax rounding events; O = SALE-ORDER tax rounding events under
+the ACTUAL tax_calculation_rounding_method (amount_tax comes from the SO tax-details
+computation, so O = distinct LEAF-TAX GROUPING KEYS under round_globally [Odoo-19
+default] / taxed-line×leaf-tax pairs under round_per_line — NEVER invoice repartition
+rows, review 4694311215 item 2; group children DEFERRED/fail-closed and NOT counted);
+the old K=distinct-groups bound is WITHDRAWN (omits S); total tol = lines +
+tol_tax_total, NO cap; a ledger self-check
 (Total_ex==totalPriceSet) backstops; each product line reproduced THROUGH THE
 ACTUAL ODOO 19 TAX ENGINE (price_include_override lives on account.tax NOT the SO
 line; construct candidate sale.order.line, read engine total_excluded/total_included

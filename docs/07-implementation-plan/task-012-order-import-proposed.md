@@ -11,7 +11,7 @@
 > and the implementation packet — **pending ChatGPT control-room acceptance**
 > (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
 > 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` +
-> `4692656343` + `4693694894`),
+> `4692656343` + `4693694894` + `4694311215`),
 > not direct PR merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
 > bindings; protected/guarded customer import + indexed normalized-email matching;
 > no unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
@@ -120,6 +120,10 @@ full normalized `ratePercentage`+`title`+`source`+`channelLiable`+inclusion tupl
 **Unicode-NFC only, case and whitespace preserved, no folding, no truncation**;
 `price_include_override` on `account.tax` per `taxesIncluded`), letting the
 **standard Odoo 19 `account.tax` engine** recompute under the total-check guard —
+the price-included recompute uses a **seed + bounded solver read back from the
+actual engine** (`special_mode='total_excluded'` is a seed, **not** an exact
+inverse — Odoo 19 symmetry holds only with an unrounded `price_unit` +
+`round_globally`, and `price_unit` is `Float`; review `4694311215` item 1) —
 **no custom connector tax engine, no automatic rate fallback, and no tax
 auto-creation** in MVP (review `4692656343`: a same-rate Odoo tax is an operator
 *suggestion* only; `order_tax_autocreate` is removed). **Group/fixed/division and
@@ -146,15 +150,21 @@ D-012-2: `totalPriceSet.shopMoney.amount` is the total comparand; each product l
 (never `quantity × discountedUnitPriceSet`, which is an *approximate* unit price),
 reproduced in Odoo **through the actual Odoo 19 tax engine** (engine
 `total_excluded`; `price_include_override` is on `account.tax` not the SO line;
-price-included residuals derived via the engine, not gross subtraction; money
-fields are binary floats). **Seven fail-closed pre-creation gates** (out of MVP
-scope → policy skip, never `financial_total_mismatch`): **order edits**
-(`Order.edited == true` → `unsupported_order_edit`, evaluated first — quantity/total
-checks alone miss price-only/offsetting edits, review `4693694894` item 2);
-refunded/removed **product** quantities (**with the exact nullable-`totalTaxSet`
-rule** — a null original tax is normalized to a canonical zero MoneyBag in the
-order currencies and must `money_equal` the non-null `currentTotalTaxSet`, else fail
-closed; review `4693694894` item 3); refunded/removed/modified **shipping**;
+price-included residuals derived via a **seed + bounded solver recomputed through
+the actual engine** — `special_mode='total_excluded'` is a **seed, not an exact
+inverse** (Odoo 19 guarantees symmetry only with an unrounded `price_unit` +
+`round_globally`; `price_unit` is `Float`), accepted only from the engine readback,
+else fail closed — review `4694311215` item 1; money fields are binary floats).
+**Six fail-closed pre-creation gate families** (out of MVP scope → policy skip,
+never `financial_total_mismatch`; §6.0.4 is a pointer into the duty-first §6.0.3
+gate, not a seventh — review `4694311215`): **order edits** (`Order.edited == true`
+→ `unsupported_order_edit`, evaluated first — quantity/total checks alone miss
+price-only/offsetting edits, review `4693694894` item 2); refunded/removed
+**product** quantities (**with the fail-closed nullable-`totalTaxSet` rule** — a
+null original tax **fails closed** `data_shape_schema_mismatch` (no SO/binding);
+Shopify does not document that null means zero, so the round-7 canonical-zero
+construction is **withdrawn**; review `4694311215` item 3); refunded/removed/modified
+**shipping**;
 **duty-first** duties/additional-fees precedence (a duty-only order reaches
 `unsupported_duties`; the skip fires from the **aggregate**
 `currentTotalAdditionalFeesSet`/`currentTotalDutiesSet` — `Order.additionalFees`
@@ -178,14 +188,17 @@ or case/whitespace-folded key could yield a correct total with the wrong
 tax/account, or collide distinct evidence; unmapped/colliding → hold). The
 tolerance is a canonical single-count ledger (`U_ex = M + H` with `T=0`; always
 tax-exclusive; shipping tax backed out once when inclusive) with a currency-rounding
-bound, **per-tax-signature reconciliation on the tax-engine excluded base before
-any tax tolerance**, and **one global tax tolerance `tol_tax_total = Σ_σ
-tax_delta_bound(σ) + 0.5r·(S+O)`** where the MVP requires `tax_delta_bound(σ) = 0`
-for every admitted signature (a leaf percent tax's engine excluded base reconciles
-exactly, else fail closed) — so `tax_delta_total ≡ 0` and the operative bound is
-`0.5r·(S+O)`, but the formula is stated with the delta term so no document calls
-`0.5r(S+O)` "complete" while a nonzero delta is permitted (review `4693694894` item
-7); its platform-rounding premise is a labelled inference, with **no** money cap.
+bound, **per-tax-signature quantized reconciliation on the tax-engine raw excluded
+base (`raw_base_amount_currency`) before any tax tolerance** (a full minor-unit base
+error fails closed), and **one global tax tolerance `tol_tax_total = Σ_σ
+tax_delta_bound(σ) + 0.5r·(S+O)`** where `tax_delta_bound(σ) = base_delta(σ)×rate/100`
+is the **actual** engine raw-base-delta term (`base_delta(σ) = |base_odoo_raw(σ) −
+base_src(σ)|`, valid for leaf percentages only) — **carried in full, not assumed
+zero and not reduced to `0.5r(S+O)`** (it is `0` only when the raw base matches
+exactly; a no-candidate signature fails closed); `O` is counted from the sale-order
+tax-details computation (leaf-tax grouping keys / taxed-line×leaf-tax pairs),
+**never** invoice repartition rows (reviews `4693694894` item 7 + `4694311215` items
+1–2); its platform-rounding premise is a labelled inference, with **no** money cap.
 This is **proposed, pending control-room acceptance** (MBQ-56 stays open until
 then).
 
