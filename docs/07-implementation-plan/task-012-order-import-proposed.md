@@ -10,14 +10,15 @@
 > [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
 > and the implementation packet — **pending ChatGPT control-room acceptance**
 > (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
-> 2026-07-14, reviews `4690680028` + `4691067575`), not direct PR merges:**
-> SRR-03 CLOSED; protected/guarded product import + complete variant bindings;
-> protected/guarded customer import + indexed normalized-email matching; no
-> unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
-> accepted — delivered via the **accepted CORE-R2 Slice-2B integration-staging
-> strategy (PR #158, review `4691064435`)**; the current unprotected PR
-> #150/#151 heads are **not** directly mergeable. **CORE-R1 is already merged**
-> (satisfied, not pending).
+> 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835`), not direct PR
+> merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
+> bindings; protected/guarded customer import + indexed normalized-email matching;
+> no unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
+> accepted — delivered via the **MERGED CORE-R2 Slice-2B integration-staging
+> strategy (PR #158, review `4691064435`; merged at `Shopify-connector` tip
+> `1494b97`)**; the current unprotected PR #150/#151 heads are **not** directly
+> mergeable. **CORE-R1 is already merged** (satisfied, not pending). This branch
+> is base-aligned onto `1494b97` (round-4).
 
 ## Status
 
@@ -129,18 +130,25 @@ against Shopify's own reported order total. A mismatch beyond a
 to-be-defined tolerance is classified `financial total mismatch` —
 conservative, never silent, never auto-retried, requires explicit human
 review. **Exact tolerance mechanism and Shopify total field — proposed
-resolution 2026-07-14 (round-3, review `4691067575`)** in the decision-closure
-§6 / packet D-012-2: `totalPriceSet.shopMoney.amount` is the total comparand;
-each product line's **exact** pre-tax net is the official
+resolution 2026-07-14 (rounds 3–4, reviews `4691067575` + `4691408835`)** in the
+decision-closure §6 / packet D-012-2: `totalPriceSet.shopMoney.amount` is the
+total comparand; each product line's **exact** pre-tax net is the official
 `priceAfterAllDiscountsBeforeTaxesSet` field (never `quantity ×
-discountedUnitPriceSet`, which is an *approximate* unit price); refunds/removed
-quantities are **out of scope and fail closed** (`currentQuantity == quantity`
-gate); the tolerance is a canonical single-count ledger (`U_ex = M + H + T`, each
-of product/shipping/tip counted once and always tax-exclusive; shipping tax
-backed out once only when inclusive) with a currency-rounding-derived bound
-(`tol_lines = 0.5r·L` or `0.5r·(L+S_ship)` tax-incl), **per-tax-signature base
-reconciliation before any tax tolerance** (a global `amount_untaxed` match is not
-sufficient), and a **proposed conditional `tol_tax = 0.5r·(S+O)`** whose
+discountedUnitPriceSet`, which is an *approximate* unit price). **Five fail-closed
+pre-creation gates** (out of MVP scope → policy skip, never `financial_total_mismatch`):
+refunded/removed **product** quantities (`currentQuantity == quantity`); refunded/
+removed/modified **shipping** (`isRemoved`, `currentDiscountedPriceSet ==
+discountedPriceSet`); **nonzero additional fees** (`currentTotalAdditionalFeesSet`);
+**nonzero duties** (by amount, not non-null); **nonzero cash rounding**
+(`totalCashRoundingAdjustment` — its relation to `totalPriceSet` is undocumented).
+The query carries every current-state field these gates consume. The tolerance is
+a canonical single-count ledger (`U_ex = M + H + T`, each of product/shipping/tip
+counted once and always tax-exclusive; shipping tax backed out once only when
+inclusive) with a currency-rounding-derived bound (`tol_lines = 0.5r·L` or
+`0.5r·(L+S_ship)` tax-incl), **exact currency-quantized per-tax-signature base
+equality before any tax tolerance** (a global `amount_untaxed` match is not
+sufficient; the round-3 base *tolerance* was withdrawn as inconsistent with the
+proof), and a **proposed conditional `tol_tax = 0.5r·(S+O)`** whose
 platform-rounding premise is labelled as an inference (not an official Shopify
 guarantee) and fails closed for undocumented-rounding currencies — replacing the
 invalid `K=distinct groups`, with **no** money cap. This is **proposed, pending
@@ -171,9 +179,11 @@ reached via a **conditional, CORE-R2-coordinated** handler-reachable core skip
 seam (recommended: a terminal-state-respect dispatcher guard so Task 012 needs
 **no** core edit; else a `JobPolicySkip` exception) — so it never overloads
 `financial_total_mismatch` and adds no 17th error class. The same policy-skip
-routing covers duties, test orders, pre-cancelled orders, and
-**refunded/removed-quantity orders** (out of MVP scope, fail closed). Both
-currencies and both `shopMoney`/`presentmentMoney` totals are captured. This
+routing covers **nonzero** duties, **nonzero additional fees**, **nonzero cash
+rounding**, refunded/removed-quantity orders, refunded/removed/modified
+**shipping**, test orders, and pre-cancelled orders (all out of MVP scope, fail
+closed, `skip_reason`-labelled — closure §6.0). Both currencies and both
+`shopMoney`/`presentmentMoney` totals are captured. This
 is **proposed, pending control-room acceptance**.
 
 ## Manual review/blocking cases

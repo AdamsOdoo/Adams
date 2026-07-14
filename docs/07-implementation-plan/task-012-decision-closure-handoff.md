@@ -8,6 +8,39 @@
 > control-room action and is **not** modified here (that file is outside this
 > session's allowed-files list).
 
+## 0-c. Round-4 correction — 2026-07-14 (control-room review `4691408835`)
+
+A fourth REVISE (docs-only, same five files; PR #159 stays draft/unmerged),
+followed by a normal base-alignment merge:
+
+1. **Header query completed** — added every current-state field the eligibility
+   gates consume (`currentTotalPriceSet`/`currentTotalTaxSet`/
+   `currentShippingPriceSet`/`currentTotalAdditionalFeesSet`/
+   `currentTotalDutiesSet`, all `MoneyBag`/`MoneyBag!` per verified nullability),
+   plus `totalCashRoundingAdjustment` and `additionalFees`. No gate references an
+   unqueried field. (closure §4.1)
+2. **Shipping refund/removal gate** — `isRemoved` + `currentDiscountedPriceSet ==
+   discountedPriceSet` (both currencies) + consistency with
+   `currentShippingPriceSet` → else policy skip `refunded_or_removed_shipping`
+   before SO. (closure §6.0.2)
+3. **Nullable shipping-id pagination** — `ShippingLine.id` is nullable [Fact];
+   switched to `edges{ cursor node }`; the edge cursor is the mandatory identity,
+   non-null id secondary, null id never a stable GID. (closure §4.2a)
+4. **Unsupported additional fees / duties-nonzero / cash rounding** — nonzero
+   `currentTotalAdditionalFeesSet` → `unsupported_additional_fees`; duties route on
+   the **nonzero amount** (not non-null; present-zero imports); nonzero
+   `totalCashRoundingAdjustment` → `unsupported_cash_rounding` (its inclusion in
+   `totalPriceSet` is undocumented — fail closed). (closure §6.0.3–§6.0.5)
+5. **Tax-base math repaired** — §6.4a now requires **exact** currency-quantized
+   per-signature base equality (`q(base_src)==q(base_odoo)`, on the exact tax-engine
+   base); the round-3 `≤0.5r(...)` tolerance (inconsistent with the same-Θ proof)
+   is withdrawn; a rigorous `tax_delta_bound(σ)` (0 in MVP) is defined via the
+   actual mapped Odoo tax function, never `rate × base_diff`. (closure §6.4a/§6.5,
+   Example L)
+6. **Base alignment** — PR #158 merged; `Shopify-connector` at `1494b97`; this
+   branch base-aligned via a **normal merge commit** (no rebase/squash/force);
+   SRR-03 stays OPEN, no gate opened. (closure §0.2)
+
 ## 0-b. Round-3 correction — 2026-07-14 (control-room review `4691067575`)
 
 A second REVISE (docs-only, same five files; PR #159 stays draft/unmerged)
@@ -163,8 +196,16 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   confirmation before a taxed-tip store.
 - **No LineItem field distinguishes refunded from removed units** — not needed
   (the §6.0 gate fails closed on the aggregate), logged for rationale.
-- Empirical confirmation of the per-tax-signature base reconciliation (§6.4a) and
-  the `OC` attribution on a real mixed-discount order → named dev-store check.
+- **Whether a nonzero `totalCashRoundingAdjustment` is included in
+  `totalPriceSet`/`currentTotalPriceSet` is UNDOCUMENTED** [Open question] — the
+  docs establish only that it applies to `totalReceived`/`totalRefunded`; Task 012
+  **fails closed** on any nonzero adjustment (`unsupported_cash_rounding`) until
+  the relationship is proven representable.
+- **`AdditionalFee` has no category enum** — duty-vs-import-fee is only the
+  free-text `name` [Fact]; the fee gate holds on the **nonzero amount** regardless
+  of kind, recording `name` as bounded non-PII evidence.
+- Empirical confirmation of the per-tax-signature **exact base equality** (§6.4a)
+  and the `OC` attribution on a real mixed-discount order → named dev-store check.
 - `res.partner.company_name` as the sink for `MailingAddress.company` (confirm
   at build; `is_company` stays False regardless).
 - The exact core skip seam (terminal-state-respect guard vs `JobPolicySkip`) is
@@ -175,15 +216,19 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
 ## 6. Files changed this session (docs-only)
 
 - `docs/03-architecture/task-012-order-import-decision-closure.md` (round-1 new;
-  round-2 rebuilt §0/§4/§5/§6/§7/§10/§14/§15/§17/§18; **round-3** four-query §4,
+  round-2 rebuilt §0/§4/§5/§6/§7/§10/§14/§15/§17/§18; round-3 four-query §4,
   exact-source + refund gate §6.0/§6.1/§6.2, per-signature §6.4a, conditional
-  bound §6.5, tip/shipping §6.1-B/C, guards §15, deps §0.1)
+  bound §6.5, tip/shipping §6.1-B/C, guards §15, deps §0.1; **round-4** current-
+  state query fields §4.1, shipping gate §6.0.2 + edge-cursor §4.2a, fees/duties/
+  cash-rounding gates §6.0.3–§6.0.5, exact base equality §6.4a, Examples L/M/N,
+  fixtures 66–83, §17 rows 31–39, base alignment §0.2)
 - `docs/07-implementation-plan/task-012-decision-closure-handoff.md`
 - `docs/07-implementation-plan/task-012-order-import-implementation-packet.md`
   (money→Char, canonical ledger, Option-A pagination, cost posture, tax-mapping
-  safety, conditional skip seam, locked prompt; **round-3** exact-line-total
-  source, refund gate, per-signature reconciliation, conditional `tol_tax`,
-  `execute_business` guards, PR-#158 deps)
+  safety, conditional skip seam, locked prompt; round-3 exact-line-total
+  source/refund gate/per-signature/conditional `tol_tax`/`execute_business`
+  guards; **round-4** current-state query fields, shipping gate + edge-cursor,
+  fee/duty/cash-rounding gates, exact base equality, MERGED PR-#158 deps)
 - `docs/07-implementation-plan/task-012-order-import-proposed.md`
 - `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-27/56/64
   proposed-resolution status + links only — **not** marked accepted)
@@ -233,6 +278,23 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   inference, discharge the base-equality assumption with an explicit
   per-signature reconciliation step, and fail closed where the premise is
   unverified.*
+- **A gate may only reference a queried field.** The round-3 eligibility gate
+  compared `totalPriceSet == currentTotalPriceSet` but the query fetched only the
+  originals — the gate referenced fields the query never requested. *Lesson: when
+  a gate is added, add its fields to the exact query in the same change and assert
+  it with a "query-contains-every-guard-field" test.*
+- **A reconciliation *tolerance* can silently contradict the *proof* it feeds.**
+  §6.4a allowed `|base_src−base_odoo| ≤ 0.5r(...)` while §6.5 proved the tax bound
+  assuming one exact `Θ` — a nonzero base delta breaks that assumption. *Lesson:
+  when a proof assumes exact equality, the preceding step must enforce exact
+  (currency-quantized) equality, not a tolerance; and a base-delta term for
+  group/compound/included taxes must follow the actual tax function, never a
+  single-rate multiplication.*
+- **"Non-null" is not "nonzero," and current ≠ original.** Duties were skipped on
+  a non-null field (wrong — a present-zero MoneyBag is fine); refund/removal
+  needed the `current*` and per-shipping-line fields, not just the originals.
+  *Lesson: for money gates, test the Decimal amount, and read current-state vs
+  before-returns semantics from the field descriptions.*
 
 ## 8. Exact next-session prompt (control-room to issue)
 
@@ -249,18 +311,21 @@ Decide per D-012 item: accept / revise / reject. In particular rule on:
 (a) money snapshots as Char/exact-decimal-string (not Float/Monetary);
 (b) the exact per-line source `priceAfterAllDiscountsBeforeTaxesSet` (not
     quantity × discountedUnitPriceSet), the canonical ledger U_ex = M + H + T
-    (always tax-exclusive; shipping tax backed out once when inclusive), the
-    fail-closed refund/removed gate (currentQuantity==quantity), the
-    per-tax-signature base reconciliation (§6.4a), and the conditional bound
-    tol_tax = 0.5r(S+O) with its labelled platform-rounding premise;
-(c) the four-query Option-A contract + pagination (three independent cursors,
-    torn-read handling), the `execute_business` AST guards, and the provisional
-    page sizes + cost telemetry;
+    (always tax-exclusive; shipping tax backed out once when inclusive), and the
+    **exact currency-quantized per-tax-signature base equality** (§6.4a — the
+    round-3 tolerance withdrawn) with the conditional bound tol_tax = 0.5r(S+O),
+    its labelled platform-rounding premise, and the `tax_delta_bound` fallback;
+(c) the four-query Option-A contract with **every current-state guard field in the
+    query** (currentTotal*/currentShipping/additionalFees/cashRounding), the
+    **shipping refund/removal gate** + **edge-cursor pagination for the nullable
+    ShippingLine.id**, the `execute_business` AST guards, and provisional page
+    sizes + cost telemetry;
 (d) MBQ-27 mapped/matched-account.tax-under-the-guard with the §5.5 tax-mapping
     safety (company match, ambiguous hold, fiscal-position validation);
-(e) divergent currency / refunds-removed / duties / test / pre-cancelled →
-    skipped policy via the conditional/coordinated core skip seam
-    (terminal-state-respect guard recommended).
+(e) the closed policy-skip set — divergent currency, refunded/removed **product**,
+    refunded/removed/modified **shipping**, **nonzero** duties / additional fees /
+    cash rounding, test, pre-cancelled — via the conditional/coordinated core skip
+    seam (terminal-state-respect guard recommended).
 
 Do NOT open the order-domain gate or issue the locked prompt until the
 CAPABILITY prerequisites (§0.1 / §4) hold in Shopify-connector — SRR-03 CLOSED;
