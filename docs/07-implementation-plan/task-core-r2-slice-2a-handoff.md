@@ -304,3 +304,46 @@ upgrade on a multi-DB runtime; (3) optional Section-9 REPEATABLE READ/40001 retr
 
 **SRR-03 remains OPEN.** PR #160 stays **draft/unmerged**; Slice 2B not begun; no live
 Shopify request; issue #157 untouched. Await control-room decision.
+
+## 10. Test-only source-guard + service-retry correction (review 4692156428) `[Fact — NOT runtime-tested this session]`
+
+Control-room **runtime** review `4692156428` (after static acceptance
+`4691652645`) required a narrow **test-only** correction of the RT.0–RT.14
+exact-head record. Full detail:
+`docs/05-qa/task-core-r2-validation-results.md` §S2A-C.0–C.4.
+
+- **Historical evidence preserved.** Build **34872373** remains the exact-head
+  runtime evidence for the **production** SHA `79dbfc0`. The add-on tree at the
+  corrected head is **byte-identical** to `79dbfc0`; the RT record is unchanged.
+- **The four RT.3 fresh-install failures were TEST DEFECTS** (naive
+  `assertNotIn(token, getsource(method))` guards matching the method's own
+  docstring — `sudo(`, `SKIP LOCKED`, `action_clear_token`, `call.lease`). Each
+  guard is now **executable-AST**, docstring-robust, with **every original safety
+  assertion preserved** (no always-pass weakening). A new `TestSourceGuardDetectors`
+  class proves each detector both FIRES on real unsafe executable code and IGNORES
+  a docstring-only mention.
+- **Genuine service-retry proof (closes the RT.8 gap).** New opt-in `post_install`
+  `TestLifecycleServiceRetryGenuine.test_repeatable_read_serialization_retry_issues_one_transport`
+  drives the **real** `odoo.service.model.retrying(func, env)` at the normal
+  REPEATABLE READ isolation: a concurrent `action_disconnect` committed on an
+  independent backend forces the post-network `FOR NO KEY UPDATE` revalidation to
+  raise a **genuine SQLSTATE 40001**, which the real retry handles; the retried
+  attempt is matrix-refused before transport, so **exactly one** transport occurs.
+  No injected serialization, no fake retry loop, production isolation not weakened,
+  no main-cursor commit; only the retry backoff is patched.
+- **Files changed (test-only):** `tests/test_credential_service.py`,
+  `tests/test_disconnect_quiescence.py` (+ this handoff and the validation record).
+  **No production / XML / manifest / security / cron file changed.**
+- **A new committed head requires a new Odoo.sh build.** The corrected head is a
+  **new commit**, so the RT record does not transfer to it; a **new exact-head
+  Odoo.sh build + full revalidation from RT.1** is REQUIRED. **This correction is
+  NOT runtime-tested in this session.**
+- **Static (this session):** `py_compile` + `compileall` OK; exact changed-file
+  inventory; conflict-marker scan clean; AST detector self-tests pass (verified
+  with the file-defined helpers against the real production source); no new
+  token/PII literal; no live Shopify URL/request; synchronous adversarial review
+  found no confirmed defect in the allowed files.
+- **Base→head genuine upgrade remains OPEN** (RT.4). **Issue #157 remains
+  separate and untouched.** **SRR-03 remains OPEN.** PR #160 stays
+  **draft/unmerged**; Slice 2B not begun. No runtime-green of the corrected head
+  is claimed. Await control-room review.

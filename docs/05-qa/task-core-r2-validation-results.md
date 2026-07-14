@@ -1721,3 +1721,144 @@ re-reads on `token=None` (business/lifecycle pass non-None).
 - **SRR-03 remains OPEN** pending control-room decision. PR #160 stays **draft/unmerged**;
   Slice 2B not begun; no live Shopify request. Validated code SHA = `79dbfc0`; this runtime
   evidence is carried by a later **docs-only, non-runtime-tested** commit.
+
+---
+
+# CORE-R2 — Foundation Slice 2A — TEST-ONLY source-guard + service-retry correction (review 4692156428)
+
+> `[Fact — test-only correction; NOT runtime-tested in this GitHub session.]`
+> Control-room **runtime** review `4692156428` (which read the RT.0–RT.14
+> exact-head record above, itself following the earlier static acceptance
+> `4691652645`) required a narrow **test-only** correction: make the four
+> docstring false-positive source guards docstring-robust, and add the genuine
+> default-REPEATABLE-READ / real-Odoo-service-retry proof that RT.8 left open.
+> **No production, XML, manifest, security, or cron file changed.** The historical
+> runtime evidence above is **preserved unchanged**.
+
+## S2A-C.0 What this correction does and does not do `[Fact]`
+
+- **Historical evidence preserved.** Build **34872373** remains the exact-head
+  runtime evidence for the **production** code SHA
+  `79dbfc00428802da8c98c97d3e6d7eb6025ea74e` (the add-on tree at the corrected
+  head is **byte-identical** to `79dbfc0`; only test + doc files changed). The
+  RT.0–RT.14 record is unaltered.
+- **The four RT.3 fresh-install failures were TEST DEFECTS**, not production
+  defects — naive `assertNotIn(<token>, inspect.getsource(<method>))` guards
+  matching the inspected method's **own docstring**. RT.3 already root-caused
+  them; this session fixes them.
+- **A new committed head requires a new Odoo.sh build.** Because the corrected
+  head is a **new commit**, the RT record does **not** transfer to it: a **new
+  exact-head Odoo.sh build + full revalidation from RT.1** is REQUIRED before any
+  runtime-green of the corrected head. **This correction is NOT runtime-tested in
+  this normal GitHub session** (no Odoo runtime; single-DB webshell unavailable).
+- **Scope frozen.** Only two test files changed:
+  `addons/shopify_connector_core/tests/test_credential_service.py` and
+  `addons/shopify_connector_core/tests/test_disconnect_quiescence.py`, plus this
+  record and the handoff. **Issue #157 remains separate and untouched.**
+
+## S2A-C.1 The four source-guard corrections — executable-AST, docstring-robust `[Fact — static-verified this session]`
+
+Each guard was converted from a raw-source `assertNotIn`/`assertIn` substring
+scan to inspection of the method's **executable AST** (docstring excluded, so a
+docstring/comment mention is not a false positive). Reusable helpers
+(`guard_fn_ast`, `guard_called_names`, `guard_execute_sql`, `guard_str_constants`,
+`guard_identifiers`, `guard_has_call_with_const_kwarg`, `guard_min_call_lineno`)
+live once in `test_disconnect_quiescence.py` and are imported into
+`test_credential_service.py` (the existing `from .test_api_client import …`
+convention). **Every original safety assertion is preserved** — evaluated against
+real code, never weakened to an always-pass:
+
+| # | Guard (test) | Token that matched the docstring | Corrected AST check (all prior assertions kept) |
+| --- | --- | --- | --- |
+| A | `TestCredentialService.test_mutate_token_locks_store_before_credential_source` | `sudo(` in `_mutate_token` docstring "no `sudo()`" | `_lock_store_for_lifecycle` call-lineno **<** `self.search(` call-lineno; `'disconnecting'` present as an executable string constant; **no** `sudo` call node in the executable body. |
+| B | `TestDisconnectSourceGuards.test_lifecycle_lock_is_blocking_for_no_key_update` | `SKIP LOCKED` in `_lock_store_for_lifecycle` docstring | SQL string literal passed to `.execute(...)` **contains** `FOR NO KEY UPDATE` and **does not contain** `SKIP LOCKED`. |
+| C | `TestDisconnectSourceGuards.test_store_then_credential_clear_order` | `action_clear_token` in `_finalize_disconnect_completed` docstring | both finalizers **call** `_clear_token_under_store_lock` and **do not call** `action_clear_token` (call nodes); controller **calls** `try_lock_for_update(limit=1)`; `action_disconnect` calls **neither** clear. |
+| D | `TestLifecycleAdmissionSourceGuards.test_admit_lifecycle_creates_no_lease` | `call.lease` in `_admit_lifecycle` docstring | executable body has **no** `shopify.connector.call.lease` model-lookup constant, **no** `lease_key` identifier, and **no** `create` call. |
+
+**Non-circular / anti-weakening proof.** A new `TestSourceGuardDetectors` class
+(pure AST, no DB) proves each detector both **FIRES** on a deliberately-unsafe
+executable example — a real `.sudo()` call, executable SQL containing
+`SKIP LOCKED`, a real `action_clear_token()` invocation, and a real call-lease
+model `create(...)` (model lookup + `lease_key` + `create`) — **and IGNORES** a
+docstring-only mention of the same token. So the correction does not merely pass
+against the current safe production source; a future weakening (reverting to a
+substring scan, or a detector that can never fail) is caught by these self-tests.
+
+Static verification this session (plain-Python AST, no Odoo runtime): the
+file-defined helpers, run against the **real production source**, reproduce the
+RT.3 raw-source false-positive (each token IS in the raw source) yet return the
+correct safe verdict on the executable AST, and every detector self-test passes.
+
+## S2A-C.2 Genuine REPEATABLE-READ service-retry test (closes the RT.8 gap) `[Fact — authored; runtime-pending]`
+
+New opt-in `post_install` test
+`TestLifecycleServiceRetryGenuine.test_repeatable_read_serialization_retry_issues_one_transport`
+(in `tests/test_disconnect_quiescence.py`) exercises the **real** Odoo 19
+`odoo.service.model.retrying(func, env)` boundary — **not** a fake local retry
+loop:
+
+- **Setup:** a committed connected-store fixture + credential; one **main retry
+  cursor/env** on a genuine pooled `db_connect` connection at the **normal Odoo
+  isolation (REPEATABLE READ)** — asserted via `SHOW transaction_isolation`,
+  **never** forced to READ COMMITTED; one **independent** connection for the
+  disconnect; the Shopify transport seam (`_send`) patched; a **dummy token only**;
+  no live request.
+- **Genuine 40001 (not injected):** the callable re-browses the store from the
+  retry env on **every** attempt and runs `action_test_connection`. On attempt 1
+  the REPEATABLE READ snapshot is established before the disconnect commits; the
+  patched transport opens an independent connection, runs the **real**
+  `action_disconnect`, and commits (on a **distinct backend PID**); the
+  post-network `_lifecycle_probe_superseded` → `_lock_store_for_lifecycle`
+  `SELECT … FOR NO KEY UPDATE` then **cannot serialize** against the concurrently
+  committed disconnect and PostgreSQL raises **SQLSTATE 40001**. Odoo's `retrying`
+  catches it (`SERIALIZATION_FAILURE` ∈ `PG_CONCURRENCY_ERRORS_TO_RETRY`), rolls
+  back, resets, and re-invokes; attempt 2 sees the committed `disconnecting` row
+  and is **matrix-refused before transport**. Only the retry **backoff**
+  (`random.uniform`/`time.sleep`) is patched — never the retry decision or
+  exception classification.
+- **Assertions:** default isolation is REPEATABLE READ; **≥2** callable attempts;
+  **exactly one** transport total (attempt 2 adds zero); the first transport used
+  the captured dummy token; the first attempt's `OperationalError.pgcode` is
+  `SERIALIZATION_FAILURE` (40001) and the service retry logged its retry; the
+  disconnect committed on a distinct backend PID; final store state
+  `disconnecting`; generation bumped **exactly once**; credential **present**;
+  **no** `pass` mirror and **no** stale-first-attempt `fail` mirror written;
+  `credential_last_verified_at` empty; **no** call lease; **no** raw serialization
+  error escaped; all cursors close; zero residue.
+- **Runtime status:** this is the **design** and the static (`py_compile`,
+  `compileall`) proof only. Because no Odoo runtime exists in this session, the
+  genuine 40001 path is **not executed here** — it is validated on the next
+  exact-head Odoo.sh build. The complementary READ-COMMITTED supersession test
+  (`TestLifecycleAdmissionRaceGenuine`, RT.6/RT.8) already proves — by using
+  READ COMMITTED **specifically to avoid** this retry — that the REPEATABLE READ
+  path is the one that raises the 40001 the retry handles.
+
+## S2A-C.3 Static results (this GitHub session; no Odoo runtime) `[Fact]`
+
+- `py_compile` + `compileall -q addons/shopify_connector_core` — **OK**.
+- Changed-file inventory = exactly the two allowed test files (+ this record and
+  the handoff) — **no production/XML/manifest/security/cron file changed**; no
+  product/sale/010B/011B/#157 file touched.
+- Conflict-marker scan — clean. No new token/PII literal (dummy fixtures only);
+  no live Shopify URL or network request in the diff.
+- AST detector self-tests — all pass (fire-on-unsafe **and** ignore-docstring),
+  verified with the file-defined helpers against the real production source.
+- **Adversarial review** (guard-weakening, detector coverage, fake-vs-genuine
+  40001, real-vs-fake retry, second-transport, stale mirror, isolation, main
+  cursor commit, cleanup leakage, production/#157 contamination, premature
+  closure) — no confirmed defect in the allowed files.
+
+## S2A-C.4 Remaining gates (unchanged; still control-room-gated) `[Open]`
+
+1. **New exact-head Odoo.sh build + full revalidation from RT.1** of the corrected
+   head (this correction is **not** runtime-tested here).
+2. Genuine base→head upgrade on a runtime with a second database (RT.4) — still
+   **open**.
+3. (Now authored, runtime-pending) the Section-9 REPEATABLE READ / 40001-retry
+   proof (RT.8) — awaits the new build.
+4. Optional Section 7/8 assertion tightening + stale `_admit` docstring (RT.7/RT.13).
+
+**Issue #157 remains a separate, out-of-scope item — untouched.** **SRR-03 remains
+OPEN.** No runtime-green of the corrected head is claimed; the corrected head must
+be validated by a **new** Odoo.sh build. PR #160 stays **draft/unmerged**; Slice 2B
+not begun; no live Shopify request.
