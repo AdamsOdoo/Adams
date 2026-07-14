@@ -1,5 +1,4 @@
 import ast
-import inspect
 import os
 
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -7,6 +6,16 @@ from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
 from ..models import shopify_connector_store_credential as credential_module
+# Reusable AST source-guard helpers (control-room review 4692156428). Defined
+# once in test_disconnect_quiescence (imported earlier by tests/__init__.py,
+# mirroring the existing `from .test_api_client import ...` convention) so the
+# executable-AST inspection is shared, not duplicated.
+from .test_disconnect_quiescence import (
+    guard_called_names,
+    guard_fn_ast,
+    guard_min_call_lineno,
+    guard_str_constants,
+)
 
 DUMMY_TOKEN_1 = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 DUMMY_TOKEN_2 = 'shpat_DUMMYDUMMYDUMMY1111111111111111'
@@ -215,16 +224,27 @@ class TestCredentialService(TransactionCase):
         # store -> credential global lock order: _mutate_token takes the store
         # update lock (store._lock_store_for_lifecycle) BEFORE it reads/writes the
         # credential row, refuses while disconnecting, and uses no sudo().
-        src = inspect.getsource(
+        #
+        # AST-robust (control-room review 4692156428): inspect the EXECUTABLE
+        # body -- not raw source text -- so the method docstring's "normal ACL,
+        # **no `sudo()`**" prose is NOT a false positive. All three original
+        # safety assertions are preserved, now evaluated against real code.
+        fn = guard_fn_ast(
             credential_module.ShopifyConnectorStoreCredential._mutate_token
         )
+        lock_line = guard_min_call_lineno(fn, '_lock_store_for_lifecycle')
+        search_line = guard_min_call_lineno(fn, 'search', receiver_name='self')
+        self.assertIsNotNone(lock_line, 'the store lifecycle lock must be taken')
+        self.assertIsNotNone(search_line, 'the credential row must be searched')
         self.assertLess(
-            src.index('_lock_store_for_lifecycle'),
-            src.index('self.search('),
+            lock_line, search_line,
             'the store row must be locked before the credential row is read/written',
         )
-        self.assertIn("== 'disconnecting'", src)   # refuse-while-disconnecting
-        self.assertNotIn('sudo(', src)             # no sudo in the mutation path
+        # refuse-while-disconnecting: the executable code compares the freshly
+        # locked state against the 'disconnecting' literal.
+        self.assertIn('disconnecting', guard_str_constants(fn))
+        # no sudo() call anywhere in the mutation path (docstring prose excluded).
+        self.assertNotIn('sudo', guard_called_names(fn))
 
     def test_action_clear_token_on_connected_store_requests_two_phase_disconnect(self):
         # CORE-R2 (reviews 4690804619 #2 + 4690807427): public clear on a

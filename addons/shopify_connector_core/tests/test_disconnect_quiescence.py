@@ -107,6 +107,124 @@ def _ok_send(captured):
     return fake_send
 
 
+# ---------------------------------------------------------------------------
+# Reusable AST source-guard helpers (CORE-R2 control-room review 4692156428,
+# test-only correction). Shared by the source guards in this file AND
+# `test_credential_service.py` (imported there). Every helper inspects a
+# method's EXECUTABLE ast -- never the raw source text -- and excludes the
+# method's own docstring, so a docstring/comment that mentions a forbidden
+# token (`sudo()`, `SKIP LOCKED`, `action_clear_token`, `call.lease`) is NOT a
+# false positive. This is the same `ast.parse` discipline the pre-existing
+# sibling guard `test_admit_lifecycle_commits_and_closes_before_transport`
+# already used; these helpers generalise it so all four naive
+# `assertNotIn(<token>, inspect.getsource(...))` guards become docstring-robust
+# without weakening a single safety assertion. `test_source_guard_detector_*`
+# (this file) proves each helper both FIRES on real unsafe executable code and
+# IGNORES a docstring-only mention.
+# ---------------------------------------------------------------------------
+def guard_fn_ast(func):
+    """Return the `ast.FunctionDef` for a (bound or unbound) method's source."""
+    return ast.parse(textwrap.dedent(inspect.getsource(func))).body[0]
+
+
+def _guard_executable_body(fn):
+    """The executable body statements of a FunctionDef, excluding a leading
+    string-literal docstring (comments are already absent from the AST)."""
+    body = list(fn.body)
+    if (body and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)):
+        body = body[1:]
+    return body
+
+
+def _guard_executable_nodes(fn):
+    """Every AST node reachable from the executable body (docstring excluded),
+    so a docstring's own sub-nodes are never inspected."""
+    nodes = []
+    for stmt in _guard_executable_body(fn):
+        nodes.extend(ast.walk(stmt))
+    return nodes
+
+
+def guard_called_names(fn):
+    """Set of call target identifiers in the executable body
+    (`x.sudo()` -> `sudo`, `foo()` -> `foo`)."""
+    names = set()
+    for node in _guard_executable_nodes(fn):
+        if isinstance(node, ast.Call):
+            target = node.func
+            if isinstance(target, ast.Attribute):
+                names.add(target.attr)
+            elif isinstance(target, ast.Name):
+                names.add(target.id)
+    return names
+
+
+def guard_execute_sql(fn):
+    """Concatenated string literals passed as the first argument to any
+    `.execute(...)` call in the executable body -- the SQL a cursor runs."""
+    parts = []
+    for node in _guard_executable_nodes(fn):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'execute' and node.args):
+            arg = node.args[0]
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                parts.append(arg.value)
+    return ' '.join(parts)
+
+
+def guard_str_constants(fn):
+    """All string-literal constants in the executable body (docstring
+    excluded) -- e.g. a model xmlid used in a `self.env['...']` lookup."""
+    return [
+        node.value for node in _guard_executable_nodes(fn)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
+
+
+def guard_identifiers(fn):
+    """All Name ids, attribute names, and keyword-argument names in the
+    executable body -- used to forbid an identifier such as `lease_key`."""
+    out = set()
+    for node in _guard_executable_nodes(fn):
+        if isinstance(node, ast.Name):
+            out.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            out.add(node.attr)
+        elif isinstance(node, ast.keyword) and node.arg:
+            out.add(node.arg)
+    return out
+
+
+def guard_has_call_with_const_kwarg(fn, method_name, kwarg, value):
+    """True if the executable body calls `<recv>.<method_name>(..., <kwarg>=<value>)`
+    with a literal `value` (e.g. `try_lock_for_update(limit=1)`)."""
+    for node in _guard_executable_nodes(fn):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == method_name):
+            for kw in node.keywords:
+                if (kw.arg == kwarg and isinstance(kw.value, ast.Constant)
+                        and kw.value.value == value):
+                    return True
+    return False
+
+
+def guard_min_call_lineno(fn, attr, receiver_name=None):
+    """Smallest source line of an executable `<recv>.<attr>(...)` call
+    (optionally restricted to receiver `<receiver_name>`), or None."""
+    linenos = []
+    for node in _guard_executable_nodes(fn):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == attr):
+            if receiver_name is not None and not (
+                    isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == receiver_name):
+                continue
+            linenos.append(node.lineno)
+    return min(linenos) if linenos else None
+
+
 class TestCallLeaseModelSchema(TransactionCase):
     """The lease table shape + the client source-level guards."""
 
@@ -1669,11 +1787,16 @@ class TestDisconnectSourceGuards(_DisconnectHelpers, TransactionCase):
     # The generation-changing lifecycle lock is a BLOCKING FOR NO KEY UPDATE
     # (never SKIP LOCKED -- a lifecycle transition must wait, not be skipped).
     def test_lifecycle_lock_is_blocking_for_no_key_update(self):
-        src = inspect.getsource(
-            store_module.ShopifyConnectorStore._lock_store_for_lifecycle
-        )
-        self.assertIn('FOR NO KEY UPDATE', src)
-        self.assertNotIn('SKIP LOCKED', src)
+        # AST-robust (control-room review 4692156428): inspect the SQL string
+        # literal actually passed to `.execute(...)` in the executable body, so
+        # the method docstring's "unlike ... FOR UPDATE SKIP LOCKED" prose is
+        # NOT a false positive. The lifecycle lock must be a blocking FOR NO KEY
+        # UPDATE and must NEVER use SKIP LOCKED in real SQL.
+        fn = guard_fn_ast(
+            store_module.ShopifyConnectorStore._lock_store_for_lifecycle)
+        sql = guard_execute_sql(fn)
+        self.assertIn('FOR NO KEY UPDATE', sql)
+        self.assertNotIn('SKIP LOCKED', sql)
 
     # Delayed re-poll uses _trigger(at=...); no immediate same-store re-trigger
     # from a quiescing pass; no busy loop / sleep anywhere.
@@ -1697,21 +1820,28 @@ class TestDisconnectSourceGuards(_DisconnectHelpers, TransactionCase):
     # action_clear_token (which refuses a `disconnecting` store); Phase 1 never
     # clears the credential (review 4690804619 #2).
     def test_store_then_credential_clear_order(self):
-        controller_src = inspect.getsource(
-            store_module.ShopifyConnectorStore._run_disconnect_quiesce
-        )
-        self.assertIn('try_lock_for_update(limit=1)', controller_src)
+        # AST-robust (control-room review 4692156428): inspect executable call
+        # nodes, so `_finalize_disconnect_completed`'s docstring "never the
+        # public `action_clear_token`" prose is NOT a false positive. Both
+        # finalizers must call the controller-only PRIVATE clear primitive and
+        # must NEVER call the public `action_clear_token` (which refuses a
+        # `disconnecting` store); the controller selects under
+        # `try_lock_for_update(limit=1)`; Phase 1 clears nothing.
+        controller = guard_fn_ast(
+            store_module.ShopifyConnectorStore._run_disconnect_quiesce)
+        self.assertTrue(
+            guard_has_call_with_const_kwarg(
+                controller, 'try_lock_for_update', 'limit', 1),
+            'controller must select via try_lock_for_update(limit=1)')
         for name in (
             '_finalize_disconnect_completed', '_finalize_disconnect_timed_out',
         ):
-            fsrc = inspect.getsource(
-                getattr(store_module.ShopifyConnectorStore, name)
-            )
-            self.assertIn('_clear_token_under_store_lock', fsrc)
-            self.assertNotIn('action_clear_token', fsrc)
-        phase1 = inspect.getsource(
-            store_module.ShopifyConnectorStore.action_disconnect
-        )
+            called = guard_called_names(
+                guard_fn_ast(getattr(store_module.ShopifyConnectorStore, name)))
+            self.assertIn('_clear_token_under_store_lock', called)
+            self.assertNotIn('action_clear_token', called)
+        phase1 = guard_called_names(
+            guard_fn_ast(store_module.ShopifyConnectorStore.action_disconnect))
         self.assertNotIn('action_clear_token', phase1)
         self.assertNotIn('_clear_token_under_store_lock', phase1)
 
@@ -2511,10 +2641,17 @@ class TestLifecycleAdmissionSourceGuards(TransactionCase):
                         'only the owned side cursor may rollback; found %s' % rolled)
 
     def test_admit_lifecycle_creates_no_lease(self):
-        src = self._admit_src()
-        self.assertNotIn('call.lease', src)
-        self.assertNotIn('lease_key', src)
-        self.assertNotIn('.create(', src)
+        # AST-robust (control-room review 4692156428): inspect the executable
+        # body, so the `_admit_lifecycle` docstring's "no `call.lease` is
+        # created" prose is NOT a false positive. The lifecycle admission must
+        # create no lease -- no lease-model lookup, no `lease_key` identifier,
+        # and no create() call anywhere in real code.
+        fn = guard_fn_ast(
+            client_module.ShopifyConnectorApiClient._admit_lifecycle)
+        self.assertNotIn(
+            'shopify.connector.call.lease', guard_str_constants(fn))
+        self.assertNotIn('lease_key', guard_identifiers(fn))
+        self.assertNotIn('create', guard_called_names(fn))
 
     def test_admit_lifecycle_commits_and_closes_before_transport(self):
         # The side transaction commits and the cursor closes INSIDE
@@ -2563,6 +2700,120 @@ class TestLifecycleAdmissionSourceGuards(TransactionCase):
         probe = self._probe_src()
         self.assertIn('except UserError:', probe)
         self.assertIn('_audit_probe_superseded(job)', probe)
+
+
+class TestSourceGuardDetectors(TransactionCase):
+    """Detector self-tests (control-room review 4692156428) -- guard the guards.
+
+    Prove each reusable AST source-guard helper both (a) FIRES on real unsafe
+    EXECUTABLE code and (b) IGNORES a docstring-only mention of the same token.
+    This makes the correction non-circular: it does not rely only on the current
+    safe production source, so a future weakening (reverting to a raw
+    `assertNotIn` substring scan, or a detector that could never fail) is caught
+    here. Pure AST -- no database access."""
+
+    @staticmethod
+    def _fn(src):
+        return ast.parse(textwrap.dedent(src)).body[0]
+
+    def test_sudo_detector_fires_on_real_call_and_ignores_docstring(self):
+        # Guard A (test_credential_service): a real `.sudo()` call is detected;
+        # a docstring that says "no sudo()" is not.
+        unsafe = self._fn(
+            "def bad(self, store):\n"
+            "    'plain docstring, no forbidden prose'\n"
+            "    return self.sudo().search([('store_id', '=', store.id)])\n"
+        )
+        safe = self._fn(
+            "def ok(self, store):\n"
+            "    'Runs with no sudo() -- the ACL stays live (prose only).'\n"
+            "    return self.search([('store_id', '=', store.id)])\n"
+        )
+        self.assertIn('sudo', guard_called_names(unsafe))
+        self.assertNotIn('sudo', guard_called_names(safe))
+
+    def test_skip_locked_detector_fires_on_real_sql_and_ignores_docstring(self):
+        # Guard B: SKIP LOCKED in real executable SQL is detected; a docstring
+        # that explains it does *not* use SKIP LOCKED is not.
+        unsafe = self._fn(
+            "def bad(self):\n"
+            "    'plain docstring'\n"
+            "    self.env.cr.execute('SELECT id FROM t WHERE id=%s "
+            "FOR UPDATE SKIP LOCKED', (1,))\n"
+        )
+        safe = self._fn(
+            "def ok(self):\n"
+            "    'Unlike FOR UPDATE SKIP LOCKED, this blocks (prose only).'\n"
+            "    self.env.cr.execute('SELECT id FROM t WHERE id=%s "
+            "FOR NO KEY UPDATE', (1,))\n"
+        )
+        self.assertIn('SKIP LOCKED', guard_execute_sql(unsafe))
+        self.assertNotIn('SKIP LOCKED', guard_execute_sql(safe))
+        self.assertIn('FOR NO KEY UPDATE', guard_execute_sql(safe))
+
+    def test_clear_detector_fires_on_real_call_and_ignores_docstring(self):
+        # Guard C: a real public `action_clear_token()` call is detected; a
+        # finalizer docstring that says "never the public action_clear_token"
+        # is not (and the private primitive is still required).
+        unsafe = self._fn(
+            "def bad(self):\n"
+            "    'finalizer'\n"
+            "    self.env['x'].action_clear_token(self)\n"
+        )
+        safe = self._fn(
+            "def ok(self):\n"
+            "    'Clears via the private primitive, never the public "
+            "action_clear_token.'\n"
+            "    self.env['x']._clear_token_under_store_lock(self)\n"
+        )
+        self.assertIn('action_clear_token', guard_called_names(unsafe))
+        self.assertNotIn('action_clear_token', guard_called_names(safe))
+        self.assertIn(
+            '_clear_token_under_store_lock', guard_called_names(safe))
+
+    def test_lease_detector_fires_on_real_create_and_ignores_docstring(self):
+        # Guard D: a real call-lease model create() (model lookup + `lease_key`
+        # identifier + create call) is detected; a docstring that says "no
+        # call.lease is created" is not.
+        unsafe = self._fn(
+            "def bad(self, side_env):\n"
+            "    'admission'\n"
+            "    lease_key = uuid.uuid4().hex\n"
+            "    side_env['shopify.connector.call.lease'].create("
+            "{'lease_key': lease_key})\n"
+        )
+        safe = self._fn(
+            "def ok(self, token):\n"
+            "    'Snapshot only; no call.lease is created and no lease_key "
+            "exists.'\n"
+            "    return {'token': token}\n"
+        )
+        self.assertIn(
+            'shopify.connector.call.lease', guard_str_constants(unsafe))
+        self.assertIn('lease_key', guard_identifiers(unsafe))
+        self.assertIn('create', guard_called_names(unsafe))
+        self.assertNotIn(
+            'shopify.connector.call.lease', guard_str_constants(safe))
+        self.assertNotIn('lease_key', guard_identifiers(safe))
+        self.assertNotIn('create', guard_called_names(safe))
+
+    def test_limit_kwarg_detector_requires_a_real_call(self):
+        # Guard C helper: try_lock_for_update(limit=1) must be a real call with
+        # the literal kwarg; a docstring mention alone does not satisfy it.
+        real = self._fn(
+            "def q(self):\n"
+            "    'doc'\n"
+            "    return self.search([]).try_lock_for_update(limit=1)\n"
+        )
+        prose_only = self._fn(
+            "def q(self):\n"
+            "    'uses try_lock_for_update(limit=1) -- prose only'\n"
+            "    return self.search([]).try_lock_for_update()\n"
+        )
+        self.assertTrue(guard_has_call_with_const_kwarg(
+            real, 'try_lock_for_update', 'limit', 1))
+        self.assertFalse(guard_has_call_with_const_kwarg(
+            prose_only, 'try_lock_for_update', 'limit', 1))
 
 
 class _GenuineRaceHelpers:
