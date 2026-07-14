@@ -1,7 +1,11 @@
+import queue
+import threading
 import uuid
 from unittest.mock import patch
 
+from odoo import SUPERUSER_ID, api
 from odoo.exceptions import ValidationError
+from odoo.sql_db import db_connect
 from odoo.tests.common import TransactionCase
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
@@ -1832,6 +1836,14 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
         self.assertEqual(self._lease_count(), 0)
 
     def test_quiesced_admission_propagates_uncaught_no_transport_no_write(self):
+        """Exception-contract proof (validation-plan M9, generation-mismatch
+        trigger): a `ShopifyQuiescedError` from a fail-closed admission
+        propagates UNCAUGHT from the importer (never remapped to
+        `JobHandlerError`), with no transport and no write. This is a
+        same-test-transaction generation bump under registry test mode -- an
+        M9 refusal proof, NOT the genuine cross-connection admission-vs-
+        `action_disconnect` race (M8), which is proven by
+        `TestProductCallSiteLifecycleGenuine`."""
         gid = 'gid://shopify/Product/CS-404'
         sent = []
 
@@ -1843,7 +1855,8 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
             )
 
         job = self._import_job(gid)
-        # A generation move after enqueue makes admission fail closed.
+        # M9: a generation move after enqueue makes admission fail closed
+        # (a data-value generation bump, not a genuine action_disconnect).
         self.store.write({
             'connection_generation': job.expected_connection_generation + 1,
         })
@@ -1859,7 +1872,17 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
             ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
         ]))
 
-    def test_disconnect_between_pages_fails_next_admission_no_partial_write(self):
+    def test_generation_bump_between_pages_refuses_next_admission_m9_m10(self):
+        """Validation-plan M9/M10 (generation mismatch / no-second-call): a
+        generation bump landing BETWEEN pages fails the next page's admission
+        closed -- page 2 never transports, page 1's lease is released, and no
+        partial product is written.
+
+        This is a same-test-transaction generation bump under registry test
+        mode -- an M9/M10 next-admission-refusal proof. It is **not** Race A
+        (M8): it does not use the genuine cross-connection
+        `action_disconnect` vs `_admit` lock protocol. Genuine M8 (both
+        orderings) is proven by `TestProductCallSiteLifecycleGenuine`."""
         gid = 'gid://shopify/Product/CS-405'
         job = self._import_job(gid)
         sent = []
@@ -1872,8 +1895,9 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
         def fake_execute(client_self, store, query, variables=None):
             sent.append(1)
             if len(sent) == 1:
-                # A disconnect lands BETWEEN pages: bump the generation after
-                # this (page-1) admission committed but before page 2 admits.
+                # M9/M10: a generation bump lands BETWEEN pages (a data-value
+                # bump, NOT a genuine action_disconnect) after this (page-1)
+                # admission committed but before page 2 admits.
                 self.store.write({
                     'connection_generation':
                         job.expected_connection_generation + 1,
@@ -1909,3 +1933,593 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
             ('store_id', '=', self.store.id),
             ('shopify_gid', '=', '%s/v/0' % gid),
         ]))
+
+
+class TestProductCallSiteLifecycleGenuine(TransactionCase):
+    """Genuine independent-PostgreSQL-connection lifecycle proofs for the
+    CORE-R2 Slice 2B product call site (validation plan M1/M2, M8, M18).
+
+    Mirrors the accepted core `TestGenuineRealAdmission` harness: each worker
+    owns a real pooled `db_connect` main cursor + Environment created AFTER the
+    fixtures commit; the production `_admit`/`_release_lease` side transactions
+    are made genuinely independent (real pooled bounded cursors that commit and
+    are observable cross-connection) by patching the registry cursor factory for
+    the bounded window. `action_disconnect`, `_admit`, the lease ORM, the
+    generation checks, and `_run_disconnect_quiesce` are the REAL production
+    code -- only `_send` is replaced (the network seam), and reconciliation is
+    paused via an observe-and-delegate spy on the product-domain `_apply_import`
+    (never a lifecycle/state/controller monkeypatch). Raw SQL is used only to
+    OBSERVE committed rows and to clean up; it never creates the lease under
+    test.
+
+    These tests require a live PostgreSQL backend and a fully-built Odoo
+    registry; they are authored to run under the Odoo test runner (Odoo.sh /
+    dev), not in a plain GitHub session. No live Shopify request is made and no
+    real token is used.
+    """
+
+    STATEMENT_TIMEOUT_MS = 10000
+    LOCK_TIMEOUT_MS = 8000
+    BOUND_SECONDS = 20
+
+    # -- genuine-connection harness (mirrors TestGenuineRealAdmission) --
+
+    def _open_bounded(self, dbname):
+        """Open a genuine pooled cursor and apply BOTH transaction-local
+        PostgreSQL limits (statement_timeout + lock_timeout); close + re-raise on
+        a setup failure so no genuine cursor is ever left unbounded."""
+        cr = db_connect(dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
+    def _real_registry_cursor(self, dbname):
+        """registry.cursor() replacement handing out bounded real pooled cursors,
+        so every production `_admit`/`_release_lease` side transaction is time
+        bounded and genuinely independent (accepts/ignores any args)."""
+        return lambda *args, **kwargs: self._open_bounded(dbname)
+
+    def _sanitize(self, exc, phase):
+        """Type-only, non-sensitive finding for a worker-thread failure (never
+        str/repr, SQL, paths, credentials, payloads, or tokens)."""
+        error_class = getattr(exc, 'error_class', None)
+        return {
+            'phase': phase,
+            'type': type(exc).__name__,
+            'error_class': error_class if isinstance(error_class, str) else None,
+        }
+
+    def _safe_worker_teardown(self, wcr, diagnostics):
+        if wcr is None:
+            return
+        try:
+            wcr.rollback()
+        except BaseException as exc:
+            diagnostics.put(self._sanitize(exc, 'rollback'))
+        try:
+            wcr.close()
+        except BaseException as exc:
+            diagnostics.put(self._sanitize(exc, 'cursor_close'))
+
+    def _drain(self, diagnostics):
+        findings = []
+        while True:
+            try:
+                findings.append(diagnostics.get_nowait())
+            except queue.Empty:
+                break
+        return findings
+
+    def _assert_workers_dead(self, threads):
+        alive = sum(1 for t in threads if t is not None and t.is_alive())
+        self.assertEqual(
+            alive, 0, 'worker thread still alive at the cleanup boundary')
+
+    # -- fixtures + observers -----------------------------------------
+
+    def _commit_product_fixtures(self, dbname, gid):
+        """On an independent bounded connection, create+commit a connected
+        store, its credential, and one matching `product_import_sync` job (its
+        generation captured at enqueue). Returns `(store_id, job_id)`."""
+        setup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(setup, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Genuine Product Call-Site Store',
+                'shop_domain': 'genuine-prod-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07',
+                'state': 'connected',
+            })
+            env['shopify.connector.store.credential'].action_set_token(
+                store, DUMMY_TOKEN
+            )
+            # action_set_token demotes connected -> reconnect_needed; re-assert.
+            store.write({'state': 'connected'})
+            job = env['shopify.connector.job.enqueue'].enqueue(
+                store, 'manual_sync', 'product_import_sync',
+                payload_hash=uuid.uuid4().hex, shopify_target_gid=gid,
+            )
+            store_id, job_id = store.id, job.id
+            setup.commit()
+            return store_id, job_id
+        finally:
+            setup.close()
+
+    def _committed_lease_rows(self, dbname, store_id):
+        """Observe committed leases from a fresh, bounded independent cursor."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT lease_key, job_id FROM shopify_connector_call_lease "
+                "WHERE store_id = %s ORDER BY lease_key", (store_id,))
+            rows = obs.fetchall()
+            obs.rollback()
+            return rows
+        finally:
+            obs.close()
+
+    def _store_state(self, dbname, store_id):
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT state FROM shopify_connector_store WHERE id = %s",
+                (store_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return row[0] if row else None
+        finally:
+            obs.close()
+
+    def _credential_present(self, dbname, store_id):
+        """Observe the store's `credential_present` mirror cross-connection."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT credential_present FROM shopify_connector_store "
+                "WHERE id = %s", (store_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return bool(row[0]) if row else False
+        finally:
+            obs.close()
+
+    def _binding_count(self, dbname, store_id):
+        """Committed template + variant bindings for the store, cross-connection."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT "
+                "(SELECT count(*) FROM shopify_connector_product_template_binding "
+                " WHERE store_id = %s) "
+                "+ (SELECT count(*) FROM shopify_connector_product_variant_binding "
+                " WHERE store_id = %s)", (store_id, store_id))
+            total = obs.fetchone()[0]
+            obs.rollback()
+            return total
+        finally:
+            obs.close()
+
+    def _cleanup(self, dbname, store_id, job_id):
+        """Durable, bounded, fail-loud teardown + zero-residue check."""
+        if store_id is None:
+            return
+        cr = self._open_bounded(dbname)
+        try:
+            cr.execute(
+                "DELETE FROM shopify_connector_product_variant_binding "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_product_template_binding "
+                "WHERE store_id = %s", (store_id,))
+            if job_id is not None:
+                cr.execute(
+                    "DELETE FROM shopify_connector_job_log WHERE job_id = %s",
+                    (job_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_call_lease WHERE store_id = %s",
+                (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_job WHERE store_id = %s",
+                (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store_credential "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store WHERE id = %s", (store_id,))
+            cr.commit()
+        finally:
+            cr.close()
+        self._assert_zero_residue(dbname, store_id)
+
+    def _assert_zero_residue(self, dbname, store_id):
+        v = self._open_bounded(dbname)
+        try:
+            for table, msg in (
+                ('shopify_connector_call_lease', 'lease residue'),
+                ('shopify_connector_store', 'store residue'),
+                ('shopify_connector_store_credential', 'credential residue'),
+                ('shopify_connector_job', 'job residue'),
+                ('shopify_connector_product_template_binding',
+                 'template-binding residue'),
+                ('shopify_connector_product_variant_binding',
+                 'variant-binding residue'),
+            ):
+                col = 'id' if table == 'shopify_connector_store' else 'store_id'
+                v.execute(
+                    "SELECT count(*) FROM %s WHERE %s = %%s" % (table, col),
+                    (store_id,))
+                self.assertEqual(v.fetchone()[0], 0, '%s after cleanup' % msg)
+            v.rollback()
+        finally:
+            v.close()
+
+    # -- product page fixtures ----------------------------------------
+
+    def _variant_node(self, gid, sku, selected=None):
+        return {
+            'id': gid, 'sku': sku, 'barcode': None,
+            'price': None, 'compareAtPrice': None,
+            'selectedOptions': selected or [], 'image': None,
+            'inventoryItem': None,
+        }
+
+    def _page(self, gid, nodes, has_next, end_cursor, options=None):
+        return {'data': {'product': {
+            'id': gid, 'title': 'Genuine Product', 'status': 'ACTIVE',
+            'updatedAt': '2026-07-14T00:00:00Z', 'featuredImage': None,
+            'options': options or [],
+            'variants': {
+                'nodes': nodes,
+                'pageInfo': {'hasNextPage': has_next, 'endCursor': end_cursor},
+            },
+        }}}
+
+    def _edition_options(self, n):
+        return [{
+            'id': 'opt', 'name': 'Edition', 'position': 1,
+            'optionValues': [{'id': 'ov%d' % i, 'name': 'Ed-%d' % i}
+                             for i in range(n)],
+        }]
+
+    # ==================================================================
+    # M1/M2 — genuine committed-lease visibility before each _send and
+    # through terminal reconciliation, one lease at a time, released after.
+    # ==================================================================
+
+    def test_real_lease_visible_before_send_and_through_reconciliation(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M12'
+        store_id = job_id = worker_cr = None
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+            worker_cr = self._open_bounded(dbname)
+            wenv = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = wenv['shopify.connector.store'].browse(store_id)
+            job = wenv['shopify.connector.job'].browse(job_id)
+            Importer = wenv['shopify.connector.product.importer']
+            Client = wenv['shopify.connector.api.client']
+            options = self._edition_options(2)
+            obs = {'sends': [], 'tokens': [], 'apply': []}
+
+            def observing_send(client_self, store_arg, body, token=None):
+                obs['tokens'].append(token)
+                obs['sends'].append(self._committed_lease_rows(dbname, store_id))
+                cursor = ((body or {}).get('variables') or {}).get('cursor')
+                if cursor is None:
+                    node = self._variant_node(
+                        '%s/v/0' % gid, 'M12-0',
+                        selected=[{'name': 'Edition', 'value': 'Ed-0'}])
+                    return _FakeSendResponse(
+                        self._page(gid, [node], True, 'cur-0', options=options))
+                node = self._variant_node(
+                    '%s/v/1' % gid, 'M12-1',
+                    selected=[{'name': 'Edition', 'value': 'Ed-1'}])
+                return _FakeSendResponse(
+                    self._page(gid, [node], False, None, options=options))
+
+            real_apply = type(Importer)._apply_import
+
+            def observing_apply(imp_self, store_a, payload, job=None,
+                                requested_gid=None):
+                obs['apply'].append(self._committed_lease_rows(dbname, store_id))
+                return real_apply(imp_self, store_a, payload, job=job,
+                                  requested_gid=requested_gid)
+
+            with patch.object(self.registry, 'cursor',
+                              self._real_registry_cursor(dbname)):
+                with patch.object(type(Importer), '_apply_import',
+                                  observing_apply):
+                    with patch.object(type(Client), '_send', observing_send):
+                        result = Importer.import_product_sync(
+                            store, gid, job=job)
+            obs['after'] = self._committed_lease_rows(dbname, store_id)
+
+            # M1: exactly one committed lease is visible before EACH page's send.
+            self.assertEqual(len(obs['sends']), 2)          # two pages, two sends
+            self.assertEqual(len(obs['sends'][0]), 1)       # one lease, page 1
+            self.assertEqual(len(obs['sends'][1]), 1)       # one lease, page 2
+            # one lease at a time: the non-terminal page's lease released before
+            # the next admission (page-2's key differs from page-1's).
+            self.assertNotEqual(obs['sends'][0][0][0], obs['sends'][1][0][0])
+            self.assertEqual(obs['sends'][0][0][1], job_id)         # real job id
+            self.assertRegex(obs['sends'][0][0][0], r'^[0-9a-f]{32}$')  # opaque key
+            self.assertEqual(set(obs['tokens']), {DUMMY_TOKEN})     # real snapshot
+            # M2: reconciliation runs exactly once (terminal), lease still visible.
+            self.assertEqual(len(obs['apply']), 1)
+            self.assertEqual(len(obs['apply'][0]), 1)
+            # terminal lease released only AFTER reconciliation + flush + return.
+            self.assertEqual(len(obs['after']), 0)
+            self.assertEqual(len(result['variant_bindings']), 2)
+        finally:
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_id)
+
+    # ==================================================================
+    # Race A / M8 — disconnect-first ordering (genuine action_disconnect).
+    # ==================================================================
+
+    def test_race_a_disconnect_first_refuses_admission(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M8A'
+        store_id = job_id = worker_cr = None
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+            # Disconnect COMMITS first on an independent connection (real
+            # action_disconnect: FOR NO KEY UPDATE + generation bump +
+            # state->disconnecting).
+            dcr = self._open_bounded(dbname)
+            try:
+                denv = api.Environment(dcr, SUPERUSER_ID, {})
+                denv['shopify.connector.store'].browse(store_id).action_disconnect()
+                dcr.commit()
+            finally:
+                dcr.close()
+            # Worker opens AFTER the disconnect committed -> its admission
+            # observes the new state/generation and fails closed.
+            worker_cr = self._open_bounded(dbname)
+            wenv = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = wenv['shopify.connector.store'].browse(store_id)
+            job = wenv['shopify.connector.job'].browse(job_id)
+            Importer = wenv['shopify.connector.product.importer']
+            Client = wenv['shopify.connector.api.client']
+            sent = []
+
+            def counting_send(client_self, store_arg, body, token=None):
+                sent.append(1)
+                return _FakeSendResponse(self._page(
+                    gid, [self._variant_node('%s/v/0' % gid, 'M8A-0')],
+                    False, None))
+
+            with patch.object(self.registry, 'cursor',
+                              self._real_registry_cursor(dbname)):
+                with patch.object(type(Client), '_send', counting_send):
+                    with self.assertRaises(ShopifyQuiescedError):
+                        Importer.import_product_sync(store, gid, job=job)
+            # Disconnect-first: no transport, no lease, no partial write.
+            self.assertEqual(sent, [])
+            self.assertEqual(len(self._committed_lease_rows(dbname, store_id)), 0)
+            self.assertEqual(self._binding_count(dbname, store_id), 0)
+        finally:
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_id)
+
+    # ==================================================================
+    # Race A / M8 — admission-first ordering (lease commits, then a
+    # concurrent action_disconnect returns without aborting the call).
+    # ==================================================================
+
+    def test_race_a_admission_first_lease_commits_then_disconnect_returns(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M8B'
+        store_id = job_id = t = None
+        admitted = threading.Semaphore(0)
+        resume = threading.Event()
+        diagnostics = queue.Queue()
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+
+            def blocking_send(client_self, store_arg, body, token=None):
+                admitted.release()        # _admit already committed this lease
+                if not resume.wait(timeout=self.BOUND_SECONDS):
+                    raise AssertionError('resume gate not set within bound')
+                return _FakeSendResponse(self._page(
+                    gid, [self._variant_node('%s/v/0' % gid, 'M8B-0')],
+                    False, None))
+
+            def worker():
+                wcr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    wcr = self._open_bounded(dbname)
+                    wenv = api.Environment(wcr, SUPERUSER_ID, {})
+                    store = wenv['shopify.connector.store'].browse(store_id)
+                    job = wenv['shopify.connector.job'].browse(job_id)
+                    wenv['shopify.connector.product.importer'].import_product_sync(
+                        store, gid, job=job)
+                    wcr.commit()
+                except BaseException as exc:
+                    diagnostics.put(self._sanitize(exc, 'worker_body'))
+                finally:
+                    self._safe_worker_teardown(wcr, diagnostics)
+
+            Client = self.env['shopify.connector.api.client']
+            observed = {}
+            got = False
+            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+                    patch.object(self.registry, 'cursor',
+                                 self._real_registry_cursor(dbname)):
+                with patch.object(type(Client), '_send', blocking_send):
+                    t = threading.Thread(target=worker, daemon=True)
+                    t.start()
+                    got = admitted.acquire(timeout=self.BOUND_SECONDS)
+                    if got:
+                        # Admission-first: the lease/token snapshot is committed
+                        # before the disconnect proceeds.
+                        observed['lease_before'] = self._committed_lease_rows(
+                            dbname, store_id)
+                        dcr = self._open_bounded(dbname)
+                        try:
+                            denv = api.Environment(dcr, SUPERUSER_ID, {})
+                            # Returns within the bound WITHOUT waiting for the
+                            # parked, already-admitted worker (uncontended
+                            # FOR NO KEY UPDATE; the admission released FOR SHARE).
+                            denv['shopify.connector.store'].browse(
+                                store_id).action_disconnect()
+                            dcr.commit()
+                            observed['disconnect_returned'] = True
+                        finally:
+                            dcr.close()
+                    resume.set()
+                    t.join(timeout=self.BOUND_SECONDS)
+                    self._assert_workers_dead((t,))
+            observed['after'] = self._committed_lease_rows(dbname, store_id)
+
+            findings = self._drain(diagnostics)
+            self.assertEqual(findings, [], 'worker findings: %s' % findings)
+            self.assertTrue(got, 'admission did not commit within bound')
+            self.assertEqual(len(observed['lease_before']), 1)   # committed first
+            self.assertEqual(observed['lease_before'][0][1], job_id)
+            self.assertTrue(observed.get('disconnect_returned'))  # returned w/o wait
+            # The already-admitted page proceeded to completion and released;
+            # no untracked admitted call is possible (the one lease is accounted).
+            self.assertEqual(len(observed['after']), 0)
+            self.assertEqual(self._binding_count(dbname, store_id), 2)
+        finally:
+            resume.set()
+            if t is not None:
+                t.join(timeout=self.BOUND_SECONDS)
+                self._assert_workers_dead((t,))
+            self._cleanup(dbname, store_id, job_id)
+
+    # ==================================================================
+    # Race B / M18 — terminal reconciliation survives a concurrent
+    # action_disconnect; the controller defers finalization until release.
+    # ==================================================================
+
+    def test_race_b_terminal_reconciliation_survives_concurrent_disconnect(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M18'
+        store_id = job_id = t = None
+        reconciling = threading.Semaphore(0)
+        resume = threading.Event()
+        diagnostics = queue.Queue()
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+            Importer_cls = type(self.env['shopify.connector.product.importer'])
+            real_apply = Importer_cls._apply_import
+
+            def pausing_apply(imp_self, store_a, payload, job=None,
+                              requested_gid=None):
+                # Terminal admission has committed; the lease is held. Pause
+                # here (inside terminal reconciliation) while a concurrent
+                # disconnect runs, then delegate to the REAL reconciliation.
+                reconciling.release()
+                if not resume.wait(timeout=self.BOUND_SECONDS):
+                    raise AssertionError('resume gate not set within bound')
+                return real_apply(imp_self, store_a, payload, job=job,
+                                  requested_gid=requested_gid)
+
+            def ok_send(client_self, store_arg, body, token=None):
+                return _FakeSendResponse(self._page(
+                    gid, [self._variant_node('%s/v/0' % gid, 'M18-0')],
+                    False, None))
+
+            def worker():
+                wcr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    wcr = self._open_bounded(dbname)
+                    wenv = api.Environment(wcr, SUPERUSER_ID, {})
+                    store = wenv['shopify.connector.store'].browse(store_id)
+                    job = wenv['shopify.connector.job'].browse(job_id)
+                    wenv['shopify.connector.product.importer'].import_product_sync(
+                        store, gid, job=job)
+                    wcr.commit()
+                except BaseException as exc:
+                    diagnostics.put(self._sanitize(exc, 'worker_body'))
+                finally:
+                    self._safe_worker_teardown(wcr, diagnostics)
+
+            Client = self.env['shopify.connector.api.client']
+            obs = {}
+            got = False
+            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+                    patch.object(self.registry, 'cursor',
+                                 self._real_registry_cursor(dbname)):
+                with patch.object(Importer_cls, '_apply_import', pausing_apply):
+                    with patch.object(type(Client), '_send', ok_send):
+                        t = threading.Thread(target=worker, daemon=True)
+                        t.start()
+                        got = reconciling.acquire(timeout=self.BOUND_SECONDS)
+                        if got:
+                            obs['lease_during'] = self._committed_lease_rows(
+                                dbname, store_id)
+                            obs['cred_before'] = self._credential_present(
+                                dbname, store_id)
+                            dcr = self._open_bounded(dbname)
+                            try:
+                                denv = api.Environment(dcr, SUPERUSER_ID, {})
+                                # Concurrent disconnect returns within the bound,
+                                # WITHOUT waiting for the paused reconciliation.
+                                denv['shopify.connector.store'].browse(
+                                    store_id).action_disconnect()
+                                dcr.commit()
+                                obs['disconnect_returned'] = True
+                                # Controller must NOT finalize while a lease exists.
+                                denv['shopify.connector.store'
+                                     ]._run_disconnect_quiesce()
+                                dcr.commit()
+                            finally:
+                                dcr.close()
+                            obs['lease_after_ctrl'] = self._committed_lease_rows(
+                                dbname, store_id)
+                            obs['state_during'] = self._store_state(
+                                dbname, store_id)
+                            obs['cred_during'] = self._credential_present(
+                                dbname, store_id)
+                        resume.set()
+                        t.join(timeout=self.BOUND_SECONDS)
+                        self._assert_workers_dead((t,))
+            obs['after_release'] = self._committed_lease_rows(dbname, store_id)
+            # After the terminal reconciliation released its lease, a fresh
+            # controller pass finalizes `completed` and clears the credential.
+            fcr = self._open_bounded(dbname)
+            try:
+                fenv = api.Environment(fcr, SUPERUSER_ID, {})
+                fenv['shopify.connector.store']._run_disconnect_quiesce()
+                fcr.commit()
+            finally:
+                fcr.close()
+            obs['state_final'] = self._store_state(dbname, store_id)
+            obs['cred_final'] = self._credential_present(dbname, store_id)
+
+            findings = self._drain(diagnostics)
+            self.assertEqual(findings, [], 'worker findings: %s' % findings)
+            self.assertTrue(got, 'terminal reconciliation did not start in bound')
+            self.assertEqual(len(obs['lease_during']), 1)   # lease held mid-reconcile
+            self.assertTrue(obs['cred_before'])             # credential present
+            self.assertTrue(obs.get('disconnect_returned'))  # returned w/o waiting
+            self.assertEqual(len(obs['lease_after_ctrl']), 1)  # not reaped early
+            self.assertEqual(obs['state_during'], 'disconnecting')  # deferred
+            self.assertTrue(obs['cred_during'])             # credential remains
+            self.assertEqual(len(obs['after_release']), 0)  # released after reconcile
+            self.assertEqual(self._binding_count(dbname, store_id), 2)  # completed
+            self.assertEqual(obs['state_final'], 'disconnected')  # finalized after
+            self.assertFalse(obs['cred_final'])             # credential cleared then
+        finally:
+            resume.set()
+            if t is not None:
+                t.join(timeout=self.BOUND_SECONDS)
+                self._assert_workers_dead((t,))
+            self._cleanup(dbname, store_id, job_id)
