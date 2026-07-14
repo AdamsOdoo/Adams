@@ -6,7 +6,7 @@ from unittest.mock import patch
 from odoo import SUPERUSER_ID, api
 from odoo.exceptions import ValidationError
 from odoo.sql_db import db_connect
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
     ShopifyClientError,
@@ -1935,6 +1935,16 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
         ]))
 
 
+@tagged(
+    # Opt-in only: this class opens genuine independent `db_connect`
+    # PostgreSQL connections and spawns worker threads, so it is deliberately
+    # EXCLUDED from the standard CI suite (`-standard`) and from the
+    # at-install phase (`-at_install`); it runs post-install and only when its
+    # own explicit tag is selected, e.g.
+    #   odoo --test-tags shopify_connector_product_callsite_lifecycle
+    'post_install', '-at_install', '-standard',
+    'shopify_connector_product_callsite_lifecycle',
+)
 class TestProductCallSiteLifecycleGenuine(TransactionCase):
     """Genuine independent-PostgreSQL-connection lifecycle proofs for the
     CORE-R2 Slice 2B product call site (validation plan M1/M2, M8, M18).
@@ -2017,10 +2027,49 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 break
         return findings
 
-    def _assert_workers_dead(self, threads):
-        alive = sum(1 for t in threads if t is not None and t.is_alive())
-        self.assertEqual(
-            alive, 0, 'worker thread still alive at the cleanup boundary')
+    def _finalize_threaded(self, threads, resume_events, diagnostics,
+                           dbname, store_id, job_id):
+        """Cleanup-first, fail-loud teardown for the threaded genuine tests,
+        called from the test's `finally` so it runs even when a body assertion
+        raised first. Ordered exactly so cleanup can never be skipped by an
+        assertion and a stuck worker can never deadlock the delete path or
+        yield a false pass:
+
+        1. set every resume gate (release any barrier the worker waits on);
+        2. bounded-join each worker (normal, then the join IS the emergency
+           recovery -- a genuine `db_connect` cursor cannot be force-killed
+           from here, and `_open_bounded`'s statement/lock timeouts guarantee
+           the worker self-terminates within the bound);
+        3. record worker liveness;
+        4. the worker owns and closes its OWN cursor (`_safe_worker_teardown`),
+           so nothing the worker holds is closed from here;
+        5. if any worker is still alive: DO NOT run destructive cleanup (it may
+           still hold row locks -- deleting under it could deadlock or corrupt
+           the result); preserve sanitized findings and fail loudly;
+        6. only when every worker has stopped: run durable cleanup +
+           zero-residue verification;
+        7. assertions (here, the loud failure) occur only after that.
+        """
+        for event in resume_events:
+            event.set()
+        for thread in threads:
+            if thread is not None:
+                thread.join(timeout=self.BOUND_SECONDS)
+        alive = [t for t in threads if t is not None and t.is_alive()]
+        if alive:
+            diagnostics.put({
+                'phase': 'teardown', 'type': 'WorkerStillAlive',
+                'error_class': None,
+            })
+            # Fail loud, but never issue destructive cleanup against a lock a
+            # live worker may own; leave residue diagnosable rather than hang.
+            self.fail(
+                'worker thread still alive at teardown boundary; skipped '
+                'destructive cleanup to avoid a lock deadlock. findings: %s'
+                % (self._drain(diagnostics),))
+        # Every worker has stopped and released its cursor -> durable cleanup
+        # is safe, and its own bounded cursor prevents an indefinite hang.
+        self._cleanup(dbname, store_id, job_id)
 
     # -- fixtures + observers -----------------------------------------
 
@@ -2107,21 +2156,77 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             obs.close()
 
     def _cleanup(self, dbname, store_id, job_id):
-        """Durable, bounded, fail-loud teardown + zero-residue check."""
+        """Durable, bounded, fail-loud teardown + zero-residue check.
+
+        A successful genuine import commits real Odoo master data (a
+        `product.template`, its `product.product` variants, and -- for the
+        structured M1/M2 fixture -- a per-test `product.attribute` with its
+        `product.attribute.value` set), not just connector rows. This teardown
+        removes ALL of it by EXACT id (never a broad name search), in FK-safe
+        order, and leaves every pre-existing record untouched:
+
+        1. capture this store's test-owned template/variant/attribute/value ids
+           from the store's own template bindings (exact ids only);
+        2. unlink the connector product variant bindings (drops FKs into the
+           product variants);
+        3. unlink the connector product template bindings (drops FKs into the
+           templates);
+        4. unlink the test-created templates via ORM -- Odoo cascades their
+           `product.product`, `product.template.attribute.line`, and
+           `product.template.attribute.value` rows;
+        5. unlink each captured attribute VALUE only if no attribute line
+           anywhere still references it (so a value shared with a pre-existing
+           product is never removed);
+        6. unlink each captured ATTRIBUTE only if no attribute line anywhere
+           still references it (same pre-existing-safety guard);
+        7. delete the connector job logs, leases, jobs, credential, and store
+           (raw SQL, FK-safe order: logs before jobs because
+           `job_log.job_id` is `ondelete='restrict'`) -- this bypasses the
+           store model's ORM guards but touches only this store's rows;
+        8. verify zero residue for the connector rows AND every captured
+           master-data id.
+        """
         if store_id is None:
             return
+        captured = {
+            'templates': [], 'variants': [], 'attributes': [], 'values': [],
+        }
         cr = self._open_bounded(dbname)
         try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            TB = env['shopify.connector.product.template.binding']
+            VB = env['shopify.connector.product.variant.binding']
+            PTAL = env['product.template.attribute.line']
+            # 1. Capture exact test-owned master-data ids from this store only.
+            tbindings = TB.search([('store_id', '=', store_id)])
+            templates = tbindings.product_template_id.exists()
+            captured['templates'] = templates.ids
+            captured['variants'] = templates.product_variant_ids.ids
+            lines = templates.attribute_line_ids
+            captured['attributes'] = lines.attribute_id.ids
+            captured['values'] = lines.value_ids.ids
+            # 2-3. Connector bindings first (FKs into the product master data).
+            VB.search([('store_id', '=', store_id)]).unlink()
+            tbindings.unlink()
+            # 4. Test-created templates (ORM cascade of variants + line/ptav).
+            templates.unlink()
+            # 5. Orphaned test-created attribute values (no remaining line ref).
+            for value in env['product.attribute.value'].browse(
+                captured['values'],
+            ).exists():
+                if not PTAL.search_count([('value_ids', 'in', value.id)]):
+                    value.unlink()
+            # 6. Orphaned test-created attributes (no remaining line ref).
+            for attribute in env['product.attribute'].browse(
+                captured['attributes'],
+            ).exists():
+                if not PTAL.search_count([('attribute_id', '=', attribute.id)]):
+                    attribute.unlink()
+            # 7. Connector rows (raw SQL; logs before jobs -- restrict FK).
             cr.execute(
-                "DELETE FROM shopify_connector_product_variant_binding "
-                "WHERE store_id = %s", (store_id,))
-            cr.execute(
-                "DELETE FROM shopify_connector_product_template_binding "
-                "WHERE store_id = %s", (store_id,))
-            if job_id is not None:
-                cr.execute(
-                    "DELETE FROM shopify_connector_job_log WHERE job_id = %s",
-                    (job_id,))
+                "DELETE FROM shopify_connector_job_log WHERE job_id IN "
+                "(SELECT id FROM shopify_connector_job WHERE store_id = %s)",
+                (store_id,))
             cr.execute(
                 "DELETE FROM shopify_connector_call_lease WHERE store_id = %s",
                 (store_id,))
@@ -2136,9 +2241,10 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             cr.commit()
         finally:
             cr.close()
-        self._assert_zero_residue(dbname, store_id)
+        # 8. Zero-residue verification (connector rows + captured master data).
+        self._assert_zero_residue(dbname, store_id, captured)
 
-    def _assert_zero_residue(self, dbname, store_id):
+    def _assert_zero_residue(self, dbname, store_id, captured=None):
         v = self._open_bounded(dbname)
         try:
             for table, msg in (
@@ -2146,6 +2252,7 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 ('shopify_connector_store', 'store residue'),
                 ('shopify_connector_store_credential', 'credential residue'),
                 ('shopify_connector_job', 'job residue'),
+                ('shopify_connector_job_log', 'job-log residue'),
                 ('shopify_connector_product_template_binding',
                  'template-binding residue'),
                 ('shopify_connector_product_variant_binding',
@@ -2156,6 +2263,26 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                     "SELECT count(*) FROM %s WHERE %s = %%s" % (table, col),
                     (store_id,))
                 self.assertEqual(v.fetchone()[0], 0, '%s after cleanup' % msg)
+            # Every captured Odoo master-data id must be gone -- verified by
+            # EXACT id, so the check can never mask residue behind a name match
+            # nor implicate a pre-existing record.
+            for table, ids, msg in (
+                ('product_template', (captured or {}).get('templates') or [],
+                 'product.template residue'),
+                ('product_product', (captured or {}).get('variants') or [],
+                 'product.product residue'),
+                ('product_attribute', (captured or {}).get('attributes') or [],
+                 'product.attribute residue'),
+                ('product_attribute_value',
+                 (captured or {}).get('values') or [],
+                 'product.attribute.value residue'),
+            ):
+                if ids:
+                    v.execute(
+                        "SELECT count(*) FROM %s WHERE id = ANY(%%s)" % table,
+                        (list(ids),))
+                    self.assertEqual(
+                        v.fetchone()[0], 0, '%s after cleanup' % msg)
             v.rollback()
         finally:
             v.close()
@@ -2181,9 +2308,9 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             },
         }}}
 
-    def _edition_options(self, n):
+    def _edition_options(self, n, name='Edition'):
         return [{
-            'id': 'opt', 'name': 'Edition', 'position': 1,
+            'id': 'opt', 'name': name, 'position': 1,
             'optionValues': [{'id': 'ov%d' % i, 'name': 'Ed-%d' % i}
                              for i in range(n)],
         }]
@@ -2205,7 +2332,13 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             job = wenv['shopify.connector.job'].browse(job_id)
             Importer = wenv['shopify.connector.product.importer']
             Client = wenv['shopify.connector.api.client']
-            options = self._edition_options(2)
+            # Unique per-test attribute name: the importer maps a Shopify
+            # option name straight to `product.attribute.name`, so a marker
+            # here guarantees the attribute is CREATED (never a pre-existing
+            # one reused) and is unambiguously attributable to this test for
+            # the by-exact-id cleanup below.
+            attr_name = 'SC2B-%s Edition' % uuid.uuid4().hex
+            options = self._edition_options(2, name=attr_name)
             obs = {'sends': [], 'tokens': [], 'apply': []}
 
             def observing_send(client_self, store_arg, body, token=None):
@@ -2215,12 +2348,12 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 if cursor is None:
                     node = self._variant_node(
                         '%s/v/0' % gid, 'M12-0',
-                        selected=[{'name': 'Edition', 'value': 'Ed-0'}])
+                        selected=[{'name': attr_name, 'value': 'Ed-0'}])
                     return _FakeSendResponse(
                         self._page(gid, [node], True, 'cur-0', options=options))
                 node = self._variant_node(
                     '%s/v/1' % gid, 'M12-1',
-                    selected=[{'name': 'Edition', 'value': 'Ed-1'}])
+                    selected=[{'name': attr_name, 'value': 'Ed-1'}])
                 return _FakeSendResponse(
                     self._page(gid, [node], False, None, options=options))
 
@@ -2239,6 +2372,11 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                     with patch.object(type(Client), '_send', observing_send):
                         result = Importer.import_product_sync(
                             store, gid, job=job)
+            # Commit the worker's own transaction so the reconciled master data
+            # (template, variants, and the created attribute + values) is
+            # genuinely persisted -- making the by-exact-id master-data cleanup
+            # and its zero-residue check a real proof, not a no-op.
+            worker_cr.commit()
             obs['after'] = self._committed_lease_rows(dbname, store_id)
 
             # M1: exactly one committed lease is visible before EACH page's send.
@@ -2257,6 +2395,9 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             # terminal lease released only AFTER reconciliation + flush + return.
             self.assertEqual(len(obs['after']), 0)
             self.assertEqual(len(result['variant_bindings']), 2)
+            # The committed reconciliation is observable cross-connection: two
+            # bindings (template + variant... two variants -> three) persisted.
+            self.assertEqual(self._binding_count(dbname, store_id), 3)
         finally:
             if worker_cr is not None:
                 worker_cr.rollback()
@@ -2326,10 +2467,15 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
         admitted = threading.Semaphore(0)
         resume = threading.Event()
         diagnostics = queue.Queue()
+        tokens = []
         try:
             store_id, job_id = self._commit_product_fixtures(dbname, gid)
 
             def blocking_send(client_self, store_arg, body, token=None):
+                # Race-specific token proof: the page was admitted with the
+                # pre-disconnect credential snapshot; record it so the test can
+                # assert the admitted call carries exactly that token.
+                tokens.append(token)
                 admitted.release()        # _admit already committed this lease
                 if not resume.wait(timeout=self.BOUND_SECONDS):
                     raise AssertionError('resume gate not set within bound')
@@ -2381,8 +2527,9 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                         finally:
                             dcr.close()
                     resume.set()
+                    # Gate the post-run observation on the worker finishing;
+                    # the AUTHORITATIVE liveness check + cleanup run in finally.
                     t.join(timeout=self.BOUND_SECONDS)
-                    self._assert_workers_dead((t,))
             observed['after'] = self._committed_lease_rows(dbname, store_id)
 
             findings = self._drain(diagnostics)
@@ -2390,17 +2537,17 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             self.assertTrue(got, 'admission did not commit within bound')
             self.assertEqual(len(observed['lease_before']), 1)   # committed first
             self.assertEqual(observed['lease_before'][0][1], job_id)
+            # Race-specific token proof: exactly one transport, carrying the
+            # pre-disconnect credential snapshot.
+            self.assertEqual(tokens, [DUMMY_TOKEN])
             self.assertTrue(observed.get('disconnect_returned'))  # returned w/o wait
             # The already-admitted page proceeded to completion and released;
             # no untracked admitted call is possible (the one lease is accounted).
             self.assertEqual(len(observed['after']), 0)
             self.assertEqual(self._binding_count(dbname, store_id), 2)
         finally:
-            resume.set()
-            if t is not None:
-                t.join(timeout=self.BOUND_SECONDS)
-                self._assert_workers_dead((t,))
-            self._cleanup(dbname, store_id, job_id)
+            self._finalize_threaded(
+                [t], [resume], diagnostics, dbname, store_id, job_id)
 
     # ==================================================================
     # Race B / M18 — terminal reconciliation survives a concurrent
@@ -2414,6 +2561,7 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
         reconciling = threading.Semaphore(0)
         resume = threading.Event()
         diagnostics = queue.Queue()
+        tokens = []
         try:
             store_id, job_id = self._commit_product_fixtures(dbname, gid)
             Importer_cls = type(self.env['shopify.connector.product.importer'])
@@ -2431,6 +2579,10 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                                   requested_gid=requested_gid)
 
             def ok_send(client_self, store_arg, body, token=None):
+                # Race-specific token proof (terminal page): record the token
+                # so the test can assert the terminal admission carries the
+                # pre-disconnect credential snapshot.
+                tokens.append(token)
                 return _FakeSendResponse(self._page(
                     gid, [self._variant_node('%s/v/0' % gid, 'M18-0')],
                     False, None))
@@ -2489,8 +2641,10 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                             obs['cred_during'] = self._credential_present(
                                 dbname, store_id)
                         resume.set()
+                        # Gate the post-release observation on the worker
+                        # finishing; the AUTHORITATIVE liveness check + cleanup
+                        # run in finally so an assertion can never skip cleanup.
                         t.join(timeout=self.BOUND_SECONDS)
-                        self._assert_workers_dead((t,))
             obs['after_release'] = self._committed_lease_rows(dbname, store_id)
             # After the terminal reconciliation released its lease, a fresh
             # controller pass finalizes `completed` and clears the credential.
@@ -2513,13 +2667,13 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             self.assertEqual(len(obs['lease_after_ctrl']), 1)  # not reaped early
             self.assertEqual(obs['state_during'], 'disconnecting')  # deferred
             self.assertTrue(obs['cred_during'])             # credential remains
+            # Race-specific token proof: exactly one terminal transport,
+            # carrying the pre-disconnect credential snapshot.
+            self.assertEqual(tokens, [DUMMY_TOKEN])
             self.assertEqual(len(obs['after_release']), 0)  # released after reconcile
             self.assertEqual(self._binding_count(dbname, store_id), 2)  # completed
             self.assertEqual(obs['state_final'], 'disconnected')  # finalized after
             self.assertFalse(obs['cred_final'])             # credential cleared then
         finally:
-            resume.set()
-            if t is not None:
-                t.join(timeout=self.BOUND_SECONDS)
-                self._assert_workers_dead((t,))
-            self._cleanup(dbname, store_id, job_id)
+            self._finalize_threaded(
+                [t], [resume], diagnostics, dbname, store_id, job_id)
