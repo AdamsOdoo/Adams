@@ -55,16 +55,21 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
     new vocabulary is added here.
 
     Critical recall-safety rule (D1 rule 2, control-room review comment
-    4932704451): candidate discovery never uses a narrowing exact
-    prefilter that could exclude a partner whose normalized email equals
-    the incoming normalized email. Odoo partner emails may be stored in
+    4932704451): candidate discovery never uses a narrowing prefilter
+    that could exclude a partner whose normalized email equals the
+    incoming normalized email. Odoo partner emails may be stored in
     display-name/wrapped/mixed-case forms (e.g. "Jane Doe"
     <Jane.DOE@Example.COM>) that normalize to the same bare address.
-    This module searches every partner with a non-empty email
-    (`[('email', '!=', False)]`, no exact/`=ilike` prefilter) and always
-    decides candidacy by comparing `odoo.tools.email_normalize()` on
-    both sides in Python -- applied identically to the active-candidate
-    search and the archived-inclusive search.
+    Task 011B (D-011B-1/D-011B-2) preserves that recall while removing
+    the former O(n) full scan: candidacy is now decided by a btree-
+    indexed equality search on the connector-owned stored column
+    `res.partner.shopify_connector_email_normalized`, which holds exactly
+    `odoo.tools.email_normalize(email, strict=False)` for each partner --
+    the same normalizer, applied identically on both the stored (partner)
+    side and the incoming side. The resulting candidate sets are provably
+    identical to the removed full scan (the equivalence backstop in
+    `test_customer_matching_scalability.py`), applied identically to the
+    active-candidate search and the archived-inclusive search.
 
     In-task decision, per final prompt §9's own allowance: the dispatch
     handler below does not populate job.res_model/res_id after a
@@ -312,33 +317,35 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
 
     @api.model
     def _find_active_candidates(self, normalized_incoming):
-        """Recall-safe active-candidate search (D1 rule 2): no exact/
-        `=ilike` prefilter -- every partner with a non-empty email is
-        compared in Python via `email_normalize()` on both sides.
+        """Recall-safe active-candidate search (D1 rule 2), Task 011B
+        indexed form: a btree-indexed equality search on the connector-
+        owned stored column `shopify_connector_email_normalized` replaces
+        the former full scan of every partner carrying an email plus a
+        per-record Python `email_normalize()` compare. That column holds
+        exactly `email_normalize(partner.email, strict=False)`, so this
+        indexed lookup returns the identical candidate set (recall-
+        equivalence proven in `test_customer_matching_scalability.py`).
         `search()` excludes archived partners by default, giving exactly
         the "active = True" candidate set rule 3/6 require."""
         Partner = self.env['res.partner']
-        candidates = Partner.search([('email', '!=', False)])
-        return candidates.filtered(
-            lambda partner: email_normalize(
-                partner.email, strict=False
-            ) == normalized_incoming
-        )
+        return Partner.search([
+            ('shopify_connector_email_normalized', '=', normalized_incoming),
+        ])
 
     @api.model
     def _find_archived_candidates(self, normalized_incoming):
         """Recall-safe archived-inclusive search (D1 rule 7), run only
-        after the active-candidate count is zero -- identical recall-
-        safety discipline as the active search above."""
+        after the active-candidate count is zero -- Task 011B indexed
+        form: the same btree-indexed equality on
+        `shopify_connector_email_normalized`, with `active_test=False`
+        plus an explicit `('active', '=', False)` so only archived
+        partners are returned. Same stored normalizer, same recall as the
+        active search above, and no full partner scan."""
         Partner = self.env['res.partner']
-        candidates = Partner.with_context(active_test=False).search([
-            ('email', '!=', False), ('active', '=', False),
+        return Partner.with_context(active_test=False).search([
+            ('shopify_connector_email_normalized', '=', normalized_incoming),
+            ('active', '=', False),
         ])
-        return candidates.filtered(
-            lambda partner: email_normalize(
-                partner.email, strict=False
-            ) == normalized_incoming
-        )
 
     @api.model
     def _build_candidate_payload(self, shopify_gid, normalized_incoming, candidates):

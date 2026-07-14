@@ -1,6 +1,149 @@
 # Research Handoff (rolling)
 
 
+### Task 011B — EXACT-HEAD CONCURRENCY-CORRECTION RUNTIME CONFIRMATION (build 34863138 @ `662e980`; draft PR #150, 2026-07-14)
+
+- **Session role:** exact-head runtime-confirmation operator. Converted the §19
+  working-tree concurrency correction into **authoritative exact-committed-head**
+  Odoo.sh evidence, on the **exact validated code SHA
+  `662e9809c7b2443a0391f417ca2dff7daa3da29e`** (branch
+  `claude/task-011b-customer-matching-k5ux9b`, Odoo 19.0, build **34863138**, DB
+  `adamsmen-claude-task-011b-customer-matching-k5ux9b-34863138`, PostgreSQL 16.14;
+  control-room acceptance `4687882165`). Build-to-commit proven by
+  `git rev-parse HEAD` = `662e980` (tree clean; branch tip local+remote == HEAD;
+  base `9128015` proven ancestor; net scope = exactly the **8 Task 011B files**;
+  **no Task 010B / issue-157 file**; the two range commits `ec07fd9` [concurrency
+  test only, +117/−4] + `662e980` [docs only] touch only the test + validation
+  record — production `models/**` byte-unchanged). **No code changed this session**
+  — docs-only evidence confirmation (no Task 011B defect found).
+- **Fresh build install — GREEN:** all four modules (`adams_base`,
+  `shopify_connector_core`, `shopify_connector_product`, `shopify_connector_sale`)
+  loaded; **`0 failed, 0 error(s) of 357 tests`, 0 WARNING**; benchmark +
+  concurrency classes correctly **absent** from the standard fresh-install pass;
+  11 `odoo.sql_db` ERRORs = expected NOT-NULL/UNIQUE negative-constraint
+  provocations (customer + product binding tests). The lone docutils
+  `<string>:38 (ERROR/3)` is on the **standard** `res.partner.email_normalized`
+  help (not our prefixed field) — pre-existing base-Odoo RST diagnostic, not 011B.
+- **Sale standard suite — GREEN:** **90 tests / `0 failed, 0 error(s) of 80`**
+  (~1.04 s, 1595 q); all **32** `TestCustomerMatchingScalability` methods; opt-in
+  benchmark/concurrency excluded; 0 WARNING; 5 expected-negative SQL. **Re-run
+  again AFTER the concurrency runs → identical green** (no leaked `Registry._lock`).
+- **Genuine independent-transaction concurrency — 3/3 STABLE (authoritative):**
+  each run reached the full **12-phase** worker trail (`worker_thread_entered …
+  after_api_environment … before_dispatch … after_commit → worker_done`); distinct
+  backend PIDs (4116713/4116715, 4117922/4117925, 4118743/4118746);
+  **A-attributed binding-`INSERT` block** (`pg_blocking_pids(B)∋A` + INSERT
+  predicate) that **cleared on A's commit**; first collision
+  `unknown_system_error → retry_waiting` (rc=1, `next_retry_at` set, attempt +
+  retry logs); clean retry `binding_conflict → blocked_manual_review`; exactly
+  **1 binding / 1 partner** surviving on `gid_a`; zero cleanup residue. This
+  **supersedes §18.6's "environment limitation / GATE OPEN"** — the true cause was
+  the `Registry._lock` post_install deadlock (CORE-R2 §4.2), fixed test-only in §19.
+- **Registry-lock safety:** original `_lock` restored to the same object in the
+  test `finally` after worker termination + worker-cursor close + parent-cursor
+  teardown; proven by the healthy post-concurrency standard suite; each run is a
+  separate process (no cross-process leak possible).
+- **Warning/SQL/cleanup/leak:** 0 WARNING, 0 ERROR-level across all 3 concurrency
+  runs (raw race SQL muted; only INFO pool `used=0` close). DB probe: **zero
+  synthetic residue** (race partners/stores/bindings/settings/jobs/logs all 0),
+  **0 idle-in-transaction**, no test PIDs alive; **cron id 3 active**; log secret
+  scan = 0 emails / tokens / raw SQL / GraphQL.
+- **Prior benchmark:** build-`34844515` 100k benchmark + EXPLAIN + single-DB
+  backfill (§18) **carried forward, NOT re-run** at `662e980` (no benchmark or
+  production logic changed). The **fully-authoritative isolated base→head build
+  backfill gate stays OPEN** (single linked DB; single-DB `-u` is not a substitute).
+- **PR / gate state:** PR **#150** kept **open, draft, unmerged, not ready**;
+  docs-only evidence commit advances the branch head (itself not runtime-tested).
+  Evidence: `../05-qa/task-011b-validation-results.md` §20; AR-045 exact-head
+  concurrency note. **Issue #157 separate/not fixed; SRR-03 OPEN; live Shopify
+  blocked.**
+- **Exact next-session prompt (control room):** "Review PR #150's exact-head
+  concurrency runtime confirmation (validation-results §20, AR-045 exact-head
+  concurrency note, this handoff): validated concurrency code SHA `662e980`, build
+  34863138, fresh install green (357/0), sale suite green (80/0, 32 methods,
+  re-confirmed after the concurrency runs), and the genuine independent-transaction
+  binding race **3/3 stable** with the full 12-phase worker trail, A-attributed
+  binding-INSERT block clearing on A's commit, `unknown_system_error → retry_waiting`
+  then `binding_conflict → blocked_manual_review`, one binding/one partner on
+  `gid_a`, zero residue, `Registry._lock` restored, cron 3 active, leak scan clean.
+  Decide: (a) accept exact-head concurrency as CLOSED/green (§18.6 superseded by
+  §19+§20); (b) whether to provision an **isolated base→head build** for the
+  fully-authoritative 100k backfill duration (single-DB `-u` is not a substitute) —
+  gate stays OPEN; (c) confirm the prior build-34844515 100k benchmark/EXPLAIN/
+  backfill evidence is carried forward (not re-run, nothing changed but the test +
+  docs); (d) route the `res_users.notification_type` issue-157 artifact to its
+  non-Task-011B owner (unchanged, separate); (e) whether to authorize the next task.
+  Do not mark PR #150 ready or merge, and do not perform live Shopify validation,
+  without an explicit control-room act. SRR-03 remains OPEN."
+
+### Task 011B — EXACT-HEAD ODOO.SH RUNTIME CLOSURE (build 34844515 @ `9895919`; draft PR #150, 2026-07-13)
+
+- **Session role:** runtime-closure operator. Executed the Task 011B runtime
+  matrix **for the first time** inside the authorized Odoo.sh dev build for the
+  **exact validated code SHA `9895919a6cc191cb24f694c1b601a0304fedda15`** (Odoo
+  19.0, build **34844515**, DB
+  `adamsmen-claude-task-011b-customer-matching-k5ux9b-34844515`, PostgreSQL
+  16.14). Build-to-commit proven by `git rev-parse HEAD` = `9895919` (tree clean;
+  base `9128015` proven ancestor; net scope = exactly the 8 Task 011B files; no
+  PR #151 / issue-157 file). **No code changed** — docs-only evidence closure
+  (LOOP 9 no-op; no Task 011B defect found).
+- **Fresh install (build-time `-i`) — GREEN:** `0 failed, 0 error(s) of 357
+  tests`, **0 WARNING**; field `store/index/readonly=t/t/t` with a real
+  `character varying` column + a `USING btree` index
+  (`res_partner__shopify_connector_email_normalized_index`); CORE-R2 Foundation
+  schema present (`call_lease`, `location`); build-time standard/opt-in tag
+  separation proven (32 scalability methods ran; benchmark/concurrency = 0).
+- **Standard-suite `-u` reruns:** product `0/53`; **sale (011B) `0 failed, 0
+  error(s) of 80`, all 32 `TestCustomerMatchingScalability` methods, 0 WARNING**
+  (re-confirmed green again after all runtime ops). `-u shopify_connector_core`
+  = `0 failed, 6 error(s) of 264` — all six are the **issue-157**
+  `res_users.notification_type` NOT-NULL `setUpClass` artifact (base-Odoo
+  `res.users`, orthogonal to Task 011B), classified separately, **not fixed**.
+- **100k benchmark — PASS:** exact in-Python+DB corpus
+  `100000/70000/30000/1500/10500/88000/100000`, exact probe mix `700/150/100/50`;
+  p50 0.328 ms / p95 0.934 ms / max 1.296 ms; 2249 cust/s; recompute proxy 4.44 s.
+- **EXPLAIN (100k corpus):** Index Scan on
+  `res_partner__shopify_connector_email_normalized_index` (0.029 ms, 4 pages, cost
+  2.44) vs forced Seq Scan (28.6 ms, 100 043 rows removed, 5823 pages, cost 5823)
+  — no full-partner scan on the lookup path.
+- **Backfill:** genuine single-DB `-u shopify_connector_sale` after dropping the
+  column recreated column+index and **backfilled all 100 000 rows** (≈4.81 s
+  isolated; cross-validates the 4.44 s proxy). The **fully-authoritative isolated
+  base→head build upgrade is NOT available** (single linked DB; agent cannot
+  provision a second build) → that gate stays **OPEN**.
+- **Two OPEN gates (reported, not hidden):** (a) **genuine concurrency proof
+  deterministically fails (4/4)** — root-caused to an **environment limitation**
+  (Odoo backends invisible in `pg_stat_activity` on this shared/pooled dev DB; a
+  standalone `psycopg2` positive control proves the DB itself supports the race
+  with correct `pg_blocking_pids` attribution and lock-release-on-commit; the job
+  reaches the correct terminal `blocked_manual_review`/`binding_conflict` with
+  exactly one binding every run — Task 011B production logic is correct). The
+  harness (authored for a dedicated runtime host) was **not modified** (no proven
+  in-scope defect). (b) authoritative isolated-build backfill (above).
+- **Cleanup/leak:** zero synthetic residue (corpus/benchmark/race/bindings/jobs
+  all 0); `ir.cron` id 3 temporarily disabled during runs and **restored**; leak
+  audit clean (0 tokens, 0 customer emails, 0 GraphQL bodies; only job-metadata
+  SQL). No live Shopify request.
+- **PR / gate state:** PR **#150** kept **draft, unmerged, not ready**; docs-only
+  evidence commit advances the branch head. Evidence:
+  `../05-qa/task-011b-validation-results.md` §18; AR-045 exact-head note.
+  **SRR-03 remains OPEN; live Shopify validation not performed.**
+- **Exact next-session prompt (control room):** "Review PR #150's exact-head
+  runtime closure (validation-results §18, AR-045 note, this handoff): validated
+  code SHA `9895919`, build 34844515, fresh install green (357/0), sale suite
+  green (80/0, 32 methods), 100k benchmark PASS with exact corpus/probe mix,
+  EXPLAIN index-scan proof, genuine single-DB backfill ≈4.81 s. Decide: (a) accept
+  the runtime evidence and keep the concurrency gate OPEN pending a **dedicated
+  runtime host** (the shared/pooled Odoo.sh dev DB cannot run the genuine
+  independent-transaction proof — environment limitation, DB-semantics positive
+  control passed, Task 011B logic proven correct via correct terminal state); (b)
+  decide whether to provision an **isolated base→head build** for the
+  fully-authoritative 100k backfill duration; (c) route the pre-existing
+  `res_users.notification_type` issue-157 artifact to its non-Task-011B owner
+  (unchanged, out of scope); (d) whether to authorize the next task. Do not mark
+  PR #150 ready or merge, and do not perform live Shopify validation, without an
+  explicit control-room act."
+
 ### Task 010B — Product Import Completeness EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34828304 @ `db534f8`; draft PR #151, 2026-07-13)
 
 - **Session role:** runtime-execution operator. Ran the **complete Task 010B
@@ -674,6 +817,105 @@
   (`docs/09-ui-prototype/`) and swapping inline-SVG placeholders for the platform
   FontAwesome set (P9).”*
 
+### Task 011B — Customer Matching Scalability (indexed normalized-email lookup) — draft PR #150 into `Shopify-connector`, 2026-07-11; three focused corrections + two base re-alignments 2026-07-12
+
+- **Base-synchronization amendment (2026-07-12, control-room base-sync):** `Shopify-connector` advanced to **`cfdb05703a65f82b34a9a11364aab6fc960cca9d`** (U0 / PR #155 acceptance closure). Re-aligned the branch via a **normal merge commit `66b0023`** (`cfdb057…` is an ancestor). Conflicts were confined to two shared append-only docs — **no `addons/**`/`tests/**`/Task 011B production/test file conflicted or changed**: (a) **this file** — resolved by preserving both sides completely (the new U0 acceptance-closure top entry **and** the Task 011B entry; 0 lines lost either side); (b) **`architecture-review-log.md`** — **AR-044 is now assigned to the U0 acceptance closure**, so the Task 011B row was **renumbered to the next available id AR-045** (its cross-references in the validation record + this handoff updated; U0's AR-044 references left intact). U0 / PR #155 acceptance-closure files + history preserved. PR diff vs `cfdb057…` = **exactly the 8 Task 011B files**; no U0 / Task 010B / CORE-R2 artifact appears. Standard Odoo.sh suites remain OUTSTANDING (operator-run); opt-in tags not run; no live Shopify request; CORE-R2 still gates live Shopify.
+- **Base-alignment session (2026-07-12, ChatGPT review `4680106356` — ACCEPTED the third correction; base-alignment set as the mandatory prerequisite before the Odoo.sh runtime gate; base-alignment + evidence documentation only, no code/test change):** re-aligned the branch onto the new integration tip **`65e915aada32930a19a14c94d23dc9bd5e6fb517`** (`Shopify-connector` after **U0 / PR #152** merged) via a **normal merge commit `19c0911b13e8a4b98845f741fbede9da6055594e`** (the new PR head; `65e915a…` is an ancestor). The only conflict was the shared append-only **this file** (both U0 and Task 011B prepend an entry); resolved by **preserving both sides completely** — the Task 011B entry **and** the U0 entry, shared `CORE-R1` tail once; git-verified **0 lines lost from either side**, no duplicated sections. **No `addons/**`/`tests/**`/Task 011B production/test file conflicted or changed.** PR diff vs `65e915a…` = **exactly the 8 Task 011B files**; no U0 / Task 010B / CORE-R2 artifact appears as a PR change; all U0 / PR #152 files + history preserved. **Standard Odoo.sh suites (`core`/`product`/`sale`, incl. the standard `test_customer_matching_scalability.py` tests) for the aligned head `19c0911` are OUTSTANDING and operator-run — this environment has no Odoo runtime and no commit status/check run is posted for `19c0911` (`get_status` total_count 0), so no build result is observed or claimed.** The two opt-in tags were **not** run; **no live/dev-store Shopify request** was made; live Shopify validation still depends on **CORE-R2**. PR stays open/draft/unmerged.
+- **Third focused correction (2026-07-12, ChatGPT review `4951165587` REVISE — reviewed head `877e033`; test/docs/base-alignment only; production design byte-unchanged; test file + these three docs only):** (0) **Base-aligned** the branch onto the current integration tip `fcbbb0b3fe3db9cba354a8a1c08e91036b70ec1f` (`Shopify-connector` after PR #153 merged) via a **normal merge commit** — conflict-free because PR #153 added only concurrency-validation evidence under `docs/05-qa/**`, disjoint from every Task 011B file; all PR #153 evidence/history preserved; shared append-only docs retain both tasks' entries. (1) **Binding-INSERT evidence** — `_blocking_evidence` now computes a server-side boolean `query ~* BINDING_INSERT_QUERY_REGEX` (case/quote-tolerant `INSERT INTO shopify_connector_customer_binding`), so a SELECT/UPDATE/DELETE or a bare table mention can no longer satisfy the lock proof; `_wait_until_blocked_by` requires `pg_blocking_pids(B)∋A` **and** the INSERT predicate together; the raw `query` column is never selected out (never enters Python); a **standard-CI** test proves INSERT matches while SELECT/UPDATE/DELETE/mention do not. (2) **Bounded cleanup SQL** — `_apply_cleanup_bounds` sets transaction-local `lock_timeout` (`CLEANUP_LOCK_TIMEOUT_MS=5000`) + `statement_timeout` (`CLEANUP_STATEMENT_TIMEOUT_MS=15000`) on both the cleanup and verification connections before any ORM work; both re-raise (incl. timeout) and never swallow; emergency cursor-teardown failures are captured as sanitized type-only diagnostics and asserted empty. (3) **Daemon worker** — the worker thread is `daemon=True` as a last-resort process-liveness guard (documented as not a substitute for cursor/row cleanup; `worker_alive_final` still asserted). (4) **Diagnostic wording** — the helper no longer claims an unredacted trace survives in host logs; only the sanitized, type-only diagnostic is guaranteed. Static checks: `py_compile` clean; **race-safety AST guards 10/10**; production-source 22/22; marker-benchmark simulation unchanged; **34 test methods** (32 standard + 2 opt-in); git-verified the three production files + `tests/__init__.py` byte-identical to `e8126ec`, **no new file added**. Runtime (Odoo.sh, concurrency tag, 100k benchmark, authoritative backfill) still **PENDING**; no live/dev-store Shopify fixture authorized; live Shopify validation depends on **CORE-R2**.
+- **Second focused correction (2026-07-12, ChatGPT review `4950353232` REVISE — reviewed head `4372a1a`; execution-safety of the opt-in harness only; production design unchanged; test file + these three docs only):** (1) **worker-owned cursor** — the concurrency worker thread itself opens `db_connect(dbname).cursor()`, reports its backend PID via a `queue.Queue`, builds its own `Environment`, runs the real dispatcher, commits on the handled outcome / rolls back on an unexpected exception, and closes its cursor in its **own** `finally`; no Odoo cursor/`Environment` crosses the thread boundary (statically AST-proven). (2) **Attributed lock-wait proof** — synchronization now requires `A_PID ∈ pg_blocking_pids(B_PID)` **and** that B's blocked statement is the customer-binding `INSERT` (server-side booleans only; the raw `pg_stat_activity.query` carrying email VALUES is never read out), and proves the wait **clears** after A commits. (3) **Bounded timeouts** for worker-start / PID-received / lock-wait / join, with fail-closed emergency termination (release the barrier, bounded re-wait, then fail rather than hang). (4) **Durable cleanup + verification** — all parent cursors rolled back/closed before a fresh cleanup connection deletes every synthetic row (FK-safe), cleanup **re-raises** (no swallow), and a second fresh connection asserts zero synthetic jobs/logs/bindings/settings/store/partner remain. (5) **Complete first-collision assertions** — `retry_count==1`, `next_retry_at` populated, an `attempt` (`to_state='running'`) log and a `retry_waiting` state-change log; the second leg is documented as a **deliberately forced clean-transaction retry** (direct `_dispatch_one`, NOT scheduler due-time selection). (6) **Type-only redacted** backfill/worker diagnostic (`_sanitized_exception_diagnostic` — never `str(exc)`; proven by a standard-CI sentinel test). (7) **Exact per-run marker** as the benchmark corpus identity (UUID domain suffix, no `min_id..max_id`), with exact DB-marker counters asserted (`total 100000 / active 70000 / archived 30000 / shared 1500 / wrapped 10500 / ordinary 88000 / non-null 100000`). Static checks green: `py_compile`, race-safety AST guards, marker-benchmark simulation, no-broad-`assertRaises`/`registry.cursor`/raw-`str(exc)`; git-verified **no production/model file changed** since `e8126ec`. Every runtime outcome stays **PENDING**.
+- **Focused correction (2026-07-12, ChatGPT review `4950230315` REVISE — reviewed head `e8126ec`):** the production design (D-011B-1 field, D-011B-2 lookup) was **accepted for the static pass and is unchanged**. Only the test file was revised (within the 4-file revision allowlist: test file + validation record + AR log + handoff): (1) the two sequential "concurrency" tests are no longer presented as a concurrency proof — one is now an honestly-labeled DB-constraint backstop (specific `psycopg2.IntegrityError`, no broad `Exception`), the other an honestly-labeled *sequential* stable-outcome test; the real proof is the new `TestCustomerMatchingConcurrency.test_genuine_independent_transaction_binding_race` — genuinely independent `db_connect` connections, committed fixtures, a worker thread whose colliding `INSERT` is **deterministically synchronized** via `pg_stat_activity` lock-wait polling, durable cleanup + cursor close in `finally`; (2) the 100k benchmark corpus is now **deterministic index-based** with **exact asserted counters** (100000 total, ≥30000 archived, ≥10000 wrapped, ≥1000 shared) rather than probabilistic; (3) throughput now measures the **full customer-matching cost** (`_normalize_incoming_email` + active + archived fallback) over a deterministic 1,000-probe mix with asserted tallies (700/150/100/50), not one SQL lookup; (4) the backfill proxy **fails loud** (asserts a usable measurement) instead of silently passing; (5) evidence wording across docs + PR body no longer checks equivalence/concurrency/benchmark/backfill/Odoo.sh as complete — each is `authored / PENDING runtime execution`. **Honest expected concurrency taxonomy (verified from core source, not yet observed at runtime):** first collision → `unknown_system_error` → `retry_waiting`; retry → `binding_conflict` → `blocked_manual_review`; exactly one binding survives. The correction touched **no production/model file** (git-verified).
+- **Base verified (hard prerequisite):** `origin/Shopify-connector` tip ==
+  `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d` (no drift); PR #149 (CORE-R1)
+  **merged** 2026-07-11T20:50:22Z and its merge produced this exact base;
+  Task 011B gate act read (PR #149 comment `4948879507`, one session,
+  parallel-safe with Task 010B). Branch
+  `claude/task-011b-customer-matching-k5ux9b`.
+- **What happened:** implemented Task 011B exactly per
+  [`../07-implementation-plan/task-011b-customer-matching-scalability-packet.md`](../07-implementation-plan/task-011b-customer-matching-scalability-packet.md)
+  (D-011B-1..7). **D-011B-1** adds one connector-owned stored computed
+  indexed field on `res.partner` via `_inherit` —
+  `shopify_connector_email_normalized` (`fields.Char`, `store=True`,
+  `index=True` btree, `readonly=True`, `@api.depends('email')`, compute
+  `email_normalize(partner.email, strict=False) or False`) — the **exact
+  merged importer normalizer**; no override/inverse/search-method/
+  constraint/sudo. **D-011B-2** rewrites only the
+  `_find_active_candidates` and `_find_archived_candidates` bodies (and
+  their stale full-scan docstrings + the class recall-safety docstring
+  paragraph) to a single btree-indexed equality search on that column;
+  the archived path keeps `active_test=False` + `('active','=',False)`.
+  Every other importer method, all routing (existing-binding shortcut /
+  single-match bind / `ambiguous_match` / archived-only `duplicate_risk` /
+  blind-create block / `binding_conflict`), candidate ordering, the 20-cap
+  evidence payload, and the error taxonomy are **byte-untouched**.
+  **D-011B-3** the new test retains the old full-scan path as a test-only
+  reference and asserts `old_ids == new_ids` (active + archived) across a
+  pathological corpus. **D-011B-5/6** preserve duplicate/ambiguity and the
+  binding-layer `UNIQUE(store_id,·)` concurrency backstop — **no partner
+  uniqueness constraint added**. **D-011B-4/7** backfill via standard
+  stored-compute initialization + a deterministic seeded 100k benchmark
+  harness tagged `post_install,-standard`.
+- **Odoo 19 source verification (no local runtime — verified against
+  official `odoo/odoo` @ 19.0):** `email_normalize(text, strict=True)`
+  defaults to strict=True (importer + field both pass `strict=False`);
+  falsy input → `email_split_tuples` returns `[]` → `False` (compute is
+  safe on email-less partners at backfill); `strict=False` returns the
+  first of multiple addresses; `_normalize_email` lowercases ascii local
+  parts + always the domain. `store=True` → real column; `index=True` =
+  btree; `readonly=True` is UI-only so the compute still writes. Full
+  findings in [`../05-qa/task-011b-validation-results.md`](../05-qa/task-011b-validation-results.md) §3.
+- **Exact changed files (8 authorized):** `models/__init__.py` (+1 line),
+  `models/shopify_connector_res_partner.py` (new),
+  `models/shopify_connector_customer_importer.py` (two method bodies +
+  stale docstrings only), `tests/test_customer_matching_scalability.py`
+  (new), `tests/__init__.py` (+1 line),
+  `docs/05-qa/task-011b-validation-results.md` (new),
+  `docs/05-qa/architecture-review-log.md` (AR-045 row),
+  `docs/01-research/research-handoff.md` (this entry).
+- **What this session does NOT do:** opens no further gate; starts no
+  Task 010B/012/LC-1/Area-6/SEC-1/inventory/fulfillment/export/UI/webhook/
+  OAuth/PERF-1 work; does not read/copy/cherry-pick Task 010B code; does
+  not touch any core/product file, the binding model, store settings, any
+  other importer method, matching policy, `adams_base`, `main`, or plain
+  `dev`; adds no migration/hook; does not mark the PR ready or merge it.
+- **Validation performed:** `python3 -m py_compile` clean on all 5 changed
+  Python files; standalone AST replication of every source guard (no
+  full-scan domain in either method; both search the indexed column;
+  `email_normalize(strict=False)` on compute + incoming; depends-only-on-
+  email; only two methods touch the column; new partner file free of
+  override/constraint/sudo) → **all green**. **OUTSTANDING (no Odoo
+  runtime this session, per the packet's honesty clause — PR stays
+  draft):** full `core`/`product`/`sale` suites green on **Odoo.sh** with
+  verbatim stats; the **100k benchmark** latency (p95 ≤ 50 ms) /
+  throughput (≥ 20 cust/s) numbers; the **module-upgrade/backfill**
+  duration (≤ 10 min). No evidence invented.
+- **Parallel-session discipline:** this PR must not merge automatically or
+  simultaneously with Task 010B. Task 010B and Task 011B share only the
+  two append-only docs (`architecture-review-log.md`, this handoff); the
+  PR merged **second** must later update from the latest
+  `Shopify-connector`, reconcile only those append-only additions, leave
+  accepted Task 011B production/test content unchanged, and rerun Odoo.sh
+  on the reconciled head. AR-045 numbering may collide with a parallel
+  Task 010B row — reconciled append-only at second-merge, not now.
+- **Learning feedback loop:**
+  - New issues discovered: reusing Odoo's own `mail` `email_normalized`
+    field would have been unsafe (different concept, normalization
+    strictness not guaranteed to equal the importer's `strict=False`); a
+    connector-owned, namespaced column is required — matches D-011B-1.
+  - Repeated pattern: the equivalence-by-construction test design (retain
+    the removed path as a test-only reference and assert set-equality,
+    with **no** hard-coded normalizer output) makes the corpus self-
+    correcting to actual Odoo 19 behavior — reusable for any future
+    "replace a scan with an index" change.
+  - Next-session prompt (below) is a **review**, not a new implementation.
+- **Exact next-session prompt (ChatGPT review):** "Review draft PR
+  ‘Task 011B: customer matching scalability (indexed normalized lookup)’
+  into `Shopify-connector` at base `f9c3c5fd25af3f94ee71cc2ead3821e7da85443d`
+  (gate `4948879507`). Verify only the 8 authorized files changed;
+  confirm the field/lookup match D-011B-1/2 and the equivalence backstop;
+  confirm no matching-policy change and no partner uniqueness constraint;
+  then require the OUTSTANDING Odoo.sh run and the 100k benchmark/backfill
+  numbers before merge. Keep parallel-merge discipline with Task 010B. Do
+  not open any other gate."
 ### CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (DESIGN ONLY; draft PR #154 into `Shopify-connector`, 2026-07-12, revision 4)
 
 - **Base (re-aligned by normal merge):** `Shopify-connector` tip ==
