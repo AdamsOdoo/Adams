@@ -102,36 +102,36 @@ odoo-bin --stop-after-init -u shopify_connector_core --test-enable --no-http \
 - Capture a verbatim green summary into
   `docs/05-qa/task-core-r2-validation-results.md`.
 
-## 5. Remaining Slice-2B work (NOT authorized here)
+## 5. Lifecycle-race correction (review 4690639375) — now part of Slice 2A
+
+The control-room review required these correctness fixes **before** Odoo.sh
+runtime; they are implemented and are **not** deferred:
+
+- **Activation/reconnect TOCTOU:** `action_activate` and `action_reconnect`
+  finalize the state transition **under** `_lock_store_for_lifecycle`, consuming
+  the locked `(state, generation)` and refusing to overwrite a one-way disconnect
+  (`disconnecting`, or a changed epoch during the reconnect probe); single epoch
+  bump on success. `action_mark_reconnect_needed` is likewise TOCTOU-safe.
+- **Reconnect probe:** `action_reconnect` now uses the internal
+  `'reconnect_probe'` purpose (permits `disconnected`, so reconnect after a
+  completed disconnect works); `action_test_connection` keeps `'test_connection'`
+  (still refused from `disconnected`). Both route through the shared private
+  `_run_connection_probe`; `execute_lifecycle` is now the **private**
+  `_execute_lifecycle` (no RPC-exposed purpose; public surface again
+  `{execute, execute_business}`).
+- **Credential mutation lock order:** `action_set_token`/`action_replace_token`
+  share the private `_mutate_token`, which locks the **store row first**, refuses
+  set/replace while `disconnecting`, and bumps the epoch exactly once on a
+  connected replacement — `store → credential` order, no new `sudo()`.
+
+## 6. Remaining Slice-2B work (NOT authorized here)
 
 - Product importer call-site migration to `with execute_business(job, …)` around
   its call **and** reconciliation (`shopify_connector_product`).
 - Customer importer call-site migration (`shopify_connector_sale`).
 - Removal/privatization of public `execute()`; collapse of its double token read.
-- Wiring `execute_lifecycle(purpose='reconnect_probe')` for reconnect **from the
-  `disconnected` state** — the test-connection matrix (faithful to analysis §9.1)
-  excludes `disconnected`, so reconnecting a re-credentialed disconnected store
-  should use `reconnect_probe` (a reconnect change, deferred; see the known
-  limitation below).
-- Credential-**replacement** refusal during `disconnecting` — the matrix (§8)
-  refuses it, but enforcing it requires a change to
-  `shopify_connector_store_credential.py` beyond the Slice-2A "clear-ordering
-  only" authorization; deferred (safe meanwhile: the epoch gate fail-closes all
-  business admission during `disconnecting`, and any credential set during
-  `disconnecting` is cleared at finalize).
 - Genuine two-server / deployed multi-worker linearization proof (T-19; SRR-09).
 - Live/dev-store Shopify validation (still gated).
-
-## 6. Known limitation carried into Slice 2B
-
-`action_reconnect` still probes via `action_test_connection`
-(`purpose='test_connection'`), whose accepted matrix excludes `disconnected`.
-After a completed disconnect the credential is cleared, so a plain reconnect
-early-returns (no probe); but a store that had a credential re-entered while
-`disconnected` would now be refused at the probe (previously it made the call
-via `execute()`). This is faithful to the analysis matrix (reconnect from
-`disconnected` should use `reconnect_probe`), untested by the existing suite, and
-deferred to the reconnect/call-site slice above. Flagged, not silently shipped.
 
 ## 7. Rollback notes
 

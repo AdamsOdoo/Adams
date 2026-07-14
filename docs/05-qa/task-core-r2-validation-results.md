@@ -1039,3 +1039,134 @@ later slice.
   disconnect-quiescence is not proven live.
 - No live Shopify request; no real credential/token used.
 - PR stays **draft**; not marked ready; not merged. Slice 2B not begun.
+
+---
+
+# CORE-R2 — Foundation Slice 2A — lifecycle-race correction (review 4690639375)
+
+> **Status: static-validated correction record for control-room review. Still no
+> Odoo runtime this session — no runtime-green claimed.** Applied on top of the
+> Slice-2A head `b3d23cb` after control-room review **4690639375** (VERDICT:
+> REVISE BEFORE ODOO.SH RUNTIME).
+
+## S2A-C.0 Scope ratification (review 4690639375)
+
+The two previously-flagged test files are **RATIFIED** as the CORE-R2 packet §4
+"minimal regressions in existing core dispatch/store/api-client tests":
+`tests/test_connection_lifecycle.py`, `tests/test_job_dispatch.py`. Commit
+`ce4ab38` is **not** rejected for allow-list drift. The corrected allow-list for
+this pass is `store.py`, `api_client.py`, `store_credential.py`,
+`tests/test_disconnect_quiescence.py`, `tests/test_connection_lifecycle.py`,
+`tests/test_job_dispatch.py`, `tests/test_credential_service.py`,
+`tests/test_api_client.py`, and these two docs. **No cron/manifest/other file
+was changed in this correction.**
+
+## S2A-C.1 Defect 1 — activation/reconnect fresh-state TOCTOU (fixed)
+
+**Root cause.** `action_activate` and successful `action_reconnect` validated
+pre-lock, then took `_lock_store_for_lifecycle()` but **ignored** the locked
+`(state, generation)` and wrote `connected` — so a disconnect winning before the
+lock could be overwritten (one-way lifecycle violated) and the epoch mis-bumped.
+
+**Correction (`store.py`).**
+- `action_activate`: takes the lock **first**, consumes the locked
+  `(state, generation)`, refuses if the fresh state is `disconnecting`/
+  `disconnected`, re-validates every evidence precondition under the lock, and
+  bumps `connection_generation = locked_generation + 1` exactly once only on
+  success. No Shopify call is made while the lock is held.
+- `action_reconnect`: captures the epoch at reconnect start; runs the probe +
+  readiness **unlocked** (they call Shopify); then finalizes **under the lock**,
+  refusing (never overwriting) if the fresh state is `disconnecting` **or** the
+  epoch changed since start (a disconnect/activation/credential change won the
+  race). A store already `disconnected` at start with an unchanged epoch is a
+  *legitimate* reconnect and proceeds. Single epoch bump on success.
+- `action_mark_reconnect_needed` (reachable from the probe's auth-failure
+  handler): now also takes the lock and **never overwrites a one-way disconnect**
+  (`disconnecting`/`disconnected` → audited no-op); no epoch bump (it is an
+  auth-failure degradation, not a reconnect).
+
+## S2A-C.2 Defect 2 — reconnect probe + private lifecycle entry (fixed)
+
+**Root cause.** `action_reconnect` probed via public `action_test_connection`
+(`purpose='test_connection'`, which excludes `disconnected`), so reconnect after
+a completed disconnect was broken; and the b3d23cb `execute_lifecycle` was a
+**public** method exposing a caller-controlled `purpose` over RPC (also breaking
+the `{execute, execute_business}` public-surface guard).
+
+**Correction (`store.py`, `api_client.py`).**
+- Shared **private** `_run_connection_probe(purpose)` on the store is the single
+  implementation behind `action_test_connection` (`'test_connection'`) and
+  `action_reconnect` (`'reconnect_probe'`) — identical transport/normalization/
+  mirror/audit; only the allowed-state matrix differs. `purpose` is internal to
+  those two trusted callers, never RPC-controlled. The matrix is pre-checked
+  before any audit job is created (no dangling job).
+- `execute_lifecycle` → renamed **private** `_execute_lifecycle` (defense-in-depth
+  transport guard). The public API-client surface is again exactly
+  `{execute, execute_business}`.
+- `reconnect_probe` permits `disconnected` (reconnect after completed disconnect);
+  `test_connection` still excludes it (Test Connection from `disconnected`
+  remains refused). Neither permits `disconnecting`.
+
+## S2A-C.3 Defect 3 — credential mutation lock order (fixed)
+
+**Root cause.** `action_set_token`/`action_replace_token` mutated the credential
+row **before** linearizing on the store row, permitted replacement during
+`disconnecting`, and did not bump `connection_generation` on a connected
+replacement — so an admitted old-generation job could capture a newly-replaced,
+unverified token.
+
+**Correction (`store_credential.py`).** One shared private `_mutate_token(store,
+value, is_replace)`: (1) value-validate before any write (unchanged
+`ValidationError` message); (2) lock the **store row first**
+(`store._lock_store_for_lifecycle`, `store → credential` global order) and
+fresh-read state; (3) refuse all set/replace while `disconnecting` (no credential,
+mirror, epoch, or token-bearing audit written); (4) create/update the credential
+under the held store lock (normal ACL, **no `sudo()`**); (5) clear
+`credential_last_verified_at`, stamp `credential_last_replaced_at` for replace;
+(6) if the fresh state is `connected`, atomically move to `reconnect_needed` and
+bump `connection_generation` **exactly once**. `action_set_token`/
+`action_replace_token` keep `@api.model` and delegate to it — no second
+credential path, no new `sudo()` site (the sudo guard still finds exactly three).
+
+## S2A-C.4 Race regression tests added
+
+- `tests/test_disconnect_quiescence.py`:
+  - `TestLifecycleRaceCorrections` — activation refuses when a disconnect won
+    (no 2nd bump, no audit); reconnect refuses when a disconnect wins **during
+    the probe** (real `action_disconnect` injected at the `_send` seam); reconnect
+    from `disconnected` connects.
+  - `TestCredentialReplacementRaceGenuine` (`post_install`, genuine `db_connect`
+    connections through the real `execute_business`/`_admit` + real
+    `action_replace_token`): replacement-first → old-generation admission
+    **fails closed** (no `_send`, no lease, cannot capture the new token);
+    admission-first → uses its captured **old** token, replacement proceeds
+    afterward, lease released.
+  - `_execute_lifecycle` privacy + purpose→state matrix tests (updated).
+- `tests/test_credential_service.py`: set/replace refused while `disconnecting`
+  (original credential + mirrors + epoch unchanged); connected set/replace bump
+  the epoch exactly once; non-connected set adds no bump; `store → credential`
+  lock-order + no-`sudo` source guard.
+- `tests/test_connection_lifecycle.py`: `_run_reconnect` parameterized with the
+  reconnect entry state (reconnect_probe matrix); reconnect from completed
+  `disconnected` connects; Test Connection from `disconnected` refused.
+
+## S2A-C.5 Static checks (this correction, no Odoo runtime)
+
+`py_compile` + `compileall` OK; conflict-marker scan clean; changed set = the 3
+production + 3 test files above (no cron/manifest/product/sale change); source
+guards OK — activate/reconnect **consume** the locked `(state, generation)` and
+revalidate under the lock; `reconnect_probe` used only by reconnect; credential
+set/replace refuse `disconnecting`, lock store before credential, bump the epoch
+once on connected replacement, use no new `sudo()`; sudo call-sites still exactly
+three; public API-client surface still `{execute, execute_business}`; no
+main-cursor commit; no token literal in production.
+
+## S2A-C.6 Corrected status
+
+- **SRR-03 remains OPEN.** No runtime-green is claimed (no Odoo runtime this
+  session). Exact-head Odoo.sh validation of the full `shopify_connector_core`
+  suite is still required (handoff §3–4).
+- The credential-replacement refusal during `disconnecting` and the
+  `reconnect_probe` wiring are now **Slice-2A correctness (implemented)**, no
+  longer deferred to Slice 2B.
+- PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request.
