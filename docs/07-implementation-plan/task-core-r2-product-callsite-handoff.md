@@ -4,6 +4,18 @@
 Slice 2B, Prompt P). **Model:** Opus 4.8. **Author:** Claude
 (execution/implementation); review/gating: ChatGPT (`CLAUDE.md` §2).
 
+**Revision 2 (control-room review `4695667571`, REVISE) — test/evidence
+correction only.** The production migration is unchanged (frozen). Added the
+genuine independent-`db_connect`-connection lifecycle class
+`TestProductCallSiteLifecycleGenuine` (M1/M2 committed-lease visibility; Race
+A/M8 in both orderings via the real `action_disconnect`/`_admit` protocol; Race
+B/M18 on the terminal page with the real `_run_disconnect_quiesce` controller),
+and **reclassified** the same-transaction generation-bump between-pages test as
+**M9/M10** (no-second-call / generation mismatch) — it is no longer described as
+Race A. The genuine tests are authored + compile but are **not executed** in
+this GitHub session (no PostgreSQL/Odoo) and are not claimed green. No
+core/sale/live change; Prompt E blocked; SRR-03 OPEN.
+
 ## Session summary
 
 Migrated the Task 010B product importer from the legacy value-returning
@@ -61,10 +73,18 @@ No core, sale, manifest, XML, security, CSV, or `adams_base` file changed.
 3. **`_execute_query` and `_fetch_product_with_all_variant_pages` removed.** No
    production caller reaches `api.client.execute(`; no helper returns an
    `execute_business` result to an outer reconciler.
-4. **Tests:** a new `TestProductCallSiteExecuteBusiness` activation class, plus
+4. **Tests:** a `TestProductCallSiteExecuteBusiness` registry-test-mode
+   activation class (static/public-call guards, one/multi-page lease lifecycle,
+   failure paths, and the **M9/M10** next-admission-refusal), a **new**
+   `TestProductCallSiteLifecycleGenuine` class using genuine independent
+   `db_connect` connections for **M1/M2**, **Race A/M8** (both orderings), and
+   **Race B/M18** with the real `action_disconnect`/`_admit`/`_run_disconnect_quiesce`
+   protocol (only `_send` replaced; `_apply_import` observe/pause spy;
+   bounded timeouts + guaranteed thread termination + zero-residue), plus
    adaptation of the transport-driving Task 010B tests to the real gate + `_send`
    seam (credential seeded while `setup_incomplete`, store connected, real job
-   threaded, `registry_enter_test_mode()`).
+   threaded, `registry_enter_test_mode()`). The genuine class is authored +
+   compiles; it is executed only under the Odoo runtime (pending), never here.
 
 Old vs new call-site shapes, lease coverage, exception handling, authored tests,
 and static results are detailed in
@@ -120,6 +140,23 @@ programmatic sweep confirms **every** `import_product_sync` call across all four
 changed test files reaches a `job=` — no other instance of this class exists.
 No production defect was found.
 
+**Revision-2 self-review (genuine lifecycle tests).** The
+`TestProductCallSiteLifecycleGenuine` class was authored against the accepted
+core `TestGenuineRealAdmission`/`_DisconnectHelpers` harness and reasoned
+through path-by-path: (a) the `_apply_import` observe/delegate spy uses the
+proven `real = type(X).method; real(self, …)` pattern already used by the core
+`counting_release` test; (b) the mid-reconcile controller's store `FOR UPDATE`
+is uncontended because the terminal `_admit` already released `FOR SHARE` and
+the paused reconciliation holds only the committed **lease** row, not the store
+row; (c) the disconnect's queued-job sweep never conflicts with the worker
+(the worker only reads the job; empty notes → no `_emit_notes` write); (d) all
+waits are bounded and threads are joined + asserted dead before cleanup; (e)
+cleanup deletes bindings before jobs (FK order) and the zero-residue verifier
+covers leases/store/credential/job/both binding tables. **These tests are not
+executed here** (no PostgreSQL/registry), so any residual Odoo-runtime-only
+behaviour (attribute-lock seeding, exact MVCC visibility timing) is a
+runtime-execution obligation, not a green claim.
+
 ## Open questions
 
 - **OQ-P1 [Open]** — Odoo runtime green on the integrated staging head (fresh
@@ -161,8 +198,13 @@ No production defect was found.
    validation record).
 2. Exception contract: `ShopifyQuiescedError` uncaught; `ShopifyClientError →
    JobHandlerError` preserved (§6).
-3. Test fidelity: existing Task 010B assertions intact; new activation tests
-   prove the lease lifecycle, Race-A-per-page, and no-partial-write.
+3. Test fidelity: existing Task 010B assertions intact; the registry-test-mode
+   activation tests prove the importer-level lease lifecycle and the **M9/M10**
+   next-admission-refusal (the between-pages generation-bump test is M9/M10, not
+   Race A); the genuine `db_connect` `TestProductCallSiteLifecycleGenuine` class
+   proves **M1/M2**, **Race A/M8** (both orderings), and **Race B/M18** with the
+   real `action_disconnect`/`_admit`/controller — authored, pending Odoo runtime
+   execution (not claimed green).
 4. Scope: only `shopify_connector_product` files changed; public `execute()`
    untouched (Prompt E remains blocked).
 

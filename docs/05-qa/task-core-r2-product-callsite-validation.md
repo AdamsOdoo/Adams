@@ -216,18 +216,74 @@ inside the terminal lease (packet AF-3).
   pages; one lease at a time; **zero** product binding at every page's
   transport; reconciliation invoked once, at the terminal page; N variants
   imported); `test_multi_page_existing_cursor_and_dedup_guards_still_fire`.
-- **D. Failure and lifecycle** —
+- **D. Failure and lifecycle (registry-test-mode activation)** —
   `test_transport_client_error_routes_and_releases_once`;
   `test_normalization_error_releases_once`;
   `test_reconciliation_error_releases_once`;
   `test_media_error_releases_once`;
   `test_quiesced_admission_propagates_uncaught_no_transport_no_write`
-  (ShopifyQuiescedError uncaught, no transport, no lease, no write);
-  `test_disconnect_between_pages_fails_next_admission_no_partial_write`
-  (Race-A per page: a generation bump between pages fails the next admission
-  closed — page 2 never transports, no partial product, no leaked lease).
+  (exception contract: ShopifyQuiescedError uncaught, no transport, no lease,
+  no write — **classified M9**, a generation-mismatch refusal, not Race A);
+  `test_generation_bump_between_pages_refuses_next_admission_m9_m10`
+  (**classified M9/M10** — no-second-call / generation mismatch: a
+  *same-test-transaction* generation bump between pages fails the next
+  admission closed. This is **not** Race A: it does not use the genuine
+  cross-connection `action_disconnect` vs `_admit` lock protocol.)
 
-### 7.2 Adapted existing Task 010B tests (item E — regression)
+  These D-tests use registry test mode (the admission side cursor reuses the
+  single test connection). They prove the importer-level lease lifecycle and
+  the M9/M10 next-admission-refusal contract, but they are **not** genuine
+  independent-connection lifecycle proofs — those are §7.3.
+
+### 7.3 Genuine independent-connection lifecycle tests (M1/M2, M8, M18)
+
+`TestProductCallSiteLifecycleGenuine` mirrors the accepted core
+`TestGenuineRealAdmission` harness: real pooled `db_connect` main/observer
+cursors with bounded `statement_timeout` + `lock_timeout`, the production
+`_admit`/`_release_lease` side transactions made genuinely independent by
+patching the registry cursor factory for the bounded window, real
+`action_disconnect` and `_run_disconnect_quiesce`, threads decoupled with a
+fresh registry lock, guaranteed thread termination (`_assert_workers_dead`),
+sanitized type-only worker diagnostics, and durable cleanup + zero-residue
+verification. **Only `_send` is replaced (the network seam); reconciliation is
+paused via an observe-and-delegate spy on the product-domain `_apply_import`.
+No lifecycle/state/`_admit`/lease-ORM/controller monkeypatch is used.**
+
+- **M1/M2** — `test_real_lease_visible_before_send_and_through_reconciliation`
+  (multi-page): exactly one committed lease is visible on an **independent
+  connection** before each page's `_send`; the non-terminal page's lease
+  releases before the next admission (distinct keys, one at a time); the
+  terminal lease remains independently visible while `_apply_import` runs and
+  releases only after reconciliation + `flush_all`; the real token snapshot is
+  observed; no explicit main-cursor commit.
+- **Race A / M8 — disconnect-first** —
+  `test_race_a_disconnect_first_refuses_admission`: a real `action_disconnect`
+  commits first on an independent connection; the next `_admit` observes the
+  new state/generation and fails closed — no `_send`, no lease, no
+  template/variant binding.
+- **Race A / M8 — admission-first** —
+  `test_race_a_admission_first_lease_commits_then_disconnect_returns`: the page
+  admission commits its lease/token snapshot first (observed cross-connection);
+  a concurrent real `action_disconnect` then returns within bound **without
+  waiting** for the parked worker; the already-admitted page proceeds to
+  completion and releases — no untracked admitted call is possible.
+- **Race B / M18** —
+  `test_race_b_terminal_reconciliation_survives_concurrent_disconnect`: the
+  terminal-page admission commits; reconciliation is paused while the lease is
+  independently observable; a concurrent real `action_disconnect` returns
+  without waiting; the credential remains present and `_run_disconnect_quiesce`
+  does **not** finalize while the lease exists; the admitted reconciliation
+  finishes (its in-memory token snapshot), releases the lease; a later real
+  controller pass finalizes `completed` and clears the credential **only after**
+  release; zero leases/jobs/bindings residue is verified.
+
+**[Open — pending execution]** The §7.3 genuine tests require a live PostgreSQL
+backend and a fully-built Odoo registry; they are **authored** here and pass
+`py_compile`/`compileall`, but are **NOT executed** in this normal GitHub
+session and are therefore **not** described as green. Their runtime execution is
+a deferred Odoo.sh / dev obligation, alongside §8's integrated runtime.
+
+### 7.4 Adapted existing Task 010B tests (item E — regression)
 
 The transport-driving tests in `test_product_import_matching.py`,
 `test_product_refresh_and_stale.py`, `test_product_runtime_performance.py`
@@ -266,11 +322,19 @@ transport. The one test that formerly asserted on the dissolved
 - No available non-Odoo pure test harness exists for this addon (Odoo is not
   importable in this environment); the tests are Odoo `TransactionCase`s and run
   under the Odoo test runner, not here.
+- The §7.3 genuine independent-connection lifecycle tests
+  (`TestProductCallSiteLifecycleGenuine`) and every §7.1 activation test are
+  **authored and compile**, but are **NOT executed** here (no PostgreSQL / Odoo
+  registry). None is described as green.
 
-**[Open] Runtime still pending.** Odoo runtime (fresh install + full
-core/product/sale suites + CORE-R2 admission classes + these activation tests)
-is **not** run in this session and is **not** claimed. The integrated staging
-head is **not** runtime-green.
+**[Open] Runtime still pending.** Odoo runtime — fresh install + full
+core/product/sale suites + CORE-R2 admission classes + the §7.1 activation
+tests + the §7.3 genuine M1/M2/M8/M18 lifecycle tests + the deployed
+multi-worker proof — is **not** run in this session and is **not** claimed. The
+integrated staging head is **not** runtime-green. Tests executed this session:
+**static only** (`py_compile`, `compileall`); tests pending execution: **all
+Odoo `TransactionCase`s**, in particular the §7.3 genuine lifecycle race
+tests.
 
 ---
 
