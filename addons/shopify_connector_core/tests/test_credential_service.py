@@ -1,9 +1,21 @@
 import ast
 import os
 
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
+
+from ..models import shopify_connector_store_credential as credential_module
+# Reusable AST source-guard helpers (control-room review 4692156428). Defined
+# once in test_disconnect_quiescence (imported earlier by tests/__init__.py,
+# mirroring the existing `from .test_api_client import ...` convention) so the
+# executable-AST inspection is shared, not duplicated.
+from .test_disconnect_quiescence import (
+    guard_called_names,
+    guard_fn_ast,
+    guard_min_call_lineno,
+    guard_str_constants,
+)
 
 DUMMY_TOKEN_1 = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 DUMMY_TOKEN_2 = 'shpat_DUMMYDUMMYDUMMY1111111111111111'
@@ -45,6 +57,11 @@ class TestCredentialService(TransactionCase):
     def _credential_as_admin(self):
         return self.env['shopify.connector.store.credential'].with_user(
             self.user_admin
+        )
+
+    def search_credential(self):
+        return self._credential_as_admin().search(
+            [('store_id', '=', self.store.id)], limit=1
         )
 
     def _assert_dummy_absent_except_access_token(self, token):
@@ -143,37 +160,175 @@ class TestCredentialService(TransactionCase):
         self.assertEqual(Job.search_count([]), job_count_before)
         self.assertEqual(JobLog.search_count([]), job_log_count_before)
 
-    def test_action_clear_token_on_connected_store_moves_to_disconnected(self):
+    # ------------------------------------------------------------------
+    # CORE-R2 (AR-047; review 4690639375 #3): store->credential lock order,
+    # refuse-while-disconnecting, and connected-replacement epoch bump.
+    # ------------------------------------------------------------------
+
+    def test_set_token_refused_while_disconnecting(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'disconnecting', 'connection_generation': 3})
+        with self.assertRaises(UserError):
+            Credential.action_set_token(self.store, DUMMY_TOKEN_2)
+        # Original credential, mirrors, and generation are all unchanged.
+        credential = Credential.search([('store_id', '=', self.store.id)])
+        self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.connection_generation, 3)
+
+    def test_replace_token_refused_while_disconnecting(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'disconnecting', 'connection_generation': 3})
+        with self.assertRaises(UserError):
+            Credential.action_replace_token(self.store, DUMMY_TOKEN_2)
+        credential = Credential.search([('store_id', '=', self.store.id)])
+        self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.connection_generation, 3)
+
+    def test_connected_set_token_bumps_generation_exactly_once(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'connected', 'connection_generation': 5})
+        Credential.action_set_token(self.store, DUMMY_TOKEN_2)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertEqual(self.store.connection_generation, 6)
+        self.assertFalse(self.store.credential_last_verified_at)
+
+    def test_connected_replace_token_bumps_generation_exactly_once(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'connected', 'connection_generation': 5})
+        Credential.action_replace_token(self.store, DUMMY_TOKEN_2)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertEqual(self.store.connection_generation, 6)
+        self.assertTrue(self.store.credential_last_replaced_at)
+
+    def test_non_connected_set_token_does_not_bump_generation(self):
+        # A set/replace on a non-connected, non-disconnecting store preserves the
+        # state and adds NO extra generation bump (review §5.8).
+        Credential = self._credential_as_admin()
+        self.store.write({'state': 'reconnect_needed', 'connection_generation': 7})
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertEqual(self.store.connection_generation, 7)
+
+    def test_mutate_token_locks_store_before_credential_source(self):
+        # store -> credential global lock order: _mutate_token takes the store
+        # update lock (store._lock_store_for_lifecycle) BEFORE it reads/writes the
+        # credential row, refuses while disconnecting, and uses no sudo().
+        #
+        # AST-robust (control-room review 4692156428): inspect the EXECUTABLE
+        # body -- not raw source text -- so the method docstring's "normal ACL,
+        # **no `sudo()`**" prose is NOT a false positive. All three original
+        # safety assertions are preserved, now evaluated against real code.
+        fn = guard_fn_ast(
+            credential_module.ShopifyConnectorStoreCredential._mutate_token
+        )
+        lock_line = guard_min_call_lineno(fn, '_lock_store_for_lifecycle')
+        search_line = guard_min_call_lineno(fn, 'search', receiver_name='self')
+        self.assertIsNotNone(lock_line, 'the store lifecycle lock must be taken')
+        self.assertIsNotNone(search_line, 'the credential row must be searched')
+        self.assertLess(
+            lock_line, search_line,
+            'the store row must be locked before the credential row is read/written',
+        )
+        # refuse-while-disconnecting: the executable code compares the freshly
+        # locked state against the 'disconnecting' literal.
+        self.assertIn('disconnecting', guard_str_constants(fn))
+        # no sudo() call anywhere in the mutation path (docstring prose excluded).
+        self.assertNotIn('sudo', guard_called_names(fn))
+
+    def test_action_clear_token_on_connected_store_requests_two_phase_disconnect(self):
+        # CORE-R2 (reviews 4690804619 #2 + 4690807427): public clear on a
+        # `connected` store must NOT clear immediately (an admitted lease can
+        # outlive admission's FOR SHARE). It routes through the accepted two-phase
+        # disconnect: state -> `disconnecting`, credential STILL present, exactly
+        # one epoch bump, an audited request -- the controller clears at finalize.
         Credential = self._credential_as_admin()
         Credential.action_set_token(self.store, DUMMY_TOKEN_1)
         self.store.write({'state': 'connected'})
-        Job = self.env['shopify.connector.job']
-        JobLog = self.env['shopify.connector.job.log']
-        job_count_before = Job.search_count([])
-        job_log_count_before = JobLog.search_count([])
+        self.store.invalidate_recordset()
+        gen_before = self.store.connection_generation
 
         Credential.action_clear_token(self.store)
         self.store.invalidate_recordset()
-        self.assertEqual(self.store.state, 'disconnected')
-        self.assertFalse(self.store.credential_present)
-        self.assertEqual(Job.search_count([]), job_count_before)
-        self.assertEqual(JobLog.search_count([]), job_log_count_before)
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.disconnect_status, 'requested')
+        self.assertTrue(self.store.credential_present)   # NOT cleared yet
+        self.assertEqual(self.store.connection_generation, gen_before + 1)
+        credential = self.search_credential()
+        self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
 
-    def test_action_clear_token_on_reconnect_needed_store_moves_to_disconnected(self):
+    def test_action_clear_token_on_reconnect_needed_store_requests_two_phase_disconnect(self):
         Credential = self._credential_as_admin()
         Credential.action_set_token(self.store, DUMMY_TOKEN_1)
         self.store.write({'state': 'reconnect_needed'})
+        self.store.invalidate_recordset()
+        gen_before = self.store.connection_generation
+
+        Credential.action_clear_token(self.store)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.disconnect_status, 'requested')
+        self.assertTrue(self.store.credential_present)   # NOT cleared yet
+        self.assertEqual(self.store.connection_generation, gen_before + 1)
+        credential = self.search_credential()
+        self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
+
+    def test_action_clear_token_refused_while_disconnecting(self):
+        # Public clear must refuse while a disconnect is in progress -- the
+        # controller owns the clear at completed/timed_out.
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'disconnecting'})
+        with self.assertRaises(UserError):
+            Credential.action_clear_token(self.store)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        # Credential untouched by the refused clear.
+        credential = self.search_credential()
+        self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
+        self.assertTrue(self.store.credential_present)
+
+    def test_action_clear_token_direct_clear_from_setup_incomplete(self):
+        # A never-connected store has no active-business-call posture, so the
+        # public clear empties the credential directly (no disconnect request).
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.assertEqual(self.store.state, 'setup_incomplete')
         Job = self.env['shopify.connector.job']
-        JobLog = self.env['shopify.connector.job.log']
         job_count_before = Job.search_count([])
-        job_log_count_before = JobLog.search_count([])
+
+        Credential.action_clear_token(self.store)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'setup_incomplete')
+        self.assertFalse(self.store.credential_present)
+        credential = self.search_credential()
+        self.assertFalse(credential.access_token)
+        self.assertEqual(credential.credential_state, 'absent')
+        # A direct clear is not an audited lifecycle action -- no job rows.
+        self.assertEqual(Job.search_count([]), job_count_before)
+
+    def test_action_clear_token_direct_clear_from_disconnected(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'disconnected'})
+        Job = self.env['shopify.connector.job']
+        job_count_before = Job.search_count([])
 
         Credential.action_clear_token(self.store)
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'disconnected')
         self.assertFalse(self.store.credential_present)
         self.assertEqual(Job.search_count([]), job_count_before)
-        self.assertEqual(JobLog.search_count([]), job_log_count_before)
 
     def test_action_clear_token_empties_and_preserves_history(self):
         Credential = self._credential_as_admin()

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import requests
 
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
 from ..models import shopify_connector_api_client as client_module
@@ -74,6 +75,24 @@ class TestApiClient(TransactionCase):
             cls.store, DUMMY_TOKEN
         )
         cls.Client = cls.env['shopify.connector.api.client']
+
+    def setUp(self):
+        super().setUp()
+        # CORE-R2 (review 4691182306 #1): `_admit_lifecycle` now captures its
+        # snapshot in an OWNED `registry.cursor()` side transaction (store-row
+        # FOR SHARE), exactly like business `_admit`. Under a plain TransactionCase
+        # that side cursor is a genuinely independent connection that cannot see
+        # this class's uncommitted fixture; entering registry test mode makes every
+        # `registry.cursor()` reuse the single test connection as a TestCursor so
+        # the fixture is visible cross-cursor -- the sanctioned mechanism
+        # `TestBusinessAdmission` already uses for business `_admit`. This is a
+        # packet-§4 seam-compat adaptation: no assertion changed. Genuine
+        # cross-connection admission-vs-disconnect behaviour is proven by the
+        # genuine lifecycle-race classes in test_disconnect_quiescence.py. The
+        # execute()/_send_lifecycle direct tests open no side cursor, so test mode
+        # is transparent to them.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
 
     def _execute_with(self, fake_send):
         with patch.object(type(self.Client), '_send', fake_send):
@@ -282,6 +301,51 @@ class TestApiClient(TransactionCase):
         result = self._execute_with(fake_send)
         self.assertEqual(received['extra'], ())
         self.assertEqual(result['data']['shop']['name'], 'Test Shop')
+
+    # 21 (CORE-R2 review 4690804619 #1). `_send_lifecycle` passes the EXACT
+    # snapshot token to `_send` -- the transport re-reads no credential.
+    def test_send_lifecycle_passes_snapshot_token_to_send(self):
+        captured = {}
+
+        def spy_send(self, store, body, token=None):
+            captured['token'] = token
+            return FakeResponse(200, json_body=_success_body())
+
+        with patch.object(type(self.Client), '_send', spy_send):
+            result = self.Client._send_lifecycle(
+                self.store, 'query { shop { id } }', DUMMY_TOKEN,
+            )
+        self.assertEqual(captured['token'], DUMMY_TOKEN)
+        self.assertEqual(result['data']['shop']['name'], 'Test Shop')
+
+    # 22 (CORE-R2 review 4690804619 #1). `_admit_lifecycle` reads the token EXACTLY
+    # once (the snapshot), captures the credential id/version + store generation +
+    # the purpose matrix, and fails closed outside that matrix.
+    def test_admit_lifecycle_snapshots_token_once(self):
+        reads = []
+        Cred = type(self.env['shopify.connector.store.credential'])
+
+        def counting(self, store):
+            reads.append(1)
+            return DUMMY_TOKEN
+
+        with patch.object(Cred, '_get_access_token', counting):
+            snapshot = self.Client._admit_lifecycle(
+                self.store, 'test_connection',
+            )
+        self.assertEqual(snapshot['token'], DUMMY_TOKEN)
+        self.assertEqual(reads, [1])                 # one token read only
+        self.assertTrue(snapshot['credential_id'])
+        self.assertEqual(snapshot['generation'], self.store.connection_generation)
+        self.assertEqual(
+            snapshot['allowed_states'],
+            ('setup_incomplete', 'connected', 'reconnect_needed'),
+        )
+
+    def test_admit_lifecycle_refuses_state_outside_matrix(self):
+        self.store.write({'state': 'disconnected'})
+        with self.assertRaises(UserError):
+            self.Client._admit_lifecycle(self.store, 'test_connection')
 
     # 19. No credential leak across every fixture used above.
     def test_no_credential_leak_across_fixtures(self):

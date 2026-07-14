@@ -843,3 +843,1219 @@ API-client/job-enqueue tests" the gate refers to.
   remains open**; **issue #157** tracks the literal reproduction and separate
   fix decision.
 - Draft PR only — not marked ready, not merged; Slice 2 not begun.
+
+---
+
+# CORE-R2 — Foundation Slice 2A implementation evidence — runtime pending
+
+> **Status: static-validated implementation record for control-room review.
+> NO Odoo runtime was available in this session — no runtime-green is claimed
+> for Slice 2A (§8 of the Slice-2A gate: "When an Odoo runtime is unavailable,
+> state that clearly. Do not claim runtime green").** This section records the
+> lifecycle/controller half of CORE-R2 implemented on top of the merged
+> Foundation Slice 1. It does **not** modify, weaken, or re-claim any Slice-1
+> evidence above.
+
+## S2A.0 Exact base / branch / gate
+
+- **Base SHA:** `Shopify-connector` @
+  `912801508155c6358e8f5f1a7a0aaf01ae573675` (the merge of PR #156 —
+  Foundation Slice 1). Verified: local `HEAD`, `origin/Shopify-connector`
+  tip, and the base of open draft PRs #150/#151 all equal this SHA.
+- **Branch:** `claude/core-r2-foundation-slice-2a-mr7uwq` (environment-assigned;
+  the gate's preferred name `claude/core-r2-slice-2a-disconnect-controller` was
+  superseded by the assigned branch, per the gate's own "remain on that assigned
+  branch" clause).
+- **PR #150 / #151:** confirmed open, draft, unmerged — untouched.
+- **Gate:** the CORE-R2 Slice-2A implementation prompt.
+
+## S2A.1 Foundation Slice 1 inventory confirmed (not duplicated/redesigned)
+
+Present and reused unchanged: the `shopify.connector.call.lease` model
+(Integer `job_id`, indexed `expires_at`); `execute_business` context manager
+(parity + deterministic exception precedence); `_admit` store-row `FOR SHARE`
+admission; single-token `_send(store, body, token)`; `store.connection_generation`
+(previously inert); `job.expected_connection_generation` (captured at enqueue);
+`_release_lease`; and the Slice-1 test scaffolding. Slice 2A does **not** re-open,
+alter, or weaken any of these.
+
+## S2A.2 Implemented lifecycle/controller behavior `[Fact — static]`
+
+- **Store state + fields.** New `disconnecting` state; new
+  `disconnect_status` (`none`/`requested`/`quiescing`/`completed`/`timed_out`),
+  `disconnect_status_reason`, `disconnect_open_lease_count`,
+  `disconnect_oldest_admitted_at`, `disconnect_requested_at`,
+  `disconnect_requested_by` (M2o `res.users`), `disconnect_completed_at`. All
+  additive; existing rows backfill to `disconnect_status='none'` / empty / 0.
+- **Generation-changing lifecycle lock** (`_lock_store_for_lifecycle`): a
+  **blocking** `SELECT … FOR NO KEY UPDATE` on the store row (raw, main cursor),
+  with `flush_recordset` before and `invalidate_recordset` after; conflicts with
+  admission's `FOR SHARE`; never `SKIP LOCKED` (a lifecycle transition must
+  wait); released at the natural RPC/cron-boundary commit (no explicit
+  main-cursor commit). Applied to `action_disconnect`, `action_activate`, and the
+  reconnect-success write; each bumps `connection_generation` **exactly once**.
+- **Two-phase `action_disconnect`:** lock+fresh-read → bump epoch → `state`
+  `disconnecting`, `disconnect_status='requested'`, stamp requester/time → one
+  non-blocking A/B (queued/retry_waiting) sweep → wake controller → return. Does
+  **not** clear the credential, wait for holders, write a locked running job row,
+  or commit the main cursor. Repeated disconnect while
+  `disconnecting`/`disconnected` = audited idempotent no-op.
+- **Quiescence controller** (`_run_disconnect_quiesce`, cron): one store per
+  invocation via `search(order='disconnect_requested_at, id').try_lock_for_update(limit=1)`
+  (`FOR UPDATE SKIP LOCKED LIMIT 1`) — next unlocked store, all-locked → no-op.
+- **Direction-C lease interpretation + finalization** (`_process_disconnect_quiesce`):
+  counts **all** committed lease rows (expired = unknown/live, still counts);
+  writes the escalation snapshot; **zero rows → `completed`** (credential cleared
+  under the held store `FOR UPDATE`, store→credential order, `state=disconnected`);
+  **rows before timeout → `quiescing`** (delayed re-poll); **rows at/past
+  `DISCONNECT_QUIESCE_TIMEOUT` → `timed_out`** (bounded, secret-free escalation
+  snapshot of ≤ 20 opaque `lease_key`s / Integer `job_id`s; credential cleared;
+  `state=disconnected`; residual lease rows cleaned up **only after** the
+  `timed_out` finalize). `completed` and `timed_out` are observably distinct.
+- **Delayed repoll** (`_trigger_disconnect_controller(at=now+POLL_DELAY)`): a
+  still-quiescing store schedules exactly one bounded delayed trigger; no
+  immediate same-store re-trigger, no busy loop, no sleep.
+- **Lifecycle request matrix during `disconnecting`:** business job create
+  (existing connected-only gate) and start (existing write→running gate) and
+  `execute_business` admission all already fail-closed for `disconnecting`
+  (`state != 'connected'`); `action_test_connection`, `action_activate`, and
+  `action_reconnect` are refused; `action_test_connection` is migrated through the
+  new `execute_lifecycle(purpose='test_connection')` (purpose→state matrix:
+  `setup_incomplete`/`connected`/`reconnect_needed`), which also refuses any
+  lifecycle call while `disconnecting`.
+- **Constants** (`shopify_connector_job_dispatch.py`): `DISCONNECT_QUIESCE_TIMEOUT
+  = timedelta(minutes=15)` (> the 300 s admission lease lifetime),
+  `POLL_DELAY = timedelta(minutes=1)` (≥ the `_trigger` 1-minute granularity).
+  `MAX_CALL_LIFETIME` was **not** re-added: the lease lifetime already lives in
+  `api_client._CALL_LEASE_LIFETIME_SECONDS = 300`; a second constant would be a
+  forbidden alias.
+- **Controller cron** (`data/shopify_connector_cron_disconnect.xml`): one
+  `ir.cron` (priority 0, `user_id=base.user_root`, 5-minute recovery heartbeat)
+  calling `model._run_disconnect_quiesce()`; registered in `__manifest__.py`
+  (version `19.0.1.6.0` → `19.0.1.7.0`).
+
+## S2A.3 Exact changed files
+
+Allowed by the Slice-2A gate §3:
+`models/shopify_connector_store.py`, `models/shopify_connector_api_client.py`
+(execute_lifecycle + test-connection migration only),
+`models/shopify_connector_job_dispatch.py` (two controller constants only),
+`__manifest__.py`, `data/shopify_connector_cron_disconnect.xml` (new),
+`tests/test_disconnect_quiescence.py`, and this document.
+
+**Not needed / not touched (in-scope-allowed but unchanged):**
+`models/shopify_connector_job.py` (the existing connected-only start gate already
+makes `disconnecting` non-startable — no change required),
+`models/shopify_connector_store_credential.py` (the finalize reuses
+`action_clear_token` as-is under the store lock — no clear-ordering change was
+needed), `tests/__init__.py` (no new test file, no import change).
+
+**⚠️ Scope deviation flagged for control-room ratification.** The two-phase
+`action_disconnect` (§5.C — non-negotiable accepted contract) necessarily
+supersedes single-phase disconnect assertions in **two existing test files not
+listed in the Slice-2A §3 allow-list**:
+`tests/test_connection_lifecycle.py` and `tests/test_job_dispatch.py`. The merged
+CORE-R2 **packet §4** allow-list explicitly authorized "`tests/test_disconnect_quiescence.py`
+(+ **minimal regressions in existing core dispatch/store/api-client tests**)"; the
+Slice-2A §3 re-frozen list dropped that clause. Because §5.C cannot be delivered
+green without it, **minimal, surgical** migrations were applied to only the
+obsolete single-phase disconnect assertions in those two files (state
+`disconnecting` not `disconnected`; credential cleared at controller finalize not
+in Phase 1; A/B sweep = queued/retry_waiting). Nothing else in those files
+changed. This is flagged here, in the handoff, and in the PR body; the PR stays
+draft. **Requested control-room action:** ratify these two files as the
+packet-§4 "minimal regressions in existing tests," or reissue a corrected §3
+list.
+
+## S2A.4 Tests added (authored; NOT executed — no runtime this session)
+
+`tests/test_disconnect_quiescence.py` gains 30 Slice-2A tests across four
+classes, covering all 24 required scenarios:
+
+- `TestDisconnectPhase1` (10): connected→disconnecting; generation +1 exactly
+  once; repeated-disconnect audited no-op; A/B sweep scope; running-job never
+  written; disconnecting non-startable; test-connection refused (action +
+  execute_lifecycle); activate/reconnect refused; activation bumps generation.
+- `TestQuiescenceController` (12): zero→completed→cleared→disconnected;
+  credential-present-before-timeout; live-lease quiescing; expired-lease still
+  quiescing (direction C); deadline→timed_out (≠ completed); timed_out clears
+  credential; cleanup only after timed_out; completed requires zero rows; delayed
+  repoll at ≥ now+POLL_DELAY with no immediate re-trigger; one store per
+  invocation; duplicate-invocation idempotent; no secret in fields/snapshot/audit.
+- `TestDisconnectSourceGuards` (6): no main-cursor commit; SKIP LOCKED LIMIT 1
+  selection; blocking FOR NO KEY UPDATE (not SKIP LOCKED); delayed `_trigger(at=)`
+  + no busy-loop/sleep; store→credential clear order; controller makes no Shopify
+  call.
+- `TestDisconnectControllerSelectionGenuine` (2, `post_install`, genuine
+  `db_connect` connections): locked-first store doesn't block a later one;
+  all-locked is a safe no-op.
+
+Existing Slice-1 tests are **not** weakened. The two migrated test files' other
+tests are unchanged.
+
+## S2A.5 Static checks run this session `[Fact — verified]`
+
+No Odoo runtime (Odoo not importable; no `odoo-bin`). Static tooling only:
+
+- `py_compile` on every changed `.py` — **OK**.
+- `compileall -q addons/shopify_connector_core` — **OK**.
+- XML parse of both cron data files — **OK**.
+- Manifest `ast.literal_eval`; version `19.0.1.7.0`; new data file registered — **OK**.
+- Precise 7-char git conflict-marker scan — **none**.
+- Circular-import check: `store → job_dispatch → job` is acyclic (nothing those
+  depend on imports `store`) — **OK**.
+- Source guards: no `self.env.cr.commit`/`self._cr.commit`/`.commit()` in
+  `store.py`; no product/sale file changed; controller/finalize contain no
+  `_send`/`requests`/`.execute(`/`execute_business`/`execute_lifecycle`; no
+  `shpat_` literal in production models/data; `completed` gated on zero rows;
+  `timed_out` distinct; `_trigger(at=` present; no `while True`/`time.sleep`/
+  `import time`; no `architecture-review-log.md` / `research-handoff.md` /
+  `sync-engine-risk-register.md` change — **all OK**.
+
+## S2A.6 Unresolved runtime gates (deferred)
+
+- **Odoo.sh exact-head runtime of the full `shopify_connector_core` suite**
+  (fresh install + per-class) — **NOT run this session; required before any
+  runtime-green claim.**
+- Genuine **two-server / multi-worker** proof of admission↔disconnect
+  linearization (T-19) — deferred (SRR-09 / RR-4).
+- Live/dev-store Shopify validation — **not authorized, not performed.**
+- The seven base `res_users.notification_type` post-init-rerun artifacts
+  (issue #157) are pre-existing and out of scope.
+
+## S2A.7 No call-site activation
+
+The product and customer importers still call the legacy `execute()` and are
+**unchanged**; `execute_business` remains dormant (no production business call
+site). Public `execute()` is **not** removed (deferred). So the
+admission↔disconnect linearization is now implemented on **both** halves
+(admission `FOR SHARE` + lifecycle `FOR NO KEY UPDATE`/controller `FOR UPDATE`)
+but is **not exercised end-to-end by a live domain handler** — activation is a
+later slice.
+
+## S2A.8 Confirmations
+
+- **SRR-03 remains OPEN.** No remediation runtime-green is claimed; end-to-end
+  disconnect-quiescence is not proven live.
+- No live Shopify request; no real credential/token used.
+- PR stays **draft**; not marked ready; not merged. Slice 2B not begun.
+
+---
+
+# CORE-R2 — Foundation Slice 2A — lifecycle-race correction (review 4690639375)
+
+> **Status: static-validated correction record for control-room review. Still no
+> Odoo runtime this session — no runtime-green claimed.** Applied on top of the
+> Slice-2A head `b3d23cb` after control-room review **4690639375** (VERDICT:
+> REVISE BEFORE ODOO.SH RUNTIME).
+
+## S2A-C.0 Scope ratification (review 4690639375)
+
+The two previously-flagged test files are **RATIFIED** as the CORE-R2 packet §4
+"minimal regressions in existing core dispatch/store/api-client tests":
+`tests/test_connection_lifecycle.py`, `tests/test_job_dispatch.py`. Commit
+`ce4ab38` is **not** rejected for allow-list drift. The corrected allow-list for
+this pass is `store.py`, `api_client.py`, `store_credential.py`,
+`tests/test_disconnect_quiescence.py`, `tests/test_connection_lifecycle.py`,
+`tests/test_job_dispatch.py`, `tests/test_credential_service.py`,
+`tests/test_api_client.py`, and these two docs. **No cron/manifest/other file
+was changed in this correction.**
+
+## S2A-C.1 Defect 1 — activation/reconnect fresh-state TOCTOU (fixed)
+
+**Root cause.** `action_activate` and successful `action_reconnect` validated
+pre-lock, then took `_lock_store_for_lifecycle()` but **ignored** the locked
+`(state, generation)` and wrote `connected` — so a disconnect winning before the
+lock could be overwritten (one-way lifecycle violated) and the epoch mis-bumped.
+
+**Correction (`store.py`).**
+- `action_activate`: takes the lock **first**, consumes the locked
+  `(state, generation)`, refuses if the fresh state is `disconnecting`/
+  `disconnected`, re-validates every evidence precondition under the lock, and
+  bumps `connection_generation = locked_generation + 1` exactly once only on
+  success. No Shopify call is made while the lock is held.
+- `action_reconnect`: captures the epoch at reconnect start; runs the probe +
+  readiness **unlocked** (they call Shopify); then finalizes **under the lock**,
+  refusing (never overwriting) if the fresh state is `disconnecting` **or** the
+  epoch changed since start (a disconnect/activation/credential change won the
+  race). A store already `disconnected` at start with an unchanged epoch is a
+  *legitimate* reconnect and proceeds. Single epoch bump on success.
+- `action_mark_reconnect_needed` (reachable from the probe's auth-failure
+  handler): now also takes the lock and **never overwrites a one-way disconnect**
+  (`disconnecting`/`disconnected` → audited no-op); no epoch bump (it is an
+  auth-failure degradation, not a reconnect).
+
+## S2A-C.2 Defect 2 — reconnect probe + private lifecycle entry (fixed)
+
+**Root cause.** `action_reconnect` probed via public `action_test_connection`
+(`purpose='test_connection'`, which excludes `disconnected`), so reconnect after
+a completed disconnect was broken; and the b3d23cb `execute_lifecycle` was a
+**public** method exposing a caller-controlled `purpose` over RPC (also breaking
+the `{execute, execute_business}` public-surface guard).
+
+**Correction (`store.py`, `api_client.py`).**
+- Shared **private** `_run_connection_probe(purpose)` on the store is the single
+  implementation behind `action_test_connection` (`'test_connection'`) and
+  `action_reconnect` (`'reconnect_probe'`) — identical transport/normalization/
+  mirror/audit; only the allowed-state matrix differs. `purpose` is internal to
+  those two trusted callers, never RPC-controlled. The matrix is pre-checked
+  before any audit job is created (no dangling job).
+- `execute_lifecycle` → renamed **private** `_execute_lifecycle` (defense-in-depth
+  transport guard). The public API-client surface is again exactly
+  `{execute, execute_business}`.
+- `reconnect_probe` permits `disconnected` (reconnect after completed disconnect);
+  `test_connection` still excludes it (Test Connection from `disconnected`
+  remains refused). Neither permits `disconnecting`.
+
+## S2A-C.3 Defect 3 — credential mutation lock order (fixed)
+
+**Root cause.** `action_set_token`/`action_replace_token` mutated the credential
+row **before** linearizing on the store row, permitted replacement during
+`disconnecting`, and did not bump `connection_generation` on a connected
+replacement — so an admitted old-generation job could capture a newly-replaced,
+unverified token.
+
+**Correction (`store_credential.py`).** One shared private `_mutate_token(store,
+value, is_replace)`: (1) value-validate before any write (unchanged
+`ValidationError` message); (2) lock the **store row first**
+(`store._lock_store_for_lifecycle`, `store → credential` global order) and
+fresh-read state; (3) refuse all set/replace while `disconnecting` (no credential,
+mirror, epoch, or token-bearing audit written); (4) create/update the credential
+under the held store lock (normal ACL, **no `sudo()`**); (5) clear
+`credential_last_verified_at`, stamp `credential_last_replaced_at` for replace;
+(6) if the fresh state is `connected`, atomically move to `reconnect_needed` and
+bump `connection_generation` **exactly once**. `action_set_token`/
+`action_replace_token` keep `@api.model` and delegate to it — no second
+credential path, no new `sudo()` site (the sudo guard still finds exactly three).
+
+## S2A-C.4 Race regression tests added
+
+- `tests/test_disconnect_quiescence.py`:
+  - `TestLifecycleRaceCorrections` — activation refuses when a disconnect won
+    (no 2nd bump, no audit); reconnect refuses when a disconnect wins **during
+    the probe** (real `action_disconnect` injected at the `_send` seam); reconnect
+    from `disconnected` connects.
+  - `TestCredentialReplacementRaceGenuine` (`post_install`, genuine `db_connect`
+    connections through the real `execute_business`/`_admit` + real
+    `action_replace_token`): replacement-first → old-generation admission
+    **fails closed** (no `_send`, no lease, cannot capture the new token);
+    admission-first → uses its captured **old** token, replacement proceeds
+    afterward, lease released.
+  - `_execute_lifecycle` privacy + purpose→state matrix tests (updated).
+- `tests/test_credential_service.py`: set/replace refused while `disconnecting`
+  (original credential + mirrors + epoch unchanged); connected set/replace bump
+  the epoch exactly once; non-connected set adds no bump; `store → credential`
+  lock-order + no-`sudo` source guard.
+- `tests/test_connection_lifecycle.py`: `_run_reconnect` parameterized with the
+  reconnect entry state (reconnect_probe matrix); reconnect from completed
+  `disconnected` connects; Test Connection from `disconnected` refused.
+
+## S2A-C.5 Static checks (this correction, no Odoo runtime)
+
+`py_compile` + `compileall` OK; conflict-marker scan clean; changed set = the 3
+production + 3 test files above (no cron/manifest/product/sale change); source
+guards OK — activate/reconnect **consume** the locked `(state, generation)` and
+revalidate under the lock; `reconnect_probe` used only by reconnect; credential
+set/replace refuse `disconnecting`, lock store before credential, bump the epoch
+once on connected replacement, use no new `sudo()`; sudo call-sites still exactly
+three; public API-client surface still `{execute, execute_business}`; no
+main-cursor commit; no token literal in production.
+
+## S2A-C.6 Corrected status
+
+- **SRR-03 remains OPEN.** No runtime-green is claimed (no Odoo runtime this
+  session). Exact-head Odoo.sh validation of the full `shopify_connector_core`
+  suite is still required (handoff §3–4).
+- The credential-replacement refusal during `disconnecting` and the
+  `reconnect_probe` wiring are now **Slice-2A correctness (implemented)**, no
+  longer deferred to Slice 2B.
+- PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request.
+
+# CORE-R2 — Foundation Slice 2A — probe-snapshot + credential-clear correction (reviews 4690804619 + 4690807427)
+
+> **Status: static-validated correction record for control-room review. Still no
+> Odoo runtime this session — no runtime-green claimed.** Applied on top of head
+> `415c05c` after control-room reviews **4690804619** ("two lifecycle/credential
+> race paths remain open") and its clarification **4690807427** (clear must not
+> substitute an immediate connected-state clear for quiescence).
+
+## S2A-C2.0 Objective
+
+Two open race paths, corrected before Odoo.sh runtime:
+
+1. **Lifecycle probe not bound to one credential snapshot.** `_execute_lifecycle`
+   delegated to public `execute()`, which pre-checked the credential and then let
+   `_send(store, body)` **re-read** it; `_run_connection_probe` then wrote
+   verification/failure mirrors **without** revalidating the store generation or
+   the credential row — so a concurrent replacement could mark a newly-replaced
+   token verified from an old-token response, or invalidate a new token from an
+   old-token failure.
+2. **Public `action_clear_token` bypassed two-phase disconnect.** It cleared
+   without the lifecycle store lock, permitted clearing while `disconnecting`, and
+   moved `connected`/`reconnect_needed` → `disconnected` with no epoch bump —
+   breaking the invariant that credentials remain present until the controller
+   reaches `completed`/`timed_out`.
+
+Plus review §11: `action_disconnect` must write `connection_generation =
+locked_generation + 1` from the value returned under the lock.
+
+## S2A-C2.1 Defect 1 — one-snapshot lifecycle probe + post-network revalidation (fixed)
+
+**Correction (`api_client.py`, `store.py`, `store_credential.py`).**
+
+- `_execute_lifecycle` is **removed** and replaced by two private client helpers:
+  - `_admit_lifecycle(store, purpose)` — the matrix gate + the **single**
+    credential snapshot: one token read (via the sanctioned `_get_access_token`),
+    the credential id + version (`write_date`), the store `connection_generation`,
+    and the purpose's allowed-state matrix. Takes **no** lock (a probe must not
+    hold a lock across the network); fails closed on a bad purpose/state
+    (`UserError`) or a missing token (`ShopifyClientError(ERROR_AUTH,
+    REASON_TOKEN_INVALID, credential_invalid=True)`).
+  - `_send_lifecycle(store, query, token, variables=None)` — issues the request
+    with **exactly** the snapshot token via `_send(store, body, token)`, so the
+    transport re-reads **no** credential (closing the double-read window). Same
+    config-`UserError` / `RequestException`→temporary / `_normalize_response`
+    contract as `execute()`. The legacy two-arg `_send(store, body)` seam
+    (`execute()`) is unchanged.
+- `store._run_connection_probe` now: snapshots via `_admit_lifecycle`, sends via
+  `_send_lifecycle`, then — for **success and failure alike** — calls
+  `_lifecycle_probe_superseded(snapshot)`, which acquires the **store → credential**
+  locks (`_lock_store_for_lifecycle` then the credential-row `FOR NO KEY UPDATE`
+  via `store_credential._lifecycle_credential_version(lock=True)`) and rejects the
+  result if the locked state left the matrix, the generation changed, or the
+  credential id/version/**value** changed. A superseded probe is audited via
+  `_audit_probe_superseded` (job → `cancelled`, reason "Connection probe
+  superseded by a lifecycle or credential change; rerun it.") and writes **no**
+  mirror or credential state. Non-superseded results apply the existing pass/fail
+  mirrors under the held lock (TOCTOU-safe). **No lock spans the network call.**
+- The credential **value** is compared in addition to id/`write_date` because
+  PostgreSQL fixes `write_date` to the transaction timestamp within one
+  transaction, so a same-transaction replacement is caught by the value change.
+- `action_reconnect` aborts (no readiness, no finalize) when the probe returns
+  `'superseded'`.
+
+## S2A-C2.2 Defect 2 — public/controller credential-clear split (fixed)
+
+**Correction (`store_credential.py`, `store.py`; clarification 4690807427).**
+
+- New **controller-only** primitive `store_credential._clear_token_under_store_lock
+  (store)`: clears the value + `credential_state` + non-secret store mirrors,
+  performs **no** state transition and **no** epoch bump, and takes **no** lock of
+  its own (the caller holds the store lock). Both `_finalize_disconnect_completed`
+  and `_finalize_disconnect_timed_out` now call it under the controller's held
+  store `FOR UPDATE` (they set `disconnected` themselves) — never the public
+  `action_clear_token` (which would refuse a `disconnecting` store).
+- Public `action_clear_token(store)` now locks the store first
+  (`_lock_store_for_lifecycle`) and routes by the locked state:
+  `disconnecting` → **refused** (`UserError`); `connected`/`reconnect_needed` →
+  **routed** to the accepted two-phase disconnect via the shared
+  `store._request_disconnect_locked` (state → `disconnecting`, one epoch bump,
+  audited request) with **nothing cleared now** — the controller clears at
+  finalize; `setup_incomplete`/`disconnected` → cleared directly under the lock.
+  No public path manufactures a clear-before-quiescence.
+
+## S2A-C2.3 Review §11 — `action_disconnect` uses the locked generation (fixed)
+
+`action_disconnect` and the public clear routing share
+`store._request_disconnect_locked(locked_state, locked_generation)`, which writes
+`connection_generation = locked_generation + 1` from the value returned under the
+lock (no indirect `self.connection_generation` re-read). The single-bump
+idempotent-no-op contract is preserved.
+
+## S2A-C2.4 Tests added / migrated
+
+- `tests/test_disconnect_quiescence.py`:
+  - `TestLifecycleProbeSupersession` (controlled, same-cursor injection at the
+    `_send` seam): `_send_lifecycle` receives the exact snapshot token; a
+    non-superseded probe applies the pass mirror; supersession by a credential
+    **replace** (generation) and by a **disconnect** (state) → job `cancelled`,
+    no mirror; an **auth-failure** result during a replace does **not** invalidate
+    the replaced token (the named hazard); a `reconnect_needed` replace (no epoch
+    bump — value-only supersede) aborts the reconnect **before** readiness.
+  - `TestCredentialClearPolicy`: public clear on a `connected` store with an
+    outstanding committed lease defers to the controller and does **not** clear
+    until zero holders (no premature clear); refused while `disconnecting`; direct
+    clear from `setup_incomplete`/`disconnected`; `action_disconnect` bumps the
+    generation exactly once from the locked value.
+  - Updated the `test_store_then_credential_clear_order` source guard: finalize
+    calls `_clear_token_under_store_lock` (not the public `action_clear_token`),
+    and `action_disconnect` clears nothing.
+- `tests/test_api_client.py`: `_send_lifecycle` passes the snapshot token to
+  `_send`; `_admit_lifecycle` reads the token exactly once and snapshots
+  id/version/generation/matrix; refuses a state outside the matrix.
+- `tests/test_credential_service.py`: connected/reconnect_needed public clear
+  **requests two-phase disconnect** (credential still present, one epoch bump);
+  refused while `disconnecting`; direct clear from `setup_incomplete`/
+  `disconnected` (migrated from the obsolete immediate-`disconnected` contract).
+- `tests/test_connection_lifecycle.py`: `_send` seam fakes accept the token
+  snapshot; the direct-clear-on-connected test migrated to two-phase routing.
+
+## S2A-C2.5 Scope note — transport-seam regressions (packet §4)
+
+Binding the probe to `_send(store, body, token)` means the lifecycle transport
+seam is now three-arg. Two existing tests that patch `_send` with a 2-arg fake and
+then drive `action_test_connection` had to widen **only** their fake signatures
+(`lambda self, store, body, token=None: …`); **no assertion changed** in either:
+
+- `tests/test_test_connection.py` (api-client/test-connection behavior);
+- `tests/test_readiness_slot_closure.py` (its `_run_test_connection` provisioning
+  helper).
+
+This is the same packet §4 "minimal regressions in existing core dispatch/store/
+api-client tests" class the control room **ratified** for
+`test_connection_lifecycle.py` / `test_job_dispatch.py` in review 4690639375, and
+is **flagged here for the same ratification**. Net PR scope becomes **15**
+addon+doc files: the 12 prior files, `tests/test_api_client.py` (already in the
+Round-2 corrected allow-list; newly carries this correction's client-unit tests),
+plus the two seam-compat test files above. `test_readiness_check.py` was
+**not** touched — it patches `execute` (not `_send`) and never drives the probe.
+
+## S2A-C2.6 Static checks (this correction, no Odoo runtime)
+
+`py_compile` OK for all changed model + test files; AST guards re-verified:
+sudo call-sites still exactly three (`job_log`, `readiness_check`,
+`store_credential` — **no new `sudo()`**); public API-client surface still
+`{execute, execute_business}` (`_admit_lifecycle`/`_send_lifecycle` are private,
+`_execute_lifecycle` removed); the four credential service methods keep
+`@api.model`; no `.commit()` anywhere in `store.py`; client commits only on
+`side_cr`; both `_send(store, body)` and `_send(store, body, token)` seams present;
+no token literal persisted or logged (snapshot token is in-memory only). Store →
+credential lock order preserved on every clear/probe/mutation path; no lock spans
+the network call.
+
+## S2A-C2.7 Corrected status
+
+- **SRR-03 remains OPEN.** No runtime-green claimed (no Odoo runtime this
+  session). Exact-head Odoo.sh validation of the full `shopify_connector_core`
+  suite is still required (handoff §3–4).
+- PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request;
+  no product/sale/cron change in this correction.
+
+# CORE-R2 — Foundation Slice 2A — atomic lifecycle admission + genuine race tests (review 4691182306)
+
+Third control-room pass, at head `756684d`. Two blocking defects; both fixed.
+`Fact`s below are static (source/AST) — **no Odoo runtime this session**.
+
+## S2A-C3.0 Scope ratification applied (control-room ruling)
+
+Per the ruling accompanying review 4691182306, the two prior seam-compat files
+(`tests/test_test_connection.py`, `tests/test_readiness_slot_closure.py`) are
+**ratified**. This round extends the **same packet-§4 transport-seam-compat class**
+to every remaining test that drives a lifecycle probe, because defect 1 (below)
+makes `_admit_lifecycle` capture its snapshot in an OWNED `registry.cursor()` side
+transaction — under a plain `TransactionCase` that side cursor is a genuinely
+independent connection that cannot see an uncommitted fixture, so each
+probe-driving class must enter **registry test mode** (the sanctioned mechanism
+`TestBusinessAdmission` already uses for business `_admit`). This adaptation adds
+**no assertion change**; it only makes the production side cursor see the fixture.
+The control room approved extending it to `tests/test_connection_lifecycle.py`
+(outside the round's initial allowed-list) and adding the test-mode line to the two
+ratified seam-compat files. `test_readiness_check.py` was **not** touched (it calls
+`run_for_store`/creates jobs directly and never drives `_admit_lifecycle`).
+
+## S2A-C3.1 Defect 1 — lifecycle admission is now atomic (independent FOR SHARE)
+
+**Was** [Fact]: `_admit_lifecycle` performed a plain main-cursor/cached snapshot
+with no store-row lock, so `action_disconnect` could win after the probe pre-check
+but before `_send`; the probe could still issue an outbound Shopify request that
+post-network supersession could only discard *after the fact*.
+
+**Now** [Fact]: `_admit_lifecycle` captures the snapshot in one short **owned side
+transaction** — the same accepted mechanism as business `_admit`, minus any lease:
+
+1. `self.env.flush_all()` so the independent cursor observes the caller's state;
+2. open `self.env.registry.cursor()` (the side transaction);
+3. `SELECT state, connection_generation FROM shopify_connector_store WHERE id=%s
+   FOR SHARE` — the linearization lock (conflicts with the lifecycle
+   `FOR NO KEY UPDATE`);
+4. **fresh** purpose→state matrix re-check on the value read under the lock (no
+   purpose lists `disconnecting`);
+5. read the access token **exactly once** (the one sanctioned `_get_access_token`);
+6. capture the credential row id + `write_date`;
+7. `side_cr.commit()` — persists **nothing**, releases the `FOR SHARE`, completes
+   the admission linearization — **before** the network call;
+8. `side_cr.close()`; return the non-persisted snapshot.
+
+`_send_lifecycle` then runs (a separate call in `_run_connection_probe`) with the
+exact snapshot token — **no lock spans the network call, no `call.lease` is
+created**. A matrix refusal under the lock (a disconnect that won before the
+`FOR SHARE`) raises `UserError`, which `_run_connection_probe` treats as a
+**probe superseded before send** (audited `cancelled`, **no** network); a
+missing/empty credential at admission raises the accepted `ShopifyClientError`
+auth taxonomy (no network); any side-transaction failure rolls back and closes.
+The post-network `_lifecycle_probe_superseded` revalidation is unchanged and still
+catches a disconnect that wins *after* admission.
+
+`action_disconnect` still writes `connection_generation = locked_generation + 1`
+from the value returned under the lock (review 4690804619 §11, retained).
+
+## S2A-C3.2 Defect 2 — genuine independent-transaction race tests authored
+
+Added two opt-in `@tagged('post_install','-at_install')` genuine classes using
+real independent `db_connect` connections (distinct backend PIDs; raw SQL only to
+commit fixtures, observe, and clean up), plus source guards; the prior
+`TransactionCase` supersession/clear tests are **retained and re-documented as
+controlled seam-injection tests, not genuine concurrency**.
+
+- **`TestLifecycleAdmissionSourceGuards`** — source guards proving the admission
+  owns a side cursor, executes store `FOR SHARE`, re-checks the matrix under the
+  lock, reads the token exactly once, commits/rolls back only on `side_cr`
+  (never the main cursor), creates no lease, issues no transport call inside the
+  admission (AST call-node inspection, so a docstring mention is no false
+  positive), commits/closes before the transport, hands the exact snapshot token
+  to `_send`, and keeps the post-network revalidation.
+- **`TestLifecycleAdmissionRaceGenuine`** — (A) **disconnect-first**: the worker's
+  pre-check passes on its stale `connected` snapshot, but the admission `FOR SHARE`
+  (fresh, distinct backend) reads the committed `disconnecting` row and refuses
+  UNDER the lock → **zero `_send` calls**, superseded, no lease. (B)
+  **admission-first**: the admission captures the OLD token/generation, a
+  disconnect commits on a distinct backend during the call, the probe finishes
+  with **exactly** its captured OLD token, and the post-network revalidation
+  discards the stale result (superseded) with **no mirror written**. Plus a
+  **store-row lock-attribution** proof (the admission `FOR SHARE` blocks on a held
+  `FOR NO KEY UPDATE` and hits its bounded lock_timeout, then succeeds once
+  released) and a **threaded genuine-simultaneity** proof (a worker admits and
+  parks at the transport seam on one backend while a disconnect commits on
+  another; the accepted `Registry._lock` bounded-window pattern; bounded joins;
+  worker terminated; distinct worker/disconnect PIDs).
+- **`TestPublicClearAdmissionRaceGenuine`** — (A) **business-admission-first**:
+  the committed lease outlives admission's brief `FOR SHARE`; a public
+  `action_clear_token` on the connected store requests two-phase disconnect and
+  clears **nothing**; the controller stays `quiescing` with the credential present
+  while the lease is open; after the business call releases the lease, the next
+  controller pass reaches `completed` and clears the credential — **exactly one
+  generation bump**. (B) **public-clear-first**: the clear requests two-phase
+  disconnect (gen +1, credential preserved); a later old-generation business
+  admission **fails closed** (no lease, **no `_send`**), and the credential
+  remains until the controller finalizes.
+
+The single-shot genuine admission-first / threaded cases run their worker in
+**READ COMMITTED** so the post-network `FOR NO KEY UPDATE` revalidation observes
+the concurrently-committed disconnect deterministically without the production
+request-level serialization-failure retry (production runs REPEATABLE READ + that
+retry; both converge on discarding the stale probe result). This is documented in
+the `_open_bounded` helper. Every genuine test closes every cursor (try/finally),
+joins/asserts-dead every worker thread, and runs a fresh zero-residue verifier
+(store / lease / credential / job) plus removes the disconnect + drain cron
+triggers it scheduled.
+
+## S2A-C3.3 Test-mode seam-compat (packet §4) — files touched
+
+Registry-test-mode `setUp` added (no assertion changed) to every probe-driving
+class: `test_disconnect_quiescence.py` (`TestDisconnectPhase1`,
+`TestLifecycleRaceCorrections`, `TestLifecycleProbeSupersession`),
+`test_api_client.py` (`TestApiClient`), `test_test_connection.py`
+(`TestTestConnection`), `test_readiness_slot_closure.py`
+(`TestReadinessSlotClosure`), and — control-room-approved for this round —
+`test_connection_lifecycle.py` (`TestConnectionLifecycle`).
+`TestCredentialClearPolicy` opens no side cursor (no `_admit_lifecycle`), so it
+took **no** test-mode change — only a docstring clarifying it is controlled, not
+genuine.
+
+## S2A-C3.4 Static checks (this correction, no Odoo runtime)
+
+`py_compile` + `compileall` OK for the whole module. AST/source guards
+re-verified: `_admit_lifecycle` opens an owned side cursor, executes store
+`FOR SHARE`, re-checks the matrix on the locked value, reads the token exactly
+once, commits/rolls back **only** on `side_cr` (never main), creates **no** lease
+(no `.create(`/`lease_key`), makes **no** transport call inside the admission, and
+commits before returning the snapshot; `_run_connection_probe` calls
+`_admit_lifecycle` before `_send_lifecycle`, routes an under-lock `UserError` to
+superseded and a missing-credential `ShopifyClientError` to failure, and retains
+the post-network `_lifecycle_probe_superseded` revalidation. Unchanged invariants:
+public API-client surface `{execute, execute_business}`; **no new `sudo()`**
+(still exactly three call-sites: `job_log`, `readiness_check`,
+`store_credential`); the four credential methods keep `@api.model`; **no
+`.commit()` in `store.py`**; client commits only on `side_cr`; both `_send`
+seams present; store → credential order on every path; **no lock spans the network
+call**; no token literal logged or persisted; no product/sale/cron change. Net PR
+scope stays **15** addon+doc files (no new file added — `store_credential.py` and
+`job_dispatch.py` were not needed this round; the existing
+`_lifecycle_credential_version` serves the side-transaction snapshot as-is).
+
+## S2A-C3.5 Corrected status
+
+- **SRR-03 remains OPEN.** No runtime-green claimed. Exact-head Odoo.sh validation
+  of the full `shopify_connector_core` suite (handoff §3–4), including the two new
+  genuine `post_install` classes, is still required.
+- PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request;
+  no product/sale change. Base re-aligned to `Shopify-connector`
+  `1494b97d0e2117af05b954dabde92a9e497ac2c3` via a normal merge commit (docs
+  histories preserved; no `addons/**` conflict).
+
+# CORE-R2 — Foundation Slice 2A — EXACT-HEAD ODOO.SH RUNTIME VALIDATION (PR #160)
+
+> `[Fact — verified at runtime on the Odoo.sh dev build for PR #160, session date
+> 2026-07-14]`. This section is the authoritative exact-head runtime record. It
+> was produced **after** the validated code SHA below; the docs commit that carries
+> it is **evidence-only and is itself NOT runtime-tested** (Section 14).
+
+## RT.0 Session identity & build-to-commit gate `[Fact]`
+
+| Item | Value |
+| --- | --- |
+| Validated code SHA (checked out; tree clean) | `79dbfc00428802da8c98c97d3e6d7eb6025ea74e` |
+| Branch (PR #160) | `claude/core-r2-foundation-slice-2a-mr7uwq` (local + `origin/…` decorate HEAD) |
+| Required base ancestor | `1494b97d0e2117af05b954dabde92a9e497ac2c3` — **2nd parent** of the HEAD merge; `git merge-base --is-ancestor` → true |
+| `git status --porcelain` | empty (clean) |
+| Odoo | 19.0 |
+| PostgreSQL | 16.14 |
+| Odoo ORM cursor isolation | **REPEATABLE READ** (server default `read committed` overridden per-connection) |
+| Build URL | `https://adamsmen-claude-core-r2-foundation-slice-2a-mr7uwq-34872373.dev.odoo.com` |
+| Build ID | `34872373` |
+| Database | `adamsmen-claude-core-r2-foundation-slice-2a-mr7uwq-34872373` |
+| Installed module versions | `adams_base 19.0.1.0` · `shopify_connector_core 19.0.1.7.2` · `shopify_connector_product 19.0.1.0.0` · `shopify_connector_sale 19.0.1.0.0` |
+
+Gate: **PASS**. `ls-remote` over SSH is unavailable in the webshell (no deploy key);
+the remote tip is corroborated by the fetched `origin/claude/core-r2-foundation-slice-2a-mr7uwq`
+ref decorating HEAD. Base at `1494b97` had `shopify_connector_core 19.0.1.6.0` → head
+`19.0.1.7.2` (additive: adds `data/shopify_connector_cron_disconnect.xml`).
+
+## RT.1 Scope audit — exactly the 15 accepted files `[Fact]`
+
+`git diff --name-status 1494b97..79dbfc0` = 15 files: 6 production
+(`__manifest__.py` M, `data/shopify_connector_cron_disconnect.xml` A, 4 models M),
+7 tests (all M), 2 docs (`task-core-r2-validation-results.md` M,
+`task-core-r2-slice-2a-handoff.md` A). **No** product/sale file, **no** Task 010B/011B
+file, **no** issue-157 fixture, **no** live credential/token. Secret scan of the net
+diff: the only `shpat_` strings are labelled `shpat_DUMMYDUMMYDUMMY…` test fixtures
++ one doc mention — no live token.
+
+## RT.2 Fresh-install validation (authoritative = build `install.log`) `[Fact]`
+
+The Odoo.sh build performed the sanctioned fresh install at the exact head:
+`odoo-bin -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable`.
+
+- `shopify_connector_core`: **4 failures, 0 errors of 282 tests** (at_install) + **19 post-tests, 0 failed** (`19 post-tests in 0.95s, 792 queries`).
+- Disconnect cron installed **once**; both crons present once; new fields + selections created (RT.11); no install/registry/XML/manifest/constraint failure; no duplicate cron/model record.
+- The **4 failures are the only failures** and are TEST DEFECTS (RT.3). Fresh install is otherwise green — I quote the Odoo summary above rather than relying on process exit code.
+
+## RT.3 The 4 fresh-install failures — root-caused as TEST DEFECTS (docstring false-positives) `[Fact]`
+
+All four are naive `assertNotIn(<token>, inspect.getsource(<method>))` source-guards
+that match the method's **own docstring**, not executable code:
+
+| Test (file) | Token | Where it actually appears |
+| --- | --- | --- |
+| `TestCredentialService.test_mutate_token_locks_store_before_credential_source` (test_credential_service.py:227) | `sudo(` | docstring "normal ACL, **no `sudo()`**" |
+| `TestDisconnectSourceGuards.test_lifecycle_lock_is_blocking_for_no_key_update` (test_disconnect_quiescence.py:1676) | `SKIP LOCKED` | docstring explaining it does *not* use `FOR UPDATE SKIP LOCKED` |
+| `TestDisconnectSourceGuards.test_store_then_credential_clear_order` (~1699) | `action_clear_token` | `_finalize_disconnect_completed` docstring "never the public `action_clear_token`" |
+| `TestLifecycleAdmissionSourceGuards.test_admit_lifecycle_creates_no_lease` (~2554) | `call.lease` | `_admit_lifecycle` docstring "no `call.lease` is created" |
+
+**Non-invasive runtime proof** (AST strip of docstring+comments via `odoo-bin shell`,
+no file modified): every token is present in the RAW source but ABSENT from the
+executable code — `ALL_PRODUCTION_CODE_CLEAN = True`. The sibling test
+`test_admit_lifecycle_commits_and_closes_before_transport` already uses `ast.parse`
+"so a docstring mention … is NOT a false positive", proving the author knew the
+failure mode but left these four naive scans. **Production behaviour is correct; the
+four are pure test-suite hygiene defects.** They do not touch any connector code path
+and do not affect any behavioural/genuine test.
+
+Recommended (control-room-gated) fix: make the four `assertNotIn` guards
+docstring-robust (strip the docstring/comments, or use AST like the sibling test),
+in `tests/test_credential_service.py` + `tests/test_disconnect_quiescence.py` only.
+Per Section 9/13 a test-only correction requires a focused commit + push + **new
+exact-head build + full revalidation from Section 1** — which this session cannot
+produce (webhook held; single-DB container). Left OPEN as a remaining gate.
+
+## RT.4 Base-to-head genuine upgrade — EXACT LIMITATION (not performed) `[Fact / Open limitation]`
+
+A genuine isolated base→head upgrade **could not be created** in this container:
+(1) it is a single-database dev build — `odoo-bin` auto-injects `-d <the one DB>` and
+the db-filter locks it (AGENTS.md: "never attempt to create a new one"); (2) the DB
+role is restricted — `pg_roles`/`pg_database` are `permission denied`, so it has no
+`CREATEDB`; (3) the 1 GB `/home/odoo`+PG disk cap. `-i` on an already-installed module
+is a no-op (**0 tests**), so it cannot substitute. Per Section 4 I do **not** substitute
+a fresh install or same-head `-u` and call it an upgrade.
+
+Supporting additive-safety analysis (not a substitute): the base→head delta is
+additive only — one `noupdate="1"` cron + 9 additive store fields; the two `required`
+new columns carry defaults (`connection_generation = Integer(default=0)`,
+`disconnect_status = Selection(default='none')` — source comments: "Existing rows
+backfill to 0" / "…to 'none'"), the rest are nullable/`default=False`/`default=0`, so an
+`ADD COLUMN … NOT NULL DEFAULT` backfills existing rows safely. **A genuine base→head
+upgrade + `-u shopify_connector_core` remains a REMAINING GATE for a runtime that
+supports a second database.**
+
+## RT.5 Complete core suite at head + `notification_type` env-artifact `[Fact]`
+
+Live reproduction: `odoo-bin -u shopify_connector_core --test-enable --test-tags /shopify_connector_core --stop-after-init --no-http`
+(run twice: before and **after** the 15 genuine runs — byte-identical):
+
+- `shopify_connector_core: 247 tests`, **`19 post-tests` all pass**, `3 failed, 6 error(s) of 197 tests`.
+- The **3 failures** = the same source-guard defects (the 4th is masked because its class `setUpClass` errors first).
+- The **6 errors** = `res.users.create()` `NotNullViolation: notification_type` in `setUpClass._create_group_user` of the 6 user-creating `at_install` `TransactionCase` classes — including **non-PR** classes (`test_credential_access`, `test_job_log_system_append`). This is exactly the known **issue #157** (`res_users.notification_type` post-init-rerun base-fixture artifact, tracked in the handoff §1/§4, and explicitly out of scope — the task says *do not fix #157*). It is an **`-u`-only test-harness env-artifact, NOT a PR #160 defect**, proven four ways: (a) the fresh `-i` build had 0 such errors; (b) `odoo-bin shell` creates a user fine (`default_get→'email'`, `create→'email'`); (c) it strikes non-PR classes identically; (d) it never touches connector code. Root cause: in the `-u` at_install phase `shopify_connector_core` (deps: `base` only) loads at position 4 while `mail` (which supplies the `notification_type` default) loads later; the fresh `-i` build assembles the full registry before the per-module test loop, so the default is present.
+- All previously-existing test classes still execute (API client, connection lifecycle, credential service, test connection, readiness slot closure, job dispatch, Slice-1 admission/lease, Slice-2A disconnect/controller). Registry test-mode does not leak (RT.10).
+
+## RT.6 Genuine `post_install` classes — ×3 distinct processes each (all green) `[Fact]`
+
+Each run: `odoo-bin -u shopify_connector_core --test-enable --test-tags '/shopify_connector_core:<Class>' --stop-after-init --no-http`.
+
+| Class | Runs | Tests/run | Result (all runs) |
+| --- | --- | --- | --- |
+| `TestGenuineRealAdmission` | 3 | 9 | 0 failed, 0 errors |
+| `TestCredentialReplacementRaceGenuine` | 3 | 2 | 0 failed, 0 errors |
+| `TestDisconnectControllerSelectionGenuine` | 3 | 2 | 0 failed, 0 errors |
+| `TestLifecycleAdmissionRaceGenuine` | 3 | 4 | 0 failed, 0 errors |
+| `TestPublicClearAdmissionRaceGenuine` | 3 | 2 | 0 failed, 0 errors |
+
+15 distinct executions, all green. The genuine classes assert their invariants
+(distinct `pg_backend_pid`, zero-transport, no lease, worker-join, cursor-close,
+zero residue) internally; a pass = the invariants held. Only emitted SQL noise is the
+**expected** `lock timeout` provocation in `TestLifecycleAdmissionRaceGenuine`
+(Section 7.C); the other 12 isolated runs emit zero SQL errors.
+
+## RT.7 Sections 7 & 8 — race assertions (source-mapped, adversarially verified) `[Fact / Inference]`
+
+`TestLifecycleAdmissionRaceGenuine` (Section 7): core invariants **proven** —
+disconnect-first zero transport via a real counting `_send` spy (`assertEqual(send_calls, [])`),
+distinct backends (`assertGreaterEqual(len(set(pids)),2)`), lease=0; admission-first
+uses the exact captured old token (`captured['token']==DUMMY_TOKEN`) with the disconnect
+committing on a distinct backend *during* the simulated request, result discarded as
+superseded (`job cancelled`+`'superseded'`, `store.state=='disconnecting'`), credential
+not cleared; **lock attribution (C) rigorous** — a 500 ms `lock_timeout` (not
+`statement_timeout`) fires only on the `FOR SHARE` lock wait, `assertRaises(OperationalError)`
+wraps *only* `_admit_lifecycle`, ruling out `Registry._lock`/cursor-creation/other SQL,
+and after `holder.rollback()` admission proceeds; threaded case parks at the transport
+seam on a real second backend, joins the worker **inside** the `patch.object(_lock)`
+window (join precedes lock restoration).
+
+`TestPublicClearAdmissionRaceGenuine` (Section 8): **proven** — business-admission-first
+commits one lease (`lease_during==1`) with the old token, credential preserved while the
+lease is open, deferred clear until a later controller pass, and **exactly one generation
+bump** (`final_gen == initial_gen + 1`); public-clear-first commits `disconnecting` first
+and the later old-generation admission **fails closed** (`assertRaises(ShopifyQuiescedError)`,
+`assertNotIn('token', captured)` → zero transport, `lease==0`), credential retained,
+zero residue.
+
+Narrow, non-blocking test-completeness observations (production behaviour is correct;
+these are assertion-tightening notes, not defects): Section 7A does not itself assert
+"no mirror" (proven in 7B); "no pass/**fail** mirror" excludes only `'pass'`; "exactly one
+transport" is counter-asserted only in test A; "original `Registry._lock` object restored"
+rests on `patch.object` restore semantics (no identity assertion). Section 8A's
+"quiescing (not completed)" and 8B's "new generation (clear-first)" are proven by
+`state`/lease/gen **proxies**, not by observing the `disconnect_status`/gen value directly.
+Recommended (control-room-gated) minor assertion tightening in
+`tests/test_disconnect_quiescence.py`.
+
+## RT.8 Section 9 — isolation level + serialization-retry `[Fact / Inference / Open]`
+
+- **Isolation proven at runtime**: Odoo ORM cursor = **REPEATABLE READ** (`show transaction_isolation` inside an Odoo cursor).
+- **Deterministic READ COMMITTED path proven**: `test_admission_first_uses_old_token_then_disconnect_supersedes` (+ threaded sibling) open the worker cursor `READ COMMITTED` (`SET TRANSACTION ISOLATION LEVEL READ COMMITTED`) so the post-network `FOR NO KEY UPDATE` revalidation directly observes a concurrently-committed disconnect and supersedes it, writing **no mirror** (`last_test_connection_result != 'pass'`, `credential_last_verified_at` falsy). Green ×3.
+- **Framework retry verified from official Odoo 19 source** (not from memory): `odoo/service/model.py` — `PG_CONCURRENCY_ERRORS_TO_RETRY` includes `SERIALIZATION_FAILURE` (SQLSTATE 40001), `MAX_TRIES_ON_CONCURRENCY_FAILURE = 5`, `def retrying(...)` retry loop (L185); `call_kw` (L150) and `odoo/http.py:2303/2329` wrap every RPC/HTTP request. So the production RPC path for `action_test_connection`/`action_reconnect` **is** wrapped by a real 40001 retry — the docstring's "REPEATABLE READ + retry converge" claim is architecturally sound.
+- **GAP (Open)**: **no connector test** forces a REPEATABLE READ 40001 and drives Odoo's retry to prove "total transport across attempt+retry == exactly one" / "no unhandled serialization error escapes" (b/c/e). The tests deliberately use READ COMMITTED to observe deterministically; the convergence is an **Inference** backed by framework source, not a connector test. Per Section 9 a narrowly-scoped runtime test may be added **only** to `tests/test_disconnect_quiescence.py` — REMAINING GATE (test-only correction ⇒ commit + push + new exact-head build + full revalidation, out of scope this session; production isolation must NOT be weakened to pass).
+
+## RT.9 Section 10 — controller & timeout: ALL PROVEN `[Fact]`
+
+All 12 claims map to real, load-bearing assertions matching production: one unlocked
+store per invocation; locked-first skipped for a later unlocked store and all-locked
+no-op **proven with genuine second-connection `FOR UPDATE` locks** (`TestDisconnectControllerSelectionGenuine`,
+distinct backends, not a monkeypatch); zero-leases→`completed`; live/expired-before-timeout
+lease→`quiescing` (credential kept); leases-at-deadline→`timed_out` (never `completed`,
+`assertNotEqual`); credential clear only in `completed`/`timed_out` finalization (source +
+runtime + grep: primitive has exactly the two finalize call-sites); residual leases
+unlinked only **after** `timed_out` recorded (snapshot count before, `lease_count==0`
+after); delayed re-poll via future `_trigger(at=now+POLL_DELAY)` with `call_at` bounded to
+`[before+POLL_DELAY, after+POLL_DELAY+5s]`; no busy loop (`no while True/time.sleep/import time`);
+repeated execution idempotent (no double-finalize, zero extra audit jobs).
+
+## RT.10 Section 11 — registry test-mode safety: ALL PROVEN `[Fact]`
+
+Four controlled `TransactionCase` classes enter Odoo's **sanctioned** `registry_enter_test_mode()`
+in `setUp` (default `register_cleanup=True` → auto `addCleanup(registry_leave_test_mode)`,
+restoring `registry.cursor` + `Registry._lock` after **each** method; the "Can only patch
+registry once" guard blocks any leaked double-entry) so each probe-driving case sees its
+uncommitted fixture through the shared `TestCursor`; **no assertion weakened** (whole-file
+grep: no `skipTest`/`assertTrue(True)`/`@skip`). The five genuine `post_install` classes
+**never** enter test mode — they use real `db_connect(dbname).cursor()` backends (distinct
+`pg_backend_pid` asserted) and, where production needs `registry.cursor()`, patch it with a
+factory handing out **real bounded pooled cursors** (not `TestCursor`) inside auto-restoring
+`with` blocks; threaded cases use a real `threading.RLock()` (not the test-mode `DummyRLock`).
+No `TestCursor` or `Registry._lock` replacement survives a boundary. The RT.5 full-suite
+re-run **after** all 15 genuine runs is byte-identical to the baseline → no leak.
+
+## RT.11 Section 3 schema — fields, selections, cron `[Fact]`
+
+- New store fields all present: `connection_generation, credential_present, disconnect_status, disconnect_open_lease_count, disconnect_oldest_admitted_at, disconnect_completed_at, disconnect_status_reason, credential_last_verified_at, credential_last_replaced_at`.
+- `state` selection = `[setup_incomplete, connected, reconnect_needed, disconnecting, disconnected]`; `disconnect_status` = `[none, requested, quiescing, completed, timed_out]`.
+- `shopify.connector.call.lease` model exists.
+- Disconnect cron `ir_cron_shopify_connector_disconnect_quiesce`: installed **exactly once** (`active=t, interval=5 minutes, priority=0`); job-drain cron once; **no duplicate** cron/model/data rows.
+
+## RT.12 Section 12 — cleanup / leak audit: CLEAN `[Fact]`
+
+After all runs: `shopify_connector_store/store_credential/call_lease/job/job_log` = **0**
+each; `idle in transaction` backends = **0**; `ir_cron_trigger` = 18 rows all on the
+standard base cron (`cron_id=1`), **0** referencing the disconnect (id 4) or drain (id 3)
+crons → zero connector-trigger residue. Disconnect + drain crons active exactly once.
+Backend visibility is limited to the restricted role's own connection. **Secret scan** over
+all 18 generated logs + `odoo.log`: no real `shpat_` token, no `Authorization`/`Bearer`
+header, no real email/PII, no raw GraphQL body.
+
+## RT.13 Section 16 — adversarial review: ALL PREVENTED `[Fact]`
+
+All 11 production invariants have concrete guarding code (both admissions take a
+side-tx `FOR SHARE`, refuse before `_send` if not `connected`/outside matrix/generation
+mismatch, commit-release before the network; no retry loop; single token read in
+`_admit_lifecycle`; no store lock across the network; no lease in lifecycle admission;
+no mirror on superseded; completed-path clear only at zero leases; single generation
+bump; no explicit main-cursor commit in STORE/CRED; one sanctioned `sudo()` in
+`_get_access_token`; public surface exactly `{execute, execute_business}`). Three flags
+are **by-design/doc, not runtime escapes**: (1) `timed_out` clears the credential with
+bounded already-admitted holders present (direction-C; no NEW admission possible since
+generation bumped at Phase 1); (2) stale `_admit` docstring says the lifecycle update-lock
+is a later slice though Slice 2A ships it (code correct); (3) legacy `execute()` `_send`
+re-reads on `token=None` (business/lifecycle pass non-None).
+
+## RT.14 Warning / SQL-error inventory + remaining gates `[Fact]`
+
+- **Warnings (connector-relevant): 0.**
+- **SQL ERROR-level inventory**: `lock timeout` — expected Section-7.C provocation
+  (1 per `TestLifecycleAdmissionRaceGenuine` run); `notification_type` NOT NULL —
+  `-u`-only env-artifact (RT.5), not a defect. **Zero unexpected SQL errors.**
+- **Remaining gates (all control-room-gated; none producible this session — webhook
+  held / single-DB container):**
+  1. Fix the 4 source-guard docstring false-positives (test-only) → new exact-head build + full revalidation.
+  2. Genuine base→head upgrade in a runtime with a second database (RT.4).
+  3. Optional narrowly-scoped REPEATABLE READ / 40001-retry connector test for Section 9(b/c/e) (RT.8).
+  4. Optional minor assertion tightening for the Section 7/8 proxies + stale `_admit` docstring (RT.7/RT.13).
+- **SRR-03 remains OPEN** pending control-room decision. PR #160 stays **draft/unmerged**;
+  Slice 2B not begun; no live Shopify request. Validated code SHA = `79dbfc0`; this runtime
+  evidence is carried by a later **docs-only, non-runtime-tested** commit.
+
+---
+
+# CORE-R2 — Foundation Slice 2A — TEST-ONLY source-guard + service-retry correction (review 4692156428)
+
+> `[Fact — test-only correction; NOT runtime-tested in this GitHub session.]`
+> Control-room **runtime** review `4692156428` (which read the RT.0–RT.14
+> exact-head record above, itself following the earlier static acceptance
+> `4691652645`) required a narrow **test-only** correction: make the four
+> docstring false-positive source guards docstring-robust, and add the genuine
+> default-REPEATABLE-READ / real-Odoo-service-retry proof that RT.8 left open.
+> **No production, XML, manifest, security, or cron file changed.** The historical
+> runtime evidence above is **preserved unchanged**.
+
+## S2A-C.0 What this correction does and does not do `[Fact]`
+
+- **Historical evidence preserved.** Build **34872373** remains the exact-head
+  runtime evidence for the **production** code SHA
+  `79dbfc00428802da8c98c97d3e6d7eb6025ea74e` (the add-on tree at the corrected
+  head is **byte-identical** to `79dbfc0`; only test + doc files changed). The
+  RT.0–RT.14 record is unaltered.
+- **The four RT.3 fresh-install failures were TEST DEFECTS**, not production
+  defects — naive `assertNotIn(<token>, inspect.getsource(<method>))` guards
+  matching the inspected method's **own docstring**. RT.3 already root-caused
+  them; this session fixes them.
+- **A new committed head requires a new Odoo.sh build.** Because the corrected
+  head is a **new commit**, the RT record does **not** transfer to it: a **new
+  exact-head Odoo.sh build + full revalidation from RT.1** is REQUIRED before any
+  runtime-green of the corrected head. **This correction is NOT runtime-tested in
+  this normal GitHub session** (no Odoo runtime; single-DB webshell unavailable).
+- **Scope frozen.** Only two test files changed:
+  `addons/shopify_connector_core/tests/test_credential_service.py` and
+  `addons/shopify_connector_core/tests/test_disconnect_quiescence.py`, plus this
+  record and the handoff. **Issue #157 remains separate and untouched.**
+
+## S2A-C.1 The four source-guard corrections — executable-AST, docstring-robust `[Fact — static-verified this session]`
+
+Each guard was converted from a raw-source `assertNotIn`/`assertIn` substring
+scan to inspection of the method's **executable AST** (docstring excluded, so a
+docstring/comment mention is not a false positive). Reusable helpers
+(`guard_fn_ast`, `guard_called_names`, `guard_execute_sql`, `guard_str_constants`,
+`guard_identifiers`, `guard_has_call_with_const_kwarg`, `guard_min_call_lineno`)
+live once in `test_disconnect_quiescence.py` and are imported into
+`test_credential_service.py` (the existing `from .test_api_client import …`
+convention). **Every original safety assertion is preserved** — evaluated against
+real code, never weakened to an always-pass:
+
+| # | Guard (test) | Token that matched the docstring | Corrected AST check (all prior assertions kept) |
+| --- | --- | --- | --- |
+| A | `TestCredentialService.test_mutate_token_locks_store_before_credential_source` | `sudo(` in `_mutate_token` docstring "no `sudo()`" | `_lock_store_for_lifecycle` call-lineno **<** `self.search(` call-lineno; `'disconnecting'` present as an executable string constant; **no** `sudo` call node in the executable body. |
+| B | `TestDisconnectSourceGuards.test_lifecycle_lock_is_blocking_for_no_key_update` | `SKIP LOCKED` in `_lock_store_for_lifecycle` docstring | SQL string literal passed to `.execute(...)` **contains** `FOR NO KEY UPDATE` and **does not contain** `SKIP LOCKED`. |
+| C | `TestDisconnectSourceGuards.test_store_then_credential_clear_order` | `action_clear_token` in `_finalize_disconnect_completed` docstring | both finalizers **call** `_clear_token_under_store_lock` and **do not call** `action_clear_token` (call nodes); controller **calls** `try_lock_for_update(limit=1)`; `action_disconnect` calls **neither** clear. |
+| D | `TestLifecycleAdmissionSourceGuards.test_admit_lifecycle_creates_no_lease` | `call.lease` in `_admit_lifecycle` docstring | executable body has **no** `shopify.connector.call.lease` model-lookup constant, **no** `lease_key` identifier, and **no** `create` call. |
+
+**Non-circular / anti-weakening proof.** A new `TestSourceGuardDetectors` class
+(pure AST, no DB) proves each detector both **FIRES** on a deliberately-unsafe
+executable example — a real `.sudo()` call, executable SQL containing
+`SKIP LOCKED`, a real `action_clear_token()` invocation, and a real call-lease
+model `create(...)` (model lookup + `lease_key` + `create`) — **and IGNORES** a
+docstring-only mention of the same token. So the correction does not merely pass
+against the current safe production source; a future weakening (reverting to a
+substring scan, or a detector that can never fail) is caught by these self-tests.
+
+Static verification this session (plain-Python AST, no Odoo runtime): the
+file-defined helpers, run against the **real production source**, reproduce the
+RT.3 raw-source false-positive (each token IS in the raw source) yet return the
+correct safe verdict on the executable AST, and every detector self-test passes.
+
+## S2A-C.2 Genuine REPEATABLE-READ service-retry test (closes the RT.8 gap) `[Fact — authored; runtime-pending]`
+
+New opt-in `post_install` test
+`TestLifecycleServiceRetryGenuine.test_repeatable_read_serialization_retry_issues_one_transport`
+(in `tests/test_disconnect_quiescence.py`) exercises the **real** Odoo 19
+`odoo.service.model.retrying(func, env)` boundary — **not** a fake local retry
+loop:
+
+- **Setup:** a committed connected-store fixture + credential; one **main retry
+  cursor/env** on a genuine pooled `db_connect` connection at the **normal Odoo
+  isolation (REPEATABLE READ)** — asserted via `SHOW transaction_isolation`,
+  **never** forced to READ COMMITTED; one **independent** connection for the
+  disconnect; the Shopify transport seam (`_send`) patched; a **dummy token only**;
+  no live request.
+- **Genuine 40001 (not injected):** the callable re-browses the store from the
+  retry env on **every** attempt and runs `action_test_connection`. On attempt 1
+  the REPEATABLE READ snapshot is established before the disconnect commits; the
+  patched transport opens an independent connection, runs the **real**
+  `action_disconnect`, and commits (on a **distinct backend PID**); the
+  post-network `_lifecycle_probe_superseded` → `_lock_store_for_lifecycle`
+  `SELECT … FOR NO KEY UPDATE` then **cannot serialize** against the concurrently
+  committed disconnect and PostgreSQL raises **SQLSTATE 40001**. Odoo's `retrying`
+  catches it (`SERIALIZATION_FAILURE` ∈ `PG_CONCURRENCY_ERRORS_TO_RETRY`), rolls
+  back, resets, and re-invokes; attempt 2 sees the committed `disconnecting` row
+  and is **matrix-refused before transport**. Only the retry **backoff**
+  (`random.uniform`/`time.sleep`) is patched — never the retry decision or
+  exception classification.
+- **Assertions:** default isolation is REPEATABLE READ; **≥2** callable attempts;
+  **exactly one** transport total (attempt 2 adds zero); the first transport used
+  the captured dummy token; the first attempt's `OperationalError.pgcode` is
+  `SERIALIZATION_FAILURE` (40001) and the service retry logged its retry; the
+  disconnect committed on a distinct backend PID; final store state
+  `disconnecting`; generation bumped **exactly once**; credential **present**;
+  **no** `pass` mirror and **no** stale-first-attempt `fail` mirror written;
+  `credential_last_verified_at` empty; **no** call lease; **no** raw serialization
+  error escaped; all cursors close; zero residue.
+- **Runtime status:** this is the **design** and the static (`py_compile`,
+  `compileall`) proof only. Because no Odoo runtime exists in this session, the
+  genuine 40001 path is **not executed here** — it is validated on the next
+  exact-head Odoo.sh build. The complementary READ-COMMITTED supersession test
+  (`TestLifecycleAdmissionRaceGenuine`, RT.6/RT.8) already proves — by using
+  READ COMMITTED **specifically to avoid** this retry — that the REPEATABLE READ
+  path is the one that raises the 40001 the retry handles.
+
+## S2A-C.3 Static results (this GitHub session; no Odoo runtime) `[Fact]`
+
+- `py_compile` + `compileall -q addons/shopify_connector_core` — **OK**.
+- Changed-file inventory = exactly the two allowed test files (+ this record and
+  the handoff) — **no production/XML/manifest/security/cron file changed**; no
+  product/sale/010B/011B/#157 file touched.
+- Conflict-marker scan — clean. No new token/PII literal (dummy fixtures only);
+  no live Shopify URL or network request in the diff.
+- AST detector self-tests — all pass (fire-on-unsafe **and** ignore-docstring),
+  verified with the file-defined helpers against the real production source.
+- **Adversarial review** (guard-weakening, detector coverage, fake-vs-genuine
+  40001, real-vs-fake retry, second-transport, stale mirror, isolation, main
+  cursor commit, cleanup leakage, production/#157 contamination, premature
+  closure) — no confirmed defect in the allowed files.
+
+## S2A-C.4 Remaining gates (unchanged; still control-room-gated) `[Open]`
+
+1. **New exact-head Odoo.sh build + full revalidation from RT.1** of the corrected
+   head (this correction is **not** runtime-tested here).
+2. Genuine base→head upgrade on a runtime with a second database (RT.4) — still
+   **open**.
+3. (Now authored, runtime-pending) the Section-9 REPEATABLE READ / 40001-retry
+   proof (RT.8) — awaits the new build.
+4. Optional Section 7/8 assertion tightening + stale `_admit` docstring (RT.7/RT.13).
+
+**Issue #157 remains a separate, out-of-scope item — untouched.** **SRR-03 remains
+OPEN.** No runtime-green of the corrected head is claimed; the corrected head must
+be validated by a **new** Odoo.sh build. PR #160 stays **draft/unmerged**; Slice 2B
+not begun; no live Shopify request.
+
+---
+
+# CORE-R2 — Foundation Slice 2A — EXACT-HEAD ODOO.SH RUNTIME VALIDATION of the test-only correction (build 34879305 @ `6e89138`)
+
+> `[Fact — runtime-verified 2026-07-14 inside the authorized Odoo.sh dev build for
+> the exact corrected head.]` This section is the **new exact-head build + full
+> revalidation from RT.1** that §S2A-C.0/§S2A-C.4(1) required for the test-only
+> correction `4692156428`. It runs **inside the Odoo.sh build for the exact head**
+> `6e89138712ba4fc3c7899db19a8d6629b177591a` (build **34879305**). The four RT.3
+> fresh-install source-guard failures are now **GONE**, the RT.8 gap is **closed**
+> by a genuine runtime-green service-retry proof, and all prior genuine classes
+> remain green across three distinct processes each. **No production, XML, manifest,
+> security, or cron file changed** (add-on tree byte-identical to `79dbfc0`).
+> **Issue #157 is separated, not fixed. The base→head upgrade gate stays OPEN.
+> SRR-03 stays OPEN. PR #160 stays open/draft/unmerged.** This evidence commit is
+> **docs-only and is itself NOT runtime-tested.**
+
+## RTX.0 Build-to-commit gate `[Fact]`
+
+- `git rev-parse HEAD` = **`6e89138712ba4fc3c7899db19a8d6629b177591a`** (exact required head).
+- Ref: detached HEAD; the commit is the tip of local + `origin/claude/core-r2-foundation-slice-2a-mr7uwq` (`git show-ref` → both at `6e89138`); branch belongs to **PR #160**.
+- `git status --porcelain` — **clean** working tree.
+- Ancestry: `git merge-base --is-ancestor 1494b97d… HEAD` → **yes** (merge-base == `1494b97d…`); previously-validated production SHA `79dbfc00…` is also an ancestor. Both objects present.
+- Odoo **19.0**; PostgreSQL **16.14** (Ubuntu 16.14-0ubuntu0.24.04.1).
+- `ODOO_BUILD_URL` = `https://adamsmen-claude-core-r2-foundation-slice-2a-mr7uwq-34879305.dev.odoo.com`; Odoo.sh build **34879305**; DB `adamsmen-claude-core-r2-foundation-slice-2a-mr7uwq-34879305`.
+- Installed module versions: `adams_base 19.0.1.0`, `shopify_connector_core 19.0.1.7.2`, `shopify_connector_product 19.0.1.0.0`, `shopify_connector_sale 19.0.1.0.0` (all `installed`).
+- (gh CLI + GitHub token are **unavailable** in this build, so the PR-body edit is provided as text for the control room — see RTX.13.)
+
+## RTX.1 Test-only diff proof `79dbfc0 → 6e89138` `[Fact]`
+
+`git diff --name-status 79dbfc0 6e89138` = exactly four files: `M
+tests/test_credential_service.py` (+26/−6), `M tests/test_disconnect_quiescence.py`
+(+497/−21), `M docs/05-qa/task-core-r2-validation-results.md` (+380/−0), `M
+docs/07-implementation-plan/task-core-r2-slice-2a-handoff.md` (+91/−0). Proven
+byte-identical (empty diff / equal blob or tree hashes):
+
+- **Core production tree** `models/ + data/ + security/ + views/ + controllers/` → identical `sha256` of `git ls-tree -r` (`1aae155f…`).
+- `__manifest__.py`, both cron XML (`shopify_connector_cron_drain.xml`, `…_disconnect.xml`), and the **issue-157 files** (`shopify_connector_job_dispatch.py`, `shopify_connector_job.py`, `tests/test_job_dispatch.py`) → identical blob hashes.
+- `shopify_connector_product/**`, `shopify_connector_sale/**`, `adams_base/**` → **no** changed path.
+- No product/sale file, no XML/manifest/security/cron data, no non-test `.py` changed.
+
+## RTX.2 Fresh install (authoritative = build `install.log`) — GREEN `[Fact]`
+
+The build DB was created by a **fresh `-i` install with tests** of the exact head.
+Exact command (`install.log`):
+
+```
+odoo-bin --stop-after-init --log-db <db> --http-interface=127.0.0.1 \
+  -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale \
+  --test-enable --log-level=test \
+  --test-tags /adams_base,/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,<standard base-tour exclusions>
+```
+
+Result: **`0 failed, 0 error(s) of 408 tests`** (stats: core **361**, product **61**,
+sale **56**; **20** post-tests). **The four RT.3 source-guard failures are GONE** —
+each of the four guard methods
+(`test_mutate_token_locks_store_before_credential_source`,
+`test_source_level_sanctioned_sudo_sites_guard`,
+`test_lifecycle_lock_is_blocking_for_no_key_update`,
+`test_store_then_credential_clear_order`, `test_admit_lifecycle_creates_no_lease`)
+**ran once and passed** on the fresh install, and `TestCredentialService` had **24**
+clean method-starts with **0** `notification_type` errors (issue #157 does **not**
+strike the fresh `-i` build). No install / XML / registry / manifest error.
+**Connector crons installed exactly once** (see RTX.11).
+
+## RTX.3 AST source-guard validation (in-session, build 34879305) `[Fact]`
+
+Targeted per-class `-u … --test-tags /shopify_connector_core:<Class>`:
+
+| Class | Result | Notes |
+| --- | --- | --- |
+| `TestSourceGuardDetectors` | **0 failed, 0 error(s) of 5** | detector self-tests: `sudo`, `SKIP LOCKED`, `clear`, `call.lease`, `limit=1`-kwarg — each **FIRES on real unsafe executable code** and **IGNORES a docstring-only mention** |
+| `TestDisconnectSourceGuards` | **0 failed, 0 error(s) of 6** | guards B (`FOR NO KEY UPDATE`/no `SKIP LOCKED`) and C (`_clear_token_under_store_lock`, not `action_clear_token`; `try_lock_for_update(limit=1)`) |
+| `TestLifecycleAdmissionSourceGuards` | **0 failed, 0 error(s) of 10** | guard D (`_admit_lifecycle` creates no lease) |
+| `TestCredentialService` (guard A) | green on the **fresh `-i` build** (RTX.2); in-session `-u` shows only the issue-#157 `setUpClass` artifact (RTX.6), **not** a guard failure | guard A = `test_mutate_token_locks_store_before_credential_source` + `test_source_level_sanctioned_sudo_sites_guard` |
+
+Detectors prove real unsafe examples are detected, docstring-only mentions ignored,
+and **no guard was weakened to always-pass** (a substring-scan regression would fail
+the detector self-tests). **All four historical false-positive failures are closed.**
+
+## RTX.4 Genuine REPEATABLE-READ service-retry — three distinct processes `[Fact]`
+
+`TestLifecycleServiceRetryGenuine.test_repeatable_read_serialization_retry_issues_one_transport`
+(`post_install`), each a separate `odoo-bin` process:
+
+| Run | PID | Elapsed | Result |
+| --- | --- | --- | --- |
+| 1 | 584 | 9 s | `0 failed, 0 error(s) of 1` |
+| 2 | 601 | 10 s | `0 failed, 0 error(s) of 1` |
+| 3 | 616 | 12 s | `0 failed, 0 error(s) of 1` |
+
+Direct log evidence (every run): the post-network revalidation
+`SELECT state, connection_generation FROM shopify_connector_store WHERE id=<n> FOR
+NO KEY UPDATE` raises a **genuine SQLSTATE 40001** — `ERROR: could not serialize
+access due to concurrent update` (not injected) — and the **real** Odoo service
+retry logs `odoo.service.model: SERIALIZATION_FAILURE, 4 tries left, try again in
+0.0000 sec…`. The connection pool closes cleanly (`ConnectionPool(…used=0/count=0):
+Closed 3 connections`). The test's 18 in-body assertions (main cursor REPEATABLE
+READ; ≥2 attempts; exactly one transport; first transport uses only the dummy
+token; disconnect on a **distinct** backend PID; 40001 captured from
+`OperationalError.pgcode`; second attempt matrix-refused with zero transport; final
+state `disconnecting`; generation `+1`; no `pass`/`fail` mirror;
+`credential_last_verified_at` empty; credential present; zero leases; all cursors
+closed; zero residue; final safe `UserError`; no raw serialization escape) all hold
+— a green result proves each. **Production isolation was not weakened; only the
+retry backoff was patched.**
+
+## RTX.5 Prior five genuine classes — three distinct processes each (15 executions, all green) `[Fact]`
+
+| Class (tests/run) | run1 | run2 | run3 |
+| --- | --- | --- | --- |
+| `TestGenuineRealAdmission` (9) | ✓ pid635 | ✓ pid754 | ✓ pid897 |
+| `TestCredentialReplacementRaceGenuine` (2) | ✓ pid661 | ✓ pid780 | ✓ pid946 |
+| `TestDisconnectControllerSelectionGenuine` (2) | ✓ pid684 | ✓ pid803 | ✓ pid993 |
+| `TestLifecycleAdmissionRaceGenuine` (4) | ✓ pid707 | ✓ pid826 | ✓ pid1033 |
+| `TestPublicClearAdmissionRaceGenuine` (2) | ✓ pid731 | ✓ pid860 | ✓ pid1075 |
+
+Every one of the 15 executions = **`0 failed, 0 error(s)`**. `TestLifecycleAdmissionRaceGenuine`
+emits its intended **lock-timeout** SQL log (`FOR SHARE` vs lifecycle `FOR NO KEY
+UPDATE` → `canceling statement due to lock timeout`) — an **expected
+negative-constraint log**, not a defect (result stays 0/0).
+
+## RTX.6 Complete core suite (before / after the isolated genuine tests) + issue-#157 separation `[Fact]`
+
+- **BEFORE (pristine baseline = build `install.log` fresh `-i`):** `0 failed, 0 error(s) of 408` — the full suite (incl. every genuine `post_install` class) ran during the build, before any in-session isolated run.
+- **AFTER (in-session `-u shopify_connector_core --test-enable --test-tags /shopify_connector_core`, run twice, identical):** **`0 failed, 6 error(s) of 203 tests`**; **0** source-guard `FAIL` lines; **20** post-tests green. Re-running gave the **identical** result → no residue accumulation.
+
+**PR #160 result: GREEN (0 failures).** **Known issue #157 result: 6 `setUpClass`
+errors**, on exactly `TestConnectionLifecycle`, `TestCredentialAccess`,
+`TestCredentialService`, `TestJobLogSystemAppend`, `TestReadinessSlotClosure`,
+`TestTestConnection` — the `res_users.notification_type` NOT-NULL base-fixture
+artifact that appears **only** on the `-u` at_install re-run (the `mail`-supplied
+default is not yet in the registry when `shopify_connector_core`'s at_install tests
+run), **never** on the fresh `-i` build. This is the documented **issue #157**,
+explicitly out of scope and **not fixed** here. **Combined raw Odoo summary: `0
+failed, 6 error(s) of 203 tests`.** No registry-test-mode leak, no `Registry._lock`
+leak, no cursor/worker leak (RTX.11).
+
+## RTX.7 Controller & lifecycle regression `[Fact]`
+
+`TestDisconnectPhase1` **11/11**, `TestQuiescenceController` **12/12**,
+`TestLifecycleRaceCorrections` **3/3**, `TestLifecycleProbeSupersession` **6/6**
+(all in-session `-u`, 0/0), plus the RTX.5 genuine classes. Coverage confirmed
+green for: disconnect request; exactly-one generation bump; repeated-disconnect
+idempotency; `completed` vs `timed_out`; live & expired lease handling; delayed
+polling; one-store controller selection; all-locked safe no-op; credential clear
+only at finalization; public-clear two-phase routing; activation/reconnect race
+protection; lifecycle exact-token snapshot; post-network supersession.
+`TestConnectionLifecycle` (activation/reconnect state machine; #157-masked under
+`-u`) ran **43** method-starts green on the fresh `-i` build.
+
+## RTX.8 Cleanup / leak / secret audit `[Fact]`
+
+- Residue: **0** stores, **0** credentials, **0** call leases, **0** jobs, **0** job logs.
+- Cron triggers: **0** connector triggers (the 6 `ir_cron_trigger` rows are all base `base.autovacuum_job` framework housekeeping).
+- Backends: **1** active (the audit `psql`), **0** idle-in-transaction, **0** `odoo`-named backends → no worker/cursor leak.
+- `Registry._lock`: no leak — no leak indicator in any run log; every subsequent run passes (the fresh RLock is restored after each bounded window).
+- Crons active exactly once: id 3 `Shopify Connector: Job Dispatch Drain`, id 4 `Shopify Connector: Disconnect Quiescence Controller`.
+- **Secret scan across all 28 in-session run logs:** **no** `shpat_` token (not even the dummy — it is never emitted), **no** `Authorization`/`Bearer`/`X-Shopify-Access-Token`, **no** raw GraphQL query/mutation body, **no** customer email/address PII.
+
+## RTX.9 Warnings / SQL-error inventory (expected negatives separated from defects) `[Fact]`
+
+Every `ERROR`-level SQL line during the runs is **expected**, none a defect:
+- **(a) genuine SQLSTATE 40001** — `… FOR NO KEY UPDATE` → `could not serialize access due to concurrent update`, the **intended** retry driver of `TestLifecycleServiceRetryGenuine` (RTX.4).
+- **(b) lock timeout** — `FOR SHARE` vs lifecycle `FOR NO KEY UPDATE` → `canceling statement due to lock timeout`, the intended conflict of `TestLifecycleAdmissionRaceGenuine` (RTX.5).
+- **(c) NOT-NULL / duplicate-key** on product/customer binding tables — deliberately-invalid inserts in passing negative-constraint tests.
+- **(d) `res_users.notification_type` NOT-NULL** — the `-u`-only issue-#157 env artifact (RTX.6), out of scope.
+No CORE-R2 (`call_lease`/admission/lifecycle) SQL error, and no unexpected error.
+
+## RTX.10 Base→head genuine upgrade — EXACT LIMITATION (not performed) `[Fact / Open]`
+
+A genuine isolated base-installed second database is **not available**: the injected
+PostgreSQL role gets `permission denied` for both `pg_database` and `pg_roles`
+(cannot create or enumerate databases — `odoo-bin` itself logs "skipping
+auto-creation: permission denied for table pg_database"), and the Odoo.sh dev build
+is bound to a **single injected DB**. No substitute (same-head `-u`, fresh install,
+schema inspection) was used. **The upgrade gate remains OPEN** (RT.4 / RR-F).
+
+## RTX.11 Registry / lock / cron-once safety `[Fact]`
+
+No registry-test-mode leak, no `Registry._lock` replacement leak, no cursor or
+worker backend leak (RTX.8). The two connector crons remain active exactly once.
+
+## RTX.12 Runtime defects / corrections `[Fact]`
+
+**None.** No PR #160 defect was exposed by any run; **no production or test code was
+changed** in this validation session (the §11 failure policy was not triggered).
+Production files remain frozen. The only failure policy items observed are the
+expected negative logs (RTX.9) and the out-of-scope issue #157 (RTX.6).
+
+## RTX.13 Evidence commit, PR state, remaining gates `[Fact]`
+
+- **Validated CODE SHA: `6e89138712ba4fc3c7899db19a8d6629b177591a`** (add-on tree byte-identical to `79dbfc0`). This section is a **docs-only evidence commit** that advances the branch head but does **not** alter the validated code SHA, and **is itself NOT runtime-tested**.
+- **PR #160 stays open, draft, unmerged.** Not marked ready; not merged. gh CLI/token unavailable in the build → the PR-body update text is handed to the control room (mirrors this section's headline result).
+- **Remaining gates (unchanged):** base→head genuine upgrade on a two-DB runtime (RTX.10) — **OPEN**; optional Section 7/8 assertion tightening + stale `_admit` docstring (RT.7/RT.13).
+- **Issue #157 remains separate and untouched. Slice 2B not begun. No live Shopify request, no real credential. SRR-03 remains OPEN** — no end-to-end disconnect-quiescence remediation runtime-green is claimed.
