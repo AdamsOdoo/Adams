@@ -204,20 +204,109 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         `JobHandlerError` so its accepted DEC-009 error class survives
         (D-010B-12: same job contract, same error taxonomy).
 
-        `job`, when provided by the dispatch handler, is used only to
-        append informational job-log notes (media protection,
-        price-undecomposable, stale/deletion) -- never to change routing.
+        **CORE-R2 Slice 2B (AR-047, RD-P).** Every Shopify Admin page call
+        is issued through the core `execute_business(job, store, query,
+        variables)` admission-lease context manager -- never the legacy
+        value-returning `execute()`. The pagination loop itself owns each
+        page's `with` block, so the transport response never escapes its
+        lease: a non-terminal page validates + accumulates in memory and
+        then releases its lease (the next iteration re-admits), while the
+        terminal page performs the entire reconciliation
+        (`_normalize_payload` + `_apply_import`, including its media
+        preparation and savepoint) and the final `self.env.flush_all()`
+        **inside** its own lease, before the context exits. At most one
+        lease is held at a time; no umbrella/double lease is taken.
+
+        `execute_business` requires a real `job`: production always reaches
+        this method through `_handle_product_import_sync`, which threads the
+        dispatched job. A `ShopifyQuiescedError` from a fail-closed admission
+        (store not connected, generation moved, missing/invalid job) is left
+        to propagate uncaught (Slice 2A routes it to `skipped`); only
+        `ShopifyClientError` is remapped to `JobHandlerError`.
+
+        `job`, when provided by the dispatch handler, is also used to append
+        informational job-log notes (media protection, price-undecomposable,
+        stale/deletion) -- never to change routing.
         """
-        product_node = self._fetch_product_with_all_variant_pages(
-            store, shopify_product_gid,
-        )
-        if product_node is None:
-            # D-010B-8: the requested GID returned a null product node.
-            return self._handle_absent_product(store, shopify_product_gid, job)
-        payload = self._normalize_payload(product_node)
-        return self._apply_import(
-            store, payload, job=job, requested_gid=shopify_product_gid,
-        )
+        client = self.env['shopify.connector.api.client']
+        # All pagination/accumulation state lives in this method's locals
+        # (an AbstractModel is stateless and shared): it never crosses a
+        # context boundary as a returned transport result. Only the control
+        # disposition ('absent'/'terminal'/'continue') leaves each page's
+        # `execute_business` context; the accumulated node/variants are
+        # reconciled solely inside the terminal page's own lease.
+        state = {
+            'cursor': None,
+            'product_node': None,
+            'accumulated_variants': [],
+            'seen_cursors': set(),
+            'seen_variant_gids': set(),
+            'first_updated_present': False,
+            'first_updated_at': None,
+            'page_count': 0,
+        }
+        while True:
+            state['page_count'] += 1
+            if state['page_count'] > MAX_VARIANT_PAGES:
+                # Unreachable given the zero-node + unique-GID + variant-cap
+                # guards; a pure defensive backstop, never a catalog cap. It
+                # runs before admission -- a purely in-memory bound, no lease.
+                raise self._schema_error(
+                    shopify_product_gid,
+                    'pagination exceeded the defensive page ceiling without '
+                    'terminating -- blocked as a malformed connection.')
+            try:
+                with client.execute_business(
+                    job, store, PRODUCT_IMPORT_QUERY,
+                    variables={
+                        'id': shopify_product_gid,
+                        'cursor': state['cursor'],
+                    },
+                ) as result:
+                    # Every use of `result` occurs inside this page's lease.
+                    disposition = self._consume_variant_page(
+                        result, shopify_product_gid, state,
+                    )
+                    if disposition == 'absent':
+                        # D-010B-8: a null product node on the first (only)
+                        # page. This is the terminal page -- reconcile the
+                        # remote-deletion/data-error decision and flush inside
+                        # the lease, then release on exit.
+                        outcome = self._handle_absent_product(
+                            store, shopify_product_gid, job,
+                        )
+                        self.env.flush_all()
+                        return outcome
+                    if disposition == 'terminal':
+                        # Finish accumulation onto one connection dict, then
+                        # run the complete reconciliation + final flush inside
+                        # this terminal lease; the return sits inside the
+                        # `with`, so `__exit__` releases the lease after flush.
+                        state['product_node']['variants'] = {
+                            'nodes': state['accumulated_variants'],
+                        }
+                        payload = self._normalize_payload(
+                            state['product_node'],
+                        )
+                        outcome = self._apply_import(
+                            store, payload, job=job,
+                            requested_gid=shopify_product_gid,
+                        )
+                        self.env.flush_all()
+                        return outcome
+                    # disposition == 'continue': a non-terminal page. No Odoo
+                    # business write occurred; the next cursor is captured in
+                    # `state`. Falling out of the `with` releases this page's
+                    # lease, and the next iteration re-admits (fail-closed if a
+                    # disconnect/generation-bump landed in the gap).
+            except ShopifyClientError as exc:
+                # Admission-credential / transport / GraphQL normalization
+                # failure from `execute_business.__enter__` -- preserve the
+                # accepted DEC-009 class (D-010B-12). ShopifyQuiescedError is
+                # NOT caught here: it propagates uncaught (fail closed).
+                raise JobHandlerError(
+                    exc.error_class, exc.reason, exc.technical_detail,
+                ) from exc
 
     @api.model
     def _schema_error(self, shopify_gid, detail):
@@ -227,13 +316,28 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         )
 
     @api.model
-    def _fetch_product_with_all_variant_pages(self, store, shopify_product_gid):
-        """Loop `variants(first: 100, after: $cursor)` until exhausted.
+    def _consume_variant_page(self, result, shopify_product_gid, state):
+        """Validate one `variants(first: 100, after: $cursor)` page's raw
+        GraphQL `result` and accumulate its variants into `state`.
 
-        Returns a single raw product node dict with every variant node
-        accumulated across pages, or `None` when the product node is null
-        on the first page (a possible remote deletion -- handled by the
-        caller, D-010B-8). Cursors live only in memory for this call (PD-5).
+        Returns one of:
+
+        * `'absent'` -- the product node is null on the first page (a
+          possible remote deletion, D-010B-8; handled by the caller);
+        * `'terminal'` -- this is the last variant page (`hasNextPage`
+          false), so the accumulated node is ready to reconcile;
+        * `'continue'` -- another page must be fetched; the next cursor has
+          been validated and captured into `state['cursor']`.
+
+        **CORE-R2 Slice 2B (RD-P).** This runs INSIDE the caller loop's
+        per-page `execute_business` context, so `result` never escapes that
+        lease. It performs NO Odoo business write -- only in-memory
+        validation + accumulation -- so a non-terminal page leaves the
+        database untouched before its lease releases. `state` carries the
+        pagination locals (`cursor`, `product_node`, `accumulated_variants`,
+        `seen_cursors`, `seen_variant_gids`, `first_updated_present`,
+        `first_updated_at`) across page contexts; only these carry over, and
+        only the terminal page reconciles them.
 
         Every page is strictly shape-validated (control-room reviews
         `4950202231` item 1 and `4950339305` item 1): `data`, `product`
@@ -250,7 +354,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
         * the pagination cursor must strictly advance -- an `endCursor` equal
           to the cursor just used, or equal to any cursor already seen in
-          this call, is rejected;
+          this fetch, is rejected;
         * a continuing page (`hasNextPage=true`) must carry at least one
           variant node -- an empty `nodes` with `hasNextPage=true` makes no
           data progress and is rejected (control-room review `4951145191`
@@ -271,153 +375,116 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
           guard only -- NOT enqueue-level deduplication or `payload_hash`
           ownership (that remains an Area-6 obligation).
 
-        Because every continuing page adds >=1 unique accumulated variant and
-        the accumulated set is capped at `MAX_ACCUMULATED_VARIANTS`, the loop
-        runs at most `MAX_ACCUMULATED_VARIANTS + 1` continuing pages;
-        `MAX_VARIANT_PAGES` is a defensive backstop above that bound. All
-        violations route to `data_shape_schema_mismatch`, and no product or
-        binding is written (this method runs entirely before `_apply_import`).
+        All violations route to `data_shape_schema_mismatch`, and no product
+        or binding is written (validation runs entirely before the terminal
+        page's `_apply_import`).
         """
-        cursor = None
-        product_node = None
-        accumulated_variants = []
-        seen_cursors = set()
-        seen_variant_gids = set()
-        first_updated_present = False
-        first_updated_at = None
-        page_count = 0
-        while True:
-            page_count += 1
-            if page_count > MAX_VARIANT_PAGES:
-                # Unreachable given the zero-node + unique-GID + variant-cap
-                # guards above; a pure defensive backstop, never a catalog cap.
+        cursor = state['cursor']
+        if not isinstance(result, dict):
+            raise self._schema_error(
+                shopify_product_gid, 'the GraphQL response was not a mapping.')
+        data = result.get('data')
+        if not isinstance(data, dict):
+            raise self._schema_error(
+                shopify_product_gid, 'the GraphQL "data" was not a mapping.')
+        page_product = data.get('product')
+        if page_product is None:
+            # A null product on the first page is a possible deletion;
+            # a null product on a later page is malformed.
+            if state['product_node'] is None and cursor is None:
+                return 'absent'
+            raise self._schema_error(
+                shopify_product_gid, 'a null product node mid-pagination.')
+        if not isinstance(page_product, dict):
+            raise self._schema_error(
+                shopify_product_gid, 'the product node was not a mapping.')
+        # Identity guard: every page must be for the requested product.
+        if page_product.get('id') != shopify_product_gid:
+            raise self._schema_error(
+                shopify_product_gid,
+                'a page returned product GID %r, which does not match the '
+                'requested product.' % (page_product.get('id'),))
+        # Cross-page torn-read guard: the product's updatedAt must be
+        # identical (same present/absent shape and value) on every page.
+        page_updated_present = 'updatedAt' in page_product
+        page_updated_at = page_product.get('updatedAt')
+        if state['product_node'] is None:
+            state['product_node'] = page_product
+            state['first_updated_present'] = page_updated_present
+            state['first_updated_at'] = page_updated_at
+        elif (
+            page_updated_present != state['first_updated_present']
+            or page_updated_at != state['first_updated_at']
+        ):
+            raise self._schema_error(
+                shopify_product_gid,
+                'the product updatedAt changed between pagination pages -- '
+                'a torn read across two remote versions; nothing imported.')
+        variants_connection = page_product.get('variants')
+        if not isinstance(variants_connection, dict):
+            raise self._schema_error(
+                shopify_product_gid, 'variants was not a mapping.')
+        nodes = variants_connection.get('nodes')
+        if not isinstance(nodes, list):
+            raise self._schema_error(
+                shopify_product_gid, 'variants.nodes was not a list.')
+        for node in nodes:
+            if not isinstance(node, dict):
                 raise self._schema_error(
                     shopify_product_gid,
-                    'pagination exceeded the defensive page ceiling without '
-                    'terminating -- blocked as a malformed connection.')
-            result = self._execute_query(store, shopify_product_gid, cursor)
-            if not isinstance(result, dict):
-                raise self._schema_error(
-                    shopify_product_gid, 'the GraphQL response was not a mapping.')
-            data = result.get('data')
-            if not isinstance(data, dict):
-                raise self._schema_error(
-                    shopify_product_gid, 'the GraphQL "data" was not a mapping.')
-            page_product = data.get('product')
-            if page_product is None:
-                # A null product on the first page is a possible deletion;
-                # a null product on a later page is malformed.
-                if product_node is None and cursor is None:
-                    return None
-                raise self._schema_error(
-                    shopify_product_gid, 'a null product node mid-pagination.')
-            if not isinstance(page_product, dict):
-                raise self._schema_error(
-                    shopify_product_gid, 'the product node was not a mapping.')
-            # Identity guard: every page must be for the requested product.
-            if page_product.get('id') != shopify_product_gid:
+                    'a variants.nodes element was not a mapping.')
+            node_gid = node.get('id')
+            if not node_gid:
                 raise self._schema_error(
                     shopify_product_gid,
-                    'a page returned product GID %r, which does not match the '
-                    'requested product.' % (page_product.get('id'),))
-            # Cross-page torn-read guard: the product's updatedAt must be
-            # identical (same present/absent shape and value) on every page.
-            page_updated_present = 'updatedAt' in page_product
-            page_updated_at = page_product.get('updatedAt')
-            if product_node is None:
-                product_node = page_product
-                first_updated_present = page_updated_present
-                first_updated_at = page_updated_at
-            elif (
-                page_updated_present != first_updated_present
-                or page_updated_at != first_updated_at
-            ):
+                    'a variant node is missing its Shopify variant GID.')
+            if node_gid in state['seen_variant_gids']:
                 raise self._schema_error(
                     shopify_product_gid,
-                    'the product updatedAt changed between pagination pages -- '
-                    'a torn read across two remote versions; nothing imported.')
-            variants_connection = page_product.get('variants')
-            if not isinstance(variants_connection, dict):
-                raise self._schema_error(
-                    shopify_product_gid, 'variants was not a mapping.')
-            nodes = variants_connection.get('nodes')
-            if not isinstance(nodes, list):
-                raise self._schema_error(
-                    shopify_product_gid, 'variants.nodes was not a list.')
-            for node in nodes:
-                if not isinstance(node, dict):
-                    raise self._schema_error(
-                        shopify_product_gid,
-                        'a variants.nodes element was not a mapping.')
-                node_gid = node.get('id')
-                if not node_gid:
-                    raise self._schema_error(
-                        shopify_product_gid,
-                        'a variant node is missing its Shopify variant GID.')
-                if node_gid in seen_variant_gids:
-                    raise self._schema_error(
-                        shopify_product_gid,
-                        'variant GID %r appeared more than once across the '
-                        'pagination pages.' % (node_gid,))
-                seen_variant_gids.add(node_gid)
-            accumulated_variants.extend(nodes)
-            if len(accumulated_variants) > MAX_ACCUMULATED_VARIANTS:
-                raise self._schema_error(
-                    shopify_product_gid,
-                    'more than %d variants -- above the documented platform '
-                    'ceiling; blocked as a schema-change guard rather than '
-                    'imported.' % (MAX_ACCUMULATED_VARIANTS,))
-            page_info = variants_connection.get('pageInfo')
-            if not isinstance(page_info, dict):
-                raise self._schema_error(
-                    shopify_product_gid, 'variants.pageInfo was not a mapping.')
-            has_next_page = page_info.get('hasNextPage')
-            if not isinstance(has_next_page, bool):
-                raise self._schema_error(
-                    shopify_product_gid,
-                    'variants.pageInfo.hasNextPage was not a Boolean.')
-            if not has_next_page:
-                break
-            # Zero-node forward-progress guard: a continuing page must make
-            # data progress, or the loop could never terminate on nodes.
-            if not nodes:
-                raise self._schema_error(
-                    shopify_product_gid,
-                    'hasNextPage is true but the page carried zero variants -- '
-                    'no forward progress; blocked as a malformed connection.')
-            next_cursor = page_info.get('endCursor')
-            if not isinstance(next_cursor, str) or not next_cursor:
-                raise self._schema_error(
-                    shopify_product_gid,
-                    'hasNextPage is true but endCursor is missing or empty -- '
-                    'cannot paginate safely.')
-            # Forward-progress guard: the cursor must strictly advance and
-            # never repeat, or the connection would loop forever.
-            if next_cursor == cursor or next_cursor in seen_cursors:
-                raise self._schema_error(
-                    shopify_product_gid,
-                    'pagination did not advance -- endCursor repeated a cursor '
-                    'already used in this fetch.')
-            seen_cursors.add(next_cursor)
-            cursor = next_cursor
-        # Rewrite the accumulated variant set onto a single connection dict
-        # so `_normalize_payload` consumes one product node uniformly.
-        product_node['variants'] = {'nodes': accumulated_variants}
-        return product_node
-
-    @api.model
-    def _execute_query(self, store, shopify_product_gid, cursor):
-        """One read-only GraphQL page call, preserving the client's error
-        taxonomy (D-010B-12)."""
-        try:
-            return self.env['shopify.connector.api.client'].execute(
-                store, PRODUCT_IMPORT_QUERY,
-                variables={'id': shopify_product_gid, 'cursor': cursor},
-            )
-        except ShopifyClientError as exc:
-            raise JobHandlerError(
-                exc.error_class, exc.reason, exc.technical_detail,
-            ) from exc
+                    'variant GID %r appeared more than once across the '
+                    'pagination pages.' % (node_gid,))
+            state['seen_variant_gids'].add(node_gid)
+        state['accumulated_variants'].extend(nodes)
+        if len(state['accumulated_variants']) > MAX_ACCUMULATED_VARIANTS:
+            raise self._schema_error(
+                shopify_product_gid,
+                'more than %d variants -- above the documented platform '
+                'ceiling; blocked as a schema-change guard rather than '
+                'imported.' % (MAX_ACCUMULATED_VARIANTS,))
+        page_info = variants_connection.get('pageInfo')
+        if not isinstance(page_info, dict):
+            raise self._schema_error(
+                shopify_product_gid, 'variants.pageInfo was not a mapping.')
+        has_next_page = page_info.get('hasNextPage')
+        if not isinstance(has_next_page, bool):
+            raise self._schema_error(
+                shopify_product_gid,
+                'variants.pageInfo.hasNextPage was not a Boolean.')
+        if not has_next_page:
+            return 'terminal'
+        # Zero-node forward-progress guard: a continuing page must make
+        # data progress, or the loop could never terminate on nodes.
+        if not nodes:
+            raise self._schema_error(
+                shopify_product_gid,
+                'hasNextPage is true but the page carried zero variants -- '
+                'no forward progress; blocked as a malformed connection.')
+        next_cursor = page_info.get('endCursor')
+        if not isinstance(next_cursor, str) or not next_cursor:
+            raise self._schema_error(
+                shopify_product_gid,
+                'hasNextPage is true but endCursor is missing or empty -- '
+                'cannot paginate safely.')
+        # Forward-progress guard: the cursor must strictly advance and
+        # never repeat, or the connection would loop forever.
+        if next_cursor == cursor or next_cursor in state['seen_cursors']:
+            raise self._schema_error(
+                shopify_product_gid,
+                'pagination did not advance -- endCursor repeated a cursor '
+                'already used in this fetch.')
+        state['seen_cursors'].add(next_cursor)
+        state['cursor'] = next_cursor
+        return 'continue'
 
     # ------------------------------------------------------------------
     # Normalization.

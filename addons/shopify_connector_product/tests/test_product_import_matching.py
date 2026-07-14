@@ -1,17 +1,47 @@
+import queue
+import threading
 import uuid
 from unittest.mock import patch
 
+from odoo import SUPERUSER_ID, api
 from odoo.exceptions import ValidationError
-from odoo.tests.common import TransactionCase
+from odoo.sql_db import db_connect
+from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
     ShopifyClientError,
+    ShopifyQuiescedError,
 )
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
 
 from ..models.shopify_connector_product_importer import PRODUCT_IMPORT_QUERY
+
+# CORE-R2 Slice 2B: the product importer now issues every Shopify Admin page
+# call through the core `execute_business` admission-lease context manager
+# (`_send` transport seam), not the legacy value-returning `execute()`. The
+# transport tests below drive the REAL admission gate; `DUMMY_TOKEN` is a
+# non-secret test constant (never a live token) and no live Shopify request runs
+# (`_send` is stubbed with the accepted Task 010B fixtures).
+DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+
+class _FakeSendResponse:
+    """Minimal `requests.Response` stand-in for the `_send` transport seam;
+    `_normalize_response` reads `.status_code`, `.json()`, `.headers` and
+    `.text` only, and the JSON body is the accepted Task 010B fixture dict, so
+    `{'data': {...}}` normalizes to the exact result the legacy `execute()`
+    returned."""
+
+    def __init__(self, body, status_code=200, headers=None):
+        self._body = body
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.text = ''
+
+    def json(self):
+        return self._body
 
 
 class TestProductImportMatching(TransactionCase):
@@ -30,6 +60,60 @@ class TestProductImportMatching(TransactionCase):
         cls.Job = cls.env['shopify.connector.job']
         cls.Dispatch = cls.env['shopify.connector.job.dispatch']
         cls.Settings = cls.env['shopify.connector.store.settings']
+        # Seed a credential while the store is still `setup_incomplete`, so no
+        # `connection_generation` bump occurs; the store stays at generation 0,
+        # matching a directly-created job's default expected generation.
+        cls.env['shopify.connector.store.credential'].action_set_token(
+            cls.store, DUMMY_TOKEN,
+        )
+        cls.env.flush_all()
+
+    def setUp(self):
+        super().setUp()
+        # `execute_business._admit` runs its gate/lease on a `registry.cursor()`
+        # side transaction; under a plain TransactionCase that cursor cannot see
+        # this test's uncommitted fixture, so admission would fail closed.
+        # Entering registry test mode makes every `registry.cursor()` reuse the
+        # single test connection as a TestCursor (the sanctioned core-test
+        # mechanism); it changes no production behaviour and is left on teardown.
+        # This class runs no genuine separate-connection test, so class-wide test
+        # mode is safe here.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    def _import_job(self, shopify_target_gid):
+        """Connect the store (the business-job create gate requires `connected`)
+        and return a product-import job at generation 0 (matching the store), so
+        `execute_business._admit` admits it. Flush so the admission side cursor
+        observes the connected store and the job."""
+        self.store.write({'state': 'connected'})
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'product_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': shopify_target_gid,
+        })
+        self.env.flush_all()
+        return job
+
+    def _patch_send(self, fake_execute):
+        """Route an accepted normalized-response `fake_execute(self, store,
+        query, variables=None)` fixture through the real `execute_business`
+        gate by patching only the `_send` transport seam. A `fake_execute` that
+        raises `ShopifyClientError` propagates unchanged (the gate re-raises it;
+        the importer maps it to `JobHandlerError`)."""
+        Client = self.env['shopify.connector.api.client']
+
+        def fake_send(client_self, store, body, token=None):
+            body = body or {}
+            outcome = fake_execute(
+                client_self, store, body.get('query'), body.get('variables'),
+            )
+            return _FakeSendResponse(outcome)
+
+        return patch.object(type(Client), '_send', fake_send)
 
     # ------------------------------------------------------------------
     # Fixtures.
@@ -331,8 +415,9 @@ class TestProductImportMatching(TransactionCase):
                 },
             }
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        # Flush so the admission side cursor sees the connected store + job.
+        self.env.flush_all()
+        with self._patch_send(fake_execute):
             self.Dispatch.run_drain(20)
         job.invalidate_recordset()
         self.assertEqual(job.state, 'blocked_manual_review')
@@ -428,10 +513,10 @@ class TestProductImportMatching(TransactionCase):
                 },
             }
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        gid = 'gid://shopify/Product/907'
+        with self._patch_send(fake_execute):
             result = self.Importer.import_product_sync(
-                self.store, 'gid://shopify/Product/907',
+                self.store, gid, job=self._import_job(gid),
             )
         self.assertTrue(calls)
         for query in calls:
@@ -537,8 +622,9 @@ class TestProductImportMatching(TransactionCase):
                 'Shopify is asking us to slow down — try again shortly.',
             )
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        # Flush so the admission side cursor sees the connected store + job.
+        self.env.flush_all()
+        with self._patch_send(fake_execute):
             self.Dispatch.run_drain(20)
         job.invalidate_recordset()
         self.assertEqual(job.error_class, 'shopify_throttling_rate_limit')
@@ -557,8 +643,9 @@ class TestProductImportMatching(TransactionCase):
                 'usually temporary.',
             )
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        # Flush so the admission side cursor sees the connected store + job.
+        self.env.flush_all()
+        with self._patch_send(fake_execute):
             self.Dispatch.run_drain(20)
         job.invalidate_recordset()
         self.assertEqual(job.error_class, 'shopify_temporary_server_network')
@@ -576,8 +663,9 @@ class TestProductImportMatching(TransactionCase):
                 credential_invalid=True,
             )
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        # Flush so the admission side cursor sees the connected store + job.
+        self.env.flush_all()
+        with self._patch_send(fake_execute):
             self.Dispatch.run_drain(20)
         job.invalidate_recordset()
         self.assertEqual(job.error_class, 'shopify_permission_scope_auth')
@@ -599,11 +687,11 @@ class TestProductImportMatching(TransactionCase):
                 'shopify_throttling_rate_limit', 'Slow down.',
             )
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        gid = 'gid://shopify/Product/963'
+        with self._patch_send(fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
                 self.Importer.import_product_sync(
-                    self.store, 'gid://shopify/Product/963',
+                    self.store, gid, job=self._import_job(gid),
                 )
         self.assertEqual(ctx.exception.error_class, 'shopify_throttling_rate_limit')
         self.assertEqual(len(calls), 1)
@@ -634,11 +722,11 @@ class TestProductImportMatching(TransactionCase):
         def fake_execute(self, store, query, variables=None):
             return {'data': {'product': None}}
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        gid = 'gid://shopify/Product/970'
+        with self._patch_send(fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
                 self.Importer.import_product_sync(
-                    self.store, 'gid://shopify/Product/970',
+                    self.store, gid, job=self._import_job(gid),
                 )
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
 
@@ -796,9 +884,8 @@ class TestProductImportMatching(TransactionCase):
         option_values, pages = self._single_option_pages(gid, 250)
         self.assertEqual(len(pages), 3)
         fake_execute = self._paginated_execute(gid, 'Paged 250', option_values, pages)
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
-            result = self.Importer.import_product_sync(self.store, gid)
+        with self._patch_send(fake_execute):
+            result = self.Importer.import_product_sync(self.store, gid, job=self._import_job(gid))
         self.assertEqual(len(result['variant_bindings']), 250)
         self.assertEqual(
             self.VariantBinding.search_count([
@@ -825,10 +912,9 @@ class TestProductImportMatching(TransactionCase):
             gid, 'Bad Cursor', [{'id': 'ov0', 'name': 'E0'}], pages,
         )
         templates_before = self.env['product.template'].search_count([])
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with self._patch_send(fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, gid)
+                self.Importer.import_product_sync(self.store, gid, job=self._import_job(gid))
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
@@ -856,12 +942,11 @@ class TestProductImportMatching(TransactionCase):
     def _assert_shape_blocked(self, gid, variants_connection):
         templates_before = self.env['product.template'].search_count([])
         product_node = self._one_variant_product(gid, variants_connection)
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(
-            type(Client), 'execute', self._one_page_execute(product_node),
-        ):
+        with self._patch_send(self._one_page_execute(product_node)):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, gid)
+                self.Importer.import_product_sync(
+                    self.store, gid, job=self._import_job(gid),
+                )
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
@@ -928,12 +1013,9 @@ class TestProductImportMatching(TransactionCase):
 
     def test_null_product_first_page_no_binding_is_data_error(self):
         gid = 'gid://shopify/Product/1268'
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(
-            type(Client), 'execute', self._one_page_execute(None),
-        ):
+        with self._patch_send(self._one_page_execute(None)):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, gid)
+                self.Importer.import_product_sync(self.store, gid, job=self._import_job(gid))
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
 
     def test_valid_single_page_shape_accepted(self):
@@ -946,11 +1028,8 @@ class TestProductImportMatching(TransactionCase):
             }],
             'pageInfo': {'hasNextPage': False, 'endCursor': None},
         })
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(
-            type(Client), 'execute', self._one_page_execute(product_node),
-        ):
-            result = self.Importer.import_product_sync(self.store, gid)
+        with self._patch_send(self._one_page_execute(product_node)):
+            result = self.Importer.import_product_sync(self.store, gid, job=self._import_job(gid))
         self.assertEqual(result['template_binding'].shopify_gid, gid)
 
     def test_over_ceiling_variant_count_blocked(self):
@@ -984,10 +1063,9 @@ class TestProductImportMatching(TransactionCase):
                 },
             }
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with self._patch_send(fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, gid)
+                self.Importer.import_product_sync(self.store, gid, job=self._import_job(gid))
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
 
     def test_variant_single_page_not_blocked(self):
@@ -1016,10 +1094,10 @@ class TestProductImportMatching(TransactionCase):
                 },
             }
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        gid = 'gid://shopify/Product/982'
+        with self._patch_send(fake_execute):
             result = self.Importer.import_product_sync(
-                self.store, 'gid://shopify/Product/982',
+                self.store, gid, job=self._import_job(gid),
             )
         self.assertEqual(
             result['template_binding'].shopify_gid, 'gid://shopify/Product/982',
@@ -1078,10 +1156,11 @@ class TestProductImportMatching(TransactionCase):
     def _assert_sequenced_blocked(self, gid, responses):
         templates_before = self.env['product.template'].search_count([])
         fake_execute = self._sequenced_execute(gid, responses)
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with self._patch_send(fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, gid)
+                self.Importer.import_product_sync(
+                    self.store, gid, job=self._import_job(gid),
+                )
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
@@ -1159,12 +1238,11 @@ class TestProductImportMatching(TransactionCase):
                 'pageInfo': {'hasNextPage': False, 'endCursor': None},
             },
         }
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(
-            type(Client), 'execute', self._one_page_execute(other_node),
-        ):
+        with self._patch_send(self._one_page_execute(other_node)):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, requested)
+                self.Importer.import_product_sync(
+                    self.store, requested, job=self._import_job(requested),
+                )
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
@@ -1183,9 +1261,8 @@ class TestProductImportMatching(TransactionCase):
         fake_execute = self._paginated_execute(
             gid, 'Two Page', option_values, pages,
         )
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
-            result = self.Importer.import_product_sync(self.store, gid)
+        with self._patch_send(fake_execute):
+            result = self.Importer.import_product_sync(self.store, gid, job=self._import_job(gid))
         self.assertEqual(len(result['variant_bindings']), 2)
 
     # ------------------------------------------------------------------
@@ -1230,12 +1307,9 @@ class TestProductImportMatching(TransactionCase):
     def test_zero_node_pages_with_fresh_cursors_blocked(self):
         gid = 'gid://shopify/Product/1290'
         templates_before = self.env['product.template'].search_count([])
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(
-            type(Client), 'execute', self._empty_fresh_cursor_execute(gid),
-        ):
+        with self._patch_send(self._empty_fresh_cursor_execute(gid)):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, gid)
+                self.Importer.import_product_sync(self.store, gid, job=self._import_job(gid))
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
@@ -1288,10 +1362,11 @@ class TestProductImportMatching(TransactionCase):
 
     def _assert_cross_page_blocked(self, gid, fake_execute):
         templates_before = self.env['product.template'].search_count([])
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        with self._patch_send(fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
-                self.Importer.import_product_sync(self.store, gid)
+                self.Importer.import_product_sync(
+                    self.store, gid, job=self._import_job(gid),
+                )
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
         self.assertEqual(
             self.env['product.template'].search_count([]), templates_before,
@@ -1301,17 +1376,27 @@ class TestProductImportMatching(TransactionCase):
         ]))
 
     def test_cross_page_identical_updated_at_accepted(self):
-        """Two pages carrying the same updatedAt accumulate both variants --
-        the torn-read guard does not reject a consistent product."""
+        """Two pages carrying the SAME product `updatedAt` accumulate both
+        variants and import completely -- the cross-page torn-read guard does
+        NOT reject a consistent product (`_paginated_execute` stamps one
+        identical `updatedAt` on every page).
+
+        CORE-R2 Slice 2B: the former assertion on the now-dissolved
+        `_fetch_product_with_all_variant_pages` return value is replaced by the
+        full loop-owned call site, which accumulates across per-page
+        `execute_business` leases and reconciles inside the terminal page's
+        lease -- so the observable is the two imported variant bindings."""
         gid = 'gid://shopify/Product/1291'
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(
-            type(Client), 'execute',
-            self._two_page_updated_at_execute(gid, 'U1', 'U1'),
-        ):
-            node = self.Importer._fetch_product_with_all_variant_pages(
-                self.store, gid)
-        self.assertEqual(len(node['variants']['nodes']), 2)
+        option_values, pages = self._single_option_pages(gid, 2, page_size=1)
+        self.assertEqual(len(pages), 2)
+        fake_execute = self._paginated_execute(
+            gid, 'Consistent Two Page', option_values, pages,
+        )
+        with self._patch_send(fake_execute):
+            result = self.Importer.import_product_sync(
+                self.store, gid, job=self._import_job(gid),
+            )
+        self.assertEqual(len(result['variant_bindings']), 2)
 
     def test_cross_page_changed_updated_at_blocked(self):
         gid = 'gid://shopify/Product/1292'
@@ -1333,3 +1418,1262 @@ class TestProductImportMatching(TransactionCase):
             self._two_page_updated_at_execute(
                 gid, 'U1', None, first_present=True, second_present=False),
         )
+
+
+class TestProductCallSiteExecuteBusiness(TransactionCase):
+    """CORE-R2 Slice 2B (AR-047, RD-P): the product importer's call-site
+    migration from the legacy value-returning `execute()` to the loop-owned
+    `execute_business(job, store, query, variables)` admission-lease context
+    manager.
+
+    These are the Slice-2B activation tests. They exercise the REAL core
+    admission gate + `_send` transport seam (no lifecycle/state monkeypatch):
+    one committed `shopify.connector.call.lease` per Shopify Admin page, held
+    from before that page's transport through -- on the terminal page -- the
+    complete reconciliation and the final `flush_all`, released on every exit.
+    Static/public-call guards, one-page and multi-page lease lifecycles, and
+    the failure/quiescence/disconnect paths are all covered here; the existing
+    Task 010B suites (adapted to the same gate) provide the behavioural
+    regression coverage (item E)."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.store = cls.env['shopify.connector.store'].create({
+            'name': 'CORE-R2 Product Call-Site Store',
+            'shop_domain': 'core-r2-product-callsite.myshopify.com',
+            'api_version': '2026-07',
+        })
+        cls.Importer = cls.env['shopify.connector.product.importer']
+        cls.TemplateBinding = cls.env['shopify.connector.product.template.binding']
+        cls.VariantBinding = cls.env['shopify.connector.product.variant.binding']
+        cls.Job = cls.env['shopify.connector.job']
+        cls.Lease = cls.env['shopify.connector.call.lease']
+        # Seed a credential while `setup_incomplete` so no generation bump
+        # occurs; the store stays at generation 0, matching a job's default
+        # captured generation.
+        cls.env['shopify.connector.store.credential'].action_set_token(
+            cls.store, DUMMY_TOKEN,
+        )
+        cls.env.flush_all()
+
+    def setUp(self):
+        super().setUp()
+        # Enter registry test mode so `execute_business._admit`'s side cursor
+        # sees the fixture (the sanctioned core-test mechanism); no production
+        # behaviour changes and it is auto-left on teardown.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    # -- helpers -------------------------------------------------------
+
+    def _import_job(self, shopify_target_gid):
+        """Connect the store (business-job create gate) and return a
+        product-import job at generation 0 (matching the store)."""
+        self.store.write({'state': 'connected'})
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'product_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': shopify_target_gid,
+        })
+        self.env.flush_all()
+        return job
+
+    def _patch_send(self, fake_execute):
+        """Patch only the `_send` transport seam so `fake_execute` drives the
+        real `execute_business` gate + `_normalize_response`."""
+        Client = self.env['shopify.connector.api.client']
+
+        def fake_send(client_self, store, body, token=None):
+            body = body or {}
+            outcome = fake_execute(
+                client_self, store, body.get('query'), body.get('variables'),
+            )
+            return _FakeSendResponse(outcome)
+
+        return patch.object(type(Client), '_send', fake_send)
+
+    def _lease_count(self):
+        return self.Lease.search_count([('store_id', '=', self.store.id)])
+
+    def _make_product(self, name, default_code=None):
+        template = self.env['product.template'].create({'name': name})
+        if default_code:
+            template.product_variant_id.default_code = default_code
+        return template
+
+    def _variant_node(self, gid, sku, selected=None, image_url=None):
+        node = {
+            'id': gid, 'sku': sku, 'barcode': None,
+            'price': None, 'compareAtPrice': None,
+            'selectedOptions': selected or [], 'image': None,
+            'inventoryItem': None,
+        }
+        if image_url:
+            node['image'] = {'url': image_url}
+        return node
+
+    def _product_page(
+        self, gid, nodes, has_next, end_cursor, options=None,
+        updated='2026-07-13T00:00:00Z', image_url=None,
+    ):
+        return {'data': {'product': {
+            'id': gid, 'title': 'Call-Site Product', 'status': 'ACTIVE',
+            'updatedAt': updated,
+            'featuredImage': {'url': image_url} if image_url else None,
+            'options': options or [],
+            'variants': {
+                'nodes': nodes,
+                'pageInfo': {'hasNextPage': has_next, 'endCursor': end_cursor},
+            },
+        }}}
+
+    def _single_page_fake(self, gid, sku='CS-SINGLE'):
+        """One no-option, single-variant product -> a clean singleton import."""
+        def fake_execute(client_self, store, query, variables=None):
+            return self._product_page(
+                gid, [self._variant_node('%s/v/0' % gid, sku)], False, None,
+            )
+        return fake_execute
+
+    def _multi_page_fake(self, gid, pages):
+        """One structured product spanning `pages` variant pages (one variant
+        per page, each a distinct value of a single `Edition` option), so the
+        product is genuinely importable. Returns `(fake_execute, calls)`."""
+        option_values = [
+            {'id': 'ov-%d' % i, 'name': 'Ed-%d' % i} for i in range(pages)
+        ]
+        options = [{
+            'id': 'opt', 'name': 'Edition', 'position': 1,
+            'optionValues': option_values,
+        }]
+        calls = {'n': 0}
+
+        def fake_execute(client_self, store, query, variables=None):
+            idx = calls['n']
+            calls['n'] += 1
+            node = self._variant_node(
+                '%s/v/%d' % (gid, idx), 'CS-MP-%d' % idx,
+                selected=[{'name': 'Edition', 'value': 'Ed-%d' % idx}],
+            )
+            has_next = idx < pages - 1
+            end_cursor = 'cur-%d' % idx if has_next else None
+            return self._product_page(
+                gid, [node], has_next, end_cursor, options=options,
+            )
+        return fake_execute, calls
+
+    # ==================================================================
+    # A. Static / public-call guards.
+    # ==================================================================
+
+    def _importer_source(self):
+        import os
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'models', 'shopify_connector_product_importer.py',
+        )
+        with open(path, 'r', encoding='utf-8') as source_file:
+            return source_file.read()
+
+    def test_source_guard_execute_business_only(self):
+        import re
+        src = self._importer_source()
+        # No reachable legacy value-returning api-client `execute()` call.
+        self.assertNotIn('.execute(', src)
+        # The value-escaping fetch/transport helpers are dissolved.
+        self.assertNotIn('_execute_query', src)
+        self.assertNotIn('_fetch_product_with_all_variant_pages', src)
+        # `execute_business` is the sole transport entry, admitted WITH a job.
+        self.assertIn('client.execute_business(', src)
+        self.assertTrue(
+            re.search(r'execute_business\(\s*job,', src),
+            'execute_business must be admitted with the real job as first arg',
+        )
+
+    def test_source_guard_no_manual_lease_or_commit(self):
+        src = self._importer_source()
+        # Admission + release are owned by the core context manager -- the
+        # importer never touches the lease model or releases a lease itself.
+        self.assertNotIn('call.lease', src)
+        self.assertNotIn('_release_lease', src)
+        # No explicit main-cursor commit anywhere in the importer.
+        self.assertNotIn('cr.commit(', src)
+        # The terminal reconciliation materializes via flush_all (in-txn).
+        self.assertIn('self.env.flush_all()', src)
+
+    def test_no_legacy_execute_fallback_at_runtime(self):
+        """The migrated path never falls back to the legacy `execute()`."""
+        gid = 'gid://shopify/Product/CS-NOFB'
+        Client = self.env['shopify.connector.api.client']
+        exec_calls = []
+        orig_execute = type(Client).execute
+
+        def spy_execute(client_self, store, query, variables=None):
+            exec_calls.append(1)
+            return orig_execute(client_self, store, query, variables=variables)
+
+        job = self._import_job(gid)
+        with patch.object(type(Client), 'execute', spy_execute), \
+                self._patch_send(self._single_page_fake(gid)):
+            result = self.Importer.import_product_sync(self.store, gid, job=job)
+        self.assertEqual(exec_calls, [])   # legacy execute() never called
+        self.assertEqual(len(result['variant_bindings']), 1)
+
+    # ==================================================================
+    # B. One-page product: one lease, reconcile + flush + release inside.
+    # ==================================================================
+
+    def test_single_page_one_lease_reconciles_flushes_releases(self):
+        gid = 'gid://shopify/Product/CS-100'
+        at_send = []
+        at_apply = []
+        flushed_at_apply = []
+        Importer = type(self.Importer)
+        orig_apply = Importer._apply_import
+
+        def spy_apply(imp_self, store, payload, job=None, requested_gid=None):
+            # Reconciliation runs while the (single) lease is still held.
+            at_apply.append(self._lease_count())
+            return orig_apply(
+                imp_self, store, payload, job=job, requested_gid=requested_gid,
+            )
+
+        def fake_execute(client_self, store, query, variables=None):
+            # Transport runs with the lease already committed (== 1).
+            at_send.append(self._lease_count())
+            return self._product_page(
+                gid, [self._variant_node('%s/v/0' % gid, 'CS-100-0')],
+                False, None,
+            )
+
+        job = self._import_job(gid)
+        with patch.object(Importer, '_apply_import', spy_apply), \
+                self._patch_send(fake_execute):
+            result = self.Importer.import_product_sync(self.store, gid, job=job)
+
+        self.assertEqual(len(at_send), 1)          # exactly one page/transport
+        self.assertEqual(at_send, [1])             # lease held at transport
+        self.assertEqual(at_apply, [1])            # lease held through reconcile
+        self.assertEqual(self._lease_count(), 0)   # released after reconcile+flush
+        self.assertEqual(result['template_binding'].shopify_gid, gid)
+        self.assertEqual(len(result['variant_bindings']), 1)
+
+    def test_single_page_return_and_bindings_come_from_terminal_context(self):
+        """The binding is created (reconciliation ran) and the lease is gone
+        (released) -- proving reconcile+flush+release all completed inside the
+        one terminal context."""
+        gid = 'gid://shopify/Product/CS-101'
+        job = self._import_job(gid)
+        with self._patch_send(self._single_page_fake(gid, sku='CS-101-0')):
+            result = self.Importer.import_product_sync(self.store, gid, job=job)
+        self.assertTrue(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+        self.assertEqual(len(result['variant_bindings']), 1)
+        self.assertEqual(self._lease_count(), 0)
+
+    # ==================================================================
+    # C. Multi-page product: one lease per page, terminal reconciliation.
+    # ==================================================================
+
+    def test_multi_page_one_lease_per_page_terminal_reconciles(self):
+        gid = 'gid://shopify/Product/CS-300'
+        pages = 3
+        fake_execute, calls = self._multi_page_fake(gid, pages)
+        lease_at_send = []
+        bindings_at_send = []
+        apply_calls = []
+        Importer = type(self.Importer)
+        orig_apply = Importer._apply_import
+        Client = self.env['shopify.connector.api.client']
+
+        def spy_apply(imp_self, store, payload, job=None, requested_gid=None):
+            apply_calls.append(1)
+            return orig_apply(
+                imp_self, store, payload, job=job, requested_gid=requested_gid,
+            )
+
+        def spy_send(client_self, store, body, token=None):
+            # At every page's transport: exactly one lease, and no product
+            # binding yet (non-terminal pages write no business records; the
+            # terminal page reconciles only AFTER its transport returns).
+            lease_at_send.append(self._lease_count())
+            bindings_at_send.append(self.TemplateBinding.search_count([
+                ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+            ]))
+            body = body or {}
+            return _FakeSendResponse(fake_execute(
+                client_self, store, body.get('query'), body.get('variables'),
+            ))
+
+        job = self._import_job(gid)
+        with patch.object(Importer, '_apply_import', spy_apply), \
+                patch.object(type(Client), '_send', spy_send):
+            result = self.Importer.import_product_sync(self.store, gid, job=job)
+
+        self.assertEqual(calls['n'], pages)                 # exactly N API calls
+        self.assertEqual(len(lease_at_send), pages)
+        self.assertTrue(all(c == 1 for c in lease_at_send)) # one lease at a time
+        self.assertTrue(all(b == 0 for b in bindings_at_send))  # no early write
+        self.assertEqual(len(apply_calls), 1)               # terminal reconcile only
+        self.assertEqual(self._lease_count(), 0)            # released after
+        self.assertEqual(len(result['variant_bindings']), pages)
+        self.assertEqual(
+            len(result['template_binding'].product_template_id
+                .product_variant_ids),
+            pages,
+        )
+
+    def test_multi_page_existing_cursor_and_dedup_guards_still_fire(self):
+        """A repeated variant GID across pages still routes to a schema
+        mismatch under the loop-owned context -- the pagination guards run
+        inside each page's lease exactly as before."""
+        gid = 'gid://shopify/Product/CS-301'
+        node = self._variant_node('%s/v/0' % gid, 'CS-301-0')
+
+        def fake_execute(client_self, store, query, variables=None):
+            cursor = (variables or {}).get('cursor')
+            if cursor is None:
+                return self._product_page(gid, [node], True, 'cur-0')
+            return self._product_page(gid, [node], False, None)  # repeated GID
+
+        job = self._import_job(gid)
+        with self._patch_send(fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid, job=job)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(self._lease_count(), 0)   # every page's lease released
+
+    # ==================================================================
+    # D. Failure and lifecycle: lease released once on every failure path;
+    #    quiescence propagates uncaught; no partial write across a disconnect.
+    # ==================================================================
+
+    def test_transport_client_error_routes_and_releases_once(self):
+        gid = 'gid://shopify/Product/CS-400'
+
+        def fake_execute(client_self, store, query, variables=None):
+            raise ShopifyClientError(
+                'shopify_throttling_rate_limit', 'Slow down.',
+            )
+
+        job = self._import_job(gid)
+        with self._patch_send(fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid, job=job)
+        self.assertEqual(
+            ctx.exception.error_class, 'shopify_throttling_rate_limit',
+        )
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_normalization_error_releases_once(self):
+        gid = 'gid://shopify/Product/CS-401'
+
+        def fake_execute(client_self, store, query, variables=None):
+            # variants is not a mapping -> a page validation (normalization)
+            # error inside the terminal context, before any write.
+            return {'data': {'product': {
+                'id': gid, 'title': 'X', 'status': 'ACTIVE',
+                'featuredImage': None, 'options': [],
+                'variants': ['not', 'a', 'mapping'],
+            }}}
+
+        job = self._import_job(gid)
+        with self._patch_send(fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid, job=job)
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_reconciliation_error_releases_once(self):
+        gid = 'gid://shopify/Product/CS-402'
+        # Two Odoo products share the incoming SKU -> ambiguous template match
+        # raised inside `_apply_import`, inside the terminal lease.
+        self._make_product('Dup A', default_code='CS-DUP')
+        self._make_product('Dup B', default_code='CS-DUP')
+
+        def fake_execute(client_self, store, query, variables=None):
+            return self._product_page(
+                gid, [self._variant_node('%s/v/0' % gid, 'CS-DUP')],
+                False, None,
+            )
+
+        job = self._import_job(gid)
+        with self._patch_send(fake_execute):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid, job=job)
+        self.assertEqual(ctx.exception.error_class, 'ambiguous_match')
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_media_error_releases_once(self):
+        gid = 'gid://shopify/Product/CS-403'
+        Importer = type(self.Importer)
+
+        def fake_execute(client_self, store, query, variables=None):
+            return self._product_page(
+                gid,
+                [self._variant_node('%s/v/0' % gid, 'CS-403-0')],
+                False, None, image_url='https://cdn.shopify.com/p.png',
+            )
+
+        def boom(inner, url):
+            raise JobHandlerError(
+                'shopify_temporary_server_network', 'unreachable image',
+            )
+
+        job = self._import_job(gid)
+        with self._patch_send(fake_execute), \
+                patch.object(Importer, '_fetch_image', boom):
+            with self.assertRaises(JobHandlerError) as ctx:
+                self.Importer.import_product_sync(self.store, gid, job=job)
+        self.assertEqual(
+            ctx.exception.error_class, 'shopify_temporary_server_network',
+        )
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_quiesced_admission_propagates_uncaught_no_transport_no_write(self):
+        """Exception-contract proof (validation-plan M9, generation-mismatch
+        trigger): a `ShopifyQuiescedError` from a fail-closed admission
+        propagates UNCAUGHT from the importer (never remapped to
+        `JobHandlerError`), with no transport and no write. This is a
+        same-test-transaction generation bump under registry test mode -- an
+        M9 refusal proof, NOT the genuine cross-connection admission-vs-
+        `action_disconnect` race (M8), which is proven by
+        `TestProductCallSiteLifecycleGenuine`."""
+        gid = 'gid://shopify/Product/CS-404'
+        sent = []
+
+        def fake_execute(client_self, store, query, variables=None):
+            sent.append(1)
+            return self._product_page(
+                gid, [self._variant_node('%s/v/0' % gid, 'CS-404-0')],
+                False, None,
+            )
+
+        job = self._import_job(gid)
+        # M9: a generation move after enqueue makes admission fail closed
+        # (a data-value generation bump, not a genuine action_disconnect).
+        self.store.write({
+            'connection_generation': job.expected_connection_generation + 1,
+        })
+        self.env.flush_all()
+        with self._patch_send(fake_execute):
+            with self.assertRaises(ShopifyQuiescedError):
+                self.Importer.import_product_sync(self.store, gid, job=job)
+        # ShopifyQuiescedError is NOT remapped to JobHandlerError, no transport
+        # occurred, no lease survives, and nothing was written.
+        self.assertEqual(sent, [])
+        self.assertEqual(self._lease_count(), 0)
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+
+    def test_generation_bump_between_pages_refuses_next_admission_m9_m10(self):
+        """Validation-plan M9/M10 (generation mismatch / no-second-call): a
+        generation bump landing BETWEEN pages fails the next page's admission
+        closed -- page 2 never transports, page 1's lease is released, and no
+        partial product is written.
+
+        This is a same-test-transaction generation bump under registry test
+        mode -- an M9/M10 next-admission-refusal proof. It is **not** Race A
+        (M8): it does not use the genuine cross-connection
+        `action_disconnect` vs `_admit` lock protocol. Genuine M8 (both
+        orderings) is proven by `TestProductCallSiteLifecycleGenuine`."""
+        gid = 'gid://shopify/Product/CS-405'
+        job = self._import_job(gid)
+        sent = []
+        options = [{
+            'id': 'opt', 'name': 'Edition', 'position': 1,
+            'optionValues': [{'id': 'ov0', 'name': 'Ed-0'},
+                             {'id': 'ov1', 'name': 'Ed-1'}],
+        }]
+
+        def fake_execute(client_self, store, query, variables=None):
+            sent.append(1)
+            if len(sent) == 1:
+                # M9/M10: a generation bump lands BETWEEN pages (a data-value
+                # bump, NOT a genuine action_disconnect) after this (page-1)
+                # admission committed but before page 2 admits.
+                self.store.write({
+                    'connection_generation':
+                        job.expected_connection_generation + 1,
+                })
+                self.env.flush_all()
+                return self._product_page(
+                    gid,
+                    [self._variant_node(
+                        '%s/v/0' % gid, 'CS-405-0',
+                        selected=[{'name': 'Edition', 'value': 'Ed-0'}])],
+                    True, 'cur-0', options=options,
+                )
+            return self._product_page(
+                gid,
+                [self._variant_node(
+                    '%s/v/1' % gid, 'CS-405-1',
+                    selected=[{'name': 'Edition', 'value': 'Ed-1'}])],
+                False, None, options=options,
+            )
+
+        with self._patch_send(fake_execute):
+            with self.assertRaises(ShopifyQuiescedError):
+                self.Importer.import_product_sync(self.store, gid, job=job)
+        # Page 1 transported once; page 2 was refused BEFORE its transport.
+        self.assertEqual(len(sent), 1)
+        # Page 1's lease released; page 2 never admitted -> zero leases.
+        self.assertEqual(self._lease_count(), 0)
+        # No product/binding was written (reconciliation never began).
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id), ('shopify_gid', '=', gid),
+        ]))
+        self.assertFalse(self.VariantBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', '%s/v/0' % gid),
+        ]))
+
+
+@tagged(
+    # Opt-in only: this class opens genuine independent `db_connect`
+    # PostgreSQL connections and spawns worker threads, so it is deliberately
+    # EXCLUDED from the standard CI suite (`-standard`) and from the
+    # at-install phase (`-at_install`); it runs post-install and only when its
+    # own explicit tag is selected, e.g.
+    #   odoo --test-tags shopify_connector_product_callsite_lifecycle
+    'post_install', '-at_install', '-standard',
+    'shopify_connector_product_callsite_lifecycle',
+)
+class TestProductCallSiteLifecycleGenuine(TransactionCase):
+    """Genuine independent-PostgreSQL-connection lifecycle proofs for the
+    CORE-R2 Slice 2B product call site (validation plan M1/M2, M8, M18).
+
+    Mirrors the accepted core `TestGenuineRealAdmission` harness: each worker
+    owns a real pooled `db_connect` main cursor + Environment created AFTER the
+    fixtures commit; the production `_admit`/`_release_lease` side transactions
+    are made genuinely independent (real pooled bounded cursors that commit and
+    are observable cross-connection) by patching the registry cursor factory for
+    the bounded window. `action_disconnect`, `_admit`, the lease ORM, the
+    generation checks, and `_run_disconnect_quiesce` are the REAL production
+    code -- only `_send` is replaced (the network seam), and reconciliation is
+    paused via an observe-and-delegate spy on the product-domain `_apply_import`
+    (never a lifecycle/state/controller monkeypatch). Raw SQL is used only to
+    OBSERVE committed rows and to clean up; it never creates the lease under
+    test.
+
+    These tests require a live PostgreSQL backend and a fully-built Odoo
+    registry; they are authored to run under the Odoo test runner (Odoo.sh /
+    dev), not in a plain GitHub session. No live Shopify request is made and no
+    real token is used.
+    """
+
+    STATEMENT_TIMEOUT_MS = 10000
+    LOCK_TIMEOUT_MS = 8000
+    BOUND_SECONDS = 20
+
+    # -- genuine-connection harness (mirrors TestGenuineRealAdmission) --
+
+    def _open_bounded(self, dbname):
+        """Open a genuine pooled cursor and apply BOTH transaction-local
+        PostgreSQL limits (statement_timeout + lock_timeout); close + re-raise on
+        a setup failure so no genuine cursor is ever left unbounded."""
+        cr = db_connect(dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
+    def _real_registry_cursor(self, dbname):
+        """registry.cursor() replacement handing out bounded real pooled cursors,
+        so every production `_admit`/`_release_lease` side transaction is time
+        bounded and genuinely independent (accepts/ignores any args)."""
+        return lambda *args, **kwargs: self._open_bounded(dbname)
+
+    def _sanitize(self, exc, phase):
+        """Type-only, non-sensitive finding for a worker-thread failure (never
+        str/repr, SQL, paths, credentials, payloads, or tokens)."""
+        error_class = getattr(exc, 'error_class', None)
+        return {
+            'phase': phase,
+            'type': type(exc).__name__,
+            'error_class': error_class if isinstance(error_class, str) else None,
+        }
+
+    def _safe_worker_teardown(self, wcr, diagnostics):
+        if wcr is None:
+            return
+        try:
+            wcr.rollback()
+        except BaseException as exc:
+            diagnostics.put(self._sanitize(exc, 'rollback'))
+        try:
+            wcr.close()
+        except BaseException as exc:
+            diagnostics.put(self._sanitize(exc, 'cursor_close'))
+
+    def _drain(self, diagnostics):
+        findings = []
+        while True:
+            try:
+                findings.append(diagnostics.get_nowait())
+            except queue.Empty:
+                break
+        return findings
+
+    def _finalize_threaded(self, threads, resume_events, diagnostics,
+                           dbname, store_id, job_id):
+        """Cleanup-first, fail-loud teardown for the threaded genuine tests,
+        called from the test's `finally` so it runs even when a body assertion
+        raised first. Ordered exactly so cleanup can never be skipped by an
+        assertion and a stuck worker can never deadlock the delete path or
+        yield a false pass:
+
+        1. set every resume gate (release any barrier the worker waits on);
+        2. bounded-join each worker (normal, then the join IS the emergency
+           recovery -- a genuine `db_connect` cursor cannot be force-killed
+           from here, and `_open_bounded`'s statement/lock timeouts guarantee
+           the worker self-terminates within the bound);
+        3. record worker liveness;
+        4. the worker owns and closes its OWN cursor (`_safe_worker_teardown`),
+           so nothing the worker holds is closed from here;
+        5. if any worker is still alive: DO NOT run destructive cleanup (it may
+           still hold row locks -- deleting under it could deadlock or corrupt
+           the result); preserve sanitized findings and fail loudly;
+        6. only when every worker has stopped: run durable cleanup +
+           zero-residue verification;
+        7. assertions (here, the loud failure) occur only after that.
+        """
+        for event in resume_events:
+            event.set()
+        for thread in threads:
+            if thread is not None:
+                thread.join(timeout=self.BOUND_SECONDS)
+        alive = [t for t in threads if t is not None and t.is_alive()]
+        if alive:
+            diagnostics.put({
+                'phase': 'teardown', 'type': 'WorkerStillAlive',
+                'error_class': None,
+            })
+            # Fail loud, but never issue destructive cleanup against a lock a
+            # live worker may own; leave residue diagnosable rather than hang.
+            self.fail(
+                'worker thread still alive at teardown boundary; skipped '
+                'destructive cleanup to avoid a lock deadlock. findings: %s'
+                % (self._drain(diagnostics),))
+        # Every worker has stopped and released its cursor -> durable cleanup
+        # is safe, and its own bounded cursor prevents an indefinite hang.
+        self._cleanup(dbname, store_id, job_id)
+
+    # -- fixtures + observers -----------------------------------------
+
+    def _commit_product_fixtures(self, dbname, gid):
+        """On an independent bounded connection, create+commit a connected
+        store, its credential, and one matching `product_import_sync` job (its
+        generation captured at enqueue). Returns `(store_id, job_id)`."""
+        setup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(setup, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Genuine Product Call-Site Store',
+                'shop_domain': 'genuine-prod-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07',
+                'state': 'connected',
+            })
+            env['shopify.connector.store.credential'].action_set_token(
+                store, DUMMY_TOKEN
+            )
+            # action_set_token demotes connected -> reconnect_needed; re-assert.
+            store.write({'state': 'connected'})
+            job = env['shopify.connector.job.enqueue'].enqueue(
+                store, 'manual_sync', 'product_import_sync',
+                payload_hash=uuid.uuid4().hex, shopify_target_gid=gid,
+            )
+            store_id, job_id = store.id, job.id
+            setup.commit()
+            return store_id, job_id
+        finally:
+            setup.close()
+
+    def _committed_lease_rows(self, dbname, store_id):
+        """Observe committed leases from a fresh, bounded independent cursor."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT lease_key, job_id FROM shopify_connector_call_lease "
+                "WHERE store_id = %s ORDER BY lease_key", (store_id,))
+            rows = obs.fetchall()
+            obs.rollback()
+            return rows
+        finally:
+            obs.close()
+
+    def _store_state(self, dbname, store_id):
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT state FROM shopify_connector_store WHERE id = %s",
+                (store_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return row[0] if row else None
+        finally:
+            obs.close()
+
+    def _credential_present(self, dbname, store_id):
+        """Observe the store's `credential_present` mirror cross-connection."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT credential_present FROM shopify_connector_store "
+                "WHERE id = %s", (store_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return bool(row[0]) if row else False
+        finally:
+            obs.close()
+
+    def _binding_count(self, dbname, store_id):
+        """Committed template + variant bindings for the store, cross-connection."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT "
+                "(SELECT count(*) FROM shopify_connector_product_template_binding "
+                " WHERE store_id = %s) "
+                "+ (SELECT count(*) FROM shopify_connector_product_variant_binding "
+                " WHERE store_id = %s)", (store_id, store_id))
+            total = obs.fetchone()[0]
+            obs.rollback()
+            return total
+        finally:
+            obs.close()
+
+    def _cleanup(self, dbname, store_id, job_id):
+        """Durable, bounded, fail-loud teardown + zero-residue check.
+
+        A successful genuine import commits real Odoo master data (a
+        `product.template`, its `product.product` variants, and -- for the
+        structured M1/M2 fixture -- a per-test `product.attribute` with its
+        `product.attribute.value` set), not just connector rows. This teardown
+        removes ALL of it by EXACT id (never a broad name search), in FK-safe
+        order, and leaves every pre-existing record untouched:
+
+        1. capture this store's test-owned template/variant/attribute/value ids
+           from the store's own template bindings (exact ids only);
+        2. unlink the connector product variant bindings (drops FKs into the
+           product variants);
+        3. unlink the connector product template bindings (drops FKs into the
+           templates);
+        4. unlink the test-created templates via ORM -- Odoo cascades their
+           `product.product`, `product.template.attribute.line`, and
+           `product.template.attribute.value` rows;
+        5. unlink each captured attribute VALUE only if no attribute line
+           anywhere still references it (so a value shared with a pre-existing
+           product is never removed);
+        6. unlink each captured ATTRIBUTE only if no attribute line anywhere
+           still references it (same pre-existing-safety guard);
+        7. delete the connector job logs, leases, jobs, credential, and store
+           (raw SQL, FK-safe order: logs before jobs because
+           `job_log.job_id` is `ondelete='restrict'`) -- this bypasses the
+           store model's ORM guards but touches only this store's rows;
+        8. verify zero residue for the connector rows AND every captured
+           master-data id.
+        """
+        if store_id is None:
+            return
+        captured = {
+            'templates': [], 'variants': [], 'attributes': [], 'values': [],
+        }
+        cr = self._open_bounded(dbname)
+        try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            TB = env['shopify.connector.product.template.binding']
+            VB = env['shopify.connector.product.variant.binding']
+            PTAL = env['product.template.attribute.line']
+            # 1. Capture exact test-owned master-data ids from this store only.
+            tbindings = TB.search([('store_id', '=', store_id)])
+            templates = tbindings.product_template_id.exists()
+            captured['templates'] = templates.ids
+            captured['variants'] = templates.product_variant_ids.ids
+            lines = templates.attribute_line_ids
+            captured['attributes'] = lines.attribute_id.ids
+            captured['values'] = lines.value_ids.ids
+            # 2-3. Connector bindings first (FKs into the product master data).
+            VB.search([('store_id', '=', store_id)]).unlink()
+            tbindings.unlink()
+            # 4. Test-created templates (ORM cascade of variants + line/ptav).
+            templates.unlink()
+            # 5. Orphaned test-created attribute values (no remaining line ref).
+            for value in env['product.attribute.value'].browse(
+                captured['values'],
+            ).exists():
+                if not PTAL.search_count([('value_ids', 'in', value.id)]):
+                    value.unlink()
+            # 6. Orphaned test-created attributes (no remaining line ref).
+            for attribute in env['product.attribute'].browse(
+                captured['attributes'],
+            ).exists():
+                if not PTAL.search_count([('attribute_id', '=', attribute.id)]):
+                    attribute.unlink()
+            # 7. Connector rows (raw SQL; logs before jobs -- restrict FK).
+            cr.execute(
+                "DELETE FROM shopify_connector_job_log WHERE job_id IN "
+                "(SELECT id FROM shopify_connector_job WHERE store_id = %s)",
+                (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_call_lease WHERE store_id = %s",
+                (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_job WHERE store_id = %s",
+                (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store_credential "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store WHERE id = %s", (store_id,))
+            cr.commit()
+        finally:
+            cr.close()
+        # 8. Zero-residue verification (connector rows + captured master data).
+        self._assert_zero_residue(dbname, store_id, captured)
+
+    def _assert_zero_residue(self, dbname, store_id, captured=None):
+        v = self._open_bounded(dbname)
+        try:
+            for table, msg in (
+                ('shopify_connector_call_lease', 'lease residue'),
+                ('shopify_connector_store', 'store residue'),
+                ('shopify_connector_store_credential', 'credential residue'),
+                ('shopify_connector_job', 'job residue'),
+                ('shopify_connector_job_log', 'job-log residue'),
+                ('shopify_connector_product_template_binding',
+                 'template-binding residue'),
+                ('shopify_connector_product_variant_binding',
+                 'variant-binding residue'),
+            ):
+                col = 'id' if table == 'shopify_connector_store' else 'store_id'
+                v.execute(
+                    "SELECT count(*) FROM %s WHERE %s = %%s" % (table, col),
+                    (store_id,))
+                self.assertEqual(v.fetchone()[0], 0, '%s after cleanup' % msg)
+            # Every captured Odoo master-data id must be gone -- verified by
+            # EXACT id, so the check can never mask residue behind a name match
+            # nor implicate a pre-existing record.
+            for table, ids, msg in (
+                ('product_template', (captured or {}).get('templates') or [],
+                 'product.template residue'),
+                ('product_product', (captured or {}).get('variants') or [],
+                 'product.product residue'),
+                ('product_attribute', (captured or {}).get('attributes') or [],
+                 'product.attribute residue'),
+                ('product_attribute_value',
+                 (captured or {}).get('values') or [],
+                 'product.attribute.value residue'),
+            ):
+                if ids:
+                    v.execute(
+                        "SELECT count(*) FROM %s WHERE id = ANY(%%s)" % table,
+                        (list(ids),))
+                    self.assertEqual(
+                        v.fetchone()[0], 0, '%s after cleanup' % msg)
+            v.rollback()
+        finally:
+            v.close()
+
+    # -- product page fixtures ----------------------------------------
+
+    def _variant_node(self, gid, sku, selected=None):
+        return {
+            'id': gid, 'sku': sku, 'barcode': None,
+            'price': None, 'compareAtPrice': None,
+            'selectedOptions': selected or [], 'image': None,
+            'inventoryItem': None,
+        }
+
+    def _page(self, gid, nodes, has_next, end_cursor, options=None):
+        return {'data': {'product': {
+            'id': gid, 'title': 'Genuine Product', 'status': 'ACTIVE',
+            'updatedAt': '2026-07-14T00:00:00Z', 'featuredImage': None,
+            'options': options or [],
+            'variants': {
+                'nodes': nodes,
+                'pageInfo': {'hasNextPage': has_next, 'endCursor': end_cursor},
+            },
+        }}}
+
+    def _edition_options(self, n, name='Edition'):
+        return [{
+            'id': 'opt', 'name': name, 'position': 1,
+            'optionValues': [{'id': 'ov%d' % i, 'name': 'Ed-%d' % i}
+                             for i in range(n)],
+        }]
+
+    # ==================================================================
+    # M1/M2 — genuine committed-lease visibility before each _send and
+    # through terminal reconciliation, one lease at a time, released after.
+    # ==================================================================
+
+    def test_real_lease_visible_before_send_and_through_reconciliation(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M12'
+        store_id = job_id = worker_cr = None
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+            worker_cr = self._open_bounded(dbname)
+            wenv = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = wenv['shopify.connector.store'].browse(store_id)
+            job = wenv['shopify.connector.job'].browse(job_id)
+            Importer = wenv['shopify.connector.product.importer']
+            Client = wenv['shopify.connector.api.client']
+            # Unique per-test attribute name: the importer maps a Shopify
+            # option name straight to `product.attribute.name`, so a marker
+            # here guarantees the attribute is CREATED (never a pre-existing
+            # one reused) and is unambiguously attributable to this test for
+            # the by-exact-id cleanup below.
+            attr_name = 'SC2B-%s Edition' % uuid.uuid4().hex
+            options = self._edition_options(2, name=attr_name)
+            obs = {'sends': [], 'tokens': [], 'apply': []}
+
+            def observing_send(client_self, store_arg, body, token=None):
+                obs['tokens'].append(token)
+                obs['sends'].append(self._committed_lease_rows(dbname, store_id))
+                cursor = ((body or {}).get('variables') or {}).get('cursor')
+                if cursor is None:
+                    node = self._variant_node(
+                        '%s/v/0' % gid, 'M12-0',
+                        selected=[{'name': attr_name, 'value': 'Ed-0'}])
+                    return _FakeSendResponse(
+                        self._page(gid, [node], True, 'cur-0', options=options))
+                node = self._variant_node(
+                    '%s/v/1' % gid, 'M12-1',
+                    selected=[{'name': attr_name, 'value': 'Ed-1'}])
+                return _FakeSendResponse(
+                    self._page(gid, [node], False, None, options=options))
+
+            real_apply = type(Importer)._apply_import
+
+            def observing_apply(imp_self, store_a, payload, job=None,
+                                requested_gid=None):
+                obs['apply'].append(self._committed_lease_rows(dbname, store_id))
+                return real_apply(imp_self, store_a, payload, job=job,
+                                  requested_gid=requested_gid)
+
+            with patch.object(self.registry, 'cursor',
+                              self._real_registry_cursor(dbname)):
+                with patch.object(type(Importer), '_apply_import',
+                                  observing_apply):
+                    with patch.object(type(Client), '_send', observing_send):
+                        result = Importer.import_product_sync(
+                            store, gid, job=job)
+            # Commit the worker's own transaction so the reconciled master data
+            # (template, variants, and the created attribute + values) is
+            # genuinely persisted -- making the by-exact-id master-data cleanup
+            # and its zero-residue check a real proof, not a no-op.
+            worker_cr.commit()
+            obs['after'] = self._committed_lease_rows(dbname, store_id)
+
+            # M1: exactly one committed lease is visible before EACH page's send.
+            self.assertEqual(len(obs['sends']), 2)          # two pages, two sends
+            self.assertEqual(len(obs['sends'][0]), 1)       # one lease, page 1
+            self.assertEqual(len(obs['sends'][1]), 1)       # one lease, page 2
+            # one lease at a time: the non-terminal page's lease released before
+            # the next admission (page-2's key differs from page-1's).
+            self.assertNotEqual(obs['sends'][0][0][0], obs['sends'][1][0][0])
+            self.assertEqual(obs['sends'][0][0][1], job_id)         # real job id
+            self.assertRegex(obs['sends'][0][0][0], r'^[0-9a-f]{32}$')  # opaque key
+            self.assertEqual(set(obs['tokens']), {DUMMY_TOKEN})     # real snapshot
+            # M2: reconciliation runs exactly once (terminal), lease still visible.
+            self.assertEqual(len(obs['apply']), 1)
+            self.assertEqual(len(obs['apply'][0]), 1)
+            # terminal lease released only AFTER reconciliation + flush + return.
+            self.assertEqual(len(obs['after']), 0)
+            self.assertEqual(len(result['variant_bindings']), 2)
+            # The committed reconciliation is observable cross-connection: two
+            # bindings (template + variant... two variants -> three) persisted.
+            self.assertEqual(self._binding_count(dbname, store_id), 3)
+        finally:
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_id)
+
+    # ==================================================================
+    # Race A / M8 — disconnect-first ordering (genuine action_disconnect).
+    # ==================================================================
+
+    def test_race_a_disconnect_first_refuses_admission(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M8A'
+        store_id = job_id = worker_cr = None
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+            # Disconnect COMMITS first on an independent connection (real
+            # action_disconnect: FOR NO KEY UPDATE + generation bump +
+            # state->disconnecting).
+            dcr = self._open_bounded(dbname)
+            try:
+                denv = api.Environment(dcr, SUPERUSER_ID, {})
+                denv['shopify.connector.store'].browse(store_id).action_disconnect()
+                dcr.commit()
+            finally:
+                dcr.close()
+            # Worker opens AFTER the disconnect committed -> its admission
+            # observes the new state/generation and fails closed.
+            worker_cr = self._open_bounded(dbname)
+            wenv = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = wenv['shopify.connector.store'].browse(store_id)
+            job = wenv['shopify.connector.job'].browse(job_id)
+            Importer = wenv['shopify.connector.product.importer']
+            Client = wenv['shopify.connector.api.client']
+            sent = []
+
+            def counting_send(client_self, store_arg, body, token=None):
+                sent.append(1)
+                return _FakeSendResponse(self._page(
+                    gid, [self._variant_node('%s/v/0' % gid, 'M8A-0')],
+                    False, None))
+
+            with patch.object(self.registry, 'cursor',
+                              self._real_registry_cursor(dbname)):
+                with patch.object(type(Client), '_send', counting_send):
+                    with self.assertRaises(ShopifyQuiescedError):
+                        Importer.import_product_sync(store, gid, job=job)
+            # Disconnect-first: no transport, no lease, no partial write.
+            self.assertEqual(sent, [])
+            self.assertEqual(len(self._committed_lease_rows(dbname, store_id)), 0)
+            self.assertEqual(self._binding_count(dbname, store_id), 0)
+        finally:
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_id)
+
+    # ==================================================================
+    # Race A / M8 — admission-first ordering (lease commits, then a
+    # concurrent action_disconnect returns without aborting the call).
+    # ==================================================================
+
+    def test_race_a_admission_first_lease_commits_then_disconnect_returns(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M8B'
+        store_id = job_id = t = None
+        admitted = threading.Semaphore(0)
+        resume = threading.Event()
+        diagnostics = queue.Queue()
+        tokens = []
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+
+            def blocking_send(client_self, store_arg, body, token=None):
+                # Race-specific token proof: the page was admitted with the
+                # pre-disconnect credential snapshot; record it so the test can
+                # assert the admitted call carries exactly that token.
+                tokens.append(token)
+                admitted.release()        # _admit already committed this lease
+                if not resume.wait(timeout=self.BOUND_SECONDS):
+                    raise AssertionError('resume gate not set within bound')
+                return _FakeSendResponse(self._page(
+                    gid, [self._variant_node('%s/v/0' % gid, 'M8B-0')],
+                    False, None))
+
+            def worker():
+                wcr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    wcr = self._open_bounded(dbname)
+                    wenv = api.Environment(wcr, SUPERUSER_ID, {})
+                    store = wenv['shopify.connector.store'].browse(store_id)
+                    job = wenv['shopify.connector.job'].browse(job_id)
+                    wenv['shopify.connector.product.importer'].import_product_sync(
+                        store, gid, job=job)
+                    wcr.commit()
+                except BaseException as exc:
+                    diagnostics.put(self._sanitize(exc, 'worker_body'))
+                finally:
+                    self._safe_worker_teardown(wcr, diagnostics)
+
+            Client = self.env['shopify.connector.api.client']
+            observed = {}
+            got = False
+            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+                    patch.object(self.registry, 'cursor',
+                                 self._real_registry_cursor(dbname)):
+                with patch.object(type(Client), '_send', blocking_send):
+                    t = threading.Thread(target=worker, daemon=True)
+                    t.start()
+                    got = admitted.acquire(timeout=self.BOUND_SECONDS)
+                    if got:
+                        # Admission-first: the lease/token snapshot is committed
+                        # before the disconnect proceeds.
+                        observed['lease_before'] = self._committed_lease_rows(
+                            dbname, store_id)
+                        dcr = self._open_bounded(dbname)
+                        try:
+                            denv = api.Environment(dcr, SUPERUSER_ID, {})
+                            # Returns within the bound WITHOUT waiting for the
+                            # parked, already-admitted worker (uncontended
+                            # FOR NO KEY UPDATE; the admission released FOR SHARE).
+                            denv['shopify.connector.store'].browse(
+                                store_id).action_disconnect()
+                            dcr.commit()
+                            observed['disconnect_returned'] = True
+                        finally:
+                            dcr.close()
+                    resume.set()
+                    # Gate the post-run observation on the worker finishing;
+                    # the AUTHORITATIVE liveness check + cleanup run in finally.
+                    t.join(timeout=self.BOUND_SECONDS)
+            observed['after'] = self._committed_lease_rows(dbname, store_id)
+
+            findings = self._drain(diagnostics)
+            self.assertEqual(findings, [], 'worker findings: %s' % findings)
+            self.assertTrue(got, 'admission did not commit within bound')
+            self.assertEqual(len(observed['lease_before']), 1)   # committed first
+            self.assertEqual(observed['lease_before'][0][1], job_id)
+            # Race-specific token proof: exactly one transport, carrying the
+            # pre-disconnect credential snapshot.
+            self.assertEqual(tokens, [DUMMY_TOKEN])
+            self.assertTrue(observed.get('disconnect_returned'))  # returned w/o wait
+            # The already-admitted page proceeded to completion and released;
+            # no untracked admitted call is possible (the one lease is accounted).
+            self.assertEqual(len(observed['after']), 0)
+            self.assertEqual(self._binding_count(dbname, store_id), 2)
+        finally:
+            self._finalize_threaded(
+                [t], [resume], diagnostics, dbname, store_id, job_id)
+
+    # ==================================================================
+    # Race B / M18 — terminal reconciliation survives a concurrent
+    # action_disconnect; the controller defers finalization until release.
+    # ==================================================================
+
+    def test_race_b_terminal_reconciliation_survives_concurrent_disconnect(self):
+        dbname = self.env.cr.dbname
+        gid = 'gid://shopify/Product/GEN-M18'
+        store_id = job_id = t = None
+        reconciling = threading.Semaphore(0)
+        resume = threading.Event()
+        diagnostics = queue.Queue()
+        tokens = []
+        try:
+            store_id, job_id = self._commit_product_fixtures(dbname, gid)
+            Importer_cls = type(self.env['shopify.connector.product.importer'])
+            real_apply = Importer_cls._apply_import
+
+            def pausing_apply(imp_self, store_a, payload, job=None,
+                              requested_gid=None):
+                # Terminal admission has committed; the lease is held. Pause
+                # here (inside terminal reconciliation) while a concurrent
+                # disconnect runs, then delegate to the REAL reconciliation.
+                reconciling.release()
+                if not resume.wait(timeout=self.BOUND_SECONDS):
+                    raise AssertionError('resume gate not set within bound')
+                return real_apply(imp_self, store_a, payload, job=job,
+                                  requested_gid=requested_gid)
+
+            def ok_send(client_self, store_arg, body, token=None):
+                # Race-specific token proof (terminal page): record the token
+                # so the test can assert the terminal admission carries the
+                # pre-disconnect credential snapshot.
+                tokens.append(token)
+                return _FakeSendResponse(self._page(
+                    gid, [self._variant_node('%s/v/0' % gid, 'M18-0')],
+                    False, None))
+
+            def worker():
+                wcr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    wcr = self._open_bounded(dbname)
+                    wenv = api.Environment(wcr, SUPERUSER_ID, {})
+                    store = wenv['shopify.connector.store'].browse(store_id)
+                    job = wenv['shopify.connector.job'].browse(job_id)
+                    wenv['shopify.connector.product.importer'].import_product_sync(
+                        store, gid, job=job)
+                    wcr.commit()
+                except BaseException as exc:
+                    diagnostics.put(self._sanitize(exc, 'worker_body'))
+                finally:
+                    self._safe_worker_teardown(wcr, diagnostics)
+
+            Client = self.env['shopify.connector.api.client']
+            obs = {}
+            got = False
+            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+                    patch.object(self.registry, 'cursor',
+                                 self._real_registry_cursor(dbname)):
+                with patch.object(Importer_cls, '_apply_import', pausing_apply):
+                    with patch.object(type(Client), '_send', ok_send):
+                        t = threading.Thread(target=worker, daemon=True)
+                        t.start()
+                        got = reconciling.acquire(timeout=self.BOUND_SECONDS)
+                        if got:
+                            obs['lease_during'] = self._committed_lease_rows(
+                                dbname, store_id)
+                            obs['cred_before'] = self._credential_present(
+                                dbname, store_id)
+                            dcr = self._open_bounded(dbname)
+                            try:
+                                denv = api.Environment(dcr, SUPERUSER_ID, {})
+                                # Concurrent disconnect returns within the bound,
+                                # WITHOUT waiting for the paused reconciliation.
+                                denv['shopify.connector.store'].browse(
+                                    store_id).action_disconnect()
+                                dcr.commit()
+                                obs['disconnect_returned'] = True
+                                # Controller must NOT finalize while a lease exists.
+                                denv['shopify.connector.store'
+                                     ]._run_disconnect_quiesce()
+                                dcr.commit()
+                            finally:
+                                dcr.close()
+                            obs['lease_after_ctrl'] = self._committed_lease_rows(
+                                dbname, store_id)
+                            obs['state_during'] = self._store_state(
+                                dbname, store_id)
+                            obs['cred_during'] = self._credential_present(
+                                dbname, store_id)
+                        resume.set()
+                        # Gate the post-release observation on the worker
+                        # finishing; the AUTHORITATIVE liveness check + cleanup
+                        # run in finally so an assertion can never skip cleanup.
+                        t.join(timeout=self.BOUND_SECONDS)
+            obs['after_release'] = self._committed_lease_rows(dbname, store_id)
+            # After the terminal reconciliation released its lease, a fresh
+            # controller pass finalizes `completed` and clears the credential.
+            fcr = self._open_bounded(dbname)
+            try:
+                fenv = api.Environment(fcr, SUPERUSER_ID, {})
+                fenv['shopify.connector.store']._run_disconnect_quiesce()
+                fcr.commit()
+            finally:
+                fcr.close()
+            obs['state_final'] = self._store_state(dbname, store_id)
+            obs['cred_final'] = self._credential_present(dbname, store_id)
+
+            findings = self._drain(diagnostics)
+            self.assertEqual(findings, [], 'worker findings: %s' % findings)
+            self.assertTrue(got, 'terminal reconciliation did not start in bound')
+            self.assertEqual(len(obs['lease_during']), 1)   # lease held mid-reconcile
+            self.assertTrue(obs['cred_before'])             # credential present
+            self.assertTrue(obs.get('disconnect_returned'))  # returned w/o waiting
+            self.assertEqual(len(obs['lease_after_ctrl']), 1)  # not reaped early
+            self.assertEqual(obs['state_during'], 'disconnecting')  # deferred
+            self.assertTrue(obs['cred_during'])             # credential remains
+            # Race-specific token proof: exactly one terminal transport,
+            # carrying the pre-disconnect credential snapshot.
+            self.assertEqual(tokens, [DUMMY_TOKEN])
+            self.assertEqual(len(obs['after_release']), 0)  # released after reconcile
+            self.assertEqual(self._binding_count(dbname, store_id), 2)  # completed
+            self.assertEqual(obs['state_final'], 'disconnected')  # finalized after
+            self.assertFalse(obs['cred_final'])             # credential cleared then
+        finally:
+            self._finalize_threaded(
+                [t], [resume], diagnostics, dbname, store_id, job_id)

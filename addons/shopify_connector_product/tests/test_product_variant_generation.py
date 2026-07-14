@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase
@@ -5,6 +6,32 @@ from odoo.tests.common import TransactionCase
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
+
+# CORE-R2 Slice 2B: the product importer now issues every Shopify Admin page
+# call through the core `execute_business` admission-lease context manager
+# (`_send` transport seam), not the legacy value-returning `execute()`. The
+# transport test below drives the REAL admission gate: it seeds a store
+# credential, connects the store, and converts the accepted Task 010B
+# normalized-response fixture into a `_send` transport stub. `DUMMY_TOKEN` is a
+# non-secret test constant (never a live token); no live Shopify request runs.
+DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+
+class _FakeSendResponse:
+    """Minimal `requests.Response` stand-in for the `_send` transport seam.
+    `_normalize_response` reads `.status_code`, `.json()`, `.headers` and
+    `.text` only; the JSON body is the accepted Task 010B fixture dict,
+    consumed unchanged (so `{'data': {...}}` normalizes to the same result the
+    legacy `execute()` returned)."""
+
+    def __init__(self, body, status_code=200, headers=None):
+        self._body = body
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.text = ''
+
+    def json(self):
+        return self._body
 
 
 class TestProductVariantGeneration(TransactionCase):
@@ -22,6 +49,58 @@ class TestProductVariantGeneration(TransactionCase):
         cls.Importer = cls.env['shopify.connector.product.importer']
         cls.TemplateBinding = cls.env['shopify.connector.product.template.binding']
         cls.VariantBinding = cls.env['shopify.connector.product.variant.binding']
+        cls.Job = cls.env['shopify.connector.job']
+        # Seed a credential while the store is still `setup_incomplete`, so no
+        # `connection_generation` bump occurs (a `connected` `action_set_token`
+        # would bump it); the store therefore stays at generation 0, matching a
+        # directly-created job's default `expected_connection_generation`.
+        cls.env['shopify.connector.store.credential'].action_set_token(
+            cls.store, DUMMY_TOKEN,
+        )
+        cls.env.flush_all()
+
+    def setUp(self):
+        super().setUp()
+        # `execute_business._admit` runs its gate/lease on a `registry.cursor()`
+        # side transaction; under a plain TransactionCase that cursor cannot see
+        # this test's uncommitted fixture, so admission would fail closed. Entering
+        # registry test mode makes every `registry.cursor()` reuse the single test
+        # connection as a TestCursor (the sanctioned core-test mechanism); it
+        # changes no production behaviour and is auto-left on teardown.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    def _import_job(self, shopify_target_gid):
+        """Connect the store (the business-job create gate requires it) and
+        return a product-import job whose captured generation matches the store
+        (both 0), so `execute_business._admit` admits it. Flush so the admission
+        side cursor observes the store/job."""
+        self.store.write({'state': 'connected'})
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'product_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': shopify_target_gid,
+        })
+        self.env.flush_all()
+        return job
+
+    def _patch_send(self, fake_execute):
+        """Route an accepted normalized-response `fake_execute(self, store,
+        query, variables=None)` fixture through the real `execute_business`
+        gate by patching only the `_send` transport seam."""
+        Client = self.env['shopify.connector.api.client']
+
+        def fake_send(client_self, store, body, token=None):
+            body = body or {}
+            outcome = fake_execute(
+                client_self, store, body.get('query'), body.get('variables'),
+            )
+            return _FakeSendResponse(outcome)
+
+        return patch.object(type(Client), '_send', fake_send)
 
     def _variant(self, gid, selected, sku=None, price=None):
         return {
@@ -312,9 +391,10 @@ class TestProductVariantGeneration(TransactionCase):
                 },
             }
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
-            result = self.Importer.import_product_sync(self.store, gid)
+        with self._patch_send(fake_execute):
+            result = self.Importer.import_product_sync(
+                self.store, gid, job=self._import_job(gid),
+            )
         self.assertEqual(len(result['variant_bindings']), 150)
         self.assertEqual(
             len(result['template_binding'].product_template_id.product_variant_ids),

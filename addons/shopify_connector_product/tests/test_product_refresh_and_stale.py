@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase
@@ -6,6 +7,29 @@ from odoo.tools import float_compare
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
+
+# CORE-R2 Slice 2B: the product importer now issues every Shopify Admin page
+# call through the core `execute_business` admission-lease context manager
+# (`_send` transport seam), not the legacy value-returning `execute()`. The
+# transport tests below drive the REAL admission gate; `DUMMY_TOKEN` is a
+# non-secret test constant (never a live token) and no live Shopify request
+# runs (the absent-product fixtures normalize a null product node).
+DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+
+class _FakeSendResponse:
+    """Minimal `requests.Response` stand-in for the `_send` transport seam;
+    `_normalize_response` reads `.status_code`, `.json()`, `.headers` and
+    `.text` only, and the JSON body is the accepted Task 010B fixture dict."""
+
+    def __init__(self, body, status_code=200, headers=None):
+        self._body = body
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.text = ''
+
+    def json(self):
+        return self._body
 
 
 class TestProductRefreshAndStale(TransactionCase):
@@ -24,6 +48,51 @@ class TestProductRefreshAndStale(TransactionCase):
         cls.VariantBinding = cls.env['shopify.connector.product.variant.binding']
         cls.Settings = cls.env['shopify.connector.store.settings']
         cls.Job = cls.env['shopify.connector.job']
+        # Seed a credential while `setup_incomplete` (no generation bump), so the
+        # store stays at generation 0, matching a directly-created job.
+        cls.env['shopify.connector.store.credential'].action_set_token(
+            cls.store, DUMMY_TOKEN,
+        )
+        cls.env.flush_all()
+
+    def setUp(self):
+        super().setUp()
+        # Enter registry test mode so `execute_business._admit`'s side cursor
+        # sees this test's fixture (the sanctioned core-test mechanism); no
+        # production behaviour changes and it is auto-left on teardown.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    def _import_job(self, shopify_target_gid):
+        """Connect the store (the business-job create gate requires it) and
+        return a product-import job at generation 0 (matching the store), then
+        flush so the admission side cursor observes the store/job."""
+        self.store.write({'state': 'connected'})
+        job = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'product_import_sync',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+            'shopify_target_gid': shopify_target_gid,
+        })
+        self.env.flush_all()
+        return job
+
+    def _patch_send(self, fake_execute):
+        """Route an accepted normalized-response `fake_execute(self, store,
+        query, variables=None)` fixture through the real `execute_business`
+        gate by patching only the `_send` transport seam."""
+        Client = self.env['shopify.connector.api.client']
+
+        def fake_send(client_self, store, body, token=None):
+            body = body or {}
+            outcome = fake_execute(
+                client_self, store, body.get('query'), body.get('variables'),
+            )
+            return _FakeSendResponse(outcome)
+
+        return patch.object(type(Client), '_send', fake_send)
 
     def _settings(self, **vals):
         return self.Settings.create(dict(vals, store_id=self.store.id))
@@ -283,9 +352,10 @@ class TestProductRefreshAndStale(TransactionCase):
         def fake_execute(self, store, query, variables=None):
             return {'data': {'product': None}}
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
-            result = self.Importer.import_product_sync(self.store, gid)
+        with self._patch_send(fake_execute):
+            result = self.Importer.import_product_sync(
+                self.store, gid, job=self._import_job(gid),
+            )
         self.assertTrue(result.get('stale'))
         self.assertEqual(result['template_binding'].status, 'stale')
         self.assertTrue(template.exists())
@@ -448,11 +518,11 @@ class TestProductRefreshAndStale(TransactionCase):
         def fake_execute(self, store, query, variables=None):
             return {'data': {'product': None}}
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
+        gid = 'gid://shopify/Product/6008-never-seen'
+        with self._patch_send(fake_execute):
             with self.assertRaises(JobHandlerError) as ctx:
                 self.Importer.import_product_sync(
-                    self.store, 'gid://shopify/Product/6008-never-seen',
+                    self.store, gid, job=self._import_job(gid),
                 )
         self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
 
@@ -467,9 +537,10 @@ class TestProductRefreshAndStale(TransactionCase):
         def fake_execute(self, store, query, variables=None):
             return {'data': {'product': None}}
 
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), 'execute', fake_execute):
-            self.Importer.import_product_sync(self.store, gid)
+        with self._patch_send(fake_execute):
+            self.Importer.import_product_sync(
+                self.store, gid, job=self._import_job(gid),
+            )
         self.assertTrue(self.env['product.template'].browse(template_id).exists())
         self.assertEqual(
             self.env['product.product'].search_count([]), products_before,
