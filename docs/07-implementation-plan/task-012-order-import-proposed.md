@@ -10,8 +10,8 @@
 > [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
 > and the implementation packet — **pending ChatGPT control-room acceptance**
 > (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
-> 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835`), not direct PR
-> merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
+> 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835` + `4691931971`),
+> not direct PR merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
 > bindings; protected/guarded customer import + indexed normalized-email matching;
 > no unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
 > accepted — delivered via the **MERGED CORE-R2 Slice-2B integration-staging
@@ -130,29 +130,34 @@ against Shopify's own reported order total. A mismatch beyond a
 to-be-defined tolerance is classified `financial total mismatch` —
 conservative, never silent, never auto-retried, requires explicit human
 review. **Exact tolerance mechanism and Shopify total field — proposed
-resolution 2026-07-14 (rounds 3–4, reviews `4691067575` + `4691408835`)** in the
-decision-closure §6 / packet D-012-2: `totalPriceSet.shopMoney.amount` is the
-total comparand; each product line's **exact** pre-tax net is the official
-`priceAfterAllDiscountsBeforeTaxesSet` field (never `quantity ×
-discountedUnitPriceSet`, which is an *approximate* unit price). **Five fail-closed
-pre-creation gates** (out of MVP scope → policy skip, never `financial_total_mismatch`):
-refunded/removed **product** quantities (`currentQuantity == quantity`); refunded/
-removed/modified **shipping** (`isRemoved`, `currentDiscountedPriceSet ==
-discountedPriceSet`); **nonzero additional fees** (`currentTotalAdditionalFeesSet`);
-**nonzero duties** (by amount, not non-null); **nonzero cash rounding**
-(`totalCashRoundingAdjustment` — its relation to `totalPriceSet` is undocumented).
-The query carries every current-state field these gates consume. The tolerance is
-a canonical single-count ledger (`U_ex = M + H + T`, each of product/shipping/tip
-counted once and always tax-exclusive; shipping tax backed out once only when
-inclusive) with a currency-rounding-derived bound (`tol_lines = 0.5r·L` or
-`0.5r·(L+S_ship)` tax-incl), **exact currency-quantized per-tax-signature base
-equality before any tax tolerance** (a global `amount_untaxed` match is not
-sufficient; the round-3 base *tolerance* was withdrawn as inconsistent with the
-proof), and a **proposed conditional `tol_tax = 0.5r·(S+O)`** whose
-platform-rounding premise is labelled as an inference (not an official Shopify
-guarantee) and fails closed for undocumented-rounding currencies — replacing the
-invalid `K=distinct groups`, with **no** money cap. This is **proposed, pending
-control-room acceptance** (MBQ-56 stays open in the register until then).
+resolution 2026-07-14 (rounds 3–5, reviews `4691067575` + `4691408835` +
+`4691931971`)** in the decision-closure §6 / packet D-012-2:
+`totalPriceSet.shopMoney.amount` is the total comparand; each product line's
+**exact** pre-tax net is the official `priceAfterAllDiscountsBeforeTaxesSet` field
+(never `quantity × discountedUnitPriceSet`, which is an *approximate* unit price),
+reproduced in Odoo **through the actual Odoo 19 tax engine** (engine
+`total_excluded`; `price_include_override` is on `account.tax` not the SO line;
+price-included residuals derived via the engine, not gross subtraction; money
+fields are binary floats). **Six fail-closed pre-creation gates** (out of MVP
+scope → policy skip, never `financial_total_mismatch`): refunded/removed **product**
+quantities; refunded/removed/modified **shipping**; **duty-first** duties/additional-
+fees precedence (a duty-only order reaches `unsupported_duties`; `AdditionalFee.name`
+is potentially-PII, redacted/bounded); **nonzero cash rounding**; and **nonzero
+tips fail closed** (`unsupported_tip_tax_treatment` — tip tax treatment
+undocumented, no untaxed Tip line). The query uses **one `edges{ cursor node }`
+shape for all three connections** and carries every current-state/tax-evidence
+field the gates consume. Tax mapping is keyed by a **composite
+`shopify_tax_evidence_key`** (rate+title+source+channelLiable+inclusion — a
+rate-only key could yield a correct total with the wrong tax/account; collisions
+hold). The tolerance is a canonical single-count ledger (`U_ex = M + H` with `T=0`;
+always tax-exclusive; shipping tax backed out once when inclusive) with a
+currency-rounding bound, **per-tax-signature reconciliation on the tax-engine
+excluded base before any tax tolerance** (currency-rounded equality is necessary
+but not sufficient — an **engine-derived `tax_delta_bound`** is carried, 0 only
+when the engine proves it), and a **proposed conditional `tol_tax = 0.5r·(S+O)`**
+whose platform-rounding premise is a labelled inference, with **no** money cap.
+This is **proposed, pending control-room acceptance** (MBQ-56 stays open until
+then).
 
 ## Same-currency-only rule (DEC-020 / MBQ-64)
 
@@ -179,10 +184,11 @@ reached via a **conditional, CORE-R2-coordinated** handler-reachable core skip
 seam (recommended: a terminal-state-respect dispatcher guard so Task 012 needs
 **no** core edit; else a `JobPolicySkip` exception) — so it never overloads
 `financial_total_mismatch` and adds no 17th error class. The same policy-skip
-routing covers **nonzero** duties, **nonzero additional fees**, **nonzero cash
-rounding**, refunded/removed-quantity orders, refunded/removed/modified
-**shipping**, test orders, and pre-cancelled orders (all out of MVP scope, fail
-closed, `skip_reason`-labelled — closure §6.0). Both currencies and both
+routing covers (duty-first) **nonzero** duties, **nonzero additional fees**,
+**nonzero cash rounding**, **nonzero tips** (`unsupported_tip_tax_treatment`),
+refunded/removed-quantity orders, refunded/removed/modified **shipping**, test
+orders, and pre-cancelled orders (all out of MVP scope, fail closed,
+`skip_reason`-labelled — closure §6.0). Both currencies and both
 `shopMoney`/`presentmentMoney` totals are captured. This
 is **proposed, pending control-room acceptance**.
 

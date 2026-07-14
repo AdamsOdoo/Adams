@@ -57,6 +57,20 @@
 > exact currency-quantized per-signature base equality** (resolving the base-vs-Θ
 > inconsistency) with a rigorously-defined `tax_delta_bound`; and **base-aligned**
 > the branch onto the merged PR #158 `Shopify-connector` tip.
+>
+> **Round-5 correction (control-room review `4691931971`, 2026-07-14):** converged
+> **all three** GraphQL connections (`lineItems`/`shippingLines`/
+> `discountApplications`) to one executable `edges{ cursor node }` shape (no
+> `nodes`-only reads); made duty/additional-fee routing **duty-first** so a
+> duty-only order reaches `unsupported_duties`; reclassified `AdditionalFee.name`
+> as **potentially-PII** (redacted/truncated/bounded, out of ordinary logs);
+> replaced the rate-only tax key with a **composite `shopify_tax_evidence_key`**
+> (rate+title+source+channelLiable+inclusion, collision → hold); **rebuilt the
+> residual/tax-base reconciliation around the actual Odoo 19 tax engine** (engine
+> `total_excluded`; `price_include_override` on `account.tax`; price-included via
+> the engine, not gross subtraction; binary-float honesty; engine-derived
+> `tax_delta_bound`, 0 only when engine-proven); and made a **nonzero tip
+> fail-closed** (`unsupported_tip_tax_treatment`, no untaxed Tip line).
 
 ---
 
@@ -65,7 +79,7 @@
 | Item | Required | Verified state | Class |
 | --- | --- | --- | --- |
 | `Shopify-connector` tip | `1494b97d0e2117af05b954dabde92a9e497ac2c3` | `origin/Shopify-connector` HEAD = `1494b97…c2c3` (PR #158 merged); this branch is **base-aligned** onto it via a normal merge commit (§0.2) | [Fact — repo] |
-| PR #159 (this PR) | open, draft, unmerged | `state:open, draft:true, merged:false`; base `Shopify-connector`; round-4 correction (reviews `4690680028` + `4691067575` + `4691408835`); head = the round-4 correction commits + the base-alignment merge (see PR body) | [Fact — repo] |
+| PR #159 (this PR) | open, draft, unmerged | `state:open, draft:true, merged:false`; base `Shopify-connector @ 1494b97` (0 behind); round-5 correction (reviews `4690680028` + `4691067575` + `4691408835` + `4691931971`); head per PR body | [Fact — repo] |
 | PR #150 (Task 011B) | not modified | left as-is (open/draft) — **not a direct-merge prerequisite**; subsumed by the merged Slice-2B strategy | [Fact — repo] |
 | PR #151 (Task 010B) | not modified | left as-is (open/draft) — **not a direct-merge prerequisite** | [Fact — repo] |
 | CORE-R2 / SRR-03 | remediation open | Foundation Slice 1 merged; **SRR-03 remains OPEN**; **Slice-2B call-site-activation packet (PR #158) is MERGED** (review `4691064435`; merge tip `1494b97`) — the authoritative integration-staging strategy; Slice 2A (PR #160) draft/unmerged | [Fact — repo] |
@@ -386,7 +400,8 @@ call.**
 - **Addresses:** `billingAddress` and `shippingAddress` (nullable
   `MailingAddress`) `{ firstName lastName name company address1 address2 city
   zip provinceCode countryCodeV2 phone }`.
-- **Line items** (connection — paginate, §4.2): `lineItems(first: 100){ nodes{
+- **Line items** (connection — paginate via **edges/cursor**, §4.2):
+  `lineItems(first: 100){ edges{ cursor node{
   id name title variantTitle vendor quantity currentQuantity sku isGiftCard
   requiresShipping taxable variant{ id } product{ id }
   originalUnitPriceSet{shopMoney{amount}} originalTotalSet{shopMoney{amount}}
@@ -396,8 +411,10 @@ call.**
   discountAllocations{ allocatedAmountSet{shopMoney{amount} presentmentMoney{amount}}
   discountApplication{ __typename index targetType allocationMethod targetSelection
   ... on DiscountCodeApplication { code } } }
-  taxLines{ title rate ratePercentage priceSet{shopMoney{amount}} channelLiable }
-  customAttributes{ key value } } pageInfo{ hasNextPage endCursor } }`.
+  taxLines{ title source rate ratePercentage priceSet{shopMoney{amount}} channelLiable }
+  customAttributes{ key value } } } pageInfo{ hasNextPage endCursor } }`
+  (`LineItem.id` is non-null [Fact — official] — the immutable **secondary**
+  business identity behind the edge cursor).
   **`priceAfterAllDiscountsBeforeTaxesSet` is the canonical exact per-line
   financial target** — *"The total price of the line item… after all discounts
   are applied and excluding refunded and removed quantities. This value doesn't
@@ -424,16 +441,19 @@ call.**
   id isRemoved title code custom
   discountedPriceSet{shopMoney{amount currencyCode} presentmentMoney{amount currencyCode}}
   currentDiscountedPriceSet{shopMoney{amount currencyCode} presentmentMoney{amount currencyCode}}
-  taxLines{ title rate ratePercentage priceSet{shopMoney{amount} presentmentMoney{amount}} } } }
+  taxLines{ title source rate ratePercentage priceSet{shopMoney{amount} presentmentMoney{amount}} channelLiable } } }
   pageInfo{ hasNextPage endCursor } }`. **`isRemoved`** (`Boolean!`) and
   **`currentDiscountedPriceSet`** (`MoneyBag!` — *"the current shipping price after
   applying refunds, after applying discounts"*) drive the §6.0 shipping
   eligibility gate; `discountedPriceSet` is the **original/before-refund**
   post-discount price [Fact — official].
-- **Discount applications** (connection — paginate): `discountApplications(first:
-  50){ nodes{ __typename index allocationMethod targetSelection targetType } pageInfo{
+- **Discount applications** (connection — paginate via **edges/cursor**):
+  `discountApplications(first: 50){ edges{ cursor node{
+  __typename index allocationMethod targetSelection targetType } } pageInfo{
   hasNextPage endCursor } }` (evidence/reconciliation; per-line money comes from
-  each line's `discountAllocations`).
+  each line's `discountAllocations`). **`DiscountApplication` is an interface with
+  no `id`/GID** [Fact — official] — its **secondary** identity is
+  `__typename`+`index` behind the edge cursor.
 
 ### 4.2 Pagination — implementation-exact, three independent cursors (task §7)
 
@@ -476,12 +496,14 @@ duplication**). Every page (header first-pages included) is validated:
 - **require cursor progress** — the new `endCursor` must differ from the prior
   page's cursor and the page must add ≥1 edge (a repeated `endCursor` while
   `hasNextPage` → `data_shape_schema_mismatch`, preventing an infinite loop);
-- **deduplicate by edge cursor (mandatory), then by non-null node id where
-  present** (§4.2a): a **duplicate edge cursor** → `data_shape_schema_mismatch`; a
-  **conflicting duplicate non-null node id** → `data_shape_schema_mismatch`; a
-  **null `node.id` is never treated as a stable GID** (line-item `id` is non-null,
-  shipping-line `id` is nullable, discount applications key on edge cursor +
-  `index`); no node is accumulated twice;
+- **deduplicate by edge cursor (mandatory), then by the connection's secondary
+  identity** (§4.2a): a **duplicate edge cursor** → `data_shape_schema_mismatch`;
+  a **repeated `endCursor`** → `data_shape_schema_mismatch`; a **conflicting
+  secondary identity** → `data_shape_schema_mismatch`. The secondary identity is:
+  **`LineItem.id`** (non-null [Fact — official], the immutable business identity);
+  **`ShippingLine.id`** (nullable — used only when present, never as a stable GID
+  when null); **`DiscountApplication.__typename`+`index`** (the interface has **no
+  `id`** [Fact — official]). No node is accumulated twice;
 - **enforce an independent per-connection page ceiling**
   (`LINE_ITEMS_PAGE_LIMIT`, `SHIPPING_LINES_PAGE_LIMIT`,
   `DISCOUNT_APPLICATIONS_PAGE_LIMIT` — named provisional defaults, §4.3);
@@ -600,33 +622,39 @@ approach re-proposed).
 shipping line, resolve an `account.tax` in this order; ordinary order import
 **never silently creates accounting configuration**:
 
-1. **Explicit tax mapping (preferred).** New connector model
-   `shopify.connector.tax.mapping` (`store_id`; **`shopify_rate_key` Char** =
-   canonical decimal-string percentage key, never a Float; `price_include`
-   Boolean = the connector's own key component; `account_tax_id` M2o
-   `account.tax` required `restrict`; `UNIQUE(store_id, shopify_rate_key,
-   price_include)`). A hit resolves immediately **only after** the resolved
-   `account_tax_id` passes the §5.5 validations.
-2. **Existing-tax rate match.** Candidate filter: `account.tax` with
+1. **Explicit tax mapping (preferred), keyed by a COMPOSITE Shopify tax evidence
+   key (REBUILT 2026-07-14, review `4691931971` item 4).** New connector model
+   `shopify.connector.tax.mapping` (`store_id`; **`shopify_tax_evidence_key`
+   Char** — the composite defined in §5.2a; `account_tax_id` M2o `account.tax`
+   required `restrict`; **`UNIQUE(store_id, shopify_tax_evidence_key)`**). The
+   round-1..4 `UNIQUE(store_id, shopify_rate_key, price_include)` is **withdrawn**:
+   a rate-only key **collapses distinct Shopify taxes that share a rate but differ
+   by title/source/liability** (e.g. two 5% taxes, or state-vs-city 5%), which can
+   yield a correct **total** but the **wrong** Odoo tax/account. The composite key
+   keeps them distinct. A hit resolves **only after** the resolved `account_tax_id`
+   passes the §5.5 validations.
+2. **Existing-tax match (fallback).** Candidate filter: `account.tax` with
    `company_id == order_company_id`, `type_tax_use == 'sale'`, `active == True`,
-   `amount_type == 'percent'`, and `price_include_override` matching
-   `Order.taxesIncluded`. Rate identity is decided by the **canonical
-   decimal-string key** (the authoritative evidence layer): the candidate's
-   `account.tax.amount` (an Odoo `Float(16,4)` field) is canonicalized by the
-   same rule and compared to the Shopify canonical key. **This comparison
-   crosses the Decimal→Float boundary** — the Odoo `amount` is genuinely a
-   `Float`, so `float_compare(tax.amount, rate_percent, precision_digits=6) == 0`
-   is the correct *boundary* comparison against that existing Float field.
-   **It does NOT "preserve Shopify Decimal precision"** — the Decimal/string
-   canonicalization is the identity/evidence layer; `float_compare` is only the
-   comparison at the boundary to Odoo's existing Float column (correction per
-   review). **Ambiguity rule (§5.5):** zero candidates → configuration hold; more
-   than one → **ambiguous** configuration hold; the first candidate is **never**
-   chosen silently.
-3. **Unmatched → hold, never create.** `odoo_validation_configuration`
-   (`failed_retryable`) naming the exact rate/inclusion pair; the readiness
-   surface carries a standing warning listing unmapped rates seen in holds; the
-   operator adds a mapping (or the tax) and retries.
+   `amount_type == 'percent'`, and `price_include_override` matching the order's
+   effective inclusion. The candidate's `account.tax.amount` (Odoo `Float(16,4)`)
+   is canonicalized by the same rule and compared to the Shopify canonical
+   **ratePercentage** via `float_compare(tax.amount, rate_percent,
+   precision_digits=6) == 0` — the correct *boundary* comparison against that
+   existing Float field (it does **not** "preserve Shopify Decimal precision"; the
+   Decimal/string canonicalization is the identity layer, `float_compare` only the
+   Float boundary). **Because rate alone is not identity**, a fallback match is
+   accepted **only** when it is **unique** for the *whole composite evidence*:
+   **zero** candidates → configuration hold; **more than one** (including two
+   Odoo taxes at the same rate) → **ambiguous** configuration hold; the first is
+   **never** chosen silently. When the Shopify evidence (title/source/liability)
+   cannot be safely disambiguated against multiple same-rate Odoo taxes, the
+   importer **holds** and requires an explicit mapping row — it never guesses.
+3. **Unmatched / ambiguous → hold, never create.** `odoo_validation_configuration`
+   (`failed_retryable`) naming the bounded/redacted evidence (rate + inclusion +
+   truncated title/source, §5.2a); the readiness surface lists unmapped/ambiguous
+   evidence keys seen in holds; the operator adds a mapping (or the tax) and
+   retries. **One evidence key can never silently change its Odoo tax** — a
+   mapping's `account_tax_id` is a deliberate, audited row.
 4. **Auto-creation only as an explicit admin opt-in.** Store-settings Boolean
    `order_tax_autocreate`, **default `False`**, admin-gated; when `True`, step 3
    instead creates `"Shopify Tax {percent}% ({incl|excl})"` (`amount_type=percent`,
@@ -639,12 +667,44 @@ shipping line, resolve an `account.tax` in this order; ordinary order import
 **Rate-unit pinning + canonicalization [Proposed Task 012 decision]:** the
 query requests **both** `TaxLine.rate` (decimal proportion, e.g. `0.06`) and
 `TaxLine.ratePercentage` (percentage, e.g. `6.0`) [Fact — official]. The
-**authoritative input is `ratePercentage`**, parsed with `decimal.Decimal`
+**authoritative rate input is `ratePercentage`**, parsed with `decimal.Decimal`
 (never `float`), quantized to 6 dp, trailing zeros stripped — so `6.0`, `6.00`,
-`6.000` → the single key `"6"`, and `8.375` → `"8.375"`. The connector verifies
-`rate × 100 == ratePercentage` within 6-dp precision; disagreement, or a
+`6.000` → the single canonical `"6"`, and `8.375` → `"8.375"`. The connector
+verifies `rate × 100 == ratePercentage` within 6-dp precision; disagreement, or a
 null/empty `rate`/`ratePercentage`, → `data_shape_schema_mismatch` hold. This
 rejects the ambiguity where a bare `0.06` could mean 0.06 % or 6 %.
+
+### 5.2a Composite `shopify_tax_evidence_key` (all stable TaxLine evidence)
+
+**[Proposed Task 012 decision]** Because `TaxLine` has **no `id`/GID** [Fact —
+official], a Shopify tax is identified only by its evidence tuple. The
+`shopify_tax_evidence_key` is the deterministic composite of **all** stable
+evidence:
+
+- **`rate_key`** — canonical `ratePercentage` (above);
+- **`title_key`** — normalized `TaxLine.title` (`String!`): Unicode-NFC,
+  case-folded, whitespace-collapsed/trimmed, then **truncated to
+  `TAX_TITLE_MAX_LEN`**. `title` is **merchant free text — potentially sensitive**,
+  so it is bounded and **redacted in ordinary logs** (only the hash/truncated form
+  enters evidence);
+- **`source_key`** — normalized `TaxLine.source` (`String`, **nullable**) with a
+  **null-safe sentinel** (null → a reserved `"∅"`) so a null source and a literal
+  empty string never collide;
+- **`liable_key`** — `channelLiable` (`Boolean`, **nullable**) as a **tri-state**
+  (`true`/`false`/`null` are three distinct key values — `null` is *"unknown
+  liability"* [Fact — official], not `false`);
+- **`inclusion_key`** — the order's effective inclusion posture (`Order.taxesIncluded`
+  → the mapping's `account_tax_id.price_include_override`).
+
+The key is a stable, order-independent serialization of `(rate_key, title_key,
+source_key, liable_key, inclusion_key)` (e.g. a delimited canonical string or its
+hash). **The same identity fields (`title`, `source`, `channelLiable`, `rate`,
+`ratePercentage`) are queried on product-line `taxLines`, shipping-line
+`taxLines`, and the order-level `taxLines`** (§4.1) so the key is computed
+identically everywhere. **Identical rate with different `title`/`source`/liability
+does not collapse.** Normalization rules are documented here and are the mapping
+model's `@api.depends` for the stored key. No `TaxLine` GID is assumed (there is
+none).
 
 Odoo recomputes tax amounts from the resolved `tax_ids`; agreement with
 Shopify's per-line math is enforced by the **total-check guard (§6)**, the
@@ -727,9 +787,9 @@ once any order binding or tax mapping exists for the store** (a `@api.constrains
 structural safety** to a stored `company_id` column without duplicating derivable
 data; the choice — *store-scoped mapping + constrained tax company + immutable
 `order_company_id` + resolution-time re-check* — is the recorded decision. **The
-mapping's `UNIQUE(store_id, shopify_rate_key, price_include)` therefore also
+mapping's `UNIQUE(store_id, shopify_tax_evidence_key)` (§5.2a) therefore also
 uniquely determines the company** (via the store), so it cannot yield two taxes
-in different companies for one key.
+in different companies for one evidence key.
 
 ---
 
@@ -750,22 +810,24 @@ pre-tax total from `priceAfterAllDiscountsBeforeTaxesSet` as the financial
 invariant (§6.1), (c) requires **exact per-tax-signature base equality** before
 any tax-tolerance comparison (§6.4a), and (d) reframes the tax bound as a
 **proposed conservative bound with explicit, separately-labelled assumptions**
-(§6.5). **§6.0 = five fail-closed eligibility gates (product refund/removed,
-shipping refund/removal, additional fees, duties, cash rounding); §6.1 = canonical
-exact ledger; §6.2 = single Decimal→Odoo boundary + exact Odoo line
-representation; §6.3 = tax-inclusive; §6.4 = tolerances; §6.4a = exact
+(§6.5). **§6.0 = six fail-closed eligibility gates (product refund/removed,
+shipping refund/removal, additional fees & duties, cash rounding, nonzero tip);
+§6.1 = canonical exact ledger; §6.2 = single Decimal→Odoo boundary + exact Odoo
+line representation via the tax engine; §6.3 = tax-inclusive; §6.4 = tolerances;
+§6.4a = exact
 per-tax-signature base equality; §6.5 = tax-bound assumptions + proof; §6.6 =
 worked examples.**
 
 ### 6.0 Pre-creation eligibility gates (fail closed, before any SO write)
 
-**[Proposed Task 012 decision]** Five fail-closed gates run on the
+**[Proposed Task 012 decision]** Six fail-closed gates run on the
 header/first-page data **before any Odoo write**. Each unsupported-scope
 condition is a terminal **policy `skipped`** (no error class, no partial SO, no
 binding), never a `financial_total_mismatch`. The permitted `skip_reason` values
 are the closed set (§10). The gates are §6.0.1 product refund/removed, §6.0.2
-shipping refund/removal/modification, §6.0.3 unsupported additional fees, §6.0.4
-unsupported duties, §6.0.5 unsupported cash rounding.
+shipping refund/removal/modification, §6.0.3 unsupported additional fees & duties
+(duty-first precedence), §6.0.4 (duties, evaluated inside §6.0.3), §6.0.5
+unsupported cash rounding, §6.0.6 unsupported tip tax treatment (nonzero tip).
 
 #### 6.0.1 Product refund/removed quantities
 
@@ -818,34 +880,59 @@ unexplained total defect. Non-PII evidence: per-line `discountedPriceSet` vs
 `currentDiscountedPriceSet`, `isRemoved`, and `totalShippingPriceSet` vs
 `currentShippingPriceSet` (numbers + shipping-line ids/cursors only).
 
-#### 6.0.3 Unsupported additional fees
+#### 6.0.3 Unsupported additional fees & duties — deterministic precedence (duty-first)
 
 The canonical ledger (§6.1) is merchandise + shipping + tip + tax **only**; it
-does **not** represent Shopify **additional fees** (`Order.additionalFees:
-[AdditionalFee!]!` — *"duties, import fees, or … special handling"* [Fact —
-official]). The gate tests the **Decimal amount** of
-`currentTotalAdditionalFeesSet` (nullable `MoneyBag`; **null → treat as zero**):
+does **not** represent Shopify **additional fees** or **duties**. Official Shopify
+semantics state additional fees *"can include duties"* [Fact — official], so
+`currentTotalAdditionalFeesSet` and `currentTotalDutiesSet` are **not** disjoint
+and must **not** be subtracted from one another (no official rule proves they are
+directly composable). The gate therefore evaluates a **deterministic, duty-first
+precedence** on the **Decimal amounts** (both nullable `MoneyBag`; **null → zero**):
 
-- **nonzero** current additional fees → **no SO, no binding**, terminal `skipped`
-  with `skip_reason = "unsupported_additional_fees"` (§10);
-- record **bounded non-PII evidence**: amount + currency, and each fee's free-text
-  **`name`** as the category label (there is **no** category enum on
-  `AdditionalFee` — `name:String!` is the only differentiator [Fact — official]).
-  `additionalFees` is queried only to produce this bounded explanation.
+1. parse `d = currentTotalDutiesSet` amount; parse `f =
+   currentTotalAdditionalFeesSet` amount;
+2. **if `d != 0`** → terminal `skipped` `skip_reason = "unsupported_duties"`
+   ([Deferred / non-MVP]); **record whether `f` is also nonzero**, but do **not**
+   claim any non-duty portion is known (the composition is not officially
+   decomposable);
+3. **else if `f != 0`** → terminal `skipped` `skip_reason =
+   "unsupported_additional_fees"`;
+4. **else** (both zero / present-zero) → **pass**;
+5. **both nonzero** is handled by step 2 (duty reason wins) — the operator
+   evidence states *duties are present and the remaining fee composition is not
+   automatically inferred*.
 
-Duties are kept **separately identifiable** (§6.0.4) but the importer does **not**
-assume every additional fee is a duty. `unsupported_additional_fees` is **not**
-`financial_total_mismatch`.
+This makes **`unsupported_duties` reachable for a duty-only order** (the earlier
+"any nonzero additional fees first" ordering made it unreachable — review
+`4691931971` item 2). Neither is ever `financial_total_mismatch`.
 
-#### 6.0.4 Unsupported duties (route on nonzero amount, not on non-null)
+**Bounded, privacy-safe fee evidence (review `4691931971` item 3):**
+`AdditionalFee.name` is **arbitrary merchant-provided free text — NOT guaranteed
+non-PII** and is **not** treated as a safe category label. Therefore:
 
-`currentTotalDutiesSet` is a **nullable** `MoneyBag` [Fact — official]. The gate
-routes on the **Decimal amount**, not field presence: a **present but zero**
-duties MoneyBag is **not** a hold; only a **nonzero** current duties amount →
-terminal `skipped` with `skip_reason = "unsupported_duties"` ([Deferred /
-non-MVP]). (This corrects the earlier "non-null → skip" rule, which would have
-wrongly skipped orders that merely carry a zero-valued duties field.) Evidence:
-duties amount + currency.
+- **ordinary job/log messages** carry **only** `fee_count`, `total_amount`,
+  `currency`, and the `skip_reason` — **never** raw fee names;
+- when names are retained at all, they go **only** into **protected technical
+  evidence**, each passed through the connector **`REDACTION_EXTENSION`** pipeline,
+  **truncated to a fixed bound** (`ADDITIONAL_FEE_NAME_MAX_LEN`), with the **number
+  retained capped** at `ADDITIONAL_FEES_EVIDENCE_LIMIT`, and visibility restricted
+  per the SEC-1 financial/technical-evidence tier (§13);
+- **`Order.additionalFees` is `[AdditionalFee!]!` — a plain list, not a
+  connection** [Fact — official], so it takes no `first:`/cursor argument; the
+  importer reads it but **retains at most `ADDITIONAL_FEES_EVIDENCE_LIMIT`
+  entries**, recording `truncated: true` + the true `fee_count` when the list is
+  longer (never widening any query unboundedly); the **skip itself fires from the
+  aggregate `currentTotalAdditionalFeesSet`/`currentTotalDutiesSet`**, independent
+  of how many names are retained. No raw order/customer payload is persisted.
+
+#### 6.0.4 Unsupported duties — see §6.0.3
+
+The duty gate is evaluated **first** in §6.0.3 (`d != 0` →
+`skip_reason = "unsupported_duties"`, before the additional-fee reason). Routing
+is on the **nonzero Decimal amount**, not on the field being non-null — a
+present-but-zero `currentTotalDutiesSet` is **not** a hold (correcting the earlier
+"non-null → skip"). Evidence: duties amount + currency.
 
 #### 6.0.5 Unsupported cash rounding
 
@@ -865,14 +952,26 @@ separate from the order price — evidence: the `paymentSet`/`refundSet`
 descriptions target `totalReceived`/`totalRefunded`, and `totalPriceSet` documents
 only "taxes and discounts."]*
 
+#### 6.0.6 Unsupported tip tax treatment
+
+**Tip tax treatment is undocumented** in the Admin GraphQL API (no `TipLine`, no
+tip `taxLines`) [Fact — official], so importing a tip as untaxed and relying on
+the total/tax tolerance is unsafe — a small taxed-tip difference can fall **inside**
+the rounding envelope (§6.1-C). MVP: a **nonzero `totalTipReceivedSet`** (either
+currency) → **no SO, no binding**, terminal `skipped` with `skip_reason =
+"unsupported_tip_tax_treatment"` (§10). `totalTipReceivedSet == 0` proceeds; no
+"Shopify Tip" line is ever constructed in MVP. Evidence: tip amount + currency
+(no PII). A future separately-accepted store policy may lift this once tip tax
+treatment is proven and mapped (§6.1-C).
+
 **Consequence for the ledger:** every order that reaches §6.1 has, on every line,
 `currentQuantity == quantity` and unmodified shipping, and carries **no** nonzero
-additional fees, duties, or cash rounding — so
+tip, additional fees, duties, or cash rounding — so
 `priceAfterAllDiscountsBeforeTaxesSet` (current-net) equals the full original line
-total, the ledger's four components (merchandise + shipping + tip + tax) fully
-account for `totalPriceSet`, and the self-check is exact. This is what makes the
-exact per-line construction below sound. `Refund`/order-edit objects are **not**
-queried; the current-state fields above are sufficient.
+total, `T = 0`, the ledger's three active components (merchandise + shipping +
+tax) fully account for `totalPriceSet`, and the self-check is exact. This is what
+makes the exact per-line construction below sound. `Refund`/order-edit objects are
+**not** queried; the current-state fields above are sufficient.
 
 ### 6.1 The canonical Shopify source ledger (each component once)
 
@@ -925,18 +1024,22 @@ shipping line `s`:
   `targetType == SHIPPING_LINE` are already reflected here; they never appear on a
   product line.
 
-**C. Tips `T` — fail-closed tax posture.** `T = totalTipReceivedSet.shopMoney`,
-counted **exactly once**. **Tip tax treatment is undocumented in the Admin
-GraphQL API** — there is **no `TipLine` object** and no tip-level `taxLines`
-[Fact — official]; a Help-Center page states the tip is *"calculated on the
-cart's subtotal before taxes and shipping"* but does **not** state tips are
-tax-exempt. So "a tip is untaxed" is an **[Inference]**, not a Fact. **Posture:**
-the tip is represented as an **untaxed** line; the mandatory total self-check
-(part F) is the fail-closed backstop — if a tip were in fact taxed,
-`totalTaxSet` would exceed the tax the ledger accounts for and `Total_ex ≠
-totalPriceSet`, so the order is **held** (`financial_total_mismatch`), never
-silently imported with a wrong tax. A tip is never assigned a tax signature
-without evidence.
+**C. Tips `T` — nonzero tips FAIL CLOSED (MVP, review `4691931971` item 6).**
+`T = totalTipReceivedSet.shopMoney`. **Tip tax treatment is undocumented in the
+Admin GraphQL API** — there is **no `TipLine` object** and no tip-level `taxLines`
+[Fact — official]; a Help-Center page states the tip is *"calculated on the cart's
+subtotal before taxes and shipping"* but does **not** state tips are tax-exempt.
+The round-3/4 posture (import the tip as an **untaxed** line and rely on the total
+self-check) is **withdrawn**: a small *taxed*-tip difference can fall **inside**
+the permitted `tol_tax`/total rounding envelope and be silently accepted. **New
+MVP rule (§6.0.6): a nonzero `totalTipReceivedSet` is a pre-creation fail-closed
+policy skip** (`unsupported_tip_tax_treatment`) — **no SO, no binding, no untaxed
+"Shopify Tip" line is constructed**. Only `totalTipReceivedSet == 0` proceeds, so
+in the ledger **`T = 0` for every imported order**. A future, separately accepted
+store policy may support tips only after (i) official or live evidence establishes
+their tax treatment, (ii) the correct tax signature is mapped, and (iii) the exact
+Odoo representation and total guard are validated. Evidence on skip: tip amount +
+currency (no customer PII).
 
 **D. Discounts — attribution, not the net-amount source.** Because `M` and `H`
 are taken from exact all-discounts-applied fields, **no ledger term subtracts a
@@ -948,10 +1051,11 @@ classification perfectly reconstructing any total — the exact line-total field
 the backstop (review `4691067575` item 2).
 
 **E. Untaxed source expectation `U_ex` — always tax-exclusive, no global
-back-out.** `U_ex = M + H + T`. Every term is already **tax-exclusive**:
-`priceAfterAllDiscountsBeforeTaxesSet` is pre-tax by definition (both modes),
-shipping tax is backed out per-line when inclusive (part B), and the tip is
-untaxed (part C). **There is no `U_ex = G − totalTaxSet` global back-out** — the
+back-out.** `U_ex = M + H + T`, and **`T = 0`** for every imported order (a
+nonzero tip is skipped upstream, §6.0.6), so effectively `U_ex = M + H`. Every
+term is already **tax-exclusive**: `priceAfterAllDiscountsBeforeTaxesSet` is
+pre-tax by definition (both modes) and shipping tax is backed out per-line when
+inclusive (part B). **There is no `U_ex = G − totalTaxSet` global back-out** — the
 round-2 global subtraction (which the review flagged as not proving identical
 per-signature bases) is **withdrawn**; each component is independently pre-tax.
 The independent **total** expectation is `Total_ex = U_ex +
@@ -971,67 +1075,98 @@ official], and duties/additional-fees/cash-rounding are excluded (a **nonzero**
 adjustments; `quantity × discountedUnitPriceSet` is never assumed equal to any
 total).
 
-### 6.2 The single Decimal→Odoo boundary + exact Odoo line representation
+### 6.2 Exact Odoo line representation through the actual Odoo 19 tax engine (task §7)
 
-There is **exactly one** place where lossless `Decimal` source values enter
-Odoo's `Float`/`Monetary` fields: when the importer **writes** each SO line's
-`price_unit` (and `discount %`, and adjustment-line `price_unit`). Every source
-figure (`source_line_untaxed_exact_i`, `source_shipping_untaxed_exact_s`, `T`,
-`M`, `H`, `U_ex`, `Total_ex`) is computed in `Decimal` **before** that write.
-After the write, Odoo computes `price_subtotal`, `amount_tax`, `amount_total` and
-rounds them to `r` using its own `float_round(precision_rounding=r)`. The guard
-then reads those Odoo figures back and compares them, in `Decimal`, to the
-`Decimal` source. No guard arithmetic is done in binary `float`.
+**REBUILT 2026-07-14 (review `4691931971` item 5).** The earlier text made five
+false claims, now **withdrawn**: (i) "an Odoo Float stores the Decimal residual
+exactly" — Odoo money fields are Python **binary `float`** (`sale.order.line.price_unit`
+is `fields.Float`, `price_subtotal` is `fields.Monetary`; `res.currency.round`
+returns a `float_round` float) [Fact — Odoo 19 source], so a Decimal is **not**
+stored exactly; (ii) "currency-rounded base equality proves exact pre-rounding
+equality" — it does not (§6.4a); (iii) "`price_include_override` is written on
+`sale.order.line`" — it is an **`account.tax`** field, **not** a sale-order-line
+field [Fact — Odoo 19 source]; (iv) "a price-included residual is a pre-tax target
+subtracted from a gross line amount" — for price-included taxes Odoo backs tax out
+**through the tax engine**, not by subtraction; (v) "`tax_delta_bound` is
+automatically zero after currency rounding" — only an actual engine calculation
+can prove zero (§6.4a).
 
-**Exact per-line representation [Proposed Task 012 decision] (task §6).** For
-each eligible product line `i`, the target is `source_line_untaxed_exact_i`. The
-line is written with `price_include_override` matching `Order.taxesIncluded` (so
-Odoo's `price_subtotal` is tax-**excluded** in both modes) and its resolved
-`tax_ids` (§5), then represented by **one** of:
+**Field ownership [Fact — Odoo 19 source].** `account.tax` carries
+`price_include_override` (`tax_included`/`tax_excluded`/blank→company default);
+`sale.order.line` carries `tax_ids` (M2m `account.tax`), `price_unit` (Float),
+`product_uom_qty`, and `discount` (Float, "Discount (%)"). `sale.order.line`
+computes `price_subtotal`/`price_total`/`price_tax` via the **new tax engine** —
+`_prepare_base_line_for_taxes_computation()` → `AccountTax._add_tax_details_in_base_line()`
+→ `AccountTax._round_base_lines_tax_details()`, with `price_subtotal =
+tax_details['total_excluded_currency']` [Fact — Odoo 19 source]. The engine applies
+the `discount` and, for a price-included tax, **derives the tax-excluded base
+internally** (e.g. 121 at 10% incl → excluded base 110).
 
-1. **Native price + discount % (preferred when faithful):** `price_unit =
-   originalUnitPriceSet_i`, `product_uom_qty = quantity_i` (`= currentQuantity_i`
-   by §6.0), and a native Odoo `discount` (%) — used **only when** the resulting
-   Odoo `price_subtotal` reproduces `source_line_untaxed_exact_i` **within the
-   line-rounding boundary `0.5r`** (the discount % is 2-dp; for many lines it
-   hits the target exactly).
-2. **Exact line-level residual adjustment (otherwise):** keep the best faithful
-   `price_unit`/`discount %` and add an **exact residual adjustment** carrying
-   the difference, **associated with the source line's tax signature and
-   price-inclusion posture** (§7). Never a single universal no-tax adjustment
-   line; residuals may be **combined per tax signature** (one negative line per
-   `tax_ids`+inclusion bucket), with each source-line allocation preserved in
-   evidence.
-3. **Post-computation verification (mandatory):** after Odoo computes, require
-   `| (product-line price_subtotal_i + its attributable residual price_subtotal)
-   − source_line_untaxed_exact_i | ≤ 0.5r`. A line that cannot be reproduced
-   within the boundary → `financial_total_mismatch` (never absorbed by widening a
-   tolerance).
+**Exact per-line representation [Proposed Task 012 decision] (task §6).** For each
+eligible product line `i` the target is `source_line_untaxed_exact_i =
+priceAfterAllDiscountsBeforeTaxesSet_i` (a **tax-excluded** amount). The importer
+uses the **actual mapped `account.tax` records** (§5) whose `price_include_override`
+already encodes inclusion — inclusion lives on the tax, never on the SO line.
 
-`quantity × discountedUnitPriceSet` is **never** assumed equal to
-`discountedTotalSet` or to any target. Every residual preserves traceability to
-its **source Shopify line GID, tax signature, allocation evidence, and exact
-Decimal amount**. Shipping lines are written the same way against
-`source_shipping_untaxed_exact_s` (with the shipping tax signature); the tip line
-is written untaxed against `T`.
+**A. Candidate line computation (via the engine, not by hand).** Construct the
+candidate `sale.order.line` (`price_unit = originalUnitPriceSet_i`,
+`product_uom_qty = quantity_i` (`= currentQuantity_i` by §6.0), native `discount`
+%, resolved `tax_ids`); run it through the **same engine `sale.order.line` uses**
+and read the engine's actual `total_excluded_currency`, `total_included_currency`,
+the per-tax breakdown (`base_amount`/`tax_amount` per mapped tax), and the
+repartition/group evidence. **No `price_unit × qty × (1−discount)` hand formula is
+used as the base** — the engine's `total_excluded_currency` is the base.
+
+**B. Tax-excluded signatures.** Compute the residual from the **engine-returned
+excluded base**: `residual = source_line_untaxed_exact_i − engine_total_excluded`.
+Add a **quantity-1 adjustment line carrying the same tax signature** (same
+`tax_ids`), **recompute through the engine**, and require the resulting engine
+excluded base for the (line + residual) to reconcile with the Shopify source
+(§6.4a). The residual's own `price_unit` is a `float`; it is chosen so the engine
+result reconciles, not assumed to store a Decimal exactly.
+
+**C. Tax-included signatures.** **Do not** subtract the pre-tax `PAAD` target from
+a gross line amount. Instead derive the residual **gross** `price_unit` through the
+mapped tax engine: use Odoo's supported analytic net→gross path
+(`special_mode='total_excluded'`, exact for percentage price-included taxes [Fact —
+Odoo 19 source]) or, where rounding/mixed taxes make the map non-linear, a
+**deterministic bounded solver** over currency-valid `price_unit` candidates.
+**Recompute through the engine after adding the adjustment** and verify the engine
+excluded base and tax result. **Fail closed** (`financial_total_mismatch`) if **no
+currency-valid residual** yields the required excluded base *and* tax result.
+
+**D. Post-computation verification (mandatory).** After the engine recomputes the
+final (line + attributable residual), require the reconciliation of §6.4a (exact
+quantized excluded-base equality) **and** `|engine_total_included −
+(source_line_untaxed_exact_i + its tax)| ≤` the §6.4/§6.5 bound. A line/signature
+that cannot be reproduced → `financial_total_mismatch`, never absorbed by widening
+a tolerance.
+
+`quantity × discountedUnitPriceSet` is **never** assumed equal to any target.
+Every residual preserves traceability to its **source Shopify line GID, tax
+signature, allocation evidence, and exact Decimal amount**. Shipping lines are
+represented the same way against `source_shipping_untaxed_exact_s` (with the
+shipping tax signature). **No tip line is constructed** (a nonzero tip is skipped
+upstream, §6.0.6).
 
 ### 6.3 Tax-inclusive orders (`taxesIncluded = true`) (task §5)
 
-Because the product invariant `priceAfterAllDiscountsBeforeTaxesSet` is
-**pre-tax in both modes** [Fact — official], tax-inclusivity affects only two
-places — **no global `G − totalTaxSet` back-out is needed**:
+Because the product invariant `priceAfterAllDiscountsBeforeTaxesSet` is **pre-tax
+in both modes** [Fact — official], tax-inclusivity affects only two places — **no
+global `G − totalTaxSet` back-out is needed**:
 
-- **Shipping (part B):** `discountedPriceSet` is tax-**inclusive** when
+- **Shipping source (part B):** `discountedPriceSet` is tax-**inclusive** when
   `taxesIncluded=true` [Fact — official], so `source_shipping_untaxed_exact_s`
-  subtracts the shipping `TaxLine.priceSet` amounts **exactly once** (part B);
-  when `false`, it subtracts nothing.
-- **Odoo write (§6.2):** each taxed line/shipping line/residual is written with
-  `price_include_override = 'tax_included'`, so Odoo's `price_subtotal` is the
-  tax-**excluded** base — the same quantity the pre-tax source target already is.
-  The comparison `price_subtotal ↔ source_*_untaxed_exact` is therefore
-  like-against-like in both modes, and tax is **never removed twice** (the source
-  side removes shipping tax at most once in part B; the product source never had
-  tax to remove).
+  subtracts the shipping `TaxLine.priceSet` amounts **exactly once**; when
+  `false`, it subtracts nothing. This is a **source-side** Decimal computation,
+  independent of Odoo.
+- **Odoo side:** the mapped `account.tax` has `price_include_override =
+  'tax_included'` (**on the tax**, not the line), so the **engine** derives the
+  tax-excluded base internally (§6.2-C); the importer never subtracts tax on the
+  Odoo side by hand. The comparison is **engine `total_excluded` ↔
+  `source_*_untaxed_exact`** — like-against-like in both modes, and tax is **never
+  removed twice** (source removes shipping tax at most once; the product source
+  never carried tax).
 
 The **tax component** (`|amount_tax − totalTaxSet|`) and the **total** are
 compared identically in both modes. The only inclusive-mode tolerance change is
@@ -1042,8 +1177,9 @@ bound (§6.4).
 
 Rounding-event counts:
 - **`L`** = number of Odoo SO lines contributing to `amount_untaxed` (product
-  lines + shipping lines + tip line + any residual adjustment lines). Odoo rounds
-  each line's `price_subtotal` to `r` → each contributes ≤ `0.5r`.
+  lines + shipping lines + any residual adjustment lines; **no tip line** — a
+  nonzero tip is skipped, §6.0.6). Odoo rounds each line's `price_subtotal` to `r`
+  → each contributes ≤ `0.5r`.
 - **`S_ship`** = number of **Shopify shipping** tax events backed out in part B
   when `taxesIncluded=true` (`Σ_s |shipping taxLines_s|`), else `0`. Each is a
   reported `TaxLine.priceSet` rounded to `r` → ≤ `0.5r`.
@@ -1093,67 +1229,74 @@ difference means Shopify taxes `base_src` while Odoo taxes `base_odoo`, so
 is withdrawn; §6.4a now requires exact per-signature base equality after a single
 currency quantization.**
 
-Define a **tax signature** `σ` = the resolved `account.tax` set + inclusion
-posture (keyed by the canonical rate key(s) of §5 + `price_include_override`),
-plus a distinguished **untaxed** signature. For each `σ`, in `Decimal`:
-- **`base_src(σ)`** = Σ of the exact pre-tax sources
-  (`priceAfterAllDiscountsBeforeTaxesSet_i` product amounts,
-  `source_shipping_untaxed_exact_s` shipping amounts, and `T` in the untaxed
-  bucket) whose Shopify `TaxLine` rate(s) map to `σ`. Every summand is a
-  reported MoneyV2 at currency precision (or an exact Decimal difference of such),
-  so `base_src(σ)` is exact.
-- **`base_odoo(σ)`** = the **exact taxable base Odoo's tax engine applies** for
-  `σ` — the sum of each Odoo line's exact taxable amount `price_unit × qty ×
-  (1 − discount) + attributable residual`, **before** Odoo's own tax rounding.
-  (Under `round_globally` Odoo taxes the sum of these exact line bases and rounds
-  once; the displayed `amount_untaxed` is the sum of *rounded* `price_subtotal`s
-  and is **not** the quantity used here — using it would hide a base error under
-  `round_globally`.)
-- **`tax_src(σ)`** = Σ `TaxLine.priceSet` for that signature; **`tax_odoo(σ)`** =
-  Odoo's `amount_tax` attributable to that mapped tax/repartition group; the
-  mapped Odoo tax/repartition group is recorded for audit.
+Define a **tax signature** `σ` = the resolved `account.tax` set for that mapped
+Shopify tax (its inclusion posture lives on the tax's `price_include_override`),
+keyed by the **composite `shopify_tax_evidence_key` (§5.2a)** — so two same-rate
+Shopify taxes with different title/source/liability are **distinct** signatures —
+plus a distinguished **untaxed** signature. Five quantities are tracked
+**separately** per `σ` (currency-rounded equality of one does **not** imply
+equality of another):
 
-Let **`q(x) = res.currency.round(x)`** be the single currency quantization
-(Odoo's real `res_currency.round`, precision `r`).
+- **`base_src(σ)`** (source target base) = Σ of the exact pre-tax sources
+  (`priceAfterAllDiscountsBeforeTaxesSet_i`, `source_shipping_untaxed_exact_s`)
+  mapped to `σ`. Each summand is a reported MoneyV2 (or an exact Decimal
+  difference of such), so `base_src(σ)` is exact.
+- **`base_odoo(σ)`** (**engine excluded base**) = Σ of the **tax engine's
+  returned** `base_amount`/`total_excluded_currency` for `σ` over the candidate
+  lines + attributable residuals (§6.2-A/B/C) — the base Odoo's engine actually
+  taxes, **not** a hand `price_unit×qty×(1−discount)` formula and **not** the
+  displayed `amount_untaxed` (a sum of *rounded* subtotals). For a price-included
+  tax the engine has already de-grossed to this excluded base.
+- **`sub_display(σ)`** (currency-rounded display subtotal) = Σ of the engine's
+  rounded `price_subtotal` for `σ` — reported for audit only, **not** the
+  reconciliation quantity.
+- **`delta_engine(σ)`** (pre-rounding engine base delta) = the engine's own
+  `delta_total_excluded` accumulation for `σ` (Odoo tracks it), i.e. the exact
+  base the engine carries beyond the rounded display.
+- **`tax_odoo(σ)`** = the engine's `tax_amount` for `σ`; **`tax_src(σ)`** = Σ
+  `TaxLine.priceSet` for `σ`.
 
-**Requirement (exact):** for **every** signature `σ`,
+Let **`q(x) = res.currency.round(x)`** (Odoo's real `res_currency.round`, a
+`float_round` at precision `r` — returning a **float**, [Fact — Odoo source]).
 
-    q(base_src(σ)) == q(base_odoo(σ))          (exact, zero difference)
+**Base requirement (mandatory, before any tax tolerance):** for **every** `σ`,
 
-**Any** nonzero quantized base difference → `financial_total_mismatch`
-**immediately**, before the §6.5 tax tolerance is even evaluated (a structural
-per-rate base error can never be absorbed by a rounding tolerance).
+    q(base_src(σ)) == q(base_odoo(σ))          (engine excluded base, quantized)
 
-**Why exact equality is achievable (not merely aspirational).** The §6.2 residual
-mechanism writes each product/shipping line so that its Odoo exact taxable base
-equals its exact source `PAAD_i` (the residual `price_unit = PAAD_i − price_unit
-× qty × (1 − discount)` is an exact Decimal at currency precision, so Odoo stores
-it exactly and the line's exact base is exactly `PAAD_i`). Summing the same
-currency-valid `PAAD_i` on both sides gives `base_odoo(σ) = base_src(σ)` exactly.
-So a supported (eligible, non-refunded) order **always** reconciles to zero; a
-nonzero difference signals a real defect and is rejected.
+**Any** nonzero quantized difference → `financial_total_mismatch` **immediately**.
+This is **necessary but not by itself a proof of exact pre-rounding equality** —
+`q(base_src)==q(base_odoo)` can hold while the exact bases differ sub-minor-unit
+(binary `float`; the engine's `delta_engine(σ)` records that residue). So the
+tax check also carries an **engine-derived base delta** (below), rather than
+assuming zero.
 
-**Fallback `tax_delta_bound(σ)` (defined, not relied on in MVP).** If exact
-quantized equality provably **cannot** be reached for some future supported case,
-the tax comparison for that signature must add a rigorously derived
-`tax_delta_bound(σ)` **before** the rounding terms:
+**Achieving reconciliation (via the engine, §6.2).** The residual mechanism adds
+a quantity-1 adjustment carrying `σ` and **recomputes through the tax engine**
+until the engine's excluded base for `σ` reconciles to `base_src(σ)` within `q(·)`
+**and** `delta_engine(σ)` is within the engine's own rounding residue. Because
+`price_unit` is a binary `float`, the residual is **not** assumed to store a
+Decimal exactly — it is chosen so the **engine result** reconciles, and the
+result is **read back from the engine** and re-checked. If **no currency-valid
+residual** makes the engine reconcile (tax-included/rounded/mixed cases), the
+line **fails closed** (§6.2-C/D).
+
+**Tax check with an honest delta.** For each `σ`:
 
     |tax_odoo(σ) − tax_src(σ)| ≤ tax_delta_bound(σ) + 0.5r·S_σ + 0.5r·O_σ
 
-where `tax_delta_bound(σ)` is `|T_Odoo(base_odoo(σ)) − T_Odoo(base_src(σ))|` —
-the difference the **actual mapped Odoo tax function** `T_Odoo(·)` produces on the
-two bases — **not** a naive `rate × base_difference`. For **grouped, compound
-(tax-on-tax), price-included, or multi-repartition** taxes `T_Odoo(·)` is
-**non-linear** in the base, so the single-rate product is wrong; the delta must be
-computed from the mapped tax's own definition. In the MVP `tax_delta_bound(σ) =
-0` (exact equality holds); a case that would need a nonzero delta without a proven
-`T_Odoo` derivation **fails closed** (`financial_total_mismatch`). The final
-per-signature tax check therefore distinguishes three sources cleanly: **base
-mismatch** (`tax_delta_bound`, must be 0 or proven), **Shopify rounding**
-(`0.5r·S_σ`), and **Odoo rounding** (`0.5r·O_σ`).
+`tax_delta_bound(σ)` is set to **0 only when the actual engine calculation proves
+zero relevant base/tax delta** for `σ` (i.e. the engine's `delta_engine(σ) = 0`
+and `q(base_src)==q(base_odoo)`); **otherwise** it is the **actual-engine-derived**
+delta — `|tax_engine(base_odoo(σ)) − tax_engine(base_src(σ))|` computed by the
+**mapped Odoo tax function** (which for **grouped, compound (tax-on-tax),
+price-included, or multi-repartition** taxes is **non-linear**, so **never** a
+naive `rate × base_difference`) — or the signature **fails closed**. The check
+thus distinguishes **base mismatch** (`tax_delta_bound`), **Shopify rounding**
+(`0.5r·S_σ`) and **Odoo rounding** (`0.5r·O_σ`) as three separate sources.
 
-Only after every signature satisfies the exact base equality does the guard
-compare `amount_tax` to `totalTaxSet` under §6.5.
+Only after every signature satisfies the base requirement (and its
+`tax_delta_bound` is 0-proven or engine-derived) does the guard compare
+`amount_tax` to `totalTaxSet` under §6.5.
 
 ### 6.5 Tax-rounding bound — proposed conservative bound with explicit assumptions (task §9)
 
@@ -1162,13 +1305,16 @@ tolerance `tol_tax = 0.5 r (S + O)` is a **proposed conservative bound**, valid
 **only** under the following stated assumptions — it is **not** presented as an
 official Shopify guarantee:
 
-1. **Bases exactly equal** — `q(base_src(σ)) == q(base_odoo(σ))` for every
-   signature (§6.4a, exact currency-quantized equality — **not** a tolerance).
-   *(Discharged by §6.4a; this is what makes `Θ` genuinely shared below —
-   `tax_delta_bound(σ) = 0`.)*
-2. **Rates match** — the mapped Odoo rate equals the Shopify rate for each
-   signature (canonical-key mapping §5 + `rate × 100 == ratePercentage`
-   cross-check). *(Discharged.)*
+1. **Bases reconciled at the engine** — `q(base_src(σ)) == q(base_odoo(σ))` on the
+   **engine excluded base** for every signature, **and** either the engine proves
+   zero pre-rounding base delta (`tax_delta_bound(σ) = 0`) **or** the
+   engine-derived `tax_delta_bound(σ)` is carried (§6.4a). *(Discharged by §6.4a;
+   currency-rounded equality alone is not assumed to make `Θ` exactly shared — the
+   `tax_delta_bound` term absorbs any proven residual base delta.)*
+2. **Rates match** — the mapped Odoo tax's rate equals the Shopify rate for each
+   signature (composite-evidence mapping §5.2a + `rate × 100 == ratePercentage`
+   cross-check), and the composite key prevents a same-rate/different-tax
+   collision. *(Discharged.)*
 3. **Shopify-event rounding premise `[Platform-rounding premise — Inference, not
    an official guarantee]`:** each counted Shopify tax event (`TaxLine.priceSet`)
    is a rounding of its exact tax to within `0.5r`. **The Admin GraphQL schema
@@ -1183,13 +1329,16 @@ official Shopify guarantee:
 5. **Complete `O`** — every relevant group/repartition rounding event is counted
    in `O` (§6.4).
 
-**Conditional proof.** Under 1–5, let `Θ` be the exact total tax on the
-reconciled bases. Shopify's `totalTaxSet = Σ_{k=1..S} round_r(t_k)` with `Σ t_k
-= Θ` ⇒ `|totalTaxSet − Θ| ≤ 0.5 r S` (assumption 3). Odoo's `amount_tax =
-Σ_{o=1..O} round_r(g_o)` with `Σ g_o = Θ` on the **same** reconciled bases
-(assumptions 1–2, 4–5) ⇒ `|amount_tax − Θ| ≤ 0.5 r O`. Triangle inequality ⇒
-`|amount_tax − totalTaxSet| ≤ 0.5 r (S + O)`. ∎ (Conditional on the premises —
-not a claim about undocumented platform behaviour.)
+**Conditional proof.** Under 1–5, when `tax_delta_bound(σ) = 0` is engine-proven,
+let `Θ` be the exact total tax on the shared base. Shopify's `totalTaxSet =
+Σ_{k=1..S} round_r(t_k)` with `Σ t_k = Θ` ⇒ `|totalTaxSet − Θ| ≤ 0.5 r S`
+(assumption 3). Odoo's `amount_tax = Σ_{o=1..O} round_r(g_o)` with `Σ g_o = Θ` on
+the **same** base (assumptions 1–2, 4–5) ⇒ `|amount_tax − Θ| ≤ 0.5 r O`. Triangle
+inequality ⇒ `|amount_tax − totalTaxSet| ≤ 0.5 r (S + O)`. ∎ When the engine
+carries a nonzero base delta, the extra `tax_delta_bound(σ)` term (the engine's
+own tax on that delta) is added, and `Θ` is split accordingly; if neither zero
+nor an engine-derived delta can be justified, the signature **fails closed**.
+(Conditional on the premises — not a claim about undocumented platform behaviour.)
 
 The round-1 `K = distinct tax groups` bound is **withdrawn**: it omitted `S`
 entirely, so under `round_globally` (Odoo rounds once per group, `O` small) while
@@ -1290,9 +1439,10 @@ Line 10% included; **`PAAD = 100.00`** (the field is pre-tax in **both** modes,
 so **no back-out is needed on the product source**); `TaxLine.priceSet = 10.00`,
 `totalTaxSet = 10.00`, `totalPriceSet = 110.00`. `M = U_ex = 100.00`; `Total_ex =
 100.00 + 10.00 = 110.00 = totalPriceSet` ✓. Odoo
-(`price_include_override='tax_included'`, `price_unit = originalUnitPriceSet =
-110.00 incl`): Odoo backs out → `price_subtotal = 100.00 = PAAD` ✓, `amount_tax =
-10.00`. §6.4a: 10%-incl signature `base_src = 100.00 = base_odoo` ✓. `L = 1`,
+— the **mapped `account.tax`** has `price_include_override='tax_included'` (on the
+tax, not the SO line), `price_unit = originalUnitPriceSet = 110.00 incl`: the
+**engine** de-grosses → `total_excluded = price_subtotal = 100.00 = PAAD` ✓,
+`tax_amount = 10.00`. §6.4a: 10%-incl signature engine `base_odoo = 100.00 = base_src` ✓. `L = 1`,
 `S_ship = 0` → `tol_lines = 0.005`; `|100−100| = 0` ✓. `O = 1`, `tol_tax = 0.01`;
 `|10−10| = 0` ✓. **PASS** — tax removed once (by Odoo), the product source never
 carried it.
@@ -1342,27 +1492,27 @@ is captured. **No** financial construction is attempted and the historical
 quantity is **never** imported against a current-state total. No refunded-vs-
 removed distinction is needed. **HELD (policy skip), no SO.**
 
-**Example L — adversarial per-signature base delta (USD, `r = 0.01`,
-`round_globally`).** One 10% signature, 100 product lines. `base_src(σ) =
-Σ priceAfterAllDiscountsBeforeTaxesSet = 100.00` (each line 1.00, currency-valid).
-Suppose a **defective** Odoo representation left each line's exact taxable base at
-`1.004` (its `price_subtotal` rounds to `1.00`, so the displayed `amount_untaxed
-= 100.00` looks fine, but under `round_globally` the tax engine taxes the exact
-sum `Σ 1.004 = 100.40`). Then `tax_odoo = round_r(100.40 × 10%) = 10.04`, while
-`tax_src = round_r(100.00 × 10%) = 10.00`. Difference `|10.04 − 10.00| = 0.04`.
-- **Old §6.4a tolerance** allowed `|base_src − base_odoo| ≤ 0.5r·L_σ = 0.50`, and
-  the rounding-only tax envelope `0.5r(S+O) = 0.5·0.01·(100+1) = 0.505` **would
-  accept** the 0.04 — masking a **base error** (Odoo taxed 100.40, Shopify taxed
-  100.00) as if it were rounding. This is the exact inconsistency review
-  `4691408835` item 4 named.
-- **Corrected §6.4a** compares the **exact taxable bases**: `q(base_src(σ)) =
-  100.00`, `q(base_odoo(σ)) = 100.40` (the base the tax engine used) → **not
-  equal** → `financial_total_mismatch`, **fail closed**, before any tax tolerance.
-The §6.2 residual mechanism prevents this defect in the first place (it forces
-each line's exact base to `1.00 = PAAD`), so a supported order has
-`base_odoo(σ) = base_src(σ) = 100.00` exactly and passes; the corrupted variant is
-rejected. `tax_delta_bound(σ)` is **0** for the supported case and is **never**
-computed as `rate × 0.40` for a grouped/compound/included tax (§6.4a).
+**Example L — adversarial per-signature base delta, engine-framed (USD, `r =
+0.01`, `round_globally`).** One 10% signature, 100 product lines, `base_src(σ) =
+100.00` (each line 1.00). Suppose a **defective** representation left each line's
+**engine excluded base** (`total_excluded`, read from the tax engine — not a hand
+formula) at `1.004`; each rounded `price_subtotal` displays `1.00`, so the
+**displayed** `amount_untaxed = 100.00` looks fine, but the engine taxes the
+excluded base it actually carries — under `round_globally`, `Σ 1.004 = 100.40` →
+`tax_odoo = round_r(100.40 × 10%) = 10.04` vs `tax_src = 10.00`, diff 0.04.
+- **Old §6.4a tolerance** `|base_src − base_odoo| ≤ 0.5r·L_σ = 0.50` plus the
+  rounding envelope `0.5r(S+O) = 0.505` **would accept** the 0.04 — masking a
+  **base error** as rounding (review `4691408835` item 4).
+- **Corrected §6.4a** compares the **engine excluded bases**: `q(base_src) =
+  100.00` vs `q(base_odoo) = 100.40` → **not equal** → `financial_total_mismatch`,
+  fail closed, before any tax tolerance. And even if `q(base_odoo)` had *rounded*
+  to 100.00 while the engine's `delta_engine(σ)` still carried 0.40, the tax check
+  would add the **engine-derived** `tax_delta_bound(σ)` (the mapped tax's own
+  result on that delta), not treat it as zero (review `4691931971` item 5).
+For a **supported** order the §6.2 engine-recompute forces the engine excluded
+base for (line + residual) to reconcile to `base_src(σ)` and `delta_engine(σ)→0`,
+so it passes; `tax_delta_bound(σ)` is **0 only when the engine proves it**, and is
+**never** computed as `rate × 0.40` for a grouped/compound/included tax.
 
 **Example M — shipping refund with unchanged product (task §4).** Product lines
 all `currentQuantity == quantity` (product gate §6.0.1 **passes**). Shipping line:
@@ -1424,9 +1574,10 @@ represented — but never to add/subtract a net amount.
   already inside `discountedPriceSet` (§6.1-B) — **nothing is subtracted twice**
   because nothing is subtracted at all in the ledger.
 - **Tax inheritance for taxable residuals:** a residual against a **taxable**
-  source line **inherits that line's `tax_ids` and `price_include_override`** —
-  never a no-tax line for a taxable source — so Odoo reduces the same taxable base
-  Shopify taxed (Example E).
+  source line **inherits that line's `tax_ids`** (and thereby the mapped
+  `account.tax`'s `price_include_override` — inclusion lives on the tax, not the
+  SO line) — never a no-tax line for a taxable source — so the engine reduces the
+  same taxable base Shopify taxed (Example E).
 - **Separate buckets by tax signature:** residuals sharing an identical signature
   (same `tax_ids` + inclusion) may be combined into **one negative line per
   signature/bucket**, per-source-line allocation preserved in evidence.
@@ -1594,9 +1745,10 @@ residual; does NOT overload `financial_total_mismatch`):**
 **Permitted policy skips (closed, enumerated set) [Proposed Task 012 decision]:**
 exactly — (1) divergent presentment currency (`skip_reason =
 "divergent_presentment_currency"`); (2) **nonzero** `currentTotalDutiesSet`
-**amount** (`unsupported_duties`, [Deferred / non-MVP] — routes on the Decimal
-amount, **not** on the field being non-null; a present-but-zero duties MoneyBag is
-**not** skipped, §6.0.4); (3) `test: true` when `order_import_include_test` is
+**amount** (`unsupported_duties`, [Deferred / non-MVP] — evaluated **first** in the
+duty/fee precedence, routes on the Decimal amount, **not** on the field being
+non-null; a present-but-zero duties MoneyBag is **not** skipped, §6.0.3/§6.0.4);
+(3) `test: true` when `order_import_include_test` is
 `False` (`test_order_excluded`); (4) order already cancelled at first import
 (`order_pre_cancelled`); (5) any line where `currentQuantity != quantity`, or an
 order where `totalPriceSet != currentTotalPriceSet` / `totalTaxSet !=
@@ -1604,10 +1756,12 @@ currentTotalTaxSet` (`refunded_or_removed_quantity`, §6.0.1); (6) any shipping
 line with `isRemoved == true` or `currentDiscountedPriceSet != discountedPriceSet`
 or shipping inconsistent with `currentShippingPriceSet`
 (`refunded_or_removed_shipping`, §6.0.2); (7) **nonzero**
-`currentTotalAdditionalFeesSet` amount (`unsupported_additional_fees`, §6.0.3);
+`currentTotalAdditionalFeesSet` amount **when duties are zero**
+(`unsupported_additional_fees`, §6.0.3 — duty-first precedence);
 (8) **nonzero** `totalCashRoundingAdjustment.paymentSet`/`refundSet`
-(`unsupported_cash_rounding`, §6.0.5). No other policy skip exists; all eight are
-decided by the handler from the header/first-page data **before any Shopify
+(`unsupported_cash_rounding`, §6.0.5); (9) **nonzero** `totalTipReceivedSet`
+(`unsupported_tip_tax_treatment`, §6.0.6). No other policy skip exists; all nine
+are decided by the handler from the header/first-page data **before any Shopify
 mutation or SO write** (there are none — the importer is read-only).
 
 **Mechanism — reconsidered against the corrected CORE-R2 dispatcher (task §10)
@@ -1875,7 +2029,7 @@ acceptance is claimed here** — this is the required matrix.
 | 10 | protected / no-PII order | fallback path; no invented PII; audit marker |
 | 11 | separate billing/shipping addresses | two child partners (`invoice`/`delivery`); normalized-tuple dedup; parent unmutated |
 | 12 | company customer | person-only; `is_company` unset; `company` captured, no company partner created |
-| 13 | taxes included | `price_include_override='tax_included'`; guard passes |
+| 13 | taxes included | mapped **`account.tax`** carries `price_include_override='tax_included'` (not the SO line); engine de-grosses; guard passes |
 | 14 | taxes excluded | `price_include_override='tax_excluded'`; guard passes |
 | 15 | multiple tax rates | each rate mapped/matched; per-group `O`; guard passes |
 | 16 | mixed taxed/untaxed | per-signature residual buckets reconcile; tax component passes |
@@ -1884,7 +2038,7 @@ acceptance is claimed here** — this is the required matrix.
 | 19 | high-value discount | faithful-% fails → exact tax-preserving adjustment line; guard passes (Example D) |
 | 20 | tax-preserving residual line | residual inherits source `tax_ids`/inclusion; recomputed tax matches `totalTaxSet` |
 | 21 | shipping | one SO line per shipping node; its `taxLines` mapped; counted in `L` |
-| 22 | tip | one `"Shopify Tip"` line when `totalTipReceivedSet>0`; no tax |
+| 22 | nonzero tip fails closed | `totalTipReceivedSet != 0` → `skipped` `unsupported_tip_tax_treatment`; **no SO, no "Shopify Tip" line**; zero tip proceeds (§6.0.6) |
 | 23 | zero-decimal currency (JPY) | `r=1.0`; guard passes (Example B) |
 | 24 | three-decimal currency (BHD) | `r=0.001`; clean case passes; risk case flagged; empirical-check note |
 | 25 | divergent currency | `skipped` (policy); no SO; both currencies+moneys captured; not `financial_total_mismatch` |
@@ -1905,7 +2059,7 @@ acceptance is claimed here** — this is the required matrix.
 | + | duties (currentTotalDutiesSet) | `skipped` (policy); no SO |
 | + | test order (`test:true`) | `skipped` unless `order_import_include_test`; no SO |
 | + | unset confirmation policy | `odoo_validation_configuration` hold; readiness warning |
-| 38 | taxesIncluded=true ordinary | product `PAAD` is pre-tax (no product back-out); Odoo `price_include_override='tax_included'`; guard passes (Example G) |
+| 38 | taxesIncluded=true ordinary | product `PAAD` is pre-tax (no product back-out); mapped **`account.tax`** has `price_include_override='tax_included'`; engine de-grosses; guard passes (Example G) |
 | 39 | taxesIncluded=true + order discount | `PAAD` already after discount + pre-tax; residual (if any) inherits inclusion; tax not removed twice (Example H) |
 | 40 | many-small-lines global-rounding counterexample | Example I: conditional `tol_tax=0.5r(S+O)` accepts `0.16` divergence; `K=#groups` would false-reject; missing line still caught by lines/§6.4a |
 | 41 | multiple taxes on one line | each `TaxLine` = an `S` event; each Odoo tax = an `O` event; guard passes |
@@ -1932,7 +2086,7 @@ acceptance is claimed here** — this is the required matrix.
 | 62 | mixed eligible/ineligible order + order-level cross-check | one ineligible line holds the **whole** order; `totalPriceSet ≠ currentTotalPriceSet` independently triggers the skip; **no partial SO ever written** |
 | 63 | per-signature base shift (equal global untaxed) | value shifted taxed→untaxed / rate→rate → §6.4a **rejects before** the tax tolerance; global `amount_untaxed` match is not sufficient (Example E) |
 | 64 | shipping tax-inclusive back-out | `taxesIncluded=true` shipping `discountedPriceSet` backs out its `taxLines` once → exact pre-tax shipping source; `S_ship` counted |
-| 65 | tip untaxed + total self-check backstop | tip line untaxed; a taxed-tip fixture (`totalTaxSet` exceeds accounted tax) → `financial_total_mismatch` (fail closed, no silent import) |
+| 65 | zero-tip proceeds / nonzero-tip skip | `totalTipReceivedSet == 0` imports normally; nonzero → `unsupported_tip_tax_treatment` (no reliance on the rounding tolerance to hide a taxed tip) |
 | 66 | query contains every guard field | AST/schema check: the header query requests `currentTotalPriceSet`, `currentTotalTaxSet`, `currentShippingPriceSet`, `currentTotalAdditionalFeesSet`, `currentTotalDutiesSet`, `totalCashRoundingAdjustment`, `additionalFees`, and per-shipping `isRemoved`/`currentDiscountedPriceSet` — no gate references an unqueried field |
 | 67 | fully refunded shipping | `currentDiscountedPriceSet == 0 ≠ discountedPriceSet` → `skipped` `refunded_or_removed_shipping`; no SO |
 | 68 | partially refunded shipping | `currentDiscountedPriceSet < discountedPriceSet` → `skipped` `refunded_or_removed_shipping`; no SO |
@@ -1951,6 +2105,28 @@ acceptance is claimed here** — this is the required matrix.
 | 81 | zero cash rounding | `paymentSet == refundSet == 0` → import proceeds (common case) |
 | 82 | nonzero cash rounding | `paymentSet` or `refundSet` != 0 → `skipped` `unsupported_cash_rounding`; never a generic `financial_total_mismatch` |
 | 83 | per-signature base-delta adversarial | base_src(σ) and base_odoo(σ) differ within the old §6.4a allowance but `S`/`O` rounding terms alone are insufficient (base error, not rounding); the old tolerance would wrongly accept; **exact quantized equality (§6.4a) fails closed** (Example L) |
+| 84 | all three connections edges/cursor | header first page + all three page queries use `edges{cursor node}` for `lineItems`/`shippingLines`/`discountApplications`; header/page shapes identical; dedup by edge cursor |
+| 85 | header/page shape equality | the same connection read in the header first page and a page query yields identical node shape; a node re-appearing across the two is caught by edge-cursor identity |
+| 86 | duty-only order reaches duty reason | `currentTotalDutiesSet != 0`, `currentTotalAdditionalFeesSet == d` (fees include the duty) → `unsupported_duties` (duty-first precedence — reachable) |
+| 87 | non-duty fee only | duties zero, `currentTotalAdditionalFeesSet != 0` → `unsupported_additional_fees` |
+| 88 | duties + additional fees together | both nonzero → `unsupported_duties` (wins), evidence states duties present + composition not inferred; no subtraction |
+| 89 | both fee totals present-zero | duties 0 and fees 0 → import proceeds |
+| 90 | duty nonzero, additional total null | duty amount routes `unsupported_duties`; null fee total treated as zero |
+| 91 | additional total nonzero, duty null | fees route `unsupported_additional_fees`; null duty treated as zero |
+| 92 | fee-name privacy | ordinary logs carry only count/amount/currency/reason; raw `AdditionalFee.name` redacted+truncated (`ADDITIONAL_FEE_NAME_MAX_LEN`), capped at `ADDITIONAL_FEES_EVIDENCE_LIMIT`, SEC-1-tiered; overflow records count/truncation only |
+| 93 | two 5% taxes, different titles | distinct `shopify_tax_evidence_key` (title differs) → not collapsed; each maps independently or holds |
+| 94 | same title/rate, different source | distinct key (source differs); null source uses the `∅` sentinel, distinct from empty string |
+| 95 | channelLiable true/false/null | tri-state key component; null (unknown liability) never equals false |
+| 96 | rate-collision under old key | two Shopify tax lines that collided under `(rate, price_include)` now stay distinct under the composite key → correct Odoo tax each |
+| 97 | correct total, wrong Odoo tax candidate | a same-rate different-tax candidate is **ambiguous → held**; never silently mapped (right total, wrong account rejected) |
+| 98 | tax-excluded residual via engine | engine `total_excluded` drives the residual; qty-1 adjustment recomputed through the engine; base reconciles |
+| 99 | tax-included residual via engine | residual gross derived through the mapped engine (`special_mode='total_excluded'`/bounded solver), **not** gross/pre-tax subtraction; engine recompute verifies excluded base + tax |
+| 100 | binary-float boundary | a Decimal target not representable exactly as a float is handled via the engine reconcile + `tax_delta_bound`, never assumed stored exactly |
+| 101 | sub-minor-unit pre-rounding delta, equal rounded bases | `q(base_src)==q(base_odoo)` but `delta_engine(σ) != 0` → the engine-derived `tax_delta_bound` is applied, not zero |
+| 102 | compound/group/base-affecting/multi-repartition tax | `tax_delta_bound` follows the actual mapped tax function; never `rate × base_delta`; `O` counts each rounding event |
+| 103 | no valid residual solution | inclusive/rounded case where no currency-valid residual yields the required excluded base + tax → `financial_total_mismatch`, fail closed |
+| 104 | same displayed subtotal, different engine base | two candidates with equal rounded `price_subtotal` but different engine `total_excluded` → the engine base (not the display) governs; base error caught |
+| 105 | exact engine recomputation success | supported order: engine recompute of (line+residual) reconciles excluded base + tax; guard passes |
 
 Source-level guards (AST) — **REBUILT 2026-07-14 (review `4691067575` item 4;
 Task 012 has four query constants and multiple paginated calls, not one
@@ -1960,9 +2136,12 @@ importer; every query **result is consumed inside its `execute_business`
 context** (no result escapes the `with` body); **no Odoo business write begins
 until all four query phases complete**; a disconnect between pages blocks the
 next page; a torn read leaves no SO/binding; **no explicit main-cursor commit**
-occurs. Plus: zero mutation strings; zero core/product file edits. Runtime: full
-three-suite Odoo.sh run green before merge (SRR-06), concurrency caveat carried
-verbatim (architecture §5.12).
+occurs; **all three connections use the `edges{ cursor node }` shape** (no
+`nodes`-only connection read; the header first page and page query for each of
+`lineItems`/`shippingLines`/`discountApplications` have identical shape — review
+`4691931971` item 1). Plus: zero mutation strings; zero core/product file edits.
+Runtime: full three-suite Odoo.sh run green before merge (SRR-06), concurrency
+caveat carried verbatim (architecture §5.12).
 **Live-Shopify: none required** (read-only; VAL-B2 independent).
 
 ---
@@ -1988,10 +2167,10 @@ states that **no live Shopify request occurs during implementation or its tests*
 ## 17. Adversarial self-critic (task §13/§18) — re-run after each correction round
 
 Strict adversarial review re-run against the review-`4690680028`,
-review-`4691067575` **and** review-`4691408835` vectors; each confirmed problem is
-corrected in this closure (and the packet). Rows 1–21 = round-2 vectors (updated
-where later rounds superseded the mechanism); rows 22–30 = round-3 vectors; rows
-31–39 = round-4 (review `4691408835`) vectors.
+`4691067575`, `4691408835` **and** `4691931971` vectors; each confirmed problem is
+corrected. Rows 1–21 = round-2 vectors (updated where later rounds superseded the
+mechanism); rows 22–30 = round-3; rows 31–39 = round-4; rows 40–49 = round-5
+(review `4691931971`).
 
 | # | Risk | Verdict | Resolution |
 | --- | --- | --- | --- |
@@ -2033,7 +2212,17 @@ where later rounds superseded the mechanism); rows 22–30 = round-3 vectors; ro
 | 36 | zero duty incorrectly skipped | **CONFIRMED → FIXED** | duties route on the **nonzero amount**, not on the field being non-null; a present-but-zero duties MoneyBag imports (§6.0.4, fixture 79) |
 | 37 | cash rounding omitted | **CONFIRMED → FIXED** | `totalCashRoundingAdjustment` queried; nonzero payment/refund → `unsupported_cash_rounding` fail-closed; inclusion in `totalPriceSet` logged as undocumented/Open (§6.0.5, fixture 82) |
 | 38 | tax-base difference absorbed by rounding tolerance | **CONFIRMED → FIXED** | §6.4a now requires **exact** `q(base_src)==q(base_odoo)` per signature before any rounding bound; the round-3 `≤0.5r(L+S_ship)` tolerance withdrawn (Example L) |
-| 39 | compound/group-tax delta calculated naively | **CONFIRMED → FIXED** | `tax_delta_bound(σ)` (0 in MVP) is defined via the **actual mapped Odoo tax function**, never `rate × base_difference`, for grouped/compound/included/multi-repartition taxes (§6.4a) |
+| 39 | compound/group-tax delta calculated naively | **CONFIRMED → FIXED** | `tax_delta_bound(σ)` is defined via the **actual mapped Odoo tax function**, never `rate × base_difference`, for grouped/compound/included/multi-repartition taxes (§6.4a) |
+| 40 | query shape that cannot support the dedup assertions | **CONFIRMED → FIXED** | **all three** connections (lineItems/shippingLines/discountApplications) use `edges{cursor node}` in header + page queries; dedup keys on edge cursor + typed secondary identity (§4.1/§4.2) |
+| 41 | duty reason unreachable | **CONFIRMED → FIXED** | duty-first precedence: `d != 0 → unsupported_duties` **before** the additional-fee reason; duty-only order reaches the duty reason (§6.0.3) |
+| 42 | merchant free text (`AdditionalFee.name`) leaking to logs | **CONFIRMED → FIXED** | name is potentially-PII: ordinary logs carry only count/amount/currency/reason; names redacted+truncated (`ADDITIONAL_FEE_NAME_MAX_LEN`), capped (`ADDITIONAL_FEES_EVIDENCE_LIMIT`), SEC-1-tiered (§6.0.3) |
+| 43 | same-rate distinct taxes silently collapsed | **CONFIRMED → FIXED** | composite `shopify_tax_evidence_key` (rate+title+source+channelLiable+inclusion); rate-only key withdrawn; collision → ambiguous hold (§5.2a) |
+| 44 | correct total with wrong Odoo tax/account | **CONFIRMED → FIXED** | a same-rate different-tax candidate is ambiguous → held; one evidence key can never silently change its Odoo tax (§5.2, fixture 97) |
+| 45 | price-included residual using the wrong basis | **CONFIRMED → FIXED** | inclusive residual derived **through the mapped tax engine** (`special_mode='total_excluded'`/bounded solver), never gross/pre-tax subtraction; engine recompute verifies (§6.2-C) |
+| 46 | rounded base equality hiding a tax delta | **CONFIRMED → FIXED** | `q(base_src)==q(base_odoo)` is necessary but not sufficient; the engine-derived `tax_delta_bound(σ)` (from `delta_engine`) is carried, 0 only when engine-proven (§6.4a) |
+| 47 | Odoo Float described as exact Decimal storage | **CONFIRMED → FIXED** | money fields are binary `float`; the residual is chosen so the **engine result** reconciles (read back + re-checked), never assumed to store a Decimal exactly (§6.2) |
+| 48 | small taxed tip accepted inside tolerance | **CONFIRMED → FIXED** | nonzero `totalTipReceivedSet` → `unsupported_tip_tax_treatment` fail-closed; no untaxed Tip line; `T=0` in the ledger (§6.0.6/§6.1-C) |
+| 49 | accidental implementation authorization | NOT-A-PROBLEM | closure + packet deny gate/code/live-call; prompt unusable-until-gate; SRR-03 OPEN; capability prerequisites unmet (§0/§16/§19) |
 
 **Rejected-approach guardrails re-checked (all revisit conditions UNMET, none
 re-proposed):** RA-006 (name/fuzzy matching — email-only kept), RA-010

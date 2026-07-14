@@ -8,6 +8,46 @@
 > control-room action and is **not** modified here (that file is outside this
 > session's allowed-files list).
 
+## 0-d. Round-5 correction — 2026-07-14 (control-room review `4691931971`)
+
+A fifth REVISE (docs-only, same five files; PR #159 stays draft/unmerged):
+
+1. **One executable connection shape** — `lineItems`/`shippingLines`/
+   `discountApplications` all use `edges{ cursor node }` in the header first page
+   and every page query (no `nodes`-only). Secondary identity: `LineItem.id`
+   (non-null), `ShippingLine.id` (nullable), `DiscountApplication` `__typename`+
+   `index` (interface has no id). (closure §4.1/§4.2/§4.2a)
+2. **Duty-first fee/duty precedence** — additional fees can include duties, so
+   `currentTotalDutiesSet != 0 → unsupported_duties` is evaluated **before** the
+   additional-fee reason; a duty-only order now reaches the duty reason; no
+   subtraction of duties from fees; both-present → duty reason with "composition
+   not inferred". (closure §6.0.3)
+3. **`AdditionalFee.name` is potentially-PII** — not a safe category label:
+   ordinary logs carry only count/amount/currency/reason; names are
+   redacted/truncated (`ADDITIONAL_FEE_NAME_MAX_LEN`), capped
+   (`ADDITIONAL_FEES_EVIDENCE_LIMIT`), SEC-1-tiered; the list is a plain
+   `[AdditionalFee!]!` (no `first:`), read whole and bounded application-side.
+   (closure §6.0.3)
+4. **Composite `shopify_tax_evidence_key`** — rate + normalized title + null-safe
+   source + `channelLiable` tri-state + inclusion, keyed `UNIQUE(store_id,
+   shopify_tax_evidence_key)`; the rate-only key is withdrawn (it collapsed
+   distinct same-rate taxes → correct total, wrong tax/account); the same identity
+   is queried on line/shipping/order tax lines; collisions/ambiguity hold.
+   (closure §5.2a)
+5. **Residual/tax-base rebuilt around the actual Odoo 19 tax engine** — five false
+   claims withdrawn (Float stores Decimal exactly; rounded==pre-rounding;
+   `price_include_override` on the SO line; inclusive residual by gross
+   subtraction; `tax_delta_bound` auto-zero). Now: `price_include_override` on
+   `account.tax`; candidate line + engine `total_excluded`/`total_included`/
+   breakdown; excluded-signature residual from the engine base; **inclusive
+   residual derived through the engine** (`special_mode='total_excluded'`/bounded
+   solver, never gross subtraction); per-signature reconciliation on the **engine
+   excluded base**; `tax_delta_bound` **0 only when the engine proves it**, else
+   engine-derived or fail closed; binary-float honesty. (closure §6.2/§6.4a)
+6. **Nonzero tip fails closed** — `unsupported_tip_tax_treatment`; the untaxed
+   Tip line is removed from MVP (`T = 0`), because a small taxed-tip difference
+   could hide inside the rounding envelope. (closure §6.0.6/§6.1-C)
+
 ## 0-c. Round-4 correction — 2026-07-14 (control-room review `4691408835`)
 
 A fourth REVISE (docs-only, same five files; PR #159 stays draft/unmerged),
@@ -191,9 +231,15 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
 - Shopify three-decimal-currency rounding policy (undocumented) → the `tol_tax`
   platform-rounding premise fails closed until a named authorized dev-store
   empirical check confirms the convention.
-- **Tip tax treatment is undocumented in the Admin API** (no `TipLine`); "tips
-  untaxed" is an inference backstopped by the total self-check → dev-store
-  confirmation before a taxed-tip store.
+- **Tip tax treatment is undocumented in the Admin API** (no `TipLine`) → round-5
+  makes a **nonzero tip fail closed** (`unsupported_tip_tax_treatment`); a future
+  store policy needs official/live evidence + an explicit mapping before tips
+  import.
+- **Inclusive-tax residual solver bound:** Odoo 19's engine gives an exact
+  analytic net→gross path for percentage price-included taxes
+  (`special_mode='total_excluded'`); the rounded/mixed-tax case needs a bounded
+  deterministic solver whose exact iteration bound is a build-time detail (fail
+  closed if no currency-valid residual reconciles).
 - **No LineItem field distinguishes refunded from removed units** — not needed
   (the §6.0 gate fails closed on the aggregate), logged for rationale.
 - **Whether a nonzero `totalCashRoundingAdjustment` is included in
@@ -221,14 +267,19 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   bound §6.5, tip/shipping §6.1-B/C, guards §15, deps §0.1; **round-4** current-
   state query fields §4.1, shipping gate §6.0.2 + edge-cursor §4.2a, fees/duties/
   cash-rounding gates §6.0.3–§6.0.5, exact base equality §6.4a, Examples L/M/N,
-  fixtures 66–83, §17 rows 31–39, base alignment §0.2)
+  fixtures 66–83, §17 rows 31–39, base alignment §0.2; **round-5** all-three
+  edges/cursor §4.1/§4.2, duty-first + fee-privacy §6.0.3, composite tax key
+  §5.2a, tip gate §6.0.6, tax-engine rebuild §6.2/§6.4a, fixtures 84–105, §17 rows
+  40–49)
 - `docs/07-implementation-plan/task-012-decision-closure-handoff.md`
 - `docs/07-implementation-plan/task-012-order-import-implementation-packet.md`
   (money→Char, canonical ledger, Option-A pagination, cost posture, tax-mapping
   safety, conditional skip seam, locked prompt; round-3 exact-line-total
   source/refund gate/per-signature/conditional `tol_tax`/`execute_business`
-  guards; **round-4** current-state query fields, shipping gate + edge-cursor,
-  fee/duty/cash-rounding gates, exact base equality, MERGED PR-#158 deps)
+  guards; round-4 current-state query fields, shipping gate + edge-cursor,
+  fee/duty/cash-rounding gates, exact base equality, MERGED PR-#158 deps;
+  **round-5** all-three edges/cursor, duty-first + fee-privacy, composite tax key,
+  tip fail-closed, tax-engine residual rebuild, locked prompt)
 - `docs/07-implementation-plan/task-012-order-import-proposed.md`
 - `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-27/56/64
   proposed-resolution status + links only — **not** marked accepted)
@@ -295,6 +346,26 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   needed the `current*` and per-shipping-line fields, not just the originals.
   *Lesson: for money gates, test the Decimal amount, and read current-state vs
   before-returns semantics from the field descriptions.*
+- **One executable query shape, everywhere.** The field list and the pagination
+  contract drifted apart (`nodes` in one, `edges{cursor}` in the other). *Lesson:
+  pick the shape the dedup rules require (edge cursor) and write it identically in
+  the header first page and every page query — a mixed shape is not runnable.*
+- **Reconcile against the real engine, not a hand formula.** The base/residual
+  math assumed `price_include_override` on the SO line, exact Decimal storage in a
+  Float, and net→gross by subtraction — all false. Reading the Odoo 19 tax-engine
+  source (`_add_tax_details_in_base_line`, `total_excluded`, the price-included
+  de-grossing, `special_mode='total_excluded'`) replaced guesses with the actual
+  API. *Lesson: when reconciling to another system's computed value, drive that
+  system's own engine and read its returned base/tax back — never re-derive it.*
+- **A rate is not a tax identity; free text is not a category.** A rate-only tax
+  key collapsed distinct taxes (right total, wrong account); `AdditionalFee.name`
+  was treated as a safe label though it is arbitrary merchant text. *Lesson: key on
+  all stable evidence (title/source/liability), fail closed on collisions, and
+  treat merchant free text as potentially-PII (redact/bound).*
+- **Don't lean on a tolerance to cover an unknown.** A nonzero tip was imported
+  untaxed, trusting the rounding envelope to catch a taxed tip — but a small taxed
+  difference fits inside it. *Lesson: when a component's tax treatment is unproven,
+  fail closed rather than hoping the total guard absorbs it.*
 
 ## 8. Exact next-session prompt (control-room to issue)
 
@@ -310,22 +381,25 @@ claude/task-012-decision-closure-mb88sn → Shopify-connector):
 Decide per D-012 item: accept / revise / reject. In particular rule on:
 (a) money snapshots as Char/exact-decimal-string (not Float/Monetary);
 (b) the exact per-line source `priceAfterAllDiscountsBeforeTaxesSet` (not
-    quantity × discountedUnitPriceSet), the canonical ledger U_ex = M + H + T
-    (always tax-exclusive; shipping tax backed out once when inclusive), and the
-    **exact currency-quantized per-tax-signature base equality** (§6.4a — the
-    round-3 tolerance withdrawn) with the conditional bound tol_tax = 0.5r(S+O),
-    its labelled platform-rounding premise, and the `tax_delta_bound` fallback;
-(c) the four-query Option-A contract with **every current-state guard field in the
-    query** (currentTotal*/currentShipping/additionalFees/cashRounding), the
-    **shipping refund/removal gate** + **edge-cursor pagination for the nullable
-    ShippingLine.id**, the `execute_business` AST guards, and provisional page
-    sizes + cost telemetry;
-(d) MBQ-27 mapped/matched-account.tax-under-the-guard with the §5.5 tax-mapping
-    safety (company match, ambiguous hold, fiscal-position validation);
-(e) the closed policy-skip set — divergent currency, refunded/removed **product**,
-    refunded/removed/modified **shipping**, **nonzero** duties / additional fees /
-    cash rounding, test, pre-cancelled — via the conditional/coordinated core skip
-    seam (terminal-state-respect guard recommended).
+    quantity × discountedUnitPriceSet), the canonical ledger U_ex = M + H (T=0),
+    the Odoo representation **through the actual tax engine** (engine
+    total_excluded; price_include_override on account.tax; inclusive residual via
+    the engine, not gross subtraction; binary-float honesty), the per-signature
+    reconciliation on the **engine excluded base** with the **engine-derived
+    `tax_delta_bound`** (0 only when engine-proven), and the conditional tol_tax =
+    0.5r(S+O) with its labelled platform-rounding premise;
+(c) the four-query Option-A contract with **all three connections in one
+    `edges{ cursor node }` shape**, every current-state/tax-evidence guard field in
+    the query, the shipping refund/removal gate, the `execute_business` AST guards,
+    and provisional page sizes + cost telemetry;
+(d) MBQ-27 mapped/matched-account.tax under the guard with the §5.5 safety **and
+    the composite `shopify_tax_evidence_key`** (rate+title+source+channelLiable+
+    inclusion; collision → hold — a rate-only key gives correct total/wrong tax);
+(e) the closed policy-skip set — divergent currency; refunded/removed **product**;
+    refunded/removed/modified **shipping**; **duty-first** duties then additional
+    fees (fee-name potentially-PII); **nonzero** cash rounding; **nonzero tip**
+    (`unsupported_tip_tax_treatment`); test; pre-cancelled — via the
+    conditional/coordinated core skip seam (terminal-state-respect guard recommended).
 
 Do NOT open the order-domain gate or issue the locked prompt until the
 CAPABILITY prerequisites (§0.1 / §4) hold in Shopify-connector — SRR-03 CLOSED;
