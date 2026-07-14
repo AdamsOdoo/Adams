@@ -41,7 +41,8 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
     binding model, plus, on a confident no-match, a new res.partner. It
     never touches an order, product, inventory, or fulfillment model,
     and it never issues a Shopify mutation call, only
-    shopify.connector.api.client.execute() with a query operation.
+    shopify.connector.api.client.execute_business() with a query
+    operation.
 
     Match-key priority (final prompt §8.1, D1): existing binding, then
     email, then manual review. Email is the sole automatic match key --
@@ -96,40 +97,68 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
     def import_customer_sync(self, store, shopify_customer_gid, job=False):
         """Fetch one Shopify customer payload and import/match it.
 
-        The only method in this file that calls the Shopify API client --
-        always with `CUSTOMER_IMPORT_QUERY` (a `query` operation, never a
-        `mutation`). `_apply_import()` below contains the actual
-        matching/creation logic and takes a plain, already-normalized
-        payload dict, so it can be unit-tested directly against a fake/
-        stub payload with no API-client involvement at all.
+        The only method in this file that calls the Shopify API client.
+        The single read-only Admin GraphQL customer call
+        (`CUSTOMER_IMPORT_QUERY`, a `query` operation, never a
+        `mutation`), the payload normalization, and the entire local
+        matching/creation reconciliation all run inside **one** CORE-R2
+        `execute_business()` admission lease (AR-047): the connector-owned,
+        admission-gated context manager on
+        `shopify.connector.api.client`. That single lease covers the
+        network call (issued in `__enter__`), `_normalize_payload()`, the
+        full `_apply_import()` reconciliation, and a final
+        `self.env.flush_all()` that materializes the reconciliation SQL in
+        the current transaction; the lease releases only when the `with`
+        block exits, after reconciliation. There is **no explicit commit**
+        -- the outer dispatcher/RPC transaction boundary commits naturally
+        after the handler returns -- and **no legacy value-returning
+        `execute()` fallback path remains**.
 
-        `job`, when provided by the dispatcher path
-        (`_handle_customer_import_sync()` below), is threaded through
-        only so an unresolved country/state code can append an
-        informational job-log note (§8.3) -- optional and otherwise
-        unused; direct calls with no `job` behave exactly as before.
+        `_apply_import()` below contains the actual matching/creation
+        logic and takes a plain, already-normalized payload dict, so it
+        can still be unit-tested directly against a fake/stub payload with
+        no API-client involvement at all.
 
-        A `ShopifyClientError` raised by `execute()` is re-raised as
+        `job`, supplied by the dispatcher path
+        (`_handle_customer_import_sync()` below), is now load-bearing in
+        two ways: it is the admission credential `execute_business()`
+        requires (a business Shopify call is refused at admission without
+        a valid job), and it is the thread through which an unresolved
+        country/state code can append an informational job-log note
+        (§8.3).
+
+        A `ShopifyClientError` raised at admission (a missing/empty
+        credential) or by the transport/normalization is re-raised as
         `JobHandlerError(exc.error_class, exc.reason,
-        exc.technical_detail)`, preserving its DEC-009 error class
-        through the dispatcher's own `_route_failure()`.
+        exc.technical_detail)`, preserving its DEC-009 error class through
+        the dispatcher's own `_route_failure()`. A fail-closed admission
+        refusal (`ShopifyQuiescedError`) is deliberately **not** caught
+        here: it propagates uncaught so the CORE-R2 dispatcher can route
+        it through the disconnect-quiescence (SRR-03) contract.
         """
+        client = self.env['shopify.connector.api.client']
         try:
-            result = self.env['shopify.connector.api.client'].execute(
-                store, CUSTOMER_IMPORT_QUERY,
+            with client.execute_business(
+                job, store, CUSTOMER_IMPORT_QUERY,
                 variables={'id': shopify_customer_gid},
-            )
+            ) as result:
+                payload = self._normalize_payload(result)
+                outcome = self._apply_import(store, payload, job=job)
+                # Materialize the pending reconciliation SQL in the current
+                # transaction before the lease releases on context exit --
+                # a flush, never a commit (the dispatcher/RPC boundary
+                # commits later, after this handler returns).
+                self.env.flush_all()
+                return outcome
         except ShopifyClientError as exc:
             raise JobHandlerError(
                 exc.error_class, exc.reason, exc.technical_detail,
             ) from exc
-        payload = self._normalize_payload(result)
-        return self._apply_import(store, payload, job=job)
 
     @api.model
     def _normalize_payload(self, result):
-        """Raw `execute()` GraphQL response -> the internal payload dict
-        shape `_apply_import()` consumes.
+        """Raw `execute_business()` GraphQL response -> the internal
+        payload dict shape `_apply_import()` consumes.
 
         Reads only the fields `CUSTOMER_IMPORT_QUERY` requests. A
         `defaultAddress.company` value, if Shopify ever returned one,
