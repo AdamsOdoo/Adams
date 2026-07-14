@@ -16,6 +16,46 @@ Race A. The genuine tests are authored + compile but are **not executed** in
 this GitHub session (no PostgreSQL/Odoo) and are not claimed green. No
 core/sale/live change; Prompt E blocked; SRR-03 OPEN.
 
+**Revision 3 (control-room review `4696396464`, REVISE) — product test/evidence
+correction only.** The production importer stays **byte-for-byte frozen**. Five
+targeted fixes to `TestProductCallSiteLifecycleGenuine`, all inside the same
+three allowed files:
+1. **Runtime tag** — imported `tagged` and decorated the class
+   `@tagged('post_install', '-at_install', '-standard',
+   'shopify_connector_product_callsite_lifecycle')` so it is excluded from the
+   standard CI suite and runs only on its explicit tag. The exact tag is echoed
+   in the validation doc (§7.3, §8), this handoff, the PR body, and the runtime
+   command.
+2. **Zero-residue master-data cleanup** — a successful genuine import commits
+   real `product.template`/`product.product` (and, for the M1/M2 structured
+   fixture, a per-test `product.attribute` + values). `_cleanup` now captures
+   those ids by **exact id from the store's own template bindings**, unlinks in
+   FK-safe ORM order (variant bindings → template bindings → templates → orphan
+   values → orphan attributes, each attribute/value removed only when no line
+   still references it), then deletes the connector rows; `_assert_zero_residue`
+   verifies zero rows for every connector table **and** every captured
+   master-data id. No pre-existing record is touched (unique markers + exact-id
+   deletion, never a name search).
+3. **Cleanup-first, fail-loud teardown** — the threaded tests no longer call
+   `_assert_workers_dead()` before cleanup. A single `_finalize_threaded` in
+   `finally` sets every resume gate, bounded-joins the workers, records
+   liveness, runs durable cleanup + zero-residue **only when all workers have
+   stopped**, and otherwise skips destructive cleanup (a live worker may hold
+   locks), preserves sanitized findings, and fails loudly — so no assertion can
+   skip cleanup and no stuck worker can deadlock or false-pass.
+4. **Race-specific token proofs** — the admission-first (`blocking_send`) and
+   M18 (`ok_send`) fakes now record their `_send` `token` argument; each test
+   asserts exactly one transport carrying the pre-disconnect `DUMMY_TOKEN`.
+   M1/M2 additionally commits its worker transaction so the committed
+   reconciliation (three bindings) is observed cross-connection and the
+   master-data cleanup path is genuinely exercised.
+5. **Classification unchanged** — the between-pages generation-bump test stays
+   **M9/M10** (not Race A).
+
+Still authored-only: the genuine lifecycle tests **compile** (`py_compile`,
+`compileall`) but are **not executed** here (no PostgreSQL/Odoo) and are not
+claimed green. No core/sale/live change; Prompt E blocked; SRR-03 OPEN.
+
 ## Session summary
 
 Migrated the Task 010B product importer from the legacy value-returning
@@ -36,8 +76,11 @@ attribute, media, binding, or refresh behaviour is redesigned.
 - **Product domain source:** PR #151 head
   `e4669aaf206fe8436a6d8a524b083f48d56ac9df` (an ancestor of the base).
 - **Post-Slice-2A base:** `a3fd6cdfcb6f3654ae81a48a7f4e694994d4762b` (ancestor).
-- **Commits (three focused):** (1) product call-site migration; (2) focused
-  product tests; (3) product validation + handoff docs.
+- **Commits (focused):** (1) product call-site migration; (2) focused product
+  tests; (3) product validation + handoff docs; (4) Revision-2 genuine lifecycle
+  race tests; (5) Revision-2 evidence reclassification; (6) Revision-3 test tag +
+  master-data zero-residue + cleanup-first teardown + token proofs (review
+  `4696396464`).
 - **Final head:** the pushed tip of `claude/core-r2-product-callsite` (recorded
   in the draft PR).
 - **Draft PR:** head `claude/core-r2-product-callsite` → base
@@ -80,11 +123,14 @@ No core, sale, manifest, XML, security, CSV, or `adams_base` file changed.
    `db_connect` connections for **M1/M2**, **Race A/M8** (both orderings), and
    **Race B/M18** with the real `action_disconnect`/`_admit`/`_run_disconnect_quiesce`
    protocol (only `_send` replaced; `_apply_import` observe/pause spy;
-   bounded timeouts + guaranteed thread termination + zero-residue), plus
-   adaptation of the transport-driving Task 010B tests to the real gate + `_send`
-   seam (credential seeded while `setup_incomplete`, store connected, real job
-   threaded, `registry_enter_test_mode()`). The genuine class is authored +
-   compiles; it is executed only under the Odoo runtime (pending), never here.
+   `@tagged(..., '-standard', 'shopify_connector_product_callsite_lifecycle')`
+   opt-in exclusion; race-specific `_send`-`token` assertions; bounded timeouts +
+   cleanup-first/fail-loud teardown + by-exact-id master-data + connector
+   zero-residue), plus adaptation of the transport-driving Task 010B tests to the
+   real gate + `_send` seam (credential seeded while `setup_incomplete`, store
+   connected, real job threaded, `registry_enter_test_mode()`). The genuine class
+   is authored + compiles; it is executed only under the Odoo runtime (pending),
+   never here.
 
 Old vs new call-site shapes, lease coverage, exception handling, authored tests,
 and static results are detailed in
@@ -156,6 +202,28 @@ covers leases/store/credential/job/both binding tables. **These tests are not
 executed here** (no PostgreSQL/registry), so any residual Odoo-runtime-only
 behaviour (attribute-lock seeding, exact MVCC visibility timing) is a
 runtime-execution obligation, not a green claim.
+
+**Revision-3 self-review (review `4696396464`).** Path-by-path over the five
+fixes: (a) the `@tagged` decorator carries `-standard` (source-scanned), so CI
+never picks the class up implicitly; (b) `_cleanup` captures master-data ids
+**before** unlinking any binding and deletes strictly by exact id, unlinking
+bindings→templates→orphan-values→orphan-attributes (each value/attribute gated
+on "no attribute line still references it"), so a value shared with a
+pre-existing product can never be removed and no name search is used — the
+importer maps the Shopify option name straight to `product.attribute.name`, and
+the M1/M2 per-test `SC2B-<uuid>` marker guarantees the attribute is created
+fresh (never a reused pre-existing one) and is unambiguously test-owned; (c)
+`_finalize_threaded` runs in `finally` and cannot be short-circuited by a body
+assertion — cleanup + zero-residue run only once every worker is joined-dead,
+and a still-alive worker fails loud **without** destructive cleanup (no delete
+against a lock it may hold, no hang: `_open_bounded`'s statement/lock timeouts
+bound every cursor); (d) the admission-first and M18 fakes record the `_send`
+`token` and assert exactly one transport with the pre-disconnect `DUMMY_TOKEN`,
+and M1/M2 commits its worker so the committed master data is genuinely present
+for the cleanup proof; (e) the between-pages test remains **M9/M10**. No
+production defect surfaced; the importer stays byte-for-byte frozen. As with
+Revision 2, these are **authored, not executed** — the exact MVCC/lock timing is
+a runtime obligation, never described as green.
 
 ## Open questions
 

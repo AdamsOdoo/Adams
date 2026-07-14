@@ -243,19 +243,33 @@ cursors with bounded `statement_timeout` + `lock_timeout`, the production
 `_admit`/`_release_lease` side transactions made genuinely independent by
 patching the registry cursor factory for the bounded window, real
 `action_disconnect` and `_run_disconnect_quiesce`, threads decoupled with a
-fresh registry lock, guaranteed thread termination (`_assert_workers_dead`),
-sanitized type-only worker diagnostics, and durable cleanup + zero-residue
-verification. **Only `_send` is replaced (the network seam); reconciliation is
-paused via an observe-and-delegate spy on the product-domain `_apply_import`.
-No lifecycle/state/`_admit`/lease-ORM/controller monkeypatch is used.**
+fresh registry lock, cleanup-first / fail-loud worker teardown
+(`_finalize_threaded`), sanitized type-only worker diagnostics, and durable
+cleanup + zero-residue verification. **Only `_send` is replaced (the network
+seam); reconciliation is paused via an observe-and-delegate spy on the
+product-domain `_apply_import`. No lifecycle/state/`_admit`/lease-ORM/controller
+monkeypatch is used.**
+
+**Runtime tag (review `4696396464` item 1).** The class is decorated
+`@tagged('post_install', '-at_install', '-standard',
+'shopify_connector_product_callsite_lifecycle')`, so it is **excluded from the
+standard CI suite** and runs only when its explicit tag is selected
+(`--test-tags shopify_connector_product_callsite_lifecycle`). This exact tag is
+used consistently in the test source, this document, the handoff, the PR body,
+and the runtime commands (§8).
 
 - **M1/M2** — `test_real_lease_visible_before_send_and_through_reconciliation`
-  (multi-page): exactly one committed lease is visible on an **independent
-  connection** before each page's `_send`; the non-terminal page's lease
-  releases before the next admission (distinct keys, one at a time); the
+  (multi-page, structured product): exactly one committed lease is visible on an
+  **independent connection** before each page's `_send`; the non-terminal page's
+  lease releases before the next admission (distinct keys, one at a time); the
   terminal lease remains independently visible while `_apply_import` runs and
   releases only after reconciliation + `flush_all`; the real token snapshot is
-  observed; no explicit main-cursor commit.
+  observed (`{DUMMY_TOKEN}`). The worker transaction is **committed** so the
+  reconciled master data genuinely persists — a **per-test unique attribute
+  name** (`SC2B-<uuid> Edition`, mapped straight to `product.attribute.name` by
+  the importer) makes the created `product.attribute` + values unambiguously
+  test-owned; the committed reconciliation is confirmed cross-connection (three
+  bindings) and cleaned by exact id (see cleanup below).
 - **Race A / M8 — disconnect-first** —
   `test_race_a_disconnect_first_refuses_admission`: a real `action_disconnect`
   commits first on an independent connection; the next `_admit` observes the
@@ -266,7 +280,10 @@ No lifecycle/state/`_admit`/lease-ORM/controller monkeypatch is used.**
   admission commits its lease/token snapshot first (observed cross-connection);
   a concurrent real `action_disconnect` then returns within bound **without
   waiting** for the parked worker; the already-admitted page proceeds to
-  completion and releases — no untracked admitted call is possible.
+  completion and releases — no untracked admitted call is possible. **Token
+  proof (review item 4):** the blocking `_send` records its `token` argument and
+  the test asserts exactly one transport carrying the pre-disconnect
+  `DUMMY_TOKEN`.
 - **Race B / M18** —
   `test_race_b_terminal_reconciliation_survives_concurrent_disconnect`: the
   terminal-page admission commits; reconciliation is paused while the lease is
@@ -275,7 +292,30 @@ No lifecycle/state/`_admit`/lease-ORM/controller monkeypatch is used.**
   does **not** finalize while the lease exists; the admitted reconciliation
   finishes (its in-memory token snapshot), releases the lease; a later real
   controller pass finalizes `completed` and clears the credential **only after**
-  release; zero leases/jobs/bindings residue is verified.
+  release. **Token proof (review item 4):** the terminal `_send` records its
+  `token` and the test asserts exactly one transport carrying `DUMMY_TOKEN`.
+  Zero leases/jobs/bindings **and master-data** residue is verified.
+
+**Fixture ownership + zero-residue cleanup (review items 2–3).** Every genuine
+record is attributable to its test (unique store `shop_domain`, unique product
+GID, unique per-test attribute marker). `_cleanup` captures the test-owned
+`product.template` / `product.product` / `product.attribute` /
+`product.attribute.value` ids **from the store's own template bindings** (exact
+ids, never a broad name search), then unlinks in FK-safe ORM order — variant
+bindings → template bindings → templates (Odoo cascades `product.product`,
+`product.template.attribute.line`, `product.template.attribute.value`) → each
+captured attribute value/attribute **only when no attribute line anywhere still
+references it** (so a value shared with a pre-existing product is never removed)
+— and deletes the connector job logs/leases/jobs/credential/store (raw SQL, logs
+before jobs for the `restrict` FK). `_assert_zero_residue` then verifies **zero
+rows for every connector table and every captured master-data id** on a fresh
+bounded connection. Threaded teardown is **cleanup-first**: `_finalize_threaded`
+(run in `finally`) sets every resume gate, bounded-joins each worker, records
+liveness, runs durable cleanup + zero-residue **only when all workers have
+stopped**, and — if a worker is still alive — skips destructive cleanup (it may
+hold row locks), preserves sanitized findings, and fails loudly; assertions
+never precede cleanup, so no early assertion can leave residue and no stuck
+worker can deadlock the delete path or yield a false pass.
 
 **[Open — pending execution]** The §7.3 genuine tests require a live PostgreSQL
 backend and a fully-built Odoo registry; they are **authored** here and pass
@@ -322,6 +362,16 @@ transport. The one test that formerly asserted on the dissolved
 - No available non-Odoo pure test harness exists for this addon (Odoo is not
   importable in this environment); the tests are Odoo `TransactionCase`s and run
   under the Odoo test runner, not here.
+- Runtime-tag scan (review `4696396464` item 1): `TestProductCallSiteLifecycleGenuine`
+  carries `@tagged('post_install', '-at_install', '-standard',
+  'shopify_connector_product_callsite_lifecycle')` — the `-standard` exclusion
+  keeps it out of the default suite; a source scan confirms no other genuine-class
+  test lacks the tag.
+- Forbidden-monkeypatch scan: the genuine class patches **only** `_send` (network
+  seam), the product-domain `_apply_import` (observe-and-delegate), and the
+  sanctioned `registry.cursor` / `registry._lock` harness — **no**
+  `action_disconnect` / `_admit` / `_release_lease` / lease-ORM / generation /
+  `_run_disconnect_quiesce` / controller patch.
 - The §7.3 genuine independent-connection lifecycle tests
   (`TestProductCallSiteLifecycleGenuine`) and every §7.1 activation test are
   **authored and compile**, but are **NOT executed** here (no PostgreSQL / Odoo
@@ -329,7 +379,8 @@ transport. The one test that formerly asserted on the dissolved
 
 **[Open] Runtime still pending.** Odoo runtime — fresh install + full
 core/product/sale suites + CORE-R2 admission classes + the §7.1 activation
-tests + the §7.3 genuine M1/M2/M8/M18 lifecycle tests + the deployed
+tests + the §7.3 genuine M1/M2/M8/M18 lifecycle tests (run explicitly with
+`--test-tags shopify_connector_product_callsite_lifecycle`) + the deployed
 multi-worker proof — is **not** run in this session and is **not** claimed. The
 integrated staging head is **not** runtime-green. Tests executed this session:
 **static only** (`py_compile`, `compileall`); tests pending execution: **all
