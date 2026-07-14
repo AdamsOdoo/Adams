@@ -152,6 +152,29 @@
 > product refund/removal, shipping, duties & additional fees (duty-first), cash
 > rounding, tip; §6.0.4 is a pointer into §6.0.3, not a seventh — D-012-2/§6.0. The
 > decision-closure §4–§18 remains authoritative where it and this packet differ.
+> **Round-9 correction (control-room review `4695589297`, docs-only; against the
+> retrieved official Odoo 19.0 source — paths in closure §2):** (a9) **order-level
+> financial acceptance** — the guard recomputes the **complete
+> `sale.order._compute_amounts` batch** (all priced lines + EPD lines →
+> `_add_tax_details_in_base_lines` → `_round_base_lines_tax_details` →
+> `_get_tax_totals_summary`) and compares Shopify evidence to the **actual**
+> `sale.order.amount_untaxed`/`amount_tax`/`amount_total` + batch tax evidence, never
+> to summed line subtotals (which differ under `round_globally`); `O` = distinct
+> batch grouping keys — D-012-2/closure §6.2a; (b9) **payment-term posture** — a
+> proposed store setting `order_payment_term_id` the importer assigns **explicitly**
+> (never inheriting the partner `property_payment_term_id`); readiness blocks when
+> unset; a term that would add EPD base lines fails closed
+> `odoo_validation_configuration` / `unsupported_early_payment_discount_payment_term`
+> (never `financial_total_mismatch`) — D-012-2/closure §5.6; (c9)
+> **implementation-exact solver** — the round-8 "bounded solver over currency-valid
+> candidates" is replaced by the finite deterministic §6.2b contract on the
+> Product-Price-precision grid (`price_unit` is an unrounded `Float`), full-order
+> recompute per candidate, fail-closed on exhaustion/no-safe-grid — D-012-2/closure
+> §6.2b; (d9) **five-doc consistency** — capability-based prerequisites (no
+> "Task 010/011 merged"); ambiguous customer creates **no partial SO/binding** (job
+> → `blocked_manual_review`, atomic retry); order `amount_tax` never attributed to
+> the line-level compute. The decision-closure §4–§18 remains authoritative where it
+> and this packet differ.
 > Produced 2026-07-10 by the MVP
 > planning-completion session (AR-042 candidate); **revised
 > 2026-07-11** by the PR #148 revision session per ChatGPT's
@@ -221,7 +244,11 @@ refunds/returns (evidence fields exist on Order but are not imported);
 **no order edits** (`Order.edited == true` → `unsupported_order_edit`
 fail-closed skip, §6.0.0); **no advanced tax structures** (only leaf
 `amount_type=='percent'` sale taxes; group/fixed/division/base-affecting
-compound fail closed, §5.5); no fulfillment write-back (Task 014); no inventory logic (Task 013 —
+compound fail closed, §5.5); **no early-payment-discount payment terms**
+(a store `order_payment_term_id` whose term would add EPD base lines via
+`_add_base_lines_for_early_payment_discount` fails closed
+`unsupported_early_payment_discount_payment_term`, §5.6 — representing the
+discounted-base tax is deferred post-MVP); no fulfillment write-back (Task 014); no inventory logic (Task 013 —
 SO confirmation's standard Odoo reservation is not connector inventory
 logic); no presentment-currency orders; **no custom connector tax
 engine — the standard Odoo 19 `account.tax` engine is authoritative for
@@ -309,6 +336,42 @@ full SO inside the savepoint, the guard evaluates **three component
 checks plus the total check** — a real mismatch in one component can
 no longer hide under aggregate slack:
 
+**ORDER-LEVEL ACCEPTANCE (round-9, review `4695589297` item 1; closure §6.2a) —
+authoritative.** The guard accepts or rejects **only after the complete
+`sale.order._compute_amounts` batch is recomputed** (all priced lines + any
+early-payment-discount base lines → `AccountTax._add_tax_details_in_base_lines` →
+`_round_base_lines_tax_details` → `_get_tax_totals_summary`; official Odoo 19
+`sale_order.py` L512–528). The comparison surface is the **actual order values**
+`sale.order.amount_untaxed`/`amount_tax`/`amount_total` plus the batch tax evidence
+— **never** summed line-level `price_subtotal`/`price_tax` (which differ from the
+order totals under `round_globally`, `account_tax.py` L1896–1927). Line-level
+`sale.order.line._compute_amount` produces one line's figures only; a candidate that
+passes in isolation is **rejected** if the order-level recompute breaches any bound.
+`O` is counted from the batch grouping keys `{tax, currency, is_refund,
+is_reverse_charge, price_include, computation_key}` (`account_tax.py` L1907–1920),
+never invoice repartition rows.
+
+**PAYMENT TERM (round-9, review `4695589297` item 2; closure §5.6) — the store
+setting `order_payment_term_id` is assigned EXPLICITLY (never inheriting
+`partner_id.property_payment_term_id`, which `_compute_payment_term_id` would
+otherwise do, `sale_order.py` L430–434); readiness blocks import when it is unset;
+a term that would add EPD base lines through
+`_add_base_lines_for_early_payment_discount` (`sale_order.py` L530–573, fires on
+`early_discount and early_pay_discount_computation=='mixed' and discount_percentage`
+— those ± lines alter `amount_tax`) FAILS CLOSED `odoo_validation_configuration` /
+`unsupported_early_payment_discount_payment_term` BEFORE any SO/binding, NEVER
+`financial_total_mismatch`.**
+
+**PRICE-INCLUDED SOLVER (round-9, review `4695589297` item 3; closure §6.2b) — the
+finite deterministic contract:** because `price_unit` is `fields.Float` with only
+`min_display_digits='Product Price'` (`sale_order_line.py` L177–181, no storage
+grid), candidates are drawn from the finite Product-Price-precision grid (≤ `2K+1`,
+non-decreasing `|u−u₀|`, `u₀−d` before `u₀+d`, lower-wins tie-break), each recomputed
+through the actual engine AND the full-order `_compute_amounts` batch for acceptance;
+**fail closed** on grid exhaustion (`K`) or when the order cannot be represented on
+the grid (narrowed MVP scope). The grid is **never** assumed equal to currency
+rounding.
+
 **REBUILT 2026-07-14 (review `4690680028` items 2 & 3, then review `4691067575`
 items 2 & 3) — the canonical single-count ledger, per-tax-signature base
 reconciliation, and conditional tax bound live in closure §6, authoritative.**
@@ -377,9 +440,9 @@ round-4 untaxed-Tip-line posture is **withdrawn**, review `4691931971` item 6).
    derived **through the engine** — `special_mode='total_excluded'` is a **seed,
    NOT an exact inverse** (Odoo 19 guarantees symmetry only with an unrounded
    `price_unit` + `round_globally`; `price_unit` is `Float` — review `4694311215`
-   item 1), so a **deterministic bounded solver** over currency-valid `price_unit`
-   candidates recomputes through the actual engine and **accepts only from the
-   engine readback** (`raw_total_excluded_currency`/`total_excluded_currency`/
+   item 1), so the **finite deterministic §6.2b solver** over the
+   Product-Price-precision grid recomputes through the actual engine and **accepts
+   only from the engine readback** (`raw_total_excluded_currency`/`total_excluded_currency`/
    `raw_base_amount_currency`/`raw_tax_amount_currency`/`tax_amount_currency`),
    **never** by gross/pre-tax subtraction; **no valid candidate → fail closed**.
    Money fields are binary `float`, so the residual is **not** assumed to store a
@@ -405,8 +468,8 @@ round-4 untaxed-Tip-line posture is **withdrawn**, review `4691931971` item 6).
    independent **leaf percentages**, §5.5 — never applied to a deferred complex
    structure); it is **not assumed zero**, and `tax_odoo(σ)` is compared using the
    engine's **actual `tax_amount_currency`** readback. It is `0` only when the raw
-   base matches exactly (the clean 2-decimal case). A signature for which the §6.2
-   solver finds **no** currency-valid candidate satisfying the base + tax checks
+   base matches exactly (the clean 2-decimal case). A signature for which the §6.2b
+   solver finds **no** grid candidate satisfying the base + tax checks
    **fails closed** (never widening the tolerance). The formula carries the
    `tax_delta_total` term **in full** so **no document reduces it to `0.5r(S+O)`
    while a nonzero delta is possible** (the linear `base_delta×rate/100` form is the
@@ -643,7 +706,7 @@ closure §6.1-A). It is reproduced in Odoo **through the actual Odoo 19 tax engi
 the engine; the residual uses the engine's `total_excluded` (for tax-included, the
 residual gross is derived **through the engine**, never by gross/pre-tax
 subtraction), is **recomputed through the engine**, and the engine excluded base
-is **verified** to reconcile — fail closed if no currency-valid residual exists.
+is **verified** to reconcile — fail closed if no §6.2b grid residual exists.
 Money fields are binary `float`, so no residual is assumed to store a Decimal
 exactly. **`quantity × discountedUnitPriceSet` is never assumed** equal to
 any total (`discountedUnitPriceSet` is the *"approximate"* unit price excluding
@@ -864,7 +927,17 @@ the shop currency → else `odoo_validation_configuration`
 (failed_retryable; operator creates/activates the pricelist —
 `currency_id` is pricelist-derived and not directly settable, captures
 §8). Sales team: optional `order_sales_team_id` (unset → Odoo
-default). Warehouse: never set by the connector — whenever
+default). **Payment term (round-9, review `4695589297` item 2; closure §5.6):
+new store-settings field `order_payment_term_id` (Many2one `account.payment.term`,
+NO default). The importer assigns `sale.order.payment_term_id` EXPLICITLY from it
+and NEVER inherits `partner_id.property_payment_term_id` (which
+`_compute_payment_term_id` would otherwise apply, `sale_order.py` L430–434).
+Readiness BLOCKS order import while it is unset. A configured term that would add
+early-payment-discount base lines through `_add_base_lines_for_early_payment_discount`
+(`sale_order.py` L530–573) FAILS CLOSED `odoo_validation_configuration` /
+`unsupported_early_payment_discount_payment_term` before any SO/binding (never
+`financial_total_mismatch`); a matched customer's property term can never override
+it.** Warehouse: never set by the connector — whenever
 `sale_stock` is present (any database with sale + stock_account,
 regardless of connector edition — captures-11 §1), Odoo's own
 `warehouse_id` compute applies untouched; where it is absent the
@@ -1074,7 +1147,19 @@ and its linear `tax_delta_bound(σ)=base_delta×rate/100` is carried in `tol_tax
 `0.5r(S+O)`); `O` from SO tax-details grouping keys, never invoice repartition rows
 (Example R); the same `tol_tax_total` in per-signature/`amount_tax`/`amount_total`
 bounds; a full-minor-unit base mismatch or no-candidate signature FAILS CLOSED
-(Example L)**);
+(Example L)**); **round-9 order-level + payment-term + solver (review `4695589297`)
+— acceptance uses the actual `sale.order.amount_untaxed`/`amount_tax`/`amount_total`
+from the full `_compute_amounts` batch, NOT summed line subtotals (a `round_globally`
+case where they differ is accepted only via the order value; a line-level candidate
+rejected by the order recompute; multiple lines sharing a tax validated through the
+batch; multiple invoice repartition rows keep `O=1`, fixtures 150–153); payment term
+assigned explicitly from `order_payment_term_id`, never the partner default; unset
+term BLOCKS at readiness; an EPD-mixed term (`_add_base_lines_for_early_payment_discount`)
+FAILS CLOSED `unsupported_early_payment_discount_payment_term`; a non-EPD term
+imports; a partner property EPD term cannot override the store term, fixtures
+154–158; the §6.2b solver is finite/deterministic (≤`2K+1` Product-Price-precision
+candidates, seed-passes / seed-adjusts / two-pass-tie / no-candidate-exhaustion /
+no-safe-grid, tax-excl + tax-incl + JPY + BHD), fixtures 159–164**);
 `tests/test_order_tax_resolution.py` (**explicit-mapping-only** resolution on the
 **versioned `shopify_tax_evidence_key`** (`v1:<sha256 hex>`, full untruncated
 tuple); **rate-unit pinning — the query carries both `rate` and `ratePercentage`;
@@ -1167,15 +1252,24 @@ ambiguous handling incl. exact evidence fields ✅(D-012-4).
 ## 8. Acceptance criteria / definition of done / rollback
 
 Only §15 allowlist files changed; binding sole anchor (no duplicate SO
-ever); guard blocks beyond tolerance, never silent/auto-retried; no
-divergent-currency/duties SO under any circumstance; evidence-refresh
-never mutates an imported SO; zero payout/refund/invoice/tax-engine/
-presentment logic in the diff; suites green locally and on Odoo.sh;
-handoff + validation record + AR row appended; draft PR; gate closes on
+ever); **financial acceptance is the order-level `_compute_amounts` batch
+(`amount_untaxed`/`amount_tax`/`amount_total`), not summed line subtotals (round-9)**;
+guard blocks beyond tolerance, never silent/auto-retried; **`order_payment_term_id`
+assigned explicitly, readiness blocks it unset, EPD-mixed term fails closed
+`unsupported_early_payment_discount_payment_term` (round-9)**; **the §6.2b solver is
+finite/deterministic and fails closed on grid exhaustion / no-safe-grid (round-9)**;
+no divergent-currency/duties SO under any circumstance; evidence-refresh
+never mutates an imported SO; **an ambiguous customer creates no partial SO/binding
+(job → `blocked_manual_review`, atomic retry after resolution)**; zero
+payout/refund/invoice/tax-engine/presentment logic in the diff; suites green locally
+and on Odoo.sh; handoff + validation record + AR row appended; draft PR; gate closes on
 draft-open. Rollback: revert the single PR — order bindings drop,
 `sale.order` records survive as ordinary data; Tasks 013/014 are not
-yet started so nothing depends on it. Upgrade note: the two settings
-fields and the SOL field are additive (no migration).
+yet started so nothing depends on it. **No database, schema, Odoo module, Shopify
+config, or runtime state is changed by this docs-only session; documentation
+rollback is reverting the round-9 commit(s).** Upgrade note: the **three** settings
+fields (`order_company_id`/`order_pricelist_id`/`order_payment_term_id` and the
+others) and the SOL field are additive (no migration).
 
 ## 9–14. Cross-references
 
@@ -1253,7 +1347,7 @@ ALLOWED FILES (exhaustive):
   addons/shopify_connector_sale/models/shopify_connector_order_binding.py     (NEW — money snapshots are Char/exact-decimal-string, never Float; shop+presentment totals + component snapshots; no customer PII on the binding)
   addons/shopify_connector_sale/models/shopify_connector_order_importer.py    (NEW — importer service + job seams + REDACTION_EXTENSION)
   addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py   (NEW — shopify_line_item_gid only)
-  addons/shopify_connector_sale/models/shopify_connector_store_settings.py    (order_import_confirmation_policy — NO default, unset holds imports; order_import_include_test; order_company_id; order_pricelist_id; order_sales_team_id; sale_order_last_import_checkpoint_at — inert checkpoint) — NO order_tax_autocreate (tax auto-create removed from MVP, review 4692656343 item 4)
+  addons/shopify_connector_sale/models/shopify_connector_store_settings.py    (order_import_confirmation_policy — NO default, unset holds imports; order_import_include_test; order_company_id; order_pricelist_id; order_sales_team_id; order_payment_term_id — NO default, readiness BLOCKS import while unset, holds unsupported_early_payment_discount_payment_term if the term adds EPD base lines, review 4695589297 item 2; sale_order_last_import_checkpoint_at — inert checkpoint) — NO order_tax_autocreate (tax auto-create removed from MVP, review 4692656343 item 4)
   addons/shopify_connector_sale/models/shopify_connector_tax_mapping.py       (NEW — shopify.connector.tax.mapping per D-012-9 step 1)
   addons/shopify_connector_sale/security/ir.model.access.csv                  (binding + tax-mapping rows only)
   addons/shopify_connector_sale/tests/{__init__.py, test_order_binding.py, test_order_import_mapping.py, test_order_totals_guard.py, test_order_tax_resolution.py, test_order_duplicate_prevention.py, test_order_customer_resolution.py}  (NEW)
@@ -1314,16 +1408,35 @@ assume quantity × discountedUnitPriceSet == any total; discountedUnitPriceSet i
 shipping taxLines if taxesIncluded else 0) (exact shipping, back out tax once only
 when inclusive); U_ex is ALWAYS tax-exclusive (NO global G−totalTaxSet back-out);
 lines tol = 0.5r*L (tax-excl) or 0.5r*(L+S_ship) (tax-incl, only shipping back-out
-roundings; no tip line in L); TAX-INCLUDED RESIDUAL VIA SEED + BOUNDED SOLVER, NOT
-EXACT INVERSION (closure §6.2-C, review 4694311215 item 1) — special_mode=
-'total_excluded' is a SEED, NOT an exact inverse (Odoo 19 guarantees symmetry only
-with an unrounded price_unit + round_globally; sale.order.line.price_unit is Float),
-so a deterministic bounded solver over currency-valid price_unit candidates
-RECOMPUTES through the ACTUAL engine (real tax_calculation_rounding_method, real
-account.tax, real inclusion, real base prep) and ACCEPTS ONLY from the engine
-readback (raw_total_excluded_currency/total_excluded_currency/raw_base_amount_currency/
-raw_tax_amount_currency/tax_amount_currency), else FAIL CLOSED (no candidate ->
-financial_total_mismatch); PER-TAX-SIGNATURE BASE — ENGINE RAW EXCLUDED BASE,
+roundings; no tip line in L); ORDER-LEVEL ACCEPTANCE (round-9, review 4695589297
+item 1; closure §6.2a) — after constructing ALL candidate lines and assigning the
+explicit payment term, RECOMPUTE the WHOLE sale.order via _compute_amounts (all
+priced lines + EPD lines -> _add_tax_details_in_base_lines -> _round_base_lines_tax_details
+-> _get_tax_totals_summary, sale_order.py L512-528) and compare Shopify evidence to
+the ACTUAL sale.order.amount_untaxed/amount_tax/amount_total + batch tax evidence,
+NEVER to summed line price_subtotal/price_tax (they differ under round_globally,
+account_tax.py L1896-1927); a line candidate that passes in isolation is REJECTED by
+the order recompute; O = distinct batch grouping keys, never repartition rows;
+PAYMENT TERM (round-9, review 4695589297 item 2; closure §5.6) — assign
+sale.order.payment_term_id EXPLICITLY from store.order_payment_term_id, NEVER inherit
+partner_id.property_payment_term_id (sale_order.py L430-434); readiness BLOCKS import
+while order_payment_term_id is unset; a term that would add EPD base lines via
+_add_base_lines_for_early_payment_discount (fires on early_discount + 'mixed' +
+discount_percentage, sale_order.py L530-573) FAILS CLOSED odoo_validation_configuration
+/ unsupported_early_payment_discount_payment_term BEFORE any SO/binding, NEVER
+financial_total_mismatch; TAX-INCLUDED RESIDUAL VIA SEED + FINITE §6.2b SOLVER, NOT
+EXACT INVERSION (closure §6.2-C/§6.2b, reviews 4694311215 item 1 + 4695589297 item 3)
+— special_mode='total_excluded' is a SEED, NOT an exact inverse (Odoo 19 guarantees
+symmetry only with an unrounded price_unit + round_globally; sale.order.line.price_unit
+is fields.Float with min_display_digits='Product Price' = a DISPLAY hint, NOT a storage
+grid, sale_order_line.py L177-181), so a FINITE DETERMINISTIC solver over the
+Product-Price-precision grid (<= 2K+1 candidates, non-decreasing |u-u0|, u0-d before
+u0+d, lower-wins tie-break; grid NEVER assumed = currency rounding) RECOMPUTES each
+candidate through the ACTUAL engine AND the full-order _compute_amounts batch,
+ACCEPTS ONLY from the engine readback (raw_total_excluded_currency/total_excluded_currency/
+raw_base_amount_currency/raw_tax_amount_currency/tax_amount_currency + order amounts),
+else FAIL CLOSED on grid exhaustion (K) or no-safe-grid (narrowed MVP scope) ->
+financial_total_mismatch; PER-TAX-SIGNATURE BASE — ENGINE RAW EXCLUDED BASE,
 QUANTIZED (closure §6.4a) BEFORE the tax tolerance — for each signature (the
 VERSIONED shopify_tax_evidence_key, v1:<sha256 hex>) require
 res.currency.round(base_src(σ)) == res.currency.round(base_odoo_raw(σ)) where
@@ -1340,7 +1453,7 @@ the FINAL ACTUAL engine tax_amount_currency with Shopify evidence; it is 0 only 
 the raw base matches exactly (clean 2-decimal). The linear form is valid ONLY for
 independent leaf percentages — NEVER applied to a deferred group/fixed/division/
 base-affecting structure (those are HELD unsupported_tax_structure). A signature for
-which the solver finds NO currency-valid candidate satisfying the base+tax checks
+which the §6.2b solver finds NO grid candidate satisfying the base+tax checks
 FAILS CLOSED (never widen the tolerance). State/use tol_tax_total WITH the
 tax_delta_total term EVERYWHERE (per-signature/amount_tax/amount_total/examples/
 tests) so NO doc reduces it to 0.5r(S+O) while a nonzero delta is possible; it is a
@@ -1361,7 +1474,7 @@ ACTUAL ODOO 19 TAX ENGINE (price_include_override lives on account.tax NOT the S
 line; construct candidate sale.order.line, read engine total_excluded/total_included
 + tax breakdown, add qty-1 residual with the same tax signature, RECOMPUTE THROUGH
 THE ENGINE; for tax-included derive the residual gross via the engine
-[special_mode='total_excluded'/bounded solver], NEVER gross/pre-tax subtraction;
+[special_mode='total_excluded' seed + finite §6.2b solver], NEVER gross/pre-tax subtraction;
 money fields are binary float so no residual is assumed to store a Decimal exactly;
 no valid residual -> FAIL CLOSED), VERIFIED the engine excluded base reconciles;
 residual INHERITS the source line's tax_ids (and thereby the mapped account.tax's

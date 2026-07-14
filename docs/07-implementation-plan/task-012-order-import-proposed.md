@@ -11,7 +11,7 @@
 > and the implementation packet — **pending ChatGPT control-room acceptance**
 > (not accepted here). **Prerequisites are CAPABILITY-BASED (corrected
 > 2026-07-14, reviews `4690680028` + `4691067575` + `4691408835` + `4691931971` +
-> `4692656343` + `4693694894` + `4694311215`),
+> `4692656343` + `4693694894` + `4694311215` + `4695589297`),
 > not direct PR merges:** SRR-03 CLOSED; protected/guarded product import + complete variant
 > bindings; protected/guarded customer import + indexed normalized-email matching;
 > no unguarded product/customer Shopify call remaining; LC-1 merged + DEC-030
@@ -43,9 +43,23 @@ binding as the sole idempotency anchor.
 
 ## Preconditions
 
-- Task 010 and Task 011 merged and reviewed (product and customer
-  bindings must already resolve).
-- Foundation Tasks 002/003 merged and gate-opened.
+**Capability-based (corrected round-2, reaffirmed round-9 review `4695589297`
+item 4 — NOT direct PR merges):** the prior "Task 010 and Task 011 merged and
+reviewed" precondition is **withdrawn** (the current unprotected PR #150/#151 heads
+are not directly mergeable into `Shopify-connector`). Task 012 depends on the
+**capabilities**, however delivered:
+
+- **SRR-03 closed** (CORE-R2 disconnect quiescence proven runtime-green);
+- **protected/guarded product import + complete product/variant bindings** present
+  on `Shopify-connector` (order lines resolve; product Shopify calls run through
+  `execute_business`);
+- **protected/guarded customer import + indexed normalized-email matching** present
+  on `Shopify-connector` (guest path reuses the indexed lookup);
+- **no unguarded product/customer Shopify call remains** (the public generic
+  `execute` entry is closed);
+- these capabilities integrated via the **accepted CORE-R2 Slice-2B integration-staging
+  strategy** (PR #158), with PR #150/#151 then closed as merged or subsumed;
+- CORE-R1 is already merged (satisfied, not a pending prerequisite).
 - The "sale domain gate" (also named by
   [`ui-ux-implementation-task-map.md`](./ui-ux-implementation-task-map.md)
   Group 12 for the order-touchpoint UI extensions) explicitly opened.
@@ -120,7 +134,7 @@ full normalized `ratePercentage`+`title`+`source`+`channelLiable`+inclusion tupl
 **Unicode-NFC only, case and whitespace preserved, no folding, no truncation**;
 `price_include_override` on `account.tax` per `taxesIncluded`), letting the
 **standard Odoo 19 `account.tax` engine** recompute under the total-check guard —
-the price-included recompute uses a **seed + bounded solver read back from the
+the price-included recompute uses a **seed + finite §6.2b solver read back from the
 actual engine** (`special_mode='total_excluded'` is a seed, **not** an exact
 inverse — Odoo 19 symmetry holds only with an unrounded `price_unit` +
 `round_globally`, and `price_unit` is `Float`; review `4694311215` item 1) —
@@ -150,8 +164,8 @@ D-012-2: `totalPriceSet.shopMoney.amount` is the total comparand; each product l
 (never `quantity × discountedUnitPriceSet`, which is an *approximate* unit price),
 reproduced in Odoo **through the actual Odoo 19 tax engine** (engine
 `total_excluded`; `price_include_override` is on `account.tax` not the SO line;
-price-included residuals derived via a **seed + bounded solver recomputed through
-the actual engine** — `special_mode='total_excluded'` is a **seed, not an exact
+price-included residuals derived via a **seed + finite §6.2b solver recomputed
+through the actual engine** — `special_mode='total_excluded'` is a **seed, not an exact
 inverse** (Odoo 19 guarantees symmetry only with an unrounded `price_unit` +
 `round_globally`; `price_unit` is `Float`), accepted only from the engine readback,
 else fail closed — review `4694311215` item 1; money fields are binary floats).
@@ -199,8 +213,26 @@ exactly; a no-candidate signature fails closed); `O` is counted from the sale-or
 tax-details computation (leaf-tax grouping keys / taxed-line×leaf-tax pairs),
 **never** invoice repartition rows (reviews `4693694894` item 7 + `4694311215` items
 1–2); its platform-rounding premise is a labelled inference, with **no** money cap.
-This is **proposed, pending control-room acceptance** (MBQ-56 stays open until
-then).
+**Order-level acceptance (round-9, review `4695589297` item 1):** the guard
+accepts/rejects **only after the complete `sale.order._compute_amounts` batch is
+recomputed** (all priced lines + any early-payment-discount lines →
+`_add_tax_details_in_base_lines` → `_round_base_lines_tax_details` →
+`_get_tax_totals_summary`, official `sale_order.py` L512–528) and compares Shopify
+evidence to the **actual** `sale.order.amount_untaxed`/`amount_tax`/`amount_total` +
+batch tax evidence — **never** summed line subtotals (which differ under
+`round_globally`); a line candidate is rejected by the order recompute; `O` = distinct
+batch grouping keys. **Payment term (round-9, review `4695589297` item 2):** a
+proposed store setting `order_payment_term_id` the importer assigns **explicitly**
+(never inheriting `partner_id.property_payment_term_id`); readiness blocks import
+when unset; a term that would add EPD base lines
+(`_add_base_lines_for_early_payment_discount`, `sale_order.py` L530–573) fails closed
+`odoo_validation_configuration` / `unsupported_early_payment_discount_payment_term`
+(never `financial_total_mismatch`). **Solver (round-9, review `4695589297` item 3):**
+the price-included residual uses a **finite deterministic** search on the
+Product-Price-precision grid (`price_unit` is an unrounded `Float`; grid never assumed
+= currency rounding), ≤`2K+1` candidates, full-order recompute per candidate, **fail
+closed** on exhaustion / no-safe-grid. This is **proposed, pending control-room
+acceptance** (MBQ-56 stays open until then).
 
 ## Same-currency-only rule (DEC-020 / MBQ-64)
 

@@ -8,6 +8,57 @@
 > control-room action and is **not** modified here (that file is outside this
 > session's allowed-files list).
 
+## 0-h. Round-9 correction — 2026-07-14 (control-room review `4695589297`)
+
+A ninth REVISE (docs-only, same five files; PR #159 stays draft/unmerged). The
+previous session was rejected for returning the round-8 report without a round-9
+correction. Resolved against the **retrieved official Odoo 19.0 source** (paths in
+closure §2 — not the prior paraphrase). `Shopify-connector` tip **unchanged** at
+`a3fd6cd`, so **no base-alignment merge was needed** this round.
+
+1. **Order-level financial acceptance (closure §6.2a).** The guard accepts/rejects
+   **only after the complete `sale.order._compute_amounts` batch is recomputed**
+   [Fact — Odoo 19 source, `sale_order.py` L512–528]: gather every priced line →
+   `_prepare_base_line_for_taxes_computation`; **add EPD base lines**
+   (`_add_base_lines_for_early_payment_discount`); `_add_tax_details_in_base_lines`
+   → `_round_base_lines_tax_details` (aggregate per grouping key, round once, distribute
+   delta) → `_get_tax_totals_summary`; assign `amount_untaxed = base_amount_currency`,
+   `amount_tax = tax_amount_currency`, `amount_total = total_amount_currency`. The
+   comparison surface is the **actual** `sale.order.amount_untaxed`/`amount_tax`/
+   `amount_total` + batch tax evidence — **never** summed line subtotals (they differ
+   under `round_globally`, `account_tax.py` L1896–1927). Line-level `_compute_amount`
+   computes one line only; a candidate passing in isolation is rejected by the order
+   recompute. `O` = distinct batch grouping keys `{tax, currency, is_refund,
+   is_reverse_charge, price_include, computation_key}`, never repartition rows.
+   (Fixtures 150–153.)
+2. **Payment-term posture (closure §5.6).** `_compute_payment_term_id` inherits
+   `partner_id.property_payment_term_id` [Fact — `sale_order.py` L430–434], and an
+   EPD-mixed term adds ± base lines that alter `amount_tax`
+   [`_add_base_lines_for_early_payment_discount`, L530–573]. MVP: a proposed store
+   setting **`order_payment_term_id`** assigned **explicitly** (never inheriting the
+   partner default); readiness **blocks** import while unset; a term that would add
+   EPD base lines **fails closed** `odoo_validation_configuration` /
+   `unsupported_early_payment_discount_payment_term` (never `financial_total_mismatch`);
+   a matched customer's property term can never override it. (Fixtures 154–158.)
+3. **Implementation-exact solver (closure §6.2b).** `price_unit` is `fields.Float`
+   with only `min_display_digits='Product Price'` [Fact — `sale_order_line.py`
+   L177–181] — a display hint, **not** a storage grid — so there is no source-proven
+   finite grid. The round-8 "bounded solver over currency-valid candidates" is
+   replaced by a **finite deterministic** search on the Product-Price-precision grid
+   (≤`2K+1` candidates, non-decreasing `|u−u₀|`, `u₀−d` before `u₀+d`, lower-wins
+   tie-break), each recomputed through the actual engine **and the full-order batch**,
+   accepting only from readback, **failing closed** on grid exhaustion (`K`) or when
+   the order is not grid-representable (narrowed MVP scope); the grid is **never**
+   assumed equal to currency rounding. (Fixtures 159–164.)
+4. **Five-document consistency.** Capability-based prerequisites (no "Task 010/011
+   merged" — proposed.md Preconditions rewritten); the **ambiguous-customer path
+   creates no partial SO/binding** (job → `blocked_manual_review`, atomic retry after
+   resolution; "rest of order import proceeds" removed); no order `amount_tax`
+   attributed to the line-level compute. (Fixture 165.)
+
+Fixtures 150–165 added; §17 adversarial rows 74–80 added. Official Odoo 19.0 source
+paths recorded in closure §2.
+
 ## 0-g. Round-8 correction — 2026-07-14 (control-room review `4694311215`)
 
 An eighth REVISE (docs-only, same five files; PR #159 stays draft/unmerged). After
@@ -38,11 +89,13 @@ after the merge.
    nonzero delta is possible; the linear form is **never** applied to a deferred
    complex structure. (closure §6.4/§6.4a/§6.5; packet D-012-2; Examples Q/L)
 3. **`O` rounding-event count corrected** — repartition-line counting is **removed**.
-   `sale.order.line._compute_amount` derives `amount_tax` from the engine's tax
-   details, not from invoice/accounting repartition rounding, so `round_per_line`
-   `O =` taxed-line × leaf-tax pairs and `round_globally` `O =` distinct global
-   leaf-tax grouping keys whose tax is rounded — **never** multiplied by invoice
-   repartition rows. (closure §6.4; packet D-012-2; Example R)
+   The tax-engine tax details (not invoice/accounting repartition rounding) drive the
+   amounts, so `round_per_line` `O =` taxed-line × leaf-tax pairs and `round_globally`
+   `O =` distinct leaf-tax grouping keys whose tax is rounded — **never** multiplied by
+   invoice repartition rows. *(Round-9 §6.2a: the **order** `amount_tax` comes from
+   `sale.order._compute_amounts`/`_get_tax_totals_summary`, not the line-level
+   `_compute_amount`; `O` is counted from that batch.)* (closure §6.4/§6.2a; packet
+   D-012-2; Examples R)
 4. **Nullable `totalTaxSet` fails closed** — the round-7 canonical-zero-from-null
    construction is **withdrawn**; Shopify documents `totalTaxSet` as nullable but
    **not** that null means zero, so a **null** original tax → **no SO, no binding**,
@@ -407,8 +460,9 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   `special_mode='total_excluded'` is a **seed, NOT an exact inverse** — symmetrical
   accuracy is guaranteed only with an unrounded `price_unit` and `round_globally`,
   and `price_unit` is a `Float` (review `4694311215` item 1). So the design seeds
-  from the analytic mode, runs a **deterministic bounded solver** over currency-valid
-  `price_unit` values, **recomputes through the actual engine**, and accepts only
+  from the analytic mode, runs the **finite deterministic §6.2b solver** over the
+  Product-Price-precision grid (round-9 — **not** an open "currency-valid" search),
+  **recomputes through the actual engine** and the full-order batch, and accepts only
   from the engine readback (`raw_base_amount_currency`/`tax_amount_currency`), failing
   closed if no candidate reconciles. The exact iteration bound is a build-time
   detail; any future reliance on the analytic mode as an exact inverse is out of
@@ -453,6 +507,19 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   item 2).
 - **Order edits deferred [round-7].** `Order.edited == true` fails closed
   (`unsupported_order_edit`); representing edited orders is future scope.
+- **Order-level acceptance authoritative [round-9].** Acceptance uses the actual
+  `sale.order._compute_amounts` batch (`amount_untaxed`/`amount_tax`/`amount_total`),
+  not summed line subtotals (§6.2a). The §6.2b solver's bound `K` and the exact
+  order-level reconciliation on real many-line `round_globally` orders are build-time
+  fixtures.
+- **`price_unit` has no source-guaranteed finite grid [round-9].** The §6.2b solver
+  restricts candidates to the Product-Price precision grid and fails closed when an
+  order cannot be represented on it; the grid is never assumed equal to currency
+  rounding (review `4695589297` item 3).
+- **Payment-term posture [round-9].** MVP requires an explicit `order_payment_term_id`
+  with no early-payment-discount base-line effect; an EPD-mixed term fails closed
+  (`unsupported_early_payment_discount_payment_term`, §5.6). Supporting EPD terms is
+  deferred post-MVP.
 - Empirical confirmation of the per-tax-signature **quantized base equality** (§6.4a,
   on the engine `raw_base_amount_currency`) and the `OC` attribution on a real
   mixed-discount order → named dev-store check.
@@ -486,10 +553,15 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   §6.4/§6.4a/§6.5, `O`-not-repartition §6.4, nullable-`totalTaxSet` fail-closed
   §6.0.1, six-gate count §6.0/§6.0.4, Examples Q/R + P/L re-framed, fixtures
   122–124/133/134/141 updated + 142–149 added, §17 rows 57/59/63 re-framed + 65–73,
-  §5.4/§18 dev-store obligations)
+  §5.4/§18 dev-store obligations; **round-9** §2 official Odoo 19.0 source paths,
+  §6.2 line-vs-order note, §6.2a order-level `_compute_amounts` acceptance, §6.2b
+  implementation-exact solver, §5.6 payment-term posture + §5.4 readiness, §6.4 `O`
+  from batch grouping keys, §8/§8.1 ambiguous-customer no-partial-import, §14
+  `order_payment_term_id`, fixtures 150–165, §17 rows 74–80, §18 round-9 open
+  questions, §0 verified-state)
 - `docs/07-implementation-plan/task-012-decision-closure-handoff.md` (**round-6**
   §0-e; **round-7** §0-f + §5/§6/§7/§8 refresh; **round-8** §0-g + §5/§6/§7/§8
-  refresh)
+  refresh; **round-9** §0-h + §6/§7/§8 refresh)
 - `docs/07-implementation-plan/task-012-order-import-implementation-packet.md`
   (money→Char, canonical ledger, Option-A pagination, cost posture, tax-mapping
   safety, conditional skip seam, locked prompt; round-3 exact-line-total
@@ -508,7 +580,10 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   tolerance + fingerprint + query fields; **round-8** header a8–e8, D-012-2
   seed+solver+readback / actual raw-base delta / `O`-not-repartition / six gates /
   nullable-tax fail-closed, D-012-9 tax structure delta, §6 test list, locked prompt
-  gates + tolerance + engine contract)
+  gates + tolerance + engine contract; **round-9** header a9–d9, §2 non-goals (EPD
+  payment terms), D-012-2 order-level acceptance + payment-term + solver, D-012-11
+  `order_payment_term_id`, §6 test list (fixtures 150–165), DoD/rollback, locked
+  prompt order-level + payment-term + finite-solver + store-settings field)
 - `docs/07-implementation-plan/task-012-order-import-proposed.md` (**round-6**
   MBQ-27 resolution + total-check note: hashed fingerprint, explicit-mapping-only,
   no auto-create, data-minimization, Decimal-numeric equality, standard tax engine;
@@ -516,13 +591,17 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   order-edit gate + nullable-`totalTaxSet` + additionalFees list-args +
   `code`/shipping-field removal + `tol_tax_total`; review list; **round-8** MBQ-27
   seed+solver recompute, total-check six-gate/seed-not-inverse/nullable-fail-closed/
-  actual-raw-base-delta/`O`-not-repartition, review list)
+  actual-raw-base-delta/`O`-not-repartition, review list; **round-9** Preconditions
+  rewritten capability-based (no "Task 010/011 merged"); total-check note: order-level
+  `_compute_amounts` acceptance + payment-term posture + finite solver; review list)
 - `docs/03-architecture/master-blueprint-open-questions.md` (MBQ-27/56/64
   proposed-resolution status + links only — **not** marked accepted; **round-6**
   note refresh; **round-7** MBQ-27/56 note refresh — versioned fingerprint,
   order-edit gate, nullable-tax, leaf-percent tax, one `tol_tax_total`, review list;
   **round-8** MBQ-27/56 note refresh — seed-not-inverse, actual raw-base delta,
-  `O`-not-repartition, nullable-tax fail-closed, six gates, review list)
+  `O`-not-repartition, nullable-tax fail-closed, six gates, review list; **round-9**
+  MBQ-56/27 note refresh — order-level `_compute_amounts` acceptance, payment-term
+  posture, finite solver, review list)
 
 ## 7. Learning feedback loop
 
@@ -675,6 +754,32 @@ These arrive via the **accepted CORE-R2 Slice-2B integration-staging strategy
   would have needlessly widened the tolerance. *Lesson: derive a rounding-event count
   from the computation that actually produces the figure being compared (SO
   tax-details grouping keys), not from a downstream accounting artifact.* (round-8)
+- **Reconcile against the ORDER computation, not the line computation.** The guard
+  compared summed line subtotals, but `sale.order._compute_amounts` runs a **batch**
+  (`_get_tax_totals_summary` over all base lines) and, under `round_globally`,
+  aggregates-then-rounds per grouping key — so line sums differ from `amount_tax`.
+  *Lesson: when another system exposes both a line-level and a document-level
+  computation, drive the **document-level** one and compare against its assigned
+  fields (`amount_untaxed`/`amount_tax`/`amount_total`).* (round-9)
+- **A silently-inherited setting can move the number you're guarding.** Odoo's
+  `_compute_payment_term_id` inherits the partner's term, and an early-payment-discount
+  'mixed' term injects base lines that change `amount_tax`. *Lesson: for any input the
+  target computation reads (`@api.depends(... 'payment_term_id')`), assign it
+  **explicitly** from a controlled setting and **fail closed** on values that alter
+  the computation — never let a matched entity's default leak in.* (round-9)
+- **Don't invent a finite grid the field doesn't guarantee.** `price_unit` is
+  `fields.Float(min_display_digits='Product Price')` — a **display** hint, not a
+  storage grid; "currency-valid candidates" assumed a grid Odoo does not enforce.
+  *Lesson: verify the field's precision behaviour in source; if no finite grid is
+  guaranteed, restrict the search to an explicit operator-facing grid and **fail
+  closed** (narrow scope) rather than search a continuous domain — and never claim the
+  grid equals currency rounding.* (round-9)
+- **Retrieve the source; don't trust a paraphrase.** The round-9 corrections were only
+  possible by reading the actual `sale_order.py`/`sale_order_line.py`/`account_tax.py`
+  from the official 19.0 repo (exact line numbers), which revealed the batch order
+  computation, the EPD injection, and the `min_display_digits` display-only hint.
+  *Lesson: when a claim is load-bearing, read the primary source and record exact
+  paths — a prior paraphrase can omit the decisive detail.* (round-9)
 
 ## 8. Exact next-session prompt (control-room to issue)
 
@@ -693,10 +798,18 @@ Decide per D-012 item: accept / revise / reject. In particular rule on:
     quantity × discountedUnitPriceSet), the canonical ledger U_ex = M + H (T=0),
     the Odoo representation **through the actual tax engine** (engine
     total_excluded; price_include_override on account.tax; inclusive residual via a
-    **seed + bounded solver recomputed through the actual engine** —
+    **seed + finite §6.2b solver recomputed through the actual engine** —
     `special_mode='total_excluded'` is a **seed, NOT an exact inverse**, accept only
     from the engine readback `raw_base_amount_currency`/`tax_amount_currency`, else
-    fail closed; binary-float honesty), **SIX** fail-closed pre-creation gate
+    fail closed; the §6.2b solver is finite/deterministic on the Product-Price-precision
+    grid (`price_unit` is an unrounded Float, grid ≠ currency rounding) and fails
+    closed on exhaustion/no-safe-grid; binary-float honesty), **ORDER-LEVEL
+    ACCEPTANCE** via the full `sale.order._compute_amounts` batch — compare Shopify
+    evidence to the ACTUAL `sale.order.amount_untaxed`/`amount_tax`/`amount_total` +
+    batch tax evidence, never summed line subtotals (§6.2a) — the **explicit
+    `order_payment_term_id`** posture (assigned, never inherited; readiness blocks
+    unset; EPD-mixed term fails closed `unsupported_early_payment_discount_payment_term`,
+    §5.6), **SIX** fail-closed pre-creation gate
     families (§6.0.4 is a pointer into duty-first §6.0.3, not a seventh), the
     per-signature quantized reconciliation on the **engine RAW excluded base**
     (`raw_base_amount_currency`; a full minor-unit error fails closed), the
