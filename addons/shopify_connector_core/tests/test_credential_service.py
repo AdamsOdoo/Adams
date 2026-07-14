@@ -1,9 +1,12 @@
 import ast
+import inspect
 import os
 
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
+
+from ..models import shopify_connector_store_credential as credential_module
 
 DUMMY_TOKEN_1 = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 DUMMY_TOKEN_2 = 'shpat_DUMMYDUMMYDUMMY1111111111111111'
@@ -142,6 +145,81 @@ class TestCredentialService(TransactionCase):
         self.assertFalse(self.store.credential_last_verified_at)
         self.assertEqual(Job.search_count([]), job_count_before)
         self.assertEqual(JobLog.search_count([]), job_log_count_before)
+
+    # ------------------------------------------------------------------
+    # CORE-R2 (AR-047; review 4690639375 #3): store->credential lock order,
+    # refuse-while-disconnecting, and connected-replacement epoch bump.
+    # ------------------------------------------------------------------
+
+    def test_set_token_refused_while_disconnecting(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'disconnecting', 'connection_generation': 3})
+        with self.assertRaises(UserError):
+            Credential.action_set_token(self.store, DUMMY_TOKEN_2)
+        # Original credential, mirrors, and generation are all unchanged.
+        credential = Credential.search([('store_id', '=', self.store.id)])
+        self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.connection_generation, 3)
+
+    def test_replace_token_refused_while_disconnecting(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'disconnecting', 'connection_generation': 3})
+        with self.assertRaises(UserError):
+            Credential.action_replace_token(self.store, DUMMY_TOKEN_2)
+        credential = Credential.search([('store_id', '=', self.store.id)])
+        self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.connection_generation, 3)
+
+    def test_connected_set_token_bumps_generation_exactly_once(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'connected', 'connection_generation': 5})
+        Credential.action_set_token(self.store, DUMMY_TOKEN_2)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertEqual(self.store.connection_generation, 6)
+        self.assertFalse(self.store.credential_last_verified_at)
+
+    def test_connected_replace_token_bumps_generation_exactly_once(self):
+        Credential = self._credential_as_admin()
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.write({'state': 'connected', 'connection_generation': 5})
+        Credential.action_replace_token(self.store, DUMMY_TOKEN_2)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertEqual(self.store.connection_generation, 6)
+        self.assertTrue(self.store.credential_last_replaced_at)
+
+    def test_non_connected_set_token_does_not_bump_generation(self):
+        # A set/replace on a non-connected, non-disconnecting store preserves the
+        # state and adds NO extra generation bump (review §5.8).
+        Credential = self._credential_as_admin()
+        self.store.write({'state': 'reconnect_needed', 'connection_generation': 7})
+        Credential.action_set_token(self.store, DUMMY_TOKEN_1)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'reconnect_needed')
+        self.assertEqual(self.store.connection_generation, 7)
+
+    def test_mutate_token_locks_store_before_credential_source(self):
+        # store -> credential global lock order: _mutate_token takes the store
+        # update lock (store._lock_store_for_lifecycle) BEFORE it reads/writes the
+        # credential row, refuses while disconnecting, and uses no sudo().
+        src = inspect.getsource(
+            credential_module.ShopifyConnectorStoreCredential._mutate_token
+        )
+        self.assertLess(
+            src.index('_lock_store_for_lifecycle'),
+            src.index('self.search('),
+            'the store row must be locked before the credential row is read/written',
+        )
+        self.assertIn("== 'disconnecting'", src)   # refuse-while-disconnecting
+        self.assertNotIn('sudo(', src)             # no sudo in the mutation path
 
     def test_action_clear_token_on_connected_store_moves_to_disconnected(self):
         Credential = self._credential_as_admin()

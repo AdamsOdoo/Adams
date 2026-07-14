@@ -83,7 +83,14 @@ class TestConnectionLifecycle(TransactionCase):
         with patch.object(type(Client), '_send', lambda self, store, body: response):
             return self._store().action_test_connection()
 
-    def _run_reconnect(self, test_connection_response, readiness_result, call_log=None):
+    def _run_reconnect(self, test_connection_response, readiness_result,
+                       call_log=None, entry_state='reconnect_needed'):
+        # CORE-R2 (AR-047; review 4690639375 #2): action_reconnect probes via the
+        # INTERNAL purpose 'reconnect_probe', whose frozen matrix permits only
+        # reconnect_needed / disconnected. Put the store in a valid reconnect
+        # entry state first (default reconnect_needed; pass 'disconnected' to
+        # exercise reconnect after a completed disconnect).
+        self.store.write({'state': entry_state})
         Client = self.env['shopify.connector.api.client']
         ReadinessCheck = self.env['shopify.connector.readiness.check']
         if call_log is None:
@@ -773,6 +780,34 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'reconnect_needed')
         self.assertEqual(len(self._audit_jobs()), 1)
+
+    # ------------------------------------------------------------------
+    # CORE-R2 (AR-047; review 4690639375 #2): reconnect_probe vs test_connection
+    # ------------------------------------------------------------------
+
+    def test_reconnect_from_completed_disconnected_connects(self):
+        # Reconnect after a completed disconnect (state 'disconnected', a
+        # credential re-entered) must work via purpose='reconnect_probe'.
+        self._set_token()
+        response = FakeResponse(
+            200, json_body=_success_body(domain=self.store.shop_domain)
+        )
+        self._run_reconnect(response, 'pass', entry_state='disconnected')
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'connected')
+
+    def test_test_connection_refused_from_disconnected(self):
+        # Ordinary Test Connection uses purpose='test_connection', whose matrix
+        # excludes 'disconnected' -> refused (Reconnect is the recovery path).
+        self._set_token()
+        self.store.write({'state': 'disconnected'})
+        with self.assertRaises(UserError):
+            self._store().action_test_connection()
+        # No dangling test-connection job was created by the refused attempt.
+        self.assertFalse(self.Job.search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_test_connection'),
+        ]))
 
     # ------------------------------------------------------------------
     # No secret leakage across lifecycle actions

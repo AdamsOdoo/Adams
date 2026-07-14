@@ -287,8 +287,15 @@ class TestBusinessAdmission(TransactionCase):
 
     # 7. Generation mismatch is refused.
     def test_generation_mismatch_refused(self):
-        job = self._make_job()  # captured expected_connection_generation == 0
-        self.store.write({'connection_generation': 1})
+        job = self._make_job()  # captures the store's current epoch at enqueue
+        # Bump the store epoch PAST the job's captured value to force a mismatch,
+        # regardless of the fixture's base epoch (CORE-R2 review 4690639375 #3:
+        # a connected `action_set_token` now bumps the epoch, so the setUpClass
+        # fixture is no longer necessarily at 0 -- derive the mismatch from the
+        # job's own captured generation rather than a hard-coded 0->1).
+        self.store.write({
+            'connection_generation': job.expected_connection_generation + 1,
+        })
         self.env.flush_all()
         with self.assertRaises(ShopifyQuiescedError):
             with self.Client.execute_business(job, self.store, 'q'):
@@ -1352,18 +1359,38 @@ class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
             ('job_type', '=', 'core_test_connection'),
         ]))
 
-    # 20. execute_lifecycle refuses test connection during disconnecting.
-    def test_execute_lifecycle_refuses_test_connection_while_disconnecting(self):
+    # 20. _execute_lifecycle (PRIVATE -- no RPC-exposed purpose, review
+    # 4690639375 #2) enforces the purpose->state matrix: `disconnecting` refuses
+    # every purpose; `test_connection` excludes `disconnected`; `reconnect_probe`
+    # permits it.
+    def test_execute_lifecycle_private_matrix_enforcement(self):
+        Client = self.env['shopify.connector.api.client']
         store = self._connected_with_token()
         store.write({'state': 'disconnecting'})
-        Client = self.env['shopify.connector.api.client']
         with self.assertRaises(UserError):
-            Client.execute_lifecycle(
-                store, 'query { shop { id } }', purpose='test_connection'
-            )
-        # An unknown purpose also fails closed.
+            Client._execute_lifecycle(store, 'q', purpose='test_connection')
         with self.assertRaises(UserError):
-            Client.execute_lifecycle(store, 'q', purpose='not_a_purpose')
+            Client._execute_lifecycle(store, 'q', purpose='reconnect_probe')
+        # Unknown purpose fails closed.
+        with self.assertRaises(UserError):
+            Client._execute_lifecycle(store, 'q', purpose='not_a_purpose')
+        # test_connection excludes `disconnected`; reconnect_probe permits it.
+        store.write({'state': 'disconnected'})
+        with self.assertRaises(UserError):
+            Client._execute_lifecycle(store, 'q', purpose='test_connection')
+        with patch.object(
+            type(Client), '_send',
+            lambda s, st, b, token=None: FakeResponse(200, json_body={'data': {}}),
+        ):
+            # reconnect_probe from disconnected passes the matrix and reaches the
+            # (faked) transport -- no UserError.
+            Client._execute_lifecycle(store, 'q', purpose='reconnect_probe')
+
+    # The purpose-carrying lifecycle entry is PRIVATE (not RPC-exposed).
+    def test_execute_lifecycle_is_private(self):
+        Client = type(self.env['shopify.connector.api.client'])
+        self.assertTrue(hasattr(Client, '_execute_lifecycle'))
+        self.assertFalse(hasattr(Client, 'execute_lifecycle'))
 
     # Activation and reconnect lifecycle operations are refused during
     # disconnecting (matrix §8).
@@ -1842,3 +1869,313 @@ class TestDisconnectControllerSelectionGenuine(TransactionCase):
                 lock_cr.rollback()
                 lock_cr.close()
             self._cleanup(dbname, store_ids)
+
+
+class TestLifecycleRaceCorrections(_DisconnectHelpers, TransactionCase):
+    """CORE-R2 review 4690639375 #1/#2: activation/reconnect TOCTOU + the
+    reconnect_probe path. Controlled tests driving the REAL production
+    `action_activate`/`action_reconnect`; the racing disconnect is a genuine
+    `action_disconnect` injected at the sanctioned `_send` transport seam (never
+    a lifecycle/state monkeypatch)."""
+
+    def _seed_activation_evidence(self, store):
+        now = fields.Datetime.now()
+        store.write({
+            'last_test_connection_result': 'pass',
+            'last_readiness_result': 'pass',
+            'credential_last_verified_at': now,
+            'last_readiness_at': now,
+        })
+
+    def _fake_readiness_pass(self):
+        def fake_run_for_store(rc_self, store):
+            store.write({
+                'last_readiness_result': 'pass',
+                'last_readiness_at': fields.Datetime.now(),
+            })
+            return {'job': None, 'overall_result': 'pass', 'checks': []}
+        return fake_run_for_store
+
+    # Activation must refuse a store a disconnect already won, without a second
+    # generation bump and without an activation audit (TOCTOU-safe under lock).
+    def test_activation_refuses_when_disconnect_won(self):
+        store = self._connected_with_token()
+        self._seed_activation_evidence(store)
+        store.action_disconnect()                    # -> disconnecting, gen +1
+        store.invalidate_recordset()
+        gen_after_disconnect = store.connection_generation
+        audits_before = len(self._audit_jobs(store))
+        with self.assertRaises(UserError):
+            store.action_activate()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnecting')          # not overwritten
+        self.assertEqual(
+            store.connection_generation, gen_after_disconnect)  # no 2nd bump
+        self.assertEqual(
+            len(self._audit_jobs(store)), audits_before)        # no activation audit
+
+    # Reconnect must refuse to overwrite a disconnect that won DURING the probe.
+    def test_reconnect_refuses_when_disconnect_wins_during_probe(self):
+        store = self._connected_with_token()
+        store.write({'state': 'reconnect_needed'})
+        store.invalidate_recordset()
+        gen_before = store.connection_generation
+        Client = self.env['shopify.connector.api.client']
+        ReadinessCheck = self.env['shopify.connector.readiness.check']
+
+        def racing_send(client_self, store_arg, body, token=None):
+            # A REAL one-way disconnect wins the race during the probe's call.
+            store.action_disconnect()
+            return FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain))
+
+        with patch.object(type(Client), '_send', racing_send), \
+             patch.object(type(ReadinessCheck), 'run_for_store',
+                          self._fake_readiness_pass()):
+            store.action_reconnect()
+        store.invalidate_recordset()
+        # Disconnect won -> reconnect must NOT overwrite it.
+        self.assertEqual(store.state, 'disconnecting')
+        self.assertEqual(store.disconnect_status, 'requested')
+        # Only the injected disconnect bumped the epoch (+1); reconnect bumped none.
+        self.assertEqual(store.connection_generation, gen_before + 1)
+
+    # Reconnect from a completed `disconnected` store (unchanged epoch) succeeds
+    # via reconnect_probe -- NOT refused by a blanket `disconnected` check.
+    def test_reconnect_from_disconnected_connects(self):
+        store = self._connected_with_token()
+        store.write({'state': 'disconnected'})
+        store.invalidate_recordset()
+        gen_before = store.connection_generation
+        Client = self.env['shopify.connector.api.client']
+        ReadinessCheck = self.env['shopify.connector.readiness.check']
+
+        def ok_send(client_self, store_arg, body, token=None):
+            return FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain))
+
+        with patch.object(type(Client), '_send', ok_send), \
+             patch.object(type(ReadinessCheck), 'run_for_store',
+                          self._fake_readiness_pass()):
+            store.action_reconnect()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'connected')
+        self.assertEqual(store.connection_generation, gen_before + 1)
+
+
+@tagged('post_install', '-at_install')
+class TestCredentialReplacementRaceGenuine(TransactionCase):
+    """CORE-R2 review 4690639375 #3 (§6.8/§6.9): genuine admission-vs-replacement
+    linearization through the REAL `execute_business`/`_admit` boundary and the
+    REAL `action_replace_token`, on independent `db_connect` connections (the
+    production `_admit` side transaction is made genuinely independent by patching
+    the registry cursor factory for the bounded window, mirroring
+    `TestGenuineRealAdmission`). Raw SQL is used only for observation/cleanup."""
+
+    STATEMENT_TIMEOUT_MS = 10000
+    LOCK_TIMEOUT_MS = 8000
+    NEW_TOKEN = 'shpat_DUMMYDUMMYDUMMY2222222222222222'
+
+    def _open_bounded(self, dbname):
+        cr = db_connect(dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
+    def _real_registry_cursor(self, dbname):
+        return lambda *args, **kwargs: self._open_bounded(dbname)
+
+    def _commit_connected_fixture(self, dbname):
+        setup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(setup, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Cred Race Store',
+                'shop_domain': 'cred-race-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07',
+                'state': 'connected',
+            })
+            env['shopify.connector.store.credential'].action_set_token(
+                store, DUMMY_TOKEN)
+            # action_set_token demotes connected -> reconnect_needed; re-assert.
+            store.write({'state': 'connected'})
+            job = env['shopify.connector.job.enqueue'].enqueue(
+                store, 'manual_sync', 'core_dispatch_selftest',
+                payload_hash=uuid.uuid4().hex,
+            )
+            ids = (store.id, job.id)
+            setup.commit()
+            return ids
+        finally:
+            setup.close()
+
+    def _observe(self, dbname, store_id):
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT state, connection_generation FROM "
+                "shopify_connector_store WHERE id = %s", (store_id,))
+            store_row = obs.fetchone()
+            obs.execute(
+                "SELECT access_token FROM shopify_connector_store_credential "
+                "WHERE store_id = %s", (store_id,))
+            cred_row = obs.fetchone()
+            obs.execute(
+                "SELECT count(*) FROM shopify_connector_call_lease "
+                "WHERE store_id = %s", (store_id,))
+            lease_count = obs.fetchone()[0]
+            obs.rollback()
+            return store_row, cred_row, lease_count
+        finally:
+            obs.close()
+
+    def _cleanup(self, dbname, store_id, job_id):
+        if store_id is None:
+            return
+        cr = self._open_bounded(dbname)
+        try:
+            if job_id is not None:
+                cr.execute(
+                    "DELETE FROM shopify_connector_job_log WHERE job_id = %s",
+                    (job_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_call_lease WHERE store_id = %s",
+                (store_id,))
+            if job_id is not None:
+                cr.execute(
+                    "DELETE FROM shopify_connector_job WHERE id = %s", (job_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store_credential "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store WHERE id = %s", (store_id,))
+            cr.commit()
+        finally:
+            cr.close()
+        verifier = self._open_bounded(dbname)
+        try:
+            verifier.execute(
+                "SELECT count(*) FROM shopify_connector_store WHERE id = %s",
+                (store_id,))
+            self.assertEqual(
+                verifier.fetchone()[0], 0, 'store residue after cleanup')
+            verifier.execute(
+                "SELECT count(*) FROM shopify_connector_call_lease "
+                "WHERE store_id = %s", (store_id,))
+            self.assertEqual(
+                verifier.fetchone()[0], 0, 'lease residue after cleanup')
+            verifier.rollback()
+        finally:
+            verifier.close()
+
+    # 6.9. Replacement winning FIRST: an old-generation admission fails closed
+    # and never captures the newly-replaced token.
+    def test_replacement_first_old_generation_admission_fails_closed(self):
+        dbname = self.env.cr.dbname
+        store_id = job_id = None
+        try:
+            store_id, job_id = self._commit_connected_fixture(dbname)
+            # Replacement commits first on an independent connection: connected ->
+            # reconnect_needed, generation bumped, new token stored.
+            repl = self._open_bounded(dbname)
+            try:
+                renv = api.Environment(repl, SUPERUSER_ID, {})
+                renv['shopify.connector.store.credential'].action_replace_token(
+                    renv['shopify.connector.store'].browse(store_id),
+                    self.NEW_TOKEN,
+                )
+                repl.commit()
+            finally:
+                repl.close()
+            # The old-generation admission now runs against the committed replace.
+            worker = self._open_bounded(dbname)
+            captured = {}
+            try:
+                wenv = api.Environment(worker, SUPERUSER_ID, {})
+                store = wenv['shopify.connector.store'].browse(store_id)
+                job = wenv['shopify.connector.job'].browse(job_id)
+                Client = wenv['shopify.connector.api.client']
+
+                def spy_send(client_self, s, b, token=None):
+                    captured['token'] = token
+                    return FakeResponse(200, json_body={'data': {}})
+
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)):
+                    with patch.object(type(Client), '_send', spy_send):
+                        with self.assertRaises(ShopifyQuiescedError):
+                            with Client.execute_business(job, store, 'q'):
+                                pass
+                worker.rollback()
+            finally:
+                worker.close()
+            # Fail-closed: no _send, so the new token was never captured...
+            self.assertNotIn('token', captured)
+            # ...and no lease was committed for the refused admission.
+            _store_row, cred_row, lease_count = self._observe(dbname, store_id)
+            self.assertEqual(lease_count, 0)
+            self.assertEqual(cred_row[0], self.NEW_TOKEN)   # replace won
+        finally:
+            self._cleanup(dbname, store_id, job_id)
+
+    # 6.8. Admission FIRST: it commits its lease and captures the OLD token; a
+    # replacement during the call proceeds afterward and the in-flight call keeps
+    # its captured old token (single in-memory snapshot).
+    def test_admission_first_uses_old_token_then_replacement_proceeds(self):
+        dbname = self.env.cr.dbname
+        store_id = job_id = None
+        try:
+            store_id, job_id = self._commit_connected_fixture(dbname)
+            worker = self._open_bounded(dbname)
+            captured = {}
+            try:
+                wenv = api.Environment(worker, SUPERUSER_ID, {})
+                store = wenv['shopify.connector.store'].browse(store_id)
+                job = wenv['shopify.connector.job'].browse(job_id)
+                Client = wenv['shopify.connector.api.client']
+
+                def racing_send(client_self, s, b, token=None):
+                    # The lease is already committed (old gen, old token captured)
+                    # before _send. A replacement now runs on an INDEPENDENT
+                    # connection; it does not block (admission's FOR SHARE already
+                    # released) and bumps the epoch.
+                    captured['token'] = token
+                    repl = self._open_bounded(dbname)
+                    try:
+                        renv = api.Environment(repl, SUPERUSER_ID, {})
+                        renv[
+                            'shopify.connector.store.credential'
+                        ].action_replace_token(
+                            renv['shopify.connector.store'].browse(store_id),
+                            self.NEW_TOKEN,
+                        )
+                        repl.commit()
+                    finally:
+                        repl.close()
+                    captured['lease_during'] = self._observe(dbname, store_id)[2]
+                    return FakeResponse(200, json_body={'data': {}})
+
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)):
+                    with patch.object(type(Client), '_send', racing_send):
+                        with Client.execute_business(job, store, 'q') as result:
+                            self.assertEqual(result['data'], {})
+                worker.rollback()
+            finally:
+                worker.close()
+            # The admitted call used its captured OLD token, never the replacement.
+            self.assertEqual(captured['token'], DUMMY_TOKEN)
+            self.assertEqual(captured['lease_during'], 1)   # lease held during call
+            store_row, cred_row, lease_count = self._observe(dbname, store_id)
+            self.assertEqual(cred_row[0], self.NEW_TOKEN)   # replace proceeded
+            self.assertEqual(store_row[0], 'reconnect_needed')
+            self.assertEqual(lease_count, 0)                # released on exit
+        finally:
+            self._cleanup(dbname, store_id, job_id)
