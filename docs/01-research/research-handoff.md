@@ -1,5 +1,80 @@
 # Research Handoff (rolling)
 
+### Task 011B — EXACT-HEAD CONCURRENCY-CORRECTION RUNTIME CONFIRMATION (build 34863138 @ `662e980`; draft PR #150, 2026-07-14)
+
+- **Session role:** exact-head runtime-confirmation operator. Converted the §19
+  working-tree concurrency correction into **authoritative exact-committed-head**
+  Odoo.sh evidence, on the **exact validated code SHA
+  `662e9809c7b2443a0391f417ca2dff7daa3da29e`** (branch
+  `claude/task-011b-customer-matching-k5ux9b`, Odoo 19.0, build **34863138**, DB
+  `adamsmen-claude-task-011b-customer-matching-k5ux9b-34863138`, PostgreSQL 16.14;
+  control-room acceptance `4687882165`). Build-to-commit proven by
+  `git rev-parse HEAD` = `662e980` (tree clean; branch tip local+remote == HEAD;
+  base `9128015` proven ancestor; net scope = exactly the **8 Task 011B files**;
+  **no Task 010B / issue-157 file**; the two range commits `ec07fd9` [concurrency
+  test only, +117/−4] + `662e980` [docs only] touch only the test + validation
+  record — production `models/**` byte-unchanged). **No code changed this session**
+  — docs-only evidence confirmation (no Task 011B defect found).
+- **Fresh build install — GREEN:** all four modules (`adams_base`,
+  `shopify_connector_core`, `shopify_connector_product`, `shopify_connector_sale`)
+  loaded; **`0 failed, 0 error(s) of 357 tests`, 0 WARNING**; benchmark +
+  concurrency classes correctly **absent** from the standard fresh-install pass;
+  11 `odoo.sql_db` ERRORs = expected NOT-NULL/UNIQUE negative-constraint
+  provocations (customer + product binding tests). The lone docutils
+  `<string>:38 (ERROR/3)` is on the **standard** `res.partner.email_normalized`
+  help (not our prefixed field) — pre-existing base-Odoo RST diagnostic, not 011B.
+- **Sale standard suite — GREEN:** **90 tests / `0 failed, 0 error(s) of 80`**
+  (~1.04 s, 1595 q); all **32** `TestCustomerMatchingScalability` methods; opt-in
+  benchmark/concurrency excluded; 0 WARNING; 5 expected-negative SQL. **Re-run
+  again AFTER the concurrency runs → identical green** (no leaked `Registry._lock`).
+- **Genuine independent-transaction concurrency — 3/3 STABLE (authoritative):**
+  each run reached the full **12-phase** worker trail (`worker_thread_entered …
+  after_api_environment … before_dispatch … after_commit → worker_done`); distinct
+  backend PIDs (4116713/4116715, 4117922/4117925, 4118743/4118746);
+  **A-attributed binding-`INSERT` block** (`pg_blocking_pids(B)∋A` + INSERT
+  predicate) that **cleared on A's commit**; first collision
+  `unknown_system_error → retry_waiting` (rc=1, `next_retry_at` set, attempt +
+  retry logs); clean retry `binding_conflict → blocked_manual_review`; exactly
+  **1 binding / 1 partner** surviving on `gid_a`; zero cleanup residue. This
+  **supersedes §18.6's "environment limitation / GATE OPEN"** — the true cause was
+  the `Registry._lock` post_install deadlock (CORE-R2 §4.2), fixed test-only in §19.
+- **Registry-lock safety:** original `_lock` restored to the same object in the
+  test `finally` after worker termination + worker-cursor close + parent-cursor
+  teardown; proven by the healthy post-concurrency standard suite; each run is a
+  separate process (no cross-process leak possible).
+- **Warning/SQL/cleanup/leak:** 0 WARNING, 0 ERROR-level across all 3 concurrency
+  runs (raw race SQL muted; only INFO pool `used=0` close). DB probe: **zero
+  synthetic residue** (race partners/stores/bindings/settings/jobs/logs all 0),
+  **0 idle-in-transaction**, no test PIDs alive; **cron id 3 active**; log secret
+  scan = 0 emails / tokens / raw SQL / GraphQL.
+- **Prior benchmark:** build-`34844515` 100k benchmark + EXPLAIN + single-DB
+  backfill (§18) **carried forward, NOT re-run** at `662e980` (no benchmark or
+  production logic changed). The **fully-authoritative isolated base→head build
+  backfill gate stays OPEN** (single linked DB; single-DB `-u` is not a substitute).
+- **PR / gate state:** PR **#150** kept **open, draft, unmerged, not ready**;
+  docs-only evidence commit advances the branch head (itself not runtime-tested).
+  Evidence: `../05-qa/task-011b-validation-results.md` §20; AR-045 exact-head
+  concurrency note. **Issue #157 separate/not fixed; SRR-03 OPEN; live Shopify
+  blocked.**
+- **Exact next-session prompt (control room):** "Review PR #150's exact-head
+  concurrency runtime confirmation (validation-results §20, AR-045 exact-head
+  concurrency note, this handoff): validated concurrency code SHA `662e980`, build
+  34863138, fresh install green (357/0), sale suite green (80/0, 32 methods,
+  re-confirmed after the concurrency runs), and the genuine independent-transaction
+  binding race **3/3 stable** with the full 12-phase worker trail, A-attributed
+  binding-INSERT block clearing on A's commit, `unknown_system_error → retry_waiting`
+  then `binding_conflict → blocked_manual_review`, one binding/one partner on
+  `gid_a`, zero residue, `Registry._lock` restored, cron 3 active, leak scan clean.
+  Decide: (a) accept exact-head concurrency as CLOSED/green (§18.6 superseded by
+  §19+§20); (b) whether to provision an **isolated base→head build** for the
+  fully-authoritative 100k backfill duration (single-DB `-u` is not a substitute) —
+  gate stays OPEN; (c) confirm the prior build-34844515 100k benchmark/EXPLAIN/
+  backfill evidence is carried forward (not re-run, nothing changed but the test +
+  docs); (d) route the `res_users.notification_type` issue-157 artifact to its
+  non-Task-011B owner (unchanged, separate); (e) whether to authorize the next task.
+  Do not mark PR #150 ready or merge, and do not perform live Shopify validation,
+  without an explicit control-room act. SRR-03 remains OPEN."
+
 ### Task 011B — EXACT-HEAD ODOO.SH RUNTIME CLOSURE (build 34844515 @ `9895919`; draft PR #150, 2026-07-13)
 
 - **Session role:** runtime-closure operator. Executed the Task 011B runtime
