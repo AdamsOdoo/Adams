@@ -189,18 +189,24 @@ class ShopifyConnectorStore(models.Model):
         `reconnect_probe` permits it (reconnect after completed disconnect,
         matrix §8), and neither permits `disconnecting`.
 
-        **One credential snapshot per probe (review 4690804619 #1).** The probe
-        binds to exactly one credential snapshot via `_admit_lifecycle` (a single
-        token read + the credential id/version + the store generation) and issues
-        the request through `_send_lifecycle(store, query, token)` with that exact
-        token -- the transport re-reads **no** credential. After the network
-        result (success **or** failure), `_lifecycle_probe_superseded` acquires the
-        store->credential locks and revalidates state, generation, and credential
-        version; if a lifecycle or credential change won during the call the
-        response is **discarded** and the probe is audited as **superseded**
-        (job cancelled, **no** verification/failure mirror and **no** credential
-        state written). No lock spans the network call. Returns `'superseded'` in
-        that case (so `action_reconnect` aborts), else `None`.
+        **One atomic credential snapshot per probe (reviews 4690804619 #1 +
+        4691182306 #1).** The probe binds to exactly one credential snapshot via
+        `_admit_lifecycle`, which captures it in a **short independent side
+        transaction** whose store-row ``FOR SHARE`` linearizes the probe against
+        any concurrent generation-changing lifecycle transition and is
+        **committed/released before** the network call (no lease, no lock across
+        the network). It then issues the request through
+        `_send_lifecycle(store, query, token)` with that exact token -- the
+        transport re-reads **no** credential. A disconnect that wins **before** the
+        admission ``FOR SHARE`` is refused under the lock (no network issued); a
+        disconnect that wins **after** is caught by the post-network revalidation:
+        `_lifecycle_probe_superseded` acquires the store->credential locks and
+        revalidates state, generation, and credential version/value; if a lifecycle
+        or credential change won the response is **discarded** and the probe is
+        audited as **superseded** (job cancelled, **no** verification/failure mirror
+        and **no** credential state written). No lock spans the network call.
+        Returns `'superseded'` in either case (so `action_reconnect` aborts),
+        else `None`.
 
         The matrix is pre-checked here **before** any audit job is created (so a
         refused probe never leaves a dangling `running` job) and re-enforced in
@@ -240,14 +246,30 @@ class ShopifyConnectorStore(models.Model):
             job, 'attempt', 'Test connection attempt started.',
         )
 
-        # CORE-R2 (review 4690804619 #1): bind the probe to ONE credential
-        # snapshot and send with exactly that token (no second credential read on
-        # the transport). A missing-token/bad-state admit failure is pre-network
-        # (no snapshot, no stale result); a transport ShopifyClientError still
-        # goes through the post-network revalidation below.
-        snapshot = None
+        # CORE-R2 (reviews 4690804619 #1 + 4691182306 #1): bind the probe to ONE
+        # credential snapshot captured in an atomic side transaction, and send
+        # with exactly that token (no second credential read on the transport).
+        # `_admit_lifecycle`'s store-row FOR SHARE linearizes this probe against a
+        # concurrent generation-changing lifecycle transition:
+        #   * a matrix refusal under the lock (`UserError`) means a disconnect (or
+        #     other transition) WON between this probe's pre-check and the
+        #     admission FOR SHARE -> the probe is superseded and NO network is
+        #     issued (the exact "disconnect wins before _send" hole review
+        #     4691182306 #1 named);
+        #   * a missing/empty credential at admission (`ShopifyClientError`, e.g. a
+        #     raced direct clear) is an auth failure recorded without any network;
+        #   * otherwise the request is sent with the snapshot token, and the
+        #     result goes through the post-network revalidation below.
         try:
             snapshot = Client._admit_lifecycle(self, purpose)
+        except UserError:
+            self._audit_probe_superseded(job)
+            return 'superseded'
+        except ShopifyClientError as exc:
+            self._apply_probe_failure(job, exc)
+            return None
+
+        try:
             result = Client._send_lifecycle(
                 self, TEST_CONNECTION_QUERY, snapshot['token'],
             )
@@ -257,8 +279,9 @@ class ShopifyConnectorStore(models.Model):
             probe_error = exc
 
         # Post-network revalidation: discard a result the snapshot no longer
-        # backs, and audit it as superseded -- writing NO mirror/credential state.
-        if snapshot is not None and self._lifecycle_probe_superseded(snapshot):
+        # backs (state/generation/credential changed during the call), audit it as
+        # superseded, and write NO mirror/credential state. No lock spans the call.
+        if self._lifecycle_probe_superseded(snapshot):
             self._audit_probe_superseded(job)
             return 'superseded'
 

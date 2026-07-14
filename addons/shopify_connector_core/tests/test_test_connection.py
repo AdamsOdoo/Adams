@@ -24,6 +24,20 @@ class TestTestConnection(TransactionCase):
             'admin', 'group_shopify_connector_admin'
         )
 
+    def setUp(self):
+        super().setUp()
+        # CORE-R2 (review 4691182306 #1): `action_test_connection` now routes
+        # through `_admit_lifecycle`, which captures its one-token snapshot in an
+        # OWNED `registry.cursor()` side transaction (store-row FOR SHARE), exactly
+        # like business `_admit`. A plain TransactionCase side cursor is a
+        # genuinely independent connection that cannot see this class's uncommitted
+        # fixture; entering registry test mode makes every `registry.cursor()`
+        # reuse the single test connection as a TestCursor so the fixture is
+        # visible cross-cursor -- the sanctioned mechanism `TestBusinessAdmission`
+        # already uses. Packet-§4 seam-compat: no assertion changed.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     @classmethod
     def _create_group_user(cls, label, group_xmlid):
         group = cls.env.ref('shopify_connector_core.%s' % group_xmlid)

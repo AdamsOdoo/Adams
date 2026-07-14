@@ -76,6 +76,24 @@ class TestApiClient(TransactionCase):
         )
         cls.Client = cls.env['shopify.connector.api.client']
 
+    def setUp(self):
+        super().setUp()
+        # CORE-R2 (review 4691182306 #1): `_admit_lifecycle` now captures its
+        # snapshot in an OWNED `registry.cursor()` side transaction (store-row
+        # FOR SHARE), exactly like business `_admit`. Under a plain TransactionCase
+        # that side cursor is a genuinely independent connection that cannot see
+        # this class's uncommitted fixture; entering registry test mode makes every
+        # `registry.cursor()` reuse the single test connection as a TestCursor so
+        # the fixture is visible cross-cursor -- the sanctioned mechanism
+        # `TestBusinessAdmission` already uses for business `_admit`. This is a
+        # packet-§4 seam-compat adaptation: no assertion changed. Genuine
+        # cross-connection admission-vs-disconnect behaviour is proven by the
+        # genuine lifecycle-race classes in test_disconnect_quiescence.py. The
+        # execute()/_send_lifecycle direct tests open no side cursor, so test mode
+        # is transparent to them.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     def _execute_with(self, fake_send):
         with patch.object(type(self.Client), '_send', fake_send):
             return self.Client.execute(self.store, 'query { shop { id } }')

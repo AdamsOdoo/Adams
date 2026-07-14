@@ -45,6 +45,22 @@ class TestReadinessSlotClosure(TransactionCase):
             'admin', 'group_shopify_connector_admin'
         )
 
+    def setUp(self):
+        super().setUp()
+        # CORE-R2 (review 4691182306 #1): `action_test_connection` now routes
+        # through `_admit_lifecycle`, which captures its one-token snapshot in an
+        # OWNED `registry.cursor()` side transaction (store-row FOR SHARE), exactly
+        # like business `_admit`. A plain TransactionCase side cursor is a
+        # genuinely independent connection that cannot see this class's uncommitted
+        # fixtures; entering registry test mode makes every `registry.cursor()`
+        # reuse the single test connection as a TestCursor so the fixtures are
+        # visible cross-cursor -- the sanctioned mechanism `TestBusinessAdmission`
+        # already uses. Packet-§4 seam-compat: no assertion changed;
+        # `action_activate` and the source-guard tests open no side cursor, so test
+        # mode is transparent to them.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     # ------------------------------------------------------------------
     # Fixtures / helpers
     # ------------------------------------------------------------------

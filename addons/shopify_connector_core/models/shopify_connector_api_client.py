@@ -183,8 +183,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
 
     @api.model
     def _admit_lifecycle(self, store, purpose):
-        """Bind one lifecycle probe to exactly ONE credential snapshot (CORE-R2,
-        AR-047; analysis §9.1; review 4690804619 #1).
+        """Atomically bind one lifecycle probe to ONE credential snapshot in a
+        short independent side transaction (CORE-R2, AR-047; analysis §9.1;
+        reviews 4690804619 #1 + 4691182306 #1).
 
         **Private on purpose.** `purpose` is a fixed enum selected by the two
         trusted store callers only (`action_test_connection` -> `test_connection`,
@@ -194,25 +195,38 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         through RPC (the public API-client surface stays exactly
         `{execute, execute_business}`).
 
-        Returns the immutable probe snapshot the caller passes to `_send_lifecycle`
-        and later revalidates (analysis §9.3): the **single** in-memory token read
-        (via the one sanctioned `_get_access_token`), the credential row identity +
-        version (`id`, `write_date`), the store `connection_generation`, and the
-        `purpose`'s allowed-state matrix. The token is read **once here** and passed
-        to `_send_lifecycle(store, body, token)` so the transport performs **no**
-        second credential read -- closing the double-read window review 4690804619
-        cited (`execute()` pre-check read + `_send` re-read).
+        **Atomic admission (review 4691182306 #1).** The snapshot is captured in
+        one owned side transaction so the store-row ``SELECT … FOR SHARE`` lock
+        **linearizes** this admission against any generation-changing lifecycle
+        transition's ``FOR NO KEY UPDATE`` (disconnect / activation / reconnect /
+        connected credential-replace) -- the **same** mechanism as the business
+        `_admit`, minus any lease. If ``action_disconnect`` wins first, this
+        admission's ``FOR SHARE`` reads the fresh ``disconnecting``/new-generation
+        row **before** any network call and refuses; if this admission commits
+        first, a later disconnect is caught by the post-network revalidation. The
+        ``FOR SHARE`` is **committed (released) before** `_send_lifecycle` runs --
+        **no lock spans the network call** -- and **no `call.lease` is created**
+        (this is the setup/diagnostic counterpart, not a business admission).
+
+        Sequence (mirrors `_admit`): open an owned ``registry.cursor()`` side
+        transaction; ``SELECT state, connection_generation … FOR SHARE`` on the
+        store row; **freshly** re-check the fixed purpose->state matrix under that
+        lock (no purpose lists ``disconnecting``); read the access token **exactly
+        once** (the one sanctioned `_get_access_token`); capture the credential row
+        id + version (``id``, ``write_date``); ``commit`` (persists nothing,
+        releases the ``FOR SHARE``, completes the admission linearization); close.
+        Returns the non-persisted snapshot the caller passes to
+        `_send_lifecycle(store, body, token)` (so the transport re-reads **no**
+        credential) and later revalidates via `_lifecycle_probe_superseded`.
 
         Fails closed exactly like the read-only contract: an unknown/absent purpose
-        or a state outside the matrix raises `UserError` (defense in depth atop the
-        store's pre-check; no purpose lists `disconnecting`), and a missing/empty
-        credential raises `ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID,
-        credential_invalid=True)` -- before any network. This is a **plain**
-        snapshot read: it takes **no** lock (a lifecycle probe must not hold a lock
-        across the network call) and does not itself change the epoch; the
-        generation-changing write that may *follow* a successful probe (activation /
-        reconnect success) is what takes the store-row update lock, in
-        `shopify.connector.store`.
+        or a state outside the matrix (freshly read under the lock) raises
+        `UserError` -- the caller treats a post-pre-check matrix refusal as a probe
+        superseded before send; a missing/empty credential raises
+        `ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID,
+        credential_invalid=True)` -- both before any network. Any side-transaction
+        failure rolls back and closes the cursor; no request/main-cursor commit and
+        no token is ever logged/persisted.
         """
         allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
         if allowed_states is None:
@@ -220,33 +234,77 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 'An unknown lifecycle purpose was requested; the Shopify '
                 'call is refused.'
             )
-        if store.state not in allowed_states:
-            raise UserError(
-                'This diagnostic is not available while the store is "%s"; '
-                'the Shopify call is refused.' % store.state
+        # Flush the caller's pending ORM writes (store + credential) so the
+        # independent side cursor's raw locking SELECT and the side-env credential
+        # reads observe the current state/generation/token. In production the store
+        # and credential rows are long committed, so this is effectively a no-op
+        # for the side cursor's reads (it sees committed data); it is required for
+        # correctness only when the caller created/wrote them within this same
+        # transaction (e.g. under registry test mode).
+        self.env.flush_all()
+        side_cr = self.env.registry.cursor()
+        try:
+            side_cr.execute(
+                "SELECT state, connection_generation "
+                "FROM shopify_connector_store WHERE id = %s FOR SHARE",
+                (store.id,),
             )
-        token = self.env['shopify.connector.store.credential']._get_access_token(
-            store
-        )
-        if not token:
-            raise ShopifyClientError(
-                error_class=ERROR_AUTH,
-                reason=REASON_TOKEN_INVALID,
-                credential_invalid=True,
+            row = side_cr.fetchone()
+            if row is None:
+                # The store row is not available on an independent transaction
+                # (e.g. deleted mid-probe) -- fail closed before any network.
+                raise UserError(
+                    'This store is no longer available; the Shopify call is '
+                    'refused.'
+                )
+            state, generation = row
+            # Fresh matrix re-check UNDER the FOR SHARE lock (defense in depth
+            # atop the store's pre-check + the linearization point): a disconnect
+            # that won before this lock is observed here and refused before send.
+            if state not in allowed_states:
+                raise UserError(
+                    'This diagnostic is not available while the store is "%s"; '
+                    'the Shopify call is refused.' % state
+                )
+            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
+            side_credential = side_env['shopify.connector.store.credential']
+            side_store = side_env['shopify.connector.store'].browse(store.id)
+            # Single token read under the lock (the one sanctioned
+            # `_get_access_token` sudo -- no new sudo introduced here).
+            token = side_credential._get_access_token(side_store)
+            if not token:
+                # A store still inside the matrix but with no usable credential
+                # (e.g. a raced direct clear) is an authentication failure -- the
+                # accepted API-client taxonomy, before any lease/network.
+                raise ShopifyClientError(
+                    error_class=ERROR_AUTH,
+                    reason=REASON_TOKEN_INVALID,
+                    credential_invalid=True,
+                )
+            # Credential id + write_date baseline captured under the same locked
+            # snapshot (lock=False: the store FOR SHARE is the linearization
+            # primitive; the post-network revalidation takes the credential lock).
+            version = side_credential._lifecycle_credential_version(
+                side_store, lock=False
             )
-        # Non-locking credential version baseline (id + write_date). A lock here
-        # would span the network call (forbidden); the post-network revalidation
-        # takes the store->credential locks and re-reads this version.
-        version = self.env[
-            'shopify.connector.store.credential'
-        ]._lifecycle_credential_version(store, lock=False)
-        return {
-            'token': token,
-            'credential_id': version[0] if version else False,
-            'credential_version': version[1] if version else False,
-            'generation': store.connection_generation,
-            'allowed_states': allowed_states,
-        }
+            snapshot = {
+                'token': token,
+                'credential_id': version[0] if version else False,
+                'credential_version': version[1] if version else False,
+                'generation': generation,
+                'allowed_states': allowed_states,
+            }
+            # Commit the short admission side transaction: persists NO business
+            # data (no lease, no write), releases the FOR SHARE lock, and
+            # completes the lifecycle-admission linearization -- all BEFORE the
+            # network call in `_send_lifecycle`.
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return snapshot
 
     @api.model
     def _send_lifecycle(self, store, query, token, variables=None):
