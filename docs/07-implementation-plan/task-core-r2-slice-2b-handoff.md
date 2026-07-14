@@ -13,6 +13,101 @@ questions and adversarial findings are load-bearing.
 
 ---
 
+## Slice 2B integration-staging setup (2026-07-14 — branch-orchestration session)
+
+> **Separate follow-up session — branch orchestration & history integration only.**
+> This session created the Slice-2B integration-staging branch and merged the two
+> accepted domain PR heads into it. **No production, test, XML, manifest, security,
+> or cron code was written or modified; no call-site migration was performed; the
+> public generic `execute()` was not removed/privatized; no PR was opened, merged,
+> or closed; no Odoo.sh or live-Shopify validation was run.** The prerequisite in
+> `Recommended next session` (drive PR #160 to runtime-green, accept, and merge into
+> `Shopify-connector`) has been satisfied by the control room, so this session
+> begins at packet §7 step 2. **SRR-03 remains OPEN. Issue #157 remains separate.**
+
+**Base (§7 steps 1–2).** Branch `claude/core-r2-slice-2b-integration` was created
+from the exact post-PR-#160 `Shopify-connector` tip
+`a3fd6cdfcb6f3654ae81a48a7f4e694994d4762b` — the merge commit of **PR #160 —
+CORE-R2 Foundation Slice 2A** (control-room Slice 2A acceptance `4693862195`;
+parents `1494b97d…` + Slice-2A head `843511c004…`). The branch tip was verified to
+equal the required base before any merge.
+
+**Merge of PR #151 (§7 step 3 — product / Task 010B).** The exact accepted PR #151
+head `e4669aaf206fe8436a6d8a524b083f48d56ac9df` (validated code SHA
+`db534f833cf3636184681801dcd7e13636e09245`; control-room acceptance `4686089797`)
+was merged into staging with a **normal no-fast-forward merge commit**
+`2c4d5e9a522ea414b40f9dc9967ead608679e38c` (parents = staging base `a3fd6cdf…` +
+PR #151 head `e4669aaf…`). No `addons/**` conflict occurred; the merge was clean.
+Every `shopify_connector_product/**` blob is byte-identical to the PR #151 head,
+and the 010B validation record/packet match the PR #151 head.
+
+**Merge of PR #150 (§7 step 3 — customer / Task 011B).** The exact accepted PR #150
+head `10d0034e8e666684daa36f517788223976d74035` (validated concurrency code SHA
+`662e9809c7b2443a0391f417ca2dff7daa3da29e`; control-room acceptance `4689951254`)
+was merged into staging with a **normal no-fast-forward merge commit**
+`4beba38b37534bca01335907d1c884d952dec5d4` (parents = post-#151 staging head
+`2c4d5e9…` + PR #150 head `10d0034e…`). No `addons/**` conflict occurred. Every
+`shopify_connector_sale/**` blob is byte-identical to the PR #150 head, the 011B
+validation record matches the PR #150 head, and the product blobs still match the
+PR #151 head.
+
+**Documentation-only conflict resolution (§7 step 3 shared-document rule).** The
+second merge conflicted **only** in the two expected shared documents; both were
+resolved by **union, preserving both domain histories completely** — each resolved
+file differs from the post-PR-#151 staging head by *only* PR #150's own additions
+(verified: zero deletions):
+
+- `docs/05-qa/architecture-review-log.md` — the AR-045 (Task 011B) index row was
+  inserted immediately before AR-046 (Task 010B), keeping the AR table ascending
+  (`AR-044 / AR-045 / AR-046 / AR-047`). **Both AR-045 and AR-046 records are
+  preserved** with all their build/SHA/acceptance references; no historical note
+  was deleted.
+- `docs/01-research/research-handoff.md` — **both** runtime-closure session blocks
+  were kept at the top in reverse-chronological order (Task 011B build `34863138`
+  above Task 010B build `34828304`, both above the prior CORE-R2 Slice 1 entry).
+  No acceptance ID, SHA, build ID, gate status, or chronology was lost.
+
+**Inherited domain code unchanged.** This session made **no** call-site change and
+edited no inherited product/customer/core production or test file. A static
+`compileall` of the three connector addons passes (syntax only) — this is **not** a
+runtime-green claim.
+
+**Evidence status.** The historical PR #150/#151 exact-head runtime evidence
+(builds 34828304 @ `db534f8`; 34863138 @ `662e980`) remains **supporting evidence
+only** for the inherited domains (packet §6). **No integrated-head runtime evidence
+exists yet** — the integration-staging tree has not been built or tested and is
+**explicitly not runtime-green**. Integrated exact-head Odoo.sh evidence and the
+deployed multi-worker proof are earned later on the staging head (validation plan
+§1.4/§2), not by this session.
+
+**Final integration-staging head and child-branch creation point.** After the two
+merge commits above, **this staging-setup handoff commit becomes the final
+integration-staging head**, and it is the **exact point from which both child
+branches are cut** (§7 step 4). `claude/core-r2-product-callsite` and
+`claude/core-r2-customer-callsite` are created from that **one identical** final
+head — so both contain Slice 2A plus the complete Task 010B and Task 011B domains,
+both share the same tip, neither carries an extra commit, and neither starts from a
+raw PR #150/#151 head nor directly from `Shopify-connector`. The exact final-head
+SHA and the two identical child tips are recorded in the session final report.
+
+**Gate / scope status after this session.**
+
+- PR #150 and PR #151 remain **open, draft, and unmerged**; neither was merged into
+  `Shopify-connector`, and neither was closed. No code from either PR reached
+  `Shopify-connector`.
+- **No implementation gate beyond branch setup is opened.** Both domain importers
+  still call the legacy public `execute()`; `execute_business` exists but no
+  production call site enters it; the public generic `execute()` is untouched.
+- **SRR-03 remains OPEN.** Issue #157 remains a separate
+  `res.users.notification_type` fixture investigation, not mixed into this work.
+- **Next sessions:** **Prompt P** (product call-site migration, §8) and **Prompt C**
+  (customer call-site migration, §9) may run **in parallel** on the two child
+  branches (disjoint file sets). **Prompt E** (public-`execute()` closure, §9c)
+  **remains blocked** until **both** child branches are merged back into
+  `claude/core-r2-slice-2b-integration`.
+
+---
+
 ## Session summary
 
 **Revision 3 — correction session** driven by control-room review **`4690831454`
