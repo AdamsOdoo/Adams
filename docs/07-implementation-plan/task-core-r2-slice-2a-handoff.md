@@ -163,6 +163,57 @@ for ratification — `tests/test_test_connection.py` and
 argument; no assertion changed). Net PR scope: 15 files. Full evidence:
 `docs/05-qa/task-core-r2-validation-results.md` §S2A-C2.
 
+## 5c. Atomic lifecycle admission + genuine race tests (review 4691182306)
+
+A third control-room pass (on head `756684d`) required two further correctness
+fixes before Odoo.sh runtime; both are implemented and **not** deferred:
+
+- **Atomic lifecycle admission (defect 1).** `_admit_lifecycle` no longer takes a
+  plain main-cursor/cached snapshot. It now captures the snapshot in one short
+  **owned side transaction** — the same accepted mechanism as business `_admit`,
+  minus any lease: open `registry.cursor()`, `SELECT state, connection_generation
+  … FOR SHARE` on the store row (the linearization lock, conflicts with the
+  lifecycle `FOR NO KEY UPDATE`), re-check the purpose→state matrix on the locked
+  value, read the token exactly once and capture the credential id/version, then
+  `commit`/`close` **before** the network call. So a disconnect that wins before
+  the `FOR SHARE` is refused under the lock (no transport issued — the exact hole
+  the review named), and one that wins after is caught by the unchanged
+  post-network `_lifecycle_probe_superseded` revalidation. `_run_connection_probe`
+  routes an under-lock `UserError` to *superseded* and a missing-credential
+  `ShopifyClientError` to *failure*, both without any network. No lock spans the
+  network call; no `call.lease` is created; no main-cursor commit.
+- **Genuine independent-transaction race tests (defect 2).** Added
+  `TestLifecycleAdmissionSourceGuards` (source guards for the side-transaction
+  admission), `TestLifecycleAdmissionRaceGenuine` (both orders across distinct
+  backend PIDs: disconnect-first → zero transport; admission-first → old token
+  then superseded, no mirror; a store-row lock-attribution proof; and a threaded
+  genuine-simultaneity proof via the accepted `Registry._lock` bounded-window
+  pattern), and `TestPublicClearAdmissionRaceGenuine` (business-admission-first →
+  clear deferred, credential cleared only at controller `completed`, one
+  generation bump; public-clear-first → old-generation admission fails closed,
+  no lease, no transport, credential preserved until finalization). The prior
+  `TransactionCase` supersession/clear tests are retained and re-documented as
+  **controlled seam-injection** tests (not genuine concurrency).
+- **Test-mode seam-compat (packet §4, control-room-approved).** Because the
+  atomic admission opens an owned `registry.cursor()` side transaction, every
+  probe-driving test class enters **registry test mode** (the mechanism
+  `TestBusinessAdmission` uses for business `_admit`) so the production side cursor
+  sees the fixture — **no assertion changed**. This extends the ratified §4
+  seam-compat class to `test_connection_lifecycle.py` (approved for this round)
+  plus the test-mode line on the two already-ratified seam-compat files.
+  `test_readiness_check.py` is untouched (it never drives the probe).
+
+Files touched by this correction: `models/shopify_connector_api_client.py`,
+`models/shopify_connector_store.py`, `__manifest__.py` (version `19.0.1.7.2`),
+`tests/test_disconnect_quiescence.py`, `tests/test_api_client.py`,
+`tests/test_test_connection.py`, `tests/test_readiness_slot_closure.py`,
+`tests/test_connection_lifecycle.py`, and the two docs. **No new file** enters the
+PR; `store_credential.py`/`job_dispatch.py` were not needed (the existing
+`_lifecycle_credential_version` serves the side-transaction snapshot). Net PR
+scope stays **15** files. Base re-aligned to `Shopify-connector`
+`1494b97d0e2117af05b954dabde92a9e497ac2c3` via a normal merge commit. Full
+evidence: `docs/05-qa/task-core-r2-validation-results.md` §S2A-C3.
+
 ## 6. Remaining Slice-2B work (NOT authorized here)
 
 - Product importer call-site migration to `with execute_business(job, …)` around

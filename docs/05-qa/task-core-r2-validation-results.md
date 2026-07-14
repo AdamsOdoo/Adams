@@ -1330,3 +1330,155 @@ the network call.
   suite is still required (handoff §3–4).
 - PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request;
   no product/sale/cron change in this correction.
+
+# CORE-R2 — Foundation Slice 2A — atomic lifecycle admission + genuine race tests (review 4691182306)
+
+Third control-room pass, at head `756684d`. Two blocking defects; both fixed.
+`Fact`s below are static (source/AST) — **no Odoo runtime this session**.
+
+## S2A-C3.0 Scope ratification applied (control-room ruling)
+
+Per the ruling accompanying review 4691182306, the two prior seam-compat files
+(`tests/test_test_connection.py`, `tests/test_readiness_slot_closure.py`) are
+**ratified**. This round extends the **same packet-§4 transport-seam-compat class**
+to every remaining test that drives a lifecycle probe, because defect 1 (below)
+makes `_admit_lifecycle` capture its snapshot in an OWNED `registry.cursor()` side
+transaction — under a plain `TransactionCase` that side cursor is a genuinely
+independent connection that cannot see an uncommitted fixture, so each
+probe-driving class must enter **registry test mode** (the sanctioned mechanism
+`TestBusinessAdmission` already uses for business `_admit`). This adaptation adds
+**no assertion change**; it only makes the production side cursor see the fixture.
+The control room approved extending it to `tests/test_connection_lifecycle.py`
+(outside the round's initial allowed-list) and adding the test-mode line to the two
+ratified seam-compat files. `test_readiness_check.py` was **not** touched (it calls
+`run_for_store`/creates jobs directly and never drives `_admit_lifecycle`).
+
+## S2A-C3.1 Defect 1 — lifecycle admission is now atomic (independent FOR SHARE)
+
+**Was** [Fact]: `_admit_lifecycle` performed a plain main-cursor/cached snapshot
+with no store-row lock, so `action_disconnect` could win after the probe pre-check
+but before `_send`; the probe could still issue an outbound Shopify request that
+post-network supersession could only discard *after the fact*.
+
+**Now** [Fact]: `_admit_lifecycle` captures the snapshot in one short **owned side
+transaction** — the same accepted mechanism as business `_admit`, minus any lease:
+
+1. `self.env.flush_all()` so the independent cursor observes the caller's state;
+2. open `self.env.registry.cursor()` (the side transaction);
+3. `SELECT state, connection_generation FROM shopify_connector_store WHERE id=%s
+   FOR SHARE` — the linearization lock (conflicts with the lifecycle
+   `FOR NO KEY UPDATE`);
+4. **fresh** purpose→state matrix re-check on the value read under the lock (no
+   purpose lists `disconnecting`);
+5. read the access token **exactly once** (the one sanctioned `_get_access_token`);
+6. capture the credential row id + `write_date`;
+7. `side_cr.commit()` — persists **nothing**, releases the `FOR SHARE`, completes
+   the admission linearization — **before** the network call;
+8. `side_cr.close()`; return the non-persisted snapshot.
+
+`_send_lifecycle` then runs (a separate call in `_run_connection_probe`) with the
+exact snapshot token — **no lock spans the network call, no `call.lease` is
+created**. A matrix refusal under the lock (a disconnect that won before the
+`FOR SHARE`) raises `UserError`, which `_run_connection_probe` treats as a
+**probe superseded before send** (audited `cancelled`, **no** network); a
+missing/empty credential at admission raises the accepted `ShopifyClientError`
+auth taxonomy (no network); any side-transaction failure rolls back and closes.
+The post-network `_lifecycle_probe_superseded` revalidation is unchanged and still
+catches a disconnect that wins *after* admission.
+
+`action_disconnect` still writes `connection_generation = locked_generation + 1`
+from the value returned under the lock (review 4690804619 §11, retained).
+
+## S2A-C3.2 Defect 2 — genuine independent-transaction race tests authored
+
+Added two opt-in `@tagged('post_install','-at_install')` genuine classes using
+real independent `db_connect` connections (distinct backend PIDs; raw SQL only to
+commit fixtures, observe, and clean up), plus source guards; the prior
+`TransactionCase` supersession/clear tests are **retained and re-documented as
+controlled seam-injection tests, not genuine concurrency**.
+
+- **`TestLifecycleAdmissionSourceGuards`** — source guards proving the admission
+  owns a side cursor, executes store `FOR SHARE`, re-checks the matrix under the
+  lock, reads the token exactly once, commits/rolls back only on `side_cr`
+  (never the main cursor), creates no lease, issues no transport call inside the
+  admission (AST call-node inspection, so a docstring mention is no false
+  positive), commits/closes before the transport, hands the exact snapshot token
+  to `_send`, and keeps the post-network revalidation.
+- **`TestLifecycleAdmissionRaceGenuine`** — (A) **disconnect-first**: the worker's
+  pre-check passes on its stale `connected` snapshot, but the admission `FOR SHARE`
+  (fresh, distinct backend) reads the committed `disconnecting` row and refuses
+  UNDER the lock → **zero `_send` calls**, superseded, no lease. (B)
+  **admission-first**: the admission captures the OLD token/generation, a
+  disconnect commits on a distinct backend during the call, the probe finishes
+  with **exactly** its captured OLD token, and the post-network revalidation
+  discards the stale result (superseded) with **no mirror written**. Plus a
+  **store-row lock-attribution** proof (the admission `FOR SHARE` blocks on a held
+  `FOR NO KEY UPDATE` and hits its bounded lock_timeout, then succeeds once
+  released) and a **threaded genuine-simultaneity** proof (a worker admits and
+  parks at the transport seam on one backend while a disconnect commits on
+  another; the accepted `Registry._lock` bounded-window pattern; bounded joins;
+  worker terminated; distinct worker/disconnect PIDs).
+- **`TestPublicClearAdmissionRaceGenuine`** — (A) **business-admission-first**:
+  the committed lease outlives admission's brief `FOR SHARE`; a public
+  `action_clear_token` on the connected store requests two-phase disconnect and
+  clears **nothing**; the controller stays `quiescing` with the credential present
+  while the lease is open; after the business call releases the lease, the next
+  controller pass reaches `completed` and clears the credential — **exactly one
+  generation bump**. (B) **public-clear-first**: the clear requests two-phase
+  disconnect (gen +1, credential preserved); a later old-generation business
+  admission **fails closed** (no lease, **no `_send`**), and the credential
+  remains until the controller finalizes.
+
+The single-shot genuine admission-first / threaded cases run their worker in
+**READ COMMITTED** so the post-network `FOR NO KEY UPDATE` revalidation observes
+the concurrently-committed disconnect deterministically without the production
+request-level serialization-failure retry (production runs REPEATABLE READ + that
+retry; both converge on discarding the stale probe result). This is documented in
+the `_open_bounded` helper. Every genuine test closes every cursor (try/finally),
+joins/asserts-dead every worker thread, and runs a fresh zero-residue verifier
+(store / lease / credential / job) plus removes the disconnect + drain cron
+triggers it scheduled.
+
+## S2A-C3.3 Test-mode seam-compat (packet §4) — files touched
+
+Registry-test-mode `setUp` added (no assertion changed) to every probe-driving
+class: `test_disconnect_quiescence.py` (`TestDisconnectPhase1`,
+`TestLifecycleRaceCorrections`, `TestLifecycleProbeSupersession`),
+`test_api_client.py` (`TestApiClient`), `test_test_connection.py`
+(`TestTestConnection`), `test_readiness_slot_closure.py`
+(`TestReadinessSlotClosure`), and — control-room-approved for this round —
+`test_connection_lifecycle.py` (`TestConnectionLifecycle`).
+`TestCredentialClearPolicy` opens no side cursor (no `_admit_lifecycle`), so it
+took **no** test-mode change — only a docstring clarifying it is controlled, not
+genuine.
+
+## S2A-C3.4 Static checks (this correction, no Odoo runtime)
+
+`py_compile` + `compileall` OK for the whole module. AST/source guards
+re-verified: `_admit_lifecycle` opens an owned side cursor, executes store
+`FOR SHARE`, re-checks the matrix on the locked value, reads the token exactly
+once, commits/rolls back **only** on `side_cr` (never main), creates **no** lease
+(no `.create(`/`lease_key`), makes **no** transport call inside the admission, and
+commits before returning the snapshot; `_run_connection_probe` calls
+`_admit_lifecycle` before `_send_lifecycle`, routes an under-lock `UserError` to
+superseded and a missing-credential `ShopifyClientError` to failure, and retains
+the post-network `_lifecycle_probe_superseded` revalidation. Unchanged invariants:
+public API-client surface `{execute, execute_business}`; **no new `sudo()`**
+(still exactly three call-sites: `job_log`, `readiness_check`,
+`store_credential`); the four credential methods keep `@api.model`; **no
+`.commit()` in `store.py`**; client commits only on `side_cr`; both `_send`
+seams present; store → credential order on every path; **no lock spans the network
+call**; no token literal logged or persisted; no product/sale/cron change. Net PR
+scope stays **15** addon+doc files (no new file added — `store_credential.py` and
+`job_dispatch.py` were not needed this round; the existing
+`_lifecycle_credential_version` serves the side-transaction snapshot as-is).
+
+## S2A-C3.5 Corrected status
+
+- **SRR-03 remains OPEN.** No runtime-green claimed. Exact-head Odoo.sh validation
+  of the full `shopify_connector_core` suite (handoff §3–4), including the two new
+  genuine `post_install` classes, is still required.
+- PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request;
+  no product/sale change. Base re-aligned to `Shopify-connector`
+  `1494b97d0e2117af05b954dabde92a9e497ac2c3` via a normal merge commit (docs
+  histories preserved; no `addons/**` conflict).
