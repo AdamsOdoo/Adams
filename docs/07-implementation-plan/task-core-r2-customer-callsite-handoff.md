@@ -280,3 +280,212 @@ No runtime-green claimed.
 > core/product/sale suites + CORE-R2 admission classes + both domains'
 > call-site activation tests + the deployed multi-worker proof ×3). Do **not**
 > start Prompt E until both call-site branches are merged back. SRR-03 stays OPEN.
+
+---
+
+## Integrated-staging update (CORE-R2 Slice 2B integration session, 2026-07-14)
+
+> **Session type:** controlled integration/validation only — no new design, no
+> code authored. Merges three already control-room-accepted PRs onto
+> `claude/core-r2-slice-2b-integration` and runs available static validation.
+> **Prompt E BLOCKED. SRR-03 OPEN. No final `claude/core-r2-slice-2b-integration`
+> → `Shopify-connector` PR opened. No Task 012 implementation begun. No live
+> Shopify request.**
+
+### Merge sequence and exact commits
+
+1. **PR #159** (Task 012 order-import decision closure, docs-only, no gate) —
+   marked ready, merge-commit into `Shopify-connector` (accepted head
+   `d953272acbbef9318082d81158e242f0e5170d80`, control-room review
+   `4697419280`).
+   - **PR #159 merge commit:** `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`
+   - **Shopify-connector head after PR #159:** `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`
+     (parents: prior tip `a3fd6cdfcb6f3654ae81a48a7f4e694994d4762b` +
+     PR #159 head `d953272acbbef9318082d81158e242f0e5170d80`).
+2. **Staging alignment** — merged the new `Shopify-connector` head into
+   `claude/core-r2-slice-2b-integration` with a normal (non-fast-forward)
+   merge commit; zero conflicts (exactly the five Task 012 Markdown files
+   applied cleanly).
+   - **Staging alignment merge commit:** `1a8d5adf31fb5194a16cff9e4344857c8d0139bb`
+3. **PR #161** (CORE-R2 Slice 2B customer call-site migration) — marked ready,
+   merge-commit into `claude/core-r2-slice-2b-integration` (accepted head
+   `29b8dd12d406737b10e5834c657e5b214b8e1227`, control-room review
+   `4697421328`, "ACCEPT FOR INTEGRATION-STAGING MERGE").
+   - **PR #161 merge commit:** `78c7bd85039b9bc1daba0e3b70b6806ccade0cc4`
+4. **PR #162** (CORE-R2 Slice 2B product call-site migration) — marked ready,
+   merge-commit into `claude/core-r2-slice-2b-integration` (accepted head
+   `cda4b6f04027a68dc58586412b1546465f25706d`, control-room review
+   `4697422563`, "ACCEPT FOR INTEGRATION-STAGING MERGE").
+   - **PR #162 merge commit:** `0c7b6f42bb111067455897f44146d66f9e62d4c2`
+
+**Final exact `claude/core-r2-slice-2b-integration` SHA (before this handoff
+commit):** `0c7b6f42bb111067455897f44146d66f9e62d4c2`.
+
+Every merge was a plain `merge` (no squash, no rebase, no force-push). Each
+merge commit's own diff was audited against its source PR's declared file
+scope and found to introduce **no unrelated file**:
+- PR #159 merge delta = exactly the 5 Task 012 Markdown files.
+- Staging-alignment merge delta = the same 5 files (fast-forward-equivalent
+  content).
+- PR #161 merge delta = exactly its declared 5 files (customer importer +
+  2 test files + 2 docs).
+- PR #162 merge delta = exactly its declared 7 files (product importer +
+  4 test files + 2 docs).
+
+### Ancestry proof (`git merge-base --is-ancestor <sha> 0c7b6f42…`)
+
+All six required ancestors verified present on the final staging head:
+
+| Required ancestor | SHA | Result |
+| --- | --- | --- |
+| PR #159 accepted head | `d953272acbbef9318082d81158e242f0e5170d80` | ✅ ancestor |
+| PR #161 accepted head | `29b8dd12d406737b10e5834c657e5b214b8e1227` | ✅ ancestor |
+| PR #162 accepted head | `cda4b6f04027a68dc58586412b1546465f25706d` | ✅ ancestor |
+| PR #150 accepted source | `10d0034e8e666684daa36f517788223976d74035` | ✅ ancestor |
+| PR #151 accepted source | `e4669aaf206fe8436a6d8a524b083f48d56ac9df` | ✅ ancestor |
+| Shopify-connector head after PR #159 | `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b` | ✅ ancestor |
+
+No conflict markers on the final head (`grep` scan for
+`<<<<<<<`/`=======`/`>>>>>>>` clean). Working tree clean at every step.
+`main` (`a5d45432a9b60f724c1aff700f4b371ea019960e`) and the repo's `staging`
+branch were never touched; no plain `dev` branch exists in this repository.
+No child PR (#161/#162) was merged directly into `Shopify-connector` — both
+went only into `claude/core-r2-slice-2b-integration`. PR #150 and PR #151
+remain open/draft/unmerged (re-verified after all merges).
+
+### Static validation on the final staging SHA (`0c7b6f42…`)
+
+All of the following ran directly against the checked-out final staging SHA:
+
+- **Python compilation** — `py_compile` + `compileall` clean for
+  `shopify_connector_core`, `shopify_connector_product`, `shopify_connector_sale`
+  (every `.py` file compiles).
+- **Manifest static inspection** — all three manifests load via
+  `ast.literal_eval`; every `data`-listed file (security XML/CSV, cron XML,
+  attribute-lock XML) resolves on disk.
+- **XML parsing** — all 4 XML files parse (`xml.etree.ElementTree`), 0
+  failures.
+- **CSV / security-reference inspection** — all 3 `ir.model.access.csv`
+  files parse with a `model_id:id` on every row.
+- **Conflict-marker scan** — clean across the final staging tree.
+- **Legacy-call search** — no bare `.execute(` call remains in
+  `shopify_connector_customer_importer.py` or
+  `shopify_connector_product_importer.py`; both call `execute_business`
+  exclusively (5 and 6 occurrences respectively).
+- **AST guards:**
+  - Customer importer's single Shopify call site uses
+    `client.execute_business(...)`, never legacy `execute()`.
+  - Product importer's pagination loop issues `execute_business` on **every**
+    page (the `while True` loop body); no `_execute_query`/
+    `_fetch_product_with_all_variant_pages` helper remains.
+  - The one production call site of `import_product_sync` (in
+    `_handle_product_import_sync`) passes `job=job` explicitly; a full sweep
+    of every `import_product_sync(` call site (production + all test files)
+    found none missing `job=`.
+  - The one production call site of `import_customer_sync` passes `job=job`
+    explicitly.
+  - `ShopifyQuiescedError` and `ShopifyClientError` are independent
+    `Exception` subclasses (no inheritance relationship); both importers'
+    `except ShopifyClientError` clauses cannot and do not catch
+    `ShopifyQuiescedError` — it propagates uncaught in both call sites.
+- **Runtime-tag audit** — all three genuine lifecycle test classes carry
+  `-standard` alongside their custom tag:
+  `TestCustomerCallsiteLeaseVisibilityGenuine`,
+  `TestCustomerCallsiteRaceAGenuine`, `TestCustomerCallsiteRaceBGenuine`
+  (`shopify_connector_customer_callsite_lifecycle`), and
+  `TestProductCallSiteLifecycleGenuine`
+  (`shopify_connector_product_callsite_lifecycle`) — none will run in the
+  standard CI suite.
+- **Forbidden-monkeypatch audit** — every `patch.object` target across both
+  changed test files is one of `{_send, _apply_import, cursor, _lock}` (plus
+  pre-existing, out-of-scope `execute`/`_fetch_image` patches in unrelated
+  legacy/media tests); zero occurrences of
+  `action_disconnect`/`_admit`/`_release_lease`/`_run_disconnect_quiesce`/
+  `connection_generation` as a patch target.
+- **Secret / live-URL scan** — no hardcoded API key/token/password pattern in
+  any of the three connector addons; the only `myshopify.com`/`admin/api/`
+  literal outside `tests/` is the parameterized URL-template line in
+  `shopify_connector_api_client.py` (`'https://%s/admin/api/%s/graphql.json'
+  % (...)`), not a live endpoint.
+- **Full changed-file and ancestry audit** — see the merge-sequence and
+  ancestry sections above; confirmed exact, no unrelated implementation
+  change from any of the three merges performed this session.
+
+No accepted production code was altered to satisfy a cosmetic static
+preference; nothing was changed outside the three merge commits themselves.
+
+### Integrated Odoo runtime validation — PENDING (no runtime available)
+
+This session's environment has **no importable `odoo` module** (`import
+odoo` → `ModuleNotFoundError`), **no `odoo-bin` on PATH**, and **no
+responding PostgreSQL server** (`pg_isready` → "no response"; no `postgres`
+process running). Per the session's own instructions, **no runtime-green is
+claimed**, no child PR was revised on the basis of static speculation, and no
+new test was invented. Integrated runtime validation is classified
+**PENDING** and must be executed on an Odoo 19 runtime (Odoo.sh or an
+equivalent host with PostgreSQL) against the exact final staging SHA above
+(or the post-handoff SHA recorded at the top of this update, whichever the
+runtime session checks out).
+
+**Exact commands to run on that runtime**, all against staging SHA
+`0c7b6f42bb111067455897f44146d66f9e62d4c2` (or its handoff-commit descendant):
+
+```
+# 1. Fresh install (all four modules)
+odoo-bin -d <db> -i adams_base,shopify_connector_core,shopify_connector_product,shopify_connector_sale \
+  --test-enable --stop-after-init --log-level=test
+
+# 2. Customer call-site lifecycle (genuine M1/M2/Race-A/Race-B, opt-in tag)
+odoo-bin -d <db> -u shopify_connector_sale --test-enable \
+  --test-tags shopify_connector_customer_callsite_lifecycle \
+  --stop-after-init --log-level=test
+
+# 3. Product call-site lifecycle (genuine M1/M2/Race-A/Race-B, opt-in tag)
+odoo-bin -d <db> -u shopify_connector_product --test-enable \
+  --test-tags shopify_connector_product_callsite_lifecycle \
+  --stop-after-init --log-level=test
+
+# 4. Existing customer import and matching suites (standard suite)
+odoo-bin -d <db> -u shopify_connector_sale --test-enable \
+  --test-tags /shopify_connector_sale --stop-after-init --log-level=test
+
+# 5. Existing product import, matching, variant-generation, refresh and
+#    stale-data suites (standard suite)
+odoo-bin -d <db> -u shopify_connector_product --test-enable \
+  --test-tags /shopify_connector_product --stop-after-init --log-level=test
+
+# 6. Relevant CORE-R2 admission, lease, disconnect and controller tests
+odoo-bin -d <db> -u shopify_connector_core --test-enable \
+  --test-tags /shopify_connector_core --stop-after-init --log-level=test
+```
+
+**Tests pending (all groups):**
+1. `shopify_connector_customer_callsite_lifecycle` (M1/M2, Race A/M8 both
+   orderings, Race B/M18 primary lease-count proof, lock-skip coverage).
+2. `shopify_connector_product_callsite_lifecycle` (M1/M2, Race A/M8 both
+   orderings, Race B/M18, M9/M10 between-pages).
+3. Existing `shopify_connector_sale` customer import/matching/duplicate-
+   prevention/fallback-partner/binding suites (Task 011/011B).
+4. Existing `shopify_connector_product` product import/matching/duplicate-
+   prevention/attribute/media/price/template-binding/variant-binding/
+   variant-generation/refresh-and-stale/runtime-performance suites
+   (Task 010/010B).
+5. `shopify_connector_core` admission, lease, job-dispatch, disconnect-
+   quiescence, readiness, connection-lifecycle and credential controller
+   suites (CORE-R1/CORE-R2 Slice 2A).
+
+No fix was made, because no failure was reproduced (no runtime execution
+occurred). Nothing in this session touched a test's expected behavior.
+
+### Gate status confirmation
+
+- **Prompt E: BLOCKED** (unchanged — legacy public `execute()` closure not
+  started).
+- **SRR-03: OPEN** (unchanged — not closed by this session).
+- **No final `claude/core-r2-slice-2b-integration` → `Shopify-connector`
+  integration PR was opened** this session.
+- **No Task 012 implementation begun** (PR #159 merge froze documentation
+  only; no code/model/view/manifest file was created or touched).
+- **No live Shopify request** was made at any point.
+- **PR #150 and PR #151 remain open, draft, and unmerged** (re-verified
+  after all merges completed).
