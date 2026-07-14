@@ -843,3 +843,199 @@ API-client/job-enqueue tests" the gate refers to.
   remains open**; **issue #157** tracks the literal reproduction and separate
   fix decision.
 - Draft PR only — not marked ready, not merged; Slice 2 not begun.
+
+---
+
+# CORE-R2 — Foundation Slice 2A implementation evidence — runtime pending
+
+> **Status: static-validated implementation record for control-room review.
+> NO Odoo runtime was available in this session — no runtime-green is claimed
+> for Slice 2A (§8 of the Slice-2A gate: "When an Odoo runtime is unavailable,
+> state that clearly. Do not claim runtime green").** This section records the
+> lifecycle/controller half of CORE-R2 implemented on top of the merged
+> Foundation Slice 1. It does **not** modify, weaken, or re-claim any Slice-1
+> evidence above.
+
+## S2A.0 Exact base / branch / gate
+
+- **Base SHA:** `Shopify-connector` @
+  `912801508155c6358e8f5f1a7a0aaf01ae573675` (the merge of PR #156 —
+  Foundation Slice 1). Verified: local `HEAD`, `origin/Shopify-connector`
+  tip, and the base of open draft PRs #150/#151 all equal this SHA.
+- **Branch:** `claude/core-r2-foundation-slice-2a-mr7uwq` (environment-assigned;
+  the gate's preferred name `claude/core-r2-slice-2a-disconnect-controller` was
+  superseded by the assigned branch, per the gate's own "remain on that assigned
+  branch" clause).
+- **PR #150 / #151:** confirmed open, draft, unmerged — untouched.
+- **Gate:** the CORE-R2 Slice-2A implementation prompt.
+
+## S2A.1 Foundation Slice 1 inventory confirmed (not duplicated/redesigned)
+
+Present and reused unchanged: the `shopify.connector.call.lease` model
+(Integer `job_id`, indexed `expires_at`); `execute_business` context manager
+(parity + deterministic exception precedence); `_admit` store-row `FOR SHARE`
+admission; single-token `_send(store, body, token)`; `store.connection_generation`
+(previously inert); `job.expected_connection_generation` (captured at enqueue);
+`_release_lease`; and the Slice-1 test scaffolding. Slice 2A does **not** re-open,
+alter, or weaken any of these.
+
+## S2A.2 Implemented lifecycle/controller behavior `[Fact — static]`
+
+- **Store state + fields.** New `disconnecting` state; new
+  `disconnect_status` (`none`/`requested`/`quiescing`/`completed`/`timed_out`),
+  `disconnect_status_reason`, `disconnect_open_lease_count`,
+  `disconnect_oldest_admitted_at`, `disconnect_requested_at`,
+  `disconnect_requested_by` (M2o `res.users`), `disconnect_completed_at`. All
+  additive; existing rows backfill to `disconnect_status='none'` / empty / 0.
+- **Generation-changing lifecycle lock** (`_lock_store_for_lifecycle`): a
+  **blocking** `SELECT … FOR NO KEY UPDATE` on the store row (raw, main cursor),
+  with `flush_recordset` before and `invalidate_recordset` after; conflicts with
+  admission's `FOR SHARE`; never `SKIP LOCKED` (a lifecycle transition must
+  wait); released at the natural RPC/cron-boundary commit (no explicit
+  main-cursor commit). Applied to `action_disconnect`, `action_activate`, and the
+  reconnect-success write; each bumps `connection_generation` **exactly once**.
+- **Two-phase `action_disconnect`:** lock+fresh-read → bump epoch → `state`
+  `disconnecting`, `disconnect_status='requested'`, stamp requester/time → one
+  non-blocking A/B (queued/retry_waiting) sweep → wake controller → return. Does
+  **not** clear the credential, wait for holders, write a locked running job row,
+  or commit the main cursor. Repeated disconnect while
+  `disconnecting`/`disconnected` = audited idempotent no-op.
+- **Quiescence controller** (`_run_disconnect_quiesce`, cron): one store per
+  invocation via `search(order='disconnect_requested_at, id').try_lock_for_update(limit=1)`
+  (`FOR UPDATE SKIP LOCKED LIMIT 1`) — next unlocked store, all-locked → no-op.
+- **Direction-C lease interpretation + finalization** (`_process_disconnect_quiesce`):
+  counts **all** committed lease rows (expired = unknown/live, still counts);
+  writes the escalation snapshot; **zero rows → `completed`** (credential cleared
+  under the held store `FOR UPDATE`, store→credential order, `state=disconnected`);
+  **rows before timeout → `quiescing`** (delayed re-poll); **rows at/past
+  `DISCONNECT_QUIESCE_TIMEOUT` → `timed_out`** (bounded, secret-free escalation
+  snapshot of ≤ 20 opaque `lease_key`s / Integer `job_id`s; credential cleared;
+  `state=disconnected`; residual lease rows cleaned up **only after** the
+  `timed_out` finalize). `completed` and `timed_out` are observably distinct.
+- **Delayed repoll** (`_trigger_disconnect_controller(at=now+POLL_DELAY)`): a
+  still-quiescing store schedules exactly one bounded delayed trigger; no
+  immediate same-store re-trigger, no busy loop, no sleep.
+- **Lifecycle request matrix during `disconnecting`:** business job create
+  (existing connected-only gate) and start (existing write→running gate) and
+  `execute_business` admission all already fail-closed for `disconnecting`
+  (`state != 'connected'`); `action_test_connection`, `action_activate`, and
+  `action_reconnect` are refused; `action_test_connection` is migrated through the
+  new `execute_lifecycle(purpose='test_connection')` (purpose→state matrix:
+  `setup_incomplete`/`connected`/`reconnect_needed`), which also refuses any
+  lifecycle call while `disconnecting`.
+- **Constants** (`shopify_connector_job_dispatch.py`): `DISCONNECT_QUIESCE_TIMEOUT
+  = timedelta(minutes=15)` (> the 300 s admission lease lifetime),
+  `POLL_DELAY = timedelta(minutes=1)` (≥ the `_trigger` 1-minute granularity).
+  `MAX_CALL_LIFETIME` was **not** re-added: the lease lifetime already lives in
+  `api_client._CALL_LEASE_LIFETIME_SECONDS = 300`; a second constant would be a
+  forbidden alias.
+- **Controller cron** (`data/shopify_connector_cron_disconnect.xml`): one
+  `ir.cron` (priority 0, `user_id=base.user_root`, 5-minute recovery heartbeat)
+  calling `model._run_disconnect_quiesce()`; registered in `__manifest__.py`
+  (version `19.0.1.6.0` → `19.0.1.7.0`).
+
+## S2A.3 Exact changed files
+
+Allowed by the Slice-2A gate §3:
+`models/shopify_connector_store.py`, `models/shopify_connector_api_client.py`
+(execute_lifecycle + test-connection migration only),
+`models/shopify_connector_job_dispatch.py` (two controller constants only),
+`__manifest__.py`, `data/shopify_connector_cron_disconnect.xml` (new),
+`tests/test_disconnect_quiescence.py`, and this document.
+
+**Not needed / not touched (in-scope-allowed but unchanged):**
+`models/shopify_connector_job.py` (the existing connected-only start gate already
+makes `disconnecting` non-startable — no change required),
+`models/shopify_connector_store_credential.py` (the finalize reuses
+`action_clear_token` as-is under the store lock — no clear-ordering change was
+needed), `tests/__init__.py` (no new test file, no import change).
+
+**⚠️ Scope deviation flagged for control-room ratification.** The two-phase
+`action_disconnect` (§5.C — non-negotiable accepted contract) necessarily
+supersedes single-phase disconnect assertions in **two existing test files not
+listed in the Slice-2A §3 allow-list**:
+`tests/test_connection_lifecycle.py` and `tests/test_job_dispatch.py`. The merged
+CORE-R2 **packet §4** allow-list explicitly authorized "`tests/test_disconnect_quiescence.py`
+(+ **minimal regressions in existing core dispatch/store/api-client tests**)"; the
+Slice-2A §3 re-frozen list dropped that clause. Because §5.C cannot be delivered
+green without it, **minimal, surgical** migrations were applied to only the
+obsolete single-phase disconnect assertions in those two files (state
+`disconnecting` not `disconnected`; credential cleared at controller finalize not
+in Phase 1; A/B sweep = queued/retry_waiting). Nothing else in those files
+changed. This is flagged here, in the handoff, and in the PR body; the PR stays
+draft. **Requested control-room action:** ratify these two files as the
+packet-§4 "minimal regressions in existing tests," or reissue a corrected §3
+list.
+
+## S2A.4 Tests added (authored; NOT executed — no runtime this session)
+
+`tests/test_disconnect_quiescence.py` gains 30 Slice-2A tests across four
+classes, covering all 24 required scenarios:
+
+- `TestDisconnectPhase1` (10): connected→disconnecting; generation +1 exactly
+  once; repeated-disconnect audited no-op; A/B sweep scope; running-job never
+  written; disconnecting non-startable; test-connection refused (action +
+  execute_lifecycle); activate/reconnect refused; activation bumps generation.
+- `TestQuiescenceController` (12): zero→completed→cleared→disconnected;
+  credential-present-before-timeout; live-lease quiescing; expired-lease still
+  quiescing (direction C); deadline→timed_out (≠ completed); timed_out clears
+  credential; cleanup only after timed_out; completed requires zero rows; delayed
+  repoll at ≥ now+POLL_DELAY with no immediate re-trigger; one store per
+  invocation; duplicate-invocation idempotent; no secret in fields/snapshot/audit.
+- `TestDisconnectSourceGuards` (6): no main-cursor commit; SKIP LOCKED LIMIT 1
+  selection; blocking FOR NO KEY UPDATE (not SKIP LOCKED); delayed `_trigger(at=)`
+  + no busy-loop/sleep; store→credential clear order; controller makes no Shopify
+  call.
+- `TestDisconnectControllerSelectionGenuine` (2, `post_install`, genuine
+  `db_connect` connections): locked-first store doesn't block a later one;
+  all-locked is a safe no-op.
+
+Existing Slice-1 tests are **not** weakened. The two migrated test files' other
+tests are unchanged.
+
+## S2A.5 Static checks run this session `[Fact — verified]`
+
+No Odoo runtime (Odoo not importable; no `odoo-bin`). Static tooling only:
+
+- `py_compile` on every changed `.py` — **OK**.
+- `compileall -q addons/shopify_connector_core` — **OK**.
+- XML parse of both cron data files — **OK**.
+- Manifest `ast.literal_eval`; version `19.0.1.7.0`; new data file registered — **OK**.
+- Precise 7-char git conflict-marker scan — **none**.
+- Circular-import check: `store → job_dispatch → job` is acyclic (nothing those
+  depend on imports `store`) — **OK**.
+- Source guards: no `self.env.cr.commit`/`self._cr.commit`/`.commit()` in
+  `store.py`; no product/sale file changed; controller/finalize contain no
+  `_send`/`requests`/`.execute(`/`execute_business`/`execute_lifecycle`; no
+  `shpat_` literal in production models/data; `completed` gated on zero rows;
+  `timed_out` distinct; `_trigger(at=` present; no `while True`/`time.sleep`/
+  `import time`; no `architecture-review-log.md` / `research-handoff.md` /
+  `sync-engine-risk-register.md` change — **all OK**.
+
+## S2A.6 Unresolved runtime gates (deferred)
+
+- **Odoo.sh exact-head runtime of the full `shopify_connector_core` suite**
+  (fresh install + per-class) — **NOT run this session; required before any
+  runtime-green claim.**
+- Genuine **two-server / multi-worker** proof of admission↔disconnect
+  linearization (T-19) — deferred (SRR-09 / RR-4).
+- Live/dev-store Shopify validation — **not authorized, not performed.**
+- The seven base `res_users.notification_type` post-init-rerun artifacts
+  (issue #157) are pre-existing and out of scope.
+
+## S2A.7 No call-site activation
+
+The product and customer importers still call the legacy `execute()` and are
+**unchanged**; `execute_business` remains dormant (no production business call
+site). Public `execute()` is **not** removed (deferred). So the
+admission↔disconnect linearization is now implemented on **both** halves
+(admission `FOR SHARE` + lifecycle `FOR NO KEY UPDATE`/controller `FOR UPDATE`)
+but is **not exercised end-to-end by a live domain handler** — activation is a
+later slice.
+
+## S2A.8 Confirmations
+
+- **SRR-03 remains OPEN.** No remediation runtime-green is claimed; end-to-end
+  disconnect-quiescence is not proven live.
+- No live Shopify request; no real credential/token used.
+- PR stays **draft**; not marked ready; not merged. Slice 2B not begun.
