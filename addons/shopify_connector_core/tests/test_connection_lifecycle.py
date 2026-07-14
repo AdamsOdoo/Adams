@@ -79,8 +79,14 @@ class TestConnectionLifecycle(TransactionCase):
         ])
 
     def _run_test_connection(self, response):
+        # CORE-R2 (review 4690804619 #1): the lifecycle probe passes its one token
+        # snapshot to `_send(store, body, token)`, so the transport-seam fake
+        # accepts the token argument.
         Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), '_send', lambda self, store, body: response):
+        with patch.object(
+            type(Client), '_send',
+            lambda self, store, body, token=None: response,
+        ):
             return self._store().action_test_connection()
 
     def _run_reconnect(self, test_connection_response, readiness_result,
@@ -105,7 +111,8 @@ class TestConnectionLifecycle(TransactionCase):
             return {'job': None, 'overall_result': readiness_result, 'checks': []}
 
         with patch.object(
-            type(Client), '_send', lambda self, store, body: test_connection_response
+            type(Client), '_send',
+            lambda self, store, body, token=None: test_connection_response,
         ), patch.object(
             type(ReadinessCheck), 'run_for_store', fake_run_for_store
         ):
@@ -360,27 +367,34 @@ class TestConnectionLifecycle(TransactionCase):
     # not via action_disconnect())
     # ------------------------------------------------------------------
 
-    def test_credential_service_clear_token_sets_state_disconnected_directly(self):
-        # Calls the credential service's action_clear_token() directly
-        # -- not action_disconnect() -- to prove the state invalidation
-        # lives in the credential service itself, not only in
-        # action_disconnect()'s own follow-up write.
+    def test_credential_service_clear_token_on_connected_requests_disconnect(self):
+        # CORE-R2 (reviews 4690804619 #2 + 4690807427): calling the credential
+        # service's action_clear_token() directly on a `connected` store must NOT
+        # clear immediately -- an admitted lease can outlive admission's brief
+        # FOR SHARE. It routes through the accepted two-phase disconnect
+        # (state -> disconnecting, credential still present, one epoch bump); the
+        # quiescence controller performs the actual clear at `completed`.
         self._set_token()
         self._seed_verified_evidence()
         self._store().action_activate()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
-        jobs_before = self.Job.search_count([])
-        logs_before = self.JobLog.search_count([])
+        gen_before = self.store.connection_generation
 
         self.Credential.with_user(self.user_admin).action_clear_token(
             self.store
         )
         self.store.invalidate_recordset()
+        self.assertEqual(self.store.state, 'disconnecting')
+        self.assertEqual(self.store.disconnect_status, 'requested')
+        self.assertTrue(self.store.credential_present)   # not cleared yet
+        self.assertEqual(self.store.connection_generation, gen_before + 1)
+
+        # The controller finalizes (zero committed leases) and clears then.
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
+        self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'disconnected')
         self.assertFalse(self.store.credential_present)
-        self.assertEqual(self.Job.search_count([]), jobs_before)
-        self.assertEqual(self.JobLog.search_count([]), logs_before)
 
     # ------------------------------------------------------------------
     # action_disconnect

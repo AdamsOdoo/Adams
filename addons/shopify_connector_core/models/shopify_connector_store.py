@@ -169,30 +169,46 @@ class ShopifyConnectorStore(models.Model):
         purpose used by `action_reconnect` for the finalized `disconnected` state.
         """
         self.ensure_one()
-        return self._run_connection_probe('test_connection')
+        # `_run_connection_probe` returns `'superseded'` when a concurrent
+        # lifecycle/credential change discarded the result; Test Connection has no
+        # further step, so return None (the accepted RPC contract) either way.
+        self._run_connection_probe('test_connection')
+        return None
 
     def _run_connection_probe(self, purpose):
-        """Shared read-only connection probe (Task 003 + CORE-R2; review
-        4690639375 #2).
+        """Shared read-only connection probe (Task 003 + CORE-R2; reviews
+        4690639375 #2 + 4690804619 #1).
 
         The single implementation behind `action_test_connection`
         (`purpose='test_connection'`) and `action_reconnect`
         (`purpose='reconnect_probe'`). `purpose` is a fixed INTERNAL enum chosen
         by those two trusted callers -- it is **not** a caller/RPC-controlled
-        value (this method is private, and it forwards to the private
-        `_execute_lifecycle`). Identical transport, normalization, mirror, and
-        audit behavior for both purposes; only the allowed-state matrix differs
+        value. Identical transport, normalization, mirror, and audit behavior for
+        both purposes; only the allowed-state matrix differs
         (`LIFECYCLE_PURPOSE_STATES`): `test_connection` excludes `disconnected`,
         `reconnect_probe` permits it (reconnect after completed disconnect,
         matrix §8), and neither permits `disconnecting`.
 
+        **One credential snapshot per probe (review 4690804619 #1).** The probe
+        binds to exactly one credential snapshot via `_admit_lifecycle` (a single
+        token read + the credential id/version + the store generation) and issues
+        the request through `_send_lifecycle(store, query, token)` with that exact
+        token -- the transport re-reads **no** credential. After the network
+        result (success **or** failure), `_lifecycle_probe_superseded` acquires the
+        store->credential locks and revalidates state, generation, and credential
+        version; if a lifecycle or credential change won during the call the
+        response is **discarded** and the probe is audited as **superseded**
+        (job cancelled, **no** verification/failure mirror and **no** credential
+        state written). No lock spans the network call. Returns `'superseded'` in
+        that case (so `action_reconnect` aborts), else `None`.
+
         The matrix is pre-checked here **before** any audit job is created (so a
         refused probe never leaves a dangling `running` job) and re-enforced in
-        the private `_execute_lifecycle` transport as defense in depth. Creates
-        exactly one `job_type='core_test_connection'` job per run with a fresh
-        UUID4 `payload_hash` nonce; writes only the store mirrors, the
-        credential's `credential_state` (only for a genuine token-invalid
-        signal), and the job/job.log rows -- never the token.
+        `_admit_lifecycle` as defense in depth. Creates exactly one
+        `job_type='core_test_connection'` job per run with a fresh UUID4
+        `payload_hash` nonce; writes only the store mirrors, the credential's
+        `credential_state` (only for a genuine token-invalid signal), and the
+        job/job.log rows -- never the token.
         """
         self.ensure_one()
         allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
@@ -209,6 +225,7 @@ class ShopifyConnectorStore(models.Model):
             raise UserError(
                 'Enter a credential before testing the connection.'
             )
+        Client = self.env['shopify.connector.api.client']
         Job = self.env['shopify.connector.job']
         JobLog = self.env['shopify.connector.job.log']
         job = Job.create({
@@ -223,45 +240,30 @@ class ShopifyConnectorStore(models.Model):
             job, 'attempt', 'Test connection attempt started.',
         )
 
+        # CORE-R2 (review 4690804619 #1): bind the probe to ONE credential
+        # snapshot and send with exactly that token (no second credential read on
+        # the transport). A missing-token/bad-state admit failure is pre-network
+        # (no snapshot, no stale result); a transport ShopifyClientError still
+        # goes through the post-network revalidation below.
+        snapshot = None
         try:
-            # CORE-R2 (analysis §9.3; review 4690639375 #2): the shared probe
-            # forwards to the PRIVATE `_execute_lifecycle` with the internal
-            # purpose (no lease, no RPC-exposed purpose). Same transport,
-            # normalization, and error taxonomy as the pre-existing `execute()`.
-            result = self.env[
-                'shopify.connector.api.client'
-            ]._execute_lifecycle(
-                self, TEST_CONNECTION_QUERY, purpose=purpose,
+            snapshot = Client._admit_lifecycle(self, purpose)
+            result = Client._send_lifecycle(
+                self, TEST_CONNECTION_QUERY, snapshot['token'],
             )
+            probe_error = None
         except ShopifyClientError as exc:
-            self.write({
-                'last_test_connection_result': 'fail',
-                'last_test_connection_at': fields.Datetime.now(),
-                'last_test_connection_reason': redact(exc.reason),
-            })
-            if exc.credential_invalid:
-                credential = self.env[
-                    'shopify.connector.store.credential'
-                ].search([('store_id', '=', self.id)], limit=1)
-                if credential:
-                    credential.write({'credential_state': 'invalid'})
-            if exc.credential_invalid or exc.error_class == ERROR_AUTH:
-                # Task 005 / DEC-022 §4.7: any auth/permission/scope
-                # invalidation signal -- not only a genuine token-invalid
-                # one -- moves the store to reconnect_needed. Human/admin
-                # action (reconnect/disconnect) is the only way out; this
-                # never auto-reconnects.
-                self.action_mark_reconnect_needed(reason=exc.reason)
-            job.write({
-                'error_class': exc.error_class,
-                'state': 'failed_final',
-                'finished_at': fields.Datetime.now(),
-            })
-            JobLog._system_append(
-                job, 'attempt', redact(exc.reason),
-                technical_detail=exc.technical_detail,
-                from_state='running', to_state='failed_final',
-            )
+            result = None
+            probe_error = exc
+
+        # Post-network revalidation: discard a result the snapshot no longer
+        # backs, and audit it as superseded -- writing NO mirror/credential state.
+        if snapshot is not None and self._lifecycle_probe_superseded(snapshot):
+            self._audit_probe_superseded(job)
+            return 'superseded'
+
+        if probe_error is not None:
+            self._apply_probe_failure(job, probe_error)
             return None
 
         data = result.get('data') or {}
@@ -334,6 +336,123 @@ class ShopifyConnectorStore(models.Model):
             job, 'attempt',
             'Connection verified with %s.' % shop.get('name'),
             from_state='running', to_state='succeeded',
+        )
+        return None
+
+    def _apply_probe_failure(self, job, exc):
+        """Write the shared probe-failure mirrors + job/log for a
+        `ShopifyClientError` (CORE-R2; extracted from `_run_connection_probe`).
+
+        Runs only after the post-network revalidation confirmed the snapshot still
+        holds (never from a superseded result). Writes the fail mirrors, flips the
+        credential's `credential_state` to `invalid` **only** on a genuine
+        token-invalid signal, and -- for any auth/permission/scope class (Task 005 /
+        DEC-022 §4.7), not only a token-invalid one -- moves the store to
+        `reconnect_needed` via the TOCTOU-safe `action_mark_reconnect_needed`
+        (which itself refuses to overwrite a one-way disconnect). Never logs the
+        token.
+        """
+        self.ensure_one()
+        JobLog = self.env['shopify.connector.job.log']
+        self.write({
+            'last_test_connection_result': 'fail',
+            'last_test_connection_at': fields.Datetime.now(),
+            'last_test_connection_reason': redact(exc.reason),
+        })
+        if exc.credential_invalid:
+            credential = self.env[
+                'shopify.connector.store.credential'
+            ].search([('store_id', '=', self.id)], limit=1)
+            if credential:
+                credential.write({'credential_state': 'invalid'})
+        if exc.credential_invalid or exc.error_class == ERROR_AUTH:
+            self.action_mark_reconnect_needed(reason=exc.reason)
+        job.write({
+            'error_class': exc.error_class,
+            'state': 'failed_final',
+            'finished_at': fields.Datetime.now(),
+        })
+        JobLog._system_append(
+            job, 'attempt', redact(exc.reason),
+            technical_detail=exc.technical_detail,
+            from_state='running', to_state='failed_final',
+        )
+        return None
+
+    def _lifecycle_probe_superseded(self, snapshot):
+        """Return True if a lifecycle/credential change superseded the probe
+        (CORE-R2, AR-047; review 4690804619 #1).
+
+        Runs **after** the network result. Acquires the store-row lifecycle lock
+        first (`_lock_store_for_lifecycle`, `FOR NO KEY UPDATE`), then the
+        credential-row lock (`_lifecycle_credential_version(lock=True)`) -- the
+        global `store -> credential` order -- and compares the freshly-locked
+        values against the pre-network `snapshot`:
+
+        - the locked state left the `purpose`'s allowed matrix (e.g. a disconnect
+          moved it to `disconnecting`);
+        - the `connection_generation` changed (an activation/reconnect/disconnect
+          or a connected credential replace won the race);
+        - the credential row vanished, or its identity/version (`id`,
+          `write_date`) changed (a set/replace/clear happened);
+        - the credential **value** changed from the snapshot token -- the
+          definitive signal for a same-row replace whose `write_date` PostgreSQL
+          may fix to the transaction timestamp (so an equal-value or same-txn
+          replacement is still caught).
+
+        Any of these means the network response no longer describes the current
+        credential/store, so the caller discards it. The lock is taken only here
+        (after the network), never across the network call, and -- once acquired --
+        is held to the request-boundary commit so the subsequent mirror write is
+        TOCTOU-safe. The token compared here is the in-memory snapshot value; it is
+        never logged or persisted.
+        """
+        self.ensure_one()
+        locked_state, locked_generation = self._lock_store_for_lifecycle()
+        if locked_state not in snapshot['allowed_states']:
+            return True
+        if locked_generation != snapshot['generation']:
+            return True
+        Credential = self.env['shopify.connector.store.credential']
+        current = Credential._lifecycle_credential_version(self, lock=True)
+        if not current:
+            return True
+        if current[0] != snapshot['credential_id']:
+            return True
+        if current[1] != snapshot['credential_version']:
+            return True
+        # Value revalidation under the held credential-row lock: any set/replace
+        # changes the stored value even when its write_date is transaction-fixed.
+        if Credential._get_access_token(self) != snapshot['token']:
+            return True
+        return False
+
+    def _audit_probe_superseded(self, job):
+        """Cancel a superseded probe job; write NO store/credential mirror
+        (CORE-R2, AR-047; review 4690804619 #1).
+
+        Uses the existing terminal `cancelled` state + `cancel_reason` taxonomy
+        (writes to `cancelled` are never store-state-gated) with the required
+        empty `manual_review_subreason`, and appends the audit log row. Deliberately
+        writes **no** verification/failure mirror and **no** credential state -- the
+        whole point of a superseded probe is that its result must not touch the
+        store's connection evidence.
+        """
+        self.ensure_one()
+        JobLog = self.env['shopify.connector.job.log']
+        reason = (
+            'Connection probe superseded by a lifecycle or credential '
+            'change; rerun it.'
+        )
+        job.write({
+            'state': 'cancelled',
+            'cancel_reason': reason,
+            'finished_at': fields.Datetime.now(),
+            'manual_review_subreason': False,
+        })
+        JobLog._system_append(
+            job, 'state_change', reason,
+            from_state='running', to_state='cancelled',
         )
         return None
 
@@ -604,16 +723,40 @@ class ShopifyConnectorStore(models.Model):
         (matrix §8). Disconnect is one-way.
         """
         self.ensure_one()
-        state, _generation = self._lock_store_for_lifecycle()
-        if state in ('disconnecting', 'disconnected'):
+        locked_state, locked_generation = self._lock_store_for_lifecycle()
+        if locked_state in ('disconnecting', 'disconnected'):
             self._create_lifecycle_audit_job(
                 'Disconnect requested; store already %s -- audited no-op.'
-                % state
+                % locked_state
             )
             return None
+        self._request_disconnect_locked(locked_state, locked_generation)
+        return None
+
+    def _request_disconnect_locked(self, locked_state, locked_generation):
+        """Phase-1 disconnect request body, run UNDER the held store lifecycle
+        lock (CORE-R2, AR-047; reviews 4690804619 §11 + 4690807427).
+
+        The caller must already hold `_lock_store_for_lifecycle` and pass the
+        `(state, generation)` it read under that lock; this consumes them directly
+        -- bumping `connection_generation` to **`locked_generation + 1`** (the
+        value returned under the lock, never an indirect re-read of the field) --
+        so **no new business Shopify call can be admitted** and no business job can
+        start. It then transitions to `disconnecting`/`requested`, stamps the
+        request, runs **one** non-blocking A/B (queued/retry_waiting) business-job
+        sweep, records the audit, and wakes the quiescence controller. It clears
+        **no** credential and issues no explicit commit; the controller finalizes.
+
+        Shared by `action_disconnect` (the direct request) and the public
+        `action_clear_token` when it routes a `connected`/`reconnect_needed` store
+        through the accepted two-phase disconnect instead of clearing immediately
+        (review 4690807427) -- both take the lock, then call this once.
+        """
+        self.ensure_one()
+        new_generation = locked_generation + 1
         self.write({
             'state': 'disconnecting',
-            'connection_generation': self.connection_generation + 1,
+            'connection_generation': new_generation,
             'disconnect_status': 'requested',
             'disconnect_status_reason': False,
             'disconnect_requested_at': fields.Datetime.now(),
@@ -625,7 +768,7 @@ class ShopifyConnectorStore(models.Model):
         self._sweep_quiescing_business_jobs('Store disconnecting.')
         self._create_lifecycle_audit_job(
             'Store disconnect requested (state=disconnecting; connection '
-            'generation bumped to %d).' % self.connection_generation
+            'generation bumped to %d).' % new_generation
         )
         self._trigger_disconnect_controller()
         return None
@@ -713,15 +856,19 @@ class ShopifyConnectorStore(models.Model):
         """Finalize a fully-quiesced disconnect (zero committed lease rows).
 
         Reachable **only** at zero lease rows (INV-3, direction C). Clears the
-        credential via the existing Task 002 service **under the controller's held
-        store ``FOR UPDATE``** (store->credential global lock order, §9.2/§15) --
-        no admission can slip in during the clear -- then sets `disconnected` /
-        `disconnect_status='completed'` and stamps completion. All job/log history
-        is preserved. `completed` is provably distinct from `timed_out` (this path
-        is the zero-rows condition only).
+        credential via the controller-only `_clear_token_under_store_lock`
+        primitive **under the controller's held store ``FOR UPDATE``**
+        (store->credential global lock order, §9.2/§15) -- never the public
+        `action_clear_token`, which refuses a `disconnecting` store (review
+        4690804619 #2). No admission can slip in during the clear; this finalize
+        then sets `disconnected` / `disconnect_status='completed'` and stamps
+        completion. All job/log history is preserved. `completed` is provably
+        distinct from `timed_out` (this path is the zero-rows condition only).
         """
         self.ensure_one()
-        self.env['shopify.connector.store.credential'].action_clear_token(self)
+        self.env[
+            'shopify.connector.store.credential'
+        ]._clear_token_under_store_lock(self)
         self.write({
             'state': 'disconnected',
             'disconnect_status': 'completed',
@@ -764,7 +911,11 @@ class ShopifyConnectorStore(models.Model):
             '(bounded to %d): %s'
             % (count, _ESCALATION_SNAPSHOT_LIMIT, json.dumps(snapshot))
         )
-        self.env['shopify.connector.store.credential'].action_clear_token(self)
+        # Controller-only clear primitive under the held store FOR UPDATE (review
+        # 4690804619 #2); this finalize sets `disconnected`/`timed_out` itself.
+        self.env[
+            'shopify.connector.store.credential'
+        ]._clear_token_under_store_lock(self)
         self.write({
             'state': 'disconnected',
             'disconnect_status': 'timed_out',
@@ -835,9 +986,14 @@ class ShopifyConnectorStore(models.Model):
         # `_run_connection_probe` with the INTERNAL purpose `'reconnect_probe'`,
         # which the frozen matrix permits from the finalized `disconnected` state
         # (reconnect after completed disconnect) -- unlike `'test_connection'`,
-        # which excludes `disconnected`. The probe + readiness run WITHOUT the
-        # lifecycle lock (they issue the Shopify call).
-        self._run_connection_probe('reconnect_probe')
+        # which excludes `disconnected`. The probe issues the Shopify call, then
+        # revalidates its one credential snapshot under the store->credential locks.
+        probe_status = self._run_connection_probe('reconnect_probe')
+        if probe_status == 'superseded':
+            # A lifecycle/credential change won during the probe; it was already
+            # audited as superseded and wrote no mirrors. Do not run readiness or
+            # finalize on a store that has moved on -- abort the reconnect.
+            return None
         self.invalidate_recordset()
         # If the probe just failed with an auth/permission/scope signal,
         # `_run_connection_probe`'s own handler already called

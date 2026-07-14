@@ -1170,3 +1170,163 @@ main-cursor commit; no token literal in production.
   `reconnect_probe` wiring are now **Slice-2A correctness (implemented)**, no
   longer deferred to Slice 2B.
 - PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request.
+
+# CORE-R2 — Foundation Slice 2A — probe-snapshot + credential-clear correction (reviews 4690804619 + 4690807427)
+
+> **Status: static-validated correction record for control-room review. Still no
+> Odoo runtime this session — no runtime-green claimed.** Applied on top of head
+> `415c05c` after control-room reviews **4690804619** ("two lifecycle/credential
+> race paths remain open") and its clarification **4690807427** (clear must not
+> substitute an immediate connected-state clear for quiescence).
+
+## S2A-C2.0 Objective
+
+Two open race paths, corrected before Odoo.sh runtime:
+
+1. **Lifecycle probe not bound to one credential snapshot.** `_execute_lifecycle`
+   delegated to public `execute()`, which pre-checked the credential and then let
+   `_send(store, body)` **re-read** it; `_run_connection_probe` then wrote
+   verification/failure mirrors **without** revalidating the store generation or
+   the credential row — so a concurrent replacement could mark a newly-replaced
+   token verified from an old-token response, or invalidate a new token from an
+   old-token failure.
+2. **Public `action_clear_token` bypassed two-phase disconnect.** It cleared
+   without the lifecycle store lock, permitted clearing while `disconnecting`, and
+   moved `connected`/`reconnect_needed` → `disconnected` with no epoch bump —
+   breaking the invariant that credentials remain present until the controller
+   reaches `completed`/`timed_out`.
+
+Plus review §11: `action_disconnect` must write `connection_generation =
+locked_generation + 1` from the value returned under the lock.
+
+## S2A-C2.1 Defect 1 — one-snapshot lifecycle probe + post-network revalidation (fixed)
+
+**Correction (`api_client.py`, `store.py`, `store_credential.py`).**
+
+- `_execute_lifecycle` is **removed** and replaced by two private client helpers:
+  - `_admit_lifecycle(store, purpose)` — the matrix gate + the **single**
+    credential snapshot: one token read (via the sanctioned `_get_access_token`),
+    the credential id + version (`write_date`), the store `connection_generation`,
+    and the purpose's allowed-state matrix. Takes **no** lock (a probe must not
+    hold a lock across the network); fails closed on a bad purpose/state
+    (`UserError`) or a missing token (`ShopifyClientError(ERROR_AUTH,
+    REASON_TOKEN_INVALID, credential_invalid=True)`).
+  - `_send_lifecycle(store, query, token, variables=None)` — issues the request
+    with **exactly** the snapshot token via `_send(store, body, token)`, so the
+    transport re-reads **no** credential (closing the double-read window). Same
+    config-`UserError` / `RequestException`→temporary / `_normalize_response`
+    contract as `execute()`. The legacy two-arg `_send(store, body)` seam
+    (`execute()`) is unchanged.
+- `store._run_connection_probe` now: snapshots via `_admit_lifecycle`, sends via
+  `_send_lifecycle`, then — for **success and failure alike** — calls
+  `_lifecycle_probe_superseded(snapshot)`, which acquires the **store → credential**
+  locks (`_lock_store_for_lifecycle` then the credential-row `FOR NO KEY UPDATE`
+  via `store_credential._lifecycle_credential_version(lock=True)`) and rejects the
+  result if the locked state left the matrix, the generation changed, or the
+  credential id/version/**value** changed. A superseded probe is audited via
+  `_audit_probe_superseded` (job → `cancelled`, reason "Connection probe
+  superseded by a lifecycle or credential change; rerun it.") and writes **no**
+  mirror or credential state. Non-superseded results apply the existing pass/fail
+  mirrors under the held lock (TOCTOU-safe). **No lock spans the network call.**
+- The credential **value** is compared in addition to id/`write_date` because
+  PostgreSQL fixes `write_date` to the transaction timestamp within one
+  transaction, so a same-transaction replacement is caught by the value change.
+- `action_reconnect` aborts (no readiness, no finalize) when the probe returns
+  `'superseded'`.
+
+## S2A-C2.2 Defect 2 — public/controller credential-clear split (fixed)
+
+**Correction (`store_credential.py`, `store.py`; clarification 4690807427).**
+
+- New **controller-only** primitive `store_credential._clear_token_under_store_lock
+  (store)`: clears the value + `credential_state` + non-secret store mirrors,
+  performs **no** state transition and **no** epoch bump, and takes **no** lock of
+  its own (the caller holds the store lock). Both `_finalize_disconnect_completed`
+  and `_finalize_disconnect_timed_out` now call it under the controller's held
+  store `FOR UPDATE` (they set `disconnected` themselves) — never the public
+  `action_clear_token` (which would refuse a `disconnecting` store).
+- Public `action_clear_token(store)` now locks the store first
+  (`_lock_store_for_lifecycle`) and routes by the locked state:
+  `disconnecting` → **refused** (`UserError`); `connected`/`reconnect_needed` →
+  **routed** to the accepted two-phase disconnect via the shared
+  `store._request_disconnect_locked` (state → `disconnecting`, one epoch bump,
+  audited request) with **nothing cleared now** — the controller clears at
+  finalize; `setup_incomplete`/`disconnected` → cleared directly under the lock.
+  No public path manufactures a clear-before-quiescence.
+
+## S2A-C2.3 Review §11 — `action_disconnect` uses the locked generation (fixed)
+
+`action_disconnect` and the public clear routing share
+`store._request_disconnect_locked(locked_state, locked_generation)`, which writes
+`connection_generation = locked_generation + 1` from the value returned under the
+lock (no indirect `self.connection_generation` re-read). The single-bump
+idempotent-no-op contract is preserved.
+
+## S2A-C2.4 Tests added / migrated
+
+- `tests/test_disconnect_quiescence.py`:
+  - `TestLifecycleProbeSupersession` (controlled, same-cursor injection at the
+    `_send` seam): `_send_lifecycle` receives the exact snapshot token; a
+    non-superseded probe applies the pass mirror; supersession by a credential
+    **replace** (generation) and by a **disconnect** (state) → job `cancelled`,
+    no mirror; an **auth-failure** result during a replace does **not** invalidate
+    the replaced token (the named hazard); a `reconnect_needed` replace (no epoch
+    bump — value-only supersede) aborts the reconnect **before** readiness.
+  - `TestCredentialClearPolicy`: public clear on a `connected` store with an
+    outstanding committed lease defers to the controller and does **not** clear
+    until zero holders (no premature clear); refused while `disconnecting`; direct
+    clear from `setup_incomplete`/`disconnected`; `action_disconnect` bumps the
+    generation exactly once from the locked value.
+  - Updated the `test_store_then_credential_clear_order` source guard: finalize
+    calls `_clear_token_under_store_lock` (not the public `action_clear_token`),
+    and `action_disconnect` clears nothing.
+- `tests/test_api_client.py`: `_send_lifecycle` passes the snapshot token to
+  `_send`; `_admit_lifecycle` reads the token exactly once and snapshots
+  id/version/generation/matrix; refuses a state outside the matrix.
+- `tests/test_credential_service.py`: connected/reconnect_needed public clear
+  **requests two-phase disconnect** (credential still present, one epoch bump);
+  refused while `disconnecting`; direct clear from `setup_incomplete`/
+  `disconnected` (migrated from the obsolete immediate-`disconnected` contract).
+- `tests/test_connection_lifecycle.py`: `_send` seam fakes accept the token
+  snapshot; the direct-clear-on-connected test migrated to two-phase routing.
+
+## S2A-C2.5 Scope note — transport-seam regressions (packet §4)
+
+Binding the probe to `_send(store, body, token)` means the lifecycle transport
+seam is now three-arg. Two existing tests that patch `_send` with a 2-arg fake and
+then drive `action_test_connection` had to widen **only** their fake signatures
+(`lambda self, store, body, token=None: …`); **no assertion changed** in either:
+
+- `tests/test_test_connection.py` (api-client/test-connection behavior);
+- `tests/test_readiness_slot_closure.py` (its `_run_test_connection` provisioning
+  helper).
+
+This is the same packet §4 "minimal regressions in existing core dispatch/store/
+api-client tests" class the control room **ratified** for
+`test_connection_lifecycle.py` / `test_job_dispatch.py` in review 4690639375, and
+is **flagged here for the same ratification**. Net PR scope becomes **15**
+addon+doc files: the 12 prior files, `tests/test_api_client.py` (already in the
+Round-2 corrected allow-list; newly carries this correction's client-unit tests),
+plus the two seam-compat test files above. `test_readiness_check.py` was
+**not** touched — it patches `execute` (not `_send`) and never drives the probe.
+
+## S2A-C2.6 Static checks (this correction, no Odoo runtime)
+
+`py_compile` OK for all changed model + test files; AST guards re-verified:
+sudo call-sites still exactly three (`job_log`, `readiness_check`,
+`store_credential` — **no new `sudo()`**); public API-client surface still
+`{execute, execute_business}` (`_admit_lifecycle`/`_send_lifecycle` are private,
+`_execute_lifecycle` removed); the four credential service methods keep
+`@api.model`; no `.commit()` anywhere in `store.py`; client commits only on
+`side_cr`; both `_send(store, body)` and `_send(store, body, token)` seams present;
+no token literal persisted or logged (snapshot token is in-memory only). Store →
+credential lock order preserved on every clear/probe/mutation path; no lock spans
+the network call.
+
+## S2A-C2.7 Corrected status
+
+- **SRR-03 remains OPEN.** No runtime-green claimed (no Odoo runtime this
+  session). Exact-head Odoo.sh validation of the full `shopify_connector_core`
+  suite is still required (handoff §3–4).
+- PR #160 stays **draft/unmerged**; Slice 2B not begun; no live Shopify request;
+  no product/sale/cron change in this correction.

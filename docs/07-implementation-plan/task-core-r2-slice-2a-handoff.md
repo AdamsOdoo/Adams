@@ -124,6 +124,45 @@ runtime; they are implemented and are **not** deferred:
   set/replace while `disconnecting`, and bumps the epoch exactly once on a
   connected replacement — `store → credential` order, no new `sudo()`.
 
+## 5b. Probe-snapshot + credential-clear correction (reviews 4690804619 + 4690807427) — now part of Slice 2A
+
+A second control-room pass (on head `415c05c`) required two further correctness
+fixes before Odoo.sh runtime; they are implemented and are **not** deferred:
+
+- **One-snapshot lifecycle probe.** The probe binds to exactly one credential
+  snapshot via the private client helper `_admit_lifecycle` (single token read +
+  credential id/version + store generation + purpose matrix) and issues the
+  request through `_send_lifecycle(store, query, token)` with that exact token
+  (`_send(store, body, token)` — no transport credential re-read). After the
+  network result (success **or** failure), `store._lifecycle_probe_superseded`
+  acquires the **store → credential** locks and revalidates state, generation, and
+  credential id/version/**value**; a change → the response is discarded and the
+  probe job is audited `cancelled` ("superseded"), writing **no** mirror or
+  credential state. `_execute_lifecycle` is removed; the public client surface
+  stays `{execute, execute_business}`. **No lock spans the network call.**
+- **Public/controller credential-clear split.** The controller-only
+  `_clear_token_under_store_lock` primitive (no state change, no bump, caller holds
+  the lock) is what `_finalize_disconnect_completed`/`_timed_out` call under the
+  held store `FOR UPDATE`. Public `action_clear_token` now locks the store first
+  and routes: `disconnecting` → refused; `connected`/`reconnect_needed` → the
+  accepted two-phase `action_disconnect` request (shared
+  `_request_disconnect_locked`, one epoch bump, **nothing cleared now**;
+  clarification 4690807427); `setup_incomplete`/`disconnected` → direct clear.
+- **Disconnect generation.** `action_disconnect` and the clear routing share
+  `_request_disconnect_locked`, which writes `connection_generation =
+  locked_generation + 1` from the value returned under the lock (review §11).
+
+Files touched by this correction: `api_client.py`, `store.py`,
+`store_credential.py`, `tests/test_disconnect_quiescence.py`,
+`tests/test_api_client.py`, `tests/test_credential_service.py`,
+`tests/test_connection_lifecycle.py`, `__manifest__.py` (version
+`19.0.1.7.1`), `tests/test_api_client.py` (client-unit tests; already in the
+Round-2 allow-list), and — as packet-§4 minimal transport-seam regressions flagged
+for ratification — `tests/test_test_connection.py` and
+`tests/test_readiness_slot_closure.py` (their `_send` fakes now accept the token
+argument; no assertion changed). Net PR scope: 15 files. Full evidence:
+`docs/05-qa/task-core-r2-validation-results.md` §S2A-C2.
+
 ## 6. Remaining Slice-2B work (NOT authorized here)
 
 - Product importer call-site migration to `with execute_business(job, …)` around

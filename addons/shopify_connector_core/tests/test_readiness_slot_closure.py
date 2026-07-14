@@ -117,9 +117,12 @@ class TestReadinessSlotClosure(TransactionCase):
         }
 
     def _run_test_connection(self, store, response):
+        # CORE-R2 (review 4690804619 #1): the lifecycle probe passes its one token
+        # snapshot to `_send(store, body, token)`; the transport-seam fake accepts
+        # the token argument (packet-§4 minimal seam-compat, no assertion changed).
         Client = self.env['shopify.connector.api.client']
         with patch.object(
-            type(Client), '_send', lambda self, s, body: response
+            type(Client), '_send', lambda self, s, body, token=None: response
         ):
             store.with_user(self.user_admin).action_test_connection()
 

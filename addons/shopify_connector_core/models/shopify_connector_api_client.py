@@ -58,11 +58,12 @@ REASON_UNKNOWN = (
 )
 
 # CORE-R2 (AR-047; analysis §9.1) lifecycle-call purpose -> allowed store
-# states. `_execute_lifecycle` is the private guarded entry for setup/diagnostic
-# Shopify calls; each `purpose` carries a fixed allowed-state matrix (not a
-# generic bypass). A call outside its matrix fails closed, and NO lifecycle
-# call is permitted while the store is `disconnecting` -- none of the purposes
-# below lists it (frozen lifecycle matrix, analysis §8).
+# states. `_admit_lifecycle` (snapshot/gate) and `_send_lifecycle` (transport)
+# are the private guarded entry for setup/diagnostic Shopify calls; each
+# `purpose` carries a fixed allowed-state matrix (not a generic bypass). A call
+# outside its matrix fails closed, and NO lifecycle call is permitted while the
+# store is `disconnecting` -- none of the purposes below lists it (frozen
+# lifecycle matrix, analysis §8).
 LIFECYCLE_PURPOSE_STATES = {
     'test_connection': ('setup_incomplete', 'connected', 'reconnect_needed'),
     'readiness_probe': ('setup_incomplete', 'connected', 'reconnect_needed'),
@@ -181,9 +182,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         return self._normalize_response(store, response)
 
     @api.model
-    def _execute_lifecycle(self, store, query, variables=None, purpose=None):
-        """PRIVATE guarded entry for setup/diagnostic Shopify calls (CORE-R2,
-        AR-047; analysis §9.1; review 4690639375 #2).
+    def _admit_lifecycle(self, store, purpose):
+        """Bind one lifecycle probe to exactly ONE credential snapshot (CORE-R2,
+        AR-047; analysis §9.1; review 4690804619 #1).
 
         **Private on purpose.** `purpose` is a fixed enum selected by the two
         trusted store callers only (`action_test_connection` -> `test_connection`,
@@ -193,21 +194,25 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         through RPC (the public API-client surface stays exactly
         `{execute, execute_business}`).
 
-        A **plain** method -- no admission lease, no context manager: a lifecycle
-        *call* is a diagnostic, not a generation-changing transition (the
-        generation-changing write that may *follow* a successful probe --
-        activation / reconnect success -- is what takes the store-row update lock
-        and bumps the epoch, in `shopify.connector.store`). Each `purpose` carries
-        an allowed store-state matrix (`LIFECYCLE_PURPOSE_STATES`, analysis §9.1):
-        a call outside its matrix fails closed with a `UserError`, and **no
-        lifecycle call is permitted while the store is `disconnecting`** (no
-        purpose lists it -- frozen lifecycle matrix, §8). An unknown/absent purpose
-        also fails closed. On an allowed state it routes through the **same**
-        transport and normalization as the pre-existing `execute()` (missing-config
-        `UserError`, missing-token classification, `RequestException` mapping, and
-        `_normalize_response`), so the accepted read-only response/error contract
-        is unchanged. Public `execute()` remains until a later CORE-R2 slice
-        privatizes it.
+        Returns the immutable probe snapshot the caller passes to `_send_lifecycle`
+        and later revalidates (analysis §9.3): the **single** in-memory token read
+        (via the one sanctioned `_get_access_token`), the credential row identity +
+        version (`id`, `write_date`), the store `connection_generation`, and the
+        `purpose`'s allowed-state matrix. The token is read **once here** and passed
+        to `_send_lifecycle(store, body, token)` so the transport performs **no**
+        second credential read -- closing the double-read window review 4690804619
+        cited (`execute()` pre-check read + `_send` re-read).
+
+        Fails closed exactly like the read-only contract: an unknown/absent purpose
+        or a state outside the matrix raises `UserError` (defense in depth atop the
+        store's pre-check; no purpose lists `disconnecting`), and a missing/empty
+        credential raises `ShopifyClientError(ERROR_AUTH, REASON_TOKEN_INVALID,
+        credential_invalid=True)` -- before any network. This is a **plain**
+        snapshot read: it takes **no** lock (a lifecycle probe must not hold a lock
+        across the network call) and does not itself change the epoch; the
+        generation-changing write that may *follow* a successful probe (activation /
+        reconnect success) is what takes the store-row update lock, in
+        `shopify.connector.store`.
         """
         allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
         if allowed_states is None:
@@ -220,7 +225,63 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 'This diagnostic is not available while the store is "%s"; '
                 'the Shopify call is refused.' % store.state
             )
-        return self.execute(store, query, variables=variables)
+        token = self.env['shopify.connector.store.credential']._get_access_token(
+            store
+        )
+        if not token:
+            raise ShopifyClientError(
+                error_class=ERROR_AUTH,
+                reason=REASON_TOKEN_INVALID,
+                credential_invalid=True,
+            )
+        # Non-locking credential version baseline (id + write_date). A lock here
+        # would span the network call (forbidden); the post-network revalidation
+        # takes the store->credential locks and re-reads this version.
+        version = self.env[
+            'shopify.connector.store.credential'
+        ]._lifecycle_credential_version(store, lock=False)
+        return {
+            'token': token,
+            'credential_id': version[0] if version else False,
+            'credential_version': version[1] if version else False,
+            'generation': store.connection_generation,
+            'allowed_states': allowed_states,
+        }
+
+    @api.model
+    def _send_lifecycle(self, store, query, token, variables=None):
+        """Issue one lifecycle probe using the exact snapshot token (CORE-R2,
+        AR-047; review 4690804619 #1).
+
+        The transport half of the lifecycle path. Receives the single token
+        snapshot from `_admit_lifecycle` and passes it straight to
+        `_send(store, body, token)` -- so the request uses **exactly** that
+        snapshot and the transport re-reads **no** credential (unlike the former
+        `execute()` delegation, which pre-checked the token and then let `_send`
+        read it again). Preserves the accepted read-only contract: the same
+        missing-configuration `UserError` (raised before any transport), the
+        `RequestException` -> `ShopifyClientError(ERROR_TEMPORARY, REASON_TEMPORARY)`
+        mapping, and the shared `_normalize_response` taxonomy. No lock is held
+        here; the post-network revalidation lives in the store's probe. Public
+        `execute()` (still the two-arg `_send(store, body)` seam) is unchanged.
+        """
+        if not store.shop_domain or not store.api_version:
+            raise UserError(
+                'A shop domain and API version are required before '
+                'contacting Shopify.'
+            )
+        body = {'query': query, 'variables': variables or {}}
+        try:
+            response = self._send(store, body, token)
+        except ShopifyClientError:
+            raise
+        except requests.exceptions.RequestException as exc:
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail=redact(str(exc)),
+            )
+        return self._normalize_response(store, response)
 
     @contextmanager
     def execute_business(self, job, store, query, variables=None):

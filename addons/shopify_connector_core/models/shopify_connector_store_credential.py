@@ -173,16 +173,63 @@ class ShopifyConnectorStoreCredential(models.Model):
 
     @api.model
     def action_clear_token(self, store):
-        """Empty the store's credential value, preserving history.
+        """Public/manual credential clear -- never bypasses two-phase quiescence
+        (CORE-R2, AR-047; reviews 4690804619 #2 + 4690807427).
 
-        Idempotent when no credential row exists yet: no error, no row
-        created. The credential row itself and
-        `credential_last_replaced_at` are never removed (MBQ-08). A
-        `connected` or `reconnect_needed` store also moves to
-        `disconnected`: with the credential gone, `store.state` must
-        not still claim a live/recoverable connection --
-        `action_disconnect()` may still write `disconnected` afterward,
-        which remains fine and idempotent.
+        Takes the store-row lifecycle lock FIRST (store -> credential global
+        order) and fresh-reads the state under it, then routes by that state:
+
+        - `disconnecting`: **refused** (`UserError`) -- a disconnect is already in
+          progress and the controller clears the credential when it reaches
+          `completed`/`timed_out`; a manual clear must not race it.
+        - `connected` / `reconnect_needed`: an already-admitted call lease can
+          outlive admission's brief `FOR SHARE`, so a live/recoverable store must
+          **quiesce** before its credential is cleared. This delegates to the
+          accepted two-phase `action_disconnect` request (`_request_disconnect_
+          locked`, one epoch bump, `state -> disconnecting`) and clears **nothing**
+          now -- the controller performs the actual clear at finalize. It does
+          **not** manufacture a clear-before-quiescence (review 4690807427).
+        - `setup_incomplete` / already `disconnected`: no active-business-call
+          posture, so the credential is cleared **directly** under the held lock
+          via the shared `_clear_token_under_store_lock` primitive.
+
+        Idempotent when no credential row exists yet (direct-clear states): no
+        error, no row created. The credential row itself and
+        `credential_last_replaced_at` are never removed (MBQ-08). No token is ever
+        logged/persisted; runs as the calling user (no `sudo()`), so the ACL layer
+        stays live.
+        """
+        locked_state, locked_generation = store._lock_store_for_lifecycle()
+        if locked_state == 'disconnecting':
+            raise UserError(
+                'Cannot clear the credential while a disconnect is in '
+                'progress for this store; it is cleared automatically when '
+                'the disconnect completes.'
+            )
+        if locked_state in ('connected', 'reconnect_needed'):
+            # Route through the accepted two-phase disconnect -- clear nothing now.
+            store._request_disconnect_locked(locked_state, locked_generation)
+            return None
+        # setup_incomplete / disconnected: safe to clear directly under the lock.
+        self._clear_token_under_store_lock(store)
+        return None
+
+    @api.model
+    def _clear_token_under_store_lock(self, store):
+        """Controller-only credential clear primitive (CORE-R2, AR-047; review
+        4690804619 #2).
+
+        Empties the credential value + `credential_state` and the store's
+        non-secret credential mirrors, preserving history (the credential row and
+        `credential_last_replaced_at` are never removed, MBQ-08). It performs **no
+        store-state transition and no epoch bump** and takes **no** lock of its own:
+        the caller must already hold the store-row lock -- the quiescence controller
+        holds the store `FOR UPDATE` at `_finalize_disconnect_completed` /
+        `_finalize_disconnect_timed_out` (and writes `disconnected` itself), and the
+        public `action_clear_token` holds `_lock_store_for_lifecycle` for its
+        direct-clear states. This keeps the credential present until the controller
+        reaches `completed`/`timed_out`, so no path clears before quiescence.
+        Idempotent with no credential row. No token logging; no `sudo()`.
         """
         credential = self.search([('store_id', '=', store.id)], limit=1)
         if credential:
@@ -195,9 +242,46 @@ class ShopifyConnectorStoreCredential(models.Model):
             'credential_last_verified_at': False,
             'credential_last_failure_reason': False,
         })
-        if store.state in ('connected', 'reconnect_needed'):
-            store.write({'state': 'disconnected'})
         return None
+
+    @api.model
+    def _lifecycle_credential_version(self, store, lock):
+        """Return `(id, write_date)` of the store's credential row, or `None`.
+
+        The credential-version signal for the CORE-R2 lifecycle-probe snapshot +
+        post-network revalidation (review 4690804619 #1). `write_date` advances on
+        every credential set/replace/clear (the credential service always writes
+        the row), so an unchanged `(id, write_date)` pair proves the credential was
+        not mutated between the probe snapshot and its revalidation.
+
+        `lock=False` is the non-locking pre-network baseline used by
+        `_admit_lifecycle` (a lock there would span the network call). `lock=True`
+        takes the blocking `FOR NO KEY UPDATE` credential-row lock used by the
+        store's post-network revalidation -- run **after** the store-row lock, so
+        the global `store -> credential` order holds. Raw SQL (never `sudo()`) with
+        the sanctioned `flush_recordset` / `invalidate_recordset` discipline so the
+        read reflects committed state, not a stale ORM cache. Reads only `id` and
+        `write_date` -- never the token.
+        """
+        credential = self.search([('store_id', '=', store.id)], limit=1)
+        if not credential:
+            return None
+        credential.flush_recordset()
+        if lock:
+            self.env.cr.execute(
+                "SELECT id, write_date FROM shopify_connector_store_credential "
+                "WHERE id = %s FOR NO KEY UPDATE",
+                (credential.id,),
+            )
+        else:
+            self.env.cr.execute(
+                "SELECT id, write_date FROM shopify_connector_store_credential "
+                "WHERE id = %s",
+                (credential.id,),
+            )
+        row = self.env.cr.fetchone()
+        credential.invalidate_recordset()
+        return row
 
     @api.model
     def _get_access_token(self, store):

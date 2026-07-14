@@ -1359,38 +1359,40 @@ class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
             ('job_type', '=', 'core_test_connection'),
         ]))
 
-    # 20. _execute_lifecycle (PRIVATE -- no RPC-exposed purpose, review
-    # 4690639375 #2) enforces the purpose->state matrix: `disconnecting` refuses
-    # every purpose; `test_connection` excludes `disconnected`; `reconnect_probe`
-    # permits it.
-    def test_execute_lifecycle_private_matrix_enforcement(self):
+    # 20. _admit_lifecycle (PRIVATE -- no RPC-exposed purpose, reviews 4690639375
+    # #2 + 4690804619 #1) enforces the purpose->state matrix and returns the one
+    # credential snapshot: `disconnecting` refuses every purpose; `test_connection`
+    # excludes `disconnected`; `reconnect_probe` permits it.
+    def test_admit_lifecycle_private_matrix_enforcement(self):
         Client = self.env['shopify.connector.api.client']
         store = self._connected_with_token()
         store.write({'state': 'disconnecting'})
         with self.assertRaises(UserError):
-            Client._execute_lifecycle(store, 'q', purpose='test_connection')
+            Client._admit_lifecycle(store, 'test_connection')
         with self.assertRaises(UserError):
-            Client._execute_lifecycle(store, 'q', purpose='reconnect_probe')
+            Client._admit_lifecycle(store, 'reconnect_probe')
         # Unknown purpose fails closed.
         with self.assertRaises(UserError):
-            Client._execute_lifecycle(store, 'q', purpose='not_a_purpose')
+            Client._admit_lifecycle(store, 'not_a_purpose')
         # test_connection excludes `disconnected`; reconnect_probe permits it.
         store.write({'state': 'disconnected'})
         with self.assertRaises(UserError):
-            Client._execute_lifecycle(store, 'q', purpose='test_connection')
-        with patch.object(
-            type(Client), '_send',
-            lambda s, st, b, token=None: FakeResponse(200, json_body={'data': {}}),
-        ):
-            # reconnect_probe from disconnected passes the matrix and reaches the
-            # (faked) transport -- no UserError.
-            Client._execute_lifecycle(store, 'q', purpose='reconnect_probe')
+            Client._admit_lifecycle(store, 'test_connection')
+        # reconnect_probe from disconnected passes the matrix and returns a
+        # one-token snapshot (no transport needed for the gate).
+        snapshot = Client._admit_lifecycle(store, 'reconnect_probe')
+        self.assertEqual(snapshot['token'], DUMMY_TOKEN)
+        self.assertEqual(
+            snapshot['allowed_states'], ('reconnect_needed', 'disconnected'))
 
-    # The purpose-carrying lifecycle entry is PRIVATE (not RPC-exposed).
-    def test_execute_lifecycle_is_private(self):
+    # The purpose-carrying lifecycle entries are PRIVATE (not RPC-exposed); the
+    # former `_execute_lifecycle` was split into `_admit_lifecycle`/`_send_lifecycle`.
+    def test_lifecycle_helpers_are_private(self):
         Client = type(self.env['shopify.connector.api.client'])
-        self.assertTrue(hasattr(Client, '_execute_lifecycle'))
+        self.assertTrue(hasattr(Client, '_admit_lifecycle'))
+        self.assertTrue(hasattr(Client, '_send_lifecycle'))
         self.assertFalse(hasattr(Client, 'execute_lifecycle'))
+        self.assertFalse(hasattr(Client, '_execute_lifecycle'))
 
     # Activation and reconnect lifecycle operations are refused during
     # disconnecting (matrix §8).
@@ -1673,8 +1675,10 @@ class TestDisconnectSourceGuards(_DisconnectHelpers, TransactionCase):
         self.assertNotIn('import time', module_src)
 
     # 21. Credential clear follows the store -> credential lock order: the
-    # controller takes the store FOR UPDATE (selection) BEFORE any finalize
-    # calls action_clear_token; Phase 1 never clears the credential.
+    # controller takes the store FOR UPDATE (selection) BEFORE any finalize calls
+    # the controller-only PRIVATE clear primitive; it must NOT call the public
+    # action_clear_token (which refuses a `disconnecting` store); Phase 1 never
+    # clears the credential (review 4690804619 #2).
     def test_store_then_credential_clear_order(self):
         controller_src = inspect.getsource(
             store_module.ShopifyConnectorStore._run_disconnect_quiesce
@@ -1686,11 +1690,13 @@ class TestDisconnectSourceGuards(_DisconnectHelpers, TransactionCase):
             fsrc = inspect.getsource(
                 getattr(store_module.ShopifyConnectorStore, name)
             )
-            self.assertIn('action_clear_token', fsrc)
+            self.assertIn('_clear_token_under_store_lock', fsrc)
+            self.assertNotIn('action_clear_token', fsrc)
         phase1 = inspect.getsource(
             store_module.ShopifyConnectorStore.action_disconnect
         )
         self.assertNotIn('action_clear_token', phase1)
+        self.assertNotIn('_clear_token_under_store_lock', phase1)
 
     # The controller / finalization make NO Shopify call.
     def test_controller_makes_no_shopify_call(self):
@@ -1960,6 +1966,229 @@ class TestLifecycleRaceCorrections(_DisconnectHelpers, TransactionCase):
             store.action_reconnect()
         store.invalidate_recordset()
         self.assertEqual(store.state, 'connected')
+        self.assertEqual(store.connection_generation, gen_before + 1)
+
+
+class TestLifecycleProbeSupersession(_DisconnectHelpers, TransactionCase):
+    """CORE-R2 review 4690804619 #1: the lifecycle probe binds to ONE credential
+    snapshot (single token read, credential id/version, store generation), issues
+    the request with exactly that token via `_send(store, body, token)`, and after
+    the network result revalidates state/generation/credential id+version+value
+    under the store->credential locks. A lifecycle or credential change that wins
+    DURING the probe -- injected at the sanctioned `_send` transport seam,
+    same-cursor, never a state monkeypatch -- must be detected: the response is
+    discarded, the probe job is audited `cancelled` ('superseded'), and NO
+    verification/failure mirror or credential state is written."""
+
+    def _probe_job(self, store):
+        return self.env['shopify.connector.job'].search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'core_test_connection'),
+        ], order='id desc', limit=1)
+
+    def _run_probe(self, store, send_fake):
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), '_send', send_fake):
+            store.action_test_connection()
+
+    def _replace_during_send(self, store, new_token):
+        def racing_send(client_self, s, body, token=None):
+            self.env['shopify.connector.store.credential'].action_replace_token(
+                store, new_token)
+            return FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain))
+        return racing_send
+
+    def test_send_lifecycle_receives_exact_snapshot_token(self):
+        # Review §4: the request uses EXACTLY the admitted snapshot token -- the
+        # transport is handed the token, never left to re-read the credential.
+        store = self._connected_with_token()
+        captured = {}
+
+        def spy_send(client_self, s, body, token=None):
+            captured['token'] = token
+            return FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain))
+
+        self._run_probe(store, spy_send)
+        self.assertEqual(captured.get('token'), DUMMY_TOKEN)
+
+    def test_probe_not_superseded_applies_pass_mirror(self):
+        # Snapshot unchanged through the probe -> the result is applied normally
+        # (guards against a false-positive supersede).
+        store = self._connected_with_token()
+
+        def ok_send(client_self, s, body, token=None):
+            return FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain))
+
+        self._run_probe(store, ok_send)
+        store.invalidate_recordset()
+        job = self._probe_job(store)
+        self.assertEqual(job.state, 'succeeded')
+        self.assertEqual(store.last_test_connection_result, 'pass')
+        self.assertTrue(store.credential_last_verified_at)
+
+    def test_test_connection_superseded_by_credential_replace(self):
+        # A connected replace bumps the epoch -> generation mismatch supersedes.
+        store = self._connected_with_token()
+        self._run_probe(store, self._replace_during_send(store, DUMMY_TOKEN + 'N'))
+        store.invalidate_recordset()
+        job = self._probe_job(store)
+        self.assertEqual(job.state, 'cancelled')
+        self.assertIn('superseded', job.cancel_reason)
+        # No pass mirror / verification stamp written from the stale result.
+        self.assertNotEqual(store.last_test_connection_result, 'pass')
+        self.assertFalse(store.credential_last_verified_at)
+
+    def test_test_connection_superseded_by_disconnect(self):
+        store = self._connected_with_token()
+
+        def racing_send(client_self, s, body, token=None):
+            store.action_disconnect()
+            return FakeResponse(
+                200, json_body=_success_body(domain=store.shop_domain))
+
+        self._run_probe(store, racing_send)
+        store.invalidate_recordset()
+        job = self._probe_job(store)
+        self.assertEqual(job.state, 'cancelled')
+        self.assertIn('superseded', job.cancel_reason)
+        self.assertEqual(store.state, 'disconnecting')
+        self.assertNotEqual(store.last_test_connection_result, 'pass')
+
+    def test_auth_failure_superseded_does_not_invalidate_replaced_token(self):
+        # The exact hazard review 4690804619 #1 names: an OLD-token failure must
+        # not invalidate a token that was REPLACED during the probe.
+        store = self._connected_with_token()
+
+        def racing_send(client_self, s, body, token=None):
+            self.env['shopify.connector.store.credential'].action_replace_token(
+                store, DUMMY_TOKEN + 'N')
+            return FakeResponse(200, json_body={
+                'errors': [{
+                    'message': 'Access denied',
+                    'extensions': {'code': 'ACCESS_DENIED'},
+                }],
+            })
+
+        self._run_probe(store, racing_send)
+        store.invalidate_recordset()
+        job = self._probe_job(store)
+        # Superseded -> cancelled, NOT failed_final; the new token is intact.
+        self.assertEqual(job.state, 'cancelled')
+        self.assertIn('superseded', job.cancel_reason)
+        credential = self._credential(store)
+        self.assertEqual(credential.access_token, DUMMY_TOKEN + 'N')
+        self.assertNotEqual(credential.credential_state, 'invalid')
+
+    def test_reconnect_superseded_by_credential_replace_aborts(self):
+        # A reconnect_needed replace does NOT bump the epoch, so the credential
+        # value revalidation is what supersedes; the reconnect then aborts BEFORE
+        # readiness / finalize.
+        store = self._connected_with_token()
+        store.write({'state': 'reconnect_needed'})
+        store.invalidate_recordset()
+        Client = self.env['shopify.connector.api.client']
+        ReadinessCheck = self.env['shopify.connector.readiness.check']
+        readiness_calls = []
+
+        def fake_readiness(rc_self, s):
+            readiness_calls.append(s.id)
+            return {'job': None, 'overall_result': 'pass', 'checks': []}
+
+        with patch.object(
+            type(Client), '_send',
+            self._replace_during_send(store, DUMMY_TOKEN + 'N'),
+        ), patch.object(
+            type(ReadinessCheck), 'run_for_store', fake_readiness
+        ):
+            store.action_reconnect()
+        store.invalidate_recordset()
+        self.assertEqual(readiness_calls, [])          # aborted before readiness
+        self.assertNotEqual(store.state, 'connected')
+        job = self._probe_job(store)
+        self.assertEqual(job.state, 'cancelled')
+        self.assertIn('superseded', job.cancel_reason)
+
+
+class TestCredentialClearPolicy(_DisconnectHelpers, TransactionCase):
+    """CORE-R2 reviews 4690804619 #2 + 4690807427: the public/manual credential
+    clear never bypasses two-phase quiescence. A live/recoverable store routes
+    through `action_disconnect` and is cleared only by the controller at
+    `completed`/`timed_out`; `disconnecting` is refused; only setup_incomplete /
+    disconnected clear directly. An admitted lease keeps the credential present
+    until the controller observes zero holders (no premature clear)."""
+
+    def test_public_clear_connected_defers_to_controller_no_premature_clear(self):
+        # The linearization proof: a public clear on a connected store with an
+        # outstanding committed lease must NOT clear the credential until the
+        # controller reaches `completed` (zero holders).
+        store = self._connected_with_token()
+        lease = self._make_lease(store)
+        self.env['shopify.connector.store.credential'].action_clear_token(store)
+        store.invalidate_recordset()
+        # Two-phase requested; credential still present while the lease is open.
+        self.assertEqual(store.state, 'disconnecting')
+        self.assertTrue(store.credential_present)
+        self.assertEqual(self._credential(store).access_token, DUMMY_TOKEN)
+
+        # Controller pass with the lease still open -> quiescing, still not cleared.
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnecting')
+        self.assertTrue(store.credential_present)
+        self.assertEqual(self._credential(store).access_token, DUMMY_TOKEN)
+
+        # Holder releases -> next controller pass finalizes and clears then.
+        lease.unlink()
+        self.env['shopify.connector.store']._run_disconnect_quiesce()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnected')
+        self.assertEqual(store.disconnect_status, 'completed')
+        self.assertFalse(store.credential_present)
+        self.assertFalse(self._credential(store).access_token)
+
+    def test_public_clear_refused_while_disconnecting(self):
+        store = self._connected_with_token()
+        store.action_disconnect()
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnecting')
+        with self.assertRaises(UserError):
+            self.env['shopify.connector.store.credential'].action_clear_token(
+                store)
+        store.invalidate_recordset()
+        # Credential untouched by the refused clear.
+        self.assertTrue(store.credential_present)
+        self.assertEqual(self._credential(store).access_token, DUMMY_TOKEN)
+
+    def test_public_clear_direct_from_setup_incomplete(self):
+        store = self._make_store(state='setup_incomplete')
+        self.env['shopify.connector.store.credential'].action_set_token(
+            store, DUMMY_TOKEN)
+        self.env['shopify.connector.store.credential'].action_clear_token(store)
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'setup_incomplete')
+        self.assertFalse(store.credential_present)
+        self.assertFalse(self._credential(store).access_token)
+
+    def test_public_clear_direct_from_disconnected(self):
+        store = self._connected_with_token()
+        store.write({'state': 'disconnected'})
+        self.env['shopify.connector.store.credential'].action_clear_token(store)
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'disconnected')
+        self.assertFalse(store.credential_present)
+        self.assertFalse(self._credential(store).access_token)
+
+    def test_action_disconnect_uses_locked_generation_directly(self):
+        # Review §11: the Phase-1 write bumps to locked_generation + 1 from the
+        # value returned under the lock (exactly one bump).
+        store = self._connected_with_token()
+        store.invalidate_recordset()
+        gen_before = store.connection_generation
+        store.action_disconnect()
+        store.invalidate_recordset()
         self.assertEqual(store.connection_generation, gen_before + 1)
 
 
