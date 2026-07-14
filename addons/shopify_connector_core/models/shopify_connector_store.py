@@ -5,8 +5,12 @@ from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 from ..tools.redaction import redact
-from .shopify_connector_api_client import ERROR_AUTH, ShopifyClientError
-from .shopify_connector_job import BUSINESS_JOB_SOURCES, TERMINAL_JOB_STATES
+from .shopify_connector_api_client import (
+    ERROR_AUTH,
+    LIFECYCLE_PURPOSE_STATES,
+    ShopifyClientError,
+)
+from .shopify_connector_job import BUSINESS_JOB_SOURCES
 from .shopify_connector_job_dispatch import (
     DISCONNECT_QUIESCE_TIMEOUT,
     POLL_DELAY,
@@ -158,24 +162,48 @@ class ShopifyConnectorStore(models.Model):
 
         Admin-invoked (store write access is Admin-only per the merged
         ACL, so this is enforced by the existing ACL, not a new guard).
-        Creates exactly one `job_type='core_test_connection'` job per
-        run, with a fresh UUID4 `payload_hash` nonce so repeat runs never
-        collide on `store_idempotency_key_uniq` --
-        `core_readiness_check`'s identical latent exposure is untouched
-        (TD-001). Writes only the store mirrors, the credential's
-        `credential_state` (only for a genuine token-invalid signal), and
-        the job/job.log rows -- never the token, never a raw response
-        body outside the client's already-redacted `technical_detail`.
+        Thin public wrapper over the shared `_run_connection_probe` with the
+        INTERNAL purpose `'test_connection'` -- never a caller/RPC-controlled
+        purpose. The frozen matrix refuses it while the store is `disconnecting`
+        **or** `disconnected` (analysis §8/§9.1); `reconnect_probe` is the sibling
+        purpose used by `action_reconnect` for the finalized `disconnected` state.
         """
         self.ensure_one()
-        # CORE-R2 (AR-047; analysis §8/§9.1): Test Connection is a lifecycle
-        # diagnostic and is refused while the store is `disconnecting` (before
-        # any audit job is created). `execute_lifecycle`'s purpose→state matrix
-        # is the second, in-transport guard for the same rule.
-        if self.state == 'disconnecting':
+        return self._run_connection_probe('test_connection')
+
+    def _run_connection_probe(self, purpose):
+        """Shared read-only connection probe (Task 003 + CORE-R2; review
+        4690639375 #2).
+
+        The single implementation behind `action_test_connection`
+        (`purpose='test_connection'`) and `action_reconnect`
+        (`purpose='reconnect_probe'`). `purpose` is a fixed INTERNAL enum chosen
+        by those two trusted callers -- it is **not** a caller/RPC-controlled
+        value (this method is private, and it forwards to the private
+        `_execute_lifecycle`). Identical transport, normalization, mirror, and
+        audit behavior for both purposes; only the allowed-state matrix differs
+        (`LIFECYCLE_PURPOSE_STATES`): `test_connection` excludes `disconnected`,
+        `reconnect_probe` permits it (reconnect after completed disconnect,
+        matrix §8), and neither permits `disconnecting`.
+
+        The matrix is pre-checked here **before** any audit job is created (so a
+        refused probe never leaves a dangling `running` job) and re-enforced in
+        the private `_execute_lifecycle` transport as defense in depth. Creates
+        exactly one `job_type='core_test_connection'` job per run with a fresh
+        UUID4 `payload_hash` nonce; writes only the store mirrors, the
+        credential's `credential_state` (only for a genuine token-invalid
+        signal), and the job/job.log rows -- never the token.
+        """
+        self.ensure_one()
+        allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
+        if allowed_states is None:
             raise UserError(
-                'Test Connection is not available while a disconnect is in '
-                'progress.'
+                'An unknown connection-probe purpose was requested.'
+            )
+        if self.state not in allowed_states:
+            raise UserError(
+                'A connection check is not available while the store is '
+                '"%s".' % self.state
             )
         if not self.credential_present:
             raise UserError(
@@ -196,14 +224,14 @@ class ShopifyConnectorStore(models.Model):
         )
 
         try:
-            # CORE-R2 (analysis §9.3): the core store test-connection call site
-            # migrates to the guarded `execute_lifecycle` lifecycle entry
-            # (purpose='test_connection'; plain call, no lease). Same transport,
+            # CORE-R2 (analysis §9.3; review 4690639375 #2): the shared probe
+            # forwards to the PRIVATE `_execute_lifecycle` with the internal
+            # purpose (no lease, no RPC-exposed purpose). Same transport,
             # normalization, and error taxonomy as the pre-existing `execute()`.
             result = self.env[
                 'shopify.connector.api.client'
-            ].execute_lifecycle(
-                self, TEST_CONNECTION_QUERY, purpose='test_connection',
+            ]._execute_lifecycle(
+                self, TEST_CONNECTION_QUERY, purpose=purpose,
             )
         except ShopifyClientError as exc:
             self.write({
@@ -378,12 +406,18 @@ class ShopifyConnectorStore(models.Model):
         (DEC-022 §4.4).
         """
         self.ensure_one()
-        # CORE-R2 (AR-047; analysis §8): activation is refused while the store
-        # is `disconnecting` (disconnect is one-way; the matrix permits no
-        # lifecycle mutation during quiescence).
-        if self.state == 'disconnecting':
+        # CORE-R2 (AR-047; review 4690639375 #1): take the conflicting store-row
+        # update lock FIRST, then validate every state-dependent precondition
+        # against the fresh state read UNDER that lock (TOCTOU-safe). A disconnect
+        # that won the race is observed here and refused -- disconnect is one-way,
+        # activation must never overwrite `disconnecting`/`disconnected`. No
+        # Shopify call is made while the lock is held (only stored evidence is
+        # read); `connection_generation` is bumped exactly once, only on success.
+        locked_state, locked_generation = self._lock_store_for_lifecycle()
+        if locked_state in ('disconnecting', 'disconnected'):
             raise UserError(
-                'Cannot activate: a disconnect is in progress for this store.'
+                'Cannot activate: a disconnect is in progress or has completed '
+                'for this store.'
             )
         if not self.credential_present:
             raise UserError(
@@ -423,14 +457,11 @@ class ShopifyConnectorStore(models.Model):
                 'the current credential was verified — run the '
                 'readiness check first.'
             )
-        # CORE-R2 (AR-047; analysis §8/§9.2): activation is a generation-changing
-        # transition -- take the conflicting store-row update lock, fresh-read
-        # under it, and bump the epoch exactly once so any admission racing this
-        # activation linearizes on the row.
-        self._lock_store_for_lifecycle()
+        # Consume the generation read under the held lock and bump it exactly
+        # once -- the single successful-activation transition (analysis §8/§9.2).
         self.write({
             'state': 'connected',
-            'connection_generation': self.connection_generation + 1,
+            'connection_generation': locked_generation + 1,
         })
         self._create_lifecycle_audit_job(
             'Store activated (test-connection: %s, readiness: %s).' % (
@@ -791,20 +822,28 @@ class ShopifyConnectorStore(models.Model):
                 'reconnect_needed.'
             )
             return None
-        self.action_test_connection()
+        # CORE-R2 (AR-047; review 4690639375 #1): capture the connection epoch at
+        # reconnect start. The probe/readiness below run UNLOCKED, so a disconnect
+        # (or any other generation-changing transition) winning the race during
+        # them will change this epoch; the finalize then refuses rather than
+        # overwriting it. Capturing the epoch -- not a blanket `disconnected`
+        # refusal -- is what lets a *legitimate* reconnect from the finalized
+        # `disconnected` state (its epoch unchanged during the probe) still
+        # succeed, while a disconnect that WON during the probe is refused.
+        initial_generation = self.connection_generation
+        # CORE-R2 (AR-047; review 4690639375 #2): reconnect probes via the shared
+        # `_run_connection_probe` with the INTERNAL purpose `'reconnect_probe'`,
+        # which the frozen matrix permits from the finalized `disconnected` state
+        # (reconnect after completed disconnect) -- unlike `'test_connection'`,
+        # which excludes `disconnected`. The probe + readiness run WITHOUT the
+        # lifecycle lock (they issue the Shopify call).
+        self._run_connection_probe('reconnect_probe')
         self.invalidate_recordset()
-        # If test-connection just failed with an auth/permission/scope
-        # signal, action_test_connection()'s own exception handler
-        # already called action_mark_reconnect_needed() -- its state
-        # write and audit job are already recorded. Re-running that same
-        # write/audit below would double the audit trail for one logical
-        # reconnect attempt, so detect it via the fresh job's error_class
-        # (the same condition action_test_connection() itself used) and
-        # skip the redundant re-write. Every other failure path (identity
-        # mismatch, temporary/throttle/unknown errors, or a readiness
-        # failure with a passing test-connection) still falls through to
-        # this method's own reconnect_needed write/audit below, since
-        # action_test_connection() does not handle those itself.
+        # If the probe just failed with an auth/permission/scope signal,
+        # `_run_connection_probe`'s own handler already called
+        # action_mark_reconnect_needed() (which is itself TOCTOU-safe and refuses
+        # to overwrite a one-way disconnect). Detect it via the fresh job's
+        # error_class to avoid doubling the audit trail for one logical attempt.
         already_marked_reconnect_needed = False
         if self.last_test_connection_result != 'pass':
             last_test_job = self.env['shopify.connector.job'].search([
@@ -816,17 +855,34 @@ class ShopifyConnectorStore(models.Model):
             )
         self.env['shopify.connector.readiness.check'].run_for_store(self)
         self.invalidate_recordset()
-        if (
+        reconnect_ok = (
             self.last_test_connection_result == 'pass'
             and self.last_readiness_result in ('pass', 'warning')
+        )
+        # CORE-R2 (AR-047; review 4690639375 #1): finalize the reconnect state
+        # transition UNDER the conflicting update lock, revalidating the fresh
+        # state read under it. Refuse -- never overwriting -- if a disconnect is
+        # in progress (`disconnecting`) OR if the connection epoch changed since
+        # reconnect start (a disconnect, activation, or credential change won the
+        # race during the unlocked probe/readiness). A store that was already
+        # `disconnected` at reconnect start with an unchanged epoch is a
+        # legitimate reconnect and proceeds.
+        locked_state, locked_generation = self._lock_store_for_lifecycle()
+        if (
+            locked_state == 'disconnecting'
+            or locked_generation != initial_generation
         ):
-            # CORE-R2 (AR-047; analysis §8/§9.2): a successful reconnect is a
-            # generation-changing transition -- take the conflicting store-row
-            # update lock, fresh-read under it, and bump the epoch exactly once.
-            self._lock_store_for_lifecycle()
+            self._create_lifecycle_audit_job(
+                'Reconnect aborted: a concurrent lifecycle transition won '
+                'during the probe; store remains %s.' % locked_state
+            )
+            return None
+        if reconnect_ok:
+            # A successful reconnect is a generation-changing transition -- bump
+            # the epoch exactly once, consuming the generation read under the lock.
             self.write({
                 'state': 'connected',
-                'connection_generation': self.connection_generation + 1,
+                'connection_generation': locked_generation + 1,
             })
             self._create_lifecycle_audit_job(
                 'Store reconnected (test-connection: %s, readiness: '
@@ -855,8 +911,23 @@ class ShopifyConnectorStore(models.Model):
         (DEC-022 §4.7). Idempotent: calling this on a store already in
         `reconnect_needed` is a safe, audited no-op re-record, never an
         error.
+
+        CORE-R2 (AR-047; review 4690639375 #1): this is called both directly and
+        from `_run_connection_probe`'s auth-failure handler, so it takes the
+        conflicting store-row update lock and fresh-reads the state first; it
+        **never overwrites a one-way disconnect** (`disconnecting`/`disconnected`
+        -> audited no-op). Moving to `reconnect_needed` is an auth-failure
+        degradation, not a generation-changing reconnect, so it does **not** bump
+        the epoch.
         """
         self.ensure_one()
+        locked_state, _generation = self._lock_store_for_lifecycle()
+        if locked_state in ('disconnecting', 'disconnected'):
+            self._create_lifecycle_audit_job(
+                'Reconnect-needed signal ignored: store is %s (disconnect is '
+                'one-way).' % locked_state
+            )
+            return None
         self.write({'state': 'reconnect_needed'})
         message = 'Store marked reconnect_needed.'
         if reason:

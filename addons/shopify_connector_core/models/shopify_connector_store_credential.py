@@ -1,5 +1,5 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class ShopifyConnectorStoreCredential(models.Model):
@@ -78,34 +78,13 @@ class ShopifyConnectorStoreCredential(models.Model):
         closing the Task 005 stale-evidence path at the source instead
         of relying on the credential row's own `write_date` as a
         freshness signal. A `connected` store also moves to
-        `reconnect_needed`: business-job gating keys off `store.state`,
-        so a credential mutation must invalidate that state too, not
-        just the verification mirror -- otherwise sync jobs could run
-        against an unverified changed credential.
+        `reconnect_needed` (and bumps the connection epoch): business-job
+        gating and `execute_business` admission key off `store.state` /
+        `connection_generation`, so a credential mutation must invalidate
+        both, not just the verification mirror. Delegates to the shared
+        store->credential-ordered `_mutate_token`.
         """
-        if not isinstance(value, str) or not value:
-            raise ValidationError(
-                "A non-empty credential value is required."
-            )
-        credential = self.search([('store_id', '=', store.id)], limit=1)
-        if credential:
-            credential.write({
-                'access_token': value,
-                'credential_state': 'present',
-            })
-        else:
-            credential = self.create({
-                'store_id': store.id,
-                'access_token': value,
-                'credential_state': 'present',
-            })
-        store.write({
-            'credential_present': True,
-            'credential_last_verified_at': False,
-        })
-        if store.state == 'connected':
-            store.write({'state': 'reconnect_needed'})
-        return None
+        return self._mutate_token(store, value, is_replace=False)
 
     @api.model
     def action_replace_token(self, store, value):
@@ -113,16 +92,60 @@ class ShopifyConnectorStoreCredential(models.Model):
 
         Stamps `credential_last_replaced_at`; does not touch
         `last_test_connection_*` (Task 003 owns those). A `connected`
-        store also moves to `reconnect_needed`: business-job gating
-        keys off `store.state`, so a credential replacement must
-        invalidate that state too, not just the verification mirror --
-        otherwise sync jobs could run against an unverified changed
-        credential.
+        store also moves to `reconnect_needed` (and bumps the connection
+        epoch) -- same rationale as `action_set_token`. Delegates to the
+        shared store->credential-ordered `_mutate_token`.
         """
+        return self._mutate_token(store, value, is_replace=True)
+
+    def _mutate_token(self, store, value, is_replace):
+        """Shared store->credential-ordered token mutation (CORE-R2, AR-047;
+        review 4690639375 #3).
+
+        The single credential set/replace path. Enforces the global **store ->
+        credential** lock order and the frozen lifecycle matrix:
+
+        1. validate the supplied value **before any write** (identical
+           `ValidationError` message as before, for both set and replace);
+        2. acquire the **conflicting store-row update lock** on the store row
+           first (`store._lock_store_for_lifecycle`, `FOR NO KEY UPDATE`), and
+           fresh-read `(state, generation)` under it -- so a concurrent admission
+           holding `FOR SHARE` linearizes against this mutation and a stale gate
+           read can never capture the newly-written token under the old epoch;
+        3. if the fresh state is `disconnecting`, **refuse** (`UserError`) --
+           without touching the credential, the mirrors, or the generation, and
+           without writing any audit that could carry the token (disconnect is
+           one-way; the operator replaces after it finalizes);
+        4. only then create/update the credential row (normal ACL, **no
+           `sudo()`**), under the held store lock;
+        5. clear `credential_last_verified_at` (stale-evidence closure) and, for
+           a replace, stamp `credential_last_replaced_at`;
+        6. if the fresh state is `connected`, atomically move to
+           `reconnect_needed` **and increment `connection_generation` exactly
+           once** (the connected credential change invalidates both the state and
+           the epoch); for any other allowed state, preserve the state and add no
+           extra generation bump.
+
+        The token is never logged, never persisted outside `access_token`, and
+        never placed in an audit/exception message. This is the only credential
+        set/replace path -- no second credential model or service is introduced.
+        """
+        # (1) value validation BEFORE any write (before the store lock).
         if not isinstance(value, str) or not value:
             raise ValidationError(
                 "A non-empty credential value is required."
             )
+        # (2) store-row conflicting update lock FIRST (store -> credential global
+        # order), then the fresh state/generation read under the lock.
+        locked_state, locked_generation = store._lock_store_for_lifecycle()
+        # (3) refuse a credential change while a disconnect is in progress --
+        # nothing is written (no credential, no mirror, no generation, no audit).
+        if locked_state == 'disconnecting':
+            raise UserError(
+                'Cannot change the credential while a disconnect is in '
+                'progress for this store.'
+            )
+        # (4) credential row create/update, under the held store lock, normal ACL.
         credential = self.search([('store_id', '=', store.id)], limit=1)
         if credential:
             credential.write({
@@ -135,13 +158,17 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'access_token': value,
                 'credential_state': 'present',
             })
-        store.write({
+        # (5)/(6) store mirrors + connected-state/epoch invalidation.
+        store_vals = {
             'credential_present': True,
-            'credential_last_replaced_at': fields.Datetime.now(),
             'credential_last_verified_at': False,
-        })
-        if store.state == 'connected':
-            store.write({'state': 'reconnect_needed'})
+        }
+        if is_replace:
+            store_vals['credential_last_replaced_at'] = fields.Datetime.now()
+        if locked_state == 'connected':
+            store_vals['state'] = 'reconnect_needed'
+            store_vals['connection_generation'] = locked_generation + 1
+        store.write(store_vals)
         return None
 
     @api.model

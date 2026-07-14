@@ -58,7 +58,7 @@ REASON_UNKNOWN = (
 )
 
 # CORE-R2 (AR-047; analysis §9.1) lifecycle-call purpose -> allowed store
-# states. `execute_lifecycle` is the guarded entry for setup/diagnostic
+# states. `_execute_lifecycle` is the private guarded entry for setup/diagnostic
 # Shopify calls; each `purpose` carries a fixed allowed-state matrix (not a
 # generic bypass). A call outside its matrix fails closed, and NO lifecycle
 # call is permitted while the store is `disconnecting` -- none of the purposes
@@ -181,28 +181,33 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         return self._normalize_response(store, response)
 
     @api.model
-    def execute_lifecycle(self, store, query, variables=None, purpose=None):
-        """Guarded entry for setup/diagnostic Shopify calls (CORE-R2, AR-047;
-        analysis §9.1).
+    def _execute_lifecycle(self, store, query, variables=None, purpose=None):
+        """PRIVATE guarded entry for setup/diagnostic Shopify calls (CORE-R2,
+        AR-047; analysis §9.1; review 4690639375 #2).
+
+        **Private on purpose.** `purpose` is a fixed enum selected by the two
+        trusted store callers only (`action_test_connection` -> `test_connection`,
+        `action_reconnect` -> `reconnect_probe`, both via the store's shared
+        `_run_connection_probe`). It is deliberately **not** a public/RPC-exposed
+        method, so an arbitrary caller can never drive a caller-controlled purpose
+        through RPC (the public API-client surface stays exactly
+        `{execute, execute_business}`).
 
         A **plain** method -- no admission lease, no context manager: a lifecycle
         *call* is a diagnostic, not a generation-changing transition (the
         generation-changing write that may *follow* a successful probe --
         activation / reconnect success -- is what takes the store-row update lock
-        and bumps the epoch, in `shopify.connector.store`). `purpose` is a fixed
-        enum, each with an allowed store-state matrix (`LIFECYCLE_PURPOSE_STATES`,
-        analysis §9.1): a call outside its matrix fails closed with a `UserError`,
-        and **no lifecycle call is permitted while the store is `disconnecting`**
-        (no purpose lists it -- frozen lifecycle matrix, §8). An unknown/absent
-        purpose also fails closed.
-
-        On an allowed state it routes through the **same** transport and
-        normalization as the pre-existing `execute()` (missing-config `UserError`,
-        missing-token classification, `RequestException` mapping, and
+        and bumps the epoch, in `shopify.connector.store`). Each `purpose` carries
+        an allowed store-state matrix (`LIFECYCLE_PURPOSE_STATES`, analysis §9.1):
+        a call outside its matrix fails closed with a `UserError`, and **no
+        lifecycle call is permitted while the store is `disconnecting`** (no
+        purpose lists it -- frozen lifecycle matrix, §8). An unknown/absent purpose
+        also fails closed. On an allowed state it routes through the **same**
+        transport and normalization as the pre-existing `execute()` (missing-config
+        `UserError`, missing-token classification, `RequestException` mapping, and
         `_normalize_response`), so the accepted read-only response/error contract
         is unchanged. Public `execute()` remains until a later CORE-R2 slice
-        privatizes it; `execute_lifecycle` is the sanctioned lifecycle wrapper the
-        core store test-connection call site migrates to now (analysis §9.3).
+        privatizes it.
         """
         allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
         if allowed_states is None:
