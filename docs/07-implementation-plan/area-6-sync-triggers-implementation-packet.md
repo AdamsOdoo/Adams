@@ -25,6 +25,27 @@
 > `_inherit` to also verify the scan crons of enabled domains
 > (CORE-R1 D-R1-1's capability-aware rule) — an additive check
 > extension, part of this packet's core-additive allowance.
+>
+> **D-A6-5 ownership transferred 2026-07-15
+> ([`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md),
+> Wave 1 packet reconciliation, resolving Sol's hard-stop, issue #167
+> comment `4980808811`): the generic job-control services
+> (`action_manual_retry()`/`action_cancel()`) are extracted from this
+> packet into their own independently gated, generic, core-owned Wave 1
+> task —
+> [`task-job-actions-generic-core-packet.md`](./task-job-actions-generic-core-packet.md)
+> (Task JOB-ACTIONS).** This resolves the ownership question §3 of this
+> packet originally left "Flagged for ChatGPT" ("job-control services
+> are generic and belong to core... an explicitly-named additive core
+> exception for generic operator services"). D-A6-5's text below is
+> preserved as the historical design record (mechanics unchanged,
+> carried forward verbatim into the new packet); **this packet no
+> longer owns or implements `action_manual_retry`/`action_cancel` in
+> any future implementation** — it depends on Task JOB-ACTIONS's
+> already-merged services (§7 prompt corrected accordingly). This
+> packet retains D-A6-1..4/6 (scan jobs, crons, manual domain-sync
+> services, progress visibility) and remains unauthorized Wave 2+
+> scope, gated on Task 012 merging, exactly as before.
 
 ## 1. Objective, scope, non-goals
 
@@ -33,15 +54,19 @@ working number) — **a core-plus-Lite-trio task, stated plainly
 (red-team-corrected: an earlier draft of this section claimed "no
 core edits," contradicting the allowlist)**. It touches
 `shopify_connector_product` and `shopify_connector_sale` (scan
-services + cron data files) **and core, by design, in two named
-additive pieces (revised 2026-07-11 — the former third piece, the
-D-A6-7 readiness closure, moved to Task CORE-R1)**: (a) the generic
-job-control services (`shopify_connector_job_actions.py`, NEW —
-D-A6-5) plus the optional D-R1-1 scan-cron check extension
-(`_inherit`, additive); (b) one import line in
-`core/models/__init__.py`. **Non-goals:** no readiness placeholder
-edits (CORE-R1's scope, already merged by this task's gate time); no
-UI (services are called from shell/server actions until the UI phase
+services + cron data files) **and core, by design, in one named
+additive piece (revised 2026-07-15, DEC-034 — the former second piece,
+D-A6-5's generic job-control services, moved to Task JOB-ACTIONS,
+Wave 1; the former third piece, the D-A6-7 readiness closure, had
+already moved to Task CORE-R1 in the 2026-07-11 revision)**: the
+optional D-R1-1 scan-cron check extension
+(`_inherit`, additive) to `core/models/__init__.py`. **Non-goals:** no
+readiness placeholder edits (CORE-R1's scope, already merged by this
+task's gate time); no generic job-control actions (Task JOB-ACTIONS's
+scope, already merged by this task's gate time — this task calls
+`action_manual_retry`/`action_cancel`, e.g. from `action_sync_selected()`'s
+re-enqueue path where applicable, it does not implement them); no UI
+(services are called from shell/server actions until the UI phase
 wires buttons to them); no webhooks; no full-sync/backfill beyond
 the 60-day order window; no changes to import mapping/matching logic
 of any kind; no dispatcher/job-model logic changes beyond the named
@@ -102,7 +127,15 @@ entity's import job, `manual_sync`); all group-gated
 (`group_shopify_connector_operator`+), all enqueue-only, all
 collision-safe by the same keys.
 
-**D-A6-5 — Job-control services (retry/cancel/requeue).** On
+**D-A6-5 — Job-control services (retry/cancel/requeue) — OWNERSHIP
+TRANSFERRED 2026-07-15: moved to Task JOB-ACTIONS
+(`task-job-actions-generic-core-packet.md`), its own independently
+gated Wave 1 task, per DEC-034. The text below is preserved as the
+historical design record — the mechanics are unchanged and carried
+forward verbatim; Task JOB-ACTIONS's packet is the operative version.
+This task (Area 6) does not implement, and its future allowlist must
+not include, either method — see §7's corrected allowed/forbidden
+lists.** On
 `shopify.connector.job`: `action_manual_retry()` — allowed from
 `failed_retryable`/`failed_final`/`blocked_manual_review`/**`skipped`**
 (red-team addition: `skipped` is a terminal state a policy-skipped
@@ -200,37 +233,36 @@ is the only honest path.
 ## 3. Tests (exact files)
 
 In product: `test_product_scan_triggers.py`; in sale:
-`test_customer_scan_triggers.py`, `test_order_scan_triggers.py`,
-`test_job_control_services.py` (placed in sale to avoid core edits?
-— **no**: job-control services extend `shopify.connector.job` via
-`_inherit` from… **decision:** job-control services are generic and
-belong to core — but core edits are forbidden for domain tasks.
-Resolution (flagged): `action_manual_retry`/`action_cancel` are
-implemented in a small `shopify_connector_job.py` `_inherit`
-extension **inside `shopify_connector_sale`**? Rejected — generic
-services in a domain module is mis-ownership. **Final proposal: this
-task's allowlist includes one NEW core file
-`addons/shopify_connector_core/models/shopify_connector_job_actions.py`**
-(pure additive `_inherit` extension of the job model, no existing
-core file edited) plus `tests/test_job_actions.py` in core — an
-explicitly-named additive core exception for generic operator
-services, consistent with core owning the job substrate. Flagged for
-ChatGPT.) Coverage: one-scan-per-store-domain collision; checkpoint
-advance only after commit; overlap window applied; unchanged-object
-collision counted; manual/scheduled/source labeling; cron
-never-raises; retry/cancel state matrices incl. permission denials,
-no-bypass, `skipped`-recovery, and retry_count reset;
-selected-record sync. (Readiness-slot tests moved to CORE-R1's
+`test_customer_scan_triggers.py`, `test_order_scan_triggers.py`.
+**Resolved 2026-07-15, DEC-034 (this section's original "Flagged for
+ChatGPT" ownership question — job-control services are generic and
+belong to core, but core edits were forbidden for domain tasks — is
+now answered):** `action_manual_retry`/`action_cancel` and their test
+coverage belong to Task JOB-ACTIONS
+(`addons/shopify_connector_core/models/shopify_connector_job_actions.py`,
+`addons/shopify_connector_core/tests/test_job_actions.py`), a separate,
+independently gated, generic Wave 1 core task — **not** this task's
+allowlist. This task's own test coverage is therefore: one-scan-per-store-domain
+collision; checkpoint advance only after commit; overlap window
+applied; unchanged-object collision counted; manual/scheduled/source
+labeling; cron never-raises; selected-record sync (`action_sync_selected()`
+is enqueue-only, per D-A6-4 — it does not call `action_manual_retry`/
+`action_cancel`; this task's dependency on Task JOB-ACTIONS is that
+those two methods already exist for the later UI wave to wire buttons
+to, not a call-graph dependency inside this task's own services).
+(Readiness-slot tests moved to CORE-R1's
 `test_readiness_slot_closure.py` — 2026-07-11; if this task extends
 `cron_queue_health` with the scan-cron verification, it appends the
 scan-cron pass/fail cases to that same core test file.)
 
 ## 4. Acceptance criteria / DoD
 
-Operator can (from shell/server action) trigger any Lite-domain sync,
-retry any failed or skipped job, cancel any stuck job — with every
-path audited, collision-safe, and permission-gated; zero
-mapping-logic changes (diff-level check); suites + Odoo.sh green;
+Operator can (from shell/server action) trigger any Lite-domain sync
+and re-sync a selected record — with every path audited,
+collision-safe, and permission-gated; zero mapping-logic changes
+(diff-level check); retry/cancel of a failed, skipped, or stuck job is
+Task JOB-ACTIONS's already-merged scope (`action_manual_retry`/
+`action_cancel`), not re-proven here; suites + Odoo.sh green;
 validation record + AR row + handoff; draft PR; gate closes on
 draft-open. (The store-reaches-`connected` regression is CORE-R1's —
 already merged by this task's gate time — 2026-07-11.) Rollback:
@@ -257,10 +289,13 @@ needed.
 
 The 15-pattern applies with: 1 = Task 012 merged runtime-green
 (order scan needs the order importer) AND CORE-R1 merged (readiness
-already corrected); 6/7 = no mapping-logic and no Full-domain scope;
-13 = the D-A6-5 core-additive exception explicitly accepted (the
-readiness edits are CORE-R1's own accepted scope — revised
-2026-07-11); others as in prior packets.
+already corrected) AND Task JOB-ACTIONS merged (this task depends on,
+never reimplements, `action_manual_retry`/`action_cancel` — DEC-034,
+2026-07-15); 6/7 = no mapping-logic and no Full-domain scope; 13 =
+**superseded 2026-07-15 (DEC-034) — the D-A6-5 core-additive exception
+no longer applies to this task; it was resolved by transferring D-A6-5
+to Task JOB-ACTIONS.** The readiness edits remain CORE-R1's own
+accepted scope (revised 2026-07-11); others as in prior packets.
 
 ## 7. Locked final implementation prompt (Area 6 / "Task 016")
 
@@ -271,10 +306,12 @@ AND ISSUES THIS PROMPT.
 
 Implement the Area 6 trigger retrofit exactly per
 docs/07-implementation-plan/area-6-sync-triggers-implementation-packet.md
-(D-A6-1..6 binding; D-A6-7 is Task CORE-R1's merged scope — do not
-touch the readiness file). Prerequisites: Task 012 AND CORE-R1 merged
-runtime-green. Branch from the verified current Shopify-connector tip
-(STOP on drift). One session; draft PR; stop.
+(D-A6-1..4/6 binding; D-A6-5 is Task JOB-ACTIONS's merged scope — do
+NOT reimplement action_manual_retry/action_cancel; D-A6-7 is Task
+CORE-R1's merged scope — do not touch the readiness file). Prerequisites:
+Task 012 AND CORE-R1 AND Task JOB-ACTIONS merged runtime-green. Branch
+from the verified current mvp/program-integration tip (STOP on drift).
+One session; draft PR; stop.
 
 ALLOWED FILES (exhaustive):
 addons/shopify_connector_product/models/{__init__.py,
@@ -292,14 +329,10 @@ addons/shopify_connector_sale/data/shopify_connector_sale_cron.xml (NEW),
 addons/shopify_connector_sale/__manifest__.py (data entry only),
 addons/shopify_connector_sale/tests/{test_customer_scan_triggers.py,
 test_order_scan_triggers.py} (NEW),
-addons/shopify_connector_core/models/shopify_connector_job_actions.py
-(NEW — additive _inherit only: action_manual_retry, action_cancel),
-addons/shopify_connector_core/models/__init__.py (one import line),
 addons/shopify_connector_core/models/shopify_connector_scan_cron_health.py
 (NEW, OPTIONAL — additive _inherit extension of the CORE-R1
 cron_queue_health check adding scan-cron verification for enabled
 domains, per the packet header follow-on note; nothing else),
-addons/shopify_connector_core/tests/test_job_actions.py (NEW),
 addons/shopify_connector_core/tests/test_readiness_slot_closure.py
 (append scan-cron cases ONLY, if the optional extension is built),
 docs/05-qa/task-016-sync-triggers-validation-results.md (NEW),
@@ -307,7 +340,10 @@ docs/05-qa/architecture-review-log.md (append row),
 docs/01-research/research-handoff.md (top entry).
 FORBIDDEN: every other EXISTING core model file — explicitly
 including shopify_connector_readiness_check.py (CORE-R1's merged
-scope; this task extends via _inherit only, never edits); all
+scope; this task extends via _inherit only, never edits) AND
+shopify_connector_job_actions.py (Task JOB-ACTIONS's merged scope,
+2026-07-15 DEC-034 — action_manual_retry/action_cancel already exist;
+this task must not create, edit, or duplicate them); all
 importer/matching logic files' logic (scan services call them, never
 modify them); inventory/fulfillment/product_export anything;
 UI/webhooks/OAuth/CI; adams_base.
@@ -317,13 +353,14 @@ cursors in-run only; checkpoints advance post-commit with the 10-min
 overlap; one active scan per store+domain via operation_scope_key
 with shopify_target_gid='scan:<domain>' (the merged key excludes
 job_type — the marker is mandatory);
-scheduled sync opt-in per store; cron handlers never raise; job
-services carry no bypass and full audit logs (manual retry: allowed
-from failed_retryable/failed_final/blocked_manual_review/skipped,
-retry_count reset to 0); the readiness file is NEVER edited (CORE-R1
-scope — the optional scan-cron check extension is _inherit-additive
-only); concurrency caveat restated. Odoo.sh green before merge
-review (verbatim quote). Stop
+scheduled sync opt-in per store; cron handlers never raise; this
+task's own services (scans/crons/manual-sync/selected-record-sync)
+carry no bypass and full audit logs; job-level manual retry/cancel is
+Task JOB-ACTIONS's already-merged, already-tested scope — not
+reimplemented or re-tested here; the readiness file is NEVER edited
+(CORE-R1 scope — the optional scan-cron check extension is
+_inherit-additive only); concurrency caveat restated. Odoo.sh green
+before merge review (verbatim quote). Stop
 condition: draft PR "Task 016: manual and scheduled sync triggers";
 gate closes on draft-open; no UI/webhook work.
 ```

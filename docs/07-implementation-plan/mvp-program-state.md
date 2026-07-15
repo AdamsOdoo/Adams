@@ -4,9 +4,11 @@
 
 ## Current status
 
-**WAVE 0 ACCEPTED BY CLAUDE CONTROL ROOM — PENDING MERGE (2026-07-15).** DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed once PR #169 merges. The exact merge commit and resulting `mvp/program-integration` SHA are recorded in the control-room review comment on PR #169 and in the Wave 0 closure comment on issue #167 — not restated here, to avoid this table going stale the moment it is committed.
+**WAVE 0 MERGED (2026-07-15).** PR #169 merged into `mvp/program-integration` (merge commit `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`, per the Wave 0 closure comment on issue #167). DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed.
 
-Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code is authorized in this wave. **Wave 1 is authorized to begin once PR #169 merges** (CORE-R1, SEC-1, LC-1, and the SRR-03 closure sub-gate, per `mvp-completion-program.md` §4). Wave 2 remains unauthorized and may not merge, be enabled, or receive live Shopify validation while SRR-03 remains OPEN.
+**WAVE 1 — SOL HARD-STOPPED; PACKET RECONCILIATION ACTIVE (2026-07-15).** Sol correctly stopped before creating any branch, PR, code, or test, per issue #167 comment `4980808811`: the pre-reconciliation Wave 1 order (CORE-R1 → SEC-1 → LC-1 → SRR-03 closure) could not be implemented exactly as packaged — SEC-1 depended on Area 6's unauthorized Wave 2+ `action_manual_retry`/`action_cancel`; SEC-1's allowlist named a nonexistent Task 012 order-binding file; and LC-1's accepted design assumed it lands before SEC-1, contradicting the stated order. Claude control room independently re-verified all three findings against primary sources (packet text, live code `git grep`, live `git ls-tree`) and confirmed each is real. **[`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md)** records the resolution: Wave 1 is re-frozen to CORE-R1 → LC-1 → Task JOB-ACTIONS (new, extracted from Area 6's D-A6-5) → SEC-1 (rescoped to the current-surface baseline) → SRR-03 closure. **No Wave 1 implementation branch exists.** Wave 1 implementation is paused pending this docs-only reconciliation PR's review and merge; Sol's next launch uses the corrected packets.
+
+Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code was authorized in that wave. **Wave 1 is authorized in principle (Wave 0 merged) but implementation has not started** — Sol's first Wave 1 attempt hard-stopped on the packet conflicts above; a fresh Sol Wave 1 launch is the next action, once this packet-reconciliation PR merges. Wave 2 remains unauthorized and may not merge, be enabled, or receive live Shopify validation while SRR-03 remains OPEN.
 
 ## Checkpoint / integration identity
 
@@ -24,14 +26,14 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Active wave
 
-**Wave 0 — Current-state reconciliation and research closure — ACCEPTED, PENDING MERGE.** Working branch: `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) targets `mvp/program-integration`. Scope remained `docs/**` only. Wave 1 becomes the active wave once this PR merges.
+**Wave 1 — Existing read-only foundation integration — PACKET RECONCILIATION ACTIVE (docs-only), IMPLEMENTATION NOT STARTED.** Wave 0 merged (PR #169, merge commit `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`). Sol's first Wave 1 launch hard-stopped before any branch/PR/code (issue #167 comment `4980808811`). This session's docs-only packet-reconciliation PR (branch: this session's designated working branch, see the PR itself for the exact head) targets `mvp/program-integration` and carries [`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md) plus the corrected CORE-R1/LC-1/JOB-ACTIONS/SEC-1/Area-6/Task-012 packet text. Wave 1 implementation begins with a fresh Sol launch once this PR merges.
 
 ## Wave status
 
 | Wave | Status | Branch/PR | Notes |
 | --- | --- | --- | --- |
-| 0 — Reconciliation & research closure | Accepted by Claude control room, pending merge | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
-| 1 — Read-only foundation integration (CORE-R1, SEC-1, LC-1, SRR-03 closure) | Authorized upon Wave 0 merge | — | Requires Odoo.sh runtime access. Recommended internal sub-stages: CORE-R1, SEC-1, LC-1, then SRR-03 closure. |
+| 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
+| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | Authorized; Sol's first launch hard-stopped on packet conflicts (issue #167 comment `4980808811`); packet reconciliation (DEC-034) in review this session; **no implementation branch exists yet** | This session's docs-only reconciliation PR (see PR for exact head) | Requires Odoo.sh runtime access. Corrected internal sub-stages (DEC-034): CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. |
 | 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is OPEN; blocked on Wave 1 prerequisites/closure evidence and packet gate. May not merge, be enabled, or receive live Shopify validation while SRR-03 remains open. |
 | 3 — Inventory synchronization (Task 013/013B) | Not started | — | Blocked on Wave 2 and DEC-031 Layer 2 design+acceptance. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
@@ -58,8 +60,8 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Blockers
 
-1. **PR #169 merge** — Accepted by Claude control room; merge into `mvp/program-integration` completes Wave 0.
-2. **Wave 1 runtime access** — Odoo.sh dev-build access is required for CORE-R1/SEC-1/LC-1/SRR-03-closure evidence once Wave 1 opens.
+1. **This packet-reconciliation PR's review/merge** — must merge into `mvp/program-integration` before a fresh Sol Wave 1 launch, so Sol launches against the corrected CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03-closure packets instead of the pre-reconciliation ones that already produced one hard-stop.
+2. **Wave 1 runtime access** — Odoo.sh dev-build access is required for CORE-R1/LC-1/JOB-ACTIONS/SEC-1/SRR-03-closure evidence once Wave 1 implementation opens.
 3. **Dev-store access provisioning** — Wave 6 and mutation-domain UAT require human-provisioned Shopify Partner/dev-store credentials; Sol cannot self-provision them (hard-stop 5).
 
 ## Open decisions (full list: `mvp-completion-program.md` §9) — resolved by Wave 0 acceptance
@@ -81,9 +83,11 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Next control-room gate
 
-Wave 1 macro-wave review (CORE-R1, SEC-1, LC-1, SRR-03 closure), once Sol opens that wave's PR into `mvp/program-integration` and it reaches its own definition of done, per `mvp-completion-program.md` §4 and `../06-prompts/claude-mvp-wave-review-template.md`.
+Immediate: review/merge of this docs-only Wave 1 packet-reconciliation PR (DEC-034). After that: the Wave 1 macro-wave review itself (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure), once a freshly launched Sol opens that wave's implementation PR into `mvp/program-integration` and it reaches its own definition of done, per `mvp-completion-program.md` §4 and `../06-prompts/claude-mvp-wave-review-template.md`.
 
 ## Sprint checkpoint log
+
+- **Wave 1 packet reconciliation (2026-07-15):** Sol's first Wave 1 launch hard-stopped before any branch/PR/code (issue #167 comment `4980808811`) on three packet conflicts (SEC-1's Area-6/action-doors dependency; SEC-1's nonexistent order-binding allowlist entry; LC-1-vs-SEC-1 sequencing). Claude control room independently re-verified all three against primary sources (packet text line-by-line, live `git grep`/`git ls-tree`) and confirmed each. Produced `DEC-034` (corrected Wave 1 order: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure), a new `task-job-actions-generic-core-packet.md` extracting D-A6-5, and corrections to the SEC-1, Area 6, lifecycle-design, DEC-030, program-contract, program-state, acceptance-matrix, and Task 012 documents. Docs-only; no addon code, protected reference, or implementation branch created. Opened as a draft PR into `mvp/program-integration`, pending control-room adversarial consistency check before merge.
 
 - **Wave 0 acceptance (2026-07-15):** Claude control-room review accepted DEC-033 with two minor documentation corrections (Wave 1 internal sub-stage note; hard-stop 11 rewording), applied directly on PR #169. DEC-028/029/030 accepted; DEC-027 confirmed Proposed/Deferred. PR #150/#151 administrative closure as superseded authorized to proceed post-merge. Full review recorded as a PR #169 review comment and an issue #167 closure comment. Wave 1 authorized upon merge; Wave 2 remains blocked on SRR-03 closure.
 

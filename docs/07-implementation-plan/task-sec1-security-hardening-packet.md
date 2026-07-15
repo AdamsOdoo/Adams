@@ -1,13 +1,26 @@
 # Task SEC-1 — Cross-Cutting Security Hardening: Implementation-Ready Planning Packet
 
-> **Status: Proposed for ChatGPT review. NOT accepted. The locked
+> **Status: Proposed for control-room review. NOT accepted. The locked
 > prompt in §9 is NOT usable.** Produced 2026-07-11 by the PR #148
 > revision session, implementing review item 7 of ChatGPT's
-> control-room review (PR #148 comment `4942966937`). Sequenced
-> **after Area 6 (which introduces the sanctioned job-action
-> services) and before UI-U1** — the UI must wire buttons to an
-> already-hardened backend. Evidence: merged code re-read 2026-07-11;
-> captures 2026-07-11 §8 (`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`).
+> control-room review (PR #148 comment `4942966937`). **Sequencing
+> corrected 2026-07-15 by
+> [`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md)
+> (Wave 1 packet reconciliation, resolving Sol's hard-stop, issue #167
+> comment `4980808811`): this packet is Wave 1 Stage 4 — sequenced
+> after CORE-R1, Task LC-1, and Task
+> [JOB-ACTIONS](./task-job-actions-generic-core-packet.md) (which
+> supplies `action_manual_retry()`/`action_cancel()`, the sanctioned
+> job-action doors D-SEC1-3 names, as a generic Wave 1 prerequisite —
+> not Area 6, which remains unauthorized Wave 2+ scope), and before
+> UI-U1** — the UI must wire buttons to an already-hardened backend.
+> The original text below assumed an Area-6 prerequisite; every place
+> that assumption appears is corrected in place (§3 D-SEC1-3, §5, §7,
+> §9) rather than left as historical narrative, since the underlying
+> mechanics (the two methods' exact behavior) are unchanged — only
+> which task supplies them. Evidence: merged code re-read 2026-07-11
+> and re-verified 2026-07-15 against the live Wave 1 baseline; captures
+> 2026-07-11 §8 (`../00-source-materials/odoo19-shopify-official-captures-2026-07-11.md`).
 > **Final-convergence revision 2026-07-11 per comment `4947866018`
 > item 6: the `action_override_binding` contract is corrected — no
 > model argument is accepted, the scalar id is resolved *only* in the
@@ -118,13 +131,28 @@ writer of protected job fields — test-connection job mirrors, the
 lifecycle audit jobs, and the disconnect cancellation sweep, lines
 108–205/233–248/351–364 — and is therefore in the §5 allowlist with
 those exact sites elevated; without this, Test Connection / Activate
-/ Disconnect / Reconnect would raise under the new guard).
+/ Disconnect / Reconnect would raise under the new guard). **Wave 1
+reconciliation addition (DEC-034):** two further sanctioned internal
+protected-field writers are recognized by name — Task LC-1's
+`_reassign_to_historic_job_type()` (writes `state='cancelled'` on
+non-terminal jobs during historic-job conversion; lands
+Wave-1-Stage-2, before this packet) and Task JOB-ACTIONS's
+`action_manual_retry()`/`action_cancel()` (land Wave-1-Stage-3, before
+this packet). Both already exist by the time this packet implements;
+both are elevated at their existing write sites (in
+`shopify_connector_job.py` for the former, `shopify_connector_job_actions.py`
+for the latter — both in §5's allowlist) exactly like every other
+named site above — no new mechanism, no behavior change to either
+method, only the su wrapper.
 
 **D-SEC1-3 — Sanctioned methods (the only doors).** The public
 mutation surface for jobs becomes exactly: `enqueue()` (creation —
 existing service; direct `create()` by non-su callers is refused for
-business sources), Area 6's `action_manual_retry()` /
-`action_cancel()`, and a new `action_resolve_manual_review()`
+business sources), Task JOB-ACTIONS's `action_manual_retry()` /
+`action_cancel()` (extracted from the original D-A6-5 design into its
+own generic Wave 1 prerequisite stage per DEC-034 — implemented
+Wave-1-Stage-3, immediately before this packet; mechanics unchanged
+from the original D-A6-5 text), and a new `action_resolve_manual_review()`
 (reviewer/admin; `blocked_manual_review→queued` after an operator
 fixes the underlying cause, one audited `manual_action` log row —
 this is the "resolve" affordance the Error Center wires later; it
@@ -145,23 +173,38 @@ model's Odoo-record `Many2one` field (or a falsy value when the
 binding's identity is composite/derived, not a single Odoo record).
 The mixin default returns `False`; every concrete binding model
 declares its own (a one-line return). **Enumeration — every current
-and planned binding model:**
+and planned binding model (corrected 2026-07-15, DEC-034: the "exists
+at gate" column reflects the live Wave 1 baseline, not the
+pre-reconciliation assumption that Task 012's order binding would
+already exist):**
 
-| Binding model | `_odoo_binding_field_name()` | Comodel |
-| --- | --- | --- |
-| `shopify.connector.product.template.binding` | `product_template_id` | `product.template` |
-| `shopify.connector.product.variant.binding` | `product_variant_id` | `product.product` |
-| `shopify.connector.customer.binding` | `partner_id` | `res.partner` |
-| `shopify.connector.order.binding` (Task 012) | `sale_order_id` | `sale.order` |
-| `shopify.connector.location.mapping` (Task 013) | `odoo_location_id` | `stock.location` |
-| `shopify.connector.inventory.level.binding` (Task 013) | `False` (composite: variant-binding × location — re-derived deterministically, not overridable) | — |
-| `shopify.connector.product.media.binding` (Task 015B) | `False` (identity is the remote File GID, not an Odoo record — not overridable) | — |
+| Binding model | `_odoo_binding_field_name()` | Comodel | Exists at Wave 1 gate? |
+| --- | --- | --- | --- |
+| `shopify.connector.product.template.binding` | `product_template_id` | `product.template` | Yes |
+| `shopify.connector.product.variant.binding` | `product_variant_id` | `product.product` | Yes |
+| `shopify.connector.customer.binding` | `partner_id` | `res.partner` | Yes |
+| `shopify.connector.order.binding` (Task 012, Wave 2) | `sale_order_id` | `sale.order` | **No — future, per the binding-extension contract (DEC-034)** |
+| `shopify.connector.location.mapping` (Task 013, Wave 3) | `odoo_location_id` | `stock.location` | No — future |
+| `shopify.connector.inventory.level.binding` (Task 013, Wave 3) | `False` (composite: variant-binding × location — re-derived deterministically, not overridable) | — | No — future |
+| `shopify.connector.product.media.binding` (Task 015B, Wave 5) | `False` (identity is the remote File GID, not an Odoo record — not overridable) | — | No — future |
 
-The four models that exist at the SEC-1 gate (product template/variant,
-customer, order) get the one-liner from **this task** (§5); the later
-bindings declare theirs in their own packets (Task 013 location.mapping
-returns `odoo_location_id`; level/media rely on the mixin default
-`False`), so no uncontrolled later retrofit is required.
+**Only the three models that exist at the Wave 1 baseline** (product
+template/variant, customer) get the one-liner from **this task** (§5).
+The nonexistent order-binding file is removed from this task's
+allowlist (§5) — Task 012 does not exist at Wave 1 and must not be
+started here. **Binding-extension contract (binding, DEC-034):** every
+future binding model (order, location.mapping, inventory.level, media,
+and any later addition) declares its own `_odoo_binding_field_name()`
+seam — or explicitly relies on the mixin's fail-closed `False` default
+where identity is composite/derived, per the table above — in **that
+model's own implementation packet**, at the time the model is created.
+The mixin default (`False`) is fail-closed: a future binding model that
+forgets to declare the seam gets `UserError` on any
+`action_override_binding` call, never a silent write. No future
+binding may introduce its own parallel, unprotected identity-mutation
+path — the su-protection on identity fields lives on the mixin
+(inherited automatically by every concrete binding model, §4), so this
+is structural, not a per-model opt-in.
 
 **Public method.** `action_override_binding(new_record_id, reason)`
 accepts a **scalar integer record ID** (not a recordset — RPC cannot
@@ -280,19 +323,26 @@ core-task rule, with the exhaustive allowlist below.
 
 **Allowed:**
 - `addons/shopify_connector_core/models/shopify_connector_job.py`
-  (matrix constant, write-guard, `action_resolve_manual_review`)
+  (matrix constant, write-guard, `action_resolve_manual_review`, and
+  the su-elevation of Task LC-1's already-existing
+  `_reassign_to_historic_job_type()` write site — DEC-034)
+- `addons/shopify_connector_core/models/shopify_connector_job_actions.py`
+  (su-elevation of Task JOB-ACTIONS's already-existing
+  `action_manual_retry()`/`action_cancel()` write sites only — DEC-034;
+  no behavior change to either method)
 - `addons/shopify_connector_core/models/shopify_connector_binding_mixin.py`
   (protected-field guard, `action_override_binding`, and the
   `_odoo_binding_field_name()` seam defaulting to `False`)
 - the concrete-binding `_odoo_binding_field_name()` one-liners on the
-  models existing at this gate:
+  **three** models existing at this gate (corrected 2026-07-15,
+  DEC-034 — the order-binding file does not exist and is removed from
+  this allowlist; Task 012 declares its own seam in its own packet per
+  the binding-extension contract):
   `addons/shopify_connector_product/models/shopify_connector_product_template_binding.py`
   (`return 'product_template_id'`),
   `addons/shopify_connector_product/models/shopify_connector_product_variant_binding.py`
-  (`return 'product_variant_id'`),
-  `addons/shopify_connector_sale/models/shopify_connector_order_binding.py`
-  (`return 'sale_order_id'`) — one line each (the customer binding's
-  is added with its PII change below)
+  (`return 'product_variant_id'`) — one line each (the customer
+  binding's is added with its PII change below)
 - `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`,
   `shopify_connector_job_enqueue.py`,
   `shopify_connector_readiness_check.py`,
@@ -349,8 +399,12 @@ behavior).
 
 ## 7. Gate criteria (15-pattern, abbreviated)
 
-1 Area 6 merged runtime-green (sanctioned services exist to inherit
-the guard); 2–3 exact names ✅(§3); 4 files ✅(§5); 5 matrix +
+1 Task LC-1 merged runtime-green (the historic-job helper exists to
+recognize as a sanctioned writer) AND Task JOB-ACTIONS merged
+runtime-green (the sanctioned job-action services exist to inherit the
+guard) — corrected 2026-07-15, DEC-034; replaces the original "Area 6
+merged runtime-green" criterion, which named unauthorized Wave 2+
+scope; 2–3 exact names ✅(§3); 4 files ✅(§5); 5 matrix +
 protected sets fixed ✅(D-SEC1-1/2); 6–8 no UI/webhook/domain-logic
 scope ✅; 9 tests ✅(§6); 10 rollback ✅(single-PR revert; guards
 drop, behavior returns to merged state — documented, no data change
@@ -375,15 +429,18 @@ only.
 ## 9. Locked final implementation prompt (Task SEC-1)
 
 ```text
-DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS THIS PLANNING PACKAGE,
-EXPLICITLY OPENS THE SEC-1 GATE, VERIFIES THE CURRENT BASE SHA, AND
-ISSUES THIS PROMPT. (Prerequisite: Area 6 merged runtime-green.)
+DO NOT USE UNTIL CHATGPT/CONTROL-ROOM REVIEWS AND ACCEPTS THIS PLANNING
+PACKAGE, EXPLICITLY OPENS THE SEC-1 GATE, VERIFIES THE CURRENT BASE
+SHA, AND ISSUES THIS PROMPT. (Prerequisite: Task LC-1 AND Task
+JOB-ACTIONS merged runtime-green, per DEC-034's corrected Wave 1 order
+— CORE-R1 -> LC-1 -> JOB-ACTIONS -> SEC-1 -> SRR-03 closure. NOT Area
+6 — Area 6 remains unauthorized Wave 2+ scope.)
 
 Implement Task SEC-1 — cross-cutting security hardening — exactly per
 docs/07-implementation-plan/task-sec1-security-hardening-packet.md
 (D-SEC1-1..7 binding) and captures 2026-07-11 §8. Branch from the
-verified current Shopify-connector tip (STOP on drift). One session;
-draft PR; stop.
+verified current mvp/program-integration tip (STOP on drift). One
+session; draft PR; stop.
 
 ALLOWED FILES: exactly the §5 list — nothing else. FORBIDDEN: ACL CSV
 permission rows; credential model; error registry; retry constants;
@@ -394,11 +451,20 @@ IMPLEMENT exactly: D-SEC1-1 exhaustive legal-transition matrix
 enforced in write() for every caller including sudo; D-SEC1-2
 protected-field su guard on the job model (named field set; every
 internal elevation itemized in the validation record's sudo
-inventory); D-SEC1-3 sanctioned doors only (enqueue, manual retry,
-cancel, resolve-manual-review — group-checked, matrix-legal, audited,
-no bypass parameter); D-SEC1-4 binding identity su-protected + the
-_odoo_binding_field_name() mixin seam (each concrete binding declares
-its Odoo-record field per the enumerated table) +
+inventory — INCLUDING Task LC-1's already-existing
+_reassign_to_historic_job_type() and Task JOB-ACTIONS's already-existing
+action_manual_retry()/action_cancel(), recognized as sanctioned
+internal writers and elevated at their existing write sites, no
+behavior change to either); D-SEC1-3 sanctioned doors only (enqueue,
+manual retry, cancel [already implemented by Task JOB-ACTIONS —
+this task elevates them, does not reimplement them], resolve-manual-
+review [new] — group-checked, matrix-legal, audited, no bypass
+parameter); D-SEC1-4 binding identity su-protected + the
+_odoo_binding_field_name() mixin seam (each of the THREE concrete
+binding models existing at this gate declares its Odoo-record field
+per the enumerated table; the order/location/inventory/media bindings
+do not exist yet and are NOT touched — they declare their own seam in
+their own future packets per the DEC-034 binding-extension contract) +
 action_override_binding(new_record_id:int, reason) — NO model argument
 is accepted; resolve the comodel from the seam and the id ONLY within
 that comodel; validate the target exists in the declared comodel +

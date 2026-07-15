@@ -7,6 +7,17 @@
 > runtime-green before Wave 2 begins. Task LC-1's own code still requires its
 > own future implementation-gate act (per `CLAUDE.md` §9) — this acceptance
 > authorizes the design, not the code.
+>
+> **Reconciliation note (DEC-034, 2026-07-15):** this record's Task LC-1
+> sequencing (before Task 012 — §"Proposed decision" point 5) is unchanged
+> and is now also the binding Wave 1 internal stage order (LC-1 runs before
+> Task SEC-1 as well, resolving a conflict between this record's assumption
+> and a since-superseded Wave-0-recommended order — see
+> [`DEC-034`](DEC-034-wave-1-packet-dependency-reconciliation.md)). No
+> redesign of this record's lifecycle decision. `task-sec1-security-hardening-packet.md`
+> is corrected (not this record) to recognize LC-1's
+> `_reassign_to_historic_job_type()` as a sanctioned internal writer once
+> SEC-1 lands.
 
 ## Status
 
