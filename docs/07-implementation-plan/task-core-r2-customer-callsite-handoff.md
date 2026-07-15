@@ -507,3 +507,29 @@ container; no force-push); NOT promoted to `Shopify-connector`. PR #150/#151
 untouched.**
 See `../05-qa/task-core-r2-validation-results.md` §RTC and
 `../05-qa/task-core-r2-customer-callsite-validation.md` §12.
+
+## Runtime CORRECTION addendum (2026-07-15) — ownership/replay model (review `4699752673`)
+
+**This supersedes the "retry-then-refuse / `failed_retryable` / service-retry
+log" wording in the 2026-07-14 addendum above.** The control room proved that the
+prior dispatcher, which wrapped the whole handler in `odoo.service.model.retrying`,
+(a) would REPLAY a complete handler after a Shopify transport (unsafe for a
+still-connected job hitting an unrelated concurrency failure), and (b) re-drove /
+routed a job by a bare `browse(job_id)` after a rollback had already released its
+row-lock claim. The corrected `shopify_connector_job_dispatch.py` no longer uses
+`retrying`: `_drain_one` runs the handler once under a held `FOR UPDATE SKIP
+LOCKED` claim and commits per job; on a genuine 40001/40P01/55P03 it rolls back,
+resets, REACQUIRES the exact job under a fresh row lock, revalidates claimability,
+and routes it ONCE to `concurrency_race_conflict` → `retry_waiting` WITHOUT
+replaying the handler (`_recover_after_concurrency_conflict`). The customer M18
+test (`test_m18_lease_count_then_serialization_retry_refuses_after_disconnect`) is
+unchanged in intent and still proves one transport, `open_lease_count=1`, zero
+binding, and a genuine 40001 — but the 40001 is now evidenced from the **dispatcher
+concurrency-recovery log** (not the service-retry log), and the superseded job
+ends **`cancelled`** (the later controller pass sweeps the retry_waiting business
+job under the disconnect), not `failed_retryable`. Runtime-validated on Odoo.sh
+build **34923103** (PR #163 head branch `claude/core-r2-slice-2b-runtime-correction-review`):
+customer lifecycle tag `0 failed/0 error of 6`, three consecutive green; independent
+zero-residue audit clean. No live Shopify request; SRR-03 OPEN; Prompt E BLOCKED;
+`Shopify-connector`/`main`/plain `dev` untouched; PR #150/#151 untouched. See
+`../05-qa/task-core-r2-validation-results.md` §RTC-2.

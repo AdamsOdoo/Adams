@@ -13,6 +13,66 @@ questions and adversarial findings are load-bearing.
 
 ---
 
+## Runtime CORRECTION session (2026-07-15) — dispatch ownership/replay model (review `4699752673`)
+
+> **Status: code + test + doc correction session, runtime-validated on Odoo.sh.**
+> The implementation gate for the CORE-R2 dispatcher was already open (the drain
+> and its tests exist and are being corrected); this session's control-room prompt
+> authorised editing the allow-listed production/test/doc files. **No new module,
+> no Prompt E, no merge, no gate self-authorisation. SRR-03 remains OPEN.**
+
+**Model:** Opus 4.8 (1M). **Date:** 2026-07-15. **Author:** Claude. **Review/gate:** ChatGPT.
+
+- **PR / base / head.** PR #163 (draft), base
+  `claude/core-r2-slice-2b-integration` @ `63d10fb`, head branch
+  `claude/core-r2-slice-2b-runtime-correction-review` (was `677cb67`; advanced by
+  this session's single correction commit).
+- **Root cause (control-room, confirmed).** The `retrying`-wrapped drain replayed
+  the complete handler after a transport and re-drove/routed a job by a bare id
+  after a rollback had already released its `FOR UPDATE SKIP LOCKED` claim (a
+  transaction-scoped row lock, not a durable flag). See
+  `../05-qa/task-core-r2-validation-results.md` §RTC-2.1.
+- **Correction.** `shopify_connector_job_dispatch.py` drops `retrying`; `_drain_one`
+  runs the handler once under the held claim and commits per job; a genuine
+  40001/40P01/55P03 is recovered by `_recover_after_concurrency_conflict`
+  (rollback → reset → reacquire the exact job under a fresh `FOR UPDATE SKIP
+  LOCKED` lock → revalidate claimability under the lock → route ONCE to
+  `concurrency_race_conflict`, `retry_waiting`/`failed_final`, WITHOUT replaying
+  the handler). Another worker owning the job (SKIP-LOCKED empty) or having changed
+  its state is a valid do-nothing outcome, never an overwrite.
+- **Tests.** Updated the core disconnect `run_drain` proof to the no-replay model
+  (`retry_waiting`, pgcode captured); added `TestDrainOwnershipReplayGenuine`
+  (Tests A/B/C/D — genuine independent-connection races, real 40001, distinct
+  PIDs); customer/product M18 tests now assert the superseded job ends `cancelled`
+  (disconnect sweep of the `retry_waiting` job) with the 40001 evidenced from the
+  dispatcher recovery log.
+- **Files changed (allow-list only).** `models/shopify_connector_job_dispatch.py`;
+  `tests/test_disconnect_quiescence.py`; `sale/tests/test_customer_matching_scalability.py`;
+  `product/tests/test_product_import_matching.py`; `docs/05-qa/task-core-r2-validation-results.md`;
+  `docs/05-qa/task-core-r2-customer-callsite-validation.md`;
+  `docs/05-qa/task-core-r2-product-callsite-validation.md`; this file;
+  `docs/07-implementation-plan/task-core-r2-customer-callsite-handoff.md`;
+  `docs/07-implementation-plan/task-core-r2-product-callsite-handoff.md`.
+  (`test_job_dispatch.py` needed no change and was not touched.)
+- **Runtime (build 34923103).** Upgrade clean; product `0/0 of 174`; sale `0/0 of
+  93`; core `0 failed, 6 error of 476` (the 6 = known `notification_type`
+  `res.users` `setUpClass` artifact, RR-F/issue #157, classified separately);
+  customer lifecycle `0/0 of 6` ×3; product lifecycle `0/0 of 4` ×3; ownership
+  class (A/B/C/D + disconnect) `0/0 of 5` ×3; independent zero-residue audit clean.
+- **Governance.** No live Shopify request; no merge; PR #163 kept draft, not marked
+  ready; no new PR; `Shopify-connector`/`main`/plain `dev`/integration branch not
+  advanced by this session beyond the PR head; PR #150/#151 untouched; Prompt E
+  BLOCKED; SRR-03 OPEN. Full record: `../05-qa/task-core-r2-validation-results.md`
+  §RTC-2.
+- **Exact next-session prompt (for ChatGPT to authorise).** "Review PR #163 head
+  on `claude/core-r2-slice-2b-runtime-correction-review` (ownership/replay
+  correction, review `4699752673`): confirm the no-replay recovery contract, the
+  reacquire-under-lock ownership guarantees, Tests A–D, and the runtime evidence in
+  `task-core-r2-validation-results.md` §RTC-2; then decide whether to merge PR #163
+  into the integration branch or request further changes. Do not open Prompt E."
+
+---
+
 ## Slice 2B integration-staging setup (2026-07-14 — branch-orchestration session)
 
 > **Separate follow-up session — branch orchestration & history integration only.**

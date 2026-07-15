@@ -417,12 +417,24 @@ Runtime-validated on Odoo.sh build **34912503** from staging `63d10fb` on branch
   the two backend PIDs are distinct **by construction** (deterministic
   `assertNotEqual`, not batch-size ≥2). Fail-closed + zero-residue preserved.
 - **Finding #2 (concurrent-disconnect reconciliation aborts under REPEATABLE
-  READ):** the customer M18 test now drives the REAL scheduled `run_drain` and is
-  renamed `test_m18_lease_count_then_serialization_retry_refuses_after_disconnect`
-  — it proves the accepted **retry-then-refuse** contract (one transport with
-  `DUMMY_TOKEN`, `open_lease_count=1`, genuine 40001 from the real service-retry
-  log, lease released, **zero binding**, job `failed_retryable`, controller
-  finalizes + clears the credential only after release). No assertion weakened.
+  READ):** the customer M18 test drives the REAL scheduled `run_drain` and is
+  renamed `test_m18_lease_count_then_serialization_retry_refuses_after_disconnect`.
+  **`[Corrected 2026-07-15, review 4699752673 — supersedes the retrying /
+  failed_retryable wording]`** The dispatcher no longer wraps the handler in
+  `odoo.service.model.retrying` (which would REPLAY the complete handler after a
+  transport and re-drive the job by a bare id without reacquiring its claim). It
+  catches the genuine 40001 at its per-job outer boundary, rolls back, resets,
+  REACQUIRES the exact job under a real `FOR UPDATE SKIP LOCKED` row lock,
+  revalidates claimability under the lock, and routes it ONCE to
+  `concurrency_race_conflict` → `retry_waiting` WITHOUT replaying the handler. The
+  test proves: one transport with `DUMMY_TOKEN`, `open_lease_count=1`, a genuine
+  40001 evidenced from the **dispatcher concurrency-recovery log** (no longer the
+  service-retry log — `retrying` is not used by the drain), lease released,
+  **zero binding**; and — because a later controller pass sweeps the retry_waiting
+  business job under the disconnect — the superseded job ends **`cancelled`** (was
+  `failed_retryable` under the removed replay model), the controller finalizing +
+  clearing the credential only after release. No assertion weakened. See
+  `task-core-r2-validation-results.md` §RTC-2.
 - Production fix is the common **core** dispatcher retry boundary
   (`shopify_connector_job_dispatch.py`), not per-domain logic.
 - **Runtime: customer callsite lifecycle tag `0 failed, 0 error(s) of 6`, three

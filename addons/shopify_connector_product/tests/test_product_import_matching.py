@@ -2091,10 +2091,15 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
 
     @contextlib.contextmanager
     def _capture_service_retry(self):
-        """Capture the REAL `odoo.service.model` retry log so a genuine SQLSTATE
-        40001 that drove the production retry can be evidenced (never injected).
-        Process-global logging -- a retry logged from a worker thread is captured
-        too."""
+        """Capture the dispatcher's concurrency-recovery log (and the legacy
+        `odoo.service.model` retry log) so a genuine SQLSTATE 40001 -- never an
+        injected exception -- that drove the corrected no-replay recovery can be
+        evidenced. Process-global logging -- a record emitted from a worker
+        thread is captured too. (The dispatcher no longer wraps the handler in
+        `odoo.service.model.retrying`; the corrected per-job boundary logs the
+        SQLSTATE itself from `shopify_connector_job_dispatch` before rolling back
+        and reacquiring the job under a fresh row lock -- runtime correction,
+        review `4699752673`.)"""
         records = []
 
         class _Capture(logging.Handler):
@@ -2104,16 +2109,22 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 except Exception:
                     pass
 
-        logger = logging.getLogger('odoo.service.model')
         handler = _Capture()
-        prior_level = logger.level
-        logger.setLevel(logging.DEBUG)
-        logger.addHandler(handler)
+        loggers = [logging.getLogger(name) for name in (
+            'odoo.addons.shopify_connector_core.models.'
+            'shopify_connector_job_dispatch',
+            'odoo.service.model',
+        )]
+        prior = [(lg, lg.level) for lg in loggers]
+        for lg in loggers:
+            lg.setLevel(logging.DEBUG)
+            lg.addHandler(handler)
         try:
             yield records
         finally:
-            logger.removeHandler(handler)
-            logger.setLevel(prior_level)
+            for lg, level in prior:
+                lg.removeHandler(handler)
+                lg.setLevel(level)
 
     def _sanitize(self, exc, phase):
         """Type-only, non-sensitive finding for a worker-thread failure (never
@@ -2700,21 +2711,26 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
     # ==================================================================
 
     def test_race_b_terminal_reconciliation_retry_refuses_after_disconnect(self):
-        """Corrected M18 contract (runtime finding #2): the terminal-page
-        admission holds a lease and a concurrent real ``action_disconnect``
-        returns without waiting; the controller does NOT finalize while the lease
-        is open (credential retained). On release the reconciliation's binding
-        write touches the store row the disconnect committed and raises a genuine
-        SQLSTATE 40001; the REAL scheduled ``run_drain`` -> ``odoo.service.model.
-        retrying`` boundary rolls back, the lease releases, the environment resets
-        and re-browses, and the reset attempt is refused (store ``disconnecting``)
-        BEFORE any second transport. Net: exactly one transport, ZERO binding from
-        the aborted attempt, the job in a safe retryable state, no raw concurrency
-        exception as the outcome, and the controller finalizes + clears the
-        credential only after the lease releases. (Was
-        `..._survives_concurrent_disconnect`, whose "reconciliation binds after
-        the disconnect" outcome was invalid under the real REPEATABLE READ
-        serialization behaviour -- runtime finding #2.)"""
+        """Corrected M18 contract (runtime correction, review `4699752673`): the
+        terminal-page admission holds a lease and a concurrent real
+        ``action_disconnect`` returns without waiting; the controller does NOT
+        finalize while the lease is open (credential retained). On release the
+        reconciliation's binding write touches the store row the disconnect
+        committed and raises a genuine SQLSTATE 40001; the REAL scheduled
+        ``run_drain`` dispatcher catches it at its per-job boundary WITHOUT
+        replaying the handler -- it rolls back (the lease has already released via
+        the ``execute_business`` context exit), resets, REACQUIRES the exact job
+        under a real ``FOR UPDATE SKIP LOCKED`` row lock, and routes it ONCE to the
+        bounded ``concurrency_race_conflict`` -> ``retry_waiting`` state. A later
+        controller pass SWEEPS that (retry_waiting) business job to ``cancelled``
+        under the disconnect and finalizes the store. Net: exactly one transport,
+        ZERO binding from the aborted attempt, NO second transport (no replay), no
+        raw concurrency exception as the outcome, and the superseded job cancelled
+        by the disconnect (credential cleared only after the lease releases). (Was
+        a ``retrying``-boundary proof whose reset RE-INVOCATION was gate-refused
+        into ``failed_retryable``; the corrected dispatcher no longer replays the
+        handler and routes once under a reacquired lock, so the disconnect sweep
+        cancels the retry_waiting job -- runtime correction, review `4699752673`.)"""
         dbname = self.env.cr.dbname
         gid = 'gid://shopify/Product/GEN-M18'
         store_id = job_id = t = None
@@ -2848,12 +2864,13 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 'binding')
             self.assertTrue(
                 obs.get('retry_serialization_logged'),
-                'a genuine SQLSTATE 40001 must have driven the real service retry '
-                'boundary; service-retry log sample: %s'
-                % obs.get('retry_log_sample'))
+                'a genuine SQLSTATE 40001 must have driven the corrected '
+                'dispatcher concurrency-recovery boundary; recovery log sample: '
+                '%s' % obs.get('retry_log_sample'))
             self.assertEqual(
-                obs.get('job_state_final'), 'failed_retryable',
-                'the superseded job must end in a safe retryable state; saw %s'
+                obs.get('job_state_final'), 'cancelled',
+                'the superseded job must be routed once (no replay) to '
+                'retry_waiting and then cancelled by the disconnect sweep; saw %s'
                 % obs.get('job_state_final'))
             self.assertEqual(obs['state_final'], 'disconnected')  # finalized after
             self.assertFalse(obs['cred_final'])             # credential cleared then

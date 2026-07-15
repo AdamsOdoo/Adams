@@ -527,3 +527,29 @@ SRR-03 OPEN. Prompt E BLOCKED. Pushed via `odoosh-push` to the build-bound branc
 container; no force-push); NOT promoted to `Shopify-connector`. PR #150/#151
 untouched.** See `../05-qa/task-core-r2-validation-results.md` §RTC and
 `../05-qa/task-core-r2-product-callsite-validation.md` §12.
+
+## Runtime CORRECTION addendum (2026-07-15) — ownership/replay model (review `4699752673`)
+
+**This supersedes the "retry-then-refuse / `failed_retryable` / service-retry
+log" wording in the 2026-07-14 addendum above.** The control room proved that the
+prior dispatcher, which wrapped the whole handler in `odoo.service.model.retrying`,
+(a) would REPLAY a complete handler after a Shopify transport, and (b) re-drove /
+routed a job by a bare `browse(job_id)` after a rollback had already released its
+row-lock claim. The corrected `shopify_connector_job_dispatch.py` no longer uses
+`retrying`: `_drain_one` runs the handler once under a held `FOR UPDATE SKIP
+LOCKED` claim and commits per job; on a genuine 40001/40P01/55P03 it rolls back,
+resets, REACQUIRES the exact job under a fresh row lock, revalidates claimability,
+and routes it ONCE to `concurrency_race_conflict` → `retry_waiting` WITHOUT
+replaying the handler (`_recover_after_concurrency_conflict`). The product M18 test
+(`test_race_b_terminal_reconciliation_retry_refuses_after_disconnect`) is unchanged
+in intent and still proves one terminal transport, lease held then released, zero
+binding, and a genuine 40001 — now evidenced from the **dispatcher
+concurrency-recovery log** (not the service-retry log), with the superseded job
+ending **`cancelled`** (the later controller pass sweeps the retry_waiting business
+job under the disconnect), not `failed_retryable`. Runtime-validated on Odoo.sh
+build **34923103** (PR #163 head branch `claude/core-r2-slice-2b-runtime-correction-review`):
+product lifecycle tag `0 failed/0 error of 4`, three consecutive green; product +
+sale standard suites green; independent zero-residue audit (including cron-trigger
+delta) clean. No live Shopify request; SRR-03 OPEN; Prompt E BLOCKED;
+`Shopify-connector`/`main`/plain `dev` untouched; PR #150/#151 untouched. See
+`../05-qa/task-core-r2-validation-results.md` §RTC-2.

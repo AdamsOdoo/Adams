@@ -2221,3 +2221,134 @@ credential/token/header/request-body leakage in any log.
 - `Shopify-connector` unchanged (`dd6ecb8…`) — **no promotion**. `main` / plain
   `dev` untouched. Task 012 docs untouched.
 - **Prompt E remains BLOCKED. SRR-03 remains OPEN pending control-room review.**
+
+---
+
+# CORE-R2 Slice 2B — Runtime CORRECTION session (2026-07-15): dispatch ownership/replay model `[Fact]`
+
+> Control-room review `4699752673`. This session **corrects** the RTC.1–RTC.3
+> dispatcher description above: the `retrying`-boundary drain was proven unsafe and
+> is replaced by a per-job ownership/replay-safe boundary. Validated on Odoo.sh
+> build **34923103**, PR #163 head branch
+> `claude/core-r2-slice-2b-runtime-correction-review` (base
+> `claude/core-r2-slice-2b-integration` @ `63d10fb`).
+
+## RTC-2.1 Proven problem (control-room diagnosis, retained)
+
+The prior `_drain_one()` claimed a job (a transaction-scoped `FOR UPDATE SKIP
+LOCKED` row lock — **not** a durable state flag), stored only its id, then ran the
+**complete** handler inside `odoo.service.model.retrying`. On a genuine PostgreSQL
+concurrency failure `retrying` rolled the transaction back — which **released the
+original claim and undid the `state→running` write** — then **re-invoked the whole
+handler** by a bare `browse(job_id)` without reacquiring any claim; retry
+exhaustion likewise routed the job by a bare id without a lock. Two unsafe
+consequences: (1) a competing drain worker could claim the same job between
+rollback and retry; (2) the handler could be **replayed after a Shopify transport
+had already occurred** — the old disconnect test only avoided a second call because
+the reset attempt observed `disconnecting` and was gate-refused, which does **not**
+protect a still-connected job hitting an unrelated concurrency failure after
+transport.
+
+## RTC-2.2 Corrected facts (SUPERSEDE the earlier "retrying / failed_retryable / service-retry log" wording)
+
+- **[Corrects claim] A rolled-back claim does NOT remain exclusive.** The claim is
+  only a row lock; a rollback releases it. Every reset treats the claim as lost and
+  re-locks before any dispatch or state transition.
+- **[Corrects claim] Re-browsing by id is NOT equivalent to reacquiring a claim.**
+  Recovery reacquires the exact job via the real `try_lock_for_update`
+  (`FOR UPDATE SKIP LOCKED`) and revalidates its claimable state **under the lock**.
+- **[Corrects claim] Wrapping the handler in `retrying()` does NOT inherently
+  prevent duplicate transport.** `retrying` re-invokes the complete handler; the
+  drain no longer uses it — the handler runs **at most once** per drain pass and is
+  never automatically replayed after transport.
+- **[Corrects claim] Retry exhaustion is NOT routed without a lock.** Exhaustion
+  (and every conflict routing) occurs only after reacquiring the exact job lock.
+
+## RTC-2.3 Selected design (conservative direction)
+
+`_drain_one` runs the claimed job once under its held claim and **commits per job**
+(batch integrity); it flushes inside the guard so a REPEATABLE-READ 40001 surfacing
+at flush time is caught, never after commit. On a
+`PG_CONCURRENCY_EXCEPTIONS_TO_RETRY` (SQLSTATE 40001/40P01/55P03) it logs the
+SQLSTATE and calls `_recover_after_concurrency_conflict(job_id)`: `cr.rollback()` +
+`env.transaction.reset()` → `try_lock_for_update` the exact job → empty (another
+worker owns it / row gone) ⇒ **do nothing** → else revalidate claimable state
+(`queued`, or due `retry_waiting`) under the lock → non-claimable
+(running/terminal/etc.) ⇒ **do nothing, never overwrite** → else route ONCE to
+`concurrency_race_conflict` (`retry_waiting`, or `failed_final` once the bounded
+budget is exhausted), **without replaying the handler**. Isolation unchanged
+(REPEATABLE READ); no in-memory flag; PG concurrency errors still escape
+`_invoke_handler` and are never caught inside the domain importers.
+
+## RTC-2.4 Production changes (allowed file)
+
+`addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`: dropped
+the `retrying` import/use; rewrote `run_drain`/`_drain_one` to the per-job
+transaction boundary; added `_recover_after_concurrency_conflict`; added a module
+`_logger` recording the SQLSTATE on recovery; updated `_invoke_handler`'s re-raise
+comment and `_concurrency_retry_supported`'s docstring. No API-client,
+store-lifecycle, credential, importer, manifest, XML, or security change.
+
+## RTC-2.5 Tests (allowed files)
+
+- `test_disconnect_quiescence.py`: updated
+  `test_scheduled_run_drain_serialization_retry_refuses_after_disconnect` to the
+  no-replay model (one transport, genuine 40001 pgcode captured, job
+  `retry_waiting`, distinct PID); added class `TestDrainOwnershipReplayGenuine` —
+  **Test A** (rollback/reclaim race: one owner, SKIP-LOCKED loser, one transport),
+  **Test B** (still-connected post-transport 40001: one transport, no replay,
+  routed once, store stays connected), **Test C** (conflict-exhaustion →
+  `failed_final` after reacquire; and ownership-refusal — A does not overwrite a
+  job Worker B completed), **Test D** (batch integrity: per-job commit survives a
+  neighbour's rollback, later job still processed). Every 40001 is a REAL
+  serialization failure (benign committed store-row `write_date` bump vs the real
+  `_lock_store_for_lifecycle` `FOR NO KEY UPDATE`), on genuine pooled `db_connect`
+  cursors with distinct backend PIDs.
+- Customer/product M18 tests: the superseded job now ends **`cancelled`** (the
+  disconnect controller sweeps the `retry_waiting` business job) and the 40001 is
+  evidenced from the dispatcher concurrency-recovery log; all other assertions
+  (one transport, zero binding, lease released, store finalized, credential
+  cleared after release) unchanged.
+
+## RTC-2.6 Runtime results (build 34923103)
+
+| Group | Result |
+| --- | --- |
+| Exact-head upgrade (core+sale+product) | 47 modules loaded, **zero registry/module errors** |
+| Product standard suite | `0 failed, 0 error of 174` |
+| Sale standard suite | `0 failed, 0 error of 93` |
+| Representative core suite | `0 failed, 6 error of 476` — the 6 = the **known `notification_type` `res.users` `setUpClass` artifact** (RR-F / issue #157, §11); the other 470 green |
+| Customer lifecycle tag ×3 | `0 failed, 0 error of 6` (runs 1/2/3) |
+| Product lifecycle tag ×3 | `0 failed, 0 error of 4` (runs 1/2/3) |
+| Test A/B/C/D + updated disconnect (ownership class) ×3 | `0 failed, 0 error of 5` (runs 1/2/3) |
+| Existing genuine CORE-R2 admission/lease/disconnect/controller classes | green (within the core suite) |
+
+## RTC-2.7 `notification_type` artifact classification `[Fact]`
+
+The 6 core-suite errors are `setUpClass` failures in six classes NOT touched by
+this correction (`test_connection_lifecycle`, `test_credential_access`,
+`test_credential_service`, `test_job_log_system_append`, `test_readiness_slot_closure`,
+`test_test_connection`), each raising `null value in column "notification_type" of
+relation "res_users" violates not-null constraint` while creating a test user
+**before any test logic runs**. Proven invocation-invariant: running just these six
+classes yields `0 failed, 6 error of 0 tests` (zero tests execute). This is exactly
+the base-environment `res.users` artifact recorded in §4.3 / RR-F (the "six core …
+`setUpClass` errors expected to reproduce identically", issue #157), independent of
+the dispatch change (which touches neither `res.users` nor these classes).
+
+## RTC-2.8 Independent zero-residue audit `[Fact]`
+
+Fresh-connection SQL audit after the full matrix: call leases 0; jobs 0; job logs
+0; stores 0; credentials 0; customer bindings 0; product template/variant bindings
+0; test-pattern partners 0; test-marker product templates/variants/attributes/
+values 0; connector cron-trigger delta 0; idle-in-transaction connections 0;
+ungranted (blocking) locks 0; token/secret leakage in job logs 0 (only the
+`shpat_DUMMYDUMMY…` sentinel is used; no `myshopify.com`/GraphQL/HTTP egress).
+
+## RTC-2.9 Governance
+
+Validated on the working tree of build 34923103, byte-identical to the PR #163 head
+after this session's commit (Odoo.sh holds the dev-branch rebuild webhook during an
+AI session, so the running build already contains the exact validated code). **No
+live Shopify request. No merge. PR #163 kept draft. No Prompt E. SRR-03 remains
+OPEN. `Shopify-connector` / `main` / plain `dev` unchanged. PR #150/#151 untouched.**

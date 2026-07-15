@@ -435,15 +435,25 @@ Runtime-validated on Odoo.sh build **34912503** from staging `63d10fb` on branch
 `task-core-r2-validation-results.md` §RTC for the full record. Product-specific:
 
 - **Finding #2 (concurrent-disconnect terminal reconciliation aborts under
-  REPEATABLE READ):** the product M18 test now drives the REAL scheduled
-  `run_drain` and is renamed
-  `test_race_b_terminal_reconciliation_retry_refuses_after_disconnect` — it proves
-  the accepted **retry-then-refuse** contract (one terminal transport with
-  `DUMMY_TOKEN`, lease held then released, genuine 40001 from the real
-  service-retry log, **zero binding** from the aborted attempt, job
-  `failed_retryable`, controller finalizes + clears the credential only after
-  release). No assertion weakened; the fixture now enables
-  `product_domain_enabled` so the real dispatch start-gate admits the job.
+  REPEATABLE READ):** the product M18 test drives the REAL scheduled `run_drain`
+  and is renamed
+  `test_race_b_terminal_reconciliation_retry_refuses_after_disconnect`.
+  **`[Corrected 2026-07-15, review 4699752673 — supersedes the retrying /
+  failed_retryable wording]`** The dispatcher no longer wraps the handler in
+  `odoo.service.model.retrying` (which would REPLAY the complete handler after a
+  transport and re-drive the job by a bare id without reacquiring its claim). It
+  catches the genuine 40001 at its per-job outer boundary, rolls back, resets,
+  REACQUIRES the exact job under a real `FOR UPDATE SKIP LOCKED` row lock, and
+  routes it ONCE to `concurrency_race_conflict` → `retry_waiting` WITHOUT replaying
+  the handler. The test proves: one terminal transport with `DUMMY_TOKEN`, lease
+  held then released, a genuine 40001 evidenced from the **dispatcher
+  concurrency-recovery log** (no longer the service-retry log), **zero binding**
+  from the aborted attempt; and — because a later controller pass sweeps the
+  retry_waiting business job under the disconnect — the superseded job ends
+  **`cancelled`** (was `failed_retryable` under the removed replay model), the
+  controller finalizing + clearing the credential only after release. No assertion
+  weakened; the fixture enables `product_domain_enabled` so the real dispatch
+  start-gate admits the job. See `task-core-r2-validation-results.md` §RTC-2.
 - **Finding #3 (product lifecycle left disconnect-controller cron-trigger
   residue):** the product genuine class now owns its connector-cron
   `ir_cron_trigger` rows via a per-test `setUp` baseline, deleting only the
