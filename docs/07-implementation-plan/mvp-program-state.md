@@ -15,8 +15,9 @@ Freeze/resume status: **implementation freeze remains in place** (per issue #165
 | Checkpoint SHA | `acd8c4691e72cf5590f2a56228b08f183b76cd9a` |
 | Checkpoint branch | `checkpoint/core-r2-readonly-uat-2026-07-15` |
 | Program integration branch | `mvp/program-integration` |
-| Current `mvp/program-integration` SHA | Checkpoint SHA + this bootstrap governance PR's merge commit (see below; recorded exactly once merged) |
-| Bootstrap branch | `claude/mvp-control-room-bootstrap-39nip0` |
+| Current `mvp/program-integration` SHA | `f7950e68ff4bb085deaef82563aff25bda6b8545` (checkpoint + governance bootstrap only) |
+| Bootstrap branch / PR | `claude/mvp-control-room-bootstrap-39nip0` → PR [#166](https://github.com/AdamsOdoo/Adams/pull/166), merged |
+| Master program issue | [#167](https://github.com/AdamsOdoo/Adams/issues/167) |
 
 ## Active wave
 
@@ -40,6 +41,7 @@ Freeze/resume status: **implementation freeze remains in place** (per issue #165
 - Created `mvp/program-integration` from the exact checkpoint SHA.
 - Ran a 10-workstream evidence-based repository audit (addons/manifests, architecture/decisions, research, QA/runtime evidence, PR #150, PR #151, issues/risk register, operator UX, tests/CI, implementation-plan/prompt history).
 - Produced `mvp-completion-program.md` (frozen MVP contract + macro-waves + Sol authority + hard-stops), this state file, `../05-qa/mvp-acceptance-matrix.md`, `DEC-032-mvp-autonomous-execution-model.md`, `../06-prompts/gpt56-sol-master-mvp-mission.md`, `../06-prompts/claude-mvp-wave-review-template.md`, a `CLAUDE.md` addendum, and root `GPT_SOL.md`.
+- Merged the governance bootstrap via PR [#166](https://github.com/AdamsOdoo/Adams/pull/166) and opened the master program issue [#167](https://github.com/AdamsOdoo/Adams/issues/167).
 - No addon code created or modified. No macro-wave opened. No live Shopify/Odoo runtime call made.
 
 ## Blockers
