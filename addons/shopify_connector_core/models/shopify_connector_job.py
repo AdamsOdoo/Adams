@@ -106,6 +106,9 @@ class ShopifyConnectorJob(models.Model):
             ('core_readiness_check', 'Core Readiness Check'),
             ('core_manual_maintenance', 'Core Manual Maintenance'),
             ('core_test_connection', 'Core Test Connection'),
+            # LC-1 / DEC-030: permanent core-owned sink for jobs whose
+            # domain selection value is removed during supported uninstall.
+            ('historic_domain_job', 'Historic Domain Job'),
             # Task 006C / Decision F (gate-opening proposal §6):
             # core/diagnostic-only, reserved solely for the dispatcher's
             # own registry/dispatch self-tests (shopify_connector_job_
@@ -117,6 +120,11 @@ class ShopifyConnectorJob(models.Model):
         index=True,
         readonly=True,
     )
+    # LC-1 / DEC-030: set once at creation and deliberately not computed
+    # from job_type, so domain uninstall can retype the row without losing
+    # the original domain identity used for audit and later querying.
+    original_job_type = fields.Char(index=True, readonly=True)
+
     state = fields.Selection(
         selection=JOB_STATE_SELECTION,
         required=True,
@@ -216,8 +224,12 @@ class ShopifyConnectorJob(models.Model):
         exempt: they exist to determine connection/readiness state, so
         gating them on `connected` would be circular.
         """
+        vals_list = [dict(vals) for vals in vals_list]
         Store = self.env['shopify.connector.store']
         for vals in vals_list:
+            # Never trust an RPC-supplied historic identity: the immutable
+            # snapshot is always the effective job_type at creation.
+            vals['original_job_type'] = vals.get('job_type')
             if self._is_business_job_source(vals.get('job_source')):
                 store = Store.browse(vals.get('store_id')).exists()
                 if not store or store.state != 'connected':
@@ -228,6 +240,42 @@ class ShopifyConnectorJob(models.Model):
                         )
                     )
         return super().create(vals_list)
+
+    def _reassign_to_historic_job_type(self):
+        """Preserve jobs when a domain module removes its selection value.
+
+        Odoo calls this method from each domain job type's ``selection_add``
+        ``ondelete`` callback. Non-terminal work is cancelled first through
+        the current sanctioned state-write path and receives exactly one
+        auditable manual-action log entry; terminal work is only retyped.
+        No job or log row is unlinked.
+        """
+        reason = (
+            'Domain capability uninstalled; job preserved as historic '
+            'connector history.'
+        )
+        for job in self:
+            original_job_type = job.original_job_type or job.job_type
+            if job.state not in TERMINAL_JOB_STATES:
+                from_state = job.state
+                job.write({
+                    'state': 'cancelled',
+                    'cancel_reason': reason,
+                    'finished_at': fields.Datetime.now(),
+                    'manual_review_subreason': False,
+                })
+                job._log_transition(
+                    'manual_action',
+                    'Job cancelled during domain uninstall; original job '
+                    'type %r is preserved.' % original_job_type,
+                    from_state=from_state,
+                    to_state='cancelled',
+                )
+            values = {'job_type': 'historic_domain_job'}
+            if not job.original_job_type:
+                values['original_job_type'] = original_job_type
+            job.write(values)
+        return True
 
     def write(self, vals):
         """Execution/start-time gating (Task 005 / DEC-022 §4.2, plus
