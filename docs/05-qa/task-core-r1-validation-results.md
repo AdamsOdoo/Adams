@@ -7,6 +7,39 @@
 > `4678631974` + gate amendment `4948368039`), on branch
 > `claude/task-core-r1-readiness-correction-trxl43`.
 
+## Wave 1 integration re-verification (2026-07-15)
+
+**[Fact]** The complete accepted CORE-R1 production change, its focused
+20-method suite, both amended exact-sudo guards, AR-043, and this validation
+record are already present byte-for-byte in the protected checkpoint and in the
+authorized Wave 1 base. Wave 1 therefore does not duplicate or rewrite the
+inherited implementation. The live base was checked at the exact
+product-owner-authorized integration identity recorded in PR #172, and the
+following inherited content was re-read against D-R1-1..5:
+
+- the actual registered drain cron plus the exact 60-minute
+  `state='queued' AND started_at=False` stall boundary;
+- inventory-disabled and pull-based-webhook not-applicable passes, with
+  inventory-enabled/no-override remaining fail-closed;
+- successful non-fall-forward test connection recording
+  `api_health_state='normal'` while fall-forward remains `degraded`;
+- the eligible Lite-store real-behavior activation and essential-failure
+  regressions;
+- the source guards prohibiting readiness-time Shopify calls and credential
+  reads and enforcing the narrow cron-read sudo inventory.
+
+**[Fact]** The inherited implementation was previously Odoo.sh-green at exact
+implementation head `e262738696dc18f775fcc42b5de0ef98c7b722ee`, build
+`34779589`, with `0 failed, 0 error(s) of 288 tests` as recorded below.
+**[Open runtime gate]** That prior result proves the inherited CORE-R1 content;
+it does not replace the mandatory final Wave 1 exact-head Odoo.sh rerun. PR #172
+will record that final build separately before any Wave 1 completion claim.
+
+No CORE-R1 production or test code changed in this Wave 1 stage because
+reimplementation would violate the repository's “do not re-implement existing
+code” rule and the packet's narrow diff contract. This stage commit updates only
+this packet-owned validation record.
+
 ## 1. Base verification (prerequisite gate)
 
 | Item | Required | Observed | Result |
