@@ -1,3 +1,13 @@
+### Wave 1 SEC-1/CORE-R2 runtime correction — compact handoff (2026-07-16)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
+- **Diagnostic runtime:** Odoo.sh 19 build `34968318`, database `adamsmen-sol-wave-1-readonly-foundation-34968318`, exact pre-correction SHA `62b2645f69280aadc68a56045a26bef2063c5821`. Upgrade, focused Wave 1 suites, lifecycle uninstall/reinstall, genuine admission/lifecycle-race repetitions, residue audit and security scan supplied partial evidence; fresh/full/drain-recovery suites were not green.
+- **Finding:** PostgreSQL rollback removes the uncommitted `running` transition, so accepted CORE-R2 recovery re-locks the exact job in committed `queued` or due `retry_waiting`. D-SEC1-1 omitted five routes from those states. Recovery did not replay the handler or weaken ownership.
+- **Correction:** commit `2b6d9d8259fada252abca19407d1df53bed9e66f` adds only `queued→retry_waiting|failed_final|blocked_manual_review` and `retry_waiting→failed_final|blocked_manual_review`; draft start/retry edges remain illegal. Invalid inherited fixtures were corrected and both claimable states now cover safe retry, exhaustion, conservative/undeclared policy, exact re-lock and zero handler replay.
+- **Static evidence:** all seven changed Python sources parse; transition delta is exactly five; production sudo/bypass inventories are unchanged; dispatcher production code, replay classifications, retry constants, ACLs and job vocabulary are untouched.
+- **Runtime classification:** issue #157 is only the exact known `notification_type`/`color_scheme` post-init fixture artifact. No corrected-head Odoo.sh success is claimed. SRR-03 remains OPEN.
+- **Boundary / next:** no Wave 2+ code, no Shopify call, no mutation, no merge. Run the complete Odoo.sh matrix at the new exact PR head; keep PR #172 draft for the eventual complete Wave 1 control-room gate.
+
 ### Wave 1 SEC-1 implementation / runtime-access hard-stop — compact handoff (2026-07-15)
 
 - **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.

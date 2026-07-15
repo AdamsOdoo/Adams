@@ -1,5 +1,33 @@
 # CORE-R2 — Foundation Slice 1 — Validation Results
 
+
+## Wave 1 runtime-correction checkpoint — build 34968318 (2026-07-16)
+
+Odoo.sh 19 build `34968318` ran draft PR #172 at exact SHA
+`62b2645f69280aadc68a56045a26bef2063c5821` on database
+`adamsmen-sol-wave-1-readonly-foundation-34968318`. The genuine
+`TestGenuineRealAdmission` (9 tests ×3) and
+`TestLifecycleAdmissionRaceGenuine` (4 tests ×3) repetitions passed, but
+`TestDrainOwnershipReplayGenuine` failed deterministically
+(`1 failed / 4 errors / 6` ×3) and the scheduled-drain lifecycle-retry case
+failed. The defect was not dispatcher replay or row-lock ownership: SEC-1's
+legal-transition matrix omitted the committed-state recovery edges needed
+after PostgreSQL rolls back the original transaction and its uncommitted
+`running` transition.
+
+Product-owner ruling PR #172 comment `4984719237` authorizes only the five
+recovery edges now implemented in correction commit
+`2b6d9d8259fada252abca19407d1df53bed9e66f`. Recovery continues to re-lock
+the exact `queued` or due `retry_waiting` row, consult replay policy, and
+route once without invoking the handler; `draft→running` and
+`draft→retry_waiting` remain illegal. Residue/leak and security/log scans for
+the completed diagnostic run were clean. Issue #157 was limited to its exact
+known `notification_type`/`color_scheme` post-init fixture artifact.
+
+This is failed-run diagnostic evidence, not closure evidence. No post-correction
+runtime pass is claimed; **SRR-03 remains OPEN pending an exact-head rerun of
+the complete genuine concurrency/disconnect matrix and stability repetitions.**
+
 > **Status: runtime-validated implementation record for control-room review.**
 > CORE-R2 **implementation** gate OPENED by control-room comment `4952145926`
 > (authorized base `Shopify-connector` @

@@ -2,13 +2,13 @@
 
 ## Status
 
-**Stage 4 implementation is pushed on draft PR #172; exact-head Odoo.sh runtime is blocked by unavailable access.**
+**Odoo.sh build 34968318 exposed a production transition-matrix regression; the product-owner-approved correction is implemented at `2b6d9d8259fada252abca19407d1df53bed9e66f` and awaits an exact-head rerun.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, open, unmerged)
-- **Date:** 2026-07-15
-- **Binding clarifications:** product-owner ruling PR #172 comment `4982750956`
-- **Runtime claim:** None yet. Static/source checks and eventual Odoo.sh results are recorded separately and never conflated.
+- **Date:** 2026-07-16
+- **Binding clarifications:** product-owner rulings PR #172 comments `4982429209`, `4982750956`, and runtime-correction ruling `4984719237`
+- **Runtime claim:** Build 34968318 is a failed diagnostic run against pre-correction head `62b2645f69280aadc68a56045a26bef2063c5821`; no post-correction runtime pass is claimed.
 
 ## Binding product-owner clarification
 
@@ -93,17 +93,51 @@ These are source/static checks, not Odoo runtime results.
 
 ## Runtime evidence
 
-**NOT EXECUTED — hard-stop 5.** The connected GitHub status list and workflow
-run list for implementation commit `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`
-were both empty. This execution environment has no `odoo` or `odoo-bin`
-command and `import odoo` raises `ModuleNotFoundError`; no authenticated
-Odoo.sh control surface or database/build credential is available. Therefore
-no build number, database, Odoo version, install/upgrade command result, Odoo
-test count, concurrency repetition, residue audit, session/cursor/worker
-audit, or credential/PII log scan is claimed.
+### Odoo.sh diagnostic run — build 34968318 (pre-correction)
 
-The exact unvalidated Stage 4 code SHA is
-`60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`. SRR-03 remains OPEN and
-Stage 5 closure proof is unstarted. Resume only in a genuine Odoo.sh 19 dev
-build checked out at the exact final Wave 1 head; execute the complete matrix
-from the Wave 1 plan and record every result here before any completion claim.
+- **Database:** `adamsmen-sol-wave-1-readonly-foundation-34968318`
+- **Odoo:** 19.0
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172
+- **Exact tested SHA:** `62b2645f69280aadc68a56045a26bef2063c5821`
+- **Module versions:** core `19.0.1.9.0`; product `19.0.2.1.1`; sale `19.0.1.2.0`
+- **Upgrade:** completed without runtime errors.
+- **Fresh install:** stopped with five transition-related errors after 198 tests; this is not a passing fresh-install result.
+- **Focused after the database-only issue #157 accommodation:** CORE-R1 `0 failed / 0 errors / 20`; LC-1 `0/0/9`; JOB-ACTIONS `0/0/9`; SEC-1 core `0/0/9`; PII `0/0/12`.
+- **Full suites:** core initially `4 failed / 19 errors / 495`, then `4 failed / 11 errors / 346` after the database-only issue #157 accommodation (15 Wave-1-owned transition failures); product `0 failed / 1 error / 176` (Wave-1-owned transition fixture); sale `0 failed / 2 errors / 95` (one exact issue #157 fixture artifact and one Wave-1-owned transition fixture).
+- **Lifecycle:** domain uninstall/reinstall passed.
+- **Genuine SRR-03 classes:** `TestGenuineRealAdmission` `0/0/9` ×3 and `TestLifecycleAdmissionRaceGenuine` `0/0/4` ×3 passed; `TestDrainOwnershipReplayGenuine` deterministically failed `1 failed / 4 errors / 6` ×3, and the scheduled-drain case in `TestLifecycleServiceRetryGenuine` failed, because the recovery route attempted state edges omitted by D-SEC1-1.
+- **Residue/leak scan:** clean for the completed diagnostic run.
+- **Security/log scan:** clean; no credential, token, header, raw PII, or temporary-path leakage was found.
+- **Issue #157:** only the exact known `res.users.notification_type` / `color_scheme` post-init test-fixture artifact was accommodated at database level. No new failure was classified under #157.
+
+### Runtime-discovered regression and correction
+
+A genuine PostgreSQL concurrency failure rolls back the original transaction,
+including the uncommitted `running` write. CORE-R2 recovery correctly re-locks
+the exact job in its committed claimable state (`queued` or due
+`retry_waiting`) and routes without replaying the handler. SEC-1's matrix
+incorrectly rejected the resulting production recovery states.
+
+Correction commit `2b6d9d8259fada252abca19407d1df53bed9e66f` adds only:
+
+- `queued→retry_waiting|failed_final|blocked_manual_review`;
+- `retry_waiting→failed_final|blocked_manual_review`.
+
+It leaves `draft→running` and `draft→retry_waiting` illegal, changes no
+replay-policy classification or dispatcher architecture, and adds queued/due
+retry recovery coverage for budget remaining, exhaustion, conservative and
+undeclared policy, exact-row re-locking, and zero handler replay. Inherited
+core/product/sale fixtures now use valid claimable states or controlled
+superuser setup for an explicitly later state.
+
+### Pre-push correction checks
+
+All seven changed Python sources parsed successfully. Source guards prove the
+transition delta is exactly the five approved edges, production `sudo()` and
+bypass-marker inventories are unchanged, the recovery method still calls
+`Job.browse(job_id).try_lock_for_update()`, replay policy remains checked, and
+the recovery body contains no handler invocation.
+
+**No post-correction Odoo.sh runtime success is claimed.** SRR-03 remains OPEN.
+The next required action is another Odoo.sh 19 run at the new exact PR head,
+including the complete Wave 1 matrix and the required genuine repetitions.

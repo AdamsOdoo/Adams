@@ -6,7 +6,7 @@
 
 **WAVE 0 MERGED (2026-07-15).** PR #169 merged into `mvp/program-integration` (merge commit `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`, per the Wave 0 closure comment on issue #167). DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed.
 
-**WAVE 1 HARD-STOPPED AT THE EXACT-HEAD RUNTIME GATE (2026-07-15).** DEC-034's reconciled order is binding: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. The live protected/integration references were re-verified before branching; `sol/wave-1-readonly-foundation` was created from the exact authorized `mvp/program-integration` tip. The single Wave 1 draft PR is [#172](https://github.com/AdamsOdoo/Adams/pull/172) into `mvp/program-integration`; it remains draft. CORE-R1 was reconciled from the inherited checkpoint implementation; LC-1 is implemented and syntax-checked but not Odoo.sh-validated. Product-owner ruling [comment 4982429209](https://github.com/AdamsOdoo/Adams/pull/172#issuecomment-4982429209) approved the one-field SEC-1 completeness correction for LC-1's immutable `original_job_type`; the binding packet was amended in commit `a4a370b5378366e719c59c01b1bbd5febe0a868b`, clearing hard-stop 9. Stage 3 JOB-ACTIONS is implemented and syntax-checked. Product-owner ruling [comment 4982750956](https://github.com/AdamsOdoo/Adams/pull/172#issuecomment-4982750956) binds the existing lifecycle maintenance job as the atomic binding/PII audit carrier and binds the fail-closed `env.company` rule without adding store ownership, clearing hard-stop 10. The clarification is recorded in the SEC-1 packet and validation record. Stage 4 SEC-1 is implemented at code commit `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`; all 31 changed Python sources parse, the cron XML parses, and the exact sudo/source guards are present. Genuine Odoo.sh execution is unavailable: the implementation commit has no GitHub status/workflow run, this environment has no Odoo runtime, and no authenticated Odoo.sh build/database surface is connected. Work therefore stops under hard-stop 5 before Stage 5 proof. **SRR-03 remains OPEN, Wave 2 remains unauthorized, and no Wave 2+ implementation has started.**
+**WAVE 1 RUNTIME CORRECTION PUSHED; EXACT-HEAD RERUN PENDING (2026-07-16).** DEC-034's order remains binding: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft/unmerged on `sol/wave-1-readonly-foundation`. Odoo.sh 19 build `34968318` tested pre-correction SHA `62b2645f69280aadc68a56045a26bef2063c5821`: upgrade and focused CORE-R1/LC-1/JOB-ACTIONS/SEC-1 suites passed after the exact issue #157 database-only accommodation, but the fresh/full and genuine drain-recovery suites exposed SEC-1's missing CORE-R2 recovery transitions. Product-owner ruling [comment 4984719237](https://github.com/AdamsOdoo/Adams/pull/172#issuecomment-4984719237) authorized only five committed-state recovery edges. Correction commit `2b6d9d8259fada252abca19407d1df53bed9e66f` adds those edges, repairs invalid fixtures, and adds queued/due-`retry_waiting` policy, exhaustion, exact-relock and no-handler-replay coverage. Static correction checks are green; **no post-correction runtime pass is claimed. SRR-03 remains OPEN, Wave 2 remains unauthorized and unstarted.**
 
 Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code was authorized in that wave. **Wave 1 is active for implementation** on `sol/wave-1-readonly-foundation` — CORE-R1, LC-1, JOB-ACTIONS, SEC-1, then SRR-03 closure, in that corrected order, per DEC-034. **Wave 2 remains unauthorized** and may not merge, be enabled, or receive live Shopify validation while **SRR-03 remains OPEN**.
 
@@ -26,21 +26,21 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Active wave
 
-**Wave 1 — Existing read-only foundation integration — RUNTIME ACCESS HARD-STOP.** Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft. CORE-R1 is reconciled; LC-1, JOB-ACTIONS, and SEC-1 are implemented pending exact-head Odoo.sh. SEC-1 code commit `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5` contains the accepted `original_job_type`, lifecycle-audit-carrier, company-consistency, binding, PII, retention, transition, and sanctioned-writer protections. Static syntax/XML/sudo guards are green; no Odoo runtime result is claimed. Hard-stop 5 is active because no Odoo.sh build/database access is available. SRR-03 is OPEN and Stage 5 closure proof is unstarted; Wave 2 is unauthorized.
+**Wave 1 — Existing read-only foundation integration — CORRECTION RERUN PENDING.** Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft. Build `34968318` supplied genuine runtime evidence but failed on the SEC-1/CORE-R2 transition compatibility regression. Correction commit `2b6d9d8259fada252abca19407d1df53bed9e66f` is statically validated and awaits an exact-head Odoo.sh rerun. SRR-03 is OPEN; no macro-wave completion or runtime-green claim is made; Wave 2 is unauthorized.
 
 ## Wave status
 
 | Wave | Status | Branch/PR | Notes |
 | --- | --- | --- | --- |
 | 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
-| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Hard-stopped — runtime access** | `sol/wave-1-readonly-foundation`; draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) | CORE-R1/LC-1/JOB-ACTIONS/SEC-1 code present; hard-stop 5 blocks Odoo.sh and SRR-03 proof; SRR-03 OPEN. |
+| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Active — runtime correction rerun pending** | `sol/wave-1-readonly-foundation`; draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) | Build 34968318 found the transition regression; narrow correction pushed; no corrected runtime pass; SRR-03 OPEN. |
 | 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is OPEN; blocked on Wave 1 prerequisites/closure evidence and packet gate. May not merge, be enabled, or receive live Shopify validation while SRR-03 remains open. |
 | 3 — Inventory synchronization (Task 013/013B) | Not started | — | Blocked on Wave 2 and DEC-031 Layer 2 design+acceptance. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
 | 5 — Premium operator experience (UI U1–U3, PERF-1, Task 015/015B) | Not started / unauthorized | — | Proposed scope includes product export after Layer 2 (DEC-033 accepted); pending Waves 1–4. |
 | 6 — E2E integration, UAT, release readiness | Not started | — | Blocked on Waves 1–5. |
 
-## Active Sol session (Wave 1 execution — 2026-07-15)
+## Active Sol session (Wave 1 runtime correction — 2026-07-16)
 
 - Re-verified the live base before branching: `mvp/program-integration` matched the product-owner-authorized tip; checkpoint `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, `Shopify-connector`, and `main` remained unchanged.
 - Confirmed PR #170/DEC-034 and PR #171 normalized the Wave 1 packets without introducing addon implementation.
@@ -50,8 +50,8 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 - Product-owner ruling comment `4982429209` validated the omission and authorized the exact one-field completeness correction. D-SEC1-2/D-SEC1-7 and the LC-1 sanctioned-writer statement were amended in commit `a4a370b5378366e719c59c01b1bbd5febe0a868b`; no architecture or scope changed.
 - Stage 3 JOB-ACTIONS: the additive two-action model, nine-method role/state/audit suite, version/import wiring, validation record, AR-051, and handoff are pushed; both new Python sources compile. Odoo.sh remains pending.
 - Product-owner ruling comment `4982750956` validated and resolved the Stage 4 pre-edit hard-stop: binding/PII audit uses the existing lifecycle maintenance job helper with narrow protected-site sudo and original actor preservation; company validation uses caller-context records plus `env.company`, without a store field. Packet and validation record updated.
-- Stage 4 SEC-1: packet-owned implementation and 21 new focused test methods are pushed at `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`; all 31 changed Python files and the cron XML parse; exact core/importer sudo inventories are guarded. No Odoo runtime pass is claimed.
-- Stage 5 runtime gate: GitHub exposes no status/check run for the implementation commit, this environment has no Odoo runtime, and no authenticated Odoo.sh build/database access is connected. Hard-stop 5 is active. SRR-03 closure, concurrency repetitions, full-suite execution, and leak/residue audits are unstarted. SRR-03 remains OPEN. Wave 2 and every excluded later-wave domain remain unstarted.
+- Stage 4 SEC-1 runtime correction: Odoo.sh build `34968318` at `62b2645f69280aadc68a56045a26bef2063c5821` exposed five missing committed-state recovery edges. Correction commit `2b6d9d8259fada252abca19407d1df53bed9e66f` adds only those edges, fixes illegal fixtures, and adds both-state recovery/re-lock/no-replay tests; seven changed Python sources parse and static guards are green.
+- Stage 5 runtime gate: the diagnostic build supplied partial genuine evidence and clean residue/security scans, but the recovery repetitions failed before closure. An exact-head rerun is required. SRR-03 remains OPEN. Wave 2 and every excluded later-wave domain remain unstarted.
 
 ## Prior completed work (bootstrap governance)
 
@@ -64,7 +64,7 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Blockers
 
-1. **Wave 1 runtime access** — Odoo.sh dev-build access is required for CORE-R1/LC-1/JOB-ACTIONS/SEC-1/SRR-03-closure exact-head evidence. If access is unavailable at the runtime gate, all completed work is pushed and the wave stops under hard-stop 5 without a completion claim.
+1. **Wave 1 exact-head rerun** — Odoo.sh dev build `34968318` exposed and localized the SEC-1/CORE-R2 compatibility regression. The corrected PR head now requires the full fresh/upgrade/focused/full/concurrency/lifecycle/leak/security matrix; until it passes, SRR-03 remains OPEN and Wave 1 is incomplete.
 2. **Dev-store access provisioning** — Wave 6 and mutation-domain UAT require human-provisioned Shopify Partner/dev-store credentials; Sol cannot self-provision them (hard-stop 5).
 
 ## Open decisions (full list: `mvp-completion-program.md` §9) — resolved by Wave 0 acceptance
@@ -81,14 +81,16 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 | Date | Wave | Evidence | Odoo.sh build | Result |
 | --- | --- | --- | --- | --- |
 | 2026-07-15 | Checkpoint (pre-program) | `../05-qa/task-core-r2-validation-results.md` §IS2 | `34935129` | Fresh install 0/0 across core/product/sale; issue #157 artifact only known failure class. |
-
-*(No runtime evidence has been generated by this program yet — the row above is the inherited checkpoint evidence, carried forward for context.)*
+| 2026-07-16 | Wave 1 diagnostic (pre-correction SHA `62b2645`) | SEC-1 and CORE-R2 validation records | `34968318` | Upgrade/focused/lifecycle partial passes; transition regression in fresh/full/drain-recovery suites; residue and security scans clean; issue #157 exact artifact only; no Wave 1 pass. |
 
 ## Next control-room gate
 
-The next action is product-owner provisioning of authenticated Odoo.sh 19 dev-build/database access, followed by the exact-head Wave 1 matrix and genuine SRR-03 closure attempt. The final Claude macro-wave gate is not yet reachable. PR #172 remains draft/unmerged.
+The next action is an Odoo.sh 19 run at the new exact draft-PR head, repeating the complete Wave 1 matrix and genuine SRR-03 stability proofs. The Claude macro-wave gate is not yet reachable. PR #172 remains draft/unmerged.
 
 ## Sprint checkpoint log
+
+- **Wave 1 runtime correction pushed (2026-07-16):** Build `34968318` at pre-correction SHA `62b2645f69280aadc68a56045a26bef2063c5821` found that D-SEC1-1 rejected five accepted CORE-R2 recovery outcomes after a PostgreSQL rollback returned the exact job to committed `queued`/due-`retry_waiting`. Product-owner ruling `4984719237` authorized only those edges. Commit `2b6d9d8259fada252abca19407d1df53bed9e66f` implements the narrow correction and tests both states across safe retry, exhaustion, conservative and undeclared policy, exact re-lock and no handler replay. Static guards are green; corrected runtime is not yet run; SRR-03 OPEN; Wave 2 unstarted.
+
 
 - **Wave 1 Stage 4 implementation / runtime-access hard-stop (2026-07-15):** SEC-1 implementation commit `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5` applies D-SEC1-1..7 and both product-owner rulings across 32 packet-owned addon/test files. Static proof: 31 Python parses green, cron XML parses, exact sudo inventories guarded, 9 core security + 12 PII focused tests encoded. No Odoo.sh status/workflow, local Odoo runtime, authenticated build, or database is available; hard-stop 5 is active. Stage 5/SRR-03 runtime proof is unstarted; SRR-03 OPEN; Wave 2 unauthorized.
 
