@@ -2,7 +2,7 @@
 
 ## Status
 
-**Stage 4 implementation active on draft PR #172; exact-head Odoo.sh runtime pending.**
+**Stage 4 implementation is pushed on draft PR #172; exact-head Odoo.sh runtime is blocked by unavailable access.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, open, unmerged)
@@ -58,8 +58,52 @@ The final Stage 4 record must include:
 - retention masking, append-only preservation, and no raw PII leakage;
 - full core/product/sale regressions and exact sudo inventory.
 
+## Static implementation evidence
+
+- **Implementation commit:** `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`
+  (`feat(sec1): enforce protected mutations and PII controls`).
+- **Scope:** 32 packet-owned addon/test files; no ACL CSV, credential model,
+  UI, order, Area 6, inventory, fulfillment, export, or Layer 2 file changed.
+- **Syntax:** all 31 Python files in the Stage 4 change map parsed
+  successfully with Python `ast.parse`; the new cron XML parsed successfully
+  with `xml.etree.ElementTree`.
+- **Focused test inventory:** 9 core security methods and 12 sale/PII methods,
+  plus the three existing binding ACL matrices and the inherited
+  JOB-ACTIONS/LC-1/dispatcher/readiness/credential/log guards.
+- **Exact core sudo inventory (AST):** binding mixin 1; job 8; job actions 2;
+  dispatcher 2; enqueue 1; PII retention 5; readiness 3; store 8; plus the
+  inherited job-log 1 and credential 1 sites. The product importer has 9 and
+  customer importer 3 packet-owned binding writer elevations. Exact-list
+  source guards were updated; no context-flag bypass was introduced.
+- **Ruling proof encoded:** `original_job_type` and `cancel_reason` are in
+  the server-side protected set and four-role denial matrix; create-time
+  `original_job_type` anti-spoof remains; LC-1 historic conversion and all
+  sanctioned writers have regressions. Binding override tests cover
+  same-company, company-neutral, both mismatch directions, malformed/missing/
+  colliding targets, non-overridable seams, no-write/no-audit refusal,
+  one-carrier actor/redaction proof, and rollback on audit failure. Manual
+  masking and per-store sweeps carry equivalent count/actor/atomicity checks.
+- **Boundary scan:** the store model gained no `company_id`; the override
+  signature accepts neither a model nor company argument; `env.companies`
+  and `create_uid.company_id` are absent. Audit calls reuse only
+  `_create_lifecycle_audit_job()`; no audit table/job type/job source was
+  added.
+
+These are source/static checks, not Odoo runtime results.
+
 ## Runtime evidence
 
-**Pending.** Record build, database, Odoo version, exact tested SHA, addon
-versions, command forms, tags/classes, counts, warnings/errors, residue/leak
-checks, and failure ownership only after genuine Odoo.sh execution.
+**NOT EXECUTED — hard-stop 5.** The connected GitHub status list and workflow
+run list for implementation commit `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`
+were both empty. This execution environment has no `odoo` or `odoo-bin`
+command and `import odoo` raises `ModuleNotFoundError`; no authenticated
+Odoo.sh control surface or database/build credential is available. Therefore
+no build number, database, Odoo version, install/upgrade command result, Odoo
+test count, concurrency repetition, residue audit, session/cursor/worker
+audit, or credential/PII log scan is claimed.
+
+The exact unvalidated Stage 4 code SHA is
+`60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`. SRR-03 remains OPEN and
+Stage 5 closure proof is unstarted. Resume only in a genuine Odoo.sh 19 dev
+build checked out at the exact final Wave 1 head; execute the complete matrix
+from the Wave 1 plan and record every result here before any completion claim.
