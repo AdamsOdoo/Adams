@@ -782,3 +782,33 @@ quality gate, commit/push to the designated branch, then STOP.
   `Shopify-connector`. No gate transition, no live Shopify request. SRR-03 OPEN.
   Prompt E BLOCKED. PR #150/#151 untouched; `Shopify-connector` unchanged.** See
   `../05-qa/task-core-r2-validation-results.md` §RTC.
+- **DEC-031 Immediate Slice 2 — exact-head Odoo.sh runtime validation (2026-07-15):**
+  PR #163 on branch `claude/core-r2-slice-2b-runtime-correction-review`, Odoo.sh
+  build **34935129** (Odoo 19.0), base head `4b45d35`. Applied two **non-behavioral**
+  exactness corrections and pushed head **`757a9680182f65c627a3880b9c7989d6c5d56035`**
+  (*"Tighten DEC-031 runtime validation proofs"*, 3 files +72/−13): (1)
+  comment/docstring-only rewording in `shopify_connector_job_dispatch.py` so the
+  recovery narrative is policy-gated (recovery call never re-invokes the handler;
+  `local_only`/`remote_read_replay_safe` → later bounded retry;
+  `remote_effect_not_replay_safe`/undeclared → manual review; no exactly-once
+  claim); (2) added `test_installed_scope_every_handler_has_replay_policy` to the
+  product and customer test files (`set(_get_handlers()) − set(_get_replay_policies())
+  == ∅`, missing keys listed), retaining the `*_import_sync → remote_read_replay_safe`
+  assertions. **Runtime (exact head `757a968`):** fresh install of core+product+sale
+  clean (0 registry/module/import/selection/XML/security errors, 0 migration);
+  focused Layer 1 core 6/6, product 2/2, customer 2/2; **genuine PostgreSQL 40001
+  read-safe recovery → `retry_waiting`/`retry_count 1` ×3** and **conservative
+  replay-policy recovery → `blocked_manual_review`/`duplicate_risk` (never
+  `retry_waiting`, one transport, no lease) ×3** (distinct backend PID, SQLSTATE
+  40001 logged); standard suites product `0/176`, sale `0/95`, core `0 failed / 6
+  error of 486` (the 6 = the known `notification_type` `res.users` `setUpClass`
+  artifact, RR-F/#157, unrelated); product-lifecycle ×3, customer-lifecycle ×3,
+  PR #163 ownership class ×3 all green; independent residue audit clean (all
+  connector tables 0, 0 leaked sessions/idle-in-transaction/processes); security
+  audit clean (only `shpat_DUMMY…` sentinel, no headers/mutations/PII/egress).
+  **No schema/model/cron/migration/importer-behavior/Shopify-mutation change; no
+  Task 012; no Layer 2. No merge; PR #163 kept draft. Prompt E BLOCKED. SRR-03
+  OPEN. `Shopify-connector` / `main` / plain `dev` unchanged; PR #150/#151
+  untouched.** Docs-only evidence commit records `757a968` as the validated SHA
+  (the docs commit itself is not runtime-tested). See
+  `../05-qa/task-core-r2-validation-results.md` §IS2.
