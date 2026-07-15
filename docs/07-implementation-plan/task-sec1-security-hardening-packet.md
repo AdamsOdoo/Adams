@@ -108,7 +108,9 @@ permission).
 **D-SEC1-2 — Protected system fields require system context.** On
 `shopify.connector.job`, the protected set — `state`, `retry_count`,
 `error_class`, `manual_review_subreason`, `payload_hash`,
-`res_model`, `res_id`, `shopify_target_gid`, `job_type`, `job_source`,
+`res_model`, `res_id`, `shopify_target_gid`, `job_type`,
+**`original_job_type`** (LC-1's immutable audit identity; added by the
+product-owner ruling on PR #172, comment `4982429209`), `job_source`,
 `trigger_origin`, `next_retry_at`, `started_at`, `finished_at`,
 `superseded_by_job_id`, **`cancel_reason`** (added 2026-07-15, DEC-034
 Wave 1 reconciliation adversarial check: `cancel_reason` is the field
@@ -148,8 +150,11 @@ those exact sites elevated; without this, Test Connection / Activate
 reconciliation addition (DEC-034):** two further sanctioned internal
 protected-field writers are recognized by name — Task LC-1's
 `_reassign_to_historic_job_type()` (writes `state='cancelled'` on
-non-terminal jobs during historic-job conversion; lands
-Wave-1-Stage-2, before this packet) and Task JOB-ACTIONS's
+non-terminal jobs and writes `job_type='historic_domain_job'` while
+preserving/backfilling `original_job_type` during historic-job conversion;
+lands Wave-1-Stage-2, before this packet; PR #172 ruling
+`4982429209` confirms this remains one named sanctioned writer whose
+existing write sites alone receive the su elevation) and Task JOB-ACTIONS's
 `action_manual_retry()`/`action_cancel()` (land Wave-1-Stage-3, before
 this packet). Both already exist by the time this packet implements;
 both are elevated at their existing write sites (in
@@ -299,9 +304,14 @@ without inventing encryption (DEC-028 boundary respected).
 
 **D-SEC1-7 — Negative test matrix (the proof).** For each group
 (auditor/operator/reviewer/admin) × each protected surface: direct
-`write({'state': …})`, `write({'retry_count': …})`, **`write({'cancel_reason': …})`
-(added 2026-07-15, DEC-034 — proves the field `action_cancel()` writes
-cannot be forged/overwritten outside that sanctioned method)**, binding
+`write({'state': …})`, `write({'retry_count': …})`,
+**`write({'original_job_type': …})`** (for Auditor/Operator/Reviewer/Admin;
+added by the binding product-owner ruling on PR #172, comment
+`4982429209`, proving LC-1's preserved audit identity cannot be forged or
+overwritten outside the sanctioned historic conversion),
+**`write({'cancel_reason': …})`** (added 2026-07-15, DEC-034 — proves the
+field `action_cancel()` writes cannot be forged/overwritten outside that
+sanctioned method), binding
 `write({'shopify_gid': …})`, `write({'partner_id': …})`, job
 `create()` bypassing enqueue, `unlink()` everywhere, PII field read,
 masked-field read, each sanctioned method with and without the
