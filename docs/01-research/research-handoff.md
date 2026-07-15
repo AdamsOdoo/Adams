@@ -1,3 +1,12 @@
+### Task LC-1 implementation — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Scope:** Wave 1 Stage 2 only — accepted DEC-030 lifecycle/uninstall implementation; no later-wave domain.
+- **Implemented:** historic-domain job sink, original-type preservation/backfill, audited non-terminal cancellation, terminal history retyping, product/customer selection-removal callables, fail-closed dispatcher, focused lifecycle tests, version bumps.
+- **Runtime:** exact-head Odoo.sh install/upgrade/uninstall/reinstall and full-suite matrix pending; no pass claimed.
+- **Data posture:** disable-first preferred; business/core audit history preserved; domain bindings/mappings export/re-derived after physical uninstall.
+- **Next:** Stage 3 JOB-ACTIONS on the same draft PR; SRR-03 remains OPEN; Wave 2 unauthorized.
+
 ### Wave 1 gate normalization — compact handoff (2026-07-15)
 
 - **Branch / PR:** `claude/wave-1-gate-normalization-e7uw4v`, head `e0762f3784a32c08f103992ed9027a7b183b52b8`; PR [#171](https://github.com/AdamsOdoo/Adams/pull/171) → `mvp/program-integration`, docs-only.
