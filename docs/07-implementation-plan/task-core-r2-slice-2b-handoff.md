@@ -13,6 +13,89 @@ questions and adversarial findings are load-bearing.
 
 ---
 
+## CORE-R2 replay-safety decision package (2026-07-15 — architecture-decision session)
+
+> **Separate follow-up session — docs-only architecture decision, not a
+> Slice-2B implementation or integration-staging session.** This session did
+> **not** touch `claude/core-r2-slice-2b-integration`'s Slice-2B call-site
+> work, PR #150, PR #151, or PR #163. It produced a new, separate decision
+> package on its own branch/PR, targeting `claude/core-r2-slice-2b-
+> integration` (not `Shopify-connector`). **SRR-03 remains OPEN. Prompt E
+> remains BLOCKED.**
+
+**Why.** PR #163 (`claude/core-r2-slice-2b-runtime-correction-review` @
+`655e1cd744c9a9c9d82d65a926369168e0429de0`, base `claude/core-r2-slice-2b-
+integration` @ `63d10fb465a26189fa463f9c7ac580da6a931c5c`) fixed three real
+scheduled-dispatch defects but, by its own PR body, could not close the
+underlying gap: a transaction-scoped row lock (`try_lock_for_update`)
+prevents same-worker replay only — after a genuine PostgreSQL rollback,
+another worker can legitimately claim the released job row and re-invoke the
+real handler, and the recovered job's bounded auto-retry class
+(`concurrency_race_conflict`) schedules a further automatic replay, in both
+cases with no proof a prior Shopify transport did not already occur.
+Control-room review (`4700703933`) required a decided, documented production
+contract before any further CORE-R2 implementation is authorized. **PR #163
+remains open, draft, and unmerged; it was not modified by this session.**
+
+**What this session did.** Verified the current state (integration branch
+still exactly `63d10fb`; PR #163/#150/#151 all draft/open/unmerged at their
+required heads; `Shopify-connector` unchanged at `dd6ecb8`; no prior
+replay-safety decision PR existed). Reset this session's designated branch
+(`claude/core-r2-replay-safety-decision-3f7pjs`, which had initially pointed
+at the `Shopify-connector` tip rather than the required integration SHA, and
+carried no unique commits) to start exactly at `63d10fb`. Reviewed the exact
+current job-dispatch mechanism (`_claim_for_dispatch`, PR #163's `_drain_one`/
+`_recover_after_concurrency_conflict`, `operation_scope_key`/
+`idempotency_key`), proved directly against the code that the existing
+`shopify.connector.call.lease`/`execute_business` mechanism (dormant — no
+production call site uses it) cannot be reused as-is (its lifecycle ends
+before the job's own terminal-state commit), and independently re-verified
+official Odoo 19 (`github.com/odoo/odoo`) and Shopify Admin GraphQL API
+(`shopify.dev`) evidence directly (access date 2026-07-15). Produced a
+12-phase architecture-decision package: semantic contract (effectively-once,
+differentiated by declared operation class), a four-option durable-ownership
+comparison (recommending Option A — committed `running`+`attempt_id`
+ownership, extending PR #163's own accepted recovery mechanism), a
+fail-closed replay-safety registry design, crash/stale-owner recovery
+behavior, state/error mapping (reusing the existing `duplicate_risk`
+vocabulary — no new error class needed), a nine-slice future implementation
+sequence, and a self-critique against every named adversarial scenario.
+**No implementation code, test, or PR #163 change was made.**
+
+**Deliverables:**
+[`../03-architecture/core-r2-job-execution-replay-safety.md`](../03-architecture/core-r2-job-execution-replay-safety.md)
+(full analysis) and
+[`../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md`](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md)
+(decision record) — both **Proposed for ChatGPT review, NOT accepted**.
+Architecture-review-log row **AR-048** added
+([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)),
+also Proposed, not accepted.
+
+**Gate / scope status after this session.**
+
+- PR #163 remains **draft and unmerged**; its runtime evidence is retained,
+  but its implementation is **not accepted** — blocked by this replay-safety
+  architecture decision, pending control-room review.
+- PR #150 and PR #151 remain **open, draft, and unmerged**, untouched by this
+  session.
+- **No implementation gate is opened by this session.** The nine
+  implementation slices in the architecture doc §9 are sequencing only, not
+  an authorization.
+- **SRR-03 remains OPEN.** This session's package is a necessary but not
+  sufficient step toward closing it — genuine multi-worker/multi-server
+  runtime proof (SRR-04/SRR-09) is still separately owed, and this package's
+  own ownership sweep is not yet jointly analyzed against the existing
+  disconnect-quiescence controller's timeout (flagged as an open question in
+  the architecture doc §10/§11, not silently assumed fine).
+- `Shopify-connector` is **unchanged**.
+- **Next session (after ChatGPT review):** if the semantic contract and the
+  recommended Option-A ownership architecture are accepted, a future,
+  separately-authorized implementation-gate session begins with architecture
+  doc §9 slice 1 (core schema and ownership substrate) — not started, not
+  implied, by this session's acceptance-pending package.
+
+---
+
 ## Slice 2B integration-staging setup (2026-07-14 — branch-orchestration session)
 
 > **Separate follow-up session — branch orchestration & history integration only.**
