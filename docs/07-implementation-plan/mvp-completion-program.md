@@ -94,6 +94,7 @@ Waves are as given in the program instruction, annotated with the exact reposito
 ### Wave 1 — Existing read-only foundation integration
 
 - **Scope:** Task CORE-R1; Task SEC-1; Task LC-1 implementing accepted DEC-030 lifecycle/uninstall behavior; and the SRR-03 closure sub-gate proposed by DEC-033. Verify the checkpointed Task 010B/011B work rather than re-implement it. If the accepted SRR-03 closure criteria cannot be proven or an owned core defect cannot be corrected inside the wave, trigger hard-stop 6/10 before Wave 2 completes.
+- **Internal sub-stages (recommended sequencing, one macro-wave gate):** this wave bundles four substantial items behind a single Claude control-room gate; Sol should progress them as reviewable internal stages — (1) CORE-R1 readiness fix, (2) SEC-1 hardening/effective-permission tests, (3) LC-1 lifecycle/uninstall implementation, (4) the SRR-03 closure/runtime-proof stage (the CORE-R2 disconnect-quiescence design's remaining slices, per `sync-engine-risk-register.md` SRR-03 and `task-core-r2-disconnect-quiescence-packet.md`) — in roughly that order, since (4) is the most runtime-intensive and most likely to trigger hard-stop 6/10. Interim commits/checkpoints within the wave branch are encouraged for reviewability; only one PR and one control-room gate close the wave.
 - **Owned paths:** `addons/shopify_connector_core/**` and Wave 1 evidence/docs, limited by the CORE-R1, SEC-1, LC-1, and accepted SRR-03-closure packets; no new addon directories.
 - **Forbidden:** `addons/shopify_connector_product/**`, `addons/shopify_connector_sale/**` except as CORE-R1/SEC-1's own packets explicitly allow; no UI files (UI is Wave 5); no order/inventory/fulfillment code (later waves).
 - **Acceptance criteria:** a store reaches `connected` end-to-end on Odoo.sh; SEC-1 exposures are closed with dedicated effective-permission tests; DEC-030 lifecycle behavior is implemented/runtime-green; SRR-03's accepted closure evidence is recorded; all existing core/product/sale tests remain green.
@@ -179,7 +180,7 @@ Every macro-wave PR is reviewed with `../06-prompts/claude-mvp-wave-review-templ
 9. A security or credential-exposure risk is found.
 10. The active wave cannot satisfy its own definition of done.
 
-**Program-specific stop condition (11):** the SRR-03 "CLOSED" vs. "OPEN" contradiction (§2 finding 7) is not resolved before Wave 2 begins implementation. Sol must escalate rather than pick a reading.
+**Program-specific stop condition (11):** SRR-03 itself remains OPEN (not merely: the "CLOSED" vs. "OPEN" documentation contradiction — DEC-033, once accepted, resolves that wording conflict, but does not itself close the risk) and Wave 2 is about to merge, be enabled, or receive live Shopify validation before Wave 1's SRR-03 closure evidence (§4 Wave 1) is accepted. Sol must escalate rather than treat the wording reconciliation as equivalent to risk closure.
 
 ## 9. Open decisions requiring product-owner / control-room resolution (Wave 0 agenda)
 
