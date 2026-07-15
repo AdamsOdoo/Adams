@@ -164,8 +164,13 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         back, resets the environment, REACQUIRES the exact job under a real
         ``FOR UPDATE SKIP LOCKED`` row lock, revalidates its claimable state
         under that lock, and -- only if the job is still safely owned and
-        claimable -- routes it ONCE to the bounded ``concurrency_race_conflict``
-        retry path WITHOUT replaying the handler. Per-job commit keeps one
+        claimable -- routes it ONCE through its declared DEC-031 Layer 1
+        (AR-048) replay policy WITHOUT the recovery call itself re-invoking
+        the handler: a ``local_only`` or ``remote_read_replay_safe`` job may
+        be scheduled for a later bounded ``concurrency_race_conflict`` retry,
+        while a ``remote_effect_not_replay_safe`` or undeclared job is routed
+        to manual review instead of any automatic retry. This routing is
+        policy-gated and makes no exactly-once claim. Per-job commit keeps one
         racing (or failing) job from rolling back the work of jobs already
         committed in the same drain (batch integrity); and because the claim is
         only a transaction-scoped row lock, a rolled-back job is never
@@ -190,8 +195,11 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         later job's rollback can never undo it. On a genuine PostgreSQL
         concurrency failure the aborted transaction has lost BOTH the claim and
         every uncommitted write; recovery re-locks the job before touching it
-        (:meth:`_recover_after_concurrency_conflict`) and the handler is never
-        automatically replayed.
+        (:meth:`_recover_after_concurrency_conflict`), which itself never
+        re-invokes the handler and instead routes the still-owned job once
+        through its declared DEC-031 Layer 1 replay policy (a bounded retry
+        for ``local_only``/``remote_read_replay_safe`` jobs, manual review
+        for ``remote_effect_not_replay_safe``/undeclared ones).
 
         Returns ``True`` when a job was claimed and handled (whether it
         succeeded, was refused, routed, recovered, or left to another worker),
@@ -223,9 +231,11 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             self.env.cr.flush()
         except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY as exc:
             # A genuine 40001/40P01/55P03 aborted this transaction AFTER a
-            # transport may already have occurred. Do NOT replay the handler:
-            # reset, reacquire the exact job under a real row lock, and route
-            # it once to the bounded conflict path only if we still own it.
+            # transport may already have occurred. The recovery call does NOT
+            # replay the handler: reset, reacquire the exact job under a real
+            # row lock, and -- only if we still own it -- route it once
+            # through its declared DEC-031 Layer 1 replay policy (a bounded
+            # conflict retry for replay-safe jobs, manual review otherwise).
             # Record the SQLSTATE (operationally useful, and the observable
             # evidence that a genuine PostgreSQL concurrency failure -- not an
             # injected exception -- drove this recovery).
@@ -265,9 +275,15 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
            worker already moved to ``running``/terminal/etc. is not claimable
            and must never be overwritten;
         4. only a still-owned, still-claimable job is routed ONCE, in this
-           clean transaction we own, to the accepted bounded
-           ``concurrency_race_conflict`` path (``retry_waiting``, or
-           ``failed_final`` once the bounded budget is exhausted).
+           clean transaction we own, through its declared DEC-031 Layer 1
+           (AR-048) replay policy -- never by re-invoking the handler: a
+           ``local_only`` or ``remote_read_replay_safe`` job may be scheduled
+           for a later bounded ``concurrency_race_conflict`` retry
+           (``retry_waiting``, or ``failed_final`` once the bounded budget is
+           exhausted), while a ``remote_effect_not_replay_safe`` or undeclared
+           job is routed to manual review (``duplicate_risk``) instead of any
+           automatic retry. The routing is policy-gated and makes no
+           exactly-once claim.
 
         Every exit commits the (owned or empty) transaction so the row lock, if
         any, is released and the next ``_drain_one`` claim starts clean. Another
@@ -513,9 +529,14 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             # InFailedSqlTransaction, masking the real conflict. Re-raise it
             # unchanged so the drain's per-job outer boundary rolls back,
             # resets the environment, REACQUIRES the exact job under a real
-            # row lock and -- without replaying this handler -- routes it once
-            # to the bounded ``concurrency_race_conflict`` path (``_drain_one``
-            # / ``_recover_after_concurrency_conflict``). (Classified handler
+            # row lock and -- without the recovery call re-invoking this
+            # handler -- routes it once through its declared DEC-031 Layer 1
+            # replay policy (``_drain_one`` /
+            # ``_recover_after_concurrency_conflict``): a bounded
+            # ``concurrency_race_conflict`` retry only for
+            # ``local_only``/``remote_read_replay_safe`` jobs, manual review
+            # for ``remote_effect_not_replay_safe``/undeclared ones.
+            # (Classified handler
             # conflicts a handler can detect BEFORE poisoning the transaction
             # still raise ``JobHandlerError('concurrency_race_conflict', ...)``
             # and route below.)

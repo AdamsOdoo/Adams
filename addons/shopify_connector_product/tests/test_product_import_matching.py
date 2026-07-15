@@ -604,6 +604,25 @@ class TestProductImportMatching(TransactionCase):
             policies.get('product_import_sync'), 'remote_read_replay_safe',
         )
 
+    def test_installed_scope_every_handler_has_replay_policy(self):
+        """DEC-031 Layer 1 (AR-048) completeness invariant, proven in the
+        product-installed scope: every `job_type` the dispatcher can route
+        (`_get_handlers()`) -- including the `product_import_sync` handler
+        this module contributes -- has an explicit entry in
+        `_get_replay_policies()`. The fail-closed runtime lookup
+        (`_get_replay_policy`) still defaults any undeclared `job_type`
+        conservatively, but a handler this build actually registers must
+        never silently rely on that default. The set difference must be
+        empty; the failure message lists any missing handler keys."""
+        handlers = set(self.Dispatch._get_handlers())
+        policies = set(self.Dispatch._get_replay_policies())
+        missing = handlers - policies
+        self.assertEqual(
+            missing, set(),
+            'Every registered handler must declare an explicit replay '
+            'policy; handler keys with no replay policy: %s' % sorted(missing),
+        )
+
     # ------------------------------------------------------------------
     # 9. Shopify API client error taxonomy preserved (control-room
     # review, comment 4927037139, fix 1) -- a ShopifyClientError raised
