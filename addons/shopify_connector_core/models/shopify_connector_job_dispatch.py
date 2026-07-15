@@ -497,6 +497,20 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         9). A job whose `job_type` has no registered handler fails
         safely (never hangs, never silently drops).
         """
+        if job.job_type == 'historic_domain_job':
+            # LC-1 / DEC-030: this permanent sink has no handler by design.
+            # The ondelete conversion leaves only terminal rows, but a
+            # directly-created/malformed non-terminal row must still fail
+            # closed instead of falling into any future domain handler.
+            job._transition_failed_final(
+                error_class='unknown_system_error',
+                message=(
+                    'Historic domain jobs are audit-only and cannot be '
+                    'dispatched.'
+                ),
+            )
+            return
+
         store = job.store_id
         store.invalidate_recordset()
         if (
