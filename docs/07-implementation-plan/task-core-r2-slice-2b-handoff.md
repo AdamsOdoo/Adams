@@ -13,6 +13,148 @@ questions and adversarial findings are load-bearing.
 
 ---
 
+## CORE-R2 replay-safety decision package (2026-07-15 — architecture-decision session)
+
+> **Separate follow-up session — docs-only architecture decision, not a
+> Slice-2B implementation or integration-staging session.** This session did
+> **not** touch `claude/core-r2-slice-2b-integration`'s Slice-2B call-site
+> work, PR #150, PR #151, or PR #163. It produced a new, separate decision
+> package on its own branch/PR, targeting `claude/core-r2-slice-2b-
+> integration` (not `Shopify-connector`). **SRR-03 remains OPEN. Prompt E
+> remains BLOCKED.**
+
+**Why.** PR #163 (`claude/core-r2-slice-2b-runtime-correction-review` @
+`655e1cd744c9a9c9d82d65a926369168e0429de0`, base `claude/core-r2-slice-2b-
+integration` @ `63d10fb465a26189fa463f9c7ac580da6a931c5c`) fixed three real
+scheduled-dispatch defects but, by its own PR body, could not close the
+underlying gap: a transaction-scoped row lock (`try_lock_for_update`)
+prevents same-worker replay only — after a genuine PostgreSQL rollback,
+another worker can legitimately claim the released job row and re-invoke the
+real handler, and the recovered job's bounded auto-retry class
+(`concurrency_race_conflict`) schedules a further automatic replay, in both
+cases with no proof a prior Shopify transport did not already occur.
+Control-room review (`4700703933`) required a decided, documented production
+contract before any further CORE-R2 implementation is authorized. **PR #163
+remains open, draft, and unmerged; it was not modified by this session.**
+
+**What this session did.** Verified the current state (integration branch
+still exactly `63d10fb`; PR #163/#150/#151 all draft/open/unmerged at their
+required heads; `Shopify-connector` unchanged at `dd6ecb8`; no prior
+replay-safety decision PR existed). Reset this session's designated branch
+(`claude/core-r2-replay-safety-decision-3f7pjs`, which had initially pointed
+at the `Shopify-connector` tip rather than the required integration SHA, and
+carried no unique commits) to start exactly at `63d10fb`. Reviewed the exact
+current job-dispatch mechanism (`_claim_for_dispatch`, PR #163's `_drain_one`/
+`_recover_after_concurrency_conflict`, `operation_scope_key`/
+`idempotency_key`), proved directly against the code that the existing
+`shopify.connector.call.lease`/`execute_business` mechanism (dormant — no
+production call site uses it) cannot be reused as-is (its lifecycle ends
+before the job's own terminal-state commit), and independently re-verified
+official Odoo 19 (`github.com/odoo/odoo`) and Shopify Admin GraphQL API
+(`shopify.dev`) evidence directly (access date 2026-07-15). Produced a
+12-phase architecture-decision package: semantic contract (effectively-once,
+differentiated by declared operation class), a four-option durable-ownership
+comparison (recommending Option A — committed `running`+`attempt_id`
+ownership, extending PR #163's own accepted recovery mechanism), a
+fail-closed replay-safety registry design, crash/stale-owner recovery
+behavior, state/error mapping (reusing the existing `duplicate_risk`
+vocabulary — no new error class needed), a nine-slice future implementation
+sequence, and a self-critique against every named adversarial scenario.
+**No implementation code, test, or PR #163 change was made.**
+
+**Deliverables:**
+[`../03-architecture/core-r2-job-execution-replay-safety.md`](../03-architecture/core-r2-job-execution-replay-safety.md)
+(full analysis) and
+[`../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md`](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md)
+(decision record) — both **Proposed for ChatGPT review, NOT accepted**.
+Architecture-review-log row **AR-048** added
+([`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)),
+also Proposed, not accepted.
+
+**Gate / scope status after this session.**
+
+- PR #163 remains **draft and unmerged**; its runtime evidence is retained,
+  but its implementation is **not accepted** — blocked by this replay-safety
+  architecture decision, pending control-room review.
+- PR #150 and PR #151 remain **open, draft, and unmerged**, untouched by this
+  session.
+- **No implementation gate is opened by this session.** The implementation
+  sequencing in the architecture doc §9 (superseded by the scope-narrowing
+  revision below — now Immediate Slice 1, Immediate Slice 2, and the
+  deferred Layer 2 architecture gate) is sequencing only, not an
+  authorization.
+- **SRR-03 remains OPEN.** This session's package is a necessary but not
+  sufficient step toward closing it — genuine multi-worker/multi-server
+  runtime proof (SRR-04/SRR-09) is still separately owed, and this package's
+  own ownership sweep is not yet jointly analyzed against the existing
+  disconnect-quiescence controller's timeout (flagged as an open question in
+  the architecture doc §10/§11, not silently assumed fine).
+- `Shopify-connector` is **unchanged**.
+- **Next session (after ChatGPT review):** superseded by the scope-narrowing
+  revision and formal-acceptance note below — the next session, once
+  separately authorized, begins with architecture doc §9 Immediate Slice 1
+  (minimal replay-policy registry correction — no schema, no model, no
+  cron), not Option A's schema/ownership substrate. Layer 2's schema and
+  ownership substrate remain deferred, reopened by name only when a Shopify
+  mutation domain is authorized for implementation.
+
+**Scope-narrowing revision (2026-07-15, control-room review `4701015790`,
+same session family — no new handoff entry).** Control-room review found
+the package above disproportionate to current UAT scope: it made the full
+Option-A durable-ownership protocol an immediate requirement, when every
+implemented Shopify handler is read-only. The package was revised in place
+(same PR #164, new head) to split into **Layer 1** — decided now, routed to
+DEC-031 for acceptance: a minimal fail-closed replay-policy registry with
+three declared classes (`local_only`/`remote_read_replay_safe`/
+`remote_effect_not_replay_safe`), explicit declarations for the core
+diagnostic/self-test handler and the current customer/product import
+handlers, a fail-closed default for everything else, and PR #163's existing
+recovery behavior **accepted as-is** for the current read-only scope — no
+new model, field, migration, or cron proposed — and **Layer 2** — Option A
+and the rest of the mutation-hardening design, retained unchanged in
+substance but **deferred**, reopened by name only when inventory export,
+fulfillment/tracking update, product export, refund creation, or any other
+Shopify mutation is authorized for implementation. Task 012 order import is
+explicitly not pre-registered by this decision. The nine-slice future
+sequence is replaced with two immediate slices (registry implementation;
+exact-head runtime validation) plus one deferred-roadmap paragraph. Evidence
+is unchanged — only the recommendation and slicing narrowed. **PR #163
+runtime evidence retained, implementation still not accepted. DEC-031/AR-048
+remain Proposed/pending. SRR-03 remains OPEN. Prompt E remains BLOCKED.
+`Shopify-connector` unchanged. Current UAT fast-track is read-only
+product/customer/order work.** Updated files: architecture doc, DEC-031,
+AR-048, this handoff, `research-handoff.md` — no production/test file
+touched, PR #163 not modified, PR #164 kept draft, not merged.
+
+**Formal acceptance (2026-07-15, control-room review `4701644819`, same
+session family — no new handoff entry).** The Layer 1 / Layer 2 split above
+is **accepted in substance** — no architecture redesign or additional
+research required. A small docs-only editorial closure patch was applied
+across the same five files: registry-completeness wording corrected to key
+off `_get_handlers()`, not `JOB_STATE_SELECTION` (the unrelated job-state
+vocabulary); the core handler-policy table corrected to list only
+`core_dispatch_selftest` as a registered dispatcher handler (verified
+against `shopify_connector_job_dispatch.py:145-161` — `core_readiness_check`,
+`core_manual_maintenance`, and `core_test_connection` are job-type
+vocabulary created outside the dispatcher registry, not `_get_handlers()`
+entries); stale references to the superseded nine-slice plan replaced with
+Immediate Slice 1 / Immediate Slice 2 / the deferred Layer 2 architecture
+gate; the Layer 1 crash-recovery claim corrected from "strictly improved"
+to "policy gating only" (PR #163's existing rollback/reclaim behavior is
+accepted as sufficient for read-only handlers, unmodified). DEC-031 status
+is now **Accepted by ChatGPT — 2026-07-15, control-room review
+`4701644819`**; AR-048 status is now **Accepted**. **PR #164 is merged into
+`claude/core-r2-slice-2b-integration` after this closure patch** (docs
+only, same five files, no new file). PR #163 remains untouched,
+draft/unmerged. PR #150 and PR #151 remain untouched, open/draft/unmerged.
+`Shopify-connector` remains unchanged. **SRR-03 remains OPEN. Prompt E
+remains BLOCKED. Task 012 implementation is not authorized by this
+acceptance** — the next authorized step is a small, separately-authorized
+implementation-gate session scoped to architecture doc §9 Immediate Slice 1
+only.
+
+---
+
 ## Runtime CORRECTION session (2026-07-15) — dispatch ownership/replay model (review `4699752673`)
 
 > **Status: code + test + doc correction session, runtime-validated on Odoo.sh.**
