@@ -1,7 +1,11 @@
 # Task JOB-ACTIONS — Generic Job-Control Services (`action_manual_retry` / `action_cancel`): Implementation-Ready Planning Packet
 
-> **Status: Proposed for ChatGPT/control-room review. NOT accepted. The
-> locked prompt in §9 is NOT usable.** Produced 2026-07-15 by the Claude
+> **Status: Accepted for Wave 1 Stage 3 implementation under DEC-034.**
+> Implementation gate opened; prerequisite is successful completion of
+> Task LC-1 (Wave 1 Stage 2) on the same Wave 1 branch. The locked
+> prompt in §9 may be used only inside the authorized Wave 1 Sol
+> mission, against the verified live `mvp/program-integration` tip.
+> Produced 2026-07-15 by the Claude
 > control-room Wave 1 packet-reconciliation session, resolving conflict
 > finding 1 of Sol's Wave 1 hard-stop (issue #167 comment `4980808811`)
 > per [`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md).
@@ -223,9 +227,10 @@ states, identical in kind to LC-1's own rollback note).
 ## 9. Locked final implementation prompt (Task JOB-ACTIONS)
 
 ```text
-DO NOT USE UNTIL CHATGPT/CONTROL-ROOM REVIEWS AND ACCEPTS THIS PLANNING
-PACKAGE, EXPLICITLY OPENS THE JOB-ACTIONS GATE, VERIFIES THE CURRENT
-BASE SHA, AND ISSUES THIS PROMPT. (Prerequisite: Task LC-1 merged
+GATE OPEN — accepted for Wave 1 Stage 3 under DEC-034 and issue #167.
+Usable only inside the authorized Wave 1 Sol mission: verify the
+current mvp/program-integration tip directly from GitHub before
+branching (STOP on drift). (Prerequisite: Task LC-1 merged
 runtime-green, per the DEC-034-corrected Wave 1 order.)
 
 Implement Task JOB-ACTIONS — generic job-control services — exactly per
