@@ -1,5 +1,14 @@
 # DEC-029 — Lite/Full Packaging Model (OP-23 / Q6 / Q21 / Q27)
 
+> **Accepted by Claude control room — 2026-07-15, under DEC-032's MVP-program
+> authority.** See [`DEC-033`](DEC-033-mvp-wave-0-reconciliation.md) §4 (Wave 0
+> reconciliation, control-room review, PR #169). Prerequisite per DEC-033:
+> binding before Wave 3 creates write-back modules and before Wave 5 creates
+> the separate product-export module/UI; no pricing, billing, entitlement, or
+> licensing work is authorized by this acceptance (points 7 and the
+> alternatives-considered section remain deferred exactly as written below).
+> OP-23/Q6/Q21/Q27 close as Resolved-by-DEC-029; PD-1/PD-2 are ratified.
+
 ## Status
 
 **Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-10 by

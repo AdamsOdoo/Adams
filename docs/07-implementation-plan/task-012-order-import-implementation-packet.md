@@ -1,7 +1,20 @@
 # Task 012 — Order Import: Implementation-Ready Planning Packet
 
 > **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §15 is NOT usable.**
+> prompt in §15 is NOT usable.
+>
+> **Wave 0 reconciliation notice (2026-07-15; DEC-033 Proposed):** The MVP
+> program's checkpoint is now `acd8c4691e72cf5590f2a56228b08f183b76cd9a`.
+> Product/customer capabilities are checkpoint-integrated, but CORE-R1, SEC-1,
+> and LC-1 remain Wave 1 work. Exact-head checkpoint evidence keeps **SRR-03
+> OPEN**; statements below that say “SRR-03 CLOSED” or “CORE-R1 already merged”
+> are historical and stale. DEC-033 proposes: Task 012 declares
+> `remote_read_replay_safe`; DEC-031 Layer 2 remains reserved for Shopify
+> mutation domains; parallel Task 012 development may begin only after Wave 1
+> code prerequisites exist; and no Task 012 PR may merge, be enabled, or receive
+> live validation until SRR-03 closure and LC-1 runtime proof are accepted. Until
+> Claude accepts DEC-033, the stricter existing gate and this packet's unusable
+> locked prompt remain in force.**
 > **Decision-closure update 2026-07-14 (Task 012 decision-closure session,
 > docs-only, no gate/code/live-call):** the companion decision-closure
 > [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)

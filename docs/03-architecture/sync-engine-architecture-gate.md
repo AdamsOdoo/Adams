@@ -1,18 +1,14 @@
-# Sync Engine — Proposed Architecture Gate (Task 006B)
+# Sync Engine — Architecture Gate (Task 006B; accepted via DEC-025)
 
-> **Proposed architecture gate. Not an accepted decision. Not implementation
-> authorization.** This document converts the accepted Task 006A research
-> package (PR #123 competitor/common-pattern research, PR #124 Odoo/repo
-> substrate research, PR #126 queue/idempotency/retry/backoff/dead-letter
-> research, PR #125 final synthesis/evidence map, PR #127 completeness audit
-> — all merged into `Shopify-connector`) into a proposed architecture-level
-> shape for the future **domain-neutral sync engine**. Every claim below is
-> classified per `CLAUDE.md` §8 (**Fact** / **Competitor claim** / **Inference**
-> / **Recommendation** / **Decision** / **Open question**). Nothing in this
-> document is a **Decision** — the companion record
-> [`../04-decisions/DEC-025-task-006-sync-engine-gate.md`](../04-decisions/DEC-025-task-006-sync-engine-gate.md)
-> is **Status: Proposed / Pending ChatGPT review**, not Accepted. The companion
-> QA checklist is
+> **Accepted architecture shape; historical proposal text retained.** This
+> document was originally prepared as the Task 006B proposal. Its companion
+> decision record,
+> [`DEC-025`](../04-decisions/DEC-025-task-006-sync-engine-gate.md), was
+> accepted by ChatGPT on **2026-07-08** and accepts this architecture gate.
+> DEC-025 explicitly does **not** authorize implementation by itself. Any
+> “Proposed” wording below describes the document's review-time state and
+> must be read together with DEC-025's later acceptance note. The companion
+> QA checklist remains
 > [`../05-qa/task-006b-architecture-gate-review-checklist.md`](../05-qa/task-006b-architecture-gate-review-checklist.md).
 
 - **Session date:** 2026-07-08.

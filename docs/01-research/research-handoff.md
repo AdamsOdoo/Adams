@@ -1,3 +1,20 @@
+### MVP Wave 0 reconciliation — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-0-reconciliation-research`; draft PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) → `mvp/program-integration`, awaiting Claude control-room review.
+- **Files changed:** `docs/00-source-materials/wave-0-official-security-scope-captures-2026-07-15.md`; `docs/01-research/wave-0-roles-permissions-and-fulfillment-scope-refresh.md`; `docs/03-architecture/sync-engine-architecture-gate.md`; `docs/03-architecture/task-012-order-import-decision-closure.md`; `docs/04-decisions/DEC-033-mvp-wave-0-reconciliation.md`; `docs/05-qa/mvp-acceptance-matrix.md`; `docs/05-qa/sync-engine-risk-register.md`; `docs/05-qa/technical-debt-register.md`; `docs/07-implementation-plan/mvp-completion-program.md`; `docs/07-implementation-plan/mvp-program-state.md`; `docs/07-implementation-plan/task-012-order-import-implementation-packet.md`; this handoff.
+- **What changed / residue fixed:** protected references were verified before branching; DEC-033 records dispositions for all six Wave 0 agenda items; product export stays in proposed Wave 5 scope; SRR-03 is reconciled to OPEN with a proposed Wave 1 closure sub-gate; DEC-027 is explicitly deferred and DEC-028/029/030 are routed for acceptance; roles/permissions research is sufficient; the merchant-managed FulfillmentOrder scope correction is exact; stale gate/Task 012 narratives are visibly annotated; TD-002 research routing is closed while code debt remains Open.
+- **Items deferred:** Claude acceptance/revision of DEC-033 and DEC-028/029/030 status notes; DEC-027 until a second production private customer/public distribution; PR #150/#151 administrative closure to Claude/product owner; hazardous branch and inert requirements file indefinitely absent explicit authorization; every implementation/runtime action to later waves.
+- **Learning feedback loop:** new issue categories — stale status/contradictory prerequisite text and a misclassified shared-core group reuse were corrected in the program sources; repeated-pattern threshold — not newly reached; rules/checklists updated — live state/contract/matrix now cross-link DEC-033 and historical proposal docs carry current-status banners; rejected approaches — none new (RA-001 and RA-022/023 were honored); technical debt — TD-002 updated to “research routed, code Open”; architecture concerns — SRR-03 vs. Layer 2 separated in proposed DEC-033; tests/review gates — Wave 1 SRR-03/LC-1 evidence and Wave 4 scope tests made explicit; future prompt change — No, the master mission and wave-review template already express the correct gate.
+- **Quality gate confirmation:** handoff updated YES · feedback loop checked YES · learning captured YES · rejected approach logged if any N/A · technical debt logged YES · repeated-issue escalation applied if any N/A.
+- **Next recommended session:** Claude MVP Wave 0 control-room review using `docs/06-prompts/claude-mvp-wave-review-template.md`; decide DEC-033 and the DEC-027/028/029/030 status effects, verify the docs-only boundary, then merge or return focused corrections.
+- **Stop condition:** Wave 0 branch and PR submitted. Sol stopped at the macro-wave boundary; no addon code, runtime claim, protected-reference action, later-wave start, ADR self-acceptance, or self-merge is authorized.
+
+## Sprint checkpoint log
+
+- **MVP Wave 0 submission (2026-07-15):** Draft PR #169 submitted with the reconciliation ADR, official-source refresh, dependency/acceptance updates, and QA records. Awaiting Claude control-room review.
+
+---
+
 # Research Handoff (rolling)
 
 

@@ -20,6 +20,8 @@
 > shard) into SRR-01, SRR-03, SRR-04, SRR-05, and SRR-07, and adding two new
 > risk rows (SRR-08, SRR-09) for concrete, actionable findings `R33`
 > surfaced that this package had not previously researched.
+>
+> **Wave 0 checkpoint refresh (2026-07-15):** The SRR-03 row below retains its historical chronology, but its current status is authoritatively **OPEN** at checkpoint/integration merge `acd8c4691e72cf5590f2a56228b08f183b76cd9a` and validated code `757a9680182f65c627a3880b9c7989d6c5d56035`. Exact-head Odoo.sh build `34935129` validated DEC-031 Layer 1 and the merged CORE-R2 path without claiming SRR-03 closure; `task-core-r2-validation-results.md` §IS2.10 explicitly preserves the risk. DEC-033 (Proposed) therefore reconciles Task 012's stale “CLOSED” statements to **OPEN**, separates this read/call safety risk from DEC-031 Layer 2 mutation ownership, and assigns Wave 1 a closure-evidence sub-gate. Until Claude control-room acceptance and runtime closure proof, no Task 012 PR may merge, be enabled, or receive live validation.
 
 | ID | Risk | Evidence | Likelihood / severity (qualitative) | Trigger condition | Mitigation direction (not decided) | Owner / next step |
 | --- | --- | --- | --- | --- | --- | --- |
