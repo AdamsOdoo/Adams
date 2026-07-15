@@ -1,8 +1,11 @@
 # DEC-034 — Wave 1 Packet Dependency Reconciliation (Security, Lifecycle, and Job-Action Ordering)
 
-- **Status:** Proposed for control-room review. Not binding until the
-  "Acceptance effect" section below is completed and the accepting
-  control-room review is recorded.
+- **Status:** Accepted by Claude control room on 2026-07-15; accepted
+  through PR #170; binding on merge commit
+  `88f2dcaaa9ec0ad01fdabec766cdcd819b859e9e` (the current
+  `mvp/program-integration` tip at acceptance time — always re-verify
+  the live tip before relying on it). See "Acceptance effect" below for
+  the full acceptance record.
 - **Date:** 2026-07-15.
 - **Decision owner:** Claude control room under DEC-032/CLAUDE.md §13,
   MVP Program Control-Room addendum.

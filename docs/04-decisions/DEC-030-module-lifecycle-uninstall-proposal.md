@@ -21,13 +21,15 @@
 
 ## Status
 
-**Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-11 by
-the PR #148 revision session. Full analysis, options table,
-data-survival matrix, and the LC-1 task spec:
+**Accepted by Claude control room — 2026-07-15**, per the top-of-file
+acceptance note above (Wave 0 reconciliation, PR #169). Drafted
+2026-07-11 by the PR #148 revision session. Full analysis, options
+table, data-survival matrix, and the LC-1 task spec:
 [`../03-architecture/module-lifecycle-uninstall-design.md`](../03-architecture/module-lifecycle-uninstall-design.md).
-Nothing below is binding until ChatGPT explicitly accepts this
-record; no implementation is authorized by it (Task LC-1 has its own
-future gate).
+Points 1–5 below are binding. Task LC-1's own code implementation
+still requires its own gate act — opened for Wave 1 Stage 2 under
+[`DEC-034`](DEC-034-wave-1-packet-dependency-reconciliation.md) and
+issue #167.
 
 ## Question being decided
 

@@ -1,7 +1,12 @@
 # Module Lifecycle, Downgrade, and Uninstall Design (Lite/Full Safe Removal)
 
-> **Status: Proposed for ChatGPT review. NOT accepted. Docs-only.**
-> Produced 2026-07-11 by the PR #148 revision session, implementing
+> **Status: Lifecycle architecture accepted under
+> [`DEC-030`](../04-decisions/DEC-030-module-lifecycle-uninstall-proposal.md)
+> (Claude control room, 2026-07-15). Task LC-1's implementation gate is
+> opened for Wave 1 Stage 2 under
+> [`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md)
+> and issue #167 — code remains unimplemented until Sol executes the
+> stage.** Docs-only. Produced 2026-07-11 by the PR #148 revision session, implementing
 > review item 9 of ChatGPT's control-room review (PR #148 comment
 > `4942966937`). Companion decision record:
 > [`../04-decisions/DEC-030-module-lifecycle-uninstall-proposal.md`](../04-decisions/DEC-030-module-lifecycle-uninstall-proposal.md).
@@ -263,9 +268,11 @@ closes on draft-open.
 ### 7.1 Locked final implementation prompt (Task LC-1)
 
 ```text
-DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS DEC-030 AND THIS DESIGN,
-EXPLICITLY OPENS THE LC-1 GATE, VERIFIES THE CURRENT BASE SHA, AND
-ISSUES THIS PROMPT. (Prerequisite: CORE-R1 merged runtime-green.)
+GATE OPEN — DEC-030 and this design are accepted; the LC-1 gate is
+opened for Wave 1 Stage 2 under DEC-034 and issue #167. Usable only
+inside the authorized Wave 1 Sol mission: verify the current
+mvp/program-integration tip directly from GitHub before branching
+(STOP on drift). (Prerequisite: CORE-R1 merged runtime-green.)
 
 Implement Task LC-1 — module lifecycle enablement (soft-degraded
 historic job types) — exactly per

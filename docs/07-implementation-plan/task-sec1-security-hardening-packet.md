@@ -1,7 +1,11 @@
 # Task SEC-1 — Cross-Cutting Security Hardening: Implementation-Ready Planning Packet
 
-> **Status: Proposed for control-room review. NOT accepted. The locked
-> prompt in §9 is NOT usable.** Produced 2026-07-11 by the PR #148
+> **Status: Accepted for Wave 1 Stage 4 implementation under DEC-034.**
+> Implementation gate opened; prerequisites are completion of CORE-R1
+> (Stage 1), Task LC-1 (Stage 2), and Task JOB-ACTIONS (Stage 3) on the
+> same Wave 1 branch. The corrected locked prompt in §9 may be used
+> only inside the authorized Wave 1 Sol mission, against the verified
+> live `mvp/program-integration` tip. Produced 2026-07-11 by the PR #148
 > revision session, implementing review item 7 of ChatGPT's
 > control-room review (PR #148 comment `4942966937`). **Sequencing
 > corrected 2026-07-15 by
@@ -440,9 +444,10 @@ only.
 ## 9. Locked final implementation prompt (Task SEC-1)
 
 ```text
-DO NOT USE UNTIL CHATGPT/CONTROL-ROOM REVIEWS AND ACCEPTS THIS PLANNING
-PACKAGE, EXPLICITLY OPENS THE SEC-1 GATE, VERIFIES THE CURRENT BASE
-SHA, AND ISSUES THIS PROMPT. (Prerequisite: Task LC-1 AND Task
+GATE OPEN — accepted for Wave 1 Stage 4 under DEC-034 and issue #167.
+Usable only inside the authorized Wave 1 Sol mission: verify the
+current mvp/program-integration tip directly from GitHub before
+branching (STOP on drift). (Prerequisite: Task LC-1 AND Task
 JOB-ACTIONS merged runtime-green, per DEC-034's corrected Wave 1 order
 — CORE-R1 -> LC-1 -> JOB-ACTIONS -> SEC-1 -> SRR-03 closure. NOT Area
 6 — Area 6 remains unauthorized Wave 2+ scope.)

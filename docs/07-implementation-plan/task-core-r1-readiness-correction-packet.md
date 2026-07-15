@@ -1,8 +1,13 @@
 # Task CORE-R1 — Capability-Aware Readiness Correction: Implementation-Ready Planning Packet
 
-> **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §8 is NOT usable.** Produced 2026-07-11 by the PR #148
-> revision session, implementing review item 5 of ChatGPT's control-room
+> **Status: Accepted for Wave 1 Stage 1 implementation.** Implementation
+> gate opened under
+> [`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md)
+> and issue #167 (Wave 0 closure comment `4980646566`; Wave 1
+> reconciliation comment `4981237759`). The locked prompt in §8 may be
+> used only inside the authorized Wave 1 Sol mission, against the
+> verified live `mvp/program-integration` tip. Produced 2026-07-11 by
+> the PR #148 revision session, implementing review item 5 of ChatGPT's control-room
 > review (PR #148 comment `4942966937`): the critical readiness
 > correction formerly bundled as Area-6 design item D-A6-7 is split out
 > as its own tiny, independently gated core task, sequenced **before**
@@ -218,9 +223,10 @@ later live validation require a store that can reach `connected`.
 ## 8. Locked final implementation prompt (Task CORE-R1)
 
 ```text
-DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS THIS PLANNING PACKAGE,
-EXPLICITLY OPENS THE CORE-R1 GATE, VERIFIES THE CURRENT BASE SHA, AND
-ISSUES THIS PROMPT.
+GATE OPEN — accepted for Wave 1 Stage 1 implementation under DEC-034
+and issue #167. Usable only inside the authorized Wave 1 Sol mission:
+verify the current mvp/program-integration tip directly from GitHub
+before branching (STOP on drift).
 
 Implement Task CORE-R1 — capability-aware readiness correction —
 exactly per
