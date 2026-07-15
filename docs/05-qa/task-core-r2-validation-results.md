@@ -2059,3 +2059,502 @@ expected negative logs (RTX.9) and the out-of-scope issue #157 (RTX.6).
 - **PR #160 stays open, draft, unmerged.** Not marked ready; not merged. gh CLI/token unavailable in the build → the PR-body update text is handed to the control room (mirrors this section's headline result).
 - **Remaining gates (unchanged):** base→head genuine upgrade on a two-DB runtime (RTX.10) — **OPEN**; optional Section 7/8 assertion tightening + stale `_admit` docstring (RT.7/RT.13).
 - **Issue #157 remains separate and untouched. Slice 2B not begun. No live Shopify request, no real credential. SRR-03 remains OPEN** — no end-to-end disconnect-quiescence remediation runtime-green is claimed.
+
+---
+
+# CORE-R2 Slice 2B — Runtime CORRECTION session (2026-07-14) `[Fact]`
+
+> One controlled runtime-correction session on Odoo.sh build **34912503** (Odoo
+> **19.0**, DB `adamsmen-claude-core-r2-slice-2b-integration-34912503`), from the
+> accepted staging SHA **`63d10fb465a26189fa463f9c7ac580da6a931c5c`** on a
+> dedicated correction branch **`claude/core-r2-slice-2b-runtime-correction`**.
+> Closes the three control-room-adjudicated runtime findings from the preceding
+> integrated-closure session. **Prompt E stays BLOCKED. SRR-03 stays OPEN. No
+> final integration PR. No merge. No live Shopify request.**
+
+## RTC.1 Root cause (adjudicated) `[Fact]`
+
+The scheduled job-dispatch path (`ir.cron` → `run_drain`) had **no transaction
+retry protection**, and the dispatcher **caught a raw PostgreSQL concurrency
+failure (SQLSTATE 40001/40P01/55P03) and re-issued ORM writes inside the
+already-aborted transaction** (`_invoke_handler`'s `except Exception` → job
+`write()` → `InFailedSqlTransaction`). Confirmed from the runtime: `ir_cron.
+_callback` runs the server action and on any exception rolls back and re-raises
+with **no retry**; `odoo.service.model.retrying` (the real Odoo boundary,
+`MAX_TRIES_ON_CONCURRENCY_FAILURE=5`) was never applied to `run_drain`. Under
+the container's REPEATABLE READ isolation a concurrent committed disconnect made
+the parked call-site reconciliation's binding `FOR KEY SHARE` on the store row
+serialization-fail — reproduced deterministically as the customer-M18
+`InFailedSqlTransaction` and product-M18 `SerializationFailure` findings.
+
+## RTC.2 Production correction (smallest, common-layer) `[Fact]`
+
+**Single production file:** `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`.
+
+1. `run_drain` now drains **one job at a time** through `_drain_one`, which wraps
+   each dispatch in the **real** `odoo.service.model.retrying(func, env)` boundary:
+   a genuine 40001/40P01/55P03 rolls the transaction back, resets the environment,
+   **re-browses the job/store by id** and retries under the real Odoo policy;
+   `retrying` commits each job on its own (batch integrity — a later job's
+   rollback can never undo, or duplicate the transport of, an already-committed
+   job). The bounded budget being exhausted routes the job **once, in a clean
+   transaction**, to the existing `concurrency_race_conflict` auto-retry path.
+2. `_invoke_handler` now **re-raises** `PG_CONCURRENCY_EXCEPTIONS_TO_RETRY`
+   unchanged instead of routing it through an ORM write in the aborted
+   transaction (the bug). Classified handler conflicts still raise
+   `JobHandlerError('concurrency_race_conflict', …)` and route as before.
+3. `_concurrency_retry_supported()` detects the test runner's forbidden-commit
+   guard so the standard `TransactionCase` suite dispatches directly (no real
+   serialization can occur on its single shared connection), while production and
+   the genuine independent-connection lifecycle tests (real pooled cursors) run
+   the real boundary. No new API surface; no `.create(`/`.sudo(`/`shopify.
+   connector.api.client`/`.execute(` introduced (existing AST/source guards stay
+   green).
+
+**On the retry contract:** the accepted-design outcome is **safe supersession** —
+a superseded call retries and is **refused before any second transport** (an
+already-disconnecting store fails the `write()`→`running` gate), landing the job
+in `failed_retryable`. This is NOT "reconciliation completes after the disconnect".
+
+## RTC.3 Test corrections (no weakening) `[Fact]`
+
+- **Customer disconnect-first PID (finding #1)** —
+  `test_race_a_disconnect_first_fails_closed_zero_transport`: the disconnect
+  connection is now held **open** while the worker connection is opened, so the
+  two backend PIDs are distinct **by construction** (not by LIFO-pool timing).
+  The PID assertion is **strengthened** to a deterministic `assertNotEqual`, never
+  removed; fail-closed + zero-residue preserved.
+- **Customer M18 (finding #2)** — renamed
+  `test_m18_lease_count_then_serialization_retry_refuses_after_disconnect`: drives
+  the REAL `run_drain`; proves lease-count/controller-defer **and** the genuine
+  40001 → retry → refuse contract (exactly one transport with `DUMMY_TOKEN`,
+  `open_lease_count=1`, lease released, **zero binding**, `failed_retryable`,
+  serialization evidenced from the real service-retry log, controller finalizes +
+  clears credential only after release). The controller-vs-worker distinct-PID
+  claim is scoped to the parked window (a post-release finalize pass may reuse the
+  freed backend via the pool).
+- **Product M18 (finding #2)** — renamed
+  `test_race_b_terminal_reconciliation_retry_refuses_after_disconnect`: same
+  contract via `run_drain` (one transport, zero binding, `failed_retryable`, 40001
+  evidenced). Its fixture now enables `product_domain_enabled` so the real
+  dispatch start-gate admits the job.
+- **Product cron-trigger residue (finding #3)** — the product genuine class now
+  owns its connector-cron `ir_cron_trigger` rows via a per-test baseline
+  (`setUp`), deleting only `current − baseline` and asserting a zero delta
+  (mirrors the accepted customer pattern). Independently verified: connector
+  cron-trigger residue after the product lifecycle runs is **0** (was +4/run).
+- **New Phase-5 core proof** —
+  `TestLifecycleServiceRetryGenuine.test_scheduled_run_drain_serialization_retry_refuses_after_disconnect`:
+  the shared core dispatcher retry-then-refuse proven once at the core layer via
+  `run_drain` with a representative business handler (execute_business +
+  `FOR NO KEY UPDATE` revalidation → genuine 40001).
+
+## RTC.4 `notification_type` classification (Phase 9 — unchanged, non-blocking) `[Fact]`
+
+Six isolated-core `res.users.notification_type` `setUpClass` `NotNullViolation`s
+persist and were **accepted by the control room as a non-blocking partial-
+registry / invocation artifact**, **not** touched by this correction:
+
+- **Producing command (isolated):** `odoo-bin -u shopify_connector_core
+  --test-enable --test-tags '/shopify_connector_core' --stop-after-init --no-http`.
+- **Cause:** `notification_type` is a **`mail`-owned stored computed field**
+  (`compute='_compute_notification_type'`, `default='email'`, `required=True`);
+  `shopify_connector_core` depends only on `['base']` — not `mail` — so under an
+  isolated partial upgrade of a mail-independent module the default is not
+  applied. In the full registry `env['res.users'].default_get(['notification_type'])`
+  returns `'email'`, and the connector never touches `res.users`.
+- **Full-install (representative) command under which the same classes pass:**
+  the Odoo.sh **build-time fresh install** of all modules with `--test-enable`
+  (the canonical release-validation path) — at `63d10fb` that run was **`0 failed,
+  0 error(s) of 574 tests`**, and all six user-fixture classes ran green.
+- **Canonical connector validation** must load the representative dependency
+  registry (the fresh full install), not an artificial core-only partial
+  registry. Kept visible as an **invocation limitation, not a connector defect**.
+
+## RTC.5 Runtime results — correction branch, build 34912503 `[Fact]`
+
+_(exact commands: `odoo-bin -u <module> --test-enable --test-tags '<tag>'
+--stop-after-init --no-http`; per-run logs under the build's session dir.)_
+
+- **Core standard suite ×3:** `0 failed, 6 error(s) of 204` each (the 6 accepted
+  `notification_type` artifacts only; the new Phase-5 test + all genuine
+  admission/lease/disconnect/controller/SKIP-LOCKED/serialization-retry proofs
+  green, repeatable).
+- **Product standard suite:** `0 failed, 0 error(s) of 174`.
+- **Sale (customer) standard suite:** `0 failed, 0 error(s) of 93`.
+- **Customer callsite lifecycle tag ×3:** `0 failed, 0 error(s) of 6` each.
+- **Product callsite lifecycle tag ×3:** `0 failed, 0 error(s) of 4` each.
+- **Scheduled-dispatch serialization/retry proof ×3 per domain/path:** customer
+  M18 (in the customer tag ×3), product M18 (in the product tag ×3), core
+  `test_scheduled_run_drain_…` (in the core suite ×3) — all green.
+
+## RTC.6 Independent residue / leak audit `[Fact]`
+
+After every group and at the end (independent `psql`, not test assertions): all
+connector data tables 0 (`call_lease`, customer/template/variant bindings, store,
+credential, settings, job, job_log); `attribute_lock` singleton = 1; master
+tables exactly at baseline (`res_partner`=44, `product_template`=34,
+`product_product`=44, `product_attribute`=19, `product_attribute_value`=101);
+**connector cron-trigger delta = 0** (finding #3 closed); 0 idle-in-transaction;
+1 backend (self); no stray workers. **No live Shopify request** (only the
+`shpat_DUMMYDUMMY…` sentinel; no `myshopify.com`/GraphQL/HTTP egress); no
+credential/token/header/request-body leakage in any log.
+
+## RTC.7 Governance state + push mechanism `[Fact / control-room decision needed]`
+
+- **Push mechanism (platform-forced deviation from the separate-branch / draft-PR
+  model):** the Odoo.sh dev container's only push mechanism is `odoosh-push`,
+  which — by Odoo.sh security design — **forces the push onto the build's bound
+  branch, `claude/core-r2-slice-2b-integration`** ("you are forced to push on the
+  branch your build is currently linked to; you cannot deactivate this
+  behavior"). A separate correction branch **cannot** be pushed from this
+  container, and `gh` is unavailable to open a PR (the project's established
+  pattern — prior sessions' "evidence commit advances the branch head"). The
+  correction therefore landed as a **single, clean, fast-forward commit on
+  `claude/core-r2-slice-2b-integration`** (`63d10fb…` → the correction head).
+  **No force-push, no rebase, no amend.** It is one well-scoped reviewable unit
+  (allowed-list files only) that the control room can review in place, branch a
+  review PR from, or reset the integration head to `63d10fb…`. **This session did
+  NOT promote onward to `Shopify-connector` and did not self-authorize any gate
+  transition.**
+- PR #150 (`10d0034…`) / PR #151 (`e4669aa…`): present, **not touched**.
+- `Shopify-connector` unchanged (`dd6ecb8…`) — **no promotion**. `main` / plain
+  `dev` untouched. Task 012 docs untouched.
+- **Prompt E remains BLOCKED. SRR-03 remains OPEN pending control-room review.**
+
+---
+
+# CORE-R2 Slice 2B — Runtime CORRECTION session (2026-07-15): dispatch ownership/replay model `[Fact]`
+
+> Control-room review `4699752673`. This session **corrects** the RTC.1–RTC.3
+> dispatcher description above: the `retrying`-boundary drain was proven unsafe and
+> is replaced by a per-job ownership/replay-safe boundary. Validated on Odoo.sh
+> build **34923103**, PR #163 head branch
+> `claude/core-r2-slice-2b-runtime-correction-review` (base
+> `claude/core-r2-slice-2b-integration` @ `63d10fb`).
+
+## RTC-2.1 Proven problem (control-room diagnosis, retained)
+
+The prior `_drain_one()` claimed a job (a transaction-scoped `FOR UPDATE SKIP
+LOCKED` row lock — **not** a durable state flag), stored only its id, then ran the
+**complete** handler inside `odoo.service.model.retrying`. On a genuine PostgreSQL
+concurrency failure `retrying` rolled the transaction back — which **released the
+original claim and undid the `state→running` write** — then **re-invoked the whole
+handler** by a bare `browse(job_id)` without reacquiring any claim; retry
+exhaustion likewise routed the job by a bare id without a lock. Two unsafe
+consequences: (1) a competing drain worker could claim the same job between
+rollback and retry; (2) the handler could be **replayed after a Shopify transport
+had already occurred** — the old disconnect test only avoided a second call because
+the reset attempt observed `disconnecting` and was gate-refused, which does **not**
+protect a still-connected job hitting an unrelated concurrency failure after
+transport.
+
+## RTC-2.2 Corrected facts (SUPERSEDE the earlier "retrying / failed_retryable / service-retry log" wording)
+
+- **[Corrects claim] A rolled-back claim does NOT remain exclusive.** The claim is
+  only a row lock; a rollback releases it. Every reset treats the claim as lost and
+  re-locks before any dispatch or state transition.
+- **[Corrects claim] Re-browsing by id is NOT equivalent to reacquiring a claim.**
+  Recovery reacquires the exact job via the real `try_lock_for_update`
+  (`FOR UPDATE SKIP LOCKED`) and revalidates its claimable state **under the lock**.
+- **[Corrects claim] Wrapping the handler in `retrying()` does NOT inherently
+  prevent duplicate transport.** `retrying` re-invokes the complete handler; the
+  drain no longer uses it — the handler runs **at most once** per drain pass and is
+  never automatically replayed after transport.
+- **[Corrects claim] Retry exhaustion is NOT routed without a lock.** Exhaustion
+  (and every conflict routing) occurs only after reacquiring the exact job lock.
+
+## RTC-2.3 Selected design (conservative direction)
+
+`_drain_one` runs the claimed job once under its held claim and **commits per job**
+(batch integrity); it flushes inside the guard so a REPEATABLE-READ 40001 surfacing
+at flush time is caught, never after commit. On a
+`PG_CONCURRENCY_EXCEPTIONS_TO_RETRY` (SQLSTATE 40001/40P01/55P03) it logs the
+SQLSTATE and calls `_recover_after_concurrency_conflict(job_id)`: `cr.rollback()` +
+`env.transaction.reset()` → `try_lock_for_update` the exact job → empty (another
+worker owns it / row gone) ⇒ **do nothing** → else revalidate claimable state
+(`queued`, or due `retry_waiting`) under the lock → non-claimable
+(running/terminal/etc.) ⇒ **do nothing, never overwrite** → else route ONCE to
+`concurrency_race_conflict` (`retry_waiting`, or `failed_final` once the bounded
+budget is exhausted), **without replaying the handler**. Isolation unchanged
+(REPEATABLE READ); no in-memory flag; PG concurrency errors still escape
+`_invoke_handler` and are never caught inside the domain importers.
+
+## RTC-2.4 Production changes (allowed file)
+
+`addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`: dropped
+the `retrying` import/use; rewrote `run_drain`/`_drain_one` to the per-job
+transaction boundary; added `_recover_after_concurrency_conflict`; added a module
+`_logger` recording the SQLSTATE on recovery; updated `_invoke_handler`'s re-raise
+comment and `_concurrency_retry_supported`'s docstring. No API-client,
+store-lifecycle, credential, importer, manifest, XML, or security change.
+
+## RTC-2.5 Tests (allowed files)
+
+- `test_disconnect_quiescence.py`: updated
+  `test_scheduled_run_drain_serialization_retry_refuses_after_disconnect` to the
+  no-replay model (one transport, genuine 40001 pgcode captured, job
+  `retry_waiting`, distinct PID); added class `TestDrainOwnershipReplayGenuine` —
+  **Test A** (rollback/reclaim race: one owner, SKIP-LOCKED loser, one transport),
+  **Test B** (still-connected post-transport 40001: one transport, no replay,
+  routed once, store stays connected), **Test C** (conflict-exhaustion →
+  `failed_final` after reacquire; and ownership-refusal — A does not overwrite a
+  job Worker B completed), **Test D** (batch integrity: per-job commit survives a
+  neighbour's rollback, later job still processed). Every 40001 is a REAL
+  serialization failure (benign committed store-row `write_date` bump vs the real
+  `_lock_store_for_lifecycle` `FOR NO KEY UPDATE`), on genuine pooled `db_connect`
+  cursors with distinct backend PIDs.
+- Customer/product M18 tests: the superseded job now ends **`cancelled`** (the
+  disconnect controller sweeps the `retry_waiting` business job) and the 40001 is
+  evidenced from the dispatcher concurrency-recovery log; all other assertions
+  (one transport, zero binding, lease released, store finalized, credential
+  cleared after release) unchanged.
+
+## RTC-2.6 Runtime results (build 34923103)
+
+| Group | Result |
+| --- | --- |
+| Exact-head upgrade (core+sale+product) | 47 modules loaded, **zero registry/module errors** |
+| Product standard suite | `0 failed, 0 error of 174` |
+| Sale standard suite | `0 failed, 0 error of 93` |
+| Representative core suite | `0 failed, 6 error of 476` — the 6 = the **known `notification_type` `res.users` `setUpClass` artifact** (RR-F / issue #157, §11); the other 470 green |
+| Customer lifecycle tag ×3 | `0 failed, 0 error of 6` (runs 1/2/3) |
+| Product lifecycle tag ×3 | `0 failed, 0 error of 4` (runs 1/2/3) |
+| Test A/B/C/D + updated disconnect (ownership class) ×3 | `0 failed, 0 error of 5` (runs 1/2/3) |
+| Existing genuine CORE-R2 admission/lease/disconnect/controller classes | green (within the core suite) |
+
+## RTC-2.7 `notification_type` artifact classification `[Fact]`
+
+The 6 core-suite errors are `setUpClass` failures in six classes NOT touched by
+this correction (`test_connection_lifecycle`, `test_credential_access`,
+`test_credential_service`, `test_job_log_system_append`, `test_readiness_slot_closure`,
+`test_test_connection`), each raising `null value in column "notification_type" of
+relation "res_users" violates not-null constraint` while creating a test user
+**before any test logic runs**. Proven invocation-invariant: running just these six
+classes yields `0 failed, 6 error of 0 tests` (zero tests execute). This is exactly
+the base-environment `res.users` artifact recorded in §4.3 / RR-F (the "six core …
+`setUpClass` errors expected to reproduce identically", issue #157), independent of
+the dispatch change (which touches neither `res.users` nor these classes).
+
+## RTC-2.8 Independent zero-residue audit `[Fact]`
+
+Fresh-connection SQL audit after the full matrix: call leases 0; jobs 0; job logs
+0; stores 0; credentials 0; customer bindings 0; product template/variant bindings
+0; test-pattern partners 0; test-marker product templates/variants/attributes/
+values 0; connector cron-trigger delta 0; idle-in-transaction connections 0;
+ungranted (blocking) locks 0; token/secret leakage in job logs 0 (only the
+`shpat_DUMMYDUMMY…` sentinel is used; no `myshopify.com`/GraphQL/HTTP egress).
+
+## RTC-2.9 Governance
+
+Validated on the working tree of build 34923103, byte-identical to the PR #163 head
+after this session's commit (Odoo.sh holds the dev-branch rebuild webhook during an
+AI session, so the running build already contains the exact validated code). **No
+live Shopify request. No merge. PR #163 kept draft. No Prompt E. SRR-03 remains
+OPEN. `Shopify-connector` / `main` / plain `dev` unchanged. PR #150/#151 untouched.**
+
+# CORE-R2 Slice 2B — DEC-031 Immediate Slice 2: exact-head Odoo.sh runtime validation (2026-07-15) `[Fact]`
+
+Control-room refs: DEC-031 **Accepted**, AR-048 **Accepted**, implementation
+authorization `4701810356`, runtime code-review acceptance `4702066051`. Session
+type: Odoo.sh runtime validation only (Do-not-merge, do-not-mark-ready).
+
+- **Build:** `34935129`  ·  **DB:** `adamsmen-claude-core-r2-slice-2b-runtime-correction-34935129`  ·  **Odoo:** `19.0`  ·  **Stage:** dev
+- **Branch:** `claude/core-r2-slice-2b-runtime-correction-review`
+- **Base head before this session:** `4b45d350317a6889c32777ab5b73e56124276142`
+- **Validated code SHA (exact head):** `757a9680182f65c627a3880b9c7989d6c5d56035`
+
+## IS2.0 Exactness corrections (commit `757a968`) `[Fact]`
+
+Commit **`757a9680182f65c627a3880b9c7989d6c5d56035`** — *"Tighten DEC-031 runtime
+validation proofs"* — 3 files, +72/−13, **no production logic change**:
+
+- `shopify_connector_job_dispatch.py` — **comments/docstrings only** (5 stale
+  locations). Reworded `run_drain`/`_drain_one` docstrings, the `_drain_one`
+  except-block comment, the `_recover_after_concurrency_conflict` docstring point
+  4, and the `_invoke_handler` re-raise comment so they no longer imply that every
+  concurrency recovery routes to `concurrency_race_conflict` or that every
+  recovered job auto-retries. Accurate wording now states: the recovery call
+  itself never re-invokes the handler; `local_only`/`remote_read_replay_safe` jobs
+  may be scheduled for a later **bounded** retry; `remote_effect_not_replay_safe`
+  and undeclared jobs route to **manual review**; routing is **policy-gated**; **no
+  exactly-once claim** is made. `git diff` confirms every changed line is inside a
+  docstring or `#` comment — no executable line touched.
+- `test_product_import_matching.py` / `test_customer_import_matching.py` —
+  **test-strengthening only**. Retained the explicit `product_import_sync` /
+  `customer_import_sync → remote_read_replay_safe` assertions and added
+  `test_installed_scope_every_handler_has_replay_policy`, asserting in each
+  installed scope that `set(_get_handlers()) - set(_get_replay_policies()) == ∅`
+  with a failure message listing any missing handler keys. No generic registry
+  framework; no production-mapping change.
+
+Pushed via `odoosh-push` (`4b45d35..757a968`, no force). `odoo-bin` executes the
+working tree, which is **byte-identical to `757a968`** (`git diff --quiet 757a968`
+= clean); Odoo.sh holds the dev rebuild webhook in-session, so the platform build
+number (`34935129`) was provisioned from `4b45d35` while the **code under test is
+exactly `757a968`**.
+
+## IS2.1 Install / upgrade — exact head `757a968` `[Fact]`
+
+This build's DB was **empty (0 tables, no demo)**; validated by a **fresh exact-head
+install** `odoo-bin -i shopify_connector_core,shopify_connector_product,shopify_connector_sale`:
+registry loaded in 32.3 s, **exit 0**, all three modules `installed`
+(`core 19.0.1.7.2`, `product 19.0.2.0.0`, `sale 19.0.1.0.0`). **Zero**
+registry / module-load / Python-import / selection / constraint / XML / data /
+security errors; **zero** migration requirement; **zero** shopify warnings. The
+only log "error" substring is a standard-Odoo **`mail`** module docutils RST
+render notice (`<string>:38 Unexpected indentation`, module 22/43) — unrelated,
+not absorbed.
+
+## IS2.2 Focused Layer 1 results (all green) `[Fact]`
+
+Command form: `odoo-bin -u <module> --test-enable --test-tags '/<module>:<Class>.<method>' --stop-after-init --no-http`.
+
+| Scope | Method / mapping | Result |
+| --- | --- | --- |
+| CORE `TestJobDispatch` | `core_dispatch_selftest → local_only` | ✅ |
+| CORE `TestJobDispatch` | unexpected job type → `remote_effect_not_replay_safe` | ✅ |
+| CORE `TestJobDispatch` | handler-policy completeness (`_get_handlers − _get_replay_policies = ∅`) | ✅ |
+| CORE `TestJobDispatch` | synthetic missing-handler completeness proof (non-vacuous) | ✅ |
+| CORE `TestJobDispatch` | read-safe retry eligibility (`local_only ∈ REPLAY_SAFE_RETRY_POLICIES`) | ✅ |
+| CORE `TestJobDispatch` | existing missing-handler safe failure → `failed_final`/`unknown_system_error` | ✅ |
+| PRODUCT `TestProductImportMatching` | `product_import_sync → remote_read_replay_safe` | ✅ |
+| PRODUCT `TestProductImportMatching` | **installed-scope** handler-policy completeness (new) | ✅ |
+| CUSTOMER `TestCustomerImportMatching` | `customer_import_sync → remote_read_replay_safe` | ✅ |
+| CUSTOMER `TestCustomerImportMatching` | **installed-scope** handler-policy completeness (new) | ✅ |
+
+CORE focused: `0 failed, 0 error(s) of 6 tests`. PRODUCT+CUSTOMER focused:
+`0 failed, 0 error(s) of 4 tests`.
+
+## IS2.3 Genuine concurrency proof — each ×3 on exact head `757a968` `[Fact]`
+
+`odoo-bin -u shopify_connector_core --test-enable --test-tags '/shopify_connector_core:TestDrainOwnershipReplayGenuine.<method>'`, three separate processes.
+Every 40001 is a **REAL PostgreSQL serialization failure** (benign committed
+store-row `write_date` bump on a **distinct backend PID** vs the real
+`_lock_store_for_lifecycle FOR NO KEY UPDATE`), on genuine bounded `db_connect`
+cursors at REPEATABLE READ — never an injected Python exception. Runtime log shows
+`ERROR: could not serialize access due to concurrent update` + dispatcher INFO
+`Job N hit a PostgreSQL concurrency failure (SQLSTATE 40001) … the handler is not
+replayed` for each attempt.
+
+1. **Read-safe recovery** `test_b_still_connected_post_transport_serialization_routes_once`
+   — green ×3 (jobs 2/4/6). Asserted: genuine SQLSTATE 40001; distinct backend PID;
+   **exactly one transport** (handler not replayed); job → **`retry_waiting`**;
+   **`retry_count == 1`** (one bounded increment); store stays `connected`; **lease
+   count 0**; no raw `SerializationFailure`/`InFailedSqlTransaction` as the result.
+2. **Conservative replay-policy recovery** `test_conservative_replay_policy_routes_to_blocked_manual_review_not_retry`
+   — green ×3 (jobs 3/5/7). Same genuine 40001 + distinct PID + **exactly one
+   transport**; recovery **does not re-invoke the handler**; final job state
+   **`blocked_manual_review`**, `error_class` **`duplicate_risk`**,
+   `manual_review_subreason` **`duplicate_risk`**; **never `retry_waiting`**; **lease
+   count 0**. Each run: `0 failed, 0 error(s) of 2 tests`.
+
+## IS2.4 Standard suites + lifecycle/ownership ×3 `[Fact]`
+
+| Group | Command | Result |
+| --- | --- | --- |
+| Complete standard **core** suite | `-u shopify_connector_core --test-enable` | `0 failed, 6 error of 486` — the 6 = the known `notification_type` `res.users` `setUpClass` artifact (RR-F / issue #157); all other 480 green |
+| Complete standard **product** suite | `-u shopify_connector_product --test-enable` | `0 failed, 0 error of 176` |
+| Complete standard **sale/customer** suite | `-u shopify_connector_sale --test-enable` | `0 failed, 0 error of 95` |
+| **Product lifecycle** `TestProductCallSiteLifecycleGenuine` ×3 | tag `shopify_connector_product_callsite_lifecycle` | `0 failed, 0 error of 4` (runs 1/2/3) |
+| **Customer lifecycle** (LeaseVisibility + RaceA + RaceB Genuine) ×3 | tag `shopify_connector_customer_callsite_lifecycle` | `0 failed, 0 error of 6` (runs 1/2/3) |
+| **PR #163 ownership/concurrency** `TestDrainOwnershipReplayGenuine` ×3 | `:TestDrainOwnershipReplayGenuine` | `0 failed, 0 error of 6` (runs 1/2/3; **6 genuine SQLSTATE-40001 recoveries logged each run**) |
+
+Test-count deltas vs the prior build (34923103: core 476 / product 174 / sale 93)
+reconcile exactly: +10 core = the DEC-031 Layer 1 tests added at `4b45d35`; +2
+product / +2 sale = the declared-policy test (`4b45d35`) + this session's
+installed-scope completeness test (`757a968`). **All Layer 1 and PR #163-owned
+tests are green.**
+
+## IS2.5 `notification_type` artifact classification `[Fact — unrelated pre-existing]`
+
+The 6 core-suite errors are `setUpClass` failures — creating a test user **before
+any test logic runs** — in six classes this session never touches
+(`test_connection_lifecycle`, `test_credential_access`, `test_credential_service`,
+`test_job_log_system_append`, `test_readiness_slot_closure`, `test_test_connection`),
+each raising `null value in column "notification_type" of relation "res_users"
+violates not-null constraint`. Root cause proven this session: standard Odoo 19
+`res.users.notification_type` is a **stored computed** field (`mail`,
+`_compute_notification_type`, `required=True`, **no plain default**) that only
+*transitions* an existing value by `mail.group_mail_notification_type_inbox`
+membership; a test user created with `group_ids:[(6,0,[shopify group])]` under a
+**no-demo** build joins no inbox-notification group (verified:
+`base.group_user` does **not** imply it here), so the column lands NULL. This is
+the base-environment artifact RR-F / issue #157 ("six core `setUpClass` errors
+expected to reproduce identically") — independent of the dispatch change (touches
+neither `res.users` nor these classes; the DEC-031 `TestJobDispatch` class, which
+creates only a store, passes). All 6 are the identical artifact (12 log lines, no
+other exception type); **zero assertion failures**. Not absorbed into PR #163; not
+fixed (the six classes are outside this session's authorized files).
+
+## IS2.6 Independent zero-residue / leak audit `[Fact]`
+
+Fresh-connection SQL audit after the full matrix: connector **jobs 0, job logs 0,
+call leases 0, stores 0, credentials 0, store settings 0, customer bindings 0,
+product template bindings 0, product variant bindings 0**; test-pattern
+partners 0; test product templates 0. Non-test standard rows left intact
+(ownership-scoped cleanup): 8 `product_attribute` = standard `product_barcodelookup`
+xmlids; 18 `ir_cron_trigger` = standard *Base: Auto-vacuum internal data* (**0
+shopify-owned trigger delta**); 29 `ir_attachment` = standard install assets (**0
+shopify-model, 0 test-named**). Sessions: **1 active (this webshell psql), 0
+idle-in-transaction, 0 leaked odoo backend cursors**; **0 leaked odoo processes**
+(all `--stop-after-init` runs exited). No pre-existing row deleted.
+
+## IS2.7 Security / transport audit `[Fact]`
+
+Across all captured runtime logs and DB records: **no** access tokens (only the
+`shpat_DUMMYDUMMYDUMMY0000000000000000` synthetic sentinel appears), **no**
+Authorization / `X-Shopify-Access-Token` headers, **no** raw credentials, **no**
+GraphQL request bodies with sensitive values, **no** GraphQL mutation
+(`productUpdate`/`customerUpdate`/`productCreate`/…), **no** customer PII beyond
+synthetic `example.com`/`myshopify.com` fixtures, **no** image bytes, **no**
+connection strings, **no** sensitive `/tmp` path leaks. **No outbound HTTP** (all
+`_send` patched → no real network), **no live Shopify mutation, no real merchant
+data, no Task 012 execution, no outbound write to Shopify**.
+
+## IS2.8 Warnings / errors classification `[Fact]`
+
+| Item | Class |
+| --- | --- |
+| `mail` module docutils RST render notice (`Unexpected indentation`) at install | standard-Odoo cosmetic, **unrelated** |
+| 6 core `setUpClass` `notification_type` errors | **unrelated pre-existing** (RR-F / #157) |
+| Genuine `ERROR: could not serialize access due to concurrent update` (×N in genuine tests) | **expected** — the induced real 40001 the recovery path is proving |
+| Layer 1 / PR #163-owned test errors or failures | **none** |
+
+## IS2.9 Limitations `[Fact / Open]`
+
+1. **No GitHub API/`gh`/git-fetch** from this container (private repo → 404). PR
+   open/draft/unmerged flags and "no newer control-room review supersedes
+   `4702066051`" were **not live-verified**; every required SHA was verified against
+   remote-tracking refs captured at build provisioning and **all match** (head
+   `757a968` pre-commit `4b45d35`, integration `80a8bbb`, PR #150 `10d0034e`, PR
+   #151 `e4669aaf`, Shopify-connector `dd6ecb8f`); integration has not advanced
+   past `80a8bbb`, so #163 is unmerged.
+2. **Base→head genuine upgrade not performed** — this build shipped an empty
+   no-demo DB, so validation used a fresh exact-head install (not a
+   `4b45d35→757a968` migration). No schema/XML/data change exists between the two,
+   so no migration path is exercised or required.
+3. The `notification_type` artifact prevents 6 user-creating core classes from
+   running their bodies in this no-demo environment (see IS2.5) — pre-existing,
+   non-blocking for PR #163.
+
+## IS2.10 SRR-03 status + merge recommendation `[Fact / Recommendation]`
+
+- **SRR-03: OPEN (unchanged).** DEC-031 Layer 1 validation does not address, and
+  makes no claim about, the SRR-03 disconnect/in-flight-job checkpoint-3 race
+  closure criteria; none of those criteria are satisfied by this session.
+- **Recommendation:** DEC-031 Layer 1 (AR-048) and the existing PR #163 dispatch
+  ownership/replay correction are **fully green on exact head `757a968`** —
+  focused, genuine-concurrency ×3, lifecycle ×3, ownership ×3, and the complete
+  product/sale suites, with zero residue/leak and a clean security audit. **No
+  blocking defect owned by PR #163.** Route to **control-room runtime review**;
+  keep PR #163 **draft/unmerged**. Prompt E **BLOCKED**, Layer 2 **deferred**.
+
+## IS2.11 Governance `[Fact]`
+
+The **validated code SHA is `757a968`**; the docs-only evidence commit that records
+this section is made **after** runtime validation and is itself **not
+runtime-tested** (documentation-only, zero code change — it cannot alter the
+validated behaviour). **No live Shopify request. No merge. PR #163 kept draft. No
+Prompt E. Layer 2 deferred. SRR-03 remains OPEN. `Shopify-connector` / `main` /
+plain `dev` unchanged. PR #150 / #151 untouched.**

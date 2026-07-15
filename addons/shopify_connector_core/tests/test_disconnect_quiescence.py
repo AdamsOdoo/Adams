@@ -72,6 +72,7 @@ from ..models.shopify_connector_api_client import (
 from ..models.shopify_connector_job_dispatch import (
     DISCONNECT_QUIESCE_TIMEOUT,
     POLL_DELAY,
+    RETRY_MAX_ATTEMPTS,
 )
 from .test_api_client import FakeResponse, _success_body
 
@@ -3693,4 +3694,923 @@ class TestLifecycleServiceRetryGenuine(_GenuineRaceHelpers, TransactionCase):
             self.assertEqual(self._lease_count(dbname, store_id), 0)  # no lease
         finally:
             service_logger.setLevel(prior_level)
+            self._cleanup(dbname, store_id)
+
+    def test_scheduled_run_drain_serialization_retry_refuses_after_disconnect(self):
+        """Phase-5 companion proof, corrected for the ownership/replay model
+        (control-room review `4699752673`): the SAME genuine 40001-driven conflict
+        as ``test_repeatable_read_serialization_retry_...``, but through the REAL
+        SCHEDULED job-dispatch entrypoint ``run_drain`` -- now proving the NO-REPLAY
+        recovery contract rather than a ``retrying`` re-invocation.
+
+        A representative business handler admits + transports exactly once, then a
+        real post-network store-row revalidation (``_lock_store_for_lifecycle``,
+        ``FOR NO KEY UPDATE``) raises a genuine SQLSTATE 40001 once a concurrent
+        real ``action_disconnect`` has committed on an INDEPENDENT backend. The
+        dispatcher NEVER re-issues an ORM write inside the aborted transaction and
+        NEVER replays the handler: ``_drain_one`` catches the concurrency failure
+        at its per-job outer boundary, rolls back (the lease has already released
+        via the ``execute_business`` context exit), resets the environment,
+        REACQUIRES the exact job under a real ``FOR UPDATE SKIP LOCKED`` row lock,
+        revalidates it as still claimable (its rolled-back ``running`` write is
+        gone, so it is ``queued`` again), and routes it ONCE to the bounded
+        ``concurrency_race_conflict`` path -> ``retry_waiting`` -- with no second
+        transport. Only ``_send`` (the network seam) and the handler registry are
+        patched; ``run_drain`` / ``_dispatch_one`` / ``_invoke_handler`` /
+        ``_recover_after_concurrency_conflict`` / ``execute_business`` / ``_admit``
+        / ``_release_lease`` / ``action_disconnect`` are the REAL production code.
+        (Was a ``retrying``-boundary proof asserting the reset RE-INVOCATION was
+        gate-refused into ``failed_retryable``; the corrected dispatcher no longer
+        replays the handler at all -- runtime correction, review `4699752673`.)
+        """
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        pgcodes = []
+        disc_info = {}
+        try:
+            store_id, shop_domain, job_id = self._commit_connected_fixture(
+                dbname, with_job=True)
+            ClientCls = type(self.env['shopify.connector.api.client'])
+            DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+
+            def racing_send(client_self, s, body, token=None):
+                # Admission committed the lease + token snapshot; a REAL one-way
+                # disconnect now commits ONCE on an INDEPENDENT backend.
+                send_tokens.append(token)
+                if 'pid' not in disc_info:
+                    disc = self._open_bounded(dbname)
+                    try:
+                        denv = api.Environment(disc, SUPERUSER_ID, {})
+                        disc_info['pid'] = self._backend_pid(disc)
+                        denv['shopify.connector.store'].browse(
+                            store_id).action_disconnect()
+                        disc.commit()
+                    finally:
+                        disc.close()
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def racing_selftest(job):
+                # Representative business handler: REAL admission + transport, then
+                # a REAL post-network store-row revalidation that raises a genuine
+                # 40001 under REPEATABLE READ once the disconnect has committed. The
+                # pgcode is observed (never reclassified) then re-raised so the REAL
+                # dispatcher recovery -- not this handler -- decides.
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    try:
+                        job.store_id._lock_store_for_lifecycle()
+                    except psycopg2.OperationalError as exc:
+                        pgcodes.append(getattr(exc, 'pgcode', None))
+                        raise
+
+            drain_cr = self._open_bounded(dbname)      # production REPEATABLE READ
+            try:
+                drain_cr.execute("SHOW transaction_isolation")
+                self.assertEqual(
+                    drain_cr.fetchone()[0], 'repeatable read',
+                    'the drain cursor must run at the production isolation')
+                drain_pid = self._backend_pid(drain_cr)
+                drain_env = api.Environment(drain_cr, SUPERUSER_ID, {})
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)), \
+                     patch.object(ClientCls, '_send', racing_send), \
+                     patch.object(
+                         DispatchCls, '_get_handlers',
+                         lambda self: {
+                             'core_dispatch_selftest': racing_selftest}):
+                    drain_env[
+                        'shopify.connector.job.dispatch'].run_drain(1)
+            finally:
+                drain_cr.close()
+
+            # ---- one-transport + genuine-40001 + no-replay assertions ----
+            self.assertEqual(
+                len(send_tokens), 1,
+                'exactly one transport: the aborted attempt is never replayed')
+            self.assertEqual(send_tokens[0], DUMMY_TOKEN)
+            self.assertIn(
+                psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes,
+                'a genuine SQLSTATE 40001 must have aborted the dispatch; saw %s'
+                % pgcodes)
+            self.assertIn('pid', disc_info)
+            self.assertNotEqual(
+                disc_info['pid'], drain_pid,
+                'the disconnect committed on a distinct backend PID')
+            # Aborted attempt released its lease; store superseded; credential
+            # retained (the controller finalizes later); job re-locked and routed
+            # ONCE to the bounded conflict retry state, never replayed or left raw.
+            self.assertEqual(self._lease_count(dbname, store_id), 0)
+            state, _gen, _ltc, _clv, cred_present = self._observe_store(
+                dbname, store_id)
+            self.assertEqual(state, 'disconnecting')
+            self.assertTrue(cred_present)
+            obs_job = self._open_bounded(dbname)
+            try:
+                obs_job.execute(
+                    "SELECT state FROM shopify_connector_job WHERE id = %s",
+                    (job_id,))
+                job_state = obs_job.fetchone()[0]
+                obs_job.rollback()
+            finally:
+                obs_job.close()
+            self.assertEqual(
+                job_state, 'retry_waiting',
+                'the superseded job must be re-locked and routed once to the '
+                'bounded conflict retry state, never replayed or left raw; saw %s'
+                % job_state)
+        finally:
+            self._cleanup(dbname, store_id)
+
+
+@tagged('post_install', '-at_install')
+class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
+    """Runtime correction (control-room review `4699752673`) -- GENUINE
+    independent-connection proofs of the corrected job-dispatch ownership/replay
+    model in ``shopify_connector_job_dispatch.py``.
+
+    The dispatcher no longer wraps the handler in ``odoo.service.model.retrying``
+    (which would auto-replay a complete handler after a Shopify transport and
+    re-drive a job by a bare id without reacquiring the row-lock claim the
+    rollback released). Instead ``_drain_one`` runs the handler once under a held
+    ``FOR UPDATE SKIP LOCKED`` claim and commits per job; a genuine PostgreSQL
+    concurrency failure is recovered by ``_recover_after_concurrency_conflict``:
+    roll back, reset, REACQUIRE the exact job under a real row lock, revalidate
+    claimability under the lock, and -- only if still safely owned -- route it
+    ONCE to the bounded ``concurrency_race_conflict`` path, never replaying the
+    handler.
+
+    All connections are genuine pooled ``db_connect`` cursors (REPEATABLE READ,
+    bounded by statement/lock timeouts, distinct backend PIDs); every 40001 is a
+    REAL PostgreSQL serialization failure (never an injected exception), driven
+    by a concurrently-committed benign store-row UPDATE (``write_date`` only --
+    the store stays ``connected`` and admission still passes) conflicting with
+    the real ``_lock_store_for_lifecycle`` ``FOR NO KEY UPDATE``. Only ``_send``
+    and the handler registry (plus, for the reclaim-window proofs, a park barrier
+    wrapping the REAL ``_route_failure`` / ``try_lock_for_update`` -- never their
+    logic) are patched; the whole claim/dispatch/recovery path is REAL production
+    code. Raw SQL only commits fixtures, induces the benign conflict, observes,
+    and cleans up (fresh zero-residue check)."""
+
+    # ------------------------------------------------------------------
+    # Fixtures / observers (genuine, bounded, independent connections)
+    # ------------------------------------------------------------------
+
+    def _commit_store_with_jobs(self, dbname, n_jobs=1, retry_counts=None):
+        """Commit a connected store + credential + ``n_jobs`` business
+        (``manual_sync`` / ``core_dispatch_selftest``) jobs on an independent
+        bounded connection. Optionally seed each job's ``retry_count`` (raw SQL)
+        so the bounded-retry exhaustion boundary can be exercised. Returns
+        ``(store_id, shop_domain, [job_id, ...])`` with ids ascending == claim
+        order."""
+        setup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(setup, SUPERUSER_ID, {})
+            shop_domain = 'genuine-drain-%s.myshopify.com' % uuid.uuid4().hex
+            store = env['shopify.connector.store'].create({
+                'name': 'Genuine Drain Ownership Store',
+                'shop_domain': shop_domain,
+                'api_version': '2026-07',
+                'state': 'connected',
+            })
+            env['shopify.connector.store.credential'].action_set_token(
+                store, DUMMY_TOKEN)
+            # action_set_token demotes connected -> reconnect_needed; re-assert.
+            store.write({'state': 'connected'})
+            job_ids = []
+            for _n in range(n_jobs):
+                job = env['shopify.connector.job.enqueue'].enqueue(
+                    store, 'manual_sync', 'core_dispatch_selftest',
+                    payload_hash=uuid.uuid4().hex,
+                )
+                job_ids.append(job.id)
+            store_id = store.id
+            setup.commit()
+            if retry_counts:
+                seed = self._open_bounded(dbname)
+                try:
+                    for jid, rc in zip(job_ids, retry_counts):
+                        seed.execute(
+                            "UPDATE shopify_connector_job SET retry_count = %s "
+                            "WHERE id = %s", (rc, jid))
+                    seed.commit()
+                finally:
+                    seed.close()
+            return store_id, shop_domain, job_ids
+        finally:
+            setup.close()
+
+    def _commit_benign_store_bump(self, dbname, store_id, info=None):
+        """Commit a benign store-row UPDATE (``write_date`` only -- ``state`` and
+        ``connection_generation`` untouched, so the store stays ``connected`` and
+        admission still passes) on an INDEPENDENT backend. Under REPEATABLE READ
+        this makes the drain's later ``_lock_store_for_lifecycle`` ``FOR NO KEY
+        UPDATE`` raise a genuine 40001. Records the committing backend PID."""
+        c = self._open_bounded(dbname)
+        try:
+            pid = self._backend_pid(c)
+            c.execute(
+                "UPDATE shopify_connector_store SET write_date = now() "
+                "WHERE id = %s", (store_id,))
+            c.commit()
+            if info is not None:
+                info['pid'] = pid
+            return pid
+        finally:
+            c.close()
+
+    def _observe_job(self, dbname, job_id):
+        """(state, retry_count) for a job, read + rolled back on a fresh
+        connection."""
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT state, retry_count FROM shopify_connector_job "
+                "WHERE id = %s", (job_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return row
+        finally:
+            obs.close()
+
+    # ------------------------------------------------------------------
+    # Test B -- still-connected post-transport serialization failure
+    # ------------------------------------------------------------------
+
+    def test_b_still_connected_post_transport_serialization_routes_once(self):
+        """Test B -- a genuine post-transport 40001 while the store stays
+        CONNECTED (no disconnect). Proves exactly one transport, the complete
+        handler is NOT automatically replayed, the job is routed once through the
+        accepted ``concurrency_race_conflict`` state contract under a reacquired
+        lock, and no raw SerializationFailure / InFailedSqlTransaction becomes the
+        final result. This is the companion the disconnect-only proof lacked."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        pgcodes = []
+        conflict = {}
+        try:
+            store_id, shop_domain, job_ids = self._commit_store_with_jobs(dbname)
+            job_id = job_ids[0]
+            ClientCls = type(self.env['shopify.connector.api.client'])
+            DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+
+            def ok_send(client_self, s, body, token=None):
+                # One transport; then commit a benign store bump on an independent
+                # backend so the post-network revalidation serializes-fails while
+                # the store REMAINS connected.
+                send_tokens.append(token)
+                if 'pid' not in conflict:
+                    self._commit_benign_store_bump(dbname, store_id, conflict)
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def conflicting_selftest(job):
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    try:
+                        job.store_id._lock_store_for_lifecycle()
+                    except psycopg2.OperationalError as exc:
+                        pgcodes.append(getattr(exc, 'pgcode', None))
+                        raise
+
+            drain_cr = self._open_bounded(dbname)
+            try:
+                drain_cr.execute("SHOW transaction_isolation")
+                self.assertEqual(drain_cr.fetchone()[0], 'repeatable read')
+                drain_pid = self._backend_pid(drain_cr)
+                drain_env = api.Environment(drain_cr, SUPERUSER_ID, {})
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)), \
+                     patch.object(ClientCls, '_send', ok_send), \
+                     patch.object(
+                         DispatchCls, '_get_handlers',
+                         lambda self: {
+                             'core_dispatch_selftest': conflicting_selftest}):
+                    drain_env['shopify.connector.job.dispatch'].run_drain(1)
+            finally:
+                drain_cr.close()
+
+            self.assertEqual(
+                len(send_tokens), 1,
+                'exactly one transport; the handler is not replayed')
+            self.assertEqual(send_tokens[0], DUMMY_TOKEN)
+            self.assertIn(
+                psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes,
+                'a genuine SQLSTATE 40001 must have aborted the dispatch; saw %s'
+                % pgcodes)
+            self.assertIn('pid', conflict)
+            self.assertNotEqual(
+                conflict['pid'], drain_pid,
+                'the conflicting bump committed on a distinct backend')
+            # The store stayed connected the whole time (no disconnect involved).
+            state, _gen, _ltc, _clv, cred_present = self._observe_store(
+                dbname, store_id)
+            self.assertEqual(
+                state, 'connected', 'Test B keeps the store connected throughout')
+            self.assertTrue(cred_present)
+            # Routed ONCE to the bounded conflict retry state -- not a raw error,
+            # not a replay -- under the reacquired lock.
+            job_state, retry_count = self._observe_job(dbname, job_id)
+            self.assertEqual(
+                job_state, 'retry_waiting',
+                'the still-connected conflicted job must route once to the '
+                'accepted concurrency-conflict retry state; saw %s' % job_state)
+            self.assertEqual(
+                retry_count, 1, 'exactly one bounded-retry increment recorded')
+            self.assertEqual(
+                self._lease_count(dbname, store_id), 0,
+                'the aborted attempt released its lease')
+        finally:
+            self._cleanup(dbname, store_id)
+
+    # ------------------------------------------------------------------
+    # DEC-031 Layer 1 (AR-048) -- fail-closed replay-policy recovery routing.
+    # ------------------------------------------------------------------
+
+    def test_conservative_replay_policy_routes_to_blocked_manual_review_not_retry(
+            self):
+        """The SAME genuine post-transport 40001 as Test B, but with a
+        SYNTHETIC replay-policy override forcing `core_dispatch_selftest` to
+        the conservative `remote_effect_not_replay_safe` class (never its
+        real, accepted `local_only` policy -- this proves the routing
+        branch only, not a real production classification change, and
+        introduces no Shopify-mutation handler). `_recover_after_
+        concurrency_conflict` still rolls back, resets, REACQUIRES the exact
+        job under a real row lock, and revalidates claimability exactly as
+        Test B does; but because the declared policy is not one of the
+        read-safe retry classes, it routes to `blocked_manual_review` /
+        `duplicate_risk` instead of the bounded `concurrency_race_conflict`
+        auto-retry path -- no automatic retry, never `retry_waiting`, and
+        the handler is never invoked a second time (exactly one transport,
+        same as Test B)."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        pgcodes = []
+        conflict = {}
+        try:
+            store_id, shop_domain, job_ids = self._commit_store_with_jobs(dbname)
+            job_id = job_ids[0]
+            ClientCls = type(self.env['shopify.connector.api.client'])
+            DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+
+            def ok_send(client_self, s, body, token=None):
+                send_tokens.append(token)
+                if 'pid' not in conflict:
+                    self._commit_benign_store_bump(dbname, store_id, conflict)
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def conflicting_selftest(job):
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    try:
+                        job.store_id._lock_store_for_lifecycle()
+                    except psycopg2.OperationalError as exc:
+                        pgcodes.append(getattr(exc, 'pgcode', None))
+                        raise
+
+            def conservative_only_policy(self):
+                # Synthetic override only -- never the real accepted core
+                # mapping (`local_only`) -- to exercise the conservative
+                # recovery branch without a real Shopify-mutation handler.
+                return {
+                    'core_dispatch_selftest': 'remote_effect_not_replay_safe',
+                }
+
+            drain_cr = self._open_bounded(dbname)
+            try:
+                drain_cr.execute("SHOW transaction_isolation")
+                self.assertEqual(drain_cr.fetchone()[0], 'repeatable read')
+                drain_pid = self._backend_pid(drain_cr)
+                drain_env = api.Environment(drain_cr, SUPERUSER_ID, {})
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)), \
+                     patch.object(ClientCls, '_send', ok_send), \
+                     patch.object(
+                         DispatchCls, '_get_handlers',
+                         lambda self: {
+                             'core_dispatch_selftest': conflicting_selftest}), \
+                     patch.object(
+                         DispatchCls, '_get_replay_policies',
+                         conservative_only_policy):
+                    drain_env['shopify.connector.job.dispatch'].run_drain(1)
+            finally:
+                drain_cr.close()
+
+            self.assertEqual(
+                len(send_tokens), 1,
+                'exactly one transport; the handler is never replayed, even '
+                'on the conservative recovery path')
+            self.assertEqual(send_tokens[0], DUMMY_TOKEN)
+            self.assertIn(
+                psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes,
+                'a genuine SQLSTATE 40001 must have aborted the dispatch; saw %s'
+                % pgcodes)
+            self.assertIn('pid', conflict)
+            self.assertNotEqual(
+                conflict['pid'], drain_pid,
+                'the conflicting bump committed on a distinct backend')
+            state, _gen, _ltc, _clv, cred_present = self._observe_store(
+                dbname, store_id)
+            self.assertEqual(
+                state, 'connected',
+                'this scenario keeps the store connected throughout')
+            self.assertTrue(cred_present)
+            obs = self._open_bounded(dbname)
+            try:
+                obs.execute(
+                    "SELECT state, error_class, manual_review_subreason "
+                    "FROM shopify_connector_job WHERE id = %s", (job_id,))
+                job_state, error_class, manual_review_subreason = obs.fetchone()
+                obs.rollback()
+            finally:
+                obs.close()
+            self.assertEqual(
+                job_state, 'blocked_manual_review',
+                'a policy not declared replay-safe must never reach the '
+                'auto-retry concurrency_race_conflict path; saw %s'
+                % job_state)
+            self.assertEqual(error_class, 'duplicate_risk')
+            self.assertEqual(manual_review_subreason, 'duplicate_risk')
+            self.assertEqual(
+                self._lease_count(dbname, store_id), 0,
+                'the aborted attempt released its lease')
+        finally:
+            self._cleanup(dbname, store_id)
+
+    # ------------------------------------------------------------------
+    # Test A -- post-rollback reclaim race (SKIP-LOCKED mutual exclusion)
+    # ------------------------------------------------------------------
+
+    def test_a_rollback_reclaim_race_one_owner_one_transport(self):
+        """Test A -- the post-rollback reclaim race. Worker A transports once,
+        hits a genuine 40001, rolls back (losing its claim), and reacquires the
+        exact job under a real ``FOR UPDATE`` lock; while A holds that reacquired
+        lock, Worker B's genuine ``_claim_for_dispatch`` is SKIP-LOCKED out and
+        obtains NOTHING -- no dispatch, no state transition. Exactly one worker
+        owns the post-rollback claim; total transport stays exactly one; the job
+        reaches one deterministic safe state; no lease / partial data remains."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        pgcodes = []
+        conflict = {}
+        result = {}
+        diagnostics = queue.Queue()
+        a_holds_lock = threading.Semaphore(0)
+        b_done = threading.Event()
+        registry_cls = type(self.registry)
+        ClientCls = type(self.env['shopify.connector.api.client'])
+        DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+        real_route_failure = DispatchCls._route_failure
+        worker_a = worker_b = None
+        try:
+            store_id, shop_domain, job_ids = self._commit_store_with_jobs(dbname)
+            job_id = job_ids[0]
+
+            def ok_send(client_self, s, body, token=None):
+                send_tokens.append(token)
+                if 'pid' not in conflict:
+                    self._commit_benign_store_bump(dbname, store_id, conflict)
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def conflicting_selftest(job):
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    try:
+                        job.store_id._lock_store_for_lifecycle()
+                    except psycopg2.OperationalError as exc:
+                        pgcodes.append(getattr(exc, 'pgcode', None))
+                        raise
+
+            def parking_route_failure(disp_self, job, error_class, reason,
+                                      technical_detail=False):
+                # Worker A reaches this ONLY from its recovery, AFTER it has
+                # reacquired the exact job under FOR UPDATE. Park here (holding
+                # that lock) so Worker B genuinely races the claim while A owns it,
+                # then delegate to the REAL routing unchanged.
+                if getattr(threading.current_thread(), 'is_worker_a', False):
+                    a_holds_lock.release()
+                    if not b_done.wait(timeout=self.BOUND_SECONDS):
+                        raise AssertionError('b_done not set within bound')
+                return real_route_failure(
+                    disp_self, job, error_class, reason, technical_detail)
+
+            def worker_a_fn():
+                acr = None
+                try:
+                    th = threading.current_thread()
+                    th.is_worker_a = True
+                    th.dbname = dbname
+                    acr = self._open_bounded(dbname)
+                    result['a_pid'] = self._backend_pid(acr)
+                    aenv = api.Environment(acr, SUPERUSER_ID, {})
+                    aenv['shopify.connector.job.dispatch'].run_drain(1)
+                    acr.commit()
+                except BaseException as exc:
+                    if acr is not None:
+                        try:
+                            acr.rollback()
+                        except Exception:
+                            pass
+                    diagnostics.put(self._sanitize(exc, 'worker_a'))
+                finally:
+                    if acr is not None:
+                        try:
+                            acr.close()
+                        except Exception:
+                            pass
+
+            def worker_b_fn():
+                bcr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    bcr = self._open_bounded(dbname)
+                    result['b_pid'] = self._backend_pid(bcr)
+                    benv = api.Environment(bcr, SUPERUSER_ID, {})
+                    # A genuine competing claim, WHILE A holds the reacquired lock.
+                    claimed = benv['shopify.connector.job']._claim_for_dispatch(1)
+                    result['b_claimed_ids'] = list(claimed.ids)
+                    bcr.rollback()
+                except BaseException as exc:
+                    if bcr is not None:
+                        try:
+                            bcr.rollback()
+                        except Exception:
+                            pass
+                    diagnostics.put(self._sanitize(exc, 'worker_b'))
+                finally:
+                    b_done.set()
+                    if bcr is not None:
+                        try:
+                            bcr.close()
+                        except Exception:
+                            pass
+
+            a_parked = False
+            with patch.object(registry_cls, '_lock', threading.RLock()), \
+                    patch.object(self.registry, 'cursor',
+                                 self._real_registry_cursor(dbname)), \
+                    patch.object(ClientCls, '_send', ok_send), \
+                    patch.object(DispatchCls, '_route_failure',
+                                 parking_route_failure), \
+                    patch.object(
+                        DispatchCls, '_get_handlers',
+                        lambda self: {
+                            'core_dispatch_selftest': conflicting_selftest}):
+                worker_a = threading.Thread(target=worker_a_fn, daemon=True)
+                worker_a.start()
+                a_parked = a_holds_lock.acquire(timeout=self.BOUND_SECONDS)
+                if a_parked:
+                    worker_b = threading.Thread(target=worker_b_fn, daemon=True)
+                    worker_b.start()
+                    worker_b.join(timeout=self.BOUND_SECONDS)
+                b_done.set()   # release A regardless (defensive)
+                worker_a.join(timeout=self.BOUND_SECONDS)
+                self._assert_workers_dead((worker_a, worker_b))
+
+            findings = self._drain(diagnostics)
+            self.assertEqual(findings, [], 'worker findings: %s' % findings)
+            self.assertTrue(
+                a_parked, 'Worker A never reacquired the lock + parked in bound')
+            # Worker B genuinely raced the claim while A held the reacquired lock
+            # and was SKIP-LOCKED out -- it obtained NOTHING (no dispatch).
+            self.assertEqual(
+                result.get('b_claimed_ids'), [],
+                'the losing worker must obtain no post-rollback claim; saw %s'
+                % result.get('b_claimed_ids'))
+            # Exactly one transport total (A once; B never dispatched).
+            self.assertEqual(
+                len(send_tokens), 1, 'total transport must remain exactly one')
+            self.assertIn(psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes)
+            self.assertIsNotNone(result.get('a_pid'))
+            self.assertIsNotNone(result.get('b_pid'))
+            self.assertNotEqual(
+                result['a_pid'], result['b_pid'],
+                'the two workers ran on genuinely distinct backends')
+            # The job reaches one deterministic safe state (A's single route).
+            job_state, _rc = self._observe_job(dbname, job_id)
+            self.assertEqual(
+                job_state, 'retry_waiting',
+                'the job must reach one deterministic safe state; saw %s'
+                % job_state)
+            self.assertEqual(
+                self._lease_count(dbname, store_id), 0,
+                'no lease / partial business data remains')
+        finally:
+            b_done.set()
+            for t in (worker_a, worker_b):
+                if t is not None:
+                    t.join(timeout=self.BOUND_SECONDS)
+            self._cleanup(dbname, store_id)
+
+    # ------------------------------------------------------------------
+    # Test C -- retry/exhaustion + ownership refusal
+    # ------------------------------------------------------------------
+
+    def test_c_conflict_exhaustion_routes_to_failed_final_after_reacquire(self):
+        """Test C (exhaustion) -- when the bounded retry budget is already spent,
+        the conflict path, reached ONLY after reacquiring the exact job lock,
+        routes the job to the terminal ``failed_final`` state (not a raw error,
+        not a replay) and persists the exhausted attempt count."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        pgcodes = []
+        conflict = {}
+        try:
+            store_id, shop_domain, job_ids = self._commit_store_with_jobs(
+                dbname, retry_counts=[RETRY_MAX_ATTEMPTS])
+            job_id = job_ids[0]
+            ClientCls = type(self.env['shopify.connector.api.client'])
+            DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+
+            def ok_send(client_self, s, body, token=None):
+                send_tokens.append(token)
+                if 'pid' not in conflict:
+                    self._commit_benign_store_bump(dbname, store_id, conflict)
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def conflicting_selftest(job):
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    try:
+                        job.store_id._lock_store_for_lifecycle()
+                    except psycopg2.OperationalError as exc:
+                        pgcodes.append(getattr(exc, 'pgcode', None))
+                        raise
+
+            drain_cr = self._open_bounded(dbname)
+            try:
+                drain_env = api.Environment(drain_cr, SUPERUSER_ID, {})
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)), \
+                     patch.object(ClientCls, '_send', ok_send), \
+                     patch.object(
+                         DispatchCls, '_get_handlers',
+                         lambda self: {
+                             'core_dispatch_selftest': conflicting_selftest}):
+                    drain_env['shopify.connector.job.dispatch'].run_drain(1)
+            finally:
+                drain_cr.close()
+
+            self.assertEqual(len(send_tokens), 1, 'exactly one transport')
+            self.assertIn(psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes)
+            job_state, retry_count = self._observe_job(dbname, job_id)
+            self.assertEqual(
+                job_state, 'failed_final',
+                'an exhausted-budget conflict must route (under the reacquired '
+                'lock) to the terminal failed_final state; saw %s' % job_state)
+            self.assertEqual(
+                retry_count, RETRY_MAX_ATTEMPTS + 1,
+                'the exhausted attempt count is persisted')
+            self.assertEqual(self._lease_count(dbname, store_id), 0)
+        finally:
+            self._cleanup(dbname, store_id)
+
+    def test_c_recovery_refuses_to_overwrite_a_job_worker_b_completed(self):
+        """Test C (ownership) -- if, during A's reset window (after A rolled back,
+        before A reacquires), Worker B genuinely claims and COMPLETES the job, A's
+        recovery reacquires the exact row, sees a non-claimable (terminal) state
+        under the lock, and does NOTHING: B's outcome is never overwritten, no
+        duplicate transition is written, and A ends without error."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        pgcodes = []
+        conflict = {}
+        result = {}
+        diagnostics = queue.Queue()
+        a_at_reacquire = threading.Semaphore(0)
+        b_done = threading.Event()
+        registry_cls = type(self.registry)
+        ClientCls = type(self.env['shopify.connector.api.client'])
+        DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+        JobCls = type(self.env['shopify.connector.job'])
+        real_try_lock = JobCls.try_lock_for_update
+        worker_a = worker_b = None
+        try:
+            store_id, shop_domain, job_ids = self._commit_store_with_jobs(dbname)
+            job_id = job_ids[0]
+
+            def dual_send(client_self, s, body, token=None):
+                # Only Worker A transports (Worker B's handler is a clean no-op).
+                send_tokens.append(token)
+                threading.current_thread().transported = True
+                if getattr(threading.current_thread(), 'is_worker_a', False) \
+                        and 'pid' not in conflict:
+                    self._commit_benign_store_bump(dbname, store_id, conflict)
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def dual_selftest(job):
+                if getattr(threading.current_thread(), 'is_worker_a', False):
+                    Client = job.env['shopify.connector.api.client']
+                    with Client.execute_business(job, job.store_id, 'q'):
+                        try:
+                            job.store_id._lock_store_for_lifecycle()
+                        except psycopg2.OperationalError as exc:
+                            pgcodes.append(getattr(exc, 'pgcode', None))
+                            raise
+                # Worker B: clean success, NO transport, NO conflict.
+
+            def gated_try_lock(recs, *args, **kwargs):
+                th = threading.current_thread()
+                if getattr(th, 'park_reacquire', False) \
+                        and getattr(th, 'transported', False):
+                    th.transported = False   # park once (the recovery reacquire)
+                    a_at_reacquire.release()
+                    if not b_done.wait(timeout=self.BOUND_SECONDS):
+                        raise AssertionError('b_done not set within bound')
+                return real_try_lock(recs, *args, **kwargs)
+
+            def worker_a_fn():
+                acr = None
+                try:
+                    th = threading.current_thread()
+                    th.is_worker_a = True
+                    th.park_reacquire = True
+                    th.dbname = dbname
+                    acr = self._open_bounded(dbname)
+                    result['a_pid'] = self._backend_pid(acr)
+                    aenv = api.Environment(acr, SUPERUSER_ID, {})
+                    aenv['shopify.connector.job.dispatch'].run_drain(1)
+                    acr.commit()
+                except BaseException as exc:
+                    if acr is not None:
+                        try:
+                            acr.rollback()
+                        except Exception:
+                            pass
+                    diagnostics.put(self._sanitize(exc, 'worker_a'))
+                finally:
+                    if acr is not None:
+                        try:
+                            acr.close()
+                        except Exception:
+                            pass
+
+            def worker_b_fn():
+                bcr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    bcr = self._open_bounded(dbname)
+                    result['b_pid'] = self._backend_pid(bcr)
+                    benv = api.Environment(bcr, SUPERUSER_ID, {})
+                    benv['shopify.connector.job.dispatch'].run_drain(1)
+                    bcr.commit()
+                    result['b_ok'] = True
+                except BaseException as exc:
+                    if bcr is not None:
+                        try:
+                            bcr.rollback()
+                        except Exception:
+                            pass
+                    diagnostics.put(self._sanitize(exc, 'worker_b'))
+                finally:
+                    b_done.set()
+                    if bcr is not None:
+                        try:
+                            bcr.close()
+                        except Exception:
+                            pass
+
+            a_parked = False
+            with patch.object(registry_cls, '_lock', threading.RLock()), \
+                    patch.object(self.registry, 'cursor',
+                                 self._real_registry_cursor(dbname)), \
+                    patch.object(ClientCls, '_send', dual_send), \
+                    patch.object(JobCls, 'try_lock_for_update', gated_try_lock), \
+                    patch.object(
+                        DispatchCls, '_get_handlers',
+                        lambda self: {'core_dispatch_selftest': dual_selftest}):
+                worker_a = threading.Thread(target=worker_a_fn, daemon=True)
+                worker_a.start()
+                a_parked = a_at_reacquire.acquire(timeout=self.BOUND_SECONDS)
+                if a_parked:
+                    worker_b = threading.Thread(target=worker_b_fn, daemon=True)
+                    worker_b.start()
+                    worker_b.join(timeout=self.BOUND_SECONDS)
+                b_done.set()
+                worker_a.join(timeout=self.BOUND_SECONDS)
+                self._assert_workers_dead((worker_a, worker_b))
+
+            findings = self._drain(diagnostics)
+            self.assertEqual(findings, [], 'worker findings: %s' % findings)
+            self.assertTrue(
+                a_parked, 'Worker A never parked before its recovery reacquire')
+            self.assertTrue(result.get('b_ok'), 'Worker B did not complete')
+            # Worker B completed the job; Worker A did NOT overwrite it.
+            job_state, _rc = self._observe_job(dbname, job_id)
+            self.assertEqual(
+                job_state, 'succeeded',
+                "Worker B's completed job must not be overwritten by A's "
+                'recovery; saw %s' % job_state)
+            # Exactly one transport (A's; B's handler never transported).
+            self.assertEqual(
+                len(send_tokens), 1,
+                'only Worker A transported; B ran a clean no-op success')
+            self.assertIn(psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes)
+            self.assertIsNotNone(result.get('a_pid'))
+            self.assertIsNotNone(result.get('b_pid'))
+            self.assertNotEqual(result['a_pid'], result['b_pid'])
+            self.assertEqual(self._lease_count(dbname, store_id), 0)
+        finally:
+            b_done.set()
+            for t in (worker_a, worker_b):
+                if t is not None:
+                    t.join(timeout=self.BOUND_SECONDS)
+            self._cleanup(dbname, store_id)
+
+    # ------------------------------------------------------------------
+    # Test D -- batch integrity across a per-job-committed drain
+    # ------------------------------------------------------------------
+
+    def test_d_batch_integrity_neighbor_conflict_preserves_committed_jobs(self):
+        """Test D -- per-job commit integrity across a batch. Job 1 succeeds and
+        commits once; Job 2 hits a genuine 40001 and is routed once to the bounded
+        conflict state; Job 2's rollback cannot undo Job 1 (nor re-transport it),
+        and a later eligible Job 3 is still processed. Each job's handler runs
+        exactly once -- no replay anywhere in the batch."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        handler_jobs = []
+        pgcodes = []
+        conflict = {}
+        try:
+            store_id, shop_domain, job_ids = self._commit_store_with_jobs(
+                dbname, n_jobs=3)
+            job1, job2, job3 = job_ids   # id asc == claim order
+            ClientCls = type(self.env['shopify.connector.api.client'])
+            DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+
+            def ok_send(client_self, s, body, token=None):
+                send_tokens.append(token)
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def batch_selftest(job):
+                handler_jobs.append(job.id)   # one entry per handler invocation
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    if job.id == job2:
+                        # Only Job 2 conflicts. Its REPEATABLE READ snapshot began
+                        # at its OWN claim (Job 1 already committed), so the benign
+                        # bump + FOR NO KEY UPDATE aborts ONLY Job 2.
+                        if 'pid' not in conflict:
+                            self._commit_benign_store_bump(
+                                dbname, store_id, conflict)
+                        try:
+                            job.store_id._lock_store_for_lifecycle()
+                        except psycopg2.OperationalError as exc:
+                            pgcodes.append(getattr(exc, 'pgcode', None))
+                            raise
+
+            drain_cr = self._open_bounded(dbname)
+            try:
+                drain_pid = self._backend_pid(drain_cr)
+                drain_env = api.Environment(drain_cr, SUPERUSER_ID, {})
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)), \
+                     patch.object(ClientCls, '_send', ok_send), \
+                     patch.object(
+                         DispatchCls, '_get_handlers',
+                         lambda self: {
+                             'core_dispatch_selftest': batch_selftest}):
+                    drain_env['shopify.connector.job.dispatch'].run_drain(3)
+            finally:
+                drain_cr.close()
+
+            # Each job's handler ran exactly once, in claim order -- no replay.
+            self.assertEqual(
+                handler_jobs, [job1, job2, job3],
+                'each job handled once, in claim order, none replayed; saw %s'
+                % handler_jobs)
+            # One transport per job, three total -- Job 1 never re-transported by
+            # Job 2's rollback.
+            self.assertEqual(
+                len(send_tokens), 3, 'one transport per job; no job re-transported')
+            self.assertIn(psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes)
+            self.assertIn('pid', conflict)
+            self.assertNotEqual(conflict['pid'], drain_pid)
+            # Job 1 committed once and survived Job 2's rollback.
+            self.assertEqual(
+                self._observe_job(dbname, job1)[0], 'succeeded',
+                "Job 1's committed success must survive Job 2's rollback")
+            # Job 2 reached the selected safe conflict state.
+            self.assertEqual(
+                self._observe_job(dbname, job2)[0], 'retry_waiting',
+                'Job 2 must reach the bounded conflict retry state')
+            # A later eligible job was still processed after the conflict.
+            self.assertEqual(
+                self._observe_job(dbname, job3)[0], 'succeeded',
+                'a later eligible job must still be processed')
+            self.assertEqual(self._lease_count(dbname, store_id), 0)
+        finally:
             self._cleanup(dbname, store_id)

@@ -1,9 +1,12 @@
+import contextlib
+import logging
 import queue
 import threading
 import uuid
 from unittest.mock import patch
 
 from odoo import SUPERUSER_ID, api
+import odoo.service.model as service_model
 from odoo.exceptions import ValidationError
 from odoo.sql_db import db_connect
 from odoo.tests.common import TransactionCase, tagged
@@ -589,6 +592,35 @@ class TestProductImportMatching(TransactionCase):
         self.assertEqual(
             Job._domain_flag_for_job_type('product_import_sync'),
             'product_domain_enabled',
+        )
+
+    def test_product_import_sync_declared_remote_read_replay_safe(self):
+        """DEC-031 Layer 1 (AR-048): `product_import_sync` issues only a
+        Shopify read (see `PRODUCT_IMPORT_QUERY`) -- replaying it has no
+        Shopify-side effect, so the domain extension declares it
+        `remote_read_replay_safe`, never the conservative default."""
+        policies = self.Dispatch._get_replay_policies()
+        self.assertEqual(
+            policies.get('product_import_sync'), 'remote_read_replay_safe',
+        )
+
+    def test_installed_scope_every_handler_has_replay_policy(self):
+        """DEC-031 Layer 1 (AR-048) completeness invariant, proven in the
+        product-installed scope: every `job_type` the dispatcher can route
+        (`_get_handlers()`) -- including the `product_import_sync` handler
+        this module contributes -- has an explicit entry in
+        `_get_replay_policies()`. The fail-closed runtime lookup
+        (`_get_replay_policy`) still defaults any undeclared `job_type`
+        conservatively, but a handler this build actually registers must
+        never silently rely on that default. The set difference must be
+        empty; the failure message lists any missing handler keys."""
+        handlers = set(self.Dispatch._get_handlers())
+        policies = set(self.Dispatch._get_replay_policies())
+        missing = handlers - policies
+        self.assertEqual(
+            missing, set(),
+            'Every registered handler must declare an explicit replay '
+            'policy; handler keys with no replay policy: %s' % sorted(missing),
         )
 
     # ------------------------------------------------------------------
@@ -1996,6 +2028,133 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
         bounded and genuinely independent (accepts/ignores any args)."""
         return lambda *args, **kwargs: self._open_bounded(dbname)
 
+    # -- test-owned connector-cron trigger ownership (runtime finding #3) --
+    #
+    # `action_disconnect` and every quiescing controller pass schedule
+    # `ir_cron_trigger` rows on the connector's disconnect-quiesce cron (and the
+    # job path may schedule the drain cron). Those trigger rows carry no store_id,
+    # so ownership is established by a per-test BASELINE captured in setUp: cleanup
+    # deletes ONLY the ids that appeared after that snapshot (`current - baseline`)
+    # -- exactly the rows this test created -- never a pre-existing trigger, never
+    # a whole-cron wipe; `_assert_zero_residue` recomputes the same delta to prove
+    # none remain. (Mirrors the accepted customer `_CustomerGenuineHelpers`
+    # pattern; the earlier product tests had no such ownership, so their
+    # controller triggers accumulated across runs -- runtime finding #3.)
+
+    _CONNECTOR_CRON_XMLIDS = (
+        'shopify_connector_core.ir_cron_shopify_connector_disconnect_quiesce',
+        'shopify_connector_core.ir_cron_shopify_connector_job_dispatch_drain',
+    )
+
+    def setUp(self):
+        super().setUp()
+        # Snapshot the connector-cron trigger ids that exist BEFORE this test, so
+        # teardown deletes (and residue-checks) only the ids this test created.
+        self._connector_trigger_baseline = self._trigger_baseline(
+            self.env.cr.dbname)
+
+    def _connector_cron_ids(self, cr):
+        env = api.Environment(cr, SUPERUSER_ID, {})
+        ids = []
+        for xmlid in self._CONNECTOR_CRON_XMLIDS:
+            cron = env.ref(xmlid, raise_if_not_found=False)
+            if cron:
+                ids.append(cron.id)
+        return ids
+
+    def _trigger_baseline(self, dbname):
+        cr = self._open_bounded(dbname)
+        try:
+            cron_ids = self._connector_cron_ids(cr)
+            if not cron_ids:
+                cr.rollback()
+                return frozenset()
+            cr.execute(
+                "SELECT id FROM ir_cron_trigger WHERE cron_id = ANY(%s)",
+                (cron_ids,))
+            baseline = frozenset(row[0] for row in cr.fetchall())
+            cr.rollback()
+            return baseline
+        finally:
+            cr.close()
+
+    def _trigger_delta_ids(self, cr, baseline):
+        """`sorted(current - baseline)` connector-cron trigger ids on `cr` -- the
+        test-owned delta; by construction never a pre-existing/baseline id."""
+        cron_ids = self._connector_cron_ids(cr)
+        if not cron_ids:
+            return []
+        cr.execute(
+            "SELECT id FROM ir_cron_trigger WHERE cron_id = ANY(%s)", (cron_ids,))
+        current = frozenset(row[0] for row in cr.fetchall())
+        return sorted(current - baseline)
+
+    def _observe_job_state(self, dbname, job_id):
+        obs = self._open_bounded(dbname)
+        try:
+            obs.execute(
+                "SELECT state FROM shopify_connector_job WHERE id = %s", (job_id,))
+            row = obs.fetchone()
+            obs.rollback()
+            return row[0] if row else None
+        finally:
+            obs.close()
+
+    @staticmethod
+    @contextlib.contextmanager
+    def _instant_retry_backoff():
+        """Make the REAL `odoo.service.model.retrying` inter-try backoff instant
+        WITHOUT touching its retry decision or exception classification."""
+        patches = []
+        if hasattr(service_model, 'time') and hasattr(service_model.time, 'sleep'):
+            patches.append(patch.object(service_model.time, 'sleep',
+                                        lambda *a, **k: None))
+        if hasattr(service_model, 'random') and hasattr(
+                service_model.random, 'uniform'):
+            patches.append(patch.object(service_model.random, 'uniform',
+                                        lambda *a, **k: 0.0))
+        with contextlib.ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            yield
+
+    @contextlib.contextmanager
+    def _capture_service_retry(self):
+        """Capture the dispatcher's concurrency-recovery log (and the legacy
+        `odoo.service.model` retry log) so a genuine SQLSTATE 40001 -- never an
+        injected exception -- that drove the corrected no-replay recovery can be
+        evidenced. Process-global logging -- a record emitted from a worker
+        thread is captured too. (The dispatcher no longer wraps the handler in
+        `odoo.service.model.retrying`; the corrected per-job boundary logs the
+        SQLSTATE itself from `shopify_connector_job_dispatch` before rolling back
+        and reacquiring the job under a fresh row lock -- runtime correction,
+        review `4699752673`.)"""
+        records = []
+
+        class _Capture(logging.Handler):
+            def emit(self_handler, record):
+                try:
+                    records.append(record.getMessage())
+                except Exception:
+                    pass
+
+        handler = _Capture()
+        loggers = [logging.getLogger(name) for name in (
+            'odoo.addons.shopify_connector_core.models.'
+            'shopify_connector_job_dispatch',
+            'odoo.service.model',
+        )]
+        prior = [(lg, lg.level) for lg in loggers]
+        for lg in loggers:
+            lg.setLevel(logging.DEBUG)
+            lg.addHandler(handler)
+        try:
+            yield records
+        finally:
+            for lg, level in prior:
+                lg.removeHandler(handler)
+                lg.setLevel(level)
+
     def _sanitize(self, exc, phase):
         """Type-only, non-sensitive finding for a worker-thread failure (never
         str/repr, SQL, paths, credentials, payloads, or tokens)."""
@@ -2091,6 +2250,12 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             )
             # action_set_token demotes connected -> reconnect_needed; re-assert.
             store.write({'state': 'connected'})
+            # Enable the product domain flag so the REAL scheduled-dispatch start
+            # gate (`_domain_flag_for_job_type` -> `product_domain_enabled`) admits
+            # a `product_import_sync` job driven through run_drain. (The other
+            # genuine tests call the importer directly and bypass this gate.)
+            env['shopify.connector.store.settings'].create({
+                'store_id': store.id, 'product_domain_enabled': True})
             job = env['shopify.connector.job.enqueue'].enqueue(
                 store, 'manual_sync', 'product_import_sync',
                 payload_hash=uuid.uuid4().hex, shopify_target_gid=gid,
@@ -2222,6 +2387,16 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             ).exists():
                 if not PTAL.search_count([('attribute_id', '=', attribute.id)]):
                     attribute.unlink()
+            # 6b. Test-owned connector-cron triggers (the delta this test's
+            # action_disconnect / controller passes created) -- scoped by id, so a
+            # pre-existing trigger is never removed and a whole-cron wipe is never
+            # done. This closes the product-lifecycle cron-trigger residue
+            # (runtime finding #3).
+            delta_ids = self._trigger_delta_ids(
+                cr, getattr(self, '_connector_trigger_baseline', frozenset()))
+            if delta_ids:
+                cr.execute(
+                    "DELETE FROM ir_cron_trigger WHERE id = ANY(%s)", (delta_ids,))
             # 7. Connector rows (raw SQL; logs before jobs -- restrict FK).
             cr.execute(
                 "DELETE FROM shopify_connector_job_log WHERE job_id IN "
@@ -2232,6 +2407,9 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 (store_id,))
             cr.execute(
                 "DELETE FROM shopify_connector_job WHERE store_id = %s",
+                (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store_settings WHERE store_id = %s",
                 (store_id,))
             cr.execute(
                 "DELETE FROM shopify_connector_store_credential "
@@ -2251,6 +2429,7 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 ('shopify_connector_call_lease', 'lease residue'),
                 ('shopify_connector_store', 'store residue'),
                 ('shopify_connector_store_credential', 'credential residue'),
+                ('shopify_connector_store_settings', 'settings residue'),
                 ('shopify_connector_job', 'job residue'),
                 ('shopify_connector_job_log', 'job-log residue'),
                 ('shopify_connector_product_template_binding',
@@ -2283,6 +2462,12 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                         (list(ids),))
                     self.assertEqual(
                         v.fetchone()[0], 0, '%s after cleanup' % msg)
+            # No test-created connector-cron trigger delta may remain (every
+            # pre-existing/baseline trigger is untouched by construction).
+            self.assertEqual(
+                self._trigger_delta_ids(
+                    v, getattr(self, '_connector_trigger_baseline', frozenset())),
+                [], 'connector cron-trigger delta residue after cleanup')
             v.rollback()
         finally:
             v.close()
@@ -2554,7 +2739,27 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
     # action_disconnect; the controller defers finalization until release.
     # ==================================================================
 
-    def test_race_b_terminal_reconciliation_survives_concurrent_disconnect(self):
+    def test_race_b_terminal_reconciliation_retry_refuses_after_disconnect(self):
+        """Corrected M18 contract (runtime correction, review `4699752673`): the
+        terminal-page admission holds a lease and a concurrent real
+        ``action_disconnect`` returns without waiting; the controller does NOT
+        finalize while the lease is open (credential retained). On release the
+        reconciliation's binding write touches the store row the disconnect
+        committed and raises a genuine SQLSTATE 40001; the REAL scheduled
+        ``run_drain`` dispatcher catches it at its per-job boundary WITHOUT
+        replaying the handler -- it rolls back (the lease has already released via
+        the ``execute_business`` context exit), resets, REACQUIRES the exact job
+        under a real ``FOR UPDATE SKIP LOCKED`` row lock, and routes it ONCE to the
+        bounded ``concurrency_race_conflict`` -> ``retry_waiting`` state. A later
+        controller pass SWEEPS that (retry_waiting) business job to ``cancelled``
+        under the disconnect and finalizes the store. Net: exactly one transport,
+        ZERO binding from the aborted attempt, NO second transport (no replay), no
+        raw concurrency exception as the outcome, and the superseded job cancelled
+        by the disconnect (credential cleared only after the lease releases). (Was
+        a ``retrying``-boundary proof whose reset RE-INVOCATION was gate-refused
+        into ``failed_retryable``; the corrected dispatcher no longer replays the
+        handler and routes once under a reacquired lock, so the disconnect sweep
+        cancels the retry_waiting job -- runtime correction, review `4699752673`.)"""
         dbname = self.env.cr.dbname
         gid = 'gid://shopify/Product/GEN-M18'
         store_id = job_id = t = None
@@ -2579,9 +2784,10 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                                   requested_gid=requested_gid)
 
             def ok_send(client_self, store_arg, body, token=None):
-                # Race-specific token proof (terminal page): record the token
-                # so the test can assert the terminal admission carries the
-                # pre-disconnect credential snapshot.
+                # One entry per transport invocation (total across all attempts):
+                # proves the terminal admission carries the pre-disconnect
+                # credential snapshot AND that the refused retry adds no second
+                # transport.
                 tokens.append(token)
                 return _FakeSendResponse(self._page(
                     gid, [self._variant_node('%s/v/0' % gid, 'M18-0')],
@@ -2593,10 +2799,10 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                     threading.current_thread().dbname = dbname
                     wcr = self._open_bounded(dbname)
                     wenv = api.Environment(wcr, SUPERUSER_ID, {})
-                    store = wenv['shopify.connector.store'].browse(store_id)
-                    job = wenv['shopify.connector.job'].browse(job_id)
-                    wenv['shopify.connector.product.importer'].import_product_sync(
-                        store, gid, job=job)
+                    # Drive the REAL scheduled entrypoint so the production
+                    # concurrency-retry boundary applies end to end (claims this
+                    # job, dispatches it under odoo.service.model.retrying).
+                    wenv['shopify.connector.job.dispatch'].run_drain(1)
                     wcr.commit()
                 except BaseException as exc:
                     diagnostics.put(self._sanitize(exc, 'worker_body'))
@@ -2606,7 +2812,9 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             Client = self.env['shopify.connector.api.client']
             obs = {}
             got = False
-            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+            with self._capture_service_retry() as retry_log, \
+                    self._instant_retry_backoff(), \
+                    patch.object(type(self.registry), '_lock', threading.RLock()), \
                     patch.object(self.registry, 'cursor',
                                  self._real_registry_cursor(dbname)):
                 with patch.object(Importer_cls, '_apply_import', pausing_apply):
@@ -2645,9 +2853,13 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                         # finishing; the AUTHORITATIVE liveness check + cleanup
                         # run in finally so an assertion can never skip cleanup.
                         t.join(timeout=self.BOUND_SECONDS)
+            obs['retry_serialization_logged'] = any(
+                'serial' in m.lower() or '40001' in m for m in retry_log)
+            obs['retry_log_sample'] = list(retry_log)[:6]
             obs['after_release'] = self._committed_lease_rows(dbname, store_id)
-            # After the terminal reconciliation released its lease, a fresh
-            # controller pass finalizes `completed` and clears the credential.
+            # After the aborted terminal reconciliation released its lease, a
+            # fresh controller pass finalizes `completed` and clears the
+            # credential.
             fcr = self._open_bounded(dbname)
             try:
                 fenv = api.Environment(fcr, SUPERUSER_ID, {})
@@ -2657,6 +2869,7 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
                 fcr.close()
             obs['state_final'] = self._store_state(dbname, store_id)
             obs['cred_final'] = self._credential_present(dbname, store_id)
+            obs['job_state_final'] = self._observe_job_state(dbname, job_id)
 
             findings = self._drain(diagnostics)
             self.assertEqual(findings, [], 'worker findings: %s' % findings)
@@ -2667,11 +2880,27 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             self.assertEqual(len(obs['lease_after_ctrl']), 1)  # not reaped early
             self.assertEqual(obs['state_during'], 'disconnecting')  # deferred
             self.assertTrue(obs['cred_during'])             # credential remains
-            # Race-specific token proof: exactly one terminal transport,
-            # carrying the pre-disconnect credential snapshot.
+            # Exactly one terminal transport carrying the pre-disconnect snapshot;
+            # the refused retry adds none.
             self.assertEqual(tokens, [DUMMY_TOKEN])
-            self.assertEqual(len(obs['after_release']), 0)  # released after reconcile
-            self.assertEqual(self._binding_count(dbname, store_id), 2)  # completed
+            self.assertEqual(len(obs['after_release']), 0)  # released after 40001
+            # The aborted attempt bound nothing (retried-then-refused), a genuine
+            # 40001 drove the REAL retry boundary, and the job ended in a safe
+            # retryable state -- never a raw concurrency error.
+            self.assertEqual(
+                self._binding_count(dbname, store_id), 0,
+                'the superseded (retried-then-refused) attempt must leave no '
+                'binding')
+            self.assertTrue(
+                obs.get('retry_serialization_logged'),
+                'a genuine SQLSTATE 40001 must have driven the corrected '
+                'dispatcher concurrency-recovery boundary; recovery log sample: '
+                '%s' % obs.get('retry_log_sample'))
+            self.assertEqual(
+                obs.get('job_state_final'), 'cancelled',
+                'the superseded job must be routed once (no replay) to '
+                'retry_waiting and then cancelled by the disconnect sweep; saw %s'
+                % obs.get('job_state_final'))
             self.assertEqual(obs['state_final'], 'disconnected')  # finalized after
             self.assertFalse(obs['cred_final'])             # credential cleared then
         finally:

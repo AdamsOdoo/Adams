@@ -402,3 +402,45 @@ schema or data migration is introduced. Reverting restores the inherited Task
 011B `import_customer_sync` (legacy `execute()`), which remains intact below the
 call site. Ordered rollback (zero lease holders first) mirrors
 `task-core-r2-disconnect-quiescence-packet.md` §17 for any future live teardown.
+
+---
+
+## 12. Runtime CORRECTION (2026-07-14) — customer findings closed `[Fact]`
+
+Runtime-validated on Odoo.sh build **34912503** from staging `63d10fb` on branch
+`claude/core-r2-slice-2b-runtime-correction`. See
+`task-core-r2-validation-results.md` §RTC for the full record. Customer-specific:
+
+- **Finding #1 (disconnect-first PID proof invalid under pooled backend reuse):**
+  `test_race_a_disconnect_first_fails_closed_zero_transport` now holds the
+  committed-disconnect connection **open** while opening the worker connection, so
+  the two backend PIDs are distinct **by construction** (deterministic
+  `assertNotEqual`, not batch-size ≥2). Fail-closed + zero-residue preserved.
+- **Finding #2 (concurrent-disconnect reconciliation aborts under REPEATABLE
+  READ):** the customer M18 test drives the REAL scheduled `run_drain` and is
+  renamed `test_m18_lease_count_then_serialization_retry_refuses_after_disconnect`.
+  **`[Corrected 2026-07-15, review 4699752673 — supersedes the retrying /
+  failed_retryable wording]`** The dispatcher no longer wraps the handler in
+  `odoo.service.model.retrying` (which would REPLAY the complete handler after a
+  transport and re-drive the job by a bare id without reacquiring its claim). It
+  catches the genuine 40001 at its per-job outer boundary, rolls back, resets,
+  REACQUIRES the exact job under a real `FOR UPDATE SKIP LOCKED` row lock,
+  revalidates claimability under the lock, and routes it ONCE to
+  `concurrency_race_conflict` → `retry_waiting` WITHOUT replaying the handler. The
+  test proves: one transport with `DUMMY_TOKEN`, `open_lease_count=1`, a genuine
+  40001 evidenced from the **dispatcher concurrency-recovery log** (no longer the
+  service-retry log — `retrying` is not used by the drain), lease released,
+  **zero binding**; and — because a later controller pass sweeps the retry_waiting
+  business job under the disconnect — the superseded job ends **`cancelled`** (was
+  `failed_retryable` under the removed replay model), the controller finalizing +
+  clearing the credential only after release. No assertion weakened. See
+  `task-core-r2-validation-results.md` §RTC-2.
+- Production fix is the common **core** dispatcher retry boundary
+  (`shopify_connector_job_dispatch.py`), not per-domain logic.
+- **Runtime: customer callsite lifecycle tag `0 failed, 0 error(s) of 6`, three
+  consecutive green runs; zero residue (independently inspected).**
+- **No live Shopify call. SRR-03 remains OPEN. Prompt E remains BLOCKED. The
+  correction was pushed via `odoosh-push` to the build's bound branch
+  `claude/core-r2-slice-2b-integration` (a separate branch is not possible from
+  the dev container; no force-push); NOT promoted to `Shopify-connector`;
+  awaiting control-room review (see `task-core-r2-validation-results.md` §RTC.7).**

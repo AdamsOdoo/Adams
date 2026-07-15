@@ -155,6 +155,66 @@ only.
 
 ---
 
+## Runtime CORRECTION session (2026-07-15) — dispatch ownership/replay model (review `4699752673`)
+
+> **Status: code + test + doc correction session, runtime-validated on Odoo.sh.**
+> The implementation gate for the CORE-R2 dispatcher was already open (the drain
+> and its tests exist and are being corrected); this session's control-room prompt
+> authorised editing the allow-listed production/test/doc files. **No new module,
+> no Prompt E, no merge, no gate self-authorisation. SRR-03 remains OPEN.**
+
+**Model:** Opus 4.8 (1M). **Date:** 2026-07-15. **Author:** Claude. **Review/gate:** ChatGPT.
+
+- **PR / base / head.** PR #163 (draft), base
+  `claude/core-r2-slice-2b-integration` @ `63d10fb`, head branch
+  `claude/core-r2-slice-2b-runtime-correction-review` (was `677cb67`; advanced by
+  this session's single correction commit).
+- **Root cause (control-room, confirmed).** The `retrying`-wrapped drain replayed
+  the complete handler after a transport and re-drove/routed a job by a bare id
+  after a rollback had already released its `FOR UPDATE SKIP LOCKED` claim (a
+  transaction-scoped row lock, not a durable flag). See
+  `../05-qa/task-core-r2-validation-results.md` §RTC-2.1.
+- **Correction.** `shopify_connector_job_dispatch.py` drops `retrying`; `_drain_one`
+  runs the handler once under the held claim and commits per job; a genuine
+  40001/40P01/55P03 is recovered by `_recover_after_concurrency_conflict`
+  (rollback → reset → reacquire the exact job under a fresh `FOR UPDATE SKIP
+  LOCKED` lock → revalidate claimability under the lock → route ONCE to
+  `concurrency_race_conflict`, `retry_waiting`/`failed_final`, WITHOUT replaying
+  the handler). Another worker owning the job (SKIP-LOCKED empty) or having changed
+  its state is a valid do-nothing outcome, never an overwrite.
+- **Tests.** Updated the core disconnect `run_drain` proof to the no-replay model
+  (`retry_waiting`, pgcode captured); added `TestDrainOwnershipReplayGenuine`
+  (Tests A/B/C/D — genuine independent-connection races, real 40001, distinct
+  PIDs); customer/product M18 tests now assert the superseded job ends `cancelled`
+  (disconnect sweep of the `retry_waiting` job) with the 40001 evidenced from the
+  dispatcher recovery log.
+- **Files changed (allow-list only).** `models/shopify_connector_job_dispatch.py`;
+  `tests/test_disconnect_quiescence.py`; `sale/tests/test_customer_matching_scalability.py`;
+  `product/tests/test_product_import_matching.py`; `docs/05-qa/task-core-r2-validation-results.md`;
+  `docs/05-qa/task-core-r2-customer-callsite-validation.md`;
+  `docs/05-qa/task-core-r2-product-callsite-validation.md`; this file;
+  `docs/07-implementation-plan/task-core-r2-customer-callsite-handoff.md`;
+  `docs/07-implementation-plan/task-core-r2-product-callsite-handoff.md`.
+  (`test_job_dispatch.py` needed no change and was not touched.)
+- **Runtime (build 34923103).** Upgrade clean; product `0/0 of 174`; sale `0/0 of
+  93`; core `0 failed, 6 error of 476` (the 6 = known `notification_type`
+  `res.users` `setUpClass` artifact, RR-F/issue #157, classified separately);
+  customer lifecycle `0/0 of 6` ×3; product lifecycle `0/0 of 4` ×3; ownership
+  class (A/B/C/D + disconnect) `0/0 of 5` ×3; independent zero-residue audit clean.
+- **Governance.** No live Shopify request; no merge; PR #163 kept draft, not marked
+  ready; no new PR; `Shopify-connector`/`main`/plain `dev`/integration branch not
+  advanced by this session beyond the PR head; PR #150/#151 untouched; Prompt E
+  BLOCKED; SRR-03 OPEN. Full record: `../05-qa/task-core-r2-validation-results.md`
+  §RTC-2.
+- **Exact next-session prompt (for ChatGPT to authorise).** "Review PR #163 head
+  on `claude/core-r2-slice-2b-runtime-correction-review` (ownership/replay
+  correction, review `4699752673`): confirm the no-replay recovery contract, the
+  reacquire-under-lock ownership guarantees, Tests A–D, and the runtime evidence in
+  `task-core-r2-validation-results.md` §RTC-2; then decide whether to merge PR #163
+  into the integration branch or request further changes. Do not open Prompt E."
+
+---
+
 ## Slice 2B integration-staging setup (2026-07-14 — branch-orchestration session)
 
 > **Separate follow-up session — branch orchestration & history integration only.**
@@ -700,3 +760,55 @@ quality gate, commit/push to the designated branch, then STOP.
   subsumed, not individually merged (§7.3; C9). Prompt E made capability-based; all
   PR #160 references made capability-based (head unpinned). No code, no gate,
   SRR-03 OPEN. Next: PR #160 runtime-green + merge, then the staging sequence.
+- **CORE-R2 Slice 2B runtime CORRECTION — (2026-07-14):** one controlled
+  correction session on Odoo.sh build **34912503** from staging `63d10fb`, branch
+  `claude/core-r2-slice-2b-runtime-correction`. Closed the three adjudicated
+  runtime findings: (1) customer disconnect-first PID proof made genuinely
+  distinct by holding the disconnect connection open; (2) the customer & product
+  M18 concurrent-disconnect reconciliations now retry-then-refuse through the REAL
+  scheduled `run_drain` under `odoo.service.model.retrying` — the smallest
+  common-layer production fix in `shopify_connector_job_dispatch.py` (never
+  re-issues an ORM write in an aborted transaction; genuine 40001 → rollback →
+  re-browse → refuse-before-second-transport → `failed_retryable`); (3) product
+  lifecycle cron-trigger residue closed via per-test baseline ownership. Added a
+  core Phase-5 `run_drain` retry proof. `notification_type` kept as an accepted
+  non-blocking partial-registry artifact (unchanged). **Runtime:** fresh-install
+  precedent 574/574; product 174, sale 93 green; core ×3 (6 notif-artifacts
+  only); customer lifecycle ×3 and product lifecycle ×3 all `0 failed/0 error`;
+  independent residue audit clean (incl. cron-trigger delta 0). Pushed via
+  `odoosh-push` to the build's bound branch `claude/core-r2-slice-2b-integration`
+  (a separate branch cannot be pushed from the dev container; no force-push), as
+  a single clean fast-forward correction commit; **NOT promoted to
+  `Shopify-connector`. No gate transition, no live Shopify request. SRR-03 OPEN.
+  Prompt E BLOCKED. PR #150/#151 untouched; `Shopify-connector` unchanged.** See
+  `../05-qa/task-core-r2-validation-results.md` §RTC.
+- **DEC-031 Immediate Slice 2 — exact-head Odoo.sh runtime validation (2026-07-15):**
+  PR #163 on branch `claude/core-r2-slice-2b-runtime-correction-review`, Odoo.sh
+  build **34935129** (Odoo 19.0), base head `4b45d35`. Applied two **non-behavioral**
+  exactness corrections and pushed head **`757a9680182f65c627a3880b9c7989d6c5d56035`**
+  (*"Tighten DEC-031 runtime validation proofs"*, 3 files +72/−13): (1)
+  comment/docstring-only rewording in `shopify_connector_job_dispatch.py` so the
+  recovery narrative is policy-gated (recovery call never re-invokes the handler;
+  `local_only`/`remote_read_replay_safe` → later bounded retry;
+  `remote_effect_not_replay_safe`/undeclared → manual review; no exactly-once
+  claim); (2) added `test_installed_scope_every_handler_has_replay_policy` to the
+  product and customer test files (`set(_get_handlers()) − set(_get_replay_policies())
+  == ∅`, missing keys listed), retaining the `*_import_sync → remote_read_replay_safe`
+  assertions. **Runtime (exact head `757a968`):** fresh install of core+product+sale
+  clean (0 registry/module/import/selection/XML/security errors, 0 migration);
+  focused Layer 1 core 6/6, product 2/2, customer 2/2; **genuine PostgreSQL 40001
+  read-safe recovery → `retry_waiting`/`retry_count 1` ×3** and **conservative
+  replay-policy recovery → `blocked_manual_review`/`duplicate_risk` (never
+  `retry_waiting`, one transport, no lease) ×3** (distinct backend PID, SQLSTATE
+  40001 logged); standard suites product `0/176`, sale `0/95`, core `0 failed / 6
+  error of 486` (the 6 = the known `notification_type` `res.users` `setUpClass`
+  artifact, RR-F/#157, unrelated); product-lifecycle ×3, customer-lifecycle ×3,
+  PR #163 ownership class ×3 all green; independent residue audit clean (all
+  connector tables 0, 0 leaked sessions/idle-in-transaction/processes); security
+  audit clean (only `shpat_DUMMY…` sentinel, no headers/mutations/PII/egress).
+  **No schema/model/cron/migration/importer-behavior/Shopify-mutation change; no
+  Task 012; no Layer 2. No merge; PR #163 kept draft. Prompt E BLOCKED. SRR-03
+  OPEN. `Shopify-connector` / `main` / plain `dev` unchanged; PR #150/#151
+  untouched.** Docs-only evidence commit records `757a968` as the validated SHA
+  (the docs commit itself is not runtime-tested). See
+  `../05-qa/task-core-r2-validation-results.md` §IS2.

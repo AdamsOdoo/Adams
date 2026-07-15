@@ -425,3 +425,48 @@ future live activation follows the packet §17 zero-holders rule.
 - **Stop condition:** this session ends after pushing the child branch and
   opening the draft PR into `claude/core-r2-slice-2b-integration`. No merge, no
   runtime run, no live Shopify request, no real token. Await ChatGPT review.
+
+---
+
+## 12. Runtime CORRECTION (2026-07-14) — product findings closed `[Fact]`
+
+Runtime-validated on Odoo.sh build **34912503** from staging `63d10fb` on branch
+`claude/core-r2-slice-2b-runtime-correction`. See
+`task-core-r2-validation-results.md` §RTC for the full record. Product-specific:
+
+- **Finding #2 (concurrent-disconnect terminal reconciliation aborts under
+  REPEATABLE READ):** the product M18 test drives the REAL scheduled `run_drain`
+  and is renamed
+  `test_race_b_terminal_reconciliation_retry_refuses_after_disconnect`.
+  **`[Corrected 2026-07-15, review 4699752673 — supersedes the retrying /
+  failed_retryable wording]`** The dispatcher no longer wraps the handler in
+  `odoo.service.model.retrying` (which would REPLAY the complete handler after a
+  transport and re-drive the job by a bare id without reacquiring its claim). It
+  catches the genuine 40001 at its per-job outer boundary, rolls back, resets,
+  REACQUIRES the exact job under a real `FOR UPDATE SKIP LOCKED` row lock, and
+  routes it ONCE to `concurrency_race_conflict` → `retry_waiting` WITHOUT replaying
+  the handler. The test proves: one terminal transport with `DUMMY_TOKEN`, lease
+  held then released, a genuine 40001 evidenced from the **dispatcher
+  concurrency-recovery log** (no longer the service-retry log), **zero binding**
+  from the aborted attempt; and — because a later controller pass sweeps the
+  retry_waiting business job under the disconnect — the superseded job ends
+  **`cancelled`** (was `failed_retryable` under the removed replay model), the
+  controller finalizing + clearing the credential only after release. No assertion
+  weakened; the fixture enables `product_domain_enabled` so the real dispatch
+  start-gate admits the job. See `task-core-r2-validation-results.md` §RTC-2.
+- **Finding #3 (product lifecycle left disconnect-controller cron-trigger
+  residue):** the product genuine class now owns its connector-cron
+  `ir_cron_trigger` rows via a per-test `setUp` baseline, deleting only the
+  test-created delta and asserting a zero delta (mirrors the accepted customer
+  pattern). **Independently inspected: connector cron-trigger residue after the
+  product runs is 0** (was +4/run).
+- Production fix is the common **core** dispatcher retry boundary
+  (`shopify_connector_job_dispatch.py`), not per-domain logic.
+- **Runtime: product callsite lifecycle tag `0 failed, 0 error(s) of 4`, three
+  consecutive green runs; zero product/template/variant/attribute/value + zero
+  cron-trigger residue (independently inspected).**
+- **No live Shopify call. SRR-03 remains OPEN. Prompt E remains BLOCKED. The
+  correction was pushed via `odoosh-push` to the build's bound branch
+  `claude/core-r2-slice-2b-integration` (a separate branch is not possible from
+  the dev container; no force-push); NOT promoted to `Shopify-connector`;
+  awaiting control-room review (see `task-core-r2-validation-results.md` §RTC.7).**
