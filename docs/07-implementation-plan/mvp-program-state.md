@@ -6,7 +6,7 @@
 
 **WAVE 0 MERGED (2026-07-15).** PR #169 merged into `mvp/program-integration` (merge commit `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`, per the Wave 0 closure comment on issue #167). DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed.
 
-**WAVE 1 RESUMED — STAGE 3 ACTIVE (2026-07-15).** DEC-034's reconciled order is binding: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. The live protected/integration references were re-verified before branching; `sol/wave-1-readonly-foundation` was created from the exact authorized `mvp/program-integration` tip. The single Wave 1 draft PR is [#172](https://github.com/AdamsOdoo/Adams/pull/172) into `mvp/program-integration`; it remains draft. CORE-R1 was reconciled from the inherited checkpoint implementation; LC-1 is implemented and syntax-checked but not Odoo.sh-validated. Product-owner ruling [comment 4982429209](https://github.com/AdamsOdoo/Adams/pull/172#issuecomment-4982429209) approved the one-field SEC-1 completeness correction for LC-1's immutable `original_job_type`; the binding packet was amended in commit `a4a370b5378366e719c59c01b1bbd5febe0a868b`, clearing hard-stop 9. Stage 3 JOB-ACTIONS is active. **SRR-03 remains OPEN, Wave 2 remains unauthorized, and no Wave 2+ implementation has started.**
+**WAVE 1 ACTIVE — STAGE 4 SEC-1 (2026-07-15).** DEC-034's reconciled order is binding: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. The live protected/integration references were re-verified before branching; `sol/wave-1-readonly-foundation` was created from the exact authorized `mvp/program-integration` tip. The single Wave 1 draft PR is [#172](https://github.com/AdamsOdoo/Adams/pull/172) into `mvp/program-integration`; it remains draft. CORE-R1 was reconciled from the inherited checkpoint implementation; LC-1 is implemented and syntax-checked but not Odoo.sh-validated. Product-owner ruling [comment 4982429209](https://github.com/AdamsOdoo/Adams/pull/172#issuecomment-4982429209) approved the one-field SEC-1 completeness correction for LC-1's immutable `original_job_type`; the binding packet was amended in commit `a4a370b5378366e719c59c01b1bbd5febe0a868b`, clearing hard-stop 9. Stage 3 JOB-ACTIONS is implemented and syntax-checked; Stage 4 SEC-1 is active. **SRR-03 remains OPEN, Wave 2 remains unauthorized, and no Wave 2+ implementation has started.**
 
 Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code was authorized in that wave. **Wave 1 is active for implementation** on `sol/wave-1-readonly-foundation` — CORE-R1, LC-1, JOB-ACTIONS, SEC-1, then SRR-03 closure, in that corrected order, per DEC-034. **Wave 2 remains unauthorized** and may not merge, be enabled, or receive live Shopify validation while **SRR-03 remains OPEN**.
 
@@ -26,14 +26,14 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Active wave
 
-**Wave 1 — Existing read-only foundation integration — STAGE 3 ACTIVE.** Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft. CORE-R1 is reconciled; LC-1 is implemented pending Odoo.sh; product-owner ruling comment `4982429209` approved the narrow SEC-1 `original_job_type` correction and the packet amendment is committed. JOB-ACTIONS implementation is active; SEC-1 and SRR-03 closure follow on this same branch and PR. SRR-03 is OPEN; Wave 2 is unauthorized.
+**Wave 1 — Existing read-only foundation integration — STAGE 4 ACTIVE.** Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft. CORE-R1 is reconciled; LC-1 is implemented pending Odoo.sh; product-owner ruling comment `4982429209` approved the narrow SEC-1 `original_job_type` correction and the packet amendment is committed. JOB-ACTIONS is implemented and syntax-checked; SEC-1 is active and SRR-03 closure follows on this same branch and PR. SRR-03 is OPEN; Wave 2 is unauthorized.
 
 ## Wave status
 
 | Wave | Status | Branch/PR | Notes |
 | --- | --- | --- | --- |
 | 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
-| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Active — Stage 3** | `sol/wave-1-readonly-foundation`; draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) | Approved one-field SEC-1 amendment committed; JOB-ACTIONS active; Odoo.sh pending; SRR-03 OPEN. |
+| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Active — Stage 4** | `sol/wave-1-readonly-foundation`; draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) | Approved one-field SEC-1 amendment committed; JOB-ACTIONS implemented; SEC-1 active; Odoo.sh pending; SRR-03 OPEN. |
 | 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is OPEN; blocked on Wave 1 prerequisites/closure evidence and packet gate. May not merge, be enabled, or receive live Shopify validation while SRR-03 remains open. |
 | 3 — Inventory synchronization (Task 013/013B) | Not started | — | Blocked on Wave 2 and DEC-031 Layer 2 design+acceptance. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
@@ -48,7 +48,8 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 - Stage 1 CORE-R1: inherited accepted code/test slice re-verified; prior build evidence retained; final exact-head rerun pending.
 - Stage 2 LC-1: implementation, focused tests, migration, manifests, validation record, AR-050, and handoff pushed; Python syntax checks passed; Odoo.sh install/upgrade/uninstall/reinstall proof pending.
 - Product-owner ruling comment `4982429209` validated the omission and authorized the exact one-field completeness correction. D-SEC1-2/D-SEC1-7 and the LC-1 sanctioned-writer statement were amended in commit `a4a370b5378366e719c59c01b1bbd5febe0a868b`; no architecture or scope changed.
-- Stage 3 JOB-ACTIONS is active. SEC-1 and SRR-03 runtime closure remain unstarted. SRR-03 remains OPEN. Wave 2 and every excluded later-wave domain remain unstarted.
+- Stage 3 JOB-ACTIONS: the additive two-action model, nine-method role/state/audit suite, version/import wiring, validation record, AR-051, and handoff are pushed; both new Python sources compile. Odoo.sh remains pending.
+- Stage 4 SEC-1 is active. SRR-03 runtime closure remains unstarted. SRR-03 remains OPEN. Wave 2 and every excluded later-wave domain remain unstarted.
 
 ## Prior completed work (bootstrap governance)
 
@@ -86,6 +87,8 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 The next control-room gate is the final Wave 1 macro-wave review after all five stages and exact-head Odoo.sh evidence satisfy the Wave 1 DoD. No internal-stage merge or review gate remains; PR #172 stays draft throughout implementation and validation.
 
 ## Sprint checkpoint log
+
+- **Wave 1 Stage 3 JOB-ACTIONS implemented (2026-07-15):** Implemented accepted D-JA-1 as a pure additive core extension: manual retry across the four approved recovery states, cancel across the four approved non-terminal work states, exact role/reason/audit contracts, and no force/bypass or pre-SEC-1 sudo. Added a nine-method focused matrix, version/import wiring, validation record, AR-051, and compact handoff. Both new Python sources compile; exact-head Odoo.sh remains pending. Stage 4 SEC-1 is active; SRR-03 remains OPEN; Wave 2 unauthorized.
 
 - **Wave 1 resumed under product-owner ruling (2026-07-15):** PR #172 comment `4982429209` validated the LC-1/SEC-1 completeness hard-stop and approved the narrow one-field correction. The SEC-1 packet now protects `original_job_type`, adds four-role direct-write denial coverage, and preserves the LC-1 conversion helper as a named sanctioned writer; the packet amendment is isolated in commit `a4a370b5378366e719c59c01b1bbd5febe0a868b`. Stage 3 resumed on the same branch and draft PR. SRR-03 remains OPEN; Wave 2 remains unauthorized.
 
