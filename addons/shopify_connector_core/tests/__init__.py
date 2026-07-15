@@ -13,6 +13,7 @@ from . import test_credential_service
 from . import test_job_dispatch
 from . import test_job_enqueue
 from . import test_job_log_system_append
+from . import test_job_actions
 from . import test_lifecycle_uninstall
 from . import test_job_retry_scheduling
 from . import test_readiness_check
