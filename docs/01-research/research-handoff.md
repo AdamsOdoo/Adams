@@ -165,6 +165,30 @@ architecture doc, DEC-031, AR-048, `task-core-r2-slice-2b-handoff.md`, this
 entry — docs only, no production/test file touched, PR #163 not modified,
 PR #164 kept draft.
 
+**Formal acceptance (2026-07-15, control-room review `4701644819`, same PR
+#164 — no new top entry).** The Layer 1 / Layer 2 split above is **accepted
+in substance** — no architecture redesign or additional research required.
+A small docs-only editorial closure patch was applied: registry-completeness
+wording now keys off `_get_handlers()`, not `JOB_STATE_SELECTION`; the core
+handler-policy table now lists only `core_dispatch_selftest` as a
+registered dispatcher handler (verified against `shopify_connector_job_
+dispatch.py:145-161`; `core_readiness_check`/`core_manual_maintenance`/
+`core_test_connection` are job-type vocabulary outside the registry, not
+`_get_handlers()` entries); stale nine-slice references replaced with
+Immediate Slice 1 / Immediate Slice 2 / the deferred Layer 2 architecture
+gate; the Layer 1 crash-recovery claim corrected from "strictly improved"
+to "policy gating only" (PR #163's existing rollback/reclaim behavior
+accepted as sufficient for read-only handlers, unmodified). **DEC-031
+status: Accepted by ChatGPT — 2026-07-15, control-room review
+`4701644819`. AR-048 status: Accepted.** **PR #164 merged into
+`claude/core-r2-slice-2b-integration`** after this closure patch (docs
+only, same five files). PR #163 remains untouched, draft/unmerged. PR #150
+and PR #151 remain untouched, open/draft/unmerged. `Shopify-connector`
+unchanged. **SRR-03 remains OPEN. Prompt E remains BLOCKED. Task 012
+implementation is not authorized by this acceptance.** Files updated: the
+architecture doc, DEC-031, AR-048, `task-core-r2-slice-2b-handoff.md`, this
+entry — docs only, no production/test file touched, PR #163 not modified.
+
 ### Task 011B — EXACT-HEAD CONCURRENCY-CORRECTION RUNTIME CONFIRMATION (build 34863138 @ `662e980`; draft PR #150, 2026-07-14)
 
 - **Session role:** exact-head runtime-confirmation operator. Converted the §19

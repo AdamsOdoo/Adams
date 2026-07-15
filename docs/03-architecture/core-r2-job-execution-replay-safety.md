@@ -1,12 +1,12 @@
 # CORE-R2 — Durable Job Execution Ownership & Remote Replay Safety
 
-> **Status: PROPOSED — PENDING CONTROL-ROOM ACCEPTANCE.** This is an
-> architecture-decision **package**, not an accepted decision. Nothing in
-> this file authorizes implementation. The no-code gate (`CLAUDE.md` §4–§5)
-> remains in force. Companion decision record:
+> **Status: Layer 1 ACCEPTED — Layer 2 remains PROPOSED / DEFERRED.**
+> Nothing in this file authorizes implementation by itself. The no-code gate
+> (`CLAUDE.md` §4–§5) remains in force. Companion decision record:
 > [`../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md`](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md)
-> (also **Proposed**). Architecture-review-log row:
-> [`AR-048`](../05-qa/architecture-review-log.md).
+> (**Accepted by ChatGPT — 2026-07-15, control-room review `4701644819`**,
+> Layer 1 only). Architecture-review-log row:
+> [`AR-048`](../05-qa/architecture-review-log.md) (**Accepted**).
 >
 > **Revised 2026-07-15 (control-room review `4701015790`).** The original
 > draft made the full durable-ownership protocol (Option A) an immediate
@@ -16,10 +16,25 @@
 > Shopify-mutation domain, §0.1/§8). Evidence and option analysis (§2–§4)
 > are unchanged; the recommendation and implementation slicing (§8–§9) are
 > narrowed.
+>
+> **Accepted 2026-07-15 (control-room review `4701644819`).** The Layer 1 /
+> Layer 2 split above is **accepted in substance** — no architecture redesign
+> or additional research required. This acceptance pass also applied five
+> editorial corrections (registry-completeness wording now keys off
+> `_get_handlers()`, not `JOB_STATE_SELECTION`; the core handler-policy table
+> now lists only `core_dispatch_selftest` as a registered dispatcher handler;
+> stale references to the superseded nine-slice plan replaced with Immediate
+> Slice 1 / Immediate Slice 2 / the deferred Layer 2 architecture gate; the
+> Layer 1 crash-recovery claim corrected to "policy gating only," not
+> "strictly improved"; a final terminology scan) — see §1 "Revision
+> verification." **Merge authorization:** this PR merges into
+> `claude/core-r2-slice-2b-integration` only, docs-only, after exact-head
+> re-verification (§1).
 
 **Session type:** normal Claude Code session (not Odoo.sh runtime). Docs-only.
 No production code, test code, or PR #163 changes were made by this session.
-**Date:** 2026-07-15 (revised same day — control-room review `4701015790`).
+**Date:** 2026-07-15 (revised same day — control-room review `4701015790`;
+accepted same day — control-room review `4701644819`).
 
 ---
 
@@ -118,6 +133,21 @@ Re-checked before this revision was written: PR #164 head still
 PR #163 still open/draft/unmerged at `655e1cd744c9a9c9d82d65a926369168e0429de0`,
 untouched. Nothing in this revision required re-verifying §2's evidence — it
 is unchanged and still current.
+
+**Acceptance-closure verification (2026-07-15, control-room review
+`4701644819`).** Re-checked before this editorial-closure patch was written:
+PR #164 open, draft, unmerged, head exactly `cdb86bc4eedbffd536bc8efdfcabf26f585ea276`;
+base still `claude/core-r2-slice-2b-integration` @ `63d10fb465a26189fa463f9c7ac580da6a931c5c`;
+diff still exactly the same five documentation files; PR #163 still
+open/draft/unmerged at `655e1cd744c9a9c9d82d65a926369168e0429de0`; PR #150
+still open/draft/unmerged at `10d0034e8e666684daa36f517788223976d74035`; PR
+#151 still open/draft/unmerged at `e4669aaf206fe8436a6d8a524b083f48d56ac9df`;
+`Shopify-connector` still `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`; working
+tree clean. Direct code re-verification (`shopify_connector_job_dispatch.py:145-161`)
+confirmed `_get_handlers()` returns only `{'core_dispatch_selftest': ...}` —
+the basis for editorial correction 2 below. This session performed no new
+research; it applied five editorial corrections to already-written text and
+recorded formal acceptance (§0.1, §5, §8.1, §9; DEC-031; AR-048).
 
 ---
 
@@ -934,22 +964,29 @@ shared vocabularies) — rather than inventing a new extension pattern.
 - **Tests preventing accidental read-safe inheritance:** a static
   registry-completeness test (mirroring `test_job_dispatch.py:519`'s
   existing `assertNotIn('.execute(', content, path)` source-level guard
-  pattern) asserts: (a) every `job_type` in `JOB_STATE_SELECTION`'s domain
-  (i.e. every registered handler) has an explicit replay-policy entry — no
-  silent gaps; (b) no domain module's `_get_replay_policies()` override
-  removes or reclassifies a core-owned entry; (c) a new test job_type added
-  without a replay-policy entry fails the suite, not just the runtime
-  default — so a future mutation handler cannot ship *at all* without an
-  explicit, reviewed classification, closing the loop the control room
-  named: *"how tests prevent a future mutation handler from accidentally
-  using read-safe retry behavior."*
+  pattern) asserts: (a) every key returned by `_get_handlers()` (the
+  dispatcher's registered-handler set — **not** `JOB_STATE_SELECTION`, which
+  is the unrelated job-*state* vocabulary) has an explicit entry in
+  `_get_replay_policies()` — **the build fails** if a registered handler has
+  no policy declared, not just at runtime; no silent gaps; (b) no domain
+  module's `_get_replay_policies()` override removes or reclassifies a
+  core-owned entry; (c) a new test job_type added without a replay-policy
+  entry fails the suite, not just the runtime default — so a future mutation
+  handler cannot ship *at all* without an explicit, reviewed classification,
+  closing the loop the control room named: *"how tests prevent a future
+  mutation handler from accidentally using read-safe retry behavior."* The
+  runtime lookup itself (§3.3) still fails closed to
+  `remote_effect_not_replay_safe` for any `job_type` unexpected or
+  undeclared at call time — the build-time completeness test and the
+  runtime fail-closed default are two independent, complementary guards, not
+  substitutes for each other.
 
 **Current classification (proposed, for control-room acceptance in
 DEC-031):**
 
 | `job_type` | Policy | Basis |
 | --- | --- | --- |
-| `core_readiness_check`, `core_manual_maintenance`, `core_test_connection`, `core_dispatch_selftest` (core diagnostic/self-test) | `local_only` | No Shopify call, or (test-connection) a lifecycle-only call outside the business-job dispatch path entirely. |
+| `core_dispatch_selftest` (core diagnostic/self-test handler) | `local_only` | The **only** `job_type` `_get_handlers()` currently returns for core (`shopify_connector_job_dispatch.py:160`) — a no-op that never calls Shopify. |
 | **Current** customer import handler (`shopify_connector_sale`) | `remote_read_replay_safe` | **Explicit, not inferred from the module name** — because it issues only `ConnectorCustomerImport`, a read-only GraphQL query (§2.1), never a mutation. |
 | **Current** product import handler (`shopify_connector_product`) | `remote_read_replay_safe` | **Explicit, not inferred** — `ConnectorProductImport` is read-only (§2.1). |
 | Task 012 order import | **Not pre-registered by this package.** Not yet implemented, so it gets **no entry now** — defaults to `remote_effect_not_replay_safe` (§3.3) until it lands. When implemented, it **must** declare `remote_read_replay_safe` explicitly, classified **separately** from customer/product, based on its own verified read-only design — never assumed, inherited, or pre-registered by this decision. | Per its own confirmed read-only behavior (§2.2) — not grouped by "it's an import," "it touches orders," or its unrelated "frozen" solver-bound constants. |
@@ -957,6 +994,18 @@ DEC-031):**
 | Future refund domain | **Not a scoped domain at all yet** — no DEC/task document exists (§2.2); defaults to `remote_effect_not_replay_safe` (§3.3) if ever introduced without an explicit registration | `refundCreate` is confirmed `@idempotent`-mandatory as of API 2026-04 (§2.4), the same future-candidate caveat as inventory applies once a real domain is designed. |
 | Future fulfillment tracking (Task 014/DEC-011) | **No entry until designed** — defaults to `remote_effect_not_replay_safe` (§3.3) | `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate` are confirmed **not** on Shopify's `@idempotent` list (§2.4) — likely a `remote_mutation_reconcile_before_retry` candidate (verification read against FulfillmentOrder status) once designed, never assumed idempotent. |
 | Future product export (Task 015) | **No entry until designed** — defaults to `remote_effect_not_replay_safe` (§3.3) | `productSet` is not natively `@idempotent` (§2.4); Task 015's own packet proposes an unproven upsert-by-custom-id mitigation — not a platform guarantee, so it cannot pre-qualify for a safer default class before it is implemented and proven. |
+
+> **`core_readiness_check` / `core_manual_maintenance` / `core_test_connection`
+> are job-type vocabulary, not dispatcher-registered handlers.** They exist
+> in `shopify.connector.job`'s `job_type` Selection (`shopify_connector_
+> job.py:106-108`) and are created directly by `shopify_connector_store.py`
+> and `shopify_connector_readiness_check.py`, each through its own
+> processing path — **none of the three is a key in `_get_handlers()`**
+> (verified against `shopify_connector_job_dispatch.py:145-161`, which
+> returns only `{'core_dispatch_selftest': ...}`). They are therefore **out
+> of scope for this table and for the registry-completeness test** (which
+> checks `_get_handlers()`'s keys, not the full `job_type` Selection) —
+> listed here only so the vocabulary is not mistaken for an omission.
 
 ---
 
@@ -1079,8 +1128,9 @@ retry` are **not yet reachable** (no mutation handler exists), so this
 package does **not** propose new states/classes for them now — per
 CLAUDE.md's "no hypothetical future requirements," the exact reconciliation-
 read state machine is correctly deferred to the implementation session that
-ships the first real mutation domain (§9, slice 6), which will have a
-concrete Shopify operation to design against instead of a hypothetical one.
+ships the first real mutation domain (the deferred Layer 2 architecture
+gate, §9), which will have a concrete Shopify operation to design against
+instead of a hypothetical one.
 This is recorded as an explicit future decision, not silently dropped.
 
 ---
@@ -1089,7 +1139,8 @@ This is recorded as an explicit future decision, not silently dropped.
 
 ### 8.1 Layer 1 recommendation — implement now
 
-**[Recommendation, routed to DEC-031 for control-room acceptance]**
+**[Recommendation — ACCEPTED, DEC-031, control-room review `4701644819`,
+2026-07-15]**
 
 **Recommended immediate architecture: the Phase-5 replay-safety registry,
 and nothing else.** Three declared classes (`local_only`,
@@ -1216,7 +1267,10 @@ job_dispatch.py` and its tests; one registration point each in
 `shopify_connector_job.py` schema; `call_lease.py`; `api_client.py`; any
 domain-module importer logic (call sites unchanged).
 
-*Prerequisites:* DEC-031 accepted by control room.
+*Prerequisites:* DEC-031 accepted by control room — **satisfied 2026-07-15,
+control-room review `4701644819`.** This slice is not yet started; its own
+separately-authorized implementation-gate session is still required
+(`CLAUDE.md` §9) before any code is written.
 
 *Acceptance criteria:* every declared `job_type` matches §5's table; an
 undeclared `job_type` provably routes to `remote_effect_not_replay_safe`
@@ -1312,7 +1366,8 @@ not a hedge.
 - **Duplicate cron workers / worker crash:** **Closed** for the ownership
   question (§6); **not** re-closed for the underlying claim-layer
   multi-server question, which remains the pre-existing SRR-04/SRR-09 open
-  item this package explicitly does not claim to resolve (§6, §9 slice 7).
+  item this package explicitly does not claim to resolve (§6, deferred
+  Layer 2 architecture gate).
 - **Lease expiry and takeover / stale owner returning after takeover:**
   **Closed** by the `attempt_id` compare-and-swap (§4/§6) — a returning
   stale owner's finalize fails closed.
@@ -1333,13 +1388,19 @@ not a hedge.
   be coordinated, e.g. so a disconnecting store's stuck job is recovered
   *before* `DISCONNECT_QUIESCE_TIMEOUT` fires a `timed_out` escalation
   against it) is not analyzed here and is logged as an open question for
-  the implementing session (§9 slice 4/9), not silently assumed fine.
-- **Current read-only queries:** **Unaffected in observable behavior**,
-  strictly improved in crash-recovery mechanics (§8).
+  the deferred Layer 2 architecture gate (§9), not silently assumed fine.
+- **Current read-only queries:** **Unaffected in observable behavior.**
+  Layer 1 introduces **policy gating only** — it does not introduce durable
+  ownership, a stale-owner sweep, or any new crash-recovery mechanism.
+  Crash/stale-owner recovery for these jobs remains exactly PR #163's
+  existing rollback/reset/re-lock/revalidate/bounded-retry behavior (§0.1,
+  §6), accepted **as sufficient** for the current read-only scope because
+  replaying the Shopify query has no Shopify-side effect to duplicate.
+  Durable crash/attempt ownership (Option A) remains Layer 2, deferred.
 - **Future Shopify mutations:** **Not endangered** — fail-closed default
   (§3.3/§5) is the load-bearing guarantee here, verified structurally (a
-  static test, not a promise) rather than by inspection alone (§5, §9
-  slice 6).
+  static test, not a promise) rather than by inspection alone (§5, deferred
+  Layer 2 architecture gate).
 
 **Guarantee this design explicitly cannot provide, stated for the record:**
 it cannot make a **non-idempotent** Shopify mutation safe to auto-retry

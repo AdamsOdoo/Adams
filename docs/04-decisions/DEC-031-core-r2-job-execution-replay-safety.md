@@ -1,15 +1,15 @@
 # DEC-031 — CORE-R2 Replay-Safety Registry (Layer 1) & Deferred Mutation Hardening (Layer 2) (AR-048)
 
-> **Proposed for ChatGPT review — NOT accepted.** This record resolves
-> **AR-048** in
-> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md).
-> Full evidence, option analysis, and self-critique live in the companion
-> document,
-> [`../03-architecture/core-r2-job-execution-replay-safety.md`](../03-architecture/core-r2-job-execution-replay-safety.md).
-> **Acceptance would not by itself authorize implementation** — a future,
-> separately authorized implementation-gate session is still required
-> (`CLAUDE.md` §9) for the Layer 1 registry (companion doc §9, Immediate
-> Slice 1).
+> **Accepted by ChatGPT — 2026-07-15. Control-room review: `4701644819`.**
+> This record resolves **AR-048** in
+> [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md)
+> (also **Accepted**). Full evidence, option analysis, and self-critique
+> live in the companion document,
+> [`../03-architecture/core-r2-job-execution-replay-safety.md`](../03-architecture/core-r2-job-execution-replay-safety.md)
+> (also **Accepted**, Layer 1). **Acceptance does not by itself authorize
+> implementation** — a future, separately authorized implementation-gate
+> session is still required (`CLAUDE.md` §9) for the Layer 1 registry
+> (companion doc §9, Immediate Slice 1).
 >
 > **Revised 2026-07-15 (control-room review `4701015790`).** The first
 > draft of this record made the full Option-A durable-ownership protocol an
@@ -19,14 +19,26 @@
 > registry — decided now) and **Layer 2** (Option A and mutation hardening —
 > deferred until the first Shopify-mutation domain). The evidence base is
 > unchanged; only the decision's scope and immediacy are narrowed.
+>
+> **Accepted 2026-07-15 (control-room review `4701644819`).** The Layer 1 /
+> Layer 2 split immediately above is accepted in substance, with a small
+> docs-only editorial closure patch (registry-completeness wording corrected
+> to key off `_get_handlers()`; the core handler-policy table corrected to
+> list only `core_dispatch_selftest`, verified against
+> `shopify_connector_job_dispatch.py:145-161`; stale nine-slice references
+> replaced; the Layer 1 crash-recovery claim corrected to "policy gating
+> only"). No architecture redesign or additional research was required.
 
 ## Status
 
-**Proposed for ChatGPT review.** Not accepted. Not implementation-authorizing.
+**Accepted by ChatGPT — 2026-07-15. Control-room review: `4701644819`.**
+Not implementation-authorizing by itself — see "No implementation
+authorized" below.
 
 ## Date
 
-2026-07-15 (revised same day — control-room review `4701015790`).
+2026-07-15 (revised same day — control-room review `4701015790`; accepted
+same day — control-room review `4701644819`).
 
 ## Scope
 
@@ -214,17 +226,18 @@ unchanged (companion doc §1 "Revision verification").
 
 ## No implementation authorized
 
-**This record does not itself authorize implementation, even if accepted.**
-It creates no code, no database DDL, no Python class, no Odoo module, and no
+**This record does not itself authorize implementation — acceptance
+(2026-07-15, control-room review `4701644819`) does not change that.** It
+creates no code, no database DDL, no Python class, no Odoo module, and no
 file outside `docs/03-architecture/**` and `docs/04-decisions/**`. The
 no-code gate (`CLAUDE.md` §4–§5) remains in force.
 
-If accepted, the **next** step is a small, separately-authorized
-implementation-gate session scoped to companion doc §9 Immediate Slice 1
-(the registry only — no schema, no model, no cron) — not implied or opened
-by this record's acceptance alone, per `CLAUDE.md` §9. Layer 2 has no
-implementation step to authorize yet; it is not reopened until one of its
-named trigger domains is separately proposed.
+The **next** step is a small, separately-authorized implementation-gate
+session scoped to companion doc §9 Immediate Slice 1 (the registry only —
+no schema, no model, no cron) — **not** implied or opened by this record's
+acceptance alone; that gate session must still be explicitly issued per
+`CLAUDE.md` §9. Layer 2 has no implementation step to authorize yet; it is
+not reopened until one of its named trigger domains is separately proposed.
 
 **PR #163 remains open, draft, and unmerged, and is not modified by this
 record.**

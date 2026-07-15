@@ -78,9 +78,11 @@ also Proposed, not accepted.
   architecture decision, pending control-room review.
 - PR #150 and PR #151 remain **open, draft, and unmerged**, untouched by this
   session.
-- **No implementation gate is opened by this session.** The nine
-  implementation slices in the architecture doc §9 are sequencing only, not
-  an authorization.
+- **No implementation gate is opened by this session.** The implementation
+  sequencing in the architecture doc §9 (superseded by the scope-narrowing
+  revision below — now Immediate Slice 1, Immediate Slice 2, and the
+  deferred Layer 2 architecture gate) is sequencing only, not an
+  authorization.
 - **SRR-03 remains OPEN.** This session's package is a necessary but not
   sufficient step toward closing it — genuine multi-worker/multi-server
   runtime proof (SRR-04/SRR-09) is still separately owed, and this package's
@@ -88,11 +90,13 @@ also Proposed, not accepted.
   disconnect-quiescence controller's timeout (flagged as an open question in
   the architecture doc §10/§11, not silently assumed fine).
 - `Shopify-connector` is **unchanged**.
-- **Next session (after ChatGPT review):** if the semantic contract and the
-  recommended Option-A ownership architecture are accepted, a future,
-  separately-authorized implementation-gate session begins with architecture
-  doc §9 slice 1 (core schema and ownership substrate) — not started, not
-  implied, by this session's acceptance-pending package.
+- **Next session (after ChatGPT review):** superseded by the scope-narrowing
+  revision and formal-acceptance note below — the next session, once
+  separately authorized, begins with architecture doc §9 Immediate Slice 1
+  (minimal replay-policy registry correction — no schema, no model, no
+  cron), not Option A's schema/ownership substrate. Layer 2's schema and
+  ownership substrate remain deferred, reopened by name only when a Shopify
+  mutation domain is authorized for implementation.
 
 **Scope-narrowing revision (2026-07-15, control-room review `4701015790`,
 same session family — no new handoff entry).** Control-room review found
@@ -121,6 +125,33 @@ remain Proposed/pending. SRR-03 remains OPEN. Prompt E remains BLOCKED.
 product/customer/order work.** Updated files: architecture doc, DEC-031,
 AR-048, this handoff, `research-handoff.md` — no production/test file
 touched, PR #163 not modified, PR #164 kept draft, not merged.
+
+**Formal acceptance (2026-07-15, control-room review `4701644819`, same
+session family — no new handoff entry).** The Layer 1 / Layer 2 split above
+is **accepted in substance** — no architecture redesign or additional
+research required. A small docs-only editorial closure patch was applied
+across the same five files: registry-completeness wording corrected to key
+off `_get_handlers()`, not `JOB_STATE_SELECTION` (the unrelated job-state
+vocabulary); the core handler-policy table corrected to list only
+`core_dispatch_selftest` as a registered dispatcher handler (verified
+against `shopify_connector_job_dispatch.py:145-161` — `core_readiness_check`,
+`core_manual_maintenance`, and `core_test_connection` are job-type
+vocabulary created outside the dispatcher registry, not `_get_handlers()`
+entries); stale references to the superseded nine-slice plan replaced with
+Immediate Slice 1 / Immediate Slice 2 / the deferred Layer 2 architecture
+gate; the Layer 1 crash-recovery claim corrected from "strictly improved"
+to "policy gating only" (PR #163's existing rollback/reclaim behavior is
+accepted as sufficient for read-only handlers, unmodified). DEC-031 status
+is now **Accepted by ChatGPT — 2026-07-15, control-room review
+`4701644819`**; AR-048 status is now **Accepted**. **PR #164 is merged into
+`claude/core-r2-slice-2b-integration` after this closure patch** (docs
+only, same five files, no new file). PR #163 remains untouched,
+draft/unmerged. PR #150 and PR #151 remain untouched, open/draft/unmerged.
+`Shopify-connector` remains unchanged. **SRR-03 remains OPEN. Prompt E
+remains BLOCKED. Task 012 implementation is not authorized by this
+acceptance** — the next authorized step is a small, separately-authorized
+implementation-gate session scoped to architecture doc §9 Immediate Slice 1
+only.
 
 ---
 
