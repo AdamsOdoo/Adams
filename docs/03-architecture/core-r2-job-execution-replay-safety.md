@@ -7,10 +7,19 @@
 > [`../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md`](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md)
 > (also **Proposed**). Architecture-review-log row:
 > [`AR-048`](../05-qa/architecture-review-log.md).
+>
+> **Revised 2026-07-15 (control-room review `4701015790`).** The original
+> draft made the full durable-ownership protocol (Option A) an immediate
+> requirement. This revision splits the architecture into **Layer 1** (a
+> minimal replay-policy registry — the immediate MVP/UAT decision, §0.1) and
+> **Layer 2** (Option A and mutation hardening — deferred until the first
+> Shopify-mutation domain, §0.1/§8). Evidence and option analysis (§2–§4)
+> are unchanged; the recommendation and implementation slicing (§8–§9) are
+> narrowed.
 
 **Session type:** normal Claude Code session (not Odoo.sh runtime). Docs-only.
 No production code, test code, or PR #163 changes were made by this session.
-**Date:** 2026-07-15.
+**Date:** 2026-07-15 (revised same day — control-room review `4701015790`).
 
 ---
 
@@ -38,6 +47,45 @@ used as a base by this package (§1).
 
 ---
 
+## 0.1 Two-layer decision structure (revision — control-room review `4701015790`)
+
+> **This revision narrows scope; it does not redo the research.** Control-room
+> review `4701015790` found the original package's immediate requirement —
+> the full Option-A durable-ownership protocol (`attempt_id`/
+> `owner_worker_ref`/`transport_attempted`, two commits per job, a new
+> stale-owner cron) — disproportionate to current UAT scope, where every
+> implemented Shopify handler is read-only. The evidence and option analysis
+> below (§2–§4) are unchanged and still support both layers; only the
+> recommendation and implementation slicing (§8–§9) are narrowed.
+
+**Layer 1 — MVP/UAT contract, decided now, implement next.** A minimal,
+fail-closed replay-policy registry (§5) with three declared classes
+(`local_only`, `remote_read_replay_safe`, `remote_effect_not_replay_safe`),
+explicit declarations for the three current handlers, and a fail-closed
+default for everything else. **No new model, field, migration, or cron.**
+PR #163's rollback/reset/re-lock/revalidate/bounded-retry behavior
+(Option D, §4) is **accepted as-is** for the current read-only scope: a
+replayed Shopify query has no side effect to duplicate, the failed Odoo
+transaction is rolled back, and importer duplicate prevention/bindings/
+uniqueness constraints remain the local data-integrity protection. The new
+registry's job is to make that acceptance **safe by construction** — never
+to let a future mutation handler silently inherit it.
+
+**Layer 2 — mutation hardening, deferred.** Durable execution ownership
+(Option A, §4), persisted attempt identity, transport-ambiguity tracking,
+stale-owner recovery, Shopify idempotency-key persistence, and
+reconciliation-before-retry remain the correct future architecture — **not
+required, and not a blocker, for current read-only product/customer/order
+UAT.** Layer 2 is reopened by name (§8) the moment any Shopify **mutation**
+domain is authorized for implementation: inventory export,
+fulfillment/tracking update, product export, refund creation, or any other
+Shopify write.
+
+See §8 for the full Layer 1/Layer 2 recommendation and §9 for the narrowed
+implementation slicing.
+
+---
+
 ## 1. Verified starting state (Phase 1)
 
 Verified directly against the repository and GitHub at session start
@@ -62,6 +110,14 @@ Verified directly against the repository and GitHub at session start
 start exactly at the accepted integration SHA before any file was written.
 No history was lost — the discarded tip is `Shopify-connector`'s own
 already-preserved history.
+
+**Revision verification (2026-07-15, control-room review `4701015790`).**
+Re-checked before this revision was written: PR #164 head still
+`3cefc42346f48a339fdaec0ddad5035625ff7751`, base still
+`claude/core-r2-slice-2b-integration` @ `63d10fb465a26189fa463f9c7ac580da6a931c5c`;
+PR #163 still open/draft/unmerged at `655e1cd744c9a9c9d82d65a926369168e0429de0`,
+untouched. Nothing in this revision required re-verifying §2's evidence — it
+is unchanged and still current.
 
 ---
 
@@ -552,28 +608,51 @@ differentiated by declared operation class**:
 This is a direct generalization of DEC-009's already-accepted
 ambiguous-outcome rule (§2.2) to a second failure source (local
 post-transport concurrency failure) that DEC-009 did not yet contemplate.
+**Layer 1 note:** the middle two rows (idempotent mutation, non-idempotent/
+unproven mutation) are not yet reachable by any shipped handler; the
+registry (§5) collapses them into one declared class,
+`remote_effect_not_replay_safe`, until a real mutation domain exists to
+design against (§3.2, §0.1).
 
 ### 3.2 Operation-class taxonomy
 
-**[Recommendation]** Five replay-policy classes (full registry design in
-§5):
+**[Recommendation, revised — Layer 1 minimum]** The registry (§5) declares
+every `job_type` into exactly **three** classes for the current scope, not
+five. A finer split is real future work (Layer 2) but is not materially
+required by any handler that exists today (per the control-room guidance:
+do not introduce five policy classes unless they are materially required by
+current code):
 
 1. **`local_only`** — no Shopify call is possible for this `job_type`.
-2. **`remote_read_replay_safe`** — Shopify query only, no mutation possible.
-3. **`remote_mutation_idempotent`** — a Shopify mutation using a persisted,
-   reused Shopify `@idempotent` key within the platform TTL.
-4. **`remote_mutation_reconcile_before_retry`** — a mutation with no platform
-   idempotency guarantee, but a defined, safe verification read that can
-   confirm whether the operation already succeeded before any further
-   attempt.
-5. **`remote_mutation_ambiguous_manual_review`** — a mutation with no
-   platform idempotency guarantee and no defined safe verification read;
-   ambiguity can only be resolved by an operator.
+2. **`remote_read_replay_safe`** — Shopify query only, no mutation possible;
+   replaying it has no Shopify-side side effect.
+3. **`remote_effect_not_replay_safe`** — anything else: a Shopify mutation,
+   or a `job_type` whose Shopify-call behavior is not (yet) proven
+   read-only. This is also the fail-closed default (§3.3) for any
+   undeclared `job_type`.
+
+**Layer 2 refinement (deferred, not decided now).** Once a real Shopify
+mutation domain is authorized for implementation, `remote_effect_not_
+replay_safe` is expected to split into finer sub-classes — distinguishing a
+mutation with a persisted, reused Shopify `@idempotent` key
+(`remote_mutation_idempotent`) from one that needs a reconciliation read
+before retry (`remote_mutation_reconcile_before_retry`) from one that has
+neither and must always route to a human
+(`remote_mutation_ambiguous_manual_review`, the original package's name for
+what Layer 1 now calls `remote_effect_not_replay_safe`). That three-way
+split remains a reasonable starting point for the Layer 2 design, but is
+**not adopted now** — designing it before a single mutation handler exists
+to design it against would be exactly the kind of hypothetical-future-
+requirement design `CLAUDE.md` cautions against. Until Layer 2 is
+authorized, every non-read, non-local `job_type` is simply
+`remote_effect_not_replay_safe` and is handled identically: never
+auto-retried; routed to `blocked_manual_review`/`duplicate_risk` if ever
+reached (today, it never is — no mutation handler is implemented).
 
 ### 3.3 The default rule — fail closed, always
 
 **[Recommendation]** An **undeclared** `job_type` (no registry entry, §5)
-is treated as **`remote_mutation_ambiguous_manual_review`** — the most
+is treated as **`remote_effect_not_replay_safe`** — the most
 conservative class — never as `remote_read_replay_safe`. A mutation handler
 **never inherits** a read handler's retry behavior by omission: the registry
 lookup that decides retry eligibility is keyed by `job_type`, is populated
@@ -604,13 +683,19 @@ not assume that stays true, per §2.1's "live-relevant today" finding.)
 
 1. If `remote_read_replay_safe` or `local_only`: automatic retry (no
    ambiguity possible by definition).
-2. If `remote_mutation_idempotent`: automatic retry, reusing the same
-   persisted Shopify idempotency key (bounded, per DEC-009).
-3. If `remote_mutation_reconcile_before_retry`: schedule a reconciliation
-   read; if it proves the operation did not occur, retry; if it proves the
-   operation occurred, mark succeeded (no duplicate); if reconciliation
-   itself cannot resolve it, fall through to (4).
-4. If `remote_mutation_ambiguous_manual_review` (including the default/
+2. **[Layer 2, deferred, currently unreachable — no `job_type` is declared
+   this way]** If a future finer sub-class proves Shopify-side idempotency
+   (the original package's `remote_mutation_idempotent` sketch, §3.2):
+   automatic retry, reusing the same persisted Shopify idempotency key
+   (bounded, per DEC-009).
+3. **[Layer 2, deferred, currently unreachable]** If a future finer
+   sub-class has a defined safe verification read (the original package's
+   `remote_mutation_reconcile_before_retry` sketch, §3.2): schedule a
+   reconciliation read; if it proves the operation did not occur, retry; if
+   it proves the operation occurred, mark succeeded (no duplicate); if
+   reconciliation itself cannot resolve it, fall through to (4).
+4. **[Layer 1 — the only case any current or undeclared `job_type` can
+   reach]** If `remote_effect_not_replay_safe` (including the default/
    undeclared case): **`blocked_manual_review`** with
    `manual_review_subreason='duplicate_risk'` — an operator confirms the
    real-world state before any further attempt. This reuses the **existing**
@@ -624,6 +709,14 @@ why this is the smallest additive change to the existing taxonomy.
 ---
 
 ## 4. Durable ownership options compared (Phase 4)
+
+**Layer framing (revision).** This comparison is unchanged from the
+original package. **Layer 1 (decided now) keeps Option D** — PR #163's
+mechanism, as-is, gated by the new replay-policy registry (§5) rather than
+replaced. **Layer 2 (deferred) recommends Option A** when a mutation domain
+is authorized; Options B and C remain evaluated-and-deferred, as before.
+Nothing below changes the technical analysis — only §8's recommendation of
+*when* to build each option is narrowed.
 
 ### Option D — transaction row lock only (PR #163's approach): does not meet the required semantics
 
@@ -798,6 +891,9 @@ later; it is Option C's first slice, not a competing design.
 
 ## 5. Replay-safety registry (Phase 5)
 
+**This is the Layer 1 deliverable — the only registry design change this
+revision asks to be implemented next (§9, Immediate Slice 1).**
+
 **[Recommendation]** A new, **core-owned**, fail-closed registry, modeled
 directly on the two extension seams this exact file already uses
 successfully — `_get_handlers()` (job_type → handler) and
@@ -831,7 +927,7 @@ shared vocabularies) — rather than inventing a new extension pattern.
   level, applied here at the Python-registry level.
 - **No declared policy:** **[Recommendation, restating §3.3]** the lookup
   helper that reads this registry treats a missing `job_type` key as
-  `remote_mutation_ambiguous_manual_review` — never as "no policy needed" or
+  `remote_effect_not_replay_safe` — never as "no policy needed" or
   "assume safe." This is enforced at the **single** call site the dispatcher
   and the recovery/finalize paths both use (not duplicated logic in two
   places, which is exactly how such a default could silently drift).
@@ -853,21 +949,33 @@ DEC-031):**
 
 | `job_type` | Policy | Basis |
 | --- | --- | --- |
-| `core_readiness_check`, `core_manual_maintenance`, `core_test_connection`, `core_dispatch_selftest` | `local_only` | No Shopify call, or (test-connection) a lifecycle-only call outside the business-job dispatch path entirely. |
-| Future customer import (`shopify_connector_sale`) | `remote_read_replay_safe` | **Explicit, not inferred from the module name** — because it issues only `ConnectorCustomerImport`, a read-only GraphQL query (§2.1), never a mutation. |
-| Future product import (`shopify_connector_product`) | `remote_read_replay_safe` | **Explicit, not inferred** — `ConnectorProductImport` is read-only (§2.1). |
-| Task 012 order import | `remote_read_replay_safe`, classified **separately** from customer/product | Per its own confirmed read-only behavior (§2.2) — not grouped by "it's an import," "it touches orders," or its unrelated "frozen" solver-bound constants; classified strictly on its own confirmed query-only behavior. |
-| Future inventory export/sync (Task 013/DEC-010) | **No entry until designed** — defaults to `remote_mutation_ambiguous_manual_review` (§3.3); **potential future `remote_mutation_idempotent` candidate** once implemented | `inventorySetQuantities`/`inventoryAdjustQuantities` are within Shopify's `@idempotent` surface, **mandatory as of API 2026-04** (§2.4) — but the classification requires the connector to actually persist and reuse a stable key, which does not exist yet; defaults conservative until proven. |
-| Future refund domain | **Not a scoped domain at all yet** — no DEC/task document exists (§2.2); defaults to `remote_mutation_ambiguous_manual_review` (§3.3) if ever introduced without an explicit registration | `refundCreate` is confirmed `@idempotent`-mandatory as of API 2026-04 (§2.4), the same future-candidate caveat as inventory applies once a real domain is designed. |
-| Future fulfillment tracking (Task 014/DEC-011) | **No entry until designed** — defaults to `remote_mutation_ambiguous_manual_review` (§3.3) | `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate` are confirmed **not** on Shopify's `@idempotent` list (§2.4) — likely a `remote_mutation_reconcile_before_retry` candidate (verification read against FulfillmentOrder status) once designed, never assumed idempotent. |
-| Future product export (Task 015) | **No entry until designed** — defaults to `remote_mutation_ambiguous_manual_review` (§3.3) | `productSet` is not natively `@idempotent` (§2.4); Task 015's own packet proposes an unproven upsert-by-custom-id mitigation — not a platform guarantee, so it cannot pre-qualify for a safer default class before it is implemented and proven. |
+| `core_readiness_check`, `core_manual_maintenance`, `core_test_connection`, `core_dispatch_selftest` (core diagnostic/self-test) | `local_only` | No Shopify call, or (test-connection) a lifecycle-only call outside the business-job dispatch path entirely. |
+| **Current** customer import handler (`shopify_connector_sale`) | `remote_read_replay_safe` | **Explicit, not inferred from the module name** — because it issues only `ConnectorCustomerImport`, a read-only GraphQL query (§2.1), never a mutation. |
+| **Current** product import handler (`shopify_connector_product`) | `remote_read_replay_safe` | **Explicit, not inferred** — `ConnectorProductImport` is read-only (§2.1). |
+| Task 012 order import | **Not pre-registered by this package.** Not yet implemented, so it gets **no entry now** — defaults to `remote_effect_not_replay_safe` (§3.3) until it lands. When implemented, it **must** declare `remote_read_replay_safe` explicitly, classified **separately** from customer/product, based on its own verified read-only design — never assumed, inherited, or pre-registered by this decision. | Per its own confirmed read-only behavior (§2.2) — not grouped by "it's an import," "it touches orders," or its unrelated "frozen" solver-bound constants. |
+| Future inventory export/sync (Task 013/DEC-010) | **No entry until designed** — defaults to `remote_effect_not_replay_safe` (§3.3); **potential future `remote_mutation_idempotent` candidate** once implemented | `inventorySetQuantities`/`inventoryAdjustQuantities` are within Shopify's `@idempotent` surface, **mandatory as of API 2026-04** (§2.4) — but the classification requires the connector to actually persist and reuse a stable key, which does not exist yet; defaults conservative until proven. |
+| Future refund domain | **Not a scoped domain at all yet** — no DEC/task document exists (§2.2); defaults to `remote_effect_not_replay_safe` (§3.3) if ever introduced without an explicit registration | `refundCreate` is confirmed `@idempotent`-mandatory as of API 2026-04 (§2.4), the same future-candidate caveat as inventory applies once a real domain is designed. |
+| Future fulfillment tracking (Task 014/DEC-011) | **No entry until designed** — defaults to `remote_effect_not_replay_safe` (§3.3) | `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate` are confirmed **not** on Shopify's `@idempotent` list (§2.4) — likely a `remote_mutation_reconcile_before_retry` candidate (verification read against FulfillmentOrder status) once designed, never assumed idempotent. |
+| Future product export (Task 015) | **No entry until designed** — defaults to `remote_effect_not_replay_safe` (§3.3) | `productSet` is not natively `@idempotent` (§2.4); Task 015's own packet proposes an unproven upsert-by-custom-id mitigation — not a platform guarantee, so it cannot pre-qualify for a safer default class before it is implemented and proven. |
 
 ---
 
-## 6. Crash and stale-owner recovery (Phase 6)
+## 6. Crash and stale-owner recovery (Phase 6) — Layer 2, deferred
 
-**[Recommendation]**, built on Option A's committed-`running`+`attempt_id`
-model (§4):
+> **Not part of this revision's immediate decision.** Everything in this
+> section depends on Option A's committed-`running`+`attempt_id` ownership
+> model, which Layer 1 does not build (§0.1, §8). It is retained, unchanged
+> from the original package, as the design this project commits to building
+> when Layer 2 is triggered — not as a current requirement. For Layer 1's
+> current read-only scope, crash/stale-owner behavior is exactly what PR
+> #163 already provides (a crashed worker's row simply releases its
+> transaction-scoped lock; a future drain re-claims it; no permanently-stuck
+> state is possible because nothing is durably marked `running` before the
+> handler completes) — materially unchanged from today, and accepted as
+> sufficient for read-only jobs, whose only failure mode is a safe re-read.
+
+**[Recommendation, deferred to Layer 2]**, built on Option A's
+committed-`running`+`attempt_id` model (§4):
 
 | Scenario | Behavior |
 | --- | --- |
@@ -879,7 +987,7 @@ model (§4):
 | Expired execution ownership | `running_since`/heartbeat past the configured bound is the sweep's trigger; expiry alone never auto-finalizes as "succeeded" or "failed" — it only ever hands the job to the replay-policy decision (§3.5). |
 | Duplicate cron workers | Structurally prevented at the *claim* step exactly as today (`try_lock_for_update`, unchanged) — two workers cannot both win the initial claim. The new protection is what happens *after* a claim is lost to a rollback (§4), not the claim itself. |
 | Multi-server workers | Same protection as duplicate cron workers — `try_lock_for_update`/committed `running` state is a database-level guarantee, not a single-process one; this is exactly why Option A's ownership signal is a **committed row state**, not an in-memory flag. **[Open question, inherited from SRR-09/DEC-025]** genuine multi-server proof remains unperformed for the *claim* layer itself — this package inherits that open item, does not resolve it, and does not need to resolve it to be correct (the ownership protocol described here does not depend on single-server assumptions; it depends only on PostgreSQL's own row-lock/commit guarantees, which are multi-server-safe by construction). |
-| Manual retry by an operator | An operator-authorized retry from `blocked_manual_review` is the **one** path allowed to re-attempt a `remote_mutation_ambiguous_manual_review` job without an automatic system decision — it is a deliberate, audited, single act (existing `job.log` mechanism), not a new automatic behavior. |
+| Manual retry by an operator | An operator-authorized retry from `blocked_manual_review` is the **one** path allowed to re-attempt a `remote_effect_not_replay_safe` job without an automatic system decision — it is a deliberate, audited, single act (existing `job.log` mechanism), not a new automatic behavior. |
 
 **Explicitly prevented by this design (the control room's named
 invariants):**
@@ -911,6 +1019,16 @@ invariants):**
 ---
 
 ## 7. State and error mapping (Phase 7)
+
+> **Layer 1 result: no new field, no new error class, needed now.** For
+> every `job_type` Layer 1 actually declares (`local_only`,
+> `remote_read_replay_safe`), the existing vocabulary is fully sufficient —
+> see the first four rows below. The one genuinely new vocabulary need
+> identified in the original package (`transport_attempted`, discussed
+> below) only matters once a mutation handler exists that can reach an
+> ambiguous post-transport state; no such handler exists, so it is Layer 2,
+> deferred alongside Option A (§0.1, §8) — not proposed for implementation
+> now.
 
 **[Recommendation]** Mapped to the **existing** accepted vocabulary
 (`JOB_STATE_SELECTION`, `ERROR_CLASS_SELECTION`,
@@ -969,282 +1087,200 @@ This is recorded as an explicit future decision, not silently dropped.
 
 ## 8. Recommendation (Phase 8)
 
+### 8.1 Layer 1 recommendation — implement now
+
 **[Recommendation, routed to DEC-031 for control-room acceptance]**
 
-**Recommended architecture: Option A** (committed `running` + `attempt_id`
-ownership on the `job` row itself, timeout-driven stale-owner sweep,
-replay-policy-registry-gated recovery), **built on top of — not replacing —
-PR #163's already-accepted-progress mechanism** (re-raise concurrency
-exceptions from `_invoke_handler`; re-lock-and-revalidate recovery
-discipline), **plus** the Phase-5 replay-safety registry and the Phase-7
-`transport_attempted` field.
+**Recommended immediate architecture: the Phase-5 replay-safety registry,
+and nothing else.** Three declared classes (`local_only`,
+`remote_read_replay_safe`, `remote_effect_not_replay_safe`); explicit
+declarations for the core diagnostic/self-test handler and the current
+customer/product import handlers; a fail-closed default for everything
+else; consulted by PR #163's existing `_recover_after_concurrency_conflict`
+so a future mutation handler can never silently inherit today's read-safe
+retry behavior. **PR #163's mechanism (Option D) is otherwise kept exactly
+as shipped** — its rollback/reset/re-lock/revalidate/bounded-retry
+discipline is accepted, unmodified, for the current read-only scope (§0.1).
 
-**Why the smallest robust solution.** It adds exactly four fields to one
-existing model (`attempt_id`, `owner_worker_ref`, `transport_attempted`, and
-reuse of the existing `started_at` as `running_since`), one new
-cron-scheduled sweep method (mirroring a pattern — timeout-driven,
-`try_lock_for_update`-based — the codebase already has twice, in
-`_recover_after_concurrency_conflict` and the disconnect-quiescence
-controller), and one new registry (mirroring `_get_handlers()`'s existing
-seam exactly). It requires **no** new model, **no** new table, and **no**
-change to `call.lease` (which stays correctly scoped to its own concern,
-§4). It does not touch `Shopify-connector`, PR #150, PR #151, or any
-domain-module code.
+**Why this is sufficient for current UAT scope.** Every handler that exists
+today is read-only (§2.1, §5): replaying the underlying Shopify query has no
+side effect to duplicate, the failed Odoo transaction is rolled back, and
+importer duplicate prevention/bindings/uniqueness constraints remain the
+local data-integrity protection — so there is no case where PR #163's
+existing worker-B-wins or scheduled-replay behavior (§4, Option D) can
+produce a duplicate Shopify write. The only thing genuinely missing is a
+**structural guarantee that stays true as new handlers are added** — which
+is exactly what the registry's fail-closed default provides, at zero schema
+cost.
 
-**Why it supports current read-only imports without change.** Every shipped
-handler is `remote_read_replay_safe` (§5); for that class, `transport_
-attempted`'s value is irrelevant to safety (a read has no duplicate-effect
-risk), so Option A adds bookkeeping fields and a sweep that, for today's
-handlers, changes **failure-recovery mechanics** (crash/stale-owner handling
-gets strictly better than today's "no recovery for a hard crash" gap in
-Option D) without changing **observable retry behavior** for any currently
-shipped job type.
+**Why no schema change, no new model, no new cron, is required now.**
+Nothing in Layer 1 needs durable cross-transaction ownership signals
+(`attempt_id`/`owner_worker_ref`), transport-ambiguity tracking
+(`transport_attempted`), or a stale-owner sweep — those exist to protect a
+**mutation** from an ambiguous post-transport replay, and no mutation
+handler is implemented. Building them now, before a mutation handler exists
+to need them, would be exactly the kind of work-for-a-hypothetical-future-
+requirement `CLAUDE.md` cautions against.
 
-**Why it does not endanger future mutations.** The default-fail-closed
-registry (§3.3, §5) makes it **structurally impossible** to ship a future
-mutation handler that silently inherits safe-retry behavior — a new
-`job_type` with no registry entry is `remote_mutation_ambiguous_manual_
-review` by construction, and a static test (§5) fails the build if a handler
-exists with no matching registry entry. The `transport_attempted` field and
-`attempt_id` are written so that Option C's later outbox-shaped fields
-(`transport_started_at`/`transport_completed_at`, a persisted idempotency
-key) are a natural, additive extension of the same row — not a schema
-migration that discards this slice's work (§4).
+**Exact change for the future implementation session (not authorized
+here — see §9, Immediate Slice 1):** `shopify_connector_job_dispatch.py`
+gains `_get_replay_policies()` (§5) plus a small no-silent-overwrite guard,
+and `_recover_after_concurrency_conflict` consults it before routing
+`concurrency_race_conflict` to auto-retry.
 
-**Exact models/fields/hooks likely required (for a future, separately
-authorized implementation session — not authorized here):**
+**Modules affected:** `shopify_connector_core` (the registry seam and the
+recovery-path consult), `shopify_connector_product`/`shopify_connector_sale`
+(one registry-entry registration each — no call-site behavior change).
+No other module. `Shopify-connector`, PR #150, PR #151 are untouched.
 
-- `shopify.connector.job`: `attempt_id` (Char, opaque, null when not
-  currently owned), `owner_worker_ref` (Char), `transport_attempted`
-  (Boolean, default False, cleared each new attempt).
-- `shopify.connector.job.dispatch`: `_get_replay_policies()` (new seam,
-  §5), a small aggregating helper enforcing no-silent-overwrite (§5), a new
-  `_sweep_stale_running_jobs()` cron-target method (mirrors
-  `_recover_after_concurrency_conflict`'s locking discipline), and the
-  `_drain_one`/`_recover_after_concurrency_conflict` edits described in §4/
-  §6/§7 (early commit after claim; `transport_attempted`-gated routing).
-- A new scheduled action (`ir.cron` record) for the stale-owner sweep,
-  following the exact XML pattern already used for the disconnect-
-  quiescence controller (`data/shopify_connector_cron_disconnect.xml`).
-- API-client boundary (`shopify_connector_api_client.py`): the point
-  **immediately before** `_send`/`_send`-equivalent in whichever call path a
-  handler uses (today: nothing, since handlers call `execute()` directly and
-  the *dispatcher*, not the API client, would need to set
-  `transport_attempted` — this is itself an open design question for the
-  implementing session: whether `transport_attempted` is set by the
-  dispatcher wrapping the handler call generically, or by each handler
-  explicitly; the former is preferred as it requires no per-handler
-  discipline and cannot be forgotten, mirroring how `_invoke_handler`
-  already generically wraps every handler call today).
+**Migration, performance, security implications:** none — no schema change,
+no new commit boundary, no new persisted field.
 
-**Exact modules likely affected:** `shopify_connector_core` only, for the
-substrate (schema, sweep, registry). Domain modules (`shopify_connector_
-product`, `shopify_connector_sale`, and future `shopify_connector_
-inventory`/`_fulfillment`/etc.) are affected only in that each must register
-a `job_type -> replay_policy` entry (§5) — no call-site behavior change is
-required for currently-shipped read-only handlers.
+**Test strategy:** see §9, Immediate Slice 2.
 
-**Migration implications:** additive-only fields on an existing model
-(`attempt_id`, `owner_worker_ref`, `transport_attempted`) — no data
-migration, existing rows default to `attempt_id=False`/`transport_
-attempted=False`, consistent with every other CORE-R2 field added so far
-(`connection_generation`, `expected_connection_generation`, all
-additive/inert-by-default per AR-047's own established pattern).
+**Rollback strategy:** remove the registry seam and its call site; recovery
+falls back to today's `AUTO_RETRY_ERROR_CLASSES`-only behavior — a safety
+*reduction* for any handler added after the registry ships, not a risk to
+anything shipped today (no mutation handler exists to regress).
 
-**Cleanup and retention policy:** unchanged from today — `job`/`job.log`
-retention is an existing, separate concern (`technical-debt-register.md`);
-this package adds no new table needing its own retention policy (a direct
-benefit of not choosing Option B, §4).
+### 8.2 Layer 2 recommendation — deferred, reopen on first Shopify mutation
 
-**Performance implications:** one additional commit per dispatched job
-(claim+running, then finalize) versus PR #163's one commit per job today —
-a bounded, small overhead, consistent with the per-job-transaction pattern
-PR #163 already introduced; the stale-owner sweep is a low-frequency,
-`try_lock_for_update`-bounded cron pass, following the exact cost profile
-of the already-accepted disconnect-quiescence controller.
+**[Recommendation, retained for a future session — not routed to DEC-031 for
+acceptance now]**
 
-**Security/redaction implications:** none beyond what already exists —
-`attempt_id`/`owner_worker_ref` are opaque, non-secret diagnostic values
-(mirroring `call.lease.lease_key`/`worker_ref`'s already-accepted pattern,
-§2.1); no token, credential, or payload is newly persisted.
+**Recommended future architecture: Option A** (committed `running` +
+`attempt_id` ownership on the `job` row itself, timeout-driven stale-owner
+sweep, replay-policy-registry-gated recovery), built on top of — not
+replacing — PR #163's mechanism, plus the §7 `transport_attempted` field.
+This is unchanged from the original package's full analysis (§4, §6, §7)
+and remains the smallest robust solution *for that later scope*. It is
+recorded here so a future implementation session does not have to re-derive
+it — recording it is not, itself, a current requirement or approval.
 
-**Test strategy (for the future implementation session):** (1) unit tests
-proving `attempt_id` compare-and-swap rejects a stale finalize; (2) the
-registry-completeness static test (§5); (3) genuine independent-connection
-tests (mirroring `test_disconnect_quiescence.py`'s already-established real-
-pooled-cursor pattern) proving Worker B cannot execute a real handler for a
-job Worker A still durably owns; (4) a sweep test proving a job crashed
-mid-transport routes to `blocked_manual_review`/`duplicate_risk`, never to
-automatic retry.
+**Explicit reopening trigger.** This layer is reopened **by name** — never
+silently assumed, never bundled into read-only work — the moment any of the
+following is authorized as an implementation domain: inventory export
+(Task 013/DEC-010), fulfillment/tracking update (Task 014/DEC-011), product
+export (Task 015), refund creation, or any other Shopify mutation. Until
+then, Layer 2 does not block current product, customer, or order read-only
+UAT.
 
-**Rollback strategy:** the new fields are additive and default-inert; a
-revert of the dispatcher/sweep code leaves the schema harmlessly unused
-(matching the exact rollback posture AR-047 already established and proved
-for `call.lease`/`connection_generation`) — no destructive migration is ever
-required to undo this slice.
+**Exact models/fields/hooks likely required, when triggered** (unchanged
+from the original package):
+
+- `shopify.connector.job`: `attempt_id` (Char, opaque), `owner_worker_ref`
+  (Char), `transport_attempted` (Boolean, default False).
+- `shopify.connector.job.dispatch`: a new `_sweep_stale_running_jobs()`
+  cron-target method; the `_drain_one`/`_recover_after_concurrency_conflict`
+  two-commit split described in §4/§6/§7.
+- A new scheduled action (`ir.cron`) for the stale-owner sweep, mirroring
+  the disconnect-quiescence controller's existing XML pattern.
+- API-client/dispatcher boundary: exactly where `transport_attempted` is
+  set — open question, §11.
+
+**Migration, performance, security, test, rollback implications when
+triggered:** unchanged from the original analysis — additive-only fields,
+one extra commit per dispatched job, opaque non-secret diagnostic values,
+independent-connection tests proving Worker B cannot execute a real handler
+for a job Worker A still durably owns, additive/inert rollback. This detail
+is retained in §4/§6 above, not repeated here.
 
 ---
 
-## 9. Implementation slicing (Phase 9)
+## 9. Implementation slicing (Phase 9, revised)
 
-**No implementation prompt is issued by this session.** The following is a
-sequencing sketch for a **future, separately authorized** implementation
-gate — not a paste-ready prompt, per the session instructions.
+**No implementation prompt is issued by this session.** This revision
+replaces the original package's nine-slice future sequence with two
+immediate slices (Layer 1) plus one deferred-roadmap paragraph (Layer 2).
+The original nine-slice sketch is not reproduced here — its content is
+superseded by this section for planning purposes; nothing in it is lost,
+since Layer 2 (§8.2) already records the exact models/fields/hooks that
+sequence would build, for whenever it is triggered.
 
-1. **Core schema and ownership substrate.**
-   *Objective:* add `attempt_id`, `owner_worker_ref`, `transport_attempted`
-   to `shopify.connector.job`, additive/inert only.
-   *Allowed files:* `addons/shopify_connector_core/models/shopify_
-   connector_job.py`, its security/view files if any expose these fields,
-   its tests.
-   *Forbidden files:* any domain module, `call_lease.py`, `api_client.py`.
-   *Prerequisites:* this package accepted by control room.
-   *Acceptance criteria:* fields exist, default-inert, no existing test
-   regresses.
-   *Runtime tests:* fresh install + full existing suite green, no behavior
-   change observed.
-   *Rollback:* drop the three columns; no data depends on them yet.
-   *Definition of done:* schema only, no dispatcher change.
+### Immediate Slice 1 — Minimal replay-policy correction
 
-2. **Claim/start/finalize protocol (two-commit `_drain_one`).**
-   *Objective:* split `_start_running`+handler+finalize into
-   claim-commit / handler / finalize-commit, with `attempt_id` compare-and-
-   swap at finalize.
-   *Allowed files:* `shopify_connector_job_dispatch.py`, its tests.
-   *Forbidden files:* domain modules, schema files (slice 1 already landed
-   them).
-   *Prerequisites:* slice 1 merged.
-   *Acceptance criteria:* same-worker replay still prevented (regression);
-   a simulated stale `attempt_id` finalize is rejected.
-   *Runtime tests:* genuine independent-connection test extending
-   `test_disconnect_quiescence.py`'s pattern.
-   *Rollback:* revert to PR #163's single-commit shape (still correct for
-   the same-worker case, just without the new ownership guarantee).
-   *Definition of done:* two-commit protocol proven under real concurrent
-   connections.
+*Objective:* implement the fail-closed registry (§5); declare
+`local_only`/`remote_read_replay_safe`/`remote_effect_not_replay_safe` for
+the core diagnostic/self-test handler and the current product and customer
+import handlers; adapt `_recover_after_concurrency_conflict` to consult the
+policy before routing `concurrency_race_conflict` to auto-retry; preserve
+current read-only bounded retries exactly as PR #163 ships them; prevent any
+undeclared or future remote-effect handler from automatic replay by
+construction (fail-closed default).
 
-3. **Replay-policy registry.**
-   *Objective:* `_get_replay_policies()` seam, fail-closed default, no-
-   overwrite guard, registry-completeness static test.
-   *Allowed files:* `shopify_connector_job_dispatch.py`, its tests.
-   *Forbidden files:* domain modules (they register in their **own** slice,
-   see 5).
-   *Prerequisites:* slice 2 merged.
-   *Acceptance criteria:* an undeclared `job_type` provably routes to
-   `remote_mutation_ambiguous_manual_review`.
-   *Runtime tests:* unit-level, no live Shopify needed.
-   *Rollback:* remove the seam; sweep/finalize fall back to today's
-   `AUTO_RETRY_ERROR_CLASSES`-only behavior (a safety **reduction**, so this
-   slice should not ship without slice 4 immediately following).
-   *Definition of done:* registry exists and is consulted, even if every
-   entry is still `local_only`/`remote_read_replay_safe`.
+*Allowed files:* `addons/shopify_connector_core/models/shopify_connector_
+job_dispatch.py` and its tests; one registration point each in
+`shopify_connector_product`/`shopify_connector_sale` and their tests.
 
-4. **Stale-owner recovery sweep.**
-   *Objective:* timeout-driven cron sweep routing expired `running` jobs
-   through the registry, never a blind requeue.
-   *Allowed files:* `shopify_connector_job_dispatch.py`, a new cron XML data
-   file, tests.
-   *Forbidden files:* domain modules.
-   *Prerequisites:* slices 2–3 merged.
-   *Acceptance criteria:* a job frozen mid-attempt (simulated crash) is
-   recovered to the correct disposition per its declared policy.
-   *Runtime tests:* genuine independent-connection + simulated-crash tests.
-   *Rollback:* disable the cron; jobs may then remain `running` past
-   timeout until a future manual intervention — an explicit, documented
-   accepted-risk rollback state, not silent.
-   *Definition of done:* every crash-phase scenario in §6's table has a
-   passing test.
+*Forbidden files:* any new database field, model, cron, XML, or migration;
+`shopify_connector_job.py` schema; `call_lease.py`; `api_client.py`; any
+domain-module importer logic (call sites unchanged).
 
-5. **Read-only customer/product integration (registry entries only).**
-   *Objective:* `shopify_connector_sale`/`shopify_connector_product` each
-   register their existing `job_type`(s) as `remote_read_replay_safe`,
-   explicitly (§5) — no call-site behavior change.
-   *Allowed files:* one new/edited file per domain module registering the
-   policy; tests.
-   *Forbidden files:* importer logic itself (unchanged).
-   *Prerequisites:* slice 3 merged.
-   *Acceptance criteria:* registry-completeness test passes for both
-   domains.
-   *Runtime tests:* existing importer suites still green (no behavior
-   change expected).
-   *Rollback:* remove the registration; falls back to slice 3's fail-closed
-   default (a safety **increase**, always safe to roll back).
-   *Definition of done:* both domains explicitly classified, matching §5's
-   table.
+*Prerequisites:* DEC-031 accepted by control room.
 
-6. **Mutation-safe default enforcement (proof slice, no real mutation
-   yet).**
-   *Objective:* a deliberately synthetic/self-test mutation `job_type`
-   (mirroring `core_dispatch_selftest`'s existing no-op-diagnostic pattern,
-   §2.1) proving end-to-end that an undeclared or `remote_mutation_
-   ambiguous_manual_review`-declared handler cannot auto-replay under a
-   simulated post-transport concurrency failure.
-   *Allowed files:* core test files, possibly a diagnostic-only handler
-   mirroring `core_dispatch_selftest`.
-   *Forbidden files:* any real domain mutation logic (none exists yet).
-   *Prerequisites:* slices 1–4 merged.
-   *Acceptance criteria:* the synthetic mutation job, given a simulated
-   post-transport rollback, lands in `blocked_manual_review`/`duplicate_
-   risk` — never `retry_waiting` — in a genuine independent-connection test.
-   *Runtime tests:* the core proof test itself.
-   *Rollback:* remove the synthetic job_type; no production impact (it was
-   never real).
-   *Definition of done:* this is the slice that actually **proves** the
-   gap PR #163 found is closed, under real concurrent connections, before
-   any real mutation domain is authorized to build on top of it.
+*Acceptance criteria:* every declared `job_type` matches §5's table; an
+undeclared `job_type` provably routes to `remote_effect_not_replay_safe`
+(fail-closed); no observable retry-behavior change for any currently shipped
+handler.
 
-7. **Genuine multi-worker runtime tests.**
-   *Objective:* the deployed, multi-`--workers`/multi-server proof this
-   package's §6 "Open question" and DEC-025's SRR-04/SRR-09 both still owe —
-   not resolvable by source-reading or single-host `TransactionCase`/
-   independent-connection tests alone.
-   *Allowed files:* test/evidence documentation only (this is a runtime-
-   operator session, not a code-authoring one, per this project's existing
-   precedent for such proofs).
-   *Prerequisites:* slices 1–6 merged and green.
-   *Acceptance criteria:* SRR-04/SRR-09's stated proof requirements met.
-   *Runtime tests:* live Odoo.sh, real second server/worker.
-   *Rollback:* n/a (evidence-only).
-   *Definition of done:* SRR-04/SRR-09 can be marked reduced/closed with
-   this package's mechanism as the tested subject.
+*Tests:* a registry-completeness static test (§5); a unit test proving the
+fail-closed default for an undeclared `job_type`; existing customer/product/
+core lifecycle and concurrency-recovery tests unchanged and green.
 
-8. **Migration/upgrade validation.**
-   *Objective:* exact-head `-u` upgrade proof (existing-row backfill of the
-   three new inert fields) on a realistic job table, following this
-   project's own established exact-head evidence discipline (e.g. Task
-   011B's build-to-commit-verified pattern).
-   *Allowed files:* validation-results documentation only.
-   *Prerequisites:* slices 1–7 merged.
-   *Acceptance criteria:* clean upgrade, zero behavior change for existing
-   terminal jobs, zero residue.
-   *Runtime tests:* Odoo.sh `-u` on a non-trivial job table.
-   *Rollback:* n/a (evidence-only; schema rollback already covered per-slice
-   above).
-   *Definition of done:* upgrade evidence recorded, matching this project's
-   existing exact-head evidence bar.
+*Rollback:* remove the registry seam and its call site; recovery reverts to
+today's `AUTO_RETRY_ERROR_CLASSES`-only behavior (a safety reduction for
+handlers added after this slice, no risk to anything shipped today).
 
-9. **Final CORE-R2 integration validation.**
-   *Objective:* fold this package's implementation into the CORE-R2
-   Slice-2B integration sequence already defined in
-   `task-core-r2-slice-2b-handoff.md` (Prompt P/C/E), now with the
-   replay-safety substrate as an explicit prerequisite alongside the
-   already-required Slice 2A merge.
-   *Allowed files:* per the existing Slice-2B packet's own allowlist,
-   extended to include this package's files.
-   *Prerequisites:* slices 1–8, plus the existing Slice-2B prerequisites
-   (unchanged).
-   *Acceptance criteria:* SRR-03 can be evaluated for closure against a
-   complete, proven ownership + replay-policy substrate — not just the
-   disconnect-half this repository already has.
-   *Runtime tests:* the full existing Slice-2B validation matrix, plus this
-   package's own.
-   *Rollback:* per the existing Slice-2B rollback posture (unchanged).
-   *Definition of done:* SRR-03 closure decision (open or closed) is made
-   with this package's mechanism in evidence, not deferred again.
+*Definition of done:* registry exists, is consulted at the one call site
+that matters, and the completeness test fails the build for any
+undeclared/future remote-effect handler.
+
+### Immediate Slice 2 — Exact-head runtime validation
+
+*Objective:* validate Immediate Slice 1 on a real Odoo.sh build at its exact
+committed head.
+
+*Validate:* core suite; product suite; customer suite; three genuine
+lifecycle repetitions; read-only concurrency-retry behavior (PR #163's
+existing recovery path, now registry-gated); unknown-handler fail-closed
+behavior; zero residue; no secret leakage; no live Shopify mutation
+performed by any test.
+
+*Prerequisites:* Immediate Slice 1 merged.
+
+*Acceptance criteria:* all listed suites green at the exact validated head;
+independent residue audit clean; no behavior change observed for any
+currently shipped job type.
+
+*Rollback:* per Immediate Slice 1's rollback (unchanged).
+
+*Definition of done:* exact-head evidence recorded, matching this project's
+established evidence bar (e.g. Task 011B's build-to-commit-verified
+pattern).
+
+### Deferred roadmap — Layer 2, one future architecture gate
+
+Option A and the full mutation-hardening architecture (§8.2) are recorded as
+**one future architecture gate**, required before the **first** Shopify
+mutation domain (inventory export, fulfillment/tracking update, product
+export, refund creation, or any other Shopify write) is authorized for
+implementation. This roadmap is **not** broken into current mandatory
+sessions, is not scheduled, and is not a prerequisite for Immediate Slices 1
+or 2. It is reopened by name, as a new control-room decision, only when a
+specific mutation domain is proposed for implementation.
 
 ---
 
 ## 10. Self-critique (Phase 11)
+
+> **Layer note.** This self-critique is unchanged from the original
+> package. Most of the scenarios below (Worker B winning, lease
+> expiry/takeover, duplicate cron workers under a mutation) describe Option A
+> — Layer 2, deferred (§0.1, §8.2) — and are not claims about what Layer 1
+> closes today. The scenarios that **are** live for Layer 1's current scope
+> are marked "[Layer 1]" below; they were already true under PR #163 alone
+> and are unaffected by this revision, because replaying a read has no
+> duplicate-effect risk to begin with.
 
 Tested against each control-room scenario. **No claim of "exactly once" is
 made anywhere in this package** — delivery is **effectively-once by
@@ -1272,7 +1308,7 @@ not a hedge.
   this into the same handling as "crash during transport" rather than
   claiming a distinction it cannot actually make.
 - **Mutation with no idempotency support:** **Handled** — this is exactly
-  `remote_mutation_ambiguous_manual_review`'s reason to exist (§3.2, §5).
+  `remote_effect_not_replay_safe`'s reason to exist (§3.2, §5).
 - **Duplicate cron workers / worker crash:** **Closed** for the ownership
   question (§6); **not** re-closed for the underlying claim-layer
   multi-server question, which remains the pre-existing SRR-04/SRR-09 open
@@ -1319,24 +1355,33 @@ silently replayed.
 
 ## 11. Open questions (carried into DEC-031 and the handoff)
 
-1. Whether `transport_attempted` should be set by the dispatcher generically
-   or by each handler explicitly (§8) — recommended generic, not decided
-   here.
-2. Whether the smallest-additive-change error-mapping choice (§7, a boolean
-   field) or the fallback (a 17th error class) is preferred by the control
-   room.
-3. Interaction between the disconnect-quiescence controller's timeout and
-   this package's stale-owner sweep timeout (§10) — not jointly analyzed.
-4. A full refresh of official Shopify mutation-idempotency/reconciliation
-   documentation against the live `shopify.dev` docs (§2.4) — not blocking,
-   recommended before any specific future mutation domain is designed in
-   implementation detail.
-5. Whether Option B (a dedicated attempt table) should be revisited once a
-   real mutation domain is authorized and needs full per-attempt audit
-   history beyond `job.log` (§4) — explicitly deferred, not rejected.
-6. The exact reconciliation-read state machine for
-   `remote_mutation_reconcile_before_retry` (§7) — deliberately deferred
-   until a concrete future mutation handler exists to design it against.
+None of the following blocks acceptance of the Layer 1 semantic
+contract/registry (§0.1, §5, §8.1) itself. Items 1–2, 5–6 are Layer 2
+questions — they matter only once Layer 2 is reopened (§8.2) and are
+recorded now so that future session does not re-derive them. Item 3 (Layer
+2) and item 4 (either layer, non-blocking) are noted for the same reason.
+
+1. **[Layer 2]** Whether `transport_attempted` should be set by the
+   dispatcher generically or by each handler explicitly (§8.2) —
+   recommended generic, not decided here.
+2. **[Layer 2]** Whether the smallest-additive-change error-mapping choice
+   (§7, a boolean field) or the fallback (a 17th error class) is preferred
+   by the control room.
+3. **[Layer 2]** Interaction between the disconnect-quiescence controller's
+   timeout and the future stale-owner sweep's timeout (§6) — not jointly
+   analyzed.
+4. **[Either layer, non-blocking]** A full refresh of official Shopify
+   mutation-idempotency/reconciliation documentation against the live
+   `shopify.dev` docs (§2.4) — recommended before any specific future
+   mutation domain is designed in implementation detail.
+5. **[Layer 2]** Whether Option B (a dedicated attempt table) should be
+   revisited once a real mutation domain is authorized and needs full
+   per-attempt audit history beyond `job.log` (§4) — explicitly deferred,
+   not rejected.
+6. **[Layer 2]** The exact reconciliation-read state machine for a future
+   `remote_mutation_reconcile_before_retry` sub-class (§3.2, §7) —
+   deliberately deferred until a concrete future mutation handler exists to
+   design it against.
 
 ---
 

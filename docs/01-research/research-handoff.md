@@ -133,6 +133,38 @@
   SHA is required per `CLAUDE.md` §9. Do not mark PR #163 ready or merge it.
   SRR-03 remains OPEN."
 
+**Scope-narrowing revision (2026-07-15, control-room review `4701015790`,
+same PR #164, new head — no new top entry).** The above package made the
+full Option-A durable-ownership protocol an immediate requirement, which
+control-room review found disproportionate to current UAT scope (every
+implemented Shopify handler is read-only). Revised in place into **Layer
+1** (decided now, routed to DEC-031): a minimal fail-closed replay-policy
+registry — three declared classes (`local_only`/`remote_read_replay_safe`/
+`remote_effect_not_replay_safe`, not five), explicit declarations for the
+core diagnostic/self-test handler and the current customer/product import
+handlers, a fail-closed default for everything else, PR #163's existing
+rollback/reset/re-lock/revalidate/bounded-retry behavior accepted **as-is**
+for read-only scope — no new model, field, migration, or cron. Task 012 is
+explicitly **not** pre-registered; it declares its own policy when
+implemented. **Layer 2** (Option A and the rest of the mutation-hardening
+design) is retained, substantively unchanged, but **deferred** — reopened
+by name only when inventory export, fulfillment/tracking update, product
+export, refund creation, or any other Shopify mutation is authorized. The
+nine-slice sequence is replaced with two immediate slices (registry;
+exact-head runtime validation) plus one deferred-roadmap paragraph — no
+numbered future sessions. Evidence unchanged; only the recommendation and
+slicing narrowed. **The "exact next-session prompt" above is superseded by
+this revision** — the live next-session ask is now: review DEC-031/AR-048's
+narrowed Layer 1 registry decision and, if accepted, authorize a small
+implementation-gate session for architecture doc §9 Immediate Slice 1 only
+(no schema/model/cron). PR #163 runtime evidence retained, implementation
+still not accepted. DEC-031/AR-048 remain Proposed/pending. SRR-03 remains
+OPEN. Prompt E remains BLOCKED. `Shopify-connector` unchanged. Current UAT
+fast-track is read-only product/customer/order work. Files updated: the
+architecture doc, DEC-031, AR-048, `task-core-r2-slice-2b-handoff.md`, this
+entry — docs only, no production/test file touched, PR #163 not modified,
+PR #164 kept draft.
+
 ### Task 011B — EXACT-HEAD CONCURRENCY-CORRECTION RUNTIME CONFIRMATION (build 34863138 @ `662e980`; draft PR #150, 2026-07-14)
 
 - **Session role:** exact-head runtime-confirmation operator. Converted the §19

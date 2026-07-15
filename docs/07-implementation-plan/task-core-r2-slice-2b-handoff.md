@@ -94,6 +94,34 @@ also Proposed, not accepted.
   doc §9 slice 1 (core schema and ownership substrate) — not started, not
   implied, by this session's acceptance-pending package.
 
+**Scope-narrowing revision (2026-07-15, control-room review `4701015790`,
+same session family — no new handoff entry).** Control-room review found
+the package above disproportionate to current UAT scope: it made the full
+Option-A durable-ownership protocol an immediate requirement, when every
+implemented Shopify handler is read-only. The package was revised in place
+(same PR #164, new head) to split into **Layer 1** — decided now, routed to
+DEC-031 for acceptance: a minimal fail-closed replay-policy registry with
+three declared classes (`local_only`/`remote_read_replay_safe`/
+`remote_effect_not_replay_safe`), explicit declarations for the core
+diagnostic/self-test handler and the current customer/product import
+handlers, a fail-closed default for everything else, and PR #163's existing
+recovery behavior **accepted as-is** for the current read-only scope — no
+new model, field, migration, or cron proposed — and **Layer 2** — Option A
+and the rest of the mutation-hardening design, retained unchanged in
+substance but **deferred**, reopened by name only when inventory export,
+fulfillment/tracking update, product export, refund creation, or any other
+Shopify mutation is authorized for implementation. Task 012 order import is
+explicitly not pre-registered by this decision. The nine-slice future
+sequence is replaced with two immediate slices (registry implementation;
+exact-head runtime validation) plus one deferred-roadmap paragraph. Evidence
+is unchanged — only the recommendation and slicing narrowed. **PR #163
+runtime evidence retained, implementation still not accepted. DEC-031/AR-048
+remain Proposed/pending. SRR-03 remains OPEN. Prompt E remains BLOCKED.
+`Shopify-connector` unchanged. Current UAT fast-track is read-only
+product/customer/order work.** Updated files: architecture doc, DEC-031,
+AR-048, this handoff, `research-handoff.md` — no production/test file
+touched, PR #163 not modified, PR #164 kept draft, not merged.
+
 ---
 
 ## Slice 2B integration-staging setup (2026-07-14 — branch-orchestration session)
