@@ -6,7 +6,7 @@
 
 **WAVE 0 MERGED (2026-07-15).** PR #169 merged into `mvp/program-integration` (merge commit `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`, per the Wave 0 closure comment on issue #167). DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed.
 
-**WAVE 1 ACTIVE (2026-07-15).** DEC-034's reconciled order is binding: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. The live protected/integration references were re-verified before branching; `sol/wave-1-readonly-foundation` was created from the exact authorized `mvp/program-integration` tip. GitHub requires at least one head commit before opening a pull request, so the single Wave 1 draft PR is opened immediately after this state-only bootstrap commit and then linked here. **SRR-03 remains OPEN, Wave 2 remains unauthorized, and no Wave 2+ implementation has started.**
+**WAVE 1 ACTIVE (2026-07-15).** DEC-034's reconciled order is binding: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. The live protected/integration references were re-verified before branching; `sol/wave-1-readonly-foundation` was created from the exact authorized `mvp/program-integration` tip. The single Wave 1 draft PR is [#172](https://github.com/AdamsOdoo/Adams/pull/172) into `mvp/program-integration`; it remains draft throughout implementation and exact-head runtime validation. **SRR-03 remains OPEN, Wave 2 remains unauthorized, and no Wave 2+ implementation has started.**
 
 Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code was authorized in that wave. **Wave 1 is active for implementation** on `sol/wave-1-readonly-foundation` — CORE-R1, LC-1, JOB-ACTIONS, SEC-1, then SRR-03 closure, in that corrected order, per DEC-034. **Wave 2 remains unauthorized** and may not merge, be enabled, or receive live Shopify validation while **SRR-03 remains OPEN**.
 
@@ -26,14 +26,14 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Active wave
 
-**Wave 1 — Existing read-only foundation integration — ACTIVE.** Branch `sol/wave-1-readonly-foundation` was created after exact live verification. The single draft PR targets `mvp/program-integration`; its number is linked by the immediate follow-up state commit after GitHub accepts the first non-empty branch commit. Internal order: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. SRR-03 is OPEN; Wave 2 is unauthorized.
+**Wave 1 — Existing read-only foundation integration — ACTIVE.** Branch `sol/wave-1-readonly-foundation` was created after exact live verification. The single draft PR is [#172](https://github.com/AdamsOdoo/Adams/pull/172) into `mvp/program-integration` and remains draft. Internal order: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. SRR-03 is OPEN; Wave 2 is unauthorized.
 
 ## Wave status
 
 | Wave | Status | Branch/PR | Notes |
 | --- | --- | --- | --- |
 | 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
-| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Active** | `sol/wave-1-readonly-foundation`; single draft PR opened immediately after this bootstrap commit | Requires exact-head Odoo.sh runtime evidence. SRR-03 remains OPEN. |
+| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Active** | `sol/wave-1-readonly-foundation`; draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) | Requires exact-head Odoo.sh runtime evidence. SRR-03 remains OPEN. |
 | 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is OPEN; blocked on Wave 1 prerequisites/closure evidence and packet gate. May not merge, be enabled, or receive live Shopify validation while SRR-03 remains open. |
 | 3 — Inventory synchronization (Task 013/013B) | Not started | — | Blocked on Wave 2 and DEC-031 Layer 2 design+acceptance. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
@@ -44,7 +44,7 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 - Re-verified the live base before branching: `mvp/program-integration` matched the product-owner-authorized tip; checkpoint `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, `Shopify-connector`, and `main` remained unchanged.
 - Confirmed PR #170/DEC-034 and PR #171 normalized the Wave 1 packets without introducing addon implementation.
-- Created `sol/wave-1-readonly-foundation` from the verified integration tip. This state-only commit is the minimum branch delta GitHub requires before accepting the single early draft PR.
+- Created `sol/wave-1-readonly-foundation` from the verified integration tip. Opened the single early draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) into `mvp/program-integration`; it remains draft and carries the frozen five-stage execution plan.
 - Active order: CORE-R1 → LC-1 → JOB-ACTIONS → SEC-1 → SRR-03 closure. Stage implementation has not started at this commit.
 - SRR-03 remains OPEN. Wave 2 and every excluded later-wave domain remain unstarted.
 
