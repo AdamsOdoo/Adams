@@ -20,6 +20,25 @@
 > `write()` gate blocks only transitions *to* `running`) — and is
 > required to remain forward-compatible with the future SEC-1 matrix,
 > which keeps `non-terminal → cancelled` legal (§7, §7.1).**
+>
+> **Wave 1 reconciliation confirmation 2026-07-15
+> ([`DEC-034`](../04-decisions/DEC-034-wave-1-packet-dependency-reconciliation.md)):**
+> the LC-1-before-SEC-1 sequencing this document already assumed is now
+> the **binding Wave 1 stage order** system-wide (corrected Wave 1:
+> CORE-R1 → LC-1 → Task JOB-ACTIONS → SEC-1 → SRR-03 closure — LC-1 is
+> Stage 2, SEC-1 is Stage 4), resolving a conflict Sol's Wave 1 hard-stop
+> found between this document's assumption and a since-superseded
+> Wave-0-recommended order that had placed SEC-1 before LC-1 (issue #167
+> comment `4980808811`, conflict 3). **No change to this document's
+> lifecycle outcomes, mechanics, or §7.1 locked prompt.** §7's forward-
+> compatibility requirement is now closed on the SEC-1 side, not this
+> one: `task-sec1-security-hardening-packet.md` §5 (as revised by
+> DEC-034) explicitly adds `_reassign_to_historic_job_type()`'s existing
+> write site to SEC-1's own D-SEC1-2 su-elevation inventory, naming it a
+> sanctioned internal protected-field writer — SEC-1 wraps this
+> already-implemented, already-tested method in su at its existing
+> write call, once SEC-1 lands; LC-1 itself calls no SEC-1 method and
+> needs no change at that time.
 
 ## 1. The contradiction being resolved (verbatim, both sides)
 
