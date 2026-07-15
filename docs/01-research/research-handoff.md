@@ -1,3 +1,12 @@
+### Wave 1 hard-stop after LC-1 — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Completed:** Stage 1 CORE-R1 reconciliation (`366198a`); Stage 2 LC-1 implementation through head `ac7d749`; syntax checks green, Odoo.sh pending.
+- **Hard-stop:** condition 9 before Stage 3. LC-1's accepted `original_job_type` audit identity is absent from SEC-1 D-SEC1-2's exact protected-field set. With current ACL write bits and ORM-level readonly semantics, implementing SEC-1 verbatim would leave direct generic mutation possible.
+- **Recommended ruling:** add `original_job_type` to D-SEC1-2 and its direct-write negative matrix; `shopify_connector_job.py` is already an allowed SEC-1 file. Do not resume without explicit control-room authorization.
+- **Unstarted:** JOB-ACTIONS, SEC-1, SRR-03 closure runtime, and every Wave 2+ domain. SRR-03 remains OPEN.
+- **Runtime:** no Odoo.sh Wave 1 build; no completion claim.
+
 ### Task LC-1 implementation — compact handoff (2026-07-15)
 
 - **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
