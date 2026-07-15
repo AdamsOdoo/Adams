@@ -649,6 +649,16 @@ class TestCustomerImportMatching(TransactionCase):
             'sale_domain_enabled',
         )
 
+    def test_customer_import_sync_declared_remote_read_replay_safe(self):
+        """DEC-031 Layer 1 (AR-048): `customer_import_sync` issues only a
+        Shopify read (see `CUSTOMER_IMPORT_QUERY`) -- replaying it has no
+        Shopify-side effect, so the domain extension declares it
+        `remote_read_replay_safe`, never the conservative default."""
+        policies = self.Dispatch._get_replay_policies()
+        self.assertEqual(
+            policies.get('customer_import_sync'), 'remote_read_replay_safe',
+        )
+
     # ------------------------------------------------------------------
     # 11. Zero-mutation proof.
     # ------------------------------------------------------------------

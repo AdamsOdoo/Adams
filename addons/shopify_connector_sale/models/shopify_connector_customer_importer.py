@@ -8,6 +8,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_api_client impo
 )
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
+    REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
 
 # Read-only GraphQL query only -- never a mutation (Task 011 is
@@ -535,6 +536,15 @@ class ShopifyConnectorJobDispatchCustomerExtension(models.AbstractModel):
         handlers = dict(super()._get_handlers())
         handlers['customer_import_sync'] = self._handle_customer_import_sync
         return handlers
+
+    @api.model
+    def _get_replay_policies(self):
+        """`customer_import_sync` is a Shopify *read* (`import_customer_sync`
+        issues no mutation) -- replaying it has no Shopify-side effect, so
+        it is declared `remote_read_replay_safe` (DEC-031 Layer 1, AR-048)."""
+        policies = dict(super()._get_replay_policies())
+        policies['customer_import_sync'] = REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE
+        return policies
 
     @api.model
     def _handle_customer_import_sync(self, job):

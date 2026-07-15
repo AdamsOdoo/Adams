@@ -594,6 +594,16 @@ class TestProductImportMatching(TransactionCase):
             'product_domain_enabled',
         )
 
+    def test_product_import_sync_declared_remote_read_replay_safe(self):
+        """DEC-031 Layer 1 (AR-048): `product_import_sync` issues only a
+        Shopify read (see `PRODUCT_IMPORT_QUERY`) -- replaying it has no
+        Shopify-side effect, so the domain extension declares it
+        `remote_read_replay_safe`, never the conservative default."""
+        policies = self.Dispatch._get_replay_policies()
+        self.assertEqual(
+            policies.get('product_import_sync'), 'remote_read_replay_safe',
+        )
+
     # ------------------------------------------------------------------
     # 9. Shopify API client error taxonomy preserved (control-room
     # review, comment 4927037139, fix 1) -- a ShopifyClientError raised

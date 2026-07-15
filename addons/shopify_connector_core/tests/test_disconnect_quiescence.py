@@ -4026,6 +4026,122 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
             self._cleanup(dbname, store_id)
 
     # ------------------------------------------------------------------
+    # DEC-031 Layer 1 (AR-048) -- fail-closed replay-policy recovery routing.
+    # ------------------------------------------------------------------
+
+    def test_conservative_replay_policy_routes_to_blocked_manual_review_not_retry(
+            self):
+        """The SAME genuine post-transport 40001 as Test B, but with a
+        SYNTHETIC replay-policy override forcing `core_dispatch_selftest` to
+        the conservative `remote_effect_not_replay_safe` class (never its
+        real, accepted `local_only` policy -- this proves the routing
+        branch only, not a real production classification change, and
+        introduces no Shopify-mutation handler). `_recover_after_
+        concurrency_conflict` still rolls back, resets, REACQUIRES the exact
+        job under a real row lock, and revalidates claimability exactly as
+        Test B does; but because the declared policy is not one of the
+        read-safe retry classes, it routes to `blocked_manual_review` /
+        `duplicate_risk` instead of the bounded `concurrency_race_conflict`
+        auto-retry path -- no automatic retry, never `retry_waiting`, and
+        the handler is never invoked a second time (exactly one transport,
+        same as Test B)."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        send_tokens = []
+        pgcodes = []
+        conflict = {}
+        try:
+            store_id, shop_domain, job_ids = self._commit_store_with_jobs(dbname)
+            job_id = job_ids[0]
+            ClientCls = type(self.env['shopify.connector.api.client'])
+            DispatchCls = type(self.env['shopify.connector.job.dispatch'])
+
+            def ok_send(client_self, s, body, token=None):
+                send_tokens.append(token)
+                if 'pid' not in conflict:
+                    self._commit_benign_store_bump(dbname, store_id, conflict)
+                return FakeResponse(
+                    200, json_body=_success_body(domain=shop_domain))
+
+            def conflicting_selftest(job):
+                Client = job.env['shopify.connector.api.client']
+                with Client.execute_business(job, job.store_id, 'q'):
+                    try:
+                        job.store_id._lock_store_for_lifecycle()
+                    except psycopg2.OperationalError as exc:
+                        pgcodes.append(getattr(exc, 'pgcode', None))
+                        raise
+
+            def conservative_only_policy(self):
+                # Synthetic override only -- never the real accepted core
+                # mapping (`local_only`) -- to exercise the conservative
+                # recovery branch without a real Shopify-mutation handler.
+                return {
+                    'core_dispatch_selftest': 'remote_effect_not_replay_safe',
+                }
+
+            drain_cr = self._open_bounded(dbname)
+            try:
+                drain_cr.execute("SHOW transaction_isolation")
+                self.assertEqual(drain_cr.fetchone()[0], 'repeatable read')
+                drain_pid = self._backend_pid(drain_cr)
+                drain_env = api.Environment(drain_cr, SUPERUSER_ID, {})
+                with patch.object(self.registry, 'cursor',
+                                  self._real_registry_cursor(dbname)), \
+                     patch.object(ClientCls, '_send', ok_send), \
+                     patch.object(
+                         DispatchCls, '_get_handlers',
+                         lambda self: {
+                             'core_dispatch_selftest': conflicting_selftest}), \
+                     patch.object(
+                         DispatchCls, '_get_replay_policies',
+                         conservative_only_policy):
+                    drain_env['shopify.connector.job.dispatch'].run_drain(1)
+            finally:
+                drain_cr.close()
+
+            self.assertEqual(
+                len(send_tokens), 1,
+                'exactly one transport; the handler is never replayed, even '
+                'on the conservative recovery path')
+            self.assertEqual(send_tokens[0], DUMMY_TOKEN)
+            self.assertIn(
+                psycopg2.errorcodes.SERIALIZATION_FAILURE, pgcodes,
+                'a genuine SQLSTATE 40001 must have aborted the dispatch; saw %s'
+                % pgcodes)
+            self.assertIn('pid', conflict)
+            self.assertNotEqual(
+                conflict['pid'], drain_pid,
+                'the conflicting bump committed on a distinct backend')
+            state, _gen, _ltc, _clv, cred_present = self._observe_store(
+                dbname, store_id)
+            self.assertEqual(
+                state, 'connected',
+                'this scenario keeps the store connected throughout')
+            self.assertTrue(cred_present)
+            obs = self._open_bounded(dbname)
+            try:
+                obs.execute(
+                    "SELECT state, error_class, manual_review_subreason "
+                    "FROM shopify_connector_job WHERE id = %s", (job_id,))
+                job_state, error_class, manual_review_subreason = obs.fetchone()
+                obs.rollback()
+            finally:
+                obs.close()
+            self.assertEqual(
+                job_state, 'blocked_manual_review',
+                'a policy not declared replay-safe must never reach the '
+                'auto-retry concurrency_race_conflict path; saw %s'
+                % job_state)
+            self.assertEqual(error_class, 'duplicate_risk')
+            self.assertEqual(manual_review_subreason, 'duplicate_risk')
+            self.assertEqual(
+                self._lease_count(dbname, store_id), 0,
+                'the aborted attempt released its lease')
+        finally:
+            self._cleanup(dbname, store_id)
+
+    # ------------------------------------------------------------------
     # Test A -- post-rollback reclaim race (SKIP-LOCKED mutual exclusion)
     # ------------------------------------------------------------------
 

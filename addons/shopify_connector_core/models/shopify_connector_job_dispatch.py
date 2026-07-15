@@ -87,6 +87,21 @@ SAFETY_NET_ERROR_CLASSES = (
     'unknown_system_error',
 )
 
+# DEC-031 Layer 1 (AR-048) -- the fail-closed replay-policy registry's
+# fixed three-value vocabulary. Do not add a fourth class here.
+REPLAY_POLICY_LOCAL_ONLY = 'local_only'
+REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE = 'remote_read_replay_safe'
+REPLAY_POLICY_REMOTE_EFFECT_NOT_REPLAY_SAFE = 'remote_effect_not_replay_safe'
+# Policies for which replaying a recovered job's existing bounded
+# concurrency_race_conflict auto-retry (this module's own recovery
+# mechanism, unmodified) stays safe: a purely local no-op or a remote
+# *read* has no Shopify-side effect, so a further automatic retry after
+# recovery cannot cause a duplicate remote effect.
+REPLAY_SAFE_RETRY_POLICIES = (
+    REPLAY_POLICY_LOCAL_ONLY,
+    REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
+)
+
 
 class JobHandlerError(Exception):
     """Raised by a registered handler to report a classified failure.
@@ -286,15 +301,37 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         if not claimable:
             self.env.cr.commit()
             return
-        # (4) We hold the lock and the job is still safely claimable: route it
-        # once to the bounded auto-retry conflict path, WITHOUT replaying the
-        # handler -- so no second Shopify transport is issued.
-        self._route_failure(
-            claimable, 'concurrency_race_conflict',
-            'A concurrent-update conflict aborted the dispatch transaction '
-            'after a transport may have occurred; the job was re-locked and '
-            'routed once to a bounded retry without replaying its handler.',
-        )
+        # (4) We hold the lock and the job is still safely claimable: route
+        # it WITHOUT replaying the handler -- so no second Shopify transport
+        # is issued -- through whichever path its declared replay policy
+        # (DEC-031 Layer 1, AR-048) allows.
+        policy = self._get_replay_policy(claimable.job_type)
+        if policy in REPLAY_SAFE_RETRY_POLICIES:
+            self._route_failure(
+                claimable, 'concurrency_race_conflict',
+                'A concurrent-update conflict aborted the dispatch '
+                'transaction after a transport may have occurred; the job '
+                'was re-locked and routed once to a bounded retry without '
+                'replaying its handler.',
+            )
+        else:
+            # remote_effect_not_replay_safe, or any undeclared/unexpected
+            # policy (fail-closed default -- never a read-safe default): an
+            # automatic retry here could re-issue a Shopify-side effect, so
+            # this never reaches concurrency_race_conflict's auto-retry.
+            # Routed instead through the existing blocked_manual_review /
+            # duplicate_risk vocabulary -- no new error class, no automatic
+            # retry, never retry_waiting.
+            self._route_failure(
+                claimable, 'duplicate_risk',
+                'A concurrent-update conflict aborted the dispatch '
+                'transaction for a job whose remote effect is not declared '
+                'replay-safe. After the rollback, a prior remote effect '
+                'cannot be safely ruled out -- this does not claim a '
+                'Shopify mutation occurred, nor exactly-once execution. '
+                'The job was re-locked and routed to manual review instead '
+                'of an automatic retry.',
+            )
         self.env.cr.commit()
 
     @api.model
@@ -345,6 +382,37 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         (Decision F) -- exercises the registry/dispatch mechanism only.
         Never calls Shopify, never represents domain sync."""
         return None
+
+    @api.model
+    def _get_replay_policies(self):
+        """`job_type` -> replay policy (DEC-031 Layer 1, AR-048).
+
+        Same domain-extension seam shape as `_get_handlers()`: override
+        via classic Odoo inheritance, calling
+        `super()._get_replay_policies()` and updating the returned dict
+        with additional `job_type` -> policy entries -- never removing
+        or overwriting a core-owned entry. Every key `_get_handlers()`
+        returns must have an explicit entry here (build-time
+        completeness invariant, `test_job_dispatch.py`); the runtime
+        lookup (`_get_replay_policy`) independently stays fail-closed
+        for any undeclared `job_type` regardless of that test.
+        """
+        return {
+            'core_dispatch_selftest': REPLAY_POLICY_LOCAL_ONLY,
+        }
+
+    @api.model
+    def _get_replay_policy(self, job_type):
+        """Fail-closed replay-policy lookup for a single `job_type`.
+
+        Returns the explicitly registered policy
+        (:meth:`_get_replay_policies`) when present; defaults any
+        unexpected or undeclared `job_type` to the conservative
+        `remote_effect_not_replay_safe` -- never a read-safe default.
+        """
+        return self._get_replay_policies().get(
+            job_type, REPLAY_POLICY_REMOTE_EFFECT_NOT_REPLAY_SAFE,
+        )
 
     # ------------------------------------------------------------------
     # Dispatch

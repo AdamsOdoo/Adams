@@ -169,6 +169,74 @@ class TestJobDispatch(TransactionCase):
         job.invalidate_recordset()
         self.assertEqual(job.state, 'succeeded')
 
+    # ------------------------------------------------------------------
+    # DEC-031 Layer 1 (AR-048) -- fail-closed replay-policy registry.
+    # ------------------------------------------------------------------
+
+    def test_core_replay_policy_registry_declares_selftest_local_only(self):
+        policies = self.Dispatch._get_replay_policies()
+        self.assertEqual(policies.get('core_dispatch_selftest'), 'local_only')
+
+    def test_every_registered_handler_has_an_explicit_replay_policy(self):
+        """Completeness invariant (DEC-031 Layer 1): every key
+        `_get_handlers()` returns must have an explicit key in
+        `_get_replay_policies()` -- keyed off the handler registry only,
+        never `JOB_STATE_SELECTION`, the full `job_type` Selection, job
+        sources, or trigger origins (those are different vocabularies).
+        This must fail if a registered handler ever lacks a declared
+        policy -- proven directly by patching in an undeclared handler
+        below."""
+        handlers = self.Dispatch._get_handlers()
+        policies = self.Dispatch._get_replay_policies()
+        missing = sorted(set(handlers) - set(policies))
+        self.assertEqual(
+            missing, [],
+            'every _get_handlers() key must have an explicit '
+            '_get_replay_policies() entry; missing: %s' % missing,
+        )
+
+    def test_completeness_invariant_fails_for_an_undeclared_handler(self):
+        """Proves the completeness check above is not vacuously true: a
+        handler registered without a matching policy entry must make it
+        fail."""
+        DispatchModel = self.env.registry['shopify.connector.job.dispatch']
+        original_get_handlers = DispatchModel._get_handlers
+
+        def _extended_get_handlers(self):
+            handlers = dict(original_get_handlers(self))
+            handlers['synthetic_undeclared_job_type'] = lambda job: None
+            return handlers
+
+        with patch.object(
+            DispatchModel, '_get_handlers', _extended_get_handlers,
+        ):
+            handlers = self.Dispatch._get_handlers()
+            policies = self.Dispatch._get_replay_policies()
+        missing = sorted(set(handlers) - set(policies))
+        self.assertEqual(missing, ['synthetic_undeclared_job_type'])
+
+    def test_unexpected_job_type_replay_policy_defaults_conservative(self):
+        """Fail-closed runtime lookup: an unexpected/undeclared `job_type`
+        must default to `remote_effect_not_replay_safe` -- never a
+        read-safe default -- independent of the completeness test above."""
+        self.assertEqual(
+            self.Dispatch._get_replay_policy('synthetic_undeclared_job_type'),
+            'remote_effect_not_replay_safe',
+        )
+
+    def test_core_selftest_replay_policy_is_read_safe_retry_eligible(self):
+        """`core_dispatch_selftest`'s declared `local_only` policy is one of
+        the two classes whose bounded `concurrency_race_conflict`
+        auto-retry recovery stays intact (see
+        test_disconnect_quiescence.py's genuine Test B and RTC-2 proofs)."""
+        from ..models.shopify_connector_job_dispatch import (
+            REPLAY_SAFE_RETRY_POLICIES,
+        )
+        self.assertIn(
+            self.Dispatch._get_replay_policy('core_dispatch_selftest'),
+            REPLAY_SAFE_RETRY_POLICIES,
+        )
+
     def test_missing_handler_fails_safely_to_failed_final(self):
         self.store.write({'state': 'connected'})
         job = self._create_selftest_job(state='queued')
