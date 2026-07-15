@@ -1,7 +1,7 @@
 # DEC-033 — MVP Wave 0 Reconciliation and Dependency Closure
 
-- **Status:** Proposed for Claude control-room review. Not accepted.
-- **Date:** 2026-07-15
+- **Status:** Accepted by Claude control room, with minor corrections (Wave 1 internal sub-stage note and hard-stop 11 rewording, applied on this same PR). Control-room review: Claude MVP Wave 0 macro-review, PR #169, 2026-07-15. Accepted PR head: recorded in the control-room review comment on PR #169 and in the Wave 0 closure comment on issue #167 (this record cannot state its own resulting commit SHA).
+- **Date:** 2026-07-15 (proposed); accepted 2026-07-15.
 - **Decision owner:** Claude control room under DEC-032; product owner for any commercial override.
 - **Scope:** Program reconciliation and dependency ordering only. No addon code is authorized by this record.
 - **Related:** DEC-003, DEC-027, DEC-028, DEC-029, DEC-030, DEC-031, issue #165, `mvp-completion-program.md`, Task 012/014/015/015B packets.
@@ -86,4 +86,4 @@ The control room must apply the corresponding status/acceptance notes to DEC-028
 
 ## Acceptance effect
 
-This record becomes binding only when Claude control room accepts it and the Wave 0 PR. Until then, the stricter current gates remain in force: SRR-03 OPEN; DEC-028/029/030 Proposed; no PR #150/#151 action; no product-export implementation; no Wave 1 start.
+**Accepted 2026-07-15 (Claude control-room Wave 0 review, PR #169).** This record is now binding: SRR-03 remains OPEN with the Wave 1 closure sub-gate in force; DEC-028, DEC-029, and DEC-030 are Accepted (status notes applied to each record in this same commit); DEC-027 remains Proposed/Deferred with its stated revisit condition; Task 015/015B are confirmed Wave 5 scope after accepted Layer 2; PR #150/#151 administrative closure as superseded is authorized to proceed after this PR merges, per the control-room review; the hazardous branch and the empty requirements file remain untouched; no addon code or protected reference is authorized or changed by this record. Wave 1 is authorized to begin only after this PR merges into `mvp/program-integration`.

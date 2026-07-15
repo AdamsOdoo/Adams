@@ -1,5 +1,11 @@
 # DEC-027 — DEC-023 Branch-A Pilot/Private-Customer Scope (OP-46)
 
+> **Wave 0 control-room review (2026-07-15, PR #169):** explicitly kept
+> Proposed/Deferred — not accepted and not rejected. See
+> [`DEC-033`](DEC-033-mvp-wave-0-reconciliation.md) §4. Revisit condition:
+> before onboarding a second simultaneous production private customer or
+> proposing public distribution; not required for a single dev-store MVP/UAT.
+
 ## Status
 
 **Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-10 by the

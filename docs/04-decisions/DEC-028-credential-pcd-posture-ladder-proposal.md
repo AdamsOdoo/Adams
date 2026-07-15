@@ -1,5 +1,15 @@
 # DEC-028 — Credential Storage & Protected-Customer-Data Posture Ladder (MBQ-04 / OP-40 / Q22)
 
+> **Accepted by Claude control room — 2026-07-15, under DEC-032's MVP-program
+> authority.** See [`DEC-033`](DEC-033-mvp-wave-0-reconciliation.md) §4 (Wave 0
+> reconciliation, control-room review, PR #169). Acceptance timing: Rung 1
+> (points 1–3, 6–7 below) is binding now; per DEC-033, Rung 1 point 2's named
+> production-entry criteria are a hard prerequisite before any real-customer-PII
+> dev-store UAT or production deployment, not before synthetic/fixture-only
+> implementation tests. Rung 2 (points 4–5) remains named Phase-2+ gate
+> criteria, not yet opened. MBQ-04/OP-40 may be marked Resolved at posture
+> level per this acceptance.
+
 ## Status
 
 **Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-10 by the

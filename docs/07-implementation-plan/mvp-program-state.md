@@ -4,9 +4,9 @@
 
 ## Current status
 
-**WAVE 0 SUBMITTED — AWAITING CLAUDE CONTROL-ROOM REVIEW (2026-07-15).**
+**WAVE 0 ACCEPTED BY CLAUDE CONTROL ROOM — PENDING MERGE (2026-07-15).** DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed once PR #169 merges. The exact merge commit and resulting `mvp/program-integration` SHA are recorded in the control-room review comment on PR #169 and in the Wave 0 closure comment on issue #167 — not restated here, to avoid this table going stale the moment it is committed.
 
-Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code is authorized in this wave.
+Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code is authorized in this wave. **Wave 1 is authorized to begin once PR #169 merges** (CORE-R1, SEC-1, LC-1, and the SRR-03 closure sub-gate, per `mvp-completion-program.md` §4). Wave 2 remains unauthorized and may not merge, be enabled, or receive live Shopify validation while SRR-03 remains OPEN.
 
 ## Checkpoint / integration identity
 
@@ -24,15 +24,15 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Active wave
 
-**Wave 0 — Current-state reconciliation and research closure — SUBMITTED / GATE PENDING.** Working branch: `sol/wave-0-reconciliation-research`; draft PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) targets `mvp/program-integration`. Scope remained `docs/**` only.
+**Wave 0 — Current-state reconciliation and research closure — ACCEPTED, PENDING MERGE.** Working branch: `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) targets `mvp/program-integration`. Scope remained `docs/**` only. Wave 1 becomes the active wave once this PR merges.
 
 ## Wave status
 
 | Wave | Status | Branch/PR | Notes |
 | --- | --- | --- | --- |
-| 0 — Reconciliation & research closure | Awaiting control-room review | `sol/wave-0-reconciliation-research`; draft PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) | DEC-033 and official-source refresh submitted; no addon/protected changes. |
-| 1 — Read-only foundation integration (CORE-R1, SEC-1, LC-1, SRR-03 closure) | Not started / unauthorized | — | Blocked on Wave 0 acceptance; requires Odoo.sh runtime access. |
-| 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is OPEN; blocked on accepted DEC-033, Wave 1 prerequisites/closure evidence, and packet gate. |
+| 0 — Reconciliation & research closure | Accepted by Claude control room, pending merge | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
+| 1 — Read-only foundation integration (CORE-R1, SEC-1, LC-1, SRR-03 closure) | Authorized upon Wave 0 merge | — | Requires Odoo.sh runtime access. Recommended internal sub-stages: CORE-R1, SEC-1, LC-1, then SRR-03 closure. |
+| 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is OPEN; blocked on Wave 1 prerequisites/closure evidence and packet gate. May not merge, be enabled, or receive live Shopify validation while SRR-03 remains open. |
 | 3 — Inventory synchronization (Task 013/013B) | Not started | — | Blocked on Wave 2 and DEC-031 Layer 2 design+acceptance. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
 | 5 — Premium operator experience (UI U1–U3, PERF-1, Task 015/015B) | Not started / unauthorized | — | Proposed scope includes product export after Layer 2; pending DEC-033 acceptance and Waves 1–4. |
@@ -58,18 +58,18 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Blockers
 
-1. **Wave 0 control-room decisions** — DEC-033 is Proposed; Claude must accept/revise it and align DEC-027/028/029/030 before Wave 0 completes.
-2. **Wave 1 authorization/runtime access** — no Wave 1 work may start before PR #169's gate; Odoo.sh dev-build access is required for its definition of done.
+1. **PR #169 merge** — Accepted by Claude control room; merge into `mvp/program-integration` completes Wave 0.
+2. **Wave 1 runtime access** — Odoo.sh dev-build access is required for CORE-R1/SEC-1/LC-1/SRR-03-closure evidence once Wave 1 opens.
 3. **Dev-store access provisioning** — Wave 6 and mutation-domain UAT require human-provisioned Shopify Partner/dev-store credentials; Sol cannot self-provision them (hard-stop 5).
 
-## Open decisions (full list: `mvp-completion-program.md` §9)
+## Open decisions (full list: `mvp-completion-program.md` §9) — resolved by Wave 0 acceptance
 
-1. DEC-033 proposes retaining Task 015/015B in MVP Wave 5 after Layer 2; pending Claude acceptance.
-2. DEC-033 reconciles SRR-03 to OPEN and proposes a Wave 1 closure sub-gate; pending Claude acceptance and later runtime proof.
-3. PR #150/#151 administrative closure as superseded is recommended; Sol took no action; control-room/product-owner decision pending.
-4. DEC-027 explicit deferral and DEC-028/029/030 acceptance timing are proposed in DEC-033; status changes pending Claude.
-5. Hazard branch: proposed leave untouched; it remains untouched.
-6. Empty requirements file: proposed leave untouched; it remains untouched.
+1. Task 015/015B retained in MVP Wave 5 after Layer 2 — Accepted (DEC-033 §1).
+2. SRR-03 reconciled to OPEN with a Wave 1 closure sub-gate — Accepted (DEC-033 §2); runtime closure proof remains outstanding, owned by Wave 1.
+3. PR #150/#151 administrative closure as superseded — Accepted (DEC-033 §3); action to proceed once PR #169 merges.
+4. DEC-027 explicitly deferred; DEC-028/029/030 Accepted with the prerequisites in DEC-033 §4 — applied to each record on this PR.
+5. Hazard branch left untouched — confirmed; remains untouched.
+6. Empty requirements file left untouched — confirmed; remains untouched.
 
 ## Runtime evidence log
 
@@ -81,9 +81,11 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Next control-room gate
 
-Claude control-room review of draft PR [#169](https://github.com/AdamsOdoo/Adams/pull/169): accept/revise DEC-033, apply the DEC-027/028/029/030 status effects if accepted, confirm the Wave 1/2 gates, and merge only if the Wave 0 definition of done is met.
+Wave 1 macro-wave review (CORE-R1, SEC-1, LC-1, SRR-03 closure), once Sol opens that wave's PR into `mvp/program-integration` and it reaches its own definition of done, per `mvp-completion-program.md` §4 and `../06-prompts/claude-mvp-wave-review-template.md`.
 
 ## Sprint checkpoint log
+
+- **Wave 0 acceptance (2026-07-15):** Claude control-room review accepted DEC-033 with two minor documentation corrections (Wave 1 internal sub-stage note; hard-stop 11 rewording), applied directly on PR #169. DEC-028/029/030 accepted; DEC-027 confirmed Proposed/Deferred. PR #150/#151 administrative closure as superseded authorized to proceed post-merge. Full review recorded as a PR #169 review comment and an issue #167 closure comment. Wave 1 authorized upon merge; Wave 2 remains blocked on SRR-03 closure.
 
 - **Wave 0 submission (2026-07-15):** Docs-only PR #169 opened. DEC-033, official-source refresh, contract/matrix/risk/Task-012 alignment, and session QA/handoff were prepared. No runtime evidence or addon/protected change. Awaiting Claude control-room review; Wave 1 unauthorized.
 

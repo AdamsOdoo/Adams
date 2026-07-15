@@ -1,5 +1,13 @@
 # DEC-030 — Module Lifecycle: Safe Disable, Downgrade, and Uninstall (Review Item 9)
 
+> **Accepted by Claude control room — 2026-07-15, under DEC-032's MVP-program
+> authority.** See [`DEC-033`](DEC-033-mvp-wave-0-reconciliation.md) §4 (Wave 0
+> reconciliation, control-room review, PR #169). Prerequisite per DEC-033:
+> Task LC-1 must implement this record's design in Wave 1 and be
+> runtime-green before Wave 2 begins. Task LC-1's own code still requires its
+> own future implementation-gate act (per `CLAUDE.md` §9) — this acceptance
+> authorizes the design, not the code.
+
 ## Status
 
 **Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-11 by
