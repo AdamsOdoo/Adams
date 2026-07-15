@@ -1,3 +1,12 @@
+### Wave 1 Stage 3 JOB-ACTIONS — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Scope:** accepted D-JA-1 only — additive `action_manual_retry()`/`action_cancel(reason)` with exact state, role, reason, audit, and no-bypass contracts.
+- **Checks:** new model and nine-method focused test source compile; packet allowlist and forbidden-core-edit guards reviewed. No Odoo runtime claim.
+- **SEC-1 seam:** Stage 3 intentionally contains no `sudo()`; Stage 4 must elevate only these two existing write sites while retaining the same behavior and tests.
+- **Boundaries:** no Area 6 scan/cron/domain trigger, Task 012, UI, inventory, fulfillment, export, or Layer 2 work.
+- **Next:** Stage 4 SEC-1 on the same branch/PR, then exact-head Odoo.sh and SRR-03 runtime proof. SRR-03 remains OPEN; Wave 2 unauthorized.
+
 ### Wave 1 hard-stop after LC-1 — compact handoff (2026-07-15)
 
 - **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
