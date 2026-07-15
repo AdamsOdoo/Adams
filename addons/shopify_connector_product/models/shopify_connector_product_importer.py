@@ -2084,7 +2084,9 @@ class ShopifyConnectorJobProductExtension(models.Model):
 
     job_type = fields.Selection(
         selection_add=[('product_import_sync', 'Product Import Sync')],
-        ondelete={'product_import_sync': 'cascade'},
+        ondelete={
+            'product_import_sync': lambda recs: recs._reassign_to_historic_job_type(),
+        },
     )
 
     @api.model
