@@ -15,9 +15,12 @@ Freeze/resume status: **implementation freeze remains in place** (per issue #165
 | Checkpoint SHA | `acd8c4691e72cf5590f2a56228b08f183b76cd9a` |
 | Checkpoint branch | `checkpoint/core-r2-readonly-uat-2026-07-15` |
 | Program integration branch | `mvp/program-integration` |
-| Current `mvp/program-integration` SHA | `f7950e68ff4bb085deaef82563aff25bda6b8545` (checkpoint + governance bootstrap only) |
+| Bootstrap governance merge SHA | `f7950e68ff4bb085deaef82563aff25bda6b8545` (PR #166 merge; checkpoint + governance bootstrap only) |
+| Tracker-upkeep commit | `06600811d664f5e1fee9ee2cb86e6c81f9c8a83e` (routine tracker upkeep recording PR #166/#167; not new governance content) |
 | Bootstrap branch / PR | `claude/mvp-control-room-bootstrap-39nip0` → PR [#166](https://github.com/AdamsOdoo/Adams/pull/166), merged |
 | Master program issue | [#167](https://github.com/AdamsOdoo/Adams/issues/167) |
+
+> **No SHA in this table is the live tip.** `mvp/program-integration` advances with every merge — including routine tracker-upkeep commits to this file — so any "current SHA" recorded here becomes stale the moment it is committed. Every new session must verify the live `mvp/program-integration` tip directly from GitHub before relying on it.
 
 ## Active wave
 
