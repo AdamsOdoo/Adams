@@ -62,4 +62,5 @@ class ShopifyConnectorJobEnqueue(models.AbstractModel):
             vals['trigger_origin_event_ref'] = trigger_origin_event_ref
         if trigger_origin_event_at:
             vals['trigger_origin_event_at'] = trigger_origin_event_at
-        return self.env['shopify.connector.job'].create(vals)
+        job = self.env['shopify.connector.job'].sudo().create(vals)
+        return self.env['shopify.connector.job'].browse(job.id)

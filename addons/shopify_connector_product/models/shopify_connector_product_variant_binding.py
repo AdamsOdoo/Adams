@@ -45,6 +45,9 @@ class ShopifyConnectorProductVariantBinding(models.Model):
     # shopify_image_checksum field for the exact ownership semantics.
     shopify_image_checksum = fields.Char(readonly=True)
 
+    def _odoo_binding_field_name(self):
+        return 'product_variant_id'
+
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',
         'A product-variant binding with this Shopify GID already '

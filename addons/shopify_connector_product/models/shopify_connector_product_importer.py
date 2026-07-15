@@ -667,11 +667,11 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 ),
             )
         with self.env.cr.savepoint():
-            binding.status = 'stale'
+            binding.sudo().write({'status': 'stale'})
             variant_bindings = self.env[
                 'shopify.connector.product.variant.binding'
             ].search([('product_template_binding_id', '=', binding.id)])
-            variant_bindings.write({'status': 'stale'})
+            variant_bindings.sudo().write({'status': 'stale'})
         note = (
             'Shopify product %s no longer exists remotely; its binding is '
             'marked stale for review. The Odoo product is left untouched '
@@ -769,7 +769,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 'or map it manually.' % (payload.get('gid'),),
             )
         with self.env.cr.savepoint():
-            binding.write({
+            binding.sudo().write({
                 'shopify_title': payload.get('title') or False,
                 'shopify_status': payload.get('status') or False,
                 'shopify_primary_image_url': payload.get('image_url') or False,
@@ -781,7 +781,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             ].search(
                 [('product_template_binding_id', '=', binding.id)], order='id',
             )
-            variant_bindings.write({'status': 'stale'})
+            variant_bindings.sudo().write({'status': 'stale'})
         note = (
             'Shopify product %s is ARCHIVED; its binding is marked stale for '
             'review. The Odoo product is left untouched (never modified, '
@@ -864,7 +864,9 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         # any earlier failure rolls it back and never advances it). A later
         # import with the same updatedAt then short-circuits.
         if payload.get('updated_at'):
-            template_binding.shopify_updated_at = payload.get('updated_at')
+            template_binding.sudo().write({
+                'shopify_updated_at': payload.get('updated_at'),
+            })
         return {
             'template_binding': template_binding,
             'variant_bindings': variant_bindings,
@@ -898,7 +900,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             ('store_id', '=', store.id), ('shopify_gid', '=', shopify_gid),
         ], limit=1)
         if existing:
-            existing.write(snapshot_vals)
+            existing.sudo().write(snapshot_vals)
             return existing, 'existing_binding', None
 
         variants = payload.get('variants') or []
@@ -912,12 +914,13 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 ),
             )
         if len(candidate_ids) == 1:
-            binding = TemplateBinding.create(dict(
+            binding = TemplateBinding.sudo().create(dict(
                 snapshot_vals,
                 store_id=store.id, shopify_gid=shopify_gid,
                 product_template_id=candidate_ids[0],
                 match_key=match_key, matched_at=fields.Datetime.now(),
             ))
+            binding = TemplateBinding.browse(binding.id)
             return binding, 'candidate_match', None
 
         any_identifier_present = any(
@@ -950,12 +953,13 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             })
             option_specs = None
             source = 'created_singleton'
-        binding = TemplateBinding.create(dict(
+        binding = TemplateBinding.sudo().create(dict(
             snapshot_vals,
             store_id=store.id, shopify_gid=shopify_gid,
             product_template_id=template.id,
             matched_at=fields.Datetime.now(),
         ))
+        binding = TemplateBinding.browse(binding.id)
         return binding, source, option_specs
 
     @api.model
@@ -1253,7 +1257,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 ),
             )
         match_key = variant_payload.get('_match_key')
-        binding = VariantBinding.create(dict(
+        binding = VariantBinding.sudo().create(dict(
             snapshot_vals,
             store_id=store.id, shopify_gid=shopify_gid,
             product_variant_id=product.id,
@@ -1261,6 +1265,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             match_key=match_key or False,
             matched_at=fields.Datetime.now(),
         ))
+        binding = VariantBinding.browse(binding.id)
         self._apply_variant_extras(
             product, variant_payload, binding, source, settings, media, notes,
         )

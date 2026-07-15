@@ -145,72 +145,52 @@ class TestProductVariantBinding(TransactionCase):
             'gid://shopify/Product/106', 'Template 106',
         )
         variant = template_binding.product_template_id.product_variant_id
-        binding_as_admin = self.VariantBinding.with_user(
-            self.user_admin
-        ).create({
+        binding = self.VariantBinding.sudo().create({
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/ProductVariant/106',
             'product_variant_id': variant.id,
             'product_template_binding_id': template_binding.id,
         })
-
-        # Fix (control-room review, comment 4927278355, fix 2): the
-        # supporting product.template record this test's own ACL
-        # assertions bind against must be created with the normal test
-        # environment/setup user, not a connector-role user -- the
-        # connector admin group is not in Odoo's own Products/Create
-        # group (correct Odoo behaviour, not a connector ACL to widen),
-        # and this test is about binding-model ACLs, not Product app
-        # permissions.
         other_template = self.env['product.template'].create({
             'name': 'Other Access Product',
         })
 
-        # Auditor: read-only.
-        auditor_view = self.VariantBinding.with_user(self.user_auditor)
-        auditor_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        with self.assertRaises(AccessError):
-            auditor_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/ProductVariant/107',
-                'product_variant_id': other_template.product_variant_id.id,
-                'product_template_binding_id': template_binding.id,
+        for index, (label, user) in enumerate((
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ), start=107):
+            view = self.VariantBinding.with_user(user)
+            view.browse(binding.id).read(['shopify_gid'])
+            with self.assertRaises(AccessError, msg=label):
+                view.create({
+                    'store_id': self.store.id,
+                    'shopify_gid': (
+                        'gid://shopify/ProductVariant/%d' % index
+                    ),
+                    'product_variant_id': (
+                        other_template.product_variant_id.id
+                    ),
+                    'product_template_binding_id': template_binding.id,
+                })
+
+        for label, user in (
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+        ):
+            with self.assertRaises(AccessError, msg=label):
+                binding.with_user(user).write({
+                    'shopify_option_values': '%s Write' % label,
+                })
+
+        for label, user in (
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ):
+            binding.with_user(user).write({
+                'shopify_option_values': '%s Write' % label,
             })
-        with self.assertRaises(AccessError):
-            auditor_view.browse(binding_as_admin.id).write(
-                {'shopify_option_values': 'Auditor Write'}
+            self.assertEqual(
+                binding.shopify_option_values, '%s Write' % label,
             )
-
-        # Operator: read + create, no write.
-        operator_view = self.VariantBinding.with_user(self.user_operator)
-        operator_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        operator_created = operator_view.create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/ProductVariant/108',
-            'product_variant_id': other_template.product_variant_id.id,
-            'product_template_binding_id': template_binding.id,
-        })
-        with self.assertRaises(AccessError):
-            operator_view.browse(binding_as_admin.id).write(
-                {'shopify_option_values': 'Operator Write'}
-            )
-
-        # Reviewer: read + write, no create.
-        reviewer_view = self.VariantBinding.with_user(self.user_reviewer)
-        reviewer_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        reviewer_view.browse(operator_created.id).write(
-            {'shopify_option_values': 'Reviewer Write'}
-        )
-        with self.assertRaises(AccessError):
-            reviewer_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/ProductVariant/109',
-                'product_variant_id': other_template.product_variant_id.id,
-                'product_template_binding_id': template_binding.id,
-            })
-
-        # Admin: full (read/write/create), proven by the create above and:
-        binding_as_admin.write({'shopify_option_values': 'Admin Write'})
-        self.assertEqual(
-            binding_as_admin.shopify_option_values, 'Admin Write'
-        )

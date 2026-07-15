@@ -540,16 +540,16 @@ class TestJobDispatch(TransactionCase):
                 create_targets.append(self._env_model_name(node.func.value))
         self.assertEqual(create_targets, ['shopify.connector.job'])
 
-    def test_source_level_no_sudo_in_new_files(self):
-        """No new sudo() site is introduced -- the existing
-        test_source_level_two_sudo_sites_total guard (test_job_log_
-        system_append.py) already fixes the total at exactly two
-        pre-existing sites; this is a same-guarantee, targeted check on
-        just this task's own new files."""
+    def test_source_level_sec1_sudo_sites_in_dispatch_files(self):
+        """SEC-1 elevates only the protected job writer sites."""
+        expected = {
+            'shopify_connector_job_enqueue.py': 1,
+            'shopify_connector_job_dispatch.py': 2,
+        }
         for path in self._find_new_model_files():
             with open(path, 'r', encoding='utf-8') as source_file:
                 tree = ast.parse(source_file.read(), filename=path)
-            offenders = [
+            sudo_calls = [
                 node for node in ast.walk(tree)
                 if (
                     isinstance(node, ast.Call)
@@ -557,7 +557,11 @@ class TestJobDispatch(TransactionCase):
                     and node.func.attr == 'sudo'
                 )
             ]
-            self.assertEqual(offenders, [], path)
+            self.assertEqual(
+                len(sudo_calls),
+                expected[os.path.basename(path)],
+                path,
+            )
 
     # ------------------------------------------------------------------
     # No live Shopify call anywhere in this task's changed production

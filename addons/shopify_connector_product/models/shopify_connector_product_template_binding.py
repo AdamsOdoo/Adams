@@ -54,6 +54,9 @@ class ShopifyConnectorProductTemplateBinding(models.Model):
     # overwritten. Updated only after a successful connector write.
     shopify_image_checksum = fields.Char(readonly=True)
 
+    def _odoo_binding_field_name(self):
+        return 'product_template_id'
+
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',
         'A product-template binding with this Shopify GID already '

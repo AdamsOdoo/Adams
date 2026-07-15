@@ -100,7 +100,7 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         Job = self.env['shopify.connector.job']
         JobLog = self.env['shopify.connector.job.log']
 
-        job = Job.create({
+        job = Job.sudo().create({
             'store_id': store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'core_readiness_check',
@@ -108,6 +108,7 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
             'payload_hash': str(uuid.uuid4()),
             'started_at': fields.Datetime.now(),
         })
+        job = Job.browse(job.id)
         JobLog._system_append(
             job, 'attempt', 'Readiness check attempt started.',
         )
@@ -125,7 +126,7 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
             'last_readiness_result': overall_result,
             'last_readiness_at': fields.Datetime.now(),
         })
-        job.write({
+        job.sudo().write({
             'state': 'succeeded',
             'finished_at': fields.Datetime.now(),
         })

@@ -188,7 +188,7 @@ class TestJobActions(TransactionCase):
             self.assertNotIn('force', args)
             self.assertNotIn('bypass', args)
 
-    def test_source_scope_is_additive_and_has_no_sudo(self):
+    def test_source_scope_is_additive_with_two_sec1_sudo_sites(self):
         path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'models',
@@ -213,4 +213,4 @@ class TestJobActions(TransactionCase):
             sorted(public_methods),
             ['action_cancel', 'action_manual_retry'],
         )
-        self.assertEqual(sudo_calls, [])
+        self.assertEqual(len(sudo_calls), 2)

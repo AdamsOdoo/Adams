@@ -120,60 +120,49 @@ class TestProductTemplateBinding(TransactionCase):
         self.assertEqual(binding.status, 'active')
 
     # ------------------------------------------------------------------
-    # 4. Access matrix: auditor read-only; operator read/create;
-    # reviewer read/write; admin full (read/write/create).
+    # 4. Effective matrix after SEC-1: role reads and snapshot writes
+    # remain ACL-governed; protected identity create is denied for all.
     # ------------------------------------------------------------------
 
     def test_access_matrix_across_four_groups(self):
         template = self._make_template('Template E')
-        binding_as_admin = self.TemplateBinding.with_user(
-            self.user_admin
-        ).create({
+        binding = self.TemplateBinding.sudo().create({
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Product/7',
             'product_template_id': template.id,
         })
 
-        # Auditor: read-only.
-        auditor_view = self.TemplateBinding.with_user(self.user_auditor)
-        auditor_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        with self.assertRaises(AccessError):
-            auditor_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/Product/8',
-                'product_template_id': self._make_template('Template F').id,
+        for index, (label, user) in enumerate((
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ), start=8):
+            view = self.TemplateBinding.with_user(user)
+            view.browse(binding.id).read(['shopify_gid'])
+            with self.assertRaises(AccessError, msg=label):
+                view.create({
+                    'store_id': self.store.id,
+                    'shopify_gid': 'gid://shopify/Product/%d' % index,
+                    'product_template_id': self._make_template(
+                        'Protected Create %s' % label
+                    ).id,
+                })
+
+        for label, user in (
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+        ):
+            with self.assertRaises(AccessError, msg=label):
+                binding.with_user(user).write({
+                    'shopify_title': '%s Write' % label,
+                })
+
+        for label, user in (
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ):
+            binding.with_user(user).write({
+                'shopify_title': '%s Write' % label,
             })
-        with self.assertRaises(AccessError):
-            auditor_view.browse(binding_as_admin.id).write(
-                {'shopify_title': 'Auditor Write'}
-            )
-
-        # Operator: read + create, no write.
-        operator_view = self.TemplateBinding.with_user(self.user_operator)
-        operator_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        operator_created = operator_view.create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/Product/9',
-            'product_template_id': self._make_template('Template G').id,
-        })
-        with self.assertRaises(AccessError):
-            operator_view.browse(binding_as_admin.id).write(
-                {'shopify_title': 'Operator Write'}
-            )
-
-        # Reviewer: read + write, no create.
-        reviewer_view = self.TemplateBinding.with_user(self.user_reviewer)
-        reviewer_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        reviewer_view.browse(operator_created.id).write(
-            {'shopify_title': 'Reviewer Write'}
-        )
-        with self.assertRaises(AccessError):
-            reviewer_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/Product/10',
-                'product_template_id': self._make_template('Template H').id,
-            })
-
-        # Admin: full (read/write/create), proven by the create above and:
-        binding_as_admin.write({'shopify_title': 'Admin Write'})
-        self.assertEqual(binding_as_admin.shopify_title, 'Admin Write')
+            self.assertEqual(binding.shopify_title, '%s Write' % label)

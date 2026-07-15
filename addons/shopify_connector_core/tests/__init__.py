@@ -19,4 +19,5 @@ from . import test_job_retry_scheduling
 from . import test_readiness_check
 from . import test_readiness_slot_closure
 from . import test_redaction
+from . import test_security_hardening
 from . import test_test_connection

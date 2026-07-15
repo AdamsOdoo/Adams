@@ -137,7 +137,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
     Every write path here goes through `shopify.connector.job`'s own
     `write()`/state-transition-helper methods and
     `job.log._system_append()` -- no second job-log write path, no
-    direct `job.log.create()` call, no `sudo()`, no live Shopify API
+    direct `job.log.create()` call, and no live Shopify API
     call anywhere in this file.
     """
 
@@ -453,7 +453,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         `_transition_failed_retryable()` helper, logged exclusively
         through `_system_append()`) rather than silently remaining
         `queued`/`retry_waiting` forever. This does not bypass or weaken
-        either gate: `job.write()` itself still raises exactly as
+        either gate: the sanctioned protected write still raises exactly as
         before -- this only makes an already-blocked start observable,
         as a configuration/state problem an operator can correct and
         retry later (the same DEC-009 "manual fix then retry" class
@@ -466,7 +466,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
         try:
-            job.write({
+            job.sudo().write({
                 'state': 'running',
                 'started_at': job.started_at or fields.Datetime.now(),
             })
@@ -568,7 +568,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
-        job.write({
+        job.sudo().write({
             'state': 'succeeded', 'finished_at': fields.Datetime.now(),
         })
         JobLog._system_append(

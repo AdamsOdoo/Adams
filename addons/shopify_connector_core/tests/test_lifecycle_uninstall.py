@@ -107,7 +107,8 @@ class TestLifecycleUninstall(TransactionCase):
         )
 
     def test_dispatcher_refuses_direct_historic_job(self):
-        job = self._job(job_type='historic_domain_job')
+        # `_dispatch_one` is entered only after the dispatcher owns a running job.
+        job = self._job(state='running', job_type='historic_domain_job')
         self.Dispatch._dispatch_one(job)
         job.invalidate_recordset()
         self.assertEqual(job.state, 'failed_final')
@@ -186,4 +187,7 @@ class TestLifecycleUninstall(TransactionCase):
             and isinstance(node.func, ast.Attribute)
         ]
         self.assertFalse(any(call.func.attr == 'unlink' for call in calls))
-        self.assertFalse(any(call.func.attr == 'sudo' for call in calls))
+        self.assertEqual(
+            len([call for call in calls if call.func.attr == 'sudo']),
+            2,
+        )

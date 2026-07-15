@@ -53,7 +53,7 @@ class ShopifyConnectorJobActions(models.Model):
         }
         if from_state == 'blocked_manual_review':
             values['manual_review_subreason'] = False
-        self.write(values)
+        self.sudo().write(values)
         self._log_transition(
             'manual_action',
             'Job manually re-queued by %s.' % self.env.user.display_name,
@@ -85,7 +85,7 @@ class ShopifyConnectorJobActions(models.Model):
             )
 
         reason = reason.strip()
-        self.write({
+        self.sudo().write({
             'state': 'cancelled',
             'cancel_reason': reason,
             'finished_at': fields.Datetime.now(),
