@@ -124,25 +124,30 @@ webhook/OAuth surface.
 
 **D-SEC1-1 — Legal job transition matrix (server-enforced).** A
 module-level constant on the job model, exhaustive:
-`draft→queued`; `queued→running|cancelled`;
-`running→succeeded|failed_final|skipped|retry_waiting|failed_retryable|blocked_manual_review`;
-`retry_waiting→running|cancelled`;
-**`draft|queued|retry_waiting→failed_retryable` (the merged
-blocked-start routing — red-team-corrected 2026-07-11 round 2: the
-dispatcher's `_start_running` catches the gating `ValidationError`
-and routes a still-`queued`/`retry_waiting`/`draft` job to
-`failed_retryable` via `odoo_validation_configuration`,
-`shopify_connector_job_dispatch.py` lines 186–200, asserted green by
-`test_job_dispatch.py` lines 238–286 — a matrix without these edges
-would break the merged dispatcher and its suite)**;
+`draft→queued|cancelled|failed_retryable`;
+`queued→running|cancelled|failed_retryable|retry_waiting|failed_final|blocked_manual_review`;
+`running→succeeded|failed_final|skipped|retry_waiting|failed_retryable|blocked_manual_review|cancelled`;
+`retry_waiting→running|cancelled|failed_retryable|failed_final|blocked_manual_review`;
 `failed_retryable|failed_final|blocked_manual_review|skipped→queued`
-(manual retry — Area 6's allowed-from set, retry_count reset);
-non-terminal→`cancelled`. Everything else — including any
-terminal→terminal edge and any write that *skips* a state — is
-illegal. `write()` validates every `state` change against the matrix
-and raises `ValidationError` on violation **regardless of caller**
-(sudo included — the matrix is a correctness invariant, not a
-permission).
+(manual retry, with the sanctioned service resetting retry state).
+Everything else — including `draft→running`, `draft→retry_waiting`,
+terminal→terminal edges, and any write that skips a state — is illegal.
+`write()` validates every state change against the matrix and raises
+`ValidationError` on violation **regardless of caller** (sudo included
+— the matrix is a correctness invariant, not a permission).
+
+**Runtime-compatibility amendment (2026-07-16; product-owner ruling PR
+#172 comment `4984719237`).** The five recovery edges
+`queued→retry_waiting|failed_final|blocked_manual_review` and
+`retry_waiting→failed_final|blocked_manual_review` are required by the
+already-accepted CORE-R2 concurrency-recovery path. A genuine PostgreSQL
+concurrency failure rolls back the original transaction and its uncommitted
+`running` write. Recovery therefore re-locks the exact job in its committed
+claimable state (`queued` or due `retry_waiting`) and routes it once,
+without replaying the handler. Recovery must not manufacture `running`,
+weaken row locking or replay policy, or legalize either forbidden draft edge.
+Same-state `retry_waiting` updates continue through the existing
+no-state-change behavior.
 
 **D-SEC1-2 — Protected system fields require system context.** On
 `shopify.connector.job`, the protected set — `state`, `retry_count`,

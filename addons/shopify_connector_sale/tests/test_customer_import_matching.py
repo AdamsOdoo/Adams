@@ -595,7 +595,7 @@ class TestCustomerImportMatching(TransactionCase):
             'store_id': self.store.id,
             'job_source': job_source,
             'job_type': 'customer_import_sync',
-            'state': 'draft',
+            'state': 'queued',
             'payload_hash': str(uuid.uuid4()),
             'shopify_target_gid': 'gid://shopify/Customer/915',
         })

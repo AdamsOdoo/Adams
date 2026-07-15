@@ -145,6 +145,38 @@ class TestSecurityHardening(TransactionCase):
                     job.invalidate_recordset()
                     self.assertEqual(job.state, from_state)
 
+    def test_recovery_edges_exact_without_legalizing_draft_or_rpc_writes(self):
+        self.assertEqual(
+            LEGAL_JOB_TRANSITIONS['queued'],
+            frozenset((
+                'running', 'cancelled', 'failed_retryable',
+                'retry_waiting', 'failed_final', 'blocked_manual_review',
+            )),
+        )
+        self.assertEqual(
+            LEGAL_JOB_TRANSITIONS['retry_waiting'],
+            frozenset((
+                'running', 'cancelled', 'failed_retryable',
+                'failed_final', 'blocked_manual_review',
+            )),
+        )
+        self.assertNotIn('running', LEGAL_JOB_TRANSITIONS['draft'])
+        self.assertNotIn('retry_waiting', LEGAL_JOB_TRANSITIONS['draft'])
+
+        for target in ('running', 'retry_waiting'):
+            job = self._job('draft')
+            with self.assertRaises(ValidationError, msg=target):
+                job.sudo().write({'state': target})
+            job.invalidate_recordset()
+            self.assertEqual(job.state, 'draft')
+
+        for label, user in self.roles.items():
+            job = self._job('queued')
+            with self.assertRaises(AccessError, msg=label):
+                job.with_user(user).write({'state': 'retry_waiting'})
+            job.invalidate_recordset()
+            self.assertEqual(job.state, 'queued')
+
     def test_resolve_manual_review_role_state_and_audit(self):
         job = self._job('blocked_manual_review')
         with self.assertRaises(AccessError):

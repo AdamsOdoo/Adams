@@ -1441,14 +1441,11 @@ class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
             'job_type': 'core_dispatch_selftest', 'state': 'queued',
             'payload_hash': uuid.uuid4().hex,
         })
-        retry = Job.create({
+        retry = Job.sudo().create({
             'store_id': store.id, 'job_source': 'webhook',
-            'job_type': 'core_dispatch_selftest', 'state': 'draft',
+            'job_type': 'core_dispatch_selftest', 'state': 'retry_waiting',
             'payload_hash': uuid.uuid4().hex,
-        })
-        retry.write({
-            'state': 'retry_waiting', 'next_retry_at': fields.Datetime.now(),
-            'retry_count': 1,
+            'next_retry_at': fields.Datetime.now(), 'retry_count': 1,
         })
         store.action_disconnect()
         for job in (queued, retry):
@@ -3857,13 +3854,17 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
     # Fixtures / observers (genuine, bounded, independent connections)
     # ------------------------------------------------------------------
 
-    def _commit_store_with_jobs(self, dbname, n_jobs=1, retry_counts=None):
-        """Commit a connected store + credential + ``n_jobs`` business
-        (``manual_sync`` / ``core_dispatch_selftest``) jobs on an independent
-        bounded connection. Optionally seed each job's ``retry_count`` (raw SQL)
-        so the bounded-retry exhaustion boundary can be exercised. Returns
-        ``(store_id, shop_domain, [job_id, ...])`` with ids ascending == claim
-        order."""
+    def _commit_store_with_jobs(
+        self, dbname, n_jobs=1, retry_counts=None, initial_states=None,
+    ):
+        """Commit a connected store + credential + claimable business jobs.
+
+        The normal enqueue service creates every row in queued. A controlled
+        superuser setup then prepares only an explicitly requested due
+        retry_waiting state and/or retry count through the real job model;
+        fixtures never rely on an illegal production transition. Returns
+        (store_id, shop_domain, [job_id, ...]) with ids in claim order.
+        """
         setup = self._open_bounded(dbname)
         try:
             env = api.Environment(setup, SUPERUSER_ID, {})
@@ -3878,25 +3879,30 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
                 store, DUMMY_TOKEN)
             # action_set_token demotes connected -> reconnect_needed; re-assert.
             store.write({'state': 'connected'})
+            states = initial_states or ['queued'] * n_jobs
+            counts = retry_counts or [0] * n_jobs
+            self.assertEqual(len(states), n_jobs)
+            self.assertEqual(len(counts), n_jobs)
             job_ids = []
-            for _n in range(n_jobs):
+            for index in range(n_jobs):
                 job = env['shopify.connector.job.enqueue'].enqueue(
                     store, 'manual_sync', 'core_dispatch_selftest',
                     payload_hash=uuid.uuid4().hex,
                 )
+                values = {'retry_count': counts[index]}
+                if states[index] == 'retry_waiting':
+                    values.update({
+                        'state': 'retry_waiting',
+                        'next_retry_at': (
+                            fields.Datetime.now() - timedelta(seconds=1)
+                        ),
+                    })
+                else:
+                    self.assertEqual(states[index], 'queued')
+                job.sudo().write(values)
                 job_ids.append(job.id)
             store_id = store.id
             setup.commit()
-            if retry_counts:
-                seed = self._open_bounded(dbname)
-                try:
-                    for jid, rc in zip(job_ids, retry_counts):
-                        seed.execute(
-                            "UPDATE shopify_connector_job SET retry_count = %s "
-                            "WHERE id = %s", (rc, jid))
-                    seed.commit()
-                finally:
-                    seed.close()
             return store_id, shop_domain, job_ids
         finally:
             setup.close()
@@ -3933,6 +3939,106 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
             return row
         finally:
             obs.close()
+
+    def _assert_direct_recovery_routes(
+        self, expected_state, retry_count=0, replay_policies=None,
+    ):
+        """Recover from both committed claimable states without replay."""
+        dbname = self.env.cr.dbname
+        store_id = None
+        relocked = []
+        handler_calls = []
+        initial_states = ['queued', 'retry_waiting']
+        try:
+            store_id, _shop_domain, job_ids = self._commit_store_with_jobs(
+                dbname,
+                n_jobs=2,
+                retry_counts=[retry_count, retry_count],
+                initial_states=initial_states,
+            )
+            recovery_cr = self._open_bounded(dbname)
+            try:
+                recovery_env = api.Environment(
+                    recovery_cr, SUPERUSER_ID, {},
+                )
+                DispatchCls = type(
+                    recovery_env['shopify.connector.job.dispatch']
+                )
+                JobCls = type(recovery_env['shopify.connector.job'])
+                real_try_lock = JobCls.try_lock_for_update
+
+                def recording_try_lock(records, *args, **kwargs):
+                    relocked.append(tuple(records.ids))
+                    return real_try_lock(records, *args, **kwargs)
+
+                def recording_handler(job):
+                    handler_calls.append(job.id)
+
+                with contextlib.ExitStack() as stack:
+                    stack.enter_context(patch.object(
+                        JobCls, 'try_lock_for_update', recording_try_lock,
+                    ))
+                    stack.enter_context(patch.object(
+                        DispatchCls, '_get_handlers',
+                        lambda self: {
+                            'core_dispatch_selftest': recording_handler,
+                        },
+                    ))
+                    if replay_policies is not None:
+                        stack.enter_context(patch.object(
+                            DispatchCls, '_get_replay_policies',
+                            lambda self: dict(replay_policies),
+                        ))
+                    dispatch = recovery_env[
+                        'shopify.connector.job.dispatch'
+                    ]
+                    for job_id in job_ids:
+                        dispatch._recover_after_concurrency_conflict(job_id)
+            finally:
+                recovery_cr.close()
+
+            self.assertEqual(
+                relocked, [(job_ids[0],), (job_ids[1],)],
+                'recovery must re-lock each exact job once before routing',
+            )
+            self.assertEqual(
+                handler_calls, [],
+                'concurrency recovery must never replay the handler',
+            )
+            for job_id in job_ids:
+                state, observed_retry_count = self._observe_job(
+                    dbname, job_id,
+                )
+                self.assertEqual(state, expected_state)
+                if expected_state in ('retry_waiting', 'failed_final'):
+                    self.assertEqual(
+                        observed_retry_count, retry_count + 1,
+                    )
+                else:
+                    self.assertEqual(observed_retry_count, retry_count)
+        finally:
+            self._cleanup(dbname, store_id)
+
+    def test_recovery_queued_and_due_retry_safe_budget_routes_retry_waiting(self):
+        self._assert_direct_recovery_routes('retry_waiting')
+
+    def test_recovery_queued_and_due_retry_exhaustion_routes_failed_final(self):
+        self._assert_direct_recovery_routes(
+            'failed_final', retry_count=RETRY_MAX_ATTEMPTS,
+        )
+
+    def test_recovery_queued_and_due_retry_remote_effect_routes_manual_review(self):
+        self._assert_direct_recovery_routes(
+            'blocked_manual_review',
+            replay_policies={
+                'core_dispatch_selftest': 'remote_effect_not_replay_safe',
+            },
+        )
+
+    def test_recovery_queued_and_due_retry_undeclared_routes_manual_review(self):
+        self._assert_direct_recovery_routes(
+            'blocked_manual_review', replay_policies={},
+        )
 
     # ------------------------------------------------------------------
     # Test B -- still-connected post-transport serialization failure

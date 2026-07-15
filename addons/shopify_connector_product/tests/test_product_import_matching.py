@@ -540,7 +540,7 @@ class TestProductImportMatching(TransactionCase):
             'store_id': self.store.id,
             'job_source': job_source,
             'job_type': 'product_import_sync',
-            'state': 'draft',
+            'state': 'queued',
             'payload_hash': str(uuid.uuid4()),
             'shopify_target_gid': 'gid://shopify/Product/908',
         })

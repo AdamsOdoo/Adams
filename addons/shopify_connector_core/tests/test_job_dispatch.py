@@ -260,7 +260,7 @@ class TestJobDispatch(TransactionCase):
             'store_id': self.store.id,
             'job_source': 'manual_sync',
             'job_type': 'core_dispatch_selftest',
-            'state': 'draft',
+            'state': 'queued',
             'payload_hash': str(uuid.uuid4()),
         })
         self.assertTrue(self.Dispatch._start_running(job))
@@ -289,7 +289,7 @@ class TestJobDispatch(TransactionCase):
         # unchanged behavior for the three pre-existing core job_types.
         self.store.write({'state': 'connected'})
         job = self._create_selftest_job(
-            job_source='setup_readiness_check', state='draft',
+            job_source='setup_readiness_check', state='queued',
         )
         self.assertTrue(self.Dispatch._start_running(job))
         self.store.write({'state': 'disconnected'})
@@ -309,7 +309,7 @@ class TestJobDispatch(TransactionCase):
             'store_id': self.store.id,
             'job_source': 'manual_sync',
             'job_type': 'core_dispatch_selftest',
-            'state': 'draft',
+            'state': 'queued',
             'payload_hash': str(uuid.uuid4()),
         })
         # The store disconnects strictly before the start-running
@@ -331,7 +331,7 @@ class TestJobDispatch(TransactionCase):
 
     def test_start_running_blocked_by_domain_flag_becomes_visible_audited(self):
         self.store.write({'state': 'connected'})
-        job = self._create_selftest_job(state='draft')
+        job = self._create_selftest_job(state='queued')
         JobModel = self.env.registry['shopify.connector.job']
 
         def _fake_domain_flag_for_job_type(self, job_type):
@@ -362,7 +362,7 @@ class TestJobDispatch(TransactionCase):
 
     def test_execution_time_domain_enabled_recheck_blocks_and_unblocks_start(self):
         self.store.write({'state': 'connected'})
-        job = self._create_selftest_job(state='draft')
+        job = self._create_selftest_job(state='queued')
         JobModel = self.env.registry['shopify.connector.job']
 
         def _fake_domain_flag_for_job_type(self, job_type):
@@ -377,7 +377,7 @@ class TestJobDispatch(TransactionCase):
             with self.assertRaises(ValidationError):
                 job.write({'state': 'running'})
             job.invalidate_recordset()
-            self.assertEqual(job.state, 'draft')
+            self.assertEqual(job.state, 'queued')
 
             self.env['shopify.connector.store.settings'].create({
                 'store_id': self.store.id,
@@ -433,6 +433,7 @@ class TestJobDispatch(TransactionCase):
             },
             'failed_retryable': {},
             'blocked_manual_review': {
+                'error_class': 'duplicate_risk',
                 'manual_review_subreason': 'ambiguous_match',
             },
         }
@@ -440,14 +441,13 @@ class TestJobDispatch(TransactionCase):
             # Reset the store to connected between scenarios (the prior
             # scenario left it `disconnecting`).
             self.store.write({'state': 'connected'})
-            job = self.Job.create({
+            job = self.Job.sudo().create(dict({
                 'store_id': self.store.id,
                 'job_source': 'manual_sync',
                 'job_type': 'core_dispatch_selftest',
-                'state': 'draft',
+                'state': state,
                 'payload_hash': str(uuid.uuid4()),
-            })
-            job.write(dict({'state': state}, **extras[state]))
+            }, **extras[state]))
             self.store.action_disconnect()
             job.invalidate_recordset()
             if state in cancellable:

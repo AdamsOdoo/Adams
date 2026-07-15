@@ -22,12 +22,18 @@ TERMINAL_JOB_STATES = ('succeeded', 'failed_final', 'skipped', 'cancelled')
 # server-side for every caller. Context flags are intentionally not accepted.
 LEGAL_JOB_TRANSITIONS = {
     'draft': frozenset(('queued', 'cancelled', 'failed_retryable')),
-    'queued': frozenset(('running', 'cancelled', 'failed_retryable')),
+    'queued': frozenset((
+        'running', 'cancelled', 'failed_retryable', 'retry_waiting',
+        'failed_final', 'blocked_manual_review',
+    )),
     'running': frozenset((
         'succeeded', 'failed_final', 'skipped', 'retry_waiting',
         'failed_retryable', 'blocked_manual_review', 'cancelled',
     )),
-    'retry_waiting': frozenset(('running', 'cancelled', 'failed_retryable')),
+    'retry_waiting': frozenset((
+        'running', 'cancelled', 'failed_retryable', 'failed_final',
+        'blocked_manual_review',
+    )),
     'failed_retryable': frozenset(('queued', 'cancelled')),
     'failed_final': frozenset(('queued',)),
     'blocked_manual_review': frozenset(('queued', 'cancelled')),

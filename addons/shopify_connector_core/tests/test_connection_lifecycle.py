@@ -470,11 +470,10 @@ class TestConnectionLifecycle(TransactionCase):
         # and handled by the controller/timeout).
         self.store.write({'state': 'connected'})
         queued = self._create_job('webhook', state='queued')
-        retry = self._create_job('manual_sync', state='draft')
-        retry.write({
-            'state': 'retry_waiting', 'next_retry_at': fields.Datetime.now(),
-            'retry_count': 1,
-        })
+        retry = self._create_job(
+            'manual_sync', state='retry_waiting',
+            next_retry_at=fields.Datetime.now(), retry_count=1,
+        )
         running = self._create_job('scheduled_sync', state='running')
         self._store().action_disconnect()
         for job in (queued, retry):
@@ -591,17 +590,17 @@ class TestConnectionLifecycle(TransactionCase):
 
     def test_business_job_running_blocked_when_not_connected(self):
         self.store.write({'state': 'connected'})
-        job = self._create_job('manual_sync', state='draft')
+        job = self._create_job('manual_sync', state='queued')
         # Race: the store disconnects after enqueue but before start.
         self.store.write({'state': 'disconnected'})
         with self.assertRaises(ValidationError):
             job.write({'state': 'running'})
         job.invalidate_recordset()
-        self.assertEqual(job.state, 'draft')
+        self.assertEqual(job.state, 'queued')
 
     def test_business_job_running_succeeds_when_connected(self):
         self.store.write({'state': 'connected'})
-        job = self._create_job('manual_sync', state='draft')
+        job = self._create_job('manual_sync', state='queued')
         job.write({'state': 'running'})
         self.assertEqual(job.state, 'running')
 
@@ -612,12 +611,12 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.write({'state': 'disconnected'})
         job = self._create_job(
             'setup_readiness_check', job_type='core_manual_maintenance',
-            state='draft',
+            state='queued',
         )
         with self.assertRaises(ValidationError):
             job.write({'job_source': 'manual_sync', 'state': 'running'})
         job.invalidate_recordset()
-        self.assertEqual(job.state, 'draft')
+        self.assertEqual(job.state, 'queued')
 
     def test_business_job_running_blocked_when_store_id_changed_in_same_write(self):
         # Symmetric bypass attempt via store_id instead of job_source.
@@ -628,11 +627,11 @@ class TestConnectionLifecycle(TransactionCase):
             'state': 'disconnected',
         })
         self.store.write({'state': 'connected'})
-        job = self._create_job('manual_sync', state='draft')
+        job = self._create_job('manual_sync', state='queued')
         with self.assertRaises(ValidationError):
             job.write({'store_id': other_store.id, 'state': 'running'})
         job.invalidate_recordset()
-        self.assertEqual(job.state, 'draft')
+        self.assertEqual(job.state, 'queued')
 
     def test_business_job_can_be_cancelled_when_not_connected(self):
         self.store.write({'state': 'connected'})
@@ -649,7 +648,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.write({'state': 'disconnected'})
         job = self._create_job(
             'setup_readiness_check', job_type='core_test_connection',
-            state='draft',
+            state='queued',
         )
         job.write({'state': 'running'})
         self.assertEqual(job.state, 'running')
