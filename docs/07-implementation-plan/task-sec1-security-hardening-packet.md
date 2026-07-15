@@ -34,6 +34,45 @@
 > safety comes from the fixed comodel plus the existence/company/
 > uniqueness checks (D-SEC1-4/7).**
 
+## Binding product-owner execution clarification (PR #172 comment `4982750956`)
+
+This clarification is binding for Stage 4 and closes the pre-implementation
+hard-stop without changing architecture or MVP scope.
+
+**Audit carrier.** D-SEC1-4 binding overrides and D-SEC1-6 PII masking reuse
+the existing
+`shopify.connector.store._create_lifecycle_audit_job(message)` helper. No
+new audit model/table, job type, job source, or orphan job-log path is
+permitted. SEC-1 narrowly applies `sudo()` only to that helper's protected job
+`create()` and terminal `write()`; the Store/helper and
+`shopify.connector.job.log._system_append()` retain the original caller
+environment so `actor_uid` remains the caller. The binding/PII mutation is
+performed first and the audit helper is called afterward in the same
+transaction, so audit failure rolls the mutation back. Each binding override
+and manual mask produces exactly one carrier/log. A scheduled retention sweep
+processes per store and produces exactly one summary carrier/log per affected
+store. Messages contain identifiers, counts, actor id, and mandatory reason
+only, after redaction — never raw PII, credentials, headers, tokens, or
+payload values.
+
+**Current-company rule.** No `company_id` is added to the store. The current
+bound record and proposed target are resolved in the seam's fixed comodel under
+the caller's normal environment before any sudo. Where `company_id` exists,
+every non-empty company must equal `self.env.company`; when both current and
+target companies are non-empty they must also equal each other. Records without
+a company field or with a false company remain valid. A mismatch raises
+`UserError` before mutation/audit. The method accepts no caller-supplied
+model or company argument and must not use `env.companies` or
+`create_uid.company_id`.
+
+**Required focused proof.** Same-company and company-neutral success; current
+and target company mismatch refusal; no write/audit on every refusal; exactly
+one carrier/log per action or affected store; original `actor_uid`; redacted,
+identifier/count/reason-only messages; atomic rollback on audit failure; and
+all earlier D-SEC1-7 coverage including `original_job_type`,
+`cancel_reason`, binding identity, PII, retention, transitions, and sanctioned
+writers.
+
 ## 1. The verified current exposure (facts, file:line)
 
 1. **[Fact]** `ir.model.access.csv` (core) grants `perm_write=1` on
