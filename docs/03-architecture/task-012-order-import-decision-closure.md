@@ -7,6 +7,19 @@
 > *decision-complete* so that a separate control-room gate can issue the
 > locked prompt (packet §15) immediately after its prerequisites merge.
 >
+> **Wave 0 reconciliation notice (2026-07-15; DEC-033 Proposed):** The MVP
+> program's checkpoint is now `acd8c4691e72cf5590f2a56228b08f183b76cd9a`.
+> Product/customer capabilities are checkpoint-integrated, but CORE-R1, SEC-1,
+> and LC-1 remain Wave 1 work. Exact-head checkpoint evidence keeps **SRR-03
+> OPEN**; statements below that say “SRR-03 CLOSED” or “CORE-R1 already merged”
+> are historical and stale. DEC-033 proposes: Task 012 declares
+> `remote_read_replay_safe`; DEC-031 Layer 2 remains reserved for Shopify
+> mutation domains; parallel Task 012 development may begin only after Wave 1
+> code prerequisites exist; and no Task 012 PR may merge, be enabled, or receive
+> live validation until SRR-03 closure and LC-1 runtime proof are accepted. Until
+> Claude accepts DEC-033, the stricter existing gate and this packet's unusable
+> locked prompt remain in force.
+>
 > **Prerequisites are capability-based, not PR-merge-based (corrected
 > 2026-07-14 per control-room review `4690680028` and the revised CORE-R2
 > Slice-2B integration-staging strategy — see §0):** SRR-03 CLOSED; the
