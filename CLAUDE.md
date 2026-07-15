@@ -4,6 +4,11 @@
 > It is the governance contract for the premium **Odoo 19 ↔ Shopify Connector**
 > project. If a task prompt conflicts with this file, stop and raise the
 > conflict in your reply rather than silently choosing one.
+>
+> **If your session's work is based on `mvp/program-integration`** (the MVP
+> completion program), read **§13 (MVP Program Control-Room)** below first —
+> it records a scoped, explicit change to the roles and process in §2/§6 for
+> that program only. Everything else in this file still applies unchanged.
 
 ---
 
@@ -207,6 +212,53 @@ A session is **not complete** until the quality gate is satisfied.
 See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
 §11 (documentation maintenance rule) — both currently
 `[Recommendation — becomes binding when merged by ChatGPT]`.
+
+## 13. MVP Program Control-Room (addendum, 2026-07-15)
+
+> This section is additive. It does not erase, retract, or reinterpret §1–§12
+> above for any work outside the MVP completion program. It records a
+> deliberate, product-owner-instructed, scoped change to the operating model
+> for work based on `mvp/program-integration` only. Full basis:
+> [`DEC-032-mvp-autonomous-execution-model.md`](docs/04-decisions/DEC-032-mvp-autonomous-execution-model.md)
+> (Accepted, 2026-07-15).
+
+- **Claude is now the independent control room** for the MVP completion
+  program: scope governor and release gatekeeper for all work on or
+  descending from `mvp/program-integration`. Claude does not write connector
+  feature code in this role.
+- **GPT-5.6 Sol is the implementation worker** for this program: the primary
+  autonomous research/implementation worker, operating under
+  [`docs/06-prompts/gpt56-sol-master-mvp-mission.md`](docs/06-prompts/gpt56-sol-master-mvp-mission.md).
+- **The checkpoint remains protected.** `checkpoint/core-r2-readonly-uat-2026-07-15`
+  (commit `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, recorded in issue #165)
+  is never modified, reset, or force-pushed by this program. `mvp/program-integration`
+  was created from that exact commit and is where every macro-wave PR lands.
+- **The macro-wave process supersedes the prior micro-session workflow
+  (§2, §6) only for work based on `mvp/program-integration`.** Sol may work
+  autonomously inside an authorized wave without per-commit approval; Claude
+  reviews and gates each wave's merge using
+  [`docs/06-prompts/claude-mvp-wave-review-template.md`](docs/06-prompts/claude-mvp-wave-review-template.md).
+  Every other CLAUDE.md rule (citation discipline §7, claim classification
+  §8, allowed/forbidden-files discipline §9/§11 adapted per wave, the
+  rejected-approaches rule §10, and the handoff/quality-loop requirement §12)
+  still applies in full to this program — only the "one clearly scoped
+  objective per session, ChatGPT reviews every step" cadence is superseded,
+  and only here.
+- **All other branch protections remain unchanged.** `Shopify-connector` and
+  `main` keep their existing rules exactly as written in this file's Branch
+  Governance section; this program never branches from or targets either.
+  PR #150 and PR #151 remain protected references for this program (their
+  code content is already integrated into the checkpoint; see
+  [`mvp-completion-program.md`](docs/07-implementation-plan/mvp-completion-program.md)
+  §2 for the evidence) and are not to be closed, merged, or edited without an
+  explicit control-room/product-owner decision recorded in that file's §9.
+- **No feature coding by Claude** under this addendum, unless the product
+  owner explicitly changes Claude's role again. Claude's role here is
+  governance, audit, wave review, and release-gating only.
+- The live status of this program is tracked in
+  [`docs/07-implementation-plan/mvp-program-state.md`](docs/07-implementation-plan/mvp-program-state.md)
+  — read it for current wave/blocker/decision status; do not rely on this
+  addendum's text staying current on those details.
 
 ---
 
