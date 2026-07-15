@@ -1,3 +1,12 @@
+### Wave 1 SEC-1 pre-edit hard-stop — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Completed this resume:** product-owner-approved `original_job_type` packet amendment; Stage 3 JOB-ACTIONS implementation, nine-method test matrix, syntax proof, validation record, AR-051, and tracker/handoff updates.
+- **New hard-stop (condition 10):** D-SEC1-4 binding override and D-SEC1-6 masking/sweep require audited `manual_action`/summary rows, but the only connector audit-row model is `shopify.connector.job.log` with required `job_id`; the packet defines no audit-job carrier/creation door or alternative audit model. D-SEC1-4 also requires binding-store/company consistency, while `shopify.connector.store` has no company field.
+- **Why Sol stopped:** inventing a generic audit model, synthesizing maintenance jobs, expanding the sanctioned sudo/create inventory, or adding store ownership would change the accepted security architecture. No SEC-1 production/test file was edited.
+- **Runtime:** Stage 1–3 exact-head Odoo.sh remains pending. Stage 5/SRR-03 is unstarted and SRR-03 remains OPEN.
+- **Boundary:** no Wave 2+ implementation; PR #172 remains draft/unmerged. Resume only after an explicit accepted mechanism resolves both SEC-1 gaps.
+
 ### Wave 1 Stage 3 JOB-ACTIONS — compact handoff (2026-07-15)
 
 - **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
