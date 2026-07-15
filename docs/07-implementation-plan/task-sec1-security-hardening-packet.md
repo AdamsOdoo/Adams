@@ -106,7 +106,16 @@ permission).
 `error_class`, `manual_review_subreason`, `payload_hash`,
 `res_model`, `res_id`, `shopify_target_gid`, `job_type`, `job_source`,
 `trigger_origin`, `next_retry_at`, `started_at`, `finished_at`,
-`superseded_by_job_id` — is writable only when `self.env.su` is true
+`superseded_by_job_id`, **`cancel_reason`** (added 2026-07-15, DEC-034
+Wave 1 reconciliation adversarial check: `cancel_reason` is the field
+Task JOB-ACTIONS's `action_cancel()` writes alongside `state` under
+its own mandatory-non-empty-reason, audited, permission-gated
+contract — omitting it here would leave it a plain
+`perm_write=1`-ACL'd field, directly RPC/ORM-writable by any
+operator/reviewer/admin with no group check, no reason validation, and
+no audit row, bypassing `action_cancel()`'s own contract for exactly
+the field that records *why* a job was cancelled) — is writable only
+when `self.env.su` is true
 (the dispatcher, transitions, and sanctioned services run their
 writes through an internal `sudo()` after their own explicit
 permission checks). A non-su write touching any protected field
@@ -286,7 +295,9 @@ without inventing encryption (DEC-028 boundary respected).
 
 **D-SEC1-7 — Negative test matrix (the proof).** For each group
 (auditor/operator/reviewer/admin) × each protected surface: direct
-`write({'state': …})`, `write({'retry_count': …})`, binding
+`write({'state': …})`, `write({'retry_count': …})`, **`write({'cancel_reason': …})`
+(added 2026-07-15, DEC-034 — proves the field `action_cancel()` writes
+cannot be forged/overwritten outside that sanctioned method)**, binding
 `write({'shopify_gid': …})`, `write({'partner_id': …})`, job
 `create()` bypassing enqueue, `unlink()` everywhere, PII field read,
 masked-field read, each sanctioned method with and without the

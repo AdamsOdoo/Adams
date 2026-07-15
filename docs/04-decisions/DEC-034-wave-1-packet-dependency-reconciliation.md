@@ -328,9 +328,52 @@ rejected, starts Wave 2 inside Wave 1. Reorder to SEC-1-before-LC-1
 and redesign LC-1's cancellation path — rejected, redesigns an Accepted
 decision (DEC-030) to fit a non-binding recommended order.
 
+## Adversarial consistency check (Phase 7)
+
+Ten independent verifier agents each checked one consistency claim
+against the live PR diff (`claude/wave-1-packet-plan-txod46` vs.
+`mvp/program-integration`), instructed to default to FAIL/UNCERTAIN
+absent direct evidence. **9/10 PASS** (no Area-6 scope absorbed; no
+Task 012 file required; LC-1 runs before SEC-1 without needing
+not-yet-existing code; SEC-1 lands after LC-1 without breaking
+uninstall conversion; future bindings inherit a mandatory fail-closed
+contract; no duplicated job-action implementation left in Area 6;
+SRR-03 closure stays independent of DEC-031 Layer 2; Wave 1 remains
+one macro-wave gate with five reviewable internal stages; every
+changed file is under `docs/**`).
+
+**1 FAIL, corrected on this PR before merge:** `task-sec1-security-hardening-packet.md`'s
+D-SEC1-2 protected-field enumeration omitted `cancel_reason` — the
+field Task JOB-ACTIONS's `action_cancel()` writes alongside `state`
+under its own mandatory-reason, audited, permission-gated contract.
+Without it in the protected set, `cancel_reason` would have stayed a
+plain `perm_write=1`-ACL'd field once SEC-1's su-guard landed —
+directly RPC/ORM-writable by any operator/reviewer/admin with no group
+check, no reason validation, and no audit row, defeating
+`action_cancel()`'s own contract for exactly the field that records
+*why* a job was cancelled. **Fixed:** `cancel_reason` added to
+D-SEC1-2's protected set (with an inline rationale note), and
+`write({'cancel_reason': …})` added to D-SEC1-7's negative test
+matrix, so the gap is both closed and test-covered. No other design
+change resulted; this is a one-field enumeration completeness fix, not
+a mechanism change.
+
 ## Acceptance effect
 
-**[Placeholder — completed only after independent verification and the
-adversarial consistency check (Phase 7) confirm the reconciliation is
-internally consistent and fully documented. Do not treat this record as
-binding until this section names the accepting control-room review.]**
+**Accepted by Claude control room — 2026-07-15.** Independently
+re-verified per the "Exact conflict" section above (primary-source
+reading, live `git grep`/`git ls-tree`, not accepted on Sol's summary
+alone) and per the adversarial consistency check above (one real gap
+found and corrected before this acceptance). Control-room review
+reference: this session's own Phase 7 adversarial check (10 verifier
+agents, workflow run `wf_81131cc0-9df`) plus this record's own
+independent-verification pass. This record is now binding: the
+corrected Wave 1 internal stage order (CORE-R1 → LC-1 → Task
+JOB-ACTIONS → SEC-1 → SRR-03 closure), the transfer of generic
+job-control ownership to Task JOB-ACTIONS, SEC-1's current-surface
+rescoping (including the `cancel_reason` protected-field correction),
+the future binding-extension contract, and LC-1/SEC-1 compatibility
+are all binding effective on this PR's merge into
+`mvp/program-integration`. AR-049 status is now ACCEPTED (same ID, no
+new AR row, per this repository's established convention for an
+acceptance pass on the same reviewed proposal).
