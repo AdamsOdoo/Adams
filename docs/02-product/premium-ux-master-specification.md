@@ -354,7 +354,7 @@ design system defaults.
 
 ### S8 — Customer matching / review (inside S24)
 
-- As S6, for customers/partners: candidate evidence = email/phone/address signals; **PII masked by default for Users** — unmasked only via the Administrator-configured PII toggle ([connector-roles-and-permissions.md](connector-roles-and-permissions.md) §3); masked values still support exact-match confirmation via server-side comparison ("email matches" without showing it). Duplicate-contact prevention is the headline (top market complaint, refresh §9). Audit as S6.
+- As S6, for customers/partners: candidate evidence = email/phone/address signals; **both Connector User and Connector Administrator read the raw operational PII** their permitted operations require — there is no masked-by-default view and no unmask toggle in the MVP ([connector-roles-and-permissions.md](connector-roles-and-permissions.md) §3); access stays governed by ordinary Odoo ACLs, company boundaries, and audit/redaction rules. Duplicate-contact prevention is the headline (top market complaint, refresh §9). Audit as S6.
 
 ### S10 — Location mapping
 
@@ -390,7 +390,7 @@ design system defaults.
 ### S13 / S20 — Fulfillment workspace
 
 - **Purpose:** the fulfillment face for both modes ([fulfillment-operating-modes.md](fulfillment-operating-modes.md)): Mode 1 outbound write-back state; Mode 2 inbound reconciliation overview; notification-guard prompts (RA-009).
-- **Primary role:** User. **Data:** fulfillment rows keyed to the **six-concept separation** ([shopify-fulfillment-status-model.md](shopify-fulfillment-status-model.md) §1) — Odoo picking state, order fulfillment summary, FO work state (incl. hold reasons), fulfillment result, carrier milestone, connector reconciliation state — **one badge per concept, never merged**.
+- **Primary role:** User. **Data:** fulfillment rows keyed to the distinct status dimensions of the four-layer status taxonomy ([shopify-fulfillment-status-model.md](shopify-fulfillment-status-model.md) §1) — Odoo delivery state, order fulfillment summary (Layer A), FO work state (incl. hold reasons), fulfillment result, carrier milestone, and connector reconciliation state (Layer C) — **one badge per dimension, never merged**.
 - **Primary action:** open the row's pending decision (notification guard / review case / timeline). **Secondary:** verify state, open picking, open S22 timeline.
 - **Status language:** exactly the §2–§5 label/badge/severity tables of the fulfillment status model, including deprecated-value tooltips and the unknown-value contract (§4.11 here).
 - **Visual:** concept badges in a fixed column order; row severity = max across concepts; Delivered-inconsistency cases (status model §8) pinned at top, danger badge `alert-decagram`, also pinned to S3.
@@ -510,15 +510,15 @@ design system defaults.
 
 - **Purpose:** show and (Administrator) assign the two customer-facing roles; make the capability split legible. Supersedes S14's four-role informational page at proposal level.
 - **Primary role:** Administrator (assign); Users see their own role and what it means.
-- **Data:** user list with one "Shopify Connector" role selection (User / Administrator / none — single privilege dropdown per the roles doc §4.3); capability comparison table (User column vs Administrator column, from roles doc §1.1/§1.2); PII visibility toggle state (§3 of roles doc) with its audit trail.
-- **Primary action:** change a user's role (consequence sentence: what they gain/lose). **Secondary:** open PII policy (S30 cross-link).
-- **Status language:** none beyond role chips; PII toggle state = explicit sentence ("Connector Users see masked customer data on this store").
-- **States:** empty n/a; error = save failure with retry. **A11y:** comparison table with proper headers. **Audit:** role changes and PII-toggle changes logged who/when.
+- **Data:** user list with one "Shopify Connector" role selection (User / Administrator / none — single privilege dropdown per the roles doc §4.3); capability comparison table (User column vs Administrator column, from roles doc §1.1/§1.2). There is **no** PII visibility toggle in the MVP (roles doc §3): both roles read raw operational PII, so no masking control is shown here.
+- **Primary action:** change a user's role (consequence sentence: what they gain/lose). **Secondary:** open retention & privacy (S30 cross-link).
+- **Status language:** none beyond role chips; no PII-masking/visibility state is shown (the MVP has no PII toggle — roles doc §3).
+- **States:** empty n/a; error = save failure with retry. **A11y:** comparison table with proper headers. **Audit:** role changes logged who/when.
 
 ### S30 — Retention & privacy
 
-- **Purpose:** Administrator controls for data retention windows, purge-on-disconnect behavior (DEC-030), PII visibility policy, export-before-uninstall.
-- **Primary role:** Administrator (Users read). **Data:** retention windows per data class (evidence records, logs, checkout PII per [abandoned-checkout-policy.md](abandoned-checkout-policy.md) §3.4), purge policy, PII toggle (per-store), last purge runs.
+- **Purpose:** Administrator controls for data retention windows, purge-on-disconnect behavior (DEC-030), documented data-privacy/retention policy, export-before-uninstall. (No PII-masking or visibility toggle exists in the MVP — roles doc §3; a masking/privacy feature is a separately reviewed post-MVP enhancement.)
+- **Primary role:** Administrator (Users read). **Data:** retention windows per data class (evidence records, logs, checkout PII per [abandoned-checkout-policy.md](abandoned-checkout-policy.md) §3.4), purge policy, last purge runs. (No per-store PII toggle — roles doc §3.)
 - **Primary action:** Save. **Secondary:** run export-before-uninstall (guarded, consequence preview), view purge history.
 - **Status language:** destructive actions danger-styled with preview of exactly what is deleted (counts per class) — never a bare "Purge" button.
 - **States:** success = purge/export completion summary; error = partial purge listed per class (§4 partial). **Audit:** every retention change and purge run logged; this screen is itself the privacy audit surface.
@@ -535,7 +535,7 @@ design system defaults.
 ### S32 — Abandoned checkouts (post-MVP placeholder)
 
 - **Purpose:** optional premium workspace per [abandoned-checkout-policy.md](abandoned-checkout-policy.md) §3: list abandoned checkouts, classification, conversion display, audited manual quotation action. **Not built in MVP; no menu entry, no stub** until the capability is enabled and the feature is implemented under its own decision.
-- **Design constraints recorded now:** contact PII masked for Users (default; OQ-E of the roles doc governs whether the PII toggle extends here); refresh cadence honest; retention window surfaced; the manual quotation action is audited and consequence-previewed. Full spec deferred to the enabling packet.
+- **Design constraints recorded now:** contact PII is shown raw to permitted roles under ordinary Odoo access control and PCD access-logging — no masking or unmask toggle (the MVP has none; roles doc §3, [abandoned-checkout-policy.md](abandoned-checkout-policy.md) §3.2); refresh cadence honest; retention window surfaced; the manual quotation action is audited and consequence-previewed. Full spec deferred to the enabling packet.
 
 ## 4. Global state contract — the eleven states
 
@@ -669,7 +669,7 @@ doesn't already gate.
   everywhere (requires SEC-2 accepted first — roles doc §5 blocker).
 - **U2 — Order-to-cash surfaces.** S16 orders workspace, S17 order review
   (four state strips + consistency panel), S18 COD reconciliation, S20
-  fulfillment workspace with the six-concept badge columns, S21 external
+  fulfillment workspace with the per-dimension status badge columns, S21 external
   fulfillment review, S22 timeline component, S5 recovery-view polish.
 - **U3 — Catalog, inventory, recovery & config.** S24/S6/S8 matching center
   productionization, S7 diff, S27 product export, S19 inventory workspace +

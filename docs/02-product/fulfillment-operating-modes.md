@@ -302,8 +302,9 @@ Rules:
 
 Pointer: the general reconnect/backfill policy (watermarks, quiescence,
 catch-up ordering) is the companion gap-closure deliverable
-(`reconnect-and-backfill-policy.md`, this mission — pending; interim
-references: [`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md)).
+[`reconnect-catchup-backfill-policy.md`](reconnect-catchup-backfill-policy.md)
+(this mission — now published; see also
+[`../03-architecture/disconnect-quiescence-remediation-analysis.md`](../03-architecture/disconnect-quiescence-remediation-analysis.md)).
 Fulfillment-specific behavior:
 
 - On reconnect, re-scan the store's FulfillmentOrders and Fulfillments
@@ -340,8 +341,8 @@ Fulfillment-specific behavior:
 
 ## 9. Tests and UAT (summary)
 
-Pointer: full matrix in `../05-qa/fulfillment-mode-uat-matrix.md` (companion
-gap-closure deliverable — pending). Minimum coverage: every §4 condition has
+Pointer: full matrix in [`../05-qa/fulfillment-mode-uat-matrix.md`](../05-qa/fulfillment-mode-uat-matrix.md)
+(companion gap-closure deliverable — now published). Minimum coverage: every §4 condition has
 a pass case and a fail-to-review case with the exact reason; §4.1 selection
 determinism incl. split/backorder; lot/serial ambiguity refusal; duplicate
 GID application blocked; cancelled/failed/held inbound states; mode-switch
@@ -352,15 +353,27 @@ precedence). Fixture names per File B §10.
 
 ## 10. Wave allocation
 
-[Recommendation] **Wave 4:** Mode 1 in full (outbound = revised Task 014;
-inbound observation, origin classification, evidence records, review cases,
-tracking import, explicit User validation) + the mode setting fixed at
-Mode 1. **Mode 2 auto-application: Wave 5** (or a Wave 4 stretch only if
-Wave 4 lands early with the location-mapping prerequisite proven) — it
-depends on location mappings, the per-line reconciliation ledger being
-battle-tested by Mode 1 review traffic, and its own UAT matrix. Shipping
-Mode 2 in the same wave as its substrate would violate the fail-closed
-philosophy of this design.
+[Proposed product decision] **Both Mode 1 and Mode 2 are required MVP Wave 4
+backend scope.** Wave 4 delivers, as backend: the per-store operating-mode
+field (live with both `mode1` and `mode2` values), Mode 1 in full (outbound =
+revised Task 014; inbound observation, origin classification, evidence records,
+review cases, tracking import, explicit User validation), and the Mode 2
+exact-conditions engine (the §4 16-condition checklist, the §4.1 deterministic
+picking selection, the inbound reconciliation data model §5, the mode-switch
+state machine §6, and reconnect reconciliation §7). Wave 4 **may internally
+sequence** Mode 1 before Mode 2 — Mode 2 auto-application depends on location
+mappings and on the per-line reconciliation ledger being exercised by Mode 1
+review traffic — but **Wave 4 cannot close until both Mode 1 and Mode 2 backend
+behavior is implemented, tested, and runtime-proven**, including genuine
+dev-store fulfillment-mutation UAT per the fulfillment-mode UAT matrix. Mode 2
+is **not** optional, a stretch, deferred, "Mode 1 only", or a Wave 5 backend
+item.
+
+**Wave 5 owns only the premium fulfillment UI** — the Administrator mode
+selector, the mode explanation/confirmation screen, the unresolved-external-
+fulfillment review UI, the User review workspace, reconciliation
+visualizations, mode-switch history, and fulfillment dashboards/timelines.
+**Wave 5 does NOT own the Mode 2 backend.**
 
 ## 11. Proposed decisions
 
@@ -376,7 +389,10 @@ philosophy of this design.
    never replays history, scan-gated, idempotent, rollback-safe (§6).
 6. [Proposed product decision] Disconnected-period external fulfillments →
    review in both modes (§7).
-7. [Recommendation] Mode 2 lands Wave 5 / Wave 4 stretch (§10).
+7. [Proposed product decision] Mode 1 and Mode 2 are both required Wave 4
+   backend scope; Wave 4 may sequence Mode 1 before Mode 2 but cannot close
+   until both are runtime-proven. Wave 5 owns only the fulfillment/mode UI,
+   never the Mode 2 backend (§10).
 
 ## 12. Open questions
 

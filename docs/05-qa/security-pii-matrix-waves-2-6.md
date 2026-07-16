@@ -6,8 +6,7 @@
 > tests — acceptance-matrix rows 2/19) to the surfaces the Wave 2–5 domains
 > introduce. Role vocabulary is the proposed two-role model of
 > [`../02-product/connector-roles-and-permissions.md`](../02-product/connector-roles-and-permissions.md)
-> (Connector User / Connector Administrator; hidden PII technical group per
-> its §3). PCD levels: [Fact] Shopify Protected Customer Data Level 2 =
+> (Connector User / Connector Administrator). PCD levels: [Fact] Shopify Protected Customer Data Level 2 =
 > name, address, email, phone (access logging, minimization, retention
 > discipline); Level 1 = other customer data
 > ([captures §12](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)).
@@ -15,6 +14,26 @@
 > (`_system_append`) and
 > [`security-redaction-test-plan.md`](./security-redaction-test-plan.md) /
 > [`credential-security-redaction-review-checklist.md`](./credential-security-redaction-review-checklist.md).
+>
+> **[Product-direction update — 2026-07-16] No PII masking in the MVP.** The
+> product owner ruled that PII masking is not part of the MVP. Connector User
+> and Connector Administrator each read the **raw** customer/order PII their
+> permitted operations require, governed by ordinary Odoo access control,
+> company boundaries, connector-model ACLs, redaction rules, and audit rules.
+> There is **no** masked-by-default display, **no** User-unmask toggle, **no**
+> per-store PII-visibility toggle, **no** separate PII permission tier, and
+> **no** hidden/third customer-facing PII role. Masked snapshots, manual /
+> scheduled / retention masking, masking configuration, masking UAT, and
+> masked-field acceptance criteria are **not** MVP capabilities. **Log / audit /
+> credential / header / error / diagnostic redaction stays mandatory** —
+> redacting PII out of logs is not the same as masking business records, and it
+> stays in force. Credential masking (the `•••` token, no read-back — DEC-004)
+> is **not** PII masking and is unaffected. The Wave-1 SEC-1 customer-PII
+> masking implementation is superseded and removed by the SEC-2 correction
+> ([`../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`](../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md),
+> Proposed); a masking feature is deferred to a separately reviewed post-MVP
+> optional privacy enhancement. The rows below are updated to this direction;
+> redaction, company-boundary, and field-ACL requirements are unchanged.
 
 ## Matrix — one section per new surface
 
@@ -34,26 +53,32 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
 - **PCD:** customer snapshot fields = **Level 2**; order line/financial data
   = Level 1. [Inference] COD collection amounts are connector-owned
   operational data, not Shopify PCD — but they are financially sensitive
-  and inherit the same masked-by-default display posture.
-- **Role visibility:** User sees orders with **masked PII by default**
-  (partial email, no phone/address); unmasked PII is Administrator-only
-  unless the per-store Administrator toggle grants Users unmasked access
-  (roles doc §3). COD ledger/collection events visible to User (operational
-  duty); discrepancy resolution Administrator-only.
-- **Field groups:** PII snapshot fields carry field-level `groups=` on the
-  hidden PII group (re-keyed from `reviewer,admin` per roles doc §4.6), with
-  computed masked display for non-members; [Fact] field-level `groups=`
-  removes fields from views and `fields_get` and blocks ORM read/write
-  (captures §5) — masking must be group-based, never view-only.
+  and inherit the same role-gated, audited, log-redacted posture (no masking).
+- **Role visibility:** [Product-direction update — 2026-07-16] Both Connector
+  User and Connector Administrator read the **raw** customer/order PII their
+  permitted operations require — no masked-by-default display, no unmask
+  toggle, no per-store PII-visibility toggle, no separate PII tier; visibility
+  is governed by ordinary Odoo access control, company boundaries,
+  connector-model ACLs, and audit. COD ledger/collection events visible to User
+  (operational duty); discrepancy resolution Administrator-only.
+- **Field groups:** [Product-direction update — 2026-07-16] customer PII
+  snapshot fields are **not** placed behind a masking group — both roles read
+  them as raw operational data, and the Wave-1 SEC-1 masking group/compute is
+  removed by the SEC-2 correction. Field-level `groups=` remains in use only
+  for genuinely restricted fields (e.g. the credential `access_token`,
+  Administrator-only settings); [Fact] field-level `groups=` removes fields
+  from views and `fields_get` and blocks ORM read/write (captures §5), so where
+  a field genuinely IS restricted the gate is group-based, never view-only.
 - **Redaction:** logs carry order GIDs and counts, never customer names/
   emails/phones/addresses; collection-event log lines carry amounts +
   event IDs, never free-text notes (notes may contain PII).
 - **Retention:** order-binding PII snapshots covered by the existing PII
   retention sweep; `customers/redact`/`shop/redact` webhook handling must
   scrub order-level customer snapshots ([Fact] obligations, captures §12).
-- **Audit:** every unmask access is logged (PCD Level 2 access-logging);
-  every collection event append-only with actor; discrepancy resolutions
-  recorded as decisions, never edits.
+- **Audit:** PCD Level 2 customer-PII access is access-logged per the
+  access-logging obligation (there is no unmask event — access itself is the
+  logged event); every collection event append-only with actor; discrepancy
+  resolutions recorded as decisions, never edits.
 - **Residue:** disconnect preserves history (MBQ-08) but a redaction
   request/retention expiry leaves zero PII residue in bindings, jobs, logs,
   or attachments.
@@ -64,11 +89,14 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
   expands); COD amount tampering (mitigated: append-only events +
   compensating corrections); mark-as-paid abuse (mitigated: rule L-3 +
   Administrator policy + discrepancy freeze).
-- **Required tests:** PII / ORM-security (masked default, toggle unmask,
-  `fields_get` omission); redaction scan over import-error logs containing
-  synthetic PII; permissions matrix (User vs Administrator on discrepancy
-  resolution, policy fields); retention/redaction sweep test; append-only
-  enforcement test.
+- **Required tests:** PII / ORM-security — assert **no** masking surface exists
+  (no masked-compute field, no unmask toggle/action, no PII-visibility group)
+  and that both roles read the raw operational PII their permitted operations
+  require; company-boundary and connector-model ACL enforcement; `fields_get`
+  omission for genuinely restricted fields (credentials/settings); redaction
+  scan over import-error logs containing synthetic PII; permissions matrix
+  (User vs Administrator on discrepancy resolution, policy fields);
+  retention/redaction sweep test; append-only enforcement test.
 
 ### 2. Abandoned checkouts (post-MVP workspace; MVP = absence)
 
@@ -78,28 +106,34 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
   explicitly PCD (captures §5/§12). The recovery URL grants cart access and
   is treated as sensitive.
 - **Role visibility:** MVP: surface does not exist (PD-AC-1/2 — the binding
-  MVP test is *absence*). Workspace, when built: User sees masked contact
-  data; recovery URL Administrator-only [Recommendation — abandoned doc
-  §3.1]; unmask follows the roles-doc mechanism with no checkout-specific
-  exception ([Open question OQ-E of the roles doc: whether checkout PII is
-  always Administrator-only]).
-- **Field groups:** customer fields + recovery URL behind the hidden PII
-  group (URL possibly admin-group only, pending OQ-E).
+  MVP test is *absence*). [Product-direction update — 2026-07-16] The post-MVP
+  workspace, if ever built, exposes checkout PII as **raw** operational data to
+  permitted roles (no masked display, no unmask toggle); the recovery URL is
+  treated as sensitive and remains Administrator-only [Recommendation —
+  abandoned doc §3.1]. Any masking of checkout PII is a deferred post-MVP
+  privacy enhancement, not an MVP capability; the former OQ-E (checkout-PII
+  unmask strictness) is dropped as a masking question.
+- **Field groups:** [Product-direction update — 2026-07-16] customer fields are
+  raw operational data (no masking group); only the recovery URL may carry an
+  Administrator-only `groups=` as a genuinely sensitive field (post-MVP
+  workspace only).
 - **Redaction:** checkout logs carry checkout IDs and counts only; never
   contact data or recovery URLs.
 - **Retention:** **the PII retention sweep must cover the checkout cache**
   (PD-AC-3); `customers/redact`/`shop/redact` must purge/scrub cache rows —
   a cache outliving redaction is a compliance defect.
-- **Audit:** every unmask access-logged; manual quotation action audited
-  (actor, checkout id, store, timestamp — PD-AC-4).
+- **Audit:** PCD Level 2 checkout-PII access is access-logged (no unmask event
+  exists); manual quotation action audited (actor, checkout id, store,
+  timestamp — PD-AC-4).
 - **Residue:** feature disable / uninstall drops the cache; MVP residue test
   = no checkout-derived record of any kind exists.
 - **Credentials:** none; uses existing `read_orders` scope [Fact].
 - **Threats:** recovery-URL leakage (cart takeover); dead-PII accumulation
   (mitigated: short default window, retention sweep); demand pollution via
   auto-quotations (structurally absent — PD-AC-1).
-- **Required tests:** MVP: UAT-AC-1/2 absence tests + residue sweep.
-  Workspace: masked-display, URL role gate, retention/redact purge,
+- **Required tests:** MVP: UAT-AC-1/2 absence tests + residue sweep (assert no
+  checkout surface and no masking surface exist). Post-MVP workspace: raw-PII
+  role-access, recovery-URL Administrator-only gate, retention/redact purge,
   audit-log presence, reconnect re-scan without duplicates.
 
 ### 3. Fulfillment addresses and tracking (Wave 4)
@@ -113,10 +147,12 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
   person + address) — displayed to Users (operational necessity), excluded
   from logs beyond identifiers.
 - **Role visibility:** User works fulfillment review cases and sees
-  tracking/locations; the address itself follows the order-surface masking
-  (§1). Mode selection/switching Administrator-only.
-- **Field groups:** address snapshots inherit §1's PII group; mode setting
-  is Administrator-only via Python-level `groups=` (modes doc §8).
+  tracking/locations; the address follows the order-surface raw-PII access
+  model (§1 — raw operational PII to both roles, no masking). Mode
+  selection/switching Administrator-only.
+- **Field groups:** address snapshots are raw operational data (no §1 masking
+  group — removed by SEC-2); the mode setting is Administrator-only via
+  Python-level `groups=` (modes doc §8).
 - **Redaction:** [Fact — Task 014 §4 posture] recipient names are never
   logged; fulfillment logs carry picking/FO/Fulfillment GIDs, quantities,
   tracking refs, and the notification decision — never name/address.
@@ -186,9 +222,11 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
 - **Role visibility:** the wizard (and its samples) is
   **Administrator-only** (PD-RB-8); Users see only post-enqueue progress
   counts.
-- **Field groups:** samples render through the same masked-field
-  infrastructure as §1 — Administrator sees per their own rights; a future
-  role relaxation must not leak samples.
+- **Field groups:** [Product-direction update — 2026-07-16] samples render the
+  raw §1 order PII (no masking infrastructure — the wizard is
+  Administrator-only, so access is gated by the role, not by field masking); a
+  future role relaxation must re-apply Administrator-only gating so samples
+  never leak to Users.
 - **Redaction:** preview job logs carry counts and range parameters only —
   never sample contents.
 - **Retention:** previews are ephemeral (no records created — PD-RB-8 §5.3);
@@ -216,9 +254,13 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
 - **Role visibility:** user form shows exactly one "Shopify Connector"
   selection with *User* / *Administrator*; the four legacy groups hidden
   (developer-mode only, "Technical /" prefixed).
-- **Field groups:** PII field `groups=` re-keyed from `reviewer,admin` to
-  the hidden PII group with **default membership = Administrator** — the
-  migration must not widen PII visibility as a side effect.
+- **Field groups:** [Product-direction update — 2026-07-16] SEC-2 does **not**
+  create a PII masking group and **removes** the Wave-1 customer-PII
+  masking/compute entirely (both roles read raw operational PII), so the module
+  owns exactly the six role groups — no separate PII tier. Genuinely restricted
+  `groups=` fields (credential `access_token`, Administrator-only settings)
+  keep their Administrator-only gating; the migration must not widen access to
+  those as a side effect.
 - **Redaction:** migration log lines carry logins and group names — no PII
   concern beyond ordinary log access control.
 - **Retention:** n/a (security data is permanent); legacy memberships
@@ -234,14 +276,18 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
   no-escalation test (exactly reviewer-tier acts gained, credentials/
   settings/destructive overrides still denied); (b) hidden groups manually
   assigned in developer mode bypassing UI gates — mitigated: server-side
-  gates must hold regardless (roles doc §4.9.5); (c) PII group membership
-  accidentally defaulted to all Users — mitigated by the §4.9.4 field-level
-  test; (d) `noupdate` group data silently not applying implied_ids edits
+  gates must hold regardless (roles doc §4.9.5); (c) the SEC-2 masking removal
+  accidentally exposing a genuinely-restricted field (e.g. credentials) or
+  leaving masking partially in place — mitigated by the §4.9 test asserting no
+  masking surface remains and that credential/settings `groups=` stay
+  Administrator-only; (d) `noupdate` group data silently not applying implied_ids edits
   (OQ-B) — mitigated by asserting the post-migration closure explicitly.
 - **Required tests:** the full roles-doc §4.9 suite — ACL matrix (5 user
   archetypes × every model), migration idempotency (script twice),
-  no-privilege-escalation, field-level PII, UI hiding + server-side-holds,
-  implication closure (admin → 5 groups, user → 4).
+  no-privilege-escalation, no-masking-surface assertion (both roles read raw
+  operational PII; only genuinely restricted fields such as credentials/settings
+  stay gated), UI hiding + server-side-holds, implication closure
+  (admin → 5 groups, user → 4).
 
 ## Cross-cutting requirements (all surfaces)
 
@@ -261,8 +307,12 @@ rules) · **Retention** (sweep coverage) · **Audit** · **Residue** ·
 
 ## Open items
 
-- [Open question] OQ-A/OQ-E (roles doc): PII toggle mechanism and checkout
-  PII strictness — both change §1/§2 rows' test details when resolved.
+- [Resolved by the 2026-07-16 no-masking ruling] The former OQ-A (PII
+  unmask-toggle mechanism) and OQ-E (checkout-PII unmask strictness) are
+  dropped — there is no masking or unmask toggle in the MVP, and both roles read
+  raw operational PII; the SEC-2 packet
+  ([`../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`](../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md),
+  Proposed) removes the Wave-1 masking.
 - [Open question] Whether COD collection-event *notes* should be
   structurally PII-restricted or covered by guidance + redaction only —
   proposed for the Wave 4 packet's security section.

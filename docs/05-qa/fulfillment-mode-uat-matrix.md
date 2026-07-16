@@ -5,9 +5,13 @@
 > [`../02-product/fulfillment-operating-modes.md`](../02-product/fulfillment-operating-modes.md)
 > (File A) and
 > [`../02-product/shopify-fulfillment-status-model.md`](../02-product/shopify-fulfillment-status-model.md)
-> (File B). Mode 1 cases execute with Wave 4; Mode 2 and mode-switch cases
-> execute when the Mode 2 packet lands (Wave 5 / Wave 4 stretch); all live
-> runs are Wave 6 dev-store UAT. Fixture names reference File B §10 where a
+> (File B). **[Product-direction update — 2026-07-16] Both Mode 1 and Mode 2
+> are required MVP Wave 4 backend scope** (File A §10/§11). Mode 1, Mode 2, and
+> mode-switch backend cases all execute with **Wave 4** — Wave 4 may internally
+> sequence Mode 1 before Mode 2 but cannot close until both are implemented,
+> tested, and runtime-proven; the Administrator mode-selection UI is Wave 5, and
+> Wave 5 does **not** own the Mode 2 backend. All live runs are Wave 6 dev-store
+> UAT. Fixture names reference File B §10 where a
 > fixture exists; live UAT cases create the equivalent condition on the dev
 > store.
 
@@ -43,7 +47,7 @@
 | UAT-FM-1.9 | Uncertain outbound outcome | Simulate timeout on `fulfillmentCreate` (network fault injection) | Verification read (FO remaining quantities + own-GID ledger) precedes any retry; applied → adopt; not-applied → retry; inconclusive → `blocked_manual_review`; never a blind retry ([Fact] no idempotency key — capture §6.5) |
 | UAT-FM-1.10 | Held / scheduled / declined FO states | Create `ON_HOLD` (each hold reason where reproducible), `SCHEDULED`, `REQUEST_DECLINED` conditions | Connector sends blocked per File B §2–3 rows; picking validation attempts route to review with the hold `displayReason` surfaced; connector never places/releases holds (D-014-5) |
 | UAT-FM-1.11 | Cancelled/failed inbound fulfillment | Cancel a connector-created fulfillment in Shopify (`ful_cancelled`); produce an `ERROR`/`FAILURE` result (`ful_error`/`ful_failure`) | Cancellation never auto-reverses Odoo stock; Odoo-already-validated → high-visibility review case; `ERROR`/`FAILURE` never reconciled as shipped |
-| UAT-FM-1.12 | Unknown status value | Fixture-level (`unknown_ful_status` etc.) or replayed synthetic payload | All five File B §7 contract points hold: raw preserved, unknown badge, never success, unsafe automation stopped, schema warning raised |
+| UAT-FM-1.12 | Unknown status value (each Layer-A enum family) | Fixture-level (`unknown_ful_status` etc.) or replayed synthetic payload, one per Layer-A enum family (all seven, incl. `FulfillmentDisplayStatus`) | All five File B §7 unknown-value contract points hold for every Layer-A family: raw preserved, unknown badge, never success, unsafe automation stopped, schema warning raised |
 
 ## 2. Mode 2 UAT (bidirectional exact reconciliation)
 

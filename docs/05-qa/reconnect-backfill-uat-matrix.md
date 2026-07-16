@@ -7,6 +7,15 @@
 > at least one negative case here, per RB §9. Order catch-up/backfill cases
 > execute with Wave 2; inventory Wave 3; fulfillment Wave 4; product-export
 > Wave 5; the consolidated live run is Wave 6.
+>
+> **[Product-direction update — 2026-07-16] Dev-store evidence rule.** Odoo.sh
+> evidence is mandatory for every wave. The **read-only** order catch-up /
+> backfill dev-store UAT (Wave 2) is strongly preferred but is **not a Wave 2
+> merge blocker** — if read-only Shopify credentials are unavailable it defers
+> to the Wave 6 consolidated run (VAL-B2 not presented as completed). The
+> mutation domains (inventory Wave 3, fulfillment Wave 4, product-export
+> Wave 5) and the Wave 6 run keep their genuine dev-store mutation-evidence
+> requirement.
 
 ## Shared conventions
 

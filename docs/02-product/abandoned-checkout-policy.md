@@ -87,23 +87,31 @@ surface, never an order pipeline.
   ([AR-005](../03-architecture/ar-005-binding-dedup-framing.md)) and no Odoo business
   document references it structurally.
 - Fields (mirroring §2 evidence): Shopify checkout id; checkout identity/number;
-  customer reference (masked display, §3.2); line items (product titles/variants +
+  customer reference (raw operational PII visible to permitted roles under access
+  control and PCD logging, §3.2); line items (product titles/variants +
   quantities — displayed, with best-effort match to known product bindings for
   navigation only); checkout value (`totalPriceSet`, presentment + shop currency);
   created/updated timestamps; `status`, `email_state`, `recovery_state`; `completedAt`;
   deep link to the checkout in Shopify admin; and the recovery URL treated as
   sensitive (it grants cart access — Administrator-only display [Recommendation]).
 
-### 3.2 Masked customer data (two-role model)
+### 3.2 Customer data access (two-role model, no PII masking)
 
 Consistent with the two-role direction in
-[`connector-roles-and-permissions.md`](connector-roles-and-permissions.md):
+[`connector-roles-and-permissions.md`](connector-roles-and-permissions.md) §3
+(**no PII masking in the MVP**):
 
-- **Connector User** sees customer identity **masked by default** (e.g. partial email,
-  no phone/address). Unmasking follows exactly the same permission-controlled mechanism
-  defined in the roles doc — no abandoned-checkout-specific exception.
-- **Connector Administrator** access follows the same doc; every unmask is subject to
-  the PCD access-logging obligation ([Fact], captures §12).
+- **Connector User** and **Connector Administrator** both read the **raw**
+  customer identity their permitted operations require — there is no
+  masked-by-default view and no unmask toggle. Access is governed by ordinary
+  Odoo access control, company boundaries, connector-model ACLs, and the
+  audit/redaction rules, not by a masking layer.
+- **PCD obligations still apply:** every access to abandoned-checkout customer
+  data is subject to the protected-customer-data access-logging obligation
+  ([Fact], captures §12), and log/audit redaction of PII remains mandatory.
+- [Post-MVP] A PII-masking / privacy enhancement, if ever built, is a
+  separately reviewed post-MVP feature — it is not part of this (itself
+  post-MVP) workspace's MVP-direction design.
 
 ### 3.3 Refresh strategy
 
@@ -178,7 +186,7 @@ checkout only through an explicit, audited, manual user action** in the workspac
   - **Post-MVP: the Abandoned Checkouts workspace (§3) and the audited manual
     quotation action (§4).**
 - Effort implications ([Inference]): the workspace is a **new read domain** — a new scan
-  job type, a new per-store cache model, a workspace UI (list + detail + masking +
+  job type, a new per-store cache model, a workspace UI (list + detail +
   review case), PCD access-logging coverage, and retention-sweep/redaction integration.
   That is meaningful scope comparable to a small domain slice, for a capability with
   single-vendor competitive evidence and no committed-transaction value.
@@ -212,9 +220,10 @@ MVP (default policy):
 
 Workspace (post-MVP, when built):
 
-3. Cache scan populates identity, masked customer, lines/quantities, value, timestamps,
-   `email_state`/`recovery_state`/`status`, Shopify link; Connector User sees masked
-   data, unmask is permission-gated and access-logged.
+3. Cache scan populates identity, raw customer data, lines/quantities, value, timestamps,
+   `email_state`/`recovery_state`/`status`, Shopify link; Connector User and Administrator
+   both read the raw customer data per access control, with PCD access-logging — assert
+   **no** masking or unmask surface exists.
 4. `completedAt` transition → "Converted" shown; linked order resolved by order-side
    lookup only; checkout record is never a binding.
 5. Manual quotation action → draft SO with provenance marker, not connector-bound;
@@ -246,9 +255,10 @@ Acceptance: product owner + Claude control room. Upon acceptance, record as an A
 2. [Open question] Does any webhook topic cover abandoned checkouts, or is polling the
    only path? Re-verify before implementation.
 3. [Open question] `abandonedCheckoutsCount` availability (for workspace KPIs).
-4. [Open question] Exact masking granularity for checkout customer fields — inherit
-   verbatim from the roles doc or define a stricter checkout-specific profile (given
-   nullable `customer` and PCD level)?
+4. [Open question — post-MVP privacy] The MVP has no PII masking (roles doc §3).
+   If a PII-masking/privacy enhancement is ever built post-MVP, what checkout-field
+   granularity would it use (given nullable `customer` and PCD level)? Not an MVP
+   question.
 5. [Open question] Should the manual-quotation action be Administrator-only or
-   available to Connector User with unmask permission? Product-owner call at
-   workspace design time.
+   available to the Connector User? Product-owner call at workspace design time.
+   (There is no "unmask permission" — the MVP has no PII masking; roles doc §3.)

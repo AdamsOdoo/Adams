@@ -43,7 +43,7 @@ Lite/Full column per accepted DEC-029: **Lite** = `core` + `product` + `sale`
 | 10 | Basic inventory synchronization | Packet-exists-Proposed (Task 013/013B) | 3 | [`../07-implementation-plan/task-013-inventory-sync-implementation-packet.md`](../07-implementation-plan/task-013-inventory-sync-implementation-packet.md) + 013B; [`../03-architecture/master-blueprint-inventory-fulfillment.md`](../03-architecture/master-blueprint-inventory-fulfillment.md) | DEC-010 (Accepted); **DEC-031 Layer 2**; RA-008 first-push guard | Full (`inventory`) |
 | 11 | Bidirectional inventory behavior per accepted rules | Packet-exists-Proposed / research remaining (apply-mode MBQs) | 3 | Same as #10 | DEC-010/015; open MBQs | Full (`inventory`) |
 | 12 | Fulfillment/tracking write-back (Mode 1) + fulfillment state model | Packet-exists-Proposed (Task 014, predates modes doc) + operating modes/state model designed this mission | 4 | [`./fulfillment-operating-modes.md`](./fulfillment-operating-modes.md); [`../07-implementation-plan/task-014-fulfillment-tracking-implementation-packet.md`](../07-implementation-plan/task-014-fulfillment-tracking-implementation-packet.md) (addendum needed per gap I-3) | DEC-011; D-014-2; **DEC-031 Layer 2**; scope correction noted in matrix row 12 | Full (`fulfillment`) |
-| — | Fulfillment Mode 2 (exact bidirectional reconciliation, auto-validate) | Designed-this-mission-Proposed | 5 (Wave 4 stretch), MVP-optional per the modes doc's recommendation | [`./fulfillment-operating-modes.md`](./fulfillment-operating-modes.md) §4/§10 | Mode-2 enablement decision (Proposed); Layer 2 | Full (`fulfillment`) |
+| — | Fulfillment Mode 2 (exact bidirectional reconciliation, auto-validate) | Designed-this-mission-Proposed | 4 (required backend) / 5 (mode UI) | [`./fulfillment-operating-modes.md`](./fulfillment-operating-modes.md) §4/§10 | Mode-2 per-store enablement design (Proposed); Layer 2 | Full (`fulfillment`) |
 | 13 | Scheduled synchronization (base crons merged; Area 6 triggers) | Merged-checkpoint (base) + Packet-exists-Proposed (Area 6) | 2+ | [`../07-implementation-plan/area-6-sync-triggers-implementation-packet.md`](../07-implementation-plan/area-6-sync-triggers-implementation-packet.md) | DEC-005/025 | Lite |
 | 14 | Manual synchronization (operator-triggered) | Packet-exists-Proposed (Area 6) | 2+ (UI Wave 5) | Same Area 6 packet | DEC-005/025 | Lite |
 | 15 | User-friendly job/sync logs (backend merged; UI remaining) | Merged-checkpoint (model) / Not-started (UI) | 5 (UI) | DEC-009; [`./screen-inventory-and-navigation-map.md`](./screen-inventory-and-navigation-map.md) | DEC-009/012/016 | Lite |
@@ -87,11 +87,14 @@ underlying docs carry the proposals; no new decision is made here):
   the manual-gateway financial-evidence rules in
   [`./sales-order-lifecycle-and-confirmation-policy.md`](./sales-order-lifecycle-and-confirmation-policy.md).
 - **Fulfillment Mode 2** (exact-conditions auto-validation of externally
-  fulfilled deliveries) — **MVP-optional** per the recommendation in
-  [`./fulfillment-operating-modes.md`](./fulfillment-operating-modes.md)
-  (Mode 1 in full in Wave 4; Mode 2 as Wave 5 / Wave 4 stretch, explicit
-  opt-in, fails closed to Mode 1). Shipping the MVP with Mode 1 only would
-  not breach the accepted DEC-003 baseline.
+  fulfilled deliveries) — **required MVP Wave 4 backend scope**, not optional,
+  per [`./fulfillment-operating-modes.md`](./fulfillment-operating-modes.md)
+  §10 and the product-owner direction. Both Mode 1 and Mode 2 backend behavior
+  must be implemented, tested, and runtime-proven before Wave 4 closes (Wave 4
+  may internally sequence Mode 1 before Mode 2). The Administrator selects the
+  operating mode per store (Mode 1 default; Mode 2 explicit opt-in that fails
+  closed to Mode 1 behavior). Wave 5 owns only the fulfillment/mode UI, never
+  the Mode 2 backend.
 
 Everything in the "Designed-this-mission-Proposed" and "Packet-exists-
 Proposed" rows remains gated on its named decisions and waves; Wave 2 is the
