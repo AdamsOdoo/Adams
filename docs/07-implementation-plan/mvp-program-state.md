@@ -6,7 +6,7 @@
 
 **WAVE 0 MERGED (2026-07-15).** PR #169 merged into `mvp/program-integration` (merge commit `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`, per the Wave 0 closure comment on issue #167). DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed.
 
-**WAVE 1 SUBSTANTIVE RUNTIME CRITERIA SATISFIED; TEST-ONLY EXACT-HEAD VERIFICATION PENDING (2026-07-16).** Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft/unmerged on `sol/wave-1-readonly-foundation`. Odoo.sh 19 build `34985521` at exact SHA `d9d2dd018470054944db064cdd553160232713cd` produced fresh `1 failed / 0 errors / 634 tests`, with the only failure being the stale enqueue AST helper; focused Wave 1 `0/0/105`, product `0/0/176`, sale `0/0/107`, and lifecycle `0/0/9` were green. All 11 genuine SRR-03 classes passed across three distinct OS-process repetitions, and residue/security scans were clean under the accepted exact issue #157 accommodation. Product-owner ruling [comment 4988098888](https://github.com/AdamsOdoo/Adams/pull/172#issuecomment-4988098888) accepts the substantive SRR-03 runtime criteria. Test-only correction `b42042d641ce2d02cad9559a03fcb268ceaac3bc` changes no production behavior. **SRR-03 remains authoritatively OPEN pending the corrected exact-head verification only; Wave 2 remains unauthorized and unstarted.**
+**WAVE 1 IMPLEMENTATION-COMPLETE AND RUNTIME-GREEN; CONTROL-ROOM REVIEW PENDING (2026-07-16).** Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft/unmerged on `sol/wave-1-readonly-foundation`. Odoo.sh 19 build `34986844`, database `adamsmen-sol-wave-1-readonly-foundation-34986844`, validated exact SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`: targeted AST `0/0/2`, fresh all-module `0/0/635`, full standard `0/0/635` (`core 352 + product 176 + sale 107`), and combined all-11-class genuine SRR-03 smoke `0/0/41`. Ten real PostgreSQL `40001` conflicts and one lock timeout were exercised. Residue/security audits were clean; temporary issue #157 defaults were dropped and verified restored. Product-owner ruling [comment 4988527547](https://github.com/AdamsOdoo/Adams/pull/172#issuecomment-4988527547) authorizes **SRR-03 CLOSED**. Wave 1 now awaits only final Claude control-room review and merge. **Wave 2 remains unauthorized and unstarted until that merge.**
 
 Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code was authorized in that wave. **Wave 1 is active for implementation** on `sol/wave-1-readonly-foundation` — CORE-R1, LC-1, JOB-ACTIONS, SEC-1, then SRR-03 closure, in that corrected order, per DEC-034. **Wave 2 remains unauthorized** and may not merge, be enabled, or receive live Shopify validation while **SRR-03 remains OPEN**.
 
@@ -26,14 +26,14 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Active wave
 
-**Wave 1 — Existing read-only foundation integration — FINAL TEST-ONLY VERIFICATION PENDING.** Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft. Build `34985521` validates all production and substantive SRR-03 criteria; the sole fresh-install failure was the stale test-only AST helper. Correction `b42042d641ce2d02cad9559a03fcb268ceaac3bc` changes only `test_job_dispatch.py`. SRR-03 remains OPEN and no Wave 1 completion is claimed until the corrected exact-head verification passes; Wave 2 is unauthorized.
+**Wave 1 — Existing read-only foundation integration — IMPLEMENTATION-COMPLETE / RUNTIME-GREEN.** Exact-head build `34986844` is fully green and SRR-03 is CLOSED. Draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) remains open/draft/unmerged pending the single final Claude macro-wave review. No further Sol implementation or runtime work remains in Wave 1.
 
 ## Wave status
 
 | Wave | Status | Branch/PR | Notes |
 | --- | --- | --- | --- |
 | 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
-| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Active — final test-only verification pending** | `sol/wave-1-readonly-foundation`; draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) | Build 34985521 satisfied production/SRR-03 criteria; one AST guard corrected test-only; SRR-03 OPEN pending exact-head verification. |
+| 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **Implementation-complete / runtime-green — Claude review pending** | `sol/wave-1-readonly-foundation`; draft PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) | Build 34986844 fully green; SRR-03 CLOSED; only control-room review/merge remains. |
 | 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is OPEN; blocked on Wave 1 prerequisites/closure evidence and packet gate. May not merge, be enabled, or receive live Shopify validation while SRR-03 remains open. |
 | 3 — Inventory synchronization (Task 013/013B) | Not started | — | Blocked on Wave 2 and DEC-031 Layer 2 design+acceptance. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
@@ -50,8 +50,8 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 - Product-owner ruling comment `4982429209` validated the omission and authorized the exact one-field completeness correction. D-SEC1-2/D-SEC1-7 and the LC-1 sanctioned-writer statement were amended in commit `a4a370b5378366e719c59c01b1bbd5febe0a868b`; no architecture or scope changed.
 - Stage 3 JOB-ACTIONS: the additive two-action model, nine-method role/state/audit suite, version/import wiring, validation record, AR-051, and handoff are pushed; both new Python sources compile. Odoo.sh remains pending.
 - Product-owner ruling comment `4982750956` validated and resolved the Stage 4 pre-edit hard-stop: binding/PII audit uses the existing lifecycle maintenance job helper with narrow protected-site sudo and original actor preservation; company validation uses caller-context records plus `env.company`, without a store field. Packet and validation record updated.
-- Stage 4 exact-head runtime: build `34985521` at `d9d2dd018470054944db064cdd553160232713cd` produced one test-only AST failure among 634 fresh tests; all focused Wave 1, product, sale, lifecycle, genuine concurrency, residue, and security criteria in ruling `4988098888` were green.
-- Stage 5 closure gate: all 11 genuine SRR-03 classes passed across three OS-process repetitions. Test-only correction `b42042d641ce2d02cad9559a03fcb268ceaac3bc` updates only the AST helper/coverage and is statically green. SRR-03 remains OPEN until final exact-head verification; Wave 2 and all excluded domains remain unstarted.
+- Final exact-head runtime: build `34986844` at `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` passed targeted `0/0/2`, fresh `0/0/635`, standard `0/0/635`, and all-11-class genuine smoke `0/0/41`; residue/security clean; issue #157 defaults dropped/restored.
+- Stage 5 closure: ruling `4988527547` accepts the complete evidence and authorizes SRR-03 CLOSED. Wave 1 is implementation-complete/runtime-green. PR #172 stays draft/unmerged for Claude review; Wave 2 and all excluded domains remain unstarted.
 
 ## Prior completed work (bootstrap governance)
 
@@ -64,13 +64,13 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Blockers
 
-1. **Wave 1 final test-only exact-head verification** — build `34985521` satisfied the production and substantive SRR-03 matrix but retained one stale AST-guard failure. Run the targeted guard, one fresh all-module run, one full core run after the accepted #157 accommodation, one combined genuine-class smoke run, residue/security audits, and restore both temporary DB defaults. Until green evidence is recorded, SRR-03 remains OPEN and Wave 1 is incomplete.
+1. **Wave 1 control-room gate** — implementation and runtime validation are complete. Claude must perform the final macro-wave review and is the only party authorized to merge draft PR #172 into `mvp/program-integration`. This is a wave-boundary gate, not an implementation defect.
 2. **Dev-store access provisioning** — Wave 6 and mutation-domain UAT require human-provisioned Shopify Partner/dev-store credentials; Sol cannot self-provision them (hard-stop 5).
 
 ## Open decisions (full list: `mvp-completion-program.md` §9) — resolved by Wave 0 acceptance
 
 1. Task 015/015B retained in MVP Wave 5 after Layer 2 — Accepted (DEC-033 §1).
-2. SRR-03 reconciled to OPEN with a Wave 1 closure sub-gate — Accepted (DEC-033 §2); build 34985521 satisfies the substantive runtime criteria, but authoritative closure awaits the corrected exact-head verification.
+2. SRR-03 closure sub-gate — **CLOSED** by exact-head build `34986844` and product-owner ruling `4988527547`; closure is read/call safety only and does not claim exactly-once remote effects or DEC-031 Layer 2.
 3. PR #150/#151 administrative closure as superseded — Accepted (DEC-033 §3); action to proceed once PR #169 merges.
 4. DEC-027 explicitly deferred; DEC-028/029/030 Accepted with the prerequisites in DEC-033 §4 — applied to each record on this PR.
 5. Hazard branch left untouched — confirmed; remains untouched.
@@ -83,12 +83,15 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 | 2026-07-15 | Checkpoint (pre-program) | `../05-qa/task-core-r2-validation-results.md` §IS2 | `34935129` | Fresh install 0/0 across core/product/sale; issue #157 artifact only known failure class. |
 | 2026-07-16 | Wave 1 diagnostic (pre-correction SHA `62b2645`) | SEC-1 and CORE-R2 validation records | `34968318` | Upgrade/focused/lifecycle partial passes; transition regression in fresh/full/drain-recovery suites; residue and security scans clean; issue #157 exact artifact only; no Wave 1 pass. |
 | 2026-07-16 | Wave 1 corrected production/SRR proof (SHA `d9d2dd0`) | SEC-1 and CORE-R2 validation records; ruling `4988098888` | `34985521` | Fresh 1/0/634, sole test-only AST guard failure; focused 0/0/105, product 0/0/176, sale 0/0/107, lifecycle 0/0/9; all 11 genuine classes ×3 green; clean residue/security; substantive SRR criteria satisfied, closure pending final test-only verification. |
+| 2026-07-16 | Wave 1 final exact-head closure (SHA `05bb463`) | Final validation records; ruling `4988527547` | `34986844` | Targeted 0/0/2; fresh 0/0/635; standard 0/0/635; all 11 genuine classes 0/0/41; 10 real 40001 + one lock timeout; clean residue/security; #157 defaults dropped/restored; SRR-03 CLOSED. |
 
 ## Next control-room gate
 
-The next action is the limited final verification authorized by ruling `4988098888`: targeted AST guard, fresh all-module run, full core after the accepted #157 accommodation, one combined genuine-class smoke run, final residue/security audit, and restoration of both temporary DB defaults. The full three-process matrix need not repeat because no production code changed. PR #172 remains draft/unmerged.
+The next action is **Claude's final Wave 1 macro-wave review** of draft PR #172. Sol stops at this boundary. Claude alone may merge into `mvp/program-integration`; Wave 2 remains unauthorized until the merge is accepted and recorded.
 
 ## Sprint checkpoint log
+
+- **Wave 1 final exact-head closure (2026-07-16):** Odoo.sh 19 build `34986844`, DB `adamsmen-sol-wave-1-readonly-foundation-34986844`, exact SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`: targeted AST `0/0/2`, fresh all-module `0/0/635`, standard `0/0/635` (`352+176+107`), all 11 genuine SRR-03 classes `0/0/41`, 10 real `40001` conflicts and one lock timeout, clean residue/security, and both issue #157 defaults dropped/restored. Ruling `4988527547` authorizes SRR-03 CLOSED. Wave 1 is implementation-complete/runtime-green; PR #172 remains draft/unmerged for Claude review; Wave 2 unstarted.
 
 - **Wave 1 build 34985521 accepted / test-only AST correction (2026-07-16):** Exact SHA `d9d2dd018470054944db064cdd553160232713cd` ran fresh `1 failed / 0 errors / 634`, with only the stale enqueue create-target AST receiver helper failing. Focused Wave 1 `0/0/105`, product `0/0/176`, sale `0/0/107`, lifecycle `0/0/9`, all 11 genuine SRR classes ×3 OS-process repetitions, residue, and security checks were green. Ruling `4988098888` accepts substantive SRR-03 criteria. Test-only commit `b42042d641ce2d02cad9559a03fcb268ceaac3bc` unwraps only the five approved wrappers and changes no production file. SRR-03 remains OPEN pending the limited final exact-head verification; Wave 2 remains unstarted.
 

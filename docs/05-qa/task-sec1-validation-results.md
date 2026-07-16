@@ -2,13 +2,31 @@
 
 ## Status
 
-**Odoo.sh build 34985521 validates the complete Wave 1 production behavior and substantive SRR-03 criteria at `d9d2dd018470054944db064cdd553160232713cd`; one test-only AST guard remained and is corrected at `b42042d641ce2d02cad9559a03fcb268ceaac3bc` pending final exact-head verification.**
+**Odoo.sh build 34986844 validates exact head `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` fully green; SEC-1 and Wave 1 are implementation-complete/runtime-green, and SRR-03 is CLOSED pending only Claude control-room review and merge of draft PR #172.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, open, unmerged)
 - **Date:** 2026-07-16
 - **Binding clarifications:** product-owner rulings PR #172 comments `4982429209`, `4982750956`, `4984719237`, and accepted runtime ruling `4988098888`
-- **Runtime claim:** Build 34985521 is accepted production/SRR-03 evidence for exact SHA `d9d2dd018470054944db064cdd553160232713cd`. Final Wave 1 success is not claimed until the test-only correction passes at the new exact head.
+- **Runtime claim:** Build 34986844 is final exact-head evidence: targeted `0/0/2`, fresh `0/0/635`, standard `0/0/635`, genuine smoke `0/0/41`, clean residue/security, and issue #157 defaults removed/restored.
+
+## Final exact-head runtime evidence — build 34986844
+
+- **Database / Odoo:** `adamsmen-sol-wave-1-readonly-foundation-34986844`; Odoo 19.0.
+- **Exact tested SHA:** `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`, matched at session start and end; working tree clean.
+- **Targeted AST:** `0 failed / 0 errors / 2`.
+- **Fresh all-module:** `0 failed / 0 errors / 635`.
+- **Full standard:** `0 failed / 0 errors / 635` (`core 352 + product 176 + sale 107`).
+- **Combined SRR-03 smoke:** all 11 genuine classes `0 failed / 0 errors / 41`; 10 real PostgreSQL `40001` conflicts and one lock timeout exercised.
+- **Residue/security:** clean, including zero connector test residue, leases, sessions, cursors, workers, idle transactions, or test cron triggers; no token/header/credential/raw-PII/temp-path leakage.
+- **Issue #157 restoration:** the temporary `notification_type='email'` and `color_scheme='system'` database defaults were dropped and verified restored to their pre-run state; no NULLs introduced.
+
+The test-only AST correction is runtime-green without any production change.
+Build 34986844 completes the exact-head reconciliation authorized by ruling
+`4988527547`. SEC-1 is runtime-green and **SRR-03 is CLOSED**. No
+exactly-once remote-effect claim is made and DEC-031 Layer 2 remains
+unimplemented. Wave 1 awaits only final Claude control-room review and merge;
+PR #172 remains draft.
 
 ## Accepted exact-head runtime evidence — build 34985521
 

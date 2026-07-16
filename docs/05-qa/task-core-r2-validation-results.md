@@ -1,6 +1,43 @@
 # CORE-R2 — Foundation Slice 1 — Validation Results
 
 
+## Wave 1 final exact-head closure — build 34986844 (2026-07-16)
+
+Odoo.sh 19 build `34986844` validated draft PR #172 at exact SHA
+`05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` on database
+`adamsmen-sol-wave-1-readonly-foundation-34986844`. Identity matched at the
+start and end of the session and the working tree remained clean.
+
+- Targeted AST tests: `0 failed / 0 errors / 2`.
+- Fresh all-module installation: `0 failed / 0 errors / 635`.
+- Full standard suite with the reversible issue #157 accommodation:
+  `0 failed / 0 errors / 635` (`core 352 + product 176 + sale 107`).
+- Combined genuine SRR-03 smoke: all 11 independent-connection classes,
+  `0 failed / 0 errors / 41`, exercising 10 real PostgreSQL `40001`
+  serialization conflicts and one lock timeout.
+- Residue audit: zero open leases, jobs, job logs, test stores, credentials,
+  idle transactions, leaked sessions/cursors/workers, or connector/test cron
+  triggers. The one `shopify_connector_attribute_lock` row is the expected
+  installation singleton; the three connector crons are legitimate installed
+  records.
+- Security audit: no real tokens, authorization headers, persisted
+  credentials, raw PII, or temporary-path leakage.
+- Issue #157: temporary defaults for
+  `res_users.notification_type='email'` and
+  `res_users_settings.color_scheme='system'` were used only for the accepted
+  base-Odoo fixture artifact, then both defaults were dropped and verified
+  restored to their pre-run state with no NULLs introduced.
+
+The exact-head run proves independent backend identities, exact-row re-lock,
+zero handler replay, fail-closed replay policy, disconnect/admission ordering,
+real conflict/timeout handling, and zero residue. Product-owner ruling
+`4988527547` therefore authorizes **SRR-03 CLOSED**. This closure does not
+claim exactly-once remote effects and does not implement or prove DEC-031 Layer
+2. Wave 1 is implementation-complete and runtime-green; PR #172 remains draft
+and unmerged pending final Claude control-room review.
+
+
+
 ## Wave 1 substantive runtime proof — build 34985521 (2026-07-16)
 
 Odoo.sh 19 build `34985521` ran draft PR #172 at exact SHA

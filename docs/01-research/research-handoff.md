@@ -1,3 +1,14 @@
+### Wave 1 final exact-head closure — compact handoff (2026-07-16)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
+- **Final runtime:** Odoo.sh 19 build `34986844`, database `adamsmen-sol-wave-1-readonly-foundation-34986844`, exact SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`; identity matched at start/end and working tree stayed clean.
+- **Results:** targeted AST `0/0/2`; fresh all-module `0/0/635`; standard `0/0/635` (`core 352 + product 176 + sale 107`); combined all-11-class genuine SRR-03 smoke `0/0/41`, including 10 real PostgreSQL `40001` conflicts and one lock timeout.
+- **Safety proof:** exact-job re-lock, no handler replay, fail-closed replay policy, independent backend identities, disconnect/admission ordering, real conflict/timeout paths, and zero lease/job/log/store/credential/idle-transaction/session/cursor/worker/test-cron residue. Security scan found no real token, header, persisted credential, raw PII, or temporary-path leakage.
+- **Issue #157:** temporary `res_users.notification_type='email'` and `res_users_settings.color_scheme='system'` defaults were used only for the accepted base-Odoo fixture artifact, then both were dropped and verified restored with no NULLs.
+- **Disposition:** product-owner ruling `4988527547` authorizes **SRR-03 CLOSED**. Closure is limited to read/call safety; no exactly-once remote-effect or DEC-031 Layer 2 claim is made.
+- **Wave boundary:** Wave 1 is implementation-complete/runtime-green. No production/test code changed in this reconciliation. PR #172 remains draft and unmerged. Wave 2 remains unauthorized/unstarted.
+- **Next:** Claude performs the single final Wave 1 macro-wave review and is the only party authorized to merge PR #172 into `mvp/program-integration`.
+
 ### Wave 1 build 34985521 / test-only AST correction — compact handoff (2026-07-16)
 
 - **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
