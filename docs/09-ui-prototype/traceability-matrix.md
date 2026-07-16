@@ -85,3 +85,24 @@ FontAwesome is required at U1). The rows below are the accepted decision record.
 The proposals above are **accepted** per control-room comment `4951204357` (see
 `README.md` §6). This matrix records that acceptance; it authorizes **no**
 implementation — each UI phase remains gated by its own act.
+
+---
+
+## Fable gap-closure extension traceability (2026-07-16) [Proposed]
+
+| Surface | Master-spec screens | Product-doc sources |
+|---|---|---|
+| `orders/` | Orders workspace | `../02-product/sales-order-lifecycle-and-confirmation-policy.md` |
+| `order-review/` | Order review | same + COD approval path |
+| `cod-reconciliation/` | COD reconciliation | `../02-product/cod-lifecycle-and-reconciliation.md` |
+| `fulfillment/` | Fulfillment workspace | `../02-product/fulfillment-operating-modes.md`, `../02-product/shopify-fulfillment-status-model.md` |
+| `external-fulfillment-review/` | External fulfillment review | same (Mode 1 review cases; Mode 2 16-condition checklist) |
+| `tracking-timeline/` | Tracking timeline | `../02-product/shopify-fulfillment-status-model.md` |
+| `inventory/` | Inventory workspace | `../02-product/inventory-operating-model.md` |
+| `reconnect-backfill/` | Reconnect & catch-up; Backfill preview | `../02-product/reconnect-catchup-backfill-policy.md` |
+| `product-export/` | Product export flow | `../02-product/product-export-operating-model.md` |
+| `stores/` | Store list & detail | store lifecycle (Wave 1 code facts) + roles doc |
+| `settings-permissions/` | Settings; Permissions; Retention & privacy | `../02-product/connector-roles-and-permissions.md` + policy docs |
+| `jobs-diagnostics/` | Jobs & logs; Retry/cancel; Diagnostics; 11-state gallery | job substrate (Wave 1 code facts) + master spec §4 |
+
+Per-surface spec files carry the detailed traceability tables.
