@@ -1,0 +1,208 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Settings, permissions &amp; retention</title><link rel="stylesheet" href="../assets/prototype.css">
+<style>
+/* screen-local helpers only — all values are shared tokens */
+.sp-toggle { display:inline-flex; align-items:center; gap:var(--sc-space-2); font-size:var(--sc-fs-secondary); }
+.sp-toggle__track { inline-size:36px; block-size:20px; border-radius:10px; background:var(--sc-neutral-bg); border:1px solid var(--sc-border-strong); position:relative; flex:none; }
+.sp-toggle__track::after { content:""; position:absolute; inset-block-start:2px; inset-inline-start:2px; inline-size:14px; block-size:14px; border-radius:50%; background:var(--sc-surface-1); border:1px solid var(--sc-border-strong); }
+.sp-toggle.is-on .sp-toggle__track { background:var(--sc-accent); border-color:var(--sc-accent); }
+.sp-toggle.is-on .sp-toggle__track::after { inset-inline-start:auto; inset-inline-end:2px; border-color:#FFFFFF; }
+.sp-row { display:grid; grid-template-columns: 1fr auto auto; gap:var(--sc-space-3); align-items:center; padding:var(--sc-space-3) 0; border-block-end:1px solid var(--sc-border); font-size:var(--sc-fs-secondary); }
+.sp-row:last-child { border-block-end:0; }
+.sp-savebar { position:sticky; inset-block-end:0; display:flex; align-items:center; gap:var(--sc-space-3); justify-content:space-between; background:var(--sc-surface-2); border:1px solid var(--sc-border-strong); border-radius:var(--sc-radius); padding:var(--sc-space-3) var(--sc-space-4); box-shadow:0 -4px 16px rgba(16,24,40,0.10); margin-top:var(--sc-space-5); }
+.sp-toast { display:inline-flex; align-items:center; gap:var(--sc-space-2); background:var(--sc-success-bg); border:1px solid var(--sc-success-text); color:var(--sc-text-primary); border-radius:var(--sc-radius); padding:var(--sc-space-3) var(--sc-space-4); font-size:var(--sc-fs-secondary); box-shadow:0 12px 32px rgba(16,24,40,0.16); }
+</style></head><body><svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute" overflow="hidden"><defs>
+<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="5 13 10 18 19 7"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 21 19H3Z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><polyline points="12 8 12 12 15 14"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9" rx="1.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><polyline points="9 12 11.5 14.5 15.5 10"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6.5h10.5v9H3z"/><path d="M13.5 9.5H18l3 3v3h-7.5z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></symbol>
+</g></defs></svg>
+
+<div class="gallery">
+<div class="gallery__intro"><h1>Settings, permissions &amp; retention</h1>
+<p>The store settings surface as five static tab sections: Capabilities &amp; schedules, Order policies, Fulfillment mode, Roles &amp; access, Retention &amp; privacy. Everything here is Administrator-editable and User-read-only (two-role model). Also shown: the User read-only variant, the unsaved-changes bar, and the saved toast. All values and copy are illustrative (MBQ-22); no field name or backend method is asserted.</p></div>
+
+<!-- shared shell macro comment: each screen repeats the Odoo shell + tab strip; the active tab differs -->
+
+<!-- =============================== (a) Capabilities & schedules =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Tab (a) — Capabilities &amp; schedules</b> · Administrator view · per-domain toggles + schedule rows · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Adams Home<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Settings</b></div>
+<div class="sc-content">
+<div class="sc-tabs"><span class="sc-tab is-active">Capabilities &amp; schedules</span><span class="sc-tab">Order policies</span><span class="sc-tab">Fulfillment mode</span><span class="sc-tab">Roles &amp; access</span><span class="sc-tab">Retention &amp; privacy</span></div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Capabilities</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Administrator only</span></div>
+<div class="sp-row"><div><b>Product import</b><div class="sc-muted">Shopify → Odoo catalog import with matching &amp; duplicate prevention.</div></div><span class="sc-muted">Scheduled every 15 minutes</span><span class="sp-toggle is-on" role="switch" aria-checked="true" aria-label="Product import enabled"><span class="sp-toggle__track"></span>On</span></div>
+<div class="sp-row"><div><b>Customer import</b><div class="sc-muted">Email-first matching; ambiguity goes to review.</div></div><span class="sc-muted">Scheduled every 15 minutes</span><span class="sp-toggle is-on" role="switch" aria-checked="true" aria-label="Customer import enabled"><span class="sp-toggle__track"></span>On</span></div>
+<div class="sp-row"><div><b>Order import</b><div class="sc-muted">Orders → Odoo sales orders under the confirmation policy (Order policies tab).</div></div><span class="sc-muted">Scheduled every 5 minutes</span><span class="sp-toggle is-on" role="switch" aria-checked="true" aria-label="Order import enabled"><span class="sp-toggle__track"></span>On</span></div>
+<div class="sp-row"><div><b>Inventory sync</b><div class="sc-muted">Reconciliation-read first; the first push always requires confirmation.</div></div><span class="sc-muted">Scheduled hourly</span><span class="sp-toggle is-on" role="switch" aria-checked="true" aria-label="Inventory sync enabled"><span class="sp-toggle__track"></span>On</span></div>
+<div class="sp-row"><div><b>Fulfillment &amp; tracking</b><div class="sc-muted">Mode 1 — Odoo-controlled (Fulfillment mode tab).</div></div><span class="sc-muted">Event-driven + hourly scan</span><span class="sp-toggle is-on" role="switch" aria-checked="true" aria-label="Fulfillment enabled"><span class="sp-toggle__track"></span>On</span></div>
+<div class="sp-row"><div><b>Product export</b><div class="sc-muted">Odoo → Shopify controlled export. Opt-in even in the Full edition.</div></div><span class="sc-muted">Manual / preview-first</span><span class="sp-toggle" role="switch" aria-checked="false" aria-label="Product export disabled"><span class="sp-toggle__track"></span>Off</span></div>
+<div class="sp-row"><div><b>Abandoned checkouts</b><div class="sc-muted">Off by default; optional read-only workspace (post-MVP candidate).</div></div><span class="sc-muted">—</span><span class="sp-toggle" role="switch" aria-checked="false" aria-label="Abandoned checkouts disabled"><span class="sp-toggle__track"></span>Off</span></div>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Schedules</div>
+<div class="sc-help sc-mt2">Plain words, never cron syntax. Changing a schedule affects future runs only.</div>
+<div class="sp-row"><div><b>Catalog &amp; customers</b></div><span class="sc-muted">Every 15 minutes</span><button class="sc-btn sc-btn--sm">Change…</button></div>
+<div class="sp-row"><div><b>Orders</b></div><span class="sc-muted">Every 5 minutes</span><button class="sc-btn sc-btn--sm">Change…</button></div>
+<div class="sp-row"><div><b>Inventory reconciliation</b></div><span class="sc-muted">Hourly</span><button class="sc-btn sc-btn--sm">Change…</button></div>
+</div>
+</div></div></section>
+
+<!-- =============================== (b) Order policies =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Tab (b) — Order policies</b> · confirmation-policy radio + manual-gateway list with COD row · Administrator view · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Adams Home<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Settings</b></div>
+<div class="sc-content">
+<div class="sc-tabs"><span class="sc-tab">Capabilities &amp; schedules</span><span class="sc-tab is-active">Order policies</span><span class="sc-tab">Fulfillment mode</span><span class="sc-tab">Roles &amp; access</span><span class="sc-tab">Retention &amp; privacy</span></div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Order confirmation policy</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Administrator only</span></div>
+<div class="sc-help sc-mt2">Choose when the connector confirms an imported order (confirmation creates deliveries and may reserve stock). Changing this affects future orders only — already-imported quotations are never retro-confirmed.</div>
+<div class="sc-candidate is-selected sc-mt4"><span class="sc-candidate__radio" role="radio" aria-checked="true" aria-label="Confirm paid orders only"></span><div class="sc-candidate__body"><div class="sc-candidate__title">Confirm paid orders only <span class="sc-status sc-status--success">Recommended</span></div><div class="sc-help">Only fully paid orders auto-confirm. Reserve stock only for captured payments. Everything else imports as a quotation or waits.</div></div></div>
+<div class="sc-candidate"><span class="sc-candidate__radio" role="radio" aria-checked="false" aria-label="Confirm paid or authorized"></span><div class="sc-candidate__body"><div class="sc-candidate__title">Confirm paid or authorized</div><div class="sc-help">Also confirms authorized-not-yet-captured payments — for merchants who fulfil before capture. If an authorization later lapses, the confirmed order is flagged for review, never auto-cancelled.</div></div></div>
+<div class="sc-candidate"><span class="sc-candidate__radio" role="radio" aria-checked="false" aria-label="Import as quotations only"></span><div class="sc-candidate__body"><div class="sc-candidate__title">Import as quotations only</div><div class="sc-help">Every eligible order arrives as a draft quotation; your team confirms manually in Odoo. The connector never confirms.</div></div></div>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Manual payment gateways</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Administrator only</span></div>
+<div class="sc-help sc-mt2">Approved manual gateways (Cash on Delivery, bank transfer, pay on pickup) get their own rule for pending payments. A manual gateway not on this list is treated like an ordinary pending payment and never auto-confirms.</div>
+<table class="sc-evidence sc-mt3"><thead><tr><th>Gateway (observed on this store)</th><th>Approved</th><th>When payment is pending</th></tr></thead><tbody>
+<tr><td data-label="Gateway"><b>Cash on Delivery (COD)</b></td><td data-label="Approved"><span class="sp-toggle is-on" role="switch" aria-checked="true" aria-label="COD approved"><span class="sp-toggle__track"></span>Yes</span></td><td data-label="Rule"><span class="sc-input" style="display:inline-flex; align-items:center; justify-content:space-between; min-block-size:34px; max-inline-size:280px" role="listbox" aria-label="COD pending rule">Require User approval <span aria-hidden="true">▾</span></span><div class="sc-help sc-mt2">Options: Confirm automatically · Create quotation · <b>Require User approval</b> (default) — a Connector User approves each COD order from the review queue before it confirms.</div></td></tr>
+<tr><td data-label="Gateway">Bank transfer</td><td data-label="Approved"><span class="sp-toggle is-on" role="switch" aria-checked="true" aria-label="Bank transfer approved"><span class="sp-toggle__track"></span>Yes</span></td><td data-label="Rule"><span class="sc-input" style="display:inline-flex; align-items:center; justify-content:space-between; min-block-size:34px; max-inline-size:280px" role="listbox" aria-label="Bank transfer pending rule">Create quotation <span aria-hidden="true">▾</span></span></td></tr>
+<tr><td data-label="Gateway">Pay on pickup</td><td data-label="Approved"><span class="sp-toggle" role="switch" aria-checked="false" aria-label="Pay on pickup not approved"><span class="sp-toggle__track"></span>No</span></td><td data-label="Rule"><span class="sc-muted">Not approved — treated as ordinary pending payment</span></td></tr>
+</tbody></table>
+<div class="sc-consequence sc-mt3"><span class="sc-consequence__ico"><svg class="sc-ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span>A pending card payment is never treated as a manual gateway — the manual rule applies only to genuinely manual gateways on this approved list.</span></div>
+</div>
+</div></div></section>
+
+<!-- =============================== (c) Fulfillment mode =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Tab (c) — Fulfillment mode</b> · Mode 1 selected + Mode 2 explainer, Administrator-only enable · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Adams Home<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Settings</b></div>
+<div class="sc-content">
+<div class="sc-tabs"><span class="sc-tab">Capabilities &amp; schedules</span><span class="sc-tab">Order policies</span><span class="sc-tab is-active">Fulfillment mode</span><span class="sc-tab">Roles &amp; access</span><span class="sc-tab">Retention &amp; privacy</span></div>
+<div class="sc-grid sc-grid--2">
+<div class="sc-card" style="border-color:var(--sc-accent); box-shadow:inset 0 0 0 1px var(--sc-accent)">
+<div class="sc-btnrow sc-btnrow--split"><div class="sc-candidate__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Mode 1 — Odoo-controlled</div><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Selected · Default</span></div>
+<p class="sc-help sc-mt3">Odoo is the warehouse execution system. Validating an Odoo delivery creates the Shopify fulfillment with tracking. Fulfillments created outside Odoo become <b>review cases</b> for your team — they never touch Odoo stock automatically.</p>
+<ul class="sc-mt3" style="display:grid; gap:var(--sc-space-2); font-size:var(--sc-fs-secondary); color:var(--sc-text-secondary)">
+<li><svg class="sc-ico" aria-hidden="true" style="color:var(--sc-success-text)"><use href="#i-check"/></svg> Zero automated inbound stock changes</li>
+<li><svg class="sc-ico" aria-hidden="true" style="color:var(--sc-success-text)"><use href="#i-check"/></svg> External fulfillments: import tracking, acknowledge, or explicitly validate an exact proposal</li>
+<li><svg class="sc-ico" aria-hidden="true" style="color:var(--sc-success-text)"><use href="#i-check"/></svg> Customer notifications default off</li>
+</ul>
+</div>
+<div class="sc-card">
+<div class="sc-btnrow sc-btnrow--split"><div class="sc-candidate__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Mode 2 — Bidirectional exact reconciliation</div><span class="sc-status sc-status--neutral">Off · Opt-in</span></div>
+<p class="sc-help sc-mt3">Everything Mode 1 does, plus: a fulfillment created in Shopify may auto-validate the matching Odoo delivery — <b>only when it passes exact reconciliation: all 16 safety conditions</b> (exact order, line, quantity, location, lot and duplicate checks). Any ambiguity falls back to Mode 1 behavior: a review case, no stock change.</p>
+<div class="sc-consequence sc-mt3"><span class="sc-consequence__ico"><svg class="sc-ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span>Enabling never replays history: existing external fulfillments stay as review cases, and a read-only reconciliation scan runs first. You can switch back to Mode 1 at any time without losing anything.</span></div>
+<div class="sc-btnrow sc-mt4"><button class="sc-btn sc-btn--secondary">Enable Mode 2…</button><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Administrator only · audited</span></div>
+</div>
+</div>
+</div></div></section>
+
+<!-- Mode 2 consequences drawer -->
+<section class="gallery-item"><div class="gallery-caption"><b>Tab (c) — Mode 2 consequences drawer</b> · confirmation with consequences + unresolved-case list · 1366px</div>
+<div class="screen"><div class="sc-content" style="background:rgba(16,24,40,0.32); padding:var(--sc-space-7) var(--sc-space-5)">
+<div class="sc-dialog" style="margin-inline:auto" role="dialog" aria-labelledby="m2t" aria-modal="true">
+<h2 id="m2t" class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Enable Mode 2 for Adams Home?</h2>
+<p class="sc-help sc-mt2">Mode 2 lets an external Shopify fulfillment validate the matching Odoo delivery automatically — moving real stock — but only when <b>every one of the 16 exact safety conditions</b> passes. The first failed condition stops everything and creates a review case instead.</p>
+<ul class="sc-mt3" style="display:grid; gap:var(--sc-space-2); font-size:var(--sc-fs-secondary); color:var(--sc-text-secondary)">
+<li>• Applies only to fulfillments observed <b>after</b> enabling — history is never replayed.</li>
+<li>• A read-only reconciliation scan runs first; automation starts only after it completes cleanly.</li>
+<li>• <b>3 unresolved external-fulfillment review cases</b> exist today. They stay in review — they are not auto-applied.</li>
+<li>• You can roll back to Mode 1 at any time; applied reconciliations, evidence and audit trail are untouched.</li>
+</ul>
+<div class="sc-help sc-mt3">This change is audited: who, when, from → to.</div>
+<div class="sc-btnrow sc-btnrow--end sc-mt5"><button class="sc-btn sc-btn--secondary">Cancel</button><button class="sc-btn sc-btn--primary">Enable Mode 2</button></div>
+</div></div></div></section>
+
+<!-- =============================== (d) Roles & access =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Tab (d) — Roles &amp; access</b> · two role cards, single-dropdown user form, PII unmasking toggle · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Adams Home<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Settings</b></div>
+<div class="sc-content">
+<div class="sc-tabs"><span class="sc-tab">Capabilities &amp; schedules</span><span class="sc-tab">Order policies</span><span class="sc-tab">Fulfillment mode</span><span class="sc-tab is-active">Roles &amp; access</span><span class="sc-tab">Retention &amp; privacy</span></div>
+<div class="sc-grid sc-grid--2">
+<div class="sc-card"><div class="sc-btnrow sc-btnrow--split"><div class="sc-candidate__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Connector User</div><span class="sc-status sc-status--info">4 people</span></div>
+<p class="sc-help sc-mt3">Daily operations and audited resolution:</p>
+<ul class="sc-mt2" style="display:grid; gap:var(--sc-space-1); font-size:var(--sc-fs-secondary); color:var(--sc-text-secondary)">
+<li>• View dashboard, stores, jobs, logs and settings (read-only)</li>
+<li>• Retry eligible jobs · cancel non-terminal jobs · run permitted manual syncs</li>
+<li>• Resolve matching and review cases (every resolution audited: who/when/what)</li>
+<li>• COD reconciliation review · fulfillment review cases · tracking import</li>
+<li>• Sees customer data <b>masked</b> by default</li>
+</ul>
+<div class="sc-help sc-mt3"><b>Cannot:</b> change configuration or credentials, connect/disconnect stores, destructive overrides, manage access.</div></div>
+<div class="sc-card"><div class="sc-btnrow sc-btnrow--split"><div class="sc-candidate__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-shield"/></svg> Connector Administrator</div><span class="sc-status sc-status--info">1 person</span></div>
+<p class="sc-help sc-mt3">Everything a Connector User can, plus:</p>
+<ul class="sc-mt2" style="display:grid; gap:var(--sc-space-1); font-size:var(--sc-fs-secondary); color:var(--sc-text-secondary)">
+<li>• Store lifecycle: connect / reconnect / disconnect · credentials &amp; scopes</li>
+<li>• All configuration: capabilities, schedules, mappings, policies, fulfillment mode</li>
+<li>• Retention &amp; privacy controls · PII visibility policy</li>
+<li>• Destructive / exceptional overrides · user access assignment</li>
+</ul>
+<div class="sc-help sc-mt3">An Administrator automatically has every User capability — assign exactly one role per person.</div></div>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">How a role is assigned (Odoo user form)</div>
+<div class="sc-help sc-mt2">One selection on the standard Odoo user form — no group list to decipher:</div>
+<div class="sc-field sc-mt3" style="max-inline-size:360px"><span class="sc-label">Shopify Connector</span><span class="sc-input" style="display:inline-flex; align-items:center; justify-content:space-between" role="listbox" aria-label="Shopify Connector role">User <span aria-hidden="true">▾</span></span><div class="sc-help">Options: (empty) · User · Administrator</div></div></div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Customer data (PII) visibility</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Administrator only</span></div>
+<div class="sp-row"><div><b>Connector Users see unmasked customer data on this store</b><div class="sc-muted">Default off: Users see masked names, emails, phones and addresses. Turn on only where operations require it (e.g. COD delivery confirmation). Every change is logged.</div></div><span></span><span class="sp-toggle" role="switch" aria-checked="false" aria-label="Unmasked PII for Users — off"><span class="sp-toggle__track"></span>Off</span></div>
+<div class="sc-help sc-mt2"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg> Administrators always see unmasked data. Masking here is a display and access rule — exports and logs stay redacted regardless.</div></div>
+</div></div></section>
+
+<!-- =============================== (e) Retention & privacy =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Tab (e) — Retention &amp; privacy</b> · PII retention, masking action, sweep schedule, audit note · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Adams Home<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Settings</b></div>
+<div class="sc-content">
+<div class="sc-tabs"><span class="sc-tab">Capabilities &amp; schedules</span><span class="sc-tab">Order policies</span><span class="sc-tab">Fulfillment mode</span><span class="sc-tab">Roles &amp; access</span><span class="sc-tab is-active">Retention &amp; privacy</span></div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Personal data retention</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Administrator only</span></div>
+<div class="sp-row"><div><b>Keep customer PII snapshots for</b><div class="sc-muted">Name, email, phone and address snapshots on connector records older than this are masked in place. Bindings and non-personal history are kept.</div></div><span class="sc-input" style="display:inline-flex; align-items:center; justify-content:space-between; min-block-size:34px; max-inline-size:160px" role="listbox" aria-label="PII retention">90 days <span aria-hidden="true">▾</span></span><span></span></div>
+<div class="sp-row"><div><b>Retention sweep</b><div class="sc-muted">Runs daily at 02:00 (store time). Last sweep: today, 02:00 — 118 records masked.</div></div><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Healthy</span><span></span></div>
+<div class="sp-row"><div><b>Mask a customer now</b><div class="sc-muted">Immediately masks one customer’s PII snapshots across this store’s connector records (e.g. for an erasure request). Audited; cannot be undone.</div></div><button class="sc-btn sc-btn--sm">Mask a customer…</button><span></span></div>
+</div>
+<div class="sc-consequence sc-mt4"><span class="sc-consequence__ico"><svg class="sc-ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span><b>Audit note:</b> every change on this page — retention period, sweep results, manual masking, PII visibility — is recorded with who, when, and old → new values. Job logs are append-only and already redact personal data at write time.</span></div>
+</div></div></section>
+
+<!-- =============================== User read-only variant =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Connector User — read-only variant</b> · same Order policies tab, view-only, no ghost buttons · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as U. Operator">UO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Adams Home<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Settings</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--neutral"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-eye"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Settings — view only</div><div class="sc-band__sub">You can see every setting; changing them needs a Connector Administrator.</div></div></div>
+<div class="sc-tabs sc-mt4"><span class="sc-tab">Capabilities &amp; schedules</span><span class="sc-tab is-active">Order policies</span><span class="sc-tab">Fulfillment mode</span><span class="sc-tab">Roles &amp; access</span><span class="sc-tab">Retention &amp; privacy</span></div>
+<div class="sc-card"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Order confirmation policy</div>
+<div class="sc-kv sc-mt3"><dt>Policy</dt><dd><b>Confirm paid orders only</b> (recommended default)</dd><dt>Cash on Delivery</dt><dd>Approved manual gateway — pending COD orders <b>require User approval</b> before confirming</dd><dt>Bank transfer</dt><dd>Approved — pending orders import as quotations</dd><dt>Pay on pickup</dt><dd>Not approved — ordinary pending-payment handling</dd></div>
+<div class="sc-help sc-mt3">Shown as plain facts, not disabled controls — nothing here looks editable when it isn’t.</div></div>
+</div></div></section>
+
+<!-- =============================== Unsaved-changes bar =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Unsaved-changes bar</b> · Administrator changed two settings; sticky bar names them · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Adams Home<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Settings</b></div>
+<div class="sc-content">
+<div class="sc-tabs"><span class="sc-tab">Capabilities &amp; schedules</span><span class="sc-tab is-active">Order policies</span><span class="sc-tab">Fulfillment mode</span><span class="sc-tab">Roles &amp; access</span><span class="sc-tab">Retention &amp; privacy</span></div>
+<div class="sc-card"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Order confirmation policy</div>
+<div class="sc-candidate is-selected sc-mt3"><span class="sc-candidate__radio" role="radio" aria-checked="true"></span><div class="sc-candidate__body"><div class="sc-candidate__title">Confirm paid or authorized</div><div class="sc-help">Changed from “Confirm paid orders only”. Applies to future orders only.</div></div></div>
+</div>
+<div class="sp-savebar" role="status"><span style="font-size:var(--sc-fs-secondary)"><svg class="sc-ico" aria-hidden="true" style="color:var(--sc-warning-text)"><use href="#i-warn"/></svg> <b>2 unsaved changes</b> — Confirmation policy · COD pending rule. Nothing takes effect until you save.</span><span class="sc-btnrow"><button class="sc-btn sc-btn--secondary sc-btn--sm">Discard</button><button class="sc-btn sc-btn--primary sc-btn--sm">Save changes</button></span></div>
+</div></div></section>
+
+<!-- =============================== Saved toast =============================== -->
+<section class="gallery-item"><div class="gallery-caption"><b>Saved toast</b> · confirmation with effect summary + audit pointer · 1366px</div>
+<div class="screen"><div class="sc-content">
+<div class="sc-tabs"><span class="sc-tab">Capabilities &amp; schedules</span><span class="sc-tab is-active">Order policies</span><span class="sc-tab">Fulfillment mode</span><span class="sc-tab">Roles &amp; access</span><span class="sc-tab">Retention &amp; privacy</span></div>
+<div style="display:flex; justify-content:flex-end"><div class="sp-toast" role="status"><svg class="sc-ico" aria-hidden="true" style="color:var(--sc-success-text)"><use href="#i-check"/></svg><span><b>Settings saved.</b> Confirmation policy is now “Confirm paid or authorized” — future orders only. Recorded in the audit log.</span></div></div>
+<div class="sc-card sc-mt4"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Order confirmation policy</div>
+<div class="sc-candidate is-selected sc-mt3"><span class="sc-candidate__radio" role="radio" aria-checked="true"></span><div class="sc-candidate__body"><div class="sc-candidate__title">Confirm paid or authorized</div><div class="sc-help">Also confirms authorized-not-yet-captured payments.</div></div></div>
+</div>
+</div></div></section>
+
+</div></body></html>
