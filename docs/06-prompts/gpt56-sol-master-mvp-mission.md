@@ -35,7 +35,7 @@ You are building the remaining scope of a premium, modular Odoo 19 ↔ Shopify c
 - issue #165
 - any future published checkpoint tag
 
-**Known hazard — do not use:** `claude/task-012-decision-closure-mb88sn` is a stray, unmerged branch containing a ~22,000-line deletion diff against the checkpoint (it removed tests, QA evidence, and decision docs — it matches issue #165's "abandon the unsuccessful experimental branch" language). Never branch from it, merge it, or treat its content as authoritative.
+**Known hazard — do not use:** `claude/task-012-decision-closure-mb88sn` is a stray, unmerged branch containing a ~22,000-line deletion diff against the checkpoint (it removed tests, QA evidence, and decision docs — it matches issue #165's "abandon the unsuccessful experimental branch" language). Never branch from it, merge it, or treat its content as authoritative. *(Update 2026-07-16: the branch was found already deleted during the Fable gap-closure prerequisite check; the product owner accepted the deleted state as authorized administrative cleanup on 2026-07-16. Do not recreate or restore it. See `../07-implementation-plan/mvp-completion-program.md` §1 for the full disposition record.)*
 
 **Your very first actions, in order:**
 1. Verify live: checkpoint branch resolves exactly to `acd8c4691e72cf5590f2a56228b08f183b76cd9a`; `mvp/program-integration` exists and also resolves to that same SHA plus only the governance-bootstrap PR on top; `Shopify-connector` and `main` are unchanged from what this file states; PR #150 and PR #151 are still at their recorded heads (`10d0034e8e666684daa36f517788223976d74035` and `e4669aaf206fe8436a6d8a524b083f48d56ac9df` respectively). If anything differs, stop and escalate (hard-stop condition 7, §9) — do not proceed.
@@ -110,7 +110,7 @@ Full detail in `mvp-completion-program.md` §9. In summary, you must close or ex
 2. **SRR-03 contradiction**: `docs/03-architecture/task-012-order-import-decision-closure.md` says "SRR-03 CLOSED"; the risk register, product-domain docs, and issue #165 all say "SRR-03 remains OPEN." Reconcile before Wave 2 begins implementation. Until reconciled, treat SRR-03 as OPEN (the stricter reading).
 3. **PR #150/#151 disposition**: recommend closing/marking superseded on GitHub (their content is already merged into the checkpoint); requires explicit control-room/product-owner sign-off before you act — do not close them unilaterally.
 4. **DEC-027/028/029/030 acceptance timing**: all four are drafted, evidenced, "Proposed... NOT accepted." Decide which (if any) is a hard prerequisite for a specific wave — DEC-028 (credential/PCD posture) is the most likely candidate, relevant before any dev-store UAT touches real customer PII.
-5. **`claude/task-012-decision-closure-mb88sn` disposition**: default is leave it untouched; deletion needs explicit sign-off.
+5. **`claude/task-012-decision-closure-mb88sn` disposition**: resolved — found already deleted (2026-07-16); product owner accepted the deleted state as authorized cleanup the same day. Restoration forbidden.
 6. **`addons/requirements.txt`**: pre-existing empty tracked file, informational only — no action expected unless the product owner asks for it.
 
 ## 7. Research rules
