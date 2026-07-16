@@ -365,3 +365,18 @@ between this benchmark and Part D's blueprint-level proposals. **Decision:
 apply a documentation-only traceability patch to Part D (this file + the Part D
 document + a one-line DEC-016 note), then proceed to the Fable F1–F7 fixes** —
 no redesign, no MBQ decided, no accepted content changed.
+
+---
+
+## Delta refresh — 2026-07-16 (Fable gap-closure mission)
+
+Premium-UX evidence pass captured in
+[`../00-source-materials/competitor-refresh-2026-07-16.md`](../00-source-materials/competitor-refresh-2026-07-16.md)
+§8: Polaris React now "(Deprecated)" with Polaris Web Components as
+successor (token taxonomy confirmed current); Celigo transactional
+error-management benchmark (classification/retry/resolve) recorded as the
+premium error-UX bar; WCAG 2.2 AA dashboard criteria verified against W3C
+(1.4.3, 1.4.11, 1.4.13, 2.4.7, new 2.4.11 Focus Not Obscured, new 2.5.8
+Target Size, 2.3.3 AAA aspirational). Apple HIG pages remain JS-blocked to
+the fetcher — HIG wording stays unquoted (open item). These findings feed
+`../02-product/premium-ux-master-specification.md`.
