@@ -8,10 +8,75 @@
 > `mvp/program-integration` @ `1e46c23ca5480eba3c6986a566ca9b33431c7ab6`.
 > **Draft PR:** (opened immediately after this commit; number recorded below.)
 > **Started:** 2026-07-16.
+>
+> **CORRECTION PASS (2026-07-16):** after the first mission delivery, the control
+> room returned PR #173 for one consolidated correction (comments `4993775983` +
+> product-owner superseding `4994990296`). That correction is now complete — see
+> **§Correction pass** below, which supersedes the "Mission completion" self-review
+> further down (retained as history).
 
 This file is the live handoff for the mission and is updated after every major
 workstream. The final control-room handoff will supersede the "Current state"
 section when the mission completes.
+
+## Correction pass — 2026-07-16 (control-room ruling reconciliation)
+
+**Rulings applied.** `4993775983` (consolidated REVISE: stale status; Mode 2 = MVP
+Wave 4 backend; fulfillment taxonomy; rendered UX evidence; Wave-2 live-evidence gate;
+decision-pack restructure) and `4994990296` (product-owner superseding: **no PII
+masking in the MVP**, which replaces only the PII section of `4993775983`).
+
+**Phase 0 re-verification (direct from GitHub).** PR #173 open/draft/unmerged/mergeable
+on `mvp/program-integration`; base `1e46c23`; PR #172 merged via `d18f9a99`; SRR-03
+CLOSED; Wave 2 unstarted; checkpoint `acd8c46` / `Shopify-connector` `dd6ecb8` / `main`
+`a5d4543` all unchanged; every changed path under `docs/**`. All pass.
+
+**Correction workstreams (all DONE).**
+
+| # | Workstream | Result |
+|---|---|---|
+| C0 | Phase-0 identity/boundary re-verification | PASS (above) |
+| C1 | Repository-wide correction-impact inventory | [`fable-correction-impact-inventory.md`](fable-correction-impact-inventory.md) |
+| C2 | Stale program-state reconciliation (Wave 1 merged / SRR-03 closed / matrices+spec exist) | DoRs, dependency map, checklist, program doc, captures, DEC notes — dated notes, no history rewritten |
+| C3 | Mode 2 = mandatory MVP **Wave 4 backend**; Wave 5 = mode UI only | fulfillment modes §10, capability map, Task 014, Wave 4/5 DoR, dependency map, QA matrices, decision pack |
+| C4 | **No PII masking in the MVP** (both roles read raw operational PII) | roles §3, security/PII matrix, cross-domain, premium UX, abandoned-checkout, settings/order/COD prototypes, SEC-1 dated notes |
+| C4a | **SEC-2** two-role + PII-masking-removal implementation packet (Proposed) | [`task-sec2-two-role-and-pii-simplification-packet.md`](task-sec2-two-role-and-pii-simplification-packet.md) |
+| C5 | One authoritative four-layer fulfillment taxonomy; **7 Layer-A enum families re-verified** vs API 2026-07 (incl. A7 `FulfillmentDisplayStatus`, 18 values) | status model §1/§4.1, capture §6/§6.8, api-notes, Task 014, Wave 4 DoR, UAT, prototypes |
+| C6 | Browser-rendered premium-UX evidence | [`../09-ui-prototype/review-evidence/2026-07-16-correction/`](../09-ui-prototype/review-evidence/2026-07-16-correction/) — 28 screenshots, 0 overflow / 0 broken links / 0 a11y flags |
+| C7 | Wave-2 live-evidence rule (Odoo.sh mandatory; read-only Shopify preferred, deferrable to Wave 6, not a merge blocker) | Wave 2 DoR, Task 012, reconnect policy, Wave 6 packet, dependency map, QA matrices, release gap |
+| C8 | Decision pack → five Classes (A binding rulings / B product / C technical / D empirical / E post-MVP) | [`../04-decisions/fable-proposed-decision-pack.md`](../04-decisions/fable-proposed-decision-pack.md) |
+| C9 | Wave 2–6 DoR completeness re-review | all five DoRs consistent |
+
+**Updated 20-track adversarial self-review (post-correction).**
+
+| # | Track | Verdict |
+|---|---|---|
+| 1 | Current-state & ancestry accuracy | PASS (proof A clean; all current-facing stale status corrected; historical records kept with dated notes) |
+| 2 | Official Shopify evidence | PASS (7 Layer-A enum families re-verified vs API 2026-07 on 2026-07-16; A7 resolved; deprecations recorded) |
+| 3 | Official Odoo evidence | PASS (roles/masking grounded in verified repo facts; captures unchanged) |
+| 4 | Competitor claim accuracy | PASS (no new/altered claims) |
+| 5 | MVP vs post-MVP scope | PASS (masking → post-MVP Class E; abandoned-checkout workspace post-MVP) |
+| 6 | Two-role model completeness | PASS (roles §3 no-masking; SEC-2 migration packet) |
+| 7 | No-masking MVP direction | PASS (proof C clean; SEC-2 packet; SEC-1 dated notes; prototypes de-masked) |
+| 8 | Sales/order logic | PASS (paid-only default binding A-8; manual-gateway A-9) |
+| 9 | COD lifecycle | PASS (Class A-10; unchanged) |
+| 10 | Fulfillment Mode 1 | PASS |
+| 11 | Fulfillment Mode 2 | PASS (mandatory Wave 4 backend everywhere; proof B clean; prototype shows the 16-condition engine) |
+| 12 | Fulfillment status taxonomy | PASS (one four-layer taxonomy; proof D clean; 7 Layer-A families exact) |
+| 13 | Reconnect/catch-up/backfill | PASS (fresh catch-up; Wave-2 evidence rule applied) |
+| 14 | Inventory & product export | PASS (Odoo authority; CAS field-name empirical preflight, Class D EQ-D1) |
+| 15 | DEC-031 Layer 2 safety | PASS (Class C; **not Accepted**; proof G4) |
+| 16 | Modular architecture & Lite/Full | PASS (unchanged; no rejected approach re-proposed) |
+| 17 | Premium UX rendered quality | **PASS — now PROVEN by rendered evidence** (28 screenshots; 0 overflow/broken/a11y; visual-review report). Upgraded from the earlier NOT-PROVEN. |
+| 18 | Performance & scalability | PASS with non-blocking (SLOs provisional pending PERF-1/Wave 6 calibration — Class D EQ-D5) |
+| 19 | Security, PII access, log redaction, audit | PASS (no MVP masking; redaction/company/credential controls retained; SEC-2 preserves SEC-1) |
+| 20 | Testing/UAT/release readiness & doc consistency | PASS (matrices exist and are aligned; proofs A–G clean; execution is Wave 6) |
+
+**Proof-search results:** A (stale status) clean · B (Mode 2 mandatory Wave 4) clean ·
+C (no MVP masking) clean · D (taxonomy) clean · E (all 12 surfaces rendered) clean ·
+F (Wave 2 not credential-blocked) clean · G (boundaries: docs-only, no addons, no
+decision Accepted, DEC-031 Layer 2 not Accepted, Wave 2 unstarted, PR draft, protected
+refs unchanged) clean. 20/20 PASS (track 18 PASS-with-non-blocking); 0 FAIL; 0 NOT PROVEN.
 
 ## Prerequisite verification (2026-07-16)
 
@@ -70,7 +135,13 @@ resolved by this ruling.
 - No live Shopify mutation; no credentials created.
 - Protected refs untouched.
 
-## Mission completion — adversarial self-review (2026-07-16)
+## Mission completion — adversarial self-review (2026-07-16, first delivery — SUPERSEDED)
+
+> **[Superseded 2026-07-16 by the Correction pass above.]** This is the first-delivery
+> self-review, retained as history. The control room returned PR #173 for correction;
+> the current, binding self-review is the 20-track table in **§Correction pass** (notably
+> track 17 UX is now **PROVEN** by rendered evidence, and PII masking is removed from the
+> MVP). Read the Correction-pass verdicts, not this table, for current state.
 
 Run as three independent verification agents (boundaries/integrity,
 cross-document consistency, mission coverage) plus direct control checks;
