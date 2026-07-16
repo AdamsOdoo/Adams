@@ -44,6 +44,19 @@ You are building the remaining scope of a premium, modular Odoo 19 ↔ Shopify c
 
 ## 3. Current-state audit summary — what already exists (do not re-implement, do not assume more exists than this)
 
+> **[Program-state update — 2026-07-16]** This section's bootstrap-dated
+> (2026-07-15) "exists today" / "documented, unmerged" / "must resolve first"
+> status claims are now **superseded**: **Wave 1 has merged** (PR #172 into
+> `mvp/program-integration`, merge `d18f9a99`), so **CORE-R1 and SEC-1 are
+> merged** (no longer live defects), and the **SRR-03 "CLOSED vs OPEN"
+> contradiction is resolved — SRR-03 is CLOSED** (corrected-head build
+> `34995642`, 0 failed / 0 errors / 644 tests). This mission prompt is retained
+> **verbatim** as the historical launch brief; per §4, always consult
+> `docs/07-implementation-plan/mvp-program-state.md` and
+> `docs/07-implementation-plan/mvp-completion-program.md` for live status. The
+> DEC-031 **Layer 2** deferral (below) still stands. This note updates no
+> instruction — it only re-dates the status snapshot.
+
 A full evidence-based audit was performed at bootstrap (2026-07-15). Headline facts:
 
 - **Three real addons exist**: `shopify_connector_core` (v19.0.1.7.2 — store/credential/job/dispatch/readiness substrate), `shopify_connector_product` (v19.0.2.0.0 — **import-only** product/variant/attribute/media import, matching, duplicate prevention), `shopify_connector_sale` (v19.0.1.0.0 — **customer-import-only** despite the module name; contains no `sale.order` logic). No inventory, fulfillment, order, or dashboard/UI module exists anywhere yet.
@@ -107,7 +120,7 @@ Work proceeds in the following waves, each targeting `mvp/program-integration`. 
 Full detail in `mvp-completion-program.md` §9. In summary, you must close or explicitly, recorded-ly defer:
 
 1. **Product export scope** (item 6): DEC-003 (accepted) includes product export/update in MVP scope; no wave above implements it. Decide whether to add it (recommended: fold into Wave 5) or formally amend DEC-003 with a new, control-room-reviewed decision record — do not silently drop it.
-2. **SRR-03 contradiction**: `docs/03-architecture/task-012-order-import-decision-closure.md` says "SRR-03 CLOSED"; the risk register, product-domain docs, and issue #165 all say "SRR-03 remains OPEN." Reconcile before Wave 2 begins implementation. Until reconciled, treat SRR-03 as OPEN (the stricter reading).
+2. **SRR-03 contradiction**: `docs/03-architecture/task-012-order-import-decision-closure.md` says "SRR-03 CLOSED"; the risk register, product-domain docs, and issue #165 all say "SRR-03 remains OPEN." Reconcile before Wave 2 begins implementation. Until reconciled, treat SRR-03 as OPEN (the stricter reading). **[Program-state update — 2026-07-16] Resolved:** the control room reconciled this and **SRR-03 is CLOSED** post-Wave-1 (see the §3 note above and `docs/07-implementation-plan/mvp-program-state.md`); the "treat as OPEN until reconciled" instruction is spent — no Wave-0 action remains on this item.
 3. **PR #150/#151 disposition**: recommend closing/marking superseded on GitHub (their content is already merged into the checkpoint); requires explicit control-room/product-owner sign-off before you act — do not close them unilaterally.
 4. **DEC-027/028/029/030 acceptance timing**: all four are drafted, evidenced, "Proposed... NOT accepted." Decide which (if any) is a hard prerequisite for a specific wave — DEC-028 (credential/PCD posture) is the most likely candidate, relevant before any dev-store UAT touches real customer PII.
 5. **`claude/task-012-decision-closure-mb88sn` disposition**: resolved — found already deleted (2026-07-16); product owner accepted the deleted state as authorized cleanup the same day. Restoration forbidden.
@@ -143,7 +156,7 @@ Full detail in `mvp-completion-program.md` §9. In summary, you must close or ex
 8. MVP scope would materially change.
 9. A security or credential-exposure risk is found.
 10. The active wave cannot satisfy its own definition of done.
-11. **(Program-specific)** The SRR-03 "CLOSED" vs. "OPEN" contradiction (§6 item 2) is still unresolved and you are about to start Wave 2 implementation.
+11. **(Program-specific)** The SRR-03 "CLOSED" vs. "OPEN" contradiction (§6 item 2) is still unresolved and you are about to start Wave 2 implementation. **[Program-state update — 2026-07-16]** This hard-stop is **no longer live** — the contradiction was reconciled and SRR-03 is CLOSED post-Wave-1 (see the §3 note and `docs/07-implementation-plan/mvp-program-state.md`).
 
 You are **not authorized** to: modify the checkpoint branch, `Shopify-connector`, or `main`; force-push any protected or shared branch; delete history; merge your own wave PR (Claude control room only); silently broaden MVP scope; claim unsupported Shopify or Odoo behavior; introduce a Shopify mutation before Layer 2 exists for that domain; claim exactly-once remote effects; hide failed tests or reclassify owned failures as unrelated; absorb unrelated defects without approval; start any excluded-from-MVP domain (§4); publish a release without the Wave 6 + product-owner release gate.
 

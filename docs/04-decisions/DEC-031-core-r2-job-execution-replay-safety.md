@@ -98,6 +98,15 @@ beyond their default-safe (fail-closed) classification.
   as `DEF-PB-1`. **Remains OPEN after this record** — Layer 1 does not close
   it; only a triggered, accepted Layer 2 plus multi-worker runtime proof
   could.
+  **[Program-state update — 2026-07-16]** The "Remains OPEN" wording reflects
+  this record's 2026-07-15 as-of state. SRR-03 was subsequently **CLOSED**
+  post-Wave-1 (per the 2026-07-16 reconciliation in
+  [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
+  and [`../07-implementation-plan/mvp-program-state.md`](../07-implementation-plan/mvp-program-state.md)).
+  This does **not** change this record's operative decision: the deferred
+  **Layer 2** mutation-ownership hardening remains reserved for the first
+  Shopify-mutation domain and must still be decided and accepted before any
+  Shopify write ships.
 - **Rejected-approaches log**: checked in full (RA-001…RA-024); none blocks
   any option this record or its companion document evaluates; none is
   re-proposed.

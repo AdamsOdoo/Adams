@@ -26,6 +26,13 @@ All items below are [Fact — repository state verified 2026-07-16]:
   (`group_shopify_connector_{auditor,operator,reviewer,admin}`); 32 test files
   incl. extensive source/AST guards. Runtime-green: build `34995642`,
   0 failed / 0 errors / 644 tests.
+  **[Product-direction update — 2026-07-16]** The customer-PII *masking* listed
+  here is recorded only as verified merged-Wave-1 repository state — **not** an
+  endorsed forward MVP capability. The 2026-07-16 product direction removes
+  customer-PII masking from the MVP (corrective packet
+  `docs/07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`,
+  Proposed; SEC-2); credential `•••` display-masking (DEC-004) and
+  log/audit/retention **redaction** are unaffected and remain in force.
 - **Current official evidence (Tier 1):** Shopify orders/inventory/
   FulfillmentOrder/product/PCD/scopes captures of 2026-07-10/11/15 (API
   2026-07) and Odoo 19 captures — current except the named gaps in §2.
@@ -44,7 +51,7 @@ All items below are [Fact — repository state verified 2026-07-16]:
 |---|---|---|---|
 | R-1 | **COD / manual-payment-gateway evidence absent.** No capture of Shopify manual gateways, `OrderTransaction.manualPaymentGateway`, `orderMarkAsPaid`, COD financial-state behavior. | Blocking for Wave 2 product design | `docs/00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md` (new) |
 | R-2 | **Abandoned-checkout evidence absent.** No AbandonedCheckout object/query capture (identity, recovery state, `completedAt` conversion, limits). | Blocking for abandoned-checkout policy | same capture file as R-1 |
-| R-3 | **Fulfillment-state completeness.** FulfillmentOrder captures exist (2026-07-10/15) but no complete verified map of all four state families (order summary, FulfillmentOrder status/requestStatus, Fulfillment status, FulfillmentEvent milestones) + holds + deprecations. | Blocking for Waves 4 product/UX design | same capture file as R-1; mapped in `docs/02-product/shopify-fulfillment-status-model.md` (new) |
+| R-3 | **Fulfillment-state completeness.** FulfillmentOrder captures exist (2026-07-10/15) but no complete verified map of all **seven Layer-A enum families** (`OrderDisplayFulfillmentStatus` order-summary, `FulfillmentOrderStatus`, `FulfillmentOrderRequestStatus`, `FulfillmentStatus`, `FulfillmentEventStatus` milestones, `FulfillmentHoldReason`, `FulfillmentDisplayStatus`) + deprecations. | Blocking for Waves 4 product/UX design | same capture file as R-1 (§6.8 re-verification delta, all seven verified 2026-07-16 incl. A7); mapped in `docs/02-product/shopify-fulfillment-status-model.md` (new) |
 | R-4 | **Competitor corpus currency.** All competitor evidence dated 2026-06-30/07-01 (re-verified 07-04); mission requires a 2026-07-16 refresh incl. COD/reconnect/fulfillment-mode behavior and any new material competitor. | Non-blocking but required output | refresh notes in `docs/00-source-materials/competitor-refresh-2026-07-16.md` (new) + deltas into existing matrix/deep-dives |
 | R-5 | **Order sort/filter + order-edit surface.** `OrderSortKeys` values, `orders/edited` implications, order-edit (`CalculatedOrder`) impact on an importer. | Medium (Wave 2 packet detail) | same capture file as R-1 |
 | R-6 | **Odoo 19 delivery/backorder/return + free_qty verification.** Source-backed statements exist but no consolidated capture for COD/fulfillment/inventory design (picking states, backorders, returns restoring stock, `free_qty` vs `qty_available`, implied groups). | Blocking for COD/fulfillment/inventory closure | `docs/00-source-materials/odoo19-sale-stock-security-captures-2026-07-16.md` (new) |

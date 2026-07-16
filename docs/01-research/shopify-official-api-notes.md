@@ -998,9 +998,11 @@ Net-new evidence relative to this file's baseline: complete
 semantics; `OrderTransaction.manualPaymentGateway` as the COD/manual-gateway
 discriminator; `orderMarkAsPaid`/`orderCreateManualPayment` (Partial);
 **AbandonedCheckout object + abandonedCheckouts query verified to exist in
-2026-07** (recovery_state, completedAt); complete four-family fulfillment
-state model incl. `FulfillmentEventStatus` (11 values) and deprecations
-(`OPEN`/`PENDING` on Fulfillment; `OPEN`/`PENDING_FULFILLMENT`/`RESTOCKED`
+2026-07** (recovery_state, completedAt); complete **seven-family (Layer A)**
+fulfillment state model — the seven Shopify fulfillment enum families incl.
+`FulfillmentEventStatus` (11 values), `FulfillmentDisplayStatus`
+(**A7 — 18 values, verified 2026-07-16, display-only roll-up**), and
+deprecations (`OPEN`/`PENDING` on Fulfillment; `OPEN`/`PENDING_FULFILLMENT`/`RESTOCKED`
 on order summary); `fulfillmentCreateV2` deprecation confirmed; fulfillment
 origin-attribution surface (`BasicEvent.attributeToApp`/`appTitle`,
 `FulfillmentHold.heldByApp`; no app field on Fulfillment itself);

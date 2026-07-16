@@ -17,6 +17,15 @@
 > at the top of this file — DEC-028 is **Accepted** (Claude control room,
 > 2026-07-15, per DEC-033 §4). Retained unedited as audit trail.
 
+> **[Product-direction update — 2026-07-16]** Every "masking" reference in this
+> record means **credential view masking (DEC-004)** or the **SEC-1
+> retention/masking surface** — both stay exactly as written here. Separately,
+> the 2026-07-16 product direction removes **customer-PII business-record
+> masking** from the MVP (corrective packet
+> [`../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`](../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md),
+> Proposed; SEC-2); this note does **not** reopen or rewrite DEC-028's decision,
+> and credential masking / PII **redaction** are unaffected.
+
 **Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-10 by the
 MVP planning-completion session (AR-042 candidate); **Rung 1 revised
 2026-07-11** by the PR #148 revision session per ChatGPT's

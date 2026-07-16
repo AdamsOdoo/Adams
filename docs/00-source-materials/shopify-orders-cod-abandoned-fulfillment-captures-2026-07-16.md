@@ -68,7 +68,7 @@ Sources: https://shopify.dev/docs/api/admin-graphql/latest/objects/AbandonedChec
 - [Fact] Abandoned-checkout data is protected customer data (PCD) — see the 2026-07-10 capture §7.
 - [Open question] No documented direct AbandonedCheckout→Order object reference beyond `completedAt`/`recovery_state`; `abandonedCheckoutsCount` unconfirmed. [Inference] Conversion linking must be done by the connector (e.g. by cart token/customer/time correlation is NOT reliable; the safe design keys on the resulting Order webhook/scan, never on the checkout).
 
-## 6. Fulfillment state models (all four families)
+## 6. Fulfillment state models (all seven Shopify fulfillment enum families — Layer A)
 
 ### 6.1 Order-level summary — `OrderDisplayFulfillmentStatus`
 
@@ -136,6 +136,46 @@ All Accessible, 2026-07-16:
 ### 6.7 Fulfillment webhook topics
 
 Source: https://shopify.dev/docs/api/webhooks?reference=toc — Accessible, 2026-07-16 (paraphrase): `fulfillments/create`, `fulfillments/update`; `fulfillment_events/create`, `fulfillment_events/delete`; `fulfillment_holds/added`, `fulfillment_holds/released`; `fulfillment_orders/*` incl. `order_routing_complete`, `placed_on_hold`, `hold_released`, `rescheduled`, `scheduled_fulfillment_order_ready`, `moved`, `split`, `merged`, `cancelled`, `fulfillment_request_submitted/accepted/rejected`, `cancellation_request_submitted/accepted/rejected`, `fulfillment_service_failed_to_complete`, `line_items_prepared_for_local_delivery`, `line_items_prepared_for_pickup`, `progress_reported`, `manually_reported_progress_stopped`. [Open question] Per-topic payload schemas not individually fetched.
+
+### 6.8 Layer-A enum-family completeness — 2026-07-16 re-verification delta
+
+[Fact] Re-verified 2026-07-16 against Admin GraphQL **2026-07**: the Shopify
+fulfillment-state model is **seven enum families** — the authoritative
+**"Layer A"** of the four-layer taxonomy in
+[`../02-product/shopify-fulfillment-status-model.md`](../02-product/shopify-fulfillment-status-model.md),
+**not four**. §6.1–§6.4 already captured six of them; this delta records the
+count correction and adds the previously-unlisted seventh family
+(A7 `FulfillmentDisplayStatus`).
+
+| # | GraphQL enum | Active values (deprecated) | Captured |
+|---|---|---|---|
+| A1 | `OrderDisplayFulfillmentStatus` | 7: UNFULFILLED, PARTIALLY_FULFILLED, FULFILLED, IN_PROGRESS, ON_HOLD, SCHEDULED, REQUEST_DECLINED (3 deprecated: OPEN→UNFULFILLED, PENDING_FULFILLMENT→IN_PROGRESS, RESTOCKED→UNFULFILLED) | §6.1 |
+| A2 | `FulfillmentOrderStatus` | 7: OPEN, IN_PROGRESS, SCHEDULED, ON_HOLD, INCOMPLETE, CLOSED, CANCELLED | §6.2 |
+| A3 | `FulfillmentOrderRequestStatus` | 8: UNSUBMITTED, SUBMITTED, ACCEPTED, REJECTED, CANCELLATION_REQUESTED, CANCELLATION_ACCEPTED, CANCELLATION_REJECTED, CLOSED | §6.2 |
+| A4 | `FulfillmentStatus` | 4: SUCCESS, CANCELLED, ERROR, FAILURE (2 deprecated: OPEN, PENDING) | §6.3 |
+| A5 | `FulfillmentEventStatus` | 11: LABEL_PURCHASED, LABEL_PRINTED, READY_FOR_PICKUP, CONFIRMED, CARRIER_PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, ATTEMPTED_DELIVERY, DELIVERED, DELAYED, FAILURE | §6.4 |
+| A6 | `FulfillmentHoldReason` | 8: AWAITING_PAYMENT, AWAITING_RETURN_ITEMS, HIGH_RISK_OF_FRAUD, INCORRECT_ADDRESS, INVENTORY_OUT_OF_STOCK, ONLINE_STORE_POST_PURCHASE_CROSS_SELL, UNKNOWN_DELIVERY_DATE, OTHER | §6.2 |
+| A7 | `FulfillmentDisplayStatus` | 18: ATTEMPTED_DELIVERY, CANCELED, CARRIER_PICKED_UP, CONFIRMED, DELAYED, DELIVERED, FAILURE, FULFILLED, IN_TRANSIT, LABEL_PRINTED, LABEL_PURCHASED, LABEL_VOIDED, MARKED_AS_FULFILLED, NOT_DELIVERED, OUT_FOR_DELIVERY, PICKED_UP, READY_FOR_PICKUP, SUBMITTED (none deprecated) | **new — this delta** |
+
+- [Fact] **A7 `FulfillmentDisplayStatus`** — source:
+  https://shopify.dev/docs/api/admin-graphql/latest/enums/FulfillmentDisplayStatus
+  — Accessible, 2026-07-16. Backs `Fulfillment.displayStatus` (§6.3 lists the
+  field; its **18** enum values are enumerated here). None deprecated.
+  **Spelling note:** A7 uses `CANCELED` (one L), distinct from A4
+  `FulfillmentStatus.CANCELLED` (two L) — store raw; never normalize the
+  distinction away.
+- [Inference/Recommendation] A7 is a **display-only roll-up — never an
+  automation input**. Mode-2 apply gating keys off A2/A4 (§6.2/§6.3), never off
+  `displayStatus`.
+- [Fact — status] This **resolves the former open question** over whether
+  `FulfillmentDisplayStatus` was verified: all **seven** Layer-A enum families
+  are now verified on 2026-07-16 (the earlier "four families" §6 title
+  undercounted — six were already in §6.1–§6.4; A7 is added here). Remove any
+  residual "FulfillmentDisplayStatus unverified" hedge elsewhere.
+- The **unknown-future-value contract** (§6.1/§6.3 handling; unchanged) applies
+  to every Layer-A family incl. A7: store raw; display "Unknown status (RAW)";
+  never map to success; stop unsafe automation (Mode-2 apply, outbound against
+  the FO, dependent retries); raise an actionable schema warning.
 
 ## 7. Webhooks vs polling (orders)
 

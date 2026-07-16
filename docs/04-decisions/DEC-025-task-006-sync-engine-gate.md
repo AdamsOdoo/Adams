@@ -224,6 +224,13 @@ companion gate document §K and in
    interrupted by a concurrent disconnect is not proven by any source.
    **Requires live Odoo.sh proof** before any design relies on the race
    being closed.
+   **[Program-state update — 2026-07-16]** This risk is retained as the
+   record's as-of-2026-07-08 statement. SRR-03 has since been runtime-proven
+   and **CLOSED** post-Wave-1 (per the 2026-07-16 reconciliation in
+   [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
+   and [`../07-implementation-plan/mvp-program-state.md`](../07-implementation-plan/mvp-program-state.md));
+   the required live proof now exists. Items 2–3 (SRR-04/SRR-09) stand as
+   written — they were reduced, not closed, and still require their tests.
 2. **Cron job-acquisition concurrency under real load (SRR-04, three-shard-
    corroborated open question).** Whether Odoo's automatic RPC-layer
    serialization retry protects a cron job's own domain-record-processing
