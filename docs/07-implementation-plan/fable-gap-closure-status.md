@@ -59,7 +59,10 @@ resolved by this ruling.
 | 9 | Implementation planning: Waves 2–6 DoR + packet addenda + U2/U3 prompts + Wave 6 packet + dependency/gate map | IN PROGRESS |
 | 10 | QA/release: cross-domain test matrix, COD/fulfillment-mode/reconnect-backfill UAT matrices, SLO/benchmark plan, security/PII matrix, release gap list | IN PROGRESS |
 | 11 | Documentation-consistency reconciliation (DEC-025/026/028/029 dated notes, stale packet/README notes, `-proposed` supersession banners) | **DONE** (`fc56898`) |
-| 12 | Consolidated decision pack; adversarial 20-track self-review; final control-room handoff | Pending |
+| 12 | Consolidated decision pack; adversarial 20-track self-review; final control-room handoff | **DONE** (`5832b89`, `f2c8197`) |
+| 8b | Premium UX master spec + 12 prototype surfaces | **DONE** (`f3b24b7`, five ux commits, `ef39d26`) |
+| 9b | Waves 2–6 DoR, packet addenda, U2/U3 prompts, Wave 6 packet, maps, readiness checklist | **DONE** (`838d483`, `3d3a3c4`, `f2c8197`) |
+| 10b | QA/release matrices and gap list | **DONE** (`0d8f162`) |
 
 ## Standing boundaries (unchanged)
 
@@ -69,3 +72,43 @@ resolved by this ruling.
 - Draft PR stays draft, open, unmerged throughout.
 - No live Shopify mutation; no credentials created.
 - Protected refs untouched.
+
+## Mission completion — adversarial self-review (2026-07-16)
+
+Run as three independent verification agents (boundaries/integrity,
+cross-document consistency, mission coverage) plus direct control checks;
+every defect found was corrected before this report (commit `f2c8197`).
+
+| # | Track | Verdict |
+|---|---|---|
+| 1 | Current-state and ancestry accuracy | PASS (base `1e46c23` exact; protected refs re-verified unchanged; 21+ docs-only commits) |
+| 2 | Official Shopify evidence | PASS (all enums live-verified on API 2026-07; open questions logged in capture §13) |
+| 3 | Official Odoo evidence | PASS (source + docs cited; open questions logged) |
+| 4 | Competitor claim accuracy | PASS (all claims classified; no capability invented; blocked sources recorded) |
+| 5 | MVP vs post-MVP scope | PASS (capability map + boundary restatement; abandoned-checkout workspace classified post-MVP) |
+| 6 | Two-role model completeness | PASS (definition + full 4→2 migration design, not implemented) |
+| 7 | Sales/order logic | PASS (8-state × 3-policy matrix + manual-gateway overlay + transitions) |
+| 8 | COD lifecycle | PASS with non-blocking corrections (two links fixed; 16/16 scenarios present) |
+| 9 | Fulfillment Mode 1 | PASS |
+| 10 | Fulfillment Mode 2 | PASS (16 exact conditions; 16 single-violation negative UAT cases) |
+| 11 | Shopify fulfillment-state coverage | PASS (7+3/7/8/4+2/11/8 enum counts verified exact against capture) |
+| 12 | Reconnect/catch-up/backfill | PASS (8-step reconnect; per-domain watermarks; preview-first backfill) |
+| 13 | Inventory and product export | PASS with non-blocking corrections (CAS field-name evidence conflict now flagged in all three records; mandatory Wave 3 preflight re-verification) |
+| 14 | DEC-031 Layer 2 safety | PASS with non-blocking corrections (all eight hard rules represented — rule 7 merges declare+fail-closed; one pre-existing "exactly once" packet wording corrected) |
+| 15 | Modular architecture | PASS (6-module family; rejections with revisit conditions; no RA re-proposal) |
+| 16 | Premium UX quality | PASS with non-blocking corrections (12 surfaces Proposed pending visual review; no rendered PNG evidence yet; Apple HIG wording uncaptured — open items) |
+| 17 | Performance and scalability | PASS with non-blocking corrections (every number carries a labeled basis; new SLOs provisional pending PERF-1/Wave 6 calibration by design) |
+| 18 | Security, PII, and audit | PASS (per-surface PCD/roles/redaction/retention/residue matrix) |
+| 19 | Testing/UAT/release readiness | PASS at planning level (matrices complete and adoptable; execution is Wave 6 scope — 0 UAT executed, honestly recorded) |
+| 20 | Documentation consistency and implementation readiness | PASS with non-blocking corrections (all found defects fixed; known PARTIALs recorded in the research handoff) |
+
+**Definition-of-done check:** all 26 mission DoD items satisfied at the
+documentation/design level; all Proposed decisions remain Proposed; Wave 2
+remains unauthorized/unstarted; PR #173 remains draft and unmerged; no file
+outside `docs/**` changed; protected refs untouched.
+
+**Final control-room handoff:** the mission-completion entry (with the exact
+next-session prompt) is at the top of
+[`../01-research/research-handoff.md`](../01-research/research-handoff.md);
+the consolidated review surface is
+[`../04-decisions/fable-proposed-decision-pack.md`](../04-decisions/fable-proposed-decision-pack.md).
