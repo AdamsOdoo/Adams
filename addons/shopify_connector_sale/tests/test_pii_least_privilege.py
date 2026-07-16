@@ -162,6 +162,33 @@ class TestPiiLeastPrivilege(TransactionCase):
         self.assertIn('[redacted-email]', logs.message)
         self.assertIn('***', logs.message)
 
+    def test_admin_override_writes_exact_provenance_and_one_audit(self):
+        current = self._partner('Admin current', self.company)
+        target = self._partner('Admin target', self.company)
+        binding = self._binding(
+            current,
+            gid='gid://shopify/Customer/AdminOverride',
+        )
+        admin = self.roles['admin']
+        before = self._audit_jobs()
+        binding.with_user(admin).action_override_binding(
+            target.id,
+            'admin approved customer@example.com',
+        )
+        binding.invalidate_recordset()
+        self.assertEqual(binding.partner_id, target)
+        self.assertEqual(binding.status, 'manually_overridden')
+        self.assertEqual(binding.match_key, 'manual')
+        self.assertEqual(binding.override_uid, admin)
+        self.assertTrue(binding.override_at)
+        self.assertEqual(
+            binding.override_previous_candidate,
+            'res.partner,%d' % current.id,
+        )
+        logs = self._assert_one_audit(before, admin)
+        self.assertNotIn('customer@example.com', logs.message)
+        self.assertIn('[redacted-email]', logs.message)
+
     def test_override_company_neutral_records_succeed(self):
         current = self._partner('Neutral current', False)
         target = self._partner('Neutral target', False)

@@ -1232,7 +1232,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
         existing = prefetch['existing_by_gid'].get(shopify_gid)
         if existing:
-            existing.write(snapshot_vals)
+            existing.sudo().write(snapshot_vals)
             self._apply_variant_extras(
                 existing.product_variant_id, variant_payload, existing,
                 source, settings, media, notes,
@@ -1771,7 +1771,9 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         # checksum matches what a later refresh will compute.
         record.flush_recordset([field_name])
         record.invalidate_recordset([field_name])
-        binding.shopify_image_checksum = self._image_checksum(record[field_name])
+        binding.sudo().write({
+            'shopify_image_checksum': self._image_checksum(record[field_name]),
+        })
 
     @api.model
     def _read_staged(self, staged_path):

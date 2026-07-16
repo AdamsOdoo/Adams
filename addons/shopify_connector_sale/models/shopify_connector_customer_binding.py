@@ -63,6 +63,15 @@ class ShopifyConnectorCustomerBinding(models.Model):
     def _odoo_binding_field_name(self):
         return 'partner_id'
 
+    @api.model
+    def _additional_protected_binding_fields(self):
+        return super()._additional_protected_binding_fields() | frozenset((
+            'shopify_display_name',
+            'shopify_email_snapshot',
+            'shopify_phone_snapshot',
+            'shopify_last_imported_at',
+        ))
+
     def _pii_snapshot_fields(self):
         return [
             'shopify_display_name',

@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ShopifyConnectorProductVariantBinding(models.Model):
@@ -47,6 +47,18 @@ class ShopifyConnectorProductVariantBinding(models.Model):
 
     def _odoo_binding_field_name(self):
         return 'product_variant_id'
+
+    @api.model
+    def _additional_protected_binding_fields(self):
+        return super()._additional_protected_binding_fields() | frozenset((
+            'product_template_binding_id',
+            'shopify_option_values',
+            'shopify_price_snapshot',
+            'shopify_compare_at_price_snapshot',
+            'shopify_last_imported_at',
+            'shopify_primary_image_url',
+            'shopify_image_checksum',
+        ))
 
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',
