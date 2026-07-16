@@ -55,14 +55,11 @@ resolved by this ruling.
 | 5 | Competitor + UX benchmark refresh | **DONE** (`../00-source-materials/competitor-refresh-2026-07-16.md` + dated deltas in `../01-research/`) |
 | 6 | Product definitions (two-role model, order confirmation, abandoned checkouts, COD, fulfillment modes + Shopify state model, reconnect/backfill, inventory, product export, capability map) | **DONE** (ten canonical docs in `../02-product/`, commits `2f6e778`, `0fa54a4`, `52a1566`, `3ecd1cf`) |
 | 7 | Architecture: modular recommendation; DEC-031 Layer 2 Proposed design + mutation reconciliation matrix; DEC-031 record revision note | **DONE** (`4ae737f`, `c86cc36`) |
-| 8 | Premium UX master specification + static prototype extension (12 new surfaces) | IN PROGRESS |
-| 9 | Implementation planning: Waves 2–6 DoR + packet addenda + U2/U3 prompts + Wave 6 packet + dependency/gate map | IN PROGRESS |
-| 10 | QA/release: cross-domain test matrix, COD/fulfillment-mode/reconnect-backfill UAT matrices, SLO/benchmark plan, security/PII matrix, release gap list | IN PROGRESS |
+| 8 | Premium UX master specification + static prototype extension (12 new surfaces) | **DONE** (`f3b24b7`, `e64b075`, `4544df5`, `2fe1255`, `5f625f4`, `ef39d26`) |
+| 9 | Implementation planning: Waves 2–6 DoR + packet addenda + U2/U3 prompts + Wave 6 packet + dependency/gate map + readiness checklist | **DONE** (`838d483`, `3d3a3c4`, `f2c8197`) |
+| 10 | QA/release: cross-domain test matrix, COD/fulfillment-mode/reconnect-backfill UAT matrices, SLO/benchmark plan, security/PII matrix, release gap list | **DONE** (`0d8f162`) |
 | 11 | Documentation-consistency reconciliation (DEC-025/026/028/029 dated notes, stale packet/README notes, `-proposed` supersession banners) | **DONE** (`fc56898`) |
-| 12 | Consolidated decision pack; adversarial 20-track self-review; final control-room handoff | **DONE** (`5832b89`, `f2c8197`) |
-| 8b | Premium UX master spec + 12 prototype surfaces | **DONE** (`f3b24b7`, five ux commits, `ef39d26`) |
-| 9b | Waves 2–6 DoR, packet addenda, U2/U3 prompts, Wave 6 packet, maps, readiness checklist | **DONE** (`838d483`, `3d3a3c4`, `f2c8197`) |
-| 10b | QA/release matrices and gap list | **DONE** (`0d8f162`) |
+| 12 | Consolidated decision pack; adversarial 20-track self-review; final control-room handoff | **DONE** (`5832b89`, `f2c8197`, `2853883`) |
 
 ## Standing boundaries (unchanged)
 
