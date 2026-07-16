@@ -1,95 +1,114 @@
-# Fable Gap-Closure Mission — Consolidated Proposed-Decision Pack (2026-07-16)
+# Fable Gap-Closure Mission — Consolidated Decision Pack (2026-07-16, corrected)
 
-> **Status: every decision in this pack is PROPOSED — none is accepted.**
-> This pack is the single consolidated review surface for the product owner
-> and Claude control room over all decisions raised by the Fable
-> remaining-gap-closure mission (draft PR #173). Each entry lists its full
-> record location (statement, evidence, alternatives, consequences, risks,
-> rollback live in the linked canonical document), the affected waves, the
-> acceptance authority, and whether implementation is blocked on it.
-> Per the mission's decision-status rules, existing Accepted decisions
-> (DEC-003..DEC-034 as recorded) are untouched; nothing here rewrites them.
-> This file does not follow the one-decision-per-ADR template because it is
-> an index, not a decision record; on acceptance, the control room may
-> promote entries into numbered DEC records or accept the canonical docs
-> directly (recording the act in the architecture-review/decision logs).
+> **How to read this pack.** It is the single consolidated review surface for the
+> product owner and Claude control room over everything the Fable
+> remaining-gap-closure mission raised (draft PR #173). It is organized into
+> **five classes**, not one undifferentiated acceptance act:
+>
+> - **Class A — Binding product-owner rulings.** Already decided by the product
+>   owner (PR #172/#173 rulings). *Not a new numbered DEC acceptance in this PR* —
+>   recorded here so downstream docs bind to them. The corpus is aligned to these.
+> - **Class B — Product decisions still requiring acceptance.**
+> - **Class C — Technical architecture decisions requiring Claude review.**
+> - **Class D — Empirical questions for implementation preflight** (fail-closed
+>   now; resolved at a named wave preflight).
+> - **Class E — Post-MVP items** (explicitly out of MVP scope).
+>
+> **Nothing in Classes B–D is accepted by this PR. DEC-031 Layer 2 is NOT marked
+> Accepted. Existing Accepted decisions (DEC-003..DEC-034) are untouched. Wave 2
+> remains unauthorized and unstarted. Draft PR #173 remains draft and unmerged.**
+> Each entry links the canonical document that carries its full statement,
+> evidence, alternatives, consequences, risks, and rollback.
 
-## How to review
+---
 
-Recommended order: A (roles) → B (orders/COD) → C (fulfillment) → D
-(reconnect/inventory/export) → E (Layer 2) → F (architecture/packaging) →
-G (UX) → H (QA/SLO). Groups A–E block Wave 2–5 gates as noted; G blocks
-Wave 5 UI; H blocks Wave 6.
+## Class A — Binding product-owner rulings (not a new numbered DEC acceptance in this PR)
 
-## A. Roles and permissions — `../02-product/connector-roles-and-permissions.md`
+These are settled product direction. Every canonical doc, packet, DoR, matrix, and
+prototype in PR #173 is aligned to them.
 
-| ID | Decision | Blocks |
-|---|---|---|
-| ROLE-1 | Two customer-facing roles only: Connector User, Connector Administrator; Administrator auto-inherits User (single assignment) | Wave 5 (SEC-2 + U1); product direction is binding, record formalizes it |
-| ROLE-2 | Migration design 4 internal groups → 2 roles (option M-A: new `group_shopify_connector_user`; admin implies user; old groups retained as hidden technical groups; stable XML IDs) | Wave 5 SEC-2 |
-| ROLE-3 | Reviewer's audited resolution acts move to Connector User; destructive/exceptional overrides stay Administrator-only | Wave 5 |
-| ROLE-4 | PII: User sees masked by default; unmasked = Administrator-only plus optional per-store Administrator toggle | Wave 5; interacts with PCD posture (DEC-028, Accepted) |
-| ROLE-5 | Auditor disposition (recommendation: retain as hidden technical group) | Wave 5 (non-blocking for backend waves) |
+| # | Binding ruling | Source | Canonical doc |
+|---|---|---|---|
+| A-1 | Exactly **two customer-facing roles** — Connector User and Connector Administrator | roles direction 2026-07-16 | `../02-product/connector-roles-and-permissions.md` §1 |
+| A-2 | **Administrator inherits User** (single role assignment per person) | same | roles §1/§4 |
+| A-3 | **No separate customer-facing Auditor or Reviewer** — Reviewer's audited acts move to User; Auditor retained only as a hidden technical group | same | roles §2 |
+| A-4 | **No PII masking in the MVP** — no masked snapshot display, no manual/scheduled masking as a capability | PR #173 ruling `4994990296` | roles §3 |
+| A-5 | **No User-unmask toggle / no per-store PII-visibility toggle / no third PII role/tier** | same | roles §3 |
+| A-6 | **Raw operational PII available to both final roles** per their permitted operations (normal ACL/company/redaction/audit still apply) | same | roles §3 |
+| A-7 | **Abandoned checkouts never auto-create quotations** in the MVP | orders direction | `../02-product/abandoned-checkout-policy.md` (PD-AC-1) |
+| A-8 | **Paid-only default order-confirmation policy** (per-store policy selectable) | orders direction | `../02-product/sales-order-lifecycle-and-confirmation-policy.md` (PD-A/ORD-1) |
+| A-9 | **Approved manual-gateway policy** — manual gateways gated by an approved-gateway list; card-PENDING never confirms | orders direction | sales-order lifecycle (PD-B/ORD-2) |
+| A-10 | **Complete COD lifecycle** — three-dimension model, stock restored only by a validated return picking, append-only collection events, operational-only accounting boundary in MVP | COD direction | `../02-product/cod-lifecycle-and-reconciliation.md` |
+| A-11 | **Mode 1 (Odoo-controlled) is the default** fulfillment mode | fulfillment direction | `../02-product/fulfillment-operating-modes.md` §1 |
+| A-12 | **Mode 1 and Mode 2 are BOTH mandatory MVP Wave 4 backend scope** (per-store mode field, 16-condition engine, inbound evidence/bindings, mode-switch state machine, reconnect reconciliation, genuine dev-store mutation UAT). **Wave 5 owns only the mode UI, not the Mode 2 backend.** | PR #173 ruling `4993775983` §2 | fulfillment-operating-modes §10 |
+| A-13 | **Administrator selects the fulfillment mode per store** | fulfillment direction | fulfillment-operating-modes §1/§6 |
+| A-14 | **Carrier "Delivered" never validates Odoo stock** — a milestone cannot move real inventory | fulfillment direction | `../02-product/shopify-fulfillment-status-model.md` §8 |
+| A-15 | **Odoo is the inventory authority** — Shopify→Odoo is read-only with divergence review | inventory direction | `../02-product/inventory-operating-model.md` |
+| A-16 | **Reconnect uses fresh catch-up** (per-domain watermark), never stale-job blind replay | reconnect direction | `../02-product/reconnect-catchup-backfill-policy.md` |
+| A-17 | **Product export remains MVP** (after DEC-031 Layer 2) | scope direction | `../02-product/product-export-operating-model.md` |
+| A-18 | **Premium UX direction** — Apple×enterprise synthesis, single role-gated surface, 11-state global contract | UX direction | `../02-product/premium-ux-master-specification.md` |
 
-## B. Orders, COD, abandoned checkouts
+## Class B — Product decisions still requiring acceptance
 
-`../02-product/sales-order-lifecycle-and-confirmation-policy.md` (PD-A..E):
+Genuinely open product choices not yet fixed by the product owner.
 
-| ID | Decision | Blocks |
-|---|---|---|
-| ORD-1 (PD-A) | Per-store confirmation policy: paid-only (default) / paid-or-authorized / quotations-only | Wave 2 |
-| ORD-2 (PD-B) | Separate manual-gateway sub-policy (auto-confirm / quotation / User approval) keyed on `manualPaymentGateway` + approved-gateway list; card-PENDING never confirms | Wave 2 |
-| ORD-3 (PD-C) | Complete 8-state financial map incl. transition/reconciliation rules; confirmed SOs never auto-cancelled | Wave 2 |
-| ORD-4 (PD-D) | Fail-closed financial gates (total check, currency, tax posture) mapped onto 16-class taxonomy | Wave 2 |
-| ORD-5 (PD-E) | Settings inventory incl. `paid_only` default (note: Task 012 addendum flags tension with packet's "no default" posture — resolve at packet re-acceptance) | Wave 2 |
+| ID | Decision | Wave | Canonical doc |
+|---|---|---|---|
+| PD-B1 | Precise **pending-payment expiry** duration before a pending order is closed/expired | 2 | sales-order lifecycle |
+| PD-B2 | Exact **initial import-window** options at onboarding (e.g. 30/60/90 days) | 2 | reconnect-catchup-backfill-policy |
+| PD-B3 | Exact **COD collection evidence-source** default per store | 2/4 | cod-lifecycle-and-reconciliation |
+| PD-B4 | Exact **Mode-switch reconciliation-scan boundary** (how far back the switch scan reaches) | 4 | fulfillment-operating-modes §6 |
+| PD-B5 | Exact **Lite/Full capability allocation** where not already fixed by DEC-029 (Accepted) | 3–5 | modular-architecture-recommendation |
+| PD-B6 | **8-state financial map** transition/reconciliation detail (ORD-3), **fail-closed financial gates** (ORD-4), and the **settings inventory + `paid_only` default vs Task-012 "no default" tension** (ORD-5) | 2 | sales-order lifecycle; Task 012 addendum |
+| PD-B7 | **Product-export field-ownership/guard defaults** (PD-PX-1..7: field-ownership matrix, changed-since-read gate, DRAFT default, identifier upsert dedup) | 5 | product-export-operating-model |
 
-`../02-product/cod-lifecycle-and-reconciliation.md` (PD-COD-1..6): three-dimension state model; stock restored only by validated return picking; partial-delivery/backorder rules; value ledger + append-only collection events, no mark-as-paid for partial; per-store authoritative evidence source; accounting boundary (operational-only MVP; `orderMarkAsPaid` optional, policy-gated, Layer-2-gated). Blocks Waves 2/4/5 as allocated in the doc §9.
+## Class C — Technical architecture decisions requiring Claude review
 
-`../02-product/abandoned-checkout-policy.md` (PD-AC-1..4): binding no-auto-quotation default (MVP); optional workspace classified **post-MVP**; audited manual quotation action; retention coverage. PD-AC-1 blocks Wave 2 (import must ignore checkouts); the rest block nothing in MVP.
+| ID | Decision | Wave | Canonical doc |
+|---|---|---|---|
+| TA-C1 | **DEC-031 Layer 2** mutation-safety design and its enumerated **L2-D** acceptance items (durable attempt identity, ownership, `transport_attempted` fencing, per-mutation idempotency/reconciliation matrix, uncertain-outcome handling, crash/stale-owner recovery). **Proposed — NOT Accepted here.** Claims at-most-once-ambiguous + reconciliation convergence, never exactly-once | 3 (Stage 0) | `../03-architecture/dec-031-layer-2-mutation-safety-design.md` |
+| TA-C2 | **Mutation-attempt model + commit boundaries + stale-owner sweep** (no lock held across a network call) | 3 | dec-031-layer-2 |
+| TA-C3 | **Module boundaries** (six-module MVP family; MA-D* decisions) | 3–5 | modular-architecture-recommendation |
+| TA-C4 | **Two-role migration mechanics** (Option M-A groups/privilege/ACL re-key/migration script) | 5 (SEC-2) | roles §4 |
+| TA-C5 | **PII-simplification implementation option** — SEC-2 Option 1 (full removal) vs Option 2 (deprecate-dormant); recommend Option 1 | 5 (SEC-2) | `../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md` |
+| TA-C6 | **Inbound reconciliation registries** (per-fulfillment binding + per-line evidence; origin classification; lot/serial only on deterministic evidence — FUL-3) | 4 | fulfillment-operating-modes §5 |
+| TA-C7 | **CAS technical contract** (compare-and-set inventory mutation shape) | 3 | inventory-operating-model |
+| TA-C8 | **Performance architecture / SLO set** (provisional rows pending PERF-1 calibration) | 6 | `../05-qa/performance-slo-benchmark-plan.md` |
 
-## C. Fulfillment — `../02-product/fulfillment-operating-modes.md` + `../02-product/shopify-fulfillment-status-model.md`
+## Class D — Empirical questions for implementation preflight
 
-| ID | Decision | Blocks |
-|---|---|---|
-| FUL-1 | Per-store operating mode; Mode 1 (Odoo-controlled) default; external fulfillments → review cases, never auto-validate stock | Wave 4 |
-| FUL-2 | Mode 2 auto-reconciliation only under all 16 exact conditions; any ambiguity → review; recommended wave: Wave 5 (Wave 4 stretch) | Wave 4/5 |
-| FUL-3 | Inbound reconciliation data model (per-fulfillment binding + per-line evidence; origin classification; lots/serials only with deterministic evidence) | Wave 4 |
-| FUL-4 | Mode-switching contract (Administrator-only, audited, idempotent, rollback-safe, reconciliation scan) | Wave 4/5 |
-| FUL-5 | Complete four-family state mapping + deprecated-value handling + unknown-future-value contract + carrier-Delivered-never-validates-stock rule | Wave 4 + UI |
+Not product decisions. Each fails **closed** today and is resolved at a named wave
+preflight against an exact source.
 
-## D. Reconnect/backfill, inventory, product export
+| ID | Question | Current fail-closed behavior | Source to re-check | Preflight owner | Blocking? |
+|---|---|---|---|---|---|
+| EQ-D1 | **CAS field name** — `compareQuantity` (2026-07-16 capture) vs `changeFromQuantity` (D-013-3) | inventory mutation withheld until confirmed | Shopify `inventorySetQuantities`/`inventoryAdjustQuantities` 2026-07 docs | Wave 3 | **Blocking** for the inventory mutation |
+| EQ-D2 | **Shopify mutation idempotency** details (which mutations expose idempotency keys) | verification-read-before-retry on any ambiguous outcome | Shopify mutation docs + live probe | Wave 3/4/5 | Non-blocking (safe default holds) |
+| EQ-D3 | **Webhook payload attribution** (does a fulfillment/order webhook expose the originating API client?) | origin classified `external`/unknown, never assumed connector | live webhook payload | Wave 4 | Non-blocking |
+| EQ-D4 | **Per-plan throttle** behavior (cost points/refill by plan) | conservative rate limiting | Shopify GraphQL rate-limit docs + live headers | Wave 3+ | Non-blocking |
+| EQ-D5 | **Actual performance calibration** (real throughput/latency) | provisional SLOs labeled provisional | PERF-1 measurement | Wave 6 | Non-blocking |
+| EQ-D6 | **Live enum/schema confirmation** at each wave freeze | unknown values stored raw, automation stops (§7 contract) | official enum pages (Layer A re-verified 2026-07-16) | each wave | Non-blocking |
+| EQ-D7 | **Dev-store evidence questions** (read-only order import; mutation proofs) | no live proof claimed; read-only deferrable to Wave 6; mutation waves require genuine dev-store evidence | dev-store when provisioned | Wave 2 (read-only, non-blocking) / Waves 3–5 (mutation, blocking) | see Wave-2 rule |
 
-`../02-product/reconnect-catchup-backfill-policy.md`: per-domain watermark catch-up with overlap; order catch-up automatic since watermark; manual Administrator backfill with mandatory preview (new/changed/duplicate/skipped/review counts); onboarding import windows; 60-day/`read_all_orders` honesty. Blocks Waves 2–5 per domain.
+## Class E — Post-MVP items (explicitly out of MVP scope)
 
-`../02-product/inventory-operating-model.md` (12 PDs): free_qty-per-mapped-location export basis; last-value-wins coalescing; CAS compareQuantity flow (note: CAS field-name evidence conflict vs D-013-3 `changeFromQuantity` — mandatory re-verification at Wave 3 preflight, recorded in the Task 013 addendum); clamp+warn negatives; read-only Shopify→Odoo with divergence review. Blocks Wave 3.
+Optional **PII masking / privacy enhancement** (separately reviewed later);
+abandoned-checkout recovery **workspace**; advanced **accounting**; **refunds**;
+**payout reconciliation**; **B2B**; **subscriptions**; **gift cards**; **Shopify
+Markets**; advanced **analytics**; **app-store packaging**; and the other agreed
+exclusions recorded in `../02-product/mvp-capability-map.md`.
 
-`../02-product/product-export-operating-model.md` (PD-PX-1..7): field-ownership matrix; changed-since-read gate; complete-variant-list destructive-guard; DRAFT/unpublished default; identifier upsert dedup; Layer 2 uncertainty reconciliation. Blocks Wave 5.
+---
 
-## E. DEC-031 Layer 2 — `../03-architecture/dec-031-layer-2-mutation-safety-design.md` (registered by the dated revision note in `DEC-031-core-r2-job-execution-replay-safety.md`)
-
-The complete Proposed mutation-safety design (durable attempt identity, ownership, transport_attempted fencing, per-mutation idempotency/reconciliation matrix, uncertain-outcome handling, crash/stale-owner recovery, no-lock-across-network commit boundaries, audit/retention, test strategy) with its enumerated L2-D* acceptance items. **Blocks Waves 3, 4, and 5 mutation domains** (implemented as Wave 3 Stage 0 per `../07-implementation-plan/wave-3-definition-of-ready.md`). Acceptance authority: product owner + Claude control room. Explicitly claims at-most-once-ambiguous with reconciliation convergence — never exactly-once.
-
-## F. Modular architecture & packaging — `../03-architecture/modular-architecture-recommendation.md` (MA-D*)
-
-Six-module MVP family (core, product, sale(+orders), inventory, fulfillment, product_export); customer module rejected for MVP (revisit at customer-export phase); sale-module naming kept with documented reality; accounting/refund/payout deferred (no empty modules); multi-store is core data-model, not a module; Layer 2 substrate lives in core (inert under Lite). Capability/module matrix incl. Lite/Full mapping per accepted DEC-029. Blocks Waves 3–5 module creation.
-
-## G. Premium UX — `../02-product/premium-ux-master-specification.md` (PD-UX-1..6) + `../09-ui-prototype/` extension
-
-Apple×enterprise synthesis; IA extension S15–S32 under the 7-menu structure; 11-state global contract; 3D-only-in-onboarding/education/empty rule; density modes; U1/U2/U3 phase allocation with SEC-2-first sequencing; twelve new prototype surfaces (Proposed, awaiting visual review). Blocks Wave 5 UI packets.
-
-## H. QA / SLO / release
-
-`../05-qa/performance-slo-benchmark-plan.md` (SLO set incl. new provisional rows — calibration owned by PERF-1/Wave 6); `../05-qa/waves-2-6-cross-domain-test-matrix.md`; COD / fulfillment-mode / reconnect-backfill UAT matrices; `../05-qa/security-pii-matrix-waves-2-6.md`; `../08-release-readiness/release-readiness-gap-list.md`. These are planning artifacts: acceptance = adoption as the binding test/UAT basis for each wave's DoR. Blocks Wave 6 execution; matrix existence is a Wave 2+ DoR item.
-
-## Wave-gate summary
+## Wave-gate summary (what must be Accepted before each wave)
 
 | Wave | Must be Accepted first |
 |---|---|
-| 2 | ORD-1..5, PD-COD import subset (1–3), PD-AC-1, reconnect order-domain subset, Task 012 packet re-acceptance (with addendum), Wave 2 DoR |
-| 3 | Layer 2 (E) accepted → implemented → runtime-proven; inventory PDs; CAS field re-verification; MA-D module decisions; Task 013/013B re-acceptance; Wave 3 DoR |
-| 4 | FUL-1..5; COD fulfillment subset (4–13); Task 014 re-acceptance; Wave 4 DoR |
-| 5 | ROLE-1..5 (SEC-2); PD-UX-1..6 + prototype visual review; PD-PX-1..7; U1–U3/PERF-1 packet acceptance; optional FUL-2 Mode 2; Wave 5 DoR |
-| 6 | All QA/UAT matrices adopted; dev-store credentials provisioned (hard stop); Wave 6 DoR + packet; product-owner release sign-off |
+| 2 | Class A order/COD/abandoned rulings recorded; PD-B1/B3/B6 accepted; reconnect order-domain subset; Task 012 packet re-acceptance (with addendum); Wave 2 DoR. **Odoo.sh evidence mandatory; read-only Shopify preferred, deferrable to Wave 6 (no waiver) — not a merge blocker.** |
+| 3 | TA-C1 DEC-031 Layer 2 accepted → implemented Stage 0 → runtime-proven; inventory PDs; EQ-D1 CAS field re-verified; TA-C3 module decisions; Task 013/013B re-acceptance; Wave 3 DoR. **Genuine dev-store mutation evidence required.** |
+| 4 | Class A fulfillment rulings (A-11..A-14); **both Mode 1 and Mode 2 backend** (A-12); TA-C6 registries; COD fulfillment subset; Task 014 re-acceptance; Wave 4 DoR. **Genuine dev-store fulfillment mutation evidence required.** |
+| 5 | **SEC-2** (A-1..A-6 two-role + no-masking; TA-C4/TA-C5); premium UX (A-18, PD-UX) + prototype visual review; the fulfillment **mode UI** (selector/review/dashboards — not the Mode 2 backend); PD-PX; U1–U3/PERF-1 packet acceptance; Wave 5 DoR. |
+| 6 | All QA/UAT matrices adopted; deferred read-only order UAT + all mutation-domain UAT executed; two-role + no-masking UAT; Wave 6 DoR + packet; product-owner release sign-off. |
 
-**Nothing in this pack is accepted. Wave 2 remains unauthorized and unstarted.
-The draft PR #173 remains draft and unmerged.**
+**Nothing in Classes B–D is accepted. DEC-031 Layer 2 is not Accepted. Wave 2
+remains unauthorized and unstarted. Draft PR #173 remains draft and unmerged.**
