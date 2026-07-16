@@ -12,6 +12,11 @@
 
 ## Status
 
+> **Status sync (2026-07-16, Fable gap-closure mission):** the line below is
+> the historical pre-Wave-0 status and is superseded by the acceptance banner
+> at the top of this file — DEC-028 is **Accepted** (Claude control room,
+> 2026-07-15, per DEC-033 §4). Retained unedited as audit trail.
+
 **Proposed for ChatGPT review. NOT accepted.** Drafted 2026-07-10 by the
 MVP planning-completion session (AR-042 candidate); **Rung 1 revised
 2026-07-11** by the PR #148 revision session per ChatGPT's

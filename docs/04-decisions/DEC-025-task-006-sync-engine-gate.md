@@ -1,5 +1,10 @@
 # DEC-025 — Task 006 Sync Engine Architecture Gate (Proposed)
 
+> *Title note (2026-07-16, Fable gap-closure mission): the "(Proposed)" suffix
+> in the H1 above is a stale artifact of the drafting phase; this record is
+> **Accepted** per the banner below. The title is left unedited to preserve
+> link/anchor stability.*
+
 > **Accepted architecture decision record.** ChatGPT accepted this record on
 > **2026-07-08**, after PR #128's governance revisions (direct, full
 > inspection of the two pre-006A baseline sources; the `AR-030` addition;

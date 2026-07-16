@@ -1,5 +1,10 @@
 # Task 012 — Order Import into Odoo Sales Orders (Proposed)
 
+> **Superseded (2026-07-16, Fable gap-closure mission):** this early scope
+> proposal is retained as history only. The canonical, decision-closed
+> specification is `task-012-order-import-implementation-packet.md` (plus its dated
+> gap-closure addendum). Do not use this file as an implementation source.
+
 > Planning-only future implementation task spec, part of the MVP domain
 > implementation-slicing sequence
 > ([`mvp-domain-implementation-sequence.md`](./mvp-domain-implementation-sequence.md),

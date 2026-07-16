@@ -1,5 +1,10 @@
 # DEC-026 — Distribution / Auth Strategy for MBQ-05 Branch B (Proposal)
 
+> *Title note (2026-07-16, Fable gap-closure mission): the "(Proposal)" suffix
+> in the H1 above is a stale drafting artifact; this record is **Accepted** as
+> the strategic Branch-B direction per its Status section. Title left unedited
+> for link/anchor stability.*
+
 ## Status
 
 **Accepted by ChatGPT as the strategic branch-B distribution/auth
