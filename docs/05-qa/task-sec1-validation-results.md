@@ -2,9 +2,11 @@
 
 ## Status
 
-**SEC-1 binding-surface correction implemented and static-green; corrected
-exact-head Odoo.sh revalidation is required before Wave 1 can return to
-runtime-green. SRR-03 remains CLOSED.**
+**SEC-1 binding-surface correction implemented and corrected-exact-head
+Odoo.sh runtime-green (build 34995642, runtime-tested SHA
+`95db3dba4bf295ca6c6ee94ae7fa08da1d505eb7`): full standard suite `0 failed /
+0 errors / 644`. SRR-03 remains CLOSED. Wave 1 awaits only the final Claude
+control-room merge decision; PR #172 remains draft, open, unmerged.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, open, unmerged)
@@ -13,10 +15,18 @@ runtime-green. SRR-03 remains CLOSED.**
   `4982429209`, `4982750956`, `4984719237`, `4988098888`, and consolidated
   mutation-surface ruling `4988842625`.
 - **Current production correction:** `36974edc68c1985e6ccfae8f6bb5c7386f820156`
-  (`fix(sec1): protect complete binding system surface`).
-- **Runtime claim:** Build 34986844 remains valid for its exact prior code SHA
-  `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` only. It does not validate the
-  new production correction.
+  (`fix(sec1): protect complete binding system surface`), unchanged through the
+  reconcile head `05acfd72b04f072e0ed95c476ceccfa606c52d91`.
+- **Runtime-tested SHA:** `95db3dba4bf295ca6c6ee94ae7fa08da1d505eb7`
+  (`test(product): tighten variant-refresh sudo-site guard`). Its production
+  sources are byte-identical to `05acfd7`; the only delta versus `05acfd7`
+  is one test file. Module versions unchanged (core `19.0.1.9.1`, product
+  `19.0.2.1.2`, sale `19.0.1.2.1`).
+- **Prior runtime claim (superseded for correctness scope):** Build 34986844
+  remains valid for its exact prior code SHA
+  `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` only and does not validate the
+  binding-surface correction; the corrected-head validation below (build
+  34995642) now covers `36974ed`/`05acfd7`.
 
 ## Consolidated binding mutation-surface correction
 
@@ -85,10 +95,54 @@ no-write/no-audit refusal, exact-set classification, fail-closed future
 omission, sanctioned importer regressions, audited Reviewer/Admin override,
 manual mask, and retention.
 
-**Corrected-head runtime state:** pending. Required: targeted binding
-protection, focused SEC-1/PII, product/customer binding and importer suites,
-fresh install, full core/product/sale, lifecycle, combined SRR-03 smoke, clean
-residue/security audit, and reversible issue #157 accommodation if needed.
+**Corrected-head runtime state:** complete and green — see *Final exact-head
+runtime evidence — build 34995642* below. Targeted binding protection, focused
+SEC-1/PII, product/customer binding and importer suites, upgrade + fresh
+install, full core/product/sale, lifecycle, combined SRR-03 smoke, clean
+residue/security audit, and reversible issue #157 accommodation were all
+exercised.
+
+## Final exact-head runtime evidence — build 34995642 (corrected binding surface)
+
+> Authoritative corrected-head evidence for the binding-surface correction
+> `36974ed` as carried unchanged through reconcile head `05acfd7`. Runtime
+> tested at working-tree SHA `95db3db` (`05acfd7` + one test-only guard fix);
+> production sources are byte-identical to `05acfd7`.
+
+- **Database / Odoo:** `adamsmen-sol-wave-1-readonly-foundation-34995642`; Odoo 19.0; PostgreSQL 16.14.
+- **Build:** 34995642 (checked out at `05acfd72b04f072e0ed95c476ceccfa606c52d91`).
+- **Runtime-tested code/test SHA:** `95db3dba4bf295ca6c6ee94ae7fa08da1d505eb7`; branch `sol/wave-1-readonly-foundation`; working tree clean; module versions core `19.0.1.9.1`, product `19.0.2.1.2`, sale `19.0.1.2.1`.
+- **Commands:** `odoo-bin -u shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --stop-after-init --no-http` (versions rolled to prior `19.0.1.9.0`/`19.0.2.1.1`/`19.0.1.2.0` first to force a genuine prior→corrected upgrade).
+- **Upgrade + registry:** prior→corrected upgrade clean — tables created/updated, `shopify_connector_security.xml` and `ir.model.access.csv` reloaded for all three modules; no migration, field, model, ACL, or manifest error. The additive/idempotent LC-1 `19.0.1.8.0` post-migration is below the prior versions and did not re-run; `TestLifecycleUninstall.test_post_migration_is_additive_and_idempotent` passed. No model, table, ACL, group, job type, job source, transition vocabulary, or replay policy was added by the correction.
+- **Full standard suite (upgrade + fresh registry):** `0 failed / 0 errors / 644 tests` — core `414`, product `202`, sale `124`; `0` `setUpClass` errors. Fresh-install of all three at `05acfd7` was performed by the Odoo.sh build itself (this database).
+- **Targeted binding security:** four-role (Auditor/Operator/Reviewer/Administrator) generic create/alter/clear denial proven for the exact 16/17/14 protected sets — `TestProductTemplateBinding` (10), `TestProductVariantBinding` (9), `TestCustomerBinding` (9), `TestPiiLeastPrivilege` (13), plus SEC-1 job `TestSecurityHardening` (10) with `test_protected_job_write_denied_for_all_four_roles` and `test_direct_create_and_unlink_denied_for_all_four_roles`. Each denied mutation leaves the binding row unchanged, creates no lifecycle audit carrier and no job log, leaves no partial write, and uses no privilege/context bypass (`_audit_counts()` invariance asserted).
+- **Exact protected-set proof:** `test_exact_stored_field_classification_and_protected_set` green for template (16), variant (17), customer (14); an unclassified future stored field fails closed via `_assert_binding_field_classification()`.
+- **Sanctioned-writer regression (importers):** product `TestProductImportMatching` (59), `TestProductRefreshAndStale` (20), `TestProductMediaImport` (26), `TestProductPriceImport` (9), `TestProductAttributeImport` (16), `TestProductDuplicatePrevention` (12), `TestProductVariantGeneration` (8); customer `TestCustomerImportMatching` (28), `TestCustomerDuplicatePrevention` (10), `TestCustomerFallbackPartner` (5), `TestCustomerMatchingScalability` (32) — all green. Audited Reviewer/Admin override, manual PII masking, and per-store PII retention sweep preserve original `actor_uid`, exactly one audit carrier, identifiers/counts/reasons only (email/phone redacted), atomic rollback on audit failure, and current/proposed company checks with company-neutral support.
+- **Static/source guards under runtime:** protected sets are exactly 16/17/14; unclassified stored field fails closed; no direct `shopify_image_checksum` assignment remains; the product importer contains exactly the two approved sudo additions (existing-variant `snapshot_vals` refresh + post-image checksum write); no `with_context`/context bypass, no broad public-method sudo, no core hardcoding of product/customer model names (`TestSourceGuardDetectors`, `TestDisconnectSourceGuards`, `TestLifecycleAdmissionSourceGuards` green).
+- **Lifecycle / JOB-ACTIONS regression:** `TestConnectionLifecycle` (43), `TestLifecycleUninstall` (9), `TestJobActions` (9) green — disable-first, historic conversion, immutable `original_job_type`, uninstall/reinstall, selection removal, manual retry/cancel, role/reason controls, audit atomicity. SEC-1 broke none of them.
+- **Combined SRR-03 smoke:** all genuine independent-connection classes green — `TestGenuineRealAdmission` (9), `TestLifecycleAdmissionRaceGenuine` (4), `TestDrainOwnershipReplayGenuine` (10), `TestLifecycleServiceRetryGenuine` (2), `TestCredentialReplacementRaceGenuine` (2), `TestDisconnectControllerSelectionGenuine` (2), `TestPublicClearAdmissionRaceGenuine` (2), with `TestReadinessCheck` (31), `TestReadinessSlotClosure` (20), `TestJobDispatch` (31), `TestBusinessAdmission` (18). The run exercised real PostgreSQL `40001` serialization conflicts and a real lock-timeout cancellation across independent backends, proving exact job re-lock, ownership preservation, no handler replay, fail-closed replay policy, and disconnect/admission ordering. No exactly-once Shopify remote-effect claim is made and DEC-031 Layer 2 remains unimplemented.
+- **Residue / security audit:** clean — all connector data tables at baseline (only the seeded `shopify.connector.attribute.lock` singleton; jobs/leases/logs/stores/credentials/bindings = 0); 0 leftover test users; 1 active backend (the audit query itself), 0 idle-in-transaction, 0 open cursors; 3 legitimate connector crons (Job Dispatch Drain, Disconnect Quiescence Controller, PII Retention Sweep) unchanged; 0 connector-owned cron triggers (the 5 queued triggers are base-Odoo autovacuum); no token/header/credential/raw-PII/temporary-path leakage.
+- **Issue #157:** genuinely required — 8 core + 1 sale `setUpClass` errors were exactly the base-Odoo `res.users.notification_type` / `res_users_settings.color_scheme` NOT-NULL artifact and were isolated only through the documented reversible database-default accommodation (`notification_type='email'`, `color_scheme='system'`). Applying it cleared all 9, leaving one genuine failure; dropping it afterward restored both columns to their original no-default NOT-NULL state (no NULLs introduced). No real connector failure was classified under #157.
+
+### Corrected-head defect and test-only correction
+
+The initial exact-head run (`05acfd7`) was red by exactly one failure:
+`TestProductVariantBinding.test_product_importer_binding_writers_use_exact_sudo_sites`
+(`AssertionError: 2 != 1`). Root cause was a too-broad AST filter authored in
+the correction commit itself: it walked `_resolve_one_variant` and counted every
+call whose first positional argument is the Name `snapshot_vals`, matching both
+the sanctioned refresh `existing.sudo().write(snapshot_vals)` and the sanctioned
+create `VariantBinding.sudo().create(dict(snapshot_vals, …))`. **The production
+importer is correct** — create and refresh are both legitimate, necessary sudo
+sites. Under this prompt's failure-handling authorization, the control room
+applied a test-only fix (`95db3db`) scoping the filter to `.write(…)` attribute
+calls; protective intent is preserved and strengthened. No production or feature
+code changed; module versions are unchanged. The definitive rerun is
+`0 failed / 0 errors / 644`.
+
+**SEC-1 is corrected-head runtime-green and SRR-03 remains CLOSED.** Wave 2 is
+unauthorized and unstarted. Wave 1 awaits only the final Claude control-room
+merge decision; PR #172 remains draft, open, and unmerged.
 
 ## Final exact-head runtime evidence — build 34986844
 
