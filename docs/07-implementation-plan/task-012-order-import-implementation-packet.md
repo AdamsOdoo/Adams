@@ -1726,3 +1726,91 @@ order-domain gate closes the moment the draft PR opens. Do not start
 Task 013/014/015, Area 6, UI, webhook, OAuth, packaging, or accounting
 work under any circumstance.
 ```
+
+## Fable gap-closure addendum (2026-07-16) — policy-layer requirements [Proposed]
+
+> Appended by the Fable gap-closure mission, 2026-07-16. This addendum is
+> additive: it does not rewrite, retract, or reinterpret any section above.
+> **All decision closures D-012-1..12 (as finalized by the 2026-07-14
+> decision closure and correction rounds 1–9) remain intact and binding as
+> written.** This addendum maps the 2026-07-16 canonical policy documents
+> onto the packet. **Packet re-acceptance is required with this addendum**
+> — the pre-addendum packet alone no longer describes Wave 2's full scope.
+> Gate context: [`wave-2-definition-of-ready.md`](wave-2-definition-of-ready.md).
+
+### A.1 Source policy documents (all Proposed, acceptance = Wave 2 gate decisions)
+
+- [`../02-product/sales-order-lifecycle-and-confirmation-policy.md`](../02-product/sales-order-lifecycle-and-confirmation-policy.md) (PD-A..E)
+- [`../02-product/cod-lifecycle-and-reconciliation.md`](../02-product/cod-lifecycle-and-reconciliation.md) (PD-COD-1..6; Wave-2 slice per its §9)
+- [`../02-product/reconnect-catchup-backfill-policy.md`](../02-product/reconnect-catchup-backfill-policy.md) (PD-RB-1..9, order-domain slice)
+- [`../02-product/abandoned-checkout-policy.md`](../02-product/abandoned-checkout-policy.md) (PD-AC-1 boundary only)
+
+### A.2 New settings fields (extends the §15 store-settings line)
+
+On `shopify_connector_store_settings.py`, Administrator-protected, in
+addition to the fields already listed in §15:
+`order_confirmation_policy` (`paid_only`/`paid_or_authorized`/`quotations_only`,
+default `paid_only` — note: this **replaces** the §15 posture of "NO
+default, unset holds imports" **only if PD-A/PD-E are accepted as
+written**; if the control room prefers the packet's unset-holds posture it
+must say so at re-acceptance — flagged, not silently resolved);
+`manual_gateway_policy` (default `require_approval`);
+`approved_manual_gateways` (empty default);
+`order_import_window` (default 30 days, 60-day/`read_all_orders` cap);
+`pending_wait_expiry` (proposed 7 days, OQ-C);
+plus the per-store order-domain watermark fields per PD-RB-4 (the existing
+`sale_order_last_import_checkpoint_at` becomes the watermark seed, no
+longer inert).
+
+### A.3 New acceptance-criteria rows (adds to §8)
+
+1. Confirmation-policy gate evaluated strictly **after** SO creation
+   eligibility (financial gates unchanged and unbypassable): full 8-state ×
+   3-policy matrix outcomes per lifecycle policy §2.1.
+2. Manual-gateway overlay per §2.2 (evidence-discriminated via
+   `manualPaymentGateway` + curated list; never `PENDING` alone).
+3. State-transition handling per §2.3 (wait→confirm on `PENDING→PAID`
+   single-SO idempotent; never auto-cancel a confirmed SO; transitions
+   recorded on the binding).
+4. COD import read-model: COD flag + ledger snapshot + three-dimension
+   state initialization at import (PD-COD-1/3 Wave-2 slice; scenarios 1–3
+   and 16 satisfiable at import level; no stock/fulfillment mechanics).
+5. Watermark catch-up (PD-RB-4/6/7) and Administrator backfill with
+   mandatory read-only preview and access-window honesty (PD-RB-8);
+   backfill obeys the same gates and policies.
+6. Abandoned checkouts never enter the order pipeline (PD-AC-1 negative
+   test).
+7. Null `displayFinancialStatus` fails closed (OQ-A class mapping to be
+   fixed at gate; fail-closed regardless).
+
+### A.4 New test families (adds to §6)
+
+Lifecycle policy §9 hooks 1–9; COD import-level rows (`../05-qa/cod-uat-matrix.md`,
+companion deliverable); reconnect/backfill order rows
+(`../05-qa/reconnect-backfill-uat-matrix.md`, companion deliverable);
+settings-change semantics (no retro-confirm on policy switch). Suggested
+new test files: `test_order_confirmation_policy.py`,
+`test_order_manual_gateway_overlay.py`, `test_order_watermark_backfill.py`,
+`test_order_cod_import_readmodel.py` — exact filenames fixed at
+re-acceptance.
+
+### A.5 Changed allowed-files additions (extends §15 ALLOWED FILES)
+
+- `shopify_connector_store_settings.py` — the A.2 fields.
+- `shopify_connector_order_binding.py` — COD ledger snapshot, financial
+  state + transition-audit fields (no customer PII, unchanged rule).
+- Area-6 order-scan slice files (`order_import_scan` job type module file,
+  order-scan cron data file, `test_order_scan_triggers.py`) — per the
+  Area-6 packet's own allowlist, landing in the same wave once the
+  importer exists.
+- The A.4 test files.
+- No other additions; the §15 FORBIDDEN list stands, and the DEC-031
+  Layer 2 substrate remains explicitly out (Task 012 stays
+  `remote_read_replay_safe` per DEC-033).
+
+### A.6 Status
+
+This addendum is Proposed. The packet, its decision closure, and this
+addendum are re-accepted together as one control-room act (Wave 2 gate
+table row "Task 012 packet re-acceptance"); the §15 prompt remains
+unusable until its own separate gate act, unchanged.

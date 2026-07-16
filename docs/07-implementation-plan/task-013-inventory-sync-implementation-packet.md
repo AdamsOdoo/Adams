@@ -339,3 +339,76 @@ recorded explicit ChatGPT waiver. Stop condition: draft PR "Task 013:
 Shopify inventory synchronization (shopify_connector_inventory)",
 gate closes on draft-open; no Task 014/015/UI/webhook work.
 ```
+
+## Fable gap-closure addendum (2026-07-16) — Layer 2 dependency + operating-model closures [Proposed]
+
+> Appended by the Fable gap-closure mission, 2026-07-16. Additive only —
+> nothing above is rewritten; D-013-1..8 remain intact as written.
+> **Packet re-acceptance is required with this addendum.** Gate context:
+> [`wave-3-definition-of-ready.md`](wave-3-definition-of-ready.md).
+
+### A.1 Layer 2 dependency — now designed
+
+The DEC-031 Layer 2 (durable mutation-safety) dependency this packet's
+domain triggers is now **designed**:
+[`../03-architecture/dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md)
+(Proposed, L2-D1..D13). Wave 3 delivers it as **Stage 0** (attempt
+records + reconciliation framework + sweep cron, in core, with its own
+allowed files and runtime/concurrency proof) before any Task 013
+mutation merges, is enabled, or is live-validated. Task 013's push
+handler runs inside the Stage 0 attempt wrapper: attempt intent
+persisted pre-network; uncertain outcomes resolved by a reconciliation
+read (applied / not-applied) before any retry. This refines — and is
+consistent with — D-013-3's key-reuse mechanics; where the accepted
+Layer 2 design and D-013-3 wording differ on attempt bookkeeping, the
+accepted Layer 2 design governs and the difference is raised at
+re-acceptance, not silently patched.
+
+### A.2 Inventory-operating-model closures folded in
+
+Per [`../02-product/inventory-operating-model.md`](../02-product/inventory-operating-model.md)
+(Proposed PDs 1–12):
+
+- **Quantity source** — confirmed as this packet's D-013-2: per-mapped-
+  location `free_qty` with location context; `on_hand`/`committed` read
+  only for preview/divergence context, never written.
+- **Coalescing — last-value-wins**: one pending-update target per
+  (item, location) pair; new stock events overwrite the pending target;
+  push consumes only the latest absolute value (bounds backlog by pair
+  count). Extends D-013-6's delta-scan posture; one-pair-per-job remains
+  the conservative floor, multi-entry batching is an accepted refinement
+  candidate with per-entry `userErrors` routing.
+- **CAS via `compareQuantity`**: the operating model's read→compare→set
+  flow with bounded retries (proposed 3) and never
+  `ignoreCompareQuantity`. **Naming note:** D-013-3 above records the
+  2026-07 CAS shape as `changeFromQuantity` ("compareQuantity … no
+  longer exist"); the 2026-07-16 captures record `compareQuantity` as
+  current. This is a direct evidence conflict — **re-verify the live
+  2026-07 schema at Stage 1 packet re-acceptance and align to the
+  verified field name** (hard-stop 2 applies if unresolved); the CAS
+  semantics themselves are identical either way.
+- **Mandatory `@idempotent` keys** — unchanged from D-013-3, tightened by
+  the Layer-2 attempt contract: one UUID per attempt, persisted on the
+  attempt record before the call; 24h replay window; >24h → reconciliation,
+  never key replay.
+- **Clamp + warn negatives** — D-013-2's clamp-to-0 stands, now with a
+  mandatory divergence warning carrying the true negative value
+  (push-negative remains an unverified, unoffered option).
+- **Divergence review** — Shopify→Odoo stays read/verify only (RA-020);
+  every divergence yields a review case with the three values
+  (Shopify current / last-pushed / Odoo current); the D-013-6
+  log-then-push-over drift posture is upgraded to review-case-first for
+  unexplained drift — flagged for explicit choice at re-acceptance.
+- **Reconnect** — reconciliation read of all mapped levels precedes the
+  first post-reconnect push (PD-RB inventory slice); no stored
+  pre-disconnect mutation replays blind.
+
+### A.3 Re-acceptance
+
+This addendum is Proposed. Task 013 is re-accepted together with this
+addendum and the accepted Layer 2 design (Wave 3 gate table); the §8
+prompt remains unusable until its own gate act, which must also restate
+the Stage 0 precondition. **Task 013B was checked against the operating
+model and no contradiction was found** (preview/confirm, drift-abort, and
+row-lock closures align with PDs 3–7); it requires re-acceptance but no
+addendum of its own.
