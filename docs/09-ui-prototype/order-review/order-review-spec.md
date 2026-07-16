@@ -22,7 +22,8 @@ policies (approved manual-gateway list, `require_approval` overlay).
 ## Data shown
 - **Summary card**: order name + store; badge row = Shopify financial badge,
   Shopify fulfillment badge, connector-state badge (three separate concepts,
-  never merged); key/value block — masked customer, total with the
+  never merged); key/value block — the raw permitted customer identity
+  (name + email), total with the
   same-currency note, gateway (with a "Manual gateway — on the approved list"
   `sc-owner` chip for COD), placement/discovery source, active policy.
 - **Line items**: qty / unit / line total (tabular numerals) + a **per-line

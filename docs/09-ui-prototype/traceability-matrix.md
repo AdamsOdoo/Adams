@@ -76,8 +76,9 @@ FontAwesome is required at U1). The rows below are the accepted decision record.
   opens **no** implementation gate.
 - **U1:** dashboard (Owl), sync/error centers, logs, settings, roles — standard
   Odoo views + the one dashboard Owl surface. Requires Area 6 + SEC-1 merged
-  **and the U0 prototype accepted** (U0 accepted ✓ 2026-07-12; Area 6 + SEC-1
-  still open). **CLOSED.**
+  **and the U0 prototype accepted** (U0 accepted ✓ 2026-07-12; SEC-1 merged
+  ✓ 2026-07-16 via Wave 1; Area 6 status tracked in the MVP program state).
+  **CLOSED.**
 - **U2:** setup wizard + readiness (Owl presentation). **CLOSED** (behind U1).
 - **U3:** matching centers, product diff/preview, domain screens (Owl per PD-7).
   **CLOSED** (behind U1).

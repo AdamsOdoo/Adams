@@ -8,7 +8,7 @@
 > Content contracts: [`../../02-product/fulfillment-operating-modes.md`](../../02-product/fulfillment-operating-modes.md)
 > (File A — Modes 1/2, origin classification, review posture) and
 > [`../../02-product/shopify-fulfillment-status-model.md`](../../02-product/shopify-fulfillment-status-model.md)
-> (File B — badge vocabulary, six-concept separation, §8 Delivered-inconsistency
+> (File B — badge vocabulary, the four-layer fulfillment-state taxonomy, §8 Delivered-inconsistency
 > rule). Both are `[Proposed]` documents; this screen renders them, it does not
 > extend them. All on-screen strings are illustrative (MBQ-22).
 
@@ -16,9 +16,11 @@
 Give the **Connector User** one honest working view of delivery/fulfillment
 condition without opening Shopify: what must ship, what is moving, what
 arrived, and what is waiting on a person. The screen's key design assertion is
-File B §1's **six-concept separation** — Odoo picking state, Shopify order
-summary, FulfillmentOrder work state, Fulfillment result, carrier milestone,
-and connector reconciliation state are **one badge each, never merged**.
+File B §1's **four-layer fulfillment-state taxonomy**, rendered as **one badge
+per concept, never merged** — the Odoo delivery state (`stock.picking.state`,
+Odoo-side), the Shopify Layer-A enum families (order summary, FulfillmentOrder
+work state, Fulfillment result, carrier milestone), and the connector
+reconciliation state (connector-derived).
 
 ## Primary role
 - **Connector User** — works the list, retries failed sends, opens review
@@ -80,7 +82,7 @@ stylesheet; no left/right styles introduced). At ≤ 640px the shared sheet
 hides the optional tracking column (`col-ref`) and keeps the compact shell.
 
 ## Traceability
-- Six-concept separation, badge labels, severities: File B §1–§5, §9.
+- Four-layer fulfillment-state taxonomy (one badge per concept), badge labels, severities: File B §1–§5, §9.
 - Hold vocabulary + read-only posture: File B §3.3; File A §5 edge table.
 - Critical Delivered-inconsistency case (copy, severity, pinning, resolution
   paths): File B §8.

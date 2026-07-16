@@ -6,7 +6,7 @@
 > authorizes no code. Source: `tracking-timeline.html` (shared stylesheet
 > `../assets/prototype.css`, zero JavaScript, no external assets).
 > Content contract: [`../../02-product/shopify-fulfillment-status-model.md`](../../02-product/shopify-fulfillment-status-model.md)
-> (File B §1 six-concept separation, §5 the 11 `FulfillmentEventStatus`
+> (File B §1 four-layer fulfillment-state taxonomy, §5 the 11 `FulfillmentEventStatus`
 > milestones + `trackingInfo`, §7 unknown-future-value contract, §8
 > Delivered-inconsistency direction) and
 > [`../../02-product/fulfillment-operating-modes.md`](../../02-product/fulfillment-operating-modes.md)
@@ -28,12 +28,13 @@ control exists on this screen.
 ## Data shown
 - **Lead band** — the latest milestone as the single dominant answer
   (Delivered / In transit / Delayed / Failed / Unknown).
-- **Six-concept separation strip** (complete state) — one labeled chip per
-  concept, side by side: Odoo delivery state (`Done`) · Shopify order summary
-  (`Fully shipped`) · FulfillmentOrder state (`Completed`) · Fulfillment
-  result (`Shipped (confirmed)`) · carrier milestone (`Delivered`) ·
-  connector reconciliation state (`Applied`). File B §1: one badge each,
-  never merged.
+- **Taxonomy strip** (complete state) — one labeled chip per concept under the
+  four-layer fulfillment-state taxonomy, side by side: Odoo delivery state
+  (`Done`, Odoo-side) · Shopify order summary (`Fully shipped`) ·
+  FulfillmentOrder state (`Completed`) · Fulfillment result
+  (`Shipped (confirmed)`) · carrier milestone (`Delivered`) — the Shopify
+  Layer-A enum families — · connector reconciliation state (`Applied`,
+  connector-derived). File B §1: one badge each, never merged.
 - **Carrier chip** — carrier name + tracking number (`trackingInfo`
   company/number).
 - **Two-package tabs mock** — static `role="tablist"` showing Package 1 of 2
@@ -48,7 +49,7 @@ control exists on this screen.
 ## States rendered
 | State | Behavior |
 | --- | --- |
-| **Complete** | LABEL_PURCHASED → CONFIRMED → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED with timestamps; success band notes the Odoo delivery was validated *separately*; six-concept strip + two-package tabs shown. |
+| **Complete** | LABEL_PURCHASED → CONFIRMED → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED with timestamps; success band notes the Odoo delivery was validated *separately*; taxonomy strip + two-package tabs shown. |
 | **In progress** | Milestones through IN_TRANSIT; "Out for delivery / Delivered — not yet reported" as muted placeholders; info band with estimated delivery. |
 | **Delayed** | Warning band; DELAYED ("carrier: weather hold") and ATTEMPTED_DELIVERY ("recipient absent, carrier will retry") as warning milestones; copy: awareness only, optional attention flag, no stock action. |
 | **Failed** | Danger band "Delivery failed — a person must decide" with **Open review case** CTA + waiting-on-a-decision chips; FAILURE milestone; cadence notes re-ship/return is Odoo's manual return flow. |
@@ -84,7 +85,7 @@ screen readers hear that later milestones are not yet reported.
 
 ## Traceability
 - Milestone vocabulary, labels, severities (11 values): File B §5.
-- Six-concept separation strip: File B §1 (+§9 one-badge rule).
+- Four-layer taxonomy strip: File B §1 (+§9 one-badge rule).
 - Display-only rule / never validates stock: File B §5, §8; File A §3
   class 4 (`carrier_event_only`).
 - Unknown-future-value contract (all five points rendered): File B §7.

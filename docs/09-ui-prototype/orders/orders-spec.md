@@ -24,8 +24,9 @@ names the active `order_confirmation_policy` (P1) and `manual_gateway_policy`
   (danger), failed (danger).
 - **Filter row**: financial status, fulfillment status, policy result, COD
   only, date window, plus search. Active filters render as removable facets.
-- **Table columns**: Shopify order name · customer (**masked** variant —
-  initialled name + masked email, credential/PII posture) · financial badge ·
+- **Table columns**: Shopify order name · customer (the raw operational
+  customer identity the role is permitted to see — name + email, a compact
+  display, not a PII-masking feature) · financial badge ·
   fulfillment badge · connector state (plain words, never a raw token) ·
   total (`sc-mono`, shop currency) · policy outcome.
 - The loaded state exercises **all 8 financial states** across rows:

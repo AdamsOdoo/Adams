@@ -323,10 +323,14 @@ Connector User / Connector Administrator):
 
 Status: **Proposed** — the U0 acceptance (PR #152, comment `4951204357`)
 covers only the original five surfaces; the twelve new surfaces await
-product-owner/control-room visual review. Master specification:
+product-owner/control-room visual review, bringing the prototype to **five U0
+surfaces plus twelve gap-closure surfaces (seventeen in total)** — the §2/§3
+artifact tables above enumerate the U0 baseline only. Master specification:
 [`../02-product/premium-ux-master-specification.md`](../02-product/premium-ux-master-specification.md)
-(§6 maps every screen to its surface). The new surfaces have no rendered PNG
-evidence yet (open item for the review session); HTML is the source of truth.
+(§6 maps every screen to its surface). The rendered-evidence set for the twelve
+new surfaces is being added under
+[`review-evidence/2026-07-16-correction/`](review-evidence/2026-07-16-correction/)
+for the correction review; until then the HTML source is authoritative.
 `jobs-diagnostics/` includes the eleven-state global reference gallery
 proposed by the master specification. No existing U0 file was modified except
 `prototype-index.html` (twelve cards added) and this README note.
