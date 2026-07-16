@@ -38,6 +38,14 @@ class ShopifyConnectorStoreSettings(models.Model):
         ],
     )
     notification_default_enabled = fields.Boolean(default=False)
+    pii_snapshot_retention_days = fields.Integer(
+        default=0,
+        help=(
+            'Number of days to retain PII-bearing connector snapshots. '
+            'Zero retains snapshots indefinitely; 365 days is the recommended '
+            'MVP operating value.'
+        ),
+    )
 
     _store_id_uniq = models.Constraint(
         'UNIQUE(store_id)',

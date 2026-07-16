@@ -7,6 +7,48 @@
 > `4678631974` + gate amendment `4948368039`), on branch
 > `claude/task-core-r1-readiness-correction-trxl43`.
 
+## Wave 1 integration re-verification (2026-07-15)
+
+**[Fact]** The complete accepted CORE-R1 production change, its focused
+20-method suite, both amended exact-sudo guards, AR-043, and this validation
+record are already present byte-for-byte in the protected checkpoint and in the
+authorized Wave 1 base. Wave 1 therefore does not duplicate or rewrite the
+inherited implementation. The live base was checked at the exact
+product-owner-authorized integration identity recorded in PR #172, and the
+following inherited content was re-read against D-R1-1..5:
+
+- the actual registered drain cron plus the exact 60-minute
+  `state='queued' AND started_at=False` stall boundary;
+- inventory-disabled and pull-based-webhook not-applicable passes, with
+  inventory-enabled/no-override remaining fail-closed;
+- successful non-fall-forward test connection recording
+  `api_health_state='normal'` while fall-forward remains `degraded`;
+- the eligible Lite-store real-behavior activation and essential-failure
+  regressions;
+- the source guards prohibiting readiness-time Shopify calls and credential
+  reads and enforcing the narrow cron-read sudo inventory.
+
+**[Fact]** The inherited implementation was previously Odoo.sh-green at exact
+implementation head `e262738696dc18f775fcc42b5de0ef98c7b722ee`, build
+`34779589`, with `0 failed, 0 error(s) of 288 tests` as recorded below.
+**[Fact, updated 2026-07-16]** The mandatory final Wave 1 exact-head Odoo.sh
+rerun has since completed: corrected-head build `34995642` (runtime-tested SHA
+`95db3db`) ran `TestReadinessCheck` (31) and `TestReadinessSlotClosure` (20)
+green as part of the full `0 failed / 0 errors / 644` standard suite recorded
+in `task-sec1-validation-results.md`. This record's own §2–§7 detail below was
+not re-verified against that later build and, per Wave 1's Claude control-room
+review, carries known staleness in two places: §4's citation of two test
+method names later renamed by the SEC-1 commit, and §6's now-superseded "exact
+three sanctioned sudo sites" claim (see the note at each location). Neither
+staleness reflects a code defect — the tests exist under their current names
+and pass; the sudo inventory simply grew when SEC-1 added its own sanctioned
+sites.
+
+No CORE-R1 production or test code changed in this Wave 1 stage because
+reimplementation would violate the repository's “do not re-implement existing
+code” rule and the packet's narrow diff contract. This stage commit updates only
+this packet-owned validation record.
+
 ## 1. Base verification (prerequisite gate)
 
 | Item | Required | Observed | Result |
@@ -119,7 +161,7 @@ activation.
 | 13 | Eligible Lite store aggregates `pass` | `test_eligible_lite_store_aggregates_pass` |
 | 14 | Eligible Lite store reaches `connected` | `test_eligible_lite_store_reaches_connected` |
 | 15 | Genuine essential failure still blocks activation | `test_genuine_essential_failure_still_blocks_activation` |
-| 16 | Source-level guards (no Shopify call / no cred read / one named sudo / store diff scope) | `test_source_level_checks_add_no_shopify_call_or_credential_read`, `test_source_level_single_named_sudo_in_readiness_helper`, `test_source_level_store_change_is_only_the_health_write` |
+| 16 | Source-level guards (no Shopify call / no cred read / one named sudo / store diff scope) | `test_source_level_checks_add_no_shopify_call_or_credential_read`, `test_source_level_sec1_sudo_inventory_in_readiness` *(renamed from `test_source_level_single_named_sudo_in_readiness_helper` by SEC-1 commit `60ac416`)*, `test_source_level_store_health_and_sec1_sudo_inventory` *(renamed from `test_source_level_store_change_is_only_the_health_write`, same commit)* |
 
 ## 5. Validation actually executed (honest scope)
 
@@ -145,17 +187,32 @@ source-level guard:
 - **Both updated global sudo guards** — `test_source_level_three_sudo_
   sites_total` (job-log) and `test_source_level_sanctioned_sudo_sites_
   guard` (credential): the actual sorted `.sudo()` inventory across
-  `shopify_connector_core/models/*.py` is exactly
+  `shopify_connector_core/models/*.py` was, **at this CORE-R1 correction
+  commit only**, exactly
   `['shopify_connector_job_log.py',
   'shopify_connector_readiness_check.py',
   'shopify_connector_store_credential.py']` → **exact-list match (green)**.
-  Exact-list equality is preserved (no `>= 3`, substring, wildcard, or
-  count-only relaxation); any fourth site fails both.
+  Exact-list equality was preserved at that commit (no `>= 3`, substring,
+  wildcard, or count-only relaxation); any fourth site would have failed
+  both. *(Superseded note, 2026-07-16: the subsequent SEC-1 commit
+  `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5` legitimately expanded the
+  sanctioned sudo surface across `shopify_connector_core/models/*.py` — e.g.
+  `shopify_connector_store.py` alone now has 8 sanctioned sites — and renamed/
+  re-scoped these two guard tests accordingly
+  (`test_source_level_sec1_sudo_inventory_in_readiness`,
+  `test_source_level_store_health_and_sec1_sudo_inventory`) rather than
+  leaving them silently broken. `task-sec1-validation-results.md`'s "Exact
+  core sudo inventory" entry is the current authoritative full-repo count;
+  this file's three-site claim below describes CORE-R1's own commit in
+  isolation, not the current shipped state.)*
 - The three CORE-R1 source guards pass (no Shopify call / no credential
   read in the three edited check methods; exactly one `.sudo()` in the
   readiness model, inside `_drain_cron_active_state`; the store change is
   exactly one `api_health_state='normal'` write with the `degraded`
-  write intact and no `.sudo()` in the store file).
+  write intact). *(At CORE-R1's original commit, `shopify_connector_store.py`
+  had no `.sudo()` sites; SEC-1 subsequently added 8 sanctioned sudo sites to
+  that file for job-state transitions unrelated to CORE-R1's own change — see
+  the §6 note below.)*
 - The pre-existing `test_readiness_check.py::test_source_level_no_check_
   method_mutates_state` guard **stays green** (no `_check_*` method calls
   write/create/unlink/execute/sudo).
@@ -166,6 +223,18 @@ Static test-method inventory (`grep -cE "^\s+def test_"`), for reference
 — **not** Odoo runtime counts, and superseded by the runtime totals in
 the Odoo.sh section below: `test_readiness_slot_closure.py` = 20;
 `test_job_log_system_append.py` = 4; `test_credential_service.py` = 15.
+
+*(Citation correction, 2026-07-16: §4 below previously named two
+`test_readiness_slot_closure.py` methods —
+`test_source_level_single_named_sudo_in_readiness_helper` and
+`test_source_level_store_change_is_only_the_health_write` — that SEC-1 commit
+`60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5` renamed to
+`test_source_level_sec1_sudo_inventory_in_readiness` and
+`test_source_level_store_health_and_sec1_sudo_inventory` respectively (same
+underlying assertions, expanded scope). The old names no longer exist in the
+test file; this note records the rename rather than restating removed lines,
+since neither this file's original allowlist nor CORE-R1's own commit may be
+edited retroactively.)*
 
 ### Odoo.sh runtime result — GREEN
 
@@ -214,12 +283,18 @@ it is not addressed here (out of CORE-R1 scope).
   `.execute(...)`, read no secret/credential (AST §16 guards + diff grep:
   NONE added). They read only local state (settings flag, this store's
   jobs, the drain cron record).
-- **Final sudo inventory (exact, three sanctioned sites):**
+- **Sudo inventory at CORE-R1's own commit (exact, three sanctioned sites):**
   `shopify_connector_job_log.py` (`_system_append`),
   `shopify_connector_store_credential.py` (`_get_access_token`),
   `shopify_connector_readiness_check.py` (`_drain_cron_active_state`, the
-  narrow read-only CORE-R1 drain-cron read). Both global guards enforce
-  this exact list; **no fourth site is permitted.**
+  narrow read-only CORE-R1 drain-cron read). Both global guards enforced
+  this exact list at that commit. **This is no longer the full-repo sudo
+  inventory** — SEC-1 (commit `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`)
+  subsequently added further sanctioned sudo sites elsewhere in
+  `shopify_connector_core/models/*.py` under its own guard tests; see
+  `task-sec1-validation-results.md`'s "Exact core sudo inventory" entry for
+  the current authoritative count. No unguarded/unaccounted site exists at
+  either commit — each addition is asserted by an exact-list test.
 - **Eligible Lite store reaches `connected` through real behavior** — see
   §3 D-R1-4 and tests 13/14 (no readiness/state force-writes; the
   `api_health_state='normal'` that makes readiness pass is set by the

@@ -234,7 +234,7 @@ class ShopifyConnectorStore(models.Model):
         Client = self.env['shopify.connector.api.client']
         Job = self.env['shopify.connector.job']
         JobLog = self.env['shopify.connector.job.log']
-        job = Job.create({
+        job = Job.sudo().create({
             'store_id': self.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'core_test_connection',
@@ -242,6 +242,7 @@ class ShopifyConnectorStore(models.Model):
             'payload_hash': str(uuid.uuid4()),
             'started_at': fields.Datetime.now(),
         })
+        job = Job.browse(job.id)
         JobLog._system_append(
             job, 'attempt', 'Test connection attempt started.',
         )
@@ -302,7 +303,7 @@ class ShopifyConnectorStore(models.Model):
                 'last_test_connection_at': fields.Datetime.now(),
                 'last_test_connection_reason': redact(reason),
             })
-            job.write({
+            job.sudo().write({
                 'error_class': 'odoo_validation_configuration',
                 'state': 'failed_final',
                 'finished_at': fields.Datetime.now(),
@@ -351,7 +352,7 @@ class ShopifyConnectorStore(models.Model):
                 'api_health_state': 'normal',
                 'api_health_reason': False,
             })
-        job.write({
+        job.sudo().write({
             'state': 'succeeded',
             'finished_at': fields.Datetime.now(),
         })
@@ -390,7 +391,7 @@ class ShopifyConnectorStore(models.Model):
                 credential.write({'credential_state': 'invalid'})
         if exc.credential_invalid or exc.error_class == ERROR_AUTH:
             self.action_mark_reconnect_needed(reason=exc.reason)
-        job.write({
+        job.sudo().write({
             'error_class': exc.error_class,
             'state': 'failed_final',
             'finished_at': fields.Datetime.now(),
@@ -467,7 +468,7 @@ class ShopifyConnectorStore(models.Model):
             'Connection probe superseded by a lifecycle or credential '
             'change; rerun it.'
         )
-        job.write({
+        job.sudo().write({
             'state': 'cancelled',
             'cancel_reason': reason,
             'finished_at': fields.Datetime.now(),
@@ -494,12 +495,14 @@ class ShopifyConnectorStore(models.Model):
         `run_for_store` pattern so repeat lifecycle actions never collide
         on `store_idempotency_key_uniq` (the TD-001 class of issue); every
         log row goes through the existing `_system_append` path -- no new
-        job type, no second log-creation path, no `sudo()`.
+        job type and no second log-creation path. SEC-1 narrowly elevates
+        only the protected job create/final-write sites; the Store and log
+        appender retain the original caller environment and actor.
         """
         self.ensure_one()
         Job = self.env['shopify.connector.job']
         JobLog = self.env['shopify.connector.job.log']
-        job = Job.create({
+        job = Job.sudo().create({
             'store_id': self.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'core_manual_maintenance',
@@ -507,11 +510,12 @@ class ShopifyConnectorStore(models.Model):
             'payload_hash': str(uuid.uuid4()),
             'started_at': fields.Datetime.now(),
         })
+        job = Job.browse(job.id)
         JobLog._system_append(
             job, 'manual_action', message,
             from_state='running', to_state='succeeded',
         )
-        job.write({
+        job.sudo().write({
             'state': 'succeeded',
             'finished_at': fields.Datetime.now(),
         })
@@ -688,7 +692,7 @@ class ShopifyConnectorStore(models.Model):
             if job.state not in ('queued', 'retry_waiting'):
                 continue
             from_state = job.state
-            job.write({
+            job.sudo().write({
                 'state': 'cancelled',
                 'cancel_reason': reason,
                 'finished_at': fields.Datetime.now(),

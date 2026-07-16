@@ -1,5 +1,102 @@
 # CORE-R2 — Foundation Slice 1 — Validation Results
 
+
+## Wave 1 final exact-head closure — build 34986844 (2026-07-16)
+
+Odoo.sh 19 build `34986844` validated draft PR #172 at exact SHA
+`05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` on database
+`adamsmen-sol-wave-1-readonly-foundation-34986844`. Identity matched at the
+start and end of the session and the working tree remained clean.
+
+- Targeted AST tests: `0 failed / 0 errors / 2`.
+- Fresh all-module installation: `0 failed / 0 errors / 635`.
+- Full standard suite with the reversible issue #157 accommodation:
+  `0 failed / 0 errors / 635` (`core 352 + product 176 + sale 107`).
+- Combined genuine SRR-03 smoke: all 11 independent-connection classes,
+  `0 failed / 0 errors / 41`, exercising 10 real PostgreSQL `40001`
+  serialization conflicts and one lock timeout.
+- Residue audit: zero open leases, jobs, job logs, test stores, credentials,
+  idle transactions, leaked sessions/cursors/workers, or connector/test cron
+  triggers. The one `shopify_connector_attribute_lock` row is the expected
+  installation singleton; the three connector crons are legitimate installed
+  records.
+- Security audit: no real tokens, authorization headers, persisted
+  credentials, raw PII, or temporary-path leakage.
+- Issue #157: temporary defaults for
+  `res_users.notification_type='email'` and
+  `res_users_settings.color_scheme='system'` were used only for the accepted
+  base-Odoo fixture artifact, then both defaults were dropped and verified
+  restored to their pre-run state with no NULLs introduced.
+
+The exact-head run proves independent backend identities, exact-row re-lock,
+zero handler replay, fail-closed replay policy, disconnect/admission ordering,
+real conflict/timeout handling, and zero residue. Product-owner ruling
+`4988527547` therefore authorizes **SRR-03 CLOSED**. This closure does not
+claim exactly-once remote effects and does not implement or prove DEC-031 Layer
+2. Wave 1 is implementation-complete and runtime-green; PR #172 remains draft
+and unmerged pending final Claude control-room review.
+
+
+
+## Wave 1 substantive runtime proof — build 34985521 (2026-07-16)
+
+Odoo.sh 19 build `34985521` ran draft PR #172 at exact SHA
+`d9d2dd018470054944db064cdd553160232713cd` on database
+`adamsmen-sol-wave-1-readonly-foundation-34985521`. The fresh all-module run
+reported `1 failed / 0 errors / 634 tests`; the sole failure was the stale
+test-only AST helper in
+`TestJobDispatch.test_source_level_job_enqueue_only_creates_job_model`.
+Focused Wave 1 tests were `0/0/105`; product was `0/0/176`; sale was
+`0/0/107`; lifecycle was `0/0/9`.
+
+All 11 genuine independent-connection SRR-03 classes passed in each of three
+distinct OS-process repetitions. Real PostgreSQL `40001` conflicts and lock
+timeouts were exercised. Exact-job re-locking, no handler replay, fail-closed
+replay policy, disconnect/admission ordering, and zero leaked leases, jobs,
+workers, sessions, cursors, and cron triggers were proven. Residue and
+credential/PII scans were clean. Issue #157 was limited to the accepted exact
+`notification_type`/`color_scheme` base-Odoo post-init fixture artifact
+under the documented reversible database-only accommodation.
+
+Product-owner ruling `4988098888` accepts the substantive SRR-03 runtime
+criteria as satisfied. The authoritative risk row remains **OPEN pending final
+exact-head reconciliation only**. Test-only correction
+`b42042d641ce2d02cad9559a03fcb268ceaac3bc` changes no production code and
+does not require repeating the three-process matrix. Final closure requires the
+targeted AST guard, fresh all-module run, full core suite after the documented
+#157 accommodation, one combined genuine-class smoke run, final
+residue/security audit, and restoration of both temporary database defaults at
+the new exact head.
+
+
+
+## Wave 1 runtime-correction checkpoint — build 34968318 (2026-07-16)
+
+Odoo.sh 19 build `34968318` ran draft PR #172 at exact SHA
+`62b2645f69280aadc68a56045a26bef2063c5821` on database
+`adamsmen-sol-wave-1-readonly-foundation-34968318`. The genuine
+`TestGenuineRealAdmission` (9 tests ×3) and
+`TestLifecycleAdmissionRaceGenuine` (4 tests ×3) repetitions passed, but
+`TestDrainOwnershipReplayGenuine` failed deterministically
+(`1 failed / 4 errors / 6` ×3) and the scheduled-drain lifecycle-retry case
+failed. The defect was not dispatcher replay or row-lock ownership: SEC-1's
+legal-transition matrix omitted the committed-state recovery edges needed
+after PostgreSQL rolls back the original transaction and its uncommitted
+`running` transition.
+
+Product-owner ruling PR #172 comment `4984719237` authorizes only the five
+recovery edges now implemented in correction commit
+`2b6d9d8259fada252abca19407d1df53bed9e66f`. Recovery continues to re-lock
+the exact `queued` or due `retry_waiting` row, consult replay policy, and
+route once without invoking the handler; `draft→running` and
+`draft→retry_waiting` remain illegal. Residue/leak and security/log scans for
+the completed diagnostic run were clean. Issue #157 was limited to its exact
+known `notification_type`/`color_scheme` post-init fixture artifact.
+
+This is failed-run diagnostic evidence, not closure evidence. No post-correction
+runtime pass is claimed; **SRR-03 remains OPEN pending an exact-head rerun of
+the complete genuine concurrency/disconnect matrix and stability repetitions.**
+
 > **Status: runtime-validated implementation record for control-room review.**
 > CORE-R2 **implementation** gate OPENED by control-room comment `4952145926`
 > (authorized base `Shopify-connector` @

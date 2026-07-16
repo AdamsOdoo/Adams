@@ -1,3 +1,108 @@
+## 2026-07-16 — Wave 1 corrected-head runtime validation (Claude control room)
+
+- **Role/scope:** Claude control-room runtime validation of the SEC-1 binding-surface correction on the existing branch/PR only. No new product scope; Wave 2 not started; PR #172 not merged and not marked ready.
+- **Identity:** branch `sol/wave-1-readonly-foundation`; build `34995642`; DB `adamsmen-sol-wave-1-readonly-foundation-34995642`; Odoo 19.0; PostgreSQL 16.14; checked out at `05acfd72b04f072e0ed95c476ceccfa606c52d91` (clean tree); versions core `19.0.1.9.1`, product `19.0.2.1.2`, sale `19.0.1.2.1`.
+- **Runtime-tested SHA:** `95db3dba4bf295ca6c6ee94ae7fa08da1d505eb7` — production sources byte-identical to `05acfd7`; the only delta is one test file.
+- **Result:** genuine prior→corrected upgrade clean (no migration/field/model/ACL/manifest error; no model/table/ACL/group/job-type/transition/replay-policy scope added). Full standard suite `0 failed / 0 errors / 644` *(a per-module breakdown of core 414 + product 202 + sale 124 was recorded during the session but does not sum to 644 — see `../05-qa/task-sec1-validation-results.md`'s Test-count reconciliation note; the breakdown is withdrawn, `644` combined stands as authoritative)*. Four-role 16/17/14 create/alter/clear denial, exact-set classification + fail-closed, importers, audited override, PII mask + retention, LC-1, JOB-ACTIONS, and all genuine SRR-03 independent-connection classes green; real `40001` conflicts and a real lock timeout exercised (exact re-lock, no handler replay, fail-closed replay). No exactly-once remote-effect or DEC-031 Layer 2 claim.
+- **One defect fixed (test-only):** the corrected head was red by exactly one failure — `test_product_importer_binding_writers_use_exact_sudo_sites` (`2 != 1`), an over-broad AST guard conflating the sanctioned `dict(snapshot_vals, …)` create with the `existing.sudo().write(snapshot_vals)` refresh. Production importer is correct. Under this prompt's failure-handling authorization, a test-only fix (`95db3db`; +7; no production/feature/version change) scoped the filter to `.write(…)` calls. Definitive rerun `0/0/644`.
+- **Issue #157:** genuinely required — 9 `setUpClass` errors were 100% the base-Odoo `notification_type`/`color_scheme` NOT-NULL artifact; the reversible DB-default accommodation cleared all 9 and was then dropped, restoring both columns to their original no-default NOT-NULL state. No real connector failure classified under #157.
+- **Residue/security:** clean — only the seeded attribute-lock singleton and 3 by-design connector crons; zero leaked jobs/leases/stores/credentials/logs/idle-txns/cursors/sessions/triggers/tokens/raw PII.
+- **Learning feedback loop:** an AST/source guard authored in the same commit as its production change can silently over-match sibling calls (here `dict(x, …)` vs `.write(x)`); guards that assert an "exact site count" should filter on the call receiver/method, not just an argument Name. Recommend that every new AST guard be exercised at runtime against the exact production tree before a wave is presented as green.
+- **Commits this session:** `95db3db` (test-only guard fix); one docs-only evidence commit.
+- **Next action (exact next-session prompt):**
+
+  > Perform the final Wave 1 macro-wave control-room review and merge decision on draft PR #172 (`sol/wave-1-readonly-foundation` → `mvp/program-integration`) using `docs/06-prompts/claude-mvp-wave-review-template.md`. Corrected-head runtime evidence is green (build 34995642, runtime-tested SHA `95db3db`, full suite `0/0/644`, clean residue/security, issue #157 restored) and recorded in `docs/05-qa/task-sec1-validation-results.md`. Verify live PR identity (open/draft/unmerged; base `mvp/program-integration`; head = latest pushed SHA), that the only non-docs delta versus `05acfd7` is the one test-guard file, and that the checkpoint/`Shopify-connector`/`main` remain untouched. Then record APPROVE-and-merge or REVISE. Do not start Wave 2. SRR-03 remains CLOSED.
+
+## 2026-07-16 — Wave 1 consolidated SEC-1 binding correction
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 into `mvp/program-integration`, open and unmerged.
+- **Binding classification:** all current stored connector-owned binding fields are identity/structural or system-maintained state/provenance/imported snapshots; computed/non-stored `pii_snapshot_masked` is not a generic write surface; there are no accepted user-editable class-4 fields on the current product/customer binding surface.
+- **Correction:** product-owner ruling `4988842625` is implemented in production/test commit `36974edc68c1985e6ccfae8f6bb5c7386f820156`. The mixin now has a reusable concrete-field seam plus fail-closed stored-field classification, and the exact template/variant/customer protected sets contain 16/17/14 fields.
+- **Legitimate writers:** audited `action_override_binding()`; product template/variant create, refresh, stale/review, timestamp/checksum maintenance; customer create/refresh; manual PII mask; retention sweep. Only two existing product-importer sites required narrow new elevation: existing-variant refresh and image-checksum persistence. Product-importer `.sudo(` inventory changes 9 → 11; core and sale inventories are unchanged.
+- **Static evidence:** changed Python parses; exact protected sets and stored-field classification are asserted; all four shared roles receive generic create/alter/clear denials; sanctioned override/import/mask/retention paths remain covered; no ACL, group, model, table, job type/source, context bypass, dispatcher, replay-policy, or Wave 2 scope changed.
+- **Runtime boundary:** Odoo.sh build `34986844` remains valid only for its prior exact SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`. The production security correction requires one complete corrected-head Odoo.sh matrix; no corrected-head runtime success is claimed in this session because authenticated Odoo.sh access is unavailable.
+- **Risk/gates:** SRR-03 remains CLOSED on its independent evidence. Wave 1 is in correction/revalidation, PR #172 remains draft/unmerged, and Wave 2 remains unauthorized and unstarted.
+- **Next action:** runtime operator runs the single complete matrix at the final corrected docs head, records exact build/database/SHA/counts and audit results in one evidence-only commit, then returns PR #172 to Claude for macro-wave re-review.
+
+### Wave 1 final exact-head closure — compact handoff (2026-07-16)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
+- **Final runtime:** Odoo.sh 19 build `34986844`, database `adamsmen-sol-wave-1-readonly-foundation-34986844`, exact SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`; identity matched at start/end and working tree stayed clean.
+- **Results:** targeted AST `0/0/2`; fresh all-module `0/0/635`; standard `0/0/635` (`core 352 + product 176 + sale 107`); combined all-11-class genuine SRR-03 smoke `0/0/41`, including 10 real PostgreSQL `40001` conflicts and one lock timeout.
+- **Safety proof:** exact-job re-lock, no handler replay, fail-closed replay policy, independent backend identities, disconnect/admission ordering, real conflict/timeout paths, and zero lease/job/log/store/credential/idle-transaction/session/cursor/worker/test-cron residue. Security scan found no real token, header, persisted credential, raw PII, or temporary-path leakage.
+- **Issue #157:** temporary `res_users.notification_type='email'` and `res_users_settings.color_scheme='system'` defaults were used only for the accepted base-Odoo fixture artifact, then both were dropped and verified restored with no NULLs.
+- **Disposition:** product-owner ruling `4988527547` authorizes **SRR-03 CLOSED**. Closure is limited to read/call safety; no exactly-once remote-effect or DEC-031 Layer 2 claim is made.
+- **Wave boundary:** Wave 1 is implementation-complete/runtime-green. No production/test code changed in this reconciliation. PR #172 remains draft and unmerged. Wave 2 remains unauthorized/unstarted.
+- **Next:** Claude performs the single final Wave 1 macro-wave review and is the only party authorized to merge PR #172 into `mvp/program-integration`.
+
+### Wave 1 build 34985521 / test-only AST correction — compact handoff (2026-07-16)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
+- **Accepted runtime:** Odoo.sh 19 build `34985521`, database `adamsmen-sol-wave-1-readonly-foundation-34985521`, exact SHA `d9d2dd018470054944db064cdd553160232713cd`. Fresh `1 failed / 0 errors / 634`, with only the stale enqueue AST guard failing; focused Wave 1 `0/0/105`, product `0/0/176`, sale `0/0/107`, lifecycle `0/0/9`.
+- **SRR-03 evidence:** all 11 genuine independent-connection classes passed in each of three distinct OS-process repetitions with real `40001` conflicts/lock timeouts, exact-job re-lock, no handler replay, fail-closed policy, disconnect/admission ordering, and zero lease/job/worker/session/cursor/cron-trigger residue. Security and PII scans were clean.
+- **Issue #157:** only the exact `notification_type`/`color_scheme` base-Odoo post-init fixture artifact used the documented reversible DB-only accommodation; no Wave 1 failure was reclassified.
+- **Correction:** `b42042d641ce2d02cad9559a03fcb268ceaac3bc` changes only `test_job_dispatch.py`. `_env_model_name()` recursively unwraps the explicit `sudo`, `with_context`, `with_company`, `with_user`, and `with_env` allowlist; arbitrary wrappers remain `None`; the production guard still compares the complete target list exactly to `['shopify.connector.job']`.
+- **Static proof:** changed Python parses; five helper cases pass. No production, sudo, transition, replay-policy, ACL, manifest, migration, lifecycle, or PII behavior changed.
+- **Gate:** product-owner ruling `4988098888` accepts substantive SRR-03 runtime criteria, but the authoritative row remains OPEN pending final corrected exact-head verification. Do not claim Wave 1 success, mark PR ready, merge, or start Wave 2.
+- **Next:** targeted AST guard; fresh all-module run; full core after accepted #157 accommodation; one combined genuine-class smoke run; final residue/security audit; drop both temporary DB defaults and record restoration.
+
+### Wave 1 SEC-1/CORE-R2 runtime correction — compact handoff (2026-07-16)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
+- **Diagnostic runtime:** Odoo.sh 19 build `34968318`, database `adamsmen-sol-wave-1-readonly-foundation-34968318`, exact pre-correction SHA `62b2645f69280aadc68a56045a26bef2063c5821`. Upgrade, focused Wave 1 suites, lifecycle uninstall/reinstall, genuine admission/lifecycle-race repetitions, residue audit and security scan supplied partial evidence; fresh/full/drain-recovery suites were not green.
+- **Finding:** PostgreSQL rollback removes the uncommitted `running` transition, so accepted CORE-R2 recovery re-locks the exact job in committed `queued` or due `retry_waiting`. D-SEC1-1 omitted five routes from those states. Recovery did not replay the handler or weaken ownership.
+- **Correction:** commit `2b6d9d8259fada252abca19407d1df53bed9e66f` adds only `queued→retry_waiting|failed_final|blocked_manual_review` and `retry_waiting→failed_final|blocked_manual_review`; draft start/retry edges remain illegal. Invalid inherited fixtures were corrected and both claimable states now cover safe retry, exhaustion, conservative/undeclared policy, exact re-lock and zero handler replay.
+- **Static evidence:** all seven changed Python sources parse; transition delta is exactly five; production sudo/bypass inventories are unchanged; dispatcher production code, replay classifications, retry constants, ACLs and job vocabulary are untouched.
+- **Runtime classification:** issue #157 is only the exact known `notification_type`/`color_scheme` post-init fixture artifact. No corrected-head Odoo.sh success is claimed. SRR-03 remains OPEN.
+- **Boundary / next:** no Wave 2+ code, no Shopify call, no mutation, no merge. Run the complete Odoo.sh matrix at the new exact PR head; keep PR #172 draft for the eventual complete Wave 1 control-room gate.
+
+### Wave 1 SEC-1 implementation / runtime-access hard-stop — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
+- **Files changed:** Stage 4 packet-owned paths in `addons/shopify_connector_core/{__manifest__.py,data/shopify_connector_pii_retention_cron.xml,models/{__init__,shopify_connector_binding_mixin,shopify_connector_job,shopify_connector_job_actions,shopify_connector_job_dispatch,shopify_connector_job_enqueue,shopify_connector_pii_retention,shopify_connector_readiness_check,shopify_connector_store,shopify_connector_store_settings}.py,tests/{__init__,test_credential_service,test_job_actions,test_job_dispatch,test_job_log_system_append,test_lifecycle_uninstall,test_readiness_slot_closure,test_security_hardening}.py}`; `addons/shopify_connector_product/{__manifest__.py,models/{shopify_connector_product_importer,shopify_connector_product_template_binding,shopify_connector_product_variant_binding}.py,tests/{test_product_template_binding,test_product_variant_binding}.py}`; `addons/shopify_connector_sale/{__manifest__.py,models/{shopify_connector_customer_binding,shopify_connector_customer_importer}.py,tests/{__init__,test_customer_binding,test_pii_least_privilege}.py}`; SEC-1 packet/validation, program tracker, acceptance/risk/architecture logs, and this handoff.
+- **What changed / residue fixed:** Implemented D-SEC1-1..7 at `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`: protected job fields (including `original_job_type`/`cancel_reason`), legal transitions, sanctioned writers, immutable binding identity with audited override, caller-context company validation, least-privilege PII, masking/retention, one lifecycle carrier/log per action or affected store, actor preservation, redaction, and atomic rollback. Added 9 core-security + 12 PII focused methods and updated inherited exact-source guards. All 31 changed Python files parse; the cron XML parses. No Odoo runtime result is claimed.
+- **Items deferred:** Exact-head Odoo.sh fresh install/upgrade, all focused/full suites, LC-1 uninstall/reinstall, SRR-03 independent-connection/disconnect repetitions, database/session/cursor/worker/lease/residue audits, and credential/PII log scan. SRR-03 remains OPEN.
+- **Learning feedback loop:** New issue: none in architecture/code after the binding ruling. Repeated pattern: unavailable Odoo.sh execution access remains the known external runtime blocker; hard-stop 5 applied, with no fabricated pass. Rules/checklists updated: exact sudo inventories and company/audit atomicity tests now encode the ruling. Rejected approaches: none. Technical debt: none accepted. Architecture concern: none new; AR-052 records implementation/runtime status. Required gate: provision genuine Odoo.sh 19 access and run the complete matrix. Future prompt change: No.
+- **Quality gate confirmation:** handoff updated YES · feedback loop checked YES · learning captured YES · rejected approach logged N/A · technical debt logged N/A · repeated-issue escalation applied YES (hard-stop 5 + tracker/runtime gate).
+- **Next recommended session:** Wave 1 exact-head Odoo.sh and SRR-03 closure session after authenticated build/database access is provisioned.
+- **Stop condition:** hard-stop 5 at the runtime boundary; PR #172 remains draft/unmerged; Stage 5 closure and Wave 2 are unstarted/unauthorized.
+
+### Wave 1 SEC-1 pre-edit hard-stop — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Completed this resume:** product-owner-approved `original_job_type` packet amendment; Stage 3 JOB-ACTIONS implementation, nine-method test matrix, syntax proof, validation record, AR-051, and tracker/handoff updates.
+- **New hard-stop (condition 10):** D-SEC1-4 binding override and D-SEC1-6 masking/sweep require audited `manual_action`/summary rows, but the only connector audit-row model is `shopify.connector.job.log` with required `job_id`; the packet defines no audit-job carrier/creation door or alternative audit model. D-SEC1-4 also requires binding-store/company consistency, while `shopify.connector.store` has no company field.
+- **Why Sol stopped:** inventing a generic audit model, synthesizing maintenance jobs, expanding the sanctioned sudo/create inventory, or adding store ownership would change the accepted security architecture. No SEC-1 production/test file was edited.
+- **Runtime:** Stage 1–3 exact-head Odoo.sh remains pending. Stage 5/SRR-03 is unstarted and SRR-03 remains OPEN.
+- **Boundary:** no Wave 2+ implementation; PR #172 remains draft/unmerged. Resume only after an explicit accepted mechanism resolves both SEC-1 gaps.
+
+### Wave 1 Stage 3 JOB-ACTIONS — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Scope:** accepted D-JA-1 only — additive `action_manual_retry()`/`action_cancel(reason)` with exact state, role, reason, audit, and no-bypass contracts.
+- **Checks:** new model and nine-method focused test source compile; packet allowlist and forbidden-core-edit guards reviewed. No Odoo runtime claim.
+- **SEC-1 seam:** Stage 3 intentionally contains no `sudo()`; Stage 4 must elevate only these two existing write sites while retaining the same behavior and tests.
+- **Boundaries:** no Area 6 scan/cron/domain trigger, Task 012, UI, inventory, fulfillment, export, or Layer 2 work.
+- **Next:** Stage 4 SEC-1 on the same branch/PR, then exact-head Odoo.sh and SRR-03 runtime proof. SRR-03 remains OPEN; Wave 2 unauthorized.
+
+### Wave 1 hard-stop after LC-1 — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Completed:** Stage 1 CORE-R1 reconciliation (`366198a`); Stage 2 LC-1 implementation through head `ac7d749`; syntax checks green, Odoo.sh pending.
+- **Hard-stop:** condition 9 before Stage 3. LC-1's accepted `original_job_type` audit identity is absent from SEC-1 D-SEC1-2's exact protected-field set. With current ACL write bits and ORM-level readonly semantics, implementing SEC-1 verbatim would leave direct generic mutation possible.
+- **Recommended ruling:** add `original_job_type` to D-SEC1-2 and its direct-write negative matrix; `shopify_connector_job.py` is already an allowed SEC-1 file. Do not resume without explicit control-room authorization.
+- **Unstarted:** JOB-ACTIONS, SEC-1, SRR-03 closure runtime, and every Wave 2+ domain. SRR-03 remains OPEN.
+- **Runtime:** no Odoo.sh Wave 1 build; no completion claim.
+
+### Task LC-1 implementation — compact handoff (2026-07-15)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 → `mvp/program-integration`.
+- **Scope:** Wave 1 Stage 2 only — accepted DEC-030 lifecycle/uninstall implementation; no later-wave domain.
+- **Implemented:** historic-domain job sink, original-type preservation/backfill, audited non-terminal cancellation, terminal history retyping, product/customer selection-removal callables, fail-closed dispatcher, focused lifecycle tests, version bumps.
+- **Runtime:** exact-head Odoo.sh install/upgrade/uninstall/reinstall and full-suite matrix pending; no pass claimed.
+- **Data posture:** disable-first preferred; business/core audit history preserved; domain bindings/mappings export/re-derived after physical uninstall.
+- **Next:** Stage 3 JOB-ACTIONS on the same draft PR; SRR-03 remains OPEN; Wave 2 unauthorized.
+
 ### Wave 1 gate normalization — compact handoff (2026-07-15)
 
 - **Branch / PR:** `claude/wave-1-gate-normalization-e7uw4v`, head `e0762f3784a32c08f103992ed9027a7b183b52b8`; PR [#171](https://github.com/AdamsOdoo/Adams/pull/171) → `mvp/program-integration`, docs-only.

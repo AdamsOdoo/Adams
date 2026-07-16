@@ -1,9 +1,31 @@
+from odoo import fields
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
 
 class TestCustomerBinding(TransactionCase):
+
+    EXPECTED_PROTECTED_FIELDS = frozenset((
+        'store_id',
+        'shopify_gid',
+        'partner_id',
+        'status',
+        'match_key',
+        'matched_by_uid',
+        'matched_at',
+        'override_uid',
+        'override_at',
+        'override_previous_candidate',
+        'shopify_display_name',
+        'shopify_email_snapshot',
+        'shopify_phone_snapshot',
+        'shopify_last_imported_at',
+    ))
+    AUTOMATIC_FIELDS = frozenset((
+        'id', 'display_name', 'create_uid', 'create_date',
+        'write_uid', 'write_date',
+    ))
 
     @classmethod
     def setUpClass(cls):
@@ -120,60 +142,143 @@ class TestCustomerBinding(TransactionCase):
         self.assertEqual(binding.status, 'active')
 
     # ------------------------------------------------------------------
-    # 4. Access matrix: auditor read-only; operator read/create;
-    # reviewer read/write; admin full (read/write/create).
+    # 4. Effective matrix after SEC-1: reads remain ACL-governed; all
+    # connector-owned stored fields are service-maintained and protected.
     # ------------------------------------------------------------------
 
     def test_access_matrix_across_four_groups(self):
-        partner_e = self._make_partner('Partner E')
-        binding_as_admin = self.CustomerBinding.with_user(
-            self.user_admin
-        ).create({
+        partner = self._make_partner('Partner E')
+        binding = self.CustomerBinding.sudo().create({
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Customer/7',
-            'partner_id': partner_e.id,
+            'partner_id': partner.id,
         })
 
-        # Auditor: read-only.
-        auditor_view = self.CustomerBinding.with_user(self.user_auditor)
-        auditor_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        with self.assertRaises(AccessError):
-            auditor_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/Customer/8',
-                'partner_id': self._make_partner('Partner F').id,
-            })
-        with self.assertRaises(AccessError):
-            auditor_view.browse(binding_as_admin.id).write(
-                {'shopify_display_name': 'Auditor Write'}
-            )
+        for index, (label, user) in enumerate((
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ), start=8):
+            view = self.CustomerBinding.with_user(user)
+            view.browse(binding.id).read(['shopify_gid'])
+            with self.assertRaises(AccessError, msg=label):
+                view.create({
+                    'store_id': self.store.id,
+                    'shopify_gid': 'gid://shopify/Customer/%d' % index,
+                    'partner_id': self._make_partner(
+                        'Protected Create %s' % label
+                    ).id,
+                })
 
-        # Operator: read + create, no write.
-        operator_view = self.CustomerBinding.with_user(self.user_operator)
-        operator_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        operator_created = operator_view.create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/Customer/9',
-            'partner_id': self._make_partner('Partner G').id,
-        })
-        with self.assertRaises(AccessError):
-            operator_view.browse(binding_as_admin.id).write(
-                {'shopify_display_name': 'Operator Write'}
-            )
+        for label, user in (
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ):
+            with self.assertRaises(AccessError, msg=label):
+                binding.with_user(user).write({
+                    'shopify_display_name': '%s Write' % label,
+                })
 
-        # Reviewer: read + write, no create.
-        reviewer_view = self.CustomerBinding.with_user(self.user_reviewer)
-        reviewer_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        reviewer_view.browse(operator_created.id).write(
-            {'shopify_display_name': 'Reviewer Write'}
+    def _audit_counts(self):
+        jobs = self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'core_manual_maintenance'),
+        ])
+        return (
+            len(jobs),
+            self.env['shopify.connector.job.log'].search_count([
+                ('job_id', 'in', jobs.ids),
+            ]),
         )
-        with self.assertRaises(AccessError):
-            reviewer_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/Customer/10',
-                'partner_id': self._make_partner('Partner H').id,
-            })
 
-        # Admin: full (read/write/create), proven by the create above and:
-        binding_as_admin.write({'shopify_display_name': 'Admin Write'})
-        self.assertEqual(binding_as_admin.shopify_display_name, 'Admin Write')
+    def test_exact_stored_field_classification_and_protected_set(self):
+        self.assertEqual(
+            self.CustomerBinding._protected_binding_fields(),
+            self.EXPECTED_PROTECTED_FIELDS,
+        )
+        stored_fields = {
+            name
+            for name, field in self.CustomerBinding._fields.items()
+            if field.store and name not in self.AUTOMATIC_FIELDS
+        }
+        self.assertEqual(stored_fields, self.EXPECTED_PROTECTED_FIELDS)
+        self.assertFalse(self.CustomerBinding._fields[
+            'pii_snapshot_masked'
+        ].store)
+
+    def test_complete_protected_surface_denies_create_alter_and_clear(self):
+        partner = self._make_partner('Protected Surface Current')
+        other_partner = self._make_partner('Protected Surface Target')
+        other_store = self.env['shopify.connector.store'].create({
+            'name': 'Protected Customer Target Store',
+            'shop_domain': 'protected-customer-target.myshopify.com',
+            'api_version': '2026-07',
+        })
+        binding = self.CustomerBinding.sudo().create({
+            'store_id': other_store.id,
+            'shopify_gid': 'gid://shopify/Customer/ProtectedSurface',
+            'partner_id': partner.id,
+            'status': 'active',
+            'match_key': 'email',
+            'matched_by_uid': self.user_admin.id,
+            'matched_at': '2000-01-01 00:00:00',
+            'override_uid': self.user_reviewer.id,
+            'override_at': '2000-01-02 00:00:00',
+            'override_previous_candidate': 'res.partner,1',
+            'shopify_display_name': 'Original customer',
+            'shopify_email_snapshot': 'original@example.invalid',
+            'shopify_phone_snapshot': '+971500000001',
+            'shopify_last_imported_at': '2000-01-03 00:00:00',
+        })
+        attempted_values = {
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Customer/Forged',
+            'partner_id': other_partner.id,
+            'status': 'manually_overridden',
+            'match_key': 'manual',
+            'matched_by_uid': self.user_reviewer.id,
+            'matched_at': fields.Datetime.now(),
+            'override_uid': self.user_admin.id,
+            'override_at': fields.Datetime.now(),
+            'override_previous_candidate': 'res.partner,999',
+            'shopify_display_name': 'Forged customer',
+            'shopify_email_snapshot': 'forged@example.invalid',
+            'shopify_phone_snapshot': '+971509999999',
+            'shopify_last_imported_at': fields.Datetime.now(),
+        }
+        self.assertEqual(
+            frozenset(attempted_values),
+            self.EXPECTED_PROTECTED_FIELDS,
+        )
+        audit_before = self._audit_counts()
+        roles = (
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        )
+        for label, user in roles:
+            model = self.CustomerBinding.with_user(user)
+            for field_name, attempted in attempted_values.items():
+                with self.assertRaises(
+                    AccessError, msg=(label, field_name, 'create'),
+                ):
+                    model.create({field_name: attempted})
+                before = binding.sudo().read([field_name])[0][field_name]
+                for value, operation in (
+                    (attempted, 'alter'),
+                    (False, 'clear'),
+                ):
+                    with self.assertRaises(
+                        AccessError, msg=(label, field_name, operation),
+                    ):
+                        binding.with_user(user).write({field_name: value})
+                    binding.invalidate_recordset([field_name])
+                    self.assertEqual(
+                        binding.sudo().read([field_name])[0][field_name],
+                        before,
+                        msg=(label, field_name, operation),
+                    )
+        self.assertEqual(self._audit_counts(), audit_before)

@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ShopifyConnectorProductTemplateBinding(models.Model):
@@ -53,6 +53,20 @@ class ShopifyConnectorProductTemplateBinding(models.Model):
     # merchant-replaced image (current checksum differs) is never
     # overwritten. Updated only after a successful connector write.
     shopify_image_checksum = fields.Char(readonly=True)
+
+    def _odoo_binding_field_name(self):
+        return 'product_template_id'
+
+    @api.model
+    def _additional_protected_binding_fields(self):
+        return super()._additional_protected_binding_fields() | frozenset((
+            'shopify_title',
+            'shopify_status',
+            'shopify_primary_image_url',
+            'shopify_last_imported_at',
+            'shopify_updated_at',
+            'shopify_image_checksum',
+        ))
 
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',

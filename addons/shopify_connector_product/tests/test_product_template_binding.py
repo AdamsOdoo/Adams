@@ -1,9 +1,35 @@
-from odoo.exceptions import AccessError
+from unittest.mock import patch
+
+from odoo import fields
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
 
 class TestProductTemplateBinding(TransactionCase):
+
+    EXPECTED_PROTECTED_FIELDS = frozenset((
+        'store_id',
+        'shopify_gid',
+        'product_template_id',
+        'status',
+        'match_key',
+        'matched_by_uid',
+        'matched_at',
+        'override_uid',
+        'override_at',
+        'override_previous_candidate',
+        'shopify_title',
+        'shopify_status',
+        'shopify_primary_image_url',
+        'shopify_last_imported_at',
+        'shopify_updated_at',
+        'shopify_image_checksum',
+    ))
+    AUTOMATIC_FIELDS = frozenset((
+        'id', 'display_name', 'create_uid', 'create_date',
+        'write_uid', 'write_date',
+    ))
 
     @classmethod
     def setUpClass(cls):
@@ -120,60 +146,164 @@ class TestProductTemplateBinding(TransactionCase):
         self.assertEqual(binding.status, 'active')
 
     # ------------------------------------------------------------------
-    # 4. Access matrix: auditor read-only; operator read/create;
-    # reviewer read/write; admin full (read/write/create).
+    # 4. Effective matrix after SEC-1: reads remain ACL-governed; all
+    # connector-owned stored fields are service-maintained and protected.
     # ------------------------------------------------------------------
 
     def test_access_matrix_across_four_groups(self):
         template = self._make_template('Template E')
-        binding_as_admin = self.TemplateBinding.with_user(
-            self.user_admin
-        ).create({
+        binding = self.TemplateBinding.sudo().create({
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Product/7',
             'product_template_id': template.id,
         })
 
-        # Auditor: read-only.
-        auditor_view = self.TemplateBinding.with_user(self.user_auditor)
-        auditor_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        with self.assertRaises(AccessError):
-            auditor_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/Product/8',
-                'product_template_id': self._make_template('Template F').id,
-            })
-        with self.assertRaises(AccessError):
-            auditor_view.browse(binding_as_admin.id).write(
-                {'shopify_title': 'Auditor Write'}
-            )
+        for index, (label, user) in enumerate((
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ), start=8):
+            view = self.TemplateBinding.with_user(user)
+            view.browse(binding.id).read(['shopify_gid'])
+            with self.assertRaises(AccessError, msg=label):
+                view.create({
+                    'store_id': self.store.id,
+                    'shopify_gid': 'gid://shopify/Product/%d' % index,
+                    'product_template_id': self._make_template(
+                        'Protected Create %s' % label
+                    ).id,
+                })
 
-        # Operator: read + create, no write.
-        operator_view = self.TemplateBinding.with_user(self.user_operator)
-        operator_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        operator_created = operator_view.create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/Product/9',
-            'product_template_id': self._make_template('Template G').id,
-        })
-        with self.assertRaises(AccessError):
-            operator_view.browse(binding_as_admin.id).write(
-                {'shopify_title': 'Operator Write'}
-            )
+        for label, user in (
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        ):
+            with self.assertRaises(AccessError, msg=label):
+                binding.with_user(user).write({
+                    'shopify_title': '%s Write' % label,
+                })
 
-        # Reviewer: read + write, no create.
-        reviewer_view = self.TemplateBinding.with_user(self.user_reviewer)
-        reviewer_view.browse(binding_as_admin.id).read(['shopify_gid'])
-        reviewer_view.browse(operator_created.id).write(
-            {'shopify_title': 'Reviewer Write'}
+    def _audit_counts(self):
+        jobs = self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'core_manual_maintenance'),
+        ])
+        return (
+            len(jobs),
+            self.env['shopify.connector.job.log'].search_count([
+                ('job_id', 'in', jobs.ids),
+            ]),
         )
-        with self.assertRaises(AccessError):
-            reviewer_view.create({
-                'store_id': self.store.id,
-                'shopify_gid': 'gid://shopify/Product/10',
-                'product_template_id': self._make_template('Template H').id,
-            })
 
-        # Admin: full (read/write/create), proven by the create above and:
-        binding_as_admin.write({'shopify_title': 'Admin Write'})
-        self.assertEqual(binding_as_admin.shopify_title, 'Admin Write')
+    def test_exact_stored_field_classification_and_protected_set(self):
+        self.assertEqual(
+            self.TemplateBinding._protected_binding_fields(),
+            self.EXPECTED_PROTECTED_FIELDS,
+        )
+        stored_fields = {
+            name
+            for name, field in self.TemplateBinding._fields.items()
+            if field.store and name not in self.AUTOMATIC_FIELDS
+        }
+        self.assertEqual(stored_fields, self.EXPECTED_PROTECTED_FIELDS)
+
+    def test_future_stored_field_omission_fails_closed(self):
+        binding = self.TemplateBinding.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/FutureContract',
+            'product_template_id': self._make_template(
+                'Future Contract'
+            ).id,
+        })
+        incomplete = (
+            self.TemplateBinding._additional_protected_binding_fields()
+            - {'shopify_title'}
+        )
+        with patch.object(
+            type(self.TemplateBinding),
+            '_additional_protected_binding_fields',
+            return_value=incomplete,
+        ):
+            with self.assertRaises(UserError):
+                binding.sudo().write({})
+
+    def test_complete_protected_surface_denies_create_alter_and_clear(self):
+        template = self._make_template('Protected Surface Current')
+        other_template = self._make_template('Protected Surface Target')
+        other_store = self.env['shopify.connector.store'].create({
+            'name': 'Protected Surface Target Store',
+            'shop_domain': 'protected-template-target.myshopify.com',
+            'api_version': '2026-07',
+        })
+        binding = self.TemplateBinding.sudo().create({
+            'store_id': other_store.id,
+            'shopify_gid': 'gid://shopify/Product/ProtectedSurface',
+            'product_template_id': template.id,
+            'status': 'active',
+            'match_key': 'sku_reference',
+            'matched_by_uid': self.user_admin.id,
+            'matched_at': '2000-01-01 00:00:00',
+            'override_uid': self.user_reviewer.id,
+            'override_at': '2000-01-02 00:00:00',
+            'override_previous_candidate': 'product.template,1',
+            'shopify_title': 'Original title',
+            'shopify_status': 'active',
+            'shopify_primary_image_url': 'https://example.invalid/original',
+            'shopify_last_imported_at': '2000-01-03 00:00:00',
+            'shopify_updated_at': '2026-07-16T00:00:00Z',
+            'shopify_image_checksum': 'original-checksum',
+        })
+        attempted_values = {
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/Forged',
+            'product_template_id': other_template.id,
+            'status': 'manually_overridden',
+            'match_key': 'manual',
+            'matched_by_uid': self.user_reviewer.id,
+            'matched_at': fields.Datetime.now(),
+            'override_uid': self.user_admin.id,
+            'override_at': fields.Datetime.now(),
+            'override_previous_candidate': 'product.template,999',
+            'shopify_title': 'Forged title',
+            'shopify_status': 'archived',
+            'shopify_primary_image_url': 'https://example.invalid/forged',
+            'shopify_last_imported_at': fields.Datetime.now(),
+            'shopify_updated_at': '2026-07-17T00:00:00Z',
+            'shopify_image_checksum': 'forged-checksum',
+        }
+        self.assertEqual(
+            frozenset(attempted_values),
+            self.EXPECTED_PROTECTED_FIELDS,
+        )
+        audit_before = self._audit_counts()
+        roles = (
+            ('auditor', self.user_auditor),
+            ('operator', self.user_operator),
+            ('reviewer', self.user_reviewer),
+            ('admin', self.user_admin),
+        )
+        for label, user in roles:
+            model = self.TemplateBinding.with_user(user)
+            for field_name, attempted in attempted_values.items():
+                with self.assertRaises(
+                    AccessError, msg=(label, field_name, 'create'),
+                ):
+                    model.create({field_name: attempted})
+                before = binding.sudo().read([field_name])[0][field_name]
+                for value, operation in (
+                    (attempted, 'alter'),
+                    (False, 'clear'),
+                ):
+                    with self.assertRaises(
+                        AccessError, msg=(label, field_name, operation),
+                    ):
+                        binding.with_user(user).write({field_name: value})
+                    binding.invalidate_recordset([field_name])
+                    self.assertEqual(
+                        binding.sudo().read([field_name])[0][field_name],
+                        before,
+                        msg=(label, field_name, operation),
+                    )
+        self.assertEqual(self._audit_counts(), audit_before)

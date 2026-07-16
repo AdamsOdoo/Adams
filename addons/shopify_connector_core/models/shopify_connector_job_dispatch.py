@@ -137,7 +137,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
     Every write path here goes through `shopify.connector.job`'s own
     `write()`/state-transition-helper methods and
     `job.log._system_append()` -- no second job-log write path, no
-    direct `job.log.create()` call, no `sudo()`, no live Shopify API
+    direct `job.log.create()` call, and no live Shopify API
     call anywhere in this file.
     """
 
@@ -453,7 +453,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         `_transition_failed_retryable()` helper, logged exclusively
         through `_system_append()`) rather than silently remaining
         `queued`/`retry_waiting` forever. This does not bypass or weaken
-        either gate: `job.write()` itself still raises exactly as
+        either gate: the sanctioned protected write still raises exactly as
         before -- this only makes an already-blocked start observable,
         as a configuration/state problem an operator can correct and
         retry later (the same DEC-009 "manual fix then retry" class
@@ -466,7 +466,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
         try:
-            job.write({
+            job.sudo().write({
                 'state': 'running',
                 'started_at': job.started_at or fields.Datetime.now(),
             })
@@ -497,6 +497,20 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         9). A job whose `job_type` has no registered handler fails
         safely (never hangs, never silently drops).
         """
+        if job.job_type == 'historic_domain_job':
+            # LC-1 / DEC-030: this permanent sink has no handler by design.
+            # The ondelete conversion leaves only terminal rows, but a
+            # directly-created/malformed non-terminal row must still fail
+            # closed instead of falling into any future domain handler.
+            job._transition_failed_final(
+                error_class='unknown_system_error',
+                message=(
+                    'Historic domain jobs are audit-only and cannot be '
+                    'dispatched.'
+                ),
+            )
+            return
+
         store = job.store_id
         store.invalidate_recordset()
         if (
@@ -554,7 +568,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
-        job.write({
+        job.sudo().write({
             'state': 'succeeded', 'finished_at': fields.Datetime.now(),
         })
         JobLog._system_append(

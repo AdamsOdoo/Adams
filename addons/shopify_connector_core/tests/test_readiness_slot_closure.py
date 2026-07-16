@@ -447,9 +447,9 @@ class TestReadinessSlotClosure(TransactionCase):
                     for banned in forbidden_names:
                         self.assertNotIn(banned, lowered)
 
-    def test_source_level_single_named_sudo_in_readiness_helper(self):
-        """The task's one new sudo lives only in `_drain_cron_active_state`
-        -- exactly one `.sudo()` call site in the readiness model."""
+    def test_source_level_sec1_sudo_inventory_in_readiness(self):
+        """SEC-1 adds protected job create/final-write elevation to
+        run_for_store; CORE-R1 retains the one cron-read elevation."""
         tree = self._readiness_source_tree()
         sudo_methods = []
         for node in ast.walk(tree):
@@ -462,13 +462,14 @@ class TestReadinessSlotClosure(TransactionCase):
                     and inner.func.attr == 'sudo'
                 ):
                     sudo_methods.append(node.name)
-        self.assertEqual(sudo_methods, ['_drain_cron_active_state'])
+        self.assertEqual(
+            sudo_methods,
+            ['run_for_store', 'run_for_store', '_drain_cron_active_state'],
+        )
 
-    def test_source_level_store_change_is_only_the_health_write(self):
-        """The store-model diff is exactly the D-R1-5
-        api_health_state='normal' write: the healthy write is present
-        once, the degraded fall-forward write is untouched, and the file
-        introduces no sudo call site."""
+    def test_source_level_store_health_and_sec1_sudo_inventory(self):
+        """CORE-R1's health write remains singular while SEC-1 adds only
+        the eight named store-side protected job writer elevations."""
         path = os.path.join(
             self._models_dir(), 'shopify_connector_store.py'
         )
@@ -485,4 +486,4 @@ class TestReadinessSlotClosure(TransactionCase):
                 and node.func.attr == 'sudo'
             )
         ]
-        self.assertEqual(sudo_calls, [])
+        self.assertEqual(len(sudo_calls), 8)

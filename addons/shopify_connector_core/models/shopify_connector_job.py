@@ -1,5 +1,5 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 # Shared with shopify_connector_job_log.py (from_state/to_state) so the two
 # models can never drift apart on the job state vocabulary (DEC-009).
@@ -17,6 +17,37 @@ JOB_STATE_SELECTION = [
 ]
 
 TERMINAL_JOB_STATES = ('succeeded', 'failed_final', 'skipped', 'cancelled')
+
+# SEC-1 D-SEC1-1/D-SEC1-2: correctness and permission invariants enforced
+# server-side for every caller. Context flags are intentionally not accepted.
+LEGAL_JOB_TRANSITIONS = {
+    'draft': frozenset(('queued', 'cancelled', 'failed_retryable')),
+    'queued': frozenset((
+        'running', 'cancelled', 'failed_retryable', 'retry_waiting',
+        'failed_final', 'blocked_manual_review',
+    )),
+    'running': frozenset((
+        'succeeded', 'failed_final', 'skipped', 'retry_waiting',
+        'failed_retryable', 'blocked_manual_review', 'cancelled',
+    )),
+    'retry_waiting': frozenset((
+        'running', 'cancelled', 'failed_retryable', 'failed_final',
+        'blocked_manual_review',
+    )),
+    'failed_retryable': frozenset(('queued', 'cancelled')),
+    'failed_final': frozenset(('queued',)),
+    'blocked_manual_review': frozenset(('queued', 'cancelled')),
+    'skipped': frozenset(('queued',)),
+    'succeeded': frozenset(),
+    'cancelled': frozenset(),
+}
+
+PROTECTED_JOB_FIELDS = frozenset((
+    'state', 'retry_count', 'error_class', 'manual_review_subreason',
+    'payload_hash', 'res_model', 'res_id', 'shopify_target_gid', 'job_type',
+    'original_job_type', 'job_source', 'trigger_origin', 'next_retry_at',
+    'started_at', 'finished_at', 'superseded_by_job_id', 'cancel_reason',
+))
 
 # The Task 005 / DEC-022 §4.2 business-job source subset: job_source
 # values representing business sync/write work, subject to store-state
@@ -106,6 +137,9 @@ class ShopifyConnectorJob(models.Model):
             ('core_readiness_check', 'Core Readiness Check'),
             ('core_manual_maintenance', 'Core Manual Maintenance'),
             ('core_test_connection', 'Core Test Connection'),
+            # LC-1 / DEC-030: permanent core-owned sink for jobs whose
+            # domain selection value is removed during supported uninstall.
+            ('historic_domain_job', 'Historic Domain Job'),
             # Task 006C / Decision F (gate-opening proposal §6):
             # core/diagnostic-only, reserved solely for the dispatcher's
             # own registry/dispatch self-tests (shopify_connector_job_
@@ -117,6 +151,11 @@ class ShopifyConnectorJob(models.Model):
         index=True,
         readonly=True,
     )
+    # LC-1 / DEC-030: set once at creation and deliberately not computed
+    # from job_type, so domain uninstall can retype the row without losing
+    # the original domain identity used for audit and later querying.
+    original_job_type = fields.Char(index=True, readonly=True)
+
     state = fields.Selection(
         selection=JOB_STATE_SELECTION,
         required=True,
@@ -216,8 +255,22 @@ class ShopifyConnectorJob(models.Model):
         exempt: they exist to determine connection/readiness state, so
         gating them on `connected` would be circular.
         """
+        vals_list = [dict(vals) for vals in vals_list]
+        if not self.env.su:
+            protected = sorted(set().union(
+                *(set(vals) & PROTECTED_JOB_FIELDS for vals in vals_list)
+            ))
+            if protected:
+                raise AccessError(
+                    "Protected Shopify job fields cannot be supplied through "
+                    "generic create(). Use the sanctioned enqueue or core "
+                    "service. Protected fields: %s" % ', '.join(protected)
+                )
         Store = self.env['shopify.connector.store']
         for vals in vals_list:
+            # Never trust an RPC-supplied historic identity: the immutable
+            # snapshot is always the effective job_type at creation.
+            vals['original_job_type'] = vals.get('job_type')
             if self._is_business_job_source(vals.get('job_source')):
                 store = Store.browse(vals.get('store_id')).exists()
                 if not store or store.state != 'connected':
@@ -228,6 +281,74 @@ class ShopifyConnectorJob(models.Model):
                         )
                     )
         return super().create(vals_list)
+
+    def _reassign_to_historic_job_type(self):
+        """Preserve jobs when a domain module removes its selection value.
+
+        Odoo calls this method from each domain job type's ``selection_add``
+        ``ondelete`` callback. Non-terminal work is cancelled first through
+        the current sanctioned state-write path and receives exactly one
+        auditable manual-action log entry; terminal work is only retyped.
+        No job or log row is unlinked.
+        """
+        reason = (
+            'Domain capability uninstalled; job preserved as historic '
+            'connector history.'
+        )
+        for job in self:
+            original_job_type = job.original_job_type or job.job_type
+            if job.state not in TERMINAL_JOB_STATES:
+                from_state = job.state
+                job.sudo().write({
+                    'state': 'cancelled',
+                    'cancel_reason': reason,
+                    'finished_at': fields.Datetime.now(),
+                    'manual_review_subreason': False,
+                })
+                job._log_transition(
+                    'manual_action',
+                    'Job cancelled during domain uninstall; original job '
+                    'type %r is preserved.' % original_job_type,
+                    from_state=from_state,
+                    to_state='cancelled',
+                )
+            values = {'job_type': 'historic_domain_job'}
+            if not job.original_job_type:
+                values['original_job_type'] = original_job_type
+            job.sudo().write(values)
+        return True
+
+    def action_resolve_manual_review(self):
+        self.ensure_one()
+        if not (
+            self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_reviewer'
+            )
+            or self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            )
+        ):
+            raise AccessError(
+                "Only a Shopify Connector Reviewer or Administrator may "
+                "resolve a manual-review job."
+            )
+        if self.state != 'blocked_manual_review':
+            raise UserError(
+                "Only a blocked_manual_review job can be resolved."
+            )
+        from_state = self.state
+        self.sudo().write({
+            'state': 'queued',
+            'manual_review_subreason': False,
+            'finished_at': False,
+        })
+        self._log_transition(
+            'manual_action',
+            'Manual review resolved by actor_uid=%d.' % self.env.uid,
+            from_state=from_state,
+            to_state='queued',
+        )
+        return True
 
     def write(self, vals):
         """Execution/start-time gating (Task 005 / DEC-022 §4.2, plus
@@ -257,6 +378,25 @@ class ShopifyConnectorJob(models.Model):
         every job_type shipped in this file maps to no flag today, so it
         is a no-op unless/until a future domain module registers one.
         """
+        protected = sorted(set(vals) & PROTECTED_JOB_FIELDS)
+        if protected and not self.env.su:
+            raise AccessError(
+                "Protected Shopify job fields can only be changed through "
+                "a sanctioned connector action or service. Protected fields: "
+                "%s" % ', '.join(protected)
+            )
+        if 'state' in vals:
+            to_state = vals['state']
+            for job in self:
+                if to_state != job.state and to_state not in (
+                    LEGAL_JOB_TRANSITIONS.get(job.state, frozenset())
+                ):
+                    raise ValidationError(
+                        "Illegal Shopify job transition: %s -> %s." % (
+                            job.state, to_state,
+                        )
+                    )
+
         if vals.get('state') == 'running':
             Store = self.env['shopify.connector.store']
             Settings = self.env['shopify.connector.store.settings']
@@ -369,7 +509,8 @@ class ShopifyConnectorJob(models.Model):
     # (+ error_class/manual_review_subreason/finished_at as applicable)
     # in a single write() call, then logs it exclusively through the
     # existing sanctioned `job.log._system_append()` path -- no direct
-    # `job.log.create()` call, no `sudo()`.
+    # `job.log.create()` call. SEC-1 elevates only each protected write;
+    # transition logging retains the original caller environment.
     # ------------------------------------------------------------------
 
     def _log_transition(
@@ -390,7 +531,7 @@ class ShopifyConnectorJob(models.Model):
         (`shopify_connector_job_dispatch.py`)."""
         self.ensure_one()
         from_state = self.state
-        self.write({
+        self.sudo().write({
             'state': 'retry_waiting',
             'error_class': error_class,
             'next_retry_at': next_retry_at,
@@ -410,7 +551,7 @@ class ShopifyConnectorJob(models.Model):
         future retry attempt."""
         self.ensure_one()
         from_state = self.state
-        self.write({
+        self.sudo().write({
             'state': 'failed_retryable',
             'error_class': error_class,
             'finished_at': fields.Datetime.now(),
@@ -444,7 +585,7 @@ class ShopifyConnectorJob(models.Model):
         }
         if retry_count:
             vals['retry_count'] = retry_count
-        self.write(vals)
+        self.sudo().write(vals)
         self._log_transition(
             'state_change', message, technical_detail=technical_detail,
             from_state=from_state, to_state='failed_final',
@@ -460,7 +601,7 @@ class ShopifyConnectorJob(models.Model):
         constraint requires."""
         self.ensure_one()
         from_state = self.state
-        self.write({
+        self.sudo().write({
             'state': 'blocked_manual_review',
             'error_class': error_class,
             'manual_review_subreason': manual_review_subreason,
@@ -479,7 +620,7 @@ class ShopifyConnectorJob(models.Model):
         race)."""
         self.ensure_one()
         from_state = self.state
-        self.write({
+        self.sudo().write({
             'state': 'skipped',
             'finished_at': fields.Datetime.now(),
         })

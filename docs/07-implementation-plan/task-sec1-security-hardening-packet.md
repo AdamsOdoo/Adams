@@ -34,6 +34,91 @@
 > safety comes from the fixed comodel plus the existence/company/
 > uniqueness checks (D-SEC1-4/7).**
 
+## Binding product-owner execution clarification (PR #172 comment `4982750956`)
+
+This clarification is binding for Stage 4 and closes the pre-implementation
+hard-stop without changing architecture or MVP scope.
+
+**Audit carrier.** D-SEC1-4 binding overrides and D-SEC1-6 PII masking reuse
+the existing
+`shopify.connector.store._create_lifecycle_audit_job(message)` helper. No
+new audit model/table, job type, job source, or orphan job-log path is
+permitted. SEC-1 narrowly applies `sudo()` only to that helper's protected job
+`create()` and terminal `write()`; the Store/helper and
+`shopify.connector.job.log._system_append()` retain the original caller
+environment so `actor_uid` remains the caller. The binding/PII mutation is
+performed first and the audit helper is called afterward in the same
+transaction, so audit failure rolls the mutation back. Each binding override
+and manual mask produces exactly one carrier/log. A scheduled retention sweep
+processes per store and produces exactly one summary carrier/log per affected
+store. Messages contain identifiers, counts, actor id, and mandatory reason
+only, after redaction — never raw PII, credentials, headers, tokens, or
+payload values.
+
+**Current-company rule.** No `company_id` is added to the store. The current
+bound record and proposed target are resolved in the seam's fixed comodel under
+the caller's normal environment before any sudo. Where `company_id` exists,
+every non-empty company must equal `self.env.company`; when both current and
+target companies are non-empty they must also equal each other. Records without
+a company field or with a false company remain valid. A mismatch raises
+`UserError` before mutation/audit. The method accepts no caller-supplied
+model or company argument and must not use `env.companies` or
+`create_uid.company_id`.
+
+**Required focused proof.** Same-company and company-neutral success; current
+and target company mismatch refusal; no write/audit on every refusal; exactly
+one carrier/log per action or affected store; original `actor_uid`; redacted,
+identifier/count/reason-only messages; atomic rollback on audit failure; and
+all earlier D-SEC1-7 coverage including `original_job_type`,
+`cancel_reason`, binding identity, PII, retention, transitions, and sanctioned
+writers.
+
+## Consolidated binding mutation-surface amendment (PR #172 comment `4988842625`)
+
+The product-owner ruling is a binding SEC-1 completeness correction, not a new
+architecture or scope expansion. Every connector-owned field on each current
+binding is classified as:
+
+1. identity/structural;
+2. system-maintained state, provenance, or imported snapshot;
+3. computed/non-stored; or
+4. intentionally user-editable configuration.
+
+Classes 1 and 2 are protected from generic non-su `create()` and `write()`,
+including attempts to clear a field. Class 3 is not a generic write surface.
+There are no accepted class-4 fields on the current product/customer binding
+surface. Odoo's automatic access-log fields remain ORM-maintained.
+
+The common protected set is `store_id`, `shopify_gid`, the concrete
+`_odoo_binding_field_name()` field, `status`, `match_key`, `matched_by_uid`,
+`matched_at`, `override_uid`, `override_at`, and
+`override_previous_candidate`. Concrete additional protected sets are:
+
+- product template: `shopify_title`, `shopify_status`,
+  `shopify_primary_image_url`, `shopify_last_imported_at`,
+  `shopify_updated_at`, `shopify_image_checksum`;
+- product variant: `product_template_binding_id`, `shopify_option_values`,
+  `shopify_price_snapshot`, `shopify_compare_at_price_snapshot`,
+  `shopify_last_imported_at`, `shopify_primary_image_url`,
+  `shopify_image_checksum`;
+- customer: `shopify_display_name`, `shopify_email_snapshot`,
+  `shopify_phone_snapshot`, `shopify_last_imported_at`.
+
+`pii_snapshot_masked` is computed/non-stored. The mixin exposes exactly one
+`_additional_protected_binding_fields()` extension seam; each concrete binding
+declares its set without core hardcoding domain model names. A classification
+assertion fails closed on unknown protected names or any connector-owned stored
+field omitted from the protected union. Every future binding packet must
+classify each stored field, declare its concrete protected set, and add an
+exact-set test.
+
+The sanctioned-writer inventory remains limited to `action_override_binding()`,
+the product/customer importers, product stale handling, manual PII masking, and
+the retention sweep. The product importer requires two exact-site elevations
+for its pre-existing non-su existing-variant snapshot refresh and image
+ownership-checksum write. No public method, recordset, ACL, group, context
+bypass, model, table, job type, or job source is broadened.
+
 ## 1. The verified current exposure (facts, file:line)
 
 1. **[Fact]** `ir.model.access.csv` (core) grants `perm_write=1` on
@@ -85,30 +170,37 @@ webhook/OAuth surface.
 
 **D-SEC1-1 — Legal job transition matrix (server-enforced).** A
 module-level constant on the job model, exhaustive:
-`draft→queued`; `queued→running|cancelled`;
-`running→succeeded|failed_final|skipped|retry_waiting|failed_retryable|blocked_manual_review`;
-`retry_waiting→running|cancelled`;
-**`draft|queued|retry_waiting→failed_retryable` (the merged
-blocked-start routing — red-team-corrected 2026-07-11 round 2: the
-dispatcher's `_start_running` catches the gating `ValidationError`
-and routes a still-`queued`/`retry_waiting`/`draft` job to
-`failed_retryable` via `odoo_validation_configuration`,
-`shopify_connector_job_dispatch.py` lines 186–200, asserted green by
-`test_job_dispatch.py` lines 238–286 — a matrix without these edges
-would break the merged dispatcher and its suite)**;
+`draft→queued|cancelled|failed_retryable`;
+`queued→running|cancelled|failed_retryable|retry_waiting|failed_final|blocked_manual_review`;
+`running→succeeded|failed_final|skipped|retry_waiting|failed_retryable|blocked_manual_review|cancelled`;
+`retry_waiting→running|cancelled|failed_retryable|failed_final|blocked_manual_review`;
 `failed_retryable|failed_final|blocked_manual_review|skipped→queued`
-(manual retry — Area 6's allowed-from set, retry_count reset);
-non-terminal→`cancelled`. Everything else — including any
-terminal→terminal edge and any write that *skips* a state — is
-illegal. `write()` validates every `state` change against the matrix
-and raises `ValidationError` on violation **regardless of caller**
-(sudo included — the matrix is a correctness invariant, not a
-permission).
+(manual retry, with the sanctioned service resetting retry state).
+Everything else — including `draft→running`, `draft→retry_waiting`,
+terminal→terminal edges, and any write that skips a state — is illegal.
+`write()` validates every state change against the matrix and raises
+`ValidationError` on violation **regardless of caller** (sudo included
+— the matrix is a correctness invariant, not a permission).
+
+**Runtime-compatibility amendment (2026-07-16; product-owner ruling PR
+#172 comment `4984719237`).** The five recovery edges
+`queued→retry_waiting|failed_final|blocked_manual_review` and
+`retry_waiting→failed_final|blocked_manual_review` are required by the
+already-accepted CORE-R2 concurrency-recovery path. A genuine PostgreSQL
+concurrency failure rolls back the original transaction and its uncommitted
+`running` write. Recovery therefore re-locks the exact job in its committed
+claimable state (`queued` or due `retry_waiting`) and routes it once,
+without replaying the handler. Recovery must not manufacture `running`,
+weaken row locking or replay policy, or legalize either forbidden draft edge.
+Same-state `retry_waiting` updates continue through the existing
+no-state-change behavior.
 
 **D-SEC1-2 — Protected system fields require system context.** On
 `shopify.connector.job`, the protected set — `state`, `retry_count`,
 `error_class`, `manual_review_subreason`, `payload_hash`,
-`res_model`, `res_id`, `shopify_target_gid`, `job_type`, `job_source`,
+`res_model`, `res_id`, `shopify_target_gid`, `job_type`,
+**`original_job_type`** (LC-1's immutable audit identity; added by the
+product-owner ruling on PR #172, comment `4982429209`), `job_source`,
 `trigger_origin`, `next_retry_at`, `started_at`, `finished_at`,
 `superseded_by_job_id`, **`cancel_reason`** (added 2026-07-15, DEC-034
 Wave 1 reconciliation adversarial check: `cancel_reason` is the field
@@ -148,8 +240,11 @@ those exact sites elevated; without this, Test Connection / Activate
 reconciliation addition (DEC-034):** two further sanctioned internal
 protected-field writers are recognized by name — Task LC-1's
 `_reassign_to_historic_job_type()` (writes `state='cancelled'` on
-non-terminal jobs during historic-job conversion; lands
-Wave-1-Stage-2, before this packet) and Task JOB-ACTIONS's
+non-terminal jobs and writes `job_type='historic_domain_job'` while
+preserving/backfilling `original_job_type` during historic-job conversion;
+lands Wave-1-Stage-2, before this packet; PR #172 ruling
+`4982429209` confirms this remains one named sanctioned writer whose
+existing write sites alone receive the su elevation) and Task JOB-ACTIONS's
 `action_manual_retry()`/`action_cancel()` (land Wave-1-Stage-3, before
 this packet). Both already exist by the time this packet implements;
 both are elevated at their existing write sites (in
@@ -174,11 +269,12 @@ explicit group check (`has_group`), matrix-legal transition, audit
 log row with actor, then su-elevated write. No force/bypass parameter
 exists anywhere (merged invariant restated).
 
-**D-SEC1-4 — Binding identity immutability + audited override
+**D-SEC1-4 — Binding identity/structure/system-surface immutability + audited override
 (exact, RPC-safe contract — re-review `4945129824` item 6).** On the
-binding mixin: identity fields (`store_id`, `shopify_gid`, the
-per-model Odoo-record M2o, `match_key`) become su-protected exactly
-like D-SEC1-2.
+binding mixin, all class-1 identity/structural and class-2 system-maintained
+state/provenance/imported-snapshot fields become su-protected exactly like
+D-SEC1-2. The exact current sets are fixed by the consolidated amendment
+above.
 
 **Mixin seam.** The abstract mixin declares
 `_odoo_binding_field_name()` returning the name of the concrete
@@ -256,10 +352,12 @@ that declared comodel. It:
    Odoo-record field — all in one **su** write after the checks (the
    sanctioned sudo path).
 
-Snapshot fields stay ordinarily writable by the importer only (they
-are already `readonly=True` in UI; importer writes are su per
-D-SEC1-2's importer adjustment). Unlink stays denied for every group
-(existing posture).
+Snapshot fields remain writable only by sanctioned connector services; their
+`readonly=True` UI declaration is not relied upon for server-side security.
+Importer, stale, PII mask, retention, and override writes use only the exact
+protected-site elevation named in the writer inventory. Generic create/write
+of identity, structure, system state, provenance, and snapshots is denied for
+all four roles. Unlink stays denied for every group (existing posture).
 
 **D-SEC1-5 — Least-privilege PII snapshots.** The customer-binding
 PII fields (`shopify_email_snapshot`, `shopify_phone_snapshot`,
@@ -299,14 +397,26 @@ without inventing encryption (DEC-028 boundary respected).
 
 **D-SEC1-7 — Negative test matrix (the proof).** For each group
 (auditor/operator/reviewer/admin) × each protected surface: direct
-`write({'state': …})`, `write({'retry_count': …})`, **`write({'cancel_reason': …})`
-(added 2026-07-15, DEC-034 — proves the field `action_cancel()` writes
-cannot be forged/overwritten outside that sanctioned method)**, binding
+`write({'state': …})`, `write({'retry_count': …})`,
+**`write({'original_job_type': …})`** (for Auditor/Operator/Reviewer/Admin;
+added by the binding product-owner ruling on PR #172, comment
+`4982429209`, proving LC-1's preserved audit identity cannot be forged or
+overwritten outside the sanctioned historic conversion),
+**`write({'cancel_reason': …})`** (added 2026-07-15, DEC-034 — proves the
+field `action_cancel()` writes cannot be forged/overwritten outside that
+sanctioned method), binding
 `write({'shopify_gid': …})`, `write({'partner_id': …})`, job
 `create()` bypassing enqueue, `unlink()` everywhere, PII field read,
 masked-field read, each sanctioned method with and without the
 required group, matrix-illegal transitions via sanctioned methods,
-and a sudo-path regression (dispatcher/importer still function).
+and a sudo-path regression (dispatcher/importer still function). The binding
+matrix additionally covers every common and concrete protected field on all
+three current binding models, for all four roles, through individual generic
+`create()`, alter, and clear attempts. Each refusal proves no row change and no
+audit carrier/log. Exact protected-set and stored-field-classification
+assertions make omissions fail closed; the sanctioned product/customer
+importers, stale/review paths, override provenance/audit, manual mask, and
+retention sweep retain positive regressions.
 **`action_override_binding` negative RPC set (re-review `4947866018`
 item 6):** non-int / malformed `new_record_id`; a **non-existent id
 (absent from the declared comodel)** → reject (this replaces the
@@ -346,17 +456,19 @@ core-task rule, with the exhaustive allowlist below.
   `action_manual_retry()`/`action_cancel()` write sites only — DEC-034;
   no behavior change to either method)
 - `addons/shopify_connector_core/models/shopify_connector_binding_mixin.py`
-  (protected-field guard, `action_override_binding`, and the
-  `_odoo_binding_field_name()` seam defaulting to `False`)
+  (complete protected-field guard, fail-closed stored-field classification,
+  `action_override_binding`, `_odoo_binding_field_name()` defaulting to
+  `False`, and the reusable `_additional_protected_binding_fields()` seam)
 - the concrete-binding `_odoo_binding_field_name()` one-liners on the
   **three** models existing at this gate (corrected 2026-07-15,
   DEC-034 — the order-binding file does not exist and is removed from
   this allowlist; Task 012 declares its own seam in its own packet per
   the binding-extension contract):
   `addons/shopify_connector_product/models/shopify_connector_product_template_binding.py`
-  (`return 'product_template_id'`),
+  (`return 'product_template_id'` plus its exact additional protected set),
   `addons/shopify_connector_product/models/shopify_connector_product_variant_binding.py`
-  (`return 'product_variant_id'`) — one line each (the customer
+  (`return 'product_variant_id'` plus its exact additional protected set)
+  (the customer
   binding's is added with its PII change below)
 - `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`,
   `shopify_connector_job_enqueue.py`,
@@ -374,7 +486,7 @@ core-task rule, with the exhaustive allowlist below.
 - `addons/shopify_connector_sale/models/shopify_connector_customer_binding.py`
   (field `groups=` + masked compute + the two-line
   `_pii_snapshot_fields()` override + the `_odoo_binding_field_name()`
-  one-liner returning `partner_id`)
+  one-liner returning `partner_id` + its exact additional protected set)
 - `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py`
   (snapshot/binding-write su adjustment only — its binding-create
   sites set protected identity fields)
@@ -408,7 +520,11 @@ regressions + retention sweep (masking, summary log, append-only
 preserved) + `action_mask_customer_pii`.
 `test_pii_least_privilege.py` — field-groups enforcement per group;
 masked compute format; order-binding pattern note (activated with
-Task 012). All existing suites must stay green — in particular
+Task 012), Reviewer/Admin audited override proof, masking, and retention.
+The three current binding test files assert exact protected sets and exhaust
+all four roles × individual create/alter/clear attempts, including no-write/
+no-audit refusal and the fail-closed future-field contract. All existing
+suites must stay green — in particular
 Task 010/011 importer suites (su adjustments must not change
 behavior).
 

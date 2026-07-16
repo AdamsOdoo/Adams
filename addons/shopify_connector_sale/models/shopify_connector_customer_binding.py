@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ShopifyConnectorCustomerBinding(models.Model):
@@ -33,10 +33,85 @@ class ShopifyConnectorCustomerBinding(models.Model):
     # never a second source of truth for matching; matching always reads
     # the live incoming payload against res.partner.email via
     # partner_id, never these snapshots -- MBQ-55 §7.1.D).
-    shopify_display_name = fields.Char(readonly=True)
-    shopify_email_snapshot = fields.Char(readonly=True)
-    shopify_phone_snapshot = fields.Char(readonly=True)
+    shopify_display_name = fields.Char(
+        readonly=True,
+        groups=(
+            'shopify_connector_core.group_shopify_connector_reviewer,'
+            'shopify_connector_core.group_shopify_connector_admin'
+        ),
+    )
+    shopify_email_snapshot = fields.Char(
+        readonly=True,
+        groups=(
+            'shopify_connector_core.group_shopify_connector_reviewer,'
+            'shopify_connector_core.group_shopify_connector_admin'
+        ),
+    )
+    shopify_phone_snapshot = fields.Char(
+        readonly=True,
+        groups=(
+            'shopify_connector_core.group_shopify_connector_reviewer,'
+            'shopify_connector_core.group_shopify_connector_admin'
+        ),
+    )
+    pii_snapshot_masked = fields.Char(
+        compute='_compute_pii_snapshot_masked',
+        compute_sudo=True,
+    )
     shopify_last_imported_at = fields.Datetime(readonly=True)
+
+    def _odoo_binding_field_name(self):
+        return 'partner_id'
+
+    @api.model
+    def _additional_protected_binding_fields(self):
+        return super()._additional_protected_binding_fields() | frozenset((
+            'shopify_display_name',
+            'shopify_email_snapshot',
+            'shopify_phone_snapshot',
+            'shopify_last_imported_at',
+        ))
+
+    def _pii_snapshot_fields(self):
+        return [
+            'shopify_display_name',
+            'shopify_email_snapshot',
+            'shopify_phone_snapshot',
+        ]
+
+    @api.depends(
+        'shopify_display_name',
+        'shopify_email_snapshot',
+        'shopify_phone_snapshot',
+    )
+    def _compute_pii_snapshot_masked(self):
+        for binding in self:
+            email = binding.shopify_email_snapshot or ''
+            phone = binding.shopify_phone_snapshot or ''
+            display_name = binding.shopify_display_name or ''
+            if email and email != '***':
+                local, separator, domain = email.partition('@')
+                host, dot, suffix = domain.rpartition('.')
+                if separator and host:
+                    binding.pii_snapshot_masked = '%s***@%s***%s%s' % (
+                        local[:1] or '*',
+                        host[:1] or '*',
+                        dot,
+                        suffix,
+                    )
+                else:
+                    binding.pii_snapshot_masked = '%s***' % (
+                        email[:1] or '*',
+                    )
+            elif phone and phone != '***':
+                digits = ''.join(char for char in phone if char.isdigit())
+                binding.pii_snapshot_masked = '***%s' % digits[-2:]
+            elif display_name and display_name != '***':
+                binding.pii_snapshot_masked = '%s***' % display_name[:1]
+            elif email or phone or display_name:
+                binding.pii_snapshot_masked = '***'
+            else:
+                binding.pii_snapshot_masked = False
 
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',

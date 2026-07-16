@@ -255,7 +255,7 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
             ('store_id', '=', store.id), ('shopify_gid', '=', shopify_gid),
         ], limit=1)
         if existing:
-            existing.write(snapshot_vals)
+            existing.sudo().write(snapshot_vals)
             return existing
 
         # Rule 2: normalize the incoming email. Missing/empty/
@@ -302,12 +302,14 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
                         shopify_gid, conflicting.shopify_gid,
                     ),
                 )
-            return CustomerBinding.create(dict(
+            binding = CustomerBinding.sudo().create(dict(
                 snapshot_vals,
                 store_id=store.id, shopify_gid=shopify_gid,
                 partner_id=partner.id,
                 match_key='email', matched_at=fields.Datetime.now(),
             ))
+            binding = CustomerBinding.browse(binding.id)
+            return binding
 
         # Rule 7: zero active candidates -- check archived matches
         # before any create is even considered.
@@ -332,12 +334,14 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
         # sale domain enabled) is already enforced by the unmodified
         # core job-start gate before this handler ever runs.
         partner = self._create_partner(shopify_gid, payload, job=job)
-        return CustomerBinding.create(dict(
+        binding = CustomerBinding.sudo().create(dict(
             snapshot_vals,
             store_id=store.id, shopify_gid=shopify_gid,
             partner_id=partner.id,
             match_key='email', matched_at=fields.Datetime.now(),
         ))
+        binding = CustomerBinding.browse(binding.id)
+        return binding
 
     @api.model
     def _normalize_incoming_email(self, raw_email):
@@ -512,7 +516,9 @@ class ShopifyConnectorJobCustomerExtension(models.Model):
 
     job_type = fields.Selection(
         selection_add=[('customer_import_sync', 'Customer Import Sync')],
-        ondelete={'customer_import_sync': 'cascade'},
+        ondelete={
+            'customer_import_sync': lambda recs: recs._reassign_to_historic_job_type(),
+        },
     )
 
     @api.model

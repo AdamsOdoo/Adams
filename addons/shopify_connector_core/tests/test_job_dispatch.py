@@ -260,7 +260,7 @@ class TestJobDispatch(TransactionCase):
             'store_id': self.store.id,
             'job_source': 'manual_sync',
             'job_type': 'core_dispatch_selftest',
-            'state': 'draft',
+            'state': 'queued',
             'payload_hash': str(uuid.uuid4()),
         })
         self.assertTrue(self.Dispatch._start_running(job))
@@ -289,7 +289,7 @@ class TestJobDispatch(TransactionCase):
         # unchanged behavior for the three pre-existing core job_types.
         self.store.write({'state': 'connected'})
         job = self._create_selftest_job(
-            job_source='setup_readiness_check', state='draft',
+            job_source='setup_readiness_check', state='queued',
         )
         self.assertTrue(self.Dispatch._start_running(job))
         self.store.write({'state': 'disconnected'})
@@ -309,7 +309,7 @@ class TestJobDispatch(TransactionCase):
             'store_id': self.store.id,
             'job_source': 'manual_sync',
             'job_type': 'core_dispatch_selftest',
-            'state': 'draft',
+            'state': 'queued',
             'payload_hash': str(uuid.uuid4()),
         })
         # The store disconnects strictly before the start-running
@@ -331,7 +331,7 @@ class TestJobDispatch(TransactionCase):
 
     def test_start_running_blocked_by_domain_flag_becomes_visible_audited(self):
         self.store.write({'state': 'connected'})
-        job = self._create_selftest_job(state='draft')
+        job = self._create_selftest_job(state='queued')
         JobModel = self.env.registry['shopify.connector.job']
 
         def _fake_domain_flag_for_job_type(self, job_type):
@@ -362,7 +362,7 @@ class TestJobDispatch(TransactionCase):
 
     def test_execution_time_domain_enabled_recheck_blocks_and_unblocks_start(self):
         self.store.write({'state': 'connected'})
-        job = self._create_selftest_job(state='draft')
+        job = self._create_selftest_job(state='queued')
         JobModel = self.env.registry['shopify.connector.job']
 
         def _fake_domain_flag_for_job_type(self, job_type):
@@ -377,7 +377,7 @@ class TestJobDispatch(TransactionCase):
             with self.assertRaises(ValidationError):
                 job.write({'state': 'running'})
             job.invalidate_recordset()
-            self.assertEqual(job.state, 'draft')
+            self.assertEqual(job.state, 'queued')
 
             self.env['shopify.connector.store.settings'].create({
                 'store_id': self.store.id,
@@ -433,6 +433,7 @@ class TestJobDispatch(TransactionCase):
             },
             'failed_retryable': {},
             'blocked_manual_review': {
+                'error_class': 'duplicate_risk',
                 'manual_review_subreason': 'ambiguous_match',
             },
         }
@@ -440,14 +441,13 @@ class TestJobDispatch(TransactionCase):
             # Reset the store to connected between scenarios (the prior
             # scenario left it `disconnecting`).
             self.store.write({'state': 'connected'})
-            job = self.Job.create({
+            job = self.Job.sudo().create(dict({
                 'store_id': self.store.id,
                 'job_source': 'manual_sync',
                 'job_type': 'core_dispatch_selftest',
-                'state': 'draft',
+                'state': state,
                 'payload_hash': str(uuid.uuid4()),
-            })
-            job.write(dict({'state': state}, **extras[state]))
+            }, **extras[state]))
             self.store.action_disconnect()
             job.invalidate_recordset()
             if state in cancellable:
@@ -494,12 +494,54 @@ class TestJobDispatch(TransactionCase):
         )
 
     def _env_model_name(self, value_node):
-        if not isinstance(value_node, ast.Subscript):
+        allowed_wrappers = frozenset((
+            'sudo', 'with_context', 'with_company', 'with_user', 'with_env',
+        ))
+        if isinstance(value_node, ast.Call):
+            if (
+                not isinstance(value_node.func, ast.Attribute)
+                or value_node.func.attr not in allowed_wrappers
+            ):
+                return None
+            return self._env_model_name(value_node.func.value)
+        if (
+            not isinstance(value_node, ast.Subscript)
+            or not isinstance(value_node.value, ast.Attribute)
+            or value_node.value.attr != 'env'
+            or not isinstance(value_node.value.value, ast.Name)
+            or value_node.value.value.id != 'self'
+        ):
             return None
         slice_node = value_node.slice
-        if isinstance(slice_node, ast.Constant):
+        if (
+            isinstance(slice_node, ast.Constant)
+            and isinstance(slice_node.value, str)
+        ):
             return slice_node.value
         return None
+
+    def test_env_model_name_unwraps_only_approved_wrappers(self):
+        cases = (
+            ("self.env['shopify.connector.job']", 'shopify.connector.job'),
+            (
+                "self.env['shopify.connector.job'].sudo()",
+                'shopify.connector.job',
+            ),
+            (
+                "self.env['shopify.connector.job'].sudo()"
+                ".with_context(active_test=False).with_user(self.env.user)",
+                'shopify.connector.job',
+            ),
+            ("self.env['another.model'].sudo()", 'another.model'),
+            (
+                "self.env['shopify.connector.job'].filtered(lambda r: r.id)",
+                None,
+            ),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                value_node = ast.parse(source, mode='eval').body
+                self.assertEqual(self._env_model_name(value_node), expected)
 
     def test_source_level_job_dispatch_never_calls_create(self):
         """AST guard: shopify_connector_job_dispatch.py never calls
@@ -540,16 +582,16 @@ class TestJobDispatch(TransactionCase):
                 create_targets.append(self._env_model_name(node.func.value))
         self.assertEqual(create_targets, ['shopify.connector.job'])
 
-    def test_source_level_no_sudo_in_new_files(self):
-        """No new sudo() site is introduced -- the existing
-        test_source_level_two_sudo_sites_total guard (test_job_log_
-        system_append.py) already fixes the total at exactly two
-        pre-existing sites; this is a same-guarantee, targeted check on
-        just this task's own new files."""
+    def test_source_level_sec1_sudo_sites_in_dispatch_files(self):
+        """SEC-1 elevates only the protected job writer sites."""
+        expected = {
+            'shopify_connector_job_enqueue.py': 1,
+            'shopify_connector_job_dispatch.py': 2,
+        }
         for path in self._find_new_model_files():
             with open(path, 'r', encoding='utf-8') as source_file:
                 tree = ast.parse(source_file.read(), filename=path)
-            offenders = [
+            sudo_calls = [
                 node for node in ast.walk(tree)
                 if (
                     isinstance(node, ast.Call)
@@ -557,7 +599,11 @@ class TestJobDispatch(TransactionCase):
                     and node.func.attr == 'sudo'
                 )
             ]
-            self.assertEqual(offenders, [], path)
+            self.assertEqual(
+                len(sudo_calls),
+                expected[os.path.basename(path)],
+                path,
+            )
 
     # ------------------------------------------------------------------
     # No live Shopify call anywhere in this task's changed production
