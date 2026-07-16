@@ -19,7 +19,10 @@ stock_delivery; **`sale_stock` red-team-added**: `picking.sale_id`,
 `move.sale_line_id`, and confirmation-time picking generation all
 live in that bridge module, and relying on it transitively would be
 luck, not architecture): validated outgoing pickings
-become Shopify fulfillments with tracking, exactly once, notification
+become Shopify fulfillments with tracking — duplicate-prevented and, per
+DEC-031 Layer 2, at-most-once with reconciliation convergence (never a
+claimed exactly-once remote effect; wording corrected 2026-07-16, Fable
+gap-closure, to match D-014-7/§9.5) — notification
 off by default. Includes its own triggers (picking-validation
 `odoo_event` hook, tracking-update hook, reconciliation scan, manual
 retry surface) per the revised Area-6 split. **Non-goals:** no

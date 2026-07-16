@@ -440,3 +440,25 @@ Per [`../07-implementation-plan/mvp-completion-program.md`](../07-implementation
 - OQ-RB-6 — full `OrderSortKeys` enum values (capture §13.1) — posture does
   not depend on them, but Wave 2 should confirm `UPDATED_AT` exists as
   assumed by ARCH PD-5.
+
+---
+
+## Appendix — compact reconnect/catch-up flow overview (added 2026-07-16 during self-review)
+
+```mermaid
+flowchart TD
+    A[action_reconnect] --> B[1 verify credentials\n2 verify scopes\n3 verify API version\n4 rerun readiness]
+    B -->|any failure| X[reconnect refused\nstore stays reconnect_needed]
+    B --> C[5 new connection generation\n6 historic jobs preserved\n7 stale-generation jobs fenced]
+    C --> D[8 fresh domain scans]
+    D --> E[per-domain catch-up\nwatermark - overlap window]
+    E --> F{candidate vs binding\n+ remote updatedAt}
+    F -->|unchanged| S[skip]
+    F -->|new / changed| G[idempotent enqueue]
+    F -->|ambiguous| H[manual review]
+    E -.orders only.-> I[Administrator backfill wizard\ndate range within access rules]
+    I --> J[read-only preview:\nnew / changed / duplicate /\nskipped / review counts]
+    J --> K[explicit enqueue confirm]
+```
+
+The normative behavior remains §2–§6; this diagram is a reading aid only.

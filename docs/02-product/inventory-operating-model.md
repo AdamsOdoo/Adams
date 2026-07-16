@@ -147,7 +147,17 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
 
 ### 4.4 compareQuantity CAS
 
-- **[Fact]** `inventorySetQuantities` supports per-entry `compareQuantity`:
+> **Evidence-conflict note (2026-07-16):** the 2026-07-16 live capture
+> verified `compareQuantity`/`ignoreCompareQuantity` on the 2026-07 API page,
+> but Task 013's earlier D-013-3 closure records the CAS shape as
+> `changeFromQuantity` (with `compareQuantity` removed in 2026-04). The two
+> Tier-1 records conflict; **mandatory re-verification against the raw
+> 2026-07 schema is a Wave 3 preflight hard-stop item** (recorded in the
+> Task 013 packet addendum §A and the consolidated decision pack). The CAS
+> *mechanism* (compare-and-set with an ignore override) is consistent across
+> both records; only the field name is in question.
+
+- **[Fact — field name subject to the conflict note above]** `inventorySetQuantities` supports per-entry `compareQuantity`:
   "the mutation will only update the quantity if the persisted quantity
   matches the `compareQuantity` value", and omitting it "can lead to
   inaccurate inventory quantities if multiple requests are made concurrently"

@@ -255,7 +255,7 @@ Conventions for every scenario below:
 
 - **Trigger:** the store connection was disconnected/suspended and is reconnected while COD orders sit mid-lifecycle (goods with courier, cash uncollected, RTO pending).
 - **Trajectory:** unchanged by reconnect itself — reconnect is an evidence-refresh event, not a state transition.
-- **Behaviour (per the reconnect/backfill policy — see [`reconnect-and-backfill-policy.md`](reconnect-and-backfill-policy.md), a sibling deliverable of this mission):**
+- **Behaviour (per the reconnect/backfill policy — see [`reconnect-catchup-backfill-policy.md`](reconnect-catchup-backfill-policy.md), a sibling deliverable of this mission):**
   1. **State re-read:** the connector re-fetches each open COD order's current Shopify facts (order status, transactions, refunds, fulfillments) and re-derives dimensions 1–2 evidence.
   2. **No replay of collection evidence:** collection events recorded in the connector are **never** re-created, re-applied, or inferred again from re-read Shopify data — the connector-owned ledger is append-only and reconnect appends nothing on its own.
   3. **Review case on divergence:** if re-read Shopify state disagrees with connector state (e.g. Shopify now `PAID` or `REFUNDED` while the connector shows outstanding; order cancelled remotely; fulfillment appeared externally), the connector opens a **discrepancy/review case** (3.14) instead of auto-applying either side.
@@ -446,4 +446,27 @@ authorizes implementation.
 
 ---
 
-*End of document. Companion deliverables referenced: [`reconnect-and-backfill-policy.md`](reconnect-and-backfill-policy.md), [`premium-ux-master-specification.md`](premium-ux-master-specification.md), [`../05-qa/cod-uat-matrix.md`](../05-qa/cod-uat-matrix.md) — created/updated by this mission's sibling tasks.*
+*End of document. Companion deliverables referenced: [`reconnect-catchup-backfill-policy.md`](reconnect-catchup-backfill-policy.md), [`premium-ux-master-specification.md`](premium-ux-master-specification.md), [`../05-qa/cod-uat-matrix.md`](../05-qa/cod-uat-matrix.md) — created/updated by this mission's sibling tasks.*
+
+---
+
+## Appendix — compact COD flow overview (added 2026-07-16 during self-review)
+
+```mermaid
+flowchart TD
+    A[Shopify COD order imported\nPENDING + manual gateway] --> B{Manual-gateway policy}
+    B -->|auto-confirm| C[SO confirmed\nstock reserved]
+    B -->|quotation| Q[Quotation awaits\nUser action]
+    B -->|User approval| R[Review case] --> C
+    C --> D[Delivery dispatched]
+    D --> E{Courier outcome}
+    E -->|full delivery| F[Picking validated\nfull quantities] --> G[Collection recorded\nper evidence source]
+    E -->|partial| H[Validate accepted qty\nbackorder or explicit cancel] --> G
+    E -->|refused / failed| I[Courier claim recorded\nNO stock change]
+    I --> J[Physical warehouse return\nvalidated return picking] --> K[Stock restored]
+    G --> L{Ledger complete?}
+    L -->|discrepancy| M[Collection discrepancy\nreview case]
+    L -->|yes| N[COD lifecycle closed\noptional orderMarkAsPaid,\npolicy + Layer 2 gated]
+```
+
+The normative behavior remains §2–§6; this diagram is a reading aid only.
