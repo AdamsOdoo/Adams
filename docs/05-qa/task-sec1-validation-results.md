@@ -27,6 +27,21 @@ control-room merge decision; PR #172 remains draft, open, unmerged.**
   `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` only and does not validate the
   binding-surface correction; the corrected-head validation below (build
   34995642) now covers `36974ed`/`05acfd7`.
+- **Test-count reconciliation (control-room docs-only correction, 2026-07-16):**
+  the module-level breakdown recorded during the session for the `644`-test
+  full standard suite (`core 414, product 202, sale 124`) does not sum to
+  `644` (`414+202+124=740`). No raw per-module Odoo.sh log line was retained
+  for build `34995642` to determine which figure is wrong, and this is not
+  the codebase's first non-additive combined-run total (a prior build's
+  cascade-update run legitimately produced a non-simple-sum total), so the
+  cause cannot be asserted either way without re-running. Per control-room
+  policy, the breakdown is removed rather than guessed; `0 failed / 0 errors
+  / 644` combined remains the authoritative, repeatedly-corroborated figure
+  and is not itself in question — it is corroborated by three independent
+  documents (this file, `research-handoff.md`, `mvp-program-state.md`) and by
+  the unrelated-but-consistent per-suite green results itemized above and
+  below (targeted binding security, sanctioned-writer regressions, lifecycle/
+  JOB-ACTIONS, SRR-03 smoke).
 
 ## Consolidated binding mutation-surface correction
 
@@ -75,14 +90,29 @@ and imported snapshots.
 **Legitimate writer inventory:** mixin `action_override_binding()`; product
 template/variant importer create, refresh, stale/review, safe-refresh timestamp,
 and image-ownership checksum sites; customer importer create/refresh sites;
-manual PII mask; retention sweep. Customer importer and PII paths were already
-sanctioned. Product importer adds only two exact-site elevations: existing
+manual PII mask; retention sweep. This correction commit (`36974ed`) adds only
+two exact-site elevations on top of the prior in-wave SEC-1 baseline: existing
 variant `snapshot_vals` refresh and post-image
 `shopify_image_checksum` ownership update.
 
-**Sudo delta:** core and sale production inventories are unchanged. Product
-importer changes from 9 to 11 syntactic `.sudo(` sites, exactly the two
-legitimate writers above. No context bypass, broad public-method elevation, ACL
+**Sudo delta — two scopes, stated explicitly to avoid ambiguity:**
+- *This correction commit only* (`36974ed` vs. its immediate parent): core and
+  sale production inventories are unchanged; product importer changes from 9 to
+  11 syntactic `.sudo(` sites, exactly the two legitimate writers above.
+- *Whole of Wave 1* (this branch vs. `mvp/program-integration` merge-base
+  `64d526f`, where none of these three files had any `.sudo(` site): the
+  product importer carries **11** new sudo sites in total (9 added earlier in
+  this wave by `60ac416`, 2 added by this correction) and the customer importer
+  carries **3** new sudo sites in total (all added in this wave). Every one of
+  these 14 sites is independently confirmed narrowly-scoped and sanctioned
+  (fixed literals, validated-payload snapshot fields, or an internally-computed
+  checksum — never a generic passthrough of caller-supplied data); none is a
+  security defect. The "exactly two" language elsewhere in this document and in
+  the PR body refers only to the narrower first scope (this correction commit)
+  and must not be read as the total new privileged-write surface introduced by
+  Wave 1 in these two files.
+
+No context bypass, broad public-method elevation, ACL
 change, group, model, table, job type, job source, transition, replay-policy,
 or SRR-03 behavior changed.
 
@@ -114,11 +144,11 @@ exercised.
 - **Runtime-tested code/test SHA:** `95db3dba4bf295ca6c6ee94ae7fa08da1d505eb7`; branch `sol/wave-1-readonly-foundation`; working tree clean; module versions core `19.0.1.9.1`, product `19.0.2.1.2`, sale `19.0.1.2.1`.
 - **Commands:** `odoo-bin -u shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --stop-after-init --no-http` (versions rolled to prior `19.0.1.9.0`/`19.0.2.1.1`/`19.0.1.2.0` first to force a genuine prior→corrected upgrade).
 - **Upgrade + registry:** prior→corrected upgrade clean — tables created/updated, `shopify_connector_security.xml` and `ir.model.access.csv` reloaded for all three modules; no migration, field, model, ACL, or manifest error. The additive/idempotent LC-1 `19.0.1.8.0` post-migration is below the prior versions and did not re-run; `TestLifecycleUninstall.test_post_migration_is_additive_and_idempotent` passed. No model, table, ACL, group, job type, job source, transition vocabulary, or replay policy was added by the correction.
-- **Full standard suite (upgrade + fresh registry):** `0 failed / 0 errors / 644 tests` — core `414`, product `202`, sale `124`; `0` `setUpClass` errors. Fresh-install of all three at `05acfd7` was performed by the Odoo.sh build itself (this database).
+- **Full standard suite (upgrade + fresh registry):** `0 failed / 0 errors / 644 tests`; `0` `setUpClass` errors. Fresh-install of all three at `05acfd7` was performed by the Odoo.sh build itself (this database). *(A per-module breakdown was recorded during the session as core `414`, product `202`, sale `124`, but `414+202+124=740 ≠ 644`; no raw per-module Odoo.sh log line is retained to reconcile the discrepancy, so the breakdown is removed here rather than guessed. `644` combined is the authoritative, repeatedly-corroborated figure — see the Test-count reconciliation note below.)*
 - **Targeted binding security:** four-role (Auditor/Operator/Reviewer/Administrator) generic create/alter/clear denial proven for the exact 16/17/14 protected sets — `TestProductTemplateBinding` (10), `TestProductVariantBinding` (9), `TestCustomerBinding` (9), `TestPiiLeastPrivilege` (13), plus SEC-1 job `TestSecurityHardening` (10) with `test_protected_job_write_denied_for_all_four_roles` and `test_direct_create_and_unlink_denied_for_all_four_roles`. Each denied mutation leaves the binding row unchanged, creates no lifecycle audit carrier and no job log, leaves no partial write, and uses no privilege/context bypass (`_audit_counts()` invariance asserted).
 - **Exact protected-set proof:** `test_exact_stored_field_classification_and_protected_set` green for template (16), variant (17), customer (14); an unclassified future stored field fails closed via `_assert_binding_field_classification()`.
 - **Sanctioned-writer regression (importers):** product `TestProductImportMatching` (59), `TestProductRefreshAndStale` (20), `TestProductMediaImport` (26), `TestProductPriceImport` (9), `TestProductAttributeImport` (16), `TestProductDuplicatePrevention` (12), `TestProductVariantGeneration` (8); customer `TestCustomerImportMatching` (28), `TestCustomerDuplicatePrevention` (10), `TestCustomerFallbackPartner` (5), `TestCustomerMatchingScalability` (32) — all green. Audited Reviewer/Admin override, manual PII masking, and per-store PII retention sweep preserve original `actor_uid`, exactly one audit carrier, identifiers/counts/reasons only (email/phone redacted), atomic rollback on audit failure, and current/proposed company checks with company-neutral support.
-- **Static/source guards under runtime:** protected sets are exactly 16/17/14; unclassified stored field fails closed; no direct `shopify_image_checksum` assignment remains; the product importer contains exactly the two approved sudo additions (existing-variant `snapshot_vals` refresh + post-image checksum write); no `with_context`/context bypass, no broad public-method sudo, no core hardcoding of product/customer model names (`TestSourceGuardDetectors`, `TestDisconnectSourceGuards`, `TestLifecycleAdmissionSourceGuards` green).
+- **Static/source guards under runtime:** protected sets are exactly 16/17/14; unclassified stored field fails closed; no direct `shopify_image_checksum` assignment remains; this correction commit's two approved sudo additions are existing-variant `snapshot_vals` refresh and post-image checksum write (see "Sudo delta" above for the full-wave count: product importer 11 new sites total, customer importer 3, all independently confirmed narrowly-scoped and sanctioned); no `with_context`/context bypass, no broad public-method sudo, no core hardcoding of product/customer model names (`TestSourceGuardDetectors`, `TestDisconnectSourceGuards`, `TestLifecycleAdmissionSourceGuards` green).
 - **Lifecycle / JOB-ACTIONS regression:** `TestConnectionLifecycle` (43), `TestLifecycleUninstall` (9), `TestJobActions` (9) green — disable-first, historic conversion, immutable `original_job_type`, uninstall/reinstall, selection removal, manual retry/cancel, role/reason controls, audit atomicity. SEC-1 broke none of them.
 - **Combined SRR-03 smoke:** all genuine independent-connection classes green — `TestGenuineRealAdmission` (9), `TestLifecycleAdmissionRaceGenuine` (4), `TestDrainOwnershipReplayGenuine` (10), `TestLifecycleServiceRetryGenuine` (2), `TestCredentialReplacementRaceGenuine` (2), `TestDisconnectControllerSelectionGenuine` (2), `TestPublicClearAdmissionRaceGenuine` (2), with `TestReadinessCheck` (31), `TestReadinessSlotClosure` (20), `TestJobDispatch` (31), `TestBusinessAdmission` (18). The run exercised real PostgreSQL `40001` serialization conflicts and a real lock-timeout cancellation across independent backends, proving exact job re-lock, ownership preservation, no handler replay, fail-closed replay policy, and disconnect/admission ordering. No exactly-once Shopify remote-effect claim is made and DEC-031 Layer 2 remains unimplemented.
 - **Residue / security audit:** clean — all connector data tables at baseline (only the seeded `shopify.connector.attribute.lock` singleton; jobs/leases/logs/stores/credentials/bindings = 0); 0 leftover test users; 1 active backend (the audit query itself), 0 idle-in-transaction, 0 open cursors; 3 legitimate connector crons (Job Dispatch Drain, Disconnect Quiescence Controller, PII Retention Sweep) unchanged; 0 connector-owned cron triggers (the 5 queued triggers are base-Odoo autovacuum); no token/header/credential/raw-PII/temporary-path leakage.

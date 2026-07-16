@@ -9,8 +9,11 @@
 > SRR-03 CLOSED. Claude's review found an incomplete SEC-1 binding mutation
 > guard. Consolidated product-owner ruling `4988842625` is implemented in
 > production correction `36974edc68c1985e6ccfae8f6bb5c7386f820156` with
-> static/exhaustive tests; corrected exact-head Odoo.sh revalidation is
-> pending. PR #172 remains draft/unmerged and Wave 2 remains unauthorized.
+> static/exhaustive tests; the corrected exact-head Odoo.sh revalidation has
+> since completed and is runtime-green (build `34995642`, runtime-tested SHA
+> `95db3db`, full standard suite `0 failed / 0 errors / 644` — see
+> `task-sec1-validation-results.md`). PR #172 is corrected-head runtime-green
+> and awaiting final Claude merge decision; Wave 2 remains unauthorized.
 >
 
 | # | MVP item | Module(s) | Requirement (accepted source) | Test type | Expected runtime/UAT evidence | Current status | Blocking issue | Release criterion |

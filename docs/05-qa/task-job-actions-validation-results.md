@@ -2,16 +2,29 @@
 
 ## Status
 
-**Implementation complete and previously runtime-green on build `34986844`;
-the final corrected Wave 1 exact-head regression is pending after the SEC-1
-binding-surface correction.**
+**Implementation complete and runtime-green: first on build `34986844`
+(pre-SEC-1), then again at the corrected head on build `34995642`
+(runtime-tested SHA `95db3db`) after the SEC-1 binding-surface correction.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, unmerged)
 - **Stage:** Wave 1 Stage 3
-- **Date:** 2026-07-15
-- **Runtime claim:** Prior exact-SHA JOB-ACTIONS evidence is green; the new
-  corrected head is not yet runtime-validated.
+- **Date:** 2026-07-15; corrected-head evidence and this reconciliation note
+  added 2026-07-16.
+- **Runtime claim:** Prior exact-SHA JOB-ACTIONS evidence is green, and the
+  corrected head has since run green (`TestJobActions` (9), part of the full
+  `0/0/644` standard suite recorded in `task-sec1-validation-results.md`,
+  build `34995642`).
+- **Doc-accuracy correction (2026-07-16, control-room docs-only fix):** the
+  "Scope implemented" and "Focused matrix" sections below previously stated
+  this stage contains no `sudo()`. That was accurate only for JOB-ACTIONS'
+  original Stage 3 commit; SEC-1 commit `60ac4165a0fa9babc070f892bfdeb6dc0a2e48b5`
+  subsequently added `self.sudo().write(...)` to both `action_manual_retry()`
+  and `action_cancel()` (the two write sites this stage always reserved for
+  SEC-1's elevation), and this file's own item-9 test was renamed accordingly
+  to assert exactly two `sudo()` sites are present. The text below is
+  corrected to state the current, accurate mechanism; no code or test
+  changed.
 
 ## Scope implemented
 
@@ -29,8 +42,10 @@ extension:
   reason, stores it, finishes the job as `cancelled`, and appends exactly one
   `manual_action` audit row.
 - neither method exposes a force/bypass parameter.
-- this stage contains no `sudo()`; SEC-1 owns the already-reserved elevation
-  at these two write sites.
+- this stage's original Stage 3 commit contained no `sudo()`; SEC-1 has since
+  added `self.sudo().write(...)` to both write sites (`action_manual_retry()`
+  and `action_cancel()`), the elevation this stage always reserved for SEC-1.
+  This is the current, shipped state at the reviewed PR head.
 
 No Area 6 scan, cron, enumeration, domain manual-sync, Task 012, UI,
 inventory, fulfillment, product-export, or DEC-031 Layer 2 work is present.
@@ -47,7 +62,9 @@ inventory, fulfillment, product-export, or DEC-031 Layer 2 work is present.
 6. missing, false, non-string, and whitespace-only reason denial;
 7. Auditor/Reviewer cancellation denial and Administrator success;
 8. terminal/recovery-state cancellation denial with no write;
-9. source-level public-method, signature, and pre-SEC-1 no-`sudo` guards.
+9. source-level public-method, signature, and exact-sudo-inventory guards
+   (originally a no-`sudo` guard at Stage 3; renamed and re-scoped by SEC-1
+   to assert exactly the two sanctioned `sudo()` sites now present).
 
 ## Executed checks
 
@@ -58,8 +75,8 @@ inventory, fulfillment, product-export, or DEC-031 Layer 2 work is present.
 | Packet scope | Manual path/line inventory against §5 allowlist | PASS |
 | Forbidden core edit | `shopify_connector_job.py` unchanged by Stage 3 | PASS |
 | Live Shopify calls | New model has no API-client or transport reference | PASS by source inspection |
-| Odoo.sh focused runtime | `--test-tags /shopify_connector_core:TestJobActions` | **GREEN on build 34986844; corrected-head repeat pending** |
-| Full core/product/sale runtime | exact-head Odoo.sh matrix | **GREEN `0/0/635` on build 34986844; corrected-head repeat pending** |
+| Odoo.sh focused runtime | `--test-tags /shopify_connector_core:TestJobActions` | **GREEN on build 34986844; corrected-head repeat GREEN on build 34995642** |
+| Full core/product/sale runtime | exact-head Odoo.sh matrix | **GREEN `0/0/635` on build 34986844; corrected-head repeat GREEN `0/0/644` on build 34995642** |
 
 ## Required exact-head Odoo.sh proof
 
@@ -73,8 +90,13 @@ Prior exact-SHA evidence: Odoo.sh 19 build `34986844` at
 `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` passed the full standard matrix
 `0/0/635` and the Wave 1 focused suites. Production correction
 `36974edc68c1985e6ccfae8f6bb5c7386f820156` changes no JOB-ACTIONS method,
-state vocabulary, transition, role, reason, or audit behavior; the required
-corrected-head repeat remains pending.
+state vocabulary, transition, role, or reason behavior (it does add the
+`self.sudo()` elevation on both write sites described above, and correspondingly
+extends the per-write audit-carrier behavior's execution context to sudo — the
+audit content/atomicity contract itself is unchanged). The corrected-head
+repeat ran on build `34995642` (runtime-tested SHA `95db3db`): `TestJobActions`
+(9) green as part of the full `0 failed / 0 errors / 644` standard suite; see
+`task-sec1-validation-results.md` for the authoritative evidence record.
 
 ## Rollback
 

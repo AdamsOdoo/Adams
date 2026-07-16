@@ -1,10 +1,16 @@
 # Task LC-1 — Lifecycle / Uninstall Validation Results
 
 > **Wave 1 Stage 2 implementation record — PR #172, 2026-07-15.**
-> DEC-030 and the locked lifecycle design are binding. This record does not
-> LC-1 runtime proof was obtained on Odoo.sh build `34986844`. A later SEC-1
-> binding-surface correction changes no LC-1 production path but requires the
-> final Wave 1 exact-head lifecycle regression to be repeated.
+> DEC-030 and the locked lifecycle design are binding. LC-1 runtime proof was
+> first obtained on Odoo.sh build `34986844`. A later SEC-1 binding-surface
+> correction changed no LC-1 production path, and the final Wave 1 exact-head
+> lifecycle regression has since run: corrected-head build `34995642`
+> (runtime-tested SHA `95db3db`) included `TestConnectionLifecycle` (43) and
+> `TestLifecycleUninstall` (9) green as part of the full `0/0/644` standard
+> suite — see `task-sec1-validation-results.md`. This record was not itself
+> re-edited for that build; the docs-only reconciliation commit that added
+> this note corrects the stale "revalidation pending" line below without
+> re-running or altering any LC-1 code or test.
 
 ## Scope implemented
 
@@ -73,7 +79,11 @@ SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` passed lifecycle `0/0/9`,
 fresh all-module `0/0/635`, and standard `0/0/635`, with clean residue.
 Install/uninstall/reinstall behavior was included in the accepted matrix.
 
-**Current corrected-head status:** revalidation pending after production
-correction `36974edc68c1985e6ccfae8f6bb5c7386f820156`. The correction touches
-binding guards/importer writer elevation only; it does not alter historic-job
+**Current corrected-head status:** revalidation complete. Production
+correction `36974edc68c1985e6ccfae8f6bb5c7386f820156` touches binding
+guards/importer writer elevation only; it does not alter historic-job
 conversion, selection `ondelete`, job/log history, or lifecycle architecture.
+The corrected-head Odoo.sh run (build `34995642`, runtime-tested SHA
+`95db3db`) exercised the full lifecycle suite green as part of the `0/0/644`
+standard-suite result; see `task-sec1-validation-results.md` for the
+authoritative evidence record.
