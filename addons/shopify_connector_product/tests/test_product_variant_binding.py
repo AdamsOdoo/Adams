@@ -356,10 +356,17 @@ class TestProductVariantBinding(TransactionCase):
                 return False
             return call.func.value.func.value.id == record_name
 
+        # Count only the binding *write* of the snapshot (the sanctioned
+        # refresh site). The sibling create path passes ``snapshot_vals`` as
+        # the first positional arg to ``dict(...)`` -- that record-building
+        # call must not be conflated with the write, so the filter is scoped
+        # to ``.write(...)`` attribute calls.
         variant_refreshes = [
             node
             for node in ast.walk(methods['_resolve_one_variant'])
             if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'write'
             and node.args
             and isinstance(node.args[0], ast.Name)
             and node.args[0].id == 'snapshot_vals'
