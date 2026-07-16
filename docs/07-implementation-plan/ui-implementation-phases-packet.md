@@ -189,3 +189,138 @@ rules (draft copy marked as draft — MBQ-22 owns final copy). Update
 the handoff and stop. UI-U1 REMAINS BLOCKED until ChatGPT accepts
 this prototype in a recorded act.
 ```
+
+---
+
+## 8. Addendum (2026-07-16) — [Proposed] U2/U3 locked prompts (Fable gap-closure)
+
+> **Status: Proposed — Fable gap-closure mission, 2026-07-16. NOT accepted;
+> the prompts below are NOT usable until this addendum is accepted.**
+> Appended; §1–§7 are not rewritten. This addendum completes the packet's
+> missing U2/U3 locked prompts (§6 deferred them "post-U1 by design"),
+> mirroring the U1 locked-prompt structure. Deliverables are organized per
+> the screen groups of `../02-product/premium-ux-master-specification.md`
+> (the master spec — forthcoming at the time of writing; referenced by path
+> and a hard prerequisite of both prompts, Wave 5 gate G5-1 in
+> [`wave-5-definition-of-ready.md`](wave-5-definition-of-ready.md)). Where
+> the master spec's grouping refines §1's U2/U3 contents (setup/readiness is
+> absorbed into the U2 stage below alongside the domain workspaces; matching
+> centers ride with their workspaces), this addendum's grouping supersedes
+> §1 **at proposal level only** — acceptance of this addendum decides.
+>
+> **Two-role dependency (binding for both prompts):** SEC-2 (the 4→2 group
+> migration, [`../02-product/connector-roles-and-permissions.md`](../02-product/connector-roles-and-permissions.md)
+> §4–§6) must be merged before U2/U3 role-gated views are built — all
+> `groups=` attributes and visibility-matrix tests target Connector
+> User/Administrator, never the legacy four groups (Wave 5 §3 sequencing:
+> SEC-2 first).
+>
+> **Prototype-fidelity acceptance (both prompts):** fidelity to the accepted
+> U0 prototype set (`docs/09-ui-prototype/**`, including the gap-closure
+> workspace prototypes) and the master spec is an acceptance criterion;
+> DESIGN SYSTEM tokens/scales only, five states per surface, §12
+> accessibility gates, §13 checklist, §14 screenshot set.
+>
+> **Browser-test requirements (both prompts):** `web_tour` tours via
+> `HttpCase.start_tour` for every primary flow named in the prompt + HOOT
+> unit tests for every Owl component; server-only visibility tests are
+> insufficient (§5). Odoo.sh green with verbatim quote.
+
+### 8.1 Locked prompt — Phase U2 (Proposed pending acceptance)
+
+```text
+DO NOT USE UNTIL: THIS ADDENDUM AND THE PREMIUM UX MASTER SPECIFICATION
+ARE ACCEPTED, U1 IS MERGED RUNTIME-GREEN, SEC-2 IS MERGED RUNTIME-GREEN,
+THE WAVE 5 GATE FOR U2 IS OPENED BY THE CONTROL ROOM, THE CURRENT BASE
+SHA IS VERIFIED, AND THIS PROMPT IS ISSUED.
+
+Implement UI Phase U2 — setup/readiness plus the domain operator
+workspaces — exactly per this packet (§1–§5 as amended by §8),
+docs/02-product/premium-ux-master-specification.md (screen groups
+binding), docs/03-architecture/premium-ui-ux-design-system.md, the
+accepted design corpus, the accepted U0 prototypes, and the state/COD
+vocabularies (docs/02-product/shopify-fulfillment-status-model.md §9,
+docs/02-product/cod-lifecycle-and-reconciliation.md §7). Branch from
+the verified current tip (STOP on drift). One stage session; draft PR;
+stop.
+
+DELIVERABLES (master-spec screen groups): setup wizard (11 accepted
+steps, token-paste branch A) + readiness screens (U0-accepted Owl
+presentation); ORDERS workspace (order list/form badges per the
+six-concept model, order error-center extensions); COD reconciliation
+workspace (queue, five-value ledger display, collection-event entry,
+discrepancy review — read models from Waves 2/4); FULFILLMENT workspace
+(S13 + inbound review center: origin evidence, tracking import,
+acknowledge, explicit-validation proposal screen); INVENTORY workspaces
+(S10-S12, mapping views); the manual-review/matching review centers for
+these domains. Owl only where the PD-7 list + master spec allow;
+everything else Odoo-native; per-phase copy deck.
+ALLOWED FILES: owning-module views/actions/menus/wizard files per the
+§2 XML-ID scheme; static/src Owl surfaces the master spec assigns to
+U2; tests (visibility matrix vs the TWO-ROLE model, button->sanctioned-
+service wiring, tours, HOOT); docs/06-prompts/ui-u2-copy-deck.md;
+docs/05-qa/ui-u2-validation-results.md (screenshots + accessibility +
+PB evidence); AR row; handoff.
+FORBIDDEN: any new backend business logic beyond read-only aggregate
+endpoints a screen needs; any mutation path not a sanctioned hardened
+service; legacy-group gating; U3 surfaces (reconnect/backfill, export
+flow, settings/permissions/retention, diagnostics); webhooks/OAuth/CI;
+external assets; adams_base.
+
+HARD CONSTRAINTS: two-role gating only (SEC-2 merged first); prototype
+fidelity is acceptance; tokens/scales only; fixed vocabularies as text
+labels (incl. the state-model badge vocabulary verbatim); five states
+per surface; §12 accessibility; PII masked per the SEC-2 PII group;
+tours + HOOT green on Odoo.sh (verbatim quote) + full screenshot set.
+Stop condition: draft PR "UI Phase U2: setup + domain workspaces";
+stage gate closes on draft-open; no U3 work.
+```
+
+### 8.2 Locked prompt — Phase U3 (Proposed pending acceptance)
+
+```text
+DO NOT USE UNTIL: THIS ADDENDUM IS ACCEPTED, U2 IS MERGED RUNTIME-GREEN
+(AND TASK 015/015B BACKENDS ARE MERGED FOR THE EXPORT-FLOW SCREENS),
+THE WAVE 5 GATE FOR U3 IS OPENED BY THE CONTROL ROOM, THE CURRENT BASE
+SHA IS VERIFIED, AND THIS PROMPT IS ISSUED.
+
+Implement UI Phase U3 — connection resilience, export flow, governance
+screens, diagnostics, and the final polish pass — exactly per this
+packet (§1–§5 as amended by §8), the premium UX master specification,
+the design system, and the accepted U0 prototypes. Branch from the
+verified current tip (STOP on drift). One stage session; draft PR; stop.
+
+DELIVERABLES (master-spec screen groups): RECONNECT/BACKFILL experience
+(disconnect/reconnect banners, watermark catch-up progress, gap-period
+review-case landing per fulfillment-operating-modes §7 and the
+reconnect/backfill policy); PRODUCT EXPORT flow (S7 preview/diff Owl
+surface: field diff, enumerated deletions, media adds/detaches,
+confirm action wired to action_confirm_export_preview; apply progress;
+per-product results; the separate explicit publish action per PD-PX-5);
+SETTINGS/PERMISSIONS/RETENTION screens (two-role Roles & Access page,
+per-store PII toggle surface, mode/domain/policy settings, log/evidence
+retention configuration); DIAGNOSTICS (connector health warnings incl.
+the unknown-enum schema warnings of the state model §7, readiness
+detail, throughput/PB indicators from PERF-1); and the POLISH pass —
+motion/reduced-motion audit, keyboard/focus walkthrough of every
+surface, contrast re-verification, empty-state completeness, copy-deck
+finalization (MBQ-22 closure).
+ALLOWED FILES: owning-module views/actions per §2; static/src Owl
+surfaces the master spec assigns to U3; tests (two-role visibility
+matrix, wiring, tours: matching resolve + preview confirm + reconnect
+walkthrough, HOOT); docs/06-prompts/ui-u3-copy-deck.md;
+docs/05-qa/ui-u3-validation-results.md; AR row; handoff.
+FORBIDDEN: new backend business logic; any export path bypassing
+preview->confirm->apply; auto-apply affordances; legacy-group gating;
+raw tokens/stack traces on any surface; webhooks/OAuth/CI; external
+assets; adams_base.
+
+HARD CONSTRAINTS: two-role gating only; prototype fidelity; tokens/
+scales only; the accessibility/motion pass is an acceptance criterion,
+not a cleanup; review-then-apply rendered as the ONLY export mode; the
+diagnostics screens never expose credentials or PII; tours + HOOT green
+on Odoo.sh (verbatim quote) + full screenshot set + the completed §13
+checklist for every U3 surface. Stop condition: draft PR "UI Phase U3:
+resilience, export flow, governance, polish"; stage gate closes on
+draft-open; no post-MVP screen work.
+```

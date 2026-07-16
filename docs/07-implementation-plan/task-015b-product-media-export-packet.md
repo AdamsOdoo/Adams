@@ -385,3 +385,31 @@ condition: draft PR "Task 015B: basic product media export
 (shopify_connector_product_export)"; gate closes on draft-open; no
 other work.
 ```
+
+---
+
+## 10. Addendum (2026-07-16) — [Proposed] Fable gap-closure alignment note
+
+> **Status: Proposed — Fable gap-closure mission, 2026-07-16. NOT accepted.**
+> Appended; nothing above is rewritten. A cross-check against
+> [`../02-product/product-export-operating-model.md`](../02-product/product-export-operating-model.md)
+> found **no contradiction** with D-015B-1..7 (the operating model §5
+> explicitly respects this packet's closures, including detach-only /
+> never-auto-`fileDelete`). Three alignment items are recorded:
+>
+> 1. **OQ-PX-2 preflight re-verification:** the `fileCreate` path's
+>    current/non-deprecated status (and the variant-bulk `strategy` enum)
+>    must be re-verified against the live 2026-07+ official docs at Wave 5
+>    preflight before the mutation surface is locked (operating model §17).
+> 2. **Layer 2 supersession of D-015B-5's framing:** the
+>    verification-read/checksum retry mechanics stand, but now execute under
+>    the accepted DEC-031 Layer 2 protocol (durable attempt records;
+>    reconciliation reads as first-class jobs) — media mutations get Layer 2
+>    matrix rows like Task 015's (§9 addendum item 4 there applies here in
+>    full).
+> 3. **Gate-authority language:** the §9 prompt's "ChatGPT opens the gate"
+>    wording is superseded by the DEC-032 control-room model; Task 015B runs
+>    inside Wave 5, after Task 015, per
+>    [`wave-5-definition-of-ready.md`](wave-5-definition-of-ready.md).
+>
+> Re-acceptance of this packet rides the same Wave 5 G5-5 gate as Task 015.

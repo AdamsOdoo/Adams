@@ -279,3 +279,62 @@ explicit ChatGPT waiver. Stop condition: draft PR "Task 015:
 controlled product export/update (shopify_connector_product_export)";
 gate closes on draft-open; no UI/webhook/media work.
 ```
+
+---
+
+## 9. Addendum (2026-07-16) — [Proposed] Fable gap-closure requirements
+
+> **Status: Proposed — Fable gap-closure mission, 2026-07-16. NOT accepted.**
+> Appended; nothing above this line is rewritten. **Every D-015 closure
+> (D-015-1..8) remains intact** — this addendum maps the export operating
+> model
+> ([`../02-product/product-export-operating-model.md`](../02-product/product-export-operating-model.md),
+> PD-PX-1..7) and the accepted DEC-031 Layer 2 design onto this packet.
+> **Re-acceptance required:** packet + addendum re-reviewed as one unit and
+> the §8 locked prompt re-issued before Task 015 starts inside Wave 5 (see
+> [`wave-5-definition-of-ready.md`](wave-5-definition-of-ready.md) gate G5-5).
+
+1. **Field-ownership matrix is binding (PD-PX-2/3).** The operating model §2
+   matrix becomes part of this packet's acceptance surface: the D-015-2
+   allowlist is the Odoo-owned set; everything else is merchant-owned by
+   definition and structurally absent from `productSet` input. Tests assert
+   the payload builder cannot emit a non-allowlisted field (extends
+   `test_export_allowlist.py`).
+2. **Changed-since-read gate (operating model §8).** D-015-6's stale-preview
+   guard is confirmed and tightened: preview is always a fresh read; apply
+   re-reads and compares `updatedAt` against the preview capture, aborting to
+   a fresh-preview requirement on any change; preview expiry (24h /
+   source-`write_date`) closes the Odoo-side staleness direction. OQ-PX-5
+   (`updatedAt` sensitivity to sub-resource edits) is a named Wave 5
+   preflight dev-store verification — if it fails, the gate widens to
+   comparing the previewed sub-resources themselves.
+3. **Destructive-list guard (C-PROD-05 mechanical; operating model §3–§4).**
+   Confirmed as stated in D-015-3, restated as binding: always the complete
+   desired variant set or fail closed; fresh-read GID-set comparison before
+   send; any would-be deletion must have been enumerated in the confirmed
+   preview (`destructive_write_guard_blocked` otherwise); `collections`/
+   `metafields` list inputs never supplied. The omitted-list-field boundary
+   stays a named dev-store empirical check.
+4. **Uncertainty reconciliation via Layer 2 (PD-PX-6; operating model §9).**
+   This packet's mutations (`productSet`, `metafieldDefinitionCreate`) run
+   only under the accepted DEC-031 Layer 2 protocol: durable attempt record
+   before the network call; ambiguous outcome → reconciliation read by
+   identifier (binding GID; `customId`/SKU search on the create path);
+   found-and-matching → adopt+bind, found-divergent → manual review, not
+   found → retry-eligible. The D-015-4 customId upsert remains the
+   convergence mechanism; Layer 2 supplies the execution-ownership,
+   fingerprint, and no-blind-retry machinery. New test family: the Layer 2
+   suite rows for both mutations (attempt-before-call; all three
+   reconciliation outcomes; source-level no-blind-retry).
+5. **Reconnect reconciliation pass (PD-PX-7).** Exports stay blocked for a
+   reconnected store until the full binding reconciliation pass completes
+   (exists / variant GID set / media checksums); deleted-or-archived remote →
+   review, never silent re-create. New acceptance row + test.
+6. **Publication posture (PD-PX-5).** Restated: publication is a separate
+   explicit operator step, never a side effect; DRAFT/unpublished default on
+   create stands (D-015-2/MBQ-25).
+7. **Wave anchoring.** Task 015 executes inside **Wave 5** after SEC-2 and
+   under Layer 2 (DEC-033; `mvp-completion-program.md` §4 Wave 5); the §8
+   prompt's "ChatGPT opens the gate" language is superseded by the DEC-032
+   control-room model — gate authority is product owner + Claude control
+   room within the Wave 5 wave gate.

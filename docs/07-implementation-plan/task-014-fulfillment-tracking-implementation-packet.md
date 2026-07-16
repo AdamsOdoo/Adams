@@ -307,3 +307,128 @@ condition: draft PR "Task 014: Shopify fulfillment/tracking write-back
 (shopify_connector_fulfillment)"; gate closes on draft-open; no Task
 015/UI/webhook work.
 ```
+
+---
+
+## 9. Addendum (2026-07-16) — [Proposed] Fable gap-closure requirements
+
+> **Status: Proposed — Fable gap-closure mission, 2026-07-16. NOT accepted.**
+> Appended per the gap-closure mission; nothing above this line is rewritten.
+> **Every D-014 closure (D-014-1..8) remains intact and binding** — this
+> addendum adds requirements on top of them and maps the accepted-canon
+> gap-closure documents onto this packet. **Re-acceptance required:** the
+> packet + this addendum must be re-reviewed and re-accepted as one unit, and
+> the §8 locked prompt re-issued against the amended packet, before Wave 4
+> opens (see [`wave-4-definition-of-ready.md`](wave-4-definition-of-ready.md)
+> gate G4-5). Sources mapped here:
+> [`../02-product/fulfillment-operating-modes.md`](../02-product/fulfillment-operating-modes.md)
+> ("Modes doc"),
+> [`../02-product/shopify-fulfillment-status-model.md`](../02-product/shopify-fulfillment-status-model.md)
+> ("State model"),
+> [`../02-product/cod-lifecycle-and-reconciliation.md`](../02-product/cod-lifecycle-and-reconciliation.md)
+> ("COD doc"), and
+> [`../03-architecture/dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md)
+> (Layer 2).
+
+### 9.1 Operating modes (Modes doc §1–§2, §6–§8)
+
+- New store setting `fulfillment_operating_mode` (Selection `mode1`/`mode2`,
+  default `mode1`, Administrator-only via Python-level `groups=`), added to
+  §4's settings list. **Wave 4 ships Mode 1 only**; the Mode 2 value exists
+  but is not selectable/effective until the Wave 5 allocation (Modes doc §10)
+  — enablement attempts route to a configuration hold.
+- Mode 1 inbound posture: observe, classify, record, review — **zero
+  automatic Odoo stock mutation** from inbound evidence. User actions from a
+  review case: import tracking (non-stock write to
+  `carrier_tracking_ref`/URL), acknowledge, or explicitly validate the exact
+  proposed action (Modes doc §2.2). The proposal engine is the §4-checklist
+  evaluator shared with future Mode 2.
+- Mode-switch state machine, audit, never-replays-history, scan-gated,
+  idempotent, rollback-safe (Modes doc §6) — the *design* lands in Wave 4
+  even though only Mode 1 is effective.
+
+### 9.2 Inbound reconciliation data model (Modes doc §3, §5)
+
+New models (naming per the merged mixin conventions; exact names a
+re-acceptance item):
+
+- **Own-GID create ledger:** the D-014-1 binding rows plus a create-attempt
+  ledger covering adopted-by-verification-read fulfillments — the primary
+  origin-classification evidence (Modes doc §3 row 1).
+- **Per-fulfillment inbound evidence record** (unique per store +
+  Fulfillment GID): order/FO identities, origin class
+  (`connector`/`external_merchant`/`external_service`/`carrier_event_only`),
+  location snapshot + mapped display, tracking snapshot, remote state
+  (raw + normalized per the State model), reconciliation state
+  (`observed`→`under_review`/`auto_matched`→`applied`/`acknowledged`/
+  `rejected`/`superseded`).
+- **Per-line evidence record** with the reconciled-quantity ledger
+  (over-fulfillment guard) and lot/serial evidence.
+
+The D-014-8 reconciliation scan generalizes to the fulfillment watermark
+catch-up (Modes doc §7): reconnect re-scan, and **every disconnected-period
+external fulfillment lands as a review case**.
+
+### 9.3 State-model storage and display (State model §1–§10)
+
+- Store all four Shopify state families **raw, verbatim**, with normalized
+  labels/badges per the State model tables; deprecated values stored-raw +
+  normalized (§6); the **unknown-future-value contract (§7)** implemented in
+  full (preserve raw, display unknown, never silently success, halt unsafe
+  automation, raise schema warning).
+- The **carrier-Delivered inconsistency rule (§8)**: milestones never write
+  stock; Delivered-with-picking-not-done raises the defined high-visibility
+  critical review case.
+- The six-concept badge separation (§1) is the data contract Wave 5 UI
+  consumes; Wave 4 owns the fields, not the screens.
+
+### 9.4 COD interplay (COD doc §3, §9)
+
+Wave 4 owns the COD ↔ fulfillment mechanics for scenarios 2–13: partial
+validation quantities, backorder ask/always/never semantics with
+Administrator-gated remainder cancellation, `stock.return.picking` as the
+**only** stock-restoration path (PD-COD-2 — never on courier/report
+evidence), and derivation of the COD fulfillment dimension from picking/
+return state. `orderMarkAsPaid` remains out of this packet (Wave 5+, Layer
+2-gated — COD doc §9).
+
+### 9.5 Layer 2 supersession note on D-014-7
+
+D-014-7's mechanics (verification-read-before-retry, operation-key
+serialization) are retained but now execute **under the accepted DEC-031
+Layer 2 protocol**: durable attempt record before every mutation,
+`fulfillmentCreate`/`fulfillmentTrackingInfoUpdate` rows in the Layer 2
+reconciliation matrix, and reconciliation reads as first-class jobs. The
+D-014-7 concurrency caveat is answered by Layer 2's ownership design rather
+than restated-unresolved; Wave 4 must not ship these mutations outside
+Layer 2 (program hard-stop 4).
+
+### 9.6 New settings, acceptance rows, test families (delta to §4–§6)
+
+- **Settings added (beyond §4):** `fulfillment_operating_mode` (§9.1);
+  the Mode 2 prerequisite/config-hold flags the Modes doc §8 names.
+- **Acceptance rows added (beyond §6):** external-fulfillment detection +
+  review cases; state-model raw storage + unknown-value contract;
+  Delivered-inconsistency case; COD scenarios 4–13 state derivation;
+  reconnect catch-up review-landing; Layer 2 compliance (source-level: no
+  mutation path outside Layer 2). See
+  [`wave-4-definition-of-ready.md`](wave-4-definition-of-ready.md) §4 for
+  the consolidated wave-level list.
+- **Test families added (beyond §5):** `test_fulfillment_inbound_evidence`
+  (record layers, uniqueness, ledger), `test_fulfillment_origin_classification`
+  (evidence stack incl. own-GID precedence and unknown→external default),
+  `test_fulfillment_state_model` (the State model §10 fixture inventory:
+  56 fixtures incl. `dep_*` and `unknown_*`), `test_fulfillment_review_cases`
+  (tracking import / acknowledge / explicit validation; Delivered
+  inconsistency), `test_fulfillment_cod_interplay` (scenarios 4–13),
+  `test_fulfillment_mode_switch` (state machine, idempotency, rollback),
+  `test_fulfillment_reconnect_catchup`. Exact file names fixed at
+  re-acceptance.
+
+### 9.7 What this addendum does NOT change
+
+Module boundary (no inventory dependency — location display via core's
+cache, [`../03-architecture/modular-architecture-recommendation.md`](../03-architecture/modular-architecture-recommendation.md)
+§2.3); the D-014-2 scope set + TD-002 fix; RA-009/014/022/023 constraints;
+the §8 prompt's hard constraints (which must be re-issued, extended with
+§9.1–§9.6, not weakened).
