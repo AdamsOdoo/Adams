@@ -7,32 +7,65 @@
 > order without opening Shopify.** Every enum value below is a [Fact] taken
 > verbatim from
 > [`../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md`](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)
-> §6 (all four state families, live-verified against API 2026-07 on
-> 2026-07-16); no values are invented. Labels/badges/behaviors are
+> §6 (all seven Shopify fulfillment enum families — Layer A — re-verified
+> value-for-value against API 2026-07 on 2026-07-16, including A7
+> `FulfillmentDisplayStatus`); no values are invented. Labels/badges/behaviors are
 > [Proposed product decision] unless marked otherwise. Companion:
 > [`fulfillment-operating-modes.md`](fulfillment-operating-modes.md)
 > (Modes 1/2, review-case and reconciliation semantics referenced throughout).
 
 ---
 
-## 1. Concept separation
+## 1. Authoritative fulfillment-state taxonomy (four layers)
 
-[Proposed product decision] The UI and data model keep **six concepts
-strictly separate** — one badge each, never merged into a single "status":
+[Proposed product decision] The connector organizes fulfillment state into one
+authoritative taxonomy of **four layers**. Each layer answers a different
+question and carries its own badge — layers are never merged into a single
+"status". This supersedes earlier loose wording ("four families" / "six
+concepts"); use the layer names below everywhere.
 
-| # | Concept | Lives where | Answers | Example values |
-|---|---|---|---|---|
-| 1 | **Odoo delivery state** | `stock.picking.state` [Fact — Odoo capture §2] | What has the warehouse done? | `draft`, `waiting`, `confirmed`, `assigned`, `done`, `cancel` |
-| 2 | **Shopify order fulfillment summary** | `Order.displayFulfillmentStatus` | Roll-up: how fulfilled is the order overall? | §2 table |
-| 3 | **Shopify FulfillmentOrder work state** | `FulfillmentOrder.status` + `requestStatus` | What work is open/held/scheduled at which location? | §3 tables |
-| 4 | **Shopify Fulfillment result** | `Fulfillment.status` | Did a concrete shipment record succeed? | §4 table |
-| 5 | **Carrier / tracking milestone** | `FulfillmentEvent.status` + `trackingInfo` | Where is the parcel physically? | §5 table |
-| 6 | **Connector reconciliation state** | connector evidence records (File A §5) | Has the connector matched this to Odoo, and how? | `observed`, `under_review`, `auto_matched`, `applied`, `acknowledged`, `rejected`, `superseded` |
+**Layer A — Shopify enum families (7).** The official GraphQL enums, re-verified
+value-for-value against Shopify Admin API **2026-07** on 2026-07-16 (all seven,
+including A7 `FulfillmentDisplayStatus`). Stored raw, normalized for
+display/logic, unknown values handled per §7.
+
+| # | GraphQL enum | Active | Deprecated | Role | Detail |
+|---|---|---|---|---|---|
+| A1 | `OrderDisplayFulfillmentStatus` | 7 | 3 (`OPEN`, `PENDING_FULFILLMENT`, `RESTOCKED`) | order-level roll-up (display) | §2 |
+| A2 | `FulfillmentOrderStatus` | 7 | 0 | FO work state (automation input, D-014-4) | §3.1 |
+| A3 | `FulfillmentOrderRequestStatus` | 8 | 0 | fulfillment-service signal (display + gating) | §3.2 |
+| A4 | `FulfillmentStatus` | 4 | 2 (`OPEN`, `PENDING`) | Fulfillment result (Mode 2 cond. 2 gate) | §4 |
+| A5 | `FulfillmentEventStatus` | 11 | 0 | carrier milestone (display only) | §5 |
+| A6 | `FulfillmentHoldReason` | 8 | 0 | hold detail (display only) | §3.3 |
+| A7 | `FulfillmentDisplayStatus` | 18 | 0 | `Fulfillment.displayStatus` roll-up — **display only, never an automation input** | §4.1 |
+
+**Layer B — Shopify non-enum status surfaces.** `trackingInfo`
+(`company`/`number`/`url`); timestamps `inTransitAt` / `deliveredAt` /
+`estimatedDeliveryAt` / `fulfillAt`; `FulfillmentHold.displayReason` /
+`reasonNotes`; `assignedLocation`; remote `updatedAt`; booleans/flags.
+Evidence/display; never standalone enum families.
+
+**Layer C — connector-derived states.** Reconciliation state (`observed`,
+`under_review`, `auto_matched`, `applied`, `acknowledged`, `rejected`,
+`superseded`), origin classes (`connector`, `external_merchant`,
+`external_service`, `carrier_event_only`), and the Delivered-inconsistency case
+(§8). Connector states — **not** Shopify enums (evidence records, File A §5).
+
+**Layer D — user-facing summary labels.** Not started, Ready to fulfill, In
+progress, Partially shipped, Fulfilled, In transit, Delivered, On hold,
+Scheduled, Exception, Failed, Cancelled, Manual review, Unknown. UX summaries —
+**not** API values; the per-value tables in §2–§5 bind each raw Layer-A value to
+its Layer-D label/badge.
+
+**Odoo-side (not a Shopify layer) — Odoo delivery state:** `stock.picking.state`
+(`draft`/`waiting`/`confirmed`/`assigned`/`done`/`cancel`; Odoo capture §2) —
+what the warehouse has actually done, and the authority for real stock movement.
 
 [Fact] Shopify itself directs detailed processing state away from the
-order-level summary and to FulfillmentOrder (capture §6.1). [Proposed product
-decision] Concept 5 is informational only: **a carrier milestone never
-changes concepts 1 or 6 by itself** (§8).
+order-level summary (A1) and to FulfillmentOrder (A2, capture §6.1). [Proposed
+product decision] Layer A5 (carrier milestones) is informational only: **a
+carrier milestone never changes the Odoo delivery state or a Layer-C
+reconciliation state by itself** (§8).
 
 **Column key for §2–§5 tables:** *Raw* = stored raw Shopify value (always
 persisted verbatim). *Label* = simplified Odoo-facing label. *Badge/Icon* =
@@ -136,6 +169,26 @@ condition 2 gates on.
 
 Deprecated `OPEN`, `PENDING` → §6. Unknown future value → §7.
 
+### 4.1 `Fulfillment.displayStatus` — `FulfillmentDisplayStatus` (A7; 18 active — verified 2026-07-16)
+
+[Fact — verified against Shopify Admin API 2026-07 on 2026-07-16] The
+`Fulfillment.displayStatus` field exposes a **display roll-up** enum with 18
+values: `ATTEMPTED_DELIVERY`, `CANCELED` (one "L" — distinct from A4
+`CANCELLED`), `CARRIER_PICKED_UP`, `CONFIRMED`, `DELAYED`, `DELIVERED`,
+`FAILURE`, `FULFILLED`, `IN_TRANSIT`, `LABEL_PRINTED`, `LABEL_PURCHASED`,
+`LABEL_VOIDED`, `MARKED_AS_FULFILLED`, `NOT_DELIVERED`, `OUT_FOR_DELIVERY`,
+`PICKED_UP`, `READY_FOR_PICKUP`, `SUBMITTED`; **no deprecated values**. This
+resolves the former open question about A7.
+
+[Proposed product decision] A7 is **display only and is never an automation
+input.** It combines fulfillment result (A4) and carrier-milestone (A5) signals
+into a single merchant-facing label, so the connector may surface it as
+supplementary display text on a fulfillment, but **all automation and
+reconciliation logic keys on the authoritative families** — A4 `FulfillmentStatus`
+(Mode 2 condition 2), A2 `FulfillmentOrderStatus` (FO selection), and the File A
+§4 checklist — never on A7. A7 values not in this list follow the §7
+unknown-value contract. No A7 value ever validates Odoo stock (§8).
+
 ---
 
 ## 5. Carrier milestones — `FulfillmentEventStatus` (11 active — capture §6.4) + tracking info
@@ -143,7 +196,7 @@ Deprecated `OPEN`, `PENDING` → §6. Unknown future value → §7.
 [Fact] Tracking display data: `trackingInfo` (`company`, `number`, `url`) and
 timestamps `inTransitAt` / `deliveredAt` / `estimatedDeliveryAt` on the
 Fulfillment (capture §6.3). [Proposed product decision] **Every** milestone is
-concept-5 display only: outbound = none; inbound = update milestone timeline
+Layer A5 (carrier-milestone) display only: outbound = none; inbound = update milestone timeline
 on the evidence record; retry = n/a; **no milestone ever changes Odoo stock
 or connector reconciliation state** (§8). Per-value specifics:
 
@@ -220,7 +273,7 @@ Fixture per family: `unknown_order_sum`, `unknown_fo_status`,
 [Proposed product decision — binding direction restated]
 
 1. **A carrier `DELIVERED` milestone (or `Fulfillment.deliveredAt`) NEVER
-   independently validates Odoo stock.** Concept 5 cannot write concept 1.
+   independently validates Odoo stock.** Layer A5 (carrier milestones) cannot write the Odoo delivery state.
    Rationale: carrier milestones are third-party display data with no line,
    lot, or location evidence — none of File A §4's conditions are satisfiable
    from a milestone.
@@ -255,8 +308,8 @@ final-bound there, semantics bound here:
 | **critical** | Needs action; pinned visibility | `badge-danger` | alert-octagon, alert-decagram |
 | *(unknown)* | Unrecognized value (§7) | `badge-unknown` | help-circle |
 
-Rules: one badge per concept (§1); severities never downgrade by roll-up (an
-order row shows the max severity across its concepts); color is never the
+Rules: one badge per layer/family (§1); severities never downgrade by roll-up (an
+order row shows the max severity across its layers); color is never the
 only signal (icon + label always present — accessibility rule of the design
 system).
 
@@ -272,21 +325,23 @@ severity per its table row; permitted/blocked actions enforced;
 outbound/inbound/retry/review behavior; expected Odoo relation; and (for
 `unknown_*`) all five §7 contract points. Cross-file fixtures for File A
 scenarios (Mode 2 checklist, mode switching, Delivered-inconsistency) live in
-`../05-qa/fulfillment-mode-uat-matrix.md` (companion deliverable — pending).
+`../05-qa/fulfillment-mode-uat-matrix.md` (companion deliverable).
 
 ## 11. Proposed decisions and open questions
 
-**Proposed decisions.** 1. Six-concept separation with one badge each (§1).
-2. Per-value mapping tables §2–§5 as the complete Odoo-facing vocabulary.
+**Proposed decisions.** 1. Four-layer taxonomy — Layer A (seven Shopify enum
+families), Layer B (non-enum surfaces), Layer C (connector-derived states),
+Layer D (user-facing labels) — one badge per layer (§1).
+2. Per-value mapping tables §2–§5 (+ §4.1 A7) as the complete Odoo-facing vocabulary.
 3. Deprecated values stored-raw + normalized (§6). 4. Unknown-value contract
 (§7). 5. Carrier Delivered never validates stock + the defined
 high-visibility inconsistency case (§8). 6. Severity/badge vocabulary (§9).
 
 **Open questions.**
-1. [Open question] `Fulfillment.displayStatus` enum values were not captured
-   on 2026-07-16 — this model builds display from the four verified families;
-   verify whether `FulfillmentDisplayStatus` adds values worth mapping before
-   Wave 4 freeze.
+1. [Resolved 2026-07-16] `Fulfillment.displayStatus`
+   (`FulfillmentDisplayStatus`, A7) was re-verified against API 2026-07 on
+   2026-07-16 — 18 values, no deprecations (§4.1) — and mapped as display-only,
+   never an automation input. No open item remains for this enum.
 2. [Open question] Per-topic fulfillment webhook payload schemas (capture
    §13.7) — which fields of these families arrive in each payload vs require
    a follow-up read.
