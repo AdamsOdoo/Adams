@@ -2,13 +2,45 @@
 
 ## Status
 
-**Odoo.sh build 34968318 exposed a production transition-matrix regression; the product-owner-approved correction is implemented at `2b6d9d8259fada252abca19407d1df53bed9e66f` and awaits an exact-head rerun.**
+**Odoo.sh build 34985521 validates the complete Wave 1 production behavior and substantive SRR-03 criteria at `d9d2dd018470054944db064cdd553160232713cd`; one test-only AST guard remained and is corrected at `b42042d641ce2d02cad9559a03fcb268ceaac3bc` pending final exact-head verification.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, open, unmerged)
 - **Date:** 2026-07-16
-- **Binding clarifications:** product-owner rulings PR #172 comments `4982429209`, `4982750956`, and runtime-correction ruling `4984719237`
-- **Runtime claim:** Build 34968318 is a failed diagnostic run against pre-correction head `62b2645f69280aadc68a56045a26bef2063c5821`; no post-correction runtime pass is claimed.
+- **Binding clarifications:** product-owner rulings PR #172 comments `4982429209`, `4982750956`, `4984719237`, and accepted runtime ruling `4988098888`
+- **Runtime claim:** Build 34985521 is accepted production/SRR-03 evidence for exact SHA `d9d2dd018470054944db064cdd553160232713cd`. Final Wave 1 success is not claimed until the test-only correction passes at the new exact head.
+
+## Accepted exact-head runtime evidence — build 34985521
+
+- **Database / Odoo:** `adamsmen-sol-wave-1-readonly-foundation-34985521`; Odoo 19.0.
+- **Exact tested SHA:** `d9d2dd018470054944db064cdd553160232713cd`.
+- **Fresh install:** `1 failed / 0 errors / 634 tests`; the only failure was `TestJobDispatch.test_source_level_job_enqueue_only_creates_job_model`, a stale test-only AST receiver helper.
+- **Focused Wave 1:** `0 failed / 0 errors / 105 tests`.
+- **Full domain suites:** product `0/0/176`; sale `0/0/107`.
+- **Lifecycle:** `0/0/9`, including the accepted uninstall/reinstall behavior.
+- **Issue #157:** the exact base-Odoo `notification_type`/`color_scheme` post-init fixture artifact was isolated only through the documented reversible database-default accommodation. No Wave 1 failure was classified under #157.
+- **SRR-03:** all 11 genuine independent-connection classes passed in each of three distinct OS-process repetitions. The run exercised real PostgreSQL `40001` conflicts and lock timeouts and proved exact-job re-lock, zero handler replay, fail-closed replay policy, disconnect/admission ordering, and zero leaked leases, jobs, workers, sessions, cursors, or cron triggers.
+- **Residue/security:** clean; no credential, token, header, raw PII, or temporary-path leakage.
+
+Product-owner ruling `4988098888` accepts the substantive SRR-03 runtime
+criteria as satisfied. The authoritative risk row remains **OPEN pending final
+exact-head reconciliation only** because the fresh install retained the single
+test-only AST failure.
+
+### Test-only AST correction
+
+Commit `b42042d641ce2d02cad9559a03fcb268ceaac3bc` changes only
+`test_job_dispatch.py`. The helper recursively unwraps exactly `sudo`,
+`with_context`, `with_company`, `with_user`, and `with_env`; arbitrary
+wrappers still resolve to `None`. The production guard still appends every
+resolved value (including `None`) and asserts the complete list equals exactly
+`['shopify.connector.job']`.
+
+Static verification: the changed Python file parses, and five focused helper
+cases pass for bare access, `sudo()`, an approved chain, another model, and an
+unapproved wrapper. No production, sudo behavior, transition, replay policy,
+ACL, manifest, migration, or lifecycle behavior changed. No final Wave 1
+success or SRR-03 closure is claimed before the corrected exact-head rerun.
 
 ## Binding product-owner clarification
 

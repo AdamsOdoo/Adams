@@ -1,6 +1,38 @@
 # CORE-R2 — Foundation Slice 1 — Validation Results
 
 
+## Wave 1 substantive runtime proof — build 34985521 (2026-07-16)
+
+Odoo.sh 19 build `34985521` ran draft PR #172 at exact SHA
+`d9d2dd018470054944db064cdd553160232713cd` on database
+`adamsmen-sol-wave-1-readonly-foundation-34985521`. The fresh all-module run
+reported `1 failed / 0 errors / 634 tests`; the sole failure was the stale
+test-only AST helper in
+`TestJobDispatch.test_source_level_job_enqueue_only_creates_job_model`.
+Focused Wave 1 tests were `0/0/105`; product was `0/0/176`; sale was
+`0/0/107`; lifecycle was `0/0/9`.
+
+All 11 genuine independent-connection SRR-03 classes passed in each of three
+distinct OS-process repetitions. Real PostgreSQL `40001` conflicts and lock
+timeouts were exercised. Exact-job re-locking, no handler replay, fail-closed
+replay policy, disconnect/admission ordering, and zero leaked leases, jobs,
+workers, sessions, cursors, and cron triggers were proven. Residue and
+credential/PII scans were clean. Issue #157 was limited to the accepted exact
+`notification_type`/`color_scheme` base-Odoo post-init fixture artifact
+under the documented reversible database-only accommodation.
+
+Product-owner ruling `4988098888` accepts the substantive SRR-03 runtime
+criteria as satisfied. The authoritative risk row remains **OPEN pending final
+exact-head reconciliation only**. Test-only correction
+`b42042d641ce2d02cad9559a03fcb268ceaac3bc` changes no production code and
+does not require repeating the three-process matrix. Final closure requires the
+targeted AST guard, fresh all-module run, full core suite after the documented
+#157 accommodation, one combined genuine-class smoke run, final
+residue/security audit, and restoration of both temporary database defaults at
+the new exact head.
+
+
+
 ## Wave 1 runtime-correction checkpoint — build 34968318 (2026-07-16)
 
 Odoo.sh 19 build `34968318` ran draft PR #172 at exact SHA

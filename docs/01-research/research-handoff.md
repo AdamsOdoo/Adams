@@ -1,3 +1,14 @@
+### Wave 1 build 34985521 / test-only AST correction — compact handoff (2026-07-16)
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
+- **Accepted runtime:** Odoo.sh 19 build `34985521`, database `adamsmen-sol-wave-1-readonly-foundation-34985521`, exact SHA `d9d2dd018470054944db064cdd553160232713cd`. Fresh `1 failed / 0 errors / 634`, with only the stale enqueue AST guard failing; focused Wave 1 `0/0/105`, product `0/0/176`, sale `0/0/107`, lifecycle `0/0/9`.
+- **SRR-03 evidence:** all 11 genuine independent-connection classes passed in each of three distinct OS-process repetitions with real `40001` conflicts/lock timeouts, exact-job re-lock, no handler replay, fail-closed policy, disconnect/admission ordering, and zero lease/job/worker/session/cursor/cron-trigger residue. Security and PII scans were clean.
+- **Issue #157:** only the exact `notification_type`/`color_scheme` base-Odoo post-init fixture artifact used the documented reversible DB-only accommodation; no Wave 1 failure was reclassified.
+- **Correction:** `b42042d641ce2d02cad9559a03fcb268ceaac3bc` changes only `test_job_dispatch.py`. `_env_model_name()` recursively unwraps the explicit `sudo`, `with_context`, `with_company`, `with_user`, and `with_env` allowlist; arbitrary wrappers remain `None`; the production guard still compares the complete target list exactly to `['shopify.connector.job']`.
+- **Static proof:** changed Python parses; five helper cases pass. No production, sudo, transition, replay-policy, ACL, manifest, migration, lifecycle, or PII behavior changed.
+- **Gate:** product-owner ruling `4988098888` accepts substantive SRR-03 runtime criteria, but the authoritative row remains OPEN pending final corrected exact-head verification. Do not claim Wave 1 success, mark PR ready, merge, or start Wave 2.
+- **Next:** targeted AST guard; fresh all-module run; full core after accepted #157 accommodation; one combined genuine-class smoke run; final residue/security audit; drop both temporary DB defaults and record restoration.
+
 ### Wave 1 SEC-1/CORE-R2 runtime correction — compact handoff (2026-07-16)
 
 - **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
