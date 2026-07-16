@@ -47,19 +47,19 @@ resolved by this ruling.
 
 | # | Workstream | Status |
 |---|---|---|
-| 0 | Prerequisites, branch, draft PR, hazard disposition | **IN PROGRESS** |
-| 1 | Complete repository preflight (docs, decisions, packets, prototype, code inventory) | Pending |
-| 2 | Remaining-gap inventory | Pending |
-| 3 | Official Shopify evidence refresh (orders/financial states, fulfillment models, inventory, product/media, abandoned checkouts, rate limits, API versioning) | Pending |
-| 4 | Official Odoo 19 evidence refresh | Pending |
-| 5 | Competitor + UX benchmark refresh | Pending |
-| 6 | Product: roles (2-role model), order import/confirmation, abandoned checkouts, COD lifecycle, fulfillment modes, Shopify state mapping, reconnect/backfill, inventory, product export, Lite/Full packaging | Pending |
-| 7 | Architecture: modular boundaries, domain flows, DEC-031 Layer 2 (Proposed), reconciliation matrix, retention/audit, performance architecture | Pending |
-| 8 | Premium UX master specification + static prototype | Pending |
-| 9 | Implementation planning: Waves 2–6 DoR + packets (012, 013/013B, 014, 015/015B, U1–U3, PERF-1, Wave 6) | Pending |
-| 10 | QA/release: test matrices, UAT matrices, performance SLO plan, security/PII matrix, readiness checklists | Pending |
-| 11 | Consolidated decision pack (all Proposed; none accepted) | Pending |
-| 12 | Adversarial self-review (20 tracks) + final control-room handoff | Pending |
+| 0 | Prerequisites, branch, draft PR #173, hazard disposition | **DONE** (`33c1f96`) |
+| 1 | Complete repository preflight (docs, decisions, packets, prototype, code inventory) | **DONE** (six parallel read-only agents, 2026-07-16) |
+| 2 | Remaining-gap inventory | **DONE** (`../01-research/mvp-remaining-gap-inventory.md`, `cdbc457`) |
+| 3 | Official Shopify evidence refresh | **DONE** (`../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md`, `b7b6e41`) |
+| 4 | Official Odoo 19 evidence refresh | **DONE** (`../00-source-materials/odoo19-sale-stock-security-captures-2026-07-16.md`) |
+| 5 | Competitor + UX benchmark refresh | **DONE** (`../00-source-materials/competitor-refresh-2026-07-16.md` + dated deltas in `../01-research/`) |
+| 6 | Product definitions (two-role model, order confirmation, abandoned checkouts, COD, fulfillment modes + Shopify state model, reconnect/backfill, inventory, product export, capability map) | **DONE** (ten canonical docs in `../02-product/`, commits `2f6e778`, `0fa54a4`, `52a1566`, `3ecd1cf`) |
+| 7 | Architecture: modular recommendation; DEC-031 Layer 2 Proposed design + mutation reconciliation matrix; DEC-031 record revision note | **DONE** (`4ae737f`, `c86cc36`) |
+| 8 | Premium UX master specification + static prototype extension (12 new surfaces) | IN PROGRESS |
+| 9 | Implementation planning: Waves 2–6 DoR + packet addenda + U2/U3 prompts + Wave 6 packet + dependency/gate map | IN PROGRESS |
+| 10 | QA/release: cross-domain test matrix, COD/fulfillment-mode/reconnect-backfill UAT matrices, SLO/benchmark plan, security/PII matrix, release gap list | IN PROGRESS |
+| 11 | Documentation-consistency reconciliation (DEC-025/026/028/029 dated notes, stale packet/README notes, `-proposed` supersession banners) | **DONE** (`fc56898`) |
+| 12 | Consolidated decision pack; adversarial 20-track self-review; final control-room handoff | Pending |
 
 ## Standing boundaries (unchanged)
 
