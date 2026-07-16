@@ -73,6 +73,52 @@ all earlier D-SEC1-7 coverage including `original_job_type`,
 `cancel_reason`, binding identity, PII, retention, transitions, and sanctioned
 writers.
 
+## Consolidated binding mutation-surface amendment (PR #172 comment `4988842625`)
+
+The product-owner ruling is a binding SEC-1 completeness correction, not a new
+architecture or scope expansion. Every connector-owned field on each current
+binding is classified as:
+
+1. identity/structural;
+2. system-maintained state, provenance, or imported snapshot;
+3. computed/non-stored; or
+4. intentionally user-editable configuration.
+
+Classes 1 and 2 are protected from generic non-su `create()` and `write()`,
+including attempts to clear a field. Class 3 is not a generic write surface.
+There are no accepted class-4 fields on the current product/customer binding
+surface. Odoo's automatic access-log fields remain ORM-maintained.
+
+The common protected set is `store_id`, `shopify_gid`, the concrete
+`_odoo_binding_field_name()` field, `status`, `match_key`, `matched_by_uid`,
+`matched_at`, `override_uid`, `override_at`, and
+`override_previous_candidate`. Concrete additional protected sets are:
+
+- product template: `shopify_title`, `shopify_status`,
+  `shopify_primary_image_url`, `shopify_last_imported_at`,
+  `shopify_updated_at`, `shopify_image_checksum`;
+- product variant: `product_template_binding_id`, `shopify_option_values`,
+  `shopify_price_snapshot`, `shopify_compare_at_price_snapshot`,
+  `shopify_last_imported_at`, `shopify_primary_image_url`,
+  `shopify_image_checksum`;
+- customer: `shopify_display_name`, `shopify_email_snapshot`,
+  `shopify_phone_snapshot`, `shopify_last_imported_at`.
+
+`pii_snapshot_masked` is computed/non-stored. The mixin exposes exactly one
+`_additional_protected_binding_fields()` extension seam; each concrete binding
+declares its set without core hardcoding domain model names. A classification
+assertion fails closed on unknown protected names or any connector-owned stored
+field omitted from the protected union. Every future binding packet must
+classify each stored field, declare its concrete protected set, and add an
+exact-set test.
+
+The sanctioned-writer inventory remains limited to `action_override_binding()`,
+the product/customer importers, product stale handling, manual PII masking, and
+the retention sweep. The product importer requires two exact-site elevations
+for its pre-existing non-su existing-variant snapshot refresh and image
+ownership-checksum write. No public method, recordset, ACL, group, context
+bypass, model, table, job type, or job source is broadened.
+
 ## 1. The verified current exposure (facts, file:line)
 
 1. **[Fact]** `ir.model.access.csv` (core) grants `perm_write=1` on
@@ -223,11 +269,12 @@ explicit group check (`has_group`), matrix-legal transition, audit
 log row with actor, then su-elevated write. No force/bypass parameter
 exists anywhere (merged invariant restated).
 
-**D-SEC1-4 — Binding identity immutability + audited override
+**D-SEC1-4 — Binding identity/structure/system-surface immutability + audited override
 (exact, RPC-safe contract — re-review `4945129824` item 6).** On the
-binding mixin: identity fields (`store_id`, `shopify_gid`, the
-per-model Odoo-record M2o, `match_key`) become su-protected exactly
-like D-SEC1-2.
+binding mixin, all class-1 identity/structural and class-2 system-maintained
+state/provenance/imported-snapshot fields become su-protected exactly like
+D-SEC1-2. The exact current sets are fixed by the consolidated amendment
+above.
 
 **Mixin seam.** The abstract mixin declares
 `_odoo_binding_field_name()` returning the name of the concrete
@@ -305,10 +352,12 @@ that declared comodel. It:
    Odoo-record field — all in one **su** write after the checks (the
    sanctioned sudo path).
 
-Snapshot fields stay ordinarily writable by the importer only (they
-are already `readonly=True` in UI; importer writes are su per
-D-SEC1-2's importer adjustment). Unlink stays denied for every group
-(existing posture).
+Snapshot fields remain writable only by sanctioned connector services; their
+`readonly=True` UI declaration is not relied upon for server-side security.
+Importer, stale, PII mask, retention, and override writes use only the exact
+protected-site elevation named in the writer inventory. Generic create/write
+of identity, structure, system state, provenance, and snapshots is denied for
+all four roles. Unlink stays denied for every group (existing posture).
 
 **D-SEC1-5 — Least-privilege PII snapshots.** The customer-binding
 PII fields (`shopify_email_snapshot`, `shopify_phone_snapshot`,
@@ -360,7 +409,14 @@ sanctioned method), binding
 `create()` bypassing enqueue, `unlink()` everywhere, PII field read,
 masked-field read, each sanctioned method with and without the
 required group, matrix-illegal transitions via sanctioned methods,
-and a sudo-path regression (dispatcher/importer still function).
+and a sudo-path regression (dispatcher/importer still function). The binding
+matrix additionally covers every common and concrete protected field on all
+three current binding models, for all four roles, through individual generic
+`create()`, alter, and clear attempts. Each refusal proves no row change and no
+audit carrier/log. Exact protected-set and stored-field-classification
+assertions make omissions fail closed; the sanctioned product/customer
+importers, stale/review paths, override provenance/audit, manual mask, and
+retention sweep retain positive regressions.
 **`action_override_binding` negative RPC set (re-review `4947866018`
 item 6):** non-int / malformed `new_record_id`; a **non-existent id
 (absent from the declared comodel)** → reject (this replaces the
@@ -400,17 +456,19 @@ core-task rule, with the exhaustive allowlist below.
   `action_manual_retry()`/`action_cancel()` write sites only — DEC-034;
   no behavior change to either method)
 - `addons/shopify_connector_core/models/shopify_connector_binding_mixin.py`
-  (protected-field guard, `action_override_binding`, and the
-  `_odoo_binding_field_name()` seam defaulting to `False`)
+  (complete protected-field guard, fail-closed stored-field classification,
+  `action_override_binding`, `_odoo_binding_field_name()` defaulting to
+  `False`, and the reusable `_additional_protected_binding_fields()` seam)
 - the concrete-binding `_odoo_binding_field_name()` one-liners on the
   **three** models existing at this gate (corrected 2026-07-15,
   DEC-034 — the order-binding file does not exist and is removed from
   this allowlist; Task 012 declares its own seam in its own packet per
   the binding-extension contract):
   `addons/shopify_connector_product/models/shopify_connector_product_template_binding.py`
-  (`return 'product_template_id'`),
+  (`return 'product_template_id'` plus its exact additional protected set),
   `addons/shopify_connector_product/models/shopify_connector_product_variant_binding.py`
-  (`return 'product_variant_id'`) — one line each (the customer
+  (`return 'product_variant_id'` plus its exact additional protected set)
+  (the customer
   binding's is added with its PII change below)
 - `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`,
   `shopify_connector_job_enqueue.py`,
@@ -428,7 +486,7 @@ core-task rule, with the exhaustive allowlist below.
 - `addons/shopify_connector_sale/models/shopify_connector_customer_binding.py`
   (field `groups=` + masked compute + the two-line
   `_pii_snapshot_fields()` override + the `_odoo_binding_field_name()`
-  one-liner returning `partner_id`)
+  one-liner returning `partner_id` + its exact additional protected set)
 - `addons/shopify_connector_sale/models/shopify_connector_customer_importer.py`
   (snapshot/binding-write su adjustment only — its binding-create
   sites set protected identity fields)
@@ -462,7 +520,11 @@ regressions + retention sweep (masking, summary log, append-only
 preserved) + `action_mask_customer_pii`.
 `test_pii_least_privilege.py` — field-groups enforcement per group;
 masked compute format; order-binding pattern note (activated with
-Task 012). All existing suites must stay green — in particular
+Task 012), Reviewer/Admin audited override proof, masking, and retention.
+The three current binding test files assert exact protected sets and exhaust
+all four roles × individual create/alter/clear attempts, including no-write/
+no-audit refusal and the fail-closed future-field contract. All existing
+suites must stay green — in particular
 Task 010/011 importer suites (su adjustments must not change
 behavior).
 

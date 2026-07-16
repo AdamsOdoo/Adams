@@ -2,15 +2,100 @@
 
 ## Status
 
-**Odoo.sh build 34986844 validates exact head `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` fully green; SEC-1 and Wave 1 are implementation-complete/runtime-green, and SRR-03 is CLOSED pending only Claude control-room review and merge of draft PR #172.**
+**SEC-1 binding-surface correction implemented and static-green; corrected
+exact-head Odoo.sh revalidation is required before Wave 1 can return to
+runtime-green. SRR-03 remains CLOSED.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, open, unmerged)
 - **Date:** 2026-07-16
-- **Binding clarifications:** product-owner rulings PR #172 comments `4982429209`, `4982750956`, `4984719237`, and accepted runtime ruling `4988098888`
-- **Runtime claim:** Build 34986844 is final exact-head evidence: targeted `0/0/2`, fresh `0/0/635`, standard `0/0/635`, genuine smoke `0/0/41`, clean residue/security, and issue #157 defaults removed/restored.
+- **Binding clarifications:** product-owner rulings PR #172 comments
+  `4982429209`, `4982750956`, `4984719237`, `4988098888`, and consolidated
+  mutation-surface ruling `4988842625`.
+- **Current production correction:** `36974edc68c1985e6ccfae8f6bb5c7386f820156`
+  (`fix(sec1): protect complete binding system surface`).
+- **Runtime claim:** Build 34986844 remains valid for its exact prior code SHA
+  `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` only. It does not validate the
+  new production correction.
+
+## Consolidated binding mutation-surface correction
+
+The complete current binding surface was inventoried before editing.
+
+- **Class 1 — identity/structural:** `store_id`, `shopify_gid`, each
+  concrete Odoo binding field, and variant `product_template_binding_id`.
+- **Class 2 — system-maintained state/provenance/imported snapshot:**
+  `status`, `match_key`, `matched_by_uid`, `matched_at`, `override_uid`,
+  `override_at`, `override_previous_candidate`, and every Shopify snapshot/
+  timestamp/checksum field declared by the three concrete bindings.
+- **Class 3 — computed/non-stored:** customer `pii_snapshot_masked`.
+- **Class 4 — intentionally user-editable configuration:** none.
+- **ORM automatic metadata:** `id`, `display_name` and Odoo access-log fields
+  remain framework-maintained and outside the connector mutation surface.
+
+The mixin now unions the common protected set, the concrete
+`_odoo_binding_field_name()`, and one reusable
+`_additional_protected_binding_fields()` seam. Its classification assertion
+fails closed if a protected name is unknown or any connector-owned stored
+field is omitted. Generic non-su create/write/clear is denied for all protected
+fields with error text covering identity, structure, system state, provenance,
+and imported snapshots.
+
+**Exact protected sets:**
+
+- Product template (16): `store_id`, `shopify_gid`,
+  `product_template_id`, `status`, `match_key`, `matched_by_uid`,
+  `matched_at`, `override_uid`, `override_at`,
+  `override_previous_candidate`, `shopify_title`, `shopify_status`,
+  `shopify_primary_image_url`, `shopify_last_imported_at`,
+  `shopify_updated_at`, `shopify_image_checksum`.
+- Product variant (17): `store_id`, `shopify_gid`, `product_variant_id`,
+  `status`, `match_key`, `matched_by_uid`, `matched_at`, `override_uid`,
+  `override_at`, `override_previous_candidate`,
+  `product_template_binding_id`, `shopify_option_values`,
+  `shopify_price_snapshot`, `shopify_compare_at_price_snapshot`,
+  `shopify_last_imported_at`, `shopify_primary_image_url`,
+  `shopify_image_checksum`.
+- Customer (14): `store_id`, `shopify_gid`, `partner_id`, `status`,
+  `match_key`, `matched_by_uid`, `matched_at`, `override_uid`,
+  `override_at`, `override_previous_candidate`, `shopify_display_name`,
+  `shopify_email_snapshot`, `shopify_phone_snapshot`,
+  `shopify_last_imported_at`.
+
+**Legitimate writer inventory:** mixin `action_override_binding()`; product
+template/variant importer create, refresh, stale/review, safe-refresh timestamp,
+and image-ownership checksum sites; customer importer create/refresh sites;
+manual PII mask; retention sweep. Customer importer and PII paths were already
+sanctioned. Product importer adds only two exact-site elevations: existing
+variant `snapshot_vals` refresh and post-image
+`shopify_image_checksum` ownership update.
+
+**Sudo delta:** core and sale production inventories are unchanged. Product
+importer changes from 9 to 11 syntactic `.sudo(` sites, exactly the two
+legitimate writers above. No context bypass, broad public-method elevation, ACL
+change, group, model, table, job type, job source, transition, replay-policy,
+or SRR-03 behavior changed.
+
+**Static proof:** all nine changed Python implementation/test sources parse;
+the concrete additional sets are exactly 6/7/4 fields; the product importer
+contains one sudoed existing-variant snapshot refresh and one sudoed checksum
+write, with no direct checksum assignment; exhaustive four-role tests cover
+individual generic create/alter/clear for all 16/17/14 protected fields,
+no-write/no-audit refusal, exact-set classification, fail-closed future
+omission, sanctioned importer regressions, audited Reviewer/Admin override,
+manual mask, and retention.
+
+**Corrected-head runtime state:** pending. Required: targeted binding
+protection, focused SEC-1/PII, product/customer binding and importer suites,
+fresh install, full core/product/sale, lifecycle, combined SRR-03 smoke, clean
+residue/security audit, and reversible issue #157 accommodation if needed.
 
 ## Final exact-head runtime evidence — build 34986844
+
+> Historical exact-SHA evidence for the code before correction commit
+> `36974edc68c1985e6ccfae8f6bb5c7386f820156`. The results below remain valid
+> for `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` and do not validate the new
+> binding guard.
 
 - **Database / Odoo:** `adamsmen-sol-wave-1-readonly-foundation-34986844`; Odoo 19.0.
 - **Exact tested SHA:** `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`, matched at session start and end; working tree clean.
@@ -123,7 +208,9 @@ The final Stage 4 record must include:
 - **Exact core sudo inventory (AST):** binding mixin 1; job 8; job actions 2;
   dispatcher 2; enqueue 1; PII retention 5; readiness 3; store 8; plus the
   inherited job-log 1 and credential 1 sites. The product importer has 9 and
-  customer importer 3 packet-owned binding writer elevations. Exact-list
+  customer importer 3 packet-owned binding writer elevations. After the
+  consolidated correction, product importer is 11 (two exact additional
+  protected writer sites) and customer importer remains 3. Exact-list
   source guards were updated; no context-flag bypass was introduced.
 - **Ruling proof encoded:** `original_job_type` and `cancel_reason` are in
   the server-side protected set and four-role denial matrix; create-time

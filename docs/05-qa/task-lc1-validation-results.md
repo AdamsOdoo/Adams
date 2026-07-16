@@ -2,7 +2,9 @@
 
 > **Wave 1 Stage 2 implementation record — PR #172, 2026-07-15.**
 > DEC-030 and the locked lifecycle design are binding. This record does not
-> claim Odoo.sh runtime success until the exact-head build section is filled.
+> LC-1 runtime proof was obtained on Odoo.sh build `34986844`. A later SEC-1
+> binding-surface correction changes no LC-1 production path but requires the
+> final Wave 1 exact-head lifecycle regression to be repeated.
 
 ## Scope implemented
 
@@ -15,8 +17,10 @@
   logs are never removed.
 - Product/customer selection-removal callables use the core historic converter.
 - Dispatcher rejects any malformed non-terminal historic job.
-- Core/product/sale versions advance to `19.0.1.8.0`,
-  `19.0.2.1.0`, and `19.0.1.1.0`.
+- The LC-1 stage originally advanced core/product/sale to `19.0.1.8.0`,
+  `19.0.2.1.0`, and `19.0.1.1.0`. The current corrected Wave 1 manifests are
+  `19.0.1.9.1`, `19.0.2.1.2`, and `19.0.1.2.1` after the subsequent
+  JOB-ACTIONS/SEC-1 stages and consolidated security correction.
 
 ## Data-survival posture
 
@@ -64,4 +68,12 @@ do not drop schema. Never delete business records, jobs, or logs during rollback
 
 ## Runtime result
 
-**PENDING exact-head Odoo.sh.** No pass claim is made.
+**Prior LC-1 runtime GREEN:** Odoo.sh 19 build `34986844` at exact prior code
+SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` passed lifecycle `0/0/9`,
+fresh all-module `0/0/635`, and standard `0/0/635`, with clean residue.
+Install/uninstall/reinstall behavior was included in the accepted matrix.
+
+**Current corrected-head status:** revalidation pending after production
+correction `36974edc68c1985e6ccfae8f6bb5c7386f820156`. The correction touches
+binding guards/importer writer elevation only; it does not alter historic-job
+conversion, selection `ondelete`, job/log history, or lifecycle architecture.

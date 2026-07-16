@@ -2,13 +2,16 @@
 
 ## Status
 
-**Implementation complete on draft PR #172; exact-head Odoo.sh runtime pending.**
+**Implementation complete and previously runtime-green on build `34986844`;
+the final corrected Wave 1 exact-head regression is pending after the SEC-1
+binding-surface correction.**
 
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, unmerged)
 - **Stage:** Wave 1 Stage 3
 - **Date:** 2026-07-15
-- **Runtime claim:** None. No Odoo runtime is available in this execution environment; the required Odoo.sh run remains open.
+- **Runtime claim:** Prior exact-SHA JOB-ACTIONS evidence is green; the new
+  corrected head is not yet runtime-validated.
 
 ## Scope implemented
 
@@ -55,8 +58,8 @@ inventory, fulfillment, product-export, or DEC-031 Layer 2 work is present.
 | Packet scope | Manual path/line inventory against §5 allowlist | PASS |
 | Forbidden core edit | `shopify_connector_job.py` unchanged by Stage 3 | PASS |
 | Live Shopify calls | New model has no API-client or transport reference | PASS by source inspection |
-| Odoo.sh focused runtime | `--test-tags /shopify_connector_core:TestJobActions` | **PENDING** |
-| Full core/product/sale runtime | exact-head Odoo.sh matrix | **PENDING** |
+| Odoo.sh focused runtime | `--test-tags /shopify_connector_core:TestJobActions` | **GREEN on build 34986844; corrected-head repeat pending** |
+| Full core/product/sale runtime | exact-head Odoo.sh matrix | **GREEN `0/0/635` on build 34986844; corrected-head repeat pending** |
 
 ## Required exact-head Odoo.sh proof
 
@@ -65,6 +68,13 @@ version, exact checked-out SHA, addon versions, command forms, test tags, test
 counts, warning/error classification, and residue/leak scan. The focused
 JOB-ACTIONS suite and full inherited suites must be green before Wave 1 can be
 claimed complete.
+
+Prior exact-SHA evidence: Odoo.sh 19 build `34986844` at
+`05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` passed the full standard matrix
+`0/0/635` and the Wave 1 focused suites. Production correction
+`36974edc68c1985e6ccfae8f6bb5c7386f820156` changes no JOB-ACTIONS method,
+state vocabulary, transition, role, reason, or audit behavior; the required
+corrected-head repeat remains pending.
 
 ## Rollback
 

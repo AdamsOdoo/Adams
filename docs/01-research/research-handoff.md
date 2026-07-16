@@ -1,3 +1,14 @@
+## 2026-07-16 — Wave 1 consolidated SEC-1 binding correction
+
+- **Branch / PR:** `sol/wave-1-readonly-foundation`; draft PR #172 into `mvp/program-integration`, open and unmerged.
+- **Binding classification:** all current stored connector-owned binding fields are identity/structural or system-maintained state/provenance/imported snapshots; computed/non-stored `pii_snapshot_masked` is not a generic write surface; there are no accepted user-editable class-4 fields on the current product/customer binding surface.
+- **Correction:** product-owner ruling `4988842625` is implemented in production/test commit `36974edc68c1985e6ccfae8f6bb5c7386f820156`. The mixin now has a reusable concrete-field seam plus fail-closed stored-field classification, and the exact template/variant/customer protected sets contain 16/17/14 fields.
+- **Legitimate writers:** audited `action_override_binding()`; product template/variant create, refresh, stale/review, timestamp/checksum maintenance; customer create/refresh; manual PII mask; retention sweep. Only two existing product-importer sites required narrow new elevation: existing-variant refresh and image-checksum persistence. Product-importer `.sudo(` inventory changes 9 → 11; core and sale inventories are unchanged.
+- **Static evidence:** changed Python parses; exact protected sets and stored-field classification are asserted; all four shared roles receive generic create/alter/clear denials; sanctioned override/import/mask/retention paths remain covered; no ACL, group, model, table, job type/source, context bypass, dispatcher, replay-policy, or Wave 2 scope changed.
+- **Runtime boundary:** Odoo.sh build `34986844` remains valid only for its prior exact SHA `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723`. The production security correction requires one complete corrected-head Odoo.sh matrix; no corrected-head runtime success is claimed in this session because authenticated Odoo.sh access is unavailable.
+- **Risk/gates:** SRR-03 remains CLOSED on its independent evidence. Wave 1 is in correction/revalidation, PR #172 remains draft/unmerged, and Wave 2 remains unauthorized and unstarted.
+- **Next action:** runtime operator runs the single complete matrix at the final corrected docs head, records exact build/database/SHA/counts and audit results in one evidence-only commit, then returns PR #172 to Claude for macro-wave re-review.
+
 ### Wave 1 final exact-head closure — compact handoff (2026-07-16)
 
 - **Branch / PR:** `sol/wave-1-readonly-foundation`; PR #172 → `mvp/program-integration`, draft/open/unmerged.
