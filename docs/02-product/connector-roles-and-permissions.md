@@ -98,7 +98,7 @@ Everything above, **plus**:
 | Scheduling | Cron/interval scheduling, queue tuning. |
 | Capabilities | Domain/capability enablement (inventory, product export, fulfillment, abandoned checkouts, COD). |
 | Access | User access configuration (assigning Connector User / Administrator). |
-| Privacy | Retention and privacy controls; PII visibility policy (§3). |
+| Privacy | Retention and privacy controls (§3). No PII masking or PII-visibility toggle exists in the MVP — both roles read the raw operational PII their permitted operations require. |
 | Fulfillment | Fulfillment-mode selection (mode 1 vs mode 2) per store. |
 | Order policy | Order-confirmation policy; COD policy (incl. whether any accounting posting is enabled). |
 | Overrides | Destructive / exceptional overrides (binding overrides beyond ordinary resolution, forced re-sync, destructive-write confirmations designated admin-tier). |
@@ -149,29 +149,46 @@ because the protections were never delivered by role scarcity alone:
    first push, no silent notifications, no auto accounting) are process
    guards, not role guards — they apply identically to the User.
 
-## 3. PII visibility
+## 3. PII access (no masking in the MVP)
 
-- [Fact — repo] Today, customer PII snapshot fields carry field-level
-  `groups=reviewer,admin`; lower roles see a computed masked display.
-- **[Proposed product decision]** In the two-role model: **Connector User
-  sees masked PII by default; unmasked PII is Administrator-only, with a
-  per-store, Administrator-configurable toggle that can grant Connector
-  Users unmasked access** where the merchant's operations require it (e.g.
-  COD/fulfillment reconciliation needing phone/address confirmation).
-- [Inference — justification] Shopify Protected Customer Data Level 2
-  requirements (per the accepted PCD evidence in the source-materials
-  captures) demand purpose limitation, minimization, and access control for
-  name/address/phone/email — a default-masked posture with an explicit,
-  logged, merchant-controlled opt-in is the strongest defensible reading;
-  a blanket "all Users see PII" default is weaker under minimization.
-- [Fact] Field-level `groups=` removes restricted fields from views and
-  `fields_get` and blocks read/write at the ORM (captures §5) — so the
-  toggle must be implemented as **group membership in a hidden technical
-  PII group** (e.g. the retained reviewer group per §4), toggled per user or
-  granted store-wide by the Administrator, **not** as a view-only trick.
-  Exact mechanism (per-store record rule vs. per-user hidden group) is
-  **[Open question OQ-A]** for the implementing packet; per-user hidden
-  group is the simpler default recommendation.
+**[Binding product-owner ruling — 2026-07-16; supersedes this document's
+earlier masked-by-default/unmask-toggle proposal.]** PII masking is **not part
+of the MVP**. Both **Connector User** and **Connector Administrator** may access
+the **raw** customer/order PII required for the operations their role is
+permitted to perform (§1.1/§1.2), governed by ordinary Odoo access control,
+company boundaries, connector-model ACLs, redaction, and audit. There is **no**
+customer-facing masked-PII experience, **no** User-unmask toggle, **no**
+per-store PII-visibility toggle, **no** hidden/third customer-facing PII role,
+and **no** separate PII permission tier.
+
+- [Fact — repo, 2026-07-16] The codebase currently ships (Wave 1 / SEC-1)
+  field-level `groups=reviewer,admin` on customer PII snapshot fields with a
+  computed masked display for lower roles, a manual masking action, and a
+  retention-sweep masking cron. **[Product-direction update — 2026-07-16]**
+  That masking implementation is now inconsistent with the final MVP direction
+  and must be corrected — **not by this docs-only PR** — through the controlled
+  future task **SEC-2**
+  ([`../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`](../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md))
+  before MVP UAT/release. Wave 1 stays merged and its runtime evidence stands;
+  only the product direction changed.
+- **Target MVP behavior (implemented by SEC-2):** the customer PII snapshot
+  fields become readable by both **Connector User** and **Connector
+  Administrator** (subject to the normal ACL / company / role checks). No
+  masked-compute display, no mask/unmask action, no masking cron, and no
+  masking setting are exposed as MVP capabilities.
+- **Redaction is not masking and stays mandatory.** Raw PII must never appear in
+  connector job logs, audit messages, error text, credentials, authorization
+  headers, request fingerprints, mutation-attempt evidence, or unrelated
+  diagnostic payloads (the SEC-1 `_system_append` / redaction posture is
+  retained in full).
+- **Ordinary Odoo access is unchanged.** Standard partner / address / delivery /
+  sales-order visibility remains governed by normal Odoo permissions; the
+  connector introduces no masking layer over ordinary operational records.
+- [Post-MVP] A PII-masking / privacy feature may be reconsidered later as a
+  separately reviewed, optional post-MVP privacy enhancement (Class E of the
+  decision pack). It is not an MVP capability, requirement, permission, screen,
+  setting, or acceptance criterion. Data-retention / deletion / privacy-request
+  obligations remain documented and do **not** require masking to be satisfied.
 
 ## 4. Migration design — 4 internal groups → 2 customer-facing groups
 
@@ -282,7 +299,7 @@ ACL line's `group_id`.
 | Job log (core) | all four roles: read-only | read-only for `user` (via implication nothing changes; re-key auditor→user optional) |
 | Binding (core) | auditor r; operator r+c; reviewer r+w; admin rwc | `user` r+w+c (union of operator∪reviewer, per binding direction); admin rwc; destructive override action stays admin |
 | Manual-review / exception (core) | reviewer/admin resolve actions | resolve action → `user`/admin; destructive variants admin-only |
-| Customer PII snapshot fields (core/sale) | field groups=reviewer,admin; masked compute for others | field groups= hidden PII group (default membership: admin; per-store/per-user toggle adds Users — §3) |
+| Customer PII snapshot fields (core/sale) | field groups=reviewer,admin; masked compute for others | **raw** fields readable by `user` and `admin` — SEC-2 removes the `reviewer,admin` field restriction and the masked-compute display (no PII group, no toggle); redaction unchanged (§3) |
 | Product templates/bindings (product) | mirror of binding pattern per role | same re-key: operator∪reviewer grants → `user` |
 | Sale order / COD records (sale) | operator r, reviewer r+w resolution, admin rwcu | `user` r+w resolution; posting/config admin |
 | Record rules (all) | any rule keyed to operator/reviewer | union-keyed to `user` (group rules unify — captures §5); global rules untouched |
@@ -293,11 +310,13 @@ packet (this doc's table is the mapping *rule*, not the line-by-line file —
 the control room should require the packet to include the exhaustive CSV
 diff in its plan).
 
-### 4.6 PII visibility impact
+### 4.6 PII access impact (no masking)
 
-Covered in §3: re-key field-level `groups=` from `reviewer,admin` to the
-hidden PII group; default membership = Administrator; toggle grants Users.
-Masked-compute display logic is unchanged for non-members.
+Per §3 (no MVP masking): SEC-2 removes the field-level `groups=reviewer,admin`
+restriction and the masked-compute display so that **both `user` and `admin`
+read the raw customer PII snapshot fields** under the normal ACL / company
+checks. There is no PII group, no per-store/per-user toggle, and no masked
+compute in the MVP. Log / audit redaction is untouched.
 
 ### 4.7 Migration of currently-assigned users
 
@@ -340,9 +359,15 @@ and updated", signature `migrate(cr, version)` — captures §7). Design:
 3. **No-privilege-escalation:** assert a migrated legacy Operator gains
    exactly the reviewer-tier acts and nothing admin-tier (credentials,
    settings write, destructive overrides all still denied); assert a
-   Connector User cannot read `access_token` or unmasked PII by default.
-4. **Field-level PII:** masked compute for User default; unmasked after the
-   Administrator toggle; `fields_get` omission verified for non-members.
+   Connector User **can** read the raw customer PII its permitted operations
+   require **and** still cannot read `access_token`, write settings, or
+   perform destructive overrides.
+4. **Field-level PII (no masking):** assert both `user` and `admin` read the
+   raw customer PII snapshot fields; assert **no** masked-compute display,
+   **no** mask/unmask action, **no** masking cron, and **no** masking setting
+   are exposed; assert genuinely restricted fields (e.g. `access_token`) stay
+   omitted from `fields_get` for non-members; assert log/audit redaction still
+   strips PII.
 5. **UI hiding:** user form shows exactly one "Shopify Connector" selection
    with two options; old groups absent from the form; server-side gates hold
    even when a hidden group is manually assigned in developer mode.
@@ -372,8 +397,8 @@ the UI wave must build role-gated affordances against the two-role model,
 not the four-role model, or it will be reworked. Implementation:
 
 - **Preferred: a dedicated `SEC-2` packet** (groups, privilege, ACL re-key,
-  PII group, migration script, tests) executed immediately before or at the
-  start of Wave 5, so U1 consumes a finished security surface.
+  **PII-masking removal per §3**, migration script, tests) executed immediately
+  before or at the start of Wave 5, so U1 consumes a finished security surface.
 - Acceptable fallback: fold into Wave 5 U1 as its first work item — but
   [Inference] a dedicated packet gives the control room a crisper review
   boundary (pure security diff, exhaustive ACL CSV, migration test run) and
@@ -392,7 +417,8 @@ not the four-role model, or it will be reworked. Implementation:
   current repo group/ACL facts (§0); accepted single-surface UX
   ([ui-ux-final-design-spec.md](ui-ux-final-design-spec.md)).
 - **Alternatives:** M-B (re-label operator), M-C (all-new groups) — §4.1;
-  A2a vs A2b for Auditor — §2.1; PII admin-only-hard vs configurable — §3.
+  A2a vs A2b for Auditor — §2.1. (The earlier PII masked-vs-toggle option is
+  withdrawn: the MVP has no PII masking — §3.)
 - **Consequences:** simpler customer mental model and onboarding; Reviewer's
   acts spread to all Users (mitigated per §2.2); accepted four-role UX docs
   become superseded-at-proposal-level and Wave 5 builds two-role gating;
@@ -400,7 +426,9 @@ not the four-role model, or it will be reworked. Implementation:
 - **Risks:** silent privilege widening for existing Operators (mitigated:
   explicit migration + no-escalation tests + destructive acts stay admin);
   hidden-group confusion in developer mode (mitigated: "Technical /"
-  naming); PII toggle misuse (mitigated: admin-only, logged, default off).
+  naming); the Wave-1 PII-masking code must be removed by SEC-2 before MVP
+  UAT/release (tracked as the §3 product-direction delta; previously-masked
+  values are handled per the SEC-2 packet — masking is irreversible).
 - **Rollback:** §4.10 — delete the new group and re-point privileges;
   legacy memberships intact.
 - **Affected waves:** Wave 5 (UI) directly; SEC-2 packet (new); any wave
@@ -415,8 +443,10 @@ not the four-role model, or it will be reworked. Implementation:
 | --- | --- |
 | OQ-1 | Exact `res_users_views.xml` rendering rule for privilege groups (radio vs selection) — verify before SEC-2 (carried from captures §5). |
 | OQ-3 | Upgrade-time cleanup semantics for removed XML IDs — relevant only to any *future* retirement of the legacy groups (carried from captures §5). |
-| OQ-A | PII toggle mechanism: per-user hidden-group membership vs per-store record-rule/context approach (§3). |
 | OQ-B | Are the current group data records `noupdate=1`? Determines whether implied_ids/privilege edits ride the data file or the migration script (§4.4). |
 | OQ-C | Exhaustive per-line `ir.model.access` inventory across core/product/sale for the §4.5 re-key CSV — to be produced inside the SEC-2 packet plan. |
 | OQ-D | Auditor final disposition (A2a vs A2b) — recommendation is A2b (§2.1); needs product-owner confirmation. |
-| OQ-E | Should the per-store PII toggle also unmask abandoned-checkout contact data, or is checkout PII always Administrator-only? |
+
+(Former OQ-A "PII toggle mechanism" and OQ-E "unmask abandoned-checkout
+contact data" are withdrawn: the MVP has no PII masking or unmask toggle — §3.
+The remaining PII work is the masking-removal in the SEC-2 packet.)

@@ -1,5 +1,19 @@
 # Task SEC-1 — Cross-Cutting Security Hardening: Implementation-Ready Planning Packet
 
+> **[Product-direction update — 2026-07-16 · non-retroactive].** This packet was
+> accepted and implemented under the earlier SEC-1 decision, and Wave 1 is merged;
+> that history stands. The product owner has since ruled (PR #173 comment
+> `4994990296`) that **PII masking is not part of the MVP**. The PII-masking
+> pieces this packet specified (`pii_snapshot_masked` computed display, the manual
+> `action_mask_customer_pii` action, and the retention sweep's masking of customer
+> binding snapshot fields) are therefore now **inconsistent with the final MVP
+> product direction** and must be corrected — not here — before MVP UAT/release,
+> via the controlled forward task **SEC-2**
+> ([`./task-sec2-two-role-and-pii-simplification-packet.md`](./task-sec2-two-role-and-pii-simplification-packet.md)).
+> Every other SEC-1 protection (protected-field enforcement, sanctioned sudo
+> writers, company isolation, credential secrecy, and **log/audit redaction** —
+> which is not masking) is unaffected and remains in force. Wave 1 is not reopened.
+
 > **Status: Accepted for Wave 1 Stage 4 implementation under DEC-034.**
 > Implementation gate opened; prerequisites are completion of CORE-R1
 > (Stage 1), Task LC-1 (Stage 2), and Task JOB-ACTIONS (Stage 3) on the

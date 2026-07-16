@@ -8,6 +8,21 @@ Odoo.sh runtime-green (build 34995642, runtime-tested SHA
 0 errors / 644`. SRR-03 remains CLOSED. Wave 1 awaits only the final Claude
 control-room merge decision; PR #172 remains draft, open, unmerged.**
 
+> **[Product-direction update — 2026-07-16 · non-retroactive].** Two later facts
+> post-date this record and do not change what it validated. (1) Wave 1 has since
+> been **merged** (PR #172 → `mvp/program-integration`, merge commit `d18f9a99`);
+> this record's "awaits merge / draft/unmerged" wording is historical. (2) The
+> product owner ruled (PR #173 comment `4994990296`) that **PII masking is not
+> part of the MVP**. The masking behavior validated here (`pii_snapshot_masked`,
+> `action_mask_customer_pii`, the retention sweep's customer-record masking) was
+> correctly implemented and runtime-green under the earlier SEC-1 decision and
+> **remains valid history** — but it is now **inconsistent with the final MVP
+> product direction** and requires a controlled forward correction before MVP
+> UAT/release, planned as **SEC-2**
+> ([`../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`](../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md)).
+> Log/audit redaction, protected-field enforcement, company isolation, and
+> credential secrecy are unaffected and remain in force. Wave 1 is not reopened.
+
 - **Branch:** `sol/wave-1-readonly-foundation`
 - **PR:** #172 → `mvp/program-integration` (draft, open, unmerged)
 - **Date:** 2026-07-16
