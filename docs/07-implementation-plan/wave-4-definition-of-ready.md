@@ -8,26 +8,44 @@
 > [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
 > (acceptance preconditions → allowed/forbidden → acceptance criteria → tests →
 > rollback → definition of done), adapted to the macro-wave model.
+>
+> **Current program state (2026-07-16):** Wave 1 is **merged** and **SRR-03 is
+> CLOSED**. Wave 4 depends on Waves 2 and 3 being merged (order bindings +
+> Layer 2). As a Shopify-mutation wave, Wave 4 closure requires **genuine (not
+> simulated) dev-store fulfillment mutation evidence**.
 
 ## 1. Wave objective (one scoped outcome)
 
-Implement the fulfillment/tracking domain as the new
-`shopify_connector_fulfillment` module:
+Implement the complete fulfillment/tracking domain **backend** as the new
+`shopify_connector_fulfillment` module. **Both Mode 1 and Mode 2 backend
+behavior are required MVP Wave 4 scope** — the Administrator selects the
+fulfillment operating mode per store, and the per-store
+`fulfillment_operating_mode` field ships live with **both** values:
 
-- **Task 014 outbound flow** (picking-validation → `fulfillmentCreate` with
-  explicit FulfillmentOrder line lists → `fulfillmentTrackingInfoUpdate`),
-  exactly per
+- **Task 014 outbound flow (Mode 1 default)** (picking-validation →
+  `fulfillmentCreate` with explicit FulfillmentOrder line lists →
+  `fulfillmentTrackingInfoUpdate`), exactly per
   [`task-014-fulfillment-tracking-implementation-packet.md`](task-014-fulfillment-tracking-implementation-packet.md)
   D-014-1..8 **as amended by that packet's 2026-07-16 gap-closure addendum**.
-- **Inbound reconciliation, Mode 1 in full**: observation of every Shopify
-  fulfillment, origin classification, inbound evidence records, review cases,
-  tracking import, and explicit User validation of exact proposals — per
+- **Inbound reconciliation and Mode 1 review logic**: observation of every
+  Shopify fulfillment, origin classification, inbound evidence records, review
+  cases, tracking import, and explicit User validation of exact proposals — per
   [`../02-product/fulfillment-operating-modes.md`](../02-product/fulfillment-operating-modes.md)
   §2–§3, §5–§7.
-- The `fulfillment_operating_mode` setting fixed at **Mode 1**.
-  **Mode 2 auto-application is NOT Wave 4 scope** — it is Wave 5 (optional,
-  or a Wave 4 stretch only under the fulfillment-modes doc §10 conditions:
-  Wave 4 lands early *and* the location-resolution prerequisite is proven).
+- **Mode 2 auto-application backend**: the exact 16-condition Mode 2 engine,
+  the mode-switch state machine, and disconnected-period reconciliation are
+  implemented, tested, and runtime-proven in Wave 4. **Mode 2 is NOT optional /
+  a stretch / a "Wave 5 backend" / "if shipped" / "Mode 1 only".** Wave 4 MAY
+  internally sequence Mode 1 before Mode 2, but **Wave 4 cannot close until both
+  Mode 1 and Mode 2 backend behavior is implemented, tested, and runtime-proven**
+  (per-store mode field, the exact 16-condition engine, inbound observation/
+  evidence/bindings, the mode-switch state machine, reconnect reconciliation,
+  COD interplay, the complete fulfillment-state taxonomy, and genuine dev-store
+  fulfillment mutation UAT). **Wave 5 owns only the premium UI** — the
+  Administrator mode selector, the mode explanation/confirmation screen, the
+  unresolved-external-fulfillment UI, the User review workspace, reconciliation
+  visualizations, mode-switch history, and fulfillment dashboards/timelines.
+  **Wave 5 does NOT own the Mode 2 backend.**
 
 ## 2. Gates — every box must be checked before the wave opens
 
@@ -38,19 +56,24 @@ Implement the fulfillment/tracking domain as the new
       wave review. `fulfillmentCreate` is not `@idempotent` (Task 014 packet
       D-014-7), so no fulfillment mutation may ship without Layer 2 durable
       attempt identity + reconciliation-before-retry (program hard-stop 4).
-- [ ] **G4-2 — Fulfillment operating-modes PDs accepted.** The seven proposed
+- [ ] **G4-2 — Fulfillment operating-modes PDs accepted.** The proposed
       decisions in `fulfillment-operating-modes.md` §11 (Mode 1 default,
       review-only inbound, 16-condition Mode 2 checklist, lot/serial rule,
-      mode-switch state machine, disconnected-period rule, Mode 2 wave
-      allocation) are accepted or explicitly amended by the control room.
-- [ ] **G4-3 — Fulfillment state-model PDs accepted.** The six proposed
+      mode-switch state machine, disconnected-period rule, and the binding
+      **Mode 2 Wave-4-backend allocation** — both Mode 1 and Mode 2 backend are
+      required Wave 4 scope; Wave 5 owns only the mode UI) are accepted or
+      explicitly amended by the control room.
+- [ ] **G4-3 — Fulfillment state-model PDs accepted.** The proposed
       decisions in
       [`../02-product/shopify-fulfillment-status-model.md`](../02-product/shopify-fulfillment-status-model.md)
-      §11 (six-concept separation, per-value mapping tables, deprecated-value
-      handling, unknown-future-value contract, Delivered-inconsistency rule,
-      badge/severity vocabulary) are accepted, and its Open question 1
-      (`FulfillmentDisplayStatus` values) is verified or explicitly deferred
-      before the Wave 4 freeze.
+      §11 (the **four-layer fulfillment-state taxonomy** separation — Layer A
+      seven Shopify enum families, Layer B non-enum surfaces, Layer C
+      connector-derived states, Layer D user-facing labels — per-value mapping
+      tables, deprecated-value handling, unknown-future-value contract,
+      Delivered-inconsistency rule, badge/severity vocabulary) are accepted.
+      The former Open question 1 (`FulfillmentDisplayStatus` values) is now
+      **verified** (all seven Layer-A enum families incl. `FulfillmentDisplayStatus`,
+      18 values, re-verified 2026-07-16; mapped display-only).
 - [ ] **G4-4 — Scope correction confirmed in the wave's contract.** The core
       readiness scope swap `read_fulfillments` →
       `read_merchant_managed_fulfillment_orders`, with
@@ -83,8 +106,9 @@ Implement the fulfillment/tracking domain as the new
       location cache, not inventory's mapping table
       ([`../03-architecture/modular-architecture-recommendation.md`](../03-architecture/modular-architecture-recommendation.md)
       §2.3). The fulfillment-modes doc §8 open question (Mode 2 ↔ location
-      mapping coupling) is resolved or explicitly deferred to Wave 5 with the
-      Mode 2 allocation.
+      mapping coupling) is resolved **within Wave 4** (Mode 2 backend is Wave 4
+      scope), using core's location cache rather than inventory's mapping
+      table — it is not deferred.
 - [ ] **G4-9 — Rejected-approaches check recorded.** RA-009, RA-014, RA-022,
       RA-023 (and the full log) re-checked against the amended packet; no
       rejected approach re-enters without its revisit condition
@@ -99,9 +123,10 @@ Implement the fulfillment/tracking domain as the new
 - **Forbidden:** any read of `shopify.connector.location.mapping`;
   `fulfillmentOrderMove`/hold mutations and `FULFILLMENT_ORDERS_*`
   subscriptions; legacy fulfillment endpoints (RA-022); refunds/returns
-  automation; Mode 2 auto-application code; UI beyond what the packet
-  explicitly allows (screens are Wave 5); webhooks/OAuth/CI; every protected
-  reference; `adams_base`.
+  automation; all fulfillment/mode UI — the mode selector, mode-explanation/
+  confirmation screen, review workspace, and dashboards/timelines are Wave 5
+  (Mode 2 *backend* auto-application IS in scope; only its UI is forbidden
+  here); webhooks/OAuth/CI; every protected reference; `adams_base`.
 
 ## 4. Wave acceptance criteria (observable)
 
@@ -119,9 +144,11 @@ Implement the fulfillment/tracking domain as the new
    fulfillment-operating-modes §3); external fulfillments produce Mode 1
    review cases with tracking-import / acknowledge / explicit-validation
    actions and zero automatic stock mutation.
-4. **State-model badge storage with the unknown-value contract:** all four
-   Shopify state families are stored raw + labeled per the status-model
-   tables; deprecated values stored-raw + normalized (§6); any unknown future
+4. **State-model badge storage with the unknown-value contract:** all seven
+   Layer-A Shopify enum families (per the four-layer fulfillment-state
+   taxonomy) are stored raw + labeled per the status-model tables;
+   deprecated values stored-raw + normalized (§6); `FulfillmentDisplayStatus`
+   (A7) is treated display-only, never an automation input; any unknown future
    value satisfies all five §7 contract points (preserved raw, displayed
    unknown, never silently success, unsafe automation halted, schema warning
    raised).
@@ -142,13 +169,26 @@ Implement the fulfillment/tracking domain as the new
    the disconnected period lands as a review case (fulfillment-operating-modes
    §7); interrupted outbound work resumes under
    verification-read-before-retry.
-8. **Layer 2 compliance proven:** every fulfillment mutation runs under the
-   accepted Layer 2 protocol (durable attempt record before the call;
-   reconciliation read on ambiguous outcome; no blind retry path exists —
-   source-level test).
-9. Task 014 packet §5/§6 test files and criteria (as extended by the
-   addendum) all green on Odoo.sh; dev-store mutation evidence or a recorded
-   explicit control-room waiver (mutation task rule).
+8. **Per-store mode field + Mode 2 auto-application engine:** the
+   `fulfillment_operating_mode` field is live with **both** values, selectable
+   by the Administrator; Mode 2 auto-applies an Odoo fulfillment **only** when
+   all conditions of the exact 16-condition checklist hold, and otherwise
+   routes to a review case — with a pass test and a fail-to-review test for
+   **each** of the 16 conditions, and genuine dev-store proof of at least one
+   Mode 2 auto-application.
+9. **Mode-switch state machine + disconnected-period reconciliation:**
+   switching a store between Mode 1 and Mode 2 (and back) follows the
+   documented state machine; in-flight and disconnected-period items are
+   reconciled per fulfillment-operating-modes §7 with no double-apply and no
+   lost review case.
+10. **Layer 2 compliance proven:** every fulfillment mutation runs under the
+    accepted Layer 2 protocol (durable attempt record before the call;
+    reconciliation read on ambiguous outcome; no blind retry path exists —
+    source-level test).
+11. Task 014 packet §5/§6 test files and criteria (as extended by the
+    addendum) all green on Odoo.sh; **genuine dev-store fulfillment mutation
+    evidence** for both Mode 1 and Mode 2 paths (any exception is a specific
+    product-owner ruling on the record, never a routine control-room waiver).
 
 ## 5. Hard stops (wave-local restatement of program §8)
 
@@ -168,6 +208,8 @@ Implement the fulfillment/tracking domain as the new
 Claude control-room wave review
 ([`../06-prompts/claude-mvp-wave-review-template.md`](../06-prompts/claude-mvp-wave-review-template.md))
 accepts and merges into `mvp/program-integration`; acceptance-matrix row 12
-(and the COD-affected rows) updated; handoff + program state updated; Mode 2
-disposition for Wave 5 explicitly recorded (in scope / stretch-consumed /
-deferred).
+(and the COD-affected rows) updated; handoff + program state updated. Both
+Mode 1 and Mode 2 backend behavior is delivered and runtime-proven inside
+Wave 4 — the only Mode 2 item carried forward is the Wave 5 **UI** (mode
+selector, review workspace, dashboards), whose backend contract Wave 4
+hands off intact.

@@ -5,6 +5,17 @@
 > remains unauthorized until this Definition of Ready is accepted and its
 > gate decisions are Accepted. No implementation authorized by this
 > document.**
+>
+> **Current program state (2026-07-16):** Wave 1 is **merged** (PR #172 merged
+> into `mvp/program-integration` via merge commit `d18f9a99`; CORE-R1, LC-1,
+> JOB-ACTIONS, SEC-1 all merged) and **SRR-03 is CLOSED** (corrected-head build
+> `34995642` green at 0 failed / 0 errors / 644 tests). The COD, fulfillment-mode,
+> reconnect/backfill, security/PII, and cross-domain QA matrices exist; the
+> premium UX master specification exists. **Wave 2 is unauthorized and unstarted
+> because its gate decisions and this Definition of Ready have not yet been
+> accepted — NOT because Wave 1 is unfinished.** Wave 2 introduces **no PII-masking
+> fields** (the MVP has no PII masking; the Wave-1 masking implementation is
+> corrected by SEC-2 in Wave 5).
 
 This document instantiates the 7-field standard of
 [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
@@ -153,32 +164,39 @@ matrix row unmapped to a test or an explicit deferral:
   changes, null/edge evidence).
 - `../05-qa/reconnect-backfill-uat-matrix.md` order-domain rows (watermark
   advance/hold-back, overlap dedup, stale-generation refusal, 60-day
-  honesty, preview-count accuracy, resumable backfill) — a named companion
-  deliverable of the gap-closure mission that **must exist before
-  wave-open** (added to the NOT-YET list, §5).
-- `../05-qa/cod-uat-matrix.md` import-level rows (scenarios 1–3, 16) —
-  same companion-deliverable condition.
+  honesty, preview-count accuracy, resumable backfill) — this matrix
+  **exists** (2026-07-16); the wave adopts it as the binding UAT basis.
+- `../05-qa/cod-uat-matrix.md` import-level rows (scenarios 1–3, 16) — this
+  matrix **exists** (2026-07-16) and is likewise adopted.
 - [`../05-qa/mvp-acceptance-matrix.md`](../05-qa/mvp-acceptance-matrix.md)
   items 9, 13, 14 rows.
 
-### 2.6 Runtime evidence (Odoo.sh)
+### 2.6 Runtime evidence (Odoo.sh — mandatory for Wave 2 closure)
 
-Mirrors the Wave 1 standard (program contract §4 Wave 1): Odoo.sh
-fresh-install build green; focused-class runs for every new test file; full
-existing-domain regression; zero-residue/uninstall audit per DEC-030/LC-1;
-evidence recorded in `docs/05-qa/task-012-order-import-validation-results.md`
-with build IDs and verbatim result quotes. Simulated or extrapolated
-runtime claims are a wave-gate rejection.
+Mirrors the Wave 1 standard (program contract §4 Wave 1) and is **mandatory**
+for Wave 2 closure (unlike the read-only dev-store evidence in §2.7, which is
+preferred but deferrable): Odoo.sh fresh-install build green; module upgrade;
+focused-class runs for every new test file; full existing-domain regression;
+security and duplicate-prevention tests; uninstall/reinstall and
+zero-residue/no-PII-leak audit per DEC-030/LC-1; exact-head evidence recorded
+in `docs/05-qa/task-012-order-import-validation-results.md` with build IDs and
+verbatim result quotes. Simulated or extrapolated runtime claims are a
+wave-gate rejection.
 
-### 2.7 Dev-store evidence
+### 2.7 Dev-store evidence (strongly preferred, NOT a Wave 2 merge blocker)
 
 A read-only live order import against the existing dev store (bounded
 sample: at least one PAID order end-to-end, one policy-skip, one wait-state)
-with redacted evidence in the validation record. **Credential hard-stop
-flagged:** this requires live Shopify credentials/VAL-B2 access, which has
-never been exercised in repo history (program hard-stop 5). If credentials
-are unavailable at wave time, the control room must either explicitly waive
-(recorded) or hold the wave gate — the waiver is an option, never assumed.
+with redacted evidence in the validation record is **strongly preferred**.
+Because Wave 2 performs no Shopify mutation, this read-only dev-store order
+UAT is **not a Wave 2 merge blocker**. If read-only Shopify credentials are
+unavailable at wave time, the wave states so transparently, **defers the
+read-only dev-store order UAT to Wave 6** (recording it in the Wave 6 UAT
+packet), requires **no special product-scope waiver**, and does **not**
+present VAL-B2 as completed. Wave 2 is never "implementation-incomplete"
+solely because the dev store is unavailable. (Mutation waves 3–5 still
+require genuine dev-store mutation evidence before their own wave closure,
+unless the product owner later records a specific exception.)
 
 ### 2.8 Rollback
 
@@ -207,14 +225,18 @@ updated; handoff + learning review complete.
 
 Program hard-stops 1–11 apply verbatim; Wave-2-specific instantiations:
 
-- **Stop 11**: SRR-03 still OPEN when the Wave 2 PR would merge, be
-  enabled, or receive live validation → escalate, never merge.
+- **Stop 11 — discharged.** SRR-03 is **CLOSED** as of Wave 1's merge
+  (2026-07-16); the former "SRR-03 still OPEN at Wave 2 merge" hard-stop no
+  longer blocks Wave-1-descended work. If a future validation ever reopened
+  the underlying risk, the escalation rule would re-apply, but that is not
+  the current state.
 - Wave 1 prerequisites (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure)
-  missing at branch time → stop (parallel development only after Wave 1
-  code prerequisites exist, per DEC-033).
+  are **satisfied** — Wave 1 is merged into `mvp/program-integration`
+  (PR #172). Their absence is no longer a live blocker.
 - Any gate decision in §3 not Accepted at wave-open → stop.
-- Dev-store credentials required and unavailable, with no recorded waiver
-  → stop (hard-stop 5).
+- Dev-store read credentials unavailable is **not** a Wave 2 hard-stop: the
+  read-only dev-store order UAT is deferrable to Wave 6 (§2.7), needs no
+  waiver, and never marks Wave 2 incomplete.
 - Null-financial-status class mapping (OQ-A) or mixed-transaction policy
   (OQ-D) encountered live without an accepted answer → fail closed to
   review and record; if it blocks the matrix, escalate (hard-stop 1).
@@ -254,19 +276,20 @@ wave, after the importer exists within the wave branch.
 ## 5. Current-status conclusion
 
 **READY once gate decisions are Accepted.** As of 2026-07-16, Wave 2 is
-**NOT YET ready**; the outstanding list:
+**NOT YET ready — but only because its gate decisions and this Definition of
+Ready are not yet accepted, not because any Wave 1 prerequisite is
+outstanding.** Wave 1 is merged and SRR-03 is closed; the companion QA
+matrices exist. The genuinely outstanding list:
 
-1. Wave 1 not yet executed/accepted (CORE-R1, LC-1, JOB-ACTIONS, SEC-1,
-   SRR-03 closure evidence).
-2. All §3 gate decisions are Proposed, none Accepted.
-3. Task 012 packet re-acceptance with the 2026-07-16 addendum not yet
+1. All §3 gate decisions are Proposed, none Accepted.
+2. Task 012 packet re-acceptance with the 2026-07-16 addendum not yet
    performed; the §15 prompt-issue gate act not performed.
-4. Area-6 packet (order-scan slice) not accepted.
-5. Dev-store/VAL-B2 credential path unresolved (hard-stop 5 risk; waiver
-   undecided).
-6. The companion QA matrices (`../05-qa/reconnect-backfill-uat-matrix.md`,
-   `../05-qa/cod-uat-matrix.md`) do not exist yet.
-7. This Definition of Ready itself is Proposed, not accepted.
+3. Area-6 packet (order-scan slice) not accepted.
+4. This Definition of Ready itself is Proposed, not accepted.
 
-No other blocker was identified. When items 1–6 close, Wave 2 may open per
-the program's normal control-room gate act.
+**Already satisfied (no longer blockers):** Wave 1 merged (CORE-R1, LC-1,
+JOB-ACTIONS, SEC-1) and SRR-03 closed; the companion QA matrices
+(`../05-qa/reconnect-backfill-uat-matrix.md`, `../05-qa/cod-uat-matrix.md`)
+exist. Read-only dev-store order evidence is preferred but not a blocker — if
+credentials are unavailable it defers to Wave 6 (§2.7). When items 1–4 close,
+Wave 2 may open per the program's normal control-room gate act.

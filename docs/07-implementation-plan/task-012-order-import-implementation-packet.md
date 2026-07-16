@@ -15,7 +15,21 @@
 > Shopify mutation domains; parallel Task 012 development may begin only after
 > Wave 1 code prerequisites exist; and no Task 012 PR may merge, be enabled, or
 > receive live validation until SRR-03 closure and LC-1 runtime proof are
-> accepted. **DEC-034's binding-extension contract (binding on this packet):**
+> accepted.
+>
+> **[Program-state update — 2026-07-16]** The 2026-07-15 / DEC-034 status
+> above is superseded by the current program state: **Wave 1 is merged**
+> (PR #172 merged into `mvp/program-integration` via merge commit
+> `d18f9a99`; CORE-R1, LC-1, JOB-ACTIONS, and SEC-1 all merged) and
+> **SRR-03 is CLOSED** (corrected-head build `34995642` green at 0 failed /
+> 0 errors / 644 tests). Read every "SRR-03 OPEN" / "CORE-R1 … remain
+> Wave 1 work" / "SRR-03 CLOSED … is stale" statement in this packet as the
+> pre-merge historical record — the SRR-03-closure + LC-1-runtime-proof
+> prerequisite for a Task 012 PR is now satisfied on the integration branch.
+> This note records program state only; it does **not** authorize a Task 012
+> PR or lift the code gate — Wave 2 authorization and DoR acceptance remain
+> separate and pending.
+> **DEC-034's binding-extension contract (binding on this packet):**
 > when `shopify.connector.order.binding` is created (§15 ALLOWED FILES), it
 > MUST declare `_odoo_binding_field_name()` returning `sale_order_id` (already
 > noted at §9–14 below) — this is now a binding cross-packet contract, not a
@@ -1151,8 +1165,9 @@ PII-minimal messages. **Redaction mechanism (red-team-corrected):**
 the merged core `redact()` extends only by secret-*values*
 (`extra_secrets`), not by key names, so the order importer applies a
 **module-local pre-redaction pass** (`REDACTION_EXTENSION`: email,
-phone, name parts, address fields stripped/masked from any
-message/technical_detail/payload_snapshot it composes) **before**
+phone, name parts, address fields stripped/redacted from any log
+message/technical_detail/payload_snapshot it composes — this is
+log/diagnostic PII redaction, not business-record masking) **before**
 handing text to `_system_append` (which then applies the core
 `redact()` as usual). The shared PII key list migrates into the core
 tool at W1 (a core-owned task) — feeding Q23's list; until then it is

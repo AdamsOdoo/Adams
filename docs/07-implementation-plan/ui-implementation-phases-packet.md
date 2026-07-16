@@ -200,7 +200,7 @@ this prototype in a recorded act.
 > missing U2/U3 locked prompts (§6 deferred them "post-U1 by design"),
 > mirroring the U1 locked-prompt structure. Deliverables are organized per
 > the screen groups of `../02-product/premium-ux-master-specification.md`
-> (the master spec — forthcoming at the time of writing; referenced by path
+> (the master spec — now authored; referenced by path
 > and a hard prerequisite of both prompts, Wave 5 gate G5-1 in
 > [`wave-5-definition-of-ready.md`](wave-5-definition-of-ready.md)). Where
 > the master spec's grouping refines §1's U2/U3 contents (setup/readiness is
@@ -247,7 +247,7 @@ stop.
 DELIVERABLES (master-spec screen groups): setup wizard (11 accepted
 steps, token-paste branch A) + readiness screens (U0-accepted Owl
 presentation); ORDERS workspace (order list/form badges per the
-six-concept model, order error-center extensions); COD reconciliation
+four-layer state-model taxonomy, order error-center extensions); COD reconciliation
 workspace (queue, five-value ledger display, collection-event entry,
 discrepancy review — read models from Waves 2/4); FULFILLMENT workspace
 (S13 + inbound review center: origin evidence, tracking import,
@@ -270,7 +270,8 @@ external assets; adams_base.
 HARD CONSTRAINTS: two-role gating only (SEC-2 merged first); prototype
 fidelity is acceptance; tokens/scales only; fixed vocabularies as text
 labels (incl. the state-model badge vocabulary verbatim); five states
-per surface; §12 accessibility; PII masked per the SEC-2 PII group;
+per surface; §12 accessibility; raw operational PII readable by
+User/Administrator per the SEC-2 two-role model, no masking;
 tours + HOOT green on Odoo.sh (verbatim quote) + full screenshot set.
 Stop condition: draft PR "UI Phase U2: setup + domain workspaces";
 stage gate closes on draft-open; no U3 work.

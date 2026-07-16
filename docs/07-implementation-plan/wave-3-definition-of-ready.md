@@ -5,6 +5,14 @@
 > remains unauthorized until this Definition of Ready is accepted and its
 > gate decisions are Accepted. No implementation authorized by this
 > document.**
+>
+> **Current program state (2026-07-16):** Wave 1 is **merged** and **SRR-03 is
+> CLOSED**. Wave 3's only wave-order dependency is **Wave 2 accepted and
+> merged** (plus DEC-031 Layer 2 as Stage 0); it does not wait on any Wave 1
+> prerequisite. As a Shopify-mutation wave, Wave 3 closure requires **genuine
+> (not simulated) dev-store mutation evidence**. Wave 3 introduces **no
+> PII-masking fields** (the MVP has no PII masking; inventory bindings carry no
+> customer PII).
 
 Instantiates the 7-field standard of
 [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
@@ -136,14 +144,15 @@ not sequential simulation.
 ### 2.6 Runtime and dev-store evidence
 
 Odoo.sh fresh-install + focused-class + full regression + residue audit
-per the Wave 1 standard. **Dev-store evidence is mandatory (first mutation
-wave):** at minimum one confirmed first push, one CAS round-trip with a
-provoked mismatch, one uncertain-outcome reconciliation, one 013B baseline
-preview/apply, and the PB-20 measurement — redacted evidence recorded.
-Credential hard-stop 5 applies; a control-room waiver for the live portion
-is a recorded gate option, never assumed (per Task 013 §5), but Layer 2's
-"genuine, not simulated" proof requirement (program §4 Wave 3) sets a high
-bar for any waiver.
+per the Wave 1 standard (mandatory). **Genuine dev-store mutation evidence
+is required for Wave 3 closure (first mutation wave):** at minimum one
+confirmed first push, one CAS round-trip with a provoked mismatch, one
+uncertain-outcome reconciliation, one 013B baseline preview/apply, and the
+PB-20 measurement — redacted evidence recorded. Unlike Wave 2's read-only
+dev-store evidence (which is deferrable to Wave 6), mutation proof here is
+**not routinely waivable**: Layer 2's "genuine, not simulated" requirement
+(program §4 Wave 3) governs, and any exception is a **specific product-owner
+ruling on the record**, never a routine control-room waiver.
 
 ### 2.7 Rollback
 
@@ -180,6 +189,7 @@ callables registered from the start; control-room wave review; state file
 | **Task 013 packet re-accepted with its 2026-07-16 addendum**; §8 prompt gate act separate | packet + addendum | Control room gate act |
 | **Task 013B packet re-accepted** (confirmed consistent with the operating model; no addendum required unless contradiction found) | 013B packet | Control room gate act |
 | PD-RB inventory slice (reconciliation-read catch-up, no blind push) | reconnect policy §10/§11 | Product owner + control room |
+| **CAS field-name empirical preflight** — re-verify `compareQuantity` vs D-013-3 `changeFromQuantity` against the raw 2026-07 Shopify schema before the first push; fail-closed until resolved (Class D empirical question) | inventory packet / raw schema | Control room (blocking preflight) |
 | Wave 2 accepted and merged (program wave order; Area-6 full trigger set unblocked) | program §4 | Control room |
 
 Open questions to answer or defer-fail-closed at the gate sitting:
@@ -207,13 +217,18 @@ is live-validated before Stage 0's evidence is accepted.
 **READY once gate decisions are Accepted.** As of 2026-07-16, Wave 3 is
 **NOT YET ready**; outstanding:
 
-1. Waves 1 and 2 not yet executed/accepted.
+1. Wave 2 not yet accepted/merged (Wave 3's wave-order dependency). **Wave 1
+   is already merged and SRR-03 is closed** — it is not a Wave 3 blocker.
 2. DEC-031 Layer 2 design is Proposed, not Accepted; Stage 0 has no packet
    yet (to be cut from the accepted design).
 3. Inventory-operating-model PDs and the PD-RB inventory slice are
    Proposed.
 4. Task 013 re-acceptance with the 2026-07-16 addendum, and Task 013B
    re-acceptance, not yet performed; §8/§9 prompt gate acts not performed.
-5. Dev-store credential path (hard-stop 5) unresolved — more critical here
-   than Wave 2, since mutation proof cannot be waived as lightly.
-6. This Definition of Ready itself is Proposed, not accepted.
+5. CAS field-name empirical preflight (`compareQuantity` vs
+   `changeFromQuantity`) not yet run against the raw schema.
+6. Genuine dev-store mutation evidence must be produced for closure (first
+   mutation wave); it is not routinely waivable — any exception is a
+   product-owner ruling. This is not a *readiness* blocker but a *closure*
+   requirement.
+7. This Definition of Ready itself is Proposed, not accepted.

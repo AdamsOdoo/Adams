@@ -337,18 +337,27 @@ condition: draft PR "Task 014: Shopify fulfillment/tracking write-back
 
 - New store setting `fulfillment_operating_mode` (Selection `mode1`/`mode2`,
   default `mode1`, Administrator-only via Python-level `groups=`), added to
-  §4's settings list. **Wave 4 ships Mode 1 only**; the Mode 2 value exists
-  but is not selectable/effective until the Wave 5 allocation (Modes doc §10)
-  — enablement attempts route to a configuration hold.
+  §4's settings list. **Wave 4 ships both Mode 1 and Mode 2 backend** — the
+  mode field is live with both values selectable and effective; switching a
+  store to Mode 2 follows the mode-switch state machine and its scan-gated
+  prerequisites (Modes doc §6, §8), not a not-yet-available configuration hold.
+  **Wave 4 cannot close until both Mode 1 and Mode 2 backend behavior is
+  implemented, tested, and dev-store runtime-proven; Wave 5 owns only the
+  premium mode UI, not the Mode 2 backend** (Modes doc §10).
+  > **[Product-direction update — 2026-07-16]** This supersedes the earlier
+  > "Wave 4 ships Mode 1 only / Mode 2 deferred to a Wave 5 allocation"
+  > stance: per the binding product-owner ruling, both Mode 1 and Mode 2 are
+  > mandatory Wave 4 backend scope and Wave 5 owns only the mode UI. Proposed —
+  > re-acceptance required; authorizes no implementation.
 - Mode 1 inbound posture: observe, classify, record, review — **zero
   automatic Odoo stock mutation** from inbound evidence. User actions from a
   review case: import tracking (non-stock write to
   `carrier_tracking_ref`/URL), acknowledge, or explicitly validate the exact
   proposed action (Modes doc §2.2). The proposal engine is the §4-checklist
-  evaluator shared with future Mode 2.
+  evaluator shared with Mode 2.
 - Mode-switch state machine, audit, never-replays-history, scan-gated,
-  idempotent, rollback-safe (Modes doc §6) — the *design* lands in Wave 4
-  even though only Mode 1 is effective.
+  idempotent, rollback-safe (Modes doc §6) — **both Mode 1 and Mode 2 backend
+  behavior lands and is dev-store runtime-proven in Wave 4.**
 
 ### 9.2 Inbound reconciliation data model (Modes doc §3, §5)
 
@@ -374,7 +383,8 @@ external fulfillment lands as a review case**.
 
 ### 9.3 State-model storage and display (State model §1–§10)
 
-- Store all four Shopify state families **raw, verbatim**, with normalized
+- Store all seven Shopify fulfillment enum families (State model Layer A)
+  **raw, verbatim**, with normalized
   labels/badges per the State model tables; deprecated values stored-raw +
   normalized (§6); the **unknown-future-value contract (§7)** implemented in
   full (preserve raw, display unknown, never silently success, halt unsafe
@@ -382,8 +392,8 @@ external fulfillment lands as a review case**.
 - The **carrier-Delivered inconsistency rule (§8)**: milestones never write
   stock; Delivered-with-picking-not-done raises the defined high-visibility
   critical review case.
-- The six-concept badge separation (§1) is the data contract Wave 5 UI
-  consumes; Wave 4 owns the fields, not the screens.
+- The four-layer taxonomy's badge separation (§1) is the data contract Wave 5
+  UI consumes; Wave 4 owns the fields, not the screens.
 
 ### 9.4 COD interplay (COD doc §3, §9)
 
@@ -409,7 +419,7 @@ Layer 2 (program hard-stop 4).
 ### 9.6 New settings, acceptance rows, test families (delta to §4–§6)
 
 - **Settings added (beyond §4):** `fulfillment_operating_mode` (§9.1);
-  the Mode 2 prerequisite/config-hold flags the Modes doc §8 names.
+  the mode-switch prerequisite/config-hold flags the Modes doc §8 names.
 - **Acceptance rows added (beyond §6):** external-fulfillment detection +
   review cases; state-model raw storage + unknown-value contract;
   Delivered-inconsistency case; COD scenarios 4–13 state derivation;

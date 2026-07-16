@@ -5,6 +5,11 @@
 > remains unauthorized until its Definition of Ready is accepted and its
 > gate decisions are Accepted. No implementation authorized by this
 > document.**
+>
+> **Current program state (2026-07-16):** Wave 1 is **merged** (PR #172) and
+> **SRR-03 is CLOSED**; the QA matrices and premium UX master specification
+> exist. Waves 2–6 remain unauthorized because their gate decisions/DoRs are
+> not yet accepted — not because any Wave 1 prerequisite is outstanding.
 
 Companion to [`mvp-completion-program.md`](mvp-completion-program.md) §4,
 [`wave-2-definition-of-ready.md`](wave-2-definition-of-ready.md), and
@@ -17,18 +22,18 @@ overlaps another.
 
 ```mermaid
 flowchart TD
-    W1[Wave 1 — CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure]
+    W1[Wave 1 MERGED — CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 CLOSED]
     W2[Wave 2 — Task 012 order import + Area-6 order-scan slice]
     L2[Wave 3 Stage 0 — DEC-031 Layer 2 core substrate<br/>attempt records + reconciliation framework + sweep cron]
     W3[Wave 3 Stages 1-2 — Task 013 inventory push + Task 013B baseline]
-    W4[Wave 4 — Task 014 fulfillment/tracking + COD fulfillment interplay]
-    SEC2[Wave 5 SEC-2 — two-role migration<br/>4 internal groups to 2 customer-facing roles]
+    W4[Wave 4 — Task 014 fulfillment/tracking<br/>Mode 1 + Mode 2 backend + COD interplay]
+    SEC2[Wave 5 SEC-2 — two-role migration + PII-masking removal<br/>4 internal groups to 2 customer-facing roles]
     U1[Wave 5 U1 — dashboard + job/log/retry screens]
     U2[Wave 5 U2 — guided setup wizard]
-    U3[Wave 5 U3 — mapping/configuration screens]
+    U3[Wave 5 U3 — mapping/config + fulfillment Mode UI]
     PERF1[Wave 5 PERF-1 — queue throughput calibration]
     T015[Wave 5 — Task 015/015B product export + media]
-    M2[Fulfillment Mode 2 — recommended Wave 5 slot]
+    M2UI[Wave 5 — Fulfillment Mode 2 UI<br/>surfaces the Wave 4 Mode 2 backend]
     W6[Wave 6 — E2E integration, dev-store UAT, release readiness]
 
     W1 --> W2
@@ -37,14 +42,15 @@ flowchart TD
     W3 --> W4
     W4 --> SEC2
     SEC2 --> U1 --> U2 --> U3
-    W4 --> M2
+    W4 -.Mode 2 backend feeds its UI.-> M2UI
+    U3 --> M2UI
     L2 -.Layer 2 required.-> T015
     SEC2 --> T015
     W4 --> PERF1
     U3 --> W6
     T015 --> W6
     PERF1 --> W6
-    M2 -.if adopted.-> W6
+    M2UI --> W6
 ```
 
 Reading notes:
@@ -52,18 +58,22 @@ Reading notes:
 - **Layer 2 is Wave 3 Stage 0** (Wave 3 DoR §4): a discrete core task, the
   gate for every Shopify-mutation domain (inventory, fulfillment, product
   export, optional `orderMarkAsPaid`).
-- **Two-role migration is Wave 5 SEC-2**
+- **Two-role migration + PII-masking removal is Wave 5 SEC-2**
   ([`../02-product/connector-roles-and-permissions.md`](../02-product/connector-roles-and-permissions.md)
-  §5): a dedicated security packet immediately before U1, so all UI
-  role-gating is built once against the two-role model.
+  §3–§5): a dedicated security packet immediately before U1, so all UI
+  role-gating is built once against the two-role model and the Wave-1 PII
+  masking is removed (both roles read raw operational PII; redaction stays).
 - **U1 → U2 → U3** is the accepted UI staging
-  ([`ui-implementation-phases-packet.md`](ui-implementation-phases-packet.md)).
+  ([`ui-implementation-phases-packet.md`](ui-implementation-phases-packet.md));
+  the fulfillment Mode UI (mode selector, review workspace, dashboards) is part
+  of these domain workspaces.
 - **PERF-1** (queue throughput calibration) runs in Wave 5 once all queue
   producers (orders, inventory, fulfillment) exist.
-- **Fulfillment Mode 2** (per
-  [`../02-product/fulfillment-operating-modes.md`](../02-product/fulfillment-operating-modes.md))
-  is recommended for a Wave 5 slot if adopted — after Wave 4's Mode-1
-  foundation, before Wave 6 proof.
+- **Fulfillment Mode 2 backend is Wave 4** (mandatory — both Mode 1 and Mode 2
+  backend ship in Wave 4; per
+  [`../02-product/fulfillment-operating-modes.md`](../02-product/fulfillment-operating-modes.md)).
+  Wave 5 builds **only** the Mode 2 **UI** against that backend — there is no
+  optional/adopted Mode 2 backend slot.
 
 ## 2. Decision-gate table
 
@@ -82,7 +92,7 @@ is unaccepted.
 | L2-D1..D13 — Layer 2 mutation-safety design | `../03-architecture/dec-031-layer-2-mutation-safety-design.md` | Wave 3 Stage 0 (and therefore all mutation waves) | Product owner + control room |
 | Inventory-operating-model PDs 1–12 | `../02-product/inventory-operating-model.md` §12 | Wave 3 | Product owner + control room |
 | Task 013 re-acceptance (+ 2026-07-16 addendum) and 013B re-acceptance; §8/§9 gate acts | Task 013/013B packets | Wave 3 | Control room gate acts |
-| Fulfillment operating-mode PDs | `../02-product/fulfillment-operating-modes.md` | Wave 4 (Mode 1); Wave 5 (Mode 2 if adopted) | Product owner + control room |
+| Fulfillment operating-mode PDs | `../02-product/fulfillment-operating-modes.md` | Wave 4 (Mode 1 **and** Mode 2 backend — both mandatory); Wave 5 (Mode 2 UI only) | Product owner + control room |
 | Task 014 packet acceptance + gate act | `task-014-fulfillment-tracking-implementation-packet.md` | Wave 4 | Control room gate act |
 | Two-role model (Option M-A) — SEC-2 | `../02-product/connector-roles-and-permissions.md` §6 | Wave 5 (all UI role-gating) | Product owner + control room |
 | Task 015/015B packet acceptance + gate acts | Task 015/015B packets | Wave 5 export slice | Control room gate acts |
@@ -105,8 +115,8 @@ new `selection_add` job type registers the LC-1
 | 2 | `shopify.connector.order.binding`; `shopify.connector.tax.mapping`; sale-order-line GID field; store-settings order/policy/watermark fields; order-scan job types | None (new tables/fields only; no data rewrite) | Single wave-PR revert; read-only toward Shopify — no remote unwind | New tables dropped on module uninstall per LC-1; bindings preserved on disconnect/disable (MBQ-08); job types reassigned historic |
 | 3 — Stage 0 | `shopify.connector.mutation.attempt` (core); sweep cron | None | Stage-PR revert before any consumer exists; after consumers exist, revert only with the consuming stage | Attempt evidence retained as audit evidence after any mutation has run (Layer 2 design §12); pruning only via the design's terminal-job retention rule |
 | 3 — Stages 1–2 | `shopify.connector.location.mapping`; `shopify.connector.inventory.level.binding` (incl. first-push + pending-target + CAS fields); inventory job types; store-settings inventory fields | Upgrade guard: suspend pre-existing conflicting mappings if found (operating model §7) — non-destructive flagging only | Wave-PR revert drops mapping/binding tables; live Shopify stock untouched by revert; 013B baseline apply is operator-confirmed and reversible only via ordinary Odoo inventory adjustment (documented in its evidence) | Tables dropped per LC-1; no Shopify-side cleanup required (Odoo-authoritative) |
-| 4 | Fulfillment-order bindings/state fields; COD dimension/ledger event records; fulfillment job types; readiness scope-name correction | Scope-name correction is code-level, not data | Wave-PR revert; pushed Shopify fulfillments are NOT unwound by revert — attempt records + job log are the audit trail; hence dev-store-only until Wave 6 UAT | Evidence-retention rule as Stage 0; COD collection events are append-only and follow binding retention |
-| 5 | SEC-2: new `group_shopify_connector_user` + privilege re-key (legacy groups retained hidden); UI: views/actions/menus only (no schema); Task 015/015B export bindings/fields; PERF-1 cadence params | **SEC-2 migration script** (the one real data migration: membership mapping Operator/Reviewer→User, Admin→Admin; no-escalation tests mandatory; rollback per roles doc §4.10 — delete new group, re-point privileges, legacy memberships intact) | UI revert is view-level, safe; SEC-2 rollback per §4.10; export revert leaves created Shopify products in place (audit-logged, dev-store only pre-UAT) | Hidden legacy groups and new group removed with core per LC-1; export bindings dropped with their module |
+| 4 | Fulfillment-order bindings/state fields; per-store `fulfillment_operating_mode` field (live with **both** Mode 1 and Mode 2); Mode 2 16-condition/mode-switch state fields; COD dimension/ledger event records; fulfillment job types; readiness scope-name correction | Scope-name correction is code-level, not data | Wave-PR revert; pushed Shopify fulfillments are NOT unwound by revert — attempt records + job log are the audit trail; hence dev-store-only until Wave 6 UAT | Evidence-retention rule as Stage 0; COD collection events are append-only and follow binding retention |
+| 5 | SEC-2: new `group_shopify_connector_user` + privilege re-key (legacy groups retained hidden) **plus removal of the Wave-1 PII-masking fields/services** (both roles read raw operational PII; redaction stays); UI: views/actions/menus only (no schema) including the fulfillment Mode UI; Task 015/015B export bindings/fields; PERF-1 cadence params | **SEC-2 migration script** (membership mapping Operator/Reviewer→User, Admin→Admin; no-escalation tests mandatory) plus the PII-masking-removal disposition per the SEC-2 packet (previously-masked data is refreshed/re-imported or shown "data unavailable", never fabricated); rollback per roles doc §4.10 — delete new group, re-point privileges, legacy memberships intact | UI revert is view-level, safe; SEC-2 rollback per §4.10; export revert leaves created Shopify products in place (audit-logged, dev-store only pre-UAT) | Hidden legacy groups and new group removed with core per LC-1; export bindings dropped with their module |
 | 6 | None (proof wave — no feature schema) | Upgrade-path proof scripts only (DEC-030 upgrade/uninstall demonstration) | n/a — docs/evidence only; any defect fix routes back through the owning wave's rules | Wave 6 *proves* the uninstall/upgrade story end-to-end |
 
 ## 4. Cross-wave file-ownership table

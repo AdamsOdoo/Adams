@@ -49,7 +49,11 @@ planning rows), at minimum:
    observe the outbound fulfillment + tracking on Shopify, record collection
    events, converge the five-value COD ledger to outstanding = 0
    (`../02-product/cod-lifecycle-and-reconciliation.md` scenario 1, plus at
-   least one partial/backorder variant from scenarios 8–13).
+   least one partial/backorder variant from scenarios 8–13). Run the
+   fulfillment leg in **both operating modes** — Mode 1 (explicit User
+   validation) and Mode 2 (16-condition auto-application, with at least one
+   fail-to-review case) — per the fulfillment-mode UAT matrix, since both
+   Mode 1 and Mode 2 backend ship in Wave 4.
 2. **Reconnect mid-flow:** disconnect a store with in-flight jobs, create
    external activity during the gap (an order, an external fulfillment, an
    inventory change), reconnect, and verify quiescence + watermark catch-up +
@@ -65,22 +69,37 @@ The first live Shopify Admin API interaction in the project's history
 (program §2 finding 9), executing:
 
 - VAL-B2 connection/readiness proof;
+- **the read-only dev-store order-import UAT deferred from Wave 2** — Wave 2
+  was allowed to close on Odoo.sh evidence alone with the read-only live
+  order UAT deferred here when read-only Shopify credentials were unavailable
+  (BLOCK-5 rule; recorded, no product-scope waiver). It is executed here
+  against a real dev store as part of the full UAT set;
 - every scenario in
   [`../08-release-readiness/mvp-uat-scenarios.md`](../08-release-readiness/mvp-uat-scenarios.md)
-  and the per-domain UAT matrices (fulfillment-mode matrix, COD §8 matrix,
-  export §14 scenarios) against a real dev store;
+  and the per-domain UAT matrices (fulfillment-mode matrix covering **Mode 1
+  and Mode 2**, COD §8 matrix, reconnect/backfill matrix, export §14
+  scenarios) against a real dev store, with **genuine mutation evidence** for
+  every mutation domain (inventory, fulfillment, export);
 - **credential-provisioning hard-stop:** dev-store/Partner access and
   credentials are provided by a human (program hard-stop 5). The wave stops
   and waits — it never fabricates, simulates, or borrows "live" evidence.
   DEC-028 deployment posture is a hard gate before any real-customer PII
   enters UAT.
 
-### 2.5 Security and residue audits
+### 2.5 Security, PII-model, and residue audits
 
-Full-family leak/redaction scan (no token/PII in logs, filestore, test
-artifacts); repeat of the zero-residue audit pattern from Wave 1 across all
-six modules; effective-permission spot-audit of the two-role model on the
-final head.
+Full-family **log/audit/credential/header redaction** scan (no token/PII in
+logs, filestore, test artifacts — redaction is mandatory and stays in force);
+repeat of the zero-residue audit pattern from Wave 1 across all six modules;
+effective-permission spot-audit of the **two-role** model (exactly
+User/Administrator) on the final head. **No-PII-masking UAT:** assert that no
+masked-PII surface, no unmask toggle, and no separate PII permission tier
+exists anywhere in the product; **raw-PII role-access UAT:** verify that
+Connector User and Connector Administrator each read the raw operational
+customer/order PII their permitted operations require, governed by ordinary
+Odoo access control, company boundaries, and connector-model ACLs. (Credential
+`•••` masking / no-read-back per DEC-004 is unaffected — it is credential
+masking, not PII masking, and stays.)
 
 ### 2.6 Performance benchmark execution
 
