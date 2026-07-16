@@ -1,0 +1,130 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>COD reconciliation workspace</title><link rel="stylesheet" href="../assets/prototype.css"></head><body>
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute" overflow="hidden"><defs>
+<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="5 13 10 18 19 7"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 21 19H3Z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></symbol>
+<symbol id="i-hand" viewBox="0 0 24 24"><path d="M9 11V6.5a1.5 1.5 0 0 1 3 0V10"/><path d="M12 10V5a1.5 1.5 0 0 1 3 0v5"/><path d="M15 10.5V7a1.5 1.5 0 0 1 3 0v7a6 6 0 0 1-6 6h-1.2a6 6 0 0 1-4.9-2.6l-2.2-3.3a1.6 1.6 0 0 1 2.5-2l1.5 1.8V8.5a1.5 1.5 0 0 1 3 0V11"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><polyline points="12 8 12 12 15 14"/></symbol>
+<symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><polyline points="4 4 4 8 8 8"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><polyline points="20 20 20 16 16 16"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6.5h10.5v9H3z"/><path d="M13.5 9.5H18l3 3v3h-7.5z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></symbol>
+<symbol id="i-warehouse" viewBox="0 0 24 24"><path d="M3 21V8.5L12 4l9 4.5V21"/><line x1="3" y1="21" x2="21" y2="21"/><path d="M7 21v-6h4v6"/><rect x="13.5" y="12.5" width="4" height="3.5"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
+<symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="1.5"/><circle cx="12" cy="12.5" r="2.5"/></symbol>
+<symbol id="i-order" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><polyline points="14 3 14 7 18 7"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="15.5" x2="15" y2="15.5"/><line x1="9" y1="8.5" x2="11.5" y2="8.5"/></symbol>
+<symbol id="i-caret" viewBox="0 0 24 24"><polyline points="8 10 12 14 16 10"/></symbol>
+<symbol id="i-store" viewBox="0 0 24 24"><path d="M4 9 5.5 4h13L20 9"/><path d="M4 9v11h16V9"/><path d="M9.5 20v-6h5v6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></symbol>
+</g></defs></svg>
+
+<div class="gallery">
+<div class="gallery__intro"><h1>COD reconciliation workspace</h1><p>The cash-on-delivery control surface. Every COD order is described by three independent dimensions — commercial, fulfillment, collection — never one merged status; every order carries the five-value ledger (original / fulfilled / collected / outstanding / cancelled). The Connector User records collections; only the Connector Administrator resolves discrepancies. States: loaded (with ledger card, partial-collection drawer, and discrepancy card), empty (education), loading, discrepancy-heavy.</p></div>
+
+<!-- ===================================================== state: LOADED -->
+<section class="gallery-item"><div class="gallery-caption"><b>Loaded</b> · queue + value ledger + collection drawer + discrepancy card · 1366px</div><div id="s-loaded"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">COD reconciliation</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>COD reconciliation</b></div>
+<div class="sc-content">
+<div class="sc-section__head"><span class="sc-section__title">COD reconciliation</span><button class="sc-btn sc-btn--secondary sc-btn--sm"><svg class="sc-ico" aria-hidden="true"><use href="#i-store"/></svg> aria-home.myshopify.com <svg class="sc-ico" aria-hidden="true"><use href="#i-caret"/></svg></button></div>
+<div class="sc-chips sc-mt3"><span class="sc-chip"><span class="sc-chip__value">18</span><span class="sc-chip__label">Open COD orders</span></span><span class="sc-chip"><span class="sc-chip__value sc-mono">1,240.00 USD</span><span class="sc-chip__label">Collected today</span></span><span class="sc-chip is-warning"><span class="sc-chip__value sc-mono">3,860.00 USD</span><span class="sc-chip__label">Outstanding total</span></span><span class="sc-chip is-danger"><span class="sc-chip__value">2</span><span class="sc-chip__label">Discrepancies</span></span></div>
+
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Needs the Administrator</span><span class="sc-section__meta">Discrepancy queue — always first</span></div>
+<div class="sc-exception sc-exception--danger"><span class="sc-exception__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-warehouse"/></svg></span><div class="sc-exception__body"><div class="sc-exception__title">#1038 — Courier reported return · stock NOT restored · awaiting warehouse validation</div><div class="sc-exception__why">The courier says the parcel is coming back, but stock re-enters inventory only when the warehouse physically receives the goods and validates the return in Odoo. Until then this order stays open with nothing collected.</div><div class="sc-mt2"><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Waiting on the warehouse, then the Administrator</span><span class="sc-muted" style="font-size:var(--sc-fs-caption)"> &middot; 410.00 USD · reported 2 days ago</span></div></div><div class="sc-exception__action"><button class="sc-btn sc-btn--secondary sc-btn--sm">Open return flow</button></div></div>
+</div>
+
+<div class="sc-section">
+<div class="sc-listbar" role="group" aria-label="COD queue filters"><span class="sc-search"><svg class="sc-ico" aria-hidden="true"><use href="#i-search"/></svg> Search order, customer…</span><span class="sc-facet">Collection: actionable ✕</span><button class="sc-btn sc-btn--secondary sc-btn--sm">Sort: outstanding age <svg class="sc-ico" aria-hidden="true"><use href="#i-caret"/></svg></button></div>
+<table class="sc-list"><thead><tr><th scope="col">Order</th><th scope="col">Commercial</th><th scope="col">Fulfillment</th><th scope="col">Collection</th><th scope="col">Outstanding</th><th scope="col" class="col-age">Age</th></tr></thead><tbody>
+<tr class="has-exception"><td><a href="../order-review/order-review.html">#1038</a></td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg> Confirmed</span></td><td><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Return to origin — in transit</span></td><td><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> Discrepancy</span></td><td class="sc-mono">410.00</td><td class="col-age">6 d</td></tr>
+<tr><td><a href="../order-review/order-review.html">#1041</a></td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg> Confirmed</span></td><td><span class="sc-status sc-status--info"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Partially delivered</span></td><td><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-cash"/></svg> Partially collected</span></td><td class="sc-mono">80.00</td><td class="col-age">3 d</td></tr>
+<tr><td><a href="../order-review/order-review.html">#1045</a></td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg> Confirmed</span></td><td><span class="sc-status sc-status--info"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Dispatched</span></td><td><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-cash"/></svg> Nothing collected</span></td><td class="sc-mono">225.00</td><td class="col-age">1 d</td></tr>
+<tr><td><a href="../order-review/order-review.html">#1047</a></td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg> Confirmed</span></td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Fully delivered</span></td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Fully collected</span></td><td class="sc-mono">0.00</td><td class="col-age">today</td></tr>
+<tr><td><a href="../order-review/order-review.html">#1035</a></td><td><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg> Remainder cancelled</span></td><td><span class="sc-status sc-status--info"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Partially delivered — final</span></td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Fully collected</span></td><td class="sc-mono">0.00</td><td class="col-age">9 d</td></tr>
+</tbody></table>
+</div>
+
+<div class="sc-cols" style="margin-top:var(--sc-space-6)">
+<div>
+<div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Value ledger — order #1041</span><span class="sc-section__meta">five values, always shown together</span></div>
+<div class="sc-card">
+<div class="sc-band sc-band--warning" style="padding:var(--sc-space-3) var(--sc-space-4)"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-cash"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Outstanding&nbsp;&nbsp;<span class="sc-mono">80.00 USD</span></div><div class="sc-band__sub">Fulfilled value minus collected amount · aging 3 days</div></div></div>
+<div class="sc-grid sc-grid--2 sc-mt4">
+<div class="sc-ro"><div class="sc-ro__label">Original value (at import)</div><div class="sc-mono">500.00 USD</div></div>
+<div class="sc-ro"><div class="sc-ro__label">Fulfilled value (delivered &amp; accepted)</div><div class="sc-mono">380.00 USD</div></div>
+<div class="sc-ro"><div class="sc-ro__label">Collected amount (net of refunds)</div><div class="sc-mono">300.00 USD</div></div>
+<div class="sc-ro"><div class="sc-ro__label">Cancelled value (demand dropped)</div><div class="sc-mono">120.00 USD</div></div>
+</div>
+<div class="sc-cadence"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg><span>Recomputed on every delivery validation and collection event. Collections are append-only events — corrections are new compensating events, never edits.</span></div>
+<div class="sc-section__head sc-mt5"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Collection &amp; delivery timeline</span></div>
+<ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker is-success"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg></span><span class="sc-activity__text">Delivery validated — 380.00 of 500.00 accepted at the door (backorder kept open)<span class="sc-activity__meta">3 days ago · warehouse: WH/OUT/0201</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-success"><svg class="sc-ico" aria-hidden="true"><use href="#i-cash"/></svg></span><span class="sc-activity__text">Collection recorded: 300.00 USD — source: User entry — by A. Operator<span class="sc-activity__meta">3 days ago · reference: courier receipt 8841</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg></span><span class="sc-activity__text">80.00 USD outstanding — awaiting the courier’s second remittance<span class="sc-activity__meta">no action forced; ages into attention after the configured window</span></span></li>
+</ul>
+</div>
+</div>
+<div>
+<div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Record a collection</span><span class="sc-section__meta">static drawer mock</span></div>
+<div class="sc-dialog" role="group" aria-label="Record a collection for order #1041">
+<p class="sc-help" style="margin-top:0">Order #1041 · S. Karam · due now: <b class="sc-mono">80.00 USD</b></p>
+<label class="sc-field"><span class="sc-label">Amount collected</span><input class="sc-input sc-mono" value="80.00" readonly aria-label="Amount collected, pre-filled with the due amount"><span class="sc-help">Pre-filled with the current due amount. Entering a different amount requires a reason.</span></label>
+<label class="sc-field"><span class="sc-label">Evidence source</span><input class="sc-input" value="User entry" readonly aria-label="Evidence source"><span class="sc-help">Options: Shopify transaction · User entry · Manual reconciliation (batch). The Administrator sets which source is authoritative for this store.</span></label>
+<label class="sc-field"><span class="sc-label">Note / reference (optional)</span><input class="sc-input" value="Courier remittance, tranche 2" readonly></label>
+<div class="sc-btnrow sc-btnrow--end"><button class="sc-btn sc-btn--secondary">Cancel</button><button class="sc-btn sc-btn--primary"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Record collection</button></div>
+<p class="sc-help sc-mt3">Recorded as an append-only event with your name and timestamp. There is no “mark fully paid” shortcut for partial amounts.</p>
+</div>
+</div>
+</div>
+</div></div></div></section>
+
+<!-- ===================================================== state: EMPTY -->
+<section class="gallery-item"><div class="gallery-caption"><b>Empty</b> · education — no approved manual gateways yet · 1366px</div><div id="s-empty"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">COD reconciliation</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>COD reconciliation</b></div>
+<div class="sc-content">
+<div class="sc-section"><div class="sc-card"><div class="sc-empty">
+<div class="sc-empty__ico" aria-hidden="true"><svg class="sc-ico sc-ico--40"><use href="#i-cash"/></svg><svg class="sc-ico sc-ico--28" style="margin-inline-start:-10px;vertical-align:14px"><use href="#i-truck"/></svg></div>
+<div class="sc-empty__title">No COD orders</div>
+<div class="sc-empty__text">Cash-on-Delivery tracking starts when a Connector Administrator adds a manual payment gateway (like “Cash on Delivery”) to this store’s approved list in Configuration. A manual gateway that is not on the list is treated like any ordinary pending payment — nothing appears here. Orders are recognized as COD by their payment-transaction evidence, never by a pending status alone.</div>
+<button class="sc-btn sc-btn--secondary">Open gateway settings (Administrator)</button>
+</div></div></div>
+</div></div></div></section>
+
+<!-- ===================================================== state: LOADING -->
+<section class="gallery-item"><div class="gallery-caption"><b>Loading</b> · skeleton, never blank · 1366px</div><div id="s-loading"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">COD reconciliation</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>COD reconciliation</b></div>
+<div class="sc-content" aria-busy="true">
+<div class="sc-chips"><span class="sc-chip"><span class="sc-skel" style="inline-size:90px;block-size:14px"></span></span><span class="sc-chip"><span class="sc-skel" style="inline-size:90px;block-size:14px"></span></span><span class="sc-chip"><span class="sc-skel" style="inline-size:90px;block-size:14px"></span></span><span class="sc-chip"><span class="sc-skel" style="inline-size:90px;block-size:14px"></span></span></div>
+<div class="sc-section"><div class="sc-card">
+<div class="sc-skel sc-skel--line sc-skel--w40"></div>
+<div class="sc-skel sc-skel--line sc-skel--w80 sc-mt3"></div>
+<div class="sc-skel sc-skel--line sc-skel--w80 sc-mt3"></div>
+<div class="sc-skel sc-skel--line sc-skel--w60 sc-mt3"></div>
+<div class="sc-skel sc-skel--line sc-skel--w80 sc-mt3"></div>
+<div class="sc-loadingline"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg><span>Loading COD orders… computing ledgers from delivery validations and collection events.</span></div>
+</div></div>
+</div></div></div></section>
+
+<!-- ===================================================== state: DISCREPANCY-HEAVY -->
+<section class="gallery-item"><div class="gallery-caption"><b>Discrepancy-heavy</b> · Administrator review queue first, calm but unmissable · 1366px</div><div id="s-discrepancy"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">COD reconciliation</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>COD reconciliation</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--danger"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-warn"/></svg></span><div class="sc-band__text"><div class="sc-band__answer">4 collection discrepancies need the Administrator</div><div class="sc-band__sub">The connector never resolves money conflicts on its own. Each case shows the expected and recorded amounts with both evidence trails; resolving requires a reason and is recorded as a decision.</div></div></div>
+<div class="sc-chips" style="margin-top:var(--sc-space-5)"><span class="sc-chip"><span class="sc-chip__value">18</span><span class="sc-chip__label">Open COD orders</span></span><span class="sc-chip"><span class="sc-chip__value sc-mono">0.00 USD</span><span class="sc-chip__label">Collected today</span></span><span class="sc-chip is-warning"><span class="sc-chip__value sc-mono">4,270.00 USD</span><span class="sc-chip__label">Outstanding total</span></span><span class="sc-chip is-danger"><span class="sc-chip__value">4</span><span class="sc-chip__label">Discrepancies</span></span></div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Discrepancy queue</span><span class="sc-section__meta">Administrator-only resolution · mandatory reason</span></div>
+<div class="sc-exceptions">
+<div class="sc-exception sc-exception--danger"><span class="sc-exception__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-warehouse"/></svg></span><div class="sc-exception__body"><div class="sc-exception__title">#1038 — Courier reported return · stock NOT restored · awaiting warehouse validation</div><div class="sc-exception__why">Stock re-enters inventory only when the warehouse receives the goods and validates the Odoo return picking — never on a courier claim.</div><div class="sc-mt2"><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Warehouse, then Administrator</span><span class="sc-muted" style="font-size:var(--sc-fs-caption)"> &middot; 410.00 USD</span></div></div><div class="sc-exception__action"><button class="sc-btn sc-btn--secondary sc-btn--sm">Open return flow</button></div></div>
+<div class="sc-exception sc-exception--danger"><span class="sc-exception__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-cash"/></svg></span><div class="sc-exception__body"><div class="sc-exception__title">#1032 — Courier remittance short: expected 260.00, remitted 240.00</div><div class="sc-exception__why">The manual-reconciliation batch disagrees with the recorded due amount. Both evidence trails are attached; accepting the adjusted amount needs a reason.</div><div class="sc-mt2"><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Administrator</span><span class="sc-muted" style="font-size:var(--sc-fs-caption)"> &middot; Δ 20.00 USD</span></div></div><div class="sc-exception__action"><button class="sc-btn sc-btn--secondary sc-btn--sm">Review evidence</button></div></div>
+<div class="sc-exception sc-exception--danger"><span class="sc-exception__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-cash"/></svg></span><div class="sc-exception__body"><div class="sc-exception__title">#1029 — Shopify shows Paid, connector ledger shows 150.00 outstanding</div><div class="sc-exception__why">Found at reconnect: a non-authoritative source diverges from the connector ledger. Nothing was auto-applied; the Administrator decides which evidence stands.</div><div class="sc-mt2"><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Administrator</span><span class="sc-muted" style="font-size:var(--sc-fs-caption)"> &middot; found at reconnect</span></div></div><div class="sc-exception__action"><button class="sc-btn sc-btn--secondary sc-btn--sm">Review evidence</button></div></div>
+</div>
+<p class="sc-help sc-mt3">+ 1 more discrepancy · Resolutions never edit the original events — each resolution is a new recorded decision, and the superseded evidence stays in the trail.</p>
+</div>
+</div></div></div></section>
+
+</div></body></html>
