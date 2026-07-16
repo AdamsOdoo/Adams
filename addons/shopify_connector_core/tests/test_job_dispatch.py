@@ -494,12 +494,54 @@ class TestJobDispatch(TransactionCase):
         )
 
     def _env_model_name(self, value_node):
-        if not isinstance(value_node, ast.Subscript):
+        allowed_wrappers = frozenset((
+            'sudo', 'with_context', 'with_company', 'with_user', 'with_env',
+        ))
+        if isinstance(value_node, ast.Call):
+            if (
+                not isinstance(value_node.func, ast.Attribute)
+                or value_node.func.attr not in allowed_wrappers
+            ):
+                return None
+            return self._env_model_name(value_node.func.value)
+        if (
+            not isinstance(value_node, ast.Subscript)
+            or not isinstance(value_node.value, ast.Attribute)
+            or value_node.value.attr != 'env'
+            or not isinstance(value_node.value.value, ast.Name)
+            or value_node.value.value.id != 'self'
+        ):
             return None
         slice_node = value_node.slice
-        if isinstance(slice_node, ast.Constant):
+        if (
+            isinstance(slice_node, ast.Constant)
+            and isinstance(slice_node.value, str)
+        ):
             return slice_node.value
         return None
+
+    def test_env_model_name_unwraps_only_approved_wrappers(self):
+        cases = (
+            ("self.env['shopify.connector.job']", 'shopify.connector.job'),
+            (
+                "self.env['shopify.connector.job'].sudo()",
+                'shopify.connector.job',
+            ),
+            (
+                "self.env['shopify.connector.job'].sudo()"
+                ".with_context(active_test=False).with_user(self.env.user)",
+                'shopify.connector.job',
+            ),
+            ("self.env['another.model'].sudo()", 'another.model'),
+            (
+                "self.env['shopify.connector.job'].filtered(lambda r: r.id)",
+                None,
+            ),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                value_node = ast.parse(source, mode='eval').body
+                self.assertEqual(self._env_model_name(value_node), expected)
 
     def test_source_level_job_dispatch_never_calls_create(self):
         """AST guard: shopify_connector_job_dispatch.py never calls
