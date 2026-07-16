@@ -241,3 +241,38 @@ not reopened until one of its named trigger domains is separately proposed.
 
 **PR #163 remains open, draft, and unmerged, and is not modified by this
 record.**
+
+## Layer 2 Proposed design registered (2026-07-16, Fable gap-closure mission)
+
+Layer 2's explicit reopening trigger (see "Layer 2 — mutation hardening,
+deferred" above) is now met: the MVP completion program's Waves 3/4/5
+propose Shopify-mutation domains (inventory export, fulfillment/tracking
+write-back, product export). Accordingly, the complete Layer 2 design has
+been written and is registered here:
+
+- **Design document:**
+  [`../03-architecture/dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md)
+  — durable attempt identity (Option A fields + a persisted
+  mutation-attempt record), stale-owner sweep, the per-mutation
+  reconciliation matrix, uncertain-outcome handling
+  (at-most-once-ambiguous with reconciliation convergence), commit-point
+  protocol, and the L2-D1…L2-D15 proposed decisions.
+- **Status of Layer 2: Proposed — NOT accepted.** Nothing in this section
+  changes Layer 1's Accepted record above (control-room review
+  `4701644819`), and nothing here marks any part of Layer 2 as Accepted or
+  Decided. The design document itself carries the same PROPOSED status
+  banner.
+- **This record remains the canonical DEC for Layer 2.** Per the
+  gap-closure mission instruction, the existing DEC-031 record is updated
+  by this dated revision note rather than creating a duplicate DEC; the
+  design document is the companion, not a new decision record.
+- **Acceptance authority:** the **product owner + Claude control room**,
+  exactly. Acceptance of the Layer 2 design is a separate, explicit future
+  act recorded against this DEC; it is not implied by registration.
+- **Blocking effect:** Waves 3, 4, and 5 mutation-domain implementation
+  remains **blocked** until (a) the Layer 2 design is accepted by the
+  authority above, **and** (b) it is implemented **with runtime proof**
+  (multi-worker Odoo.sh evidence per the design document's test strategy).
+  Read-only work is unaffected, as decided above.
+- No implementation is authorized by this registration; the no-code gate
+  and every other clause of this record remain in force unchanged.
