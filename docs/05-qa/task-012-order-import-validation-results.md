@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation and complete pre-runtime source validation assembled; exact-head Odoo.sh runtime not run.**
+**Exact-head Odoo.sh runtime validation campaign EXECUTED (2026-07-17, build `35080469`); outcome: CORRECTION REQUIRED — 11 sale-module test failures; `shopify_connector_core` and `shopify_connector_product` green.** (The pre-runtime source-validation history below is retained and remains accurate. No source or test code was changed by the runtime operator.)
 
 - Date: 2026-07-17
 - Branch / PR: `sol/wave-2-order-import`; draft PR #176 → `mvp/program-integration`
@@ -13,7 +13,73 @@
 - Runtime build / database: **not available**
 - Hard stop: **condition 5 — no authenticated Odoo.sh capability in this session**
 
-This record does not claim an Odoo test pass, install/upgrade success, runtime integration, residue result, or live Shopify call. The exact final runtime-candidate SHA is recorded in draft PR #176 after the last documentation commit.
+This record's pre-runtime section does not claim an Odoo test pass; the runtime campaign section immediately below now supplies the executed runtime evidence.
+
+## Exact-head runtime validation campaign — 2026-07-17
+
+> Operator runtime campaign run against the frozen runtime candidate in an authenticated Odoo.sh dev build. No source or test file was modified before, during, or as a result of this campaign; the SHA below is the exact frozen head. Correction of the failures found is implementation/test work reserved to the Sol worker (DEC-032 / CLAUDE.md §13) and was **not** performed by the control-room operator.
+
+### Environment (recorded)
+
+- Tested SHA (== branch tip `sol/wave-2-order-import`): `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`
+- Merge base: `234c0bb50b3f61b7681e18f0b28839dee619cdb9` (direct ancestor; exactly 28 changed files; 25 commits since base)
+- Odoo.sh build id `35080469`; database `adamsmen-sol-wave-2-order-import-35080469`
+- Odoo `19.0` (base module `19.0.1.3`); PostgreSQL `16.14`
+- Installed module versions: core `19.0.1.9.1`, product `19.0.2.1.2`, sale `19.0.2.0.0`
+- Checkout clean, detached at the frozen head; protected checkpoint `acd8c4691e72cf5590f2a56228b08f183b76cd9a` unchanged; Wave 3 unstarted; SRR-03 remains CLOSED. (`gh`/PR-API state is not queryable in-container — PR status asserted from git-level evidence only.)
+
+### Fresh install with tests enabled — green install, clean registry
+
+Verified in the live DB: five Wave-2 models registered; `shopify_connector_order_binding` and `shopify_connector_tax_mapping` physical tables present (importer/scan are AbstractModel services, no table); three live `UNIQUE` constraints — order `(store_id, shopify_gid)`, order `(store_id, sale_order_id)`, tax `(store_id, shopify_tax_evidence_key)`; both job types `order_import_sync` and `order_import_scan` registered with LC-1 `ondelete` reassignment and `remote_read_replay_safe` replay policy; order-scan cron loaded exactly once (15-minute, active); twelve ACL rows resolve for the four roles (tax-mapping = Administrator write/create only, no role unlink; order-binding = no role unlink); zero duplicate XML IDs; documented store-settings defaults present (`paid_only`, `require_approval`, empty allowlist, window 30, expiry 24, include-test False, scheduled-sync False, company = `env.company`). No migrations directory (none required).
+
+### Test execution (failure cap lifted: `ODOO_TEST_MAX_FAILED_TESTS` raised from the build's `5`)
+
+| Suite | Command | Result |
+|---|---|---|
+| `shopify_connector_core` (own tests) | `-u shopify_connector_core --test-enable` | **0 failed / 0 errors** (green; 291 tests / 198 at-install) |
+| `shopify_connector_product` (own tests) | `-u shopify_connector_product --test-enable` | **0 failed / 0 errors** (green; 183 tests) |
+| `shopify_connector_sale` (standard) | `-u shopify_connector_sale --test-enable` | **5 failed / 6 errors of 194** (232 methods, 13.8 s) |
+| Order-discovery concurrency (genuine independent PG connections) | `--test-tags shopify_connector_order_discovery_concurrency` ×3 | **3/3 repetitions 0 failed / 0 errors of 2** |
+
+The 86 authored order-import methods = 76 pass / 10 fail (the 2 genuine-connection order tests are `-standard`, excluded from the 194 and run/green separately). The eleventh failure is an inherited Wave-1 customer test.
+
+> Cascade-attribution note: a `-u shopify_connector_core` run cascades to dependents, so Odoo's per-module lines report "0 failures, 8 errors (core)" and "0 failures, 2 errors (product)". These are **double-counting of the same 11 sale failures** during dependents' post_install — verified by extracting the full FAIL/ERROR header set: exactly **11 unique headers, all `shopify_connector_sale`**; zero core-own or product-own test failed.
+
+### Complete sale-module failure inventory (5 FAIL + 6 ERROR) with classification
+
+| # | Class.method | Verdict | Root cause | Classification |
+|---|---|---|---|---|
+| 1 | `TestCustomerDuplicatePrevention.test_source_level_no_order_product_inventory_fulfillment_models` | FAIL | `assertNotIn('account.payment', src)` matches the legitimate `account.payment.term` (order payment term) added to `store_settings.py` | Wave-2 test defect (over-broad inherited Wave-1 source guard; production correct) |
+| 2 | `TestOrderCodImportReadModel.test_successful_manual_transaction_is_snapshot_only` | ERROR | searches `account.payment` by field `ref`, which does not exist on that model in Odoo 19 | Wave-2 test defect / Odoo-19 compatibility |
+| 3 | `TestOrderConfirmationPolicy.test_pending_wait_and_expiry_use_existing_job_states` | ERROR | `expired` job fixture built with `state='queued'`; handler calls `_transition_skipped` → `queued→skipped` illegal. Matrix allows `running→skipped`; real dispatch runs handlers on `running` jobs | Wave-2 test-fixture defect (production expiry path correct) |
+| 4 | `TestOrderCustomerResolution.test_addresses_are_child_records_and_deduplicate_on_refresh_path` | FAIL | child address `company_name != 'Example Co'` | **Needs production-vs-test adjudication** (does the importer map Shopify address `company` → `res.partner.company_name` on child addresses?) |
+| 5 | `TestOrderTaxResolution.test_mapping_rejects_wrong_company_inactive_or_incompatible_tax` | ERROR | `_tax()` helper creates `account.tax` without `tax_group_id`, which is NOT NULL in Odoo 19 (surfaced when the fixture targets a second company with no resolvable default group) | Wave-2 test defect / Odoo-19 compatibility |
+| 6 | `TestOrderTaxResolution.test_v1_fingerprint_is_full_tuple_versioned_and_fold_free` | FAIL | expects 8 distinct fingerprints, gets 7 — two evidence variants collide (most likely `source=None` vs `source=''`) | **Needs production-vs-test adjudication** (financial tax-fingerprint contract: are None and empty source intended to be distinct?) |
+| 7 | `TestOrderWatermarkBackfill.test_confirm_requires_exact_current_preview_token_then_enqueues` | ERROR | `preview_backfill`/`confirm_backfill` invoked from the default `SUPERUSER` env, which is not in `group_shopify_connector_admin`; `_assert_admin` raises `AccessError` | Wave-2 test defect (production `_assert_admin` gate correct) |
+| 8 | `TestOrderWatermarkBackfill.test_partial_page_failure_holds_watermark_and_remains_resumable` | FAIL | expected 1 enqueued `order_import_sync` job after a mid-scan failure, found 0 | **Needs production-vs-test adjudication** (resumable-partial-page contract vs. whole-scan transactional rollback) |
+| 9 | `TestOrderWatermarkBackfill.test_preview_classifies_all_buckets_and_creates_nothing` | ERROR | positive-path `preview_backfill` from default env (not Administrator) | Wave-2 test defect (admin context) |
+| 10 | `TestOrderWatermarkBackfill.test_read_all_orders_honesty_never_silently_truncates` | FAIL | expected `UserError('Partner Dashboard')`; admin gate raised `AccessError` first (default env not Administrator) | Wave-2 test defect (admin context) |
+| 11 | `TestOrderWatermarkBackfill.test_stale_or_boolean_confirmation_never_enqueues` | ERROR | `preview_backfill` from default env (not Administrator) | Wave-2 test defect (admin context) |
+
+Summary: **8 Wave-2 test-harness defects** (including 3 with an Odoo-19-compatibility flavour and 4 sharing the single "backfill positive path not invoked as Administrator" root cause) + **3 items requiring production-vs-test adjudication** (#4 address `company` mapping, #6 tax-fingerprint collision, #8 partial-page resumability). **No confirmed production defect was found**; the three adjudication items could resolve either way and touch financial-fingerprint correctness, the address data model, and a resumability guarantee — they must be routed through architecture review rather than "fixed to make the test pass".
+
+### Business-contract evidence that PASSED at runtime
+
+Protected-field forge/clear guard; complete 50-field stored-field classification; empty PII snapshot / no-customer-PII contract; tax-mapping ACL (Administrator write/create only, no role unlink); manual-gateway approval permissions (Reviewer/Administrator allowed, Auditor/Operator denied) with reason redaction; the full 8-financial-state × 3-confirmation-policy matrix; all manual-gateway policies + COD read-model; scan enumerates/enqueues only and never imports inline; genuine two-connection binding race → exactly one permanent binding, one sale order, one active job, losing path cleaned up (3 independent OS-process repetitions).
+
+### Residue / credential / PII / log audit — clean
+
+0 idle-in-transaction and 0 leaked non-self sessions on the DB; 0 advisory locks; 0 running / 0 retry-waiting jobs; 0 call-leases; 0 leftover order bindings / tax mappings / test stores after all suites; no Shopify access-token, `Authorization`/`Bearer`, connection-string, or raw customer PII in any runtime log; evidence-redaction machinery active; the order-binding table exposes only identifier columns (`shopify_order_name`, `manual_gateway_name`) — no customer email/phone/address/name column. No outbound Shopify HTTP occurred (network-free via patched `execute_business`); no Shopify mutation.
+
+### Not runtime-exercised — environment-constrained / deferred
+
+- **§4 baseline-upgrade** (`19.0.1.2.1 → 19.0.2.0.0`) and **§10 isolated uninstall/reinstall lifecycle**: the container is bound to a single injected database (`-d` is auto-injected) and the scoped PostgreSQL role cannot create a second database; these were not performed rather than mutate/destroy the frozen-head build. Structural upgrade-safety indicators are green (no migrations directory; fresh-install of the new columns is green; new NOT-NULL settings columns rely on the standard ORM `default=` backfill during `-u`; `ondelete`/`selection_add` register cleanly). The live upgrade-replay and uninstall/reinstall remain deferred to an environment that permits a second database.
+- **Issue #157 accommodation**: NOT applied — the `notification_type`/`color_scheme` defect did not reproduce.
+- **Read-only dev-store evidence (§15)**: no authenticated Shopify credentials are available in this session; no live-evidence claim is made; deferred to Wave 6.
+
+### Recommendation — CORRECTION REQUIRED
+
+The frozen runtime candidate `2e1b1eb…` is **not green**. Failed SHA: `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`. The corrected SHA is to be recorded by the corrector alongside a corrected-head rerun. Correcting the 8 test-harness defects and adjudicating the 3 production-vs-test contract questions is implementation/test work reserved to the Sol worker under DEC-032 / CLAUDE.md §13; the control-room operator made no code or test change. PR #176 remains draft, open and unmerged; Wave 3 remains unstarted.
 
 ## Implemented scope
 

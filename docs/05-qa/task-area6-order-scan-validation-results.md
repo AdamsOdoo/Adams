@@ -2,13 +2,32 @@
 
 ## Status
 
-**Implementation and static/source validation assembled; exact-head Odoo.sh runtime not run.**
+**Exact-head Odoo.sh runtime validation campaign EXECUTED (2026-07-17, build `35080469`); outcome: CORRECTION REQUIRED for the backfill/watermark test suite.** (Static/source history retained below.)
 
 - Date: 2026-07-17
 - Branch / PR: `sol/wave-2-order-import`; draft PR #176
 - Area-6 commit / combined code head: `a9e1d61a6655d6b46b53057e372115c02ba0bdfd`
-- Runtime build / database: **not available**
-- Hard stop: **condition 5**
+- Tested runtime SHA (frozen candidate / branch tip): `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`
+- Runtime build / database: `35080469` / `adamsmen-sol-wave-2-order-import-35080469` (Odoo 19.0, PostgreSQL 16.14)
+
+## Exact-head runtime results (Area-6 scope) — 2026-07-17
+
+Full campaign evidence is in `task-012-order-import-validation-results.md` §"Exact-head runtime validation campaign". Area-6-specific results:
+
+**Green at runtime:**
+
+- Order-scan cron loaded exactly once (`ir_cron_shopify_connector_order_scan`, active, 15-minute interval); `order_import_scan` registered with `remote_read_replay_safe` and LC-1 `ondelete` reassignment.
+- `TestOrderScanTriggers` (7 methods) all pass: cron requires connected store + `sale_domain_enabled` + `order_scheduled_sync_enabled`; default scheduled flag False; manual store/selected-binding triggers are role-gated, enqueue-only and collision-safe; **scan enumerates and enqueues only and never imports inline**; pagination/duplicate edges fail closed; store progress helpers are non-stored and accurate.
+- `TestOrderWatermarkBackfill.test_watermark_advances_only_after_complete_pagination` and `test_watermark_uses_thirty_minute_overlap` pass.
+- Two genuine independent-PostgreSQL-connection scan/binding-race tests pass across 3 OS-process repetitions (one scan job; one permanent binding; one sale order; losing path cleaned up).
+- `preview_backfill`/`confirm_backfill` are correctly Administrator-gated at runtime (`_assert_admin` rejects Auditor/Operator/Reviewer and the default `SUPERUSER` env).
+
+**Failing (5 of 7 watermark/backfill methods) — see the classified inventory in the Task 012 doc:**
+
+- Four are **test defects**: the positive-path `preview_backfill`/`confirm_backfill` calls run from the default `SUPERUSER` env instead of `.with_user(<connector admin>)`, so the (correct) `_assert_admin` gate raises `AccessError` (`test_confirm_requires_exact_current_preview_token_then_enqueues`, `test_preview_classifies_all_buckets_and_creates_nothing`, `test_stale_or_boolean_confirmation_never_enqueues`, `test_read_all_orders_honesty_never_silently_truncates`).
+- One needs **production-vs-test adjudication**: `test_partial_page_failure_holds_watermark_and_remains_resumable` expected 1 enqueued `order_import_sync` job after a mid-scan failure but found 0 — the "resumable partial page" contract versus whole-scan transactional rollback must be adjudicated in architecture review, not silently reconciled.
+
+Correction is Sol-worker scope (DEC-032 / CLAUDE.md §13); the runtime operator made no code/test change. PR #176 remains draft/open/unmerged.
 
 ## Implemented behavior
 
