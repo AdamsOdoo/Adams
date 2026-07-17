@@ -71,11 +71,11 @@ query ConnectorOrderHeader($id: ID!) {
       defaultPhoneNumber { phoneNumber }
     }
     billingAddress {
-      firstName lastName name company address1 address2 city zip provinceCode
+      firstName lastName name address1 address2 city zip provinceCode
       countryCodeV2 phone
     }
     shippingAddress {
-      firstName lastName name company address1 address2 city zip provinceCode
+      firstName lastName name address1 address2 city zip provinceCode
       countryCodeV2 phone
     }
     totalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
@@ -1217,7 +1217,6 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             'parent_id': partner.id,
             'type': address_type,
             'name': name,
-            'company_name': address.get('company') or False,
             'street': address.get('address1') or False,
             'street2': address.get('address2') or False,
             'city': address.get('city') or False,
