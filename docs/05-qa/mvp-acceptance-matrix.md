@@ -12,9 +12,18 @@
 > found and fixed in the reviewed head's final commit, no code/test/security
 > defect) accepted PR #172 and merged it into `mvp/program-integration` via
 > merge commit `d18f9a9997d7da574f629f834e2adb83b492cfc6`. SRR-03 remains
-> CLOSED. Wave 2 remains unauthorized/unstarted; the next authorized activity
-> is the one-time Fable remaining-gap-closure mission, not Wave 2
-> implementation.
+> CLOSED.
+>
+> Fable gap-closure MERGED (2026-07-17): PR #173 merged via merge commit
+> `0fb8ccbe8ce54404a57260f82e8226ffa7e6bf73` — every Class B/C decision
+> relevant to order import (PD-A/B/C/D/E, PD-COD, PD-RB) is now binding.
+>
+> Wave 2 gate ACCEPTED (2026-07-17): the Wave 2 Definition of Ready, the
+> Task 012 packet (with its 2026-07-16 addendum), and the Area-6 order-scan
+> slice are all Accepted (see `DEC-035-wave-2-open-question-dispositions.md`
+> for every open question's disposition). **Wave 2 is AUTHORIZED TO START.
+> Wave 2 implementation has NOT started** — row 9 below stays "Remaining
+> implementation" until Sol's wave PR lands.
 >
 
 | # | MVP item | Module(s) | Requirement (accepted source) | Test type | Expected runtime/UAT evidence | Current status | Blocking issue | Release criterion |
@@ -27,7 +36,7 @@
 | 6 | Product and variant import/export | `shopify_connector_product`; Task 015/015B export module | Task 010/010B; DEC-003; Task 015/015B | Existing import unit suite; new export/media unit + Layer 2 suite | Import Odoo.sh evidence retained; export Odoo.sh + dev-store mutation evidence required | Import complete; export remaining | DEC-033 acceptance, Layer 2, Task 015/015B implementation | Import reconfirmed in Wave 6; controlled export/update and basic media export pass Layer-2-aware runtime and dev-store UAT |
 | 7 | First-sync product matching and duplicate prevention | `shopify_connector_product` | AR-045/046-adjacent, Task 010B | Unit (`test_product_duplicate_prevention.py`, `test_product_import_matching.py`) | Odoo.sh green (obtained) | Already complete at checkpoint | None | Carried into Wave 6 dev-store UAT re-confirmation only |
 | 8 | Customer import and matching | `shopify_connector_sale` | Task 011/011B; AR-045 | Unit (5 files, incl. `test_customer_matching_scalability.py`) | Odoo.sh green + 100k-partner benchmark (obtained: build `34863138`) | Already complete at checkpoint | None | Carried into Wave 6 dev-store UAT re-confirmation only |
-| 9 | Shopify order import into Odoo sales orders | `shopify_connector_sale` order capability | Task 012 packet (proposed); DEC-033 reconciliation (accepted); DEC-034 binding-extension contract (accepted) | New unit/concurrency suite per packet | Odoo.sh fresh-install + focused-class green; dev-store order-import UAT | Remaining implementation | SRR-03 remains CLOSED on build `34986844`; Wave 1 (PR #172) is merged (`d18f9a9`); Wave 2 remains unauthorized until explicitly released for its own consolidated Definition-of-Ready/preflight session; Task 012 packet gate still applies | Packet accepted; `remote_read_replay_safe` registered; SRR-03 closed; order binding declares and tests complete stored-field classification/protection per DEC-034/SEC-1; implemented Odoo.sh-green; dev-store UAT obtained |
+| 9 | Shopify order import into Odoo sales orders | `shopify_connector_sale` order capability | Task 012 packet (RE-ACCEPTED 2026-07-17); DEC-033 reconciliation (accepted); DEC-034 binding-extension contract (accepted); DEC-035 open-question dispositions (accepted); Area-6 order-scan slice (accepted) | New unit/concurrency suite: `test_order_binding.py`, `test_order_import_mapping.py`, `test_order_totals_guard.py`, `test_order_tax_resolution.py`, `test_order_duplicate_prevention.py`, `test_order_customer_resolution.py`, `test_order_confirmation_policy.py`, `test_order_manual_gateway_overlay.py`, `test_order_watermark_backfill.py`, `test_order_cod_import_readmodel.py`, `test_order_scan_triggers.py` (per the locked Sol prompt) | Odoo.sh fresh-install + focused-class green; dev-store order-import UAT (preferred, not a merge blocker) | Remaining implementation | Wave 2 gate is ACCEPTED (this session, 2026-07-17) and Wave 2 is AUTHORIZED TO START; **no implementation branch/PR exists yet** — the next authorized activity is issuing `../06-prompts/sol-wave-2-order-import-locked-prompt.md` with the exact post-gate SHA | Packet re-accepted; `remote_read_replay_safe` registered; SRR-03 closed; order binding declares and tests complete stored-field classification/protection per DEC-034/SEC-1; implemented Odoo.sh-green; dev-store UAT obtained or honestly deferred to Wave 6 |
 | 10 | Basic inventory synchronization | New `shopify_connector_inventory` | Task 013/013B packet (proposed); DEC-010 (accepted architecture) | New unit + concurrency suite | Odoo.sh green; genuine multi-worker concurrency proof; first dev-store inventory-push UAT | Remaining implementation | DEC-031 Layer 2 not designed/accepted/implemented | Layer 2 proven; packet implemented, Odoo.sh-green, dev-store UAT evidence obtained |
 | 11 | Required bidirectional inventory behavior per accepted product rules | New `shopify_connector_inventory` | DEC-010, DEC-015 (MBQ-32/33/34 partial) | New unit suite | Same as #10 | Remaining implementation/research | Ongoing apply-mode MBQs not fully closed | Bidirectional behavior matches the accepted rule set with regression tests |
 | 12 | Fulfillment and tracking updates from Odoo to Shopify | New `shopify_connector_fulfillment` | Task 014; DEC-011; D-014-2 | New unit + concurrency suite | Odoo.sh green; dev-store FulfillmentOrder UAT | Remaining implementation | Layer 2 first; readiness scope still needs code correction | FulfillmentOrder-only packet implemented; scope uses `read_merchant_managed_fulfillment_orders` and conditional `write_merchant_managed_fulfillment_orders`; runtime/UAT green |
@@ -46,5 +55,5 @@
 ## Notes
 
 - "Current status" values mirror `mvp-completion-program.md` §3 exactly — update both files together, never one without the other.
-- Rows 6–8 and 10–12's inventory/fulfillment/order test types are "new" because no code exists yet; the exact test file names will be assigned when each wave's packet is implemented (see each packet's own §"Tests" section for the planned names).
+- Rows 6–8 and 10–12's inventory/fulfillment/order test types are "new" because no code exists yet; the exact test file names will be assigned when each wave's packet is implemented (see each packet's own §"Tests" section for the planned names). Row 9's exact test file names are now fixed (see row 9) as of the Wave 2 gate acceptance (2026-07-17) — they were the one prior omission from this note, now closed.
 - This matrix is the authoritative release checklist for Wave 6 — a release is not proposed until every row reaches its stated release criterion or is explicitly, recorded-ly waived by the product owner.

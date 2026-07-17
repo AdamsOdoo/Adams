@@ -1,3 +1,85 @@
+## 2026-07-17 — Wave 2 gate: decision-acceptance + Definition-of-Ready + Task 012/Area-6 packet re-acceptance — ACCEPTED AND MERGED (docs-only)
+
+- **Role/scope:** Claude control room (DEC-032 macro-wave model) performed
+  the Wave 2 decision-acceptance + Definition-of-Ready + Task 012/Area-6
+  packet re-acceptance + exact-base preflight session — the exact
+  next-session prompt from this handoff's prior top entry. Docs-only gate
+  session; **no connector code, no Wave 2 implementation start, no DEC-031
+  Layer 2 acceptance, no Shopify mutation.**
+- **Identity re-verified live from GitHub before any edit:** starting SHA
+  `a34c68e84aada288dad3dc22a6afe94f5ace0652` confirmed exact on
+  `mvp/program-integration`; PR #172 merged via `d18f9a99` (Wave 1); PR #173
+  merged via `0fb8ccb` (Fable gap-closure); SRR-03 CLOSED; Wave 1 accepted;
+  protected refs `acd8c46` (checkpoint) / `dd6ecb8` (`Shopify-connector`) /
+  `a5d4543` (`main`) unchanged; zero open PRs; zero order-domain code
+  anywhere in the repo (confirmed by direct `find`/`git ls-tree`/`git grep`,
+  not assumed).
+- **Exact-codebase preflight:** a 14-agent parallel research fan-out read
+  the complete `shopify_connector_core`/`_product`/`_sale` addon trees and
+  the complete planning corpus (policy docs, decision pack, architecture-review
+  log, UAT matrices, the Task 012 packet and its 3476-line decision closure,
+  the Area-6 packet, the Wave 2 DoR, the tracker/templates, and this
+  handoff's own top entry), plus a live fetch of current
+  `developer.shopify.com` Admin GraphQL documentation for the payment-state
+  open questions. Findings reconciled the packets against real code — not
+  merely against each other — and surfaced two genuine architecture gaps
+  neither packet had named (no `order_domain_enabled` flag/extension seam;
+  no `execute_business`-only AST guard scoped to future order-domain files),
+  both resolved without any core edit.
+- **Wave 2 Definition of Ready: ACCEPTED.** Every §3 gate decision (PD-A
+  through PD-E, PD-COD-1/3/6, PD-RB order-domain subset, PD-AC-1, roles
+  impact) is Accepted; the exhaustive allowed/forbidden file list is frozen
+  in §2.2/§2.3.
+- **Task 012 packet: RE-ACCEPTED** as one canonical contract (packet +
+  2026-07-14 decision closure + 2026-07-16 addendum), via a new "§0.
+  Control-room re-acceptance" section. The confirmation-policy field
+  contradiction is resolved in favour of the addendum's
+  `order_confirmation_policy` (default `paid_only`), replacing the
+  original `order_import_confirmation_policy` (no default) entirely.
+  D-012-4 confirmed as written.
+- **Area-6 order-scan slice: ACCEPTED**, scoped explicitly to the order
+  domain only (D-A6-1..4/6 as applied to orders) — product-scan,
+  customer-scan, and the optional core-additive scan-cron-health check
+  remain out of Wave 2.
+- **Every open question closed or explicitly, non-blockingly deferred** —
+  see [`DEC-035-wave-2-open-question-dispositions.md`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md).
+  Highlights: OQ-B post-MVP; OQ-C already resolved by PD-B1; OQ-D
+  (mixed transactions) resolved via the binding's existing `status='review'`
+  value (no new selection vocabulary), backed by a fresh official-Shopify
+  evidence check confirming no arbitration algorithm is published for
+  disagreeing transactions; OQ-E out of Wave 2 entirely; OQ-A (null
+  financial status) mapped to the existing `data_shape_schema_mismatch`
+  class, consistent with the packet's own nullable-`totalTaxSet` precedent;
+  OQ-RB-6 closed as a verified Fact (`UPDATED_AT` confirmed present in the
+  live `OrderSortKeys` enum, fetched 2026-07-17).
+- **Locked Sol Wave 2 prompt issued (not executed):**
+  [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md).
+- **Boundaries held:** no implementation authorized; DEC-031 Layer 2 not
+  accepted; no PII-masking field/capability added; protected refs unchanged;
+  Wave 2 implementation not started.
+- **Reconciliation commits:** `mvp-program-state.md` (tracker cleanup),
+  `wave-2-definition-of-ready.md`, `task-012-order-import-implementation-packet.md`
+  (§0), `area-6-sync-triggers-implementation-packet.md` (§0),
+  `DEC-035-wave-2-open-question-dispositions.md` (new),
+  `sol-wave-2-order-import-locked-prompt.md` (new),
+  `mvp-acceptance-matrix.md` (row 9), `architecture-review-log.md` (AR-054),
+  this handoff.
+- **Next action (exact next-session prompt — the next authorized activity):**
+
+  > Issue the locked Sol Wave 2 prompt
+  > (`docs/06-prompts/sol-wave-2-order-import-locked-prompt.md`) to a fresh
+  > GPT-5.6 Sol session, filling in the exact live `mvp/program-integration`
+  > tip at the moment of issuance (do not reuse this gate session's SHA
+  > without re-verifying it live first — only further `docs/**` commits are
+  > expected drift). Sol implements Task 012 + the Area-6 order-scan slice
+  > per the locked prompt's exact allowed/forbidden files, sequencing, and
+  > test/evidence matrix, opens one early draft PR into
+  > `mvp/program-integration`, and stops at the wave boundary for Claude's
+  > control-room wave review (`claude-mvp-wave-review-template.md`). **Do
+  > not** start Wave 3+ scope, **do not** accept DEC-031 Layer 2 (a separate
+  > pre-Wave-3 architecture gate), and **do not** perform any Shopify
+  > mutation — Wave 2 is 100% read-only toward Shopify.
+
 ## 2026-07-17 — Fable gap-closure PR #173 — control-room decision review: ACCEPTED AND MERGED (docs-only)
 
 - **Role/scope:** Claude control room (DEC-032 macro-wave model) performed the
