@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from odoo import fields
@@ -33,10 +33,10 @@ class TestOrderConfirmationPolicy(OrderImportCase):
             return 'confirm' if result['confirm'] else 'quotation'
         except OrderPendingWait:
             return 'wait'
-        except OrderPolicySkip:
-            return 'skip'
-        except JobHandlerError:
-            return 'hold'
+        except OrderPolicySkip as exc:
+            return 'skip:%s' % exc.skip_reason
+        except JobHandlerError as exc:
+            return 'hold:%s' % exc.error_class
 
     def test_complete_eight_state_by_three_policy_matrix(self):
         expected = {
@@ -56,29 +56,29 @@ class TestOrderConfirmationPolicy(OrderImportCase):
                 'quotations_only': 'quotation',
             },
             'PARTIALLY_PAID': {
-                'paid_only': 'hold',
-                'paid_or_authorized': 'hold',
+                'paid_only': 'hold:financial_total_mismatch',
+                'paid_or_authorized': 'hold:financial_total_mismatch',
                 'quotations_only': 'review',
             },
             'PARTIALLY_REFUNDED': {
-                'paid_only': 'hold',
-                'paid_or_authorized': 'hold',
-                'quotations_only': 'hold',
+                'paid_only': 'hold:financial_total_mismatch',
+                'paid_or_authorized': 'hold:financial_total_mismatch',
+                'quotations_only': 'hold:financial_total_mismatch',
             },
             'REFUNDED': {
-                'paid_only': 'skip',
-                'paid_or_authorized': 'skip',
-                'quotations_only': 'skip',
+                'paid_only': 'skip:unsupported_financial_state',
+                'paid_or_authorized': 'skip:unsupported_financial_state',
+                'quotations_only': 'skip:unsupported_financial_state',
             },
             'VOIDED': {
-                'paid_only': 'skip',
-                'paid_or_authorized': 'skip',
-                'quotations_only': 'skip',
+                'paid_only': 'skip:unsupported_financial_state',
+                'paid_or_authorized': 'skip:unsupported_financial_state',
+                'quotations_only': 'skip:unsupported_financial_state',
             },
             'EXPIRED': {
-                'paid_only': 'skip',
-                'paid_or_authorized': 'skip',
-                'quotations_only': 'skip',
+                'paid_only': 'skip:unsupported_financial_state',
+                'paid_or_authorized': 'skip:unsupported_financial_state',
+                'quotations_only': 'skip:unsupported_financial_state',
             },
         }
         self.assertEqual(len(expected), 8)
@@ -127,7 +127,10 @@ class TestOrderConfirmationPolicy(OrderImportCase):
             'name', 'product_id', 'product_uom_qty', 'price_unit', 'discount',
             'tax_ids',
         ]), line_before)
-        self.assertTrue(binding.shopify_cancelled_at)
+        self.assertEqual(
+            binding.shopify_cancelled_at,
+            fields.Datetime.to_datetime('2026-07-17 12:00:00'),
+        )
         logs = self.JobLog.search([
             ('job_id', '=', job.id), ('event_type', '=', 'note'),
         ])
@@ -188,13 +191,11 @@ class TestOrderConfirmationPolicy(OrderImportCase):
     def test_pending_wait_and_expiry_use_existing_job_states(self):
         Dispatch = self.env['shopify.connector.job.dispatch']
         ImporterType = type(self.Importer)
+        fixed_now = datetime(2026, 7, 17, 15, 0, 0)
         waiting = self._job(target='gid://shopify/Order/PendingWait')
-        with patch.object(
-            ImporterType, 'import_order_sync', side_effect=OrderPendingWait(24),
-        ):
-            Dispatch._handle_order_import_sync(waiting)
-        self.assertEqual(waiting.state, 'retry_waiting')
-        self.assertTrue(waiting.next_retry_at)
+        waiting.sudo().write({
+            'started_at': fixed_now - timedelta(hours=1),
+        })
 
         expired = self.Job.sudo().create({
             'store_id': self.store.id,
@@ -206,13 +207,24 @@ class TestOrderConfirmationPolicy(OrderImportCase):
             'res_id': self.store.id,
             'shopify_target_gid': 'gid://shopify/Order/PendingExpired',
             'expected_connection_generation': self.store.connection_generation,
-            'started_at': fields.Datetime.now() - timedelta(hours=25),
+            'started_at': fixed_now - timedelta(hours=25),
         })
-        with patch.object(
-            ImporterType, 'import_order_sync', side_effect=OrderPendingWait(24),
-        ):
-            Dispatch._handle_order_import_sync(expired)
+        with patch.object(fields.Datetime, 'now', return_value=fixed_now):
+            with patch.object(
+                ImporterType, 'import_order_sync',
+                side_effect=OrderPendingWait(24),
+            ):
+                Dispatch._handle_order_import_sync(waiting)
+                Dispatch._handle_order_import_sync(expired)
+        self.assertEqual(waiting.state, 'retry_waiting')
+        self.assertEqual(
+            waiting.next_retry_at, fixed_now + timedelta(minutes=15),
+        )
+        self.assertEqual(waiting.retry_count, 0)
+        self.assertFalse(waiting.error_class)
         self.assertEqual(expired.state, 'skipped')
+        self.assertFalse(expired.next_retry_at)
+        self.assertFalse(expired.error_class)
 
     def test_null_status_routes_failed_final_without_handler_replay(self):
         job = self._job(target='gid://shopify/Order/NullStatus')
