@@ -2,178 +2,109 @@
 
 ## Status
 
-**Implementation and static/source validation assembled; exact-head Odoo.sh runtime not run.**
+**Implementation and complete pre-runtime source validation assembled; exact-head Odoo.sh runtime not run.**
 
 - Date: 2026-07-17
 - Branch / PR: `sol/wave-2-order-import`; draft PR #176 → `mvp/program-integration`
-- Verified base: `234c0bb50b3f61b7681e18f0b28839dee619cdb9`
-- Task 012 commit: `92cab4c532e03102473a04cb2f2b23d7f307a480`
-- Combined code head before this docs-only handoff: `a9e1d61a6655d6b46b53057e372115c02ba0bdfd`
+- Verified base / merge base: `234c0bb50b3f61b7681e18f0b28839dee619cdb9`
+- Audit starting head supplied by the product owner: `c62303611e7c5337e08d1632d0541be55df248ba`
+- First audit freeze: `d348b9a180578992317840dc0e99b5349b89eada`
+- Post-freeze discrepancy corrections: stronger dispatcher-commit concurrency proof and restoration of the complete research-handoff history
 - Runtime build / database: **not available**
 - Hard stop: **condition 5 — no authenticated Odoo.sh capability in this session**
 
-This record does not claim an Odoo test pass, install/upgrade success, runtime integration, residue result, or live Shopify call. The PR remains draft and cannot pass its wave gate until the matrix below is executed at the then-current exact PR head.
+This record does not claim an Odoo test pass, install/upgrade success, runtime integration, residue result, or live Shopify call. The exact final runtime-candidate SHA is recorded in draft PR #176 after the last documentation commit.
 
 ## Implemented scope
 
 - PII-free `shopify.connector.order.binding` with permanent per-store Shopify GID and sale-order uniqueness, complete fail-closed stored-field classification, manual-gateway approval provenance, and Reviewer/Administrator audited approval action.
 - `sale.order.line.shopify_line_item_gid` trace field.
-- Four read-only GraphQL operations: header plus complete line-item, shipping-line and discount-application pagination. Every transport uses `execute_business`; no network call occurs in scan classification or local readiness.
+- Four read-only importer GraphQL operations: header plus complete line-item, shipping-line and discount-application pagination. Every transport uses `execute_business`; no network call occurs in scan classification or local readiness.
+- One read-only order-scan GraphQL operation. Scan enumerates and enqueues only; it never imports inline.
 - Atomic whole-order creation and binding; existing bindings refresh evidence without rewriting commercial lines.
 - Product variant/template binding-chain resolution; custom-line and connector service products are idempotent and store-scoped.
 - Existing customer binding/import sequence, guest email match/create, fallback partner and child-address deduplication.
 - Decimal money validation; equal-currency shop/presentment checks; unsupported edit/refund/duty/fee/tip/cash-rounding gates; bounded whole-order reconciliation.
 - Versioned exact tax fingerprint and explicit Administrator-maintained mapping; no automatic `account.tax` creation.
-- Paid/authorized/pending/partial/terminal confirmation policies; manual gateway policies and approval refresh; COD read model only.
-- `order_import_sync` handler, `sale_domain_enabled` gate, LC-1 historic conversion and `remote_read_replay_safe` policy.
+- Paid/authorized/pending/partial/terminal confirmation policies; manual-gateway policies and approval refresh; COD read model only.
+- `order_import_sync` and `order_import_scan` handlers, `sale_domain_enabled` gate, LC-1 historic conversion and `remote_read_replay_safe` policy.
 
-## Static and source evidence actually executed
+## Static and source evidence
 
-- Exact 20 Wave-2 Python files parsed successfully.
-- Sale cron XML, manifest and ACL CSV parsed; manifest version is `19.0.2.0.0`; final ACL inventory is 12 rows.
-- The four importer operations start with `query`, contain complete cursor/pageInfo pagination, and contain no mutation.
-- AST guard confirms `execute_business` is present and raw `.execute()` / `with_context` bypasses are absent.
-- Job types register exact LC-1 `selection_add` / `ondelete` conversion and `remote_read_replay_safe`; dispatch extensions create no job directly.
-- Order binding asserts the exact 50 protected fields: 9 shared fields, `sale_order_id`, and 40 concrete system/snapshot/provenance fields; `_pii_snapshot_fields()` is empty.
-- Exact production sudo inventory: order binding 2 (one exact two-field
-  quotation read plus approval-provenance write); importer 2 (binding create
-  and evidence refresh); scan 1 (checkpoint advance); tax mapping 0.
-- Negative source scan found no `orderMarkAsPaid`, `orderCreateManualPayment`, connector mutation, account-tax auto-create, context bypass, TODO or FIXME.
-- 86 test methods are authored across the exact 11 locked order test files. They are **not described as passing** because no Odoo runtime was available.
+The complete audit at `d348b9a...` recorded:
 
-## Bounded behavior
+- exact 20 Wave-2 changed Python files parsed successfully;
+- sale cron XML, manifest and ACL CSV parsed; manifest version `19.0.2.0.0`; ACL inventory 12 rows;
+- five GraphQL operation constants, all `query`, zero `mutation`;
+- `execute_business` present; raw `.execute()` and `with_context` transport bypasses absent;
+- five new models and eleven tests imported exactly once;
+- both job types registered once with LC-1 `ondelete` conversion and `remote_read_replay_safe`;
+- exact 50-field protected order-binding set and empty `_pii_snapshot_fields()`;
+- no Shopify mutation, `account.tax` auto-create, TODO, FIXME, `NotImplemented`, skipped test or broad `assertRaises(Exception)`;
+- duplicate XML ID, ACL ID, model, job-type and selection-value scans clean;
+- query/parser field coverage reconciled, including explicitly retained evidence-only fields;
+- 86 unique test methods across the exact 11 locked order test files.
+
+The post-freeze test correction did not add, remove, skip or rename a test method; the exact count remains 86. No Odoo runtime result is inferred from these source checks.
+
+## Explicit bounds
 
 | Boundary | Value |
 | --- | --- |
 | Line items | 100/page × 100 pages = 10,000 |
 | Shipping lines | 50/page × 100 pages = 5,000 |
 | Discount applications | 50/page × 100 pages = 5,000 |
+| Order scan / preview | 100/page × 100 pages = 10,000 candidates |
 | Solver | K=2; at most 2 dependent lines; at most 25 vectors |
 | Tax suggestions | 20 non-binding candidates |
 | Sale-line description | 512 characters |
 | Pending-payment recheck | 15 minutes |
+| Watermark overlap | 30 minutes |
 | Currency posture | rounding finer than 0.01 fails closed pending named dev-store evidence |
 
-## Official-source compatibility refresh
+## Contract-to-code-to-test traceability
 
-Accessed 2026-07-17:
+Legend: **S** = implemented and statically proven; **R** = implemented, with runtime-only proof remaining; **N/A** = not applicable. No requirement is unclassified.
 
-- Accessible — Shopify Admin GraphQL 2026-07 `OrderSortKeys.UPDATED_AT`: https://shopify.dev/docs/api/admin-graphql/2026-07/enums/OrderSortKeys
-- Accessible — Odoo 19 sale-order tax calculation helpers: https://github.com/odoo/odoo/blob/19.0/addons/sale/models/sale_order.py
-- Accessible — Odoo 19 account-tax `price_include_override`: https://github.com/odoo/odoo/blob/19.0/addons/account/models/account_tax.py
-
-These checks confirm compatibility of the accepted implementation shape; they are not runtime evidence.
-
-## Mandatory exact-head Odoo.sh operator matrix
-
-Run on an Odoo 19 dev build checked out at the then-current PR #176 head and record the build, database, exact SHA, clean worktree, module versions, command forms, tags, counts and warnings.
-
-1. Fresh install `shopify_connector_core,shopify_connector_product,shopify_connector_sale` with tests.
-2. Upgrade from the inherited `mvp/program-integration@234c0bb...` module state.
-3. All Task 012 and SEC-1/PII focused classes in the 11 order test files.
-4. Full standard core, product and sale suites.
-5. `shopify_connector_order_discovery_concurrency` with both the enqueue and permanent-binding/SO races; repeat for stability.
-6. LC-1 install/disable/uninstall/reinstall, selection removal, historic conversion and no-orphan checks.
-7. JOB-ACTIONS, CORE-R1, SEC-1 and one combined SRR-03 smoke regression.
-8. Residue audit: connector jobs/logs/leases/stores/credentials/bindings/orders/products/mappings created by tests; cron triggers; temporary files; workers.
-9. Database audit: sessions, idle transactions, cursors, locks, leases and cron triggers.
-10. Security scan: credentials, access tokens, Authorization headers, raw PII and temporary paths.
-11. If issue #157 reproduces exactly, apply only the accepted temporary `notification_type` and `color_scheme` defaults, rerun, then drop and verify both defaults are restored.
-12. Read-only Shopify dev-store order evidence is preferred but may be deferred honestly to Wave 6 if credentials are unavailable.
-
-Representative command forms (the operator must substitute the Odoo.sh checkout's actual binary/config/database):
-
-```text
-odoo-bin -d <db> -i shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --stop-after-init
-odoo-bin -d <db> -u shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --test-tags /shopify_connector_sale --stop-after-init
-odoo-bin -d <db> -u shopify_connector_sale --test-enable --test-tags shopify_connector_order_discovery_concurrency --stop-after-init
-```
-
-## Rollback
-
-Pre-production: restore the database backup taken immediately before module upgrade and deploy a source revert. Production: set `order_scheduled_sync_enabled=False`, quiesce non-terminal jobs through existing actions, and preserve imported sale orders, bindings and tax mappings. Do not uninstall the sale addon as rollback; it also owns the merged customer domain.
-
-## Proven / not proven
-
-Proven statically: allowed-file scope, registration, read-only query posture, fail-closed field protection, replay/lifecycle declarations, explicit caps and exact sudo inventory.
-
-Not proven: Odoo model setup, install/upgrade/uninstall/reinstall, functional tests, concurrency at runtime, full regression, residue/security runtime, dev-store behavior. No exactly-once remote-effect or DEC-031 Layer 2 claim is made.
-
-## 2026-07-17 complete pre-runtime audit
-
-This section supersedes the earlier preflight count and freezes the source
-claims at the head produced by this audit's documentation commit. No Odoo.sh
-build has been started or claimed. The prior `c6230361...` head exposed four
-source-detectable gaps, all corrected before runtime freeze:
-
-1. permanent-binding races could rely on visibility inside a PostgreSQL
-   `REPEATABLE READ` transaction after a unique conflict; the loser now raises
-   `concurrency_race_conflict` from a nested savepoint and the outer savepoint
-   rolls back its quotation and lines, without handler replay;
-2. scan/enqueue collision losers could leak `IntegrityError` when the winner
-   was not visible in the old snapshot; they now return the visible winner or
-   `False` and leave the database uniqueness contract authoritative;
-3. several tests used weak fixtures/assertions or broad exception classes;
-   exact state, side-effect, rollback, paging, configuration, and race
-   assertions now exercise the production seams; and
-4. connector Reviewer/Admin groups do not imply Odoo Sales ACLs, so the
-   sanctioned manual-gateway action now sudo-reads only `company_id` and
-   `state` from its one linked quotation. Generic `sale.order` read remains
-   denied to a connector-only Reviewer; actor identity and every write remain
-   governed by the accepted action contract.
-
-### Contract-to-code-to-test traceability
-
-Legend: **S** = implemented and statically proven; **R** = implemented, with
-runtime-only proof remaining; **N/A** = that proof dimension does not apply.
-The positive/negative cells name the exact test method suffix where the class
-is evident from the file; fully-qualified names appear in the 86-test inventory
-below. Runtime lifecycle proof is required for every row marked R.
-
-| Contract requirement | Production symbol | Positive proof | Negative / fail-closed proof | Security / concurrency | Runtime | Status |
+| Contract requirement | Exact production symbol | Positive proof | Negative / fail-closed proof | Security / concurrency | Runtime | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| DoR registration: five models, eleven tests, manifest dependency/data order | `models/__init__.py`; `tests/__init__.py`; manifest | `test_all_five_model_files_are_registered_exactly_once`; `test_manifest_dependency_graph_and_registration_contract` | duplicate/import-count assertions | N/A | fresh install/upgrade | R |
-| D-012-1 permanent order binding and dual uniqueness | `ShopifyConnectorOrderBinding`; two `models.Constraint` declarations | `test_required_fields_and_uniqueness`; repeat import | direct duplicate constraints | protected-field role matrix; two-connection binding race | DB constraints | R |
-| D-012-1 PII-free binding | `_pii_snapshot_fields`; `_additional_protected_binding_fields` | `test_identity_and_pii_contract` | excluded-field/query and redaction guards | four-role create/write/clear denial | model setup | R |
-| D-012-2 read-only header/detail retrieval | five query constants; `_execute_query` | four-query/minimization and pagination tests | mutation/raw-execute/torn-page/duplicate-node guards | N/A | mocked transport execution | R |
-| D-012-2 explicit pagination bounds | `_paginate_connection`; scan enumeration | 100-line and paging tests | page-ceiling/repeated-cursor failures | N/A | Odoo execution | R |
-| D-012-3 atomic whole-order import | `_apply_import`; outer/nested savepoints | happy-path and repeat import | financial mismatch/null status/race rollback | genuine two-connection race | transaction behavior | R |
-| D-012-3 rediscovery refreshes evidence, never rewrites lines | `_refresh_existing_binding` | authorized-to-paid and repeat import | changed-money stale-quotation guard | binding uniqueness | runtime ORM | R |
-| D-012-4 review/hold evidence is bounded and redacted | `_hold`; safe evidence helpers | preview/redaction tests | PII string-surface assertions | audit/log scan | runtime logs | R |
-| D-012-5 customer resolution reuses accepted paths | `_resolve_customer`; customer importer | eight customer-resolution tests | ambiguity/company/no-PII fallback holds | existing binding ACLs | ORM matching | R |
-| D-012-6 product/custom/gift-card resolution | `_resolve_line_product`; service-product helpers | service-product, custom and gift-card imports | missing product holds then exact retry | existing product bindings | ORM products | R |
-| D-012-7 exact decimal/totals policy | money parsers; `_precreation_gates`; bounded solver | exact tax-free/tax-included/discount/high-value/zero-decimal tests | six gate families, currency/original/current/tip/duty/fee/rounding failures | N/A | Odoo tax engine | R |
-| D-012-8 financial-state and confirmation policy | `_confirmation_decision`; `_route_job_error` | complete 8-state × 3-policy matrix | null status, reversals, partial/pending/expiry | protected snapshots | job transitions | R |
-| D-012-9 explicit tax mapping only | `ShopifyConnectorTaxMapping`; `_resolve_tax` | explicit mapped-tax reuse | no auto-create/rate fallback; wrong-company/inactive/incompatible rejection | exact four-role ACL matrix | ACL/constraint setup | R |
-| D-012-10 source-tax fingerprint | `build_tax_evidence_key`; preview helpers | full-tuple/version/case/NFC tests | collision/shape/uniqueness tests | admin-only write/create | DB uniqueness | R |
-| D-012-11 COD read model only | binding COD fields; importer initialization | four COD tests | source guard forbids payment/mark-paid behavior | protected fields | ORM initialization | R |
-| D-012-12 job handler/gating/replay | job extensions in importer | handler/replay/source guards | disabled/stale store refusal | existing JOB-ACTIONS | dispatcher regression | R |
-| DEC-035 equal-currency and MoneyBag policy | `_money`; `_precreation_gates` | exact amount/currency tests | both-side mismatch failures | N/A | Decimal/currency runtime | R |
-| DEC-035 taxes/discounts/shipping/tips/duties/fees/rounding | parser and solver helpers | mapped taxes, all-discount and shipping tests | unsupported component gates | N/A | Odoo tax engine | R |
-| DEC-035 three confirmation policies | settings + `_confirmation_decision` | 8×3 matrix | changed evidence/no stale confirm | protected policy evidence | runtime | R |
-| DEC-035 three manual-gateway policies | `_manual_gateway_decision` | all-policy/COD matrix | unapproved/card-PENDING/mixed/malformed guards | N/A | runtime | R |
-| Manual approval authorization, reason and provenance | `action_approve_manual_gateway_order` | Reviewer success + Admin path | Auditor/Operator, empty reason, policy/gateway/evidence/state/company refusals | generic Sales ACL stays denied; exact read sudo only | ACL/action | R |
-| Manual approval authoritative refresh/idempotency | action enqueue + importer refresh | refresh-confirm and repeat call | stale/changed evidence remains draft/review | one active job | job/runtime | R |
-| Manual approval atomic audit/enqueue | action savepoint | exact actor/timestamp/one log | audit and enqueue failure rollbacks | redacted reason | transaction/log | R |
-| DoR order defaults/readiness | settings fields + importer readiness gates | exact company/pricelist/payment-term/team assertions | missing term/pricelist failure | admin settings ACL inherited | upgrade/defaults | R |
-| D-A6-2 enqueue-only manual/selected/scan | `_enqueue_order_scan`; `action_sync_*`; scan handler | trigger and enumerate tests | importer-not-called and collision tests | Operator+ action gate | cron/job | R |
-| D-A6-3 opt-in scheduled cron | `_cron_enqueue_order_scans`; cron XML | both flags + connected store | disabled/disconnected refusal; cron continues after store error | internal cron | XML/cron | R |
-| D-A6-4 30-minute watermark and safe checkpoint | `_scan_since`; `_run_order_scan_job` | overlap/complete-page advance | partial failure holds checkpoint | one exact checkpoint sudo | DB/cron | R |
-| D-A6-6 stale generation/replay refusal | enqueue service + inherited store generation contract | fresh generation paths | stale/disconnected/disabled tests | replay policy guard | dispatcher | R |
-| PD-RB preview has zero writes | `preview_order_backfill` | all bucket classification | all non-admin roles and zero business/job/log effects | Administrator gate | ORM/cache | R |
-| PD-RB token binds exact current evidence | token/digest helpers; `confirm_order_backfill` | valid token enqueue/idempotency | Boolean/stale/generation-changed token refusal | Administrator gate | ORM | R |
-| 60-day/read_all_orders honesty and bounds | backfill query/window validators | under-bound preview/confirm | over-bound and truncation refusal | admin only | Shopify fixture/runtime | R |
-| LC-1 historic job conversion | both `selection_add` ondelete handlers | source registration test | immutable `original_job_type` inherited guard | SEC-1 inherited | uninstall/reinstall | R |
-| No Wave-3+, mutation, UI, webhook or Layer-2 scope | complete Wave-2 production source | negative AST/source guards | forbidden-symbol scan | N/A | N/A | S |
+| DoR registration: five models, eleven tests, dependency/data order | `models/__init__.py`; `tests/__init__.py`; `__manifest__.py` | `test_all_five_model_files_are_registered_exactly_once`; `test_manifest_dependency_graph_and_registration_contract` | duplicate/import-count assertions | N/A | fresh install/upgrade | R |
+| D-012-1 permanent binding and dual uniqueness | `ShopifyConnectorOrderBinding`; `_store_shopify_gid_uniq`; `_store_sale_order_uniq` | required-field/uniqueness and repeat-import tests | direct duplicate constraints | four-role protected-field matrix; two-connection binding race | DB constraints | R |
+| D-012-1 PII-free binding | `_pii_snapshot_fields`; `_additional_protected_binding_fields` | identity/PII and exact-classification tests | excluded-field/query and redaction guards | direct create/write/clear denial | model setup | R |
+| D-012-2 read-only header/detail retrieval | `import_order_sync`; four importer query constants; `execute_business` | query-minimization and pagination tests | mutation/raw-execute/torn-page/duplicate-node guards | N/A | mocked transport execution | R |
+| D-012-2 explicit pagination bounds | `_collect_connection`; `ShopifyConnectorOrderScan._enumerate` | 100-line and multi-page tests | page-ceiling/repeated-cursor failures | N/A | Odoo execution | R |
+| D-012-3 atomic whole-order import | `_apply_import`; outer and nested savepoints | happy-path and repeat import | financial mismatch/null status/race rollback | genuine two-connection race | transaction behavior | R |
+| D-012-3 rediscovery refreshes evidence, never rewrites lines | `_refresh_existing`; `_binding_financial_evidence_matches` | authorized-to-paid and repeat import | changed-money stale-quotation guard | binding uniqueness | runtime ORM | R |
+| D-012-4 bounded/redacted review evidence | `_redact_evidence`; `_safe_evidence`; `_safe_gateway_evidence`; job transitions | preview/redaction tests | PII string-surface assertions | audit/log scan | runtime logs | R |
+| D-012-5 customer resolution reuses accepted paths | `_resolve_customer`; existing customer importer/matcher | eight customer-resolution tests | ambiguity/company/no-PII fallback holds | inherited binding ACLs | ORM matching | R |
+| D-012-6 product/custom/gift-card resolution | `_resolve_line_product`; connector service-product helpers | service-product, custom and gift-card imports | missing product holds then exact retry | inherited product bindings | ORM products | R |
+| D-012-7 exact decimal/totals policy | money validators; `_precreation_gates`; `_solve_and_assert_totals`; bounded solver | exact tax-free/tax-included/discount/high-value/zero-decimal tests | currency/original/current/tip/duty/fee/rounding failures | N/A | Odoo tax engine | R |
+| D-012-8 financial-state and confirmation policy | `_confirmation_outcome`; `_handle_order_import_sync` | complete 8-state × 3-policy matrix | null/reversal/partial/pending/expiry routes | protected snapshots | job transitions | R |
+| D-012-9 explicit tax mapping only | `ShopifyConnectorTaxMapping`; `_resolve_tax` | explicit mapped-tax reuse | no auto-create/rate fallback; company/inactive/incompatible rejection | four-role ACL matrix | ACL/constraint setup | R |
+| D-012-10 source-tax fingerprint | `build_tax_fingerprint`; `canonical_tax_rate`; preview helpers | full-tuple/version/case/NFC tests | collision/shape/uniqueness tests | Administrator-only create/write | DB uniqueness | R |
+| D-012-11 COD read model only | binding COD fields; `_binding_snapshot_vals`; `_manual_collected_amount` | four COD tests | source guard forbids payment/mark-paid behavior | protected fields | ORM initialization | R |
+| D-012-12 handler/gating/replay | `ShopifyConnectorJobOrderExtension`; `ShopifyConnectorJobDispatchOrderExtension`; `_handle_order_import_sync` | handler/replay/source guards | disabled/stale store refusal | inherited JOB-ACTIONS | dispatcher regression | R |
+| DEC-035 equal-currency/MoneyBag policy | `_validate_money_bag_shape`; `_validate_money_bag_currency`; `_money_equal`; `_precreation_gates` | exact amount/currency tests | both-side mismatch failures | N/A | Decimal/currency runtime | R |
+| DEC-035 taxes/discounts/shipping/tips/duties/fees/rounding | parser, mapping and solver helpers | mapped taxes, all-discount and shipping tests | unsupported-component gates | N/A | Odoo tax engine | R |
+| DEC-035 three confirmation policies | settings + `_confirmation_outcome` | 8×3 matrix | changed evidence/no stale confirm | protected policy evidence | runtime | R |
+| DEC-035 three manual-gateway policies | `_classify_manual_gateway`; `_confirmation_outcome` | all-policy/COD matrix | unapproved/card-PENDING/mixed/malformed guards | N/A | runtime | R |
+| Manual approval authorization/reason/provenance | `action_approve_manual_gateway_order` | Reviewer success + Administrator path | Auditor/Operator, empty reason, policy/gateway/evidence/state/company refusals | exact two-field quotation read sudo | ACL/action | R |
+| Manual approval authoritative refresh/idempotency | approval enqueue + `_refresh_existing` | refresh-confirm and repeated approval | stale/changed evidence remains draft/review | one active job | job/runtime | R |
+| Manual approval atomic audit/enqueue | action savepoint; `_create_lifecycle_audit_job`; enqueue service | exact actor/timestamp/one audit | audit and enqueue failure rollbacks | redacted reason | transaction/log | R |
+| DoR order defaults/readiness | settings fields; `_settings_for_store`; `_resolve_pricelist`; `_validate_payment_term` | exact company/pricelist/payment-term/team tests | missing configuration failures | inherited Administrator settings ACL | upgrade/defaults | R |
+| D-A6-2 enqueue-only manual/selected/scan | `_enqueue_order_scan`; `action_sync_orders_now`; `action_sync_selected`; `_enqueue_order` | trigger/enumeration tests | importer-not-called and collision tests | Operator/Administrator gates | cron/job | R |
+| D-A6-3 opt-in scheduled cron | `_cron_enqueue_order_scans`; cron XML | both flags + connected store | disabled/disconnected refusal; per-store error continuation | internal cron | XML/cron | R |
+| D-A6-4 30-minute watermark and safe checkpoint | `_incremental_start`; `run_scan`; `_enumerate` | overlap/complete-page advance | partial failure holds checkpoint | one exact settings checkpoint sudo | DB/cron | R |
+| D-A6-6 stale generation/replay refusal | enqueue service + inherited generation/domain contracts | fresh-generation paths | stale/disconnected/disabled tests | replay-policy guard | dispatcher | R |
+| PD-RB preview has zero writes | `preview_backfill`; `_enumerate(enqueue=False)` | bucket classification | non-admin and zero business/job effects | Administrator gate | ORM/cache | R |
+| PD-RB token binds exact evidence | `_preview_token`; `confirm_backfill` | valid token enqueue/idempotency | Boolean/stale/generation-changed token refusal | Administrator gate | ORM | R |
+| 60-day/read-all-orders honesty and bounds | `_assert_access_window`; `_validate_backfill_range`; `_enumerate` | in-window preview/confirm | over-window and truncation refusal | Administrator gate | Shopify fixture/runtime | R |
+| LC-1 historic conversion | both `selection_add` `ondelete` handlers | source-registration test | inherited immutable `original_job_type` guard | inherited SEC-1 | uninstall/reinstall | R |
+| No Wave 3+, mutation, UI, webhook or Layer-2 scope | complete Wave-2 production source | negative AST/source guards | forbidden-symbol scan | N/A | N/A | S |
 
-No requirement was classified missing or contradictory. All production
-behavior rows remain runtime-pending because source/static proof is not an
-Odoo test pass.
+## Complete 86-test inventory
 
-### Complete 86-test inventory
-
-The category shown is the test's primary purpose; many tests intentionally
-cover more than one criterion.
+The category shown is primary; many tests cover multiple acceptance criteria.
 
 | Class | Category | Exact methods |
 | --- | --- | --- |
@@ -191,93 +122,81 @@ cover more than one criterion.
 | `TestOrderCodImportReadModel` | COD; source/AST guard | `test_cod_dimensions_initialize_without_accounting_side_effects`; `test_successful_manual_transaction_is_snapshot_only`; `test_non_cod_order_does_not_acquire_cod_flag`; `test_source_contains_no_mark_paid_or_payment_creation` |
 | `TestOrderScanTriggers` | scan; source/AST guard; regression | `test_manual_store_trigger_is_role_gated_enqueue_only_and_idempotent`; `test_selected_binding_trigger_is_enqueue_only_and_collision_safe`; `test_cron_requires_both_flags_and_connected_store`; `test_scan_enumerates_and_enqueues_but_never_imports_inline`; `test_pagination_and_duplicate_edge_fail_closed`; `test_store_progress_helpers_are_nonstored_and_state_accurate`; `test_disconnected_store_and_disabled_domain_refuse_manual_scan` |
 
-There are exactly 86 unique methods: no duplicate names, skips, dynamically
-excluded methods, placeholder assertions, broad `assertRaises(Exception)`, or
-swallowed worker exceptions. Install/upgrade/uninstall behavior is deliberately
-runtime matrix coverage rather than a fake unit-test count.
+There are exactly 86 unique methods: no duplicate names, skips, dynamically excluded methods, placeholder assertions or broad `assertRaises(Exception)`.
 
-### Concurrency structural proof
+## Concurrency structural proof
 
-Both tagged tests open independent `db_connect(dbname).cursor()` connections,
-set bounded statement/lock timeouts, commit fixtures before racing, and use a
-start barrier plus a second barrier at the exact production seam. The enqueue
-race delegates to the real enqueue service; the binding race delegates to the
-real precreation gates and then the real importer. Each worker catches every
-`BaseException` into a queue, rolls back failures, commits success, and closes
-its cursor in `finally`; the parent joins with a bound and fails on live
-threads or missing outcomes. Final SQL asserts exactly one scan job, one
-binding identity and one linked sale order. Any serialization, uniqueness,
-lock, missing outcome, or unexpected error changes the exact result tuple and
-fails the test. Actual overlap and PostgreSQL behavior remain runtime-only.
+Both tagged tests open independent `db_connect(dbname).cursor()` connections, set bounded statement/lock timeouts, commit fixtures before racing, and use a start barrier plus a second barrier at the exact production seam.
 
-### Install, upgrade and migration precheck
+- The scan race delegates to the real enqueue service. Every worker captures its outcome, closes its cursor in `finally`, and the parent fails on live threads, missing outcomes, unexpected error types or a row count other than one.
+- The permanent-binding race delegates to the real precreation gates and real importer. The winner commits normally. The `concurrency_race_conflict` loser intentionally executes `SELECT 1` and commits in the same transaction after catching `JobHandlerError`, matching the dispatcher's continuation posture; therefore the test fails if the importer's outer savepoint did not restore transaction usability.
+- Final SQL asserts exactly one binding, one distinct bound `sale_order_id`, and exactly one sale order with the race's unique Shopify-origin marker. An orphan losing quotation therefore fails the test instead of being hidden by a full worker rollback or by a query limited to bound orders.
+- Cleanup deletes both bound orders and any same-origin orphan candidate, then closes every connection.
+
+Actual overlap, PostgreSQL lock timing and Odoo registry behavior remain runtime-only until the exact-head Odoo.sh repetitions run.
+
+## Install, upgrade and migration precheck
 
 - Baseline sale version: `19.0.1.2.1`; Wave-2 version: `19.0.2.0.0`.
-- No migration directory is required. The order binding, tax mapping and their
-  required fields are on new tables, populated atomically by their sanctioned
-  create services. `sale.order.line.shopify_line_item_gid` is nullable.
-- Existing settings rows receive ORM/database-safe defaults: confirmation
-  `paid_only`, manual policy `require_approval`, gateways empty, window 30,
-  pending expiry 24, include-test False, scheduled False, and company from the
-  active company. Optional pricelist/team/payment-term/checkpoint remain null;
-  importer readiness fails closed until required operational defaults exist.
-- Existing customer bindings/partners receive no new field. Every order
-  binding snapshot/provenance/COD field belongs to a new table and therefore
-  has no legacy-row backfill risk. The tax fingerprint version default applies
-  only to new tax-mapping rows.
-- Both new job selections have LC-1 `ondelete` historic conversion. Cron XML is
-  `noupdate=1`; ACL IDs and cron/model XML IDs are unique. Uninstall selection
-  cleanup, historic conversion, cron/ACL removal and reinstall are runtime
-  proof items. Rollback is backup + source revert; never uninstall sale as a
-  rollback because it also owns customer history.
+- No migration directory is required. The order binding and tax mapping are new tables; their required fields are populated by sanctioned create services. `sale.order.line.shopify_line_item_gid` is nullable.
+- Existing settings rows receive ORM/database-safe defaults: confirmation `paid_only`, manual policy `require_approval`, gateways empty, window 30, pending expiry 24, include-test False, scheduled False, and company from the active company. Optional pricelist/team/payment-term/checkpoint remain null; importer readiness fails closed until required operational mappings exist.
+- Existing customer bindings and partners receive no new field. Order snapshot/provenance/COD fields are on a new table and have no legacy-row backfill risk. The tax fingerprint version default applies only to new tax-mapping rows.
+- Both new job selections have LC-1 `ondelete` historic conversion. Cron XML is `noupdate=1`; ACL and model/XML IDs are unique. Uninstall selection cleanup, historic conversion, cron/ACL removal and reinstall remain runtime proof.
+- Rollback is database backup restoration plus source revert before production, or forward-disable with preserved imported records in production. Uninstalling `shopify_connector_sale` is not an authorized rollback because it also owns customer history.
 
-### Security, data minimization and exact sudo inventory
+## Security, data minimization and exact sudo inventory
 
-The ACL CSV has 12 rows: order binding follows the accepted
-Auditor `r`, Operator `rc`, Reviewer `rw`, Admin `rwc` pattern; tax mapping is
-read-only for Auditor/Operator/Reviewer and `rwc` for Admin; no row grants
-unlink. The binding's exact 50 protected fields comprise the nine common
-fields, `sale_order_id`, and all 40 concrete snapshot/provenance/COD fields;
-all four approval fields are included and direct create/write/clear is denied.
+The ACL CSV has 12 rows. Order binding follows the accepted Auditor `r`, Operator `rc`, Reviewer `rw`, Administrator `rwc` pattern. Tax mapping is read-only for Auditor/Operator/Reviewer and `rwc` for Administrator. No row grants unlink.
 
-Exact Wave-2 sudo sites after audit:
+The exact 50 protected order-binding fields comprise nine common binding fields, `sale_order_id`, and all 40 concrete snapshot/provenance/COD fields. All four approval-provenance fields are protected; direct create/write/clear attempts are denied.
 
 | File:line | Symbol | Narrow justification |
 | --- | --- | --- |
 | `shopify_connector_order_importer.py:530` | `_apply_import` | sanctioned creation of the complete protected order binding |
-| `shopify_connector_order_importer.py:2393` | `_refresh_existing_binding` | sanctioned evidence/snapshot refresh only |
+| `shopify_connector_order_importer.py:2393` | `_refresh_existing` | sanctioned evidence/snapshot refresh only |
 | `shopify_connector_order_binding.py:189` | `action_approve_manual_gateway_order` | read only linked quotation `company_id` and `state`; connector roles intentionally do not inherit Sales ACLs |
 | `shopify_connector_order_binding.py:234` | same action | write only the four protected approval-provenance fields after caller-role/company/evidence checks |
-| `shopify_connector_order_scan.py:73` | `_run_order_scan_job` | advance only the protected per-store checkpoint after complete pagination |
+| `shopify_connector_order_scan.py:73` | `run_scan` | advance only the protected per-store checkpoint after complete pagination |
 
-There is no tax-mapping sudo, public context bypass, broad public-method sudo,
-or job create outside the enqueue service. Job payloads contain identifiers,
-hashes and bounded non-PII evidence only. Preview tokens/fingerprints use
-canonicalized non-PII evidence; they never hash raw customer PII, credentials,
-access tokens, Authorization headers or full Shopify payloads. Audit/error/log
-messages are identifier/count/reason-only and use the inherited redaction
-helpers. Runtime log and residue scans remain mandatory.
+There is no tax-mapping sudo, public context bypass, broad public-method sudo or job creation outside the enqueue service. Job payloads contain identifiers, hashes and bounded non-PII evidence only. Preview tokens and tax fingerprints use canonicalized non-PII evidence; they never hash raw customer PII, credentials, access tokens, Authorization headers or full Shopify payloads. Runtime log/residue inspection remains mandatory.
 
-### Reproducible static-tool result
+## Documentation-accuracy corrections
 
-Executed from the repository snapshot on 2026-07-17:
+The final discrepancy pass corrected the following source-document mismatches:
 
-- `compileall` and AST parse: 26 sale-addon Python files, clean;
-- XML parse: one cron file; CSV parse/column consistency: 12 ACL rows;
-- manifest parse: `19.0.2.0.0`, exact dependencies/data order;
-- imports: five new models and eleven tests, each exactly once;
-- test discovery: 86 unique methods;
-- GraphQL: five operation constants, all `query`, zero `mutation`;
-- raw `.execute()`, tax auto-create, Wave-3 mutation, TODO/FIXME,
-  `NotImplemented`, skip and broad-exception scans: clean;
-- duplicate module XML ID and ACL ID scans: clean;
-- query/parser coverage: parser-required fields are selected; the explicitly
-  retained evidence-only fields are `Order.confirmed`, `Order.closed`,
-  `Order.closedAt`,
-  `Transaction.id`, and `Transaction.processedAt`; excluded/minimized fields
-  remain absent under the existing AST guard;
-- registration, job-type, replay-policy, LC-1 ondelete and exact protected-set
-  guards: clean.
+1. restored the complete 18,000+ line `research-handoff.md` history after the first audit publication accidentally replaced it with a compact 23-line snapshot;
+2. replaced stale/nonexistent traceability aliases (`_execute_query`, `_paginate_connection`, `_refresh_existing_binding`, `_confirmation_decision`, `_manual_gateway_decision`, `_scan_since`, `_run_order_scan_job`, `preview_order_backfill`, `confirm_order_backfill`, `build_tax_evidence_key`) with the exact current symbols listed above;
+3. corrected the sudo inventory names from `_refresh_existing_binding`/`_run_order_scan_job` to `_refresh_existing`/`run_scan`;
+4. strengthened the permanent-binding race test so a full worker rollback can no longer mask an ineffective importer savepoint or orphan quotation;
+5. required the PR body to name only the final post-correction runtime-candidate SHA.
 
-This is static evidence only. It does not claim an Odoo test pass, an Odoo.sh
-build, install/upgrade success, a live Shopify call, or dev-store UAT.
+## Mandatory exact-head Odoo.sh matrix
+
+Run only against the exact frozen SHA recorded in PR #176:
+
+1. Fresh install `shopify_connector_core,shopify_connector_product,shopify_connector_sale` with tests.
+2. Upgrade from `mvp/program-integration@234c0bb50b3f61b7681e18f0b28839dee619cdb9`.
+3. All Task 012, Area-6, SEC-1 and PII-focused classes in the 11 order test files.
+4. Full standard core, product and sale suites.
+5. `shopify_connector_order_discovery_concurrency`, both tests, repeated for stability; prove registry-lock restoration, first collision, loser transaction usability and no orphan sale order.
+6. LC-1 disable/uninstall/reinstall, selection removal, historic conversion and no-orphan checks.
+7. CORE-R1, JOB-ACTIONS, SEC-1 and one combined SRR-03 smoke.
+8. Residue audit: jobs/logs/leases/stores/credentials/bindings/orders/products/mappings, cron triggers, temporary files and workers.
+9. Database audit: sessions, idle transactions, cursors, locks, leases and cron triggers.
+10. Security scan: credentials, access tokens, Authorization headers, raw PII and temporary paths.
+11. If issue #157 reproduces exactly, use only the accepted temporary `notification_type` and `color_scheme` defaults, rerun, then drop and verify both defaults are restored.
+12. Read-only Shopify dev-store order evidence is preferred but may be deferred honestly to Wave 6 if credentials are unavailable.
+
+Representative command forms:
+
+```text
+odoo-bin -d <db> -i shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --stop-after-init
+odoo-bin -d <db> -u shopify_connector_core,shopify_connector_product,shopify_connector_sale --test-enable --test-tags /shopify_connector_sale --stop-after-init
+odoo-bin -d <db> -u shopify_connector_sale --test-enable --test-tags shopify_connector_order_discovery_concurrency --stop-after-init
+```
+
+## Proven / not proven
+
+**Proven statically:** allowed-file scope, registration, read-only query posture, fail-closed field protection, exact symbol traceability, replay/lifecycle declarations, explicit caps, exact sudo inventory, and structural concurrency-test intent.
+
+**Not proven:** Odoo model setup, install/upgrade/uninstall/reinstall, functional test execution, actual concurrency behavior, full regression, runtime residue/security, or dev-store behavior. No Odoo.sh build, Odoo test pass, exactly-once remote-effect claim, Shopify mutation or DEC-031 Layer 2 claim is made.
