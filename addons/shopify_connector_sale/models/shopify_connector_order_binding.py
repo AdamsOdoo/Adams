@@ -182,7 +182,14 @@ class ShopifyConnectorOrderBinding(models.Model):
             )
         if not isinstance(reason, str) or not reason.strip():
             raise UserError('A non-empty approval reason is required.')
-        if self.sale_order_id.company_id != self.env.company:
+        # Connector Reviewer/Admin roles intentionally do not imply Odoo's
+        # Sales groups.  Read only the two business-record fields required by
+        # this sanctioned action so its accepted authorization does not rely
+        # on a warm superuser cache or unrelated sale.order ACL membership.
+        sale_order_evidence = self.sale_order_id.sudo().read(
+            ['company_id', 'state'],
+        )[0]
+        if sale_order_evidence['company_id'][0] != self.env.company.id:
             raise AccessError(
                 'Manual-gateway approval must run in the sale order company.'
             )
@@ -195,7 +202,7 @@ class ShopifyConnectorOrderBinding(models.Model):
             return True
         if self.manual_gateway_approval_state != 'pending':
             raise UserError('This order is not awaiting manual-gateway approval.')
-        if self.sale_order_id.state != 'draft':
+        if sale_order_evidence['state'] != 'draft':
             raise UserError('Only a draft quotation can be approved.')
         settings = self.env['shopify.connector.store.settings'].search([
             ('store_id', '=', self.store_id.id),
