@@ -317,7 +317,10 @@ item 11 for the full resolution record. Every other addendum field
 (`manual_gateway_policy`, `approved_manual_gateways`, `order_import_window`,
 `pending_wait_expiry` — now default 24 h / min 1 h / max 7 d per PD-B1, not
 the addendum's stale "proposed 7 days") is accepted as written, corrected for
-PD-B1's binding default.
+PD-B1's binding default. **Corrected 2026-07-17 (§0.8):** the settings field
+list also includes `order_scheduled_sync_enabled` (Boolean, default `False`,
+per-store) — Area-6's order-scan cron gate (D-A6-3), living on this same
+`shopify_connector_sale` store-settings extension file.
 
 ### 0.2 D-012-4 (ambiguous-customer resolution) — confirmed
 
@@ -407,6 +410,46 @@ Does not authorize any code, branch, or PR. Does not accept DEC-031 Layer 2
 (unrelated — Task 012 is read-only). Does not add any PII-masking field. Does
 not expand MVP scope. The next authorized activity is issuing (not
 executing) the locked Sol prompt with the exact post-gate-merge SHA.
+
+### 0.8 Correction pass (2026-07-17, same day) — contradictions found post-merge
+
+A post-merge control-room re-review of the Wave 2 gate (PR #174 comments
+`5000101837`/`5000111557`) found current-contract contradictions between
+this packet, the Wave 2 Definition of Ready, and the locked Sol prompt.
+This packet's own corrections:
+
+- **Tax resolution (§5/§6 below).** The T-B mechanism was always
+  explicit-mapping-only with no automatic creation (round-6 item c6/d6,
+  §D-012-9 step 4 above), but this packet's own §6 test-file description
+  still said "tax rate-match + creation + reuse" — a stale artifact of an
+  earlier draft. §6 below is corrected to match §D-012-9's actual, binding
+  explicit-mapping-only contract; no design changed, only the test
+  description's wording.
+- **`order_scheduled_sync_enabled`.** Added to §0.1's accepted settings-field
+  list (Area-6 owns writing to it via the cron; Task 012's own dispatcher
+  code does not read it directly, but the field lives on the
+  `shopify_connector_sale`-owned store-settings extension this packet's
+  row 6 allowed-file entry creates, so it is named here for completeness).
+- **Tax-mapping ACL (§5 below).** Corrected from the customer-binding
+  read/write/create pattern to an Administrator-create/write-only pattern —
+  `shopify.connector.tax.mapping` is configuration (which `account.tax` a
+  fingerprint resolves to), not an ordinary operational binding.
+- **Manual-gateway approval backend contract (new, §5 below).** The
+  accepted `manual_gateway_policy = require_approval` product decision had
+  no defined backend approval action, permission mapping, provenance
+  fields, or test contract anywhere in this packet. Added below.
+- **Test-purpose wording (§6 below).** "Tip mapping" and vague "metadata"
+  language replaced with the packet's own actual, already-binding behavior
+  (nonzero-tip fail-closed; exact allowlisted/excluded field assertions).
+- **Rollback honesty.** §8's rollback text is corrected — see the Wave 2
+  DoR's §2.8, now the authoritative rollback record for this wave (two
+  explicit modes; a source-level Git revert does not by itself drop any
+  table or column).
+
+No product decision, scope boundary, or open-question disposition changes.
+Full record: [`DEC-035`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md)'s
+"Correction addendum (2026-07-17)" section and the DoR's own correction
+addendum.
 
 ## 1. Objective and business outcome
 
@@ -1305,18 +1348,98 @@ handing text to `_system_append` (which then applies the core
 `redact()` as usual). The shared PII key list migrates into the core
 tool at W1 (a core-owned task) — feeding Q23's list; until then it is
 module-local by design. OP-43 verbatim-log rule in the validation
-record. ACL:
-`ir.model.access.csv` rows for the binding — auditor/operator/reviewer
-read-only, admin rwc (no unlink), exactly the customer-binding
-pattern; no new groups.
+record. ACL (**corrected 2026-07-17, §0.8 — two distinct patterns, not
+one**):
+`ir.model.access.csv` rows for `shopify.connector.order.binding` — an
+ordinary operational binding — auditor/operator/reviewer/admin exactly the
+customer-binding pattern (auditor `1,0,0,0`; operator `1,0,1,0`; reviewer
+`1,1,0,0`; admin `1,1,1,0`; no unlink). `ir.model.access.csv` rows for
+`shopify.connector.tax.mapping` — **configuration, not an operational
+binding** (it governs which `account.tax` a Shopify tax fingerprint
+resolves to) — auditor/operator/reviewer **read-only** (`1,0,0,0` for all
+three), admin **read/write/create** (`1,1,1,0`, no unlink); Operator does
+**not** get create and Reviewer does **not** get write here, unlike the
+binding pattern. No new groups either way.
+
+**Manual-gateway approval backend contract (new, 2026-07-17, §0.8).** The
+accepted `manual_gateway_policy = require_approval` product decision (§D-012-9
+context / addendum A.3) requires a sanctioned backend approval action —
+Wave 2 has no UI, but the backend path must be complete. Defined on the
+already-allowed order-binding file (row 1 of the DoR's §2.2 table), not a new
+file: `action_approve_manual_gateway_order(reason)`.
+
+Current interim four-group authorization (mirrors `action_override_binding`'s
+own pattern on the binding mixin): Reviewer and Administrator allowed;
+Auditor and Operator denied. This maps safely onto the future two-role model
+([`connector-roles-and-permissions.md`](../02-product/connector-roles-and-permissions.md),
+Proposed, not yet implemented) because Connector User inherits the Reviewer
+capability by that design's own §2.2 (SEC-2, Wave 5) — this action's
+authorization needs no rework when SEC-2 lands.
+
+Exact contract: (1) operates on exactly one order binding; (2) requires a
+non-empty `reason` string; (3) requires the linked `sale.order` to remain
+`draft`; (4) requires the store's current `manual_gateway_policy` to still be
+`require_approval`; (5) requires the order's manual gateway to remain on
+`approved_manual_gateways`; (6) requires the stored transaction evidence to
+still show an unambiguous manual-gateway signal (a binding whose `status` is
+already `review` per DEC-035 item 5's mixed-transaction disposition is
+ineligible — mixed evidence is never approved); (7) refuses cancelled,
+refunded, expired, or voided evidence; (8) performs **no** Shopify mutation
+of any kind; (9) never issues a remote call while holding a database lock —
+it enqueues an `order_import_sync` refresh job rather than calling the
+Shopify API inline; (10) records approval *intent* (writes the four
+provenance fields below via `self.sudo()`, mirroring
+`action_override_binding`'s own sudo pattern) and enqueues the authoritative
+refresh; (11) the refresh importer re-reads current Shopify evidence before
+any confirmation; (12) confirms the SO only if the refreshed evidence still
+matches the evidence recorded at approval time (compared via the existing
+`money_equal`/evidence-equality rules, never a raw string compare); (13) if
+the evidence changed, the SO stays `draft` and the binding routes to
+`status='review'` instead of silently confirming; (14) idempotent — a
+repeated call after an already-successful approval is a no-op returning the
+existing state, never a second SO or a duplicate active job; (15) preserves
+actor identity and timestamp; (16) produces exactly one redacted audit-log
+row per approval via `store_id._create_lifecycle_audit_job(...)` (the same
+helper `action_override_binding` already uses); (17) if audit-log creation or
+the refresh enqueue fails, the approval-field write rolls back atomically —
+no partial approval state persists.
+
+Four new protected system-maintained/provenance fields on the order binding,
+covered by `_additional_protected_binding_fields()` (SEC-1/DEC-034 contract —
+no generic non-`sudo()` create/write can touch them):
+`manual_gateway_approval_state` (Selection: `not_required` / `pending` /
+`approved` / `superseded`), `manual_gateway_approved_by_uid` (Many2one
+`res.users`), `manual_gateway_approved_at` (Datetime),
+`manual_gateway_approved_shopify_updated_at` (Datetime — the Shopify
+`updatedAt` snapshot the approval was granted against, the exact value the
+post-refresh evidence-match check in step (12) compares). No user-editable
+generic write surface exists for any of the four. The `reason` argument is
+recorded only in the redacted audit log (step 16) — never stored as a plain
+field on the binding, never logged unredacted, and never containing raw PII
+beyond what the existing redaction discipline already permits.
+
+No UI, menu, wizard, or controller is authorized for this action in Wave 2 —
+it is called from shell/server actions, exactly like every other Wave 2
+service method, until the UI phase (Wave 5) wires a button to it.
 
 ## 6. Tests (exact files) and validation
 
 `tests/test_order_binding.py` (schema/constraints/mixin, dual
-uniqueness, restrict FKs); `tests/test_order_import_mapping.py`
-(happy path incl. confirm policy, lines/shipping/tip mapping, tax
-rate-match + creation + reuse, addresses/dedup, metadata, guest
-paths, custom/gift-card lines, UTC parsing);
+uniqueness, restrict FKs, exact protected-field-set assertion incl. the
+2026-07-17-added manual-gateway-approval provenance fields);
+`tests/test_order_import_mapping.py` (**corrected 2026-07-17, §0.8 — this
+file never tested tax creation; it was always explicit-mapped-tax reuse
+only, and this description now matches D-012-9 step 4's actual, binding
+contract**: happy path incl. confirmation policy, lines/shipping mapping,
+zero-tip eligibility, nonzero-tip fail-closed
+[`unsupported_tip_tax_treatment`, no SO, no "Shopify Tip" line],
+explicit-mapped-tax reuse only [no automatic tax creation, no automatic
+rate fallback — creation/fallback/ambiguity behavior belongs exclusively to
+`tests/test_order_tax_resolution.py`], addresses/dedup, exact allowlisted
+order-evidence fields only with negative assertions that every
+data-minimized/excluded field is absent from every query constant and
+never stored or logged, guest/customer resolution paths, custom/gift-card
+line handling, UTC timestamp parsing);
 `tests/test_order_totals_guard.py` (the full D-012-2 revised matrix:
 per-component checks and formulas; tolerance boundary ± at each
 component; 100-line high-count case; **high-value discounted order
@@ -1448,8 +1571,9 @@ accepted (= D-012-1 acceptance); 3 exact names in final prompt ✅(§3);
 4 exact allowed/forbidden files ✅(§15); 5 dedup/thresholds fixed
 ✅(D-012-5/12); 6 no accounting/refund/payout scope ✅; 7 no
 inventory/fulfillment/product-export scope ✅; 8 no
-UI/webhook/OAuth ✅; 9 exact tests ✅(§6); 10 rollback ✅(single-PR
-revert; SOs survive un-bound; no dependent domain); 11 no live-Shopify
+UI/webhook/OAuth ✅; 9 exact tests ✅(§6); 10 rollback ✅(two explicit
+modes per DoR §2.8 — pre-production snapshot restore, or forward-disable
+preserving imported data; SOs survive un-bound; no dependent domain); 11 no live-Shopify
 dependency beyond the Task 003 client ✅; 12 blockers reconfirmed at
 gate time (ChatGPT act); 13 fallback-partner consumption boundary
 explicit ✅(D-012-5 path 3 — first sanctioned consumer); 14
@@ -1472,11 +1596,21 @@ never mutates an imported SO; **an ambiguous customer creates no partial SO/bind
 (job → `blocked_manual_review`, atomic retry after resolution)**; zero
 payout/refund/invoice/tax-engine/presentment logic in the diff; suites green locally
 and on Odoo.sh; handoff + validation record + AR row appended; draft PR; gate closes on
-draft-open. Rollback: revert the single PR — order bindings drop,
-`sale.order` records survive as ordinary data; Tasks 013/014 are not
-yet started so nothing depends on it. **No database, schema, Odoo module, Shopify
-config, or runtime state is changed by this docs-only session; documentation
-rollback is reverting the round-9 commit(s).** Upgrade note: the **three** settings
+draft-open. **Rollback (corrected 2026-07-17 — see DoR §2.8 for the full,
+authoritative record): a source-level Git revert alone changes no database
+schema — it only removes files.** The wave's actual rollback is one of two
+explicit modes: (A) exact pre-production rollback via a database backup taken
+immediately before the module upgrade, restored if needed, with the
+Git-level revert deployed on top; or (B) forward-disable in production —
+set `order_scheduled_sync_enabled=False`, quiesce non-terminal jobs via the
+already-merged JOB-ACTIONS lifecycle paths, and leave imported `sale.order`
+records, order bindings, and tax mappings exactly as they are (never
+uninstall `shopify_connector_sale`, which would also remove the merged
+Task 011 customer-import capability this wave does not own). Tasks 013/014
+are not yet started so nothing depends on Wave 2 either way. **No database,
+schema, Odoo module, Shopify config, or runtime state is changed by this
+docs-only session; documentation rollback is reverting the round-9
+commit(s).** Upgrade note: the **three** settings
 fields (`order_company_id`/`order_pricelist_id`/`order_payment_term_id` and the
 others) and the SOL field are additive (no migration).
 

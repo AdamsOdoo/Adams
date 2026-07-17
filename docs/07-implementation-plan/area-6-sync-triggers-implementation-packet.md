@@ -128,6 +128,21 @@ Does not accept the product-scan or customer-scan slices. Does not accept
 the optional core-additive readiness extension. Does not authorize any code,
 branch, or PR. Does not touch `shopify_connector_core` in any way.
 
+### 0.5 Scheduled-sync field — exact name (corrected 2026-07-17)
+
+D-A6-3 below describes the per-domain scheduling gate generically as
+`<domain>_scheduled_sync_enabled`. For the order-scan slice this session
+accepts, the exact field name is **`order_scheduled_sync_enabled`** (Boolean,
+default `False`, per-store) — it lives on the `shopify_connector_sale`
+store-settings extension (the same file Task 012 modifies, DoR §2.2 row 6),
+and the order-scan cron requires both it and `sale_domain_enabled` to be
+true before enqueueing a scan for a store. This is a naming clarification
+only — D-A6-3's mechanics were already correct; the Wave 2 Definition of
+Ready and the locked Sol prompt previously omitted the exact field name from
+their own frozen settings inventories, which is corrected in those documents
+directly (this session's post-merge correction pass; see DEC-035's
+"Correction addendum (2026-07-17)").
+
 ## 1. Objective, scope, non-goals
 
 One implementation task ("Task 016 — sync triggers & operability",

@@ -1,12 +1,25 @@
 # Locked Sol Wave 2 Implementation Prompt — Order Import (Task 012 + Area-6 Order-Scan Slice)
 
-> **Status: LOCKED, issued 2026-07-17.** This is the canonical, ready-to-copy
-> prompt for the Wave 2 implementation session. **It is issued, not
-> executed, by this gate session.** Do not run this prompt in the same
-> session that authored it. The exact base SHA below must be re-verified
-> live against `mvp/program-integration` immediately before use — if it has
-> drifted, update it and re-confirm the drift is only further-merged
-> `docs/**` commits (nothing under `addons/**`) before proceeding.
+> **Status: LOCKED, corrected 2026-07-17 (same day).** This is the
+> canonical, ready-to-copy prompt for the Wave 2 implementation session.
+> **It is issued, not executed, by this gate session.** Do not run this
+> prompt in the same session that authored it. The exact base SHA below
+> must be re-verified live against `mvp/program-integration` immediately
+> before use — if it has drifted, update it and re-confirm the drift is
+> only further-merged `docs/**` commits (nothing under `addons/**`) before
+> proceeding.
+>
+> **Correction pass (2026-07-17):** a post-merge control-room re-review
+> (PR #174 comments `5000101837`/`5000111557`) found and fixed eight
+> contradictions in this prompt's first version — a stale tax-auto-create
+> test description, a missing `order_scheduled_sync_enabled` field, a
+> model-registration count error, a tax-mapping ACL copied from the wrong
+> pattern, a missing manual-gateway-approval backend contract, stale tip/
+> metadata wording, an unsafe rollback narrative, and the `<fill in...>`
+> placeholder replaced with the standard `<EXACT_SHA_AT_ISSUANCE>` marker.
+> No scope, decision, or disposition changed — see DEC-035's "Correction
+> addendum (2026-07-17)" for the full record. Still not executed by any
+> session that has touched this file.
 
 ---
 
@@ -15,9 +28,12 @@
 ```text
 REPOSITORY: AdamsOdoo/Adams
 
-EXACT STARTING SHA (mvp/program-integration): <fill in the exact post-gate-merge
-SHA recorded in mvp-program-state.md's Wave 2 row at the moment this prompt
-is issued — do not reuse the gate-preflight session's own pre-merge SHA>
+EXACT STARTING SHA (mvp/program-integration): <EXACT_SHA_AT_ISSUANCE>
+(fill this placeholder with the exact live mvp/program-integration tip at
+the moment this prompt is actually handed to a Sol session — verify it live
+from GitHub immediately before issuance; do not reuse any SHA recorded in
+this document's own authoring/correction session, and do not let any
+repository commit occur between that verification and issuance)
 
 WORKING BRANCH TO CREATE: sol/wave-2-order-import
 
@@ -135,6 +151,23 @@ docs/07-implementation-plan/mvp-program-state.md (MODIFY, wave-status/sprint-log
 docs/05-qa/mvp-acceptance-matrix.md (MODIFY, row 9 [+13/14 if applicable] only)
 docs/01-research/research-handoff.md (MODIFY, prepend your handoff entry only)
 
+Two clarifications on files already in this list (corrected 2026-07-17,
+post-merge control-room review — full contract: Task 012 packet §5 "Manual-
+gateway approval backend contract" and §0.8; DEC-035 "Correction addendum"):
+(a) shopify_connector_order_binding.py MUST also define
+action_approve_manual_gateway_order(reason) and the four
+manual-gateway-approval provenance fields
+(manual_gateway_approval_state/manual_gateway_approved_by_uid/
+manual_gateway_approved_at/manual_gateway_approved_shopify_updated_at) —
+this is not a new file, it is a mandatory addition to this already-allowed
+file; (b) ir.model.access.csv MUST use TWO DIFFERENT ACL patterns — the
+customer-binding read/write/create pattern for
+shopify.connector.order.binding, but an Administrator-create/write-only
+pattern (auditor/operator/reviewer read-only, admin read/write/create, no
+unlink for either model) for shopify.connector.tax.mapping, which is
+configuration, not an operational binding. Do not copy the binding pattern
+onto tax mapping.
+
 Any file not in this list is forbidden by omission. In particular: no
 shopify_connector_core edit of any kind (reuse sale_domain_enabled — do
 not touch ACCEPTED_DOMAIN_FLAGS); no shopify_connector_product edit unless
@@ -184,7 +217,12 @@ B. MANUAL PAYMENT GATEWAYS: manual_gateway_policy (confirm_auto / quotation
    / require_approval [default]); gateway must be on the Administrator's
    approved_manual_gateways list; discriminate via transaction evidence
    (manualPaymentGateway + gateway identity), never PENDING alone; card
-   PENDING never receives manual-gateway treatment.
+   PENDING never receives manual-gateway treatment. Under require_approval,
+   confirmation is a Reviewer/Administrator-only backend action,
+   action_approve_manual_gateway_order(reason), on the order binding — full
+   contract (permission mapping, provenance fields, atomicity, idempotency,
+   refresh-before-confirm) is Task 012 packet §5's "Manual-gateway approval
+   backend contract"; no UI in Wave 2.
 C. PENDING PAYMENT: pending_wait_expiry default 24h, min 1h, max 7d (PD-B1);
    later PAID evidence reconciles without a duplicate order.
 D. IMPORT WINDOW: order_import_window quick 7/30/60 days + custom range,
@@ -205,6 +243,15 @@ H. PII: no new PII-masking field/capability of any kind; raw PII never
 I. MUTATION BOUNDARY: Wave 2 is 100% read-only toward Shopify; declares
    remote_read_replay_safe; no DEC-031 Layer 2 model or mutation wrapper;
    no exactly-once remote-effect claim anywhere in code, tests, or docs.
+J. SCHEDULED SYNC: order_scheduled_sync_enabled (default False, per store)
+   gates the order-scan cron alongside sale_domain_enabled; Administrator-
+   only configuration is already structural via the store-settings model's
+   existing ACL (no new field-level groups= needed); disabling it stops new
+   scheduled scans without destroying already-enqueued or historical jobs.
+K. TAX-MAPPING ACCESS: shopify.connector.tax.mapping is configuration, not
+   an operational binding — Administrator create/write-only (auditor/
+   operator/reviewer read-only, no unlink for any role); do not reuse the
+   order-binding's read/write/create-per-role pattern here.
 
 ======================================================================
 6. OPEN-QUESTION DISPOSITIONS (binding — full detail in DEC-035)
@@ -266,6 +313,18 @@ I. MUTATION BOUNDARY: Wave 2 is 100% read-only toward Shopify; declares
 12. Abandoned checkouts never enter the order pipeline (PD-AC-1 negative
     test).
 13. All existing core/product/sale tests remain green — zero regression.
+14. order_scheduled_sync_enabled (default False) gates the order-scan cron
+    alongside sale_domain_enabled; either false, or the store not
+    connected, means no enqueue; the cron never imports inline; disabling
+    the flag stops new scans without destroying existing jobs.
+15. shopify.connector.tax.mapping is Administrator-create/write-only;
+    Auditor/Operator/Reviewer create and write are denied server-side; no
+    role can unlink; a denied attempt leaves no row and no audit residue.
+16. action_approve_manual_gateway_order(reason) exists, is Reviewer/
+    Administrator-only, requires a non-empty reason and a draft SO, refuses
+    when policy/gateway/evidence no longer qualify, never mutates Shopify,
+    refreshes evidence before confirming, is idempotent, records exactly
+    one audit log, and rolls back atomically if audit or enqueue fails.
 
 ======================================================================
 8. TEST AND EVIDENCE MATRIX (targeted tests, full regression, and mandatory
@@ -274,6 +333,12 @@ I. MUTATION BOUNDARY: Wave 2 is 100% read-only toward Shopify; declares
 
 A. STATIC / PREFLIGHT
    - Python/XML/CSV/manifest parse clean for every new/changed file.
+   - Exact import-registration test: models/__init__.py registers all FIVE
+     new model files (shopify_connector_order_binding,
+     shopify_connector_sale_order_line, shopify_connector_order_importer,
+     shopify_connector_tax_mapping, shopify_connector_order_scan) — not
+     four; an omitted import must fail this static test, not surface only
+     at runtime.
    - Exact selection_add + LC-1 ondelete declarations for both new job
      types (order_import_sync, order_import_scan) — same pattern as
      product_import_sync/customer_import_sync, verified by the same kind
@@ -286,8 +351,13 @@ A. STATIC / PREFLIGHT
      test_source_level_job_dispatch_never_calls_create); sudo-site exact
      inventory for the two new files, following the existing per-file
      exact-count AST-guard pattern.
+   - No automatic account.tax creation anywhere in the importer or the tax
+     mapping model (source/ORM-level negative assertion) — explicit-mapping
+     resolution only, no rate fallback, no order_tax_autocreate setting of
+     any kind.
    - Exact protected-set classification test for the order binding (16/17/14
-     precedent — record the actual count here).
+     precedent — record the actual count here; must include the four
+     manual-gateway-approval provenance fields).
    - No context-bypass (with_context/sudo escape) outside the sanctioned
      sites.
    - Sudo inventory: every new .sudo() call quoted and justified in the
@@ -297,7 +367,8 @@ A. STATIC / PREFLIGHT
      over every new log-emitting call site).
    - No Shopify mutation path anywhere (grep for mutation keywords in the
      new GraphQL query constants — all four must be `query`, never
-     `mutation`).
+     `mutation`; action_approve_manual_gateway_order enqueues a read-only
+     refresh job, it does not call the Shopify API directly).
 
 B. TASK 012 FUNCTIONAL
    - All 8 financial states x all 3 confirmation policies.
@@ -327,12 +398,28 @@ D. SCAN / CATCH-UP
 
 E. SECURITY
    - All four existing roles (auditor/operator/reviewer/admin) under the
-     order binding's ACL; protected order-binding create/write/clear denial
-     for all four roles; sanctioned importer positive paths; settings
-     Administrator-only where specified; no direct state/provenance
-     mutation; company consistency; ACL/source-guard coverage; raw PII
-     absent from logs/audits/errors (trivially true — no PII fields exist,
-     but still test-covered).
+     order binding's ACL (customer-binding pattern); protected order-binding
+     create/write/clear denial for all four roles; sanctioned importer
+     positive paths; settings Administrator-only where specified; no direct
+     state/provenance mutation; company consistency; ACL/source-guard
+     coverage; raw PII absent from logs/audits/errors (trivially true — no
+     PII fields exist, but still test-covered).
+   - shopify.connector.tax.mapping four-role ACL matrix: Administrator
+     create/write succeed; Auditor/Operator/Reviewer create AND write
+     denied (not just create); unlink denied for all four roles; a denied
+     attempt leaves no row and no audit residue; wrong-company/inactive/
+     incompatible-tax mapping denied even for Administrator.
+   - action_approve_manual_gateway_order full permission/atomicity matrix:
+     Reviewer and Administrator succeed; Auditor and Operator denied;
+     missing/empty reason rejected; wrong store policy rejected; gateway no
+     longer approved rejected; non-manual-gateway or mixed evidence
+     rejected; non-draft SO rejected; stale Shopify evidence forces a
+     refresh rather than a stale confirm; changed evidence since approval
+     routes to review, never a silent confirm; duplicate calls are
+     idempotent; audit-log-creation or enqueue failure rolls back the
+     approval field write atomically; direct create/write/clear of the four
+     approval-provenance fields is denied for all four roles via the
+     existing binding-mixin protected-field guard.
 
 F. LIFECYCLE
    - Fresh install; prior-version upgrade; uninstall; reinstall; job-type
@@ -364,10 +451,19 @@ a silent scope reduction read as full coverage.
 9. ROLLBACK, RESIDUE, SECURITY, DEFINITION OF DONE
 ======================================================================
 
-ROLLBACK: revert the single wave PR. Order bindings/tax mappings/settings
-fields drop; sale.order rows survive as ordinary, unbound data. Nothing in
-Wave 3+ exists yet to depend on this wave's internals beyond the merged
-binding contract.
+ROLLBACK (corrected 2026-07-17 — full record: DoR §2.8): a source-level Git
+revert of the wave PR by itself changes no database schema — it only
+removes files. Two explicit modes: (A) exact pre-production rollback via a
+database backup taken immediately before the module upgrade, restored if
+needed, with the code revert deployed on top; (B) forward-disable in
+production — set order_scheduled_sync_enabled=False, quiesce non-terminal
+jobs via the already-merged JOB-ACTIONS lifecycle paths, and leave imported
+sale.order records, order bindings, and tax mappings exactly as they are.
+Never uninstall shopify_connector_sale as a Wave 2 rollback action — it also
+carries the merged Task 011 customer-import capability this wave does not
+own. No destructive schema removal in an emergency rollback; that requires
+its own separately reviewed migration. Nothing in Wave 3+ exists yet to
+depend on this wave's internals beyond the merged binding contract.
 
 RESIDUE: post-uninstall, zero orphan ir.model.data/crons/ACLs/selection
 values; LC-1's _reassign_to_historic_job_type() registered on both new job
