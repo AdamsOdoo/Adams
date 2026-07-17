@@ -611,9 +611,7 @@ class ShopifyConnectorStoreOrderScanExtension(models.Model):
                     'succeeded', 'failed_final', 'skipped', 'cancelled',
                 )),
             ], limit=1)
-            if active:
-                return active
-            raise
+            return active or False
 
     @api.model
     def _cron_enqueue_order_scans(self):
@@ -689,6 +687,4 @@ class ShopifyConnectorOrderBindingSyncExtension(models.Model):
             winner = self.env['shopify.connector.job'].search(
                 active_domain, limit=1,
             )
-            if winner:
-                return winner
-            raise
+            return winner or False
