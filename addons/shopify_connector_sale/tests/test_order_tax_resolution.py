@@ -1,5 +1,7 @@
 import json
 
+from psycopg2 import IntegrityError
+
 from odoo.exceptions import AccessError, ValidationError
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
@@ -158,14 +160,27 @@ class TestOrderTaxResolution(OrderImportCase):
             self._tax(name='Wrong inclusion', included=True),
             self._tax(name='Other company', company_id=other_company.id),
         )
+        rows_before = self.env[
+            'shopify.connector.tax.mapping'
+        ].search_count([])
+        audits_before = self.env['shopify.connector.job'].search_count([
+            ('job_type', '=', 'core_manual_maintenance'),
+        ])
         for index, tax in enumerate(candidates):
             evidence = self._evidence(title='Unsafe %d' % index)
-            with self.assertRaises(Exception, msg=tax.name):
+            with self.assertRaises(ValidationError, msg=tax.name):
                 with self.env.cr.savepoint():
                     self._mapping(
                         tax=tax, evidence=evidence, included=False,
                         user=self.roles['admin'],
                     )
+            self.assertEqual(
+                self.env['shopify.connector.tax.mapping'].search_count([]),
+                rows_before,
+            )
+            self.assertEqual(self.env['shopify.connector.job'].search_count([
+                ('job_type', '=', 'core_manual_maintenance'),
+            ]), audits_before)
 
     def test_explicit_mapping_only_resolution(self):
         evidence = self._evidence()
@@ -201,7 +216,15 @@ class TestOrderTaxResolution(OrderImportCase):
                 'shopify_tax_evidence_key': 'not-a-full-key',
                 'account_tax_id': tax.id,
             })
-        self._mapping(tax=tax)
-        with self.assertRaises(Exception):
+        mapping = self._mapping(tax=tax)
+        original_company = self.settings.order_company_id
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Order Tax Mapping Immutable Company',
+        })
+        with self.assertRaises(ValidationError):
+            self.settings.write({'order_company_id': other_company.id})
+        self.assertEqual(self.settings.order_company_id, original_company)
+        self.assertTrue(mapping.exists())
+        with self.assertRaises(IntegrityError):
             with self.env.cr.savepoint():
                 self._mapping(tax=tax)
