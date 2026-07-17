@@ -1,3 +1,140 @@
+## 2026-07-17 — Fable gap-closure PR #173 — control-room decision review: ACCEPTED AND MERGED (docs-only)
+
+- **Role/scope:** Claude control room (DEC-032 macro-wave model) performed the
+  final product/architecture decision & merge review of the corrected PR #173
+  (`fable/mvp-remaining-gap-closure` → `mvp/program-integration`). Decision &
+  merge session only — **no connector code, no Wave 2 start, no DEC-031 Layer 2
+  acceptance, no Shopify validation.**
+- **Identity re-verified live from GitHub:** PR #173 open/draft/unmerged/**clean**;
+  head `09078a8b861648cd3fbf35b349423861ac961c40`; base
+  `mvp/program-integration` @ `1e46c23ca5480eba3c6986a566ca9b33431c7ab6` (merge-base
+  = base, no divergence); PR #172 merged via `d18f9a99`; Wave 1 merged; SRR-03
+  CLOSED; Wave 2 unstarted; protected refs `acd8c46` (checkpoint) / `dd6ecb8`
+  (`Shopify-connector`) / `a5d4543` (`main`) all unchanged; all **126** changed
+  paths under `docs/**`; **no** `addons/**` / security / ACL / migration / test /
+  manifest change.
+- **Verdict: ACCEPTED with amendments (docs-only).** The reconciliation commit
+  recorded every decision, then the PR was **marked ready and merged into
+  `mvp/program-integration` with a normal merge commit (no squash, no rebase)**;
+  the merge-commit SHA is recorded on master issue #167.
+- **Class A (A-1..A-18): confirmed** faithfully/consistently recorded; no
+  current-facing contradiction (verified across canonical docs, Wave 2–6 DoRs,
+  QA/UAT matrices, and 28 rendered prototypes; cross-document searches clean).
+- **Class B (PD-B1..B7): all decided.** Amendments: **B1** per-store
+  `pending_wait_expiry` **default 24 h** (min 1 h / max 7 d; OQ-C resolved);
+  **B4** exact mode-switch reconciliation-scan boundary (earlier-of
+  watermark-overlap / latest unresolved-external boundary; 30-day default lookback;
+  Admin preview + extension; never replay; classify+dedup first); **B5** **Mode 1
+  outbound fulfillment/tracking is Full, not Lite** (Shopify mutation; conforms to
+  DEC-029). B2/B3/B6/B7 accepted as specified (B6 resolves the Task-012 "no default"
+  tension in favour of default `paid_only`).
+- **Class C (TA-C1..C8): decided or routed.** **DEC-031 Layer 2 (C1/C2) NOT
+  DEC-accepted** — design accepted only as the authoritative proposal → dedicated
+  pre-Wave-3 architecture gate (verified against all 8 hard safety properties).
+  C3 (6-module family MA-D1..D5), C4 (Option M-A), C5 (SEC-2 Option 1; retention
+  cron rescoped to log-redaction only), C6 (Wave-4 inbound evidence baseline),
+  C7 (CAS semantic — field name deferred to EQ-D1 Wave-3 preflight), C8 (adopt
+  measurement framework; new SLO rows provisional; accepted PB-1..23 binding).
+- **Class D: safely classified** (D1 CAS field-name blocking before inventory
+  mutation; D2–D7 fail-closed defaults; D7 read-only Wave-2 deferrable / mutation
+  Waves 3–5 blocking). **Class E: post-MVP confirmed** (operational COD stays MVP;
+  automatic accounting posting out of MVP).
+- **Rendered UX evidence accepted as the visual baseline only** — 28 screenshots;
+  independently confirmed raw PII (no masking), no credential exposure (DEC-004
+  token masking retained), Mode 2 shown as an Admin opt-in mode, fail-closed
+  unknown-schema state legible; the six a11y/focus-trap/contrast/RTL/reduced-motion/
+  Owl-parity limitations are carried to Wave 5 acceptance (static screenshots are
+  not treated as production-accessibility proof).
+- **Reconciliation commit updated:** `fable-proposed-decision-pack.md`
+  (§Control-room decisions 2026-07-17), `sales-order-lifecycle...` §7 (B1),
+  `fulfillment-operating-modes.md` §6 (B4), `modular-architecture-recommendation.md`
+  §6/§9 (B5/C3), `task-sec2-...packet.md` §D (C5), `architecture-review-log.md`
+  (AR-053), `fable-gap-closure-status.md`, this handoff, and the PR #173 body.
+- **Boundaries held:** no implementation authorized; **Wave 2 unauthorized and
+  unstarted**; DEC-031 Layer 2 not accepted; protected refs unchanged.
+- **Next action (exact next-session prompt — the next authorized activity):**
+
+  > Open the **Wave 2 decision-acceptance + Definition-of-Ready + packet
+  > re-acceptance + exact-base preflight** session. Start from
+  > `docs/07-implementation-plan/wave-2-definition-of-ready.md` (§3 gate-decision
+  > table) and `docs/04-decisions/fable-proposed-decision-pack.md` (§Control-room
+  > decisions 2026-07-17). Accept the Wave 2 DoR and its gate decisions (the now
+  > product-decided PD-A/B/C/D/E, PD-COD import subset, PD-RB order-domain subset,
+  > PD-AC-1, and PD-B1/B3/B6); re-accept the Task 012 packet **with its 2026-07-16
+  > addendum** and perform the §15 prompt-issue gate act; accept the Area-6
+  > order-scan slice. Re-verify the exact `mvp/program-integration` base SHA and
+  > freeze the allowed-file list before any code. **Do not** start Wave 3+ scope,
+  > **do not** accept DEC-031 Layer 2 (that is a separate pre-Wave-3 architecture
+  > gate), and **do not** perform a Shopify mutation. Odoo.sh evidence is mandatory
+  > for Wave 2 closure; read-only dev-store order evidence is preferred but
+  > deferrable to Wave 6 without a waiver.
+
+## 2026-07-16 — Fable gap-closure CORRECTION PASS COMPLETE (docs/design only)
+
+- **Role/scope:** one consolidated correction of draft PR #173 per control-room comments
+  `4993775983` (REVISE) and product-owner superseding `4994990296` (no PII masking).
+  Fable acting as research/product/architecture/UX/QA/implementation-readiness specialist
+  — **not** the implementation worker. No connector code; no Wave 2 start; no decision
+  Accepted; PR #173 (`fable/mvp-remaining-gap-closure` → `mvp/program-integration`) stays
+  draft/open/unmerged. Supersedes the prior entry's next-session prompt.
+- **Phase 0 re-verified live:** PR #173 open/draft/unmerged/mergeable; base `1e46c23`;
+  PR #172 merged via `d18f9a99`; SRR-03 CLOSED; Wave 2 unstarted; checkpoint `acd8c46` /
+  `Shopify-connector` `dd6ecb8` / `main` `a5d4543` unchanged; every changed path under `docs/**`.
+- **Corrections applied:** (1) **stale program state** reconciled everywhere current-facing
+  (Wave 1 merged / SRR-03 closed / matrices+spec exist), historical records kept with dated
+  notes; (2) **Fulfillment Mode 2 = mandatory MVP Wave 4 backend**, Wave 5 owns only the mode
+  UI; (3) **no PII masking in the MVP** — both Connector User and Administrator read raw
+  operational PII; masking reclassified post-MVP; redaction stays mandatory; (4) one
+  **four-layer fulfillment taxonomy** with **seven Layer-A enum families re-verified vs API
+  2026-07** (A7 `FulfillmentDisplayStatus` resolved — 18 values); (5) **Wave-2 live-evidence
+  rule** (Odoo.sh mandatory; read-only Shopify preferred, deferrable to Wave 6, not a merge
+  blocker); (6) decision pack **restructured into Classes A–E**.
+- **New artifacts:** `../07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`
+  (SEC-2, Proposed — removes the existing Wave-1 masking before MVP UAT/release; honest
+  previously-masked-value handling); `../07-implementation-plan/fable-correction-impact-inventory.md`;
+  `../09-ui-prototype/review-evidence/2026-07-16-correction/` (28 browser-rendered screenshots +
+  visual-review/link/overflow/a11y reports — **premium UX now PROVEN**: 0 overflow, 0 broken
+  links, 0 a11y flags). Existing Wave-1 masking code documented honestly with dated SEC-1 notes;
+  no addons touched.
+- **Self-review:** 20/20 PASS (track 18 PASS-with-non-blocking), 0 FAIL, 0 NOT PROVEN; proof
+  searches A–G all clean (see `../07-implementation-plan/fable-gap-closure-status.md` §Correction pass).
+- **Learning feedback loop:** (1) a docs-only correction is best driven by a single authoritative
+  correction spec + disjoint file-ownership fan-out, then an independent proof-search pass — this
+  caught two prototype files outside the delegated buckets; (2) "credential masking" and "log
+  redaction" must be explicitly distinguished from "business-record PII masking" in every grep,
+  or the no-masking sweep produces false positives; (3) an unresolved enum (A7) is cheap to close
+  by re-fetching the official page — do it rather than shipping a hedge.
+- **Next action (exact next-session prompt — one control-room session):**
+
+  > Fresh Claude control-room review of the corrected draft PR #173
+  > (`fable/mvp-remaining-gap-closure` → `mvp/program-integration`). Start from
+  > `docs/04-decisions/fable-proposed-decision-pack.md` (Classes A–E) and
+  > `docs/07-implementation-plan/fable-gap-closure-status.md` (§Correction pass, 20-track
+  > review). For **Class A** confirm the binding product-owner rulings are faithfully
+  > recorded (they are already decided — not a DEC acceptance here); for **Classes B, C, D**
+  > decide Accept / Revise / Reject per item and record acceptances in the decision/
+  > architecture-review logs; note **Class E** as post-MVP. Review the rendered UX evidence
+  > under `docs/09-ui-prototype/review-evidence/2026-07-16-correction/`. Then decide whether
+  > to merge PR #173. Do **not** authorize Wave 2 in the same act — Wave 2 needs its own
+  > consolidated DoR/preflight session (`docs/07-implementation-plan/wave-2-definition-of-ready.md`)
+  > after the Class B orders/COD decisions are Accepted. Do **not** mark DEC-031 Layer 2
+  > Accepted here. Do **not** start implementation.
+
+## 2026-07-16 — Fable remaining-gap-closure mission COMPLETE (docs/design only, first delivery)
+
+- **Role/scope:** one-time Fable mission (research, product definition, architecture design, premium UX, Waves 2–6 implementation readiness) per the product-owner mission prompt. No connector feature code; no Wave 2 start; no decision accepted; draft PR #173 (`fable/mvp-remaining-gap-closure` → `mvp/program-integration`) remains draft/open/unmerged.
+- **Prerequisites:** all ten verified against live GitHub before any edit. Prerequisite 10 discrepancy — hazard branch `claude/task-012-decision-closure-mb88sn` found already deleted with no prior authorization record — was hard-stopped and resolved by product-owner ruling (2026-07-16) accepting the deletion as authorized cleanup; restoration forbidden; recorded in `../07-implementation-plan/mvp-completion-program.md` §1.
+- **Evidence refreshed (Tier 1, 2026-07-16, API 2026-07):** `../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md` (all 8 financial states, `manualPaymentGateway` COD discriminator, AbandonedCheckout object/query, complete seven-family (Layer A) fulfillment state model + deprecations (re-verified 2026-07-16; A7 `FulfillmentDisplayStatus` added — capture §6.8), inventory CAS + mandatory `@idempotent`, productSet semantics, limits/versioning); `../00-source-materials/odoo19-sale-stock-security-captures-2026-07-16.md` (SO lifecycle, backorders/returns restore-only-on-validated-return, `free_qty`, payments boundary, `res.groups.privilege`, `_commit_progress`, uninstall drops columns); `../00-source-materials/competitor-refresh-2026-07-16.md` (six competitors re-verified + premium-UX evidence). Dated delta sections appended to the four canonical analysis docs.
+- **Product definitions (all Proposed):** ten canonical docs in `../02-product/` — two-role model + 4→2 group migration design; sales-order lifecycle with 8-state × 3-policy confirmation matrix + manual-gateway overlay; abandoned-checkout policy (no auto-quotation binding; workspace post-MVP); complete COD lifecycle (3 dimensions, 16 scenarios, value ledger, accounting boundary); fulfillment Modes 1/2 (16 exact conditions) + inbound reconciliation + complete Shopify state mapping with unknown-value contract; per-domain reconnect/catch-up/backfill with preview; inventory operating model (free_qty per mapped location, CAS, coalescing); product-export operating model; MVP capability map; premium UX master specification (26 screens, 11-state contract).
+- **Architecture (Proposed):** `../03-architecture/dec-031-layer-2-mutation-safety-design.md` (complete Layer 2: attempt records, transport_attempted fencing, per-mutation idempotency/reconciliation matrix, commit boundaries, crash/stale-owner recovery, test strategy) registered by a dated revision note in DEC-031 (Layer 1 record untouched); `../03-architecture/modular-architecture-recommendation.md` (6-module MVP family; customer/accounting/refund/payout/multi_store modules rejected or deferred with revisit conditions; Lite/Full capability matrix).
+- **Prototype:** `../09-ui-prototype/` extended in place (canonical, no migration) with twelve Proposed surfaces (orders, order-review, cod-reconciliation, fulfillment, external-fulfillment-review, tracking-timeline, inventory, reconnect-backfill, product-export, stores, settings-permissions, jobs-diagnostics), zero-JS, token-consistent, two-role terminology; index/README/traceability wired. U0 acceptance unchanged; new surfaces await visual review.
+- **Planning/QA:** Waves 2–6 Definitions of Ready; dated Proposed addenda to Task 012/013/014/015/015B packets; U2/U3 locked prompts completed; Wave 6 E2E/UAT/release packet (new); dependency/decision-gate/migration-rollback maps; cross-domain test matrix; COD (16), fulfillment-mode (16 negatives), reconnect/backfill UAT matrices; performance SLO/benchmark plan; security/PII matrix; release-readiness gap list; implementation-readiness checklist.
+- **Decisions:** everything new is consolidated in `../04-decisions/fable-proposed-decision-pack.md` — **all Proposed, none accepted**. Governance consistency defects reconciled with dated notes only (DEC-025/026/028/029, CORE-R2 packet, task-012 closure doc, `-proposed` supersession banners, READMEs).
+- **Self-review:** 20-track adversarial review via three verification agents; defects found and fixed pre-report: one pre-existing "exactly once" wording in the Task 014 packet (corrected to at-most-once + reconciliation), two broken links in the COD doc, one unqualified CAS [Fact] (conflict note added — `compareQuantity` vs D-013-3 `changeFromQuantity` is a mandatory Wave 3 preflight re-verification), missing handoff entry and readiness checklist (added). Known PARTIALs: no 2026-07-16 delta in common-patterns/best-in-class/gaps/avoid (refresh capture covers them); Apple HIG wording remains uncaptured (JS-blocked); COD/reconnect flows use tables + added compact Mermaid overviews.
+- **Learning feedback loop:** (1) two Tier-1 captures can conflict (CAS field name) — every mutation-relevant enum/field must be re-verified against the raw schema at each wave preflight, not carried forward; (2) large agent fan-out must checkpoint commits per workstream — a mid-mission session-limit interruption cost zero work because each agent committed its own files; (3) pre-existing packet prose can contradict its own normative sections ("exactly once") — wave reviews should grep packet prose, not only normative closures.
+- **Next action (exact next-session prompt):**
+
+  > Control-room review session: review draft PR #173 (`fable/mvp-remaining-gap-closure` → `mvp/program-integration`) — the complete Fable gap-closure deliverable. Start from `docs/04-decisions/fable-proposed-decision-pack.md` (per-wave gate summary) and `docs/07-implementation-plan/fable-gap-closure-status.md`. Decide, for each decision family (restructured into Classes A–E in the corrected pack — see the correction entry at the top of this handoff), Accept / Revise / Reject; record acceptances in the decision/architecture-review logs; then decide whether to merge PR #173 into `mvp/program-integration`. Do not authorize Wave 2 in the same act — Wave 2 requires its own consolidated Definition-of-Ready/preflight session per `docs/07-implementation-plan/wave-2-definition-of-ready.md` after the Class B (orders/COD) decisions are Accepted. Do not start implementation.
 ## 2026-07-16 — Wave 1 MERGED — final Claude control-room review and merge
 
 - **Role/scope:** Claude control-room final macro-wave review and merge-gate decision on PR #172, per `docs/06-prompts/claude-mvp-wave-review-template.md`. No connector feature code written by Claude.

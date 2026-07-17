@@ -1,0 +1,169 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Jobs, retry &amp; diagnostics</title><link rel="stylesheet" href="../assets/prototype.css">
+<style>
+/* screen-local helpers — token values only */
+.jd-key { font-size:var(--sc-fs-caption); color:var(--sc-text-secondary); font-variant-numeric:tabular-nums; letter-spacing:0.02em; }
+.jd-log { font-size:var(--sc-fs-secondary); border:1px solid var(--sc-border); border-radius:var(--sc-radius); background:var(--sc-surface-0); padding:var(--sc-space-3) var(--sc-space-4); display:grid; gap:var(--sc-space-2); }
+.jd-log__line { display:grid; grid-template-columns:auto 1fr; gap:var(--sc-space-3); }
+.jd-log__ts { color:var(--sc-text-secondary); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.jd-gallery { display:grid; grid-template-columns:repeat(4, 1fr); gap:var(--sc-space-3); }
+.jd-state { border:1px solid var(--sc-border); border-radius:var(--sc-radius); background:var(--sc-surface-1); padding:var(--sc-space-3) var(--sc-space-4); }
+.jd-state__name { font-weight:var(--sc-fw-label); font-size:var(--sc-fs-secondary); display:flex; align-items:center; gap:var(--sc-space-2); }
+.jd-state__demo { margin-top:var(--sc-space-2); }
+.jd-state__note { margin-top:var(--sc-space-2); font-size:var(--sc-fs-caption); color:var(--sc-text-secondary); }
+@media (max-width:900px){ .jd-gallery { grid-template-columns:1fr 1fr; } }
+@media (max-width:640px){ .jd-gallery { grid-template-columns:1fr; } }
+</style></head><body><svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute" overflow="hidden"><defs>
+<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="5 13 10 18 19 7"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 21 19H3Z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></symbol>
+<symbol id="i-hand" viewBox="0 0 24 24"><path d="M9 11V6.5a1.5 1.5 0 0 1 3 0V10"/><path d="M12 10V5a1.5 1.5 0 0 1 3 0v5"/><path d="M15 10.5V7a1.5 1.5 0 0 1 3 0v7a6 6 0 0 1-6 6h-1.2a6 6 0 0 1-4.9-2.6l-2.2-3.3a1.6 1.6 0 0 1 2.5-2l1.5 1.8V8.5a1.5 1.5 0 0 1 3 0V11"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><polyline points="12 8 12 12 15 14"/></symbol>
+<symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><polyline points="4 4 4 8 8 8"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><polyline points="20 20 20 16 16 16"/></symbol>
+<symbol id="i-retry" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 8 17 8"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><line x1="9" y1="2.5" x2="9" y2="7"/><line x1="15" y1="2.5" x2="15" y2="7"/><path d="M7 7h10v3.5a5 5 0 0 1-10 0z"/><line x1="12" y1="15.5" x2="12" y2="21.5"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 17a8 8 0 0 1 16 0"/><line x1="12" y1="17" x2="16" y2="12"/><circle cx="12" cy="17" r="1.1" fill="currentColor"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></symbol>
+<symbol id="i-logs" viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><polyline points="15 3 15 6 18 6"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="14.5" x2="15" y2="14.5"/><line x1="9" y1="17.5" x2="13" y2="17.5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><polyline points="9 12 11.5 14.5 15.5 10"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><polyline points="3.5 7.5 12 12 20.5 7.5"/><line x1="12" y1="12" x2="12" y2="21"/></symbol>
+</g></defs></svg>
+
+<div class="gallery">
+<div class="gallery__intro"><h1>Jobs, retry &amp; diagnostics</h1>
+<p>The operational job surface: every job with its state (all ten job states rendered as words, never raw tokens), attempts, next-retry countdown, truncated idempotency key and connection generation; Connector-User actions (retry eligible / cancel non-terminal with a reason, resolve manual review across the six sub-reasons); the append-only log drawer; the honest diagnostics panel (cron health, queue depth, throttle, API version); and the canonical eleven-state global gallery used across every connector surface. Copy illustrative (MBQ-22); no backend method asserted.</p></div>
+
+<!-- ====================================================== NORMAL: jobs table -->
+<section class="gallery-item"><div class="gallery-caption"><b>Jobs — normal</b> · all 10 job states as words · Connector User actions per row · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as U. Operator">UO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Sync Center</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Jobs</b></div>
+<div class="sc-content">
+<div style="overflow-x:auto"><table class="sc-list"><thead><tr><th>Job</th><th>Store</th><th>State</th><th>Attempts</th><th>Next retry</th><th class="col-ref">Idempotency key</th><th class="col-source">Gen.</th><th>Action</th></tr></thead><tbody>
+<tr><td><b>Order import</b> · #S-1093</td><td>Adams Home</td><td><span class="sc-status sc-status--neutral">Draft</span></td><td class="sc-mono">0</td><td class="sc-muted">—</td><td class="col-ref"><span class="jd-key">ord:1093:2026-07-16T09…</span></td><td class="col-source sc-mono">#7</td><td class="sc-muted">—</td></tr>
+<tr><td><b>Product import</b> · scan</td><td>Adams Home</td><td><span class="sc-status sc-status--neutral">Queued</span></td><td class="sc-mono">0</td><td class="sc-muted">—</td><td class="col-ref"><span class="jd-key">catchup:home:prod:#7…</span></td><td class="col-source sc-mono">#7</td><td><button class="sc-btn sc-btn--quiet sc-btn--sm">Cancel…</button></td></tr>
+<tr><td><b>Customer import</b> · page 4/9</td><td>Adams Home</td><td><span class="sc-status sc-status--info"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg> Running</span></td><td class="sc-mono">1</td><td class="sc-muted">—</td><td class="col-ref"><span class="jd-key">cust:scan:2026-07-16…</span></td><td class="col-source sc-mono">#7</td><td><button class="sc-btn sc-btn--quiet sc-btn--sm">Cancel…</button></td></tr>
+<tr><td><b>Order import</b> · #S-1088</td><td>Adams Home</td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Succeeded</span></td><td class="sc-mono">1</td><td class="sc-muted">—</td><td class="col-ref"><span class="jd-key">ord:1088:2026-07-16T08…</span></td><td class="col-source sc-mono">#7</td><td><button class="sc-btn sc-btn--quiet sc-btn--sm">Log</button></td></tr>
+<tr class="has-exception"><td><b>Fulfillment create</b> · WH/OUT/0221</td><td>Adams Home</td><td><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> Failed — final</span></td><td class="sc-mono">5 of 5</td><td class="sc-muted">No more retries</td><td class="col-ref"><span class="jd-key">ful:0221:a91f…</span></td><td class="col-source sc-mono">#7</td><td><button class="sc-btn sc-btn--sm">Retry</button></td></tr>
+<tr><td><b>Order import</b> · #S-1071</td><td>Adams Outlet</td><td><span class="sc-status sc-status--neutral">Skipped (policy)</span></td><td class="sc-mono">1</td><td class="sc-muted">—</td><td class="col-ref"><span class="jd-key">ord:1071:2026-07-15T…</span></td><td class="col-source sc-mono">#4</td><td><button class="sc-btn sc-btn--quiet sc-btn--sm">Log</button></td></tr>
+<tr><td><b>Inventory reconcile</b> · scan</td><td>Adams Outlet</td><td><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-x"/></svg> Cancelled</span></td><td class="sc-mono">1</td><td class="sc-muted">—</td><td class="col-ref"><span class="jd-key">inv:scan:2026-07-15…</span></td><td class="col-source sc-mono">#4</td><td><button class="sc-btn sc-btn--quiet sc-btn--sm">Log</button></td></tr>
+<tr><td><b>Order import</b> · #S-1090</td><td>Adams Home</td><td><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Retrying soon</span></td><td class="sc-mono">2 of 5</td><td class="sc-mono">in 3 min 40 s</td><td class="col-ref"><span class="jd-key">ord:1090:2026-07-16T09…</span></td><td class="col-source sc-mono">#7</td><td><button class="sc-btn sc-btn--quiet sc-btn--sm">Cancel…</button></td></tr>
+<tr><td><b>Product import</b> · SKU DESK-14</td><td>Adams Home</td><td><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-retry"/></svg> Failed — will retry</span></td><td class="sc-mono">1 of 5</td><td class="sc-mono">in 45 s</td><td class="col-ref"><span class="jd-key">prod:desk14:9c2e…</span></td><td class="col-source sc-mono">#7</td><td><button class="sc-btn sc-btn--sm">Retry now</button></td></tr>
+<tr class="has-exception"><td><b>Customer import</b> · j.okafor@…</td><td>Adams Home</td><td><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg> Needs review</span></td><td class="sc-mono">1</td><td class="sc-muted">Waiting on a decision</td><td class="col-ref"><span class="jd-key">cust:okafor:44b0…</span></td><td class="col-source sc-mono">#7</td><td><button class="sc-btn sc-btn--sm">Resolve…</button></td></tr>
+</tbody></table></div>
+<div class="sc-list__pager"><span>10 of 236 jobs</span><span aria-hidden="true">‹ ›</span></div>
+<div class="sc-help sc-mt2">Retry appears only on jobs the server marks retry-eligible; Cancel only on non-terminal jobs. “Needs review” is a decision for a person, not a technical failure — hand icon, reviewer owner.</div>
+
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title">Diagnostics</span><span class="sc-section__meta">Checked every minute · last checked 20 s ago</span></div>
+<div class="sc-grid sc-grid--3">
+<div class="sc-card sc-card--compact"><div class="sc-ready-group__head"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Scheduler (cron) health</div>
+<div class="sc-kv"><dt>Connector crons</dt><dd><span class="sc-status sc-status--success">Running</span></dd><dt>Last order run</dt><dd>3 min ago</dd></div>
+<div class="sc-consequence sc-mt3" style="padding:var(--sc-space-2) var(--sc-space-3)"><span class="sc-consequence__ico"><svg class="sc-ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span><b>Honesty note:</b> Odoo disables a scheduled task on its own only after 5 failures across 7 days — too slow to be your safety net. This panel watches every run and warns immediately.</span></div></div>
+<div class="sc-card sc-card--compact"><div class="sc-ready-group__head"><svg class="sc-ico" aria-hidden="true"><use href="#i-box"/></svg> Queue</div>
+<div class="sc-kv"><dt>Waiting</dt><dd class="sc-mono">14 jobs</dd><dt>Running</dt><dd class="sc-mono">2</dd><dt>Oldest waiting</dt><dd>2 min</dd></div></div>
+<div class="sc-card sc-card--compact"><div class="sc-ready-group__head"><svg class="sc-ico" aria-hidden="true"><use href="#i-gauge"/></svg> Shopify API</div>
+<div class="sc-kv"><dt>Throttle</dt><dd><span class="sc-status sc-status--success">Normal</span> <span class="sc-muted">62% budget free</span></dd><dt>API version</dt><dd>2026-07 (pinned, current)</dd></div></div>
+</div></div>
+</div></div></section>
+
+<!-- ====================================================== Cancel drawer -->
+<section class="gallery-item"><div class="gallery-caption"><b>Cancel job — reason drawer</b> · Connector User · non-terminal jobs only · 1366px</div>
+<div class="screen"><div class="sc-content" style="background:rgba(16,24,40,0.32); padding:var(--sc-space-7) var(--sc-space-5)">
+<div class="sc-dialog" style="margin-inline:auto" role="dialog" aria-labelledby="cxt" aria-modal="true">
+<h2 id="cxt" class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Cancel “Order import · #S-1090”?</h2>
+<p class="sc-help sc-mt2">The job stops before its next attempt and is marked <b>Cancelled</b> with your name and reason. Nothing already imported is undone. A future scan can pick the order up again.</p>
+<div class="sc-field sc-mt4"><label class="sc-label" for="creason">Reason (recorded in the audit log)</label><input id="creason" class="sc-input" type="text" value="Duplicate of a manual import we ran this morning" readonly></div>
+<div class="sc-btnrow sc-btnrow--end sc-mt4"><button class="sc-btn sc-btn--secondary">Keep job</button><button class="sc-btn sc-btn--danger">Cancel job</button></div>
+</div></div></div></section>
+
+<!-- ====================================================== Resolve manual review drawer -->
+<section class="gallery-item"><div class="gallery-caption"><b>Resolve manual review — drawer</b> · the six sub-reasons (words + internal token in specs only) · 1366px</div>
+<div class="screen"><div class="sc-content" style="background:rgba(16,24,40,0.32); padding:var(--sc-space-6) var(--sc-space-5)">
+<div class="sc-dialog" style="margin-inline:auto; max-width:640px" role="dialog" aria-labelledby="rxt" aria-modal="true">
+<h2 id="rxt" class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg> Waiting on a decision — Customer import · j.okafor@example.com</h2>
+<p class="sc-help sc-mt2">This job stopped because it needs a person to decide. It is one of six decision types the connector can raise:</p>
+<table class="sc-evidence sc-mt3"><thead><tr><th>Decision type</th><th>What it means</th></tr></thead><tbody>
+<tr><td data-label="Type"><b>Ambiguous match</b> <span class="sc-status sc-status--danger">this case</span></td><td data-label="Meaning">Two or more existing records share the same identity evidence — pick the right one.</td></tr>
+<tr><td data-label="Type">Binding conflict</td><td data-label="Meaning">The record is already linked to a different counterpart — untangle before syncing.</td></tr>
+<tr><td data-label="Type">Duplicate risk</td><td data-label="Meaning">Continuing might create a duplicate — confirm it is safe first.</td></tr>
+<tr><td data-label="Type">Destructive write blocked</td><td data-label="Meaning">The change would overwrite or remove data — the guard stopped it for confirmation.</td></tr>
+<tr><td data-label="Type">Inventory location missing</td><td data-label="Meaning">A Shopify location has no mapped Odoo location — map it, then re-run.</td></tr>
+<tr><td data-label="Type">Notification confirmation missing</td><td data-label="Meaning">A fulfillment would notify the customer — an explicit confirmation is required.</td></tr>
+</tbody></table>
+<div class="sc-consequence sc-mt3"><span class="sc-consequence__ico"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg></span><span>Resolving opens the matching screen with both candidates. Your decision is recorded — who, when, what — and the job then finishes on its own.</span></div>
+<div class="sc-btnrow sc-btnrow--end sc-mt4"><button class="sc-btn sc-btn--secondary">Close</button><button class="sc-btn sc-btn--primary">Review &amp; resolve</button></div>
+</div></div></div></section>
+
+<!-- ====================================================== Log drawer -->
+<section class="gallery-item"><div class="gallery-caption"><b>Job log — drawer mock</b> · append-only entries + redaction note · 1366px</div>
+<div class="screen"><div class="sc-content" style="background:rgba(16,24,40,0.32); padding:var(--sc-space-6) var(--sc-space-5)">
+<div class="sc-dialog" style="margin-inline:auto; max-width:640px" role="dialog" aria-labelledby="lxt" aria-modal="true">
+<h2 id="lxt" class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)"><svg class="sc-ico" aria-hidden="true"><use href="#i-logs"/></svg> Log — Order import · #S-1090</h2>
+<div class="sc-kv sc-mt3"><dt>State</dt><dd><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Retrying soon</span></dd><dt>Attempts</dt><dd class="sc-mono">2 of 5 · next in 3 min 40 s</dd><dt>Idempotency key</dt><dd><span class="jd-key">ord:1090:2026-07-16T09…</span></dd></div>
+<div class="jd-log sc-mt4" aria-label="Append-only job log">
+<div class="jd-log__line"><span class="jd-log__ts">09:41:02</span><span>Job created from the scheduled scan (generation #7).</span></div>
+<div class="jd-log__line"><span class="jd-log__ts">09:41:05</span><span>Attempt 1: Shopify answered slowly and the request timed out. Classified as retryable.</span></div>
+<div class="jd-log__line"><span class="jd-log__ts">09:43:05</span><span>Attempt 2: rate limit reached — waiting per Shopify’s throttle guidance.</span></div>
+<div class="jd-log__line"><span class="jd-log__ts">09:43:06</span><span>Next attempt scheduled with backoff (3 of 5).</span></div>
+</div>
+<div class="sc-help sc-mt3"><svg class="sc-ico" aria-hidden="true"><use href="#i-shield"/></svg> Log entries are append-only — nothing here can be edited or deleted, for any role. Customer personal data is redacted at write time; the raw Shopify payload is available only to Administrators in diagnostics.</div>
+<div class="sc-btnrow sc-btnrow--end sc-mt4"><button class="sc-btn sc-btn--secondary">Close</button></div>
+</div></div></div></section>
+
+<!-- ====================================================== Backlog-heavy -->
+<section class="gallery-item"><div class="gallery-caption"><b>Diagnostics — backlog-heavy</b> · warning queue depth + throttle pressure, honest cause · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as U. Operator">UO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Sync Center</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--degraded"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected · catching up</span><span class="sc-health__sm">Catching up</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Jobs</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--warning"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-clock"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Working through a backlog — nothing is lost</div><div class="sc-band__sub">312 jobs are waiting after reconnect catch-up started 18 minutes ago. Shopify’s rate limit sets the pace; live orders run first, backfill runs at lower priority.</div></div></div>
+<div class="sc-grid sc-grid--3 sc-mt5">
+<div class="sc-card sc-card--compact"><div class="sc-ready-group__head"><svg class="sc-ico" aria-hidden="true"><use href="#i-box"/></svg> Queue</div>
+<div class="sc-kv"><dt>Waiting</dt><dd><span class="sc-status sc-status--warning">312 jobs</span></dd><dt>Oldest waiting</dt><dd>16 min</dd><dt>Throughput</dt><dd class="sc-mono">~40 jobs/min</dd></div></div>
+<div class="sc-card sc-card--compact"><div class="sc-ready-group__head"><svg class="sc-ico" aria-hidden="true"><use href="#i-gauge"/></svg> Shopify API</div>
+<div class="sc-kv"><dt>Throttle</dt><dd><span class="sc-status sc-status--warning">Paced</span> <span class="sc-muted">backing off per Shopify guidance</span></dd><dt>API version</dt><dd>2026-07 (pinned, current)</dd></div></div>
+<div class="sc-card sc-card--compact"><div class="sc-ready-group__head"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Scheduler (cron) health</div>
+<div class="sc-kv"><dt>Connector crons</dt><dd><span class="sc-status sc-status--success">Running</span></dd><dt>Note</dt><dd class="sc-muted">Backlog is demand, not a scheduler fault</dd></div></div>
+</div></div></div></section>
+
+<!-- ====================================================== Offline banner -->
+<section class="gallery-item"><div class="gallery-caption"><b>Global banner — offline</b> · store unreachable; jobs hold rather than fail · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as U. Operator">UO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Sync Center</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--down"><span class="sc-health__dot"></span><span class="sc-health__lg">Shopify unreachable</span><span class="sc-health__sm">Offline</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Jobs</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--danger"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-plug"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">We can’t reach Shopify right now</div><div class="sc-band__sub">Requests to adams-home.myshopify.com have failed since 09:52 (6 minutes). Jobs are holding and will retry automatically with backoff — nothing is marked failed because of an outage. Data shown below is from the last successful check.</div></div><span class="sc-btnrow"><button class="sc-btn sc-btn--secondary sc-btn--sm">Test connection</button></span></div>
+<div class="sc-card sc-mt5"><div class="sc-kv"><dt>Holding</dt><dd class="sc-mono">9 jobs waiting for connectivity</dd><dt>Next automatic attempt</dt><dd class="sc-mono">in 52 s</dd><dt>Freshness</dt><dd>Counts last updated 09:52 — treat as possibly stale</dd></div></div>
+</div></div></section>
+
+<!-- ====================================================== Unknown-schema banner -->
+<section class="gallery-item"><div class="gallery-caption"><b>Global banner — unknown schema / API version fell forward</b> · fail-closed honesty · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as U. Operator">UO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Sync Center</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--degraded"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected · needs attention</span><span class="sc-health__sm">Attention</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Jobs</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--warning"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-warn"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Shopify is answering with a different API version than we tested</div><div class="sc-band__sub">The connector targets 2026-07, but Shopify responded with 2026-10 — when a pinned version is retired, Shopify “falls forward” to a newer one. Responses may contain shapes we haven’t verified, so affected jobs hold for review instead of writing anything.</div></div><span class="sc-btnrow"><button class="sc-btn sc-btn--secondary sc-btn--sm">View diagnostics</button></span></div>
+<div class="sc-card sc-mt5"><div class="sc-kv"><dt>Pinned version</dt><dd class="sc-mono">2026-07</dd><dt>Responding version</dt><dd class="sc-mono">2026-10 <span class="sc-status sc-status--warning">fell forward</span></dd><dt>Behavior</dt><dd>Reads continue; any response field the connector cannot verify routes the job to review — no silent guessing</dd><dt>Fix owner</dt><dd>Administrator — a connector update validating 2026-10 is required</dd></div></div>
+</div></div></section>
+
+<!-- ====================================================== GLOBAL STATE GALLERY -->
+<section class="gallery-item"><div class="gallery-caption"><b>Global state gallery</b> · the 11 canonical UI states — compact reference cards used across every connector surface · 1366px</div>
+<div class="screen"><div class="sc-content">
+<div class="sc-section__head"><span class="sc-section__title">Canonical UI states</span><span class="sc-section__meta">Reference — every surface expresses these consistently; state word always visible, color reinforces</span></div>
+<div class="jd-gallery">
+<div class="jd-state"><div class="jd-state__name">1 · Empty</div><div class="jd-state__demo"><span class="sc-status sc-status--neutral">Nothing here yet</span></div><div class="jd-state__note">Guided: say why it’s empty and name the one next action. Illustration allowed here only.</div></div>
+<div class="jd-state"><div class="jd-state__name">2 · Loading</div><div class="jd-state__demo"><span class="sc-skel sc-skel--line sc-skel--w80" style="display:block"></span><span class="sc-skel sc-skel--line sc-skel--w60" style="display:block"></span></div><div class="jd-state__note">Skeleton + honest line. Never blank, never fake-instant.</div></div>
+<div class="jd-state"><div class="jd-state__name">3 · Warning</div><div class="jd-state__demo"><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> Needs attention</span></div><div class="jd-state__note">Degraded but operating; cause + one action.</div></div>
+<div class="jd-state"><div class="jd-state__name">4 · Success</div><div class="jd-state__demo"><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> All clear</span></div><div class="jd-state__note">Affirmative, quiet. Resolved incidents labelled “resolved”, never counted as active.</div></div>
+<div class="jd-state"><div class="jd-state__name">5 · Failure</div><div class="jd-state__demo"><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> Failed</span></div><div class="jd-state__note">Technical error: reason, fix, owner, retry path. Never a raw stack trace as the primary message.</div></div>
+<div class="jd-state"><div class="jd-state__name">6 · Offline</div><div class="jd-state__demo"><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-plug"/></svg> Unreachable</span></div><div class="jd-state__note">Counterpart down. Jobs hold with backoff; data labelled last-known.</div></div>
+<div class="jd-state"><div class="jd-state__name">7 · Reconnecting</div><div class="jd-state__demo"><span class="sc-status sc-status--info"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg> Reconnecting…</span></div><div class="jd-state__note">Recovery in progress: verify → readiness → fresh catch-up scans, with per-domain progress.</div></div>
+<div class="jd-state"><div class="jd-state__name">8 · Stale</div><div class="jd-state__demo"><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> As of 09:52</span></div><div class="jd-state__note">Data older than its cadence promises — always timestamped, never silently presented as fresh.</div></div>
+<div class="jd-state"><div class="jd-state__name">9 · Delayed</div><div class="jd-state__demo"><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Running late</span></div><div class="jd-state__note">Work queued longer than expected (backlog/throttle). Cause + pace shown; nothing lost.</div></div>
+<div class="jd-state"><div class="jd-state__name">10 · Partial</div><div class="jd-state__demo"><span class="sc-status sc-status--warning">7 of 9 done</span></div><div class="jd-state__note">Some items succeeded, some didn’t. Exact split + a path to the remainder; never rounded up to success.</div></div>
+<div class="jd-state"><div class="jd-state__name">11 · Unknown schema</div><div class="jd-state__demo"><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> Unverified shape</span></div><div class="jd-state__note">The counterpart answered with something we haven’t verified (e.g. version fell forward). Fail closed: hold for review, never guess.</div></div>
+</div>
+</div></div></section>
+
+</div></body></html>

@@ -19,6 +19,21 @@
 > live validation until SRR-03 closure and LC-1 runtime proof are accepted. Until
 > Claude accepts DEC-033, the stricter existing gate and this packet's unusable
 > locked prompt remain in force.
+
+> **Reconciliation update (2026-07-16, Fable gap-closure mission):** DEC-033
+> was Accepted (2026-07-15) and Wave 1 has since **merged** (PR #172, merge
+> `d18f9a9`); **SRR-03 is now CLOSED** (build `34986844`, ruling
+> `4988527547`) and LC-1 runtime proof is accepted (build `34995642`,
+> 0/0/644). The paragraph above therefore describes a superseded
+> intermediate state: the historical "SRR-03 CLOSED" strings in this file's
+> body were stale when flagged, are coincidentally true today, but remain
+> non-authoritative — current status lives in
+> [`../07-implementation-plan/mvp-program-state.md`](../07-implementation-plan/mvp-program-state.md).
+> Task 012 policy-layer requirements added by the gap-closure mission are in
+> the packet addendum
+> ([`../07-implementation-plan/task-012-order-import-implementation-packet.md`](../07-implementation-plan/task-012-order-import-implementation-packet.md))
+> and [`../02-product/sales-order-lifecycle-and-confirmation-policy.md`](../02-product/sales-order-lifecycle-and-confirmation-policy.md).
+> Wave 2 remains unauthorized pending its Definition of Ready.
 >
 > **Prerequisites are capability-based, not PR-merge-based (corrected
 > 2026-07-14 per control-room review `4690680028` and the revised CORE-R2

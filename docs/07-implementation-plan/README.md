@@ -2,6 +2,18 @@
 
 **Purpose:** the phased implementation plan for the connector.
 
+> **Re-baseline note (2026-07-16, Fable gap-closure mission):** parts of this
+> README predate the 2026-07-15 checkpoint and the merged Waves 0/1. **Wave 1
+> is merged (PR #172) and SRR-03 is CLOSED**; the QA matrices and premium UX
+> master specification exist. Live wave status: `mvp-program-state.md`; wave
+> contract: `mvp-completion-program.md`; Waves 2–6 Definitions of Ready and the
+> dependency/gate map are the `wave-*-definition-of-ready.md` /
+> `waves-2-6-dependency-and-gate-map.md` files added by the gap-closure mission.
+> The "drafts only / no code" language further below is the general
+> research-phase default; implementation now proceeds **wave-by-wave under the
+> MVP program** (CLAUDE.md §13, DEC-032), each wave gated by Claude control-room
+> review — it is not open-ended coding.
+
 **What belongs here:** phased plans broken into small, reviewable, independently
 testable tasks, each referencing the ADR(s) it implements and the
 `../06-prompts/implementation-task-template.md` (allowed/forbidden files,

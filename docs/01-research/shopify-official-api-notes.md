@@ -986,3 +986,28 @@ section above): `/docs/api/admin-graphql/latest/objects/MoneyBag`,
 (product-domain topics).
 
 Captured excerpts: [`../00-source-materials/shopify-official.md`](../00-source-materials/shopify-official.md).
+
+---
+
+## Delta refresh — 2026-07-16 (Fable gap-closure mission)
+
+A targeted Tier-1 refresh against API version **2026-07** was captured in
+[`../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md`](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md).
+Net-new evidence relative to this file's baseline: complete
+`OrderDisplayFinancialStatus` (8 values) with COD-relevant `PENDING`
+semantics; `OrderTransaction.manualPaymentGateway` as the COD/manual-gateway
+discriminator; `orderMarkAsPaid`/`orderCreateManualPayment` (Partial);
+**AbandonedCheckout object + abandonedCheckouts query verified to exist in
+2026-07** (recovery_state, completedAt); complete **seven-family (Layer A)**
+fulfillment state model — the seven Shopify fulfillment enum families incl.
+`FulfillmentEventStatus` (11 values), `FulfillmentDisplayStatus`
+(**A7 — 18 values, verified 2026-07-16, display-only roll-up**), and
+deprecations (`OPEN`/`PENDING` on Fulfillment; `OPEN`/`PENDING_FULFILLMENT`/`RESTOCKED`
+on order summary); `fulfillmentCreateV2` deprecation confirmed; fulfillment
+origin-attribution surface (`BasicEvent.attributeToApp`/`appTitle`,
+`FulfillmentHold.heldByApp`; no app field on Fulfillment itself);
+order-edit `CalculatedOrder` flow + `orders/edited`; current rate-limit
+restore rates and the "falls forward to oldest accessible version"
+unsupported-version behavior. Open questions are consolidated in the capture
+§13. No prior claim in this file was found contradicted; the 2026-07-10
+capture remains valid.

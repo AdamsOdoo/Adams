@@ -1,5 +1,10 @@
 # DEC-025 — Task 006 Sync Engine Architecture Gate (Proposed)
 
+> *Title note (2026-07-16, Fable gap-closure mission): the "(Proposed)" suffix
+> in the H1 above is a stale artifact of the drafting phase; this record is
+> **Accepted** per the banner below. The title is left unedited to preserve
+> link/anchor stability.*
+
 > **Accepted architecture decision record.** ChatGPT accepted this record on
 > **2026-07-08**, after PR #128's governance revisions (direct, full
 > inspection of the two pre-006A baseline sources; the `AR-030` addition;
@@ -219,6 +224,13 @@ companion gate document §K and in
    interrupted by a concurrent disconnect is not proven by any source.
    **Requires live Odoo.sh proof** before any design relies on the race
    being closed.
+   **[Program-state update — 2026-07-16]** This risk is retained as the
+   record's as-of-2026-07-08 statement. SRR-03 has since been runtime-proven
+   and **CLOSED** post-Wave-1 (per the 2026-07-16 reconciliation in
+   [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
+   and [`../07-implementation-plan/mvp-program-state.md`](../07-implementation-plan/mvp-program-state.md));
+   the required live proof now exists. Items 2–3 (SRR-04/SRR-09) stand as
+   written — they were reduced, not closed, and still require their tests.
 2. **Cron job-acquisition concurrency under real load (SRR-04, three-shard-
    corroborated open question).** Whether Odoo's automatic RPC-layer
    serialization retry protects a cron job's own domain-record-processing

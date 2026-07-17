@@ -98,6 +98,15 @@ beyond their default-safe (fail-closed) classification.
   as `DEF-PB-1`. **Remains OPEN after this record** — Layer 1 does not close
   it; only a triggered, accepted Layer 2 plus multi-worker runtime proof
   could.
+  **[Program-state update — 2026-07-16]** The "Remains OPEN" wording reflects
+  this record's 2026-07-15 as-of state. SRR-03 was subsequently **CLOSED**
+  post-Wave-1 (per the 2026-07-16 reconciliation in
+  [`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)
+  and [`../07-implementation-plan/mvp-program-state.md`](../07-implementation-plan/mvp-program-state.md)).
+  This does **not** change this record's operative decision: the deferred
+  **Layer 2** mutation-ownership hardening remains reserved for the first
+  Shopify-mutation domain and must still be decided and accepted before any
+  Shopify write ships.
 - **Rejected-approaches log**: checked in full (RA-001…RA-024); none blocks
   any option this record or its companion document evaluates; none is
   re-proposed.
@@ -241,3 +250,38 @@ not reopened until one of its named trigger domains is separately proposed.
 
 **PR #163 remains open, draft, and unmerged, and is not modified by this
 record.**
+
+## Layer 2 Proposed design registered (2026-07-16, Fable gap-closure mission)
+
+Layer 2's explicit reopening trigger (see "Layer 2 — mutation hardening,
+deferred" above) is now met: the MVP completion program's Waves 3/4/5
+propose Shopify-mutation domains (inventory export, fulfillment/tracking
+write-back, product export). Accordingly, the complete Layer 2 design has
+been written and is registered here:
+
+- **Design document:**
+  [`../03-architecture/dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md)
+  — durable attempt identity (Option A fields + a persisted
+  mutation-attempt record), stale-owner sweep, the per-mutation
+  reconciliation matrix, uncertain-outcome handling
+  (at-most-once-ambiguous with reconciliation convergence), commit-point
+  protocol, and the L2-D1…L2-D15 proposed decisions.
+- **Status of Layer 2: Proposed — NOT accepted.** Nothing in this section
+  changes Layer 1's Accepted record above (control-room review
+  `4701644819`), and nothing here marks any part of Layer 2 as Accepted or
+  Decided. The design document itself carries the same PROPOSED status
+  banner.
+- **This record remains the canonical DEC for Layer 2.** Per the
+  gap-closure mission instruction, the existing DEC-031 record is updated
+  by this dated revision note rather than creating a duplicate DEC; the
+  design document is the companion, not a new decision record.
+- **Acceptance authority:** the **product owner + Claude control room**,
+  exactly. Acceptance of the Layer 2 design is a separate, explicit future
+  act recorded against this DEC; it is not implied by registration.
+- **Blocking effect:** Waves 3, 4, and 5 mutation-domain implementation
+  remains **blocked** until (a) the Layer 2 design is accepted by the
+  authority above, **and** (b) it is implemented **with runtime proof**
+  (multi-worker Odoo.sh evidence per the design document's test strategy).
+  Read-only work is unaffected, as decided above.
+- No implementation is authorized by this registration; the no-code gate
+  and every other clause of this record remain in force unchanged.

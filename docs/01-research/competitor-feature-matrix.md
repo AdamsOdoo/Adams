@@ -160,3 +160,17 @@
 - **No cell implies a build decision.** MVP scope and architecture remain gated
   (`CLAUDE.md` §4–§5); the canonical taxonomy + matrix are finalized later
   (RB-12/RB-03) after ChatGPT review.
+
+---
+
+## Delta refresh — 2026-07-16 (Fable gap-closure mission)
+
+Listing-level re-verification (pricing/versions/reviews and COD, fulfillment
+modes, reconnect/backfill coverage) is captured in
+[`../00-source-materials/competitor-refresh-2026-07-16.md`](../00-source-materials/competitor-refresh-2026-07-16.md).
+Matrix symbols are unchanged; the refresh adds no demonstrated (✅)
+capability upgrades — new capability statements are vendor claims (🟨)
+pending screenshot-capable verification. COD: 🟨 EM (gateway-mapping only),
+🟨 TQ (inference), 🟨 VT (claimed), 🟨 EC (journal mapping), 🟨 SH; ⬜ WK.
+Backfill any-date: 🟨 VT, 🟨 EC/SH (date-range), ⬜ others. Inbound/3PL
+fulfillment reconciliation: ⬜ across all six.

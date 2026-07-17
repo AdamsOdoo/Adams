@@ -304,3 +304,33 @@ correction):
   file changed** — this session produced no Odoo implementation.
 - Parallel sessions **Task 010B** and **Task 011B** were **not touched**, not
   branched from, and not depended on.
+
+---
+
+## Fable gap-closure extension (2026-07-16) — twelve new surfaces [Proposed]
+
+The Fable remaining-gap-closure mission extended this canonical prototype in
+place (per the mission's single-canonical-location rule; no migration) with
+twelve new surfaces, each following the U0 conventions (state-gallery HTML +
+companion spec, shared `assets/prototype.css` tokens only, zero JavaScript,
+no external assets, inline-SVG icons, RTL-safe, two-role terminology —
+Connector User / Connector Administrator):
+
+`orders/`, `order-review/`, `cod-reconciliation/`, `fulfillment/`,
+`external-fulfillment-review/`, `tracking-timeline/`, `inventory/`,
+`reconnect-backfill/`, `product-export/`, `stores/`, `settings-permissions/`,
+`jobs-diagnostics/`.
+
+Status: **Proposed** — the U0 acceptance (PR #152, comment `4951204357`)
+covers only the original five surfaces; the twelve new surfaces await
+product-owner/control-room visual review, bringing the prototype to **five U0
+surfaces plus twelve gap-closure surfaces (seventeen in total)** — the §2/§3
+artifact tables above enumerate the U0 baseline only. Master specification:
+[`../02-product/premium-ux-master-specification.md`](../02-product/premium-ux-master-specification.md)
+(§6 maps every screen to its surface). The rendered-evidence set for the twelve
+new surfaces is being added under
+[`review-evidence/2026-07-16-correction/`](review-evidence/2026-07-16-correction/)
+for the correction review; until then the HTML source is authoritative.
+`jobs-diagnostics/` includes the eleven-state global reference gallery
+proposed by the master specification. No existing U0 file was modified except
+`prototype-index.html` (twelve cards added) and this README note.

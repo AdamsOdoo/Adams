@@ -468,3 +468,24 @@
 4. **Trust signals matter:** dated changelogs (R6/R7), ratings (R2/R7), readable docs+screenshots (R3), and a non-gated setup guide (counter-example: R5/R6) materially affect evaluability.
 5. **Differentiation whitespace** (no single competitor does all well): effortless install **and** real reliability; payout reconciliation **with** demonstrated robustness; unified observability dashboard **with** idempotency; honest latency; clear permission model. (Developed in `gaps-opportunities.md`.)
 
+
+---
+
+## Delta refresh — 2026-07-16 (Fable gap-closure mission)
+
+Current-listing re-verification of all six tracked competitors plus a market
+scan is captured in
+[`../00-source-materials/competitor-refresh-2026-07-16.md`](../00-source-materials/competitor-refresh-2026-07-16.md).
+Headline deltas vs the 2026-06-30/07-01 corpus: Emipro `shopify_ept` 19.0
+listed at **$627.18** with ~280+ reviews and new critical reviews (Jan 2026)
+on pricing-sync and automation; Teqstars 19.0 at $456.95 with docs now
+403-blocked to automated access; VentorTech `integration_shopify` 19.0 at
+$570.06 — auto-workflow up to 5 steps with explicit COD support claimed and
+any-date historical backfill claimed; `ecommerce_shopify` vendor identified
+as **Odoo IN Pvt Ltd** (provenance question resolved), cron-only 10-minute
+sync conceded on-listing, one-way products with variant flattening, and a
+crude two-mode fulfillment concept (fulfil in Odoo or in Shopify);
+Softhealer at $169.08 with unverified GraphQL claim. No incumbent documents
+explicit COD lifecycle, duplicate-safe backfill, or inbound 3PL fulfillment
+reconciliation — the premium whitespace is unchanged and sharpened. No Odoo
+S.A. native Shopify connector exists as of this pass; Cetmix has none.

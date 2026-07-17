@@ -1,0 +1,189 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Stores — list &amp; detail</title><link rel="stylesheet" href="../assets/prototype.css"></head><body><svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute" overflow="hidden"><defs>
+<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="5 13 10 18 19 7"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 21 19H3Z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><polyline points="12 8 12 12 15 14"/></symbol>
+<symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><polyline points="4 4 4 8 8 8"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><polyline points="20 20 20 16 16 16"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><line x1="9" y1="2.5" x2="9" y2="7"/><line x1="15" y1="2.5" x2="15" y2="7"/><path d="M7 7h10v3.5a5 5 0 0 1-10 0z"/><line x1="12" y1="15.5" x2="12" y2="21.5"/></symbol>
+<symbol id="i-store" viewBox="0 0 24 24"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0"/><path d="M5 12v8h14v-8"/><path d="M9.5 20v-5h5v5"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9" rx="1.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><polyline points="9 12 11.5 14.5 15.5 10"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9z"/><polyline points="3.5 7.5 12 12 20.5 7.5"/><line x1="12" y1="12" x2="12" y2="21"/></symbol>
+</g></defs></svg>
+
+<div class="gallery">
+<div class="gallery__intro"><h1>Stores — list &amp; detail</h1>
+<p>Per-store lifecycle surface. The list shows every store as a premium card with its lifecycle badge (the five shipped states: setup incomplete, connected, reconnect needed, disconnecting, disconnected), a health strip, the connection generation, enabled capabilities, and quick stats. The detail view carries the lifecycle actions — reconnect and disconnect are Connector-Administrator only; a Connector User sees the same data read-only. Disconnect explains quiescence honestly (open in-flight work is allowed to finish, bounded by a 15-minute timeout). Copy is illustrative (MBQ-22); no backend method or field is asserted.</p></div>
+
+<!-- ============================================================ STORE LIST -->
+<section class="gallery-item"><div class="gallery-caption"><b>Store list</b> · five cards — one per lifecycle state · Administrator view · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--degraded"><span class="sc-health__dot"></span><span class="sc-health__lg">1 store needs reconnect</span><span class="sc-health__sm">Reconnect</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Stores</b></div>
+<div class="sc-content">
+<div class="sc-section__head"><span class="sc-section__title">Stores</span><span class="sc-section__meta">5 stores · Connector Administrator</span></div>
+<div class="sc-grid" style="grid-template-columns:1fr 1fr">
+
+<!-- connected / healthy -->
+<div class="sc-card sc-card--compact">
+<div class="sc-btnrow sc-btnrow--split"><div><div class="sc-exception__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-store"/></svg> Adams Home</div><div class="sc-muted" style="font-size:var(--sc-fs-secondary)">adams-home.myshopify.com</div></div><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Connected</span></div>
+<div class="sc-chips sc-mt3"><span class="sc-chip"><span class="sc-chip__value">Healthy</span><span class="sc-chip__label">API</span></span><span class="sc-chip"><span class="sc-chip__value">Ready</span><span class="sc-chip__label">Webhooks</span></span><span class="sc-chip"><span class="sc-chip__value">12 min ago</span><span class="sc-chip__label">Last readiness</span></span><span class="sc-chip"><span class="sc-chip__value sc-mono">#7</span><span class="sc-chip__label">Generation</span></span></div>
+<div class="sc-chips sc-mt2"><span class="sc-owner">Products</span><span class="sc-owner">Customers</span><span class="sc-owner">Orders</span><span class="sc-owner">Inventory</span><span class="sc-owner">Fulfillment</span></div>
+<div class="sc-kv sc-mt3"><dt>Bound products</dt><dd class="sc-mono">1,482</dd><dt>Orders this week</dt><dd class="sc-mono">216</dd><dt>Open review items</dt><dd class="sc-mono">0</dd></div>
+</div>
+
+<!-- reconnect_needed -->
+<div class="sc-card sc-card--compact" style="border-inline-start:3px solid var(--sc-warning-text)">
+<div class="sc-btnrow sc-btnrow--split"><div><div class="sc-exception__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-store"/></svg> Adams Outlet</div><div class="sc-muted" style="font-size:var(--sc-fs-secondary)">adams-outlet.myshopify.com</div></div><span class="sc-status sc-status--warning"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> Reconnect needed</span></div>
+<div class="sc-chips sc-mt3"><span class="sc-chip is-warning"><span class="sc-chip__value">Unreachable</span><span class="sc-chip__label">API</span></span><span class="sc-chip"><span class="sc-chip__value">Paused</span><span class="sc-chip__label">Webhooks</span></span><span class="sc-chip"><span class="sc-chip__value">2 days ago</span><span class="sc-chip__label">Last readiness</span></span><span class="sc-chip"><span class="sc-chip__value sc-mono">#4</span><span class="sc-chip__label">Generation</span></span></div>
+<div class="sc-chips sc-mt2"><span class="sc-owner">Products</span><span class="sc-owner">Customers</span><span class="sc-owner">Orders</span></div>
+<div class="sc-kv sc-mt3"><dt>Bound products</dt><dd class="sc-mono">640</dd><dt>Orders this week</dt><dd class="sc-mono">— (paused)</dd><dt>Open review items</dt><dd class="sc-mono">3</dd></div>
+</div>
+
+<!-- disconnecting -->
+<div class="sc-card sc-card--compact">
+<div class="sc-btnrow sc-btnrow--split"><div><div class="sc-exception__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-store"/></svg> Adams Wholesale</div><div class="sc-muted" style="font-size:var(--sc-fs-secondary)">adams-wholesale.myshopify.com</div></div><span class="sc-status sc-status--info"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Disconnecting</span></div>
+<div class="sc-chips sc-mt3"><span class="sc-chip"><span class="sc-chip__value">Quiescing</span><span class="sc-chip__label">2 jobs finishing</span></span><span class="sc-chip"><span class="sc-chip__value sc-mono">#9</span><span class="sc-chip__label">Generation</span></span></div>
+<div class="sc-help sc-mt3">In-flight work is finishing safely. No new work is admitted.</div>
+</div>
+
+<!-- disconnected -->
+<div class="sc-card sc-card--compact">
+<div class="sc-btnrow sc-btnrow--split"><div><div class="sc-exception__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-store"/></svg> Adams Archive</div><div class="sc-muted" style="font-size:var(--sc-fs-secondary)">adams-archive.myshopify.com</div></div><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-plug"/></svg> Disconnected</span></div>
+<div class="sc-chips sc-mt3"><span class="sc-chip"><span class="sc-chip__value">Preserved</span><span class="sc-chip__label">History &amp; mappings</span></span><span class="sc-chip"><span class="sc-chip__value sc-mono">#12</span><span class="sc-chip__label">Generation</span></span></div>
+<div class="sc-help sc-mt3">Nothing syncs. All settings, mappings and history are kept for reconnect.</div>
+</div>
+
+<!-- setup_incomplete -->
+<div class="sc-card sc-card--compact">
+<div class="sc-btnrow sc-btnrow--split"><div><div class="sc-exception__title"><svg class="sc-ico" aria-hidden="true"><use href="#i-store"/></svg> Adams B2B (new)</div><div class="sc-muted" style="font-size:var(--sc-fs-secondary)">adams-b2b.myshopify.com</div></div><span class="sc-status sc-status--info"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Setup incomplete</span></div>
+<div class="sc-help sc-mt3">Setup stopped at step 2 of 6 (Credentials). Nothing syncs until setup completes.</div>
+<div class="sc-btnrow sc-mt3"><button class="sc-btn sc-btn--primary sc-btn--sm">Resume setup</button></div>
+</div>
+
+</div></div></div></section>
+
+<!-- ================================================ DETAIL: healthy connected -->
+<section class="gallery-item"><div class="gallery-caption"><b>Store detail — connected, healthy</b> · Administrator: lifecycle actions + credential card · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Stores<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Adams Home</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--success"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Adams Home is connected and healthy</div><div class="sc-band__sub">adams-home.myshopify.com · connection generation <b class="sc-mono">#7</b> · connected since 2 June, reconnected once.</div></div><span class="sc-btnrow"><button class="sc-btn sc-btn--secondary sc-btn--sm">Reconnect</button><button class="sc-btn sc-btn--danger sc-btn--sm">Disconnect…</button></span></div>
+<div class="sc-cols sc-mt5">
+<div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Readiness</span><span class="sc-section__meta">Last run 12 minutes ago</span></div>
+<div class="sc-ready sc-ready--pass"><span class="sc-ready__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div><div class="sc-ready__name">Credentials &amp; test connection</div><div class="sc-ready__result">Verified with Shopify.</div></div><span></span></div>
+<div class="sc-ready sc-ready--pass"><span class="sc-ready__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div><div class="sc-ready__name">Required permissions</div><div class="sc-ready__result">All granted scopes match the enabled capabilities.</div></div><span></span></div>
+<div class="sc-ready sc-ready--pass"><span class="sc-ready__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div><div class="sc-ready__name">API version health</div><div class="sc-ready__result">2026-07 — current, matches the pinned version.</div></div><span></span></div>
+<div class="sc-ready sc-ready--pass"><span class="sc-ready__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div><div class="sc-ready__name">Background jobs healthy</div><div class="sc-ready__result">Queue running; nothing stalled.</div></div><span></span></div>
+<div class="sc-btnrow sc-mt3"><button class="sc-btn sc-btn--sm">Re-run readiness</button></div></div>
+<div class="sc-card sc-mt4"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Enabled capabilities</div>
+<div class="sc-chips sc-mt3"><span class="sc-chip"><span class="sc-chip__value">Products</span><span class="sc-chip__label">import</span></span><span class="sc-chip"><span class="sc-chip__value">Customers</span><span class="sc-chip__label">import</span></span><span class="sc-chip"><span class="sc-chip__value">Orders</span><span class="sc-chip__label">import</span></span><span class="sc-chip"><span class="sc-chip__value">Inventory</span><span class="sc-chip__label">sync</span></span><span class="sc-chip"><span class="sc-chip__value">Fulfillment</span><span class="sc-chip__label">Mode 1 — Odoo-controlled</span></span></div>
+<div class="sc-help sc-mt3">Capability enablement and schedules are managed in Settings — Administrator only.</div></div>
+</div>
+<div>
+<div class="sc-card sc-card--compact"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Credential</div>
+<div class="sc-field sc-mt3"><span class="sc-ro__label">Admin API access token</span><input class="sc-input sc-input--mask" type="text" value="••••••••••••••••••••••••••••" readonly aria-label="Stored token — never displayed"></div>
+<div class="sc-kv"><dt>Last verified</dt><dd>Today, 09:41</dd><dt>Stored</dt><dd>Restricted access; never displayed again</dd></div>
+<div class="sc-btnrow sc-mt3"><button class="sc-btn sc-btn--secondary sc-btn--sm">Replace token…</button></div>
+<div class="sc-help sc-mt2">Replacing the token is Administrator-only and starts a fresh verification. The stored value can never be read back.</div></div>
+<div class="sc-card sc-card--compact sc-mt4"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Quick stats</div>
+<div class="sc-kv sc-mt3"><dt>Bound products</dt><dd class="sc-mono">1,482</dd><dt>Bound customers</dt><dd class="sc-mono">9,306</dd><dt>Orders this week</dt><dd class="sc-mono">216</dd><dt>Open review items</dt><dd class="sc-mono">0</dd></div></div>
+</div>
+</div></div></div></section>
+
+<!-- ================================== DETAIL: User read-only variant -->
+<section class="gallery-item"><div class="gallery-caption"><b>Store detail — Connector User (read-only)</b> · same surface, no lifecycle actions, credential card view-only · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as U. Operator">UO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Stores<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Adams Home</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--success"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Adams Home is connected and healthy</div><div class="sc-band__sub">adams-home.myshopify.com · connection generation <b class="sc-mono">#7</b>.</div></div><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg> View only — lifecycle actions need a Connector Administrator</span></div>
+<div class="sc-cols sc-mt5">
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Readiness</span><span class="sc-section__meta">Last run 12 minutes ago</span></div>
+<div class="sc-ready sc-ready--pass"><span class="sc-ready__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div><div class="sc-ready__name">Credentials &amp; test connection</div><div class="sc-ready__result">Verified with Shopify.</div></div><span></span></div>
+<div class="sc-ready sc-ready--pass"><span class="sc-ready__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-check"/></svg></span><div><div class="sc-ready__name">Required permissions</div><div class="sc-ready__result">All granted scopes match the enabled capabilities.</div></div><span></span></div>
+<div class="sc-btnrow sc-mt3"><button class="sc-btn sc-btn--sm">Re-run readiness</button></div></div>
+<div class="sc-card sc-card--compact"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)"><svg class="sc-ico" aria-hidden="true"><use href="#i-lock"/></svg> Credential</div>
+<div class="sc-field sc-mt3"><span class="sc-ro__label">Admin API access token</span><input class="sc-input sc-input--mask" type="text" value="••••••••••••••••••••••••••••" readonly aria-label="Stored token — never displayed"></div>
+<div class="sc-kv"><dt>Last verified</dt><dd>Today, 09:41</dd></div>
+<div class="sc-help sc-mt2">Only a Connector Administrator can replace this credential. The stored value is never displayed for any role.</div></div>
+</div></div></div></section>
+
+<!-- ================================== DETAIL: reconnect_needed -->
+<section class="gallery-item"><div class="gallery-caption"><b>Store detail — reconnect needed</b> · warning band, cause + one action · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--down"><span class="sc-health__dot"></span><span class="sc-health__lg">Reconnect needed</span><span class="sc-health__sm">Reconnect</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Stores<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Adams Outlet</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--warning"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-warn"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Adams Outlet needs to reconnect</div><div class="sc-band__sub">Shopify stopped accepting the stored credential 2 days ago. Sync is paused; nothing was lost — settings, mappings and history are preserved. Reconnecting verifies credentials, re-runs readiness, and starts fresh catch-up scans.</div></div><span class="sc-btnrow"><button class="sc-btn sc-btn--primary sc-btn--sm">Reconnect…</button></span></div>
+<div class="sc-card sc-mt5"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">While disconnected</div>
+<div class="sc-kv sc-mt3"><dt>Paused since</dt><dd>14 July, 16:20 (2 days)</dd><dt>Catch-up on reconnect</dt><dd>Fresh scans per enabled domain from each domain’s watermark — no old jobs are replayed</dd><dt>Review queue</dt><dd>3 items waiting (unaffected — a Connector User can resolve them now)</dd></div></div>
+</div></div></section>
+
+<!-- ================================== Disconnect confirmation drawer -->
+<section class="gallery-item"><div class="gallery-caption"><b>Disconnect — confirmation drawer</b> · Administrator only · explains quiescence before anything happens · 1366px</div>
+<div class="screen"><div class="sc-content" style="background:rgba(16,24,40,0.32); padding:var(--sc-space-7) var(--sc-space-5)">
+<div class="sc-dialog" style="margin-inline:auto" role="dialog" aria-labelledby="dxt" aria-modal="true">
+<h2 id="dxt" class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Disconnect Adams Home?</h2>
+<p class="sc-help sc-mt2">Disconnecting stops all synchronization for this store. Here is exactly what happens:</p>
+<ol class="sc-mt3" style="list-style:decimal; padding-inline-start:var(--sc-space-5); font-size:var(--sc-fs-secondary); color:var(--sc-text-secondary); display:grid; gap:var(--sc-space-2)">
+<li><b style="color:var(--sc-text-primary)">No new work is admitted</b> — from the moment you confirm, no new sync job can start for this store.</li>
+<li><b style="color:var(--sc-text-primary)">In-flight work finishes safely</b> — 2 jobs are currently running. The store shows <i>Disconnecting</i> while they complete (quiescence), bounded by a 15-minute timeout.</li>
+<li><b style="color:var(--sc-text-primary)">Everything is preserved</b> — settings, mappings, bindings, history and logs are kept. Nothing is deleted. You can reconnect at any time.</li>
+</ol>
+<div class="sc-consequence sc-mt4"><span class="sc-consequence__ico"><svg class="sc-ico" aria-hidden="true"><use href="#i-shield"/></svg></span><span>External changes made in Shopify while disconnected are caught up on reconnect as normal updates or review cases — never replayed blindly.</span></div>
+<div class="sc-btnrow sc-btnrow--end sc-mt5"><button class="sc-btn sc-btn--secondary">Cancel</button><button class="sc-btn sc-btn--danger">Disconnect store</button></div>
+</div></div></div></section>
+
+<!-- ================================== DETAIL: disconnecting (quiescing) -->
+<section class="gallery-item"><div class="gallery-caption"><b>Store detail — disconnecting (quiescing)</b> · open-lease count + oldest-admitted timer against the 15-minute bound · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--degraded"><span class="sc-health__dot"></span><span class="sc-health__lg">Disconnecting</span><span class="sc-health__sm">Quiescing</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Stores<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Adams Wholesale</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--info"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-clock"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Disconnecting — letting in-flight work finish</div><div class="sc-band__sub">No new work is being admitted. The store becomes <b>Disconnected</b> when the last running job releases, or after the 15-minute quiescence timeout.</div></div></div>
+<div class="sc-card sc-mt5"><div class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Quiescence progress</div>
+<div class="sc-kv sc-mt3"><dt>Open work leases</dt><dd class="sc-mono">2 still running</dd><dt>Oldest admitted</dt><dd class="sc-mono">4 min 10 s ago</dd><dt>Timeout bound</dt><dd class="sc-mono">15 min (10 min 50 s remaining)</dd><dt>New generation</dt><dd class="sc-mono">#9 (no stale-generation job can run)</dd></div>
+<div class="sc-loadingline"><span class="sc-spinner" aria-hidden="true"></span><span>Waiting for 2 running jobs to finish. Nothing new starts. This page reports honestly — it does not pretend disconnect is instant.</span></div></div>
+</div></div></section>
+
+<!-- ================================== DETAIL: disconnected -->
+<section class="gallery-item"><div class="gallery-caption"><b>Store detail — disconnected</b> · calm data-preserved notice + reconnect CTA · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--down"><span class="sc-health__dot"></span><span class="sc-health__lg">Disconnected</span><span class="sc-health__sm">Off</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Stores<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Adams Archive</b></div>
+<div class="sc-content"><div class="sc-content--center">
+<div class="sc-band sc-band--neutral"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-plug"/></svg></span><div class="sc-band__text"><div class="sc-band__answer" style="font-size:var(--sc-fs-lead)">Adams Archive is disconnected</div><div class="sc-band__sub">Nothing syncs. Everything is preserved — settings, mappings, bindings, history and logs are exactly as you left them.</div></div></div>
+<div class="sc-card sc-mt4"><div class="sc-kv"><dt>Disconnected on</dt><dd>1 July, 11:02 (completed cleanly — all in-flight work finished)</dd><dt>Kept for you</dt><dd>Store settings, product/customer/order bindings, sync history, audit log</dd><dt>On reconnect</dt><dd>Credentials verified → readiness re-run → new connection generation → fresh catch-up scans per enabled domain</dd></div>
+<div class="sc-btnrow sc-mt4"><button class="sc-btn sc-btn--primary">Reconnect this store…</button></div>
+<div class="sc-help sc-mt2">Reconnect is Administrator-only. Changes made in Shopify while disconnected arrive as normal catch-up updates or review cases.</div></div>
+</div></div></div></section>
+
+<!-- ================================== DETAIL: setup_incomplete -->
+<section class="gallery-item"><div class="gallery-caption"><b>Store detail — setup incomplete</b> · onboarding CTA with a CSS-only welcome illustration (illustration allowed here per the education/empty-state policy) · 1366px</div>
+<div class="screen"><div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Admin">AA</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Configuration</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog & Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item is-active">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health sc-health--degraded"><span class="sc-health__dot"></span><span class="sc-health__lg">Setup incomplete</span><span class="sc-health__sm">Setup</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Configuration<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Stores<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>Adams B2B</b></div>
+<div class="sc-content"><div class="sc-content--center"><div class="sc-card sc-empty">
+<!-- CSS-only welcome illustration: layered rounded shapes on a tinted disc.
+     Illustration is permitted ONLY on education/onboarding/empty states per
+     the accepted empty-state policy — never on operational data screens. -->
+<div aria-hidden="true" style="inline-size:120px; block-size:120px; margin:0 auto var(--sc-space-4); border-radius:50%; background:var(--sc-info-bg); position:relative; overflow:hidden">
+  <span style="position:absolute; inset-inline-start:26px; inset-block-start:38px; inline-size:34px; block-size:44px; border-radius:8px; background:#FFFFFF; border:2px solid var(--sc-info-text)"></span>
+  <span style="position:absolute; inset-inline-start:60px; inset-block-start:50px; inline-size:34px; block-size:32px; border-radius:8px; background:var(--sc-success-bg); border:2px solid var(--sc-success-text)"></span>
+  <span style="position:absolute; inset-inline-start:48px; inset-block-start:28px; inline-size:24px; block-size:10px; border-radius:5px; background:var(--sc-accent)"></span>
+</div>
+<div class="sc-empty__title">Welcome — let’s connect Adams B2B</div>
+<p class="sc-empty__text">Setup stopped at step 2 of 6 (Credentials). Nothing syncs, and nothing in your Odoo database is touched, until setup completes and readiness passes.</p>
+<div class="sc-steps" style="justify-content:center"><span class="sc-step is-done"><span class="sc-step__num"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg></span>Store</span><span class="sc-step__sep" aria-hidden="true">›</span><span class="sc-step is-current"><span class="sc-step__num">2</span>Credentials</span><span class="sc-step__sep" aria-hidden="true">›</span><span class="sc-step"><span class="sc-step__num">3</span>Test</span><span class="sc-step__sep" aria-hidden="true">›</span><span class="sc-step"><span class="sc-step__num">4</span>Readiness</span><span class="sc-step__sep" aria-hidden="true">›</span><span class="sc-step"><span class="sc-step__num">5</span>Domains</span><span class="sc-step__sep" aria-hidden="true">›</span><span class="sc-step"><span class="sc-step__num">6</span>Review</span></div>
+<button class="sc-btn sc-btn--primary sc-mt4">Resume setup</button>
+<div class="sc-help sc-mt3">Setup is Administrator-only. A Connector User sees this store as “Setup incomplete” with no action.</div>
+</div></div></div></div></section>
+
+</div></body></html>

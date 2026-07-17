@@ -1,0 +1,230 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Order review detail</title><link rel="stylesheet" href="../assets/prototype.css"></head><body>
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute" overflow="hidden"><defs>
+<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<symbol id="i-check" viewBox="0 0 24 24"><polyline points="5 13 10 18 19 7"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4 21 19H3Z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/></symbol>
+<symbol id="i-hand" viewBox="0 0 24 24"><path d="M9 11V6.5a1.5 1.5 0 0 1 3 0V10"/><path d="M12 10V5a1.5 1.5 0 0 1 3 0v5"/><path d="M15 10.5V7a1.5 1.5 0 0 1 3 0v7a6 6 0 0 1-6 6h-1.2a6 6 0 0 1-4.9-2.6l-2.2-3.3a1.6 1.6 0 0 1 2.5-2l1.5 1.8V8.5a1.5 1.5 0 0 1 3 0V11"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><polyline points="12 8 12 12 15 14"/></symbol>
+<symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4.5L4 8"/><polyline points="4 4 4 8 8 8"/><path d="M4 13a8 8 0 0 0 14 4.5L20 16"/><polyline points="20 20 20 16 16 16"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></symbol>
+<symbol id="i-order" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><polyline points="14 3 14 7 18 7"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="15.5" x2="15" y2="15.5"/><line x1="9" y1="8.5" x2="11.5" y2="8.5"/></symbol>
+<symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6.5h10.5v9H3z"/><path d="M13.5 9.5H18l3 3v3h-7.5z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10.5 13.5a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 0 1 5 5l-1.2 1.2"/><path d="M13.5 10.5a3.5 3.5 0 0 1 0 5l-2 2a3.5 3.5 0 0 1-5-5l1.2-1.2"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
+<symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="11" rx="1.5"/><circle cx="12" cy="12.5" r="2.5"/></symbol>
+<symbol id="i-diff" viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="17" r="2.2"/><path d="M6 9.2V15a2 2 0 0 0 2 2h4"/><polyline points="10 13 8 15 10 17"/><path d="M18 14.8V9a2 2 0 0 0-2-2h-4"/><polyline points="14 5 16 7 14 9"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+</g></defs></svg>
+
+<div class="gallery">
+<div class="gallery__intro"><h1>Order review detail</h1><p>One Shopify order, fully explained: summary with all state badges, line items with per-line binding status, the connector event timeline, and a side panel that says exactly what (if anything) a person must do. Roles: the Connector User acts on approval/review items; the Connector Administrator owns the policies referenced. States: waiting (no action), COD approval required, blocked for manual review (duplicate risk), financial-mismatch fail-closed, order-edited divergence.</p></div>
+
+<!-- ===================================================== state: WAITING (PENDING card) -->
+<section class="gallery-item"><div class="gallery-caption"><b>Waiting — PENDING card payment</b> · no action; the connector re-checks on its own · 1366px</div><div id="s-waiting"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Orders</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><a href="../orders/orders.html">Orders</a><span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>#1055</b></div>
+<div class="sc-content">
+<div class="sc-cols">
+<div>
+<div class="sc-card">
+<div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Shopify order #1055 · aria-home.myshopify.com</span></div>
+<div class="sc-btnrow sc-mt2"><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Payment pending</span><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Not shipped</span><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg> Waiting — re-checked each scan</span></div>
+<dl class="sc-kv sc-mt4"><dt>Customer</dt><dd>Rana Tannous · <span class="sc-muted">rana.tannous@example.com</span></dd><dt>Total</dt><dd class="sc-mono">54.00 USD <span class="sc-muted">(shop currency = presentment currency — verified)</span></dd><dt>Gateway</dt><dd>Card (online) — gateway-processed, not a manual gateway</dd><dt>Placed</dt><dd>Today, 09:41 · discovered by scheduled scan</dd><dt>Policy</dt><dd>P1 — Confirm paid orders only</dd></dl>
+</div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Line items</span><span class="sc-section__meta">as reported by Shopify</span></div>
+<table class="sc-list"><thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Unit</th><th scope="col">Line total</th><th scope="col">Binding</th></tr></thead><tbody>
+<tr><td>Linen Cushion — Sage</td><td class="sc-mono">2</td><td class="sc-mono">18.00</td><td class="sc-mono">36.00</td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-link"/></svg> Bound</span></td></tr>
+<tr><td>Ceramic Coaster Set</td><td class="sc-mono">1</td><td class="sc-mono">18.00</td><td class="sc-mono">18.00</td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-link"/></svg> Bound</span></td></tr>
+</tbody></table></div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Connector timeline</span></div><div class="sc-card sc-card--compact"><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker is-info"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg></span><span class="sc-activity__text">Order discovered and evidence recorded<span class="sc-activity__meta">Today 09:45 · scheduled scan</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-info"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg></span><span class="sc-activity__text">Policy applied: P1 — payment pending, so no Odoo order is created yet<span class="sc-activity__meta">Today 09:45 · reason: awaiting payment state</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg></span><span class="sc-activity__text">Next re-check on the next scan (every 15 minutes) or Shopify update event<span class="sc-activity__meta">tracked for up to 7 days</span></span></li>
+</ul></div></div>
+</div>
+<div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Required action</span></div>
+<div class="sc-consequence"><span class="sc-consequence__ico"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg></span><span><b>PENDING card payment — waiting; no action needed.</b> The payment provider needs time to complete the payment. The connector re-checks automatically and will confirm the order the moment it becomes Paid. Nothing here needs a decision.</span></div>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Audit trail</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Financial state recorded: Payment pending<span class="sc-activity__meta">Today 09:45 · system</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Wait tracking started (expiry: 7 days)<span class="sc-activity__meta">Today 09:45 · system</span></span></li>
+</ul></div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Related records</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg></span><span class="sc-activity__text"><span class="sc-muted">No Odoo sales order yet — created only when the payment resolves</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg></span><span class="sc-activity__text"><a href="#">Odoo customer: Rana Tannous</a><span class="sc-activity__meta">linked automatically by normalized email</span></span></li>
+</ul></div>
+</div>
+</div>
+</div></div></div></section>
+
+<!-- ===================================================== state: COD APPROVAL REQUIRED -->
+<section class="gallery-item"><div class="gallery-caption"><b>COD approval required</b> · manual gateway, policy “Require User approval” · 1366px</div><div id="s-cod"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Orders</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><a href="../orders/orders.html">Orders</a><span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>#1057</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--danger"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-hand"/></svg></span><div class="sc-band__text"><div class="sc-band__answer">This COD order is waiting on your approval</div><div class="sc-band__sub">Cash on Delivery is an approved manual gateway on this store, and the Administrator’s policy requires a Connector User to approve each COD order before it is confirmed. Approving confirms the Odoo order and lets stock reserve.</div></div></div>
+<div class="sc-cols sc-mt5">
+<div>
+<div class="sc-card">
+<div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Shopify order #1057 · aria-home.myshopify.com</span></div>
+<div class="sc-btnrow sc-mt2"><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg> Payment pending</span><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Not shipped</span><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg> Awaiting approval</span></div>
+<dl class="sc-kv sc-mt4"><dt>Customer</dt><dd>Sami Karam · <span class="sc-muted">sami.karam@example.com</span></dd><dt>Total</dt><dd class="sc-mono">312.50 USD <span class="sc-muted">(shop = presentment — verified)</span></dd><dt>Gateway</dt><dd>Cash on Delivery <span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-cash"/></svg> Manual gateway — on the approved list</span></dd><dt>Placed</dt><dd>Today, 08:12 · Shopify event, verified by follow-up read</dd><dt>Policy</dt><dd>P1 + manual-gateway overlay: <b>Require User approval</b></dd></dl>
+</div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Line items</span><span class="sc-section__meta">as reported by Shopify</span></div>
+<table class="sc-list"><thead><tr><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Unit</th><th scope="col">Line total</th><th scope="col">Binding</th></tr></thead><tbody>
+<tr><td>Aria Table Lamp — Brass</td><td class="sc-mono">1</td><td class="sc-mono">240.00</td><td class="sc-mono">240.00</td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-link"/></svg> Bound</span></td></tr>
+<tr><td>Bulb — E27 Warm</td><td class="sc-mono">2</td><td class="sc-mono">11.25</td><td class="sc-mono">22.50</td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-link"/></svg> Bound</span></td></tr>
+<tr><td>Delivery</td><td class="sc-mono">1</td><td class="sc-mono">50.00</td><td class="sc-mono">50.00</td><td><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-link"/></svg> Bound</span></td></tr>
+</tbody></table></div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Connector timeline</span></div><div class="sc-card sc-card--compact"><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker is-success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg></span><span class="sc-activity__text">Order imported — quotation S00342 created with its permanent binding<span class="sc-activity__meta">Today 08:14 · all financial checks passed</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-info"><svg class="sc-ico" aria-hidden="true"><use href="#i-clock"/></svg></span><span class="sc-activity__text">Policy applied: approved manual gateway (COD) → User approval required<span class="sc-activity__meta">Today 08:14 · review-queue item opened</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg></span><span class="sc-activity__text">Waiting on a Connector User’s decision — confirm or keep as quotation<span class="sc-activity__meta">not confirmed; no stock reserved</span></span></li>
+</ul></div></div>
+</div>
+<div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Required action</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Connector User</span></div>
+<p class="sc-help"><b>COD approval required.</b> Approving confirms sales order S00342 — pickings are created and stock may reserve. Declining keeps it a quotation; you can confirm it manually in Odoo later. Cash collection is tracked afterwards in COD reconciliation.</p>
+<div class="sc-btnrow sc-mt4"><button class="sc-btn sc-btn--primary"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Approve &amp; confirm order</button><button class="sc-btn sc-btn--secondary">Decline — keep as quotation</button></div>
+<p class="sc-help sc-mt3">Either choice is recorded with your name and a timestamp.</p>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Audit trail</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">COD classified from transaction evidence (manual gateway on approved list)<span class="sc-activity__meta">Today 08:14 · system</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Totals verified: Shopify 312.50 = calculated 312.50<span class="sc-activity__meta">Today 08:14 · system</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Approval request opened for the Connector User role<span class="sc-activity__meta">Today 08:14 · system</span></span></li>
+</ul></div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Related records</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg></span><span class="sc-activity__text"><a href="#">Odoo sales order S00342 (quotation)</a></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg></span><span class="sc-activity__text"><a href="#">Odoo customer: Sami Karam</a></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-cash"/></svg></span><span class="sc-activity__text"><a href="../cod-reconciliation/cod-reconciliation.html">COD reconciliation workspace</a></span></li>
+</ul></div>
+</div>
+</div>
+</div></div></div></section>
+
+<!-- ===================================================== state: BLOCKED MANUAL REVIEW (duplicate risk) -->
+<section class="gallery-item"><div class="gallery-caption"><b>Blocked — manual review (duplicate risk)</b> · danger family + hand icon, fail closed · 1366px</div><div id="s-blocked"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Orders</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><a href="../orders/orders.html">Orders</a><span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>#1048</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--danger"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-hand"/></svg></span><div class="sc-band__text"><div class="sc-band__answer">Blocked for manual review — possible duplicate</div><div class="sc-band__sub">A sales order in Odoo already carries this Shopify order’s reference, but no connector binding links them. Importing now could create the same order twice, so nothing was created. This is not a system failure — a reviewer decides.</div></div></div>
+<div class="sc-cols sc-mt5">
+<div>
+<div class="sc-card">
+<div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Shopify order #1048 · aria-home.myshopify.com</span></div>
+<div class="sc-btnrow sc-mt2"><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Paid</span><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Not shipped</span><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg> Waiting on a decision</span></div>
+<dl class="sc-kv sc-mt4"><dt>Customer</dt><dd>Tarek Barakat · <span class="sc-muted">tarek.barakat@example.com</span></dd><dt>Total</dt><dd class="sc-mono">185.00 USD</dd><dt>Gateway</dt><dd>Card (online)</dd><dt>Conflict</dt><dd>Odoo sales order <a href="#">S00318</a> references “Shopify #1048” with no binding</dd></dl>
+<div class="sc-ready sc-ready--fail sc-mt4"><span class="sc-ready__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-warn"/></svg></span><div><div class="sc-ready__name">Why this is held</div><div class="sc-ready__result">The permanent-binding rule makes a second sales order for the same Shopify order structurally impossible — but S00318 was created outside the connector, so the connector cannot know whether it already represents this order. It fails closed instead of guessing.</div></div></div>
+</div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Connector timeline</span></div><div class="sc-card sc-card--compact"><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker is-info"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg></span><span class="sc-activity__text">Order discovered<span class="sc-activity__meta">Yesterday 16:02 · scheduled scan</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg></span><span class="sc-activity__text">Duplicate risk detected — routed to manual review; no Odoo record created<span class="sc-activity__meta">Yesterday 16:02 · sub-reason: binding conflict</span></span></li>
+</ul></div></div>
+</div>
+<div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Required action</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Connector User</span></div>
+<p class="sc-help"><b>Decide what S00318 is.</b> If it already represents Shopify #1048, link it — the binding is created and no new order is made. If it is unrelated, import normally — a new sales order is created.</p>
+<div class="sc-btnrow sc-mt4"><button class="sc-btn sc-btn--secondary"><svg class="sc-ico" aria-hidden="true"><use href="#i-diff"/></svg> Compare side by side</button></div>
+<p class="sc-help sc-mt3">Link / import actions become available from the comparison, so the decision is always made on the evidence.</p>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Audit trail</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Review case opened: duplicate risk (binding conflict)<span class="sc-activity__meta">Yesterday 16:02 · system</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Re-scans since then refresh evidence only — the hold stands until resolved<span class="sc-activity__meta">last refresh 12 minutes ago</span></span></li>
+</ul></div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Related records</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg></span><span class="sc-activity__text"><a href="#">Odoo sales order S00318 (unlinked candidate)</a></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg></span><span class="sc-activity__text"><a href="#">Odoo customer: Tarek Barakat</a></span></li>
+</ul></div>
+</div>
+</div>
+</div></div></div></section>
+
+<!-- ===================================================== state: FINANCIAL MISMATCH -->
+<section class="gallery-item"><div class="gallery-caption"><b>Financial mismatch — fail closed</b> · receipt-style breakdown, no order created · 1366px</div><div id="s-mismatch"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Orders</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><a href="../orders/orders.html">Orders</a><span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>#1042</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--danger"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-warn"/></svg></span><div class="sc-band__text"><div class="sc-band__answer">Held — the totals don’t add up</div><div class="sc-band__sub">Shopify’s order total and the total calculated from the lines differ by 4.50. The total check is mandatory and cannot be bypassed, so no Odoo order was created. Your books stay right.</div></div></div>
+<div class="sc-cols sc-mt5">
+<div>
+<div class="sc-card">
+<div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Shopify order #1042 · aria-home.myshopify.com</span></div>
+<div class="sc-btnrow sc-mt2"><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Paid</span><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Not shipped</span><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> Held — total mismatch</span></div>
+<dl class="sc-kv sc-mt4"><dt>Customer</dt><dd>Walid Saade · <span class="sc-muted">walid.saade@example.com</span></dd><dt>Gateway</dt><dd>Card (online)</dd><dt>Currency</dt><dd>USD = USD — same-currency check passed</dd></dl>
+<div class="sc-section__head sc-mt5"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Where the difference is</span><span class="sc-section__meta">receipt-style breakdown</span></div>
+<table class="sc-evidence"><thead><tr><th scope="col">Component</th><th scope="col">Shopify reports</th><th scope="col">Calculated from lines</th><th scope="col">Match</th></tr></thead><tbody>
+<tr><td data-label="Component">Merchandise</td><td data-label="Shopify reports" class="sc-mono">180.00</td><td data-label="Calculated" class="sc-mono">180.00</td><td data-label="Match"><span class="sc-match sc-match--same"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> same</span></td></tr>
+<tr><td data-label="Component">Shipping</td><td data-label="Shopify reports" class="sc-mono">12.00</td><td data-label="Calculated" class="sc-mono">12.00</td><td data-label="Match"><span class="sc-match sc-match--same"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> same</span></td></tr>
+<tr><td data-label="Component">Tax</td><td data-label="Shopify reports" class="sc-mono">21.10</td><td data-label="Calculated" class="sc-mono">16.60</td><td data-label="Match"><span class="sc-match sc-match--no"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> differs by 4.50</span></td></tr>
+<tr><td data-label="Component"><b>Total</b></td><td data-label="Shopify reports" class="sc-mono"><b>213.10</b></td><td data-label="Calculated" class="sc-mono"><b>208.60</b></td><td data-label="Match"><span class="sc-match sc-match--no"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg> differs by 4.50</span></td></tr>
+</tbody></table>
+</div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Connector timeline</span></div><div class="sc-card sc-card--compact"><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker is-info"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg></span><span class="sc-activity__text">Order discovered<span class="sc-activity__meta">Today 07:20 · Shopify event, verified by follow-up read</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-warn"/></svg></span><span class="sc-activity__text">Financial gate failed: total mismatch — held before any Odoo record<span class="sc-activity__meta">Today 07:20 · error class: financial total mismatch</span></span></li>
+</ul></div></div>
+</div>
+<div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Required action</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Connector User</span></div>
+<p class="sc-help"><b>The likely cause is a tax mapping gap.</b> Check the tax configuration for this store, then re-check the totals. The order confirms on its own once the numbers reconcile — the hold is never bypassed.</p>
+<div class="sc-btnrow sc-mt4"><button class="sc-btn sc-btn--secondary"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg> Re-check totals</button><a class="sc-btn sc-btn--quiet" href="#">View technical detail</a></div>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Audit trail</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Total check evaluated: 213.10 ≠ 208.60 (Δ 4.50)<span class="sc-activity__meta">Today 07:20 · system</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">No sales order, no customer write — the gate holds everything<span class="sc-activity__meta">Today 07:20 · system</span></span></li>
+</ul></div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Related records</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg></span><span class="sc-activity__text"><span class="sc-muted">No Odoo sales order — the hold happens before creation</span></span></li>
+</ul></div>
+</div>
+</div>
+</div></div></div></section>
+
+<!-- ===================================================== state: ORDER EDITED DIVERGENCE -->
+<section class="gallery-item"><div class="gallery-caption"><b>Order edited in Shopify — divergence</b> · evidence refreshed, Odoo order never silently rewritten · 1366px</div><div id="s-edited"><div class="screen">
+<div class="sc-topbar"><span class="sc-topbar__apps"><span class="sc-topbar__brand">Shopify Connector</span></span><span class="sc-topbar__spacer"></span><span class="sc-topbar__user" aria-label="Signed in as A. Operator">AO</span></div>
+<nav class="sc-appbar" aria-label="Shopify Connector"><button class="sc-appbar__menu" aria-haspopup="true" aria-label="Open connector menu — all sections"><svg class="sc-ico" aria-hidden="true"><use href="#i-menu"/></svg> Menu</button><span class="sc-appbar__current" aria-current="page">Orders</span><span class="sc-appbar__items"><span class="sc-appbar__item">Dashboard</span><span class="sc-appbar__item is-active">Sync Center</span><span class="sc-appbar__item">Error Center</span><span class="sc-appbar__item">Catalog &amp; Matching</span><span class="sc-appbar__item">Inventory</span><span class="sc-appbar__item">Fulfillment</span><span class="sc-appbar__item">Configuration</span></span><span class="sc-appbar__spacer"></span><span class="sc-health"><span class="sc-health__dot"></span><span class="sc-health__lg">Connected</span><span class="sc-health__sm">Connected</span></span></nav>
+<div class="sc-breadcrumb">Shopify Connector<span class="sc-breadcrumb__sep" aria-hidden="true">›</span>Sync Center<span class="sc-breadcrumb__sep" aria-hidden="true">›</span><a href="../orders/orders.html">Orders</a><span class="sc-breadcrumb__sep" aria-hidden="true">›</span><b>#1044</b></div>
+<div class="sc-content">
+<div class="sc-band sc-band--danger"><span class="sc-band__ico"><svg class="sc-ico sc-ico--20" aria-hidden="true"><use href="#i-hand"/></svg></span><div class="sc-band__text"><div class="sc-band__answer">Shopify edited this order after import</div><div class="sc-band__sub">The merchant changed the order in Shopify, and the new totals no longer match the confirmed Odoo order. The connector refreshed its evidence but did not touch the Odoo order — a person decides how to reconcile them.</div></div></div>
+<div class="sc-cols sc-mt5">
+<div>
+<div class="sc-card">
+<div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Shopify order #1044 · aria-home.myshopify.com</span></div>
+<div class="sc-btnrow sc-mt2"><span class="sc-status sc-status--success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg> Paid</span><span class="sc-status sc-status--neutral"><svg class="sc-ico" aria-hidden="true"><use href="#i-truck"/></svg> Not shipped</span><span class="sc-status sc-status--danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg> Diverged after edit</span></div>
+<dl class="sc-kv sc-mt4"><dt>Customer</dt><dd>Karim Fares · <span class="sc-muted">karim.fares@example.com</span></dd><dt>Odoo order</dt><dd><a href="#">S00327</a> — confirmed, delivery not started</dd><dt>Edited</dt><dd>Today 10:05 in Shopify (one line removed)</dd></dl>
+<div class="sc-section__head sc-mt5"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">What changed</span><span class="sc-section__meta">Shopify evidence, before → after</span></div>
+<table class="sc-evidence"><thead><tr><th scope="col">Field</th><th scope="col">At import</th><th scope="col">After edit</th><th scope="col">Odoo order</th></tr></thead><tbody>
+<tr><td data-label="Field">Lines</td><td data-label="At import" class="sc-mono">3</td><td data-label="After edit" class="sc-mono">2</td><td data-label="Odoo order" class="sc-mono">3</td></tr>
+<tr><td data-label="Field">Total</td><td data-label="At import" class="sc-mono">156.00</td><td data-label="After edit" class="sc-mono">124.00</td><td data-label="Odoo order" class="sc-mono">156.00</td></tr>
+</tbody></table>
+</div>
+<div class="sc-section"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Connector timeline</span></div><div class="sc-card sc-card--compact"><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker is-success"><svg class="sc-ico" aria-hidden="true"><use href="#i-check"/></svg></span><span class="sc-activity__text">Order imported and confirmed as S00327<span class="sc-activity__meta">Yesterday 14:30 · policy P1, Paid</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-info"><svg class="sc-ico" aria-hidden="true"><use href="#i-sync"/></svg></span><span class="sc-activity__text">Shopify edit detected — evidence refreshed (prior values kept in history)<span class="sc-activity__meta">Today 10:06 · orders/edited event</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker is-danger"><svg class="sc-ico" aria-hidden="true"><use href="#i-hand"/></svg></span><span class="sc-activity__text">Totals no longer reconcile — routed to financial-divergence review<span class="sc-activity__meta">Today 10:06 · Odoo order untouched</span></span></li>
+</ul></div></div>
+</div>
+<div>
+<div class="sc-card"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Required action</span><span class="sc-owner"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg> Connector User</span></div>
+<p class="sc-help"><b>Reconcile the Odoo order with the edited Shopify order.</b> Adjust S00327 manually in Odoo to match the edit, or acknowledge the difference with a reason if the Odoo order is intentionally different. The connector never edits a sales order by itself.</p>
+<div class="sc-btnrow sc-mt4"><button class="sc-btn sc-btn--secondary"><svg class="sc-ico" aria-hidden="true"><use href="#i-diff"/></svg> Compare before / after</button><button class="sc-btn sc-btn--secondary">Acknowledge with reason</button></div>
+</div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Audit trail</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Evidence snapshot re-taken; previous snapshot retained<span class="sc-activity__meta">Today 10:06 · system</span></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-eye"/></svg></span><span class="sc-activity__text">Divergence review case opened (156.00 vs 124.00)<span class="sc-activity__meta">Today 10:06 · system</span></span></li>
+</ul></div>
+<div class="sc-card sc-mt4"><div class="sc-section__head"><span class="sc-section__title" style="font-size:var(--sc-fs-cardtitle)">Related records</span></div><ul class="sc-activity">
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-order"/></svg></span><span class="sc-activity__text"><a href="#">Odoo sales order S00327 (confirmed)</a></span></li>
+<li class="sc-activity__item"><span class="sc-activity__marker"><svg class="sc-ico" aria-hidden="true"><use href="#i-user"/></svg></span><span class="sc-activity__text"><a href="#">Odoo customer: Karim Fares</a></span></li>
+</ul></div>
+</div>
+</div>
+</div></div></div></section>
+
+</div></body></html>

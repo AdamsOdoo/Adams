@@ -801,3 +801,17 @@ All accessed **2026-06-30**, all `odoo.com/documentation/19.0` (Tier 1):
   (`rounding`/`round()`/`compare_amounts()`).
 
 Captured excerpts: [`../00-source-materials/odoo-official.md`](../00-source-materials/odoo-official.md).
+
+---
+
+## Delta refresh — 2026-07-16 (Fable gap-closure mission)
+
+A targeted Odoo 19 Tier-1 refresh (sales-order lifecycle/`action_confirm`,
+picking states/backorders/returns semantics, `free_qty` quantity model,
+payments/`payment_state` surface and the `account.payment.register`
+auto-post boundary, the Odoo 19 `res.groups.privilege` security rework,
+`ir.cron` `_commit_progress`/failure-deactivation, Odoo.sh cron constraints,
+and module-lifecycle/uninstall column-drop behavior) was captured in
+[`../00-source-materials/odoo19-sale-stock-security-captures-2026-07-16.md`](../00-source-materials/odoo19-sale-stock-security-captures-2026-07-16.md).
+No prior claim in this file was found contradicted; the capture extends this
+baseline for the COD/fulfillment/inventory/roles design work.

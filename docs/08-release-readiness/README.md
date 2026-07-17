@@ -26,3 +26,18 @@ scenario has been executed and nothing is releasable yet** (0/15 scenarios
 executable per the gap analysis); these are planning/readiness documents
 only. Authoritative statuses live in each file's own Status section; this
 note refreshes the stale index text only and decides nothing.
+
+**Re-baseline note (2026-07-16, Fable gap-closure):** this package predates
+the 2026-07-15 checkpoint (`checkpoint/core-r2-readonly-uat-2026-07-15`) and
+Waves 0/1 of the MVP completion program; wave status is now tracked in
+[`../07-implementation-plan/mvp-program-state.md`](../07-implementation-plan/mvp-program-state.md).
+The release-readiness gap list previously implied by the audit package here
+is superseded by the QA matrices in `../05-qa/` —
+[`waves-2-6-cross-domain-test-matrix.md`](../05-qa/waves-2-6-cross-domain-test-matrix.md),
+[`cod-uat-matrix.md`](../05-qa/cod-uat-matrix.md),
+[`fulfillment-mode-uat-matrix.md`](../05-qa/fulfillment-mode-uat-matrix.md),
+[`reconnect-backfill-uat-matrix.md`](../05-qa/reconnect-backfill-uat-matrix.md),
+[`performance-slo-benchmark-plan.md`](../05-qa/performance-slo-benchmark-plan.md),
+[`security-pii-matrix-waves-2-6.md`](../05-qa/security-pii-matrix-waves-2-6.md)
+— and by the current release gap list below:
+[`release-readiness-gap-list.md`](./release-readiness-gap-list.md).

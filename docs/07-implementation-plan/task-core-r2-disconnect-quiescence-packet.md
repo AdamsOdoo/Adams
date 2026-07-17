@@ -1,5 +1,12 @@
 # Task CORE-R2 — Disconnect Quiescence & In-Flight Job Contract (Implementation Packet)
 
+> **Historical-status note (2026-07-16, Fable gap-closure mission):** the
+> gate wording below predates Wave 1. This packet's work was implemented and
+> **merged in Wave 1 (PR #172, merge `d18f9a9`)**; SRR-03 is **CLOSED**
+> (build `34986844`, ruling `4988527547`). The packet is retained as the
+> historical specification record; its locked prompt is exhausted and must
+> not be reissued.
+
 > **Status: Proposed packet for ChatGPT review. THE CODE GATE IS NOT OPEN.**
 > A *locked future prompt*, not implementation authorization. Usable only when
 > ChatGPT performs an explicit CORE-R2 implementation-gate act and issues it
