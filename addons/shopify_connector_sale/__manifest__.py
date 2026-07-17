@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.1.2.1',
+    'version': '19.0.2.0.0',
     'summary': (
         'Shopify customer import and matching (Task 011): read-only '
         'Shopify customer import, a customer binding model, and the '
@@ -34,7 +34,7 @@ file.
     'author': 'Adams',
     'license': 'LGPL-3',
     'category': 'Connector',
-    'depends': ['shopify_connector_core'],
+    'depends': ['shopify_connector_core', 'shopify_connector_product', 'sale'],
     'data': [
         'security/ir.model.access.csv',
     ],

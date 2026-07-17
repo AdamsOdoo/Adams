@@ -4,3 +4,11 @@ from . import test_customer_duplicate_prevention
 from . import test_customer_fallback_partner
 from . import test_customer_matching_scalability
 from . import test_pii_least_privilege
+from . import test_order_binding
+from . import test_order_import_mapping
+from . import test_order_totals_guard
+from . import test_order_tax_resolution
+from . import test_order_customer_resolution
+from . import test_order_confirmation_policy
+from . import test_order_manual_gateway_overlay
+from . import test_order_cod_import_readmodel
