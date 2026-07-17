@@ -3,6 +3,10 @@ from unittest.mock import patch
 
 from odoo.exceptions import AccessError, UserError
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
+)
+
 from .test_order_import_mapping import OrderImportCase
 
 
@@ -54,10 +58,11 @@ class TestOrderScanTriggers(OrderImportCase):
         )
 
     def test_manual_store_trigger_is_role_gated_enqueue_only_and_idempotent(self):
-        with self.assertRaises(AccessError):
-            self.store.with_user(
-                self.roles['auditor']
-            ).action_sync_orders_now()
+        for role in ('auditor', 'reviewer'):
+            with self.assertRaises(AccessError, msg=role):
+                self.store.with_user(
+                    self.roles[role]
+                ).action_sync_orders_now()
         first = self.store.with_user(
             self.roles['operator']
         ).action_sync_orders_now()
@@ -112,6 +117,45 @@ class TestOrderScanTriggers(OrderImportCase):
         self.assertEqual(self.Job.search_count([
             ('store_id', '=', self.store.id),
             ('job_type', '=', 'order_import_scan'),
+        ]), 1)
+
+        other_store = self.env['shopify.connector.store'].create({
+            'name': 'Order Cron Continue Store',
+            'shop_domain': 'order-cron-continue.myshopify.com',
+            'api_version': '2026-07',
+            'state': 'connected',
+        })
+        self.env['shopify.connector.store.settings'].create({
+            'store_id': other_store.id,
+            'sale_domain_enabled': True,
+            'order_scheduled_sync_enabled': True,
+        })
+        self.settings.write({
+            'sale_domain_enabled': True,
+            'order_scheduled_sync_enabled': True,
+        })
+        StoreType = type(self.store)
+        real_enqueue = StoreType._enqueue_order_scan
+        visited = []
+
+        def fail_one_store(record, source):
+            visited.append(record.id)
+            if record == self.store:
+                raise UserError('one store is temporarily unavailable')
+            return real_enqueue(record, source)
+
+        with patch.object(
+            StoreType, '_enqueue_order_scan', new=fail_one_store,
+        ):
+            result = self.env[
+                'shopify.connector.store'
+            ]._cron_enqueue_order_scans()
+        self.assertIsNone(result)
+        self.assertTrue({self.store.id, other_store.id}.issubset(visited))
+        self.assertEqual(self.Job.search_count([
+            ('store_id', '=', other_store.id),
+            ('job_type', '=', 'order_import_scan'),
+            ('state', '=', 'queued'),
         ]), 1)
         self.assertTrue(jobs.exists())
 
@@ -171,8 +215,11 @@ class TestOrderScanTriggers(OrderImportCase):
         ])['data']['orders']
         page = Scan._validate_page(connection, seen_cursors, seen_gids)
         self.assertEqual(len(page['nodes']), 2)
-        with self.assertRaises(Exception):
+        with self.assertRaises(JobHandlerError) as repeated:
             Scan._validate_page(connection, seen_cursors, seen_gids)
+        self.assertEqual(
+            repeated.exception.error_class, 'data_shape_schema_mismatch',
+        )
 
     def test_store_progress_helpers_are_nonstored_and_state_accurate(self):
         self._job(target='gid://shopify/Order/PendingCount')
