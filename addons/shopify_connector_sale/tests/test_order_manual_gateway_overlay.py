@@ -1,5 +1,7 @@
+from datetime import datetime
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 
 from ..models.shopify_connector_order_importer import OrderPendingWait
@@ -111,6 +113,12 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         self._configure()
         payload = self._manual_payload('gid://shopify/Order/Approval')
         binding = self.Importer._apply_import(self.store, payload)
+        reviewer = self.roles['reviewer']
+        self.assertFalse(reviewer.has_group('sales_team.group_sale_salesman'))
+        with self.assertRaises(AccessError):
+            binding.sale_order_id.with_user(reviewer).check_access_rights(
+                'read'
+            )
         for role in ('auditor', 'operator'):
             with self.assertRaises(AccessError, msg=role):
                 binding.with_user(self.roles[role]).action_approve_manual_gateway_order(
@@ -118,9 +126,9 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
                 )
         for reason in (False, '', '   '):
             with self.assertRaises(UserError):
-                binding.with_user(
-                    self.roles['reviewer']
-                ).action_approve_manual_gateway_order(reason)
+                binding.with_user(reviewer).action_approve_manual_gateway_order(
+                    reason
+                )
 
         audit_before = self.Job.search_count([
             ('job_type', '=', 'core_manual_maintenance'),
@@ -128,15 +136,15 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         refresh_before = self.Job.search_count([
             ('job_type', '=', 'order_import_sync'),
         ])
-        binding.with_user(
-            self.roles['reviewer']
-        ).action_approve_manual_gateway_order(
-            'Approved by buyer@example.invalid +971 50 123 4567'
-        )
+        approved_at = datetime(2026, 7, 17, 15, 30, 0)
+        with patch.object(fields.Datetime, 'now', return_value=approved_at):
+            binding.with_user(reviewer).action_approve_manual_gateway_order(
+                'Approved by buyer@example.invalid +971 50 123 4567'
+            )
         binding.invalidate_recordset()
-        self.assertTrue(binding.manual_gateway_approved_at)
+        self.assertEqual(binding.manual_gateway_approved_at, approved_at)
         self.assertEqual(
-            binding.manual_gateway_approved_by_uid, self.roles['reviewer'],
+            binding.manual_gateway_approved_by_uid, reviewer,
         )
         self.assertEqual(
             binding.manual_gateway_approved_shopify_updated_at,
@@ -153,7 +161,7 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         ]), audit_before + 1)
         logs = self.JobLog.search([('job_id', '=', audits.id)])
         self.assertEqual(len(logs), 1)
-        self.assertEqual(logs.actor_uid, self.roles['reviewer'])
+        self.assertEqual(logs.actor_uid, reviewer)
         self.assertNotIn('buyer@example.invalid', logs.message)
         self.assertNotIn('123 4567', logs.message)
 
@@ -229,34 +237,102 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         self.assertEqual(binding.manual_gateway_approval_state, 'superseded')
 
     def test_atomic_rollback_when_audit_creation_fails(self):
+        EnqueueType = type(self.env['shopify.connector.job.enqueue'])
+        failure_sites = (
+            (
+                'enqueue', EnqueueType, 'enqueue',
+                UserError('enqueue unavailable'),
+            ),
+            (
+                'audit', type(self.store), '_create_lifecycle_audit_job',
+                UserError('audit unavailable'),
+            ),
+        )
+        for label, model_type, method_name, failure in failure_sites:
+            with self.subTest(failure_site=label):
+                self._configure()
+                payload = self._manual_payload(
+                    'gid://shopify/Order/AtomicRollback/%s' % label,
+                )
+                binding = self.Importer._apply_import(self.store, payload)
+                jobs_before = self.Job.search_count([])
+                logs_before = self.JobLog.search_count([])
+                with patch.object(
+                    model_type, method_name, side_effect=failure,
+                ):
+                    with self.assertRaises(UserError):
+                        binding.with_user(
+                            self.roles['reviewer']
+                        ).action_approve_manual_gateway_order('approved')
+                binding.invalidate_recordset()
+                self.assertEqual(
+                    binding.manual_gateway_approval_state, 'pending',
+                )
+                self.assertFalse(binding.manual_gateway_approved_at)
+                self.assertFalse(binding.manual_gateway_approved_by_uid)
+                self.assertEqual(self.Job.search_count([]), jobs_before)
+                self.assertEqual(self.JobLog.search_count([]), logs_before)
+
+    def test_policy_or_gateway_change_refuses_without_audit(self):
+        scenarios = (
+            ('policy', {'manual_gateway_policy': 'quotation'}, False),
+            ('gateway', {'approved_manual_gateways': 'Bank Deposit'}, False),
+            ('evidence', {}, {
+                'manual_gateway_evidence_state': 'not_manual',
+            }),
+            ('mixed', {}, {
+                'status': 'review',
+                'manual_gateway_evidence_state': 'mixed',
+            }),
+            ('non_draft', {}, 'confirm'),
+        )
+        for label, settings_values, binding_setup in scenarios:
+            with self.subTest(refusal=label):
+                self._configure()
+                payload = self._manual_payload(
+                    'gid://shopify/Order/ApprovalRefusal/%s' % label,
+                )
+                binding = self.Importer._apply_import(self.store, payload)
+                if settings_values:
+                    self.settings.write(settings_values)
+                if isinstance(binding_setup, dict):
+                    binding.sudo().write(binding_setup)
+                elif binding_setup == 'confirm':
+                    binding.sale_order_id.action_confirm()
+                jobs_before = self.Job.search_count([])
+                logs_before = self.JobLog.search_count([])
+                with self.assertRaises(UserError):
+                    binding.with_user(
+                        self.roles['admin']
+                    ).action_approve_manual_gateway_order(
+                        'stale approval evidence'
+                    )
+                binding.invalidate_recordset()
+                self.assertFalse(binding.manual_gateway_approved_at)
+                self.assertFalse(binding.manual_gateway_approved_by_uid)
+                self.assertEqual(self.Job.search_count([]), jobs_before)
+                self.assertEqual(self.JobLog.search_count([]), logs_before)
+
         self._configure()
-        payload = self._manual_payload('gid://shopify/Order/AuditRollback')
-        binding = self.Importer._apply_import(self.store, payload)
+        binding = self.Importer._apply_import(
+            self.store,
+            self._manual_payload(
+                'gid://shopify/Order/ApprovalRefusal/company',
+            ),
+        )
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Manual Approval Other Company',
+        })
+        admin = self.roles['admin']
+        admin.sudo().write({'company_ids': [(4, other_company.id)]})
         jobs_before = self.Job.search_count([])
         logs_before = self.JobLog.search_count([])
-        with patch.object(
-            type(self.store), '_create_lifecycle_audit_job',
-            side_effect=UserError('audit unavailable'),
-        ):
-            with self.assertRaises(UserError):
-                binding.with_user(
-                    self.roles['reviewer']
-                ).action_approve_manual_gateway_order('approved')
+        with self.assertRaises(AccessError):
+            binding.with_user(admin).with_company(
+                other_company
+            ).action_approve_manual_gateway_order('wrong company')
         binding.invalidate_recordset()
         self.assertFalse(binding.manual_gateway_approved_at)
         self.assertFalse(binding.manual_gateway_approved_by_uid)
         self.assertEqual(self.Job.search_count([]), jobs_before)
         self.assertEqual(self.JobLog.search_count([]), logs_before)
-
-    def test_policy_or_gateway_change_refuses_without_audit(self):
-        self._configure()
-        payload = self._manual_payload('gid://shopify/Order/PolicyRefusal')
-        binding = self.Importer._apply_import(self.store, payload)
-        before = self.JobLog.search_count([])
-        self.settings.write({'manual_gateway_policy': 'quotation'})
-        with self.assertRaises(UserError):
-            binding.with_user(
-                self.roles['admin']
-            ).action_approve_manual_gateway_order('stale policy')
-        self.assertFalse(binding.manual_gateway_approved_at)
-        self.assertEqual(self.JobLog.search_count([]), before)
