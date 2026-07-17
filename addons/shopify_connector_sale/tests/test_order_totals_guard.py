@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
@@ -208,16 +209,98 @@ class TestOrderTotalsGuard(OrderImportCase):
         )
 
     def test_basic_tax_free_order_reconciles_exactly(self):
+        team = self.env['crm.team'].create({
+            'name': 'Order Import Team',
+            'company_id': self.env.company.id,
+        })
+        partner_term = self.payment_term.copy({
+            'name': 'Partner Default Must Not Override Store Term',
+        })
+        self.fallback_partner.property_payment_term_id = partner_term
+        self.settings.write({'order_sales_team_id': team.id})
         binding = self.Importer._apply_import(self.store, self._payload())
-        self.assertEqual(binding.sale_order_id.amount_untaxed, 100.0)
-        self.assertEqual(binding.sale_order_id.amount_tax, 0.0)
-        self.assertEqual(binding.sale_order_id.amount_total, 100.0)
-        self.assertEqual(binding.sale_order_id.state, 'sale')
-        self.assertEqual(len(binding.sale_order_id.order_line), 1)
+        order = binding.sale_order_id
+        self.assertEqual(order.company_id, self.settings.order_company_id)
+        self.assertEqual(order.pricelist_id, self.settings.order_pricelist_id)
         self.assertEqual(
-            binding.sale_order_id.order_line.shopify_line_item_gid,
+            order.payment_term_id, self.settings.order_payment_term_id,
+        )
+        self.assertNotEqual(
+            order.payment_term_id,
+            self.fallback_partner.property_payment_term_id,
+        )
+        self.assertEqual(order.team_id, team)
+        self.assertEqual(order.amount_untaxed, 100.0)
+        self.assertEqual(order.amount_tax, 0.0)
+        self.assertEqual(order.amount_total, 100.0)
+        self.assertEqual(order.state, 'sale')
+        self.assertEqual(len(order.order_line), 1)
+        self.assertEqual(
+            order.order_line.shopify_line_item_gid,
             'gid://shopify/LineItem/1200',
         )
+
+        with self.assertRaises(JobHandlerError) as epd:
+            self.Importer._validate_payment_term(SimpleNamespace(
+                early_discount=True,
+                early_pay_discount_computation='mixed',
+                discount_percentage=2,
+            ))
+        self.assertEqual(
+            epd.exception.error_class, 'odoo_validation_configuration',
+        )
+        self.assertEqual(
+            epd.exception.technical_detail,
+            'unsupported_early_payment_discount_payment_term',
+        )
+
+        self.settings.write({'order_payment_term_id': False})
+        orders_before = self.env['sale.order'].search_count([])
+        bindings_before = self.Binding.search_count([])
+        with self.assertRaises(JobHandlerError) as unset_term:
+            self.Importer._apply_import(
+                self.store,
+                self._payload('gid://shopify/Order/UnsetPaymentTerm'),
+            )
+        self.assertEqual(
+            unset_term.exception.error_class,
+            'odoo_validation_configuration',
+        )
+        self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
+        self.assertEqual(self.Binding.search_count([]), bindings_before)
+        self.settings.write({'order_payment_term_id': self.payment_term.id})
+
+        self.settings.write({'order_pricelist_id': False})
+        fallback_pricelist = self.Importer._apply_import(
+            self.store,
+            self._payload('gid://shopify/Order/FallbackPricelist'),
+        ).sale_order_id.pricelist_id
+        self.assertEqual(fallback_pricelist.currency_id, self.currency)
+        self.assertIn(
+            fallback_pricelist.company_id,
+            (self.env['res.company'], self.env.company),
+        )
+        matching = self.env['product.pricelist'].search([
+            ('active', '=', True),
+            ('currency_id', '=', self.currency.id),
+            '|', ('company_id', '=', False),
+            ('company_id', '=', self.env.company.id),
+        ])
+        self.assertIn(fallback_pricelist, matching)
+        matching.write({'active': False})
+        orders_before = self.env['sale.order'].search_count([])
+        bindings_before = self.Binding.search_count([])
+        with self.assertRaises(JobHandlerError) as no_pricelist:
+            self.Importer._apply_import(
+                self.store,
+                self._payload('gid://shopify/Order/MissingPricelist'),
+            )
+        self.assertEqual(
+            no_pricelist.exception.error_class,
+            'odoo_validation_configuration',
+        )
+        self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
+        self.assertEqual(self.Binding.search_count([]), bindings_before)
 
     def test_exact_all_discount_line_is_not_double_subtracted(self):
         payload = self._payload('gid://shopify/Order/Discount')
