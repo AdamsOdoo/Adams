@@ -307,7 +307,7 @@ class TestOrderImportMappingStatic(TransactionCase):
 
     def test_exact_sudo_inventory_and_dispatch_create_guard(self):
         expected = {
-            'shopify_connector_order_binding.py': 1,
+            'shopify_connector_order_binding.py': 2,
             'shopify_connector_order_importer.py': 2,
             'shopify_connector_order_scan.py': 1,
             'shopify_connector_tax_mapping.py': 0,
@@ -333,6 +333,12 @@ class TestOrderImportMappingStatic(TransactionCase):
                     and node.func.attr == 'create'
                 ]
                 self.assertFalse(creates, (filename, class_node.name))
+        binding_source = self._source('shopify_connector_order_binding.py')
+        self.assertIn(
+            "self.sale_order_id.sudo().read(\n"
+            "            ['company_id', 'state'],",
+            binding_source,
+        )
 
     def test_manifest_dependency_graph_and_registration_contract(self):
         manifest = ast.literal_eval(
@@ -437,6 +443,35 @@ class TestOrderImportMappingStatic(TransactionCase):
             )
         self.assertEqual(caught.exception.error_class, 'concurrency_race_conflict')
 
+        with self.assertRaises(JobHandlerError) as ceiling:
+            importer._collect_connection(
+                FakeClient([]), False,
+                self.env['shopify.connector.store'], gid,
+                '2026-07-17T11:00:00Z', first, 'lineItems',
+                ORDER_LINE_ITEMS_PAGE_QUERY, 1,
+            )
+        self.assertEqual(
+            ceiling.exception.error_class, 'data_shape_schema_mismatch',
+        )
+        self.assertIn('page ceiling (1)', ceiling.exception.reason)
+
+        repeated_cursor = copy.deepcopy(second)
+        repeated_cursor['data']['order']['lineItems']['pageInfo'] = {
+            'hasNextPage': True,
+            'endCursor': 'page-1',
+        }
+        with self.assertRaises(JobHandlerError) as stalled:
+            importer._collect_connection(
+                FakeClient([repeated_cursor]), False,
+                self.env['shopify.connector.store'], gid,
+                '2026-07-17T11:00:00Z', first, 'lineItems',
+                ORDER_LINE_ITEMS_PAGE_QUERY, 100,
+            )
+        self.assertEqual(
+            stalled.exception.error_class, 'data_shape_schema_mismatch',
+        )
+        self.assertIn('cursor did not make progress', stalled.exception.reason)
+
     def test_duplicate_node_across_pages_fails_closed(self):
         importer = self.env['shopify.connector.order.importer']
         collected = []
@@ -455,6 +490,41 @@ class TestOrderImportMappingStatic(TransactionCase):
                     'node': {'id': 'gid://shopify/LineItem/Duplicate'},
                 }], collected, cursors, identities,
             )
+
+        shipping = []
+        shipping_cursors = set()
+        shipping_identities = set()
+        importer._append_page_edges(
+            'shippingLines', [
+                {'cursor': 'ship-a', 'node': {'id': None}},
+                {'cursor': 'ship-b', 'node': {'id': None}},
+            ], shipping, shipping_cursors, shipping_identities,
+        )
+        self.assertEqual(len(shipping), 2)
+        self.assertEqual(shipping_identities, set())
+
+        discounts = []
+        discount_cursors = set()
+        discount_identities = set()
+        importer._append_page_edges(
+            'discountApplications', [{
+                'cursor': 'discount-a',
+                'node': {'__typename': 'DiscountCodeApplication', 'index': 0},
+            }], discounts, discount_cursors, discount_identities,
+        )
+        with self.assertRaises(JobHandlerError) as repeated_discount:
+            importer._append_page_edges(
+                'discountApplications', [{
+                    'cursor': 'discount-b',
+                    'node': {
+                        '__typename': 'DiscountCodeApplication', 'index': 0,
+                    },
+                }], discounts, discount_cursors, discount_identities,
+            )
+        self.assertEqual(
+            repeated_discount.exception.error_class,
+            'data_shape_schema_mismatch',
+        )
 
 
 class TestOrderImportMappingFunctional(OrderImportCase):
@@ -492,6 +562,96 @@ class TestOrderImportMappingFunctional(OrderImportCase):
         self.assertEqual(second.default_code, 'SHOPIFY-CUSTOM')
         self.assertIn('store %d' % self.store.id, first.name)
         self.assertIn('store %d' % second_store.id, second.name)
+
+        custom_payload = self._payload('gid://shopify/Order/CustomLine')
+        custom_item = custom_payload['line_items'][0]
+        custom_item.update({
+            'variant': None,
+            'product': None,
+            'sku': '',
+            'title': 'Merchant Custom Line',
+            'variantTitle': None,
+        })
+        custom = self.Importer._apply_import(self.store, custom_payload)
+        self.assertEqual(custom.sale_order_id.order_line.product_id, first)
+        self.assertEqual(
+            custom.sale_order_id.order_line.name, 'Merchant Custom Line',
+        )
+
+        gift_payload = self._payload('gid://shopify/Order/GiftCardLine')
+        gift_item = gift_payload['line_items'][0]
+        gift_item.update({
+            'variant': None,
+            'product': None,
+            'sku': '',
+            'isGiftCard': True,
+            'title': 'Gift Card',
+            'variantTitle': None,
+        })
+        gift_job = self._job(target=gift_payload['id'])
+        gift = self.Importer._apply_import(
+            self.store, gift_payload, job=gift_job,
+        )
+        self.assertEqual(gift.sale_order_id.order_line.product_id, first)
+        gift_logs = self.JobLog.search([
+            ('job_id', '=', gift_job.id),
+            ('event_type', '=', 'note'),
+        ])
+        self.assertEqual(len(gift_logs), 1)
+        self.assertIn('no gift-card accounting', gift_logs.message)
+        self.assertNotIn('Gift Card', gift_logs.technical_detail)
+
+        missing_payload = self._payload(
+            'gid://shopify/Order/MissingProductMapping',
+        )
+        missing_payload['line_items'][0]['variant'] = {
+            'id': 'gid://shopify/ProductVariant/MissingOrderMapping',
+        }
+        missing_payload['line_items'][0]['product'] = {
+            'id': 'gid://shopify/Product/MissingOrderMapping',
+        }
+        orders_before = self.env['sale.order'].search_count([])
+        bindings_before = self.Binding.search_count([])
+        with self.assertRaises(JobHandlerError) as missing:
+            self.Importer._apply_import(self.store, missing_payload)
+        self.assertEqual(missing.exception.error_class, 'mapping_missing')
+        self.assertIn(
+            'gid://shopify/ProductVariant/MissingOrderMapping',
+            missing.exception.technical_detail,
+        )
+        self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
+        self.assertEqual(self.Binding.search_count([]), bindings_before)
+
+        mapped_template = self.env['product.template'].create({
+            'name': 'Resolved Missing Order Product',
+            'type': 'service',
+            'company_id': self.env.company.id,
+            'list_price': 100.0,
+        })
+        mapped_template_binding = self.env[
+            'shopify.connector.product.template.binding'
+        ].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/MissingOrderMapping',
+            'product_template_id': mapped_template.id,
+        })
+        self.env[
+            'shopify.connector.product.variant.binding'
+        ].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': (
+                'gid://shopify/ProductVariant/MissingOrderMapping'
+            ),
+            'product_variant_id': mapped_template.product_variant_id.id,
+            'product_template_binding_id': mapped_template_binding.id,
+        })
+        resolved = self.Importer._apply_import(self.store, missing_payload)
+        self.assertEqual(
+            resolved.sale_order_id.order_line.product_id,
+            mapped_template.product_variant_id,
+        )
+        self.assertEqual(self.env['sale.order'].search_count([]), orders_before + 1)
+        self.assertEqual(self.Binding.search_count([]), bindings_before + 1)
 
     def test_one_hundred_line_order_imports_without_truncation(self):
         payload = self._payload('gid://shopify/Order/HundredLines')
