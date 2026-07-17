@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from odoo import fields
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
@@ -156,6 +156,21 @@ class TestOrderWatermarkBackfill(OrderImportCase):
         logs_before = self.JobLog.search_count([])
         orders_before = self.env['sale.order'].search_count([])
         bindings_before = self.Binding.search_count([])
+        for role in ('auditor', 'operator', 'reviewer'):
+            user = self.roles[role]
+            with self.assertRaises(AccessError, msg=role):
+                self.env[
+                    'shopify.connector.order.scan'
+                ].with_user(user).preview_backfill(
+                    self.store.with_user(user), '2026-07-17 00:00:00',
+                    '2026-07-18 00:00:00', job.with_user(user),
+                )
+            self.assertEqual(self.Job.search_count([]), jobs_before)
+            self.assertEqual(self.JobLog.search_count([]), logs_before)
+            self.assertEqual(
+                self.env['sale.order'].search_count([]), orders_before,
+            )
+            self.assertEqual(self.Binding.search_count([]), bindings_before)
         with self._patch_bodies([self._body(nodes)]):
             result = self.env[
                 'shopify.connector.order.scan'
@@ -234,6 +249,18 @@ class TestOrderWatermarkBackfill(OrderImportCase):
                         confirmation=confirmation,
                     )
             self.assertEqual(self.Job.search_count([]), before)
+
+        self.store.sudo().write({
+            'connection_generation': self.store.connection_generation + 1,
+        })
+        with self._patch_bodies([self._body(nodes)]):
+            with self.assertRaises(UserError):
+                Scan.confirm_backfill(
+                    self.store, '2026-07-17 00:00:00',
+                    '2026-07-18 00:00:00', job,
+                    confirmation=preview['confirmation_token'],
+                )
+        self.assertEqual(self.Job.search_count([]), before)
 
     def test_read_all_orders_honesty_never_silently_truncates(self):
         Scan = self.env['shopify.connector.order.scan']
