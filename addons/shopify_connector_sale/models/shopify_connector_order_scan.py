@@ -516,7 +516,12 @@ class ShopifyConnectorJobDispatchOrderScanExtension(models.AbstractModel):
 
     @api.model
     def _handle_order_import_scan(self, job):
-        self.env['shopify.connector.order.scan'].run_scan(job)
+        # One savepoint spans enumeration, child-job enqueue, page logs, and
+        # checkpoint advancement. The dispatcher may catch a classified failure
+        # and commit its routed job state, but no partial scan side effect may
+        # survive that failure.
+        with self.env.cr.savepoint():
+            self.env['shopify.connector.order.scan'].run_scan(job)
 
 
 class ShopifyConnectorStoreOrderScanExtension(models.Model):
