@@ -4,10 +4,16 @@ import threading
 import uuid
 from unittest.mock import patch
 
+from psycopg2 import IntegrityError
+
 from odoo import SUPERUSER_ID, api
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
+
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
+)
 
 from .test_order_import_mapping import OrderImportCase
 
@@ -79,7 +85,7 @@ class TestOrderDuplicatePrevention(OrderImportCase):
         binding = self.Importer._apply_import(
             self.store, self._payload('gid://shopify/Order/BindingAnchor'),
         )
-        with self.assertRaises(Exception):
+        with self.assertRaises(IntegrityError):
             with self.env.cr.savepoint():
                 self.Binding.sudo().create({
                     'store_id': self.store.id,
@@ -345,8 +351,15 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
     def test_two_connections_return_one_scan_job(self):
         dbname = self.env.cr.dbname
         store_id, settings_id = self._setup_committed_store(dbname)
-        barrier = threading.Barrier(2)
+        start_barrier = threading.Barrier(2)
+        enqueue_barrier = threading.Barrier(2)
         results = queue.Queue()
+        EnqueueType = type(self.env['shopify.connector.job.enqueue'])
+        real_enqueue = EnqueueType.enqueue
+
+        def synchronized_enqueue(service, *args, **kwargs):
+            enqueue_barrier.wait(timeout=10)
+            return real_enqueue(service, *args, **kwargs)
 
         def worker():
             cr = None
@@ -354,9 +367,9 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 cr = self._open(dbname)
                 env = api.Environment(cr, SUPERUSER_ID, {})
                 store = env['shopify.connector.store'].browse(store_id)
-                barrier.wait(timeout=10)
+                start_barrier.wait(timeout=10)
                 job = store._enqueue_order_scan('manual_sync')
-                job_id = job.id
+                job_id = job.id if job else False
                 cr.commit()
                 results.put(('ok', job_id))
             except BaseException as exc:
@@ -377,15 +390,20 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
             # bounded worker window; every database cursor, transaction,
             # unique constraint, and enqueue call remains genuine.
             with patch.object(type(self.registry), '_lock', threading.RLock()):
-                for thread in threads:
-                    thread.start()
-                for thread in threads:
-                    thread.join(timeout=self.BOUND_SECONDS)
+                with patch.object(
+                    EnqueueType, 'enqueue', new=synchronized_enqueue,
+                ):
+                    for thread in threads:
+                        thread.start()
+                    for thread in threads:
+                        thread.join(timeout=self.BOUND_SECONDS)
             self.assertFalse(any(thread.is_alive() for thread in threads))
             findings = [results.get_nowait() for _ in range(results.qsize())]
             self.assertEqual(len(findings), 2)
             self.assertTrue(all(kind == 'ok' for kind, _value in findings), findings)
-            self.assertEqual(len({value for _kind, value in findings}), 1)
+            values = [value for _kind, value in findings]
+            self.assertEqual(sum(bool(value) for value in values), 1, findings)
+            self.assertIn(False, values)
             cr = self._open(dbname)
             try:
                 cr.execute(
@@ -405,8 +423,18 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
     def test_two_connections_create_one_permanent_binding_and_sale_order(self):
         dbname = self.env.cr.dbname
         fixture = self._setup_committed_import_fixture(dbname)
-        barrier = threading.Barrier(2)
+        start_barrier = threading.Barrier(2)
+        creation_barrier = threading.Barrier(2)
         results = queue.Queue()
+        ImporterType = type(
+            self.env['shopify.connector.order.importer']
+        )
+        real_precreation_gates = ImporterType._precreation_gates
+
+        def synchronized_precreation_gates(service, payload, settings):
+            result = real_precreation_gates(service, payload, settings)
+            creation_barrier.wait(timeout=10)
+            return result
 
         def worker():
             cr = None
@@ -416,13 +444,17 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 store = env['shopify.connector.store'].browse(
                     fixture['store_id']
                 )
-                barrier.wait(timeout=10)
+                start_barrier.wait(timeout=10)
                 binding = env[
                     'shopify.connector.order.importer'
                 ]._apply_import(store, copy.deepcopy(fixture['payload']))
                 result = (binding.id, binding.sale_order_id.id)
                 cr.commit()
                 results.put(('ok', result))
+            except JobHandlerError as exc:
+                if cr:
+                    cr.rollback()
+                results.put(('conflict', exc.error_class))
             except BaseException as exc:
                 if cr:
                     cr.rollback()
@@ -434,15 +466,28 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
         threads = [threading.Thread(target=worker, daemon=True) for _ in range(2)]
         try:
             with patch.object(type(self.registry), '_lock', threading.RLock()):
-                for thread in threads:
-                    thread.start()
-                for thread in threads:
-                    thread.join(timeout=self.BOUND_SECONDS)
+                with patch.object(
+                    ImporterType, '_precreation_gates',
+                    new=synchronized_precreation_gates,
+                ):
+                    for thread in threads:
+                        thread.start()
+                    for thread in threads:
+                        thread.join(timeout=self.BOUND_SECONDS)
             self.assertFalse(any(thread.is_alive() for thread in threads))
             findings = [results.get_nowait() for _ in range(results.qsize())]
             self.assertEqual(len(findings), 2)
-            self.assertTrue(all(kind == 'ok' for kind, _value in findings), findings)
-            identities = {value for _kind, value in findings}
+            self.assertEqual(
+                sorted(kind for kind, _value in findings),
+                ['conflict', 'ok'],
+                findings,
+            )
+            self.assertEqual([
+                value for kind, value in findings if kind == 'conflict'
+            ], ['concurrency_race_conflict'])
+            identities = {
+                value for kind, value in findings if kind == 'ok'
+            }
             self.assertEqual(len(identities), 1, findings)
             cr = self._open(dbname)
             try:
