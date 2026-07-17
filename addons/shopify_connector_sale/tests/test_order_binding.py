@@ -1,5 +1,7 @@
+from psycopg2 import IntegrityError
+
 from odoo import fields
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tools import mute_logger
 
 from .test_order_import_mapping import OrderImportCase
@@ -98,22 +100,29 @@ class TestOrderBinding(OrderImportCase):
         self.Binding._assert_binding_field_classification()
 
     def test_required_fields_and_uniqueness(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(IntegrityError):
             with self.env.cr.savepoint():
                 self.Binding.sudo().create({
                     'shopify_gid': 'gid://shopify/Order/MissingStore',
                     'sale_order_id': self._draft_order('missing-store').id,
                 })
         first = self._binding('gid://shopify/Order/Unique')
+        original_company = self.settings.order_company_id
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Order Binding Immutable Company',
+        })
+        with self.assertRaises(ValidationError):
+            self.settings.write({'order_company_id': other_company.id})
+        self.assertEqual(self.settings.order_company_id, original_company)
         with mute_logger('odoo.sql_db'):
-            with self.assertRaises(Exception):
+            with self.assertRaises(IntegrityError):
                 with self.env.cr.savepoint():
                     self.Binding.sudo().create({
                         'store_id': self.store.id,
                         'shopify_gid': first.shopify_gid,
                         'sale_order_id': self._draft_order('duplicate-gid').id,
                     })
-            with self.assertRaises(Exception):
+            with self.assertRaises(IntegrityError):
                 with self.env.cr.savepoint():
                     self.Binding.sudo().create({
                         'store_id': self.store.id,
@@ -173,4 +182,3 @@ class TestOrderBinding(OrderImportCase):
             ]),
             audits_before,
         )
-
