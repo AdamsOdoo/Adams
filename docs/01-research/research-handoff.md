@@ -1,3 +1,92 @@
+### Wave 2 gate correction — compact handoff (2026-07-17, same day as the gate merge)
+
+- **Branch / PR:** `claude/wave-2-gate-correction`; PR → `mvp/program-integration`,
+  see this entry's own commit for the exact number once opened.
+- **Files changed:** `docs/07-implementation-plan/wave-2-definition-of-ready.md`,
+  `docs/07-implementation-plan/task-012-order-import-implementation-packet.md`,
+  `docs/07-implementation-plan/area-6-sync-triggers-implementation-packet.md`,
+  `docs/04-decisions/DEC-035-wave-2-open-question-dispositions.md`,
+  `docs/06-prompts/sol-wave-2-order-import-locked-prompt.md`,
+  `docs/07-implementation-plan/mvp-program-state.md`.
+- **What changed / residue fixed:** a post-merge control-room re-review of
+  the just-merged Wave 2 gate (PR #174 comments `5000101837`/`5000111557`)
+  found eight current-contract contradictions and fixed all eight in this
+  session, with no product-decision or scope change: (1) stale
+  tax-auto-create test-description wording corrected to explicit-mapping-
+  only; (2) the missing `order_scheduled_sync_enabled` settings field added
+  to every exact inventory that omitted it; (3) the "four new model files"
+  count corrected to five, with a mandatory static import-registration
+  test added; (4) `shopify.connector.tax.mapping`'s ACL corrected from the
+  customer-binding pattern to Administrator-create/write-only; (5) a
+  complete `action_approve_manual_gateway_order(reason)` backend contract
+  defined (permission mapping, four new protected provenance fields,
+  atomicity, idempotency, evidence-refresh-before-confirm, full test
+  matrix) — the accepted `manual_gateway_policy=require_approval` decision
+  previously had no implementation mechanism; (6) stale "tip mapping"/vague
+  "metadata" test wording replaced with the packet's own actual
+  nonzero-tip-fail-closed and exact-allowlist behavior; (7) the rollback
+  narrative rewritten into two explicit, technically accurate modes
+  (pre-production snapshot restore; forward-disable preserving imported
+  data), removing the false claim that a Git revert alone drops database
+  tables/columns; (8) the locked prompt's ad hoc SHA fill-in instruction
+  replaced with the standard `<EXACT_SHA_AT_ISSUANCE>` placeholder
+  convention. Full before/after record: DEC-035's new "Correction addendum
+  (2026-07-17)" section.
+- **Items deferred:** None — all eight findings from both review comments
+  were in scope and closed in this same session.
+- **Learning feedback loop:**
+  - New issues discovered: the eight contradictions above; all were
+    latent since the original gate session (stale wording never
+    reconciled against later-decided text; two genuine implementation
+    gaps — the settings field and the approval action — that the original
+    exact-codebase preflight's 14-agent fan-out did not surface, since
+    neither existed as a named requirement anywhere for it to check
+    against).
+  - Repeated issue patterns: a recurring failure mode across this
+    program — a test-file "purpose" description written early and never
+    re-synchronized when the underlying design decision changed later in
+    the same document (this is the second time, after the original Task
+    012 packet's own internal confirmation-policy contradiction, that a
+    stale early-draft description survived a later correcting decision).
+    Worth a standing rule: whenever a packet's design decision changes, a
+    control-room reviewer should grep the same document's own test/DoD
+    sections for the old vocabulary, not just downstream documents.
+  - Rules/checklists updated: none formally (no CLAUDE.md/quality-loop
+    edit authorized in this docs-only correction session) — the pattern
+    above is logged here for a future session to consider promoting into
+    `../05-qa/quality-feedback-loop.md`.
+  - New rejected approaches: none.
+  - New technical debt: none introduced; none discovered beyond what
+    DEC-035's addendum already records as closed.
+  - Architecture concerns: none new — the manual-gateway approval gap
+    (finding 5) is exactly the kind of "policy value accepted, mechanism
+    never specified" gap this note flags for future gate sessions to
+    watch for when a product-policy document and an implementation packet
+    are accepted in separate sessions.
+  - Tests or review gates needed: already fully specified by this
+    session's own corrections (DoR §2.4/§2.6, locked prompt §7/§8) — no
+    further gate needed beyond Sol's own wave implementation and its
+    control-room wave review.
+  - Should future prompts change? No — the existing wave-gate and
+    wave-review templates already provide the right structure; this was a
+    quality gap in execution (incomplete cross-referencing during the
+    original gate session), not a template gap.
+- **Quality gate confirmation:** handoff updated (this entry) · feedback
+  loop checked (above) · learning captured in the correct file (this
+  entry; DEC-035's addendum is the technical record) · no rejected
+  approach to log · no technical debt to log · repeated-issue pattern
+  logged above for a future promotion into the quality-feedback-loop
+  document, not yet escalated into a binding rule (docs-only correction
+  session scope) — all YES.
+- **Next recommended session:** issue the locked Sol Wave 2 prompt
+  (`../06-prompts/sol-wave-2-order-import-locked-prompt.md`) to a fresh Sol
+  session, with the exact live `mvp/program-integration` tip verified
+  immediately before issuance and substituted for `<EXACT_SHA_AT_ISSUANCE>`.
+- **Stop condition:** stopped after this docs-only correction PR's merge
+  and the copy-ready Sol prompt was returned to the product owner; no
+  `sol/wave-2-order-import` branch was created; no implementation code was
+  written; DEC-031 Layer 2 remains unaccepted.
+
 ## 2026-07-17 — Wave 2 gate: decision-acceptance + Definition-of-Ready + Task 012/Area-6 packet re-acceptance — ACCEPTED AND MERGED (docs-only)
 
 - **Role/scope:** Claude control room (DEC-032 macro-wave model) performed

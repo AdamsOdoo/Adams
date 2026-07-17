@@ -133,10 +133,46 @@ All fetched live on 2026-07-17 from `developer.shopify.com` (shopify.dev):
 - No new PII field, masking capability, or PII-adjacent vocabulary was introduced by any disposition above.
 - No DEC-031 Layer 2 model, mutation-attempt concept, or Shopify mutation is introduced or implied by any disposition above — every disposition operates entirely within Wave 2's read-only, `remote_read_replay_safe` boundary.
 
+## Correction addendum (2026-07-17, same day)
+
+A post-merge control-room re-review of the Wave 2 gate (PR #174, comments
+[`5000101837`](https://github.com/AdamsOdoo/Adams/pull/174#issuecomment-5000101837)
+and
+[`5000111557`](https://github.com/AdamsOdoo/Adams/pull/174#issuecomment-5000111557))
+found eight current-contract contradictions between the merged gate
+documents (the Wave 2 Definition of Ready, the re-accepted Task 012/Area-6
+packets, and the locked Sol prompt) that this addendum records and closes.
+None changes a product decision, a scope boundary, or an open-question
+disposition recorded in the table above — every fix below is either a
+stale-wording correction or a genuine implementation-contract gap the
+original gate session should have specified but did not.
+
+| # | Contradiction found | Root cause | Disposition | Corrected in |
+|---|---|---|---|---|
+| C1 | DoR §2.2 row 13 and the Task 012 packet's own §6 test-file description said `test_order_import_mapping.py` covers "tax rate-match+creation+reuse" | Stale wording carried forward from an early planning draft; D-012-9 step 4 (round-6 item d6) had already **removed** tax auto-create from MVP scope well before the gate session, but the row/§6 text was never updated to match | Corrected to explicit-mapped-tax reuse only; creation/fallback/ambiguity behavior stays exclusively `test_order_tax_resolution.py`'s scope, itself explicit-mapping-only with no auto-create path anywhere | DoR row 13/15, Task 012 packet §0.8/§6, locked prompt §8.A |
+| C2 | DoR row 9/Area-6 D-A6-3 required `order_scheduled_sync_enabled` to gate the order-scan cron, but DoR row 6's frozen exact settings list and the locked prompt's binding-decisions section never named it | The settings-inventory row (6) was written before D-A6-3's generic `<domain>_scheduled_sync_enabled` pattern was pinned to an exact Wave-2 field name; the two sections were never cross-checked | Added `order_scheduled_sync_enabled` (Boolean, default `False`) to the settings inventory everywhere it is exhaustively listed | DoR row 6/§2.4 criterion 9, Task 012 packet §0.1, Area-6 §0.5, locked prompt §5.J/§7 criterion 14 |
+| C3 | DoR row 7 said `models/__init__.py` registers "the four new model files (rows 1–5)" — rows 1–5 name five files | Arithmetic/copy error at authoring time | Corrected to "five"; added a mandatory static import-registration test so an omission fails preflight, not runtime | DoR row 7, locked prompt §8.A |
+| C4 | DoR row 8 gave `shopify.connector.tax.mapping` the same auditor/operator/reviewer/admin CRUD pattern as the ordinary customer-binding model, granting Operator create and Reviewer write | The row was drafted by copy-adapting the order-binding ACL row without re-deriving tax-mapping's own risk profile; tax mapping is configuration (it decides which `account.tax` a Shopify tax fingerprint resolves to), not an operational binding, and the accepted roles model treats configuration as Administrator-tier | Corrected to Administrator-create/write-only (auditor/operator/reviewer read-only, no unlink for any role); added the four-role negative-ACL test requirement | DoR row 8/§2.4 criterion 10, Task 012 packet §0.8/§5, locked prompt §3 clarification/§5.K/§8.E |
+| C5 | The accepted `manual_gateway_policy = require_approval` product decision (binding since PR #173) had no defined backend approval action, permission mapping, provenance fields, audit behavior, or test contract anywhere in any Wave 2 document | The lifecycle-policy document accepted the *policy value* but no implementation packet ever specified the *mechanism* that policy value requires; the gap was not discovered until this post-merge re-review | Defined `action_approve_manual_gateway_order(reason)` on the already-allowed order-binding file, with a full permission/provenance/audit/atomicity/idempotency/evidence-refresh contract and four new protected provenance fields (`manual_gateway_approval_state`/`manual_gateway_approved_by_uid`/`manual_gateway_approved_at`/`manual_gateway_approved_shopify_updated_at`) | DoR row 1/§2.4 criterion 11, Task 012 packet §0.8/§5 (full contract), locked prompt §5.B/§7 criterion 16/§8.E |
+| C6 | DoR row 13 and the Task 012 packet's §6 also said "tip mapping" (nonzero tips are in fact a hard fail-closed skip, never mapped) and vague "metadata" (the packet's own D-012-2/D-012-8/§4.4 data-minimization rules already name an exact allowlist) | Same stale-wording root cause as C1 — the test-description prose was never reconciled against the packet's own, already-binding financial-gate and data-minimization text | Corrected to zero-tip eligibility / nonzero-tip fail-closed (`unsupported_tip_tax_treatment`) and an exact allowlisted-fields description with mandatory negative query-shape assertions for every excluded field | DoR row 13, Task 012 packet §0.8/§6, locked prompt §8.A |
+| C7 | DoR §2.8, the Task 012 packet §8, and the locked prompt §9 all described rollback as a "single-wave-PR revert" that "drops" order-binding/tax-mapping tables and settings fields | Conflated a source-level Git revert (removes files only) with a database schema change (requires a module upgrade or migration to actually run); `shopify_connector_sale` is also an existing shared module carrying the merged Task 011 customer-import capability, which an uninstall-based rollback would incorrectly remove too | Replaced with two explicit modes — (A) exact pre-production database-backup restore, (B) forward-disable in production preserving imported data — and an explicit statement that a Git revert alone touches no database; any destructive schema removal requires its own separately reviewed migration | DoR §2.8/§2.9 (full rewrite, now the authoritative rollback record for the wave), Task 012 packet §8, locked prompt §9 |
+| C8 | The locked prompt's exact-starting-SHA line used an ad hoc `<fill in the exact post-gate-merge SHA…>` instruction rather than the standard placeholder convention | Authored before the issuance-SHA clarification (PR #174 comment `5000111557`) was posted | Replaced with the literal `<EXACT_SHA_AT_ISSUANCE>` placeholder plus the no-commit-between-verification-and-issuance instruction | Locked prompt, top identity line |
+
+**Consequences of this addendum:** none of C1–C8 reopens or weakens any
+disposition in the table above; none introduces a new PII field, masking
+capability, DEC-031 Layer 2 seam, or Shopify mutation; the corrected
+documents remain internally consistent with each other and with the actual
+current code as of this addendum's own re-verification. Wave 2 implementation
+remained unstarted throughout this correction pass.
+
 ## Rollback
 
 Revert this record: every gate-decision/open-question line reverts to
 "Proposed," and any packet/prompt text that cites a disposition by its item
 number above becomes stale and must be reverted in the same act. No code,
 schema, or protected reference is touched by this record in either
-direction.
+direction. Reverting the "Correction addendum" section above also reverts
+DoR §2.2 rows 1/6/7/8/13/15/19, §2.4/§2.8/§2.9, the Task 012 packet's §0.8/§5/§6/§8,
+the Area-6 packet's §0.5, and the locked prompt's §3/§5/§7/§8/§9 to their
+pre-correction (contradictory) text — the same single commit must revert
+all of them together, not a subset.

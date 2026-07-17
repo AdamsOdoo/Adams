@@ -11,6 +11,21 @@
 > [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md);
 > no code is written by this acceptance act itself.
 >
+> **Correction addendum (2026-07-17, same day):** a post-merge control-room
+> re-review of this gate (PR #174 comments `5000101837`/`5000111557`) found
+> eight current-contract contradictions between this document, the locked
+> Sol prompt, and the re-accepted Task 012/Area-6 packets — a stale
+> tax-auto-create test description, a missing `order_scheduled_sync_enabled`
+> settings field, a model-registration count error, a tax-mapping ACL that
+> copied the wrong role pattern, an unspecified manual-gateway-approval
+> backend contract, stale tip/metadata test wording, an unsafe rollback
+> narrative, and an unfilled issuance-SHA placeholder. All eight are
+> corrected **in this same document** (and its companions) by a dedicated
+> docs-only correction PR — see `mvp-program-state.md`'s Sprint checkpoint
+> log for the exact PR number and merge SHA. Wave 2's substance (scope,
+> decisions, dispositions) is unchanged; only these eight contradictions
+> are fixed. Wave 2 implementation remained unstarted throughout.
+>
 > **Current program state (2026-07-17):** Wave 1 is **merged** (PR #172 merged
 > into `mvp/program-integration` via merge commit `d18f9a9997d7da574f629f834e2adb83b492cfc6`;
 > CORE-R1, LC-1, JOB-ACTIONS, SEC-1 all merged) and **SRR-03 is CLOSED**
@@ -84,25 +99,25 @@ the minimum Task 012 + Area-6 order-scan slice:
 
 | # | File | State | Purpose | Module | Covering tests | Rollback implication |
 |---|---|---|---|---|---|---|
-| 1 | `addons/shopify_connector_sale/models/shopify_connector_order_binding.py` | Create | `shopify.connector.order.binding` model (D-012-1 field table); `_odoo_binding_field_name() → 'sale_order_id'` (DEC-034 contract); `_additional_protected_binding_fields()`; `_pii_snapshot_fields()` returning an empty tuple (binding stores no PII, DEC-034/D-012-1) | `shopify_connector_sale` | `test_order_binding.py` | Delete file; `sale.order` rows survive as ordinary data (no cascade) |
-| 2 | `addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py` | Create | `_inherit 'sale.order.line'`; adds one indexed readonly `Char` `shopify_line_item_gid` (D-012-1; DEC-013 — no line-binding model) | `shopify_connector_sale` | `test_order_import_mapping.py` | Delete file; drop the additive column (no migration needed, additive-only) |
+| 1 | `addons/shopify_connector_sale/models/shopify_connector_order_binding.py` | Create | `shopify.connector.order.binding` model (D-012-1 field table); `_odoo_binding_field_name() → 'sale_order_id'` (DEC-034 contract); `_additional_protected_binding_fields()` covering, in addition to D-012-1's field table, the four manual-gateway-approval provenance fields `manual_gateway_approval_state`/`manual_gateway_approved_by_uid`/`manual_gateway_approved_at`/`manual_gateway_approved_shopify_updated_at` (§2.4 criterion 14); `_pii_snapshot_fields()` returning an empty tuple (binding stores no PII, DEC-034/D-012-1); `action_approve_manual_gateway_order(reason)` — the sanctioned manual-gateway-approval backend action (§2.4 criterion 14, full contract below) | `shopify_connector_sale` | `test_order_binding.py`, `test_order_manual_gateway_overlay.py` | Delete file; `sale.order` rows survive as ordinary data (no cascade) — see §2.8 for the two rollback modes this and every other row's "Delete file" language refers to |
+| 2 | `addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py` | Create | `_inherit 'sale.order.line'`; adds one indexed readonly `Char` `shopify_line_item_gid` (D-012-1; DEC-013 — no line-binding model) | `shopify_connector_sale` | `test_order_import_mapping.py` | Delete file; the additive column has no code path depending on it once removed — becomes orphaned until a follow-up module upgrade/uninstall drops it (see §2.8; a source-level revert alone does not touch the database) |
 | 3 | `addons/shopify_connector_sale/models/shopify_connector_order_importer.py` | Create | `shopify.connector.order.importer` AbstractModel service (`import_order_sync`); the four `ORDER_*_QUERY` GraphQL read constants (§4 of the closure); D-012-2..12 financial/tax/customer/product resolution logic; the `job_type='order_import_sync'` `selection_add`+LC-1 `ondelete` seam, `_domain_flag_for_job_type() → 'sale_domain_enabled'` (DEC-035 EQ-PF-1), `_get_handlers()`/`_get_replay_policies() → remote_read_replay_safe` dispatch-extension classes, mirroring `shopify_connector_customer_importer.py`'s seam shape exactly; a module-local AST guard asserting `execute_business`-only usage (DEC-035 EQ-PF-2) | `shopify_connector_sale` | `test_order_import_mapping.py`, `test_order_totals_guard.py`, `test_order_tax_resolution.py`, `test_order_customer_resolution.py`, `test_order_duplicate_prevention.py` | Delete file; no running job references a handler that no longer exists once LC-1's `_reassign_to_historic_job_type` has converted any in-flight rows |
-| 4 | `addons/shopify_connector_sale/models/shopify_connector_tax_mapping.py` | Create | `shopify.connector.tax.mapping` model (D-012-9 §5.2/§5.5): `store_id`, `shopify_tax_evidence_key` (versioned SHA-256, `UNIQUE(store_id, shopify_tax_evidence_key)`), `account_tax_id` (restrict); company-scope `@api.constrains` | `shopify_connector_sale` | `test_order_tax_resolution.py` | Delete file/table; no FK from `sale.order`/`account.tax` depends on it surviving |
+| 4 | `addons/shopify_connector_sale/models/shopify_connector_tax_mapping.py` | Create | `shopify.connector.tax.mapping` model (D-012-9 §5.2/§5.5): `store_id`, `shopify_tax_evidence_key` (versioned SHA-256, `UNIQUE(store_id, shopify_tax_evidence_key)`), `account_tax_id` (restrict); company-scope `@api.constrains`. **Configuration model, not an ordinary operational binding — Administrator-only create/write** (§2.2 row 8 below), not the customer-binding read/write/create pattern | `shopify_connector_sale` | `test_order_tax_resolution.py` | Delete file; no FK from `sale.order`/`account.tax` depends on it surviving; the table itself becomes orphaned until a follow-up upgrade/uninstall drops it (see §2.8) |
 | 5 | `addons/shopify_connector_sale/models/shopify_connector_order_scan.py` | Create | Area-6 order-scan slice only (D-A6-2/3/4/6 as applied to the order domain): `job_type='order_import_scan'` `selection_add`+LC-1 `ondelete`, `_domain_flag_for_job_type() → 'sale_domain_enabled'`; scan-enumeration handler (`updated_at:>checkpoint−overlap`, `sortKey: UPDATED_AT` — confirmed live, DEC-035 item 10); `action_sync_orders_now()` (manual, `group_shopify_connector_operator`+); `action_sync_selected()` re-enqueue on the order binding; Administrator backfill preview + confirmed-enqueue service methods (PD-RB-8, backend only — no wizard view); watermark advance/hold-back on `sale_order_last_import_checkpoint_at`; collision-safe enqueue via `shopify_target_gid='scan:order'` (D-A6-2). **Does not** implement `product_import_scan`/`customer_import_scan` — explicitly out of this slice (see §1). **Does not** implement `action_manual_retry`/`action_cancel`/`action_resolve_manual_review` — already-merged JOB-ACTIONS scope, only called, never reimplemented. Its own AST guard asserting `execute_business`-only usage (DEC-035 EQ-PF-2) | `shopify_connector_sale` | `test_order_scan_triggers.py` | Delete file; cron/ACL removed by the manifest change (row 10); LC-1 conversion handles any in-flight historic rows |
-| 6 | `addons/shopify_connector_sale/models/shopify_connector_store_settings.py` | Modify (existing file, additive `_inherit` fields only) | Add: `order_confirmation_policy` (Selection, default `paid_only` — DEC-035 item 11), `manual_gateway_policy` (default `require_approval`), `approved_manual_gateways`, `order_import_window` (default 30 d), `pending_wait_expiry` (default 24 h / min 1 h / max 7 d — PD-B1), `order_import_include_test`, `order_company_id` (default `env.company`), `order_pricelist_id`, `order_sales_team_id`, `order_payment_term_id` (readiness-blocking while unset), `sale_order_last_import_checkpoint_at` (now the order-domain watermark seed, PD-RB-4) | `shopify_connector_sale` | `test_order_confirmation_policy.py`, `test_order_manual_gateway_overlay.py`, `test_order_watermark_backfill.py` | Revert file; additive fields only, no migration required |
-| 7 | `addons/shopify_connector_sale/models/__init__.py` | Modify | Register the four new model files (rows 1–5) | `shopify_connector_sale` | N/A (import-only) | Revert file |
-| 8 | `addons/shopify_connector_sale/security/ir.model.access.csv` | Modify | Add auditor/operator/reviewer/admin rows for `shopify.connector.order.binding` and `shopify.connector.tax.mapping`, exactly the customer-binding pattern (`1,0,0,0` / `1,0,1,0` / `1,1,0,0` / `1,1,1,0`); no new group | `shopify_connector_sale` | `test_order_binding.py` (ACL assertions) | Revert file; no group/model removed |
+| 6 | `addons/shopify_connector_sale/models/shopify_connector_store_settings.py` | Modify (existing file, additive `_inherit` fields only) | Add: `order_confirmation_policy` (Selection, default `paid_only` — DEC-035 item 11), `manual_gateway_policy` (default `require_approval`), `approved_manual_gateways`, `order_import_window` (default 30 d), `pending_wait_expiry` (default 24 h / min 1 h / max 7 d — PD-B1), `order_import_include_test`, `order_company_id` (default `env.company`), `order_pricelist_id`, `order_sales_team_id`, `order_payment_term_id` (readiness-blocking while unset), `sale_order_last_import_checkpoint_at` (now the order-domain watermark seed, PD-RB-4), **`order_scheduled_sync_enabled`** (Boolean, default `False`, per-store, gates the Area-6 order-scan cron alongside `sale_domain_enabled` — row 9/D-A6-3; Administrator-only configuration is already structural: `shopify.connector.store.settings`'s existing model-level ACL grants write only to `group_shopify_connector_admin`, so this field needs no new field-level `groups=`) | `shopify_connector_sale` | `test_order_confirmation_policy.py`, `test_order_manual_gateway_overlay.py`, `test_order_watermark_backfill.py`, `test_order_scan_triggers.py` | Revert file; additive fields only, no migration required |
+| 7 | `addons/shopify_connector_sale/models/__init__.py` | Modify | Register the **five** new model files (rows 1–5: `shopify_connector_order_binding`, `shopify_connector_sale_order_line`, `shopify_connector_order_importer`, `shopify_connector_tax_mapping`, `shopify_connector_order_scan`) — a static import-registration test (§2.6/matrix A) must assert all five imports are present, so an omitted import fails the wave's own static preflight rather than surfacing only at runtime | `shopify_connector_sale` | N/A (import-only; covered indirectly by the static import-registration test) | Revert file |
+| 8 | `addons/shopify_connector_sale/security/ir.model.access.csv` | Modify | Two distinct ACL patterns, not one. **`shopify.connector.order.binding`** (an ordinary operational binding): auditor/operator/reviewer/admin rows exactly the customer-binding pattern (`1,0,0,0` / `1,0,1,0` / `1,1,0,0` / `1,1,1,0`). **`shopify.connector.tax.mapping`** (configuration, not an operational binding — it governs which `account.tax` a Shopify tax fingerprint resolves to): auditor/operator/reviewer **read-only** (`1,0,0,0` for all three), admin **read/write/create** (`1,1,1,0`) — Operator does **not** get create and Reviewer does **not** get write, unlike the binding pattern; no unlink for either model, no new group | `shopify_connector_sale` | `test_order_binding.py` (order-binding ACL assertions), `test_order_tax_resolution.py` (tax-mapping four-role ACL matrix: Administrator create/write succeed; Auditor/Operator/Reviewer create and write denied; unlink denied for all four; wrong-company/inactive/incompatible-tax mapping denied even for Administrator) | Revert file; no group/model removed |
 | 9 | `addons/shopify_connector_sale/data/shopify_connector_sale_cron.xml` | Create | One `ir.cron`, order domain only, `noupdate="1"`, interval 15 min (D-A6-3), gated on `sale_domain_enabled` AND the new `order_scheduled_sync_enabled` settings boolean (default False, opt-in) | `shopify_connector_sale` | `test_order_scan_triggers.py` | Delete file; cron removed cleanly (no data depends on its `ir.model.data` XML ID surviving) |
 | 10 | `addons/shopify_connector_sale/__manifest__.py` | Modify | Version bump; `depends` becomes `['shopify_connector_core', 'shopify_connector_product', 'sale']` (ARCH PD-3); add the new cron data file to `data` | `shopify_connector_sale` | N/A (manifest; covered indirectly by install/upgrade tests) | Revert file; version rollback per LC-1's additive-migration posture |
 | 11 | `addons/shopify_connector_sale/migrations/<next-version>/post-migrate.py` | Create, only if a genuine schema-affecting default/backfill is needed (e.g. seeding `order_confirmation_policy` on existing stores) | Additive/idempotent migration, mirroring core's `19.0.1.8.0/post-migrate.py` pattern exactly | `shopify_connector_sale` | Covered by lifecycle/upgrade runtime evidence, not a dedicated unit test | Delete file; no destructive statement permitted in it (enforced by review, not by an automated guard) |
 | 12 | `addons/shopify_connector_sale/tests/test_order_binding.py` | Create | Schema/constraints/mixin, dual uniqueness (`UNIQUE(store_id, shopify_gid)` + `UNIQUE(store_id, sale_order_id)`), restrict FKs, exact protected-field-set assertion (mirrors `test_customer_binding.py`) | `shopify_connector_sale` | Self | Delete file |
-| 13 | `addons/shopify_connector_sale/tests/test_order_import_mapping.py` | Create | Happy path incl. confirmation policy, lines/shipping/tip mapping, tax rate-match+creation+reuse, addresses/dedup, metadata, guest paths, custom/gift-card lines, UTC parsing | `shopify_connector_sale` | Self | Delete file |
+| 13 | `addons/shopify_connector_sale/tests/test_order_import_mapping.py` | Create | Happy path incl. confirmation policy, lines/shipping mapping; **zero-tip eligibility and nonzero-tip fail-closed (`unsupported_tip_tax_treatment`, no SO, no "Shopify Tip" line)**; **explicit mapped-tax reuse only — no automatic tax creation, no same-rate fallback** (creation/fallback behavior is `test_order_tax_resolution.py`'s exclusive scope, not this file's); addresses/dedup; **exact allowlisted order-evidence fields only, with negative assertions that every data-minimized/excluded field (`note`, `tags`, `sourceName`, line `customAttributes`, line `vendor`, `customer.displayName`, `customer.defaultAddress`, `DiscountCodeApplication.code`, `ShippingLine.code`, `ShippingLine.custom`, `AdditionalFee.name`) is absent from every query constant and never stored/logged**; guest/customer resolution paths; custom/gift-card line handling; shipping line handling; UTC timestamp parsing; confirmation-policy happy path | `shopify_connector_sale` | Self | Delete file |
 | 14 | `addons/shopify_connector_sale/tests/test_order_totals_guard.py` | Create | Component/tax/total tolerance checks; six fail-closed pre-creation gate families; bounded whole-order solver (K=2/M=2/C_max=25) | `shopify_connector_sale` | Self | Delete file |
-| 15 | `addons/shopify_connector_sale/tests/test_order_tax_resolution.py` | Create | `shopify.connector.tax.mapping` explicit-mapping-only behavior; versioned evidence-key fingerprint; company-scope constraint | `shopify_connector_sale` | Self | Delete file |
+| 15 | `addons/shopify_connector_sale/tests/test_order_tax_resolution.py` | Create | `shopify.connector.tax.mapping` **explicit-mapping-only** behavior — no automatic `account.tax` creation path exists anywhere in the importer (a source/ORM-level negative assertion, not just a behavioral test) and a same-rate existing tax is surfaced only as a non-binding operator suggestion, never auto-selected; versioned evidence-key fingerprint (collision/case/whitespace/NFC cases); company-scope constraint; **four-role ACL matrix** — Administrator create/write succeed, Auditor/Operator/Reviewer create and write denied, unlink denied for all four roles, wrong-company/inactive/incompatible-tax mapping denied even for Administrator, a denied attempt leaves no row and no audit residue | `shopify_connector_sale` | Self | Delete file |
 | 16 | `addons/shopify_connector_sale/tests/test_order_duplicate_prevention.py` | Create | Order-binding sole-anchor idempotency; `operation_scope_key`/`idempotency_key` collision behavior across scan/catch-up/manual/backfill/repeated-webhook-follow-up-evidence paths | `shopify_connector_sale` | Self | Delete file |
 | 17 | `addons/shopify_connector_sale/tests/test_order_customer_resolution.py` | Create | All D-012-5 paths incl. fallback used/unset, ambiguous hold with candidate JSON (D-012-4), archived-only, recall-safety reuse | `shopify_connector_sale` | Self | Delete file |
 | 18 | `addons/shopify_connector_sale/tests/test_order_confirmation_policy.py` | Create | Full 8-state × 3-policy matrix (addendum A.3/A.4) | `shopify_connector_sale` | Self | Delete file |
-| 19 | `addons/shopify_connector_sale/tests/test_order_manual_gateway_overlay.py` | Create | Manual-gateway overlay incl. approved/unapproved gateways, card-`PENDING` never manual, mixed-transaction `status='review'` routing (DEC-035 item 5) | `shopify_connector_sale` | Self | Delete file |
+| 19 | `addons/shopify_connector_sale/tests/test_order_manual_gateway_overlay.py` | Create | Manual-gateway overlay incl. approved/unapproved gateways, card-`PENDING` never manual, mixed-transaction `status='review'` routing (DEC-035 item 5); **`action_approve_manual_gateway_order(reason)` full matrix** (§2.4 criterion 14) — Reviewer success, Administrator success, Auditor denial, Operator denial, missing/empty reason rejected, wrong store policy rejected, gateway no longer on `approved_manual_gateways` rejected, non-manual-gateway evidence rejected, mixed/ambiguous evidence rejected, non-`draft` SO rejected, stale Shopify `updatedAt` since approval rejected (forces a fresh authoritative refresh before confirming), changed financial evidence since approval routes to review instead of confirming, duplicate approval call is idempotent (no second SO, no duplicate active job), an audit-log-creation or enqueue failure rolls back the approval mutation atomically, exact actor/timestamp recorded, exactly one audit log per approval, direct create/write/clear of the four approval-provenance fields denied for all four roles via the binding mixin's existing protected-field guard | `shopify_connector_sale` | Self | Delete file |
 | 20 | `addons/shopify_connector_sale/tests/test_order_watermark_backfill.py` | Create | Watermark advance/hold-back/overlap/pagination/stale-generation refusal; backfill preview creates no jobs/records; confirmed backfill; resumability; 60-day/`read_all_orders` honesty | `shopify_connector_sale` | Self | Delete file |
 | 21 | `addons/shopify_connector_sale/tests/test_order_cod_import_readmodel.py` | Create | COD flag + ledger snapshot + three-dimension state initialization at import (PD-COD-1/3 Wave-2 slice) | `shopify_connector_sale` | Self | Delete file |
 | 22 | `addons/shopify_connector_sale/tests/test_order_scan_triggers.py` | Create | Order-scan job/cron/manual-trigger, collision-safe enqueue, `execute_business`-only AST guard (EQ-PF-2) | `shopify_connector_sale` | Self | Delete file |
@@ -204,6 +219,28 @@ behaviours:
    and no exactly-once-remote-effect claim anywhere.
 8. All existing core/product/sale tests remain green; order-scan cron and
    manual trigger enqueue idempotently (D-A6-2 collision safety).
+9. **`order_scheduled_sync_enabled`** (default `False`, Administrator-only)
+   gates the order-scan cron alongside `sale_domain_enabled` — both must be
+   true for the cron to enqueue a scan; either false, or the store not
+   `connected`, means no enqueue; the cron never executes an import inline;
+   disabling the flag stops new scheduled scans without destroying
+   already-enqueued or historical jobs.
+10. **`shopify.connector.tax.mapping`** is Administrator-create/write-only
+   (Auditor/Operator/Reviewer read-only, no unlink for any role); a
+   non-Administrator create/write attempt is denied server-side and leaves
+   no row and no audit residue.
+11. **`action_approve_manual_gateway_order(reason)`** exists on the order
+   binding, is Reviewer/Administrator-only, requires a non-empty reason,
+   requires the linked SO to remain `draft`, requires the store policy to
+   still be `require_approval`, requires the gateway to remain on
+   `approved_manual_gateways`, requires the stored evidence to still show a
+   manual gateway with no mixed/ambiguous signal, never performs a Shopify
+   mutation, enqueues an authoritative `order_import_sync` refresh rather
+   than confirming directly against possibly-stale evidence, confirms only
+   if the refreshed evidence still matches, is idempotent (no second SO, no
+   duplicate active job on a repeated call), records exactly one audit log
+   with actor/timestamp, and atomically rolls back its own mutation if audit
+   creation or the refresh enqueue fails.
 
 ### 2.5 Tests
 
@@ -252,18 +289,60 @@ unless the product owner later records a specific exception.)
 
 ### 2.8 Rollback
 
-Single-wave-PR revert against `mvp/program-integration`; drops
-order-binding/tax-mapping tables and new settings fields via DEC-030/LC-1
-lifecycle behaviour; read-only toward Shopify, so no remote state to
-unwind; Wave 3+ never depends on Wave 2 internals beyond the merged
-binding contract, so revert is self-contained.
+**A source-level Git revert of the wave PR, by itself, changes no database
+schema, no Odoo record, and no Shopify remote state — it only removes the
+Python/XML/CSV files from the codebase.** `shopify_connector_sale` is an
+existing, already-installed, shared module that also carries the merged
+Task 011 customer-import capability; "drop the tables via the revert" is
+not how Odoo or Git works and is not this wave's actual rollback mechanism.
+Two supported, explicit rollback modes, chosen based on when the need
+arises:
+
+**Mode A — exact pre-production rollback (before real orders/data
+accumulate on top of Wave 2, e.g. a failed staging validation):** take and
+identify a database backup immediately before the module upgrade that
+installs Wave 2's schema; if rollback is needed, stop connector workers,
+disable the order-scan cron, restore that pre-upgrade backup, deploy the
+pre-Wave-2 code (the Git revert), and verify customer-import capability
+(Task 011) remains intact. Because Wave 2 performs zero Shopify mutations,
+there is no remote state to compensate or unwind — the rollback is entirely
+local to the Odoo database.
+
+**Mode B — forward-disable / safe production fallback (once imported orders
+or the order-scan history must be preserved, e.g. a defect found after
+real orders have imported):** set `order_scheduled_sync_enabled = False`
+to stop new scheduled scans; quiesce or cancel any non-terminal Wave 2 jobs
+using the already-merged JOB-ACTIONS lifecycle paths
+(`action_cancel()`); leave already-imported `sale.order` records, order
+bindings, tax mappings, and audit/job history exactly as they are; leave
+the additive schema (new tables/columns/settings fields) inert rather than
+dropping it; deploy a separately reviewed corrective patch. **Do not
+uninstall `shopify_connector_sale`** as a Wave 2 rollback action — that
+would also remove the merged Task 011 customer-import capability, which
+Wave 2 does not own and must not affect. **No destructive schema removal
+(dropping a table/column, deleting an ACL XML ID, removing a settings
+field) may be performed as part of an emergency rollback** — any such
+removal requires its own separately reviewed migration, its own backup,
+and its own upgrade/uninstall/residue/rollback proof, exactly like any
+other schema-affecting change (§9 of the implementation-task-template).
+
+Wave 3+ never depends on Wave 2 internals beyond the merged binding
+contract, so either rollback mode is self-contained and does not cascade
+into later waves. The per-row "Delete file"/"drop the … column" language
+in §2.2's table above describes the eventual schema effect **once a
+follow-up module upgrade or an explicit, separately reviewed migration is
+run** — never an automatic effect of the Git-level PR revert by itself.
 
 ### 2.9 Residue audit
 
-Post-revert/uninstall: no orphan `ir.model.data`, crons, ACLs, or
-selection values (LC-1 `_reassign_to_historic_job_type` registered on all
-new job types from the start); no PII residue (bindings carry no customer
-PII per D-012-1; evidence fields non-PII per the round-5/6 closures).
+Post-**uninstall** (not post-revert — see §2.8; a source-level revert alone
+touches no database): no orphan `ir.model.data`, crons, ACLs, or selection
+values (LC-1 `_reassign_to_historic_job_type` registered on all new job
+types from the start); no PII residue (bindings carry no customer PII per
+D-012-1; evidence fields non-PII per the round-5/6 closures). Post-**Mode B
+forward-disable** (the realistic Wave 2 rollback path, per §2.8): zero
+destroyed data by design — imported orders, bindings, tax mappings, and job
+history are explicitly preserved, not a residue-audit target.
 
 ### 2.10 Definition of done
 
