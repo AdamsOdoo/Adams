@@ -63,7 +63,43 @@
   `DEC-035-wave-2-open-question-dispositions.md` (new),
   `sol-wave-2-order-import-locked-prompt.md` (new),
   `mvp-acceptance-matrix.md` (row 9), `architecture-review-log.md` (AR-054),
-  this handoff.
+  this handoff — all in PR [#174](https://github.com/AdamsOdoo/Adams/pull/174),
+  merged via merge commit `f62197b9281d6e18e4f1861d0e327738b4c3d510`, plus one
+  routine post-merge tracker-upkeep commit `836a27a` recording that SHA.
+- **Learning feedback loop** (`../05-qa/quality-feedback-loop.md` §6):
+  - New issues discovered: two exact-codebase gaps no prior packet had
+    named — no `order_domain_enabled` settings-flag extension seam in core
+    (category: incorrect/incomplete architecture assumption); no AST guard
+    yet scoping future order-domain files to `execute_business`-only
+    (category: missing test coverage, forward-looking). Both resolved and
+    recorded in DEC-035 (EQ-PF-1/EQ-PF-2) rather than left implicit.
+  - Repeated issue patterns: none at count ≥2 this session.
+  - Rules/checklists updated: none — DEC-035's method section documents the
+    "reconcile against real code, not just against other docs" practice
+    that surfaced both gaps, for future wave-gate sessions to repeat.
+  - New rejected approaches: one, implicitly — a new `manual_review_subreason`
+    selection_add for mixed-transaction orders was considered and rejected
+    in favour of reusing the binding mixin's existing `status='review'`
+    value (see DEC-035 item 5); not logged as a separate
+    `rejected-approaches-log.md` row since it was rejected within the same
+    session that proposed it, before being written into any binding
+    contract, per that log's own scope (approaches actually adopted and
+    later reversed).
+  - New technical debt: none accepted.
+  - Architecture concerns: AR-053's "SRR-03-open" checklist phrasing is
+    genuinely ambiguous out of context (an independent preflight agent
+    misread it as a live-state claim) — clarified in AR-054 rather than
+    edited in place, to preserve the historical row verbatim.
+  - Tests or review gates needed: the locked Sol prompt's §8 test/evidence
+    matrix already requires the two new AST guards (EQ-PF-2) as mandatory,
+    not optional.
+  - Should future prompts change? No — this session's own next-session
+    prompt (below) is sufficient.
+- **Quality gate confirmation:** handoff updated (this entry) · feedback
+  loop checked (above) · learning captured in this handoff (no dedicated
+  new-file entry needed — nothing rose to defect-pattern-log/technical-debt
+  thresholds) · no rejected approach required a log row (see above) · no
+  technical debt logged · no repeated-issue escalation needed — all YES.
 - **Next action (exact next-session prompt — the next authorized activity):**
 
   > Issue the locked Sol Wave 2 prompt
