@@ -21,9 +21,15 @@
 > Wave 2 gate ACCEPTED (2026-07-17): the Wave 2 Definition of Ready, the
 > Task 012 packet (with its 2026-07-16 addendum), and the Area-6 order-scan
 > slice are all Accepted (see `DEC-035-wave-2-open-question-dispositions.md`
-> for every open question's disposition). **Wave 2 is AUTHORIZED TO START.
-> Wave 2 implementation has NOT started** — row 9 below stays "Remaining
-> implementation" until Sol's wave PR lands.
+> for every open question's disposition). **Wave 2 implementation and the
+> runtime-correction batch are complete on draft PR #176.** The first
+> exact-head runtime campaign (SHA `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`,
+> Odoo.sh build `35080469`) failed and remains preserved as historical
+> evidence; all eleven findings now have committed dispositions. Corrected-head
+> runtime validation remains pending, and the clean/full, isolated-upgrade
+> and isolated-lifecycle environments remain mandatory before acceptance.
+> PR #176 remains draft and unmerged; Wave 2 is **not** runtime-green,
+> accepted for merge, or release-ready — row 9 reflects this current state.
 >
 
 | # | MVP item | Module(s) | Requirement (accepted source) | Test type | Expected runtime/UAT evidence | Current status | Blocking issue | Release criterion |
