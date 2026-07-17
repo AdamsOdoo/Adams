@@ -1,21 +1,31 @@
 # Wave 2 — Definition of Ready (Order Import: Task 012 + Area-6 Order-Scan Slice)
 
-> **Status: Proposed — Fable gap-closure mission, 2026-07-16.** Docs-only.
-> Acceptance authority: product owner + Claude control room. **Wave 2
-> remains unauthorized until this Definition of Ready is accepted and its
-> gate decisions are Accepted. No implementation authorized by this
-> document.**
+> **Status: ACCEPTED by Claude control room, 2026-07-17.** Docs-only gate act.
+> Every §3 gate decision below is **Accepted**; every open question is closed
+> or explicitly, non-blockingly deferred per
+> [`DEC-035`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md).
+> **Wave 2 is AUTHORIZED TO START once this docs-only gate PR merges into
+> `mvp/program-integration`. Wave 2 implementation has NOT started as of this
+> acceptance** — this document and its companions authorize a future,
+> separate Sol implementation session using the locked prompt at
+> [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md);
+> no code is written by this acceptance act itself.
 >
-> **Current program state (2026-07-16):** Wave 1 is **merged** (PR #172 merged
-> into `mvp/program-integration` via merge commit `d18f9a99`; CORE-R1, LC-1,
-> JOB-ACTIONS, SEC-1 all merged) and **SRR-03 is CLOSED** (corrected-head build
-> `34995642` green at 0 failed / 0 errors / 644 tests). The COD, fulfillment-mode,
-> reconnect/backfill, security/PII, and cross-domain QA matrices exist; the
-> premium UX master specification exists. **Wave 2 is unauthorized and unstarted
-> because its gate decisions and this Definition of Ready have not yet been
-> accepted — NOT because Wave 1 is unfinished.** Wave 2 introduces **no PII-masking
-> fields** (the MVP has no PII masking; the Wave-1 masking implementation is
-> corrected by SEC-2 in Wave 5).
+> **Current program state (2026-07-17):** Wave 1 is **merged** (PR #172 merged
+> into `mvp/program-integration` via merge commit `d18f9a9997d7da574f629f834e2adb83b492cfc6`;
+> CORE-R1, LC-1, JOB-ACTIONS, SEC-1 all merged) and **SRR-03 is CLOSED**
+> (corrected-head build `34995642` green at 0 failed / 0 errors / 644 tests).
+> The Fable remaining-gap-closure mission (PR #173) is **merged**
+> (merge commit `0fb8ccbe8ce54404a57260f82e8226ffa7e6bf73`), making every
+> PD-A/B/C/D/E, PD-COD, and PD-RB decision cited in §3 below binding, not
+> merely proposed. The COD, fulfillment-mode, reconnect/backfill,
+> security/PII, and cross-domain QA matrices exist; the premium UX master
+> specification exists. This acceptance was preceded by an exact-codebase
+> preflight of `shopify_connector_core`/`_product`/`_sale` — see the
+> re-accepted Task 012 packet's "Control-room re-acceptance" section for the
+> reconciliation findings. Wave 2 introduces **no PII-masking fields** (the
+> MVP has no PII masking; the Wave-1 masking implementation is corrected by
+> SEC-2 in Wave 5).
 
 This document instantiates the 7-field standard of
 [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
@@ -66,53 +76,95 @@ idempotently into Odoo sale orders through the fail-closed financial gate
 family, then routed through the confirmation-policy gate — read-only toward
 Shopify, runtime-proven, with zero UI.
 
-### 2.2 Allowed files
+### 2.2 Allowed files — exhaustive
 
-Base list = the Task 012 §15 locked-prompt ALLOWED FILES list, verbatim
-(order binding, importer, sale-order-line extension, store settings, tax
-mapping, ACL rows, six named test files, conditional core dispatch seam,
-validation-results/AR/handoff docs). **Additions implied by the 2026-07-16
-policy docs — packet re-acceptance required (see the packet addendum):**
+Fixed at this re-acceptance. No "or the final name" / "any necessary file"
+language. Every file the Wave 2 Sol session may create or edit, scoped to
+the minimum Task 012 + Area-6 order-scan slice:
 
-- `addons/shopify_connector_sale/models/shopify_connector_store_settings.py`
-  — additional confirmation-policy settings fields (PD-A/B/E):
-  `order_confirmation_policy`, `manual_gateway_policy`,
-  `approved_manual_gateways`, `order_import_window`, `pending_wait_expiry`.
-- `addons/shopify_connector_sale/models/shopify_connector_order_binding.py`
-  — COD operational-ledger snapshot fields and connector state-dimension
-  fields (PD-COD-1/3 Wave-2 slice: COD flag, financial-state evidence,
-  state-transition audit trail), plus the order watermark fields the
-  reconnect policy requires (PD-RB-4 order-domain watermark lives on store
-  settings; transition records on the binding).
-- Area-6 order-scan slice files per that packet's allowed list as scoped to
-  the order domain: `shopify_connector_order_scan.py` (or the packet's exact
-  final name), the order-scan cron data file, `test_order_scan_triggers.py`.
-- New test files for the policy layer (see §2.4/§2.5): confirmation-policy
-  matrix tests, manual-gateway overlay tests, watermark/catch-up tests,
-  backfill-preview tests (backend service level — no wizard view files).
+| # | File | State | Purpose | Module | Covering tests | Rollback implication |
+|---|---|---|---|---|---|---|
+| 1 | `addons/shopify_connector_sale/models/shopify_connector_order_binding.py` | Create | `shopify.connector.order.binding` model (D-012-1 field table); `_odoo_binding_field_name() → 'sale_order_id'` (DEC-034 contract); `_additional_protected_binding_fields()`; `_pii_snapshot_fields()` returning an empty tuple (binding stores no PII, DEC-034/D-012-1) | `shopify_connector_sale` | `test_order_binding.py` | Delete file; `sale.order` rows survive as ordinary data (no cascade) |
+| 2 | `addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py` | Create | `_inherit 'sale.order.line'`; adds one indexed readonly `Char` `shopify_line_item_gid` (D-012-1; DEC-013 — no line-binding model) | `shopify_connector_sale` | `test_order_import_mapping.py` | Delete file; drop the additive column (no migration needed, additive-only) |
+| 3 | `addons/shopify_connector_sale/models/shopify_connector_order_importer.py` | Create | `shopify.connector.order.importer` AbstractModel service (`import_order_sync`); the four `ORDER_*_QUERY` GraphQL read constants (§4 of the closure); D-012-2..12 financial/tax/customer/product resolution logic; the `job_type='order_import_sync'` `selection_add`+LC-1 `ondelete` seam, `_domain_flag_for_job_type() → 'sale_domain_enabled'` (DEC-035 EQ-PF-1), `_get_handlers()`/`_get_replay_policies() → remote_read_replay_safe` dispatch-extension classes, mirroring `shopify_connector_customer_importer.py`'s seam shape exactly; a module-local AST guard asserting `execute_business`-only usage (DEC-035 EQ-PF-2) | `shopify_connector_sale` | `test_order_import_mapping.py`, `test_order_totals_guard.py`, `test_order_tax_resolution.py`, `test_order_customer_resolution.py`, `test_order_duplicate_prevention.py` | Delete file; no running job references a handler that no longer exists once LC-1's `_reassign_to_historic_job_type` has converted any in-flight rows |
+| 4 | `addons/shopify_connector_sale/models/shopify_connector_tax_mapping.py` | Create | `shopify.connector.tax.mapping` model (D-012-9 §5.2/§5.5): `store_id`, `shopify_tax_evidence_key` (versioned SHA-256, `UNIQUE(store_id, shopify_tax_evidence_key)`), `account_tax_id` (restrict); company-scope `@api.constrains` | `shopify_connector_sale` | `test_order_tax_resolution.py` | Delete file/table; no FK from `sale.order`/`account.tax` depends on it surviving |
+| 5 | `addons/shopify_connector_sale/models/shopify_connector_order_scan.py` | Create | Area-6 order-scan slice only (D-A6-2/3/4/6 as applied to the order domain): `job_type='order_import_scan'` `selection_add`+LC-1 `ondelete`, `_domain_flag_for_job_type() → 'sale_domain_enabled'`; scan-enumeration handler (`updated_at:>checkpoint−overlap`, `sortKey: UPDATED_AT` — confirmed live, DEC-035 item 10); `action_sync_orders_now()` (manual, `group_shopify_connector_operator`+); `action_sync_selected()` re-enqueue on the order binding; Administrator backfill preview + confirmed-enqueue service methods (PD-RB-8, backend only — no wizard view); watermark advance/hold-back on `sale_order_last_import_checkpoint_at`; collision-safe enqueue via `shopify_target_gid='scan:order'` (D-A6-2). **Does not** implement `product_import_scan`/`customer_import_scan` — explicitly out of this slice (see §1). **Does not** implement `action_manual_retry`/`action_cancel`/`action_resolve_manual_review` — already-merged JOB-ACTIONS scope, only called, never reimplemented. Its own AST guard asserting `execute_business`-only usage (DEC-035 EQ-PF-2) | `shopify_connector_sale` | `test_order_scan_triggers.py` | Delete file; cron/ACL removed by the manifest change (row 10); LC-1 conversion handles any in-flight historic rows |
+| 6 | `addons/shopify_connector_sale/models/shopify_connector_store_settings.py` | Modify (existing file, additive `_inherit` fields only) | Add: `order_confirmation_policy` (Selection, default `paid_only` — DEC-035 item 11), `manual_gateway_policy` (default `require_approval`), `approved_manual_gateways`, `order_import_window` (default 30 d), `pending_wait_expiry` (default 24 h / min 1 h / max 7 d — PD-B1), `order_import_include_test`, `order_company_id` (default `env.company`), `order_pricelist_id`, `order_sales_team_id`, `order_payment_term_id` (readiness-blocking while unset), `sale_order_last_import_checkpoint_at` (now the order-domain watermark seed, PD-RB-4) | `shopify_connector_sale` | `test_order_confirmation_policy.py`, `test_order_manual_gateway_overlay.py`, `test_order_watermark_backfill.py` | Revert file; additive fields only, no migration required |
+| 7 | `addons/shopify_connector_sale/models/__init__.py` | Modify | Register the four new model files (rows 1–5) | `shopify_connector_sale` | N/A (import-only) | Revert file |
+| 8 | `addons/shopify_connector_sale/security/ir.model.access.csv` | Modify | Add auditor/operator/reviewer/admin rows for `shopify.connector.order.binding` and `shopify.connector.tax.mapping`, exactly the customer-binding pattern (`1,0,0,0` / `1,0,1,0` / `1,1,0,0` / `1,1,1,0`); no new group | `shopify_connector_sale` | `test_order_binding.py` (ACL assertions) | Revert file; no group/model removed |
+| 9 | `addons/shopify_connector_sale/data/shopify_connector_sale_cron.xml` | Create | One `ir.cron`, order domain only, `noupdate="1"`, interval 15 min (D-A6-3), gated on `sale_domain_enabled` AND the new `order_scheduled_sync_enabled` settings boolean (default False, opt-in) | `shopify_connector_sale` | `test_order_scan_triggers.py` | Delete file; cron removed cleanly (no data depends on its `ir.model.data` XML ID surviving) |
+| 10 | `addons/shopify_connector_sale/__manifest__.py` | Modify | Version bump; `depends` becomes `['shopify_connector_core', 'shopify_connector_product', 'sale']` (ARCH PD-3); add the new cron data file to `data` | `shopify_connector_sale` | N/A (manifest; covered indirectly by install/upgrade tests) | Revert file; version rollback per LC-1's additive-migration posture |
+| 11 | `addons/shopify_connector_sale/migrations/<next-version>/post-migrate.py` | Create, only if a genuine schema-affecting default/backfill is needed (e.g. seeding `order_confirmation_policy` on existing stores) | Additive/idempotent migration, mirroring core's `19.0.1.8.0/post-migrate.py` pattern exactly | `shopify_connector_sale` | Covered by lifecycle/upgrade runtime evidence, not a dedicated unit test | Delete file; no destructive statement permitted in it (enforced by review, not by an automated guard) |
+| 12 | `addons/shopify_connector_sale/tests/test_order_binding.py` | Create | Schema/constraints/mixin, dual uniqueness (`UNIQUE(store_id, shopify_gid)` + `UNIQUE(store_id, sale_order_id)`), restrict FKs, exact protected-field-set assertion (mirrors `test_customer_binding.py`) | `shopify_connector_sale` | Self | Delete file |
+| 13 | `addons/shopify_connector_sale/tests/test_order_import_mapping.py` | Create | Happy path incl. confirmation policy, lines/shipping/tip mapping, tax rate-match+creation+reuse, addresses/dedup, metadata, guest paths, custom/gift-card lines, UTC parsing | `shopify_connector_sale` | Self | Delete file |
+| 14 | `addons/shopify_connector_sale/tests/test_order_totals_guard.py` | Create | Component/tax/total tolerance checks; six fail-closed pre-creation gate families; bounded whole-order solver (K=2/M=2/C_max=25) | `shopify_connector_sale` | Self | Delete file |
+| 15 | `addons/shopify_connector_sale/tests/test_order_tax_resolution.py` | Create | `shopify.connector.tax.mapping` explicit-mapping-only behavior; versioned evidence-key fingerprint; company-scope constraint | `shopify_connector_sale` | Self | Delete file |
+| 16 | `addons/shopify_connector_sale/tests/test_order_duplicate_prevention.py` | Create | Order-binding sole-anchor idempotency; `operation_scope_key`/`idempotency_key` collision behavior across scan/catch-up/manual/backfill/repeated-webhook-follow-up-evidence paths | `shopify_connector_sale` | Self | Delete file |
+| 17 | `addons/shopify_connector_sale/tests/test_order_customer_resolution.py` | Create | All D-012-5 paths incl. fallback used/unset, ambiguous hold with candidate JSON (D-012-4), archived-only, recall-safety reuse | `shopify_connector_sale` | Self | Delete file |
+| 18 | `addons/shopify_connector_sale/tests/test_order_confirmation_policy.py` | Create | Full 8-state × 3-policy matrix (addendum A.3/A.4) | `shopify_connector_sale` | Self | Delete file |
+| 19 | `addons/shopify_connector_sale/tests/test_order_manual_gateway_overlay.py` | Create | Manual-gateway overlay incl. approved/unapproved gateways, card-`PENDING` never manual, mixed-transaction `status='review'` routing (DEC-035 item 5) | `shopify_connector_sale` | Self | Delete file |
+| 20 | `addons/shopify_connector_sale/tests/test_order_watermark_backfill.py` | Create | Watermark advance/hold-back/overlap/pagination/stale-generation refusal; backfill preview creates no jobs/records; confirmed backfill; resumability; 60-day/`read_all_orders` honesty | `shopify_connector_sale` | Self | Delete file |
+| 21 | `addons/shopify_connector_sale/tests/test_order_cod_import_readmodel.py` | Create | COD flag + ledger snapshot + three-dimension state initialization at import (PD-COD-1/3 Wave-2 slice) | `shopify_connector_sale` | Self | Delete file |
+| 22 | `addons/shopify_connector_sale/tests/test_order_scan_triggers.py` | Create | Order-scan job/cron/manual-trigger, collision-safe enqueue, `execute_business`-only AST guard (EQ-PF-2) | `shopify_connector_sale` | Self | Delete file |
+| 23 | `addons/shopify_connector_sale/tests/__init__.py` | Modify | Register the eleven new test files (rows 12–22) | `shopify_connector_sale` | N/A | Revert file |
+| 24 | `docs/05-qa/task-012-order-import-validation-results.md` | Create | Sol's runtime-evidence record (exact Odoo.sh build IDs, verbatim results) | Docs | N/A | Delete file |
+| 25 | `docs/05-qa/task-area6-order-scan-validation-results.md` | Create | Sol's runtime-evidence record for the order-scan slice | Docs | N/A | Delete file |
+| 26 | `docs/05-qa/architecture-review-log.md` | Modify | Append one new AR row for the Wave 2 implementation closure (mirrors AR-050/051/052 for Wave 1) | Docs | N/A | Revert the appended row |
+| 27 | `docs/07-implementation-plan/mvp-program-state.md` | Modify | Wave-status table row 2, sprint-log entry, runtime-evidence log row | Docs | N/A | Revert file |
+| 28 | `docs/05-qa/mvp-acceptance-matrix.md` | Modify | Row 9 (and rows 13/14 if they reference order-domain duplicate-prevention/idempotency) status update | Docs | N/A | Revert file |
+| 29 | `docs/01-research/research-handoff.md` | Modify | Prepend Sol's own session handoff entry (learning feedback loop section) | Docs | N/A | Revert prepended entry |
 
-The exhaustive final allowed-file list is fixed at packet re-acceptance;
-this DoR records the categories so the re-accepted packet cannot silently
-widen beyond them.
+Rows 1–23 are `addons/**`; rows 24–29 are `docs/**` (Sol's own required
+wave-closure documentation, per the wave-review template's Definition of
+Done — distinct from this gate session's own docs-only edits, which are
+already merged before Sol's wave starts).
 
-### 2.3 Forbidden files
+### 2.3 Forbidden files — exhaustive
 
-- Any addon path outside the re-accepted Task 012 + Area-6 order-slice
-  allowlists; every other `shopify_connector_core` /
-  `shopify_connector_product` file; `addons/adams_base` (always).
-- All Wave 3+ domains: no `shopify_connector_inventory`,
-  `shopify_connector_fulfillment`, product-export, or media files.
+- **All of `shopify_connector_core`** — every model, security, data,
+  migration, and test file. No `.sudo()` call, no ACL row, no selection
+  value, no dispatcher/enqueue/readiness-check file may be edited (the
+  three-seam `_inherit` pattern used by rows 3 and 5 above requires zero
+  core edits — reuse `sale_domain_enabled`, DEC-035 EQ-PF-1).
+- **All of `shopify_connector_product`** — every model, importer,
+  security, and test file, unless an exact inherited regression is proven
+  and the fix is a single named test-only change with its own justification
+  in the wave review (no speculative "while I'm in there" edits).
+- **Customer importer/binding behavior in `shopify_connector_sale`** beyond
+  the read-only reuse already named in row 3/17 above (resolving an order's
+  customer via the *existing* `shopify.connector.customer.binding` and
+  `shopify.connector.customer.importer` D1 match sequence) — no edit to
+  `shopify_connector_customer_binding.py`, `shopify_connector_customer_importer.py`,
+  or `shopify_connector_res_partner.py`.
+- Any `shopify_connector_inventory*`, `shopify_connector_fulfillment*`,
+  product-export, or media file/module (Wave 3–5).
+- Any accounting entry, invoice, payment, or refund model/logic anywhere.
+- Any payout model/logic.
+- All UI/views/menus/actions/wizards/controllers — the backfill "wizard" is
+  backend service methods + preview computation only in Wave 2; its screen
+  is Wave 5.
+- All webhook and OAuth files.
+- All `.github/workflows/*`, `Dockerfile`, `docker-compose*`,
+  `requirements*.txt`.
+- `addons/adams_base` — always, unconditionally.
 - The DEC-031 Layer 2 substrate
   ([`../03-architecture/dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md))
-  — **not built in Wave 2** unless separately accepted as its own gated core
-  task; Task 012 performs no Shopify mutation and must not create
-  `shopify.connector.mutation.attempt` or any Layer-2 model/seam.
-- UI beyond minimal: no views, menus, actions, wizards, controllers,
-  webhooks, OAuth, CI/workflow/Docker/requirements files. The backfill
-  "wizard" ships in Wave 2 as backend service methods + preview computation
-  only; its screen is Wave 5.
-- Protected references: checkpoint branch, `Shopify-connector`, `main`,
-  PR #150/#151, issue #165.
+  — no `shopify.connector.mutation.attempt` model, no attempt-identity
+  field, no mutation-attempt seam of any kind. Task 012/Area-6 perform zero
+  Shopify mutations.
+- Protected branches/refs/PRs: `checkpoint/core-r2-readonly-uat-2026-07-15`,
+  `Shopify-connector`, `main`, PR #150, PR #151, issue #165 — never
+  modified, reset, or force-pushed by this program.
+- Any new PII-masking field, masked-order-binding field, mask/unmask toggle,
+  masking setting, masking action, or scheduled business-record masking
+  addition anywhere (the MVP has no PII masking; Wave 2 does not expand the
+  Wave-1 masking implementation).
+- Any `manual_review_subreason` `selection_add` — DEC-035's mixed-transaction
+  disposition (item 5) uses the existing binding `status='review'` value
+  instead; no new manual-review vocabulary is authorized.
+
+No "any necessary file" language is used anywhere above; any file not
+listed in §2.2 is forbidden by omission.
 
 ### 2.4 Acceptance criteria
 
@@ -243,25 +295,30 @@ Program hard-stops 1–11 apply verbatim; Wave-2-specific instantiations:
 
 ## 3. Gate-decision table
 
-Every decision below must be **Accepted** before Wave 2 opens.
+Every decision below is **Accepted** as of this gate act (2026-07-17),
+already binding through PR #173 (§4.A of the Wave 2 gate-preflight
+session) or accepted in this same act per
+[`DEC-035`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md).
 
-| Gate decision | Source | Wave-2 relevance | Acceptance authority |
-| --- | --- | --- | --- |
-| PD-A — three-policy `order_confirmation_policy`, `paid_only` default | lifecycle policy §1.1/§10 | Core confirmation gate | Product owner + control room |
-| PD-B — manual-gateway policy + curated list, evidence-discriminated | lifecycle policy §10 | COD/manual path | Product owner + control room |
-| PD-C — full state×policy matrix + transition table | lifecycle policy §10 | Acceptance criterion 1 | Product owner + control room |
-| PD-D — cancellation staging | lifecycle policy §10 | Update-path behaviour | Product owner + control room |
-| PD-E — settings inventory + defaults | lifecycle policy §10 | Allowed-files additions | Product owner + control room |
-| PD-COD-1/3/6 (import-relevant subset; PD-COD-2/4/5 accepted now but exercised Wave 4/5) | COD policy §10 | COD read-model at import | Product owner + control room |
-| PD-RB-1..9 order-domain subset (esp. PD-RB-4/5/6/7/8/9) | reconnect policy §11 | Watermark, catch-up, backfill | Product owner + control room |
-| PD-AC-1 (abandoned checkouts never auto-import) | abandoned-checkout policy §8 | Negative boundary for the scan | Product owner + control room |
-| Roles impact — **none for Wave 2 backend**: existing four groups suffice; two-role migration is Wave 5 SEC-2 and does not gate Wave 2 (new models grant per the migration-forward note in the roles doc §6) | roles doc §5/§6 | Confirmation of non-blocking | Control room (recorded, no new decision) |
-| **Task 012 packet re-acceptance** — packet + decision closure + the 2026-07-16 policy-layer addendum, as one act | packet §15 preamble + addendum | The wave's core packet | Control room gate act (separate prompt-issue act per §15) |
-| Area-6 packet acceptance (order-scan slice D-A6-1..4/6) | area-6 packet | Work package 2 | Control room |
+| Gate decision | Source | Wave-2 relevance | Acceptance authority | Status |
+| --- | --- | --- | --- | --- |
+| PD-A — three-policy `order_confirmation_policy`, `paid_only` default | lifecycle policy §1.1/§10 | Core confirmation gate | Product owner + control room | **Accepted** (binding through PR #173) |
+| PD-B — manual-gateway policy + curated list, evidence-discriminated | lifecycle policy §10 | COD/manual path | Product owner + control room | **Accepted** (binding through PR #173) |
+| PD-C — full state×policy matrix + transition table | lifecycle policy §10 | Acceptance criterion 1 | Product owner + control room | **Accepted** — DEC-035 items 1/2/5 close the null-status/mixed-transaction gaps in the matrix |
+| PD-D — cancellation staging | lifecycle policy §10 | Update-path behaviour | Product owner + control room | **Accepted** |
+| PD-E — settings inventory + defaults | lifecycle policy §10 | Allowed-files additions | Product owner + control room | **Accepted** — exact field list frozen in §2.2 row 6 |
+| PD-COD-1/3/6 (import-relevant subset; PD-COD-2/4/5 accepted now but exercised Wave 4/5) | COD policy §10 | COD read-model at import | Product owner + control room | **Accepted** — PD-COD-6/OQ-COD-6 closed non-blocking per DEC-035 item 7 |
+| PD-RB-1..9 order-domain subset (esp. PD-RB-4/5/6/7/8/9) | reconnect policy §11 | Watermark, catch-up, backfill | Product owner + control room | **Accepted** — OQ-RB-1/5/6 closed per DEC-035 items 8–10 |
+| PD-AC-1 (abandoned checkouts never auto-import) | abandoned-checkout policy §8 | Negative boundary for the scan | Product owner + control room | **Accepted** (binding through PR #173, A-7) |
+| Roles impact — **none for Wave 2 backend**: existing four groups suffice; two-role migration is Wave 5 SEC-2 and does not gate Wave 2 (new models grant per the migration-forward note in the roles doc §6) | roles doc §5/§6 | Confirmation of non-blocking | Control room (recorded, no new decision) | **Recorded — confirmed non-blocking** |
+| **Task 012 packet re-acceptance** — packet + decision closure + the 2026-07-16 policy-layer addendum, as one act | packet §15 preamble + addendum | The wave's core packet | Control room gate act (separate prompt-issue act per §15) | **RE-ACCEPTED, 2026-07-17** — see the packet's own "Control-room re-acceptance" section |
+| Area-6 packet acceptance (order-scan slice D-A6-1..4/6) | area-6 packet | Work package 2 | Control room | **ACCEPTED (order-scan slice only), 2026-07-17** — see the packet's own "Control-room re-acceptance" section; product-scan/customer-scan remain out of Wave 2 |
 
-Open questions OQ-A..OQ-E (lifecycle), OQ-COD-6, OQ-RB-1/5/6 should be
-answered or explicitly deferred-with-fail-closed-behaviour at the same gate
-sitting; none may be silently resolved in code.
+Open questions OQ-A..OQ-E (lifecycle), OQ-COD-6, OQ-RB-1/5/6 — and the two
+exact-codebase-preflight questions EQ-PF-1/EQ-PF-2 this session discovered —
+are every one **closed or explicitly, non-blockingly deferred** per
+[`DEC-035`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md);
+none is silently resolved in code.
 
 ## 4. Explicit Layer-2 statement
 
@@ -275,21 +332,33 @@ wave, after the importer exists within the wave branch.
 
 ## 5. Current-status conclusion
 
-**READY once gate decisions are Accepted.** As of 2026-07-16, Wave 2 is
-**NOT YET ready — but only because its gate decisions and this Definition of
-Ready are not yet accepted, not because any Wave 1 prerequisite is
-outstanding.** Wave 1 is merged and SRR-03 is closed; the companion QA
-matrices exist. The genuinely outstanding list:
+**READY. Accepted, 2026-07-17.** All four items that were outstanding as of
+2026-07-16 are now closed:
 
-1. All §3 gate decisions are Proposed, none Accepted.
-2. Task 012 packet re-acceptance with the 2026-07-16 addendum not yet
-   performed; the §15 prompt-issue gate act not performed.
-3. Area-6 packet (order-scan slice) not accepted.
-4. This Definition of Ready itself is Proposed, not accepted.
+1. ~~All §3 gate decisions are Proposed, none Accepted.~~ **Every §3 gate
+   decision is Accepted** (table above).
+2. ~~Task 012 packet re-acceptance with the 2026-07-16 addendum not yet
+   performed; the §15 prompt-issue gate act not performed.~~ **Task 012
+   packet RE-ACCEPTED** (packet's own "Control-room re-acceptance" section);
+   the §15 prompt-issue gate act is performed by
+   [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md),
+   issued (not executed) by this same gate act.
+3. ~~Area-6 packet (order-scan slice) not accepted.~~ **ACCEPTED**, scoped to
+   the order-scan slice only (packet's own "Control-room re-acceptance"
+   section).
+4. ~~This Definition of Ready itself is Proposed, not accepted.~~ **This
+   document is ACCEPTED.**
 
-**Already satisfied (no longer blockers):** Wave 1 merged (CORE-R1, LC-1,
-JOB-ACTIONS, SEC-1) and SRR-03 closed; the companion QA matrices
+**Already satisfied (unchanged):** Wave 1 merged (CORE-R1, LC-1, JOB-ACTIONS,
+SEC-1) and SRR-03 closed; the companion QA matrices
 (`../05-qa/reconnect-backfill-uat-matrix.md`, `../05-qa/cod-uat-matrix.md`)
 exist. Read-only dev-store order evidence is preferred but not a blocker — if
-credentials are unavailable it defers to Wave 6 (§2.7). When items 1–4 close,
-Wave 2 may open per the program's normal control-room gate act.
+credentials are unavailable it defers to Wave 6 (§2.7).
+
+**Wave 2 is AUTHORIZED TO START once this docs-only gate PR merges into
+`mvp/program-integration`.** Wave 2 implementation itself has **not**
+started as of this acceptance — no branch, no code, no PR beyond this
+docs-only gate PR exists for Wave 2 implementation. The next authorized
+activity after this gate PR merges is issuing the locked Sol prompt at
+[`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md)
+with the exact post-merge `mvp/program-integration` SHA filled in.

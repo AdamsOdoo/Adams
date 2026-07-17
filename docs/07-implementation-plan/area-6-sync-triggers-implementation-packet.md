@@ -1,7 +1,16 @@
 # Area 6 — Manual & Scheduled Sync Triggers: Implementation-Ready Planning Packet
 
-> **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §7 is NOT usable.** Produced 2026-07-10 (AR-042 candidate);
+> **Status: ACCEPTED by Claude control room, 2026-07-17 — ORDER-SCAN SLICE
+> ONLY.** See "§0. Control-room re-acceptance (2026-07-17) — order-scan
+> slice" immediately below. Everything else in this packet (product-scan,
+> customer-scan, the optional core-additive scan-cron-health check) remains
+> **Proposed, NOT accepted, and out of Wave 2** — read every "Proposed"/
+> "NOT accepted" marker below as still current for those parts. The locked
+> prompt in §7 remains historical/illustrative for the order slice; the
+> actual Wave 2 implementation session uses
+> [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md).
+>
+> Produced 2026-07-10 (AR-042 candidate);
 > **revised 2026-07-11** by the PR #148 revision session per ChatGPT's
 > control-room review (comment `4942966937`, item 5): **D-A6-7 (the
 > readiness pending-slot closure) is split out of this task** into its
@@ -46,6 +55,78 @@
 > packet retains D-A6-1..4/6 (scan jobs, crons, manual domain-sync
 > services, progress visibility) and remains unauthorized Wave 2+
 > scope, gated on Task 012 merging, exactly as before.
+
+## 0. Control-room re-acceptance (2026-07-17) — order-scan slice
+
+**Status: ACCEPTED, scoped to the order domain only.** Claude control room
+re-reviewed this packet after an exact-codebase preflight and accepts
+exactly the **order-scan slice** of D-A6-1..4/6 — `order_import_scan` job
+type, order-domain scheduled cron, `action_sync_orders_now()` /
+`action_sync_selected()` on order bindings, and Administrator order backfill
+preview + confirmed enqueue — as Wave 2 scope, gated on Task 012 merging
+runtime-green within the same wave (this packet's own D-A6-2/§6 gate
+criterion, unchanged).
+
+### 0.1 Explicitly NOT accepted / NOT in Wave 2
+
+- **`product_import_scan` and `customer_import_scan`** — this packet designs
+  all three domains together, but Wave 2's own Definition of Ready scopes
+  acceptance to "the order-scan slice (D-A6-1..4/6)" only. Product and
+  customer domains already have working single-entity importers with no
+  bulk-enumeration trigger; adding one for them is real, valuable future
+  work, but it is **not** part of this wave's minimum scope and is not
+  authorized by this re-acceptance. A future task must accept that slice
+  separately.
+- **The optional core-additive scan-cron-health check** (`_inherit`
+  extension of `shopify.connector.readiness.check`'s `cron_queue_health`
+  check, referenced in §1 above as touching
+  `addons/shopify_connector_core/models/`) — explicitly **deferred out of
+  Wave 2**. It is optional by this packet's own text ("MAY extend"), and
+  Wave 2's forbidden-file list (DoR §2.3) forbids all edits to
+  `shopify_connector_core` without exception. Order-scan readiness relies
+  on the existing `shopify.connector.store.state == 'connected'` gate and
+  the existing `sale_domain_enabled` flag; it does not require this
+  extension to function correctly, only to surface cron-health more richly
+  in a future readiness UI.
+- **D-A6-5** (`action_manual_retry`/`action_cancel`) — already correctly
+  marked in this packet's own text as transferred to Task JOB-ACTIONS
+  (Wave 1, merged); this re-acceptance changes nothing here, only confirms
+  it (JOB-ACTIONS is called, never reimplemented).
+- **D-A6-7** (readiness pending-slot closure) — already correctly marked as
+  moved to Task CORE-R1 (Wave 1, merged); unchanged, historical record only.
+
+### 0.2 Sequencing (fixed, exact)
+
+1. Task 012 importer/binding foundation lands first within the wave
+   (`shopify.connector.order.binding`, `shopify.connector.order.importer`,
+   `order_import_sync` handler registered).
+2. Importer tests and the internal dispatcher registration are green before
+   any scan code is written.
+3. Area-6 order-scan job/cron/manual backend trigger is added, calling only
+   the already-registered `order_import_sync` handler — the scan enumerates
+   and enqueues, it never contains import logic itself.
+4. Catch-up/backfill backend service (watermark + Administrator preview) is
+   added last, on top of the working scan.
+5. Full combined validation (Task 012 + order-scan together) runs before the
+   wave PR is marked ready.
+
+The scan may not execute before its importer handler exists and is
+registered — enforced structurally by step ordering above, not by a
+separate runtime check (there is nothing to enqueue against until the
+handler is registered in `_get_handlers()`).
+
+### 0.3 Domain-enablement flag — resolved (DEC-035 EQ-PF-1)
+
+`order_import_scan`'s `_domain_flag_for_job_type()` maps to
+**`'sale_domain_enabled'`** — the same flag Task 012's `order_import_sync`
+uses and the same flag `customer_import_sync` already uses. No new
+settings flag, no core edit to `ACCEPTED_DOMAIN_FLAGS`.
+
+### 0.4 What this re-acceptance does NOT do
+
+Does not accept the product-scan or customer-scan slices. Does not accept
+the optional core-additive readiness extension. Does not authorize any code,
+branch, or PR. Does not touch `shopify_connector_core` in any way.
 
 ## 1. Objective, scope, non-goals
 

@@ -10,7 +10,20 @@
 
 **FABLE GAP-CLOSURE MERGED (2026-07-17).** PR [#173](https://github.com/AdamsOdoo/Adams/pull/173) — the one-time remaining-gap research/product/architecture/UX/QA/Waves-2–6-readiness mission — was reviewed by the Claude control room and merged into `mvp/program-integration` with a normal merge commit `0fb8ccbe8ce54404a57260f82e8226ffa7e6bf73` (reviewed head `68c159f2a46b9d0c82ab5ec19da42eca1b5eed04` = starting head `09078a8` + one docs-only reconciliation commit; 127 files, all under `docs/**`; no `addons/**` change). Decisions: **Class A confirmed; Class B (PD-B1..B7) all decided (B1 pending-expiry 24 h default; B4 mode-switch scan boundary; B5 Mode-1-outbound = Full); Class C (TA-C1..C8) decided or routed — DEC-031 Layer 2 NOT DEC-accepted (routed to a dedicated pre-Wave-3 architecture gate); Class D fail-closed classified; Class E post-MVP.** Full record: [`../04-decisions/fable-proposed-decision-pack.md`](../04-decisions/fable-proposed-decision-pack.md) §Control-room decisions (2026-07-17); [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md) AR-053; [`../01-research/research-handoff.md`](../01-research/research-handoff.md) top entry. **No implementation authorized; Wave 2 remains unauthorized and unstarted; protected refs unchanged.**
 
-Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code was authorized in that wave. **Wave 1 is merged** (PR #172, merge commit `d18f9a9`) — all five stages (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) are implementation-complete and were runtime-proven at the corrected head (build `34995642`, runtime-tested SHA `95db3db`, `0 failed / 0 errors / 644`) before merge. **Wave 2 remains unauthorized** and may not merge, be enabled, or receive live Shopify validation until explicitly released for its own consolidated preflight; the next authorized activity is the separate Wave 2 decision-acceptance / Definition-of-Ready / packet re-acceptance / exact-base preflight session (the one-time Fable remaining-gap-closure mission is now **complete** — PR #173 merged 2026-07-17, merge commit `0fb8ccb`). SRR-03 itself remains **CLOSED** on its independently verified build `34986844` evidence.
+**WAVE 2 GATE ACCEPTED (2026-07-17).** The Wave 2 decision-acceptance +
+Definition-of-Ready + Task 012/Area-6 packet re-acceptance + exact-base
+preflight session accepted the Wave 2 Definition of Ready, re-accepted the
+Task 012 packet (with its 2026-07-16 addendum) as one canonical contract,
+and accepted the Area-6 order-scan slice (order domain only). Every open
+question is closed or non-blockingly deferred per
+[`../04-decisions/DEC-035-wave-2-open-question-dispositions.md`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md).
+**Wave 2 is AUTHORIZED TO START. Wave 2 implementation has NOT started** —
+no branch, no code, no implementation PR exists yet. The next authorized
+activity is issuing the locked Sol prompt at
+[`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md).
+See the Sprint checkpoint log below for the full gate-closure record.
+
+Freeze/resume status: **the issue #165 implementation freeze is lifted only for work authorized by DEC-032 and the master Sol mission, on branches descending from `mvp/program-integration`.** The product owner launched Sol on 2026-07-15 by issuing the complete master mission. Wave 0 is documentation/research only; no addon code was authorized in that wave. **Wave 1 is merged** (PR #172, merge commit `d18f9a9`) — all five stages (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) are implementation-complete and were runtime-proven at the corrected head (build `34995642`, runtime-tested SHA `95db3db`, `0 failed / 0 errors / 644`) before merge. **Wave 2's gate is now Accepted** (2026-07-17) and Wave 2 is authorized to start; it may not merge, be enabled, or receive live Shopify validation until Sol's own implementation wave passes its control-room wave review. SRR-03 itself remains **CLOSED** on its independently verified build `34986844` evidence.
 
 ## Checkpoint / integration identity
 
@@ -28,7 +41,7 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Active wave
 
-**None — Wave 1 MERGED (2026-07-16); Wave 2 unauthorized/unstarted.** PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) merged into `mvp/program-integration` via merge commit `d18f9a9997d7da574f629f834e2adb83b492cfc6`. The next authorized activity is the separate Wave 2 decision-acceptance / Definition-of-Ready / packet re-acceptance / exact-base preflight session (the one-time Fable remaining-gap-closure mission is now **complete** — PR #173 merged 2026-07-17, merge commit `0fb8ccb`); Wave 2 itself remains gated on its own consolidated Definition-of-Ready/preflight session per the Wave status table below.
+**None implementing — Wave 2's GATE is accepted (2026-07-17); Wave 2 IMPLEMENTATION is authorized to start but has not started.** No `sol/wave-2-order-import` branch or implementation PR exists yet. The next authorized activity is issuing the locked Sol prompt at [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md) with the exact live `mvp/program-integration` tip at issuance time.
 
 ## Wave status
 
@@ -36,13 +49,26 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 | --- | --- | --- | --- |
 | 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
 | 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **MERGED (2026-07-16)** | `sol/wave-1-readonly-foundation`; PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) (merged, `d18f9a9997d7da574f629f834e2adb83b492cfc6`) | Commit `36974edc68c1985e6ccfae8f6bb5c7386f820156` closed the complete binding mutation surface under ruling `4988842625`. Corrected-head build `34995642` (runtime-tested SHA `95db3db`) ran the complete matrix `0/0/644`; residue/security clean; #157 dropped/restored. Final Claude control-room review (20-point independent verification, adversarial adjudication) accepted and merged the reviewed head `d7b08e6`. SRR-03 CLOSED. |
-| 2 — Order import (Task 012) | Not started / unauthorized | — | SRR-03 is CLOSED (build `34986844`). Wave 1 is merged; the next authorized activity is the separate Wave 2 decision-acceptance / Definition-of-Ready / packet re-acceptance / exact-base preflight session (the one-time Fable remaining-gap-closure mission is now **complete** — PR #173 merged 2026-07-17, merge commit `0fb8ccb`). Wave 2 itself remains unauthorized until explicitly released for its own consolidated Definition-of-Ready/preflight session. May not merge, be enabled, or receive live Shopify validation before that preflight and the Task 012 packet gate. |
+| 2 — Order import (Task 012 + Area-6 order-scan slice) | **GATE ACCEPTED (2026-07-17); implementation not started** | — | Wave 2 Definition of Ready, Task 012 packet, and Area-6 order-scan slice are all Accepted (see Sprint checkpoint log below and [`DEC-035`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md)). **Wave 2 is AUTHORIZED TO START.** No implementation branch/PR exists yet — the next authorized activity is issuing the locked Sol prompt at [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md). |
 | 3 — Inventory synchronization (Task 013/013B) | Not started | — | Blocked on Wave 2 and DEC-031 Layer 2 design+acceptance. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
 | 5 — Premium operator experience (UI U1–U3, PERF-1, Task 015/015B) | Not started / unauthorized | — | Proposed scope includes product export after Layer 2 (DEC-033 accepted); pending Waves 1–4. |
 | 6 — E2E integration, UAT, release readiness | Not started | — | Blocked on Waves 1–5. |
 
-## Active Sol session (Wave 1 runtime correction — 2026-07-16)
+## Historical Sol session log — Wave 1 runtime correction (2026-07-16, SUPERSEDED)
+
+> **Superseded notice (added 2026-07-17, Wave 2 gate-preflight session).** This
+> section is a **point-in-time log of an in-progress Wave 1 Sol session**,
+> written while PR #172 was still open/draft. Every "pending" / "draft" /
+> "remains OPEN" statement below was accurate only at the moment each bullet
+> was written and is **superseded by the current merged status** recorded
+> above in "Current status" and in the "Wave status" table: **PR #172 merged
+> 2026-07-16 (merge commit `d18f9a9997d7da574f629f834e2adb83b492cfc6`); SRR-03
+> is CLOSED; Wave 1 is implementation-complete and runtime-green.** This
+> section is retained verbatim for audit history — do not read any statement
+> below as describing current state. The authoritative current-state record
+> for these same events is the dated "Sprint checkpoint log" below (see
+> especially the "Wave 1 MERGED" entries).
 
 - Re-verified the live base before branching: `mvp/program-integration` matched the product-owner-authorized tip; checkpoint `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, `Shopify-connector`, and `main` remained unchanged.
 - Confirmed PR #170/DEC-034 and PR #171 normalized the Wave 1 packets without introducing addon implementation.
@@ -54,7 +80,7 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 - Product-owner ruling comment `4982750956` validated and resolved the Stage 4 pre-edit hard-stop: binding/PII audit uses the existing lifecycle maintenance job helper with narrow protected-site sudo and original actor preservation; company validation uses caller-context records plus `env.company`, without a store field. Packet and validation record updated.
 - Final exact-head runtime: build `34986844` at `05bb4631d3fdf3c6c8b54c09deb7e0b1dc72f723` passed targeted `0/0/2`, fresh `0/0/635`, standard `0/0/635`, and all-11-class genuine smoke `0/0/41`; residue/security clean; issue #157 defaults dropped/restored.
 - Stage 5 closure: ruling `4988527547` accepts the complete evidence and authorizes SRR-03 CLOSED. Wave 1 is implementation-complete/runtime-green. PR #172 stays draft/unmerged for Claude review; Wave 2 and all excluded domains remain unstarted.
-- Post-review SEC-1 correction: ruling `4988842625` authorized closing the full binding mutation surface. Commit `36974edc68c1985e6ccfae8f6bb5c7386f820156` protects the exact common and concrete identity/structure/system-state/provenance/imported-snapshot fields, adds fail-closed classification, and narrowly elevates only two legitimate product-importer writes. Static/source checks are green. Because production security code changed, build `34986844` is retained only as prior-code evidence; one complete corrected-head runtime handoff is pending. SRR-03 remains CLOSED; PR #172 remains draft/unmerged; Wave 2 remains unauthorized.
+- Post-review SEC-1 correction: ruling `4988842625` authorized closing the full binding mutation surface. Commit `36974edc68c1985e6ccfae8f6bb5c7386f820156` protects the exact common and concrete identity/structure/system-state/provenance/imported-snapshot fields, adds fail-closed classification, and narrowly elevates only two legitimate product-importer writes. Static/source checks are green. Because production security code changed, build `34986844` is retained only as prior-code evidence; one complete corrected-head runtime handoff is pending. **(At the time this bullet was written) SRR-03 remains CLOSED; PR #172 remains draft/unmerged; Wave 2 remains unauthorized** — see the superseded notice above: PR #172 is now merged and this is historical.
 
 ## Prior completed work (bootstrap governance)
 
@@ -92,7 +118,15 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 
 ## Next control-room gate
 
-**Wave 1 is merged.** PR #172 merged into `mvp/program-integration` via merge commit `d18f9a9997d7da574f629f834e2adb83b492cfc6` (reviewed head `d7b08e6`), per the final Claude control-room review recorded in the Sprint checkpoint log below and as a PR #172 review comment. The next authorized activity is the separate Wave 2 decision-acceptance / Definition-of-Ready / packet re-acceptance / exact-base preflight session (the one-time Fable remaining-gap-closure mission is now **complete** — PR #173 merged 2026-07-17, merge commit `0fb8ccb`). Wave 2 itself remains unauthorized until explicitly released for its own consolidated Definition-of-Ready/preflight session, using `../06-prompts/claude-mvp-wave-review-template.md` for its eventual wave review.
+**Wave 2's gate is Accepted.** The Wave 2 Definition of Ready, Task 012
+packet (with its 2026-07-16 addendum), and Area-6 order-scan slice were
+reviewed and accepted by the Claude control room on 2026-07-17 (see the
+Sprint checkpoint log below). **Wave 2 is authorized to start.** The next
+control-room gate is Sol's own Wave 2 implementation wave review, once a
+`sol/wave-2-order-import` PR exists, using
+`../06-prompts/claude-mvp-wave-review-template.md`. Until then, the next
+authorized activity is issuing the locked Sol prompt at
+`../06-prompts/sol-wave-2-order-import-locked-prompt.md`.
 
 ## Sprint checkpoint log
 

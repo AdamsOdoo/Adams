@@ -1,7 +1,15 @@
 # Task 012 — Order Import: Implementation-Ready Planning Packet
 
-> **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §15 is NOT usable.
+> **Status: RE-ACCEPTED by Claude control room, 2026-07-17 — this packet,
+> its 2026-07-14 decision closure, and its 2026-07-16 policy-layer addendum
+> are re-accepted together as one canonical contract.** See "§0. Control-room
+> re-acceptance (2026-07-17)" immediately below for the current, binding
+> record — read it before anything else in this file. **The locked prompt in
+> §15 remains historical/illustrative; the actual implementation session
+> uses [`../06-prompts/sol-wave-2-order-import-locked-prompt.md`](../06-prompts/sol-wave-2-order-import-locked-prompt.md),
+> issued separately with the exact post-gate SHA.** Everything below §0 is
+> the pre-acceptance planning record; every "Proposed"/"NOT accepted"/
+> "DO NOT USE" marker inside it is superseded by §0.
 >
 > **Wave 0 reconciliation notice (2026-07-15; DEC-033 Accepted):** The MVP
 > program's checkpoint is now `acd8c4691e72cf5590f2a56228b08f183b76cd9a`.
@@ -274,6 +282,131 @@
 > (`../03-architecture/final-mvp-module-and-dependency-architecture.md`
 > — "ARCH" below). Shared reliability contracts are per ARCH §5 and are
 > not restated. API version posture: 2026-07 (ARCH PD-6).
+
+## 0. Control-room re-acceptance (2026-07-17)
+
+**Status: ACCEPTED.** Claude control room, under DEC-032/CLAUDE.md §13,
+re-accepts this packet, its decision closure
+([`../03-architecture/task-012-order-import-decision-closure.md`](../03-architecture/task-012-order-import-decision-closure.md)),
+and its "Fable gap-closure addendum (2026-07-16)" (bottom of this file) as
+**one canonical contract**, after an exact-codebase preflight of
+`shopify_connector_core`, `shopify_connector_product`, and
+`shopify_connector_sale` at `mvp/program-integration` SHA
+`a34c68e84aada288dad3dc22a6afe94f5ace0652`, confirming: zero Task 012
+order-binding code exists anywhere in the repo today (verified by
+`git ls-tree`/`git grep`, not assumed); the product/customer binding+importer
+patterns this packet's design mirrors are exactly as this packet assumes
+(9 common mixin fields, `_odoo_binding_field_name()`/
+`_additional_protected_binding_fields()` seams, `execute_business`-only
+Shopify calls, savepoint-atomic imports); and the dispatcher/enqueue/job-type
+extension seams this packet relies on are live, tested, and already proven
+by two independent precedents (`product_import_sync`, `customer_import_sync`).
+
+### 0.1 Confirmation-policy contradiction — resolved
+
+The packet's original §15 posture (`order_import_confirmation_policy`,
+Selection `quotation`/`confirm`, **no default**, readiness-blocking while
+unset) is **retired**. The 2026-07-16 addendum's field **replaces** it in
+full: **`order_confirmation_policy`** (Selection `paid_only` /
+`paid_or_authorized` / `quotations_only`, **default `paid_only`**). This is
+not "a default added to the old field" — it is a different field name and a
+different value set, and the re-accepted contract carries only the
+addendum's version. See
+[`DEC-035`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md#table--every-disposition)
+item 11 for the full resolution record. Every other addendum field
+(`manual_gateway_policy`, `approved_manual_gateways`, `order_import_window`,
+`pending_wait_expiry` — now default 24 h / min 1 h / max 7 d per PD-B1, not
+the addendum's stale "proposed 7 days") is accepted as written, corrected for
+PD-B1's binding default.
+
+### 0.2 D-012-4 (ambiguous-customer resolution) — confirmed
+
+Confirmed as written: operator resolves the customer match, then the job
+retries via the already-merged JOB-ACTIONS `action_manual_retry()` and
+completes normally. No new mechanism. (DEC-035 item 12.)
+
+### 0.3 New/clarified requirements found by this session's code preflight
+
+Not present in the pre-existing packet text; both are now part of the
+binding contract (full rationale: DEC-035, "Two additional questions"):
+
+- **`_domain_flag_for_job_type() → 'sale_domain_enabled'`** for
+  `order_import_sync` (reuses Task 011's existing flag; no new settings
+  field, no core edit — DEC-035 EQ-PF-1).
+- **A module-local AST source-guard** asserting the order importer calls
+  only `execute_business`, never the legacy `execute()` (mirrors the
+  product/sale precedent; DEC-035 EQ-PF-2).
+- **`_pii_snapshot_fields()` must be implemented on the order binding,
+  returning an empty tuple** — the binding stores no PII (confirmed: no
+  customer name/email/phone/address field appears anywhere in D-012-1's
+  field table), but the PII-retention sweep (`shopify_connector_pii_retention.py`)
+  only sweeps binding models that implement this method; omitting it is a
+  silent compliance gap, not a loud failure. Declaring it (even as a no-op)
+  is now an explicit acceptance criterion.
+
+### 0.4 Mixed-transaction and null-financial-status handling — resolved
+
+Per [`DEC-035`](../04-decisions/DEC-035-wave-2-open-question-dispositions.md)
+items 1, 2, and 5:
+
+- Null/missing `Order.displayFinancialStatus` at initial import → fail
+  closed, `data_shape_schema_mismatch`, no SO, no binding (same class
+  already used for nullable `totalTaxSet` in this packet's own §6.0.1 — no
+  new vocabulary).
+- Post-confirmation payment-evidence loss → the packet's own already-decided
+  post-import refresh rule applies unchanged: evidence-refresh-only, one
+  `event_type='note'` log row, zero writes to the SO or its lines.
+- An order whose transaction evidence is genuinely mixed/ambiguous (payment
+  authority cannot be classified exactly) → the importer still creates the
+  binding and the SO (import succeeded), but sets the binding's own
+  `status` field to **`review`** (the core mixin's existing
+  `active`/`stale`/`manually_overridden`/`review` value — no new selection
+  value) and the SO is created `draft` regardless of the configured
+  `order_confirmation_policy`. This is a **new acceptance criterion** for
+  §7/§8 below, additive to the existing gate list.
+
+### 0.5 Every packet-internal contradiction reconciled
+
+- The confirmation-policy default contradiction: resolved at §0.1.
+- The nullable-`totalTaxSet` round-7-vs-round-8 and tax-bound-formula
+  round-7-vs-round-8 texts: both already self-resolve via the packet's own
+  "superseded" annotations; the round-8 position is the one carried into
+  §15 and is unchanged by this re-acceptance.
+- The "SRR-03 OPEN" vs "SRR-03 CLOSED" language scattered through the
+  correction-round history above: both are historical; the single current
+  fact, re-verified live from GitHub as part of this session's identity
+  verification, is **SRR-03 CLOSED**, unchanged since Wave 1's merge.
+- The dangling "§18" cross-reference in the D-012-2 round-7 note: clarified
+  as pointing to the decision-closure document's own §18, not a stale
+  self-reference (DEC-035 item 13).
+
+### 0.6 Re-acceptance covers all 26 required contract elements
+
+Objective (§1); domain boundaries (§2); models/fields (§3, D-012-1); store
+settings (§0.1 above + §15's field list, as amended); order-binding
+identity/uniqueness (D-012-1, `UNIQUE(store_id, shopify_gid)` +
+`UNIQUE(store_id, sale_order_id)`); `sale.order`/`sale.order.line`
+extensions (D-012-1, `shopify_line_item_gid`); Shopify
+order/line/customer/product identity chain (D-012-5/§4); financial/total
+verification (§6 of the closure); currency behavior (D-012-3, DEC-020);
+shipping/discount/tax/tip/duty/fee/rounding (D-012-2/-8/-9/-10); confirmation
+policy (§0.1); manual-gateway/COD import behavior (addendum A.3, §0.4);
+cancellation/post-import refresh (D-012-7/-12, §0.4); reconnect/watermark/
+backfill (addendum A.2/A.3, PD-RB-4/6/7/8); duplicate prevention (§5,
+D-012-3); company consistency (D-012-9/-11); security/protected fields (§5,
+§0.3); lifecycle/uninstall (§9–14, LC-1 adoption from the start); job/log
+redaction (§5); performance limits (§4); tests (§6 + addendum A.4 + this
+DoR's §2.2 rows 12–22); runtime evidence (§6, §2.6 of the DoR — Odoo.sh
+mandatory); rollback (§8, DoR §2.8); residue audit (DoR §2.9 — this packet
+itself had no dedicated section; the DoR's is now authoritative); definition
+of done (§8 + DoR §2.10); hard stops (§15 + DoR §2.11).
+
+### 0.7 What this re-acceptance does NOT do
+
+Does not authorize any code, branch, or PR. Does not accept DEC-031 Layer 2
+(unrelated — Task 012 is read-only). Does not add any PII-masking field. Does
+not expand MVP scope. The next authorized activity is issuing (not
+executing) the locked Sol prompt with the exact post-gate-merge SHA.
 
 ## 1. Objective and business outcome
 
