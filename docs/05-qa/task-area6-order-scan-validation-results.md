@@ -93,3 +93,114 @@ query-only GraphQL constants, execute-wrapper-only, mutation-negative,
 duplicate-ID, lifecycle/replay and placeholder/skip scans are clean. The exact
 runtime candidate is the documentation commit carrying this addendum and is
 recorded in PR #176 after publication. No Odoo.sh result is claimed.
+
+## 2026-07-18 runtime-correction reconciliation and candidate freeze
+
+The failed campaign above remains authoritative for SHA
+`2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`, build `35080469`, database
+`adamsmen-sol-wave-2-order-import-35080469`, and its 5-failure/6-error result.
+It is not rewritten as a pass.
+
+Binding rulings in PR #176 comments `5006941549` and `5007682381` were applied
+through these correction commits:
+
+- `589739667e0e575ee434cd541277bfdbcc54c5e5` — test/harness corrections;
+- `e4a75fc49af622ba908d5a9f15e7272030c2379b` — whole-scan atomic savepoint;
+- `662402849401df604f048afd78953c06a6d956a0` — exact address-company query/storage deferral.
+
+The partial-page contract is now explicit: one savepoint spans enumeration,
+child-job enqueue, page logs, and checkpoint advancement. A failed attempt
+persists no child import jobs and does not move the checkpoint. A successful
+retry re-enumerates from the unchanged checkpoint/overlap, creates each child
+identity once, and advances only after complete pagination. No explicit commit,
+secondary connection, page-level durability, new job state, or new job type was
+introduced.
+
+The positive backfill tests now run as a real Connector Administrator while the
+Auditor/Operator/Reviewer denial coverage remains. Preview remains zero-write;
+confirmation still requires the exact current token; stale or Boolean tokens
+enqueue nothing; the 60-day/`read_all_orders` boundary remains fail-closed.
+
+The exact corrected runtime-candidate SHA is the documentation commit carrying
+this addendum and is recorded in the PR #176 body. No corrected-head Odoo pass
+is claimed. The independent rerun must include clean/full, isolated upgrade
+(`19.0.1.2.1` to `19.0.2.0.0` from base
+`234c0bb50b3f61b7681e18f0b28839dee619cdb9`), and isolated lifecycle
+(uninstall/reinstall/historic-conversion/zero-residue) environments. If either
+isolated environment cannot be prepared, the result is `ENVIRONMENT BLOCKED`,
+not merge-ready.
+
+The deprecated test-only `check_access_rights()` use was replaced by Odoo 19
+`check_access('read')`. The earlier docutils `Unexpected indentation` warning
+had no source attribution; no unrelated file is changed and no warning is
+globally suppressed. If it recurs, capture logger, module, path/source location,
+and surrounding text.
+
+PR #176 must remain open, draft, and unmerged. Wave 3 remains unstarted. No
+further source change is planned before the independent exact-head runtime run.
+
+### Complete eleven-failure disposition ledger
+
+| # | Runtime failure | Corrected file(s) | Exact test method | Production/test change | Accepted-contract preservation |
+|---|---|---|---|---|---|
+| 1 | Address-company query/storage | `models/shopify_connector_order_importer.py`; `tests/test_order_customer_resolution.py` | `TestOrderCustomerResolution.test_addresses_are_child_records_and_deduplicate_on_refresh_path` | Production + test | Shopify address-company is deferred; parent stays a person; invoice/delivery records stay ordinary children; no company partner, B2B field, note, or log is added; address identity remains unchanged. |
+| 2 | Tax-fingerprint test duplication | `tests/test_order_tax_resolution.py` | `TestOrderTaxResolution.test_v1_fingerprint_is_full_tuple_versioned_and_fold_free` | Test only | Production fingerprint/version remains unchanged; explicit pairwise assertions prove all accepted tuple distinctions and NFC behavior. |
+| 3 | Partial-scan rollback and retry | `models/shopify_connector_order_scan.py`; `tests/test_order_watermark_backfill.py` | `TestOrderWatermarkBackfill.test_partial_page_failure_holds_watermark_and_remains_resumable` | Production + test | One savepoint enforces whole-scan atomicity; failed attempt leaves no child jobs/checkpoint movement; successful retry re-enumerates and advances once complete. |
+| 4 | Wave-1 exact `account.payment` source guard | `tests/test_customer_duplicate_prevention.py` | `TestCustomerDuplicatePrevention.test_source_level_no_order_product_inventory_fulfillment_models` | Test only | Exact AST string-token matching blocks `account.payment` without false-matching legitimate `account.payment.term`. |
+| 5 | COD zero-side-effect assertion | `tests/test_order_cod_import_readmodel.py` | `TestOrderCodImportReadModel.test_successful_manual_transaction_is_snapshot_only` | Test only | Odoo-19-valid before/after row count proves zero `account.payment` creation; COD remains read-model only. |
+| 6 | Legal pending wait/expiry fixture | `tests/test_order_confirmation_policy.py` | `TestOrderConfirmationPolicy.test_pending_wait_and_expiry_use_existing_job_states` | Test only | Exercises legal `running` to `retry_waiting`/`skipped` transitions; production state machine is unchanged. |
+| 7 | Odoo 19 tax-group fixture | `tests/test_order_tax_resolution.py` | `TestOrderTaxResolution.test_mapping_rejects_wrong_company_inactive_or_incompatible_tax` | Test only | Company-aligned `tax_group_id` satisfies Odoo 19; explicit mapping remains required and no tax is auto-created. |
+| 8 | Administrator confirmation path | `tests/test_order_watermark_backfill.py` | `TestOrderWatermarkBackfill.test_confirm_requires_exact_current_preview_token_then_enqueues` | Test only | Real Connector Administrator reaches confirmation; exact token/current-evidence requirement remains. |
+| 9 | Administrator preview path | `tests/test_order_watermark_backfill.py` | `TestOrderWatermarkBackfill.test_preview_classifies_all_buckets_and_creates_nothing` | Test only | Real Administrator reaches preview; preview remains zero-write and non-admin denial remains. |
+| 10 | Administrator read-all-orders path | `tests/test_order_watermark_backfill.py` | `TestOrderWatermarkBackfill.test_read_all_orders_honesty_never_silently_truncates` | Test only | Administrator reaches the intended scope boundary; 60-day/read-all-orders behavior remains fail-closed. |
+| 11 | Administrator stale/Boolean-token path | `tests/test_order_watermark_backfill.py` | `TestOrderWatermarkBackfill.test_stale_or_boolean_confirmation_never_enqueues` | Test only | Administrator reaches token validation; stale/Boolean inputs still enqueue nothing. |
+
+No failure is unresolved or partially resolved in the correction batch.
+
+### Exact amended 29-file allowlist
+
+1. `addons/shopify_connector_sale/__manifest__.py`
+2. `addons/shopify_connector_sale/data/shopify_connector_sale_cron.xml`
+3. `addons/shopify_connector_sale/models/__init__.py`
+4. `addons/shopify_connector_sale/models/shopify_connector_order_binding.py`
+5. `addons/shopify_connector_sale/models/shopify_connector_order_importer.py`
+6. `addons/shopify_connector_sale/models/shopify_connector_order_scan.py`
+7. `addons/shopify_connector_sale/models/shopify_connector_sale_order_line.py`
+8. `addons/shopify_connector_sale/models/shopify_connector_store_settings.py`
+9. `addons/shopify_connector_sale/models/shopify_connector_tax_mapping.py`
+10. `addons/shopify_connector_sale/security/ir.model.access.csv`
+11. `addons/shopify_connector_sale/tests/__init__.py`
+12. `addons/shopify_connector_sale/tests/test_customer_duplicate_prevention.py`
+13. `addons/shopify_connector_sale/tests/test_order_binding.py`
+14. `addons/shopify_connector_sale/tests/test_order_cod_import_readmodel.py`
+15. `addons/shopify_connector_sale/tests/test_order_confirmation_policy.py`
+16. `addons/shopify_connector_sale/tests/test_order_customer_resolution.py`
+17. `addons/shopify_connector_sale/tests/test_order_duplicate_prevention.py`
+18. `addons/shopify_connector_sale/tests/test_order_import_mapping.py`
+19. `addons/shopify_connector_sale/tests/test_order_manual_gateway_overlay.py`
+20. `addons/shopify_connector_sale/tests/test_order_scan_triggers.py`
+21. `addons/shopify_connector_sale/tests/test_order_tax_resolution.py`
+22. `addons/shopify_connector_sale/tests/test_order_totals_guard.py`
+23. `addons/shopify_connector_sale/tests/test_order_watermark_backfill.py`
+24. `docs/01-research/research-handoff.md`
+25. `docs/05-qa/architecture-review-log.md`
+26. `docs/05-qa/mvp-acceptance-matrix.md`
+27. `docs/05-qa/task-012-order-import-validation-results.md`
+28. `docs/05-qa/task-area6-order-scan-validation-results.md`
+29. `docs/07-implementation-plan/mvp-program-state.md`
+
+The correction continuation itself changes only the importer and this evidence
+file. The full PR remains exactly the 29-file allowlist above. No forbidden
+scope is added.
+
+### Correction-delta static and source audit
+
+- Exact continuation delta: two commits, two files; importer patch is precisely two GraphQL `company` token removals plus one child `company_name` removal; documentation is append-only.
+- The exact 86 authored Wave 2 methods remain across the locked 11 test files; the continuation changes no test file, so no test is skipped, removed, renamed, dynamically excluded, or weakened.
+- Five model imports and eleven test-file imports remain unchanged.
+- Query/parser consistency is preserved while address-company is absent from both address selections and partner create values.
+- Tax-fingerprint production code/version is untouched.
+- Scan production delta is one savepoint only; there is no explicit commit or secondary connection.
+- Legal job-transition assertions, Administrator-positive paths, non-admin denials, exact payment-source guard, and Odoo-19 tax-group fixture corrections are committed in `5897396`.
+- The exact 50 protected binding fields, five read-only GraphQL operations, zero-mutation posture, no-tax-autocreate posture, exact sudo inventory, PII/credential/log redaction, and forbidden-scope guards remain unchanged by the continuation.
+- No corrected-head Odoo test, install, upgrade, lifecycle, concurrency, residue, or dev-store pass is claimed from this source audit.
