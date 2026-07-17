@@ -175,7 +175,7 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
         total = self._money('100.00', currency)
         return {
             'id': 'gid://shopify/Order/GenuineBindingRace',
-            'name': '#GENUINE-RACE',
+            'name': '#GENUINE-RACE-%s' % uuid.uuid4().hex,
             'legacyResourceId': '9000001',
             'createdAt': '2026-07-17T09:00:00Z',
             'processedAt': '2026-07-17T10:00:00Z',
@@ -326,7 +326,9 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
             bindings = env['shopify.connector.order.binding'].search([
                 ('store_id', '=', fixture['store_id']),
             ])
-            orders = bindings.mapped('sale_order_id')
+            orders = env['sale.order'].search([
+                ('origin', '=', fixture['payload']['name']),
+            ]) | bindings.mapped('sale_order_id')
             bindings.unlink()
             orders.unlink()
             env['shopify.connector.product.variant.binding'].browse(
@@ -453,7 +455,12 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 results.put(('ok', result))
             except JobHandlerError as exc:
                 if cr:
-                    cr.rollback()
+                    # The real dispatcher catches JobHandlerError and continues
+                    # in the same transaction to record the job outcome.  Prove
+                    # the importer's outer savepoint restored transaction
+                    # usability and removed the losing quotation before commit.
+                    cr.execute('SELECT 1')
+                    cr.commit()
                 results.put(('conflict', exc.error_class))
             except BaseException as exc:
                 if cr:
@@ -498,10 +505,8 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 )
                 self.assertEqual(cr.fetchone(), (1, 1))
                 cr.execute(
-                    'SELECT count(*) FROM sale_order WHERE id IN '
-                    '(SELECT sale_order_id FROM shopify_connector_order_binding '
-                    'WHERE store_id = %s)',
-                    (fixture['store_id'],),
+                    'SELECT count(*) FROM sale_order WHERE origin = %s',
+                    (fixture['payload']['name'],),
                 )
                 self.assertEqual(cr.fetchone()[0], 1)
                 cr.rollback()
