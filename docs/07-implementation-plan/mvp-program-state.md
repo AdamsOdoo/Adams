@@ -4,6 +4,8 @@
 
 ## Current status
 
+**WAVE 2 PRE-RUNTIME AUDIT COMPLETE / RUNTIME CANDIDATE FROZEN (2026-07-17).** Draft PR [#176](https://github.com/AdamsOdoo/Adams/pull/176) remains open, draft and unmerged on `sol/wave-2-order-import`. Starting head `c62303611e7c5337e08d1632d0541be55df248ba` was identity-clean against merge base `234c0bb50b3f61b7681e18f0b28839dee619cdb9`. A complete contract/code/test/install/security audit corrected the permanent-binding and enqueue collision loser paths, strengthened exact negative and concurrency proof, and made connector-only Reviewer/Admin manual approval deterministic through one exact two-field linked-quotation read. All available static checks are green; 86 unique tests are authored, but no Odoo test pass or build is claimed. The exact runtime candidate is the final documentation commit of this audit and is recorded in PR #176. SRR-03 remains CLOSED; Wave 3 remains unstarted.
+
 **WAVE 0 MERGED (2026-07-15).** PR #169 merged into `mvp/program-integration` (merge commit `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`, per the Wave 0 closure comment on issue #167). DEC-033 is Accepted with two minor corrections applied on PR #169 (Wave 1 internal sub-stage note; hard-stop 11 rewording). DEC-028/029/030 are Accepted; DEC-027 remains Proposed/Deferred. PR #150/#151 administrative closure as superseded is authorized to proceed.
 
 **WAVE 1 MERGED (2026-07-16).** PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) merged into `mvp/program-integration` with a normal merge commit `d18f9a9997d7da574f629f834e2adb83b492cfc6` (reviewed head `d7b08e6d4a84af1a15b498068205c8ee6d510ea5`; runtime-tested SHA `95db3dba4bf295ca6c6ee94ae7fa08da1d505eb7`; runtime-evidence commit `8a3104f892fa0bdf256e17a57933a7dcbb9db0c5`). Corrected-head Odoo.sh build `34995642` ran the complete matrix green (full standard suite `0 failed / 0 errors / 644`; clean residue/security; issue #157 accommodation dropped/restored). Final Claude control-room review: 20-point independent verification against production code with adversarial adjudication on every non-clean-pass finding; two documentation-only claim-accuracy defects were found and corrected in the PR's final commit (`d7b08e6`) — no code, test, or security defect found. **Decision: ACCEPTED AND MERGED. SRR-03 remains CLOSED. Wave 2 remains unauthorized and unstarted.** The next authorized activity is the separate Wave 2 decision-acceptance / Definition-of-Ready / packet re-acceptance / exact-base preflight session (the one-time Fable remaining-gap-closure mission is now **complete** — PR #173 merged 2026-07-17, merge commit `0fb8ccb`).
@@ -213,3 +215,14 @@ live `mvp/program-integration` tip substituted for
 
 - **Wave 0 start (2026-07-15):** Product-owner launch received; protected refs verified; `sol/wave-0-reconciliation-research` created from `mvp/program-integration`; Wave 0 docs/research work opened. No addon code authorized or changed.
 - **MVP Program Bootstrap (2026-07-15):** Established the control-room governance framework (this file and its siblings). Verified checkpoint integrity, created `mvp/program-integration`, audited the full repository, froze the MVP contract, and prepared Sol's launch prompt. Implementation remains frozen pending product-owner launch. Next: product owner reviews the bootstrap PR, then launches Sol with `../06-prompts/gpt56-sol-master-mvp-mission.md` at XHigh reasoning effort.
+
+
+### Wave 2 pre-runtime freeze handoff — 2026-07-17
+
+- **Branch / PR:** `sol/wave-2-order-import`; draft PR #176 → `mvp/program-integration`, open and unmerged.
+- **Scope covered:** complete Task 012 + accepted order Area-6 contract traceability, every changed production line, 86-test quality inventory, install/upgrade/migration analysis, ACL/sudo/PII review and all available non-Odoo tooling.
+- **Corrections:** deterministic nested-savepoint binding-race rollback; invisible-winner enqueue collision handling; exact state/side-effect/configuration/pagination/atomicity tests; connector-role manual approval exact read seam.
+- **Runtime evidence:** none. Exact-head Odoo.sh matrix is pending; no pass is claimed.
+- **Hard stop:** runtime access only. Source audit found no product-decision blocker.
+- **Next action:** run the single matrix in the two Wave-2 validation records against the exact PR head; do not change source first.
+- **Boundary:** SRR-03 CLOSED; PR draft/unmerged; no mutation, Layer 2 or Wave 3+ work.
