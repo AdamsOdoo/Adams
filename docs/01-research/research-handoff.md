@@ -1,3 +1,13 @@
+### Wave 2 documentation reconciliation — Claude control-room (2026-07-17)
+
+- **Branch / PR:** `sol/wave-2-order-import`; draft PR [#176](https://github.com/AdamsOdoo/Adams/pull/176) into `mvp/program-integration`; open, draft and unmerged.
+- **First runtime campaign (preserved, historical):** frozen candidate `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`, Odoo.sh build `35080469`, `shopify_connector_sale` **5 failures / 6 errors** (11 unique findings); core/product green. Full evidence: `../05-qa/task-012-order-import-validation-results.md`.
+- **Control-room rulings:** `5006941549`, `5007682381`, `5008012338`, `5008123769` adjudicated all eleven findings and authorized the correction batch and this documentation reconciliation.
+- **Accepted correction commits:** `5897396` (test-harness corrections), `e4a75fc` (atomic scan-attempt savepoint), `6624028` (Shopify address-company mapping removed/deferred). Production and test corrections are complete; all 86 authored Wave 2 tests remain, none removed/skipped/weakened.
+- **This session:** Claude docs-only reconciliation of `mvp-program-state.md`, `task-012-order-import-validation-results.md`, `mvp-acceptance-matrix.md` (malformed-header repair plus rows 9/13/14) and this handoff entry, per ruling `5008123769`. No `addons/**` or test file touched; no Shopify API call or mutation.
+- **Runtime status:** the new exact post-commit branch head is the sole authorized runtime candidate — see PR #176's body for the exact SHA; this supersedes runtime authorization for `32237410b45c37f92f80fc07d43ddd6541d6134d`. Corrected-head runtime remains pending; no corrected-head Odoo pass is claimed. Clean/full, isolated-upgrade and isolated-lifecycle environments are mandatory for the next independent campaign.
+- **Boundaries:** PR #176 remains open, draft and unmerged; Wave 3 remains unstarted; no scope broadening in this session.
+
 ### Wave 2 implementation/static handoff — runtime-access hard stop (2026-07-17)
 
 - **Branch / PR:** `sol/wave-2-order-import`; draft PR [#176](https://github.com/AdamsOdoo/Adams/pull/176) into `mvp/program-integration`; open, draft and unmerged.

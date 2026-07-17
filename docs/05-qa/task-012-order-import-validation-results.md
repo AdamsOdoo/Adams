@@ -2,7 +2,9 @@
 
 ## Status
 
-**Exact-head Odoo.sh runtime validation campaign EXECUTED (2026-07-17, build `35080469`); outcome: CORRECTION REQUIRED — 11 sale-module test failures; `shopify_connector_core` and `shopify_connector_product` green.** (The pre-runtime source-validation history below is retained and remains accurate. No source or test code was changed by the runtime operator.)
+**CORRECTIONS COMPLETE — CORRECTED-HEAD RUNTIME PENDING (2026-07-17).** See the "Correction addendum — 2026-07-17 (current status)" section below for the full current-facing record; all eleven runtime findings from the first campaign are dispositioned and committed, no corrected-head Odoo.sh pass exists yet, and PR #176 remains open, draft and unmerged.
+
+**Exact-head Odoo.sh runtime validation campaign EXECUTED (2026-07-17, build `35080469`); outcome at that time: CORRECTION REQUIRED — 11 sale-module test failures; `shopify_connector_core` and `shopify_connector_product` green. (Historical — first-campaign record; superseded by the Correction addendum below: all eleven findings are now dispositioned and the correction batch is committed; corrected-head runtime remains pending.)** (The pre-runtime source-validation history below is retained and remains accurate. No source or test code was changed by the runtime operator.)
 
 - Date: 2026-07-17
 - Branch / PR: `sol/wave-2-order-import`; draft PR #176 → `mvp/program-integration`
@@ -15,7 +17,29 @@
 
 This record's pre-runtime section does not claim an Odoo test pass; the runtime campaign section immediately below now supplies the executed runtime evidence.
 
-## Exact-head runtime validation campaign — 2026-07-17
+## Correction addendum — 2026-07-17 (current status)
+
+**CORRECTIONS COMPLETE — CORRECTED-HEAD RUNTIME PENDING.**
+
+This addendum is the current-facing record for Task 012 / order import. The complete first-campaign evidence in "Exact-head runtime validation campaign — 2026-07-17" below is retained verbatim as historical evidence; its "CORRECTION REQUIRED" recommendation is superseded by this addendum.
+
+- Failed implementation SHA: `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`
+- Build: `35080469`
+- Database: `adamsmen-sol-wave-2-order-import-35080469`
+- Evidence commit: `936cdf9ebc44c1655ffd2ad46b44d7f7619f895b`
+- Failed result: **5 failures / 6 errors** (11 unique findings)
+- Binding control-room comments: [`5006941549`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5006941549), [`5007682381`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5007682381), [`5008012338`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5008012338), [`5008123769`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5008123769)
+- Correction commits: `589739667e0e575ee434cd541277bfdbcc54c5e5`, `e4a75fc49af622ba908d5a9f15e7272030c2379b`, `662402849401df604f048afd78953c06a6d956a0`, `32237410b45c37f92f80fc07d43ddd6541d6134d`
+- All eleven findings (8 test-harness defects + 3 production-vs-test adjudication items) are resolved in source/tests per the binding rulings above; none remains unresolved or partially resolved.
+- Whole-scan atomic rollback is the accepted and committed behavior (ruling `5006941549` item 3): a failed scan persists no child job or checkpoint change, and a successful retry re-enumerates and advances only after full pagination.
+- Shopify address-`company` mapping to child-address `company_name` is removed and deferred to a post-MVP/B2B enhancement (ruling `5006941549` item 1; commit `662402849401df604f048afd78953c06a6d956a0`).
+- Tax-fingerprint production code, version and NFC-normalization semantics are unchanged; only the defective set-cardinality test was replaced with explicit pairwise assertions (ruling `5006941549` item 2).
+- All 86 authored Wave 2 order-import test methods remain; no test was removed, skipped, renamed, dynamically excluded or weakened by the correction batch.
+- No corrected-head Odoo.sh pass exists yet. The next independent runtime campaign requires: a clean/full install environment; an isolated baseline-upgrade environment; and an isolated uninstall/reinstall lifecycle environment.
+- PR #176 remains open, draft and unmerged.
+- Wave 3 remains unstarted.
+
+## Exact-head runtime validation campaign — 2026-07-17 (historical — first campaign; superseded by the Correction addendum above)
 
 > Operator runtime campaign run against the frozen runtime candidate in an authenticated Odoo.sh dev build. No source or test file was modified before, during, or as a result of this campaign; the SHA below is the exact frozen head. Correction of the failures found is implementation/test work reserved to the Sol worker (DEC-032 / CLAUDE.md §13) and was **not** performed by the control-room operator.
 
@@ -77,9 +101,9 @@ Protected-field forge/clear guard; complete 50-field stored-field classification
 - **Issue #157 accommodation**: NOT applied — the `notification_type`/`color_scheme` defect did not reproduce.
 - **Read-only dev-store evidence (§15)**: no authenticated Shopify credentials are available in this session; no live-evidence claim is made; deferred to Wave 6.
 
-### Recommendation — CORRECTION REQUIRED
+### Recommendation — CORRECTION REQUIRED (historical; superseded by the Correction addendum above)
 
-The frozen runtime candidate `2e1b1eb…` is **not green**. Failed SHA: `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`. The corrected SHA is to be recorded by the corrector alongside a corrected-head rerun. Correcting the 8 test-harness defects and adjudicating the 3 production-vs-test contract questions is implementation/test work reserved to the Sol worker under DEC-032 / CLAUDE.md §13; the control-room operator made no code or test change. PR #176 remains draft, open and unmerged; Wave 3 remains unstarted.
+The frozen runtime candidate `2e1b1eb…` is **not green**. Failed SHA: `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`. The corrected SHA is to be recorded by the corrector alongside a corrected-head rerun. Correcting the 8 test-harness defects and adjudicating the 3 production-vs-test contract questions is implementation/test work reserved to the Sol worker under DEC-032 / CLAUDE.md §13; the control-room operator made no code or test change. PR #176 remains draft, open and unmerged; Wave 3 remains unstarted. This recommendation reflects the first campaign only; see the Correction addendum near the top of this document for the current, corrected-head-runtime-pending status.
 
 ## Implemented scope
 
