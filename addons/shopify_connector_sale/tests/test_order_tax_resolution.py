@@ -1,4 +1,5 @@
 import json
+import unicodedata
 
 from psycopg2 import IntegrityError
 
@@ -20,12 +21,18 @@ from .test_order_import_mapping import OrderImportCase
 class TestOrderTaxResolution(OrderImportCase):
 
     def _tax(self, name='VAT 5', amount=5.0, included=False, **extra):
+        company_id = extra.get('company_id', self.env.company.id)
+        tax_group = self.env['account.tax.group'].sudo().create({
+            'name': '%s Group' % name,
+            'company_id': company_id,
+        })
         values = {
             'name': name,
             'amount': amount,
             'amount_type': 'percent',
             'type_tax_use': 'sale',
-            'company_id': self.env.company.id,
+            'company_id': company_id,
+            'tax_group_id': tax_group.id,
             'price_include_override': (
                 'tax_included' if included else 'tax_excluded'
             ),
@@ -80,20 +87,36 @@ class TestOrderTaxResolution(OrderImportCase):
 
     def test_v1_fingerprint_is_full_tuple_versioned_and_fold_free(self):
         evidence = self._evidence()
-        key = self._key(evidence)
-        self.assertRegex(key, r'^v1:[0-9a-f]{64}$')
+        base = self._key(evidence)
+        self.assertRegex(base, r'^v1:[0-9a-f]{64}$')
         self.assertEqual(canonical_tax_rate(0.05, 5), '5')
-        variants = {
-            self._key(self._evidence(title='vat')),
-            self._key(self._evidence(title='VAT')),
+
+        self.assertNotEqual(base, self._key(self._evidence(title='vat')))
+        self.assertNotEqual(
             self._key(self._evidence(source=None)),
             self._key(self._evidence(source='')),
-            self._key(self._evidence(liable=True)),
-            self._key(self._evidence(liable=False)),
-            self._key(self._evidence(liable=None)),
-            self._key(evidence, included=True),
+        )
+        liability_keys = {
+            value: self._key(self._evidence(liable=value))
+            for value in (None, True, False)
         }
-        self.assertEqual(len(variants), 8)
+        self.assertNotEqual(liability_keys[None], liability_keys[True])
+        self.assertNotEqual(liability_keys[None], liability_keys[False])
+        self.assertNotEqual(liability_keys[True], liability_keys[False])
+        self.assertNotEqual(base, self._key(evidence, included=True))
+
+        composed = 'Café'
+        decomposed = unicodedata.normalize('NFD', composed)
+        self.assertNotEqual(composed, decomposed)
+        self.assertEqual(
+            self._key(self._evidence(title=composed)),
+            self._key(self._evidence(title=decomposed)),
+        )
+        self.assertNotEqual(
+            self._key(self._evidence(title='A|B', source='C')),
+            self._key(self._evidence(title='A', source='B|C')),
+        )
+
         with self.assertRaises(ValidationError):
             canonical_tax_rate(0.05, 6)
         for invalid in ('false', 0, 1):

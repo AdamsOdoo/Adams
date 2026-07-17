@@ -116,9 +116,7 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         reviewer = self.roles['reviewer']
         self.assertFalse(reviewer.has_group('sales_team.group_sale_salesman'))
         with self.assertRaises(AccessError):
-            binding.sale_order_id.with_user(reviewer).check_access_rights(
-                'read'
-            )
+            binding.sale_order_id.with_user(reviewer).check_access('read')
         for role in ('auditor', 'operator'):
             with self.assertRaises(AccessError, msg=role):
                 binding.with_user(self.roles[role]).action_approve_manual_gateway_order(

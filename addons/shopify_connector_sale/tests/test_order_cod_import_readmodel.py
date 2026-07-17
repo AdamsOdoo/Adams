@@ -44,6 +44,7 @@ class TestOrderCodImportReadModel(OrderImportCase):
             'manual_gateway_policy': 'quotation',
             'approved_manual_gateways': 'Cash on Delivery',
         })
+        payments_before = self.env['account.payment'].search_count([])
         binding = self.Importer._apply_import(
             self.store,
             self._cod_payload(
@@ -54,9 +55,9 @@ class TestOrderCodImportReadModel(OrderImportCase):
         self.assertEqual(binding.cod_collection_state, 'fully_collected')
         self.assertEqual(binding.cod_collected_value_amount, '100.00')
         self.assertEqual(binding.sale_order_id.state, 'draft')
-        self.assertFalse(self.env['account.payment'].search([
-            ('ref', '=', binding.shopify_order_name),
-        ]))
+        self.assertEqual(
+            self.env['account.payment'].search_count([]), payments_before,
+        )
 
     def test_non_cod_order_does_not_acquire_cod_flag(self):
         binding = self.Importer._apply_import(
@@ -74,4 +75,3 @@ class TestOrderCodImportReadModel(OrderImportCase):
         self.assertNotIn('orderCreateManualPayment', source)
         self.assertNotIn("env['account.payment'].create", source)
         self.assertNotIn("env['account.move'].create", source)
-

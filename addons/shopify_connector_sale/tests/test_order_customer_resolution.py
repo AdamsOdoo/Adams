@@ -1,3 +1,5 @@
+import re
+
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
@@ -150,6 +152,16 @@ class TestOrderCustomerResolution(OrderImportCase):
         self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
 
     def test_addresses_are_child_records_and_deduplicate_on_refresh_path(self):
+        self.assertIsNone(re.search(
+            r'billingAddress\s*\{[^}]*\bcompany\b',
+            ORDER_HEADER_QUERY,
+            flags=re.DOTALL,
+        ))
+        self.assertIsNone(re.search(
+            r'shippingAddress\s*\{[^}]*\bcompany\b',
+            ORDER_HEADER_QUERY,
+            flags=re.DOTALL,
+        ))
         payload = self._payload('gid://shopify/Order/Addresses')
         payload['email'] = 'address-guest@example.invalid'
         address = {
@@ -161,15 +173,26 @@ class TestOrderCustomerResolution(OrderImportCase):
         }
         payload['billingAddress'] = dict(address)
         payload['shippingAddress'] = dict(address)
+        company_partners_before = self.env['res.partner'].search_count([
+            ('is_company', '=', True),
+        ])
         binding = self.Importer._apply_import(self.store, payload)
         partner = binding.sale_order_id.partner_id
+        parent_before = partner.read([
+            'name', 'is_company', 'parent_id', 'company_name',
+        ])[0]
         children = partner.child_ids.filtered(
             lambda child: child.type in ('invoice', 'delivery')
         )
         self.assertEqual(len(children), 2)
-        self.assertTrue(all(
-            child.company_name == 'Example Co' for child in children
-        ))
+        self.assertEqual(set(children.mapped('type')), {'invoice', 'delivery'})
+        self.assertTrue(all(child.parent_id == partner for child in children))
+        self.assertTrue(all(not child.is_company for child in children))
+        self.assertTrue(all(not child.company_name for child in children))
+        self.assertEqual(
+            self.env['res.partner'].search_count([('is_company', '=', True)]),
+            company_partners_before,
+        )
         self.assertFalse(partner.is_company)
         self.assertEqual(partner.name, 'Address Guest')
         same = self.Importer._apply_import(self.store, payload)
@@ -192,6 +215,13 @@ class TestOrderCustomerResolution(OrderImportCase):
         self.assertEqual(len(partner.child_ids.filtered(
             lambda child: child.type in ('invoice', 'delivery')
         )), 2)
+        self.assertEqual(partner.read([
+            'name', 'is_company', 'parent_id', 'company_name',
+        ])[0], parent_before)
+        self.assertEqual(
+            self.env['res.partner'].search_count([('is_company', '=', True)]),
+            company_partners_before,
+        )
 
     def test_abandoned_checkouts_never_enter_order_pipeline(self):
         self.assertNotIn('abandonedCheckout', ORDER_HEADER_QUERY)

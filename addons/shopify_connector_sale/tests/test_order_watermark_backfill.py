@@ -56,6 +56,14 @@ class TestOrderWatermarkBackfill(OrderImportCase):
         client = self.env['shopify.connector.api.client']
         return patch.object(type(client), 'execute_business', new=execute)
 
+    def _admin_records(self, job):
+        admin = self.roles['admin']
+        return (
+            self.env['shopify.connector.order.scan'].with_user(admin),
+            self.store.with_user(admin),
+            job.with_user(admin),
+        )
+
     def _draft_order(self, label):
         return self.env['sale.order'].create({
             'partner_id': self.fallback_partner.id,
@@ -117,17 +125,58 @@ class TestOrderWatermarkBackfill(OrderImportCase):
             job_type='order_import_scan', target='scan:order', state='running',
         )
         first = self._body([
-            ('cursor-first', self._node('PartialFirst')),
+            ('cursor-first', self._node(
+                'PartialFirst', '2026-07-17T11:00:00Z',
+            )),
         ], has_next=True, end_cursor='partial-end')
         malformed = {'data': {'orders': None}}
+        Dispatch = self.env['shopify.connector.job.dispatch']
         with self._patch_bodies([first, malformed]):
             with self.assertRaises(JobHandlerError):
-                self.env['shopify.connector.order.scan'].run_scan(job)
+                Dispatch._handle_order_import_scan(job)
         self.settings.invalidate_recordset([
             'sale_order_last_import_checkpoint_at',
         ])
         self.assertEqual(
             self.settings.sale_order_last_import_checkpoint_at, old,
+        )
+        child_domain = [
+            ('job_type', '=', 'order_import_sync'),
+            ('shopify_target_gid', 'in', [
+                'gid://shopify/Order/PartialFirst',
+                'gid://shopify/Order/PartialSecond',
+            ]),
+        ]
+        self.assertEqual(self.Job.search_count(child_domain), 0)
+
+        retry_first = self._body([
+            ('cursor-first-retry', self._node(
+                'PartialFirst', '2026-07-17T11:00:00Z',
+            )),
+        ], has_next=True, end_cursor='partial-retry-end')
+        retry_second = self._body([
+            ('cursor-second-retry', self._node(
+                'PartialSecond', '2026-07-17T12:00:00Z',
+            )),
+        ])
+        with self._patch_bodies([retry_first, retry_second]):
+            counts = Dispatch._handle_order_import_scan(job)
+        self.assertIsNone(counts)
+        self.settings.invalidate_recordset([
+            'sale_order_last_import_checkpoint_at',
+        ])
+        self.assertEqual(
+            self.settings.sale_order_last_import_checkpoint_at,
+            datetime(2026, 7, 17, 12, 0, 0),
+        )
+        children = self.Job.search(child_domain)
+        self.assertEqual(len(children), 2)
+        self.assertEqual(
+            set(children.mapped('shopify_target_gid')),
+            {
+                'gid://shopify/Order/PartialFirst',
+                'gid://shopify/Order/PartialSecond',
+            },
         )
         self.assertEqual(self.Job.search_count([
             ('job_type', '=', 'order_import_sync'),
@@ -171,12 +220,11 @@ class TestOrderWatermarkBackfill(OrderImportCase):
                 self.env['sale.order'].search_count([]), orders_before,
             )
             self.assertEqual(self.Binding.search_count([]), bindings_before)
+        Scan, store, admin_job = self._admin_records(job)
         with self._patch_bodies([self._body(nodes)]):
-            result = self.env[
-                'shopify.connector.order.scan'
-            ].preview_backfill(
-                self.store, '2026-07-17 00:00:00',
-                '2026-07-18 00:00:00', job,
+            result = Scan.preview_backfill(
+                store, '2026-07-17 00:00:00',
+                '2026-07-18 00:00:00', admin_job,
             )
         self.assertEqual({key: result[key] for key in (
             'new', 'changed', 'duplicate', 'skipped', 'needs_review',
@@ -197,17 +245,17 @@ class TestOrderWatermarkBackfill(OrderImportCase):
         job = self._job(
             job_type='order_import_scan', target='scan:order', state='running',
         )
-        Scan = self.env['shopify.connector.order.scan']
+        Scan, store, admin_job = self._admin_records(job)
         with self._patch_bodies([self._body(nodes)]):
             preview = Scan.preview_backfill(
-                self.store, '2026-07-17 00:00:00',
-                '2026-07-18 00:00:00', job,
+                store, '2026-07-17 00:00:00',
+                '2026-07-18 00:00:00', admin_job,
             )
         jobs_before = self.Job.search_count([])
         with self._patch_bodies([self._body(nodes)]):
             result = Scan.confirm_backfill(
-                self.store, '2026-07-17 00:00:00',
-                '2026-07-18 00:00:00', job,
+                store, '2026-07-17 00:00:00',
+                '2026-07-18 00:00:00', admin_job,
                 confirmation=preview['confirmation_token'],
             )
         self.assertEqual(result['enqueued'], 1)
@@ -226,11 +274,11 @@ class TestOrderWatermarkBackfill(OrderImportCase):
         job = self._job(
             job_type='order_import_scan', target='scan:order', state='running',
         )
-        Scan = self.env['shopify.connector.order.scan']
+        Scan, store, admin_job = self._admin_records(job)
         with self._patch_bodies([self._body(nodes)]):
             preview = Scan.preview_backfill(
-                self.store, '2026-07-17 00:00:00',
-                '2026-07-18 00:00:00', job,
+                store, '2026-07-17 00:00:00',
+                '2026-07-18 00:00:00', admin_job,
             )
         before = self.Job.search_count([])
         for confirmation, body in (
@@ -244,8 +292,8 @@ class TestOrderWatermarkBackfill(OrderImportCase):
             with self._patch_bodies([body]):
                 with self.assertRaises(UserError):
                     Scan.confirm_backfill(
-                        self.store, '2026-07-17 00:00:00',
-                        '2026-07-18 00:00:00', job,
+                        store, '2026-07-17 00:00:00',
+                        '2026-07-18 00:00:00', admin_job,
                         confirmation=confirmation,
                     )
             self.assertEqual(self.Job.search_count([]), before)
@@ -253,31 +301,33 @@ class TestOrderWatermarkBackfill(OrderImportCase):
         self.store.sudo().write({
             'connection_generation': self.store.connection_generation + 1,
         })
+        store = self.store.with_user(self.roles['admin'])
         with self._patch_bodies([self._body(nodes)]):
             with self.assertRaises(UserError):
                 Scan.confirm_backfill(
-                    self.store, '2026-07-17 00:00:00',
-                    '2026-07-18 00:00:00', job,
+                    store, '2026-07-17 00:00:00',
+                    '2026-07-18 00:00:00', admin_job,
                     confirmation=preview['confirmation_token'],
                 )
         self.assertEqual(self.Job.search_count([]), before)
 
     def test_read_all_orders_honesty_never_silently_truncates(self):
-        Scan = self.env['shopify.connector.order.scan']
         job = self._job(
             job_type='order_import_scan', target='scan:order', state='running',
         )
+        Scan, store, admin_job = self._admin_records(job)
         old = fields.Datetime.now() - timedelta(days=61)
         with self.assertRaisesRegex(UserError, 'Partner Dashboard'):
             Scan.preview_backfill(
-                self.store, old, fields.Datetime.now(), job,
+                store, old, fields.Datetime.now(), admin_job,
             )
         self.store.sudo().write({
             'granted_scopes': '["read_orders", "read_all_orders"]',
         })
+        store = self.store.with_user(self.roles['admin'])
         with self._patch_bodies([self._body([])]):
             result = Scan.preview_backfill(
-                self.store, old, fields.Datetime.now(), job,
+                store, old, fields.Datetime.now(), admin_job,
             )
         self.assertEqual(result['pages'], 1)
         self.assertEqual(result['enqueued'], 0)

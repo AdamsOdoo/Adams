@@ -192,7 +192,9 @@ class TestOrderConfirmationPolicy(OrderImportCase):
         Dispatch = self.env['shopify.connector.job.dispatch']
         ImporterType = type(self.Importer)
         fixed_now = datetime(2026, 7, 17, 15, 0, 0)
-        waiting = self._job(target='gid://shopify/Order/PendingWait')
+        waiting = self._job(
+            target='gid://shopify/Order/PendingWait', state='running',
+        )
         waiting.sudo().write({
             'started_at': fixed_now - timedelta(hours=1),
         })
@@ -201,7 +203,7 @@ class TestOrderConfirmationPolicy(OrderImportCase):
             'store_id': self.store.id,
             'job_source': 'manual_sync',
             'job_type': 'order_import_sync',
-            'state': 'queued',
+            'state': 'running',
             'payload_hash': 'pending-expired',
             'res_model': 'shopify.connector.store',
             'res_id': self.store.id,
@@ -209,6 +211,8 @@ class TestOrderConfirmationPolicy(OrderImportCase):
             'expected_connection_generation': self.store.connection_generation,
             'started_at': fixed_now - timedelta(hours=25),
         })
+        self.assertEqual(waiting.state, 'running')
+        self.assertEqual(expired.state, 'running')
         with patch.object(fields.Datetime, 'now', return_value=fixed_now):
             with patch.object(
                 ImporterType, 'import_order_sync',
