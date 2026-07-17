@@ -50,3 +50,27 @@ Run this file's focused classes together with the complete Task 012 matrix at th
 8. Apply and restore the accepted issue #157 defaults only if the exact known fixture artifact reproduces.
 
 No build, database or passing count exists yet. SRR-03 remains CLOSED from Wave 1; this new read-only scan still needs regression proof and makes no exactly-once claim.
+
+## 2026-07-17 pre-runtime completeness addendum
+
+The complete Wave-2 audit found and corrected one scan collision defect before
+runtime: after a PostgreSQL unique conflict, a `REPEATABLE READ` transaction
+may not see the concurrently committed winner. `_enqueue_order_scan()` and the
+selected-binding enqueue action now return the winner when visible or `False`
+when it is not; they never leak the uniqueness exception and never replay a
+handler. The database active-job uniqueness rule remains authoritative.
+
+The focused scan tests now prove exact Operator/Admin permission and
+Auditor/Reviewer denial, enqueue-only behavior, one-or-zero collision result,
+cron catch/log/continue across stores, connected + domain + opt-in gating,
+complete-page checkpoint advance, partial-page hold, repeated-cursor and page
+ceiling refusal, zero-write preview, exact token/generation binding, and
+60-day/`read_all_orders` honesty. The independent-connection enqueue race uses
+two committed transactions, two barriers, bounded joins, captured worker
+exceptions, exact one-row SQL assertions and unconditional cursor cleanup.
+
+Static rerun: Python/AST, cron XML, manifest, ACL CSV, registration, five
+query-only GraphQL constants, execute-wrapper-only, mutation-negative,
+duplicate-ID, lifecycle/replay and placeholder/skip scans are clean. The exact
+runtime candidate is the documentation commit carrying this addendum and is
+recorded in PR #176 after publication. No Odoo.sh result is claimed.
