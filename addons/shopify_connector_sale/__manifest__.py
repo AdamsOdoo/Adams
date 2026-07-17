@@ -37,6 +37,7 @@ file.
     'depends': ['shopify_connector_core', 'shopify_connector_product', 'sale'],
     'data': [
         'security/ir.model.access.csv',
+        'data/shopify_connector_sale_cron.xml',
     ],
     'installable': True,
     'application': False,

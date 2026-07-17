@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="ir_cron_shopify_connector_order_scan" model="ir.cron">
+        <field name="name">Shopify Connector: Enqueue Order Scans</field>
+        <field name="model_id" ref="shopify_connector_core.model_shopify_connector_store"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_enqueue_order_scans()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

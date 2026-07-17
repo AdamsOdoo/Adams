@@ -6,3 +6,4 @@ from . import shopify_connector_order_binding
 from . import shopify_connector_sale_order_line
 from . import shopify_connector_order_importer
 from . import shopify_connector_tax_mapping
+from . import shopify_connector_order_scan

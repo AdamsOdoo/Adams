@@ -244,7 +244,7 @@ class TestOrderImportMappingStatic(TransactionCase):
     def _tree(self, filename):
         return ast.parse(self._source(filename), filename=filename)
 
-    def test_all_four_task012_model_files_are_registered_exactly_once(self):
+    def test_all_five_model_files_are_registered_exactly_once(self):
         tree = ast.parse(
             (MODELS_ROOT / '__init__.py').read_text(encoding='utf-8')
         )
@@ -258,6 +258,7 @@ class TestOrderImportMappingStatic(TransactionCase):
             'shopify_connector_sale_order_line',
             'shopify_connector_order_importer',
             'shopify_connector_tax_mapping',
+            'shopify_connector_order_scan',
         ):
             self.assertEqual(imported.count(name), 1, name)
 
@@ -291,7 +292,10 @@ class TestOrderImportMappingStatic(TransactionCase):
             self.assertIn(required, ORDER_HEADER_QUERY)
 
     def test_execute_business_only_and_no_context_bypass(self):
-        for filename in ('shopify_connector_order_importer.py',):
+        for filename in (
+            'shopify_connector_order_importer.py',
+            'shopify_connector_order_scan.py',
+        ):
             tree = self._tree(filename)
             attributes = [
                 node.attr for node in ast.walk(tree)
@@ -305,6 +309,7 @@ class TestOrderImportMappingStatic(TransactionCase):
         expected = {
             'shopify_connector_order_binding.py': 1,
             'shopify_connector_order_importer.py': 2,
+            'shopify_connector_order_scan.py': 1,
             'shopify_connector_tax_mapping.py': 0,
         }
         for filename, count in expected.items():
@@ -340,11 +345,13 @@ class TestOrderImportMappingStatic(TransactionCase):
         )
         self.assertEqual(manifest['data'], [
             'security/ir.model.access.csv',
+            'data/shopify_connector_sale_cron.xml',
         ])
 
     def test_job_types_have_lc1_ondelete_and_replay_policy(self):
         for filename, job_type in (
             ('shopify_connector_order_importer.py', 'order_import_sync'),
+            ('shopify_connector_order_scan.py', 'order_import_scan'),
         ):
             source = self._source(filename)
             self.assertIn("selection_add=[('%s'," % job_type, source)
