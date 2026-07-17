@@ -48,6 +48,11 @@ REDACTION_EXTENSION = frozenset((
     'shippingAddress', 'street', 'street2', 'zip',
 ))
 
+# Contract-mandated evidence-only fields are deliberately limited to
+# Order.confirmed/closed and Transaction.id/processedAt.  They are retained in
+# the accepted query shape for authoritative lifecycle/payment evidence but are
+# neither persisted nor used to mutate an Odoo order in this read-only MVP.
+# Order.closedAt is separately parsed and shape-validated below.
 
 ORDER_HEADER_QUERY = """
 query ConnectorOrderHeader($id: ID!) {
@@ -466,81 +471,84 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             return self._refresh_existing(existing, payload, settings, job)
         self._precreation_gates(payload, settings)
 
-        try:
-            with self.env.cr.savepoint():
-                partner, resolution = self._resolve_customer(
-                    store, payload, settings, job,
+        with self.env.cr.savepoint():
+            partner, resolution = self._resolve_customer(
+                store, payload, settings, job,
+            )
+            if partner.company_id and partner.company_id != company:
+                raise JobHandlerError(
+                    'odoo_validation_configuration',
+                    'The resolved order customer belongs to another '
+                    'Odoo company.',
                 )
-                if partner.company_id and partner.company_id != company:
-                    raise JobHandlerError(
-                        'odoo_validation_configuration',
-                        'The resolved order customer belongs to another '
-                        'Odoo company.',
-                    )
-                invoice_partner, shipping_partner = self._resolve_order_addresses(
-                    partner, payload, resolution,
-                )
-                pricelist = self._resolve_pricelist(settings, payload)
-                self._validate_payment_term(settings.order_payment_term_id)
-                order_vals = {
-                    'partner_id': partner.id,
-                    'partner_invoice_id': invoice_partner.id,
-                    'partner_shipping_id': shipping_partner.id,
-                    'company_id': company.id,
-                    'pricelist_id': pricelist.id,
-                    'payment_term_id': settings.order_payment_term_id.id,
-                    'date_order': self._to_odoo_datetime(
-                        payload.get('processedAt') or payload.get('createdAt')
-                    ) or fields.Datetime.now(),
-                    'origin': payload.get('name') or payload['id'],
-                    'client_order_ref': payload.get('name') or payload['id'],
-                }
-                if settings.order_sales_team_id:
-                    order_vals['team_id'] = settings.order_sales_team_id.id
-                order = self.env['sale.order'].create(order_vals)
-                line_plans = self._create_order_lines(
-                    order, store, payload, settings, job=job,
-                )
-                self._solve_and_assert_totals(order, line_plans, payload)
+            invoice_partner, shipping_partner = self._resolve_order_addresses(
+                partner, payload, resolution,
+            )
+            pricelist = self._resolve_pricelist(settings, payload)
+            self._validate_payment_term(settings.order_payment_term_id)
+            order_vals = {
+                'partner_id': partner.id,
+                'partner_invoice_id': invoice_partner.id,
+                'partner_shipping_id': shipping_partner.id,
+                'company_id': company.id,
+                'pricelist_id': pricelist.id,
+                'payment_term_id': settings.order_payment_term_id.id,
+                'date_order': self._to_odoo_datetime(
+                    payload.get('processedAt') or payload.get('createdAt')
+                ) or fields.Datetime.now(),
+                'origin': payload.get('name') or payload['id'],
+                'client_order_ref': payload.get('name') or payload['id'],
+            }
+            if settings.order_sales_team_id:
+                order_vals['team_id'] = settings.order_sales_team_id.id
+            order = self.env['sale.order'].create(order_vals)
+            line_plans = self._create_order_lines(
+                order, store, payload, settings, job=job,
+            )
+            self._solve_and_assert_totals(order, line_plans, payload)
 
-                gateway = self._classify_manual_gateway(payload)
-                confirmation = self._confirmation_outcome(
-                    payload, settings, gateway,
-                )
-                if confirmation['confirm']:
-                    order.action_confirm()
+            gateway = self._classify_manual_gateway(payload)
+            confirmation = self._confirmation_outcome(
+                payload, settings, gateway,
+            )
+            if confirmation['confirm']:
+                order.action_confirm()
 
-                binding_vals = self._binding_snapshot_vals(
-                    payload, resolution, gateway, confirmation,
+            binding_vals = self._binding_snapshot_vals(
+                payload, resolution, gateway, confirmation,
+            )
+            binding_vals.update({
+                'store_id': store.id,
+                'shopify_gid': payload['id'],
+                'sale_order_id': order.id,
+                'match_key': 'existing_binding',
+                'matched_by_uid': self.env.uid,
+                'matched_at': fields.Datetime.now(),
+            })
+            try:
+                with self.env.cr.savepoint():
+                    binding = Binding.sudo().create(binding_vals)
+            except IntegrityError as exc:
+                # The outer savepoint rolls the new order and lines back.
+                # Do not attempt an in-transaction handler replay or rely on
+                # seeing the winner in a REPEATABLE READ snapshot.
+                raise JobHandlerError(
+                    'concurrency_race_conflict',
+                    'A concurrent order import won the permanent binding '
+                    'race.',
+                    json.dumps({
+                        'shopify_order_gid': payload['id'],
+                    }, sort_keys=True),
+                ) from exc
+            binding = Binding.browse(binding.id)
+            if gateway['state'] == 'mixed' and job:
+                self.env['shopify.connector.job.log']._system_append(
+                    job,
+                    'note',
+                    'Order imported as a draft for payment-evidence review.',
+                    technical_detail=self._safe_gateway_evidence(payload),
                 )
-                binding_vals.update({
-                    'store_id': store.id,
-                    'shopify_gid': payload['id'],
-                    'sale_order_id': order.id,
-                    'match_key': 'existing_binding',
-                    'matched_by_uid': self.env.uid,
-                    'matched_at': fields.Datetime.now(),
-                })
-                binding = Binding.sudo().create(binding_vals)
-                binding = Binding.browse(binding.id)
-                if gateway['state'] == 'mixed' and job:
-                    self.env['shopify.connector.job.log']._system_append(
-                        job,
-                        'note',
-                        'Order imported as a draft for payment-evidence review.',
-                        technical_detail=self._safe_gateway_evidence(payload),
-                    )
-                return binding
-        except IntegrityError:
-            # A concurrent discovery can lose the permanent binding race. The
-            # enclosing savepoint rolls its sale order and lines back first.
-            existing = Binding.search([
-                ('store_id', '=', store.id),
-                ('shopify_gid', '=', payload['id']),
-            ], limit=1)
-            if existing:
-                return existing
-            raise
+            return binding
 
     @api.model
     def _settings_for_store(self, store):
