@@ -94,6 +94,18 @@ debt, clean MVP release behavior. The one Option-2 advantage (staged column drop
 is not needed because the snapshot fields themselves are **kept** (only the masked
 *display* and the *masking behavior* are removed), so no PII data column is dropped.
 
+> **[Decided 2026-07-17 — TA-C5, control-room decision session.] Option 1 (controlled
+> full removal) is accepted as the technical method.** The **PII-retention cron is
+> retained but rescoped to log/audit `payload_snapshot` redaction only** — the
+> business-record customer-snapshot masking is removed from the sweep; if the
+> preflight finds the cron then has no remaining redaction job it may be retired
+> (§D / §B distinction (a) vs (b)). **Redaction ≠ masking and stays mandatory.**
+> Already-masked stored values are handled honestly (§E): refresh/re-import where
+> Shopify is available, else **"data unavailable"** — never reconstructed or
+> fabricated. This is a **technical-method decision only** — it authorizes no code;
+> SEC-2 still executes under its own Wave-5 gate (or an earlier separately-gated
+> pre-Wave-5 task) against the exact then-current code and the §G allowlist.
+
 ## E. Previously masked stored values (masking is irreversible)
 
 - **Never** pretend masked values can be reconstructed; **never** infer or

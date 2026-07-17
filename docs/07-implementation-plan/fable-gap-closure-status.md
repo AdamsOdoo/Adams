@@ -19,6 +19,43 @@ This file is the live handoff for the mission and is updated after every major
 workstream. The final control-room handoff will supersede the "Current state"
 section when the mission completes.
 
+## Control-room decision review — 2026-07-17 (ACCEPTED AND MERGED)
+
+The Claude control room reviewed the corrected PR #173 as a complete
+product/architecture/UX/readiness package and **merged it** into
+`mvp/program-integration` after recording its decisions in a docs-only
+reconciliation commit. Outcome:
+
+- **Verdict: ACCEPTED with amendments (docs-only).** Identity re-verified live
+  (PR open/draft/clean; head `09078a8`; base `1e46c23`; protected refs unchanged;
+  126 paths all under `docs/**`; no `addons/**` change).
+- **Class A (A-1..A-18): confirmed** consistently recorded; no current-facing
+  contradiction.
+- **Class B (PD-B1..B7): all decided.** Amendments: **B1** per-store
+  `pending_wait_expiry` default **24 h** (min 1 h / max 7 d; OQ-C resolved);
+  **B4** exact mode-switch reconciliation-scan boundary (earlier-of
+  watermark-overlap / unresolved-external boundary, 30-day default lookback);
+  **B5** **Mode 1 outbound fulfillment is Full, not Lite** (it is a Shopify
+  mutation). B2/B3/B6/B7 accepted as specified.
+- **Class C (TA-C1..C8): decided or routed.** **DEC-031 Layer 2 (C1/C2) is NOT
+  DEC-accepted** — its design is accepted only as the authoritative proposal for
+  a dedicated pre-Wave-3 architecture gate. C3 (6-module family), C4 (Option M-A),
+  C5 (SEC-2 Option 1; retention cron rescoped to log-redaction), C6 (Wave-4 inbound
+  evidence), C7 (CAS semantic; field name deferred to EQ-D1), C8 (measurement
+  framework; SLOs provisional except accepted PB rows) accepted.
+- **Class D: safely classified** (D1 blocking; others fail-closed defaults). **Class
+  E: post-MVP confirmed** (operational COD stays MVP; auto accounting posting out).
+- **Rendered UX evidence accepted** as the visual baseline only (28 screenshots;
+  no masked PII; no credential exposure; Mode 2 shown as an Admin opt-in mode; the
+  six a11y/RTL/reduced-motion/Owl-parity limitations carried to Wave 5).
+- **Boundaries held:** no implementation authorized; **Wave 2 unauthorized and
+  unstarted**; protected refs unchanged. **Next authorized activity:** a separate
+  Wave 2 decision-acceptance + Definition-of-Ready + packet re-acceptance +
+  exact-base preflight session.
+
+Full record: [`../04-decisions/fable-proposed-decision-pack.md`](../04-decisions/fable-proposed-decision-pack.md)
+§Control-room decisions (2026-07-17); [`../05-qa/architecture-review-log.md`](../05-qa/architecture-review-log.md) AR-053.
+
 ## Correction pass — 2026-07-16 (control-room ruling reconciliation)
 
 **Rulings applied.** `4993775983` (consolidated REVISE: stale status; Mode 2 = MVP

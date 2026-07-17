@@ -331,7 +331,7 @@ financial gate chooses *whether*.
 | `manual_gateway_policy` | `confirm_auto` / `quotation` / `require_approval` | `require_approval` |
 | `approved_manual_gateways` | list of gateway identities (matched against transaction `gateway` / `paymentGatewayNames`) | empty (no manual path until curated) |
 | `order_import_window` | scan lookback horizon; capped at 60 days unless `read_all_orders` is granted ([Fact] capture §4) | 30 days |
-| `pending_wait_expiry` | how long a card-`PENDING` order is tracked before it is dropped with an audit entry | proposed 7 days [Open question OQ-C] |
+| `pending_wait_expiry` | how long a card-`PENDING` order is tracked (tracked-but-unconfirmed) before the auto-wait ends and it is dropped to an auditable skipped/review state | **default 24 h; min 1 h; max 7 d; per-store, Administrator-only** [Decided 2026-07-17 — PD-B1; supersedes the earlier "proposed 7 days", which is retained as the configurable maximum; OQ-C resolved]. A later `PENDING→PAID` transition reconciles without creating a duplicate order. |
 
 Changing `order_confirmation_policy` affects **future** gate
 evaluations only; already-imported quotations are not retro-confirmed
@@ -406,7 +406,10 @@ acceptance, then ADR):**
   6-sub-reason vocabulary — control-room mapping decision.
 - OQ-B: optional early quotation for card-`PENDING` under P1/P2 (post-MVP
   toggle?).
-- OQ-C: `pending_wait_expiry` default and whether expiry should notify.
+- OQ-C: **RESOLVED 2026-07-17 (PD-B1)** — `pending_wait_expiry` is per-store
+  Administrator-configurable, **default 24 h, min 1 h, max 7 d**; on expiry the
+  auto-wait ends and the order moves to an auditable skipped/review state (whether
+  the surface also emits a notification is a Wave-5 UX detail, not a gate).
 - OQ-D: policy resolution when an order carries **mixed** transactions
   (e.g. part gift-card, part manual gateway) — needs a fresh evidence
   pass on multi-transaction orders; fail closed to review until decided.

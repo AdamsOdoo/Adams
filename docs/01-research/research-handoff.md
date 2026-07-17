@@ -1,3 +1,74 @@
+## 2026-07-17 — Fable gap-closure PR #173 — control-room decision review: ACCEPTED AND MERGED (docs-only)
+
+- **Role/scope:** Claude control room (DEC-032 macro-wave model) performed the
+  final product/architecture decision & merge review of the corrected PR #173
+  (`fable/mvp-remaining-gap-closure` → `mvp/program-integration`). Decision &
+  merge session only — **no connector code, no Wave 2 start, no DEC-031 Layer 2
+  acceptance, no Shopify validation.**
+- **Identity re-verified live from GitHub:** PR #173 open/draft/unmerged/**clean**;
+  head `09078a8b861648cd3fbf35b349423861ac961c40`; base
+  `mvp/program-integration` @ `1e46c23ca5480eba3c6986a566ca9b33431c7ab6` (merge-base
+  = base, no divergence); PR #172 merged via `d18f9a99`; Wave 1 merged; SRR-03
+  CLOSED; Wave 2 unstarted; protected refs `acd8c46` (checkpoint) / `dd6ecb8`
+  (`Shopify-connector`) / `a5d4543` (`main`) all unchanged; all **126** changed
+  paths under `docs/**`; **no** `addons/**` / security / ACL / migration / test /
+  manifest change.
+- **Verdict: ACCEPTED with amendments (docs-only).** The reconciliation commit
+  recorded every decision, then the PR was **marked ready and merged into
+  `mvp/program-integration` with a normal merge commit (no squash, no rebase)**;
+  the merge-commit SHA is recorded on master issue #167.
+- **Class A (A-1..A-18): confirmed** faithfully/consistently recorded; no
+  current-facing contradiction (verified across canonical docs, Wave 2–6 DoRs,
+  QA/UAT matrices, and 28 rendered prototypes; cross-document searches clean).
+- **Class B (PD-B1..B7): all decided.** Amendments: **B1** per-store
+  `pending_wait_expiry` **default 24 h** (min 1 h / max 7 d; OQ-C resolved);
+  **B4** exact mode-switch reconciliation-scan boundary (earlier-of
+  watermark-overlap / latest unresolved-external boundary; 30-day default lookback;
+  Admin preview + extension; never replay; classify+dedup first); **B5** **Mode 1
+  outbound fulfillment/tracking is Full, not Lite** (Shopify mutation; conforms to
+  DEC-029). B2/B3/B6/B7 accepted as specified (B6 resolves the Task-012 "no default"
+  tension in favour of default `paid_only`).
+- **Class C (TA-C1..C8): decided or routed.** **DEC-031 Layer 2 (C1/C2) NOT
+  DEC-accepted** — design accepted only as the authoritative proposal → dedicated
+  pre-Wave-3 architecture gate (verified against all 8 hard safety properties).
+  C3 (6-module family MA-D1..D5), C4 (Option M-A), C5 (SEC-2 Option 1; retention
+  cron rescoped to log-redaction only), C6 (Wave-4 inbound evidence baseline),
+  C7 (CAS semantic — field name deferred to EQ-D1 Wave-3 preflight), C8 (adopt
+  measurement framework; new SLO rows provisional; accepted PB-1..23 binding).
+- **Class D: safely classified** (D1 CAS field-name blocking before inventory
+  mutation; D2–D7 fail-closed defaults; D7 read-only Wave-2 deferrable / mutation
+  Waves 3–5 blocking). **Class E: post-MVP confirmed** (operational COD stays MVP;
+  automatic accounting posting out of MVP).
+- **Rendered UX evidence accepted as the visual baseline only** — 28 screenshots;
+  independently confirmed raw PII (no masking), no credential exposure (DEC-004
+  token masking retained), Mode 2 shown as an Admin opt-in mode, fail-closed
+  unknown-schema state legible; the six a11y/focus-trap/contrast/RTL/reduced-motion/
+  Owl-parity limitations are carried to Wave 5 acceptance (static screenshots are
+  not treated as production-accessibility proof).
+- **Reconciliation commit updated:** `fable-proposed-decision-pack.md`
+  (§Control-room decisions 2026-07-17), `sales-order-lifecycle...` §7 (B1),
+  `fulfillment-operating-modes.md` §6 (B4), `modular-architecture-recommendation.md`
+  §6/§9 (B5/C3), `task-sec2-...packet.md` §D (C5), `architecture-review-log.md`
+  (AR-053), `fable-gap-closure-status.md`, this handoff, and the PR #173 body.
+- **Boundaries held:** no implementation authorized; **Wave 2 unauthorized and
+  unstarted**; DEC-031 Layer 2 not accepted; protected refs unchanged.
+- **Next action (exact next-session prompt — the next authorized activity):**
+
+  > Open the **Wave 2 decision-acceptance + Definition-of-Ready + packet
+  > re-acceptance + exact-base preflight** session. Start from
+  > `docs/07-implementation-plan/wave-2-definition-of-ready.md` (§3 gate-decision
+  > table) and `docs/04-decisions/fable-proposed-decision-pack.md` (§Control-room
+  > decisions 2026-07-17). Accept the Wave 2 DoR and its gate decisions (the now
+  > product-decided PD-A/B/C/D/E, PD-COD import subset, PD-RB order-domain subset,
+  > PD-AC-1, and PD-B1/B3/B6); re-accept the Task 012 packet **with its 2026-07-16
+  > addendum** and perform the §15 prompt-issue gate act; accept the Area-6
+  > order-scan slice. Re-verify the exact `mvp/program-integration` base SHA and
+  > freeze the allowed-file list before any code. **Do not** start Wave 3+ scope,
+  > **do not** accept DEC-031 Layer 2 (that is a separate pre-Wave-3 architecture
+  > gate), and **do not** perform a Shopify mutation. Odoo.sh evidence is mandatory
+  > for Wave 2 closure; read-only dev-store order evidence is preferred but
+  > deferrable to Wave 6 without a waiver.
+
 ## 2026-07-16 — Fable gap-closure CORRECTION PASS COMPLETE (docs/design only)
 
 - **Role/scope:** one consolidated correction of draft PR #173 per control-room comments

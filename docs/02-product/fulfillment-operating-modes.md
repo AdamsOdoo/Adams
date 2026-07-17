@@ -288,6 +288,16 @@ Rules:
    store watermark, refresh evidence records, classify origins — read-only;
    no stock writes during the scan; Mode 2 evaluation starts only after the
    scan completes and is marked clean.
+   - **[Decided 2026-07-17 — PD-B4] Scan boundary.** The switch scan starts from
+     the **earlier of** (a) the last successful fulfillment watermark **minus the
+     configured overlap**, and (b) the **latest unresolved external-fulfillment
+     evidence boundary** — with a **bounded initial lookback default of 30 days**;
+     the Administrator sees a **preview** and may **extend the range** explicitly.
+     The scan **never replays or reapplies** historic fulfillment; **every**
+     discovered past fulfillment is **classified (§3) and deduplicated (unique
+     Fulfillment GID + per-line ledger, §5) before any action**. Persisted past
+     fulfillments remain review cases (rule 1); the scan only refreshes evidence
+     and enables post-switch Mode 2 evaluation.
 3. **Idempotent:** re-confirming the current mode, or a retried switch job,
    changes nothing and creates no duplicate scan effects (per-run nonce as in
    D-014-8).

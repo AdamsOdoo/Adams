@@ -279,6 +279,14 @@ Per accepted [DEC-029](../04-decisions/DEC-029-lite-full-packaging-proposal.md)
 - **Full** = Lite + `inventory + fulfillment + product_export`.
 - Editions are module sets; **roles ≠ editions** (the 2-role security model is
   orthogonal to packaging); store flags are the operational layer only.
+- **[Decided 2026-07-17 — PD-B5] Mode 1 outbound fulfillment/tracking is FULL,
+  not Lite.** `fulfillmentCreate` / `fulfillmentTrackingInfoUpdate` are Shopify
+  **mutations** owned by the Full-only `shopify_connector_fulfillment` module and
+  run under Layer 2; placing any Mode-1 outbound write in Lite would break Lite's
+  "structurally zero Shopify mutations" guarantee (§6 first bullet) and force the
+  Layer 2 substrate to be *active* (not merely inert) in a Lite install. Lite
+  therefore has no outbound fulfillment; Mode 2 inbound reconciliation is likewise
+  Full. This conforms to Accepted DEC-029 and the §8 capability matrix.
 
 **Layer 2 mutation substrate ships in core even for Lite —
 [Recommendation, justified]:** the Layer 2 substrate (mutation-attempt
@@ -346,6 +354,15 @@ Future extension seam.
 | Performance instrumentation (PB budgets) | core (surface); domains meet budgets | core | Yes | Yes | No | M | n/a | job timing fields | per-packet PB rows |
 
 ## 9. Proposed decisions (MA-D1..MA-D5)
+
+> **[Accepted 2026-07-17 — TA-C3, control-room decision session.]** MA-D1..MA-D5
+> are **accepted as planning/architecture decisions** (6-module MVP family;
+> keep-the-`sale`-name; no accounting/refund/payout placeholder modules;
+> multi-store as a core data-model property; Layer-2 substrate in core, inert in
+> Lite). This authorizes **no code** — each still lands only through its owning
+> wave's gate act, and the still-`[Open question]` items in §10 remain open. The
+> DEC-029 add-on list amendment flagged in §10 item 5 (drop/rescope
+> `_multi_store`) is carried at the next packaging-record touch.
 
 Common fields — **Authority:** product owner + Claude control room (DEC-032
 model). **Rollback:** each is docs-level; rollback = reject/strike the row
