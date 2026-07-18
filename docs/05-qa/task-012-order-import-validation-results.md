@@ -465,3 +465,21 @@ odoo-bin -d <db> -u shopify_connector_sale --test-enable --test-tags shopify_con
 **Proven statically:** allowed-file scope, registration, read-only query posture, fail-closed field protection, exact symbol traceability, replay/lifecycle declarations, explicit caps, exact sudo inventory, and structural concurrency-test intent.
 
 **Not proven:** Odoo model setup, install/upgrade/uninstall/reinstall, functional test execution, actual concurrency behavior, full regression, runtime residue/security, or dev-store behavior. No Odoo.sh build, Odoo test pass, exactly-once remote-effect claim, Shopify mutation or DEC-031 Layer 2 claim is made.
+
+## Campaign 4 (exact head `63607dd`) — GREEN (2026-07-18, build `35100725`)
+
+The "Not proven" list above described the pre-runtime static posture. It is now superseded at runtime
+by the fourth, final exact-head campaign, which is **green**. The authoritative clean/full fresh
+install with tests enabled (build `35100725`, DB `adamsmen-sol-wave-2-order-import-35100725`,
+Odoo 19.0, PostgreSQL 16.14) recorded **`0 failed, 0 error(s) of 728 tests`** (core 414 / product 202
+/ sale 232, all 0/0). All three Campaign-3 `TestOrderTotalsGuard` errors are closed (finding #5 fully
+closed in both `_tax()` and `_map_tax()`); the 86-method Wave-2 inventory executed with no silent
+exclusion; concurrency passed 3/3; residue/ACL/credential-PII/registry are clean; the only warm-rerun
+errors are precisely-attributed base-`account` `res_partner.autopost_bills` `setUpClass` artifacts
+absent from the fresh install. Isolated upgrade/lifecycle DBs and read-only dev-store evidence are
+honestly deferred (single-DB container / Wave 6), not Campaign-4 blockers. No production or test code
+changed; no Shopify mutation. **Full record:**
+[`task-012-campaign-4-exact-head-runtime-evidence.md`](task-012-campaign-4-exact-head-runtime-evidence.md).
+**Recommendation: READY FOR FRESH CLAUDE FINAL WAVE REVIEW.** Runtime-tested SHA
+`63607dd87a8bfc253ee60ed00e0d761ee62c8776`. Campaigns 1–3 above are preserved verbatim as historical
+evidence.
