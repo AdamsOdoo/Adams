@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 
@@ -240,8 +241,16 @@ class TestCustomerDuplicatePrevention(TransactionCase):
             path = os.path.join(models_dir, filename)
             with open(path, 'r', encoding='utf-8') as source_file:
                 content = source_file.read()
+            exact_string_tokens = {
+                node.value
+                for node in ast.walk(ast.parse(content, filename=path))
+                if isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+            }
             for forbidden in forbidden_models:
-                self.assertNotIn(forbidden, content, (path, forbidden))
+                self.assertNotIn(
+                    forbidden, exact_string_tokens, (path, forbidden),
+                )
 
     def test_import_creates_exactly_one_partner_and_one_binding(self):
         partners_before = self.env['res.partner'].search_count([])

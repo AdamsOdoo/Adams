@@ -1,0 +1,213 @@
+import hashlib
+import re
+import unicodedata
+from decimal import Decimal, InvalidOperation
+
+from odoo import api, fields, models
+from odoo.exceptions import AccessError, ValidationError
+
+from odoo.addons.shopify_connector_core.tools.redaction import redact
+
+
+SHOPIFY_TAX_FINGERPRINT_VERSION = 1
+TAX_RATE_QUANTUM = Decimal('0.000001')
+TAX_TITLE_PREVIEW_MAX_LEN = 80
+TAX_SOURCE_PREVIEW_MAX_LEN = 48
+_EMAIL_RE = re.compile(r'(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b')
+_PHONE_RE = re.compile(r'(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)')
+
+
+def _decimal_rate(value, label):
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValidationError('%s must be a decimal value.' % label) from exc
+    if not parsed.is_finite():
+        raise ValidationError('%s must be finite.' % label)
+    return parsed
+
+
+def canonical_tax_rate(rate, rate_percentage):
+    """Return the verified canonical percentage string (never a float)."""
+    proportion = _decimal_rate(rate, 'TaxLine.rate')
+    percentage = _decimal_rate(
+        rate_percentage, 'TaxLine.ratePercentage',
+    )
+    if (proportion * Decimal('100') - percentage).copy_abs() > TAX_RATE_QUANTUM:
+        raise ValidationError(
+            'TaxLine.rate and TaxLine.ratePercentage disagree.'
+        )
+    try:
+        quantized = percentage.quantize(TAX_RATE_QUANTUM)
+    except InvalidOperation as exc:
+        raise ValidationError(
+            'TaxLine.ratePercentage cannot be represented at six decimals.'
+        ) from exc
+    rendered = format(quantized, 'f').rstrip('0').rstrip('.')
+    return rendered or '0'
+
+
+def _length_prefixed(parts):
+    payload = bytearray()
+    for part in parts:
+        encoded = part.encode('utf-8')
+        payload.extend(len(encoded).to_bytes(8, byteorder='big'))
+        payload.extend(encoded)
+    return bytes(payload)
+
+
+def build_tax_fingerprint(
+    rate, rate_percentage, title, source, channel_liable, price_included,
+):
+    """Build the accepted v1, fold-free, full-tuple SHA-256 fingerprint."""
+    if not isinstance(title, str):
+        raise ValidationError('TaxLine.title must be a string.')
+    if source is not None and not isinstance(source, str):
+        raise ValidationError('TaxLine.source must be a string or null.')
+    if channel_liable is not None and not isinstance(channel_liable, bool):
+        raise ValidationError('TaxLine.channelLiable must be Boolean or null.')
+    if not isinstance(price_included, bool):
+        raise ValidationError('Order.taxesIncluded must be Boolean.')
+    rate_key = canonical_tax_rate(rate, rate_percentage)
+    title_norm = unicodedata.normalize('NFC', title)
+    source_norm = (
+        unicodedata.normalize('NFC', source)
+        if source is not None else '\u2205'
+    )
+    liable = (
+        'null' if channel_liable is None
+        else 'true' if channel_liable else 'false'
+    )
+    inclusion = 'included' if price_included else 'excluded'
+    serialized = _length_prefixed((
+        str(SHOPIFY_TAX_FINGERPRINT_VERSION), rate_key, title_norm,
+        source_norm, liable, inclusion,
+    ))
+    return 'v%d:%s' % (
+        SHOPIFY_TAX_FINGERPRINT_VERSION,
+        hashlib.sha256(serialized).hexdigest(),
+    )
+
+
+def safe_tax_preview(value, limit):
+    value = redact(value or '')
+    value = _EMAIL_RE.sub('[redacted-email]', value)
+    value = _PHONE_RE.sub('[redacted-phone]', value)
+    return value[:limit]
+
+
+class ShopifyConnectorTaxMapping(models.Model):
+    """Admin-maintained explicit mapping from Shopify evidence to Odoo tax."""
+
+    _name = 'shopify.connector.tax.mapping'
+    _description = 'Shopify Connector Tax Mapping'
+
+    store_id = fields.Many2one(
+        comodel_name='shopify.connector.store', required=True, index=True,
+        ondelete='restrict',
+    )
+    shopify_tax_evidence_key = fields.Char(
+        required=True, index=True, readonly=True,
+    )
+    shopify_tax_fingerprint_version = fields.Integer(
+        required=True, default=SHOPIFY_TAX_FINGERPRINT_VERSION, readonly=True,
+    )
+    shopify_price_included = fields.Boolean(readonly=True)
+    title_preview = fields.Char(readonly=True)
+    source_preview = fields.Char(readonly=True)
+    account_tax_id = fields.Many2one(
+        comodel_name='account.tax', required=True, ondelete='restrict',
+    )
+
+    _store_evidence_key_uniq = models.Constraint(
+        'UNIQUE(store_id, shopify_tax_evidence_key)',
+        'This Shopify tax fingerprint is already mapped for the store.',
+    )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        vals_list = [dict(vals) for vals in vals_list]
+        for vals in vals_list:
+            self._assert_evidence_key(vals.get('shopify_tax_evidence_key'))
+            self._sanitize_previews(vals)
+        return super().create(vals_list)
+
+    def write(self, vals):
+        vals = dict(vals)
+        if 'shopify_tax_evidence_key' in vals:
+            self._assert_evidence_key(vals.get('shopify_tax_evidence_key'))
+        self._sanitize_previews(vals)
+        return super().write(vals)
+
+    @api.model
+    def _sanitize_previews(self, vals):
+        if 'title_preview' in vals:
+            vals['title_preview'] = safe_tax_preview(
+                vals.get('title_preview'), TAX_TITLE_PREVIEW_MAX_LEN,
+            )
+        if 'source_preview' in vals:
+            vals['source_preview'] = safe_tax_preview(
+                vals.get('source_preview'), TAX_SOURCE_PREVIEW_MAX_LEN,
+            )
+
+    @api.model
+    def _assert_evidence_key(self, key):
+        key = key or ''
+        expected_prefix = 'v%d:' % SHOPIFY_TAX_FINGERPRINT_VERSION
+        digest = key[len(expected_prefix):] if key.startswith(expected_prefix) else ''
+        if (
+            len(digest) != 64
+            or any(character not in '0123456789abcdef' for character in digest)
+        ):
+            raise ValidationError(
+                'The tax evidence key must be a complete lowercase v1 '
+                'SHA-256 fingerprint.'
+            )
+
+    @api.constrains(
+        'store_id', 'account_tax_id', 'shopify_price_included',
+        'shopify_tax_fingerprint_version',
+    )
+    def _check_mapping_safety(self):
+        Settings = self.env['shopify.connector.store.settings']
+        for mapping in self:
+            settings = Settings.search([
+                ('store_id', '=', mapping.store_id.id),
+            ], limit=1)
+            tax = mapping.account_tax_id
+            if not settings or not settings.order_company_id:
+                raise ValidationError(
+                    'Order company must be configured before tax mapping.'
+                )
+            if tax.company_id != settings.order_company_id:
+                raise ValidationError(
+                    'The mapped tax must belong to the configured order company.'
+                )
+            if not tax.active or tax.type_tax_use != 'sale':
+                raise ValidationError('The mapped tax must be an active sale tax.')
+            if tax.amount_type != 'percent':
+                raise ValidationError(
+                    'Only independent leaf percentage taxes are supported.'
+                )
+            if tax.include_base_amount:
+                raise ValidationError(
+                    'Base-affecting compound taxes are not supported.'
+                )
+            expected = (
+                'tax_included' if mapping.shopify_price_included
+                else 'tax_excluded'
+            )
+            if getattr(tax, 'price_include_override', False) != expected:
+                raise ValidationError(
+                    'The mapped tax inclusion posture does not match Shopify.'
+                )
+            if (
+                mapping.shopify_tax_fingerprint_version
+                != SHOPIFY_TAX_FINGERPRINT_VERSION
+            ):
+                raise ValidationError('Unsupported tax fingerprint version.')
+
+    def unlink(self):
+        if not self.env.su:
+            raise AccessError('Shopify tax mappings cannot be deleted.')
+        return super().unlink()

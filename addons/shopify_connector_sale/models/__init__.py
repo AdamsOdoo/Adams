@@ -2,3 +2,8 @@ from . import shopify_connector_customer_binding
 from . import shopify_connector_store_settings
 from . import shopify_connector_res_partner
 from . import shopify_connector_customer_importer
+from . import shopify_connector_order_binding
+from . import shopify_connector_sale_order_line
+from . import shopify_connector_order_importer
+from . import shopify_connector_tax_mapping
+from . import shopify_connector_order_scan
