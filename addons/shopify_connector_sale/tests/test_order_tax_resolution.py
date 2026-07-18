@@ -21,17 +21,44 @@ from .test_order_import_mapping import OrderImportCase
 class TestOrderTaxResolution(OrderImportCase):
 
     def _tax(self, name='VAT 5', amount=5.0, included=False, **extra):
-        company_id = extra.get('company_id', self.env.company.id)
+        company_id = getattr(
+            extra.get('company_id', self.env.company.id),
+            'id',
+            extra.get('company_id', self.env.company.id),
+        )
+        company = self.env['res.company'].sudo().browse(company_id).exists()
+        self.assertTrue(company, 'Tax fixture company must exist')
+
+        explicit_country_id = getattr(
+            extra.get('country_id'), 'id', extra.get('country_id'),
+        )
+        explicit_country = self.env['res.country'].sudo().browse(
+            explicit_country_id,
+        ).exists() if explicit_country_id else self.env['res.country']
+        current_company = self.env.company.sudo()
+        country = (
+            explicit_country
+            or company.account_fiscal_country_id
+            or company.country_id
+            or current_company.account_fiscal_country_id
+            or current_company.country_id
+            or self.env.ref('base.us')
+        )
+        self.assertTrue(country, 'Tax fixture country must be resolved')
+        country.ensure_one()
+
         tax_group = self.env['account.tax.group'].sudo().create({
             'name': '%s Group' % name,
-            'company_id': company_id,
+            'company_id': company.id,
+            'country_id': country.id,
         })
         values = {
             'name': name,
             'amount': amount,
             'amount_type': 'percent',
             'type_tax_use': 'sale',
-            'company_id': company_id,
+            'company_id': company.id,
+            'country_id': country.id,
             'tax_group_id': tax_group.id,
             'price_include_override': (
                 'tax_included' if included else 'tax_excluded'
@@ -39,6 +66,11 @@ class TestOrderTaxResolution(OrderImportCase):
             'include_base_amount': False,
         }
         values.update(extra)
+        values.update({
+            'company_id': company.id,
+            'country_id': country.id,
+            'tax_group_id': tax_group.id,
+        })
         return self.env['account.tax'].sudo().create(values)
 
     def _evidence(self, title='VAT', source='Shopify', liable=None):
@@ -183,6 +215,18 @@ class TestOrderTaxResolution(OrderImportCase):
             self._tax(name='Wrong inclusion', included=True),
             self._tax(name='Other company', company_id=other_company.id),
         )
+        wrong_company_tax = candidates[-1]
+        self.assertEqual(wrong_company_tax.company_id, other_company)
+        for tax in candidates:
+            self.assertTrue(tax.country_id, tax.name)
+            self.assertTrue(tax.tax_group_id.country_id, tax.name)
+            self.assertEqual(
+                tax.company_id, tax.tax_group_id.company_id, tax.name,
+            )
+            self.assertEqual(
+                tax.country_id, tax.tax_group_id.country_id, tax.name,
+            )
+
         rows_before = self.env[
             'shopify.connector.tax.mapping'
         ].search_count([])
