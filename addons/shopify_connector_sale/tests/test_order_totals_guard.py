@@ -32,17 +32,42 @@ class TestOrderTotalsGuard(OrderImportCase):
         }
 
     def _map_tax(self, included=False):
+        company = self.env.company.sudo()
+        current_company = self.env.company.sudo()
+        country = (
+            company.account_fiscal_country_id
+            or company.country_id
+            or current_company.account_fiscal_country_id
+            or current_company.country_id
+            or self.env.ref('base.us')
+        )
+        self.assertTrue(country, 'Order totals tax fixture country must resolve')
+        country.ensure_one()
+
+        tax_group = self.env['account.tax.group'].sudo().create({
+            'name': 'Order guard VAT 5 %s Group'
+                    % ('included' if included else 'excluded'),
+            'company_id': company.id,
+            'country_id': country.id,
+        })
         tax = self.env['account.tax'].sudo().create({
             'name': 'Order guard VAT 5 %s' % ('included' if included else 'excluded'),
             'amount': 5.0,
             'amount_type': 'percent',
             'type_tax_use': 'sale',
-            'company_id': self.env.company.id,
+            'company_id': company.id,
+            'country_id': country.id,
+            'tax_group_id': tax_group.id,
             'price_include_override': (
                 'tax_included' if included else 'tax_excluded'
             ),
             'include_base_amount': False,
         })
+        self.assertTrue(tax.country_id)
+        self.assertTrue(tax.tax_group_id.country_id)
+        self.assertEqual(tax.company_id, tax.tax_group_id.company_id)
+        self.assertEqual(tax.country_id, tax.tax_group_id.country_id)
+
         evidence = self._tax_evidence()
         key = build_tax_fingerprint(
             evidence['rate'], evidence['ratePercentage'], evidence['title'],
