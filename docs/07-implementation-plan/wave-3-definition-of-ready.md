@@ -1,18 +1,24 @@
 # Wave 3 — Definition of Ready (Inventory Synchronization: Layer 2 Stage 0 + Task 013/013B)
 
-> **Status: Proposed — Fable gap-closure mission, 2026-07-16.** Docs-only.
-> Acceptance authority: product owner + Claude control room. **Wave 3
-> remains unauthorized until this Definition of Ready is accepted and its
-> gate decisions are Accepted. No implementation authorized by this
-> document.**
+> **Status: STILL PROPOSED — GATE A COMPLETE, GATE B PENDING (2026-07-18).**
+> Originally proposed, Fable gap-closure mission, 2026-07-16; Gate A
+> (DEC-031 Layer 2 architecture closure + Stage 0 packet preparation,
+> PR #177) corrected this document's CAS-field and batching text on
+> 2026-07-18 — see §5. Docs-only. Acceptance authority: product owner +
+> Claude control room. **Wave 3 remains unauthorized until this Definition
+> of Ready is accepted and its gate decisions are Accepted. No
+> implementation authorized by this document.**
 >
-> **Current program state (2026-07-16):** Wave 1 is **merged** and **SRR-03 is
-> CLOSED**. Wave 3's only wave-order dependency is **Wave 2 accepted and
-> merged** (plus DEC-031 Layer 2 as Stage 0); it does not wait on any Wave 1
-> prerequisite. As a Shopify-mutation wave, Wave 3 closure requires **genuine
-> (not simulated) dev-store mutation evidence**. Wave 3 introduces **no
-> PII-masking fields** (the MVP has no PII masking; inventory bindings carry no
-> customer PII).
+> **Current program state (2026-07-18):** Wave 1 and **Wave 2 are both
+> merged** (Wave 2: PR #176, merge commit `22bfb9a0e9b1e48b6a664351e2b321d134177110`)
+> and **SRR-03 is CLOSED**. Wave 3's wave-order dependency on Wave 2 is
+> **CLOSED**. DEC-031 Layer 2 remains Proposed, not Accepted —
+> [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) is the new
+> normalized acceptance candidate (PROPOSED FOR CONTROL-ROOM ACCEPTANCE),
+> with eight items explicitly BLOCKING. As a Shopify-mutation wave, Wave 3
+> closure requires **genuine (not simulated) dev-store mutation evidence**.
+> Wave 3 introduces **no PII-masking fields** (the MVP has no PII masking;
+> inventory bindings carry no customer PII).
 
 Instantiates the 7-field standard of
 [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
@@ -46,7 +52,14 @@ strictly ordered stages behind one wave gate:
 UI screens (Wave 5 — first-push preview/confirm and divergence review ship
 as backend service methods only); webhooks; standing Shopify→Odoo pull
 (RA-020); any `committed`/`on_hand` write (RA-018); `inventoryAdjustQuantities`
-delta semantics; `ignoreCompareQuantity`.
+delta semantics; the legacy `ignoreCompareQuantity`/`compareQuantity`
+mechanism, which does not exist in the current (2026-04+) Shopify schema
+— see the CAS field-name correction below; **and, per
+[`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) D4 (2026-07-18),
+multi-entry `quantities[]` batching of any kind** — Stage 1 defaults to one
+`(inventory_item_id, location_id)` pair per mutation request until
+partial-batch semantics are proven or every entry is independently
+reconciled.
 
 ## 2. DoR checklist
 
@@ -73,11 +86,18 @@ baseline import — runtime- and concurrency-proven, dev-store-proven.
 - **Stage 1:** the Task 013 §8 locked-prompt allowed list
   (`addons/shopify_connector_inventory/**` — models, ACL, cron, six test
   files; validation-results/AR/handoff docs), **plus** the addendum
-  deltas: coalesced pending-target mechanics, CAS `compareQuantity`
-  read→compare→set flow, divergence-review case records, batching
-  (multi-entry `quantities[]`) where adopted, and Layer-2 attempt-wrapper
-  integration — all inside the inventory module except the wrapper calls
-  into Stage 0's core API.
+  deltas: coalesced pending-target mechanics, CAS `changeFromQuantity`
+  read→compare→set flow **[corrected 2026-07-18 — the field is
+  `changeFromQuantity`, not `compareQuantity`, per Shopify Admin GraphQL
+  API 2026-04+; see DEC-036 D12]**, divergence-review case records, and
+  Layer-2 attempt-wrapper integration — all inside the inventory module
+  except the wrapper calls into Stage 0's core API. **Batching
+  ("multi-entry `quantities[]`") is superseded — corrected 2026-07-18 per
+  DEC-036 D4: it is explicitly excluded from Stage 1, not merely "where
+  adopted."** Two independent adversarial-review clusters converged on
+  excluding it (no source confirms Shopify's per-entry `UserError`
+  field-path shape or partial-batch atomicity); this DoR's prior hedge
+  language is corrected to match, not left standing.
 - **Stage 2:** the Task 013B §9 locked-prompt allowed list (baseline
   read/preview/apply service + tests within `shopify_connector_inventory`,
   its docs).
@@ -189,7 +209,8 @@ callables registered from the start; control-room wave review; state file
 | **Task 013 packet re-accepted with its 2026-07-16 addendum**; §8 prompt gate act separate | packet + addendum | Control room gate act |
 | **Task 013B packet re-accepted** (confirmed consistent with the operating model; no addendum required unless contradiction found) | 013B packet | Control room gate act |
 | PD-RB inventory slice (reconciliation-read catch-up, no blind push) | reconnect policy §10/§11 | Product owner + control room |
-| **CAS field-name empirical preflight** — re-verify `compareQuantity` vs D-013-3 `changeFromQuantity` against the raw 2026-07 Shopify schema before the first push; fail-closed until resolved (Class D empirical question) | inventory packet / raw schema | Control room (blocking preflight) |
+| **CAS field-name empirical preflight — RESOLVED 2026-07-18 (Wave 3 Gate A).** `changeFromQuantity` is confirmed the correct, current (2026-07) field on `InventoryQuantityInput`; `compareQuantity`/`ignoreCompareQuantity` do not exist as input fields from API 2026-04 onward. Four independent official citations, no conflict found between official Shopify sources (the only conflict was this project's own stale internal documents, now corrected). | [`shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md) §1; [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) D12 | Control room — **preflight closed, not itself a Wave 3 authorization act** |
+| **DEC-031 Layer 2 acceptance candidate normalized — Gate A in progress, 2026-07-18.** [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) is the complete `L2-D1`–`L2-D38` decision inventory, status PROPOSED FOR CONTROL-ROOM ACCEPTANCE — NOT YET ACCEPTED; eight items remain explicitly BLOCKING. Package is explicitly NOT FROZEN pending external "Session C" code/architecture-audit reconciliation. | DEC-036; the Stage 0 packet | Product owner + control room |
 | Wave 2 accepted and merged (program wave order; Area-6 full trigger set unblocked) | program §4 | Control room |
 
 Open questions to answer or defer-fail-closed at the gate sitting:
@@ -214,21 +235,47 @@ is live-validated before Stage 0's evidence is accepted.
 
 ## 5. Current-status conclusion
 
-**READY once gate decisions are Accepted.** As of 2026-07-16, Wave 3 is
-**NOT YET ready**; outstanding:
+**READY once gate decisions are Accepted.** As of 2026-07-18 (Wave 3 Gate A
+session, PR #177), Wave 3 is **STILL NOT ready — Gate A complete, Gate B
+pending**; outstanding:
 
-1. Wave 2 not yet accepted/merged (Wave 3's wave-order dependency). **Wave 1
-   is already merged and SRR-03 is closed** — it is not a Wave 3 blocker.
-2. DEC-031 Layer 2 design is Proposed, not Accepted; Stage 0 has no packet
-   yet (to be cut from the accepted design).
-3. Inventory-operating-model PDs and the PD-RB inventory slice are
-   Proposed.
+1. **Wave 2 is now MERGED** (PR #176, merge commit
+   `22bfb9a0e9b1e48b6a664351e2b321d134177110`, into `mvp/program-integration`
+   at `aa87ccc971eb9ab500911948e0e751136453cbc2`) — this dependency is
+   **CLOSED**. Wave 1 remains merged and SRR-03 remains closed.
+2. **DEC-031 Layer 2 design remains Proposed, not Accepted.** Gate A
+   (2026-07-18) produced a complete, normalized acceptance candidate —
+   [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md), status
+   PROPOSED FOR CONTROL-ROOM ACCEPTANCE — and the
+   [Wave 3 Stage 0 packet](wave-3-stage-0-layer-2-packet.md), status
+   PROPOSED — LOCKED PROMPT NOT ISSUED. Neither is accepted. Eight items
+   are explicitly BLOCKING (DEC-036 §5); the package is explicitly **NOT
+   FROZEN** pending an external "Session C" code/architecture-audit
+   reconciliation (control-room ruling, PR #177 comment
+   [`5012854989`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5012854989)).
+3. Inventory-operating-model PDs and the PD-RB inventory slice remain
+   Proposed. **Note:** `inventory-operating-model.md` §4.4 still references
+   the stale `compareQuantity` field name and requires correction in a
+   future session with that file in its allowed list, before Task 013
+   re-acceptance.
 4. Task 013 re-acceptance with the 2026-07-16 addendum, and Task 013B
    re-acceptance, not yet performed; §8/§9 prompt gate acts not performed.
-5. CAS field-name empirical preflight (`compareQuantity` vs
-   `changeFromQuantity`) not yet run against the raw schema.
+   `task-013-inventory-sync-implementation-packet.md`'s CAS-heading text
+   also needs the same out-of-scope correction as item 3 above.
+5. **CAS field-name empirical preflight — RESOLVED 2026-07-18** (see the
+   gate-decision table above). `changeFromQuantity` is confirmed correct;
+   no conflict between official Shopify sources.
 6. Genuine dev-store mutation evidence must be produced for closure (first
    mutation wave); it is not routinely waivable — any exception is a
    product-owner ruling. This is not a *readiness* blocker but a *closure*
-   requirement.
-7. This Definition of Ready itself is Proposed, not accepted.
+   requirement. Unaffected by Gate A.
+7. This Definition of Ready itself remains Proposed, not accepted — this
+   session's own corrections (items 1, 3's flag, 5, and the batching/CAS
+   text above) do not self-accept it.
+8. **New, Gate-A-specific outstanding item:** every DEC-036 BLOCKING item
+   (job_id field type + C2 cursor placement; open-transaction proof;
+   disconnect-quiescence interaction; `mutation_domain` ownership; N=3 cap
+   persistence scope; AST-tooling-maturity finding; the full
+   runtime/concurrency/crash-injection proof plan) must be resolved or
+   explicitly risk-accepted before Stage 0 implementation — tracked in the
+   Stage 0 packet §17, not duplicated here.
