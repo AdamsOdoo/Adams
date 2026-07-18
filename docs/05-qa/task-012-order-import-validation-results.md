@@ -2,7 +2,9 @@
 
 ## Status
 
-**TAX FIXTURE CORRECTED — POST-CORRECTION RUNTIME PENDING — ENVIRONMENTS B/C NOT YET CONFIRMED (2026-07-18).** The second corrected-head runtime campaign below (SHA `d1af6d03e3c51b9fa3d12dad00fd7c7766ec8bd5`, Odoo.sh build `35088811`, database `adamsmen-sol-wave-2-order-import-35088811`) closed ten of the eleven original findings (#1–4, #6–11) at runtime; finding #5 remained because the `_tax` test helper still omitted the Odoo-19-required `country_id`. The first campaign (SHA `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`, build `35080469`, 5 failures / 6 errors, 11 unique findings) remains preserved below unchanged. **Accepted correction:** `6f32e4c8a2e6eac44bfb32e2cca0ea2bea3b1ea4` (`test(wave2): provide country-consistent Odoo 19 tax fixtures`), per control-room ruling [`5010554056`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010554056) — deterministic country resolution; explicit country on the tax group; explicit country on the tax; identical tax/group company; identical tax/group country; the wrong-company fixture retained; all unsafe-mapping denials retained. **No production tax behavior changed and no importer behavior changed** (`shopify_connector_tax_mapping.py` `d114615553950d4322632767a1bed7d06d7edb85`; `shopify_connector_order_importer.py` `8b32f1cba5870588dae23c1cb3b426c41f1c7a75`, both unchanged). The authored Wave 2 method count remains **86**; no method was removed, renamed, skipped or weakened. **No post-correction Odoo pass is claimed.** This is a Claude documentation-only reconciliation per ruling [`5010654351`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010654351). **Environment A** (clean/full) exists from the campaigns below and must not be spent alone again. **Environment B** (isolated baseline-upgrade) remains unproven: this session's capability audit found no reachable multi-database PostgreSQL 16.14 server and no usable Odoo 19 runner in this checkout. **Environment C** (isolated lifecycle) remains unproven for the same reason — no separate usable runner exists in this session. See "Environment B/C readiness audit — 2026-07-18 (this session)" below for the exact evidence. PR #176 remains open, draft and unmerged; Wave 3 remains unstarted.
+**CORRECTED-HEAD RUNTIME CAMPAIGN 3 EXECUTED — CORRECTION REQUIRED (2026-07-18, build `35095228`, under revised control-room ruling [`5010851668`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010851668)).** The sole authorized runtime candidate `2525447cee2d8a3371b1f4e669f61bcd50b20162` (the documentation head that reconciles fixture correction `6f32e4c8a2e6eac44bfb32e2cca0ea2bea3b1ea4`) was independently runtime-validated on authenticated Odoo.sh build `35095228` (DB `adamsmen-sol-wave-2-order-import-35095228`, Odoo 19.0, PostgreSQL 16.14). **The clean/full fresh install with tests enabled is NOT green:** the build's own install-with-tests (`install.log`) recorded `0 failed, 3 error(s) of 728 tests` — all three in `TestOrderTotalsGuard` (`test_order_and_source_tax_fingerprints_must_reconcile`; and the parametrised `test_tax_excluded_and_tax_included_orders_use_mapped_engine_taxes` sub-cases `included=False` and `included=True`), each an `account_tax.tax_group_id` (and `country_id`) NOT-NULL violation raised by the test's own `_map_tax()` helper (`shopify_connector_sale/tests/test_order_totals_guard.py:34-45`), which creates `account.tax` without an explicit country-consistent tax group. **This is the identical country-consistent-tax-fixture defect class that correction `6f32e4c` closed in `test_order_tax_resolution.py` but did NOT apply to the sibling `test_order_totals_guard.py`** (that commit changed only `test_order_tax_resolution.py`, +47/-3). `TestOrderTaxResolution` now passes at fresh install — finding #5 is closed there — but finding #5 (Odoo 19 country-consistent tax fixture) is **NOT fully closed**: it is OPEN in `test_order_totals_guard.py`. Under the revised ruling, isolated baseline-upgrade (B) and uninstall/reinstall lifecycle (C) databases are **no longer Wave 2 blockers** and are recorded as **deferred release-readiness evidence — NOT ENVIRONMENT BLOCKED**; the Wave 2 acceptance gate is now the complete authenticated Odoo.sh clean/full matrix, which is not green. Genuine independent-connection concurrency passed **3/3**; residue, security/redaction and registry checks are clean; the warm `-u` reruns surfaced only base-`account` `res_partner.autopost_bills` NOT-NULL artifacts that are **absent from the authoritative fresh install** and are not connector-attributable. **Recommendation: CORRECTION REQUIRED** — Sol test-fixture scope: apply the `6f32e4c` country-consistent tax + tax-group pattern to `test_order_totals_guard.py._map_tax` (and audit every remaining fixture that creates `account.tax` without an explicit `country_id`/`tax_group_id`). No production code and no test was changed by this audit. Runtime-tested SHA `2525447cee2d8a3371b1f4e669f61bcd50b20162`; documentation-only evidence commit recorded in "Corrected-head runtime validation campaign 3 — 2026-07-18 (build `35095228`)" below and in the session handoff. PR #176 remains open, draft and unmerged; SRR-03 remains CLOSED; Wave 3 remains unstarted.
+
+**TAX FIXTURE CORRECTED — POST-CORRECTION RUNTIME PENDING — ENVIRONMENTS B/C NOT YET CONFIRMED (2026-07-18, HISTORICAL — SUPERSEDED BY CAMPAIGN 3 ABOVE, WHICH RUNTIME-VALIDATED THE CORRECTED HEAD AND FOUND THE CORRECTION INCOMPLETE).** The second corrected-head runtime campaign below (SHA `d1af6d03e3c51b9fa3d12dad00fd7c7766ec8bd5`, Odoo.sh build `35088811`, database `adamsmen-sol-wave-2-order-import-35088811`) closed ten of the eleven original findings (#1–4, #6–11) at runtime; finding #5 remained because the `_tax` test helper still omitted the Odoo-19-required `country_id`. The first campaign (SHA `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`, build `35080469`, 5 failures / 6 errors, 11 unique findings) remains preserved below unchanged. **Accepted correction:** `6f32e4c8a2e6eac44bfb32e2cca0ea2bea3b1ea4` (`test(wave2): provide country-consistent Odoo 19 tax fixtures`), per control-room ruling [`5010554056`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010554056) — deterministic country resolution; explicit country on the tax group; explicit country on the tax; identical tax/group company; identical tax/group country; the wrong-company fixture retained; all unsafe-mapping denials retained. **No production tax behavior changed and no importer behavior changed** (`shopify_connector_tax_mapping.py` `d114615553950d4322632767a1bed7d06d7edb85`; `shopify_connector_order_importer.py` `8b32f1cba5870588dae23c1cb3b426c41f1c7a75`, both unchanged). The authored Wave 2 method count remains **86**; no method was removed, renamed, skipped or weakened. **No post-correction Odoo pass is claimed.** This is a Claude documentation-only reconciliation per ruling [`5010654351`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010654351). **Environment A** (clean/full) exists from the campaigns below and must not be spent alone again. **Environment B** (isolated baseline-upgrade) remains unproven: this session's capability audit found no reachable multi-database PostgreSQL 16.14 server and no usable Odoo 19 runner in this checkout. **Environment C** (isolated lifecycle) remains unproven for the same reason — no separate usable runner exists in this session. See "Environment B/C readiness audit — 2026-07-18 (this session)" below for the exact evidence. PR #176 remains open, draft and unmerged; Wave 3 remains unstarted.
 
 **CORRECTED-HEAD RUNTIME CAMPAIGN EXECUTED — CORRECTION REQUIRED (2026-07-18, HISTORICAL — SUPERSEDED BY THE TAX-FIXTURE-CORRECTED ADDENDUM ABOVE).** The corrected runtime candidate `d1af6d03e3c51b9fa3d12dad00fd7c7766ec8bd5` was runtime-validated on authenticated Odoo.sh build `35088811` (DB `adamsmen-sol-wave-2-order-import-35088811`, Odoo 19.0, PostgreSQL 16.14). **The clean/full fresh install with tests enabled is NOT green:** it fails with `account_tax.country_id` NOT-NULL errors from `TestOrderTaxResolution` — i.e. prior **finding #5 (Odoo 19 tax fixtures) is only partially closed** (the correction added `tax_group_id` but the `_tax` test helper still omits the Odoo-19-required `country_id`). Ten of the eleven prior findings (#1–4, #6–11) are confirmed closed at runtime. Isolated **baseline-upgrade (B)** and **isolated-lifecycle (C)** environments **could not be prepared** in this single-injected-database container (ENVIRONMENT BLOCKED). See "Corrected-head runtime validation campaign — 2026-07-18" below for the full evidence. **Recommendation: CORRECTION REQUIRED.** PR #176 remains open, draft and unmerged; SRR-03 remains CLOSED; Wave 3 remains unstarted. This entry does not overwrite or reclassify the first (2026-07-17, build `35080469`) campaign, which is retained verbatim below.
 
@@ -20,6 +22,100 @@
 - Hard stop: **condition 5 — no authenticated Odoo.sh capability in this session**
 
 This record's pre-runtime section does not claim an Odoo test pass; the runtime campaign section immediately below now supplies the executed runtime evidence.
+
+## Corrected-head runtime validation campaign 3 — 2026-07-18 (build `35095228`)
+
+> Independent control-room runtime audit of the sole authorized runtime candidate under revised control-room ruling
+> [`5010851668`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010851668). No source or test file was modified before, during, or as a
+> result of this campaign. The runtime-tested SHA is recorded separately from the documentation-only evidence commit.
+> Correction of the finding below is Sol implementation/test scope (DEC-032 / CLAUDE.md §13); the auditor made no code or
+> test change. This campaign does not overwrite or reclassify the two earlier campaigns, both retained below.
+
+### 1. Exact identity (verified before runtime)
+
+- Runtime-tested SHA (== detached build head == branch tip `sol/wave-2-order-import` == `origin/sol/wave-2-order-import`): `2525447cee2d8a3371b1f4e669f61bcd50b20162`
+- Base / merge-base (`mvp/program-integration`): `234c0bb50b3f61b7681e18f0b28839dee619cdb9` — confirmed ancestor of head
+- Fixture correction `6f32e4c8a2e6eac44bfb32e2cca0ea2bea3b1ea4` confirmed in head ancestry; documentation reconciliation `2525447` is the current tip
+- Changed files vs base: **29** (matches the authorized changeset); no commit exists after the authorized SHA at campaign start; working tree clean
+- Build: `35095228`; Database: `adamsmen-sol-wave-2-order-import-35095228`; Odoo **19.0**; PostgreSQL **16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)**
+- Module versions: `shopify_connector_core` `19.0.1.9.1`; `shopify_connector_product` `19.0.2.1.2`; `shopify_connector_sale` `19.0.2.0.0` (all `installed`)
+- **PR/protected-ref limitation (recorded honestly):** this container has no `gh` CLI and no GitHub token; the GitHub API returns `404` unauthenticated. PR #176 draft/open/unmerged state and protected-ref state (`checkpoint/core-r2-readonly-uat-2026-07-15`, `main`, `Shopify-connector`, `mvp/program-integration`) **cannot be authenticated from this session** and are asserted only from local git (all four protected refs are untouched locally; the auditor performed no push to any of them, no merge, no ready-marking, and no Shopify mutation). Wave 3 remains unstarted (no Wave 3 branch/commit in local history).
+
+### 2. Fresh install + registry (authoritative)
+
+The build's own fresh install-with-tests (`install.log`, build `35095228`, exact head `2525447`) recorded the authoritative clean/full matrix:
+
+- **`0 failed, 3 error(s) of 728 tests`** overall; **`Module shopify_connector_sale: 0 failures, 3 errors of 194 tests`**; `shopify_connector_core` and `shopify_connector_product` logged **no** failure/error tally (i.e. 0 errors each).
+- Registry facts (verified in the running DB): exactly **one** order-scan cron (`Shopify Connector: Enqueue Order Scans`, active); the sale module `ir.model.access.csv` carries exactly **12** ACL rows (order.binding ×4, tax.mapping ×4, plus scan/importer/line rows); **no duplicate XML IDs** across the three connector modules (`SELECT module||'.'||name … HAVING count(*)>1` returns empty); LC-1 `ondelete` job types and replay policies load; store-setting defaults present.
+- The only `autopost_bills` occurrence in the fresh-install log is a benign XML-load line (`loading account/wizard/account_autopost_bills_wizard.xml`), **not** a test error.
+
+### 3. The genuine finding — finding #5 only partially closed (CORRECTION REQUIRED)
+
+The three fresh-install errors are all in `TestOrderTotalsGuard`:
+
+1. `TestOrderTotalsGuard.test_order_and_source_tax_fingerprints_must_reconcile`
+2. `TestOrderTotalsGuard.test_tax_excluded_and_tax_included_orders_use_mapped_engine_taxes` (sub-case `included=False`)
+3. `TestOrderTotalsGuard.test_tax_excluded_and_tax_included_orders_use_mapped_engine_taxes` (sub-case `included=True`, cascade `InFailedSqlTransaction`)
+
+Exact database error (verbatim from `install.log`):
+
+```
+INSERT INTO "account_tax" (... "country_id" ... "tax_group_id" ...) VALUES (... NULL ... NULL ...) RETURNING "id"
+ERROR: null value in column "tax_group_id" of relation "account_tax" violates not-null constraint
+DETAIL:  Failing row contains (11, 1, 1, null, null, null, ... tax_group_id=null ..., "Order guard VAT 5 excluded", ...).
+… SELECT "account_tax_group"."id" FROM "account_tax_group"
+  WHERE ("account_tax_group"."company_id" IN (1) AND "account_tax_group"."country_id" IS NULL) …  LIMIT 1
+```
+
+**Root cause (Fact).** `TestOrderTotalsGuard._map_tax()` (`test_order_totals_guard.py:34-45`) creates `account.tax` with `company_id` but **no `country_id` and no `tax_group_id`**, relying on Odoo 19's default tax-group resolution. On a clean install the default lookup (`company_id IN (1) AND country_id IS NULL`) finds nothing — the DB holds only `account_tax_group` rows scoped to `company_id=1, country_id=233` (United States) and **none with `country_id IS NULL`** — so `tax_group_id` stays NULL and the Odoo-19 NOT-NULL constraint rejects the insert.
+
+**Classification (Fact).** This is a **connector test-fixture defect** (test files under `addons/`, not production code) — the *same* anti-pattern that correction `6f32e4c` fixed in the sibling `test_order_tax_resolution.py` by creating an explicit country-consistent tax group and passing explicit `country_id` on both the tax and the group. That correction was **not** applied to `test_order_totals_guard.py`. Finding #5 (Odoo 19 country-consistent tax fixture) is therefore **closed in `test_order_tax_resolution.py` and OPEN in `test_order_totals_guard.py`** → **CORRECTION REQUIRED**. Per §5 of the mission and the "do not hide a connector-attributable failure behind an environment classification" rule, this failure is reported as the authoritative fresh-install result and is **not** reclassified as an environment artifact.
+
+### 4. Full-suite matrix (authoritative fresh install vs warm reruns)
+
+| Suite | Authoritative fresh install (`install.log`, build `35095228`) | Warm `-u … --test-enable` rerun (this session) |
+| --- | --- | --- |
+| `shopify_connector_sale` | **0 failed, 3 errors of 194** (all `TestOrderTotalsGuard`) | `0 failed, 0 error(s) of 194` |
+| `shopify_connector_core` | 0 errors | `0 failed, 8 errors of 198` — all base-`account` `res_partner.autopost_bills` NOT-NULL warm-`-u` artifacts |
+| `shopify_connector_product` | 0 errors | `0 failed, 2 errors of 163` — same `autopost_bills` warm-`-u` artifact class |
+| **Total** | **0 failed, 3 errors of 728** | (cascade `-u` core run: `0 failed, 10 error(s) of 586`) |
+
+**Warm-rerun artifact classification (Inference, evidenced).** The warm `res_partner.autopost_bills` NOT-NULL errors (10×, in unrelated tests such as `TestReadinessCheck`, `TestApiClient`, `TestJobEnqueue`, `TestProductRefreshAndStale`, `TestSourceGuardDetectors`) come from the base `account` module's `res_partner` extension during partial `-u` module updates. They do **not** appear anywhere in the authoritative fresh-install log and are **not** connector-attributable. The warm sale rerun reports `0/0/194` because the warm DB's `account_fiscal_country_id` is set (=233), so `account.tax`'s default tax group resolves — masking the fresh-install fixture defect. Per §5, the failing **fresh install is authoritative**; the passing warm sale rerun is the environment-sensitive artifact, not vice-versa.
+
+### 5. Genuine concurrency — 3/3 PASS
+
+`TestOrderDiscoveryConcurrencyGenuine` is `@tagged('post_install','-at_install','-standard','shopify_connector_order_discovery_concurrency')` — deliberately excluded from the standard suite and selected by its custom tag. Run three times (`-u shopify_connector_sale --test-enable --test-tags shopify_connector_order_discovery_concurrency`): each repetition reported **`0 failed, 0 error(s) of 2 tests`**. One job / one permanent binding / one sale order; losing transaction remains usable and commits; no deadlock; no leaked lock/session. These 2 `-standard` methods plus the 84 standard methods reconcile to the **86** authored Wave 2 methods.
+
+### 6. Residue, security/redaction, resources — clean
+
+- **Residue (post-campaign):** 0 idle-in-transaction sessions; 0 advisory locks; 0 orphan running jobs; 0 bindings with null store; 0 orphan tax mappings; 0 leftover `Genuine Order Discovery Race` stores (concurrency cleanup verified); 0 stray `odoo-bin` worker processes beyond the persistent background process. A single transient `ShareLock` waiter was observed once and cleared (not connector-attributable, no deadlock).
+- **Security/redaction:** connector runtime logs contain no `Authorization: Bearer`, `access_token`, `x-shopify-access-token`, `shpat_`/`shpca_`, password, api-key/secret assignment, or `postgres://` connection string; no raw email/phone in connector log lines. The only `apikeys` hits are base Odoo's routine `res.users.apikeys` GC (0 entries).
+- **SRR-03:** remains **CLOSED** — no genuine regression proven; core Wave 1 regression is clean at fresh install; the warm artifacts are base-`account` environment noise.
+
+### 7. Eleven original findings (this campaign)
+
+| # | Finding | Status at head `2525447` |
+| --- | --- | --- |
+| 1 | `account.payment` AST guard | PASS (fresh install, 0 sale errors outside #5 class) |
+| 2 | COD snapshot | PASS |
+| 3 | legal pending wait/expiry state | PASS |
+| 4 | address-company deferral | PASS |
+| 5 | Odoo 19 country-consistent tax fixture | **NOT FULLY CLOSED** — closed in `test_order_tax_resolution.py`, OPEN in `test_order_totals_guard.py` (3 fresh-install errors) |
+| 6 | tax fingerprint pairwise distinctions and NFC | PASS (`TestOrderTaxResolution` green at fresh install) |
+| 7 | Administrator backfill preview | PASS |
+| 8 | atomic failed scan and retry | PASS |
+| 9 | Administrator confirmation | PASS |
+| 10 | read-all-orders boundary | PASS |
+| 11 | stale/Boolean token rejection and non-admin denial | PASS |
+
+### 8. Upgrade/lifecycle (B/C) and dev-store (§11/§12) under the revised ruling
+
+- **Environments B (isolated baseline-upgrade) and C (isolated uninstall/reinstall lifecycle):** this Odoo.sh dev container is linked to a single injected database and cannot provision a second/disposable database. Per revised ruling `5010851668`, these are **deferred release-readiness evidence — NOT Wave 2 blockers and NOT ENVIRONMENT BLOCKED**. They remain to be executed in a multi-database-capable environment before final release readiness, but do not gate Wave 2 acceptance.
+- **Dev-store (read-only):** no dev-store credentials were provisioned; no live Shopify call was made and no live Shopify claim is asserted. Deferred to Wave 6. Read-only dev-store access is not a Wave 2 blocker.
+
+### Recommendation — CORRECTION REQUIRED (current-facing for campaign 3)
+
+The authorized head `2525447` is **not green**: the authoritative clean/full fresh install fails with **3 `TestOrderTotalsGuard` errors** (`account_tax.tax_group_id`/`country_id` NOT-NULL), because the accepted fixture correction `6f32e4c` fixed the country-consistent-tax-fixture defect in `test_order_tax_resolution.py` only and left the identical pattern unpatched in `test_order_totals_guard.py`. The fix is Sol test-fixture scope (mirror the `6f32e4c` country-consistent tax + tax-group construction into `test_order_totals_guard.py._map_tax`, and audit any other fixture creating `account.tax` without explicit `country_id`/`tax_group_id`); the auditor changed no source or test. The B/C and dev-store environments are deferred release-readiness evidence, not Wave 2 blockers, under revised ruling `5010851668`. PR #176 remains open, draft and unmerged; SRR-03 remains CLOSED; Wave 3 remains unstarted.
 
 ## Environment B/C readiness audit — 2026-07-18 (this session, capability audit only)
 

@@ -25,11 +25,31 @@
 > runtime-correction batch are complete on draft PR #176.** The first
 > exact-head runtime campaign (SHA `2e1b1eb62c1fd267bc8ac737e945bc962624e3a8`,
 > Odoo.sh build `35080469`) failed and remains preserved as historical
-> evidence; all eleven findings now have committed dispositions. Corrected-head
-> runtime validation remains pending, and the clean/full, isolated-upgrade
-> and isolated-lifecycle environments remain mandatory before acceptance.
+> evidence; all eleven findings now have committed dispositions.
+>
+> **Corrected-head runtime campaign 3 EXECUTED — CORRECTION REQUIRED
+> (2026-07-18, build `35095228`, revised control-room ruling `5010851668`):**
+> the sole authorized candidate `2525447cee2d8a3371b1f4e669f61bcd50b20162`
+> was runtime-validated on authenticated Odoo.sh build `35095228`
+> (DB `adamsmen-sol-wave-2-order-import-35095228`, Odoo 19.0, PostgreSQL 16.14).
+> The clean/full fresh install with tests enabled is **NOT green**:
+> `0 failed, 3 error(s) of 728 tests`, all three in `TestOrderTotalsGuard`
+> (`account_tax.tax_group_id`/`country_id` NOT-NULL). Fixture correction
+> `6f32e4c` closed finding #5 in `test_order_tax_resolution.py` only and left
+> the identical country-consistent-tax-fixture defect unpatched in the sibling
+> `test_order_totals_guard.py` — so **finding #5 is not fully closed**.
+> Genuine concurrency 3/3; residue/security/redaction clean; warm-`-u`
+> `res_partner.autopost_bills` errors are base-`account` artifacts absent from
+> the authoritative fresh install. Under revised ruling `5010851668`, the
+> isolated baseline-upgrade (B) and uninstall/reinstall lifecycle (C)
+> databases are **deferred release-readiness evidence, not Wave 2 blockers and
+> not ENVIRONMENT BLOCKED**; the Wave 2 acceptance gate is the complete
+> authenticated Odoo.sh clean/full matrix, which is not green. See
+> `task-012-order-import-validation-results.md` → "Corrected-head runtime
+> validation campaign 3 — 2026-07-18 (build `35095228`)".
 > PR #176 remains draft and unmerged; Wave 2 is **not** runtime-green,
-> accepted for merge, or release-ready — row 9 reflects this current state.
+> accepted for merge, or release-ready — rows 9/13/14 reflect this current
+> state.
 >
 
 | # | MVP item | Module(s) | Requirement (accepted source) | Test type | Expected runtime/UAT evidence | Current status | Blocking issue | Release criterion |
@@ -42,7 +62,7 @@
 | 6 | Product and variant import/export | `shopify_connector_product`; Task 015/015B export module | Task 010/010B; DEC-003; Task 015/015B | Existing import unit suite; new export/media unit + Layer 2 suite | Import Odoo.sh evidence retained; export Odoo.sh + dev-store mutation evidence required | Import complete; export remaining | DEC-033 acceptance, Layer 2, Task 015/015B implementation | Import reconfirmed in Wave 6; controlled export/update and basic media export pass Layer-2-aware runtime and dev-store UAT |
 | 7 | First-sync product matching and duplicate prevention | `shopify_connector_product` | AR-045/046-adjacent, Task 010B | Unit (`test_product_duplicate_prevention.py`, `test_product_import_matching.py`) | Odoo.sh green (obtained) | Already complete at checkpoint | None | Carried into Wave 6 dev-store UAT re-confirmation only |
 | 8 | Customer import and matching | `shopify_connector_sale` | Task 011/011B; AR-045 | Unit (5 files, incl. `test_customer_matching_scalability.py`) | Odoo.sh green + 100k-partner benchmark (obtained: build `34863138`) | Already complete at checkpoint | None | Carried into Wave 6 dev-store UAT re-confirmation only |
-| 9 | Shopify order import into Odoo sales orders | `shopify_connector_sale` order capability | Task 012 packet (RE-ACCEPTED 2026-07-17); DEC-033 reconciliation (accepted); DEC-034 binding-extension contract (accepted); DEC-035 open-question dispositions (accepted); Area-6 order-scan slice (accepted) | 86 authored order tests across the locked 11 files, including two genuine independent-connection concurrency tests; static/source guards green | Odoo.sh clean/full install, isolated baseline-upgrade, isolated uninstall/reinstall lifecycle, focused, full-suite, concurrency, residue and security evidence **not yet obtained at the corrected head** | Implementation and runtime-correction batch complete; first exact-head runtime campaign (SHA `2e1b1eb`, build `35080469`) ran and failed 5/6 (preserved); all eleven findings dispositioned and committed; corrected-head runtime rerun pending | PR #176 remains draft/unmerged and is not release-ready; no corrected-head Odoo pass exists yet; clean/full, isolated-upgrade and isolated-lifecycle proof is mandatory before acceptance; read-only dev-store proof may remain honestly deferred to Wave 6 under the accepted policy | Packet re-accepted; `remote_read_replay_safe` registered; SRR-03 closed; order binding declares and tests complete stored-field classification/protection per DEC-034/SEC-1; corrected-head Odoo.sh matrix green; dev-store UAT obtained or honestly deferred to Wave 6 |
+| 9 | Shopify order import into Odoo sales orders | `shopify_connector_sale` order capability | Task 012 packet (RE-ACCEPTED 2026-07-17); DEC-033 reconciliation (accepted); DEC-034 binding-extension contract (accepted); DEC-035 open-question dispositions (accepted); Area-6 order-scan slice (accepted) | 86 authored order tests across the locked 11 files, including two genuine independent-connection concurrency tests; static/source guards green | Odoo.sh clean/full install, isolated baseline-upgrade, isolated uninstall/reinstall lifecycle, focused, full-suite, concurrency, residue and security evidence **not yet obtained at the corrected head** | Corrected-head runtime campaign 3 (SHA `2525447`, build `35095228`) EXECUTED — **CORRECTION REQUIRED**: clean/full fresh install is not green (`0 failed, 3 errors of 728`, all `TestOrderTotalsGuard` `account_tax.tax_group_id`/`country_id` NOT-NULL); fixture correction `6f32e4c` closed finding #5 in `test_order_tax_resolution.py` only, leaving the same defect unpatched in `test_order_totals_guard.py`; concurrency 3/3, residue/security clean; two earlier failed campaigns (`2e1b1eb`/`35080469`, `d1af6d0`/`35088811`) preserved | PR #176 remains draft/unmerged and is not release-ready; the clean/full matrix is not green (finding #5 open in `test_order_totals_guard.py`); under revised ruling `5010851668` the isolated-upgrade (B) and isolated-lifecycle (C) databases are deferred release-readiness evidence (not Wave 2 blockers, not ENVIRONMENT BLOCKED); read-only dev-store proof honestly deferred to Wave 6 | Packet re-accepted; `remote_read_replay_safe` registered; SRR-03 closed; order binding declares and tests complete stored-field classification/protection per DEC-034/SEC-1; corrected-head Odoo.sh matrix green; dev-store UAT obtained or honestly deferred to Wave 6 |
 | 10 | Basic inventory synchronization | New `shopify_connector_inventory` | Task 013/013B packet (proposed); DEC-010 (accepted architecture) | New unit + concurrency suite | Odoo.sh green; genuine multi-worker concurrency proof; first dev-store inventory-push UAT | Remaining implementation | DEC-031 Layer 2 not designed/accepted/implemented | Layer 2 proven; packet implemented, Odoo.sh-green, dev-store UAT evidence obtained |
 | 11 | Required bidirectional inventory behavior per accepted product rules | New `shopify_connector_inventory` | DEC-010, DEC-015 (MBQ-32/33/34 partial) | New unit suite | Same as #10 | Remaining implementation/research | Ongoing apply-mode MBQs not fully closed | Bidirectional behavior matches the accepted rule set with regression tests |
 | 12 | Fulfillment and tracking updates from Odoo to Shopify | New `shopify_connector_fulfillment` | Task 014; DEC-011; D-014-2 | New unit + concurrency suite | Odoo.sh green; dev-store FulfillmentOrder UAT | Remaining implementation | Layer 2 first; readiness scope still needs code correction | FulfillmentOrder-only packet implemented; scope uses `read_merchant_managed_fulfillment_orders` and conditional `write_merchant_managed_fulfillment_orders`; runtime/UAT green |

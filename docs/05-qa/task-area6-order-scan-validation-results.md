@@ -2,6 +2,8 @@
 
 ## Status
 
+**CORRECTED-HEAD RUNTIME CAMPAIGN 3 (2026-07-18, build `35095228`, SHA `2525447cee2d8a3371b1f4e669f61bcd50b20162`): Area-6 order-scan slice is GREEN; the Wave 2 gate is CORRECTION REQUIRED for a defect outside Area-6 scope.** At the authoritative fresh install (`install.log`, build `35095228`), all Area-6 order-scan / watermark-backfill / duplicate-prevention behavior passed — the three fresh-install errors are confined to `TestOrderTotalsGuard` (order-totals tax fixture), not the order-scan slice: `TestOrderScanTriggers` (7), `TestOrderWatermarkBackfill` (7) and the genuine `TestOrderDiscoveryConcurrencyGenuine` (3/3 repetitions, custom tag) all pass. The order-scan cron count is exactly one (`Shopify Connector: Enqueue Order Scans`, active); enqueue-only, role-gated, watermark-overlap and preview-zero-write behaviors verify. The overall Wave 2 gate remains **CORRECTION REQUIRED** because fixture correction `6f32e4c` closed the country-consistent-tax-fixture defect in `test_order_tax_resolution.py` only and left the identical pattern unpatched in `test_order_totals_guard.py` (finding #5 not fully closed) — see [`task-012-order-import-validation-results.md`](task-012-order-import-validation-results.md) "Corrected-head runtime validation campaign 3 — 2026-07-18 (build `35095228`)". No source or test file was changed by this audit; PR #176 remains open, draft and unmerged; Wave 3 remains unstarted.
+
 **Exact-head Odoo.sh runtime validation campaign EXECUTED (2026-07-17, build `35080469`); outcome: CORRECTION REQUIRED for the backfill/watermark test suite.** (Static/source history retained below.)
 
 - Date: 2026-07-17
