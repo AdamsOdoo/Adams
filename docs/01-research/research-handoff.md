@@ -1,3 +1,14 @@
+### Wave 2 tax-fixture correction reconciliation — Claude control-room (2026-07-18)
+
+- **Branch / PR:** `sol/wave-2-order-import`; draft PR [#176](https://github.com/AdamsOdoo/Adams/pull/176) into `mvp/program-integration`; open, draft and unmerged.
+- **Second runtime campaign (preserved, historical):** SHA `d1af6d03e3c51b9fa3d12dad00fd7c7766ec8bd5`, Odoo.sh build `35088811`, database `adamsmen-sol-wave-2-order-import-35088811`; ten of eleven prior findings closed at runtime; finding #5 remained because `TestOrderTaxResolution._tax()` did not guarantee a non-null, company-consistent `account.tax.country_id`. Full evidence: `../05-qa/task-012-order-import-validation-results.md`.
+- **Control-room ruling:** [`5010554056`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010554056) dispositioned finding #5 as a test-fixture/Odoo-19-compatibility defect only and authorized a test-fixture-only correction; [`5010654351`](https://github.com/AdamsOdoo/Adams/pull/176#issuecomment-5010654351) accepted the committed correction and transferred this documentation reconciliation to Claude.
+- **Fixture correction commit:** `6f32e4c8a2e6eac44bfb32e2cca0ea2bea3b1ea4` (`test(wave2): provide country-consistent Odoo 19 tax fixtures`) — test-only, deterministic country resolution plus explicit tax/tax-group company/country consistency; wrong-company and all denial cases retained; 86 authored tests unchanged. **No production tax-mapping or order-importer behavior changed.**
+- **This session:** Claude docs-only reconciliation of `mvp-program-state.md`, `task-012-order-import-validation-results.md` and this handoff entry. No `addons/**` or test file touched; no Shopify API call or mutation. **No post-correction Odoo.sh runtime pass is claimed.**
+- **Environment B/C readiness audit (this session):** capability audit only, no Odoo/PostgreSQL/destructive action executed. Result: **B BLOCKED / C BLOCKED** — no reachable PostgreSQL server, no running container/Docker daemon, no Odoo package/source in this checkout; this session is a plain authenticated git/shell/GitHub checkout, not a multi-database-capable Odoo 19/PostgreSQL 16.14 runner.
+- **Runtime authorization:** suspended — no SHA is currently runtime-authorized; the new post-reconciliation branch head is documentation-reconciled but environment-blocked, not a runtime candidate, until a credible B/C runner is confirmed in a suitable environment.
+- **Boundaries:** PR #176 remains open, draft and unmerged; Wave 3 remains unstarted; no scope broadening in this session.
+
 ### Wave 2 documentation reconciliation — Claude control-room (2026-07-17)
 
 - **Branch / PR:** `sol/wave-2-order-import`; draft PR [#176](https://github.com/AdamsOdoo/Adams/pull/176) into `mvp/program-integration`; open, draft and unmerged.
