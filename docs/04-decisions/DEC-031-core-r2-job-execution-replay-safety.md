@@ -285,3 +285,54 @@ been written and is registered here:
   Read-only work is unaffected, as decided above.
 - No implementation is authorized by this registration; the no-code gate
   and every other clause of this record remain in force unchanged.
+
+## Layer 2 Wave 3 Gate A — corrections and normalized decision inventory (2026-07-18)
+
+**This section does not change Layer 1's Accepted status above (control-room
+review `4701644819`), and does not accept Layer 2.** A dedicated Wave 3
+Gate A session (Session A, PR #177) performed a 27-agent code/documentation
+audit, official-source refresh, and adversarial review of the full Layer 2
+proposed design against a control-room parallel-audit ruling
+([PR #177 comment `5012854989`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5012854989)).
+Results:
+
+- **[`DEC-036`](DEC-036-wave-3-layer-2-gate.md)** is the new canonical
+  record for Layer 2's decision inventory: a complete, gap-free
+  `L2-D1`–`L2-D38` numbering (replacing the inconsistent `L2-D1`–`L2-D13`/`L2-D14`/`L2-D15`
+  numbering the design document originally used), with fact/inference/
+  recommendation/accepted-candidate-wording/alternatives/risk/rollback/
+  implementation-impact/test/unresolved-question detail for every decision.
+  **Status: PROPOSED FOR CONTROL-ROOM ACCEPTANCE — NOT YET ACCEPTED.**
+- The companion design document,
+  [`dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md),
+  was corrected in place: the CAS field name
+  (`compareQuantity`/`ignoreCompareQuantity` → `changeFromQuantity`, per
+  Shopify Admin GraphQL API 2026-04+); the `THROTTLED` outcome
+  classification (`failed_clean` → `uncertain`, no official non-execution
+  guarantee found); the transaction-boundary section's isolation-level
+  assumption (Odoo 19 uses PostgreSQL `REPEATABLE READ`, not the default
+  `Read Committed` — `odoo/sql_db.py`) and a factually-wrong citation
+  (`_drain_one` does not use Odoo's `_commit_progress()` API); the
+  Uninstall/Rollback section's internal self-contradiction; and the
+  batching default (one `(inventory_item_id, location_id)` pair per
+  mutation request, not one attempt per batched request, until partial-batch
+  semantics are proven). **The design remains status Proposed — these are
+  corrections to the candidate text, not an acceptance.**
+- Full citations: [`../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md).
+- **Eight items remain explicitly BLOCKING** control-room acceptance of
+  specific pieces (not the whole package): `mutation_attempt.job_id`'s
+  field type and C2's cursor placement (DEC-036 D20); whether an open,
+  lock-free transaction can span the network call (D22); the
+  disconnect-quiescence/stale-owner-sweep timeout interaction (D28);
+  `mutation_domain`'s field-ownership model (D35); the N=3
+  inconclusive-reconciliation cap's persistence scope (D17); the repo-wide
+  AST/source-guard tooling-maturity contradiction (D37); and the full
+  three-layer runtime/concurrency/crash-injection proof requirement (D38).
+  See DEC-036 §5 for the complete list.
+- **Package status: NOT FROZEN.** Per the control-room ruling's point 8,
+  an externally-tracked "Session C" code/architecture audit is still
+  required to reconcile against this package before any freeze; this
+  session's own extensive code/architecture audit is offered as Session
+  A's contribution, not as a substitute for Session C's review.
+- No implementation authorized by this section. No `addons/**` file
+  changed. No Odoo/Odoo.sh run. No Shopify request or mutation performed.

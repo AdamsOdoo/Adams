@@ -1,10 +1,24 @@
 # DEC-031 Layer 2 — Shopify Mutation Safety Design (Durable Attempt Identity, Reconciliation-Before-Retry)
 
-> **Status: PROPOSED — NOT accepted. Fable gap-closure mission, 2026-07-16.
-> This is the complete Layer 2 design registered by DEC-031's dated revision
-> note. Acceptance authority: product owner + Claude control room. No
-> implementation authorized; Waves 3/4/5 mutation domains are blocked until
-> this design is accepted and implemented with runtime proof.**
+> **Status: CONTROL-ROOM ACCEPTANCE CANDIDATE — NOT YET ACCEPTED.**
+> Originally registered 2026-07-16
+> (Fable gap-closure mission); corrected 2026-07-18 (Wave 3 Gate A, Session
+> A) per
+> [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) — read
+> DEC-036 first. Acceptance authority: product owner + Claude control room.
+> No implementation authorized; Waves 3/4/5 mutation domains are blocked
+> until this design is accepted and implemented with runtime proof.**
+>
+> **2026-07-18 correction notice.** The decision numbering below
+> (`L2-D1`–`L2-D15`) is the *original* registration and is **superseded**
+> by DEC-036's complete, gap-free `L2-D1`–`L2-D38` numbering, which is the
+> current acceptance candidate. This document's prose has been corrected
+> in place (CAS field name, THROTTLED classification, transaction-boundary
+> isolation-level assumptions, uninstall self-contradiction, batching
+> default) but its own `L2-D#` labels are retained only as a cross-reference
+> map into DEC-036 — do **not** treat this document's numbering as current
+> for acceptance purposes. Full citations for every correction below:
+> [`../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md).
 
 This document is the full Layer 2 design that
 [`DEC-031`](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md)
@@ -121,9 +135,12 @@ depends on, so reconciliation and audit can later judge the attempt against
 what was known at send time. Examples per domain:
 
 - **Inventory export:** the CAS basis — the last-known Shopify quantity
-  used as `compareQuantity`, per `(inventory_item_id, location_id)` binding
-  identity (RA-019 honored), plus the Odoo source quantity and the recorded
-  source-of-truth decision (RA-021 honored).
+  used as `changeFromQuantity` **[corrected 2026-07-18 — `compareQuantity`
+  does not exist as an input field from Shopify Admin GraphQL API 2026-04
+  onward; see source-materials refresh §1 and DEC-036 D12]**, per
+  `(inventory_item_id, location_id)` binding identity (RA-019 honored),
+  plus the Odoo source quantity and the recorded source-of-truth decision
+  (RA-021 honored).
 - **Fulfillment create:** the FulfillmentOrder GID, per-line remaining
   quantities read from Shopify immediately before send [Fact — FO
   `lineItems` carry remaining quantities, capture §6.2], location match
@@ -151,7 +168,7 @@ strategies are [Recommendation].
 
 | Mutation | Scopes | Idempotency capability | Fingerprint basis | Reconciliation read | Retry after `uncertain` | Fail-closed rule |
 |---|---|---|---|---|---|---|
-| `inventorySetQuantities` | `write_inventory` | **Mandatory `@idempotent` UUID key (24h, cached response)** + `compareQuantity` CAS — idempotent + CAS = strongest class | items/locations/quantities/compare values | `InventoryLevel.quantities(names)` per item+location | Yes — reuse persisted key within 24h; after 24h re-read then re-issue with fresh compare | CAS mismatch or expired key without fresh read → no send |
+| `inventorySetQuantities` | `write_inventory` | **Mandatory `@idempotent` UUID key from API 2026-04 (24h retention, cached response on replay)** + `changeFromQuantity` CAS **[corrected 2026-07-18 — field renamed from `compareQuantity`; `ignoreCompareQuantity` removed; see source-materials refresh §1/§2, DEC-036 D6/D12]** — idempotent + CAS = strongest class | items/locations/quantities/change-from values | `InventoryLevel.quantities(names)` per item+location | Yes — reuse persisted key within a local staleness window below Shopify's 24h (DEC-036 D6); after the window, reconcile first, never blind-reuse | CAS mismatch (`CHANGE_FROM_QUANTITY_STALE`) or stale key without fresh read → no send; batching is deferred (DEC-036 D4) — one pair per request |
 | `inventoryAdjustQuantities` | `write_inventory` | Mandatory key, but delta-based — **excluded by design**: the connector is set-based (DEC-010 source-of-truth model; a replayed delta cannot be verified against an absolute read) | — | — | — | Never registered; registry has no entry → fail-closed |
 | `fulfillmentCreate` | one of the three `write_*_fulfillment_orders` (+ fulfill-and-ship) | **NO documented idempotency** [Fact — capture §6.5] | FO GID + line items + quantities + tracking | FO line-item **remaining quantities** re-read + connector's **own fulfillment-GID ledger** (capture §6.6 — no app-attribution field on Fulfillment) | Only after reconciliation proves not-applied (remaining quantities unchanged AND no new own-ledger GID) | Reconciliation inconclusive → `blocked_manual_review`, never re-send |
 | `fulfillmentTrackingInfoUpdate` | same three write scopes | Naturally idempotent **by convergence** (same tracking values → same end state) | fulfillment GID + tracking values | Read `Fulfillment.trackingInfo`, compare to intended values | Yes, after read confirms values absent | Fulfillment GID missing on read → manual review |
@@ -177,7 +194,7 @@ registry entry, never an implicit inheritance.
 | Event | Classification | Recorded outcome |
 |---|---|---|
 | Network timeout **after** send | Ambiguous | `uncertain` |
-| **`THROTTLED`** | **NOT uncertain — the request was not executed** [Fact — throttle returns error code `THROTTLED` with `throttleStatus`; recommended backoff 1s, capture §11] | `failed_clean`, retry-eligible with backoff (§10) |
+| **`THROTTLED`** | **[Corrected 2026-07-18 — reclassified from an original, unlabeled-Inference-as-Fact "not executed" claim.] Ambiguous — no official Shopify source establishes that a THROTTLED response guarantees the resolver did not execute** [Fact — absence of a guarantee; throttle returns error code `THROTTLED` with `throttleStatus`; the "recommended backoff time is one second" language is a stated recommendation, not a documented contractual minimum — see source-materials refresh §3, DEC-036 D9] | `uncertain`, reconcile-first for every mutation domain, never auto-classified `failed_clean` |
 | HTTP 5xx | Ambiguous (may have executed) | `uncertain` |
 | GraphQL `userErrors` | Clean remote rejection — classified via existing 16-class taxonomy [Fact — DEC-009] | `failed_clean` |
 | Ambiguous/partial `userErrors` (mutation returns both effect and errors) | Ambiguous | `uncertain` |
@@ -273,12 +290,18 @@ survives any process death.
 
 ## 10. Remote rate limiting and userErrors
 
-- **`THROTTLED` = not executed** [Fact — capture §11]: record
-  `failed_clean` (not uncertain), retry with backoff honoring
-  `throttleStatus.restoreRate` / `currentlyAvailable` (restore rates
-  100–2000 pts/s by plan; mutations cost 10 [Fact]); recommended minimum
-  backoff 1s [Fact — quote]. The persisted idempotency key (where present)
-  is reused on the throttle retry — same intent, same key.
+- **`THROTTLED` = `uncertain` [corrected 2026-07-18 — the original
+  "= not executed" claim had no official-source support; see source-materials
+  refresh §3, DEC-036 D9].** Record `uncertain`, route through
+  reconciliation before any retry, for every mutation domain — never
+  auto-classify `failed_clean`. If a retry is later authorized after
+  reconciliation resolves the attempt, honor `throttleStatus.restoreRate`/
+  `currentlyAvailable` for backoff pacing; the shopify.dev rate-limits page
+  states "the recommended backoff time is one second" as guidance, not a
+  documented guarantee [Fact — quote, source-materials refresh §3]. The
+  persisted idempotency key (where present) is reused on the throttle
+  retry only if still within the local staleness window (DEC-036 D6) —
+  same intent, same key, never a blind fresh-key resend past the window.
 - **userErrors** are clean failures, classified via the existing 16-class
   taxonomy [Fact — DEC-009]; no new error class is required for them.
   Partial-effect responses (data + userErrors) classify as `uncertain`
@@ -290,46 +313,84 @@ survives any process death.
 
 ## 11. Local transaction boundaries — exact commit points
 
-**[Proposed decision — L2-D13]** Four commit points per mutation attempt:
+**[Proposed decision — L2-D13, corrected 2026-07-18 — see DEC-036 Part 6
+for the current, authoritative version of this section; the numbering here
+is retained only as a cross-reference into DEC-036 D19–D25.]**
+
+**Governing isolation-level fact, established 2026-07-18 (previously
+absent from this document):** Odoo 19 sets every cursor to PostgreSQL
+**`REPEATABLE READ`**, not the PostgreSQL default `Read Committed`
+(`odoo/sql_db.py`, `Cursor.__init__`,
+`self.connection.set_isolation_level(ISOLATION_LEVEL_REPEATABLE_READ)` —
+source-materials refresh §5). This means a worker's later statement inside
+the **same** transaction does **not** automatically see another
+connection's newly committed data — the snapshot is fixed at the
+transaction's first statement. Every commit point below must therefore be a
+genuine, separate transaction boundary, and any code that reads a row
+across one of these boundaries (recovery, reconciliation, the sweep) must
+force a fresh read via `invalidate_recordset()` + re-`browse()`/
+re-`search()` — the existing, proven precedent for this is
+`_claim_for_dispatch`'s own post-lock-acquisition invalidate-and-re-filter
+step (`shopify_connector_job.py`), which every new cross-transaction read
+point in this protocol must follow identically (DEC-036 D21).
+
+Four commit points per mutation attempt:
 
 ```
 C1: CLAIM COMMIT           main txn: try_lock_for_update → state='running',
-                           attempt_id, owner_worker_ref → COMMIT
-C2: ATTEMPT-INTENT COMMIT  main txn (fresh, pre-network): attempt row created
-                           (intent, preconditions, fingerprint, idempotency
-                           key), transport_attempted=true → COMMIT
-    [no DB lock held beyond C2]
-NET: network call          outside any DB transaction/lock; call.lease
-                           admission (side txn, FOR SHARE, committed before
-                           network) unchanged [Fact]
-C3: OUTCOME COMMIT         fresh txn: re-lock, CAS attempt_id, write outcome
-                           + evidence + terminal/retry state → COMMIT
+                           attempt_id, owner_worker_ref, running_since
+                           → COMMIT
+C2: ATTEMPT-INTENT COMMIT  cursor placement NOT YET DECIDED (DEC-036 D20,
+                           BLOCKED): attempt row created (intent,
+                           preconditions, fingerprint, idempotency key),
+                           transport_attempted=true → COMMIT, strictly
+                           before any network call
+    [no DB lock held beyond C2 — PROVEN. Whether a bare open, lock-free
+    transaction spans NET is NOT proven — DEC-036 D22, BLOCKED.]
+NET: network call          bounded window, not itself a commit point;
+                           call.lease admission (side txn, FOR SHARE,
+                           committed before network) unchanged [Fact].
+                           An explicit "nothing touches the main cursor
+                           between C2 and NET" coding discipline is
+                           required (DEC-036 D22) — not yet proven by any
+                           test.
+C3: OUTCOME COMMIT         fresh txn: re-lock, CAS-verify attempt_id, write
+                           outcome + evidence + terminal/retry state
+                           → COMMIT. Claimability-gate widening required
+                           for 40001/lock-timeout recovery to actually
+                           reach this point (DEC-036 D25).
 ```
 
-**Choice and justification:** the intent commit (C2) is a **pre-network
-commit of the main cursor**, not a side transaction. Justification: (a) the
-no-lock-across-network rule is satisfied — committing C2 releases all locks
-before the send, and the pattern is exactly Odoo's documented cron
-`_commit_progress` per-item durability idiom that `_drain_one` already uses
-[Fact — companion §2.3 evidence; PR #163's per-job-commit pattern];
-(b) unlike the `call.lease` side transaction (which exists so an
-*independent* observer can see in-flight traffic), the attempt intent has no
-reader that needs it visible mid-transaction other than post-rollback
-recovery — and a committed main-cursor write survives rollback of the
-*subsequent* transaction just as durably; (c) a side transaction would put
-attempt-intent and job-state writes on different cursors, creating a
-new consistency seam for no benefit. Option A already establishes the
-multiple-commits-per-job precedent (companion §4).
+**Choice and justification — corrected 2026-07-18.** The intent commit
+(C2)'s cursor placement (main cursor vs. a side cursor mirroring
+`call_lease`'s `_admit` pattern) is **not settled** — see DEC-036 D20,
+BLOCKED. **The original justification for main-cursor C2 is withdrawn**:
+it cited Odoo's `_commit_progress()` API as the pattern `_drain_one`
+"exactly" follows; direct code reading confirms `_drain_one` uses a bare,
+commented `cr.commit()`, **not** the `_commit_progress()` helper — that
+citation was factually wrong (DEC-036 D19). The no-lock-across-network
+claim (a, above) remains correct and proven independent of the citation
+error. Whichever cursor placement is ultimately chosen must independently
+satisfy: (i) `mutation_attempt.job_id`'s field type question (DEC-036 D20,
+also BLOCKED — three-way unresolved conflict between this session's own
+review clusters on Many2one-FK-restrict vs. plain Integer); (ii) the
+main-cursor write-isolation invariant, that no non-connector-model write is
+pending on the main cursor at C2 time (DEC-036 D21, currently an unproven,
+accidental-not-designed property of today's narrower architecture); and
+(iii) the open-transaction-vs-network-call question (DEC-036 D22, BLOCKED).
 
-**PG failure between points — recovery table:**
+**PG failure between points — recovery table** [corrected 2026-07-18 to
+distinguish plain-crash vs. genuine-PG-exception recovery ownership, and to
+distinguish an ordinary non-crashing exception from both — see DEC-036
+D23/D24/D25 for the authoritative version]:
 
 | Failure window | Durable state | Recovery |
 |---|---|---|
 | Before C1 | nothing | ordinary re-claim |
-| C1→C2 | running + attempt_id, no attempt row / transport_attempted=false | sweep or recovery: safe requeue (fresh attempt_id) |
-| C2→NET (crash before send) | intent committed, transport_attempted=true | conservative: treated as post-send → reconciliation (cannot distinguish; companion §6 row 3 rationale) |
-| NET→C3 | intent committed, no outcome | reconciliation (sweep or 40001-recovery branch, §8/§9) |
-| During C3 (40001/lock timeout) | intent committed, transport done | §8 branch: transport_attempted=true → reconciliation |
+| C1→C2 | running + attempt_id, no attempt row / transport_attempted=false | sweep (plain crash) or `_recover_after_concurrency_conflict` (PG exception): safe requeue (fresh attempt_id) |
+| C2→NET (crash before send) | intent committed, transport_attempted=true | **unconditionally** treated as "transport may have occurred" → reconciliation, never re-invoked directly. Sweep owns plain-crash recovery; the widened `_recover_after_concurrency_conflict` branch (DEC-036 D25, requires a structural fix to the current claimability gate — a `running` row is otherwise always treated as stale) owns genuine PG 40001/lock-timeout recovery in this window. An ordinary, non-crashing Python exception in this window routes through normal `_route_failure`, **not** this table (DEC-036 D23). |
+| NET→C3 | intent committed, no outcome | identical handling to C2→NET — reconciliation, never re-invoked (DEC-036 D24) |
+| During C3 (40001/lock timeout) | intent committed, transport done | widened recovery branch (DEC-036 D25) → reconciliation |
 | After C3 | outcome committed | terminal/retry per outcome; done |
 
 ## 12. Audit evidence, retention, upgrade, uninstall, rollback
@@ -348,29 +409,55 @@ multiple-commits-per-job precedent (companion §4).
   data migration of existing rows (all historical jobs have
   `transport_attempted=false` semantics vacuously). Standard Odoo
   additive-field upgrade; no pre/post migrate script anticipated.
-- **Uninstall:** DEC-030 alignment — attempt evidence follows the same
-  export-then-drop policy as other connector audit data: offered for export
-  during the uninstall flow, then dropped with the module's models.
-  [Open question] confirm DEC-030's exact export format applies unchanged.
+- **Uninstall — corrected 2026-07-18.** This bullet previously
+  self-contradicted the Rollback bullet immediately below it (which already
+  said attempt history is never deleted). Corrected per DEC-036 D34:
+  `shopify.connector.mutation.attempt` is **core-owned**
+  (`addons/shopify_connector_core/models/`) and therefore inherits
+  `shopify.connector.job`/`job.log`'s DEC-030 posture, **not** the
+  domain-owned-binding-table export-then-drop posture. On a **domain-level**
+  uninstall (e.g. the inventory module), `mutation.attempt` rows survive
+  core-side, joined to their LC-1-retyped owning job, queryable by
+  `mutation_domain` the same way retyped jobs remain queryable by
+  `original_job_type`. Only a **core/Lite-substrate** uninstall (itself
+  unsupported while any domain module remains installed) loses this data,
+  identically to `job`/`job.log`, under DEC-030's existing, unmodified
+  matrix. This correction is contingent on DEC-036 D35's `mutation_domain`
+  field-ownership question, which remains **BLOCKING**.
 - **Rollback:** before any mutation domain ships, the feature rolls back
-  cleanly (drop fields/model — nothing depends on them). **After** a
-  mutation domain has run, the attempt table is **retained as evidence**
-  even if the feature is disabled; rollback then means disabling mutation
-  job types (fail-closed registry makes them non-executable), never
-  deleting attempt history.
+  cleanly (drop fields/model — nothing depends on them; proven by a
+  negative-migration test, DEC-036 D33). **After** a mutation domain has
+  run, the attempt table is **retained as evidence, never deleted**
+  (DEC-036 D32); rollback requires **two coordinated mechanisms together,
+  not either alone** (corrected 2026-07-18 — the original single-mechanism
+  wording under-specified this): (a) the relevant
+  `store.settings.*_domain_enabled` flag set to `False`, blocking any *new*
+  job from reaching `running`; **and** (b) the job_type's replay-policy
+  registry entry set/reverted to `remote_effect_not_replay_safe`, fail-closing
+  auto-retry for anything already in flight. Mechanism (b) alone — as this
+  bullet originally implied — does not stop an already-`queued` job from
+  starting its *first* attempt, since the replay-policy check never fires
+  on a first attempt (DEC-036 D36).
 
 ## 13. Performance and test strategy
 
 **Performance [Inference]:** ~2 extra commits per mutation (C1 already
 exists in Option A's design; C2 and the attempt-row insert are new) — small,
-bounded, and per-mutation, dwarfed by the network round-trip. Batching
-interplay: batched mutations (e.g. `inventorySetQuantities` with multiple
-quantities) get **one** attempt record per request, with per-item evidence
-in `remote_evidence_refs`; bulk operations (`bulkOperationRunMutation`,
-per-row `@idempotent` [Fact — capture §11]) are out of MVP scope and would
-need a per-row attempt design before use ([Open question]). PB alignment:
-the DEF-PB-1/SRR-03 performance-baseline observations are re-measured in the
-runtime-proof pass below.
+bounded, and per-mutation, dwarfed by the network round-trip. **Batching —
+corrected 2026-07-18, implements the ruling on PR #177 comment 5012854989
+point 5:** the original "one attempt record per request, with per-item
+evidence" design assumed batch partial-success semantics that are
+**unproven** — no source confirms whether Shopify's `userErrors` carry a
+per-entry field-path index, or whether one bad entry fails the whole
+request. Per DEC-036 D4, Stage 0/1 instead **default to one
+`(inventory_item_id, location_id)` pair per mutation request/attempt row**;
+multi-entry `quantities[]` batching is explicitly out of scope until
+partial-batch semantics are proven or every entry can be independently
+reconciled. Bulk operations (`bulkOperationRunMutation`) remain out of MVP
+scope, unchanged. PB alignment: the DEF-PB-1/SRR-03 performance-baseline
+observations are re-measured in the runtime-proof pass below; the
+throughput cost of one-pair-per-request against PB-20's ≥300 pushes/hour
+target is a Stage 1 sizing question, not a Stage 0 design question.
 
 **Test strategy [Proposed decision — L2-D15]:**
 
@@ -396,6 +483,15 @@ runtime-proof pass below.
    observed on a real killed worker; zero residue; no secret leakage.
 
 ## 14. Decisions requiring acceptance before implementation
+
+**[Superseded 2026-07-18 — this table's `L2-D1`–`L2-D15` numbering is kept
+only as a historical cross-reference; the current, complete, gap-free
+`L2-D1`–`L2-D38` decision inventory — with full fact/inference/recommendation/
+accepted-candidate-wording/alternatives/risk/rollback/impact/tests/unresolved-question
+detail for every item, and explicit BLOCKING flags — is
+[`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) §3. Read DEC-036
+for acceptance purposes; this table is retained for historical continuity
+only.]**
 
 Each item is a [Proposed decision]; acceptance authority for all: **product
 owner + Claude control room**. All block Waves 3/4/5 mutation
@@ -451,6 +547,25 @@ item 2 (boolean field, not a 17th class — L2-D12), item 3 (timeout ordering,
 ---
 
 *References: companion doc §3, §4, §6, §7, §8.2, §9, §11;
-DEC-009/DEC-010/DEC-011/DEC-025/DEC-030/DEC-031; capture file 2026-07-16
-(§1, §2, §6.2, §6.5, §6.6, §9, §10, §11); rejected-approaches log
-RA-001…RA-024 (checked, none re-proposed); SRR-03/04/09.*
+DEC-009/DEC-010/DEC-011/DEC-025/DEC-030/DEC-031/DEC-036; capture file
+2026-07-16 (§1, §2, §6.2, §6.5, §6.6, §9, §10, §11); capture file
+2026-07-18
+([`shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md),
+full document); rejected-approaches log RA-001…RA-024 (checked, none
+re-proposed); SRR-03/04/09 (SRR-04/09 remain open per DEC-036 D38 —
+required-resolved-or-explicitly-carried-forward condition on runtime-proof
+acceptance).*
+
+**2026-07-18 correction summary (Wave 3 Gate A, Session A):** this document
+was corrected for (1) the CAS field name (`compareQuantity`/
+`ignoreCompareQuantity` → `changeFromQuantity`, §3/§4.2); (2) `THROTTLED`
+reclassification (`failed_clean` → `uncertain`, §5.1/§10); (3) the
+transaction-boundary section's isolation-level assumptions (Odoo 19 uses
+PostgreSQL REPEATABLE READ, not Read Committed, and the section's
+`_commit_progress()` citation was factually wrong, §11); (4) the
+Uninstall/Rollback self-contradiction (§12); (5) the batching default
+(one pair per request, not one-attempt-per-batched-request, §13); and (6)
+pointers to DEC-036's complete, gap-free `L2-D1`–`L2-D38` decision
+inventory, which supersedes this document's own `L2-D1`–`L2-D15` numbering
+for acceptance purposes (§14). **This design remains status Proposed —
+these are corrections to the candidate text, not an acceptance.**
