@@ -136,15 +136,23 @@ expected logs, cleanup, stop conditions.
 ### Scenario 3 — Successful `inventorySetQuantities`
 
 - **Preconditions:** binding confirmed (scenario 2); scenario 9
-  (activation) has already run and the level exists at `available=0`.
+  (activation, its own separate job) has already gone terminal
+  `succeeded`, and a **fresh** `inventory_push_sync` orchestration
+  dispatch (a distinct job from scenario 9's activation job, admitted
+  only after activation went terminal, DEC-037 §5.2 step 7) has re-read
+  Shopify, found the level at `available=0`, and enqueued this
+  scenario's `inventory_set_quantities` job.
 - **Permitted mutations:** 1 (`inventorySetQuantities`, target quantity
   7).
-- **Operator approval:** operator triggers the push job (manual sync) or
-  allows the odoo_event-triggered job to run, having already confirmed
-  first-push in scenario 2.
-- **Odoo action:** the `inventory_push_sync` job dispatches; Layer 2
-  attempt: C2 commits intent with `changeFromQuantity=0` (the fresh read
-  from scenario 9's activation), `quantity=7`; NET sends the mutation.
+- **Operator approval:** operator triggers the push (manual sync) or
+  allows the odoo_event-triggered orchestration job to run, having
+  already confirmed first-push in scenario 2.
+- **Odoo action:** the standalone `inventory_set_quantities` job (its own
+  `job_type`/`job_type == mutation_domain`, its own job ID, distinct from
+  both the intervening orchestration job and scenario 9's `inventory_activate`
+  job) dispatches its own Layer 2 attempt: C2 commits intent with
+  `changeFromQuantity=0` (the fresh read the intervening orchestration
+  dispatch obtained), `quantity=7`; NET sends the mutation.
 - **Shopify request:** `inventorySetQuantities(name: 'available',
   quantities: [{inventoryItemId, locationId, quantity: 7,
   changeFromQuantity: 0}]) @idempotent(key: <uuid>)`.
@@ -154,11 +162,17 @@ expected logs, cleanup, stop conditions.
   ["available"])` for the pair returns `7`.
 - **Expected job state:** `done`.
 - **Expected attempt state:** `observed_outcome='succeeded'`,
-  `resolution_disposition` null (not needed — direct success).
+  `resolution_disposition` null (not needed — direct success). Evidence
+  must record this attempt's `job_type`/job ID/`mutation_domain`/
+  `attempt_token`/idempotency key as distinct from the intervening
+  orchestration job's and scenario 9's activation job's own values.
 - **Expected logs:** attempt intent + outcome logged; no `userErrors`.
 - **Cleanup:** none; state carries forward.
 - **Stop conditions:** any `userErrors` on this call → stop, investigate
-  before proceeding (this scenario expects a clean success).
+  before proceeding (this scenario expects a clean success); this job
+  directly enqueued by scenario 9's activation job (rather than by a
+  fresh, independent orchestration dispatch) → stop, this is the exact
+  direct-mutation-chaining defect DEC-037 §5 forbids.
 
 ### Scenario 4 — Successful `changeFromQuantity` CAS (normal round-trip)
 
@@ -167,9 +181,12 @@ expected logs, cleanup, stop conditions.
   stock move.
 - **Permitted mutations:** 1.
 - **Operator approval:** operator allows the resulting push job to run.
-- **Odoo action:** `inventory_push_sync` job for the pair; the handler
-  reads the current Shopify `available` fresh (expected `7`) into
-  `changeFromQuantity` before sending.
+- **Odoo action:** a fresh `inventory_push_sync` orchestration dispatch
+  for the pair reads the current Shopify `available` fresh (expected `7`)
+  and, finding the pair safe to push, enqueues a new
+  `inventory_set_quantities` job; that job's own handler uses the
+  orchestration read as `changeFromQuantity` before sending — the
+  orchestration job itself never sends the mutation.
 - **Shopify request:** `inventorySetQuantities(..., quantity: 4,
   changeFromQuantity: 7)`.
 - **Expected Odoo result:** attempt `succeeded`.
@@ -309,36 +326,56 @@ expected logs, cleanup, stop conditions.
   it (per this session's task §16 requirement to state this explicitly
   rather than silently skip).
 
-### Scenario 9 — `inventoryActivate` when needed
+### Scenario 9 — `inventoryActivate` when needed (own job, Revision 2)
 
 - **Preconditions:** the pair's `InventoryLevel` does not yet exist at
   the mapped location (true from onboarding per §2); binding confirmed
-  (scenario 2).
+  (scenario 2). A **prior** `inventory_push_sync` orchestration dispatch
+  has already run, read Shopify, found no existing level for this pair,
+  and — because `first_push_state='confirmed'` — enqueued this scenario's
+  `inventory_activate` job (DEC-037 §5.2 step 5). This scenario does
+  **not** begin from a set-quantities attempt observing
+  `ITEM_NOT_STOCKED_AT_LOCATION` — that race case is scenario 19.
 - **Permitted mutations:** 1 (`inventoryActivate`).
 - **Operator approval:** implicit in the first-push confirmation
   (scenario 2) — activation is part of the same reviewed first-push flow,
   not a separately re-confirmed action, per DEC-037 §6.
-- **Odoo action:** the push handler observes `ITEM_NOT_STOCKED_AT_LOCATION`
-  (or proactively detects the missing level) and issues the
-  `inventory_activate` mutation domain's own Layer 2 attempt.
+- **Odoo action:** the standalone `inventory_activate` job (its own
+  `job_type == mutation_domain`, its own job ID, enqueued by the
+  orchestration dispatch above, never by a set-quantities job) runs its
+  own Layer 2 attempt.
 - **Shopify request:** `inventoryActivate(inventoryItemId, locationId,
   available: 0, stockAtLegacyLocation: false)` — `available` sent
   explicitly, never omitted.
-- **Expected Odoo result:** `mutation.attempt` (domain `inventory_activate`)
-  `observed_outcome='succeeded'`.
+- **Expected Odoo result:** `mutation.attempt` (domain `inventory_activate`,
+  on the `inventory_activate` job) `observed_outcome='succeeded'`.
 - **Expected Shopify result:** `InventoryLevel` now exists,
   `available=0`, `on_hand=0`.
-- **Expected job state:** the enclosing `inventory_push_sync` job
-  proceeds to scenario 3's set-quantities attempt immediately after.
-- **Expected attempt state:** two distinct attempt rows in sequence
-  (`inventory_activate` then `inventory_set_quantities`), two distinct
-  `attempt_token`/idempotency-key values (DEC-037 §5).
-- **Expected logs:** activation logged distinctly from the set-quantities
-  attempt that follows it.
-- **Cleanup:** none; feeds directly into scenario 3.
+- **Expected job state:** this `inventory_activate` job goes **terminal**
+  (`succeeded`) on its own — it does **not** enqueue, dispatch, or
+  contain any `inventorySetQuantities` call. Only afterward does the
+  normal scan/manual trigger admit a **fresh, separate**
+  `inventory_push_sync` orchestration job for the pair (per DEC-037 §5.2
+  step 7), which re-reads Shopify (now `available=0`) and enqueues the
+  `inventory_set_quantities` job exercised in scenario 3.
+- **Expected attempt state:** exactly one `mutation.attempt` row for this
+  job (domain `inventory_activate`); its `job_type`/job ID/`attempt_token`/
+  idempotency key must all be distinct from the intervening orchestration
+  job's and from scenario 3's `inventory_set_quantities` job's — evidence
+  must record all four as distinct values, plus the pair-serialization
+  `operation_scope_key` as the one value shared across all three jobs
+  (DEC-037 §5.3).
+- **Expected logs:** activation logged on its own job; the subsequent
+  orchestration re-read and scenario 3's set-quantities job are logged as
+  separate job records, connected only by the shared pair-serialization
+  identity.
+- **Cleanup:** none; feeds the intervening orchestration dispatch, which
+  feeds scenario 3.
 - **Stop conditions:** the post-activation level is nonzero → stop
-  (`binding_conflict`, unexplained), never proceed to set-quantities on
-  an unreviewed nonzero baseline.
+  (`binding_conflict`, unexplained), never proceed to a set-quantities
+  push on an unreviewed nonzero baseline; this job directly enqueues or
+  contains an `inventorySetQuantities` call → stop immediately, this is
+  the exact same-job/two-mutation defect DEC-037 §5 forbids.
 
 ### Scenario 10 — Reconnect read-before-push
 
@@ -523,8 +560,12 @@ expected logs, cleanup, stop conditions.
 - **Operator approval:** operator triggers the batch of pushes (e.g. via
   `action_push_inventory_now()` across the dedicated test pairs) and
   monitors the run.
-- **Odoo action:** the push-scan/manual-sync path dispatches one job per
-  pair.
+- **Odoo action:** the push-scan/manual-sync path dispatches, per pair, an
+  `inventory_push_sync` orchestration job followed (once admitted) by an
+  `inventory_set_quantities` mutation job — two job dispatches per pair,
+  exactly one Shopify mutation call per pair (no activation needed, since
+  every dedicated pair already has a confirmed baseline level from
+  earlier scenarios).
 - **Shopify request:** one `inventorySetQuantities` call per pair,
   paced by `throttleStatus`.
 - **Expected Odoo result:** all dedicated pairs reach `succeeded`.
@@ -538,6 +579,102 @@ expected logs, cleanup, stop conditions.
 - **Stop conditions:** measured throughput cannot be extrapolated to meet
   PB-20 within the observed throttle budget → record as a Stage-1 sizing
   finding for the control room, not a silent pass.
+
+### Scenario 18 — ABA/freshness protection (new, Revision 2, DEC-037 §4 row 1)
+
+- **Preconditions:** a push job ready to dispatch; Shopify `available` at
+  a known value (e.g. `4`).
+- **Permitted mutations:** 1 connector mutation (deliberately made
+  uncertain, as in scenario 7) + 2 operator-made out-of-band changes (the
+  ABA round-trip — see below), all against the dedicated test pair only.
+- **Operator approval:** the operator sets up a timeout-injection harness
+  (as scenario 7) on the connector's `inventorySetQuantities` call, then,
+  while the connector's outcome remains `uncertain`, performs two
+  out-of-band Admin-UI changes in sequence: first to a **different** value
+  (e.g. `9`), then back to the **original pre-attempt** value (`4`) —
+  simulating a third-party ABA write that lands after the connector's
+  attempt but resolves back to the same numeric value the connector's own
+  `changeFromQuantity` used.
+- **Odoo action:** the attempt's C3 outcome-commit observes the timeout →
+  `observed_outcome='uncertain'`; the linked reconciliation read then
+  observes `available=4` — numerically identical to the pre-attempt
+  `changeFromQuantity` — but with `InventoryQuantity.updatedAt` **later**
+  than this attempt's `transport_at` (because of the intervening ABA
+  writes).
+- **Shopify request:** the original (ambiguous-outcome) mutation, plus the
+  reconciliation job's `InventoryLevel.quantities` read (requesting
+  `updatedAt` where the schema exposes it).
+- **Expected Odoo result:** the reconciliation verdict is
+  **`inconclusive`**, never `not_applied` — a same-value read whose
+  `updatedAt` postdates the attempt must not be treated as proof the
+  attempt had no effect (DEC-037 §4 row 1, binding correction 4).
+  `inconclusive_reconciliation_count` increments; a further reconciliation
+  read is scheduled.
+- **Expected Shopify result:** unchanged by this scenario beyond the
+  operator's own out-of-band changes.
+- **Expected job state:** requeued for a further reconciliation read, not
+  closed `done` and not immediately retried with a fresh attempt.
+- **Expected attempt state:** `uncertain` (permanently) +
+  `resolution_disposition` left unset (inconclusive is not a terminal
+  disposition).
+- **Expected logs:** the ABA sequence (pre-attempt value → intervening
+  value → post-attempt value, with timestamps) fully logged for audit.
+- **Cleanup:** resolve the pair to a known state before further scenarios.
+- **Stop conditions:** the reconciliation verdict is `not_applied` despite
+  the later `updatedAt` → stop immediately, this is the exact false-negative
+  defect DEC-037 §4 row 1's freshness/ABA rule exists to prevent, escalate
+  to the control room.
+
+### Scenario 19 — `ITEM_NOT_STOCKED_AT_LOCATION` race, fail-closed (new, Revision 2, DEC-037 §4 row 1/§5)
+
+- **Preconditions:** a pair whose binding is `first_push_state='confirmed'`
+  and whose prior `inventory_push_sync` orchestration read believed a
+  Shopify level existed (e.g. immediately after scenario 9/3, before this
+  scenario's provoking change). Immediately before the connector's
+  `inventory_set_quantities` job sends its request, the **operator**
+  manually deactivates the level via the Shopify Admin UI (or an
+  equivalent out-of-band action), so the level genuinely does not exist
+  by send time — simulating a race between the orchestration read and the
+  mutation send.
+- **Permitted mutations:** 1 connector mutation (expected to fail with
+  `ITEM_NOT_STOCKED_AT_LOCATION`) + 1 operator-made out-of-band
+  deactivation.
+- **Operator approval:** the operator performs the out-of-band
+  deactivation and then allows the connector's queued `inventory_set_quantities`
+  job to proceed.
+- **Odoo action:** the `inventory_set_quantities` job's attempt observes
+  `ITEM_NOT_STOCKED_AT_LOCATION`.
+- **Shopify request:** `inventorySetQuantities(...)` against a pair whose
+  level no longer exists → `ITEM_NOT_STOCKED_AT_LOCATION` `userError`.
+- **Expected Odoo result:** `observed_outcome='failed_clean'`,
+  `error_class='remote_precondition_mismatch'`, routes to
+  `blocked_manual_review`/`inventory_location_missing` — **this job issues
+  no `inventoryActivate` call, inline or otherwise, in any form.** The
+  pending target stays coalesced on the binding.
+- **Expected Shopify result:** unchanged by this job (no activation, no
+  set-quantities value recorded).
+- **Expected job state:** the `inventory_set_quantities` job goes terminal
+  `blocked_manual_review`. Only a later, independently-triggered fresh
+  `inventory_push_sync` orchestration dispatch (not created by this job)
+  re-reads Shopify, correctly finds the level absent, and — since
+  `first_push_state='confirmed'` — enqueues a new `inventory_activate`
+  job (exercising the same path as scenario 9).
+- **Expected attempt state:** one `mutation.attempt` row, domain
+  `inventory_set_quantities`, `failed_clean`; no `inventory_activate`
+  attempt exists until the later, separate orchestration-triggered job
+  runs.
+- **Expected logs:** the diagnostic `UserError.message` text may be
+  captured (redacted) for human triage only — it is not used to select
+  any error class, retry decision, or manual-review subreason (DEC-037 §4
+  row 2's uniform-classification rule applies to message-text handling
+  generally in this module).
+- **Cleanup:** resolve the review case (operator re-confirms and lets the
+  next scan re-orchestrate), restoring the pair to a known state.
+- **Stop conditions:** this job issues `inventoryActivate` in any form
+  (inline call, direct enqueue from within this job, or reuse of this
+  job's own attempt/idempotency key for an activation call) → stop
+  immediately, this is the exact defect binding correction 1 (control-room
+  comment `5015619162`) forbids.
 
 ---
 

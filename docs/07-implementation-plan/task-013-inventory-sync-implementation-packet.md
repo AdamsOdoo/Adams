@@ -1,15 +1,19 @@
 # Task 013 — Inventory Synchronization: Implementation-Ready Planning Packet
 
-> **Status: GATE B ACCEPTANCE CANDIDATE — NOT IMPLEMENTATION AUTHORIZED.**
-> Corrected 2026-07-19 (Wave 3 Gate B session) per
+> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 2) — NOT IMPLEMENTATION
+> AUTHORIZED.** Corrected 2026-07-19 (Wave 3 Gate B session) per
 > [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md): CAS
 > field name (`changeFromQuantity` throughout, §A.2/D-013-3), idempotency
 > superseded from binding-owned to attempt-owned (D-013-1(b)/D-013-3),
 > review-case-first drift handling (D-013-6/A.2), one-pair-per-request
-> made binding (not batching), and the new Layer 2 integration decision
-> D-013-9 (both `inventorySetQuantities`/`inventoryActivate` mutation
-> domains, activation sequencing). **The §8 inline prompt is superseded —
-> use
+> made binding (not batching), and the Layer 2 integration decision
+> D-013-9. **Revision 2 (control-room comment `5015619162` on PR #179)
+> corrects D-013-3/D-013-6/D-013-9: `inventory_activate` and
+> `inventory_set_quantities` are each a standalone mutation job
+> (`job_type == mutation_domain`), never two attempts inside
+> `inventory_push_sync`, which is orchestration/read-only; see DEC-037
+> §5/§9 for the corrected job model and consequence contract.** **The §8
+> inline prompt is superseded — use
 > [`../06-prompts/sol-wave-3-task-013-locked-prompt.md`](../06-prompts/sol-wave-3-task-013-locked-prompt.md)
 > (LOCKED, unissued) instead.** Task 013 implementation requires Gate B
 > accepted and merged **and** Stage 0 merged and runtime-proven. Original
@@ -96,9 +100,9 @@ the safe anti-oversell floor). Write target: Shopify **`available`**
 only (accepted; `InventorySetQuantitiesInput.name` accepts only
 available/on_hand — captures §3).
 
-**D-013-3 — Push mutation mechanics [Gate B-corrected 2026-07-19, DEC-037
-§1 items C5/C7/C8, §4 row 1, §5 — superseding this entry's original
-2026-07-10 text below].** `inventorySetQuantities` with `name:
+**D-013-3 — Push mutation mechanics [Gate B-corrected, Revision 2
+2026-07-19, DEC-037 §1 item C8/§4 row 1/§5 — superseding this entry's
+original 2026-07-10 text below].** `inventorySetQuantities` with `name:
 "available"`, `reason: "correction"` (documented vocabulary),
 `referenceDocumentUri: "odoo://<db-uuid>/shopify.connector.job/<id>"`,
 one item per job (D-013-6, DEC-036 D4 — no batching): `quantities:
@@ -110,42 +114,50 @@ D7; DEC-037 §4 row 1) — **never** read from the binding's informational
 the true current value. The mutation carries the **mandatory
 `@idempotent(key: "<uuid4>")` directive** (required as of 2026-04).
 
-**Layer 2 integration and key storage (Gate B-corrected — supersedes the
-"key lives on the binding" design below).** This mutation is
-`mutation_domain = 'inventory_set_quantities'` (DEC-037 §4 row 1): every
-call passes through the Stage 0 Layer 2 wrapper — claim (C1, job-level,
-already exists) → domain-registration gate → precondition snapshot
+**Job type and Layer 2 integration (Gate B-corrected, Revision 2 —
+supersedes both the "key lives on the binding" design and Revision 1's
+same-job activation design below).** `inventory_set_quantities` is its
+**own standalone mutation job type** (`job_type == mutation_domain ==
+'inventory_set_quantities'`, DEC-037 §4 row 1/§5 — corrected in Revision
+2 from Revision 1's design, which folded this into `inventory_push_sync`).
+Every dispatch of this job passes through the Stage 0 Layer 2 wrapper —
+claim (C1, job-level) → domain-registration gate → precondition snapshot
 capture → **C2** (side cursor: `mutation.attempt` row created,
 `business_intent_fingerprint`/`exact_request_fingerprint`, the
 idempotency key, `transport_attempted=true`) → **NET** → **C3** (outcome
 commit). The Shopify idempotency key and both fingerprints live
 **exclusively on `shopify.connector.mutation.attempt`** — request-level
 and attempt-owned, **never** on the binding, and **never** the retry
-authority via any binding field (DEC-036 D6; DEC-037 §1 item C5, closing
-this entry's original binding-owned-key design). A retry reuses the
-persisted key verbatim only for an identical `exact_request_fingerprint`
-within `idempotency_valid_until`; a CAS-stale fresh read necessarily
-changes `changeFromQuantity` (part of `exact_request_fingerprint`), so a
-CAS retry is always a **new** attempt with a new key, never a reuse.
-See DEC-037 §4 row 1 for the complete matrix (direct outcomes,
-reconciliation verdicts, manual-review subreasons).
+authority via any binding field (DEC-036 D6; DEC-037 §1 item C5). A retry
+reuses the persisted key verbatim only for an identical
+`exact_request_fingerprint` within `idempotency_valid_until`; a CAS-stale
+fresh read necessarily changes `changeFromQuantity` (part of
+`exact_request_fingerprint`), so a CAS retry is always a **new** attempt
+with a new key, never a reuse. **This job is never enqueued directly by
+`inventory_activate`** — it is enqueued only by a fresh `inventory_push_sync`
+orchestration dispatch (DEC-037 §5.2). See DEC-037 §4 row 1 and §9 for
+the complete matrix and consequence contract.
 
-**Error routing (Gate B-corrected):** `CHANGE_FROM_QUANTITY_STALE` →
-bounded re-read/re-derive, **3** attempts maximum, each a fresh Layer 2
-attempt (new fingerprints, new key, DEC-037 §1 item C7); on the 4th
-mismatch → `blocked_manual_review`/`binding_conflict` (persistent
-divergence, review case, never a further silent retry).
-`ITEM_NOT_STOCKED_AT_LOCATION` → the enclosing job proceeds through the
-**`inventory_activate`** mutation domain as its own, separate Layer 2
-attempt (own idempotency key, own fingerprints — never combined with
-this attempt), per the exact sequencing in DEC-037 §5; activation is
-attempted only for `first_push_state='confirmed'` rows, and only after
-activation's own effective disposition is `applied` does a
-set-quantities attempt follow. `INVALID_QUANTITY_NEGATIVE` cannot occur
-(clamped before send). `IDEMPOTENCY_CONCURRENT_REQUEST` →
-`observed_outcome='uncertain'` (reconcile-first, never auto-retried
-directly). `IDEMPOTENCY_KEY_PARAMETER_MISMATCH` /
-`IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` → `idempotency_contract_violation`
+**Error routing (Gate B-corrected, Revision 2):**
+`CHANGE_FROM_QUANTITY_STALE` → bounded re-read/re-derive, **3** attempts
+maximum, each a **redispatch of this same job** (not a new job — new
+fingerprints, new key, a narrow fresh CAS pre-read of the pair's current
+`available`/`updatedAt`, and a fresh read of the binding's coalesced
+pending target; DEC-037 §4 row 1); on the 4th mismatch →
+`blocked_manual_review`/`binding_conflict` (persistent divergence, review
+case, never a further silent retry). **`ITEM_NOT_STOCKED_AT_LOCATION` →
+Revision 2 correction: this is a race/contract exception, not an inline
+activation trigger.** It routes `failed_clean`/`inventory_location_missing`,
+`blocked_manual_review` — this job **never** issues `inventoryActivate`
+inline, in any form, from any code path (static/AST-guarded, §5 tests
+below). The pending target stays coalesced on the binding; a later,
+fresh `inventory_push_sync` orchestration dispatch re-reads Shopify and,
+finding the level genuinely absent for a `first_push_state='confirmed'`
+row, enqueues a separate `inventory_activate` job (DEC-037 §5.2 step 8).
+`INVALID_QUANTITY_NEGATIVE` cannot occur (clamped before send).
+`IDEMPOTENCY_CONCURRENT_REQUEST` → `observed_outcome='uncertain'`
+(reconcile-first, never auto-retried directly). `IDEMPOTENCY_KEY_PARAMETER_MISMATCH`
+/ `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` → `idempotency_contract_violation`
 (`blocked_manual_review`, no automatic retry — DEC-036 D6).
 `NON_MUTABLE_INVENTORY_ITEM` (bundles) → `blocked_manual_review` /
 `binding_conflict`. `THROTTLED` → `uncertain`, reconcile-first, never
@@ -179,13 +191,16 @@ Recorded source-of-truth decision = the store-settings
 `price_source_of_truth`-analogous field is NOT reused; the
 confirmation record itself (who/when/preview) is the recorded
 decision, per MBQ-38's closure above. The S11 UI screen later drives
-these same methods (PD-2). **Gate B addition (DEC-037 §5/§6):** first
-push never bypasses Layer 2 — both the `inventory_activate` attempt
-(when needed) and the `inventory_set_quantities` attempt run through
-the full C1/C2/NET/C3 wrapper; activation always requests an explicit
-`available: 0` and its own reconciliation read verifies zero before the
-set-quantities attempt is permitted, so first push can never create an
-unreviewed nonzero stock state.
+these same methods (PD-2). **Gate B addition, Revision 2 (DEC-037
+§5/§6):** first push never bypasses Layer 2 — the confirmation gate is
+checked by `inventory_push_sync` at enqueue time, and both
+`inventory_activate` (when needed) and `inventory_set_quantities` run
+through the full C1/C2/NET/C3 wrapper as their own standalone mutation
+jobs (never as two attempts inside one job); activation always requests
+an explicit `available: 0` and its own reconciliation read must show
+`applied` before a fresh orchestration dispatch is permitted to enqueue
+the set-quantities job, so first push can never create an unreviewed
+nonzero stock state.
 
 **D-013-5 — Location cache population + readiness seam.** New job type
 `inventory_location_sync` reads the `locations` query
@@ -210,11 +225,18 @@ seam, active only when the domain is enabled: `write_inventory`
 present in `granted_scopes`. `REQUIRED_MVP_SCOPES` is untouched by
 this task; its TD-002 fix belongs to Task 014.
 
-**D-013-6 — Job granularity & triggers.** One push job per
-level-binding change (`res_model`/`res_id` → the binding row;
-`operation_scope_key` serializes per pair; `job_type =
-'inventory_push_sync'`, gated `inventory_domain_enabled`).
-Triggers shipped in-module: (a) **odoo_event hook** — override
+**D-013-6 — Job granularity & triggers [Gate B-corrected, Revision 2,
+DEC-037 §5].** One `inventory_push_sync` **orchestration/read-only** job
+per level-binding change (`res_model`/`res_id` → the binding row;
+`operation_scope_key` = the frozen pair-serialization identity
+`inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}`,
+DEC-037 §5.3 — serializes per pair across all three inventory job types,
+not `inventory_push_sync` alone; `job_type = 'inventory_push_sync'`,
+gated `inventory_domain_enabled`). This job performs the fresh Shopify
+read and all gates and, per dispatch, enqueues **at most one** mutation
+job — `inventory_activate` or `inventory_set_quantities` (DEC-037 §5.2)
+— it never issues a Shopify mutation itself. Triggers shipped in-module:
+(a) **odoo_event hook** — override
 `stock.move._action_done` to enqueue push jobs for affected
 (variant-binding × mapped-location) pairs (`job_source='odoo_event'`,
 `trigger_origin='inventory_stock_change'` — the accepted DEC-019
@@ -242,18 +264,22 @@ unchanged) is not drift and resumes normally. **Superseded text
 (2026-07-10, do not implement):** ~~unexplained Shopify-side drift...
 is pushed over only after being logged as a drift note (Odoo-SoT), so
 drift is visible in logs while the standing direction is preserved~~.
-**Coalescing (Gate B addition, DEC-037 §7):** one pending-update target
-per (item, location) pair; `operation_scope_key =
-inventory_push:{store_id}:{shopify_inventory_item_gid}:{location_mapping_shopify_gid}`
-serializes concurrent jobs for the same pair; while a prior attempt for
-that pair is `uncertain`/pending reconciliation, no new attempt is
-created — the next dispatch waits for the current attempt's effective
-disposition to resolve (DEC-036 D10), consistent with the job-level
-`operation_scope_key` dedup already in place. Throughput note: per-pair
-jobs at batch 20/5 min are an accepted MVP simplification; multi-entry
-batching is explicitly **out of scope for Wave 3 MVP** (DEC-036 D4) — a
-future separately-gated optimization, not a release-hardening detail to
-assume.
+**Coalescing (Gate B addition, Revision 2, DEC-037 §10):** one
+pending-update target (`pending_target_available`) per (item, location)
+pair, held on the binding row; `operation_scope_key =
+inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}`
+(DEC-037 §5.3) serializes concurrent inventory jobs for the same pair
+across all three job types; while any inventory job for that pair is
+non-terminal (orchestration, activation, or set-quantities — including
+a set-quantities job's own bounded CAS-retry redispatches), no new pair
+job is admitted and no second mutation attempt is created outside that
+job's own bounded retry mechanism — the next `inventory_push_sync`
+dispatch, once admitted, reads the latest coalesced
+`pending_target_available` rather than a possibly-stale value. Throughput
+note: per-pair jobs at batch 20/5 min are an accepted MVP simplification;
+multi-entry batching is explicitly **out of scope for Wave 3 MVP**
+(DEC-036 D4) — a future separately-gated optimization, not a
+release-hardening detail to assume.
 
 **D-013-7 — Concurrency.** CAS + mandatory `@idempotent` +
 `operation_scope_key` collectively make the push race-safe **at the
@@ -270,32 +296,55 @@ locked packet, sequenced after this task and before final
 UAT/release), per the PR #148 review item 3. The accepted DEC-003
 scope is completed, not narrowed.
 
-**D-013-9 — Layer 2 integration (new, Gate B, 2026-07-19, DEC-037 §4/§5/§7).**
-Every Shopify mutation this module issues passes through the Stage 0
-Layer 2 wrapper — no direct API-client mutation call exists anywhere in
+**D-013-9 — Layer 2 integration [Gate B, Revision 2, 2026-07-19, DEC-037
+§4/§5/§7/§9 — supersedes Revision 1's same-job design].** Every Shopify
+mutation this module issues passes through the Stage 0 Layer 2 wrapper —
+no direct API-client mutation call exists anywhere in
 `shopify_connector_inventory` (enforced by the repo-wide AST guard,
-DEC-036 D16/D37, and the API-client runtime guard). Two distinct
-mutation domains are registered via `_inherit`+`super()` on
-`shopify_connector_job_dispatch.py`'s `_get_replay_policies()` and
-`_get_reconciliation_strategies()` seams:
+DEC-036 D16/D37, and the API-client runtime guard). Three distinct job
+types are registered via `_inherit`+`super()` on
+`shopify_connector_job_dispatch.py`'s `_get_replay_policies()` and, for
+the two mutation job types, `_get_reconciliation_strategies()` seams:
 
-- `inventory_set_quantities` — the `inventorySetQuantities` push, exact
-  contract in DEC-037 §4 row 1.
-- `inventory_activate` — the `inventoryActivate` call issued when
-  `ITEM_NOT_STOCKED_AT_LOCATION` is observed on a confirmed row, exact
-  contract in DEC-037 §4 row 2. **Never combined with the set-quantities
-  attempt** — own `attempt_token`, own idempotency key, own
-  fingerprints; sequencing (activation must reach effective `applied`
-  before the set-quantities attempt runs) is defined in DEC-037 §5.
+- `inventory_push_sync` — orchestration/read-only, `remote_read_replay_safe`,
+  never registered in the mutation-domain registry, issues no Shopify
+  mutation, enqueues at most one mutation job per dispatch (DEC-037 §5).
+- `inventory_set_quantities` — its **own standalone mutation job**
+  (`job_type == mutation_domain`), the `inventorySetQuantities` push,
+  exact contract in DEC-037 §4 row 1.
+- `inventory_activate` — its **own standalone mutation job**
+  (`job_type == mutation_domain`), the `inventoryActivate` call, enqueued
+  only by a fresh `inventory_push_sync` dispatch that finds no existing
+  level for a confirmed row, exact contract in DEC-037 §4 row 2. **Never
+  combined with the set-quantities job** — own job record, own
+  `attempt_token`, own idempotency key, own fingerprints; the handoff
+  from activation to a set-quantities push always passes back through a
+  fresh `inventory_push_sync` orchestration dispatch (DEC-037 §5.2 step
+  7) — it is never enqueued directly by the activation job.
+
+**Pair serialization:** all three job types share one
+`operation_scope_key` per pair (the frozen literal, DEC-037 §5.3); only
+one of the three may be non-terminal for a given pair at a time; handoff
+between phases is atomic with terminalization, under a row lock on the
+binding (DEC-037 §5.3) — implementation must include the named genuine
+concurrency test proving duplicate phase jobs cannot be created.
+
+**Consequence contract:** every mutation outcome this module's Layer 2
+wrapper reports must resolve to one of the rows in DEC-037 §9
+(`observed_outcome`/`error_class`/`manual_review_subreason`/retry
+eligibility/reconciliation requirement/next orchestration behavior) —
+unknown or malformed consequence data must never default to automatic
+retry; it routes fail-closed to `uncertain`/manual review. No domain code
+writes job state outside the accepted Layer 2 consequence interface.
 
 Frozen job contract (job_type/job_source/manual-review-subreason/
-`operation_scope_key`/domain-enable-flag vocabulary): DEC-037 §7 — this
-module must not invent additional values without a further Gate
+pair-serialization-identity/domain-enable-flag vocabulary): DEC-037 §7 —
+this module must not invent additional values without a further Gate
 decision. `shopify.connector.mutation.attempt` (core, Stage 0) is the
 sole holder of the Shopify idempotency key and both fingerprints for
 every push/activation attempt; the binding's `last_pushed_available`/
-`last_pushed_at`/`last_known_shopify_available` are informational only
-(D-013-1(b), D-013-3).
+`last_pushed_at`/`last_known_shopify_available`/`pending_target_available`
+are informational/coalescing only (D-013-1(b), D-013-3, DEC-037 §10).
 
 ## 3. Gate criteria (inventory domain, 15-pattern)
 
@@ -321,11 +370,16 @@ scoped ✅(D-013-2/3); 15 ambiguous/unmapped handling ✅ (unmapped →
 `inventory_last_push_scan_at` (Datetime ro — domain-owned checkpoint,
 ARCH PD-5).
 
-Job-type → domain-flag map (red-team-added, exhaustive): all four
-job types this module registers (`inventory_push_sync`,
-`inventory_push_scan`, `inventory_first_push_preview`,
-`inventory_location_sync`) map to `inventory_domain_enabled` via
-`_domain_flag_for_job_type()`. Logging: all free text this module
+Job-type → domain-flag map (red-team-added, exhaustive; **Revision 2,
+DEC-037 §7 adds the two mutation job types**): all six job types this
+module registers (`inventory_push_sync`, `inventory_push_scan`,
+`inventory_first_push_preview`, `inventory_location_sync`,
+`inventory_activate`, `inventory_set_quantities`) map to
+`inventory_domain_enabled` via `_domain_flag_for_job_type()`. Of these,
+only `inventory_activate` and `inventory_set_quantities` are mutation job
+types (`job_type == mutation_domain`, registered in the reconciliation-
+strategy registry); the other four are Layer 1 read/orchestration/scan
+job types and carry no `mutation_domain`. Logging: all free text this module
 composes routes through `_system_append` (core redaction); payloads
 carry GIDs/quantities/location names only — no customer PII exists in
 this domain (note recorded to satisfy the cross-packet redaction
@@ -345,14 +399,30 @@ class = destructive_write_guard_blocked);
 pre-attempt read, never the binding's informational field; idempotency
 key persisted on `mutation.attempt` only, never on the binding;
 same-attempt retry reuse vs. regenerated-on-CAS-refresh; 3-strikes
-CAS-stale bounded retry then `blocked_manual_review`/`binding_conflict`
-[Gate B, DEC-037 §4 row 1]; `inventory_activate` and
-`inventory_set_quantities` use two distinct `attempt_token`/idempotency
-keys within one job [Gate B, DEC-037 §5]; activation always sends
-explicit `available: 0` [Gate B, DEC-037 §4 row 2]; `THROTTLED`/both
-idempotency-defect codes classified per DEC-036 D6/D9;
-reconciliation-verdict tests (applied/not-applied/inconclusive) for
-both mutation domains; store-identity-mismatch routing; clamp-to-0;
+CAS-stale bounded retry (`cas_mismatch_count`) is a **redispatch of the
+same `inventory_set_quantities` job**, then `blocked_manual_review`/
+`binding_conflict` on the 4th mismatch [Gate B, Revision 2, DEC-037 §4
+row 1]; **`inventory_activate` and `inventory_set_quantities` are two
+distinct job records (`job_type`, job ID, `attempt_token`, idempotency
+key each), never two attempts inside one job — a static/AST guard
+asserts the `inventory_set_quantities` handler contains no
+`inventoryActivate` call site, and vice versa** [Gate B, Revision 2,
+DEC-037 §5]; the activation-to-set handoff always passes through a fresh
+`inventory_push_sync` orchestration dispatch, never a direct enqueue
+[Gate B, Revision 2, DEC-037 §5.2]; `job_type == mutation_domain`
+invariant test for both mutation job types [Gate B, Revision 2, DEC-037
+§7]; activation always sends explicit `available: 0` [Gate B, DEC-037 §4
+row 2]; **no code path matches on `UserError.message` text for
+`inventoryActivate` classification** (static/AST guard) [Gate B,
+Revision 2, DEC-037 §4 row 2]; `THROTTLED`/both idempotency-defect codes
+classified per DEC-036 D6/D9; reconciliation-verdict tests
+(applied/not-applied/inconclusive) for both mutation domains **including
+an induced ABA/freshness fixture (value changes away and back with a
+later `updatedAt`) asserting `inconclusive`, never `not_applied`** [Gate
+B, Revision 2, DEC-037 §4 row 1]; **genuine independent-PostgreSQL-
+connection concurrency test proving two concurrent transactions cannot
+both create the next phase job for the same pair** [Gate B, Revision 2,
+DEC-037 §5.3]; store-identity-mismatch routing; clamp-to-0;
 tracked-false skip; reason/referenceDocumentUri; **source-level guard:
 the string `committed` never appears as a quantity name, and only
 `inventorySetQuantities`/`inventoryActivate` mutations exist in the
@@ -542,8 +612,9 @@ Per [`../02-product/inventory-operating-model.md`](../02-product/inventory-opera
 ### A.3 Re-acceptance
 
 This addendum, together with the Gate B corrections above (D-013-9 and
-the superseded-text markers throughout §2), is the current
-`GATE B ACCEPTANCE CANDIDATE` — **NOT IMPLEMENTATION AUTHORIZED**. Task
+the superseded-text markers throughout §2, now at Revision 2 per DEC-037),
+is the current `GATE B ACCEPTANCE CANDIDATE` — **NOT IMPLEMENTATION
+AUTHORIZED**. Task
 013 implementation requires both: (1) this Gate B package accepted and
 merged, and (2) Stage 0 merged and runtime-proven (per PR #177 comment
 `5015174971`'s sequencing guard). The §8 inline prompt remains superseded

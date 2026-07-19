@@ -72,13 +72,17 @@ consume the DEC-036 Layer 2 mutation-safety substrate:
   Shopify-read-plus-local-write flow as if it carried the Shopify-mutation
   risk Layer 2 exists to manage, which it structurally cannot have (there
   is no Shopify mutation to be uncertain about).
-- Exact interaction with Task 013 (unchanged, restated): Task 013 must be
-  installed and its own Gate B/Stage 0 dependencies accepted first; a
-  baseline apply for a pair blocks any concurrent push job for that same
-  pair via the shared `operation_scope_key` (D-013B-4); after a
-  successful baseline, Odoo is the standing authority and the next Task
-  013 push for that pair begins from the accepted baseline state
-  (D-013B-8).
+- Exact interaction with Task 013 (unchanged, restated; cross-reference
+  updated Revision 2): Task 013 must be installed and its own Gate
+  B/Stage 0 dependencies accepted first; a baseline apply for a pair
+  blocks any concurrent Task 013 job for that same pair — now any of
+  Task 013's three inventory job types (`inventory_push_sync`,
+  `inventory_activate`, `inventory_set_quantities`), since Revision 2
+  gives all three the same pair-serialization `operation_scope_key`
+  (DEC-037 §5.3), not only the single push job Revision 1 described
+  (D-013B-4); after a successful baseline, Odoo is the standing
+  authority and the next Task 013 push for that pair begins from the
+  accepted baseline state (D-013B-8).
 
 ## 2. Decision closures (D-013B-1 … D-013B-8) — each Proposed
 

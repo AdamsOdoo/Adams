@@ -1,3 +1,108 @@
+### Wave 3 Gate B Revision 2 — job-model correction per control-room REVISE ruling — compact handoff (2026-07-19)
+
+- **Branch / PR:** same as Revision 1 below — `claude/wave-3-gate-b-inventory-2m5jcl`,
+  draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179) →
+  `mvp/program-integration`. No new branch/PR created.
+- **Trigger:** the control room reviewed Revision 1 (immediately below)
+  and returned **REVISE, NOT REJECTED** (PR #179 comment
+  [`5015619162`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015619162)):
+  Revision 1's same-job, two-sequential-mutation-attempt design for
+  `inventoryActivate`/`inventorySetQuantities` conflicted with Gate A's
+  binding "one mutation job : one Shopify mutation request : one attempt
+  row" rule and with the actual Stage 0 extension seam (mutation jobs are
+  keyed by `job_type`, not owned by an enclosing orchestration job).
+- **Identity gate (re-verified live before any edit):** PR #179
+  open/draft/unmerged at the exact expected head
+  `74478293511b5bc2763a8998c329a752fa08ea68`; base unchanged
+  (`mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`);
+  `git diff --name-only` confirmed exactly the same 15 authorized files;
+  no addon/test/security/XML/manifest/CI file changed; comment
+  `5015619162` read in full; **PR #178 now exists** — open, draft,
+  unmerged, head `644853a68b3497c134ee648ce7399e50d30ff397` (Revision 1's
+  "no PR yet" statement was accurate when written; this is new
+  information, not a correction of an error); protected refs (`main`,
+  `Shopify-connector`, both checkpoints, `mvp/program-integration`) all
+  confirmed unchanged.
+- **This session's work — one coherent documentation-only correction
+  batch, all 6 binding corrections from comment `5015619162` applied:**
+  1. **Three standalone job types** replace the rejected same-job design:
+     `inventory_push_sync` demoted to orchestration/read-only
+     (`remote_read_replay_safe`, no Shopify mutation, no
+     `mutation.attempt` row, enqueues at most one mutation job per
+     dispatch); `inventory_activate` and `inventory_set_quantities` each
+     their own standalone mutation job (`job_type == mutation_domain`).
+     No job executes two Shopify mutations; CAS-stale bounded retry (max
+     3) is a redispatch of the *same* mutation job, not a new job or a
+     second mutation type — an established generic Layer 2 pattern, not
+     the rejected design.
+  2. Exact Stage 0 registry-key compatibility: mutation job types exactly
+     `inventory_activate`/`inventory_set_quantities`, registered at those
+     exact keys in handlers/replay-policies/reconciliation strategies;
+     `inventory_push_sync` kept outside the mutation registry.
+  3. Message-string idempotency classification for `inventoryActivate`
+     **withdrawn entirely** (it was unnecessary and unsafe) — replaced by
+     a uniform payload-shape rule: any non-empty `userErrors` + null
+     `inventoryLevel` → `failed_clean`/`blocked_manual_review`/
+     `binding_conflict`, covering every clean-rejection cause without
+     needing to distinguish it; message text captured as redacted
+     diagnostic evidence only, never a routing input.
+  4. Freshness/ABA-safe reconciliation verdicts: `inventory_set_quantities`'s
+     `not_applied` verdict now requires `updatedAt` not later than
+     `transport_at`; a same-value read with a later `updatedAt` is
+     `inconclusive`, never `not_applied` (an ABA round-trip must not be
+     read as proof of no effect). `inventory_activate` gets an explicit
+     three-way verdict (applied/not_applied/inconclusive).
+  5. New job/mutation-consequence contract (DEC-037 §9): every outcome
+     now specifies `observed_outcome`/`error_class`/
+     `manual_review_subreason`/retry eligibility/retry counter+delay
+     source/reconciliation requirement/next orchestration behavior;
+     unknown/malformed consequence data never defaults to automatic
+     retry.
+  6. Factual Stage 0 status corrected everywhere (PR #178 exists,
+     open/draft/unmerged, not runtime-proven, not synced) — new DEC-037
+     §13.
+  - New frozen pair-serialization identity
+    (`inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}`,
+    DEC-037 §5.3) shared by all three job types, with atomic
+    terminalization/handoff under a binding row lock and a required
+    genuine-concurrency test proving duplicate phase jobs cannot be
+    created.
+  - One further narrow official-source verification, live,
+    2026-07-19: the complete 17-value `InventorySetQuantitiesUserErrorCode`
+    enum (closing a citation gap — Revision 1 referenced a partial list
+    without a full capture in this repository's own source materials),
+    confirming `ITEM_NOT_STOCKED_AT_LOCATION` exists and is a
+    race/contract exception on `inventory_set_quantities` (fail-closed to
+    review/re-orchestration), never an inline activation trigger.
+  - Two new dev-store scenarios added (18: ABA/freshness protection; 19:
+    `ITEM_NOT_STOCKED_AT_LOCATION` race, fail-closed) — plan is now 19
+    scenarios, still **not executed**.
+  - Both locked Sol prompts corrected for the three-job model; Task 013B
+    packet/prompt received only a cross-reference correction (its
+    Layer-2-non-applicability and preview/confirm/apply/drift-abort
+    design is unaffected in substance).
+  - All 15 originally-authorized files re-touched; **no new file
+    created** (the enum citation was captured inline in DEC-037 §2
+    instead of a new source-materials file, since this revision's
+    allowed-files list authorizes no new file).
+- **Status:** DEC-037 **REVISED — RESUBMITTED FOR CONTROL-ROOM GATE B
+  RE-REVIEW**. Task 013 packet: GATE B ACCEPTANCE CANDIDATE (Revision 2)
+  — NOT IMPLEMENTATION AUTHORIZED. Both locked Sol prompts LOCKED,
+  unissued. **Claude did not accept its own package.** No `addons/**`
+  file created or modified. No Odoo/Odoo.sh run. No Shopify mutation
+  (one Shopify read only, for the enum verification). PR #179 remains
+  open/draft/unmerged; no merge, no ready-marking.
+- **Next-session prompt:** await the control room's re-review of PR #179
+  Revision 2 / DEC-037. If further REVISE corrections are issued, apply
+  them the same way — one coherent documentation-only batch against the
+  existing branch/PR, re-verifying the identity gate (including PR #178's
+  then-current state) before editing, never reopening Gate A or DEC-036.
+  If accepted, the next session issues the two locked Sol prompts only
+  after Stage 0 (Task 013) or Task 013 (Task 013B) is separately merged
+  and runtime-proven.
+
+---
+
 ### Wave 3 Gate B — Task 013/013B inventory-readiness acceptance candidate — compact handoff (2026-07-19)
 
 - **Branch / PR:** `claude/wave-3-gate-b-inventory-2m5jcl` (session-provisioned;

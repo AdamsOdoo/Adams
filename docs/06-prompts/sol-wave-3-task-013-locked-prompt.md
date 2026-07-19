@@ -4,7 +4,9 @@
 > **LOCKED: YES**
 > **NOT USABLE UNTIL SEPARATE CONTROL-ROOM ISSUANCE.** This prompt is a
 > draft, ready-to-copy template prepared during the Wave 3 Gate B session
-> (2026-07-19), per
+> (2026-07-19; corrected to Revision 2, same date, per control-room
+> comment `5015619162` on PR #179 — the job model below is now three
+> standalone job types, not one job owning two sequential attempts), per
 > [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) and the
 > corrected
 > [Task 013 packet](../07-implementation-plan/task-013-inventory-sync-implementation-packet.md).
@@ -110,8 +112,13 @@ CAS throughout, attempt-owned Layer 2 idempotency never binding-owned,
 review-case-first drift handling, bounded 3-retry CAS-stale routing, and
 D-013-9's Layer 2 integration) and
 docs/04-decisions/DEC-037-wave-3-inventory-gate-b.md (the complete
-inventorySetQuantities/inventoryActivate mutation-domain matrix and the
-activation-then-set-quantities sequencing design, §5).
+inventorySetQuantities/inventoryActivate mutation-domain matrix, the
+three-job model — §5 — and the consequence contract — §9).
+**Revision 2 job model, binding:** `inventory_push_sync` is an
+orchestration/read-only job (no Shopify mutation, no `mutation.attempt`
+row); `inventory_activate` and `inventory_set_quantities` are each their
+own standalone mutation job (`job_type == mutation_domain`). No job may
+execute two Shopify mutations.
 
 ======================================================================
 ALLOWED FILES (exhaustive)
@@ -128,14 +135,17 @@ addons/shopify_connector_inventory/** (NEW module):
     NO last_push_params_hash fields — those are retired, superseded by
     Layer 2's attempt-owned idempotency; only last_pushed_available,
     last_pushed_at, last_known_shopify_available as informational fields)
-  models/shopify_connector_inventory_service.py (NEW — push/preview
-    service, job seams, hooks, location-cache sync with the ONE named
-    sudo per D-013-5; the Layer 2 wrapper integration per D-013-9 and
-    DEC-037 §4/§5 lives here — both inventory_set_quantities and
-    inventory_activate mutation-domain registrations, the
-    activation-then-set-quantities sequencing, the fresh
-    changeFromQuantity read into preconditions_snapshot at each
-    attempt's own C2)
+  models/shopify_connector_inventory_service.py (NEW — orchestration
+    (inventory_push_sync)/preview service, job seams, hooks,
+    location-cache sync with the ONE named sudo per D-013-5; the Layer 2
+    wrapper integration per D-013-9 and DEC-037 §4/§5/§9 lives here —
+    inventory_set_quantities and inventory_activate are each registered
+    as their OWN standalone mutation job type (job_type ==
+    mutation_domain), never combined; inventory_push_sync itself issues
+    no Shopify mutation and enqueues at most one mutation job per
+    dispatch; the fresh changeFromQuantity read into
+    preconditions_snapshot at each mutation job's own C2; the
+    pair-serialization admission/handoff mechanics per DEC-037 §5.3)
   models/shopify_connector_store_settings.py (the two new store settings
     per Task 013 §4: inventory_scheduled_sync_enabled,
     inventory_last_push_scan_at)
@@ -146,11 +156,21 @@ addons/shopify_connector_inventory/** (NEW module):
   tests/test_location_mapping.py (NEW)
   tests/test_inventory_level_binding.py (NEW)
   tests/test_inventory_first_push_guard.py (NEW)
-  tests/test_inventory_push_mechanics.py (NEW — extended per DEC-037 §4:
-    CAS bounded-3-retry test, fresh-attempt-per-retry test,
-    activation/set-quantities distinct-attempt test, THROTTLED/idempotency
-    -defect-code classification tests, reconciliation
-    applied/not-applied/inconclusive tests for BOTH mutation domains,
+  tests/test_inventory_push_mechanics.py (NEW — extended per DEC-037
+    §4/§5/§9: CAS bounded-3-retry test (same-job redispatch, never a new
+    job), fresh-CAS-pre-read-per-retry test, activation/set-quantities
+    distinct-JOB test (distinct job_type/job ID/attempt_token/idempotency
+    key, connected only by a fresh orchestration handoff — never two
+    attempts inside one job), static/AST guard that no
+    inventory_set_quantities code path calls inventoryActivate (and vice
+    versa), job_type==mutation_domain invariant test, genuine
+    independent-PostgreSQL-connection concurrency test proving duplicate
+    phase jobs cannot be created for one pair, THROTTLED classification
+    test, reconciliation applied/not-applied/inconclusive tests for BOTH
+    mutation domains INCLUDING an ABA/freshness fixture (value changes
+    away and back with a later updatedAt -> inconclusive, never
+    not_applied), static/AST guard that no code path matches on
+    UserError.message text for inventoryActivate classification,
     store-identity-mismatch test, explicit available:0 activation test,
     no-quantities-array-length->1 static guard)
   tests/test_inventory_triggers.py (NEW)
@@ -188,41 +208,84 @@ HARD CONSTRAINTS
   exists at job level; C2 attempt-intent on a side cursor; NET; C3
   outcome commit) — no direct API-client mutation call anywhere in this
   module.
-- Two distinct mutation domains: inventory_set_quantities and
-  inventory_activate (DEC-037 §4) — NEVER combined into one attempt; each
-  has its own attempt_token, own idempotency key, own fingerprints.
-- changeFromQuantity is captured FRESH into preconditions_snapshot
-  immediately before each attempt's own C2 — never read from the
-  binding's last_known_shopify_available field (informational/display
-  only).
+- THREE job types, not two attempts in one job: inventory_push_sync
+  (orchestration/read-only, remote_read_replay_safe, no Shopify mutation,
+  no mutation.attempt row, enqueues at most one mutation job per
+  dispatch) and two STANDALONE mutation job types, inventory_set_quantities
+  and inventory_activate (DEC-037 §4/§5) — job_type == mutation_domain
+  for each. NEVER combined into one job or one attempt; each mutation job
+  has its own job record, own attempt_token, own idempotency key, own
+  fingerprints. A mutation job may only enqueue nothing; only
+  inventory_push_sync enqueues mutation jobs, and only after its own
+  fresh read.
+- changeFromQuantity is captured FRESH immediately before each mutation
+  job's own C2 — never read from the binding's last_known_shopify_available
+  field (informational/display only).
 - CHANGE_FROM_QUANTITY_STALE -> bounded re-read/re-derive, exactly 3
-  attempts, each a NEW Layer 2 attempt (new fingerprints, new key); the
-  4th mismatch -> blocked_manual_review/binding_conflict, never a further
-  silent retry.
-- ITEM_NOT_STOCKED_AT_LOCATION -> the inventory_activate mutation domain
-  fires as its OWN attempt (explicit available:0, never omitted or
-  nonzero); only after its effective disposition is applied does the
-  inventory_set_quantities attempt for the same job proceed (DEC-037 §5
-  sequencing, exact steps 1-6).
+  retries, each a REDISPATCH of the SAME inventory_set_quantities job
+  (not a new job) with a new attempt (new fingerprints, new key, a fresh
+  narrow CAS pre-read of available/updatedAt, and a fresh read of the
+  binding's coalesced pending target); the 4th mismatch ->
+  blocked_manual_review/binding_conflict, never a further silent retry.
+- ITEM_NOT_STOCKED_AT_LOCATION observed by inventory_set_quantities is a
+  race/contract exception, NOT an inline activation trigger -> routes
+  failed_clean/inventory_location_missing, blocked_manual_review; this
+  job issues NO inventoryActivate call, inline or otherwise, in any form
+  (static/AST-guarded). The pending target stays coalesced; only a
+  LATER, separate, fresh inventory_push_sync orchestration dispatch may
+  find the level genuinely absent and enqueue a new inventory_activate
+  job (DEC-037 §5.2 step 8).
+- inventory_activate always sends explicit available:0 (never omitted or
+  nonzero); after its effective disposition is applied, it does NOT
+  enqueue inventory_set_quantities itself — the pending target stays
+  coalesced and only a fresh, independently-admitted inventory_push_sync
+  orchestration dispatch (after the activation job has gone terminal) may
+  re-read Shopify and enqueue inventory_set_quantities (DEC-037 §5.2 step
+  7).
+- inventoryActivate's userErrors carry NO error code (field+message
+  only) -> classify by payload shape only (non-empty userErrors + null
+  inventoryLevel = failed_clean/blocked_manual_review/binding_conflict;
+  non-empty userErrors + non-null inventoryLevel = uncertain). NEVER
+  match on UserError.message text to select an error class, retry
+  decision, or manual-review subreason for any mutation in this module
+  (DEC-037 §4 row 2) — message text may be captured as redacted
+  diagnostic evidence only.
 - Unexplained Shopify-side drift -> review case, BLOCKS the pending push
   for that pair, NEVER an automatic or silent overwrite (DEC-037 §1 item
   C6 — this replaces any "log then push over" design in the packet's own
   2026-07-10 history, which must not be implemented).
+- Reconciliation not-applied verdict for inventory_set_quantities
+  requires freshness evidence (updatedAt not later than transport_at)
+  before concluding not-applied; if updatedAt is later, or freshness is
+  unavailable and attribution is ambiguous, the verdict is inconclusive,
+  NEVER not-applied (DEC-037 §4 row 1 — an ABA round-trip must not be
+  read as proof of no effect).
 - One (inventory_item_id, location_id) pair per mutation request/attempt
   — NO multi-entry quantities[] array of length > 1 anywhere (DEC-036 D4;
   static/AST test required).
-- Coalescing: one pending-update target per pair, last-value-wins;
-  operation_scope_key = inventory_push:{store_id}:{shopify_inventory_item_gid}:{location_mapping_shopify_gid}
-  serializes concurrent jobs per pair; no new attempt while a prior
-  attempt for the same pair is uncertain/pending reconciliation.
+- Coalescing: one pending-update target (pending_target_available) per
+  pair, last-value-wins; operation_scope_key = the frozen pair-serialization
+  literal inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}
+  (DEC-037 §5.3) serializes ALL THREE job types per pair — only one
+  non-terminal inventory job per pair at a time; terminalization and next
+  -phase-job enqueue are atomic, under a row lock on the binding; a
+  genuine concurrent-transaction test is required proving duplicate phase
+  jobs cannot be created.
 - First-push guard per pair with recorded confirmation (actor/time/preview
-  qty); no write for an unconfirmed row (destructive_write_guard_blocked);
-  activation never creates an unreviewed nonzero stock state.
-- Job-source/job-type/manual-review-subreason/operation_scope_key
+  qty), checked by inventory_push_sync at enqueue time; no write for an
+  unconfirmed row (destructive_write_guard_blocked); activation never
+  creates an unreviewed nonzero stock state.
+- Job-source/job-type/manual-review-subreason/pair-serialization-identity
   vocabulary is FROZEN per DEC-037 §7 — do not invent additional values.
+- Every mutation outcome resolves to a row in DEC-037 §9's consequence
+  contract (observed_outcome/error_class/manual_review_subreason/retry
+  eligibility/reconciliation requirement/next orchestration behavior);
+  unknown or malformed consequence data NEVER defaults to automatic
+  retry — fail closed to uncertain/manual review.
 - Reconnect: no push/activation admitted for a pair until that pair's
   post-reconnect reconciliation read (store-identity check first,
-  DEC-036 D18) has completed.
+  DEC-036 D18) has completed; this gate is enforced by inventory_push_sync
+  alone — no mutation job performs reconnect classification itself.
 - Negative free_qty -> clamp to 0 + divergence warning carrying the true
   value; never send a negative available.
 - Unmapped items/locations -> skipped with surfaced counts, never a
@@ -234,9 +297,11 @@ HARD CONSTRAINTS
   simulation).
 - Dev-store mutation-validation plan
   (docs/05-qa/wave-3-dev-store-mutation-validation-plan.md) scenarios
-  1-8, 9 (activation), 10-12, 17 executed with redacted evidence, OR a
-  recorded, explicit control-room waiver for any scenario found
-  genuinely not-executable (state the reason, never silently skip).
+  1-8, 9 (activation, its own job), 10-12, 17-19 (17: throughput; 18:
+  ABA/freshness; 19: ITEM_NOT_STOCKED_AT_LOCATION race, fail-closed)
+  executed with redacted evidence, OR a recorded, explicit control-room
+  waiver for any scenario found genuinely not-executable (state the
+  reason, never silently skip).
 - Zero scope expansion: no Task 014/015/UI/webhook work; no
   reconciliation-strategy-registry mechanism changes beyond registering
   this module's two domains through the existing seam.
@@ -247,13 +312,15 @@ HARD CONSTRAINTS
 RESIDUE AUDIT
 ======================================================================
 
-Zero idle-in-transaction connections after any activation-then-set-
-quantities sequence; zero orphaned locks; zero stray workers; zero
-leaked credentials/tokens in preconditions_snapshot/remote_mutation_intent/
+Zero idle-in-transaction connections after any activation-to-set-
+quantities handoff (across the orchestration re-dispatch between the two
+standalone jobs); zero orphaned locks; zero stray workers; zero leaked
+credentials/tokens in preconditions_snapshot/remote_mutation_intent/
 remote_evidence_refs (this module's own allowlist declarations, alongside
 its D-015 reconciliation-strategy registration); zero duplicate mutation
 attempts recorded for a single successful Shopify effect across the CAS-
-retry and reconciliation test matrix.
+retry and reconciliation test matrix; zero cases of two mutation jobs
+non-terminal for the same pair-serialization identity simultaneously.
 
 ======================================================================
 ROLLBACK NOTES
@@ -281,9 +348,9 @@ DEFINITION OF DONE
   a cell this record left unresolved without also implementing its
   stated fail-closed default).
 - Static, unit, and genuine-concurrency tests green (Stage 0's proven
-  multi-connection technique, extended to this module's
-  operation_scope_key/pair-serialization claims and the two-attempt
-  sequencing).
+  multi-connection technique, extended to this module's pair-serialization
+  claims and the three-job-type handoff/admission mechanics, DEC-037
+  §5.3).
 - Odoo.sh fresh-install + focused-class + full regression + residue
   audit green.
 - Dev-store validation plan scenarios executed (or explicitly,
@@ -304,14 +371,18 @@ past any of these)
    match the live 2026-07 Shopify schema — STOP and re-report; do not
    silently re-derive the matrix yourself.
 3. Any code path found that would combine the activation and
-   set-quantities mutations into one attempt, or that constructs a
-   multi-entry quantities[] array.
-4. Any attempted change to a forbidden file.
-5. Any attempted change to a protected reference.
-6. Genuine dev-store mutation evidence proves unobtainable for a
+   set-quantities mutations into one job or one attempt, that enqueues
+   inventory_set_quantities directly from inventory_activate (or vice
+   versa) without an intervening fresh inventory_push_sync dispatch, or
+   that constructs a multi-entry quantities[] array.
+4. Any code path that matches on UserError.message text to select an
+   error class, retry decision, or manual-review subreason.
+5. Any attempted change to a forbidden file.
+6. Any attempted change to a protected reference.
+7. Genuine dev-store mutation evidence proves unobtainable for a
    scenario not already flagged as possibly-not-executable (scenario 8)
    — escalate, do not substitute simulation.
-7. Every Wave-3-DoR program-level hard stop (1-10) applies verbatim.
+8. Every Wave-3-DoR program-level hard stop (1-10) applies verbatim.
 ```
 
 ---

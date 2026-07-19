@@ -1,14 +1,18 @@
 # Inventory Operating Model — Odoo 19 ↔ Shopify Connector (MVP)
 
-> **Status: GATE B ACCEPTANCE CANDIDATE — NOT IMPLEMENTATION AUTHORIZED.**
-> Originally Proposed, Fable gap-closure mission, 2026-07-16; corrected
-> 2026-07-19 (Wave 3 Gate B session) per
+> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 2) — NOT IMPLEMENTATION
+> AUTHORIZED.** Originally Proposed, Fable gap-closure mission, 2026-07-16;
+> corrected 2026-07-19 (Wave 3 Gate B session) per
 > [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md): CAS field
 > name (`changeFromQuantity` throughout, §4.4), batching removed as an
 > assumed MVP behavior (§4.3/§9/§10 — DEC-036 D4 makes one-pair-per-request
 > binding), idempotency reworded attempt-owned not binding-owned (§4.5),
 > and unexplained drift made explicitly review-case-first, blocking, never
-> auto-overwritten (§5). This document consolidates and closes the MVP
+> auto-overwritten (§5). **Revision 2 (control-room comment `5015619162`)
+> corrects §4.2/§4.5/§6: `inventoryActivate` and `inventorySetQuantities`
+> are each a standalone mutation job, never two attempts inside one push
+> job; reconciliation `not-applied` verdicts now require freshness/ABA
+> evidence (DEC-037 §4).** This document consolidates and closes the MVP
 > inventory model on top of accepted
 > [DEC-010](../04-decisions/DEC-010-inventory-architecture-strategy.md) and the
 > Part-C blueprint
@@ -140,10 +144,14 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   converges). [Fact] Shopify itself directs systems that "act as the source
   of truth" to `inventorySetQuantities`, not the delta mutation
   ([shopify captures §9](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)).
-- **[Proposed product decision — active-job dedup]** While a push job for a
-  pair is queued/running, its `operation_scope_key` (per Task 013 D-013-6/7)
-  prevents a second concurrent job for the same pair; new events only refresh
-  the pending target consumed by the next run.
+- **[Proposed product decision — active-job dedup, Revision 2 pair scope]**
+  While any inventory job (orchestration, activation, or set-quantities —
+  Task 013 D-013-6/7) for a pair is non-terminal, the shared
+  pair-serialization `operation_scope_key`
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5.3)
+  prevents a second concurrent job of any of the three types for the same
+  pair; new events only refresh the pending target consumed by the next
+  `inventory_push_sync` dispatch.
 
 ### 4.3 Batching — excluded from Wave 3 MVP [Gate B-corrected, 2026-07-19]
 
@@ -222,8 +230,11 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   24-hour window (minus a configurable local safety margin) bounds how
   long a stored key is replayable; after that window a stale attempt must
   go through reconciliation (§6), not key replay. `inventoryActivate`
-  (when first-push requires it) uses its **own**, independently-tracked
-  idempotency key — never combined with the set-quantities attempt's key
+  (when first-push requires it) runs as its **own standalone mutation
+  job**, with its **own**, independently-tracked idempotency key — never
+  combined with the `inventory_set_quantities` job's attempt or key; the
+  handoff back to a set-quantities push always passes through a fresh
+  orchestration read, never a direct enqueue
   ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5).
 
 ## 5. Shopify→Odoo behavior (MVP)
@@ -268,11 +279,17 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   orthogonal `resolution_disposition` that never overwrites the immutable
   `observed_outcome` (DEC-036 D10): if Shopify already shows the target,
   the attempt is applied and the job closes without resend; if it shows
-  the pre-attempt value, the attempt is not-applied and a **new** attempt
-  (fresh CAS cycle, fresh key) may be issued on next dispatch; if neither,
-  the read is inconclusive and a further reconciliation read is
-  scheduled (capped at 3 inconclusive verdicts, then manual review).
-  Design detail: the Layer 2 design doc
+  the pre-attempt value **and** freshness evidence (`updatedAt` vs.
+  `transport_at`, where present) does not show a later change, the
+  attempt is not-applied and a **new** attempt (fresh CAS cycle, fresh
+  key) may be issued on next dispatch; if neither, **or** if the
+  pre-attempt value is shown but `updatedAt` is later than the attempt
+  (an ABA round-trip cannot be ruled out), the read is inconclusive and a
+  further reconciliation read is scheduled (capped at 3 inconclusive
+  verdicts, then manual review) — a same-value read is never, by itself,
+  proof of not-applied
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §4 row
+  1). Design detail: the Layer 2 design doc
   ([dec-031-layer-2-mutation-safety-design.md](../03-architecture/dec-031-layer-2-mutation-safety-design.md))
   and the domain-specific matrix in
   [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §4.

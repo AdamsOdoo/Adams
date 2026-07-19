@@ -1,25 +1,30 @@
 # Wave 3 — Definition of Ready (Inventory Synchronization: Layer 2 Stage 0 + Task 013/013B)
 
-> **Status: GATE A ACCEPTED (merged); GATE B — CONTROL-ROOM REVIEW PENDING
-> (candidate produced 2026-07-19, PR #179); STAGE 0 IMPLEMENTATION STATUS
-> REPORTED FACTUALLY BELOW; TASK 013 NOT AUTHORIZED; TASK 013B NOT
-> AUTHORIZED.** Originally proposed, Fable gap-closure mission, 2026-07-16;
-> Gate A (DEC-031 Layer 2 architecture closure + Stage 0 packet
-> preparation, PR #177) corrected this document's CAS-field and batching
-> text on 2026-07-18, the DEC-036 consolidated correction batch
-> (2026-07-19) resolved every architecture item this document previously
-> carried as BLOCKING, and the control room accepted the complete Gate A
-> package by PR #177 comment
+> **Status: GATE A ACCEPTED (merged); GATE B — CONTROL-ROOM REVISE APPLIED,
+> RE-REVIEW PENDING (Revision 2 produced 2026-07-19, PR #179); STAGE 0
+> IMPLEMENTATION STATUS REPORTED FACTUALLY BELOW; TASK 013 NOT AUTHORIZED;
+> TASK 013B NOT AUTHORIZED.** Originally proposed, Fable gap-closure
+> mission, 2026-07-16; Gate A (DEC-031 Layer 2 architecture closure +
+> Stage 0 packet preparation, PR #177) corrected this document's CAS-field
+> and batching text on 2026-07-18, the DEC-036 consolidated correction
+> batch (2026-07-19) resolved every architecture item this document
+> previously carried as BLOCKING, and the control room accepted the
+> complete Gate A package by PR #177 comment
 > [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
 > and merged it (merge commit `3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`,
 > verified live in PR #177 comment `5015174971`) — see §5. **Gate B
-> candidate (2026-07-19, this session, draft PR
-> [#179](https://github.com/AdamsOdoo/Adams/pull/179)):**
-> [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) closes
-> every remaining inventory-planning contradiction (item 3 below is now
-> **resolved**, not merely flagged) and completes the Task 013/013B
-> re-acceptance candidate, the complete `inventorySetQuantities`/
-> `inventoryActivate` Layer 2 matrix, and both locked (unissued) Sol
+> Revision 1 (2026-07-19, draft PR
+> [#179](https://github.com/AdamsOdoo/Adams/pull/179)) was returned
+> REVISE, NOT REJECTED by the control room (PR #179 comment
+> [`5015619162`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015619162)):
+> the same-job, two-sequential-mutation-attempt design was rejected in
+> favor of three standalone job types. Gate B Revision 2 (same date)
+> applies every binding correction from that comment** —
+> [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) now
+> closes every remaining inventory-planning contradiction (item 3 below is
+> **resolved**, not merely flagged) with the corrected three-job model,
+> the complete `inventorySetQuantities`/`inventoryActivate` Layer 2 matrix,
+> the job/mutation-consequence contract, and both locked (unissued) Sol
 > prompts. **This is a candidate, not an acceptance — Claude did not
 > accept its own package.** Docs-only. Acceptance authority: product owner
 > + ChatGPT control room. **Wave 3 Stage 1/2 implementation still requires
@@ -28,13 +33,19 @@
 > candidate.**
 >
 > **Stage 0 factual status (reported, not inferred, per this session's
-> governing task):** a Sol implementation branch (`sol/wave-3-stage-0-layer2`)
-> exists at the same base SHA as this Gate B candidate, but **no Stage 0
-> pull request exists yet** and **no Stage 0 work has merged**. This Gate
-> B candidate does not assume, claim, or depend on any unverified Stage 0
-> progress — Task 013 implementation authorization requires Gate B
-> accepted and merged **and** Stage 0 independently merged and
-> runtime-proven (PR #177 comment `5015174971`'s sequencing guard).
+> governing tasks; corrected Revision 2):** Sol's implementation branch
+> (`sol/wave-3-stage-0-layer2`) now has an open draft **pull request,
+> #178** (head `644853a68b3497c134ee648ce7399e50d30ff397`, opened after
+> Revision 1 was authored) — **not merged**. PR #178's own body reports
+> implementation complete and static validation passing, by its own
+> report; Odoo was not installed in that session's workspace, so genuine
+> PostgreSQL runtime tests, the process-death harness, install/upgrade,
+> and full regression were **not run there** — no runtime-pass claim is
+> made by that PR. This Gate B candidate does not assume, claim, or depend
+> on any unverified Stage 0 progress — Task 013 implementation
+> authorization requires Gate B accepted and merged **and** Stage 0
+> independently merged and runtime-proven (PR #177 comment `5015174971`'s
+> sequencing guard). See DEC-037 §13 for the full statement.
 >
 > **Current program state (2026-07-19):** Wave 1 and **Wave 2 are both
 > merged** (Wave 2: PR #176, merge commit `22bfb9a0e9b1e48b6a664351e2b321d134177110`)

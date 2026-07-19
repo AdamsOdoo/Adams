@@ -4,7 +4,9 @@
 > **LOCKED: YES**
 > **NOT USABLE UNTIL SEPARATE CONTROL-ROOM ISSUANCE.** This prompt is a
 > draft, ready-to-copy template prepared during the Wave 3 Gate B session
-> (2026-07-19), per
+> (2026-07-19; a Revision 2 cross-reference-only correction, same date,
+> reflects Task 013's corrected three-job model — this task's own
+> content and Layer-2-non-applicability are unaffected), per
 > [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §8 and the
 > corrected
 > [Task 013B packet](../07-implementation-plan/task-013b-initial-inventory-baseline-packet.md).
@@ -193,12 +195,15 @@ HARD CONSTRAINTS
   per pair, ever; no replay after a successful apply (stamp-checked,
   destructive_write_guard_blocked on mismatch).
 - Concurrency caveat (SRR-03/04/09-class) restated, not newly resolved.
-- Exact interaction with Task 013 (verbatim, DEC-037 §8): Task 013 must
-  already be installed and accepted; a baseline apply for a pair blocks
-  any concurrent Task 013 push job for that same pair via the shared
-  operation_scope_key; after a successful baseline, Odoo becomes the
-  standing authority for that pair and the next Task 013 push begins
-  from the accepted baseline state.
+- Exact interaction with Task 013 (verbatim, DEC-037 §8, cross-reference
+  updated Revision 2): Task 013 must already be installed and accepted; a
+  baseline apply for a pair blocks any concurrent Task 013 job for that
+  same pair — now any of Task 013's three inventory job types
+  (inventory_push_sync, inventory_activate, inventory_set_quantities),
+  since Revision 2 gives all three the same pair-serialization
+  operation_scope_key (DEC-037 §5.3); after a successful baseline, Odoo
+  becomes the standing authority for that pair and the next Task 013
+  push begins from the accepted baseline state.
 - No Layer 2 mutation wrapper is added to this task for symmetry with
   Task 013 (restated from the explicit statement above — do not deviate
   even if it looks more "consistent" to add one).
