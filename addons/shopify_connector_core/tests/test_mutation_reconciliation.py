@@ -24,6 +24,17 @@ class TestMutationReconciliation(TransactionCase):
         })
         cls.Job = cls.env['shopify.connector.job']
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
+        cls.admin = cls.env['res.users'].create({
+            'name': 'Layer 2 reconciliation administrator',
+            'login': 'layer2_reconciliation_admin_%s' % uuid.uuid4().hex,
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.'
+                    'group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
 
     def _fixture(self, direct_outcome=True, create_reconciliation=True):
         token = uuid.uuid4().hex
@@ -248,8 +259,34 @@ class TestMutationReconciliation(TransactionCase):
 
     def test_historic_reconciliation_keeps_attempt_evidence_link(self):
         _job, attempt, reconciliation = self._fixture()
-        reconciliation._make_historic_domain_jobs()
+        attempt._record_recovery_uncertain(
+            'post_c2_owner_recovery', 'dispatcher_recovery',
+        )
+        attempt._record_inconclusive_reconciliation({
+            'read_ref': 'historic-safe-read',
+        })
+        attempt.with_user(self.admin).action_resolve_mutation_attempt(
+            'applied', 'Historic conversion was externally verified.',
+        )
+        evidence = attempt.remote_evidence_refs
+        original_job_type = reconciliation.original_job_type
+        log_domain = [('job_id', '=', reconciliation.id)]
+        log_count = self.env[
+            'shopify.connector.job.log'
+        ].search_count(log_domain)
+        reconciliation._reassign_to_historic_job_type()
+        self.assertEqual(reconciliation.job_type, 'historic_domain_job')
+        self.assertEqual(
+            reconciliation.original_job_type, original_job_type,
+        )
         self.assertEqual(reconciliation.mutation_attempt_id, attempt)
+        self.assertTrue(reconciliation.exists())
+        self.assertTrue(attempt.exists())
+        self.assertEqual(attempt.remote_evidence_refs, evidence)
+        self.assertGreaterEqual(
+            self.env['shopify.connector.job.log'].search_count(log_domain),
+            log_count,
+        )
 
     def test_recovered_pending_attempt_reconciles_end_to_end(self):
         Dispatch = self.env['shopify.connector.job.dispatch']
