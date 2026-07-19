@@ -1,7 +1,7 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Validation Results
 
-- **Status:** RUNTIME CAMPAIGN 1 CORRECTED STATICALLY — INDEPENDENT
-  FRESH-BUILD ODOO.SH RERUN REQUIRED
+- **Status:** FINAL STATIC ADVERSARIAL GATE PASSED — INDEPENDENT FRESH-BUILD
+  ODOO.SH RERUN REQUIRED
 - **Original Stage 0 base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
 - **Pre-synchronization head:** `644853a68b3497c134ee648ce7399e50d30ff397`
 - **Accepted Gate B integration:** `8e2e707ff7025a7a2e9e0207a8886399a24b889c`
@@ -15,6 +15,7 @@
 - **Runtime Campaign 1 build / database:** `35125006` /
   `adamsmen-sol-wave-3-stage-0-layer2-35125006`
 - **Runtime-correction ruling:** PR #178 comment `5016941832`
+- **Final adversarial review:** PR #178 comment `5017091126`
 - **Frozen candidate:** the commit containing this record; its exact SHA is
   recorded in the final PR body and control-room report because a Git commit
   cannot embed its own SHA.
@@ -22,10 +23,11 @@
 
 ## 1. Identity and synchronization
 
-The pre-edit identity gate verified PR #178 open, draft, unmerged, at the exact
-pre-sync head and 23-path scope. PR #179 was closed and merged at the accepted
-Gate B integration SHA. Binding comments `5016117207`, `5016274358`, and
-`5016306005` existed and were read in full.
+The historical pre-synchronization identity gate verified PR #178 open, draft,
+unmerged, at its then-current 23-path scope. The current cumulative scope is 27
+paths. PR #179 was closed and merged at the accepted Gate B integration SHA.
+Binding comments `5016117207`, `5016274358`, and `5016306005` existed and were
+read in full.
 
 The exact integration commit was merged with a normal two-parent merge commit.
 The branch was then zero commits behind `mvp/program-integration`. All 15
@@ -142,6 +144,36 @@ remain unresolved pending an isolated, quiesced fresh-build rerun. Separate
 upgrade proof is deferred to Wave 6. The process-death harness remains pending
 safe child-process control; neither deferred item is reported passed.
 
+## 2C. Final bounded adversarial correction at 4f4c124
+
+Control-room review `5017091126` found three proof defects and one metadata
+defect. A duplicate test method caused Python to discard the weaker definition;
+the concurrent uniqueness test treated every exception as a valid loser; and
+the attempt-write guard authorized same-named methods outside the mutation
+attempt model. The PR body and this record also retained stale current-scope
+references to 23 paths although GitHub reported 27.
+
+The duplicate definition was removed while preserving the stronger test and
+its `REASON_TEMPORARY` assertion. A repository-wide AST scan now inspects each
+test class body directly across `shopify_connector_*/tests/**/*.py`, reports
+duplicate direct method definitions, and is proven by a synthetic class with
+two same-named test methods.
+
+The concurrent database proof now requires exactly one committed insertion and
+one `psycopg2.IntegrityError` loser whose SQLSTATE is
+`psycopg2.errorcodes.UNIQUE_VIOLATION` (`23505`). Unexpected exceptions are
+reported as failures, both threads must terminate within the bounded timeout,
+each thread must report exactly one outcome, and exactly one attempt row must
+survive. The separate service-level friendly `ValidationError` proof remains.
+
+Attempt create/write authorization now requires both the exact mutation-attempt
+model file and an accepted closed-surface owner method. Adversarial fixtures
+prove that external models cannot borrow `_record_direct_outcome`,
+`action_resolve_mutation_attempt`, or `_create_attempt_intent` to bypass the
+guard. Existing attempt/attempts write/unlink, direct environment lookup, and
+forged `_surface` detection remains, while unrelated store/job `self.write`
+continues to be ignored.
+
 ## 3. Binding A–N traceability
 
 | Binding | Production method(s) | Exact test evidence | Runtime proof | Rollback / fail-closed behavior |
@@ -235,10 +267,10 @@ Read-only API behavior and the intentional API context-manager
 20. `d58005e5a756461bd3040ded745b299a662477a7` — lifecycle legacy guard
     correction.
 
-The correction commits modify 17 of the already-authorized paths: eight model
-files and the nine existing Stage 0 test modules. No new production, test, or
-documentation path was introduced. The complete PR remains exactly the
-authorized 23 paths.
+The earlier consolidated correction modified 17 of the then-authorized paths:
+eight model files and the nine existing Stage 0 test modules. No new
+production, test, or documentation path was introduced in that historical
+campaign.
 
 The bounded campaign after `8915a2c` modifies exactly 13 authorized paths:
 three production models, all nine existing Stage 0 test modules, and this
@@ -263,7 +295,7 @@ it creates no file.
 | GraphQL/raw-transport/source-guard audit | PASS (static source inspection; Odoo test execution pending) |
 | Credential, token, real-domain, and PII/logging audit | PASS — no real value or call |
 | Git patch trailing-whitespace / diff-check audit | PASS |
-| Integration comparison | PASS — zero behind and exactly 23 PR paths |
+| Integration comparison | PASS — zero behind and exactly 27 PR paths |
 | Gate B byte-preservation audit | PASS |
 | Recovery-state/admission AST ownership audit | PASS |
 | Nine-module job-type/job-source fixture audit | PASS |
@@ -273,6 +305,12 @@ it creates no file.
 | Exact dispatcher create-site inventory | PASS — one sanctioned site |
 | Exact method/receiver/purpose sudo inventory | PASS — 48 sites |
 | Thirteen-file fixture and tag audit | PASS |
+| Repository-wide duplicate test-method AST scan | PASS — no duplicates |
+| Synthetic duplicate-method detector fixture | PASS — duplicate reported |
+| Concurrent uniqueness source audit | PASS — IntegrityError and SQLSTATE 23505 required |
+| Attempt-write positive/negative fixtures | PASS |
+| External same-name attempt-write bypass fixtures | PASS — all rejected |
+| Current cumulative changed-file comparison | PASS — zero behind, exactly 27 paths |
 
 Odoo and PostgreSQL executables are unavailable in this workspace. Therefore
 install/upgrade, ORM constraints, ACL runtime, cron execution, all Odoo tests,
@@ -308,11 +346,43 @@ contains no inventory, fulfillment, refund, or payout mutation implementation.
 No Shopify token was read, no credential-backed request was made, and no real
 Shopify mutation was executed.
 
-The PR changes exactly the locked 23 paths. It changes no Gate B document,
-decision record, inventory addon, other addon, CI/workflow, Wave 3 handoff, or
-Task 013/013B implementation. PR #178 must remain open, draft, and unmerged.
+The PR changes exactly these 27 existing authorized paths:
+
+1. `addons/shopify_connector_core/__manifest__.py`
+2. `addons/shopify_connector_core/data/shopify_connector_stale_owner_sweep_cron.xml`
+3. `addons/shopify_connector_core/models/__init__.py`
+4. `addons/shopify_connector_core/models/shopify_connector_api_client.py`
+5. `addons/shopify_connector_core/models/shopify_connector_job.py`
+6. `addons/shopify_connector_core/models/shopify_connector_job_actions.py`
+7. `addons/shopify_connector_core/models/shopify_connector_job_dispatch.py`
+8. `addons/shopify_connector_core/models/shopify_connector_mutation_attempt.py`
+9. `addons/shopify_connector_core/models/shopify_connector_pii_retention.py`
+10. `addons/shopify_connector_core/models/shopify_connector_stale_owner_sweep.py`
+11. `addons/shopify_connector_core/models/shopify_connector_store.py`
+12. `addons/shopify_connector_core/security/ir.model.access.csv`
+13. `addons/shopify_connector_core/tests/__init__.py`
+14. `addons/shopify_connector_core/tests/test_api_client.py`
+15. `addons/shopify_connector_core/tests/test_credential_service.py`
+16. `addons/shopify_connector_core/tests/test_disconnect_quiescence.py`
+17. `addons/shopify_connector_core/tests/test_job_dispatch.py`
+18. `addons/shopify_connector_core/tests/test_mutation_api_guard.py`
+19. `addons/shopify_connector_core/tests/test_mutation_attempt.py`
+20. `addons/shopify_connector_core/tests/test_mutation_concurrency.py`
+21. `addons/shopify_connector_core/tests/test_mutation_dispatch.py`
+22. `addons/shopify_connector_core/tests/test_mutation_reconciliation.py`
+23. `addons/shopify_connector_core/tests/test_mutation_recovery.py`
+24. `addons/shopify_connector_core/tests/test_mutation_retention.py`
+25. `addons/shopify_connector_core/tests/test_mutation_security.py`
+26. `addons/shopify_connector_core/tests/test_mutation_source_guards.py`
+27. `docs/05-qa/task-stage0-layer2-validation-results.md`
+
+No production code changed in the final adversarial campaign. No Gate B
+document, decision record, inventory addon, other addon, CI/workflow, Wave 3
+handoff, or Task 013/013B implementation changed. PR #178 remains open, draft,
+and unmerged. Odoo/PostgreSQL runtime remains pending independent fresh-build
+execution; runtime green is not claimed.
 
 ## 9. Recommendation
 
-**STATICALLY CORRECTED AFTER RUNTIME CAMPAIGN 1 — READY FOR INDEPENDENT
-FRESH-BUILD ODOO.SH RERUN**
+**FINAL STATIC ADVERSARIAL GATE PASSED — READY FOR INDEPENDENT FRESH-BUILD
+ODOO.SH RERUN**
