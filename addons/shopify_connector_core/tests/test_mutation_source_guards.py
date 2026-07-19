@@ -152,6 +152,7 @@ class TestMutationSourceGuards(TransactionCase):
         required = {
             '_create_attempt_intent',
             '_record_direct_outcome',
+            '_record_recovery_uncertain',
             '_record_reconciliation_result',
             '_record_inconclusive_reconciliation',
             'action_resolve_mutation_attempt',
@@ -166,6 +167,7 @@ class TestMutationSourceGuards(TransactionCase):
             'create', 'write',
             '_create_attempt_intent',
             '_record_direct_outcome',
+            '_record_recovery_uncertain',
             '_record_reconciliation_result',
             '_record_inconclusive_reconciliation',
             'action_resolve_mutation_attempt',
@@ -210,6 +212,45 @@ class TestMutationSourceGuards(TransactionCase):
                         node.func.attr,
                     ))
         self.assertFalse(violations, violations)
+
+    def test_write_surface_inventory_is_exact(self):
+        self.assertEqual(
+            shopify_connector_mutation_attempt.WRITE_SURFACES,
+            frozenset({
+                '_record_direct_outcome',
+                '_record_recovery_uncertain',
+                '_record_reconciliation_result',
+                '_record_inconclusive_reconciliation',
+                'action_resolve_mutation_attempt',
+                '_mask_terminal_evidence',
+            }),
+        )
+
+    def test_reconciliation_admission_has_only_uncertain_owners(self):
+        source = Path(
+            shopify_connector_job_dispatch.__file__
+        ).read_text(encoding='utf-8')
+        tree = ast.parse(source)
+        parents = {}
+        for parent in ast.walk(tree):
+            for child in ast.iter_child_nodes(parent):
+                parents[child] = parent
+        owners = set()
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == '_ensure_reconciliation_job'
+            ):
+                continue
+            owner = parents.get(node)
+            while owner and not isinstance(owner, ast.FunctionDef):
+                owner = parents.get(owner)
+            owners.add(owner.name if owner else False)
+        self.assertEqual(owners, {
+            '_apply_validated_consequence',
+            '_recover_committed_attempt_to_reconciliation',
+        })
 
     def test_zero_real_mutation_domain_and_calls(self):
         source = Path(

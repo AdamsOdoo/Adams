@@ -1,5 +1,6 @@
 import threading
 import uuid
+from unittest.mock import patch
 
 import psycopg2
 
@@ -27,11 +28,14 @@ class TestMutationConcurrency(TransactionCase):
                 'name': 'Layer 2 concurrency',
                 'shop_domain': domain,
                 'api_version': '2026-07',
+                'state': 'connected',
             })
             job = env['shopify.connector.job'].sudo().create({
                 'store_id': store.id,
                 'job_source': 'setup_readiness_check',
                 'job_type': 'mutation_dispatch_selftest',
+                'expected_connection_generation':
+                    store.connection_generation,
                 'state': 'queued',
                 'payload_hash': uuid.uuid4().hex,
             })
@@ -164,6 +168,9 @@ class TestMutationConcurrency(TransactionCase):
                 'job_id': job_id,
                 'attempt_token': token,
                 'mutation_domain': 'mutation_dispatch_selftest',
+                'expected_connection_generation':
+                    job.store_id.connection_generation,
+                'expected_store_identity': job.store_id.shop_domain,
                 'shopify_idempotency_key': uuid.uuid4().hex,
             })
             if outcome != 'pending':
@@ -339,6 +346,7 @@ class TestMutationConcurrency(TransactionCase):
                 (job_id,),
             )
             cr.commit()
+
         barrier = threading.Barrier(2)
         errors = []
 
@@ -359,12 +367,89 @@ class TestMutationConcurrency(TransactionCase):
             thread.join(timeout=20)
         self.assertFalse(errors)
         with db_connect(self.env.cr.dbname).cursor() as cr:
-            cr.execute(
-                'SELECT count(*) FROM shopify_connector_job '
-                'WHERE mutation_attempt_id = %s',
-                (attempt_id,),
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            original = env['shopify.connector.job'].browse(job_id)
+            reconciliations = env['shopify.connector.job'].search([
+                ('mutation_attempt_id', '=', attempt_id),
+            ])
+            self.assertEqual(len(reconciliations), 1)
+            self.assertEqual(attempt.observed_outcome, 'uncertain')
+            self.assertFalse(attempt.resolved_at)
+            self.assertTrue(attempt.remote_evidence_refs['recovery'])
+            self.assertEqual(
+                attempt.remote_evidence_refs['recovery'][0]['source'],
+                'stale_owner_sweep',
             )
-            self.assertEqual(cr.fetchone()[0], 1)
+            self.assertFalse(original.current_attempt_token)
+            self.assertFalse(original.owner_worker_ref)
+            self.assertFalse(original.running_since)
+            reconciliations.sudo().write({
+                'state': 'running',
+                'started_at': fields.Datetime.now(),
+            })
+            env[
+                'shopify.connector.job.dispatch'
+            ]._handle_mutation_dispatch_selftest_reconcile(reconciliations)
+            self.assertEqual(attempt.effective_disposition(), 'applied')
+            self.assertEqual(original.state, 'succeeded')
+            self.assertEqual(reconciliations.state, 'succeeded')
+            cr.commit()
+
+    def test_pre_c2_recovery_that_discovers_c2_marks_uncertain(self):
+        _store_id, job_id, attempt_id, token = (
+            self._durable_owned_attempt()
+        )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env[
+                'shopify.connector.job.dispatch'
+            ]._recover_pre_c2_failure(
+                job_id, token, RuntimeError('synthetic C2 race'),
+            )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            original = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(attempt.observed_outcome, 'uncertain')
+            self.assertFalse(attempt.resolved_at)
+            self.assertEqual(
+                attempt.remote_evidence_refs['recovery'][0]['window'],
+                'c2_discovered_during_pre_c2_recovery',
+            )
+            self.assertFalse(original.current_attempt_token)
+            self.assertEqual(env['shopify.connector.job'].search_count([
+                ('mutation_attempt_id', '=', attempt_id),
+            ]), 1)
+
+    def test_invalid_recovery_state_blocks_without_rewriting_attempt(self):
+        _store_id, job_id, attempt_id, token = (
+            self._durable_owned_attempt('succeeded')
+        )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env[
+                'shopify.connector.job.dispatch'
+            ]._recover_layer2_owner(job_id, token)
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            original = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(attempt.observed_outcome, 'succeeded')
+            self.assertTrue(attempt.resolved_at)
+            self.assertEqual(original.state, 'blocked_manual_review')
+            self.assertEqual(
+                original.manual_review_subreason, 'duplicate_risk',
+            )
+            self.assertFalse(env['shopify.connector.job'].search_count([
+                ('mutation_attempt_id', '=', attempt_id),
+            ]))
 
     def test_no_open_transaction_or_owner_lock_across_net_window(self):
         _store_id, job_id = self._durable_fixture()
@@ -403,12 +488,6 @@ class TestMutationConcurrency(TransactionCase):
         _store_id, job_id, attempt_id, _token = (
             self._durable_owned_attempt('uncertain')
         )
-        with db_connect(self.env.cr.dbname).cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
-            env['shopify.connector.mutation.attempt'].browse(
-                attempt_id
-            )._record_inconclusive_reconciliation(False)
-            cr.commit()
         barrier = threading.Barrier(2)
         results = []
         errors = []
@@ -438,22 +517,57 @@ class TestMutationConcurrency(TransactionCase):
         for thread in threads:
             thread.join(timeout=20)
         self.assertFalse(errors)
-        self.assertEqual(sorted(results), [2, 3])
+        self.assertEqual(sorted(results), [1, 2])
         with db_connect(self.env.cr.dbname).cursor() as cr:
-            cr.execute(
-                'SELECT inconclusive_reconciliation_count '
-                'FROM shopify_connector_mutation_attempt WHERE id = %s',
-                (attempt_id,),
-            )
-            self.assertEqual(cr.fetchone()[0], 3)
-            cr.execute(
-                'SELECT state, manual_review_subreason '
-                'FROM shopify_connector_job WHERE id = %s',
-                (job_id,),
-            )
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            original = env['shopify.connector.job'].browse(job_id)
+            reconciliation = env['shopify.connector.job'].sudo().create({
+                'store_id': original.store_id.id,
+                'job_source': 'reconciliation',
+                'job_type': 'mutation_dispatch_selftest_reconcile',
+                'state': 'running',
+                'payload_hash': 'cap:%s' % attempt.attempt_token,
+                'mutation_attempt_id': attempt.id,
+                'expected_connection_generation':
+                    attempt.expected_connection_generation,
+            })
+            Dispatch = env['shopify.connector.job.dispatch']
+            strategy = dict(Dispatch._get_reconciliation_strategies()[
+                attempt.mutation_domain
+            ])
+            strategy['reconcile'] = lambda _attempt: {
+                'verdict': 'inconclusive',
+                'observed_store_identity':
+                    attempt.expected_store_identity,
+                'action': 'reconcile',
+                'error_class': 'shopify_temporary_server_network',
+                'manual_review_subreason': False,
+                'message': 'Concurrent read remains inconclusive.',
+                'evidence': {'read': 'concurrent-cap'},
+            }
+            with patch.object(
+                type(Dispatch), '_get_reconciliation_strategies',
+                return_value={attempt.mutation_domain: strategy},
+            ):
+                Dispatch._handle_mutation_dispatch_selftest_reconcile(
+                    reconciliation
+                )
             self.assertEqual(
-                cr.fetchone(), ('blocked_manual_review', 'duplicate_risk')
+                attempt.inconclusive_reconciliation_count, 3,
             )
+            self.assertEqual(original.state, 'blocked_manual_review')
+            self.assertEqual(
+                original.manual_review_subreason, 'duplicate_risk',
+            )
+            self.assertEqual(reconciliation.state, 'succeeded')
+            self.assertEqual(env['shopify.connector.job.log'].search_count([
+                ('job_id', '=', original.id),
+                ('to_state', '=', 'blocked_manual_review'),
+            ]), 1)
+            cr.commit()
 
     def test_serialization_failure_recovers_to_reconciliation(self):
         _store_id, job_id, attempt_id, token = (
@@ -492,12 +606,21 @@ class TestMutationConcurrency(TransactionCase):
             worker.close()
             racer.close()
         with db_connect(self.env.cr.dbname).cursor() as cr:
-            cr.execute(
-                'SELECT count(*) FROM shopify_connector_job '
-                'WHERE mutation_attempt_id = %s',
-                (attempt_id,),
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            original = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(attempt.observed_outcome, 'uncertain')
+            self.assertTrue(attempt.remote_evidence_refs['recovery'])
+            self.assertEqual(
+                attempt.remote_evidence_refs['recovery'][0]['source'],
+                'dispatcher_recovery',
             )
-            self.assertEqual(cr.fetchone()[0], 1)
+            self.assertFalse(original.current_attempt_token)
+            self.assertEqual(env['shopify.connector.job'].search_count([
+                ('mutation_attempt_id', '=', attempt_id),
+            ]), 1)
 
     def test_second_worker_cannot_claim_durably_owned_job(self):
         _store_id, job_id, _attempt_id, _token = (

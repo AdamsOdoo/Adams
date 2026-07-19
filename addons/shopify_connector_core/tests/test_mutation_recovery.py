@@ -4,6 +4,7 @@ import time
 import uuid
 from datetime import timedelta
 from unittest import skipUnless
+from unittest.mock import Mock, patch
 
 from odoo import SUPERUSER_ID, api, fields
 from odoo.sql_db import db_connect
@@ -100,6 +101,8 @@ class TestMutationRecovery(TransactionCase):
             'store_id': self.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                self.store.connection_generation,
             'state': 'running',
             'payload_hash': uuid.uuid4().hex,
             'current_attempt_token': token,
@@ -114,6 +117,9 @@ class TestMutationRecovery(TransactionCase):
                 'job_id': job.id,
                 'attempt_token': token,
                 'mutation_domain': 'mutation_dispatch_selftest',
+                'expected_connection_generation':
+                    self.store.connection_generation,
+                'expected_store_identity': self.store.shop_domain,
                 'shopify_idempotency_key': uuid.uuid4().hex,
             })
         return job, attempt
@@ -123,6 +129,12 @@ class TestMutationRecovery(TransactionCase):
         self.Sweep.run_sweep()
         self.assertEqual(job.state, 'retry_waiting')
         self.assertFalse(job.current_attempt_token)
+        self.assertFalse(self.Attempt.search_count([
+            ('job_id', '=', job.id),
+        ]))
+        self.assertFalse(self.Job.search_count([
+            ('mutation_attempt_id.job_id', '=', job.id),
+        ]))
 
     def test_committed_c2_routes_to_one_reconciliation_job(self):
         job, attempt = self._running(True)
@@ -132,9 +144,36 @@ class TestMutationRecovery(TransactionCase):
             ('mutation_attempt_id', '=', attempt.id),
         ])
         self.assertEqual(len(reconciliations), 1)
+        self.assertEqual(attempt.observed_outcome, 'uncertain')
+        self.assertFalse(attempt.resolved_at)
+        self.assertTrue(attempt.remote_evidence_refs['recovery'])
         self.assertEqual(job.state, 'running')
         self.assertFalse(job.current_attempt_token)
         self.assertFalse(job.owner_worker_ref)
+        self.assertFalse(job.running_since)
+        transport = Mock(side_effect=AssertionError(
+            'recovery must not replay mutation transport'
+        ))
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        strategy = dict(Dispatch._get_reconciliation_strategies()[
+            attempt.mutation_domain
+        ])
+        strategy['transport'] = transport
+        reconciliations.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+        with patch.object(
+            type(Dispatch), '_get_reconciliation_strategies',
+            return_value={attempt.mutation_domain: strategy},
+        ):
+            Dispatch._handle_mutation_dispatch_selftest_reconcile(
+                reconciliations
+            )
+        transport.assert_not_called()
+        self.assertEqual(attempt.effective_disposition(), 'applied')
+        self.assertEqual(job.state, 'succeeded')
+        self.assertEqual(reconciliations.state, 'succeeded')
 
     def test_disconnect_preserves_credentials_for_unresolved_attempt(self):
         self.env['shopify.connector.store.credential'].action_set_token(
@@ -202,11 +241,14 @@ class TestMutationRecovery(TransactionCase):
                             phase, uuid.uuid4().hex,
                         ),
                         'api_version': '2026-07',
+                        'state': 'connected',
                     })
                     job = env['shopify.connector.job'].sudo().create({
                         'store_id': store.id,
                         'job_source': 'setup_readiness_check',
                         'job_type': 'mutation_dispatch_selftest',
+                        'expected_connection_generation':
+                            store.connection_generation,
                         'state': 'queued',
                         'payload_hash': uuid.uuid4().hex,
                     })
@@ -229,12 +271,72 @@ class TestMutationRecovery(TransactionCase):
                     recovered = env['shopify.connector.job'].browse(job.id)
                     if phase in ('after_c1', 'during_precondition'):
                         self.assertEqual(recovered.state, 'retry_waiting')
+                        self.assertFalse(env[
+                            'shopify.connector.mutation.attempt'
+                        ].search_count([('job_id', '=', job.id)]))
+                        self.assertFalse(env[
+                            'shopify.connector.job'
+                        ].search_count([
+                            ('mutation_attempt_id.job_id', '=', job.id),
+                        ]))
+                        self.assertFalse(recovered.current_attempt_token)
+                        self.assertFalse(recovered.owner_worker_ref)
                     else:
+                        attempt = env[
+                            'shopify.connector.mutation.attempt'
+                        ].search([('job_id', '=', job.id)])
+                        self.assertEqual(len(attempt), 1)
+                        self.assertEqual(
+                            attempt.observed_outcome, 'uncertain',
+                        )
+                        self.assertFalse(attempt.resolved_at)
+                        self.assertTrue(
+                            attempt.remote_evidence_refs['recovery']
+                        )
                         self.assertEqual(recovered.state, 'running')
-                        self.assertTrue(env['shopify.connector.job'].search([
-                            ('mutation_attempt_id', '!=', False),
-                            ('store_id', '=', store.id),
-                        ], limit=1))
+                        self.assertFalse(recovered.current_attempt_token)
+                        self.assertFalse(recovered.owner_worker_ref)
+                        self.assertFalse(recovered.running_since)
+                        reconciliations = env[
+                            'shopify.connector.job'
+                        ].search([
+                            ('mutation_attempt_id', '=', attempt.id),
+                        ])
+                        self.assertEqual(len(reconciliations), 1)
+                        transport = Mock(side_effect=AssertionError(
+                            'recovery must not replay mutation transport'
+                        ))
+                        Dispatch = env[
+                            'shopify.connector.job.dispatch'
+                        ]
+                        strategy = dict(
+                            Dispatch._get_reconciliation_strategies()[
+                                attempt.mutation_domain
+                            ]
+                        )
+                        strategy['transport'] = transport
+                        reconciliations.sudo().write({
+                            'state': 'running',
+                            'started_at': fields.Datetime.now(),
+                        })
+                        with patch.object(
+                            type(Dispatch),
+                            '_get_reconciliation_strategies',
+                            return_value={
+                                attempt.mutation_domain: strategy,
+                            },
+                        ):
+                            Dispatch._handle_mutation_dispatch_selftest_reconcile(
+                                reconciliations
+                            )
+                        transport.assert_not_called()
+                        self.assertEqual(
+                            attempt.effective_disposition(), 'applied',
+                        )
+                        self.assertEqual(recovered.state, 'succeeded')
+                        self.assertEqual(
+                            reconciliations.state, 'succeeded',
+                        )
                     cr.commit()
         finally:
             with db_connect(dbname).cursor() as cr:
@@ -243,8 +345,8 @@ class TestMutationRecovery(TransactionCase):
                 if job_ids:
                     cr.execute(
                         'DELETE FROM shopify_connector_job_log '
-                        'WHERE job_id = ANY(%s)',
-                        (job_ids,),
+                        'WHERE store_id = ANY(%s)',
+                        (store_ids,),
                     )
                     cr.execute(
                         'DELETE FROM shopify_connector_job '

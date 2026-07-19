@@ -23,6 +23,7 @@ class TestMutationDispatch(TransactionCase):
             'name': 'Layer 2 dispatch test',
             'shop_domain': 'layer2-dispatch-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07',
+            'state': 'connected',
         })
         cls.Dispatch = cls.env['shopify.connector.job.dispatch']
         cls.Job = cls.env['shopify.connector.job']
@@ -32,6 +33,8 @@ class TestMutationDispatch(TransactionCase):
             'store_id': self.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                self.store.connection_generation,
             'state': 'queued',
             'payload_hash': uuid.uuid4().hex,
         }
@@ -173,6 +176,9 @@ class TestMutationDispatch(TransactionCase):
             'job_id': job.id,
             'attempt_token': token,
             'mutation_domain': job.job_type,
+            'expected_connection_generation':
+                self.store.connection_generation,
+            'expected_store_identity': self.store.shop_domain,
             'shopify_idempotency_key': uuid.uuid4().hex,
         })
         self.Dispatch._drain_mutation_one(job)

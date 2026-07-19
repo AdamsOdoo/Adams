@@ -21,12 +21,15 @@ class TestMutationApiGuard(TransactionCase):
             'name': 'Layer 2 API guard test',
             'shop_domain': 'layer2-api-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07',
+            'state': 'connected',
         })
         token = uuid.uuid4().hex
         cls.job = cls.env['shopify.connector.job'].sudo().create({
             'store_id': cls.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                cls.store.connection_generation,
             'state': 'running',
             'payload_hash': uuid.uuid4().hex,
             'current_attempt_token': token,
@@ -43,6 +46,9 @@ class TestMutationApiGuard(TransactionCase):
             'job_id': cls.job.id,
             'attempt_token': token,
             'mutation_domain': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                cls.store.connection_generation,
+            'expected_store_identity': cls.store.shop_domain,
             'shopify_idempotency_key': uuid.uuid4().hex,
             'exact_request_fingerprint': canonical_sha256({
                 'operation': cls.operation,

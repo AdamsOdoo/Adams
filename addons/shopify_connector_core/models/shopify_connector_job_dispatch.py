@@ -1221,7 +1221,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             attempt = attempt._record_recovery_uncertain(
                 recovery_window, recovery_source,
             )
-        except (ValidationError, UserError):
+        except UserError:
+            return self.env['shopify.connector.job']
+        except ValidationError:
             if job.state == 'running':
                 self._block_original_job(
                     job,

@@ -1,5 +1,7 @@
 import uuid
 
+import psycopg2
+
 from odoo import fields
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase
@@ -23,11 +25,14 @@ class TestMutationAttempt(TransactionCase):
             'name': 'Layer 2 attempt test',
             'shop_domain': 'layer2-attempt-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07',
+            'state': 'connected',
         })
         cls.job = cls.env['shopify.connector.job'].sudo().create({
             'store_id': cls.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                cls.store.connection_generation,
             'state': 'running',
             'payload_hash': uuid.uuid4().hex,
             'current_attempt_token': 'attempt-token',
@@ -36,20 +41,45 @@ class TestMutationAttempt(TransactionCase):
         })
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
 
-    def _create(self, token='attempt-token'):
+    def _create_for(
+        self, job, token='attempt-token',
+        mutation_domain='mutation_dispatch_selftest',
+    ):
         return self.Attempt.with_context(**{
             C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
         })._create_attempt_intent({
-            'job_id': self.job.id,
+            'job_id': job.id,
             'attempt_token': token,
-            'mutation_domain': 'mutation_dispatch_selftest',
-            'expected_connection_generation': 0,
-            'expected_store_identity': self.store.shop_domain,
-            'remote_mutation_intent': {'job_id': self.job.id},
-            'preconditions_snapshot': {'generation': 0},
+            'mutation_domain': mutation_domain,
+            'expected_connection_generation':
+                job.store_id.connection_generation,
+            'expected_store_identity': job.store_id.shop_domain,
+            'remote_mutation_intent': {'job_id': job.id},
+            'preconditions_snapshot': {
+                'generation': job.store_id.connection_generation,
+            },
             'business_intent_fingerprint': canonical_sha256({'a': 1}),
             'exact_request_fingerprint': canonical_sha256({'b': 2}),
             'shopify_idempotency_key': uuid.uuid4().hex,
+        })
+
+    def _create(self, token='attempt-token'):
+        return self._create_for(self.job, token)
+
+    def _job(self, state, job_type, current_token):
+        return self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': job_type,
+            'expected_connection_generation':
+                self.store.connection_generation,
+            'state': state,
+            'payload_hash': uuid.uuid4().hex,
+            'current_attempt_token': current_token,
+            'owner_worker_ref': 'c2-refusal',
+            'running_since': (
+                fields.Datetime.now() if state == 'running' else False
+            ),
         })
 
     def test_exact_schema_and_attempt_owned_transport(self):
@@ -119,21 +149,114 @@ class TestMutationAttempt(TransactionCase):
     def test_same_job_with_different_token_is_structurally_rejected(self):
         self._create()
         self.job.sudo().write({'current_attempt_token': 'second-token'})
-        with self.assertRaises(Exception):
+        with self.assertRaises(psycopg2.IntegrityError):
             with self.env.cr.savepoint():
                 self._create('second-token')
 
     def test_c2_validates_job_token_state_and_domain(self):
-        for values in (
-            {'state': 'queued'},
-            {'current_attempt_token': 'wrong-token'},
-            {'job_type': 'setup_readiness_check'},
-        ):
-            original = {key: self.job[key] for key in values}
-            self.job.sudo().write(values)
+        cases = (
+            (
+                self._job(
+                    'queued', 'mutation_dispatch_selftest', 'queued-token',
+                ),
+                'queued-token',
+                'mutation_dispatch_selftest',
+            ),
+            (
+                self._job(
+                    'running', 'mutation_dispatch_selftest', 'owner-token',
+                ),
+                'wrong-token',
+                'mutation_dispatch_selftest',
+            ),
+            (
+                self._job(
+                    'running', 'core_dispatch_selftest', 'domain-token',
+                ),
+                'domain-token',
+                'mutation_dispatch_selftest',
+            ),
+        )
+        for job, token, domain in cases:
             with self.assertRaises(ValidationError):
-                self._create()
-            self.job.sudo().write(original)
+                self._create_for(job, token, domain)
+
+    def test_recovery_transition_is_bounded_idempotent_and_unresolved(self):
+        attempt = self._create()
+        attempt._record_direct_outcome(
+            'uncertain', evidence={'request_id': 'synthetic'},
+        )
+        direct = attempt.remote_evidence_refs['direct']
+        attempt._record_recovery_uncertain(
+            'post_c2_owner_recovery', 'dispatcher_recovery',
+        )
+        attempt._record_recovery_uncertain(
+            'post_c2_owner_recovery', 'dispatcher_recovery',
+        )
+        self.assertEqual(attempt.observed_outcome, 'uncertain')
+        self.assertFalse(attempt.resolved_at)
+        self.assertFalse(attempt.resolution_disposition)
+        self.assertEqual(attempt.remote_evidence_refs['direct'], direct)
+        self.assertEqual(len(attempt.remote_evidence_refs['recovery']), 1)
+        self.assertEqual(
+            set(attempt.remote_evidence_refs['recovery'][0]),
+            {'window', 'source', 'at', 'job_id', 'attempt_id'},
+        )
+
+    def test_pending_recovery_transitions_once_and_refuses_resolved(self):
+        attempt = self._create()
+        attempt._record_recovery_uncertain(
+            'stale_owner_post_c2', 'stale_owner_sweep',
+        )
+        self.assertEqual(attempt.observed_outcome, 'uncertain')
+        self.assertFalse(attempt.resolved_at)
+        self.assertEqual(len(attempt.remote_evidence_refs['recovery']), 1)
+        attempt.action_resolve_mutation_attempt(
+            'applied', 'Synthetic recovery verdict.'
+        )
+        with self.assertRaises(ValidationError):
+            attempt._record_recovery_uncertain(
+                'stale_owner_post_c2', 'stale_owner_sweep',
+            )
+
+    def test_recovery_refuses_direct_terminal_outcomes(self):
+        for outcome in ('succeeded', 'failed_clean'):
+            token = '%s-token' % outcome
+            job = self._job(
+                'running', 'mutation_dispatch_selftest', token,
+            )
+            attempt = self._create_for(job, token)
+            attempt._record_direct_outcome(outcome)
+            with self.assertRaises(ValidationError):
+                attempt._record_recovery_uncertain(
+                    'post_c2_owner_recovery', 'dispatcher_recovery',
+                )
+
+    def test_manual_resolution_preserves_all_prior_evidence_sections(self):
+        attempt = self._create()
+        attempt._record_direct_outcome(
+            'uncertain', evidence={'request_id': 'synthetic'},
+        )
+        attempt._record_recovery_uncertain(
+            'post_c2_owner_recovery', 'dispatcher_recovery',
+        )
+        attempt._record_inconclusive_reconciliation({
+            'read': 'synthetic',
+        })
+        before = attempt._evidence_sections()
+        attempt.action_resolve_mutation_attempt(
+            'applied', 'Verified synthetic evidence.'
+        )
+        evidence = attempt.remote_evidence_refs
+        self.assertEqual(evidence['direct'], before['direct'])
+        self.assertEqual(evidence['recovery'], before['recovery'])
+        self.assertEqual(
+            evidence['reconciliation'], before['reconciliation'],
+        )
+        self.assertEqual(len(evidence['manual_resolution']), 1)
+        self.assertEqual(
+            evidence['manual_resolution'][0]['disposition'], 'applied',
+        )
 
     def test_resolution_tuple_and_effective_timestamp_are_atomic(self):
         attempt = self._create()

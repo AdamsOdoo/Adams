@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from odoo import fields
 from odoo.exceptions import ValidationError
@@ -25,12 +25,14 @@ class TestMutationReconciliation(TransactionCase):
         cls.Job = cls.env['shopify.connector.job']
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
 
-    def _fixture(self):
+    def _fixture(self, direct_outcome=True, create_reconciliation=True):
         token = uuid.uuid4().hex
         job = self.Job.sudo().create({
             'store_id': self.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                self.store.connection_generation,
             'state': 'running',
             'payload_hash': uuid.uuid4().hex,
             'current_attempt_token': token,
@@ -43,17 +45,27 @@ class TestMutationReconciliation(TransactionCase):
             'job_id': job.id,
             'attempt_token': token,
             'mutation_domain': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                self.store.connection_generation,
+            'expected_store_identity': self.store.shop_domain,
             'shopify_idempotency_key': uuid.uuid4().hex,
         })
-        attempt._record_direct_outcome('uncertain')
-        reconciliation = self.Job.sudo().create({
-            'store_id': self.store.id,
-            'job_source': 'reconciliation',
-            'job_type': 'mutation_dispatch_selftest_reconcile',
-            'state': 'running',
-            'payload_hash': 'reconcile:%s' % token,
-            'mutation_attempt_id': attempt.id,
-        })
+        if direct_outcome:
+            attempt._record_direct_outcome(
+                'uncertain', evidence={'request_id': 'synthetic-direct'},
+            )
+        reconciliation = self.Job
+        if create_reconciliation:
+            reconciliation = self.Job.sudo().create({
+                'store_id': self.store.id,
+                'job_source': 'reconciliation',
+                'job_type': 'mutation_dispatch_selftest_reconcile',
+                'state': 'running',
+                'payload_hash': 'reconcile:%s' % token,
+                'mutation_attempt_id': attempt.id,
+                'expected_connection_generation':
+                    attempt.expected_connection_generation,
+            })
         return job, attempt, reconciliation
 
     def test_resolution_preserves_direct_and_appends_read_evidence(self):
@@ -191,7 +203,7 @@ class TestMutationReconciliation(TransactionCase):
             self.Job.sudo().create({
                 'store_id': self.store.id,
                 'job_source': 'setup_readiness_check',
-                'job_type': 'setup_readiness_check',
+                'job_type': 'core_dispatch_selftest',
                 'state': 'queued',
                 'payload_hash': marker,
             })
@@ -206,19 +218,101 @@ class TestMutationReconciliation(TransactionCase):
             'message': 'Synthetic applied verdict.',
             'evidence': {},
         }
-        with self.assertRaises(RuntimeError):
+        log_domain = [('job_id', '=', job.id)]
+        log_count = self.env[
+            'shopify.connector.job.log'
+        ].search_count(log_domain)
+        with self.assertRaisesRegex(
+            RuntimeError, 'synthetic callback rollback',
+        ):
             with self.env.cr.savepoint():
+                attempt._record_reconciliation_result(
+                    'applied', {'read': 'synthetic'},
+                )
                 Dispatch._apply_validated_consequence(
                     job, attempt, 'reconciliation', consequence, strategy,
                     reconciliation_job=reconciliation,
                 )
         job.invalidate_recordset()
+        attempt.invalidate_recordset()
         self.assertEqual(job.state, 'running')
+        self.assertFalse(attempt.resolution_disposition)
+        self.assertFalse(attempt.resolved_at)
+        self.assertEqual(
+            self.env['shopify.connector.job.log'].search_count(log_domain),
+            log_count,
+        )
         self.assertFalse(self.Job.search_count([
             ('payload_hash', '=', marker),
         ]))
 
     def test_historic_reconciliation_keeps_attempt_evidence_link(self):
         _job, attempt, reconciliation = self._fixture()
-        reconciliation.sudo().write({'job_type': 'historic_domain_job'})
+        reconciliation._make_historic_domain_jobs()
         self.assertEqual(reconciliation.mutation_attempt_id, attempt)
+
+    def test_recovered_pending_attempt_reconciles_end_to_end(self):
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        for verdict, action, expected_state, disposition in (
+            ('applied', 'succeed', 'succeeded', 'applied'),
+            ('not_applied', 'cancel', 'cancelled', 'not_applied'),
+        ):
+            job, attempt, _unused = self._fixture(
+                direct_outcome=False, create_reconciliation=False,
+            )
+            transport = Mock(side_effect=AssertionError(
+                'mutation transport must not replay during recovery'
+            ))
+            strategy = dict(Dispatch._get_reconciliation_strategies()[
+                attempt.mutation_domain
+            ])
+            strategy['transport'] = transport
+
+            def recovered_result(
+                _attempt, verdict=verdict, action=action,
+            ):
+                return {
+                    'verdict': verdict,
+                    'observed_store_identity': self.store.shop_domain,
+                    'action': action,
+                    'error_class': False,
+                    'manual_review_subreason': False,
+                    'message': 'Synthetic recovered read verdict.',
+                    'evidence': {'read': verdict},
+                }
+
+            strategy['reconcile'] = recovered_result
+            with patch.object(
+                type(Dispatch), '_get_reconciliation_strategies',
+                return_value={attempt.mutation_domain: strategy},
+            ):
+                reconciliation = (
+                    Dispatch._recover_committed_attempt_to_reconciliation(
+                        job,
+                        attempt,
+                        'post_c2_owner_recovery',
+                        'dispatcher_recovery',
+                    )
+                )
+                self.assertEqual(attempt.observed_outcome, 'uncertain')
+                self.assertFalse(attempt.resolved_at)
+                self.assertTrue(
+                    attempt.remote_evidence_refs['recovery']
+                )
+                self.assertEqual(self.Job.search_count([
+                    ('mutation_attempt_id', '=', attempt.id),
+                ]), 1)
+                self.assertFalse(job.current_attempt_token)
+                self.assertFalse(job.owner_worker_ref)
+                self.assertFalse(job.running_since)
+                reconciliation.sudo().write({
+                    'state': 'running',
+                    'started_at': fields.Datetime.now(),
+                })
+                Dispatch._handle_mutation_dispatch_selftest_reconcile(
+                    reconciliation
+                )
+            transport.assert_not_called()
+            self.assertEqual(attempt.effective_disposition(), disposition)
+            self.assertEqual(job.state, expected_state)
+            self.assertEqual(reconciliation.state, 'succeeded')

@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from odoo import fields
@@ -5,6 +6,7 @@ from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase
 
 from ..models.shopify_connector_mutation_attempt import (
+    ATTEMPT_WRITE_CONTEXT,
     C2_SENTINEL_CONTEXT,
     C2_SIDE_CURSOR_SENTINEL,
 )
@@ -19,6 +21,7 @@ class TestMutationSecurity(TransactionCase):
             'name': 'Layer 2 security test',
             'shop_domain': 'layer2-security-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07',
+            'state': 'connected',
         })
         cls.roles = {}
         for label, group in (
@@ -44,6 +47,8 @@ class TestMutationSecurity(TransactionCase):
             'store_id': self.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                self.store.connection_generation,
             'state': 'running',
             'payload_hash': uuid.uuid4().hex,
             'current_attempt_token': token,
@@ -56,6 +61,9 @@ class TestMutationSecurity(TransactionCase):
             'job_id': job.id,
             'attempt_token': token,
             'mutation_domain': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                self.store.connection_generation,
+            'expected_store_identity': self.store.shop_domain,
             'shopify_idempotency_key': uuid.uuid4().hex,
         })
         return job, attempt
@@ -72,6 +80,10 @@ class TestMutationSecurity(TransactionCase):
                 })
             with self.assertRaises(AccessError, msg=label):
                 attempt.with_user(user).write({'resolution_reason': 'forged'})
+            with self.assertRaises(AccessError, msg=label):
+                attempt.with_user(user).with_context(**{
+                    ATTEMPT_WRITE_CONTEXT: '_record_recovery_uncertain',
+                }).write({'observed_outcome': 'uncertain'})
             with self.assertRaises(AccessError, msg=label):
                 attempt.with_user(user).unlink()
 
@@ -91,6 +103,44 @@ class TestMutationSecurity(TransactionCase):
         )
         self.assertEqual(attempt.resolution_source, 'manual_admin')
         self.assertEqual(attempt.effective_disposition(), 'applied')
+
+    def test_manual_resolution_evidence_is_safe_and_redacted(self):
+        _job, attempt = self._fixture()
+        attempt._record_direct_outcome(
+            'uncertain', evidence={'request_id': 'safe-request-ref'},
+        )
+        attempt._record_recovery_uncertain(
+            'post_c2_owner_recovery', 'dispatcher_recovery',
+        )
+        attempt._record_inconclusive_reconciliation({
+            'read_ref': 'safe-read-ref',
+        })
+        before = attempt._evidence_sections()
+        unsafe_reason = (
+            'Verified token shpat_DUMMYDUMMYDUMMY0000000000000000 '
+            'for person@example.com'
+        )
+        attempt.with_user(
+            self.roles['admin']
+        ).action_resolve_mutation_attempt('applied', unsafe_reason)
+        evidence = attempt.remote_evidence_refs
+        serialized = json.dumps(evidence, sort_keys=True)
+        self.assertEqual(evidence['direct'], before['direct'])
+        self.assertEqual(evidence['recovery'], before['recovery'])
+        self.assertEqual(
+            evidence['reconciliation'], before['reconciliation'],
+        )
+        self.assertEqual(len(evidence['manual_resolution']), 1)
+        manual = evidence['manual_resolution'][0]
+        self.assertEqual(set(manual), {
+            'actor_uid', 'disposition', 'at', 'reason',
+        })
+        self.assertEqual(manual['actor_uid'], self.roles['admin'].id)
+        self.assertEqual(manual['disposition'], 'applied')
+        self.assertNotIn('shpat_DUMMY', serialized)
+        self.assertNotIn('person@example.com', serialized)
+        self.assertNotIn('shpat_DUMMY', attempt.resolution_reason)
+        self.assertNotIn('person@example.com', attempt.resolution_reason)
 
     def test_generic_retry_and_review_actions_refuse_mutation_jobs(self):
         job, attempt = self._fixture()
