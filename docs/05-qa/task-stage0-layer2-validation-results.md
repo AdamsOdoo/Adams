@@ -1,11 +1,14 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Validation Results
 
-- **Status:** STATICALLY CORRECTED AND SYNCHRONIZED — RUNTIME PENDING
+- **Status:** STATICALLY REVISED — FINAL CONTROL-ROOM PRE-RUNTIME REVIEW REQUIRED
 - **Original Stage 0 base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
 - **Pre-synchronization head:** `644853a68b3497c134ee648ce7399e50d30ff397`
 - **Accepted Gate B integration:** `8e2e707ff7025a7a2e9e0207a8886399a24b889c`
 - **Synchronization merge:** `61b1812a75add912103a13b9c2619afe162ac785`
 - **Branch / draft PR:** `sol/wave-3-stage-0-layer2` / #178
+- **Bounded correction starting head:**
+  `8915a2c36738d76e73723c003204b97b0b2f4e24`
+- **Binding control-room review:** PR #178 comment `5016571203`
 - **Frozen candidate:** the commit containing this record; its exact SHA is
   recorded in the final PR body and control-room report because a Git commit
   cannot embed its own SHA.
@@ -46,6 +49,53 @@ API admission, stale sweep, reconciliation, manual resolution, disconnect,
 retention, uninstall conversion, ACLs, cron loading, source guards, and all
 nine Stage 0 test modules. No contradiction among DEC-036, DEC-037, the binding
 ruling, and synchronized source required a hard stop.
+
+## 2A. Bounded pre-runtime correction at 8915a2c
+
+Control-room review `5016571203` found that the synchronized candidate could
+create a reconciliation job while its committed C2 attempt was still
+`pending`. That state could not be consumed by the reconciliation handler.
+Recovery evidence also lacked its own bounded section, and several test
+fixtures used invalid job types, illegal setup transitions, incomplete store
+identity snapshots, or a store lifecycle state that could not admit a
+reconciliation business job.
+
+The bounded correction adds `_record_recovery_uncertain`, a locked private
+attempt service with the only sanctioned `pending -> uncertain` recovery
+transition. It is idempotent for unresolved uncertainty, refuses terminal or
+resolved attempts, leaves `resolved_at` and the resolution tuple empty, and
+records only bounded, redacted route metadata. The dispatcher now combines
+that transition, exactly-one reconciliation admission, and owner cleanup under
+the existing job/attempt locks. This applies when pre-C2 cleanup discovers a
+C2 row, during Layer 2 owner recovery, after serialization recovery, and from
+the stale-owner sweep. A pending attempt is rejected by the reconciliation
+handler and malformed recovery fails closed on the original mutation job.
+
+`remote_evidence_refs` now has four independent bounded sections: `direct`,
+`recovery`, `reconciliation`, and `manual_resolution`. Direct evidence is
+preserved. Recovery and reconciliation are independently capped. Manual
+resolution appends one safe entry containing actor UID, disposition,
+timestamp, and a redacted reason while preserving the other sections. The
+existing retention operation masks the complete structure without deleting
+the attempt or changing identity, fingerprint, outcome, or resolution fields.
+
+All nine Stage 0 test modules were audited. Persisted job types are registered
+selection values; `setup_readiness_check` is used only as a job source. C2
+refusal fixtures are independent and legal. C3, API, reconciliation, and
+durable recovery fixtures carry matching generation/identity snapshots, and
+stores which execute reconciliation are connected. Exception scopes now
+contain the intended operation. Callback rollback creates a valid child in the
+callback and proves rollback of attempt resolution, original-job state, job
+log, and child. The inconclusive cap proof now drives its final consequence
+through the production reconciliation handler.
+
+For `after_c1` and `during_precondition`, the prepared harness proves no
+attempt, no transport, bounded pre-C2 retry, and no reconciliation job. For
+`after_c2`, `during_net`, `after_net`, and rolled-back `during_c3`, it proves
+pending-to-uncertain recovery, empty pre-verdict `resolved_at`, recovery
+evidence, no transport replay, one reconciliation job, owner cleanup,
+successful applied/not-applied recording, original-job consequence, and the
+explicit reconciliation-job state.
 
 ## 3. Binding A–N traceability
 
@@ -110,11 +160,19 @@ Read-only API behavior and the intentional API context-manager
    correction proof.
 5. `60ecc658b6dbfc71e24c84653675630a4d0f6bd8` — final reconciliation
    routing and completeness-audit corrections.
+6. `9b05a712dc4cd0219399ef762ef240c635bb586c` — locked post-C2 recovery
+   transition, atomic reconciliation admission, and evidence normalization.
+7. `5c2b6996f60d13eac56ac258f05572d013bc5f23` — complete nine-module
+   fixture audit and end-to-end recovered reconciliation proofs.
 
 The correction commits modify 17 of the already-authorized paths: eight model
 files and the nine existing Stage 0 test modules. No new production, test, or
 documentation path was introduced. The complete PR remains exactly the
 authorized 23 paths.
+
+The bounded campaign after `8915a2c` modifies exactly 13 authorized paths:
+three production models, all nine existing Stage 0 test modules, and this
+validation record. It creates no file.
 
 ## 6. Static validation actually executed
 
@@ -131,6 +189,10 @@ authorized 23 paths.
 | Git patch trailing-whitespace / diff-check audit | PASS |
 | Integration comparison | PASS — zero behind and exactly 23 PR paths |
 | Gate B byte-preservation audit | PASS |
+| Recovery-state/admission AST ownership audit | PASS |
+| Nine-module job-type/job-source fixture audit | PASS |
+| Six-window harness source and assertion audit | PASS |
+| Invalid `job_type='setup_readiness_check'` search | PASS — absent |
 
 Odoo and PostgreSQL executables are unavailable in this workspace. Therefore
 install/upgrade, ORM constraints, ACL runtime, cron execution, all Odoo tests,
@@ -172,5 +234,4 @@ Task 013/013B implementation. PR #178 must remain open, draft, and unmerged.
 
 ## 9. Recommendation
 
-**STATICALLY CORRECTED AND SYNCHRONIZED — READY FOR INDEPENDENT CLAUDE
-ODOO.SH RUNTIME VERIFICATION**
+**READY FOR FINAL CONTROL-ROOM PRE-RUNTIME RE-REVIEW**
