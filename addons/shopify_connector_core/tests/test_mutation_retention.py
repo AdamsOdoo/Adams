@@ -24,6 +24,17 @@ class TestMutationRetention(TransactionCase):
         cls.Job = cls.env['shopify.connector.job']
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
         cls.Retention = cls.env['shopify.connector.pii.retention']
+        cls.admin = cls.env['res.users'].create({
+            'name': 'Layer 2 retention administrator',
+            'login': 'layer2_retention_admin_%s' % uuid.uuid4().hex,
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.'
+                    'group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
 
     def _attempt(self, outcome='succeeded'):
         token = uuid.uuid4().hex
@@ -76,7 +87,7 @@ class TestMutationRetention(TransactionCase):
         attempt._record_inconclusive_reconciliation({
             'read_ref': 'synthetic',
         })
-        attempt.action_resolve_mutation_attempt(
+        attempt.with_user(self.admin).action_resolve_mutation_attempt(
             'applied', 'Synthetic external evidence.'
         )
         before = attempt.remote_evidence_refs
