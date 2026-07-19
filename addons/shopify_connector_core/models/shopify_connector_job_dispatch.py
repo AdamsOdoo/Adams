@@ -545,6 +545,24 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
     def _classify_direct_mutation_selftest(self, result):
         code = (result or {}).get('error_code')
         evidence = dict((result or {}).get('evidence') or {})
+        if code == 'IDEMPOTENCY_CONCURRENT_REQUEST':
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': 'concurrency_race_conflict',
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'Synthetic idempotency concurrency uncertainty.',
+                'evidence': evidence,
+            }
+        if code == 'THROTTLED':
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': 'shopify_throttling_rate_limit',
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'Synthetic throttling uncertainty.',
+                'evidence': evidence,
+            }
         if code in (
             'IDEMPOTENCY_KEY_PARAMETER_MISMATCH',
             'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED',
@@ -1040,15 +1058,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
             self.env.cr.commit()
             return
-        if self.env['shopify.connector.mutation.attempt'].search_count([
-            ('job_id', '=', job.id),
-        ]):
-            self._block_original_job(
-                job,
-                'duplicate_risk',
-                'duplicate_risk',
-                'Existing attempt evidence blocks mutation-job redispatch.',
-            )
+        if self._preflight_existing_attempt_evidence(job):
             self.env.cr.commit()
             return
         try:
@@ -1138,6 +1148,21 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
         except Exception:
             self._recover_layer2_owner(job_id, token)
+
+    @api.model
+    def _preflight_existing_attempt_evidence(self, job):
+        """Block redispatch before C1 when this job already owns evidence."""
+        if not self.env['shopify.connector.mutation.attempt'].search_count([
+            ('job_id', '=', job.id),
+        ]):
+            return False
+        self._block_original_job(
+            job,
+            'duplicate_risk',
+            'duplicate_risk',
+            'Existing attempt evidence blocks mutation-job redispatch.',
+        )
+        return True
 
     @api.model
     def _recover_pre_c2_failure(self, job_id, token, exc):
