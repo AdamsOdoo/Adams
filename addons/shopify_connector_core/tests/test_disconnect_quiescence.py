@@ -298,18 +298,44 @@ class TestCallLeaseModelSchema(TransactionCase):
             'only the owned side cursor may commit; found: %s' % committed,
         )
 
-    # 20b. execute_business is the sole new public method; no mutation string.
+    # 20b. execute_business is the sole guarded public mutation boundary.
     def test_public_surface_adds_only_execute_business(self):
+        ClientClass = client_module.ShopifyConnectorApiClient
         public = {
             name for name, value in vars(
-                client_module.ShopifyConnectorApiClient
+                ClientClass
             ).items()
             if callable(value) and not name.startswith('_')
         }
         self.assertEqual(public, {'execute', 'execute_business'})
-        self.assertIsNone(
-            re.search(r'\bmutation\s*[\{\(]', inspect.getsource(client_module))
+        self.assertIn(
+            '_validate_graphql_operation',
+            guard_called_names(guard_fn_ast(ClientClass.execute)),
         )
+        self.assertIn(
+            '_validate_graphql_operation',
+            guard_called_names(guard_fn_ast(ClientClass._send_lifecycle)),
+        )
+        business_calls = guard_called_names(
+            guard_fn_ast(ClientClass.execute_business)
+        )
+        self.assertIn('_validate_graphql_operation', business_calls)
+        self.assertIn('_admit_mutation', business_calls)
+        self.assertNotIn('_admit_mutation', guard_called_names(
+            guard_fn_ast(ClientClass.execute)
+        ))
+        self.assertNotIn('_admit_mutation', guard_called_names(
+            guard_fn_ast(ClientClass._send_lifecycle)
+        ))
+
+    # API-parity source guards (review 4680664964, blocker 1): execute_business
+    # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit
+    # captured token, and carries the RRequestException->temporary taxonomy.
+    def test_execute_business_source_normalizes_and_preserves_seam(self):
+        source = inspect.getsource(client_module)
+        self.assertIn('_normalize_response(store, response)', source)
+        self.assertIn('self._send(store, body)', source)          # legacy 2-arg
+        self.assertIn('self._send(store, body, token)', source)   # business 3-arg
 
     # API-parity source guards (review 4680664964, blocker 1): execute_business
     # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit
@@ -3684,7 +3710,7 @@ class TestLifecycleServiceRetryGenuine(_GenuineRaceHelpers, TransactionCase):
             self.assertEqual(gen, initial_gen + 1)     # generation bumped once
             self.assertNotEqual(ltc, 'pass')           # no pass result written
             self.assertFalse(ltc)                      # no stale first-attempt fail
-            self.assertFalse(clv)                      # credential_last_verified_at empty
+            self.assertFalse(clv)  # credential_last_verified_at empty
             self.assertTrue(cred_present)              # credential preserved
             self.assertEqual(
                 self._observe_credential_token(dbname, store_id), DUMMY_TOKEN)
