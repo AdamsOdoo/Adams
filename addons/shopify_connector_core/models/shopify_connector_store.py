@@ -2,7 +2,7 @@ import json
 import uuid
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 from ..tools.redaction import redact
 from .shopify_connector_api_client import (
@@ -681,6 +681,7 @@ class ShopifyConnectorStore(models.Model):
             ('store_id', '=', self.id),
             ('job_source', 'in', list(BUSINESS_JOB_SOURCES)),
             ('state', 'in', ('queued', 'retry_waiting')),
+            ('mutation_attempt_id', '=', False),
         ])
         if not candidates:
             return
@@ -832,6 +833,24 @@ class ShopifyConnectorStore(models.Model):
             return
         store._process_disconnect_quiesce()
 
+    def _layer2_disconnect_blockers(self):
+        self.ensure_one()
+        Attempt = self.env['shopify.connector.mutation.attempt']
+        attempts = Attempt.search([
+            ('store_id', '=', self.id),
+            '|',
+            ('observed_outcome', '=', 'pending'),
+            '&',
+            ('observed_outcome', '=', 'uncertain'),
+            ('resolution_disposition', '=', False),
+        ])
+        reconciliations = self.env['shopify.connector.job'].search([
+            ('store_id', '=', self.id),
+            ('mutation_attempt_id', '!=', False),
+            ('state', 'in', ('queued', 'running', 'retry_waiting')),
+        ])
+        return attempts, reconciliations
+
     def _process_disconnect_quiesce(self):
         """One quiescence pass for a single locked `disconnecting` store.
 
@@ -858,26 +877,100 @@ class ShopifyConnectorStore(models.Model):
             'disconnect_open_lease_count': count,
             'disconnect_oldest_admitted_at': oldest,
         })
-        if count == 0:
-            # Direction C: `completed` requires exactly zero lease rows -- every
-            # admitted holder has actually released.
+        attempts, reconciliations = self._layer2_disconnect_blockers()
+        if count == 0 and not attempts and not reconciliations:
+            # Completion requires both call-lease quiescence and Layer 2
+            # mutation/reconciliation quiescence.
             self._finalize_disconnect_completed()
             return
         requested_at = self.disconnect_requested_at or fields.Datetime.now()
         elapsed = fields.Datetime.now() - requested_at
         if elapsed >= DISCONNECT_QUIESCE_TIMEOUT:
-            self._finalize_disconnect_timed_out(leases)
+            if attempts or reconciliations:
+                self._block_disconnect_for_layer2_evidence(
+                    attempts, reconciliations, count,
+                )
+            else:
+                self._finalize_disconnect_timed_out(leases)
         else:
             self.write({
                 'disconnect_status': 'quiescing',
                 'disconnect_status_reason': (
-                    '%d in-flight call lease(s) outstanding; waiting for '
-                    'quiescence.' % count
+                    '%d call lease(s), %d unresolved mutation attempt(s), '
+                    'and %d reconciliation job(s) remain; waiting for '
+                    'quiescence.' % (
+                        count, len(attempts), len(reconciliations),
+                    )
                 ),
             })
             self._trigger_disconnect_controller(
                 at=fields.Datetime.now() + POLL_DELAY
             )
+
+    def _block_disconnect_for_layer2_evidence(
+        self, attempts, reconciliations, lease_count,
+    ):
+        self.ensure_one()
+        reason = (
+            'Disconnect blocked at the quiescence deadline: %d call lease(s), '
+            '%d unresolved mutation attempt(s), and %d reconciliation job(s) '
+            'remain. Credentials were preserved.'
+            % (lease_count, len(attempts), len(reconciliations))
+        )
+        self.write({
+            'disconnect_status': 'timed_out',
+            'disconnect_status_reason': reason,
+            'disconnect_open_lease_count': lease_count,
+        })
+        self._create_lifecycle_audit_job(reason)
+        return False
+
+    def action_force_disconnect(self, reason):
+        self.ensure_one()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may force disconnect.'
+            )
+        if not isinstance(reason, str) or not reason.strip():
+            raise UserError('A non-empty force-disconnect reason is required.')
+        self._lock_store_for_lifecycle()
+        attempts, reconciliations = self._layer2_disconnect_blockers()
+        for attempt in attempts:
+            job = attempt.job_id
+            if job.state != 'blocked_manual_review':
+                from_state = job.state
+                job.sudo().write({
+                    'state': 'blocked_manual_review',
+                    'error_class': 'duplicate_risk',
+                    'manual_review_subreason': 'duplicate_risk',
+                    'finished_at': fields.Datetime.now(),
+                    'reconciliation_pending_until': False,
+                })
+                job._log_transition(
+                    'manual_action',
+                    'Force-disconnect routed unresolved mutation evidence to '
+                    'Administrator review; no outcome was inferred.',
+                    from_state=from_state,
+                    to_state='blocked_manual_review',
+                )
+        audit = (
+            'Force disconnect requested by actor_uid=%d; reason=%s; '
+            'unresolved_attempt_count=%d reconciliation_job_count=%d. '
+            'Credentials preserved pending explicit attempt resolution.'
+            % (
+                self.env.uid, reason.strip(), len(attempts),
+                len(reconciliations),
+            )
+        )
+        self.write({
+            'state': 'disconnecting',
+            'disconnect_status': 'timed_out',
+            'disconnect_status_reason': audit,
+        })
+        self._create_lifecycle_audit_job(audit)
+        return not bool(attempts or reconciliations)
 
     def _finalize_disconnect_completed(self):
         """Finalize a fully-quiesced disconnect (zero committed lease rows).
