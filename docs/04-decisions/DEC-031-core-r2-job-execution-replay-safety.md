@@ -285,3 +285,141 @@ been written and is registered here:
   Read-only work is unaffected, as decided above.
 - No implementation is authorized by this registration; the no-code gate
   and every other clause of this record remain in force unchanged.
+
+## Layer 2 Wave 3 Gate A — corrections and normalized decision inventory (2026-07-18)
+
+**This section does not change Layer 1's Accepted status above (control-room
+review `4701644819`), and does not accept Layer 2.** A dedicated Wave 3
+Gate A session (Session A, PR #177) performed a 27-agent code/documentation
+audit, official-source refresh, and adversarial review of the full Layer 2
+proposed design against a control-room parallel-audit ruling
+([PR #177 comment `5012854989`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5012854989)).
+Results:
+
+- **[`DEC-036`](DEC-036-wave-3-layer-2-gate.md)** is the new canonical
+  record for Layer 2's decision inventory: a complete, gap-free
+  `L2-D1`–`L2-D38` numbering (replacing the inconsistent `L2-D1`–`L2-D13`/`L2-D14`/`L2-D15`
+  numbering the design document originally used), with fact/inference/
+  recommendation/accepted-candidate-wording/alternatives/risk/rollback/
+  implementation-impact/test/unresolved-question detail for every decision.
+  **Status: PROPOSED FOR CONTROL-ROOM ACCEPTANCE — NOT YET ACCEPTED as of
+  2026-07-18; corrected 2026-07-19 (see addendum immediately below) —
+  current status CONTROL-ROOM ACCEPTANCE CANDIDATE — CORRECTIONS APPLIED,
+  NOT YET ACCEPTED.**
+- The companion design document,
+  [`dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md),
+  was corrected in place: the CAS field name
+  (`compareQuantity`/`ignoreCompareQuantity` → `changeFromQuantity`, per
+  Shopify Admin GraphQL API 2026-04+); the `THROTTLED` outcome
+  classification (`failed_clean` → `uncertain`, no official non-execution
+  guarantee found); the transaction-boundary section's isolation-level
+  assumption (Odoo 19 uses PostgreSQL `REPEATABLE READ`, not the default
+  `Read Committed` — `odoo/sql_db.py`) and a factually-wrong citation
+  (`_drain_one` does not use Odoo's `_commit_progress()` API); the
+  Uninstall/Rollback section's internal self-contradiction; and the
+  batching default (one `(inventory_item_id, location_id)` pair per
+  mutation request, not one attempt per batched request, until partial-batch
+  semantics are proven). **The design remains status Proposed — these are
+  corrections to the candidate text, not an acceptance.**
+- Full citations: [`../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md).
+- **Eight items remain explicitly BLOCKING** control-room acceptance of
+  specific pieces (not the whole package): `mutation_attempt.job_id`'s
+  field type and C2's cursor placement (DEC-036 D20); whether an open,
+  lock-free transaction can span the network call (D22); the
+  disconnect-quiescence/stale-owner-sweep timeout interaction (D28);
+  `mutation_domain`'s field-ownership model (D35); the N=3
+  inconclusive-reconciliation cap's persistence scope (D17); the repo-wide
+  AST/source-guard tooling-maturity contradiction (D37); and the full
+  three-layer runtime/concurrency/crash-injection proof requirement (D38).
+  See DEC-036 §5 for the complete list.
+- **Package status as of 2026-07-18: NOT FROZEN.** Per the control-room
+  ruling's point 8, an externally-tracked "Session C" code/architecture
+  audit was still required to reconcile against this package before any
+  freeze; this session's own extensive code/architecture audit was offered
+  as Session A's contribution, not as a substitute for Session C's review.
+- No implementation authorized by this section. No `addons/**` file
+  changed. No Odoo/Odoo.sh run. No Shopify request or mutation performed.
+
+### Addendum — final consolidated Sessions-2-and-3 correction batch (2026-07-19)
+
+**This addendum does not change Layer 1's Accepted status, and does not
+accept Layer 2 — DEC-036's overall acceptance remains a separate, pending
+control-room act.** Following the 2026-07-18 Gate A session above, the
+control room issued a preliminary review (PR #177 comment
+[`5013028262`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5013028262))
+identifying ten further corrections, then a final consolidated ruling
+reconciling both the Session 2 official-source audit and an independent
+Session 3 adversarial architecture audit (PR #177 comment
+[`5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445)).
+Session A applied every binding decision from that ruling in one
+documentation-only correction batch:
+
+- **All eight items this addendum's 2026-07-18 text listed as explicitly
+  BLOCKING are now resolved** at the architecture level: `job_id`'s field
+  type (resolved `Many2one`-restrict) and C2's cursor placement (resolved
+  dedicated side cursor, D20); the open-transaction-vs-network-call
+  question (resolved by construction, D22); the disconnect-quiescence
+  interaction (resolved to an awareness-based design, not a timeout race,
+  D28); `mutation_domain`'s field ownership (resolved to a
+  registry-validated indexed `Char` — a third option this session's
+  original framing omitted, D35); the N=3 inconclusive-cap's persistence
+  scope (resolved as per-attempt-sufficient given the retry-eligibility
+  sequencing guarantee, D17); the AST/source-guard tooling-maturity
+  contradiction (reclassified as implementation sizing, not a blocker,
+  D37); and the runtime/concurrency/crash-injection proof requirement
+  (resolved to four distinct proof-environment layers, not three, D38 —
+  correctly classified as a Stage 0 merge-acceptance criterion, never a
+  precondition to beginning implementation).
+- Additional corrections applied: the observed-outcome/resolution model is
+  now genuinely orthogonal — `observed_outcome` is immutable once it
+  leaves `pending`, and a human/reconciliation resolution never overwrites
+  it (D10/D11); the single, unsafe request fingerprint that excluded
+  `changeFromQuantity` is split into `business_intent_fingerprint` and
+  `exact_request_fingerprint`, the latter including `changeFromQuantity`
+  and the idempotency key (D5); two idempotency defect error codes now
+  route to fail-closed manual review instead of ordinary auto-retry (D6);
+  retention is now indefinite for unresolved attempts and configurable
+  masking (not deletion, and not unbounded retention either) for resolved
+  attempts (D32); and security installs against the current, accepted
+  four-role model with an explicit SEC-2 re-key obligation, rejecting
+  Session 3's proposal to install against the future two-role model
+  (D30/D31).
+- **Session 3's proposed single six-value outcome enum is REJECTED** — the
+  orthogonal two-field model is retained. **Session 2's own conclusion that
+  Odoo uses PostgreSQL default Read Committed isolation was REJECTED** —
+  Odoo 19 REPEATABLE READ governs the design, as this addendum's
+  2026-07-18 text already independently established.
+- **DEC-036 now has zero remaining architecture blockers.** Remaining
+  items (a four-layer implementation-proof plan, several tunable
+  constants, and one narrow field-name verification) are Stage 0
+  merge-acceptance criteria, not preconditions to beginning
+  implementation — see DEC-036 §5/§6 for the complete accounting.
+- Full reconciliation record, including which Session 3 recommendations
+  were accepted vs. rejected: DEC-036 Part 0.5.
+- No implementation authorized by this addendum. No `addons/**` file
+  changed. No Odoo/Odoo.sh run. No Shopify request or mutation performed.
+  PR #177 remains open, draft and unmerged.
+
+### Layer 2 Wave 3 Gate A acceptance act (2026-07-19)
+
+**This section records the Layer 2 acceptance act. It does not change Layer
+1's Accepted status or any Layer 1 history above.** The control room
+accepted the complete DEC-036 D1–D38 decision set, the corrected DEC-031
+Layer 2 design, the Stage 0 implementation packet, and the Wave 3 Gate A
+portion of the Definition of Ready, by PR #177 comment
+[`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
+("Control-room final Gate A decision — ACCEPTED WITH TWO CLERICAL
+MERGE-CLOSURE CONDITIONS").
+
+- **DEC-031 Layer 2 design: ACCEPTED** through the complete
+  [`DEC-036`](DEC-036-wave-3-layer-2-gate.md) D1–D38 decision set.
+  Acceptance authority: PR #177 comment 5015044226. This supersedes the
+  "Proposed — NOT accepted" / "CONTROL-ROOM ACCEPTANCE CANDIDATE — NOT YET
+  ACCEPTED" status statements recorded in the dated sections above, which
+  remain accurate as a historical record of status at the time each was
+  written.
+- Two clerical merge-closure conditions (DoR gate-table wording; Stage 0
+  packet §4 addendum sentence) were applied in the same closure commit
+  that recorded this acceptance; no architecture decision was reopened.
+- No implementation authorized by this section. No `addons/**` file
+  changed. No Odoo/Odoo.sh run. No Shopify request or mutation performed.
