@@ -335,6 +335,149 @@ class TestMutationConcurrency(TransactionCase):
         for thread in threads:
             thread.join(timeout=20)
         self.assertEqual(sorted(results), ['created', 'rejected'])
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'SELECT count(*) FROM shopify_connector_mutation_attempt '
+                'WHERE job_id = %s',
+                (job_id,),
+            )
+            self.assertEqual(cr.fetchone()[0], 1)
+
+    def test_existing_evidence_redispatch_commits_on_owned_cursor(self):
+        _store_id, job_id = self._durable_fixture()
+        token = uuid.uuid4().hex
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            job = env['shopify.connector.job'].browse(job_id)
+            job.sudo().write({
+                'state': 'running',
+                'current_attempt_token': token,
+                'owner_worker_ref': 'owned-redispatch',
+                'running_since': fields.Datetime.now(),
+            })
+            env['shopify.connector.mutation.attempt'].with_context(**{
+                C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+            })._create_attempt_intent({
+                'job_id': job.id,
+                'attempt_token': token,
+                'mutation_domain': job.job_type,
+                'expected_connection_generation':
+                    job.store_id.connection_generation,
+                'expected_store_identity': job.store_id.shop_domain,
+                'shopify_idempotency_key': uuid.uuid4().hex,
+            })
+            cr.commit()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            Dispatch = env['shopify.connector.job.dispatch']
+            with patch.object(
+                type(Dispatch), '_transport_mutation_dispatch_selftest',
+                side_effect=AssertionError('transport must not replay'),
+            ) as transport:
+                Dispatch._drain_mutation_one(
+                    env['shopify.connector.job'].browse(job_id)
+                )
+            transport.assert_not_called()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'SELECT state, manual_review_subreason, '
+                'current_attempt_token FROM shopify_connector_job '
+                'WHERE id = %s',
+                (job_id,),
+            )
+            self.assertEqual(
+                cr.fetchone(),
+                ('blocked_manual_review', 'duplicate_risk', None),
+            )
+            cr.execute(
+                'SELECT count(*) FROM shopify_connector_mutation_attempt '
+                'WHERE job_id = %s',
+                (job_id,),
+            )
+            self.assertEqual(cr.fetchone()[0], 1)
+
+    def test_success_path_commits_c1_c2_then_runs_net_and_fresh_c3(self):
+        _store_id, job_id = self._durable_fixture()
+        trace = []
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            Dispatch = env['shopify.connector.job.dispatch']
+            strategy = dict(Dispatch._get_reconciliation_strategies()[
+                'mutation_dispatch_selftest'
+            ])
+            real = dict(strategy)
+
+            def assert_durable(c2_expected):
+                with db_connect(self.env.cr.dbname).cursor() as observer:
+                    observer.execute(
+                        'SELECT state FROM shopify_connector_job '
+                        'WHERE id = %s FOR UPDATE NOWAIT',
+                        (job_id,),
+                    )
+                    self.assertEqual(observer.fetchone()[0], 'running')
+                    observer.execute(
+                        'SELECT count(*) '
+                        'FROM shopify_connector_mutation_attempt '
+                        'WHERE job_id = %s',
+                        (job_id,),
+                    )
+                    self.assertEqual(observer.fetchone()[0], c2_expected)
+                    if c2_expected:
+                        observer.execute(
+                            'SELECT id '
+                            'FROM shopify_connector_mutation_attempt '
+                            'WHERE job_id = %s FOR UPDATE NOWAIT',
+                            (job_id,),
+                        )
+                        self.assertTrue(observer.fetchone()[0])
+                    observer.rollback()
+
+            def prepare_local(job):
+                trace.append('prepare_local')
+                return real['prepare_local'](job)
+
+            def prepare_preconditions(local, owner):
+                trace.append('prepare_preconditions')
+                assert_durable(0)
+                return real['prepare_preconditions'](local, owner)
+
+            def transport(request, context):
+                trace.append('transport')
+                assert_durable(1)
+                return real['transport'](request, context)
+
+            def classify(result):
+                trace.append('classify_direct_result')
+                return real['classify_direct_result'](result)
+
+            def apply(*args, **kwargs):
+                trace.append('apply_consequence')
+                return real['apply_consequence'](*args, **kwargs)
+
+            strategy.update({
+                'prepare_local': prepare_local,
+                'prepare_preconditions': prepare_preconditions,
+                'transport': transport,
+                'classify_direct_result': classify,
+                'apply_consequence': apply,
+            })
+            with patch.object(
+                type(Dispatch), '_get_reconciliation_strategies',
+                return_value={'mutation_dispatch_selftest': strategy},
+            ):
+                Dispatch._drain_mutation_one(
+                    env['shopify.connector.job'].browse(job_id)
+                )
+        self.assertEqual(trace, [
+            'prepare_local', 'prepare_preconditions', 'transport',
+            'classify_direct_result', 'apply_consequence',
+        ])
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'SELECT state FROM shopify_connector_job WHERE id = %s',
+                (job_id,),
+            )
+            self.assertEqual(cr.fetchone()[0], 'succeeded')
 
     def test_concurrent_stale_sweeps_create_one_reconciliation_job(self):
         store_id, job_id, attempt_id, _token = self._durable_owned_attempt()
