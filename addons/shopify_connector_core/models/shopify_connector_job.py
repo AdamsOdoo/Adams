@@ -363,7 +363,10 @@ class ShopifyConnectorJob(models.Model):
 
     def action_resolve_manual_review(self):
         self.ensure_one()
-        if self._has_mutation_attempt_evidence() or self.manual_review_subreason == 'duplicate_risk':
+        if (
+            self._has_mutation_attempt_evidence()
+            or self.manual_review_subreason == 'duplicate_risk'
+        ):
             raise UserError(
                 'Mutation duplicate-risk jobs may only be resolved through '
                 'action_resolve_mutation_attempt.'
