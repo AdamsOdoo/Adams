@@ -252,6 +252,10 @@ class ShopifyConnectorJob(models.Model):
         'UNIQUE(store_id, operation_scope_key)',
         'A non-terminal job already holds this operation scope for this store.',
     )
+    _mutation_attempt_reconciliation_unique = models.UniqueIndex(
+        '(mutation_attempt_id) WHERE mutation_attempt_id IS NOT NULL',
+        'Only one reconciliation job may own a mutation attempt.',
+    )
 
     @api.model
     def _is_business_job_source(self, job_source):
@@ -293,7 +297,15 @@ class ShopifyConnectorJob(models.Model):
             vals['original_job_type'] = vals.get('job_type')
             if self._is_business_job_source(vals.get('job_source')):
                 store = Store.browse(vals.get('store_id')).exists()
-                if not store or store.state != 'connected':
+                is_layer2_reconciliation = (
+                    vals.get('job_source') == 'reconciliation'
+                    and vals.get('mutation_attempt_id')
+                )
+                allowed_states = (
+                    ('connected', 'disconnecting')
+                    if is_layer2_reconciliation else ('connected',)
+                )
+                if not store or store.state not in allowed_states:
                     raise ValidationError(
                         "A business job (job_source=%r) can only be "
                         "created for a store in state 'connected'." % (
@@ -338,9 +350,18 @@ class ShopifyConnectorJob(models.Model):
             job.sudo().write(values)
         return True
 
+    def _has_mutation_attempt_evidence(self):
+        self.ensure_one()
+        return bool(
+            self.mutation_attempt_id
+            or self.env['shopify.connector.mutation.attempt'].sudo().search(
+                [('job_id', '=', self.id)], limit=1,
+            )
+        )
+
     def action_resolve_manual_review(self):
         self.ensure_one()
-        if self.mutation_attempt_id or self.manual_review_subreason == 'duplicate_risk':
+        if self._has_mutation_attempt_evidence() or self.manual_review_subreason == 'duplicate_risk':
             raise UserError(
                 'Mutation duplicate-risk jobs may only be resolved through '
                 'action_resolve_mutation_attempt.'
@@ -433,7 +454,18 @@ class ShopifyConnectorJob(models.Model):
                 else:
                     store = job.store_id
                 if self._is_business_job_source(job_source):
-                    if store.state != 'connected':
+                    mutation_attempt_id = vals.get(
+                        'mutation_attempt_id', job.mutation_attempt_id.id,
+                    )
+                    is_layer2_reconciliation = (
+                        job_source == 'reconciliation'
+                        and mutation_attempt_id
+                    )
+                    allowed_states = (
+                        ('connected', 'disconnecting')
+                        if is_layer2_reconciliation else ('connected',)
+                    )
+                    if store.state not in allowed_states:
                         raise ValidationError(
                             "This business job's store is not "
                             "'connected' -- it cannot start."
@@ -509,6 +541,10 @@ class ShopifyConnectorJob(models.Model):
         """
         now = fields.Datetime.now()
         candidates = self.search([
+            '&',
+            '|',
+            ('reconciliation_pending_until', '=', False),
+            ('reconciliation_pending_until', '<=', now),
             '|',
             ('state', '=', 'queued'),
             '&', ('state', '=', 'retry_waiting'), ('next_retry_at', '<=', now),
@@ -520,10 +556,15 @@ class ShopifyConnectorJob(models.Model):
             return locked
         locked.invalidate_recordset()
         return locked.filtered(
-            lambda job: job.state == 'queued' or (
-                job.state == 'retry_waiting'
-                and job.next_retry_at
-                and job.next_retry_at <= fields.Datetime.now()
+            lambda job: (
+                not job.reconciliation_pending_until
+                or job.reconciliation_pending_until <= fields.Datetime.now()
+            ) and (
+                job.state == 'queued' or (
+                    job.state == 'retry_waiting'
+                    and job.next_retry_at
+                    and job.next_retry_at <= fields.Datetime.now()
+                )
             )
         )
 
