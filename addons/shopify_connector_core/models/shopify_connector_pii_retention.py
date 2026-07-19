@@ -130,12 +130,8 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
             ('resolved_at', '!=', False),
             ('resolved_at', '<', cutoff),
             '|',
-            '|',
             ('observed_outcome', '=', 'succeeded'),
             ('observed_outcome', '=', 'failed_clean'),
-            '&',
-            ('observed_outcome', '=', 'uncertain'),
-            ('resolution_disposition', '!=', False),
         ], order='store_id, id')
         counts = {}
         for attempt in attempts:
