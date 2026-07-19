@@ -41,7 +41,7 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
             ('current_attempt_token', '!=', False),
             ('running_since', '!=', False),
             ('running_since', '<=', cutoff),
-        ], order='running_since, id')
+        ], order='running_since, id', limit=batch_size)
         if not candidates:
             return 0
         locked = candidates.try_lock_for_update(limit=batch_size)
@@ -68,17 +68,21 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
                 attempt = attempt.try_lock_for_update()
                 if not attempt:
                     continue
+                existing = Job.search([
+                    ('mutation_attempt_id', '=', attempt.id),
+                ], limit=1)
                 job.sudo().write({
                     'reconciliation_pending_until': now,
                 })
                 Dispatch._ensure_reconciliation_job(job, attempt)
-                job._log_transition(
-                    'manual_action',
-                    'Stale Layer 2 owner recovered through reconciliation; '
-                    'mutation transport was not replayed.',
-                    from_state='running',
-                    to_state='running',
-                )
+                if not existing:
+                    job._log_transition(
+                        'manual_action',
+                        'Stale Layer 2 owner recovered through reconciliation; '
+                        'mutation transport was not replayed.',
+                        from_state='running',
+                        to_state='running',
+                    )
             else:
                 from_state = job.state
                 job.sudo().write({
