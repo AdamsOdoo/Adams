@@ -1,6 +1,8 @@
 from datetime import timedelta
 import logging
+import os
 import random
+import uuid
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
@@ -8,6 +10,7 @@ from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 from ..tools.redaction import redact
 from .shopify_connector_job import BUSINESS_JOB_SOURCES, MANUAL_REVIEW_SUBREASON_SELECTION
+from .shopify_connector_mutation_attempt import canonical_sha256
 
 _logger = logging.getLogger(__name__)
 
@@ -210,6 +213,15 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             return False
         job_id = claimed.id
 
+        if self._is_mutation_job_type(claimed.job_type):
+            if not self._concurrency_retry_supported():
+                raise ValidationError(
+                    'Layer 2 mutation dispatch requires an owned cursor with '
+                    'real commit boundaries.'
+                )
+            self._drain_mutation_one(claimed)
+            return True
+
         if not self._concurrency_retry_supported():
             # The shared in-test transaction cursor forbids commit/rollback, so
             # the per-job transaction boundary below cannot run here. The
@@ -303,6 +315,42 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         if not locked:
             self.env.cr.commit()
             return
+        # Layer 2: a durably-running owned mutation is not claimable, but a
+        # committed C2 attempt means transport may have occurred. Reconcile;
+        # never invoke the mutation handler again.
+        locked.invalidate_recordset()
+        if (
+            locked.state == 'running'
+            and locked.current_attempt_token
+            and self._is_mutation_job_type(locked.job_type)
+        ):
+            attempt = self.env[
+                'shopify.connector.mutation.attempt'
+            ].search([
+                ('job_id', '=', locked.id),
+                ('attempt_token', '=', locked.current_attempt_token),
+            ], limit=1)
+            if attempt and attempt.transport_attempted:
+                self._ensure_reconciliation_job(locked, attempt)
+                self.env.cr.commit()
+                return
+            # C1 committed but C2 did not: no transport was possible.
+            from_state = locked.state
+            locked.sudo().write({
+                'state': 'retry_waiting',
+                'next_retry_at': fields.Datetime.now(),
+                'current_attempt_token': False,
+                'owner_worker_ref': False,
+                'running_since': False,
+            })
+            locked._log_transition(
+                'state_change',
+                'Recovered a C1-only mutation owner; safe requeue before C2.',
+                from_state=from_state,
+                to_state='retry_waiting',
+            )
+            self.env.cr.commit()
+            return
         # (3) Revalidate CLAIMABLE state UNDER the lock (mirrors
         # ``_claim_for_dispatch``): only a still-queued or genuinely-due
         # retry_waiting job may be routed; a running/terminal/otherwise
@@ -350,6 +398,347 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
         self.env.cr.commit()
 
+    # ------------------------------------------------------------------
+    # DEC-031 Layer 2 mutation protocol
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _get_reconciliation_strategies(self):
+        """Mutation-domain registry; domain addons extend by add-only merge."""
+        return {
+            'mutation_dispatch_selftest': {
+                'reconciliation_job_type':
+                    'mutation_dispatch_selftest_reconcile',
+                'prepare': self._prepare_mutation_dispatch_selftest,
+                'transport': self._transport_mutation_dispatch_selftest,
+                'reconcile': self._reconcile_mutation_dispatch_selftest,
+            },
+        }
+
+    @api.model
+    def _is_mutation_job_type(self, job_type):
+        return job_type in self._get_reconciliation_strategies()
+
+    @api.model
+    def _prepare_mutation_dispatch_selftest(self, job):
+        """Materialize the domain-neutral synthetic request before C1."""
+        idempotency_key = uuid.uuid4().hex
+        operation = (
+            'mutation MutationDispatchSelftest($idempotencyKey: String!) { '
+            'shop { id } @idempotent(key: $idempotencyKey) }'
+        )
+        variables = {'idempotencyKey': idempotency_key}
+        business_intent = {
+            'mutation_domain': 'mutation_dispatch_selftest',
+            'store_id': job.store_id.id,
+            'job_id': job.id,
+        }
+        return {
+            'mutation_domain': 'mutation_dispatch_selftest',
+            'operation': operation,
+            'variables': variables,
+            'business_intent': business_intent,
+            'remote_mutation_intent': {
+                'operation_name': 'MutationDispatchSelftest',
+                'store_id': job.store_id.id,
+                'job_id': job.id,
+            },
+            'preconditions_snapshot': {
+                'expected_connection_generation':
+                    job.expected_connection_generation,
+                'expected_store_identity': job.store_id.shop_domain,
+            },
+            'expected_connection_generation':
+                job.expected_connection_generation,
+            'expected_store_identity': job.store_id.shop_domain,
+            'shopify_idempotency_key': idempotency_key,
+        }
+
+    @api.model
+    def _transport_mutation_dispatch_selftest(self, request, attempt_context):
+        """Bounded synthetic transport: no HTTP and no credential access."""
+        del attempt_context
+        return {
+            'outcome': request.get('synthetic_outcome', 'succeeded'),
+            'evidence': {'transport': 'synthetic_stub'},
+        }
+
+    @api.model
+    def _reconcile_mutation_dispatch_selftest(self, attempt):
+        """Synthetic read-only verdict used only by Stage 0 self-tests."""
+        return {
+            'verdict': 'applied',
+            'evidence': {'reconciliation': 'synthetic_stub'},
+        }
+
+    @api.model
+    def _handle_mutation_dispatch_selftest(self, job):
+        raise ValidationError(
+            'Mutation jobs must be executed by the C1/C2/NET/C3 wrapper.'
+        )
+
+    @api.model
+    def _handle_mutation_dispatch_selftest_reconcile(self, job):
+        attempt = job.mutation_attempt_id
+        strategy = self._get_reconciliation_strategies().get(
+            attempt.mutation_domain
+        )
+        if not strategy:
+            job._transition_blocked_manual_review(
+                'no_reconciliation_strategy',
+                'no_reconciliation_strategy',
+                'No reconciliation strategy is registered for this attempt.',
+            )
+            return
+        result = strategy['reconcile'](attempt)
+        verdict = result.get('verdict')
+        evidence = result.get('evidence') or {}
+        if verdict in ('applied', 'not_applied'):
+            attempt._record_reconciliation_result(
+                verdict, False, evidence=evidence,
+            )
+        elif verdict == 'inconclusive':
+            attempt._record_inconclusive_reconciliation(job)
+        else:
+            job._transition_blocked_manual_review(
+                'duplicate_risk',
+                'duplicate_risk',
+                'The reconciliation strategy returned an invalid verdict.',
+            )
+
+    @api.model
+    def _drain_mutation_one(self, job):
+        """Execute one registered mutation through C1/C2/NET/C3."""
+        strategy = self._get_reconciliation_strategies().get(job.job_type)
+        if not strategy:
+            job._transition_blocked_manual_review(
+                'no_reconciliation_strategy',
+                'no_reconciliation_strategy',
+                'No reconciliation strategy is registered; transport refused.',
+            )
+            self.env.cr.commit()
+            return
+
+        # All ORM-derived request values are frozen before C1.
+        request = dict(strategy['prepare'](job))
+        request['variables'] = dict(request.get('variables') or {})
+        request['business_intent'] = dict(
+            request.get('business_intent') or {}
+        )
+        request['remote_mutation_intent'] = dict(
+            request.get('remote_mutation_intent') or {}
+        )
+        request['preconditions_snapshot'] = dict(
+            request.get('preconditions_snapshot') or {}
+        )
+        token = uuid.uuid4().hex
+        job_id = job.id
+
+        # C1: durable exact owner.
+        from_state = job.state
+        job.sudo().write({
+            'state': 'running',
+            'started_at': job.started_at or fields.Datetime.now(),
+            'current_attempt_token': token,
+            'owner_worker_ref': '%s:%s' % (self.env.cr.dbname, os.getpid()),
+            'running_since': fields.Datetime.now(),
+            'reconciliation_pending_until': False,
+        })
+        job._log_transition(
+            'attempt',
+            'Layer 2 mutation claim committed.',
+            from_state=from_state,
+            to_state='running',
+        )
+        self.env.flush_all()
+        pending = getattr(self.env.transaction, 'towrite', None)
+        if pending:
+            raise ValidationError(
+                'C1 contains pending ORM writes after the connector flush.'
+            )
+        self.env.cr.commit()
+
+        # C2: independent committed attempt intent.
+        attempt_id = self._commit_attempt_intent_c2(
+            job_id, token, request,
+        )
+
+        # NET: plain immutable values only; no main-cursor access.
+        try:
+            result = strategy['transport'](
+                dict(request),
+                {
+                    'job_id': job_id,
+                    'attempt_id': attempt_id,
+                    'attempt_token': token,
+                    'mutation_domain': request['mutation_domain'],
+                },
+            )
+        except BaseException as exc:
+            result = {
+                'outcome': 'uncertain',
+                'evidence': {
+                    'exception_class': type(exc).__name__,
+                    'transport': 'exception_after_c2',
+                },
+            }
+
+        # C3: fresh snapshot, exact token lock/CAS, outcome + job consequence.
+        self._commit_mutation_outcome_c3(
+            job_id, attempt_id, token, result, strategy,
+        )
+
+    @api.model
+    def _commit_attempt_intent_c2(self, job_id, token, request):
+        side_cr = self.env.registry.cursor()
+        try:
+            side_env = api.Environment(
+                side_cr,
+                self.env.uid,
+                dict(self.env.context, shopify_layer2_c2_side_cursor=True),
+            )
+            exact_request = {
+                'operation': ' '.join(request['operation'].split()),
+                'variables': request['variables'],
+            }
+            attempt = side_env[
+                'shopify.connector.mutation.attempt'
+            ]._create_attempt_intent({
+                'job_id': job_id,
+                'attempt_token': token,
+                'mutation_domain': request['mutation_domain'],
+                'expected_connection_generation':
+                    request['expected_connection_generation'],
+                'expected_store_identity':
+                    request['expected_store_identity'],
+                'remote_mutation_intent':
+                    request['remote_mutation_intent'],
+                'preconditions_snapshot':
+                    request['preconditions_snapshot'],
+                'business_intent_fingerprint': canonical_sha256(
+                    request['business_intent']
+                ),
+                'exact_request_fingerprint': canonical_sha256(exact_request),
+                'shopify_idempotency_key':
+                    request['shopify_idempotency_key'],
+            })
+            attempt_id = attempt.id
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return attempt_id
+
+    @api.model
+    def _classify_mutation_result(self, result):
+        code = (result or {}).get('error_code')
+        if code in (
+            'IDEMPOTENCY_KEY_PARAMETER_MISMATCH',
+            'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED',
+        ):
+            return 'contract_violation'
+        if code in ('IDEMPOTENCY_CONCURRENT_REQUEST', 'THROTTLED'):
+            return 'uncertain'
+        outcome = (result or {}).get('outcome')
+        if outcome in ('succeeded', 'failed_clean', 'uncertain'):
+            return outcome
+        return 'uncertain'
+
+    @api.model
+    def _commit_mutation_outcome_c3(
+        self, job_id, attempt_id, token, result, strategy,
+    ):
+        self.env.transaction.reset()
+        Job = self.env['shopify.connector.job']
+        locked = Job.browse(job_id).try_lock_for_update()
+        if not locked:
+            raise ValidationError(
+                'C3 could not reacquire the mutation job owner row.'
+            )
+        locked.invalidate_recordset()
+        if locked.current_attempt_token != token:
+            raise ValidationError(
+                'C3 mutation owner token mismatch; outcome refused.'
+            )
+        Attempt = self.env['shopify.connector.mutation.attempt']
+        attempt = Attempt.browse(attempt_id).try_lock_for_update()
+        if not attempt:
+            raise ValidationError(
+                'C3 could not reacquire the mutation attempt row.'
+            )
+        attempt.invalidate_recordset()
+        if attempt.attempt_token != token or attempt.job_id != locked:
+            raise ValidationError('C3 mutation attempt identity mismatch.')
+
+        classification = self._classify_mutation_result(result)
+        evidence = (result or {}).get('evidence') or {}
+        if classification == 'contract_violation':
+            attempt._record_direct_outcome('uncertain', evidence=evidence)
+            from_state = locked.state
+            locked.sudo().write({
+                'state': 'blocked_manual_review',
+                'error_class': 'idempotency_contract_violation',
+                'manual_review_subreason':
+                    'idempotency_contract_violation',
+                'finished_at': fields.Datetime.now(),
+                'reconciliation_pending_until': False,
+            })
+            locked._log_transition(
+                'state_change',
+                'Shopify idempotency contract violation; automatic retry '
+                'is forbidden.',
+                from_state=from_state,
+                to_state='blocked_manual_review',
+            )
+        elif classification == 'uncertain':
+            attempt._record_direct_outcome('uncertain', evidence=evidence)
+            locked.sudo().write({
+                'reconciliation_pending_until': fields.Datetime.now(),
+            })
+            self._ensure_reconciliation_job(locked, attempt, strategy)
+        else:
+            attempt._record_direct_outcome(
+                classification, evidence=evidence,
+            )
+            attempt._apply_disposition_to_job(
+                'Direct mutation outcome recorded: %s.' % classification
+            )
+        self.env.cr.flush()
+        self.env.cr.commit()
+
+    @api.model
+    def _ensure_reconciliation_job(self, original_job, attempt, strategy=None):
+        strategy = strategy or self._get_reconciliation_strategies().get(
+            attempt.mutation_domain
+        )
+        if not strategy:
+            original_job._transition_blocked_manual_review(
+                'no_reconciliation_strategy',
+                'no_reconciliation_strategy',
+                'No reconciliation strategy exists for the uncertain attempt.',
+            )
+            return self.env['shopify.connector.job']
+        Job = self.env['shopify.connector.job']
+        existing = Job.search([
+            ('mutation_attempt_id', '=', attempt.id),
+            ('job_type', '=', strategy['reconciliation_job_type']),
+            ('state', 'not in', ('succeeded', 'failed_final', 'cancelled')),
+        ], limit=1)
+        if existing:
+            return existing
+        return Job.sudo().create({
+            'store_id': original_job.store_id.id,
+            'job_source': 'reconciliation',
+            'job_type': strategy['reconciliation_job_type'],
+            'state': 'queued',
+            'payload_hash': 'reconcile:%s' % attempt.attempt_token,
+            'mutation_attempt_id': attempt.id,
+            'expected_connection_generation':
+                attempt.expected_connection_generation,
+        })
+
     @api.model
     def _concurrency_retry_supported(self):
         """Whether the per-job transaction boundary (:meth:`_drain_one`) can
@@ -390,6 +779,12 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         """
         return {
             'core_dispatch_selftest': self._handle_core_dispatch_selftest,
+            'mutation_dispatch_selftest': (
+                self._handle_mutation_dispatch_selftest
+            ),
+            'mutation_dispatch_selftest_reconcile': (
+                self._handle_mutation_dispatch_selftest_reconcile
+            ),
         }
 
     @api.model
@@ -415,6 +810,12 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         """
         return {
             'core_dispatch_selftest': REPLAY_POLICY_LOCAL_ONLY,
+            'mutation_dispatch_selftest': (
+                REPLAY_POLICY_REMOTE_EFFECT_NOT_REPLAY_SAFE
+            ),
+            'mutation_dispatch_selftest_reconcile': (
+                REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE
+            ),
         }
 
     @api.model
@@ -566,6 +967,8 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
             return
 
+        if job.state != 'running':
+            return
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
         job.sudo().write({
