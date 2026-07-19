@@ -254,7 +254,7 @@ class TestJobDispatch(TransactionCase):
     # not_connected to the new dispatch code path.
     # ------------------------------------------------------------------
 
-    def test_execution_time_store_state_recheck_skips_when_disconnected_between_start_and_dispatch(self):
+    def test_dispatch_skips_after_store_disconnect(self):
         self.store.write({'state': 'connected'})
         job = self.Job.create({
             'store_id': self.store.id,
@@ -386,7 +386,7 @@ class TestJobDispatch(TransactionCase):
             job.write({'state': 'running'})
         self.assertEqual(job.state, 'running')
 
-    def test_execution_time_domain_enabled_recheck_never_alters_enqueue_time_decision(self):
+    def test_domain_recheck_does_not_change_enqueue_decision(self):
         # The hook only runs inside write()'s state -> 'running' branch
         # -- create() is completely untouched by it, proving it cannot
         # alter an enqueue-time decision.
@@ -493,17 +493,20 @@ class TestJobDispatch(TransactionCase):
             'models',
         )
 
-    def _env_model_name(self, value_node):
+    def _env_model_name(self, value_node, aliases=None):
+        aliases = aliases or {}
         allowed_wrappers = frozenset((
             'sudo', 'with_context', 'with_company', 'with_user', 'with_env',
         ))
+        if isinstance(value_node, ast.Name):
+            return aliases.get(value_node.id)
         if isinstance(value_node, ast.Call):
             if (
                 not isinstance(value_node.func, ast.Attribute)
                 or value_node.func.attr not in allowed_wrappers
             ):
                 return None
-            return self._env_model_name(value_node.func.value)
+            return self._env_model_name(value_node.func.value, aliases)
         if (
             not isinstance(value_node, ast.Subscript)
             or not isinstance(value_node.value, ast.Attribute)
@@ -519,6 +522,58 @@ class TestJobDispatch(TransactionCase):
         ):
             return slice_node.value
         return None
+
+    def _create_sites(self, tree):
+        sites = []
+        for owner in (
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+        ):
+            aliases = {}
+            for node in ast.walk(owner):
+                if (
+                    isinstance(node, ast.Assign)
+                    and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                ):
+                    model = self._env_model_name(node.value, aliases)
+                    if model:
+                        aliases[node.targets[0].id] = model
+            for node in ast.walk(owner):
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == 'create'
+                ):
+                    sites.append((
+                        owner.name,
+                        self._env_model_name(node.func.value, aliases),
+                        'create',
+                    ))
+        return sorted(sites)
+
+    def _sudo_sites(self, filename, tree):
+        parents = {}
+        for parent in ast.walk(tree):
+            for child in ast.iter_child_nodes(parent):
+                parents[child] = parent
+        sites = []
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'sudo'
+            ):
+                continue
+            owner = parents.get(node)
+            while owner and not isinstance(owner, ast.FunctionDef):
+                owner = parents.get(owner)
+            sites.append((
+                filename,
+                owner.name if owner else False,
+                ast.unparse(node.func.value),
+            ))
+        return sorted(sites)
 
     def test_env_model_name_unwraps_only_approved_wrappers(self):
         cases = (
@@ -543,25 +598,32 @@ class TestJobDispatch(TransactionCase):
                 value_node = ast.parse(source, mode='eval').body
                 self.assertEqual(self._env_model_name(value_node), expected)
 
-    def test_source_level_job_dispatch_never_calls_create(self):
-        """AST guard: shopify_connector_job_dispatch.py never calls
-        `.create(` on anything -- every write path goes through
-        job.write()/state-transition helpers and
-        job.log._system_append() only."""
+    def test_source_level_job_dispatch_create_site_is_exact(self):
+        """Only the exact reconciliation seam may create a job."""
         path = os.path.join(
             self._models_dir(), 'shopify_connector_job_dispatch.py',
         )
         with open(path, 'r', encoding='utf-8') as source_file:
             tree = ast.parse(source_file.read(), filename=path)
-        offenders = [
-            node for node in ast.walk(tree)
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == 'create'
-            )
-        ]
-        self.assertEqual(offenders, [])
+        self.assertEqual(self._create_sites(tree), [
+            ('_ensure_reconciliation_job', 'shopify.connector.job', 'create'),
+        ])
+
+    def test_dispatch_create_site_detector_rejects_other_method(self):
+        tree = ast.parse(
+            "class Unsafe:\n"
+            "    def bad(self):\n"
+            "        Job = self.env['shopify.connector.job']\n"
+            "        return Job.create({})\n"
+        )
+        detected = self._create_sites(tree)
+        self.assertEqual(detected, [
+            ('bad', 'shopify.connector.job', 'create'),
+        ])
+        self.assertNotEqual(detected, [
+            ('_ensure_reconciliation_job',
+             'shopify.connector.job', 'create'),
+        ])
 
     def test_source_level_job_enqueue_only_creates_job_model(self):
         """AST guard: shopify_connector_job_enqueue.py's only `.create(`
@@ -583,34 +645,57 @@ class TestJobDispatch(TransactionCase):
         self.assertEqual(create_targets, ['shopify.connector.job'])
 
     def test_source_level_sec1_sudo_sites_in_dispatch_files(self):
-        """SEC-1 elevates only the protected job writer sites."""
-        expected = {
-            'shopify_connector_job_enqueue.py': 1,
-            'shopify_connector_job_dispatch.py': 2,
-        }
+        """SEC-1 elevation is method and receiver qualified."""
+        expected = sorted([
+            ('shopify_connector_job_enqueue.py', 'enqueue',
+             "self.env['shopify.connector.job']"),
+            ('shopify_connector_job_dispatch.py', '_block_original_job', 'job'),
+            ('shopify_connector_job_dispatch.py',
+             '_apply_validated_consequence', 'job'),
+            ('shopify_connector_job_dispatch.py',
+             '_complete_reconciliation_job', 'job'),
+            ('shopify_connector_job_dispatch.py', '_drain_mutation_one', 'job'),
+            ('shopify_connector_job_dispatch.py',
+             '_ensure_reconciliation_job', 'Job'),
+            ('shopify_connector_job_dispatch.py', '_invoke_handler', 'job'),
+            ('shopify_connector_job_dispatch.py',
+             '_recover_after_concurrency_conflict', 'locked'),
+            ('shopify_connector_job_dispatch.py',
+             '_recover_committed_attempt_to_reconciliation', 'job'),
+            ('shopify_connector_job_dispatch.py', '_start_running', 'job'),
+            ('shopify_connector_job_dispatch.py',
+             '_recover_pre_c2_failure', 'job'),
+            ('shopify_connector_job_dispatch.py',
+             '_recover_layer2_owner', 'job'),
+        ])
+        actual = []
         for path in self._find_new_model_files():
             with open(path, 'r', encoding='utf-8') as source_file:
                 tree = ast.parse(source_file.read(), filename=path)
-            sudo_calls = [
-                node for node in ast.walk(tree)
-                if (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == 'sudo'
-                )
-            ]
-            self.assertEqual(
-                len(sudo_calls),
-                expected[os.path.basename(path)],
-                path,
-            )
+            actual.extend(self._sudo_sites(os.path.basename(path), tree))
+        self.assertEqual(sorted(actual), expected)
+
+    def test_sudo_site_detector_rejects_unapproved_method_and_target(self):
+        tree = ast.parse(
+            "class Unsafe:\n"
+            "    def bad(self):\n"
+            "        return self.env['another.model'].sudo().write({})\n"
+        )
+        detected = self._sudo_sites('unsafe.py', tree)
+        self.assertEqual(detected, [
+            ('unsafe.py', 'bad', "self.env['another.model']"),
+        ])
+        self.assertNotEqual(detected, [
+            ('shopify_connector_job_enqueue.py', 'enqueue',
+             "self.env['shopify.connector.job']"),
+        ])
 
     # ------------------------------------------------------------------
     # No live Shopify call anywhere in this task's changed production
     # files (source-level).
     # ------------------------------------------------------------------
 
-    def test_source_level_no_shopify_api_client_reference_in_changed_production_files(self):
+    def test_changed_dispatch_files_have_no_api_client_reference(self):
         """Stronger than a per-test mocking sample: none of this task's
         three changed production files -- the modified
         shopify_connector_job.py, and the two new
