@@ -159,6 +159,15 @@ class TestMutationRecovery(TransactionCase):
             ),
             20,
         )
+        params.set_param(
+            'shopify_connector.layer2_stale_owner_batch_size', '7'
+        )
+        self.assertEqual(
+            self.Sweep._positive_int_parameter(
+                'shopify_connector.layer2_stale_owner_batch_size', 20
+            ),
+            7,
+        )
 
     @skipUnless(
         os.getenv('SHOPIFY_LAYER2_RUN_PROCESS_DEATH') == '1',
