@@ -141,7 +141,7 @@ Proof-layer state:
 ## 5. Scope and synchronization gate
 
 The branch changes exactly the 23 files authorized by the locked packet:
-14 implementation/registration/security files, nine exact tests, and this
+13 implementation/registration/security files, nine exact tests, and this
 validation record. It changes no shared Wave 3 binding document and no Task
 013/013B implementation.
 
