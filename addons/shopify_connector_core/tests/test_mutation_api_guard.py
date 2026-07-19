@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import UserError
@@ -87,6 +88,36 @@ class TestMutationApiGuard(TransactionCase):
         self.assertTrue(self.Client._validate_graphql_operation(
             self.operation, self.variables, self.context,
         ))
+
+    def test_execute_business_accepts_only_the_valid_mutation_context(self):
+        ClientClass = type(self.Client)
+        with patch.object(
+            ClientClass, '_admit_mutation',
+            return_value=('synthetic-lease', 'synthetic-token', self.store),
+        ) as admit, patch.object(
+            ClientClass, '_send', return_value=object(),
+        ) as transport, patch.object(
+            ClientClass, '_normalize_response',
+            return_value={'data': {'synthetic': True}},
+        ), patch.object(
+            ClientClass, '_release_lease',
+        ) as release:
+            with self.Client.execute_business(
+                self.job,
+                self.store,
+                self.operation,
+                self.variables,
+                mutation_context=self.context,
+            ) as result:
+                self.assertEqual(result, {'data': {'synthetic': True}})
+        admit.assert_called_once_with(
+            self.job.id, self.store.id, self.context,
+        )
+        transport.assert_called_once()
+        self.assertEqual(
+            transport.call_args.kwargs['mutation_context'], self.context,
+        )
+        release.assert_called_once_with('synthetic-lease')
 
     def test_operation_and_variable_mismatch_are_refused_exactly(self):
         for operation, variables in (
