@@ -47,6 +47,8 @@ PROTECTED_JOB_FIELDS = frozenset((
     'payload_hash', 'res_model', 'res_id', 'shopify_target_gid', 'job_type',
     'original_job_type', 'job_source', 'trigger_origin', 'next_retry_at',
     'started_at', 'finished_at', 'superseded_by_job_id', 'cancel_reason',
+    'current_attempt_token', 'owner_worker_ref', 'running_since',
+    'reconciliation_pending_until', 'mutation_attempt_id',
 ))
 
 # The Task 005 / DEC-022 §4.2 business-job source subset: job_source
@@ -67,6 +69,8 @@ MANUAL_REVIEW_SUBREASON_SELECTION = [
     ('ambiguous_match', 'Ambiguous Match'),
     ('binding_conflict', 'Binding Conflict'),
     ('duplicate_risk', 'Duplicate Risk'),
+    ('no_reconciliation_strategy', 'No Reconciliation Strategy'),
+    ('idempotency_contract_violation', 'Idempotency Contract Violation'),
     ('destructive_write_guard_blocked', 'Destructive-Write Guard Blocked'),
     ('inventory_location_missing', 'Inventory Location Missing'),
     (
@@ -146,6 +150,11 @@ class ShopifyConnectorJob(models.Model):
             # dispatch.py) -- never dispatched to a live Shopify call,
             # never a template for a future domain job_type.
             ('core_dispatch_selftest', 'Core Dispatch Selftest'),
+            ('mutation_dispatch_selftest', 'Mutation Dispatch Selftest'),
+            (
+                'mutation_dispatch_selftest_reconcile',
+                'Mutation Dispatch Selftest Reconciliation',
+            ),
         ],
         required=True,
         index=True,
@@ -222,6 +231,17 @@ class ShopifyConnectorJob(models.Model):
     expected_connection_generation = fields.Integer(
         default=0,
         readonly=True,
+    )
+    # DEC-031 Layer 2 durable claim ownership (D1).
+    current_attempt_token = fields.Char(index=True, readonly=True)
+    owner_worker_ref = fields.Char(index=True, readonly=True)
+    running_since = fields.Datetime(index=True, readonly=True)
+    reconciliation_pending_until = fields.Datetime(index=True, readonly=True)
+    mutation_attempt_id = fields.Many2one(
+        'shopify.connector.mutation.attempt',
+        index=True,
+        readonly=True,
+        ondelete='restrict',
     )
 
     _store_idempotency_key_uniq = models.Constraint(
@@ -320,6 +340,11 @@ class ShopifyConnectorJob(models.Model):
 
     def action_resolve_manual_review(self):
         self.ensure_one()
+        if self.mutation_attempt_id or self.manual_review_subreason == 'duplicate_risk':
+            raise UserError(
+                'Mutation duplicate-risk jobs may only be resolved through '
+                'action_resolve_mutation_attempt.'
+            )
         if not (
             self.env.user.has_group(
                 'shopify_connector_core.group_shopify_connector_reviewer'
@@ -688,6 +713,21 @@ class ShopifyConnectorJob(models.Model):
             if job.job_source != 'odoo_event' and job.trigger_origin:
                 raise ValidationError(
                     "trigger_origin must be empty unless job_source is 'odoo_event'."
+                )
+
+    @api.constrains('job_type', 'mutation_attempt_id')
+    def _check_reconciliation_attempt_link(self):
+        for job in self:
+            is_reconciliation = (
+                job.job_type == 'mutation_dispatch_selftest_reconcile'
+            )
+            if is_reconciliation and not job.mutation_attempt_id:
+                raise ValidationError(
+                    'A reconciliation job requires one exact mutation attempt.'
+                )
+            if job.mutation_attempt_id and job.store_id != job.mutation_attempt_id.store_id:
+                raise ValidationError(
+                    'A reconciliation job and its mutation attempt must share a store.'
                 )
 
     @api.constrains('state', 'manual_review_subreason')
