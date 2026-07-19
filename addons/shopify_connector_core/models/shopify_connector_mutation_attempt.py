@@ -357,6 +357,12 @@ class ShopifyConnectorMutationAttempt(models.Model):
 
     def action_resolve_mutation_attempt(self, disposition, reason):
         self.ensure_one()
+        attempt = self.try_lock_for_update()
+        if not attempt:
+            raise UserError(
+                'The mutation attempt is being reconciled by another worker.'
+            )
+        attempt.invalidate_recordset()
         if not self.env.user.has_group(
             'shopify_connector_core.group_shopify_connector_admin'
         ):
@@ -368,12 +374,12 @@ class ShopifyConnectorMutationAttempt(models.Model):
             raise UserError('Choose applied or not applied.')
         if not isinstance(reason, str) or not reason.strip():
             raise UserError('A non-empty resolution reason is required.')
-        if self.observed_outcome != 'uncertain':
+        if attempt.observed_outcome != 'uncertain':
             raise UserError('Only an uncertain attempt needs manual resolution.')
-        if self.resolution_disposition:
+        if attempt.resolution_disposition:
             raise UserError('This mutation attempt is already resolved.')
         now = fields.Datetime.now()
-        self._surface('action_resolve_mutation_attempt').write({
+        attempt._surface('action_resolve_mutation_attempt').write({
             'resolution_disposition': disposition,
             'resolution_source': 'manual_admin',
             'resolution_reason': reason.strip(),
@@ -381,16 +387,39 @@ class ShopifyConnectorMutationAttempt(models.Model):
             'resolution_at': now,
             'resolved_at': now,
         })
-        self._apply_disposition_to_job(
+        attempt._apply_disposition_to_job(
             'Mutation attempt manually resolved by actor_uid=%d; '
             'disposition=%s; reason=%s.'
             % (self.env.uid, disposition, reason.strip())
         )
+        reconciliation_jobs = self.env['shopify.connector.job'].search([
+            ('mutation_attempt_id', '=', attempt.id),
+            ('state', 'in', ('queued', 'running', 'retry_waiting')),
+        ]).try_lock_for_update()
+        for job in reconciliation_jobs:
+            from_state = job.state
+            job.sudo().write({
+                'state': 'cancelled',
+                'cancel_reason': 'Attempt resolved manually by Administrator.',
+                'finished_at': now,
+            })
+            job._log_transition(
+                'manual_action',
+                'Reconciliation job closed after Administrator resolution.',
+                from_state=from_state,
+                to_state='cancelled',
+            )
         return True
 
     def _mask_terminal_evidence(self):
         for attempt in self:
             if attempt.effective_disposition() == 'unresolved':
+                continue
+            if (
+                attempt.remote_mutation_intent == EVIDENCE_MASKED
+                and attempt.preconditions_snapshot == EVIDENCE_MASKED
+                and attempt.remote_evidence_refs == EVIDENCE_MASKED
+            ):
                 continue
             attempt._surface('_mask_terminal_evidence').write({
                 'remote_mutation_intent': EVIDENCE_MASKED,
