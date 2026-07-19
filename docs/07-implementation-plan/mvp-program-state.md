@@ -4,6 +4,77 @@
 
 ## Current status
 
+**WAVE 3 GATE B — INVENTORY-READINESS ACCEPTANCE CANDIDATE PRODUCED, CONTROL-ROOM REVIEW PENDING (2026-07-19, draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179)).**
+Following Gate A's merge (PR #177, merge commit
+`3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`, independently verified live
+against `mvp/program-integration` and against PR #177 comment
+[`5015174971`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015174971)'s
+"parallel-start authorization"), this Claude control-room session
+produced the Wave 3 Gate B documentation-only acceptance candidate on
+branch `claude/wave-3-gate-b-inventory-2m5jcl`, draft PR
+[#179](https://github.com/AdamsOdoo/Adams/pull/179). **Identity gate
+independently re-verified live before any edit:** PR #177 merged at the
+exact required SHA; `mvp/program-integration` identical to it; branch
+`claude/wave-3-gate-b-inventory-readiness` did not exist (this session's
+harness-provisioned branch, based at the exact required SHA with zero
+drift, is used instead — a session-naming mechanic, not a scope
+deviation); no open Gate B PR existed before this one; all three binding
+PR #177 comments (`5015044226`, `5015174971`, `5015231326`) read in full;
+Gate A documents confirmed ACCEPTED; the Sol Stage 0 branch
+(`sol/wave-3-stage-0-layer2`) exists at the same base SHA but **has no
+PR and is not merged** (reported factually, not inferred); protected refs
+(`main`, `Shopify-connector`, both checkpoints,
+`mvp/program-integration`) all confirmed unchanged.
+
+**Deliverable:** [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md)
+(new decision record, DEC-037 was unused — first unused sequential
+number) closes every remaining Task 013/013B contradiction DEC-036 Part
+0.5 carried forward to Gate B: `changeFromQuantity` CAS field name
+throughout (superseding stale `compareQuantity` references in
+`inventory-operating-model.md` §4.4 and the Task 013 packet's addendum
+heading — DEC-036's own D12 explicitly flagged these two documents as
+out-of-scope for Gate A, now closed); binding-owned idempotency
+(`last_push_idempotency_key`/`last_push_params_hash`) removed from the
+inventory-level-binding schema, superseded by attempt-owned Layer 2
+idempotency; unexplained Shopify-side drift made explicitly
+review-case-first and blocking, never auto-overwritten; one pair per
+mutation request made binding MVP behavior (DEC-036 D4), not a floor
+awaiting batching; a **complete** `inventorySetQuantities`/
+`inventoryActivate` Layer 2 mutation-domain matrix (DEC-037 §4) with a
+new activation-then-set-quantities sequencing design (§5 — two distinct
+Layer 2 attempts, own idempotency keys/fingerprints, never combined);
+the Task 013 job contract frozen (§7: job_type/job_source/manual-review-
+subreason/`operation_scope_key`/domain-enable-flag vocabulary); Task
+013B's Layer-2-non-applicability made explicit in its own packet (new
+§0); a 17-scenario dev-store mutation-validation plan
+(`wave-3-dev-store-mutation-validation-plan.md`); and two locked,
+unissued Sol prompts
+([`sol-wave-3-task-013-locked-prompt.md`](../06-prompts/sol-wave-3-task-013-locked-prompt.md),
+[`sol-wave-3-task-013b-locked-prompt.md`](../06-prompts/sol-wave-3-task-013b-locked-prompt.md)).
+Two narrow official-source verifications were performed live against
+`shopify.dev` (2026-07-19, API 2026-07) beyond the accepted Gate A
+capture: `inventoryActivate`'s omitted-quantity zero default, and its
+`userErrors` shape (plain `UserError` — no dedicated error-code enum,
+unlike `inventorySetQuantities`) — both folded into the matrix with an
+explicit fail-closed default for the one genuinely open classification
+question, deferred to dev-store verification (scenario 8), not silently
+assumed.
+
+**Status: DEC-037 PROPOSED FOR CONTROL-ROOM GATE B ACCEPTANCE. Task 013
+packet: GATE B ACCEPTANCE CANDIDATE — NOT IMPLEMENTATION AUTHORIZED. Task
+013B packet: GATE B ACCEPTANCE CANDIDATE — NOT IMPLEMENTATION
+AUTHORIZED. Both locked Sol prompts: LOCKED, unissued. Claude did not
+accept its own package — no self-acceptance act occurred.** No
+`addons/**` file was created or modified. No Odoo/Odoo.sh run occurred.
+No Shopify mutation was issued (two Shopify **reads** only, for the
+narrow official-source verification above). Task 013 implementation
+remains forbidden until this Gate B package is accepted and merged
+**and** Stage 0 is separately merged and runtime-proven, per PR #177
+comment `5015174971`'s sequencing guard; Task 013B additionally requires
+Task 013 itself merged and runtime-proven. PR #179 remains **open, draft
+and unmerged**; this session performed no merge, no ready-marking.
+**Recommendation: READY FOR CONTROL-ROOM WAVE 3 GATE B REVIEW.**
+
 **WAVE 3 GATE A ACCEPTED — CONTROL-ROOM ACCEPTANCE ACT COMPLETE; ACCEPTANCE/CLOSURE COMMIT AUTHORIZED FOR MERGE (2026-07-19, draft PR [#177](https://github.com/AdamsOdoo/Adams/pull/177)).**
 Following the final mechanical Gate A consistency correction below (2026-07-19,
 PR #177 comment
@@ -218,7 +289,7 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 | 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
 | 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **MERGED (2026-07-16)** | `sol/wave-1-readonly-foundation`; PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) (merged, `d18f9a9997d7da574f629f834e2adb83b492cfc6`) | Commit `36974edc68c1985e6ccfae8f6bb5c7386f820156` closed the complete binding mutation surface under ruling `4988842625`. Corrected-head build `34995642` (runtime-tested SHA `95db3db`) ran the complete matrix `0/0/644`; residue/security clean; #157 dropped/restored. Final Claude control-room review (20-point independent verification, adversarial adjudication) accepted and merged the reviewed head `d7b08e6`. SRR-03 CLOSED. |
 | 2 — Order import (Task 012 + Area-6 order-scan slice) | **Implementation and runtime-correction batch complete; first runtime campaign failed (preserved) and is superseded by committed corrections; corrected-head runtime rerun pending (2026-07-17)** | `sol/wave-2-order-import`; draft PR [#176](https://github.com/AdamsOdoo/Adams/pull/176) | First campaign: SHA `2e1b1eb`, build `35080469`, 5 failed / 6 errors (preserved). All eleven findings dispositioned and committed (`5897396`, `e4a75fc`, `6624028`); documentation reconciliation complete. 86 tests authored, none removed/skipped/weakened; no corrected-head runtime pass claimed. Clean/full, isolated-upgrade and isolated-lifecycle proof pending/mandatory. PR stays draft/unmerged; Wave 3 remains blocked. |
-| 3 — Inventory synchronization (Task 013/013B) | **Gate A ACCEPTED (2026-07-19); Stage 0 implementation not started; Gate B not started** | draft PR [#177](https://github.com/AdamsOdoo/Adams/pull/177) (docs-only, Gate A) | Wave-order dependency on Wave 2 **CLOSED** (Wave 2 merged, PR #176). [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) — the complete D1–D38 decision set — is **ACCEPTED — CONTROL-ROOM GATE A** (PR #177 comment [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)). Stage 0 implementation and Gate B open only after PR #177 merges and the new integration SHA is verified; the locked Sol prompt remains unissued. No implementation authorized. |
+| 3 — Inventory synchronization (Task 013/013B) | **Gate A ACCEPTED and MERGED (2026-07-19); Gate B candidate produced, control-room review pending (2026-07-19); Stage 0 implementation in progress on a Sol branch with no PR yet, not merged** | Gate A: merged PR [#177](https://github.com/AdamsOdoo/Adams/pull/177) (docs-only). Gate B: draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179) (docs-only). Stage 0: branch `sol/wave-3-stage-0-layer2` exists, no PR. | Wave-order dependency on Wave 2 **CLOSED** (Wave 2 merged, PR #176). [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) — the complete D1–D38 decision set — is **ACCEPTED — CONTROL-ROOM GATE A**, merged. [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) — the Gate B inventory-readiness candidate — is **PROPOSED FOR CONTROL-ROOM GATE B ACCEPTANCE**, not yet accepted; Claude did not self-accept. Both Task 013/013B locked Sol prompts remain unissued. Task 013 implementation requires Gate B accepted+merged **and** Stage 0 merged+runtime-proven; Task 013B additionally requires Task 013 merged+runtime-proven. No implementation authorized. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
 | 5 — Premium operator experience (UI U1–U3, PERF-1, Task 015/015B) | Not started / unauthorized | — | Proposed scope includes product export after Layer 2 (DEC-033 accepted); pending Waves 1–4. |
 | 6 — E2E integration, UAT, release readiness | Not started | — | Blocked on Waves 1–5. |

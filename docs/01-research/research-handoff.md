@@ -1,3 +1,142 @@
+### Wave 3 Gate B — Task 013/013B inventory-readiness acceptance candidate — compact handoff (2026-07-19)
+
+- **Branch / PR:** `claude/wave-3-gate-b-inventory-2m5jcl` (session-provisioned;
+  the task's requested name `claude/wave-3-gate-b-inventory-readiness` was
+  not the actual branch created — a session-naming mechanic, not a scope
+  deviation); draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179)
+  → `mvp/program-integration`.
+- **Exact base:** `mvp/program-integration` @
+  `3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9` (PR #177's merge commit,
+  independently re-verified live via `git ls-remote`/`git rev-parse`
+  before any edit).
+- **Identity gate (verified live before any edit):** PR #177 merged at
+  the exact required SHA; `mvp/program-integration` identical to it;
+  branch `claude/wave-3-gate-b-inventory-readiness` did not exist; no
+  open Gate B PR existed; PR #177 comments `5015044226`, `5015174971`,
+  `5015231326` all read in full; Gate A documents confirmed ACCEPTED;
+  Sol's Stage 0 branch (`sol/wave-3-stage-0-layer2`) exists at the same
+  base SHA with **no PR and not merged** (reported factually — this
+  session did not infer Stage 0 progress from the branch's existence);
+  protected refs (`main`, `Shopify-connector`, both checkpoints,
+  `mvp/program-integration`) all confirmed unchanged against the values
+  recorded in PR #177 comment `5015174971`; DEC-037 was unused (first
+  unused sequential DEC number after DEC-036).
+- **This session's work — Gate B documentation-only acceptance
+  candidate:** produced
+  [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md), which
+  closes every remaining Task 013/013B contradiction DEC-036 Part 0.5
+  carried forward to Gate B:
+  - `changeFromQuantity` CAS field name throughout, superseding stale
+    `compareQuantity`/`ignoreCompareQuantity` references in
+    `inventory-operating-model.md` §4.3/§4.4/§6/§8/§11, the reconnect
+    policy §4.4, the reconnect UAT matrix UAT-RB-2.6, and the Task 013
+    packet's addendum heading and CAS-mismatch routing — the two
+    documents DEC-036 D12 explicitly flagged as out of Gate A's
+    allowed-file scope are now corrected.
+  - Binding-owned idempotency (`last_push_idempotency_key`/
+    `last_push_params_hash`) **removed** from the inventory-level-binding
+    schema (Task 013 D-013-1(b)) and superseded by attempt-owned Layer 2
+    idempotency on `shopify.connector.mutation.attempt` — the binding
+    retains only informational/display fields, never read as
+    transport-replay authority.
+  - Unexplained Shopify-side drift made explicitly **review-case-first
+    and blocking** — supersedes the Task 013 packet's original "push
+    over after logging a drift note" posture, which is retired (retained
+    only as marked-superseded history in the packet itself).
+  - One `(inventory_item_id, location_id)` pair per mutation request made
+    **binding** MVP behavior (DEC-036 D4), not a conservative floor
+    awaiting a batching refinement — batching language removed from the
+    inventory operating model §4.3/§9/§10.
+  - A **complete** Layer 2 mutation-domain matrix for both
+    `inventorySetQuantities` and `inventoryActivate` (DEC-037 §4) — every
+    cell filled (job_type, mutation_domain, replay-policy class,
+    reconciliation-registry key, operation_scope_key, both fingerprints'
+    inputs, preconditions/intent/evidence allowlists, idempotency-key
+    lifecycle, direct/reconciliation verdicts, manual-review subreasons,
+    retry eligibility, first-push/reconnect/disconnect/rollback
+    interaction, exact tests, exact dev-store evidence) — no cell left as
+    "TBD"/"implementation choice."
+  - A new activation-then-set-quantities **sequencing design** (DEC-037
+    §5): `inventoryActivate` and `inventorySetQuantities` are two
+    distinct Layer 2 attempts (own `attempt_token`, own idempotency key,
+    own fingerprints) run sequentially within one job, never combined
+    into one untraceable logical attempt — DEC-036 left this sequencing
+    question to Gate B; this record resolves it as a new, explicitly
+    labeled Recommendation, not a restatement of an existing DEC-036
+    item.
+  - The Task 013 job contract **frozen** (DEC-037 §7): exact
+    `job_type`/`job_source`/`manual_review_subreason`/`operation_scope_key`/
+    domain-enable-flag vocabulary — nothing left to Sol's discretion.
+  - Task 013B's Layer-2-non-applicability made **explicit in its own
+    packet** (new §0) — it was previously only stated in the Stage 0
+    packet and DEC-036, not in Task 013B's own document.
+  - A 17-scenario dev-store mutation-validation plan
+    (`../05-qa/wave-3-dev-store-mutation-validation-plan.md`) — planning
+    only, not executed, no Shopify mutation issued by this session.
+  - Two locked, unissued Sol prompts
+    ([`sol-wave-3-task-013-locked-prompt.md`](../06-prompts/sol-wave-3-task-013-locked-prompt.md),
+    [`sol-wave-3-task-013b-locked-prompt.md`](../06-prompts/sol-wave-3-task-013b-locked-prompt.md)),
+    each with its own issuance checklist gating on Gate B acceptance +
+    Stage 0 (or Task 013) merge/runtime-proof.
+- **Official-source verification performed this session:** two narrow
+  live `WebFetch`/`WebSearch` checks against `shopify.dev` (2026-07-19,
+  API 2026-07) beyond the accepted Gate A capture —
+  `inventoryActivate`'s omitted-quantity zero default ("If you don't
+  specify quantities, then `available` and `onHand` default to zero"),
+  and its `userErrors` shape (plain `UserError` — `field`/`message`
+  only, **no dedicated `InventoryActivateUserErrorCode` enum**, unlike
+  `inventorySetQuantities`'s rich enum). Both facts are cited with exact
+  URLs in DEC-037 §2 and folded into the `inventory_activate` matrix row,
+  with an explicit fail-closed default (payload-shape classification,
+  not message-string matching, wherever a structural signal exists) for
+  the one genuinely open classification question (idempotency-defect
+  message matching for this specific mutation), deferred to dev-store
+  scenario 8, not silently assumed. No other official-source
+  re-verification was performed — every other fact cites the accepted
+  Gate A capture or DEC-036 directly, per this session's task instruction
+  to use that capture as the default source basis.
+- **Files changed (exhaustive):**
+  `docs/04-decisions/DEC-037-wave-3-inventory-gate-b.md` (new),
+  `docs/07-implementation-plan/task-013-inventory-sync-implementation-packet.md`,
+  `docs/07-implementation-plan/task-013-inventory-sync-proposed.md`,
+  `docs/07-implementation-plan/task-013b-initial-inventory-baseline-packet.md`,
+  `docs/02-product/inventory-operating-model.md`,
+  `docs/02-product/reconnect-catchup-backfill-policy.md`,
+  `docs/05-qa/reconnect-backfill-uat-matrix.md`,
+  `docs/05-qa/wave-3-dev-store-mutation-validation-plan.md` (new),
+  `docs/06-prompts/sol-wave-3-task-013-locked-prompt.md` (new),
+  `docs/06-prompts/sol-wave-3-task-013b-locked-prompt.md` (new),
+  `docs/07-implementation-plan/wave-3-definition-of-ready.md`,
+  `docs/05-qa/mvp-acceptance-matrix.md`,
+  `docs/05-qa/architecture-review-log.md` (AR-060 appended),
+  `docs/07-implementation-plan/mvp-program-state.md`,
+  `docs/01-research/research-handoff.md` (this entry). No other file
+  changed; no `addons/**`/tests/security/data/manifest/CI file touched.
+- **Self-verification:** three passes performed — (1) contradiction audit
+  (every contradiction found has a recorded original/conflicting
+  document, binding resolution, corrected document, and test
+  implication — DEC-037 §1); (2) contract traceability (both mutation
+  domains traced product-decision → packet → matrix → locked prompt →
+  tests → Odoo.sh evidence → dev-store scenario → rollback, unbroken —
+  DEC-037 §11); (3) repository consistency (only the allowed
+  documentation files changed; no addon/test/security/XML/manifest/CI
+  change; no current-facing `compareQuantity`/`ignoreCompareQuantity` use
+  remains; no binding-owned transport idempotency remains; no MVP
+  batching claim remains; no silent-drift-overwrite language remains; no
+  blind-reconnect-push language remains; no Task 013 mutation described
+  outside Layer 2; both matrix rows complete; Task 013B explicitly
+  Layer-2-not-applicable; both locked prompts remain unissued; links
+  resolve; no credentials/PII introduced).
+- **Exact next steps:** control-room review and acceptance of DEC-037;
+  only then may either locked Sol prompt be issued — Task 013's only
+  after Stage 0 is also separately merged and runtime-proven; Task 013B's
+  only after Task 013 is also separately merged and runtime-proven.
+- **Stop condition:** this session stops after producing the Gate B
+  candidate and this handoff. Claude did not accept its own package; no
+  merge; no ready-marking; no implementation; no Odoo/Odoo.sh run; no
+  Shopify mutation (two Shopify reads only, for the narrow official-source
+  verification above).
+
 ### Wave 3 Gate A — control-room acceptance act and controlled merge — compact handoff (2026-07-19)
 
 - **Branch / PR:** `claude/wave-3-gate-dec-031-layer2-q3vwfj`; draft PR
