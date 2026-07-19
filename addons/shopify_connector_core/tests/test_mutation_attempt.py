@@ -1,7 +1,5 @@
 import uuid
 
-import psycopg2
-
 from odoo import fields
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase
@@ -40,6 +38,17 @@ class TestMutationAttempt(TransactionCase):
             'running_since': fields.Datetime.now(),
         })
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
+        cls.admin = cls.env['res.users'].create({
+            'name': 'Layer 2 attempt administrator',
+            'login': 'layer2_attempt_admin_%s' % uuid.uuid4().hex,
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.'
+                    'group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
 
     def _create_for(
         self, job, token='attempt-token',
@@ -149,9 +158,23 @@ class TestMutationAttempt(TransactionCase):
     def test_same_job_with_different_token_is_structurally_rejected(self):
         self._create()
         self.job.sudo().write({'current_attempt_token': 'second-token'})
-        with self.assertRaises(psycopg2.IntegrityError):
-            with self.env.cr.savepoint():
-                self._create('second-token')
+        with self.assertRaises(ValidationError):
+            self._create('second-token')
+        self.assertEqual(self.Attempt.search_count([
+            ('job_id', '=', self.job.id),
+        ]), 1)
+
+    def test_one_attempt_per_job_unique_index_exists(self):
+        self.env.cr.execute(
+            'SELECT indexdef FROM pg_indexes '
+            "WHERE tablename = 'shopify_connector_mutation_attempt'"
+        )
+        definitions = [row[0] for row in self.env.cr.fetchall()]
+        self.assertTrue(any(
+            'UNIQUE INDEX' in definition
+            and '(job_id)' in definition.replace(' ', '')
+            for definition in definitions
+        ), definitions)
 
     def test_c2_validates_job_token_state_and_domain(self):
         cases = (
@@ -211,7 +234,7 @@ class TestMutationAttempt(TransactionCase):
         self.assertEqual(attempt.observed_outcome, 'uncertain')
         self.assertFalse(attempt.resolved_at)
         self.assertEqual(len(attempt.remote_evidence_refs['recovery']), 1)
-        attempt.action_resolve_mutation_attempt(
+        attempt.with_user(self.admin).action_resolve_mutation_attempt(
             'applied', 'Synthetic recovery verdict.'
         )
         with self.assertRaises(ValidationError):
@@ -244,7 +267,7 @@ class TestMutationAttempt(TransactionCase):
             'read': 'synthetic',
         })
         before = attempt._evidence_sections()
-        attempt.action_resolve_mutation_attempt(
+        attempt.with_user(self.admin).action_resolve_mutation_attempt(
             'applied', 'Verified synthetic evidence.'
         )
         evidence = attempt.remote_evidence_refs
@@ -269,7 +292,7 @@ class TestMutationAttempt(TransactionCase):
                 ).write({
                     'resolution_disposition': 'applied',
                 })
-        attempt.action_resolve_mutation_attempt(
+        attempt.with_user(self.admin).action_resolve_mutation_attempt(
             'applied', 'Synthetic external verification.'
         )
         self.assertTrue(attempt.resolved_at)
