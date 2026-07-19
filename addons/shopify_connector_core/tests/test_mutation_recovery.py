@@ -1,10 +1,72 @@
+import multiprocessing
 import os
+import time
 import uuid
 from datetime import timedelta
 from unittest import skipUnless
 
-from odoo import fields
+from odoo import SUPERUSER_ID, api, fields
+from odoo.sql_db import db_connect
 from odoo.tests.common import TransactionCase
+
+
+def _layer2_death_worker(dbname, job_id, phase, ready):
+    """Real child process: commit boundaries survive os._exit/terminate."""
+    with db_connect(dbname).cursor() as cr:
+        env = api.Environment(cr, SUPERUSER_ID, {})
+        Dispatch = env['shopify.connector.job.dispatch']
+        job = env['shopify.connector.job'].browse(job_id)
+        strategy = Dispatch._get_reconciliation_strategies()[
+            'mutation_dispatch_selftest'
+        ]
+        request = strategy['prepare'](job)
+        token = uuid.uuid4().hex
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+            'current_attempt_token': token,
+            'owner_worker_ref': 'death-harness:%s' % os.getpid(),
+            'running_since': fields.Datetime.now() - timedelta(hours=1),
+        })
+        cr.commit()
+        if phase == 'after_c1':
+            ready.set()
+            os._exit(71)
+        attempt_id = Dispatch._commit_attempt_intent_c2(
+            job_id, token, request,
+        )
+        if phase == 'after_c2':
+            ready.set()
+            os._exit(72)
+        if phase == 'during_net':
+            ready.set()
+            time.sleep(300)
+        result = strategy['transport'](
+            request,
+            {
+                'job_id': job_id,
+                'attempt_id': attempt_id,
+                'attempt_token': token,
+                'mutation_domain': 'mutation_dispatch_selftest',
+            },
+        )
+        if phase == 'after_net':
+            ready.set()
+            os._exit(73)
+        if phase == 'during_c3':
+            locked = env['shopify.connector.job'].browse(
+                job_id
+            ).try_lock_for_update()
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id).try_lock_for_update()
+            if locked and attempt:
+                attempt._record_direct_outcome(
+                    result['outcome'], evidence=result['evidence'],
+                )
+            ready.set()
+            time.sleep(300)
+        os._exit(74)
 
 
 class TestMutationRecovery(TransactionCase):
@@ -102,8 +164,84 @@ class TestMutationRecovery(TransactionCase):
         os.getenv('SHOPIFY_LAYER2_RUN_PROCESS_DEATH') == '1',
         'real process-death harness is opt-in outside Odoo.sh',
     )
-    def test_real_process_death_harness_gate(self):
-        # The Odoo.sh acceptance worker enables this gate and drives deaths at
-        # C1→C2, C2→NET, during NET, NET→C3 and during C3. This test refuses
-        # to downgrade process death to a same-process Python exception.
-        self.assertEqual(os.getenv('SHOPIFY_LAYER2_RUN_PROCESS_DEATH'), '1')
+    def test_real_process_death_harness(self):
+        phases = (
+            'after_c1', 'after_c2', 'during_net', 'after_net', 'during_c3',
+        )
+        dbname = self.env.cr.dbname
+        durable = []
+        try:
+            for phase in phases:
+                with db_connect(dbname).cursor() as cr:
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    store = env['shopify.connector.store'].create({
+                        'name': 'Layer 2 death %s' % phase,
+                        'shop_domain': 'layer2-death-%s-%s.myshopify.com' % (
+                            phase, uuid.uuid4().hex,
+                        ),
+                        'api_version': '2026-07',
+                    })
+                    job = env['shopify.connector.job'].sudo().create({
+                        'store_id': store.id,
+                        'job_source': 'setup_readiness_check',
+                        'job_type': 'mutation_dispatch_selftest',
+                        'state': 'queued',
+                        'payload_hash': uuid.uuid4().hex,
+                    })
+                    durable.append((store.id, job.id))
+                    cr.commit()
+                ready = multiprocessing.Event()
+                process = multiprocessing.get_context('fork').Process(
+                    target=_layer2_death_worker,
+                    args=(dbname, job.id, phase, ready),
+                )
+                process.start()
+                self.assertTrue(ready.wait(30), phase)
+                if process.is_alive():
+                    process.terminate()
+                process.join(30)
+                self.assertFalse(process.is_alive(), phase)
+                with db_connect(dbname).cursor() as cr:
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    env['shopify.connector.stale.owner.sweep'].run_sweep()
+                    recovered = env['shopify.connector.job'].browse(job.id)
+                    if phase == 'after_c1':
+                        self.assertEqual(recovered.state, 'retry_waiting')
+                    else:
+                        self.assertEqual(recovered.state, 'running')
+                        self.assertTrue(env['shopify.connector.job'].search([
+                            ('mutation_attempt_id', '!=', False),
+                            ('store_id', '=', store.id),
+                        ], limit=1))
+                    cr.commit()
+        finally:
+            with db_connect(dbname).cursor() as cr:
+                job_ids = [job_id for _store_id, job_id in durable]
+                store_ids = [store_id for store_id, _job_id in durable]
+                if job_ids:
+                    cr.execute(
+                        'DELETE FROM shopify_connector_job_log '
+                        'WHERE job_id = ANY(%s)',
+                        (job_ids,),
+                    )
+                    cr.execute(
+                        'DELETE FROM shopify_connector_job '
+                        'WHERE mutation_attempt_id IN ('
+                        'SELECT id FROM shopify_connector_mutation_attempt '
+                        'WHERE job_id = ANY(%s))',
+                        (job_ids,),
+                    )
+                    cr.execute(
+                        'DELETE FROM shopify_connector_mutation_attempt '
+                        'WHERE job_id = ANY(%s)',
+                        (job_ids,),
+                    )
+                    cr.execute(
+                        'DELETE FROM shopify_connector_job WHERE id = ANY(%s)',
+                        (job_ids,),
+                    )
+                    cr.execute(
+                        'DELETE FROM shopify_connector_store WHERE id = ANY(%s)',
+                        (store_ids,),
+                    )
+                    cr.commit()
