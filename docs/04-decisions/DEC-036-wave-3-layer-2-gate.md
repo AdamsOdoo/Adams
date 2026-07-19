@@ -217,7 +217,7 @@ M splits into D9/D16).
 
 | # | Title | Status | Source items |
 |---|---|---|---|
-| D1 | Job-row durability fields (`current_attempt_token` naming) | Candidate, corrected naming | 1, 18 |
+| D1 | Job-row durability fields — exactly three (`current_attempt_token`, `owner_worker_ref`, `running_since`) | **RESOLVED** — corrected 2026-07-19, `transport_attempted` removed from the job-field list per PR #177 comment 5014806430 item 5 | 1, 18 |
 | D2 | `mutation.attempt` core schema | **RESOLVED** — `job_id` Many2one-restrict, `mutation_domain` Char, two fingerprints, `observed_outcome`/`resolution_*` fields, per consolidated ruling §5/§8 | 2 |
 | D3 | `store_id` denormalization + multi-company scope | Candidate, one sub-gap open | 3 |
 | D4 | Attempt granularity = exactly one business pair per request; batching excluded from MVP | **RESOLVED** | K, L, 33 |
@@ -231,7 +231,7 @@ M splits into D9/D16).
 | D12 | CAS field-name correction | **RESOLVED** (source conflict), applying it is a Candidate correction | cross-cutting |
 | D13 | Job-layer reconciliation-pending gate | Candidate | F, 23 |
 | D14 | Reconciliation-job linkage (`mutation_attempt_id` Many2one-restrict, required) | **RESOLVED** — corrected per consolidated ruling §5/§8 | 10, E |
-| D15 | Reconciliation-strategy registry | Candidate, owning-model gap open (non-blocking — resolved by direct inspection at implementation time) | 11, O |
+| D15 | Reconciliation-strategy registry | **RESOLVED** — owning model bound to `shopify_connector_job_dispatch.py`, corrected 2026-07-19 per PR #177 comment 5014806430 item 3 | 11, O |
 | D16 | Domain-registration fail-closed runtime gate + mutation-wrapper/API-client enforcement | **RESOLVED** — extended per consolidated ruling §14 | 12 |
 | D17 | Inconclusive-reconciliation cap (N=3), per-attempt scope | **RESOLVED — not blocking** — per-uncertain-attempt scope is sufficient, per consolidated ruling §7 | 24 |
 | D18 | Store-identity + connection-generation snapshot and mismatch routing | **RESOLVED** — corrected per consolidated ruling §10 | 22, G |
@@ -277,23 +277,30 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
 - **Inference:** A durable, crash-surviving ownership signal requires new
   fields distinct from `started_at` (which must keep its existing,
   different meaning).
-- **Recommendation:** add three core additive fields to
-  `shopify.connector.job` (plus D13's/D14's own separate gating/linkage
-  fields).
-- **Accepted-candidate wording:** add `current_attempt_token` (Char,
-  UUIDv4, regenerated per attempt — the CAS/finalize token; **corrected
-  naming, 2026-07-19, per the consolidated ruling §5/§8** — previously
-  drafted as `attempt_id`, renamed to avoid colliding with
-  `mutation.attempt`'s own per-row `attempt_token` field and to read
-  correctly as "the token of the attempt this job currently owns"),
+- **Recommendation:** add exactly three core additive fields to
+  `shopify.connector.job`. `reconciliation_pending_until` (D13) and
+  `mutation_attempt_id` (D14) are separate, D13/D14-owned job-row fields,
+  not counted in D1's three.
+- **Accepted-candidate wording — RESOLVED (corrected 2026-07-19, per PR #177
+  comment 5014806430 item 5, closing an internal inconsistency in this
+  entry's own prior wording, which listed a fourth field and then
+  contradicted itself about whether it existed):** D1 adds **exactly three**
+  job-owned durability fields to `shopify.connector.job`:
+  `current_attempt_token` (Char, UUIDv4, regenerated per attempt — the
+  CAS/finalize token; **corrected naming, 2026-07-19, per the consolidated
+  ruling §5/§8** — previously drafted as `attempt_id`, renamed to avoid
+  colliding with `mutation.attempt`'s own per-row `attempt_token` field and
+  to read correctly as "the token of the attempt this job currently owns"),
   `owner_worker_ref` (Char, diagnostic, mirrors `call.lease.worker_ref`
-  vocabulary), `transport_attempted` (Boolean, default False, committed
-  before any network send — **this field lives on the attempt row only,
-  per D2; it is not duplicated here**, correcting this entry's own earlier
-  drafting, which listed it on both), and `running_since` (Datetime, set
-  once per claim at C1, **never aliased to `started_at`**). All fields join
-  `PROTECTED_JOB_FIELDS`, writable only via `env.su`. `mutation_attempt_id`
-  (D14) is a fifth, reconciliation-job-side field, listed separately there.
+  vocabulary), and `running_since` (Datetime, set once per claim at C1,
+  **never aliased to `started_at`**). All three join `PROTECTED_JOB_FIELDS`,
+  writable only via `env.su`. **`transport_attempted` is not a job field.**
+  It exists only on `shopify.connector.mutation.attempt` (D2) and must never
+  be duplicated onto the job row or added to job's `PROTECTED_JOB_FIELDS`.
+  `reconciliation_pending_until` (D13) and `mutation_attempt_id` (D14,
+  `Many2one`-restrict, required for reconciliation jobs) are separate
+  job-row fields, each governed by its own decision entry — neither is part
+  of D1's three-field count.
 - **Alternatives considered:** reuse `started_at` as the staleness clock
   (rejected — proven not-reset-on-retry, already load-bearing for the
   24h retry-window clock; aliasing would make every retried job appear
@@ -1076,12 +1083,13 @@ ruling §5/§8, which overrides this entry's original non-FK design)*
 - **Exact tests:** completeness test (every `mutation_domain` has both a
   replay-policy and reconciliation-strategy entry); fail-closed runtime
   test (undeclared domain returns nothing, never a default-safe value).
-- **Unresolved question:** **which model hosts this method** —
-  `shopify.connector.job.dispatch` by analogy with `_get_replay_policies()`,
-  or a new dedicated model — is never stated in the original design
-  document itself (a genuine gap in the *original* design, not introduced
-  by this review) and must be settled by the control room before Stage 0
-  implementation.
+- **Unresolved question: None — RESOLVED 2026-07-19** (per PR #177 comment
+  5014806430 item 3). Which model hosts `_get_reconciliation_strategies()`
+  was left open by the original design document (a genuine gap in the
+  *original* design, not introduced by this review); the control room has
+  now bound this bindingly to `shopify_connector_job_dispatch.py`, by
+  analogy with `_get_replay_policies()`'s existing home. No new dedicated
+  model file is authorized for this purpose.
 
 ### D16 — Domain-registration fail-closed runtime gate + mutation-wrapper/
 API-client enforcement
@@ -2310,10 +2318,17 @@ first proving that capability exists.)*
   - **Layer 4 — exact-head Odoo.sh multi-worker validation:** residue,
     lock, session, credential, and redaction proof on the target
     hosting environment, at exact committed head, proving Worker B cannot
-    execute a handler Worker A durably owns and that sweep-driven
-    reconciliation is observed on a real killed worker — this layer
-    supplies multi-worker/environment evidence Layer 3's standalone
-    harness cannot, and does not itself need to be the source of the
+    execute a handler Worker A durably owns. **Corrected 2026-07-19 (PR #177
+    comment 5014806430 item 4):** Odoo.sh is not required to expose
+    `SIGKILL`/worker-process control — Layer 4 does not need "a real killed
+    worker" as a hard requirement; where that platform capability is
+    actually available, Layer 4 observes sweep-driven reconciliation
+    following a real killed worker directly, and where it is not, Layer 4
+    instead cross-references Layer 3's accepted crash-injection evidence and
+    independently validates the restart/recovery behaviour actually
+    available on-platform. This layer supplies multi-worker/environment
+    evidence Layer 3's standalone harness cannot, and does not itself need
+    to be the source of the
     OS-process-crash evidence.
   All four layers are required; none is substitutable by simulation; **no
   layer may substitute for another** — Layer 4 does not need to reproduce

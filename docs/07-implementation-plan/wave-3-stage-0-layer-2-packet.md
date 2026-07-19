@@ -70,9 +70,15 @@ across four distinct proof-environment layers (§22).
   `_recover_after_concurrency_conflict` claimability branch (D25); the
   `ShopifyQuiescedError` handling branch (D28/D29); the
   `_get_reconciliation_strategies()` registry seam (D15) and its runtime
-  fail-closed gate (D16) — owning-model choice (this file vs. a new
-  dedicated model) determined by direct inspection at implementation time,
-  non-blocking (DEC-036 §5 Category III).
+  fail-closed gate (D16) — **owning model bindingly this file** (D15,
+  RESOLVED 2026-07-19, corrected per PR #177 comment 5014806430 item 3): no
+  new dedicated registry model file is authorized for Stage 0.
+- `addons/shopify_connector_core/models/shopify_connector_job_actions.py`
+  — narrow scope only (DEC-036 D11): the `duplicate_risk`-refusal guard
+  added to both pre-existing generic actions
+  (`action_resolve_manual_review`, `action_manual_retry`) so neither can be
+  used to bypass the Administrator-only `action_resolve_mutation_attempt`
+  override.
 - `addons/shopify_connector_core/models/shopify_connector_api_client.py` —
   **new to the allowed list, 2026-07-19** (DEC-036 D16 extension): the
   runtime fail-closed guard — a GraphQL document containing a `mutation`
@@ -111,27 +117,18 @@ Everything outside §3. Specifically: `shopify_connector_product/**`,
 `shopify_connector_sale/**`, `adams_base/**`; any file under a future
 `shopify_connector_inventory/**` (does not yet exist and must not be
 created by this packet); `shopify_connector_store_settings.py`,
-`shopify_connector_binding_mixin.py`, `shopify_connector_job_actions.py`,
-`shopify_connector_call_lease.py`, `shopify_connector_job_enqueue.py`
-(read and cited extensively by this session's audit; **not modified** by
-Stage 0 — D29's credential-snapshot field lives on the new attempt model,
-not on these files; D11's overlap-closing guard on the two pre-existing
-actions is `shopify_connector_job_actions.py`'s own scope and is
-implemented in the same Stage 0 wave under §3's job-actions surface —
-**correction, 2026-07-19**: `shopify_connector_job_actions.py` is required
-for D11's refusal-guard extension and is therefore also an allowed file,
-narrowly scoped to that one guard addition); any Layer 1
+`shopify_connector_binding_mixin.py`, `shopify_connector_call_lease.py`,
+`shopify_connector_job_enqueue.py` (read and cited extensively by this
+session's audit; **not modified** by Stage 0 — D29's credential-snapshot
+field lives on the new attempt model, not on these files); any Layer 1
 replay-policy-registry *behavior* change (only new domain declarations, via
 the existing extension seam, are ever in-scope for a *future* domain,
 never Stage 0 itself since Stage 0 registers no domain); CI/workflow
 files; protected references.
 
-**Corrected §3 addendum:** `shopify_connector_job_actions.py` (narrow
-scope: the `duplicate_risk`-refusal guard on `action_resolve_manual_review`
-and `action_manual_retry`, DEC-036 D11) is added to §3's allowed-file list,
-not left forbidden as originally drafted — this correction resolves the
-contradiction between D11's requirement (extend both pre-existing actions)
-and this section's original blanket exclusion of that file.
+`shopify_connector_job_actions.py` is **not** forbidden — it is a normal
+§3 allowed entry, narrowly scoped to D11's `duplicate_risk`-refusal guard
+addition only.
 
 ## 5. `shopify.connector.mutation.attempt` — exact schema
 
@@ -265,8 +262,9 @@ fail-closed accessor returning nothing for an undeclared domain; a runtime
 gate before every C2 commit that refuses to commit/transport if the
 registry returns no entry (routes to
 `blocked_manual_review`/`no_reconciliation_strategy` instead). **Owning
-model:** determined by direct inspection at implementation time — **not
-blocking** (DEC-036 §5 Category III, resolved 2026-07-19).
+model — RESOLVED, bindingly `shopify_connector_job_dispatch.py`** (D15,
+corrected 2026-07-19 per PR #177 comment 5014806430 item 3): no new
+dedicated registry model file is authorized.
 
 ## 9. Attempt-wrapper interface
 
@@ -471,9 +469,16 @@ implementation session); no Odoo/Odoo.sh run; no Shopify request/mutation.
 - Every §17 item resolved on the record — Category I proof complete,
   Category II constants ratified, Category III verified — none silently
   skipped.
-- Static tests (§19), unit tests (§20), genuine PostgreSQL concurrency
-  tests (§21), and genuine OS-process crash-injection tests (§22) all
-  green on a real Odoo.sh multi-worker environment.
+- Static tests (§19) and unit tests (§20) green in their normal CI/local
+  test environment (Layer 1). Genuine PostgreSQL concurrency tests (§21)
+  green under real independent PostgreSQL connections (Layer 2). Genuine
+  OS-process crash-injection tests (§22) green in whichever environment —
+  inside or outside Odoo.sh — actually provides real process-control
+  capability (Layer 3). Exact-head Odoo.sh multi-worker validation (§23)
+  green on Odoo.sh itself (Layer 4). **Corrected 2026-07-19 (PR #177
+  comment 5014806430 item 4): no single statement requires all four layers
+  to run inside Odoo.sh, and Odoo.sh is not required to host the Layer 3
+  crash-injection harness.**
 - Residue/leak audit (§23) clean.
 - Validation record (`docs/05-qa/task-stage0-layer2-validation-results.md`)
   complete and control-room reviewed.
@@ -588,8 +593,14 @@ Per DEC-036 D38 (RESOLVED, four layers, not three, 2026-07-19):
 4. **Layer 4 — exact-head Odoo.sh multi-worker validation:** residue,
    lock, session, credential, and redaction proof at exact committed head
    (§23). Multi-worker proof: Worker B cannot execute a handler Worker A
-   durably owns; sweep-driven reconciliation observed on a real killed
-   worker, not simulated.
+   durably owns. **Corrected 2026-07-19 (PR #177 comment 5014806430 item
+   4):** Odoo.sh is not required to expose `SIGKILL`/worker-process
+   control. Where that platform capability is actually available, Layer 4
+   observes sweep-driven reconciliation following a real killed worker
+   directly; where it is not, Layer 4 instead cross-references Layer 3's
+   accepted crash-injection evidence and independently validates the
+   restart/recovery behaviour actually available on-platform — never
+   simulated either way.
 
 **No layer substitutes for another** — Layer 4 does not need to reproduce
 Layer 3's crash-injection technique internally, and Layer 3 does not need
@@ -603,9 +614,14 @@ stop, do not substitute simulation, escalate per Wave-3-DoR hard-stop
 Fresh install + focused-class + full regression + residue audit, per the
 Wave 1/Wave 2 standard. Multi-worker proof specifically required: Worker B
 must not be able to execute a handler Worker A durably owns (C1's
-`current_attempt_token` durability is the property under test);
-sweep-driven reconciliation observed on a real killed worker, not
-simulated.
+`current_attempt_token` durability is the property under test). Where
+Odoo.sh's own process-control capability supports it, sweep-driven
+reconciliation is observed following a real killed worker directly;
+otherwise this plan cross-references Layer 3's accepted crash-injection
+evidence (§22) and independently validates the restart/recovery behaviour
+actually available on-platform — Odoo.sh is not required to expose
+`SIGKILL`/worker-process control, and this plan never substitutes
+simulation for whichever of the two routes above applies.
 
 ## 24. Residue/leak audit
 

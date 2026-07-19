@@ -171,9 +171,9 @@ IMPLEMENTATION SEQUENCE
    isolation fact.
 6. Reconciliation-strategy registry (_get_reconciliation_strategies(),
    packet §8) + its runtime fail-closed gate + its combined
-   completeness test with _get_replay_policies(). Owning-model choice
-   (job_dispatch.py vs. a new dedicated model) determined by direct
-   inspection — disclose the choice.
+   completeness test with _get_replay_policies(). Owning model is
+   bindingly job_dispatch.py (DEC-036 D15, resolved 2026-07-19) — no new
+   dedicated registry model file is authorized.
 7. Widened _recover_after_concurrency_conflict claimability branch
    (DEC-036 D25) — additive only, existing exclusion behavior for
    non-matching running rows must remain unchanged.
@@ -247,10 +247,15 @@ RUNTIME REQUIREMENTS
 Odoo.sh fresh install + focused-class + full regression + residue audit,
 Wave 1/Wave 2 standard (Layer 4 of the four-layer proof plan). Multi-worker
 proof specifically required: Worker B must not execute a handler Worker A
-durably owns; sweep-driven reconciliation observed on a real killed worker.
-Zero Shopify mutation at any point in this wave's runtime evidence — this
-wave's proof is entirely about the substrate's own crash-safety, not about
-any real mutation outcome (there is no mutation domain registered yet).
+durably owns. Odoo.sh is not required to expose SIGKILL/worker-process
+control: where that platform capability is actually available, observe
+sweep-driven reconciliation following a real killed worker directly;
+otherwise cross-reference Layer 3's accepted crash-injection evidence and
+independently validate the restart/recovery behavior actually available
+on-platform — never simulated either way. Zero Shopify mutation at any
+point in this wave's runtime evidence — this wave's proof is entirely
+about the substrate's own crash-safety, not about any real mutation
+outcome (there is no mutation domain registered yet).
 
 ======================================================================
 ROLLBACK NOTES
@@ -268,12 +273,16 @@ DEFINITION OF DONE
 Stage 0 packet §18, verbatim: every DEC-036 decision implemented exactly
 as specified in the accepted package; every packet §17 item resolved on
 the record before the corresponding code path was written (not after);
-static/unit/genuine-concurrency/genuine-crash-injection tests all green on
-real Odoo.sh multi-worker infrastructure across all four proof layers;
-residue/leak audit clean; validation record complete; program-state/
-acceptance-matrix/handoff updated; zero inventory-domain code anywhere in
-the repository; zero Shopify mutation ever issued during this wave's
-development or testing.
+static and unit tests green in the normal CI/local environment (Layer 1);
+genuine PostgreSQL concurrency tests green under real independent
+connections (Layer 2); genuine OS-process crash-injection tests green in
+whichever environment actually provides real process-control capability,
+inside or outside Odoo.sh (Layer 3); exact-head Odoo.sh multi-worker
+validation green on Odoo.sh itself (Layer 4) — no single statement
+requires all four layers to run inside Odoo.sh; residue/leak audit clean;
+validation record complete; program-state/acceptance-matrix/handoff
+updated; zero inventory-domain code anywhere in the repository; zero
+Shopify mutation ever issued during this wave's development or testing.
 
 ======================================================================
 STOP CONDITIONS (hard stops — consolidate and report, do not proceed

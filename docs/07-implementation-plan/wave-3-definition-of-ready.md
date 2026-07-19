@@ -128,10 +128,14 @@ Task 013 §6 and Task 013B criteria in full, plus:
    `InventoryLevel.quantities` read) before any retry, sweep cron
    recovering every crash-window state in the L2-D13 matrix — with
    genuine (not simulated) runtime and concurrency evidence.
-2. **CAS flow** — every push is read→compare→set with per-entry
-   `compareQuantity`; CAS mismatch → re-read, re-derive, bounded retries
-   (proposed 3); persistent divergence → review case; `ignoreCompareQuantity`
-   never used.
+2. **CAS flow** — every push is read→compare→set: read the current Shopify
+   quantity, send `changeFromQuantity` with the value just read, then send
+   the target quantity; a `CHANGE_FROM_QUANTITY_STALE` response → re-read,
+   re-derive, bounded retries (proposed 3); persistent divergence → review
+   case. `compareQuantity`/`ignoreCompareQuantity` do not exist as current
+   (2026-04+) input fields and must never be used — those names may appear
+   elsewhere in this document only as historical explanation of what was
+   removed, never as a current field.
 3. **Coalescing** — last-value-wins pending target per (item, location)
    pair; queue depth bounded by pair count under backlog;
    `operation_scope_key` prevents concurrent same-pair jobs.
@@ -209,9 +213,9 @@ callables registered from the start; control-room wave review; state file
 
 | Gate decision | Source | Acceptance authority |
 | --- | --- | --- |
-| **DEC-031 Layer 2 design Accepted** (L2-D1..D13) | [`dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md) | Product owner + control room |
+| **DEC-031 Layer 2 design Accepted** — the complete [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) D1–D38 decision set, pending final control-room acceptance | [`dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md) | Product owner + control room |
 | **Layer 2 implemented + runtime-proven** (Stage 0 complete, evidence accepted) before any Stage 1/2 mutation | this DoR §4 | Control room (evidence gate) |
-| Inventory-operating-model PDs 1–12 (free_qty+context source, mapping constraints, coalescing last-value-wins, CAS flow, per-attempt UUID, read/verify-only reverse direction, Layer-2 attempt contract, clamp+warn, preview-first manual, batching, reconnect read-first) | inventory-operating-model §12 | Product owner + control room |
+| Inventory-operating-model PDs 1–12 (free_qty+context source, mapping constraints, coalescing last-value-wins, CAS flow, per-attempt UUID, read/verify-only reverse direction, Layer-2 attempt contract, clamp+warn, preview-first manual, one pair per mutation request for MVP — multi-entry batching excluded, a future separately-gated optimization, reconnect read-first) | inventory-operating-model §12 | Product owner + control room |
 | Location-mapping model (D-013-1 manual-only mapping, dual uniqueness, ancestor-overlap constraint, third sanctioned sudo for cache upsert) | Task 013 D-013-1/5 | Control room (sudo elevation explicitly) |
 | **Task 013 packet re-accepted with its 2026-07-16 addendum**; §8 prompt gate act separate | packet + addendum | Control room gate act |
 | **Task 013B packet re-accepted** (confirmed consistent with the operating model; no addendum required unless contradiction found) | 013B packet | Control room gate act |
