@@ -22,6 +22,38 @@ DUMMY_TOKEN_2 = 'shpat_DUMMYDUMMYDUMMY1111111111111111'
 CREDENTIAL_VALUE_ERROR_MESSAGE = 'A non-empty credential value is required.'
 
 
+def _sudo_sites_for_tree(filename, tree):
+    parents = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+    raw = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'sudo'
+        ):
+            continue
+        owner = parents.get(node)
+        while owner and not isinstance(owner, ast.FunctionDef):
+            owner = parents.get(owner)
+        raw.append((
+            owner.name if owner else False,
+            ast.unparse(node.func.value),
+            node.lineno,
+        ))
+    counters = {}
+    sites = []
+    for method, receiver, _line in sorted(
+        raw, key=lambda site: (site[0], site[2])
+    ):
+        key = (filename, method, receiver)
+        counters[key] = counters.get(key, 0) + 1
+        sites.append(key + (counters[key],))
+    return sites
+
+
 class TestCredentialService(TransactionCase):
 
     @classmethod
@@ -267,7 +299,7 @@ class TestCredentialService(TransactionCase):
         credential = self.search_credential()
         self.assertEqual(credential.access_token, DUMMY_TOKEN_1)
 
-    def test_action_clear_token_on_reconnect_needed_store_requests_two_phase_disconnect(self):
+    def test_clear_token_requests_disconnect_when_reconnect_needed(self):
         Credential = self._credential_as_admin()
         Credential.action_set_token(self.store, DUMMY_TOKEN_1)
         self.store.write({'state': 'reconnect_needed'})
@@ -435,9 +467,7 @@ class TestCredentialService(TransactionCase):
             credential_as_operator.action_clear_token(self.store)
 
     def test_source_level_sanctioned_sudo_sites_guard(self):
-        # SEC-1 keeps the source-level sudo inventory exhaustive. Each call
-        # below is a named protected writer/read seam; any unreviewed addition
-        # changes the exact list and fails this guard.
+        # SEC-1 keeps the inventory method-, receiver-, and purpose-qualified.
         models_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'models',
@@ -449,50 +479,185 @@ class TestCredentialService(TransactionCase):
             path = os.path.join(models_dir, filename)
             with open(path, 'r', encoding='utf-8') as source_file:
                 tree = ast.parse(source_file.read(), filename=filename)
-            for node in ast.walk(tree):
-                if (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == 'sudo'
-                ):
-                    sudo_call_sites.append(filename)
-        self.assertEqual(
-            sorted(sudo_call_sites),
-            [
-                'shopify_connector_binding_mixin.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job_actions.py',
-                'shopify_connector_job_actions.py',
-                'shopify_connector_job_dispatch.py',
-                'shopify_connector_job_dispatch.py',
-                'shopify_connector_job_enqueue.py',
-                'shopify_connector_job_log.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_readiness_check.py',
-                'shopify_connector_readiness_check.py',
-                'shopify_connector_readiness_check.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store_credential.py',
-            ],
+            sudo_call_sites.extend(_sudo_sites_for_tree(filename, tree))
+        expected = [
+            ('shopify_connector_binding_mixin.py',
+             'action_override_binding', 'self', 1),
+            ('shopify_connector_job.py', '_has_mutation_attempt_evidence',
+             "self.env['shopify.connector.mutation.attempt']", 1),
+            ('shopify_connector_job.py', '_reassign_to_historic_job_type',
+             'job', 1),
+            ('shopify_connector_job.py', '_reassign_to_historic_job_type',
+             'job', 2),
+            ('shopify_connector_job.py', '_transition_blocked_manual_review',
+             'self', 1),
+            ('shopify_connector_job.py', '_transition_failed_final', 'self', 1),
+            ('shopify_connector_job.py', '_transition_failed_retryable',
+             'self', 1),
+            ('shopify_connector_job.py', '_transition_retry_waiting',
+             'self', 1),
+            ('shopify_connector_job.py', '_transition_skipped', 'self', 1),
+            ('shopify_connector_job.py', 'action_resolve_manual_review',
+             'self', 1),
+            ('shopify_connector_job_actions.py', 'action_cancel', 'self', 1),
+            ('shopify_connector_job_actions.py', 'action_manual_retry',
+             'self', 1),
+            ('shopify_connector_job_dispatch.py',
+             '_apply_validated_consequence', 'job', 1),
+            ('shopify_connector_job_dispatch.py', '_block_original_job',
+             'job', 1),
+            ('shopify_connector_job_dispatch.py',
+             '_complete_reconciliation_job', 'job', 1),
+            ('shopify_connector_job_dispatch.py', '_drain_mutation_one',
+             'job', 1),
+            ('shopify_connector_job_dispatch.py',
+             '_ensure_reconciliation_job', 'Job', 1),
+            ('shopify_connector_job_dispatch.py', '_invoke_handler', 'job', 1),
+            ('shopify_connector_job_dispatch.py',
+             '_recover_after_concurrency_conflict', 'locked', 1),
+            ('shopify_connector_job_dispatch.py',
+             '_recover_committed_attempt_to_reconciliation', 'job', 1),
+            ('shopify_connector_job_dispatch.py', '_recover_layer2_owner',
+             'job', 1),
+            ('shopify_connector_job_dispatch.py', '_recover_pre_c2_failure',
+             'job', 1),
+            ('shopify_connector_job_dispatch.py', '_start_running', 'job', 1),
+            ('shopify_connector_job_enqueue.py', 'enqueue',
+             "self.env['shopify.connector.job']", 1),
+            ('shopify_connector_job_log.py', '_system_append', 'self', 1),
+            ('shopify_connector_mutation_attempt.py', '_surface', 'self', 1),
+            ('shopify_connector_mutation_attempt.py',
+             'action_resolve_mutation_attempt', 'job', 1),
+            ('shopify_connector_pii_retention.py',
+             '_attempt_evidence_retention_days',
+             "self.env['ir.config_parameter']", 1),
+            ('shopify_connector_pii_retention.py',
+             'action_mask_customer_pii', 'binding', 1),
+            ('shopify_connector_pii_retention.py',
+             'action_mask_customer_pii', 'binding', 2),
+            ('shopify_connector_pii_retention.py', 'run_sweep',
+             "self.env['shopify.connector.store.settings']", 1),
+            ('shopify_connector_pii_retention.py', 'run_sweep', 'Binding', 1),
+            ('shopify_connector_pii_retention.py', 'run_sweep', 'JobLog', 1),
+            ('shopify_connector_readiness_check.py',
+             '_drain_cron_active_state', 'cron', 1),
+            ('shopify_connector_readiness_check.py', 'run_for_store', 'Job', 1),
+            ('shopify_connector_readiness_check.py', 'run_for_store', 'job', 1),
+            ('shopify_connector_stale_owner_sweep.py',
+             '_positive_int_parameter', "self.env['ir.config_parameter']", 1),
+            ('shopify_connector_stale_owner_sweep.py', 'run_sweep', 'job', 1),
+            ('shopify_connector_store.py', '_apply_probe_failure', 'job', 1),
+            ('shopify_connector_store.py', '_audit_probe_superseded', 'job', 1),
+            ('shopify_connector_store.py', '_create_lifecycle_audit_job',
+             'Job', 1),
+            ('shopify_connector_store.py', '_create_lifecycle_audit_job',
+             'job', 1),
+            ('shopify_connector_store.py', '_run_connection_probe', 'Job', 1),
+            ('shopify_connector_store.py', '_run_connection_probe', 'job', 1),
+            ('shopify_connector_store.py', '_run_connection_probe', 'job', 2),
+            ('shopify_connector_store.py',
+             '_sweep_quiescing_business_jobs', 'job', 1),
+            ('shopify_connector_store.py', 'action_force_disconnect', 'job', 1),
+            ('shopify_connector_store_credential.py', '_get_access_token',
+             'self', 1),
+        ]
+        purpose_by_owner = {
+            ('shopify_connector_binding_mixin.py',
+             'action_override_binding'): 'Audited binding override.',
+            ('shopify_connector_job.py',
+             '_has_mutation_attempt_evidence'): 'Protected evidence read.',
+            ('shopify_connector_job.py',
+             '_reassign_to_historic_job_type'): 'Historic conversion.',
+            ('shopify_connector_job.py',
+             '_transition_blocked_manual_review'): 'Protected transition.',
+            ('shopify_connector_job.py',
+             '_transition_failed_final'): 'Protected transition.',
+            ('shopify_connector_job.py',
+             '_transition_failed_retryable'): 'Protected transition.',
+            ('shopify_connector_job.py',
+             '_transition_retry_waiting'): 'Protected transition.',
+            ('shopify_connector_job.py',
+             '_transition_skipped'): 'Protected transition.',
+            ('shopify_connector_job.py',
+             'action_resolve_manual_review'): 'Manual review resolution.',
+            ('shopify_connector_job_actions.py',
+             'action_cancel'): 'Audited cancellation.',
+            ('shopify_connector_job_actions.py',
+             'action_manual_retry'): 'Audited manual retry.',
+            ('shopify_connector_job_dispatch.py',
+             '_apply_validated_consequence'): 'Layer 2 consequence write.',
+            ('shopify_connector_job_dispatch.py',
+             '_block_original_job'): 'Fail-closed original-job write.',
+            ('shopify_connector_job_dispatch.py',
+             '_complete_reconciliation_job'): 'Read-job completion.',
+            ('shopify_connector_job_dispatch.py',
+             '_drain_mutation_one'): 'C1 ownership write.',
+            ('shopify_connector_job_dispatch.py',
+             '_ensure_reconciliation_job'): 'Reconciliation job creation.',
+            ('shopify_connector_job_dispatch.py',
+             '_invoke_handler'): 'Handler failure transition.',
+            ('shopify_connector_job_dispatch.py',
+             '_recover_after_concurrency_conflict'): 'Conflict recovery.',
+            ('shopify_connector_job_dispatch.py',
+             '_recover_committed_attempt_to_reconciliation'):
+                'Post-C2 ownership cleanup.',
+            ('shopify_connector_job_dispatch.py',
+             '_recover_layer2_owner'): 'Layer 2 owner recovery.',
+            ('shopify_connector_job_dispatch.py',
+             '_recover_pre_c2_failure'): 'Pre-C2 owner recovery.',
+            ('shopify_connector_job_dispatch.py',
+             '_start_running'): 'Claim transition.',
+            ('shopify_connector_job_enqueue.py',
+             'enqueue'): 'Protected job creation.',
+            ('shopify_connector_job_log.py',
+             '_system_append'): 'System audit-log append.',
+            ('shopify_connector_mutation_attempt.py',
+             '_surface'): 'Closed attempt write surface.',
+            ('shopify_connector_mutation_attempt.py',
+             'action_resolve_mutation_attempt'): 'Resolved job consequence.',
+            ('shopify_connector_pii_retention.py',
+             '_attempt_evidence_retention_days'): 'Retention configuration.',
+            ('shopify_connector_pii_retention.py',
+             'action_mask_customer_pii'): 'Audited binding masking.',
+            ('shopify_connector_pii_retention.py',
+             'run_sweep'): 'Retention sweep and audit.',
+            ('shopify_connector_readiness_check.py',
+             '_drain_cron_active_state'): 'Read cron configuration.',
+            ('shopify_connector_readiness_check.py',
+             'run_for_store'): 'Readiness audit job lifecycle.',
+            ('shopify_connector_stale_owner_sweep.py',
+             '_positive_int_parameter'): 'Read sweep configuration.',
+            ('shopify_connector_stale_owner_sweep.py',
+             'run_sweep'): 'Stale-owner cleanup.',
+            ('shopify_connector_store.py',
+             '_apply_probe_failure'): 'Probe failure transition.',
+            ('shopify_connector_store.py',
+             '_audit_probe_superseded'): 'Probe supersession audit.',
+            ('shopify_connector_store.py',
+             '_create_lifecycle_audit_job'): 'Lifecycle audit carrier.',
+            ('shopify_connector_store.py',
+             '_run_connection_probe'): 'Probe audit job lifecycle.',
+            ('shopify_connector_store.py',
+             '_sweep_quiescing_business_jobs'): 'Disconnect job sweep.',
+            ('shopify_connector_store.py',
+             'action_force_disconnect'): 'Forced-disconnect audit.',
+            ('shopify_connector_store_credential.py',
+             '_get_access_token'): 'Single-store credential read.',
+        }
+        self.assertTrue(all(
+            purpose_by_owner[(site[0], site[1])] for site in expected
+        ))
+        self.assertEqual(sorted(sudo_call_sites), sorted(expected))
+
+    def test_sudo_inventory_detector_exposes_method_and_target(self):
+        tree = ast.parse(
+            "class Unsafe:\n"
+            "    def bad(self):\n"
+            "        return self.env['another.model'].sudo().search([])\n"
         )
+        self.assertEqual(_sudo_sites_for_tree('unsafe.py', tree), [
+            ('unsafe.py', 'bad', "self.env['another.model']", 1),
+        ])
 
     def test_all_service_methods_decorated_with_api_model(self):
         # AST-based, matching the sudo guard's approach: proves the
