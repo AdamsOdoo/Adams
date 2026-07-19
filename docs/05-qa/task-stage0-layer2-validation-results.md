@@ -1,158 +1,176 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Validation Results
 
-- **Status:** IMPLEMENTATION COMPLETE — WAITING FOR GATE B MERGE SYNC
-- **Original base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
-- **Branch:** `sol/wave-3-stage-0-layer2`
-- **Draft PR:** #178
-- **Runtime candidate:** NOT FROZEN
-- **Gate B synchronization:** WAITING — PR #179 is proposed/draft, not accepted or merged
-- **Real Shopify mutations issued:** ZERO
+- **Status:** STATICALLY CORRECTED AND SYNCHRONIZED — RUNTIME PENDING
+- **Original Stage 0 base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
+- **Pre-synchronization head:** `644853a68b3497c134ee648ce7399e50d30ff397`
+- **Accepted Gate B integration:** `8e2e707ff7025a7a2e9e0207a8886399a24b889c`
+- **Synchronization merge:** `61b1812a75add912103a13b9c2619afe162ac785`
+- **Branch / draft PR:** `sol/wave-3-stage-0-layer2` / #178
+- **Frozen candidate:** the commit containing this record; its exact SHA is
+  recorded in the final PR body and control-room report because a Git commit
+  cannot embed its own SHA.
+- **Real Shopify mutations or credential-backed requests issued:** ZERO
 
-## 1. Identity gate
+## 1. Identity and synchronization
 
-Verified before branch creation on 2026-07-19 and rechecked before this
-checkpoint:
+The pre-edit identity gate verified PR #178 open, draft, unmerged, at the exact
+pre-sync head and 23-path scope. PR #179 was closed and merged at the accepted
+Gate B integration SHA. Binding comments `5016117207`, `5016274358`, and
+`5016306005` existed and were read in full.
 
-- PR #177 is merged at `3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`.
-- `mvp/program-integration` is identical to that SHA.
-- PR #177 comments `5015044226`, `5015174971`, and `5015231326`
-  exist and authorize the locked Stage 0 scope.
-- Protected refs remained at their authorized SHAs:
-  - `main@a5d45432a9b60f724c1aff700f4b371ea019960e`
-  - `Shopify-connector@dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`
-  - `checkpoint/core-r2-readonly-uat-2026-07-15@acd8c4691e72cf5590f2a56228b08f183b76cd9a`
-  - `checkpoint/wave-2-order-import-2026-07-18@22bfb9a0e9b1e48b6a664351e2b321d134177110`
-- The implementation remains on its own branch and draft PR.
-- No merge, protected-ref edit, Odoo.sh action, credential read, Shopify call,
-  or Shopify mutation was performed.
+The exact integration commit was merged with a normal two-parent merge commit.
+The branch was then zero commits behind `mvp/program-integration`. All 15
+accepted Gate B documents were byte-identical to the integration version after
+the merge. No conflict, rebase, force push, history rewrite, protected-ref
+change, or Gate B document edit occurred.
 
-## 2. Mandatory pre-edit audit result
+Protected refs remained:
 
-No contradiction with accepted DEC-036 was found. The existing Layer 1
-non-mutation path remains intact; Stage 0 adds a registry-gated Layer 2 path.
+- `main@a5d45432a9b60f724c1aff700f4b371ea019960e`
+- `Shopify-connector@dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`
+- `checkpoint/core-r2-readonly-uat-2026-07-15@acd8c4691e72cf5590f2a56228b08f183b76cd9a`
+- `checkpoint/wave-2-order-import-2026-07-18@22bfb9a0e9b1e48b6a664351e2b321d134177110`
 
-| Decision area | Implemented seam | Evidence |
-|---|---|---|
-| D1–D4 durable identity/schema | exact job ownership fields and new durable `shopify.connector.mutation.attempt` | constraints, uniqueness, immutable identity/outcome tests |
-| D5–D7 fingerprints/idempotency/evidence | canonical SHA-256, attempt-owned key with 23-hour boundary, allowlisted snapshots | fingerprint and boundary tests; terminal-evidence masking |
-| D8–D18 disposition/reconciliation | shared effective disposition, one linked reconciliation job, inconclusive cap of three | applied/not-applied/inconclusive/manual-resolution tests |
-| D19–D25 C1/C2/NET/C3 | durable C1 owner, independent committed C2 intent, transaction-free synthetic NET, token-checked C3 | dispatch, genuine-connection, concurrency, and process-death harnesses |
-| D26 stale-owner recovery | bounded 30-minute, batch-20 `FOR UPDATE SKIP LOCKED` sweep and five-minute cron | C1-only safe requeue, C2 reconciliation, concurrent-sweep tests |
-| D27–D29 disconnect/identity | unresolved evidence and reconciliation quiescence gates; reasoned Administrator force route | credential-preservation and force-disconnect tests |
-| D30–D32 security/retention | four read-only ACLs; six named service write surfaces; no unlink; independent 180-day pass | per-role denial, source guard, immutability, and retention tests |
-| D33–D38 lifecycle/registry/bypass/proof | additive registry, handler/replay lockstep, API-client fail-closed guard, synthetic-only domain | manifest/init/source-guard and zero-real-mutation checks |
+## 2. Post-sync pre-edit audit
 
-### Sanctioned attempt write surfaces
+The synchronized audit found the complete correction campaign was required:
+the old implementation allowed more than one attempt per job, let the create
+surface authorize writes, exposed a four-key strategy, normalized transport
+requests incorrectly, routed clean/not-applied outcomes to same-job retry,
+overwrote direct evidence, retained stale owners after C3, excluded resolved
+uncertainty from retention, caught `BaseException` in the Layer 2 wrapper, and
+did not preserve historic reconciliation links or block every generic action.
 
-The only named write surfaces are:
+The audit also covered dispatcher and replay registries, C1/C2/NET/C3 ordering,
+API admission, stale sweep, reconciliation, manual resolution, disconnect,
+retention, uninstall conversion, ACLs, cron loading, source guards, and all
+nine Stage 0 test modules. No contradiction among DEC-036, DEC-037, the binding
+ruling, and synchronized source required a hard stop.
 
-1. `_create_attempt_intent`
-2. `_record_direct_outcome`
-3. `_record_reconciliation_result`
-4. `_record_inconclusive_reconciliation`
-5. `action_resolve_mutation_attempt`
-6. `_mask_terminal_evidence`
+## 3. Binding A–N traceability
 
-All require the closed service context and superuser execution. Direct create,
-write, and every unlink are denied. Machine-observed outcomes and attempt
-identity are immutable.
+| Binding | Production method(s) | Exact test evidence | Runtime proof | Rollback / fail-closed behavior |
+|---|---|---|---|---|
+| A | attempt unique indexes; `_create_attempt_intent`; `_drain_mutation_one` | attempt/concurrency/dispatch: different tokens, concurrent insert, evidence redispatch | one durable row; no second C1/NET | pre-C2 bounded retry only; post-C2 blocks/reconciles |
+| B | `create`, `write`, `_check_resolution_consistency` | attempt: create-surface write refusal, all-surface identity immutability, tuple/timestamp | rejected ORM writes and constraints | invalid tuple/identity write rolls back |
+| C | seven-key registry; `_drain_mutation_one` | dispatch/source/recovery: exact keys/order and precondition death window | local → C1 → precondition → C2 → NET → C3 | pre-C2 Exception clears owner; BaseException leaves C1 |
+| D | `_validate_job_consequence`; `_apply_validated_consequence` | dispatch/reconciliation: vocabulary, no retry action, callback success/failure | atomic job/domain consequence | callback failure rolls back outcome, job, log, child |
+| E | `_validate_reconciliation_result`; reconciliation handler | reconciliation: applied/not-applied/inconclusive, malformed/missing, explicit read-job terminal | normalized verdict plus explicit read-job state | original job blocks; no resend; read retry only when inconclusive |
+| F | fixed registry; C3 identity check; reconciliation identity check | concurrency/reconciliation: generation, local identity, remote identity | `store_identity_mismatch` on original job | evidence retained, disposition withheld, no child |
+| G | API `_validate_graphql_operation`, `_admit_mutation`, `_send` | API/source: exact operation/variables, expiry/state/token/domain, no direct send | owned side transactions and exact SHA-256 | stale/mismatched request refused before HTTP |
+| H | direct/reconciliation evidence recorders; redaction | attempt/reconciliation/security | bounded `direct` plus ordered reconciliation entries | direct evidence never overwritten; unsafe text redacted |
+| I | retention search; `_mask_terminal_evidence` | retention: resolved uncertainty positive, unresolved uncertainty negative | rows retained with identity/outcome metadata | unresolved evidence untouched; no unlink |
+| J | Layer 2 wrapper Exception boundary | source/recovery: BaseException source proof and six real-death windows | opt-in child-process harness | stale sweep recovers durable C1/C2; API lease behavior unchanged |
+| K | owner cleanup; C3; stale sweep | concurrency/recovery: terminal, uncertain, mismatch, crash-side ownership | owner fields empty after committed C3 | pre-C3 death retains owner for sweep |
+| L | reconciliation-link constraint; historic conversion | reconciliation historic-link test | historic job retains attempt FK and evidence | no attempt/job deletion |
+| M | manual retry/review and generic cancel guards | security: duplicate-risk and identity-mismatch refusal | UserError before state mutation | mutation-attempt resolution remains sole generic progression |
+| N | nine modules; audits below | exact obligation coverage across all nine modules | independent Odoo/PostgreSQL run pending | no unvalidated runtime-green claim |
 
-### Recovery behavior
+## 4. Final contract
 
-- C1 without a committed C2 attempt is safely requeued without transport.
-- Every committed C2 attempt is treated as transport-attempted.
-- Exceptions, process death, token mismatch, serialization failure, stale
-  ownership, and disconnect route committed attempts to read-only
-  reconciliation or manual review; none replay transport.
-- Only the synthetic `mutation_dispatch_selftest` domain is registered.
-  Its transport is an in-process stub and cannot read a credential or perform
-  HTTP.
+One mutation job owns exactly one immutable attempt for its lifetime. C2 is
+side-cursor-only and proves running state, owner token, domain, and attempt
+absence. Existing evidence blocks redispatch before C1.
 
-## 3. Proof inventory and execution status
+Every strategy has exactly:
 
-Exactly nine required Stage 0 test modules are present and registered:
+1. `reconciliation_job_type`
+2. `prepare_local`
+3. `prepare_preconditions`
+4. `transport`
+5. `classify_direct_result`
+6. `reconcile`
+7. `apply_consequence`
 
-- `test_mutation_attempt.py`
-- `test_mutation_dispatch.py`
-- `test_mutation_reconciliation.py`
-- `test_mutation_recovery.py`
-- `test_mutation_api_guard.py`
-- `test_mutation_security.py`
-- `test_mutation_retention.py`
-- `test_mutation_concurrency.py`
-- `test_mutation_source_guards.py`
+The execution sequence is `prepare_local → C1 commit → prepare_preconditions →
+C2 commit → NET → fresh C3`. No main transaction or owner lock spans the
+precondition read or transport.
 
-The concurrency module contains genuine independent PostgreSQL-connection
-proofs for C1 ownership, fresh-transaction visibility, C3 token mismatch,
-attempt uniqueness, concurrent stale sweeps, the NET transaction/lock window,
-reconciliation-count serialization, serialization-failure recovery, and
-second-worker exclusion.
+Post-C2 consequences use registered vocabulary only and contain no same-job
+retry action. Direct uncertainty routes to read-only reconciliation. Resolved
+reconciliation invokes the domain callback in the same transaction as the
+attempt resolution, original-job transition, audit record, and any child
+creation. The reconciliation job receives an explicit terminal or retry state.
 
-The recovery module includes an opt-in real child-process harness
-(`SHOPIFY_LAYER2_RUN_PROCESS_DEATH=1`) for death after C1, after C2, during
-synthetic NET, after NET, and during C3. The parent executes the real stale-owner
-sweep and asserts recovery without transport replay.
+The API hashes the exact transmitted operation string and canonical variables;
+it does not collapse whitespace. Mutation admission validates the pending
+attempt in owned side transactions and returns a plain transport snapshot.
+Read-only API behavior and the intentional API context-manager
+`BaseException` lease-release behavior remain unchanged.
 
-### Checks executed in this workspace
+## 5. Correction commits before this validation record
+
+1. `8e849a8def0bd7ca64b699a8875360bdad18b4b5` — structural one-attempt
+   lifetime and consequence protocol.
+2. `a8eacaac916aa06cbf57689fa6897eb850687278` — exact mutation-request
+   admission and main-cursor isolation.
+3. `de5bfb14cc08ffbdf571c5c4d0ae1d1de44ca8c0` — evidence retention,
+   disconnect redaction, and committed-owner cleanup.
+4. `53ac0e146310c86612f57b1713f51dfd80f25ec0` — consolidated nine-module
+   correction proof.
+5. `60ecc658b6dbfc71e24c84653675630a4d0f6bd8` — final reconciliation
+   routing and completeness-audit corrections.
+
+The correction commits modify 17 of the already-authorized paths: eight model
+files and the nine existing Stage 0 test modules. No new production, test, or
+documentation path was introduced. The complete PR remains exactly the
+authorized 23 paths.
+
+## 6. Static validation actually executed
 
 | Check | Result |
 |---|---|
-| Python AST parse of all 20 changed Python files | PASS |
-| XML parse of the changed cron file | PASS |
-| Changed Python line-length scan (100 characters) | PASS |
-| Required nine test modules present and registered | PASS |
-| New cron registered in manifest | PASS |
-| Mutation-attempt ACLs read-only for Auditor/Operator/Reviewer/Administrator | PASS |
-| Production scan for Task 013/other real mutation operation names | PASS — none present |
-| Changed-file scope | PASS — exactly 23 authorized files |
-| Real credentials/HTTP/Shopify mutation execution | ZERO |
+| Python compile/AST parse of all 20 available addon Python files | PASS |
+| XML parse of the stale-owner cron | PASS |
+| Manifest literal parse and model/ACL/cron registration audit | PASS |
+| CSV parse of 26 ACL rows | PASS |
+| 88-character line scan | PASS |
+| Legacy marker/strategy/call literal scans | PASS |
+| GraphQL/raw-transport/source-guard audit | PASS (static source inspection; Odoo test execution pending) |
+| Credential, token, real-domain, and PII/logging audit | PASS — no real value or call |
+| Git patch trailing-whitespace / diff-check audit | PASS |
+| Integration comparison | PASS — zero behind and exactly 23 PR paths |
+| Gate B byte-preservation audit | PASS |
 
-Odoo is not installed in this execution workspace, so the Odoo test suite,
-independent PostgreSQL runtime tests, process-death harness, install/upgrade
-test, and full connector regression were **not run here**. They remain required
-in an Odoo-capable independent environment before runtime acceptance. No
-runtime-pass claim is made by this document.
+Odoo and PostgreSQL executables are unavailable in this workspace. Therefore
+install/upgrade, ORM constraints, ACL runtime, cron execution, all Odoo tests,
+genuine PostgreSQL multi-connection tests, full regression, and the opt-in real
+process-death harness were **not executed**. No unexecuted test is classified
+as passed and no runtime-green claim is made.
 
-Proof-layer state:
+## 7. Independent runtime obligations
 
-- **Layer 1:** implementation and tests prepared; static checks passed; Odoo run pending.
-- **Layer 2:** genuine-connection tests prepared; execution pending.
-- **Layer 3:** process-death harness prepared; execution pending.
-- **Independent Odoo.sh Layer 4:** explicitly outside Sol's authority.
-- **Full connector regression:** pending an Odoo-capable environment.
-- **Post-Gate-B synchronization regression:** blocked until the control room
-  supplies the exact authorized integration SHA after Gate B acceptance/merge.
+Independent exact-head Odoo.sh verification must execute install and upgrade,
+all nine Stage 0 modules, full connector regression, genuine concurrent
+different-token insertion, C1/C2/C3 serialization and stale-owner recovery,
+ACLs, cron registration/execution, disconnect/force-disconnect, retention,
+historic conversion, redaction/residue checks, and read-only regressions.
 
-## 4. Zero-real-mutation evidence
+The Layer 3 harness is prepared for:
 
-- No production source contains `inventorySetQuantities`,
-  `inventoryActivate`, `fulfillmentCreate`, `refundCreate`, or payout
-  mutation registration/call sites.
-- The sole GraphQL mutation literal is the allowlisted synthetic self-test
-  request prepared by the Layer 2 dispatcher.
-- The synthetic transport returns local evidence only and cannot perform HTTP.
-- The API client rejects mutation documents lacking an exact durable
-  job/attempt/token/domain context and registered reconciliation strategy.
-- The existing core `requests.post` transport seam remains guarded; the
-  accepted product-importer CDN `requests.get` bypass is unchanged.
-- No Shopify credential was read and no Shopify request was made during this
-  work.
+- after C1;
+- during the post-C1/pre-C2 precondition window;
+- after C2;
+- during NET;
+- after NET;
+- during C3.
 
-## 5. Scope and synchronization gate
+It remains opt-in with `SHOPIFY_LAYER2_RUN_PROCESS_DEATH=1` and pending an
+environment with Odoo, PostgreSQL, and child-process control.
 
-The branch changes exactly the 23 files authorized by the locked packet:
-13 implementation/registration/security files, nine exact tests, and this
-validation record. It changes no shared Wave 3 binding document and no Task
-013/013B implementation.
+## 8. Zero-real-mutation and scope proof
 
-Gate B PR #179 currently says `PROPOSED FOR CONTROL-ROOM GATE B ACCEPTANCE`
-and is not merged. Therefore this branch has not incorporated Gate B and does
-not infer an integration sync target. Work stops before synchronization until
-the control room provides the exact post-Gate-B integration SHA.
+Only `mutation_dispatch_selftest` is registered. Its transport is an
+in-process synthetic stub with no HTTP or credential read. Production source
+contains no inventory, fulfillment, refund, or payout mutation implementation.
+No Shopify token was read, no credential-backed request was made, and no real
+Shopify mutation was executed.
 
-SEC-2 remains a future re-key obligation: Stage 0 stores no new credential and
-does not alter the accepted credential-storage boundary.
+The PR changes exactly the locked 23 paths. It changes no Gate B document,
+decision record, inventory addon, other addon, CI/workflow, Wave 3 handoff, or
+Task 013/013B implementation. PR #178 must remain open, draft, and unmerged.
 
-## 6. Recommendation
+## 9. Recommendation
 
-**IMPLEMENTATION COMPLETE — WAITING FOR GATE B MERGE SYNC**
+**STATICALLY CORRECTED AND SYNCHRONIZED — READY FOR INDEPENDENT CLAUDE
+ODOO.SH RUNTIME VERIFICATION**
