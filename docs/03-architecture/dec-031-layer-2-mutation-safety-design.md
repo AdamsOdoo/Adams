@@ -1,16 +1,19 @@
 # DEC-031 Layer 2 — Shopify Mutation Safety Design (Durable Attempt Identity, Reconciliation-Before-Retry)
 
-> **Status: CONTROL-ROOM ACCEPTANCE CANDIDATE — NOT YET ACCEPTED.**
-> Originally registered 2026-07-16
+> **Status: ACCEPTED — CONTROL-ROOM GATE A**, via DEC-036 D1–D38, per PR
+> #177 comment
+> [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
+> (2026-07-19). Originally registered 2026-07-16
 > (Fable gap-closure mission); corrected 2026-07-18 (Wave 3 Gate A, Session
 > A) and again 2026-07-19 (final consolidated Sessions-2-and-3 correction
 > batch) per
 > [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) — read
 > DEC-036 first, it is the authoritative decision record; this document is
 > the narrative design companion. Acceptance authority: product owner +
-> Claude control room. No implementation authorized; Waves 3/4/5 mutation
-> domains are blocked until this design is accepted and implemented with
-> runtime proof.**
+> Claude control room. Design accepted; implementation is authorized only
+> through the separately-issued, still-unissued Stage 0 prompt — Waves
+> 3/4/5 mutation domains remain blocked until implemented with runtime
+> proof.**
 >
 > **2026-07-19 correction notice (supersedes the 2026-07-18 notice below
 > for every point it touches).** Per PR #177 comment
@@ -756,6 +759,10 @@ finalization, not a timeout race (§7); (9) the mutation-wrapper/API-client
 runtime guard and the four-layer proof-environment plan (§13). **Every
 item this document's 2026-07-18 revision left as a DEC-036 BLOCKING
 cross-reference is now resolved** — see DEC-036 Part 3/5/6 for the
-complete, authoritative reasoning. **This design remains status
-CONTROL-ROOM ACCEPTANCE CANDIDATE — NOT YET ACCEPTED** — these are
-corrections to the candidate text, not an acceptance act.
+complete, authoritative reasoning. **At the time this correction batch was
+written, the design remained status CONTROL-ROOM ACCEPTANCE CANDIDATE —
+NOT YET ACCEPTED** — these were corrections to the candidate text, not an
+acceptance act. **Acceptance act (2026-07-19, later the same day): ACCEPTED
+— CONTROL-ROOM GATE A**, per PR #177 comment
+[`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
+— see the status banner at the top of this document.

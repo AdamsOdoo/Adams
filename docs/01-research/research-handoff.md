@@ -1,3 +1,62 @@
+### Wave 3 Gate A — control-room acceptance act and controlled merge — compact handoff (2026-07-19)
+
+- **Branch / PR:** `claude/wave-3-gate-dec-031-layer2-q3vwfj`; draft PR
+  [#177](https://github.com/AdamsOdoo/Adams/pull/177) → `mvp/program-integration`.
+- **Prior session recap (not previously recorded in this handoff):** after
+  the consolidated Sessions-2-and-3 correction batch below, the control
+  room's final Gate A review (PR #177 comment
+  [`5014806430`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014806430))
+  found six remaining textual contradictions and required one more narrow
+  documentation-only correction pass. That pass (commit `3b968e3`) closed
+  all six across exactly four files: stale `compareQuantity`/`ignoreCompareQuantity`
+  CAS syntax in the DoR; the truncated `L2-D1..D13` gate reference; the
+  Stage 0 packet's self-contradictory `job_actions.py` allowed/forbidden
+  listing and unresolved registry-owner wording; unconditional
+  "real Odoo.sh multi-worker environment" proof-layer wording; and DEC-036
+  D1's internally inconsistent job-field count (now exactly three:
+  `current_attempt_token`, `owner_worker_ref`, `running_since`).
+- **This session's work — acceptance act and controlled merge:** the
+  control room accepted the corrected package in full — PR #177 comment
+  [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
+  ("Control-room final Gate A decision — ACCEPTED WITH TWO CLERICAL
+  MERGE-CLOSURE CONDITIONS"). This session applied the two named clerical
+  fixes (DoR gate-table row; Stage 0 packet §4 addendum-sentence removal),
+  then recorded the Gate A acceptance-status act consistently across
+  `docs/04-decisions/DEC-036-wave-3-layer-2-gate.md`,
+  `docs/03-architecture/dec-031-layer-2-mutation-safety-design.md`,
+  `docs/04-decisions/DEC-031-core-r2-job-execution-replay-safety.md` (new
+  dated acceptance section appended; Layer 1 history untouched),
+  `docs/06-prompts/sol-wave-3-stage-0-locked-prompt.md`,
+  `docs/07-implementation-plan/mvp-program-state.md`,
+  `docs/07-implementation-plan/wave-3-definition-of-ready.md`,
+  `docs/07-implementation-plan/wave-3-stage-0-layer-2-packet.md`, and
+  `docs/05-qa/architecture-review-log.md` (AR-059 appended) — in one
+  documentation-only acceptance/closure commit after `3b968e3`. **No
+  architecture decision was reopened; no new blocker, recommendation, or
+  open question was introduced.**
+- **Merge authorization:** per comment 5015044226, after the acceptance
+  commit this session re-verifies PR #177 (only documentation files
+  changed, no addon/code/test/security/XML/manifest/CI change, links
+  resolve, `git diff --check` clean, protected refs unchanged), marks it
+  ready for review, and merges it into `mvp/program-integration` with a
+  standard merge commit (no squash, no rebase). Post-merge verification
+  (exact merge commit, new integration tip, unchanged protected refs) is
+  recorded in `mvp-program-state.md` and this session's final report, not
+  duplicated here.
+- **Exact next steps:** verify the new `mvp/program-integration` integration
+  SHA, then open Stage 0 implementation and Gate B as two separate,
+  independently authorized control-room acts — Stage 0 via separate,
+  explicit issuance of the locked Sol prompt at
+  [`../06-prompts/sol-wave-3-stage-0-locked-prompt.md`](../06-prompts/sol-wave-3-stage-0-locked-prompt.md)
+  (still locked/unissued as of this entry), and Gate B via a dedicated
+  session correcting the two out-of-scope `compareQuantity` documents
+  (`inventory-operating-model.md` §4.4 and the Task 013 implementation
+  packet) that remain outside PR #177's allowed-file set.
+- **Stop condition:** this session stops after the acceptance act, the
+  controlled merge, and post-merge verification. No Stage 0 or Gate B work
+  is performed in this session. No Odoo/Odoo.sh run. No Shopify request or
+  mutation.
+
 ### Wave 3 Gate A — final consolidated Sessions-2-and-3 correction batch — compact handoff (2026-07-19)
 
 - **Branch / PR:** `claude/wave-3-gate-dec-031-layer2-q3vwfj`; draft PR

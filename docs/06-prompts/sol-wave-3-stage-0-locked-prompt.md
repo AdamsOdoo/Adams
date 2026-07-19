@@ -2,7 +2,12 @@
 
 > **ISSUED-NOT-EXECUTED: NO**
 > **LOCKED: YES**
-> **NOT USABLE UNTIL CONTROL-ROOM ACCEPTANCE**
+> **READY FOR SEPARATE CONTROL-ROOM ISSUANCE AFTER MERGE.** DEC-036 and the
+> Stage 0 packet are ACCEPTED (PR #177 comment
+> [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)),
+> but this prompt remains locked and unissued until PR #177 merges and the
+> new `mvp/program-integration` tip is verified. Do not insert a Stage 0
+> starting SHA yet.
 >
 > This is a draft, ready-to-copy prompt template for the Wave 3 Stage 0
 > implementation session, prepared during the Wave 3 Gate A session

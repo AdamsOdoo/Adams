@@ -1,13 +1,15 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Core Substrate Implementation Packet
 
-> **Status: PROPOSED — LOCKED PROMPT NOT ISSUED.** Cut from
+> **Status: ACCEPTED — IMPLEMENTATION PROMPT NOT YET ISSUED.** Cut from
 > [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) (status:
-> CONTROL-ROOM ACCEPTANCE CANDIDATE — CORRECTIONS APPLIED, NOT YET
-> ACCEPTED). **This packet does not authorize implementation.**
-> Implementation opens only when (a) DEC-036 is accepted by the product
-> owner + Claude control room, and (b) the companion locked Sol prompt
+> ACCEPTED — CONTROL-ROOM GATE A, PR #177 comment
+> [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)).
+> **Acceptance of this packet does not itself authorize implementation.**
+> Implementation opens only when the companion locked Sol prompt
 > ([`../06-prompts/sol-wave-3-stage-0-locked-prompt.md`](../06-prompts/sol-wave-3-stage-0-locked-prompt.md))
-> is separately, explicitly issued to a Sol session.
+> is separately, explicitly issued to a Sol session — ready for that
+> separate control-room issuance only after PR #177 merges and the new
+> integration SHA is verified.
 >
 > **2026-07-19 correction notice.** Per the final consolidated
 > Sessions-2-and-3 control-room ruling (PR #177 comment
@@ -125,10 +127,6 @@ replay-policy-registry *behavior* change (only new domain declarations, via
 the existing extension seam, are ever in-scope for a *future* domain,
 never Stage 0 itself since Stage 0 registers no domain); CI/workflow
 files; protected references.
-
-`shopify_connector_job_actions.py` is **not** forbidden — it is a normal
-§3 allowed entry, narrowly scoped to D11's `duplicate_risk`-refusal guard
-addition only.
 
 ## 5. `shopify.connector.mutation.attempt` — exact schema
 

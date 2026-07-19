@@ -1,9 +1,12 @@
 # DEC-036 — Wave 3 Gate A: DEC-031 Layer 2 Acceptance Candidate
 
-- **Status: CONTROL-ROOM ACCEPTANCE CANDIDATE — CORRECTIONS APPLIED, NOT YET
-  ACCEPTED.** Claude does not accept its own decision package (see this
-  session's governing task, §8). This record is a candidate for independent
-  control-room review only.
+- **Status: ACCEPTED — CONTROL-ROOM GATE A.** Acceptance authority: PR #177
+  comment
+  [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
+  ("Control-room final Gate A decision — ACCEPTED WITH TWO CLERICAL
+  MERGE-CLOSURE CONDITIONS"), 2026-07-19. Claude did not accept its own
+  decision package (see this session's governing task, §8); the independent
+  control-room review and acceptance act recorded here is that comment's.
 - **Package status: CORRECTIONS APPLIED PER THE FINAL CONSOLIDATED
   SESSIONS-2-AND-3 RULING.** Per the control-room's consolidated ruling on
   PR #177 comment
@@ -11,15 +14,16 @@
   ("Sessions 2 + 3 reconciled; one correction batch authorized"), every
   binding architecture decision in that ruling is applied in this revision.
   **After this correction batch, no genuinely unresolved architecture
-  blocker remains preventing Stage 0 implementation from beginning once
-  DEC-036 itself is independently accepted** — see Part 0.5 and the revised
-  Part 5/Part 6 below. Remaining open items are either (a) implementation
-  proof/sizing work correctly classified as Stage 0 merge-acceptance
-  criteria, not pre-implementation blockers, or (b) Gate B prerequisites
-  scoped to Task 013, out of this session's allowed-files list. This
-  session (Session A) still does not accept its own decision package — the
-  control room's consolidated ruling supplies the binding architecture
-  choices; DEC-036's overall acceptance is a separate, still-pending act.
+  blocker remains preventing Stage 0 implementation from beginning, and
+  DEC-036 itself has now been independently accepted** — see Part 0.5 and
+  the revised Part 5/Part 6 below. Remaining open items are either (a)
+  implementation proof/sizing work correctly classified as Stage 0
+  merge-acceptance criteria, not pre-implementation blockers, or (b) Gate B
+  prerequisites scoped to Task 013, out of this session's allowed-files
+  list. Session A (this record's author) did not accept its own decision
+  package — the control room's consolidated ruling supplied the binding
+  architecture choices, and the control room's own separate acceptance act
+  (PR #177 comment 5015044226) is DEC-036's acceptance authority.
 - **Decision owner (candidate author, not acceptor):** Claude control room,
   under DEC-032 / `CLAUDE.md` §13, per the task's explicit "Claude must not
   accept its own decision package" rule (task §8).
@@ -2501,9 +2505,10 @@ gaps):**
 
 Acceptance authority for every decision above: **product owner + Claude
 control room**, exactly as DEC-031's Layer 2 registration already
-specifies. **This record does not accept anything.** The control room's
-possible dispositions, per this session's governing task: **ACCEPT**,
-**ACCEPT WITH CORRECTIONS**, **REVISE**, **REJECT**.
+specifies. **This record is ACCEPTED.** Disposition: **ACCEPTED — CONTROL-ROOM
+GATE A**, per PR #177 comment
+[`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
+(2026-07-19), which is this decision set's acceptance authority.
 
 **Status after this correction batch (2026-07-19):** every decision this
 record previously marked **BLOCKING** at the individual level (D17, D20,
@@ -2516,15 +2521,11 @@ flagging a factual correction that must land in code. The two out-of-scope
 document corrections remain a named Gate B prerequisite (Part 5, item 11),
 outside this session's allowed-files list, not a Stage 0 blocker.
 
-**This session's own assessment — offered as a Recommendation, not a
-self-acceptance —** is that DEC-036, as corrected in this batch, is now
-suitable for **ACCEPT WITH CORRECTIONS** treatment across its full
-decision inventory (D1–D38): no decision remains genuinely undecided at
-the architecture level. What remains is (a) the control room's own
-independent review and acceptance act on this corrected package, (b)
-Category I's implementation-proof work (Stage 0 merge-acceptance
-criteria, not a precondition to starting), (c) Category II's
-tunable-constant ratifications, and (d) Gate B's out-of-scope document
-corrections before Task 013 implementation specifically. This
-recommendation is not binding and is subject to the control room's own
-independent judgment.
+**Control-room acceptance act (2026-07-19):** the control room has accepted
+DEC-036 across its full decision inventory (D1–D38) by PR #177 comment
+[`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226):
+no decision remains genuinely undecided at the architecture level. What
+remains outstanding is (a) Category I's implementation-proof work (Stage 0
+merge-acceptance criteria, not a precondition to starting), (b) Category
+II's tunable-constant ratifications, and (c) Gate B's out-of-scope document
+corrections before Task 013 implementation specifically.

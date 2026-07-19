@@ -399,3 +399,27 @@ documentation-only correction batch:
 - No implementation authorized by this addendum. No `addons/**` file
   changed. No Odoo/Odoo.sh run. No Shopify request or mutation performed.
   PR #177 remains open, draft and unmerged.
+
+### Layer 2 Wave 3 Gate A acceptance act (2026-07-19)
+
+**This section records the Layer 2 acceptance act. It does not change Layer
+1's Accepted status or any Layer 1 history above.** The control room
+accepted the complete DEC-036 D1–D38 decision set, the corrected DEC-031
+Layer 2 design, the Stage 0 implementation packet, and the Wave 3 Gate A
+portion of the Definition of Ready, by PR #177 comment
+[`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
+("Control-room final Gate A decision — ACCEPTED WITH TWO CLERICAL
+MERGE-CLOSURE CONDITIONS").
+
+- **DEC-031 Layer 2 design: ACCEPTED** through the complete
+  [`DEC-036`](DEC-036-wave-3-layer-2-gate.md) D1–D38 decision set.
+  Acceptance authority: PR #177 comment 5015044226. This supersedes the
+  "Proposed — NOT accepted" / "CONTROL-ROOM ACCEPTANCE CANDIDATE — NOT YET
+  ACCEPTED" status statements recorded in the dated sections above, which
+  remain accurate as a historical record of status at the time each was
+  written.
+- Two clerical merge-closure conditions (DoR gate-table wording; Stage 0
+  packet §4 addendum sentence) were applied in the same closure commit
+  that recorded this acceptance; no architecture decision was reopened.
+- No implementation authorized by this section. No `addons/**` file
+  changed. No Odoo/Odoo.sh run. No Shopify request or mutation performed.
