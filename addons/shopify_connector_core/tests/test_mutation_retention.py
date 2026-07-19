@@ -58,9 +58,16 @@ class TestMutationRetention(TransactionCase):
         after = attempt.read(list(identity))[0]
         self.assertEqual(identity, after)
 
-    def test_unresolved_uncertain_attempt_is_never_masked(self):
+    def test_uncertain_attempt_is_never_masked_even_after_resolution(self):
         attempt = self._attempt('uncertain')
         before = attempt.remote_mutation_intent
+        attempt._surface('action_resolve_mutation_attempt').write({
+            'resolution_disposition': 'applied',
+            'resolution_source': 'manual_admin',
+            'resolution_reason': 'synthetic evidence',
+            'resolution_uid': self.env.uid,
+            'resolution_at': fields.Datetime.now(),
+        })
         attempt._mask_terminal_evidence()
         self.assertEqual(attempt.remote_mutation_intent, before)
 
@@ -75,3 +82,7 @@ class TestMutationRetention(TransactionCase):
             self.assertEqual(
                 self.Retention._attempt_evidence_retention_days(), 180
             )
+        params.set_param(
+            'shopify_connector.layer2_attempt_evidence_retention_days', '7'
+        )
+        self.assertEqual(self.Retention._attempt_evidence_retention_days(), 7)
