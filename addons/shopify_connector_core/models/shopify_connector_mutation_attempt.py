@@ -413,7 +413,7 @@ class ShopifyConnectorMutationAttempt(models.Model):
 
     def _mask_terminal_evidence(self):
         for attempt in self:
-            if attempt.effective_disposition() == 'unresolved':
+            if attempt.observed_outcome not in ('succeeded', 'failed_clean'):
                 continue
             if (
                 attempt.remote_mutation_intent == EVIDENCE_MASKED
