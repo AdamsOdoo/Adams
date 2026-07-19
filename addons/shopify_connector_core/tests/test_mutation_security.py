@@ -90,10 +90,13 @@ class TestMutationSecurity(TransactionCase):
     def test_only_administrator_can_resolve_with_reason(self):
         _job, attempt = self._fixture()
         attempt._record_direct_outcome('uncertain')
-        with self.assertRaises(AccessError):
-            attempt.with_user(self.roles['reviewer']).action_resolve_mutation_attempt(
-                'applied', 'reviewer bypass'
-            )
+        for role in ('auditor', 'operator', 'reviewer'):
+            with self.assertRaises(AccessError, msg=role):
+                attempt.with_user(
+                    self.roles[role]
+                ).action_resolve_mutation_attempt(
+                    'applied', '%s bypass' % role,
+                )
         with self.assertRaises(UserError):
             attempt.with_user(self.roles['admin']).action_resolve_mutation_attempt(
                 'applied', ''
