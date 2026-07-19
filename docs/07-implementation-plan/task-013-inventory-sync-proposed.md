@@ -1,9 +1,20 @@
 # Task 013 — Inventory Sync (Proposed)
 
-> **Superseded (2026-07-16, Fable gap-closure mission):** this early scope
-> proposal is retained as history only. The canonical, decision-closed
-> specification is `task-013-inventory-sync-implementation-packet.md` (plus its dated
-> gap-closure addendum). Do not use this file as an implementation source.
+> **Superseded (2026-07-16, Fable gap-closure mission; re-confirmed
+> 2026-07-19, Wave 3 Gate B session):** this early scope proposal is
+> retained as history only. The canonical, decision-closed specification
+> is `task-013-inventory-sync-implementation-packet.md` (plus its
+> 2026-07-16 gap-closure addendum and its 2026-07-19 Gate B corrections),
+> read together with
+> [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) (the
+> Gate B decision record covering the CAS field name, Layer 2 idempotency
+> ownership, drift handling, and the complete `inventorySetQuantities`/
+> `inventoryActivate` mutation-domain matrix) and
+> [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) (the
+> accepted Layer 2 substrate this packet's mutations run through). Do not
+> use this file as an implementation source for any purpose, including
+> the CAS/idempotency/batching language below, all of which predates and
+> is superseded by DEC-037.
 
 > Planning-only future implementation task spec, part of the MVP domain
 > implementation-slicing sequence

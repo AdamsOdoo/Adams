@@ -1,8 +1,16 @@
 # Task 013B — Controlled Initial Shopify→Odoo Inventory Baseline: Implementation-Ready Planning Packet
 
-> **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §9 is NOT usable.** Produced 2026-07-11 by the PR #148
-> revision session, implementing review item 3 of ChatGPT's
+> **Status: GATE B ACCEPTANCE CANDIDATE — NOT IMPLEMENTATION AUTHORIZED**
+> (updated 2026-07-19, Wave 3 Gate B session, no contradiction found; see
+> new §0 below and
+> [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §8).
+> **The locked prompt in §9 is superseded — use
+> [`../06-prompts/sol-wave-3-task-013b-locked-prompt.md`](../06-prompts/sol-wave-3-task-013b-locked-prompt.md)
+> (LOCKED, unissued) instead.** Task 013B implementation requires Gate B
+> accepted and merged, Stage 0 merged and runtime-proven, **and** Task 013
+> itself merged and runtime-proven (D-013B-8, unchanged). Originally
+> produced 2026-07-11 by the PR #148 revision session, implementing
+> review item 3 of ChatGPT's
 > control-room review (PR #148 comment `4942966937`): the accepted
 > DEC-003 capability "Initial Shopify stock import is controlled /
 > reviewed" — deferred by Task 013's D-013-8 to an unnamed candidate —
@@ -41,6 +49,40 @@ location creation/mapping changes; no unmapped-location import; no
 lot/serial support (named exclusion — tracked products with lots
 route to manual review); no UI beyond the backend service methods the
 S11-family screens later call (PD-2).
+
+## 0. Layer 2 non-applicability [new, Gate B, 2026-07-19, DEC-037 §8]
+
+Task 013B issues **zero** Shopify mutations and therefore does not
+consume the DEC-036 Layer 2 mutation-safety substrate:
+
+- Its only Shopify calls are **reads** —
+  `inventoryLevel.quantities(names: ["available"])` (D-013B-1) — which
+  the existing Layer 1 replay-policy registry already classifies
+  `remote_read_replay_safe` (unchanged, unaffected by DEC-036).
+- There is no `shopify.connector.mutation.attempt` row, no
+  `mutation_domain` registration, no C1/C2/NET/C3 protocol, and no Layer
+  2 wrapper call anywhere in this task's scope.
+- Its safety contract is a **local Odoo transaction/locking** concern —
+  database-backed row locking (`try_lock_for_update()`), a final re-read
+  under lock, drift/topology abort, and post-write `free_qty`
+  verification with rollback — fully specified below (D-013B-4) and
+  unrelated to Shopify-mutation reconciliation.
+- **No Layer 2 mutation wrapper is added to this task merely for
+  symmetry** with Task 013: doing so would misrepresent a
+  Shopify-read-plus-local-write flow as if it carried the Shopify-mutation
+  risk Layer 2 exists to manage, which it structurally cannot have (there
+  is no Shopify mutation to be uncertain about).
+- Exact interaction with Task 013 (unchanged, restated; cross-reference
+  updated Revision 2): Task 013 must be installed and its own Gate
+  B/Stage 0 dependencies accepted first; a baseline apply for a pair
+  blocks any concurrent Task 013 job for that same pair — now any of
+  Task 013's three inventory job types (`inventory_push_sync`,
+  `inventory_activate`, `inventory_set_quantities`), since Revision 2
+  gives all three the same pair-serialization `operation_scope_key`
+  (DEC-037 §5.3), not only the single push job Revision 1 described
+  (D-013B-4); after a successful baseline, Odoo is the standing
+  authority and the next Task 013 push for that pair begins from the
+  accepted baseline state (D-013B-8).
 
 ## 2. Decision closures (D-013B-1 … D-013B-8) — each Proposed
 
@@ -304,6 +346,13 @@ plan gain the corresponding rows/scenarios (updated this session).
 — DEC-030 / lifecycle §7), so no later retrofit is needed.
 
 ## 9. Locked final implementation prompt (Task 013B)
+
+> **SUPERSEDED (Gate B, 2026-07-19).** The current locked prompt is
+> [`../06-prompts/sol-wave-3-task-013b-locked-prompt.md`](../06-prompts/sol-wave-3-task-013b-locked-prompt.md)
+> (`ISSUED-NOT-EXECUTED: NO`, `LOCKED: YES`). The text below is retained
+> verbatim for history; its content is not contradicted by Gate B (no
+> Layer 2 changes apply to this task, §0), but the base-SHA/issuance
+> discipline in the dedicated file governs.
 
 ```text
 DO NOT USE UNTIL CHATGPT REVIEWS AND ACCEPTS THIS PLANNING PACKAGE,

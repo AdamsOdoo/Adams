@@ -4,6 +4,235 @@
 
 ## Current status
 
+**WAVE 3 GATE B ACCEPTED — MERGE-CLOSURE NORMALIZATION APPLIED AND MERGE AUTHORIZED (2026-07-19, PR [#179](https://github.com/AdamsOdoo/Adams/pull/179)).**
+The control room reviewed Revision 3 (immediately below) at head
+`565d3daefdf0c87c46ffaf7a6d52f63841b1e770` and, by PR #179 comment
+[`5016117207`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5016117207),
+ruled **Wave 3 Gate B ACCEPTED IN SUBSTANCE** — the separate
+orchestration/activation/set-quantities job model, one mutation job/one
+attempt for the job's entire lifetime, replacement-job retries, atomic
+handoffs, the fixed error vocabulary, freshness-safe reconciliation,
+explicit Stage 0 prerequisites, and the current role model — conditioned
+on one further docs-only merge-closure normalization commit correcting
+eleven residual wording issues: (1) `failed_clean`/`uncertain`/`applied`/
+`not_applied` are mutation-**attempt** outcome/resolution values, never
+`shopify.connector.job.state` values or "terminal job states"; (2) a
+replaced predecessor job transitions to the **existing** terminal state
+`cancelled`, preserving its attempt's outcome/resolution unchanged; (3)
+successful phase handoffs (orchestration→mutation, activation→fresh
+orchestration) use `succeeded` and never set `superseded_by_job_id`/
+`cancel_reason` — Revision 3's own §5.4 text had incorrectly listed the
+activation handoff among the superseding ones; (4) `superseded_by_job_id`
+and `cancel_reason` are **existing core** `shopify.connector.job` fields,
+reused, not new domain schema — `cas_retry_ordinal` is the **only** new,
+domain-owned field; (5) `blocked_manual_review` remains non-terminal,
+removed from every terminal-state list; (6) no scan/manual trigger
+admits a new orchestration job while a pair is blocked — only
+`action_recheck_inventory_pair` releases it; (7)/(9) the exact
+review-release owner/transition wording tightened; (8) the release
+action's precondition is `effective_disposition() == 'not_applied'`, not
+a raw `resolution_disposition` check; (10) `store_identity_mismatch`
+stays a Stage 0 correction prerequisite, not an already-existing current
+error class; (11) applied consistently across DEC-037, the Task 013
+packet, the locked Task 013 prompt, the dev-store plan, and this tracker.
+**Identity gate independently re-verified live before any edit:** PR
+#179 open/draft/unmerged at the exact expected head
+`565d3daefdf0c87c46ffaf7a6d52f63841b1e770`; base unchanged; exactly the
+same 15 authorized files; no addon/test/security/XML/manifest/CI file
+changed; comment `5016117207` read in full; PR #178 confirmed still
+open/draft/unmerged at head `644853a68b3497c134ee648ce7399e50d30ff397`;
+protected refs unchanged. **Claude did not accept its own package, in
+any revision, and did not self-accept this normalization** — acceptance
+authority is comment `5016117207`, product owner + ChatGPT control room.
+After the normalization commit, PR #179 was marked ready and merged into
+`mvp/program-integration` with a normal merge commit under expected-head
+protection — see the merge record immediately following this entry (or
+this file's Wave-status table row 3) for the exact merge SHA. **Stage 0
+(PR #178) remains held**, unmerged and not runtime-proven, pending the
+post-merge integration SHA and a consolidated synchronization/correction
+prompt. **Recommendation: ISSUE CONSOLIDATED STAGE 0 SYNCHRONIZATION AND
+CORRECTION PROMPT.**
+
+---
+
+**WAVE 3 GATE B REVISION 3 — JOB-LIFETIME/ATOMIC-HANDOFF/ERROR-VOCABULARY CORRECTION APPLIED PER SECOND CONTROL-ROOM REVISE RULING (2026-07-19, PR [#179](https://github.com/AdamsOdoo/Adams/pull/179), same day as Revisions 1/2 below; superseded by the acceptance entry above).**
+The control room reviewed Revision 2 (immediately below) at head
+`a88d5416c46662de1b15f5490b743a553185dc0a` and returned **REVISE** a
+second time (PR #179 comment
+[`5015830229`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015830229)):
+Revision 2's same-job CAS/`not_applied`-redispatch design still let one
+mutation job accumulate more than one `mutation.attempt` row, still
+violating Gate A's one-job/one-attempt rule; the activation→orchestration
+handoff was not atomic; `blocked_manual_review`'s non-terminal status and
+release path were undefined; the matrix used four invented `error_class`
+values; the `applied` verdict carried an inverted timestamp condition;
+and the locked prompts called Claude the control room/sole merge
+authority. **Identity gate independently re-verified live before any
+edit:** PR #179 open/draft/unmerged at the exact expected head
+`a88d5416c46662de1b15f5490b743a553185dc0a`; base unchanged; exactly the
+same 15 authorized files; no addon/test/security/XML/manifest/CI file
+changed; comment `5015830229` read in full; PR #178 confirmed still
+open/draft/unmerged at head `644853a68b3497c134ee648ce7399e50d30ff397`;
+protected refs unchanged.
+
+This session applied one coherent documentation-only correction batch
+implementing every one of the seven binding corrections in comment
+`5015830229`: every CAS-stale and reconciliation-`not_applied` retry now
+creates a **new**, separate job (never a same-job redispatch) — new
+job-lineage fields `cas_retry_ordinal` (0→1→2→3), `superseded_by_job_id`,
+`cancel_reason`; a new atomic handoff contract (DEC-037 §5.4) freezing
+four named transactions under a row lock, introducing no new core job
+state; `blocked_manual_review` declared explicitly non-terminal, plus a
+new `action_recheck_inventory_pair(reason)` domain action (DEC-037 §5.5);
+the fixed error-class vocabulary substituted for the four invented values
+(`remote_validation_rejected`/`remote_precondition_mismatch`/
+`transport_ambiguous`/`clean_rejection`, all withdrawn); the `applied`
+verdict's erroneous `updatedAt` condition removed; both locked Sol
+prompts' ROLE sections corrected (ChatGPT = control room/acceptance
+authority; Claude = planner/independent reviewer/Odoo.sh runtime
+verifier; Sol = implementation worker); and a new DEC-037 §13A recording
+the exact Stage 0 (PR #178) correction prerequisites for Task 013
+issuance. Two new dev-store scenarios (20: `blocked_manual_review`
+non-automatic-child; 21: `action_recheck_inventory_pair` release) were
+added, now 21 scenarios total; no new official-source fetch was
+performed — every correction is to this record's own design, not a new
+Shopify API claim.
+
+**Status: DEC-037 REVISED — RESUBMITTED FOR CONTROL-ROOM GATE B
+RE-REVIEW (Revision 3). Task 013 packet: GATE B ACCEPTANCE CANDIDATE
+(Revision 3) — NOT IMPLEMENTATION AUTHORIZED. Task 013B packet:
+unaffected in substance, role-model cross-reference corrected. Both
+locked Sol prompts: LOCKED, unissued, corrected for the job-lifetime
+model and the current role model. Claude did not accept its own package,
+in any revision.** No `addons/**` file was created or modified. No
+Odoo/Odoo.sh run occurred. No Shopify mutation was issued, and no new
+Shopify read either. PR #179 remains **open, draft and unmerged**; this
+session performed no merge, no ready-marking. **Recommendation: READY
+FOR FINAL CONTROL-ROOM WAVE 3 GATE B REVIEW.**
+
+---
+
+**WAVE 3 GATE B REVISION 2 — JOB-MODEL CORRECTION APPLIED PER CONTROL-ROOM REVISE RULING, RE-REVIEW PENDING (2026-07-19, draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179), same day as Revision 1 below).**
+The control room reviewed Revision 1 (immediately below) and returned
+**REVISE, NOT REJECTED** (PR #179 comment
+[`5015619162`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015619162)):
+Revision 1's same-job, two-sequential-mutation-attempt design for
+`inventoryActivate`/`inventorySetQuantities` conflicted with Gate A's
+binding "one mutation job : one Shopify mutation request : one attempt
+row" rule. **Identity gate independently re-verified live before any
+edit:** PR #179 open/draft/unmerged at the exact expected head
+`74478293511b5bc2763a8998c329a752fa08ea68`; base unchanged; exactly the
+same 15 authorized files; comment `5015619162` read in full; **PR #178
+now exists** (open, draft, unmerged, head
+`644853a68b3497c134ee648ce7399e50d30ff397` — corrects Revision 1's "no
+PR yet" statement, which was accurate when written); protected refs
+unchanged.
+
+This session applied one coherent documentation-only correction batch to
+[`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) and all
+14 companion documents implementing every binding correction from
+comment `5015619162`: **three standalone job types** —
+`inventory_push_sync` demoted to orchestration/read-only (no Shopify
+mutation, no `mutation.attempt` row, enqueues at most one mutation job
+per dispatch), `inventory_activate` and `inventory_set_quantities` each
+its own standalone mutation job (`job_type == mutation_domain`), never
+two attempts inside one job; a frozen pair-serialization identity and
+atomic handoff mechanics (DEC-037 §5.3); message-string idempotency
+classification for `inventoryActivate` withdrawn entirely, replaced by a
+uniform payload-shape clean-rejection rule; freshness/ABA-safe
+reconciliation verdicts for both mutation domains; a new explicit
+job/mutation-consequence contract (DEC-037 §9); two new dev-store
+scenarios (18: ABA/freshness; 19: `ITEM_NOT_STOCKED_AT_LOCATION` race,
+fail-closed, now 19 scenarios total); both locked Sol prompts corrected
+for the three-job model. One further narrow official-source verification
+was performed live (the complete 17-value `InventorySetQuantitiesUserErrorCode`
+enum, confirming `ITEM_NOT_STOCKED_AT_LOCATION` exists), closing a
+citation gap Revision 1 left in this repository's own source materials.
+
+**Status: DEC-037 REVISED — RESUBMITTED FOR CONTROL-ROOM GATE B
+RE-REVIEW. Task 013 packet: GATE B ACCEPTANCE CANDIDATE (Revision 2) —
+NOT IMPLEMENTATION AUTHORIZED. Task 013B packet: unaffected in substance,
+cross-reference corrected. Both locked Sol prompts: LOCKED, unissued,
+corrected. Claude did not accept its own package.** No `addons/**` file
+was created or modified. No Odoo/Odoo.sh run occurred. No Shopify
+mutation was issued (one Shopify read only, for the enum verification
+above). PR #179 remains **open, draft and unmerged**; this session
+performed no merge, no ready-marking. **Recommendation: READY FOR
+CONTROL-ROOM WAVE 3 GATE B RE-REVIEW.**
+
+---
+
+**WAVE 3 GATE B REVISION 1 — INVENTORY-READINESS ACCEPTANCE CANDIDATE PRODUCED, RETURNED "REVISE, NOT REJECTED" BY THE CONTROL ROOM (2026-07-19, draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179)).**
+Following Gate A's merge (PR #177, merge commit
+`3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`, independently verified live
+against `mvp/program-integration` and against PR #177 comment
+[`5015174971`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015174971)'s
+"parallel-start authorization"), this Claude control-room session
+produced the Wave 3 Gate B documentation-only acceptance candidate on
+branch `claude/wave-3-gate-b-inventory-2m5jcl`, draft PR
+[#179](https://github.com/AdamsOdoo/Adams/pull/179). **Identity gate
+independently re-verified live before any edit:** PR #177 merged at the
+exact required SHA; `mvp/program-integration` identical to it; branch
+`claude/wave-3-gate-b-inventory-readiness` did not exist (this session's
+harness-provisioned branch, based at the exact required SHA with zero
+drift, is used instead — a session-naming mechanic, not a scope
+deviation); no open Gate B PR existed before this one; all three binding
+PR #177 comments (`5015044226`, `5015174971`, `5015231326`) read in full;
+Gate A documents confirmed ACCEPTED; the Sol Stage 0 branch
+(`sol/wave-3-stage-0-layer2`) exists at the same base SHA but **has no
+PR and is not merged** (reported factually, not inferred); protected refs
+(`main`, `Shopify-connector`, both checkpoints,
+`mvp/program-integration`) all confirmed unchanged.
+
+**Deliverable:** [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md)
+(new decision record, DEC-037 was unused — first unused sequential
+number) closes every remaining Task 013/013B contradiction DEC-036 Part
+0.5 carried forward to Gate B: `changeFromQuantity` CAS field name
+throughout (superseding stale `compareQuantity` references in
+`inventory-operating-model.md` §4.4 and the Task 013 packet's addendum
+heading — DEC-036's own D12 explicitly flagged these two documents as
+out-of-scope for Gate A, now closed); binding-owned idempotency
+(`last_push_idempotency_key`/`last_push_params_hash`) removed from the
+inventory-level-binding schema, superseded by attempt-owned Layer 2
+idempotency; unexplained Shopify-side drift made explicitly
+review-case-first and blocking, never auto-overwritten; one pair per
+mutation request made binding MVP behavior (DEC-036 D4), not a floor
+awaiting batching; a **complete** `inventorySetQuantities`/
+`inventoryActivate` Layer 2 mutation-domain matrix (DEC-037 §4) with a
+new activation-then-set-quantities sequencing design (§5 — two distinct
+Layer 2 attempts, own idempotency keys/fingerprints, never combined);
+the Task 013 job contract frozen (§7: job_type/job_source/manual-review-
+subreason/`operation_scope_key`/domain-enable-flag vocabulary); Task
+013B's Layer-2-non-applicability made explicit in its own packet (new
+§0); a 17-scenario dev-store mutation-validation plan
+(`wave-3-dev-store-mutation-validation-plan.md`); and two locked,
+unissued Sol prompts
+([`sol-wave-3-task-013-locked-prompt.md`](../06-prompts/sol-wave-3-task-013-locked-prompt.md),
+[`sol-wave-3-task-013b-locked-prompt.md`](../06-prompts/sol-wave-3-task-013b-locked-prompt.md)).
+Two narrow official-source verifications were performed live against
+`shopify.dev` (2026-07-19, API 2026-07) beyond the accepted Gate A
+capture: `inventoryActivate`'s omitted-quantity zero default, and its
+`userErrors` shape (plain `UserError` — no dedicated error-code enum,
+unlike `inventorySetQuantities`) — both folded into the matrix with an
+explicit fail-closed default for the one genuinely open classification
+question, deferred to dev-store verification (scenario 8), not silently
+assumed.
+
+**Status: DEC-037 PROPOSED FOR CONTROL-ROOM GATE B ACCEPTANCE. Task 013
+packet: GATE B ACCEPTANCE CANDIDATE — NOT IMPLEMENTATION AUTHORIZED. Task
+013B packet: GATE B ACCEPTANCE CANDIDATE — NOT IMPLEMENTATION
+AUTHORIZED. Both locked Sol prompts: LOCKED, unissued. Claude did not
+accept its own package — no self-acceptance act occurred.** No
+`addons/**` file was created or modified. No Odoo/Odoo.sh run occurred.
+No Shopify mutation was issued (two Shopify **reads** only, for the
+narrow official-source verification above). Task 013 implementation
+remains forbidden until this Gate B package is accepted and merged
+**and** Stage 0 is separately merged and runtime-proven, per PR #177
+comment `5015174971`'s sequencing guard; Task 013B additionally requires
+Task 013 itself merged and runtime-proven. PR #179 remains **open, draft
+and unmerged**; this session performed no merge, no ready-marking.
+**Recommendation: READY FOR CONTROL-ROOM WAVE 3 GATE B REVIEW.**
+
 **WAVE 3 GATE A ACCEPTED — CONTROL-ROOM ACCEPTANCE ACT COMPLETE; ACCEPTANCE/CLOSURE COMMIT AUTHORIZED FOR MERGE (2026-07-19, draft PR [#177](https://github.com/AdamsOdoo/Adams/pull/177)).**
 Following the final mechanical Gate A consistency correction below (2026-07-19,
 PR #177 comment
@@ -218,7 +447,7 @@ Freeze/resume status: **the issue #165 implementation freeze is lifted only for 
 | 0 — Reconciliation & research closure | **Merged** | `sol/wave-0-reconciliation-research`; PR [#169](https://github.com/AdamsOdoo/Adams/pull/169) (merged, `a1e83a09678537ac6db8959f5ed0c76a5bcc0d1c`) | DEC-033 accepted with minor corrections; DEC-028/029/030 accepted; DEC-027 deferred; no addon/protected changes. |
 | 1 — Read-only foundation integration (CORE-R1, LC-1, JOB-ACTIONS, SEC-1, SRR-03 closure) | **MERGED (2026-07-16)** | `sol/wave-1-readonly-foundation`; PR [#172](https://github.com/AdamsOdoo/Adams/pull/172) (merged, `d18f9a9997d7da574f629f834e2adb83b492cfc6`) | Commit `36974edc68c1985e6ccfae8f6bb5c7386f820156` closed the complete binding mutation surface under ruling `4988842625`. Corrected-head build `34995642` (runtime-tested SHA `95db3db`) ran the complete matrix `0/0/644`; residue/security clean; #157 dropped/restored. Final Claude control-room review (20-point independent verification, adversarial adjudication) accepted and merged the reviewed head `d7b08e6`. SRR-03 CLOSED. |
 | 2 — Order import (Task 012 + Area-6 order-scan slice) | **Implementation and runtime-correction batch complete; first runtime campaign failed (preserved) and is superseded by committed corrections; corrected-head runtime rerun pending (2026-07-17)** | `sol/wave-2-order-import`; draft PR [#176](https://github.com/AdamsOdoo/Adams/pull/176) | First campaign: SHA `2e1b1eb`, build `35080469`, 5 failed / 6 errors (preserved). All eleven findings dispositioned and committed (`5897396`, `e4a75fc`, `6624028`); documentation reconciliation complete. 86 tests authored, none removed/skipped/weakened; no corrected-head runtime pass claimed. Clean/full, isolated-upgrade and isolated-lifecycle proof pending/mandatory. PR stays draft/unmerged; Wave 3 remains blocked. |
-| 3 — Inventory synchronization (Task 013/013B) | **Gate A ACCEPTED (2026-07-19); Stage 0 implementation not started; Gate B not started** | draft PR [#177](https://github.com/AdamsOdoo/Adams/pull/177) (docs-only, Gate A) | Wave-order dependency on Wave 2 **CLOSED** (Wave 2 merged, PR #176). [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) — the complete D1–D38 decision set — is **ACCEPTED — CONTROL-ROOM GATE A** (PR #177 comment [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)). Stage 0 implementation and Gate B open only after PR #177 merges and the new integration SHA is verified; the locked Sol prompt remains unissued. No implementation authorized. |
+| 3 — Inventory synchronization (Task 013/013B) | **Gate A ACCEPTED and MERGED (2026-07-19); Gate B ACCEPTED (comment `5016117207`) and merge-authorized, merge-closure normalization applied, merge pending/executed on PR #179 (see the Current status entry at the top of this file for the exact merge SHA once landed); Stage 0 implementation in progress on a Sol branch with an open draft PR, not merged, not runtime-proven, held pending post-merge sync** | Gate A: merged PR [#177](https://github.com/AdamsOdoo/Adams/pull/177) (docs-only). Gate B: PR [#179](https://github.com/AdamsOdoo/Adams/pull/179) (docs-only, ACCEPTED, comment `5016117207`). Stage 0: draft PR [#178](https://github.com/AdamsOdoo/Adams/pull/178) (`sol/wave-3-stage-0-layer2`, head `644853a68b3497c134ee648ce7399e50d30ff397`). | Wave-order dependency on Wave 2 **CLOSED** (Wave 2 merged, PR #176). [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) — the complete D1–D38 decision set — is **ACCEPTED — CONTROL-ROOM GATE A**, merged. [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) — is **ACCEPTED — CONTROL-ROOM GATE B** (Revision 3, accepted by comment `5016117207`, docs-only merge-closure normalization applied, §1C): every mutation job now makes at most one attempt for its entire lifetime, an atomic handoff contract, a `blocked_manual_review` review-release action, a fixed error-class vocabulary, a corrected `applied` verdict, and a corrected locked-prompt role model; Claude did not self-accept, in any revision, and did not self-accept the merge-closure normalization. Both Task 013/013B locked Sol prompts remain unissued — not usable until Stage 0/Task 013 are separately merged and runtime-proven and a separate ChatGPT issuance names the exact SHA. Task 013 implementation additionally requires Stage 0 merged+runtime-proven and providing the DEC-037 §13A correction prerequisites; Task 013B additionally requires Task 013 merged+runtime-proven. No implementation authorized. |
 | 4 — Fulfillment and tracking (Task 014) | Not started | — | Blocked on Wave 3 (Layer 2 proven). |
 | 5 — Premium operator experience (UI U1–U3, PERF-1, Task 015/015B) | Not started / unauthorized | — | Proposed scope includes product export after Layer 2 (DEC-033 accepted); pending Waves 1–4. |
 | 6 — E2E integration, UAT, release readiness | Not started | — | Blocked on Waves 1–5. |
