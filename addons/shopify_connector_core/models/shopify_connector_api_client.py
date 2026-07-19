@@ -3,6 +3,7 @@ import re
 import uuid
 from contextlib import contextmanager
 from datetime import timedelta
+from types import SimpleNamespace
 
 import requests
 
@@ -10,6 +11,7 @@ from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 from ..tools.redaction import redact
+from .shopify_connector_mutation_attempt import canonical_sha256
 
 # Adjustable planning defaults (not an official Shopify requirement).
 _CONNECT_TIMEOUT_SECONDS = 10
@@ -155,7 +157,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         error). Raises `ShopifyClientError` on any transport or
         GraphQL-level failure.
         """
-        self._validate_graphql_operation(query, mutation_context=None)
+        self._validate_graphql_operation(
+            query, variables or {}, mutation_context=None,
+        )
         if not store.shop_domain or not store.api_version:
             raise UserError(
                 'A shop domain and API version are required before '
@@ -325,7 +329,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         here; the post-network revalidation lives in the store's probe. Public
         `execute()` (still the two-arg `_send(store, body)` seam) is unchanged.
         """
-        self._validate_graphql_operation(query, mutation_context=None)
+        self._validate_graphql_operation(
+            query, variables or {}, mutation_context=None,
+        )
         if not store.shop_domain or not store.api_version:
             raise UserError(
                 'A shop domain and API version are required before '
@@ -401,25 +407,42 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         """
         # Same configuration precondition as execute() -- fail before any
         # admission, lease, or transport (no lease, no _send).
-        self._validate_graphql_operation(query, mutation_context)
-        if not store.shop_domain or not store.api_version:
-            raise UserError(
-                'A shop domain and API version are required before '
-                'contacting Shopify.'
+        variables = variables or {}
+        self._validate_graphql_operation(
+            query, variables, mutation_context,
+        )
+        is_mutation = self._graphql_contains_mutation(query)
+        if is_mutation:
+            job_id = job if isinstance(job, int) else getattr(job, 'id', False)
+            store_id = (
+                store if isinstance(store, int) else getattr(store, 'id', False)
             )
+            lease_key, token, transport_store = self._admit_mutation(
+                job_id, store_id, mutation_context,
+            )
+        else:
+            if not store.shop_domain or not store.api_version:
+                raise UserError(
+                    'A shop domain and API version are required before '
+                    'contacting Shopify.'
+                )
+            lease_key, token = self._admit(job, store)
+            transport_store = store
         # _admit reads the token once and raises the accepted taxonomy on a
         # missing credential (ShopifyClientError) or fails closed on the gate
         # (ShopifyQuiescedError) -- in either case before any lease exists, so no
         # release is owed here.
-        lease_key, token = self._admit(job, store)
         try:
-            body = {'query': query, 'variables': variables or {}}
+            body = {'query': query, 'variables': variables}
             try:
                 if mutation_context is None:
-                    response = self._send(store, body, token)
+                    response = self._send(transport_store, body, token)
                 else:
                     response = self._send(
-                        store, body, token, mutation_context=mutation_context,
+                        transport_store,
+                        body,
+                        token,
+                        mutation_context=mutation_context,
                     )
             except ShopifyClientError:
                 raise
@@ -429,7 +452,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                     reason=REASON_TEMPORARY,
                     technical_detail=redact(str(exc)),
                 )
-            result = self._normalize_response(store, response)
+            result = self._normalize_response(transport_store, response)
             yield result
         except BaseException as primary_error:
             # Precedence: the primary (body/send/normalization/caller) exception
@@ -553,6 +576,92 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             side_cr.close()
         return lease_key, token
 
+    def _admit_mutation(self, job_id, store_id, mutation_context):
+        """Admit Layer 2 from immutable ids in one owned side transaction."""
+        context = dict(mutation_context or {})
+        if not isinstance(job_id, int) or not isinstance(store_id, int):
+            raise ShopifyQuiescedError(
+                'Layer 2 admission requires immutable job/store ids.'
+            )
+        lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
+        side_cr = self.env.registry.cursor()
+        try:
+            side_cr.execute(
+                "SELECT j.store_id, j.state, j.current_attempt_token, "
+                "j.job_type, j.expected_connection_generation, "
+                "s.state, s.connection_generation, s.shop_domain, "
+                "s.api_version, a.attempt_token, a.mutation_domain, "
+                "a.observed_outcome, a.transport_attempted, "
+                "a.idempotency_valid_until, "
+                "(SELECT count(*) FROM shopify_connector_mutation_attempt "
+                "WHERE job_id = j.id) "
+                "FROM shopify_connector_job j "
+                "JOIN shopify_connector_store s ON s.id = j.store_id "
+                "JOIN shopify_connector_mutation_attempt a "
+                "ON a.job_id = j.id "
+                "WHERE j.id = %s AND a.id = %s FOR SHARE OF s",
+                (job_id, context.get('attempt_id')),
+            )
+            row = side_cr.fetchone()
+            now = fields.Datetime.now()
+            if (
+                not row
+                or row[0] != store_id
+                or row[1] != 'running'
+                or row[2] != context.get('attempt_token')
+                or row[3] != context.get('mutation_domain')
+                or row[4] != row[6]
+                or row[5] != 'connected'
+                or row[9] != context.get('attempt_token')
+                or row[10] != context.get('mutation_domain')
+                or row[11] != 'pending'
+                or not row[12]
+                or not row[13]
+                or row[13] <= now
+                or row[14] != 1
+            ):
+                raise ShopifyQuiescedError(
+                    'The Layer 2 admission snapshot is stale or invalid.'
+                )
+            shop_domain, api_version = row[7], row[8]
+            if not shop_domain or not api_version:
+                raise UserError(
+                    'A shop domain and API version are required before '
+                    'contacting Shopify.'
+                )
+            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
+            side_store = side_env['shopify.connector.store'].browse(store_id)
+            token = side_env[
+                'shopify.connector.store.credential'
+            ]._get_access_token(side_store)
+            if not token:
+                raise ShopifyClientError(
+                    error_class=ERROR_AUTH,
+                    reason=REASON_TOKEN_INVALID,
+                    credential_invalid=True,
+                )
+            lease_key = uuid.uuid4().hex
+            admitted_at = fields.Datetime.now()
+            side_env['shopify.connector.call.lease'].create({
+                'store_id': store_id,
+                'lease_key': lease_key,
+                'job_id': job_id,
+                'worker_ref': '%s:%s' % (side_cr.dbname, os.getpid()),
+                'admitted_at': admitted_at,
+                'expires_at': admitted_at + lifetime,
+            })
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return lease_key, token, SimpleNamespace(
+            id=store_id,
+            shop_domain=shop_domain,
+            api_version=api_version,
+        )
+
     def _release_lease(self, lease_key):
         """Delete exactly the admitted lease on an independent side transaction.
 
@@ -589,15 +698,19 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             return False
         # Remove GraphQL comments and string literals so a word inside an
         # argument/comment cannot create a false operation classification.
-        cleaned = re.sub(r'#[^\\r\\n]*', ' ', document)
+        cleaned = re.sub(r'#[^\r\n]*', ' ', document)
         cleaned = re.sub(r'""".*?"""', ' ', cleaned, flags=re.S)
-        cleaned = re.sub(r'"(?:\\\\.|[^"\\\\])*"', ' ', cleaned)
+        cleaned = re.sub(r'"(?:\\.|[^"\\])*"', ' ', cleaned)
         return bool(re.search(r'(?<![A-Za-z0-9_])mutation(?![A-Za-z0-9_])', cleaned))
 
     @api.model
-    def _validate_graphql_operation(self, document, mutation_context=None):
+    def _validate_graphql_operation(
+        self, document, variables, mutation_context=None,
+    ):
         if not self._graphql_contains_mutation(document):
             return True
+        if not isinstance(variables, dict):
+            raise UserError('GraphQL mutation variables must be a dict.')
         context = dict(mutation_context or {})
         required = {
             'job_id', 'attempt_id', 'attempt_token', 'mutation_domain',
@@ -609,8 +722,12 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         side_cr = self.env.registry.cursor()
         try:
             side_cr.execute(
-                "SELECT j.current_attempt_token, a.attempt_token, "
-                "a.mutation_domain, a.transport_attempted "
+                "SELECT j.state, j.current_attempt_token, j.job_type, "
+                "a.attempt_token, a.mutation_domain, a.transport_attempted, "
+                "a.observed_outcome, a.idempotency_valid_until, "
+                "a.exact_request_fingerprint, "
+                "(SELECT count(*) FROM shopify_connector_mutation_attempt "
+                "WHERE job_id = j.id) "
                 "FROM shopify_connector_job j "
                 "JOIN shopify_connector_mutation_attempt a "
                 "ON a.job_id = j.id "
@@ -618,12 +735,23 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 (context['job_id'], context['attempt_id']),
             )
             row = side_cr.fetchone()
+            expected_fingerprint = canonical_sha256({
+                'operation': document,
+                'variables': variables,
+            })
             if (
                 not row
-                or row[0] != context['attempt_token']
+                or row[0] != 'running'
                 or row[1] != context['attempt_token']
                 or row[2] != context['mutation_domain']
-                or not row[3]
+                or row[3] != context['attempt_token']
+                or row[4] != context['mutation_domain']
+                or not row[5]
+                or row[6] != 'pending'
+                or not row[7]
+                or row[7] <= fields.Datetime.now()
+                or row[8] != expected_fingerprint
+                or row[9] != 1
             ):
                 raise UserError(
                     'The Layer 2 mutation attempt context is stale or invalid.'
@@ -665,7 +793,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         patch as `_send(store, body)`.
         """
         self._validate_graphql_operation(
-            body.get('query', ''), mutation_context,
+            body.get('query', ''),
+            body.get('variables') or {},
+            mutation_context,
         )
         if token is None:
             token = self.env[
