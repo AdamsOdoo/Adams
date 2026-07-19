@@ -116,6 +116,29 @@ class TestMutationDispatch(TransactionCase):
                 'evidence': {},
             }, 'direct')
 
+    def test_registered_consequences_have_no_same_job_retry_action(self):
+        failed_clean = self.Dispatch._validate_job_consequence({
+            'observed_outcome': 'failed_clean',
+            'error_class': 'shopify_user_errors_validation',
+            'manual_review_subreason': False,
+            'action': 'fail_final',
+            'message': 'Synthetic clean refusal.',
+            'evidence': {},
+        }, 'direct')
+        not_applied = self.Dispatch._validate_reconciliation_result({
+            'verdict': 'not_applied',
+            'observed_store_identity': self.store.shop_domain,
+            'action': 'cancel',
+            'error_class': False,
+            'manual_review_subreason': False,
+            'message': 'Synthetic read proved not applied.',
+            'evidence': {},
+        })
+        self.assertEqual(failed_clean['action'], 'fail_final')
+        self.assertEqual(not_applied['consequence']['action'], 'cancel')
+        self.assertNotIn('retry', dispatch_module.DIRECT_ACTIONS)
+        self.assertNotIn('retry', dispatch_module.RECONCILIATION_ACTIONS)
+
     def test_layer2_sequence_commits_before_precondition_and_transport(self):
         source = inspect.getsource(
             dispatch_module.ShopifyConnectorJobDispatch._drain_mutation_one

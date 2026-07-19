@@ -69,7 +69,10 @@ class TestMutationReconciliation(TransactionCase):
         self.assertEqual(len(
             attempt.remote_evidence_refs['reconciliation']
         ), 1)
-        self.assertEqual(reconciliation.state, 'running')
+        self.env['shopify.connector.job.dispatch']._complete_reconciliation_job(
+            reconciliation, 'Synthetic resolved read completed.'
+        )
+        self.assertEqual(reconciliation.state, 'succeeded')
 
     def test_not_applied_resolution_never_requeues_same_job(self):
         job, attempt, _reconciliation = self._fixture()
@@ -77,18 +80,51 @@ class TestMutationReconciliation(TransactionCase):
         self.assertEqual(attempt.effective_disposition(), 'not_applied')
         self.assertEqual(job.state, 'running')
 
+    def test_valid_reconciliation_consequence_is_atomic_and_terminal(self):
+        job, attempt, reconciliation = self._fixture()
+        self.env[
+            'shopify.connector.job.dispatch'
+        ]._handle_mutation_dispatch_selftest_reconcile(reconciliation)
+        self.assertEqual(attempt.effective_disposition(), 'applied')
+        self.assertEqual(job.state, 'succeeded')
+        self.assertEqual(reconciliation.state, 'succeeded')
+
     def test_inconclusive_cap_is_per_attempt_and_fail_closed(self):
         job, attempt, reconciliation = self._fixture()
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        strategy = dict(Dispatch._get_reconciliation_strategies()[
+            attempt.mutation_domain
+        ])
+        direct = attempt.remote_evidence_refs['direct']
+        strategy['reconcile'] = lambda _attempt: {
+            'verdict': 'inconclusive',
+            'observed_store_identity': attempt.expected_store_identity,
+            'action': 'reconcile',
+            'error_class': 'shopify_temporary_server_network',
+            'manual_review_subreason': False,
+            'message': 'Synthetic read remains inconclusive.',
+            'evidence': {'read': 'synthetic'},
+        }
         for count in range(1, 4):
             if reconciliation.state != 'running':
                 reconciliation.sudo().write({'state': 'running'})
+            with patch.object(
+                type(Dispatch), '_get_reconciliation_strategies',
+                return_value={attempt.mutation_domain: strategy},
+            ):
+                Dispatch._handle_mutation_dispatch_selftest_reconcile(
+                    reconciliation
+                )
             self.assertEqual(
-                attempt._record_inconclusive_reconciliation({
-                    'read': 'synthetic', 'count': count,
-                }),
-                count,
+                attempt.inconclusive_reconciliation_count, count,
             )
-        self.assertEqual(job.state, 'running')
+        self.assertEqual(job.state, 'blocked_manual_review')
+        self.assertEqual(job.manual_review_subreason, 'duplicate_risk')
+        self.assertEqual(reconciliation.state, 'succeeded')
+        self.assertEqual(attempt.remote_evidence_refs['direct'], direct)
+        self.assertEqual(len(
+            attempt.remote_evidence_refs['reconciliation']
+        ), 3)
         self.assertFalse(attempt.resolution_disposition)
 
     def test_exact_reconciliation_link_is_required(self):
@@ -125,6 +161,7 @@ class TestMutationReconciliation(TransactionCase):
             )
         self.assertEqual(job.state, 'blocked_manual_review')
         self.assertEqual(job.error_class, 'store_identity_mismatch')
+        self.assertEqual(reconciliation.state, 'succeeded')
         self.assertFalse(attempt.resolution_disposition)
 
     def test_missing_strategy_routes_original_job_not_read_job(self):
@@ -139,7 +176,7 @@ class TestMutationReconciliation(TransactionCase):
             )
         self.assertEqual(job.state, 'blocked_manual_review')
         self.assertEqual(job.error_class, 'no_reconciliation_strategy')
-        self.assertEqual(reconciliation.state, 'running')
+        self.assertEqual(reconciliation.state, 'succeeded')
         self.assertFalse(attempt.resolution_disposition)
 
     def test_callback_failure_rolls_back_job_and_created_child(self):

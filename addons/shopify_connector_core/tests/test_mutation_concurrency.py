@@ -224,6 +224,76 @@ class TestMutationConcurrency(TransactionCase):
                 'blocked_manual_review', 'store_identity_mismatch', None,
             ))
 
+    def test_c3_local_generation_mismatch_blocks_without_resend(self):
+        store_id, job_id, attempt_id, token = self._durable_owned_attempt()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'UPDATE shopify_connector_store '
+                'SET connection_generation = connection_generation + 1 '
+                'WHERE id = %s',
+                (store_id,),
+            )
+            cr.commit()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            Dispatch = env['shopify.connector.job.dispatch']
+            strategy = Dispatch._get_reconciliation_strategies()[
+                'mutation_dispatch_selftest'
+            ]
+            Dispatch._commit_mutation_outcome_c3(
+                job_id, attempt_id, token,
+                strategy['classify_direct_result']({
+                    'outcome': 'succeeded', 'evidence': {},
+                }),
+                strategy,
+            )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'SELECT state, error_class, current_attempt_token '
+                'FROM shopify_connector_job WHERE id = %s',
+                (job_id,),
+            )
+            self.assertEqual(cr.fetchone(), (
+                'blocked_manual_review', 'store_identity_mismatch', None,
+            ))
+
+    def test_committed_c3_outcomes_clear_active_owner(self):
+        for outcome, expected_state in (
+            ('succeeded', 'succeeded'), ('uncertain', 'running'),
+        ):
+            _store_id, job_id, attempt_id, token = (
+                self._durable_owned_attempt()
+            )
+            with db_connect(self.env.cr.dbname).cursor() as cr:
+                env = api.Environment(cr, SUPERUSER_ID, {})
+                Dispatch = env['shopify.connector.job.dispatch']
+                strategy = Dispatch._get_reconciliation_strategies()[
+                    'mutation_dispatch_selftest'
+                ]
+                Dispatch._commit_mutation_outcome_c3(
+                    job_id, attempt_id, token,
+                    strategy['classify_direct_result']({
+                        'outcome': outcome, 'evidence': {},
+                    }),
+                    strategy,
+                )
+            with db_connect(self.env.cr.dbname).cursor() as cr:
+                cr.execute(
+                    'SELECT state, current_attempt_token, owner_worker_ref, '
+                    'running_since FROM shopify_connector_job WHERE id = %s',
+                    (job_id,),
+                )
+                self.assertEqual(
+                    cr.fetchone(), (expected_state, None, None, None),
+                )
+                if outcome == 'uncertain':
+                    cr.execute(
+                        'SELECT count(*) FROM shopify_connector_job '
+                        'WHERE mutation_attempt_id = %s',
+                        (attempt_id,),
+                    )
+                    self.assertEqual(cr.fetchone()[0], 1)
+
     def test_concurrent_second_attempt_with_different_tokens_is_rejected(self):
         _store_id, job_id = self._durable_fixture()
         barrier = threading.Barrier(2)

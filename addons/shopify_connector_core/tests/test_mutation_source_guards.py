@@ -67,7 +67,7 @@ class TestMutationSourceGuards(TransactionCase):
                     violations.append((relative, node.lineno, func.attr))
         self.assertFalse(violations, violations)
 
-    def test_graphql_mutation_literals_exist_only_in_layer2_wrapper(self):
+    def test_mutation_literals_require_guarded_transport_or_selftest(self):
         violations = []
         pattern = re.compile(r'\bmutation\s+[A-Za-z_][A-Za-z0-9_]*\s*[({]')
         for path in self._python_files():
@@ -86,7 +86,7 @@ class TestMutationSourceGuards(TransactionCase):
                     owner = parents.get(node)
                     while owner and not isinstance(owner, ast.FunctionDef):
                         owner = parents.get(owner)
-                    allowed = (
+                    selftest = (
                         relative.endswith(
                             'shopify_connector_core/models/'
                             'shopify_connector_job_dispatch.py'
@@ -95,8 +95,44 @@ class TestMutationSourceGuards(TransactionCase):
                         and owner.name
                         == '_prepare_preconditions_mutation_selftest'
                     )
-                    if not allowed:
+                    owner_calls = list(ast.walk(owner)) if owner else []
+                    guarded = any(
+                        isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Attribute)
+                        and call.func.attr == 'execute_business'
+                        and any(
+                            keyword.arg == 'mutation_context'
+                            for keyword in call.keywords
+                        )
+                        for call in owner_calls
+                    )
+                    legacy = any(
+                        isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Attribute)
+                        and call.func.attr == 'execute'
+                        for call in owner_calls
+                    )
+                    if not selftest and (not guarded or legacy):
                         violations.append((relative, node.lineno))
+        self.assertFalse(violations, violations)
+
+    def test_no_production_direct_send_caller(self):
+        violations = []
+        for path in self._python_files():
+            tree = ast.parse(path.read_text(encoding='utf-8'))
+            relative = str(path.relative_to(self._addon_root()))
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == '_send'
+                ):
+                    continue
+                if not relative.endswith(
+                    'shopify_connector_core/models/'
+                    'shopify_connector_api_client.py'
+                ):
+                    violations.append((relative, node.lineno))
         self.assertFalse(violations, violations)
 
     def test_attempt_write_surface_is_closed_and_unlink_forbidden(self):
@@ -183,6 +219,8 @@ class TestMutationSourceGuards(TransactionCase):
         self.assertNotIn('inventoryActivate', source)
         self.assertNotIn('fulfillmentCreate', source)
         self.assertIn("'transport': 'synthetic_stub'", source)
+        self.assertNotIn('_get_access_token', source)
+        self.assertNotIn('requests.', source)
 
     def test_exact_strategy_shape_and_process_death_escape(self):
         source = Path(
@@ -209,3 +247,11 @@ class TestMutationSourceGuards(TransactionCase):
             if isinstance(handler, ast.ExceptHandler) and handler.type
         }
         self.assertNotIn('BaseException', caught)
+        precondition = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_prepare_preconditions_mutation_selftest'
+        )
+        precondition_source = ast.unparse(precondition)
+        self.assertNotIn('self.env', precondition_source)
+        self.assertNotIn('_send', precondition_source)

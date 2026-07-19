@@ -115,6 +115,13 @@ class TestMutationApiGuard(TransactionCase):
                 self.operation, self.variables, self.context,
             )
 
+    def test_nonpending_attempt_context_is_refused(self):
+        self.attempt._record_direct_outcome('uncertain')
+        with self.assertRaises(UserError):
+            self.Client._validate_graphql_operation(
+                self.operation, self.variables, self.context,
+            )
+
     def test_token_or_domain_mismatch_is_refused(self):
         for key, value in (
             ('attempt_token', 'wrong'),

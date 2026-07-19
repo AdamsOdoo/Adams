@@ -840,6 +840,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             return
         original = attempt.job_id
         if attempt.effective_disposition() != 'unresolved':
+            self._complete_reconciliation_job(
+                job, 'Mutation attempt was already resolved.'
+            )
             return
         try:
             strategy = self._validated_mutation_strategy(
@@ -852,6 +855,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 'no_reconciliation_strategy',
                 'No valid reconciliation strategy is registered.',
             )
+            self._complete_reconciliation_job(
+                job, 'Missing strategy was routed to the original job.'
+            )
             return
         try:
             result = strategy['reconcile'](attempt)
@@ -862,6 +868,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 'data_shape_schema_mismatch',
                 'duplicate_risk',
                 'The reconciliation result was malformed; no resend occurred.',
+            )
+            self._complete_reconciliation_job(
+                job, 'Malformed read result was routed to the original job.'
             )
             return
         if (
@@ -874,6 +883,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 'store_identity_mismatch',
                 'Reconciliation observed a different Shopify store identity.',
             )
+            self._complete_reconciliation_job(
+                job, 'Store-identity mismatch was routed without a verdict.'
+            )
             return
         if normalized['verdict'] == 'inconclusive':
             count = attempt._record_inconclusive_reconciliation(
@@ -885,6 +897,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                     'duplicate_risk',
                     'duplicate_risk',
                     'Reconciliation remained inconclusive at the safety cap.',
+                )
+                self._complete_reconciliation_job(
+                    job, 'Inconclusive reconciliation reached its safety cap.'
                 )
             else:
                 job._transition_retry_waiting(
@@ -911,12 +926,36 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                     strategy,
                     reconciliation_job=job,
                 )
+                self._complete_reconciliation_job(
+                    job, 'Read-only mutation reconciliation completed.'
+                )
         except Exception as exc:
             raise JobHandlerError(
                 'shopify_temporary_server_network',
                 'Atomic reconciliation consequence failed; read retry required.',
                 type(exc).__name__,
             )
+
+    @api.model
+    def _complete_reconciliation_job(self, job, message):
+        """Give every handled read job one explicit terminal transition."""
+        if job.state != 'running':
+            raise ValidationError(
+                'Only a running reconciliation job may be completed.'
+            )
+        job.sudo().write({
+            'state': 'succeeded',
+            'error_class': False,
+            'manual_review_subreason': False,
+            'finished_at': fields.Datetime.now(),
+        })
+        job._log_transition(
+            'state_change', self._safe_message(
+                message, 'Reconciliation job completed.'
+            ),
+            from_state='running', to_state='succeeded',
+        )
+        return True
 
     @api.model
     def _validate_reconciliation_result(self, value):

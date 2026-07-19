@@ -106,3 +106,11 @@ class TestMutationSecurity(TransactionCase):
             job.with_user(self.roles['admin']).action_resolve_manual_review()
         with self.assertRaises(UserError):
             job.with_user(self.roles['admin']).action_cancel('No resend')
+        job.sudo().write({
+            'error_class': 'store_identity_mismatch',
+            'manual_review_subreason': 'store_identity_mismatch',
+        })
+        with self.assertRaises(UserError):
+            job.with_user(self.roles['admin']).action_manual_retry()
+        with self.assertRaises(UserError):
+            job.with_user(self.roles['admin']).action_resolve_manual_review()
