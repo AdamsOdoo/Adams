@@ -937,6 +937,9 @@ class ShopifyConnectorStore(models.Model):
             raise UserError('A non-empty force-disconnect reason is required.')
         self._lock_store_for_lifecycle()
         attempts, reconciliations = self._layer2_disconnect_blockers()
+        leases = self.env['shopify.connector.call.lease'].search([
+            ('store_id', '=', self.id),
+        ])
         for attempt in attempts:
             job = attempt.job_id
             if job.state != 'blocked_manual_review':
@@ -964,13 +967,17 @@ class ShopifyConnectorStore(models.Model):
                 len(reconciliations),
             )
         )
-        self.write({
-            'state': 'disconnecting',
-            'disconnect_status': 'timed_out',
-            'disconnect_status_reason': audit,
-        })
+        if attempts or reconciliations or leases:
+            self.write({
+                'state': 'disconnecting',
+                'disconnect_status': 'timed_out',
+                'disconnect_status_reason': audit,
+            })
+            self._create_lifecycle_audit_job(audit)
+            return False
         self._create_lifecycle_audit_job(audit)
-        return not bool(attempts or reconciliations)
+        self._finalize_disconnect_completed()
+        return True
 
     def _finalize_disconnect_completed(self):
         """Finalize a fully-quiesced disconnect (zero committed lease rows).
